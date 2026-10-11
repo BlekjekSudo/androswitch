@@ -596,6 +596,13 @@ fn cmd_inspect(path: &Path, json: bool, device: Option<&str>, dd: &DataDir) -> R
                 serde_json::to_value(apk.floor_status())
                     .map_err(|e| RdError::new("INTERNAL", e.to_string(), "rd-cli"))?,
             );
+            // issue #84: ambiguidade do container é DADO, não silêncio
+            if !apk.zip_duplicates.is_empty() {
+                map.insert(
+                    "zip_duplicates".into(),
+                    serde_json::json!(apk.zip_duplicates),
+                );
+            }
             if let Some(dp) = &device_profile {
                 map.insert(
                     "device_budget".into(),
@@ -674,6 +681,15 @@ fn cmd_inspect(path: &Path, json: bool, device: Option<&str>, dd: &DataDir) -> R
         apk.res_count,
         apk.resources_arsc,
     ));
+    // issue #84: nomes repetidos no ZIP — o APK é ambíguo; avisar em vez de
+    // escolher em silêncio (o inventário acima conta por nome único).
+    if !apk.zip_duplicates.is_empty() {
+        out.push_str(&format!(
+            "zip duplicates     ⚠ {} nome(s) repetido(s) no ZIP: {} — rd usa a 1ª ocorrência\n",
+            apk.zip_duplicates.len(),
+            apk.zip_duplicates.join(" · ")
+        ));
+    }
     if let Some(dp) = &device_profile {
         out.push_str(&format!(
             "device budget      {} [{}]\n{}\n",
