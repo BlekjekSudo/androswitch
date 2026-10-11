@@ -950,14 +950,6 @@ flags = []
 description = "Access extra location provider commands such as test provider hooks."
 
 [[permission]]
-name = "BATTERY_STATS"
-level = "normal"
-group = ""
-since_api = 1
-flags = []
-description = "Collect battery statistics (normal per Apêndice B4; AOSP real: signature|development — not for use by third-party apps since API 21)."
-
-[[permission]]
 name = "FLASHLIGHT"
 level = "normal"
 group = ""
@@ -1094,6 +1086,17 @@ flags = []
 description = "Write subscribed feeds (legacy, deprecated)."
 
 # ==================== B5 — SIGNATURE / SYSTEM (concedidas para o app em análise) ====================
+# issue #68: a documentação do Android define protectionLevel
+# signature|privileged|development; a entrada antiga (B4/normal, sem flags)
+# auto-concedia a permissão a apps de terceiros, o que o sistema real nega.
+[[permission]]
+name = "BATTERY_STATS"
+level = "signature"
+group = ""
+since_api = 1
+flags = ["systemApp", "development"]
+description = "Collect battery statistics (AOSP protectionLevel: signature|privileged|development — not for use by third-party apps since API 21)."
+
 [[permission]]
 name = "BIND_DEVICE_ADMIN"
 level = "signature"

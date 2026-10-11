@@ -645,6 +645,51 @@ mod gating_tests {
         );
     }
 
+    /// issue #68: a tabela precisa bater com as contagens publicadas em
+    /// `README.md` e `docs/ROADMAP.md` (total 175). Se o dado mudar, os docs
+    /// mudam junto — o teste é o guarda dessa coerência.
+    #[test]
+    fn table_matches_documented_counts() {
+        let table = PermissionTable::embedded().unwrap();
+        let lvl = |l: ProtectionLevel| table.permission.iter().filter(|p| p.level == l).count();
+        assert_eq!(table.len(), 175, "total publicado em README/ROADMAP");
+        assert_eq!(lvl(ProtectionLevel::Dangerous), 43);
+        assert_eq!(lvl(ProtectionLevel::Normal), 93);
+        assert_eq!(lvl(ProtectionLevel::Signature), 36);
+        assert_eq!(lvl(ProtectionLevel::Internal), 3);
+        assert_eq!(table.specials().count(), 15);
+    }
+
+    /// issue #68: `BATTERY_STATS` é `signature|privileged|development` no
+    /// Android real — não pode ser `AutoGranted` "limpo" (sem marcador de
+    /// confiança), porque apps de terceiros não a recebem.
+    #[test]
+    fn battery_stats_is_signature_with_trust_marker() {
+        let table = PermissionTable::embedded().unwrap();
+        let def = table
+            .get("android.permission.BATTERY_STATS")
+            .expect("BATTERY_STATS na tabela");
+        assert_eq!(def.level, ProtectionLevel::Signature);
+        assert!(
+            def.flags.iter().any(|f| f == "development"),
+            "flags: {:?}",
+            def.flags
+        );
+        assert!(!def.description.contains("Apêndice B4"));
+
+        let m = manifest_target(34, &[("BATTERY_STATS", None, false)]);
+        let e = PermissionEngine::install(&m, table);
+        assert_eq!(
+            e.state("android.permission.BATTERY_STATS"),
+            Some(GrantState::AutoGranted)
+        );
+        assert_eq!(
+            e.granted_by("android.permission.BATTERY_STATS"),
+            Some("runtime-is-system"),
+            "sem o marcador, o agente leria como concessão limpa a terceiros"
+        );
+    }
+
     /// issue #31: signature AutoGranted carrega marcador runtime-is-system
     #[test]
     fn signature_autogranted_has_trust_marker() {

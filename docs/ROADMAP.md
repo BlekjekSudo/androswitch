@@ -32,7 +32,7 @@
   (Apêndice F: 4 componentes + aliases + providers + queries + features +
   meta-data + instrumentação) com árvore crua preservada (Lei 2).
 - **Motor de permissões** (`fd-permissions`): dado versionado com 175 permissões
-  (43 dangerous/12 grupos, 15 specials, 79 normais puras + 15 com flag special = 94 normal-level, 35 signature, 3 internal) +
+  (43 dangerous/12 grupos, 15 specials, 78 normais puras + 15 com flag special = 93 normal-level, 36 signature, 3 internal) +
   13 roles + 7 appops; estado instalável/mutável (grant/deny/revoke) e auditoria
   estática (exported sem guarda, debuggable, cleartext, desconhecidas).
 - **fd-devices**: 6 perfis de device; `moto-e5` é o piso contratual (512 MB RSS /
