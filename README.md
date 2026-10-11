@@ -86,16 +86,19 @@ The foundation is **real, tested code** — verified end-to-end against the F-Dr
 - ✅ **`rd vm` (M2)** — minimal Dalvik interpreter over rd-dex: core opcodes with exact Java semantics (wrapping, saturating casts, NaN/Infinity, `MIN/-1` wrapping div), exceptions (try/catch on any instruction, platform exceptions materialized), strings/StringBuilder intrinsics, static fields + `<clinit>`, virtual dispatch through superclass chains, **heap arena capped at the moto-e5 floor (256 MB, typed `VM_OOM`)**, fuel + call-depth guards. **Golden harness `golden/vm/`: 150/150 vectors byte-identical to real JVM execution** (javac→D8→`rd vm exec --json` vs reflection runner). Real APK pure methods executed and hand-verified against smali (androidx ContainerHelpers/IntIntPair/ScatterMap)
 
 ```console
-$ rd inspect F-Droid.apk
+$ rd inspect golden-apks/org.fdroid.fdroid.apk
 package            org.fdroid.fdroid  v2.0.1 (2000051)
 label              F-Droid (resolved @0x7f110045)
 SDK                min 24 · target 37 · compile 37
 api floor          ⚠ BELOW_FLOOR(minSdk=24, floor=26) — inspect ok; execução responde erro estruturado
 signing            v1, v2, v3
-components (36: activity×10 · activity-alias×3 · provider×4 · receiver×9 · service×10)
 permissions (31 declaradas; tabela: 175 permissões)
-  auto-granted: 16 · runtime-pending: 8 · special: 5 · unknown: 2
+  auto-granted: 14 · runtime-pending: 7 · special: 5 · unknown: 0 · not requested: 3 · app-defined: 2
+    (not requested = fora da janela do targetSdk: maxSdkVersion vencido ou since_api acima do alvo)
+components (36: activity×10 · activity-alias×3 · provider×4 · receiver×9 · service×10)
 ```
+
+APK de referência: **F-Droid 2.0.1** (`v2.0.1 · 2000051`), baixado por `./golden-apks/fetch.sh` — `sha256 83d3fe522281c3cb89fce3bc05038f81b3c3b32c108536941f184c5f9bb53778`. Bloco regenerado em **2026-10-11** a partir do binário desta árvore; `cargo test -p rd-cli --test readme_inspect` falha se o exemplo divergir da saída real (o teste é ignorado quando o APK golden não está presente).
 
 Build it yourself: `cargo build -p rd-cli` → `./target/debug/rd inspect your.apk`.
 
