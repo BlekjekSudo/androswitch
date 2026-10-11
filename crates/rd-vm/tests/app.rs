@@ -751,3 +751,35 @@ fn linear_horizontal_two_visible_split_with_gone_middle() {
         "B colado em A (sem buraco do GONE): {dump}"
     );
 }
+
+// ═════════════════ issue #82: launch de classe ausente do DEX ═════════════════
+
+/// `launch_app` de uma classe que não está no DEX precisa FALHAR (no Android,
+/// `am start` de classe inexistente lança ActivityNotFoundException). Antes a
+/// VM alocava a instância vazia e devolvia sucesso — `rd mcp launch` relatava
+/// `launched: true` para um estado que nunca existiu (falso sucesso).
+#[test]
+fn launch_app_rejects_activity_missing_from_dex() {
+    let mut b = DexBuilder::new();
+    register_platform_classes(&mut b);
+    b.class("LMain;", "Landroid/app/Activity;");
+    let mut e = engine_of(&b);
+
+    let err = e
+        .launch_app("LNope;", "com.exemplo.trivial", Vec::new())
+        .expect_err("classe ausente do DEX não pode lançar");
+    let rd = match err {
+        rd_vm::err::VmExit::Error(rd) => rd,
+        other => panic!("esperava erro estruturado da VM, veio {other:?}"),
+    };
+    assert_eq!(rd.code, "MISSING_ENTRY", "{rd:?}");
+    assert!(rd.cause.contains("LNope;"), "cause cita a classe: {rd:?}");
+    assert!(
+        rd.suggestion.is_some(),
+        "erro de launch traz suggestion: {rd:?}"
+    );
+
+    // a classe que EXISTE no DEX continua lançando (sem regressão)
+    e.launch_app("LMain;", "com.exemplo.trivial", Vec::new())
+        .expect("LMain; está no DEX");
+}

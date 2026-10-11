@@ -3041,6 +3041,86 @@ mod tests {
         );
     }
 
+    /// issue #82: `launch` de classe inexistente no DEX devolvia
+    /// `launched: true` e criava uma instância vazia — falso sucesso que
+    /// invalida tudo que o agente concluir depois.
+    #[test]
+    fn launch_rejects_activity_missing_from_dex() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+
+        // as duas formas de escrever o nome (FQCN e descritor Dalvik)
+        for (label, activity) in [
+            ("FQCN inexistente", "com.test.mcp.Nope"),
+            ("descritor inexistente", "Lcom/test/mcp/Nope;"),
+        ] {
+            let (v, err) = call(&mut s, "launch", serde_json::json!({"activity": activity}));
+            assert!(
+                err,
+                "{label}: launch de classe ausente do DEX deve ser erro, veio {v}"
+            );
+            assert_eq!(v["code"], "MISSING_ENTRY", "{label}: {v}");
+            assert!(
+                v.get("launched").is_none(),
+                "{label}: erro não pode trazer `launched` (falso sucesso): {v}"
+            );
+            assert!(
+                v["cause"].as_str().unwrap_or_default().contains("Nope"),
+                "{label}: cause cita a classe pedida: {v}"
+            );
+            assert!(!v["suggestion"].is_null(), "{label}: traz suggestion: {v}");
+        }
+
+        // nada foi lançado: a sessão continua sem app em execução
+        let (v, err) = call(&mut s, "runtime_health", serde_json::json!({}));
+        assert!(!err, "runtime_health: {v}");
+        assert_eq!(
+            v["running"], false,
+            "issue #82: launch inválido não pode criar estado de sessão: {v}"
+        );
+        assert!(
+            v["activity"].is_null(),
+            "activity da sessão continua ausente: {v}"
+        );
+
+        // a activity declarada no manifest (e presente no DEX) continua ok
+        let (v, err) = call(
+            &mut s,
+            "launch",
+            serde_json::json!({"activity": "com.test.mcp.Main"}),
+        );
+        assert!(!err, "launch de com.test.mcp.Main: {v}");
+        assert_eq!(v["launched"], true, "{v}");
+        assert_eq!(v["activity"], "Lcom/test/mcp/Main;", "{v}");
+
+        // e o caminho sem `activity` (LAUNCHER do manifest) também
+        let (v, err) = call(&mut s, "launch", serde_json::json!({}));
+        assert!(!err, "launch sem activity (LAUNCHER): {v}");
+        assert_eq!(v["launched"], true, "{v}");
+
+        // decisão (compat > elegância): a falha de um launch NÃO derruba o app
+        // que já rodava — o Android mantém a activity anterior em primeiro
+        // plano quando o `am start` falha. Nenhum estado NOVO é criado.
+        let (v, err) = call(
+            &mut s,
+            "launch",
+            serde_json::json!({"activity": "com.test.mcp.Nope"}),
+        );
+        assert!(err, "segundo launch inválido continua erro: {v}");
+        let (v, err) = call(&mut s, "runtime_health", serde_json::json!({}));
+        assert!(!err, "runtime_health: {v}");
+        assert_eq!(
+            v["running"], true,
+            "app anterior continua de pé (Android não derruba): {v}"
+        );
+        assert_eq!(
+            v["activity"], "Lcom/test/mcp/Main;",
+            "nenhum estado novo foi criado pelo launch inválido: {v}"
+        );
+    }
+
     /// serve_stdio: sessão completa por linhas (loop real de E/S).
     #[test]
     fn serve_stdio_drives_full_session() {
