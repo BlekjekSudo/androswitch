@@ -195,6 +195,119 @@ mod tests {
         );
     }
 
+    /// issue #87: a spec (`RustyDroid.md`) citava Health Connect/HEALTH na API
+    /// 36 enquanto os dados versionados usam 34 (Android 14 — Health Connect
+    /// entrou na plataforma; `HealthPermissions` é "Added in API level 34").
+    /// Este teste trava a coerência entre spec e dados para o assunto.
+    #[test]
+    fn health_connect_api_is_consistent_between_spec_and_data() {
+        let root = repo_root();
+
+        // 1) dado: comutador `health-connect-platform`
+        let switches: toml::Value = toml::from_str(
+            &std::fs::read_to_string(root.join("data/behavior-switches.toml"))
+                .expect("data/behavior-switches.toml"),
+        )
+        .expect("behavior-switches.toml é TOML válido");
+        let switch_api = switches
+            .get("switch")
+            .and_then(|v| v.as_array())
+            .and_then(|a| {
+                a.iter().find(|s| {
+                    s.get("id").and_then(|i| i.as_str()) == Some("health-connect-platform")
+                })
+            })
+            .and_then(|s| s.get("api"))
+            .and_then(|v| v.as_integer())
+            .expect("switch health-connect-platform com `api`");
+        assert_eq!(
+            switch_api, 34,
+            "Android 14 (API 34) — Health Connect entrou na plataforma (issue #87)"
+        );
+
+        // 2) dado: permissões do grupo HEALTH usam o mesmo since_api
+        let perms: toml::Value = toml::from_str(
+            &std::fs::read_to_string(root.join("data/permissions.toml"))
+                .expect("data/permissions.toml"),
+        )
+        .expect("permissions.toml é TOML válido");
+        let health: Vec<(String, i64)> = perms
+            .get("permission")
+            .and_then(|v| v.as_array())
+            .expect("tabela de permissões")
+            .iter()
+            .filter(|p| p.get("group").and_then(|g| g.as_str()) == Some("HEALTH"))
+            .map(|p| {
+                (
+                    p.get("name")
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("?")
+                        .to_string(),
+                    p.get("since_api")
+                        .and_then(|v| v.as_integer())
+                        .unwrap_or(-1),
+                )
+            })
+            .collect();
+        assert!(
+            health.len() >= 3,
+            "grupo HEALTH deveria ter as 3 permissões health.*: {health:?}"
+        );
+        for (name, api) in &health {
+            assert_eq!(
+                *api, switch_api,
+                "{name}: since_api={api} difere do comutador ({switch_api}) — issue #87"
+            );
+        }
+
+        // 3) spec: toda menção a Health Connect com API/@ cita o mesmo número
+        let spec = std::fs::read_to_string(root.join("RustyDroid.md")).expect("RustyDroid.md");
+        let cited = cited_health_apis(&spec);
+        assert!(
+            !cited.is_empty(),
+            "nenhuma menção a 'Health Connect' com API na spec — o teste ficou cego"
+        );
+        for api in cited {
+            assert_eq!(
+                api, switch_api as u32,
+                "spec cita Health Connect na API {api}, os dados dizem {switch_api} (issue #87)"
+            );
+        }
+    }
+
+    /// Níveis de API citados ao lado de "Health Connect" na spec (`API 34`,
+    /// `@34`), lidos numa janela depois de cada ocorrência.
+    fn cited_health_apis(spec: &str) -> Vec<u32> {
+        let mut out = Vec::new();
+        let mut rest = spec;
+        while let Some(idx) = rest.find("Health Connect") {
+            let after = &rest[idx + "Health Connect".len()..];
+            // só a própria linha — senão a janela invade o parágrafo seguinte
+            let window: String = after.chars().take_while(|c| *c != '\n').take(80).collect();
+            out.extend(api_numbers_after(&window, "@"));
+            out.extend(api_numbers_after(&window, "API "));
+            rest = after;
+        }
+        out
+    }
+
+    /// Números que aparecem logo depois do marcador (`@34`, `API 34`).
+    fn api_numbers_after(text: &str, marker: &str) -> Vec<u32> {
+        let mut out = Vec::new();
+        let mut rest = text;
+        while let Some(idx) = rest.find(marker) {
+            let digits: String = rest[idx + marker.len()..]
+                .chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect();
+            if let Ok(n) = digits.parse::<u32>() {
+                out.push(n);
+            }
+            rest = &rest[idx + marker.len()..];
+        }
+        out
+    }
+
     /// issue #73: o placar versionado precisa ser idêntico ao gerado (senão
     /// quem seguir a documentação regenera algo diferente do commitado).
     #[test]

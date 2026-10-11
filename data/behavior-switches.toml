@@ -193,6 +193,11 @@ default_state = "enforced"
 summary = "Apps com target 35+ desenham edge-to-edge; barras de sistema transparentes e tratamento de insets obrigatório (content-margin/view-finder APIs)."
 
 # ==================== Android 14 / API 34 ====================
+# issue #87: Android 14 (API 34) — "Starting Android 14 (API Level 34), Health
+# Connect is part of the Android Framework"
+# (https://developer.android.com/health-and-fitness/health-connect/get-started).
+# A #52 fixou 34 aqui e em data/permissions.toml; a spec (RustyDroid.md) foi
+# alinhada por este commit (antes dizia 36).
 [[switch]]
 id = "health-connect-platform"
 api = 34
