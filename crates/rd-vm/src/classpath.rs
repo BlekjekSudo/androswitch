@@ -222,6 +222,75 @@ impl Classpath {
         None
     }
 
+    /// (name, type) de um field_id (helper de `resolve_static_field`).
+    fn field_info(&self, dex_idx: usize, idx: u32) -> Option<(String, String, String)> {
+        let d = self.dexes.get(dex_idx)?;
+        let f = d.field(idx).ok()?;
+        Some((
+            d.type_str(f.class_idx as u32).to_string(),
+            d.string(f.name_idx).to_string(),
+            d.type_str(f.type_idx as u32).to_string(),
+        ))
+    }
+
+    /// issue #57 (JVMS 5.4.3.2): classe DECLARANTE de um campo — caminha a
+    /// cadeia de superclasses e, depois, a closure de interfaces (campos de
+    /// interface são implicitamente public static final). `None` = não existe
+    /// em lugar nenhum (o caller materializa NoSuchFieldError — antes o miss
+    /// caía em default silencioso e sput criava slot divergente por ref).
+    pub fn resolve_static_field(&mut self, class_desc: &str, name: &str) -> Option<String> {
+        let mut cur = class_desc.to_string();
+        for _ in 0..16 {
+            let Some((dex_idx, def)) = self.find_class(&cur) else {
+                break; // builtin (fora do DEX) declara nela mesma — caller decide
+            };
+            let def = *def;
+            if let Some(data) = self.class_data(dex_idx, &def).ok().flatten() {
+                for f in &data.static_fields {
+                    if let Some((_, fname, _)) = self.field_info(dex_idx, f.field_idx) {
+                        if fname == name {
+                            return Some(cur.clone());
+                        }
+                    }
+                }
+            }
+            let super_desc = self.dexes[dex_idx].type_str(def.superclass_idx).to_string();
+            if super_desc.is_empty() || super_desc == cur {
+                break;
+            }
+            cur = super_desc;
+        }
+        // interfaces: mesma ordem de visita do resolve_method (da classe mais
+        // derivada para a raiz — fase 2 do JVMS 5.4.3.2)
+        let mut queue: Vec<String> = self.interfaces_of(class_desc);
+        let mut visited: std::collections::HashSet<String> = queue.iter().cloned().collect();
+        let mut budget = 64;
+        while let Some(iface) = queue.pop() {
+            budget -= 1;
+            if budget == 0 {
+                return None;
+            }
+            if let Some((dex_idx, def)) = self.find_class(&iface) {
+                let def = *def;
+                if let Some(data) = self.class_data(dex_idx, &def).ok().flatten() {
+                    for f in &data.static_fields {
+                        if let Some((_, fname, _)) = self.field_info(dex_idx, f.field_idx) {
+                            if fname == name {
+                                return Some(iface.clone());
+                            }
+                        }
+                    }
+                }
+                for next in self.interfaces_of(&iface) {
+                    if visited.insert(next.clone()) {
+                        queue.push(next);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Busca um método em uma interface e nas suas superinterfaces (recursão
     /// com guard de ciclo/cap — issue #26, métodos default incluídos).
     fn resolve_in_interface(
@@ -485,6 +554,14 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/lang/Object;",
         ]),
         "Ljava/lang/NoClassDefFoundError;" => Some(vec![
+            "Ljava/lang/LinkageError;",
+            "Ljava/lang/Error;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        // issue #57: campo estático inexistente na cadeia (JVMS 5.4.3.2) —
+        // capturável como LinkageError/Error/Throwable, mesma família
+        "Ljava/lang/NoSuchFieldError;" => Some(vec![
             "Ljava/lang/LinkageError;",
             "Ljava/lang/Error;",
             "Ljava/lang/Throwable;",

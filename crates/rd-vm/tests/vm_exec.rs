@@ -404,8 +404,23 @@ fn strings_length_and_hashcode() {
 fn statics_clinit_and_static_values() {
     let mut b = DexBuilder::new();
     let cls = b.class("LCaso;", "Ljava/lang/Object;");
-    b.static_field(cls, "BASE", "I", SVal::Int(100));
+    // issue #66: o fixture AGORA tem <clinit> REAL (antes: só static_values —
+    // o comentário mentia “clinit roda uma única vez” sem clinit nenhum).
+    b.static_field(cls, "BASE", "I", SVal::Int(0));
     let fidx_base = b.field_idx("LCaso;", "I", "BASE");
+    b.direct(
+        cls,
+        "<clinit>",
+        "V",
+        vec![],
+        ACC_STATIC | ACC_CONSTRUCTOR,
+        Some(b.code(2, 0, 0, {
+            let mut u = op21s(0x13, 0, 100); // const/16 v0, 100 (const/4 não cabe)
+            u.extend(op21c(0x67, 0, fidx_base)); // sput v0, BASE (clinit real)
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
     // le_base()I: sget v0, BASE; +1; return
     b.direct(
         cls,
@@ -421,6 +436,7 @@ fn statics_clinit_and_static_values() {
         })),
     );
     let mut e = engine_of(&b);
+    // 101 prova que o <clinit> RODOU (default era 0)
     assert_eq!(
         invoke(&mut e, "le_base", "()I", &[])
             .unwrap()
@@ -428,7 +444,7 @@ fn statics_clinit_and_static_values() {
             .unwrap(),
         101
     );
-    // clinit roda uma única vez (resultado estável)
+    // clinit roda uma única vez (resultado estável — sem re-execução)
     assert_eq!(
         invoke(&mut e, "le_base", "()I", &[])
             .unwrap()
@@ -436,6 +452,275 @@ fn statics_clinit_and_static_values() {
             .unwrap(),
         101
     );
+}
+
+// ── issue #57: campo estático sobe a cadeia de superclasses (JVMS 5.4.3.2) ─
+
+/// sget/sput de campo herdado via ref da SUBCLASSE usam o MESMO slot da
+/// declarante. Antes: statics keyados pela classe do ref — leitura via
+/// subclasse dava default silencioso e sput criava slot divergente.
+#[test]
+fn static_field_resolution_walks_superclasses() {
+    let mut b = DexBuilder::new();
+    let base = b.class("LBase;", "Ljava/lang/Object;");
+    b.static_field(base, "bcnt", "I", SVal::Int(1));
+    b.class("LSub;", "LBase;"); // NÃO declara bcnt
+    let cls = b.class("LCaso;", "Ljava/lang/Object;");
+    let f_via_sub = b.field_idx("LSub;", "I", "bcnt"); // ref pela subclasse
+    let f_via_base = b.field_idx("LBase;", "I", "bcnt"); // ref pela declarante
+    b.direct(
+        cls,
+        "le_via_sub",
+        "I",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(1, 0, 0, {
+            let mut u = op21c(0x60, 0, f_via_sub);
+            u.extend(op11x(0x0F, 0));
+            u
+        })),
+    );
+    b.direct(
+        cls,
+        "grava_via_sub",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(2, 0, 0, {
+            let mut u = op21s(0x13, 0, 42); // const/16 v0, 42 (const/4 não cabe)
+            u.extend(op21c(0x67, 0, f_via_sub)); // sput via LSub;
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    b.direct(
+        cls,
+        "le_via_base",
+        "I",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(1, 0, 0, {
+            let mut u = op21c(0x60, 0, f_via_base);
+            u.extend(op11x(0x0F, 0));
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+    assert_eq!(
+        invoke(&mut e, "le_via_sub", "()I", &[])
+            .unwrap()
+            .as_int()
+            .unwrap(),
+        1,
+        "sget via subclasse lê o slot da declarante (não default 0)"
+    );
+    invoke(&mut e, "grava_via_sub", "()V", &[]).unwrap();
+    assert_eq!(
+        invoke(&mut e, "le_via_base", "()I", &[])
+            .unwrap()
+            .as_int()
+            .unwrap(),
+        42,
+        "sput via LSub; e leitura via LBase; veem o MESMO slot (antes: divergente)"
+    );
+    assert_eq!(
+        invoke(&mut e, "le_via_sub", "()I", &[])
+            .unwrap()
+            .as_int()
+            .unwrap(),
+        42,
+        "ref pela subclasse continua vendo o mesmo valor"
+    );
+}
+
+/// Campo estático inexistente em toda a cadeia → NoSuchFieldError CAPTURÁVEL
+/// (JVMS 5.4.3.2; antes: default silencioso).
+#[test]
+fn static_field_missing_is_catchable_nosuchfielderror() {
+    let mut b = DexBuilder::new();
+    b.type_idx("Ljava/lang/NoSuchFieldError;");
+    b.type_idx("Ljava/lang/Error;");
+    b.class("LBase;", "Ljava/lang/Object;");
+    b.class("LSub;", "LBase;");
+    let cls = b.class("LCaso;", "Ljava/lang/Object;");
+    let f_nope = b.field_idx("LSub;", "I", "nao_existe"); // nem em LSub; nem em LBase;
+                                                          // direto()I: sget SEM try → NoSuchFieldError escapa
+    b.direct(
+        cls,
+        "direto",
+        "I",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(1, 0, 0, {
+            let mut u = op21c(0x60, 0, f_nope);
+            u.extend(op11x(0x0F, 0));
+            u
+        })),
+    );
+    // tenta()I: try { sget } catch (Error) → 1
+    let mut blob = b.code(2, 0, 0, {
+        let mut u = op11n(0x12, 0, 0); // 0: flag=0
+        u.extend(op21c(0x60, 1, f_nope)); // 1..3: sget v1 (TRY)
+        u.extend(op11x(0x0F, 0)); // 3: return flag
+        u.extend(op11x(0x0D, 1)); // 4: handler: move-exception v1
+        u.extend(op11n(0x12, 0, 1)); // 5: flag=1
+        u.extend(op11x(0x0F, 0)); // 6: return flag
+        u
+    });
+    blob.tries.push(TryBlob {
+        start: 1,
+        count: 1,
+        typed: vec![("Ljava/lang/Error;".to_string(), 4)],
+        catch_all: None,
+    });
+    b.direct(
+        cls,
+        "tenta",
+        "I",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(blob),
+    );
+
+    let mut e = engine_of(&b);
+    match invoke(&mut e, "direto", "()I", &[]) {
+        Err(VmExit::Exception(t)) => {
+            assert_eq!(
+                t.class, "Ljava/lang/NoSuchFieldError;",
+                "erro certo: {:?}",
+                t
+            )
+        }
+        other => panic!("esperava NoSuchFieldError, got {other:?}"),
+    }
+    let v = invoke(&mut e, "tenta", "()I", &[])
+        .unwrap()
+        .as_int()
+        .unwrap();
+    assert_eq!(v, 1, "NoSuchFieldError é capturável por catch (Error)");
+}
+
+/// issue #66 (probe promovido): clinit de A roda ANTES do clinit de B quando
+/// B é acessado primeiro — o clinit de B lê o resultado do de A.
+#[test]
+fn clinit_runs_super_before_sub() {
+    let mut b = DexBuilder::new();
+    let a = b.class("LA;", "Ljava/lang/Object;");
+    b.static_field(a, "sa", "I", SVal::Int(0));
+    let f_sa = b.field_idx("LA;", "I", "sa");
+    b.direct(
+        a,
+        "<clinit>",
+        "V",
+        vec![],
+        ACC_STATIC | ACC_CONSTRUCTOR,
+        Some(b.code(2, 0, 0, {
+            let mut u = op21c(0x60, 0, f_sa);
+            u.extend(op22b(0xD8, 0, 0, 1)); // sa += 1 → 1
+            u.extend(op21c(0x67, 0, f_sa));
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    let sub = b.class("LB;", "LA;");
+    b.static_field(sub, "sb", "I", SVal::Int(0));
+    let f_sb = b.field_idx("LB;", "I", "sb");
+    let f_sa2 = b.field_idx("LA;", "I", "sa");
+    // B.<clinit>: sb = sa + 1 — SÓ dá 2 se o clinit de A rodou antes
+    b.direct(
+        sub,
+        "<clinit>",
+        "V",
+        vec![],
+        ACC_STATIC | ACC_CONSTRUCTOR,
+        Some(b.code(2, 0, 0, {
+            let mut u = op21c(0x60, 0, f_sa2);
+            u.extend(op22b(0xD8, 0, 0, 1));
+            u.extend(op21c(0x67, 0, f_sb));
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    let cls = b.class("LCaso;", "Ljava/lang/Object;");
+    let f_sb2 = b.field_idx("LB;", "I", "sb");
+    b.direct(
+        cls,
+        "le",
+        "I",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(1, 0, 0, {
+            let mut u = op21c(0x60, 0, f_sb2);
+            u.extend(op11x(0x0F, 0));
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+    assert_eq!(
+        invoke(&mut e, "le", "()I", &[]).unwrap().as_int().unwrap(),
+        2,
+        "ordem A→B: sb = sa(1) + 1 = 2"
+    );
+}
+
+/// issue #66 (probe promovido): o PRIMEIRO acesso a classe com clinit que
+/// falha, dentro de try/catch e com engine FRESCO, captura EIIE (o teste
+/// oficial reusa engine → exercita NCDFE; este cobre o caminho fresco).
+#[test]
+fn eiie_first_access_catchable_on_fresh_engine() {
+    let build = || {
+        let mut b = DexBuilder::new();
+        b.type_idx("Ljava/lang/Error;");
+        let fail = b.class("LFail;", "Ljava/lang/Object;");
+        b.direct(
+            fail,
+            "<clinit>",
+            "V",
+            vec![],
+            ACC_STATIC | ACC_CONSTRUCTOR,
+            Some(b.code(2, 0, 0, {
+                let mut u = op11n(0x12, 0, 1);
+                u.extend(op11n(0x12, 1, 0));
+                u.extend(op23x(0x93, 0, 0, 1)); // div por zero no clinit
+                u.extend(op10x(0x0E));
+                u
+            })),
+        );
+        let cls = b.class("LCaso;", "Ljava/lang/Object;");
+        let fail_tidx = b.types.iter().position(|t| t == "LFail;").unwrap() as u16;
+        let mut blob = b.code(3, 0, 0, {
+            let mut u = op11n(0x12, 0, 0); // 0: flag=0
+            u.extend(op21c(0x22, 1, fail_tidx)); // 1..3: new-instance v1 (TRY)
+            u.extend(op11n(0x12, 0, 9)); // 3: flag=9 (não deve ocorrer)
+            u.extend(op11x(0x0F, 0)); // 4: return flag
+            u.extend(op11x(0x0D, 2)); // 5: handler: move-exception v2
+            u.extend(op11n(0x12, 0, 1)); // 6: flag=1
+            u.extend(op11x(0x0F, 0)); // 7: return flag
+            u
+        });
+        blob.tries.push(TryBlob {
+            start: 1,
+            count: 2,
+            typed: vec![("Ljava/lang/Error;".to_string(), 5)],
+            catch_all: None,
+        });
+        b.direct(
+            cls,
+            "tenta",
+            "I",
+            vec![],
+            ACC_PUBLIC | ACC_STATIC,
+            Some(blob),
+        );
+        b
+    };
+    // engine FRESCO: clinit nunca rodou → EIIE (não NCDFE) no primeiro acesso
+    let mut e = engine_of(&build());
+    let v = invoke(&mut e, "tenta", "()I", &[])
+        .unwrap()
+        .as_int()
+        .unwrap();
+    assert_eq!(v, 1, "EIIE de clinit fresco é capturável (catch Error)");
 }
 
 #[test]
@@ -1592,8 +1877,16 @@ fn system_out_println_executes() {
         })),
     );
     let mut e = engine_of(&b);
+    // issue #66: o teste ANTES só fazia expect() (println no-op passava —
+    // falso-verde). Agora captura a saída via HostOut::Buffer (issue #55)
+    // e asserta o CONTEÚDO impresso (String e Object boxado).
+    let buf = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    rd_vm::set_app_stdout(rd_vm::HostOut::Buffer(buf.clone()));
     invoke(&mut e, "oi", "()V", &[]).expect("println(String) não pode falhar");
     invoke(&mut e, "oi_num", "()V", &[]).expect("println(Object box) não pode falhar");
+    rd_vm::set_app_stdout(rd_vm::HostOut::Std); // restaura (testes paralelos)
+    let out = String::from_utf8(buf.lock().unwrap().clone()).expect("utf8");
+    assert_eq!(out, "hi\n7\n", "println(String) e println(Object) imprimem");
 }
 
 // ── issues #41/#49: gating de erros (EIIE capturável, OOM tipado, if-eq misto)

@@ -731,14 +731,22 @@ pub(crate) fn exec_frame(
                 let Kind::RegIndex(a, i) = &insn.kind else {
                     return bad_kind(insn);
                 };
-                let (class, fname, ftype) = vm.cp.field_ref(dex_idx, *i as u32)?;
+                let (ref_class, fname, ftype) = vm.cp.field_ref(dex_idx, *i as u32)?;
+                // issue #57: JVMS 5.4.3.2 — o slot static é da classe
+                // DECLARANTE (sobe superclasses/interfaces; miss final =
+                // NoSuchFieldError capturável). Antes: statics keyados pela
+                // classe do ref — sget de campo herdado via ref da subclasse
+                // lia default silenciosamente e sput criava slot divergente.
+                let owner = step!(vm.resolve_static_owner(&ref_class, &fname));
                 // issue #41: EIIE de <clinit> despacha na frame corrente
-                step!(vm.ensure_initialized(&class));
+                // (JVMS 5.5: init é disparado no DECLARANTE — via ref da
+                // subclasse NÃO inicializa a subclasse)
+                step!(vm.ensure_initialized(&owner));
                 // issues #43/#48: System.out/.err materializam um PrintStream
                 // embutido na primeira leitura (println/print são intrínsecos;
                 // saída vai para stdout/stderr do host, spec PrintStream: nunca lança)
-                if class == "Ljava/lang/System;" && (fname == "out" || fname == "err") {
-                    let key = (class.clone(), fname.clone());
+                if owner == "Ljava/lang/System;" && (fname == "out" || fname == "err") {
+                    let key = (owner.clone(), fname.clone());
                     if !vm.statics.contains_key(&key) {
                         let fd = if fname == "err" { 2 } else { 1 };
                         let r = step!(vm
@@ -753,7 +761,7 @@ pub(crate) fn exec_frame(
                 }
                 let v = vm
                     .statics
-                    .get(&(class.clone(), fname))
+                    .get(&(owner, fname))
                     .cloned()
                     // issue #37: default POR TIPO declarado — Int(0) genérico
                     // quebrava sget-wide (Long lido como Int → VM_TYPE_ERROR)
@@ -767,10 +775,13 @@ pub(crate) fn exec_frame(
                 let Kind::RegIndex(a, i) = &insn.kind else {
                     return bad_kind(insn);
                 };
-                let (class, fname, _ftype) = vm.cp.field_ref(dex_idx, *i as u32)?;
+                let (ref_class, fname, _ftype) = vm.cp.field_ref(dex_idx, *i as u32)?;
+                // issue #57: grava no slot da classe DECLARANTE (JVMS 5.4.3.2)
+                // — refs pela subclasse e pela superclasse vêem o MESMO valor.
+                let owner = step!(vm.resolve_static_owner(&ref_class, &fname));
                 // issue #41: EIIE de <clinit> despacha na frame corrente
-                step!(vm.ensure_initialized(&class));
-                vm.statics.insert((class, fname), regs[*a as usize].clone());
+                step!(vm.ensure_initialized(&owner));
+                vm.statics.insert((owner, fname), regs[*a as usize].clone());
             }
 
             // ── invokes (6E..72, 74..78) ────────────────────────────────────
