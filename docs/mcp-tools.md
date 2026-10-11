@@ -64,7 +64,7 @@ Avança o clock virtual (ms) e executa os runnables do Looper com deadline venci
 
 ### `wait_for`
 
-Espera CONDICIONAL: avança o clock virtual em passos de `step_ms` (default 100) até a view (resource_id/text/class) existir ou `timeout_ms` vencer (cap RD_MCP_MAX_WAIT_MS). found=false é resposta honesta (não é erro) — o agente decide.
+Espera CONDICIONAL: avança o clock virtual em passos de `step_ms` (default 100) até a view (resource_id/text/class) existir ou `timeout_ms` vencer (cap RD_MCP_MAX_WAIT_MS). `class` casa o nome completo ou o nome simples exato (issue #78). found=false é resposta honesta (não é erro) — o agente decide.
 
 - Parâmetros: `class, resource_id, step_ms, text, timeout_ms` · obrigatórios: `timeout_ms`
 
@@ -94,7 +94,7 @@ Invoca um método static no app em execução (sonda de estado geral — o 'eval
 
 ### `assert_view`
 
-Asserção de existência: procura view por resource-id (ex.: com.app:id/btn), texto ou classe. Retorna matches.
+Asserção de existência: procura view por resource-id (ex.: com.app:id/btn), trecho de texto ou classe. `class` casa o nome COMPLETO (android.widget.TextView) ou o nome SIMPLES exato (TextView) — `View` NÃO casa TextView. Retorna matches.
 
 - Parâmetros: `class, resource_id, text`
 
