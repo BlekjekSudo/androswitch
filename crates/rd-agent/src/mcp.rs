@@ -1842,6 +1842,8 @@ fn grant_state_str(s: GrantState) -> &'static str {
         GrantState::SpecialPending => "special-pending",
         GrantState::Unknown => "unknown",
         GrantState::NotRequested => "not-requested",
+        // issue #69: permissão declarada pelo próprio APK
+        GrantState::AppDefined => "app-defined",
     }
 }
 

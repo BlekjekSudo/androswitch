@@ -814,6 +814,76 @@ pub fn build_apk_sdk(
     )
 }
 
+/// Variante com `<uses-permission>` e `<permission>` declarados — issue #69:
+/// permissões customizadas que o próprio APK define (o Android real as modela
+/// a partir do manifesto, não de uma tabela externa).
+pub fn build_manifest_axml_sdk_perms_declared(
+    package: &str,
+    activity_desc: &str,
+    min_sdk: i32,
+    target_sdk: i32,
+    uses_permissions: &[&str],
+    declared_permissions: &[(&str, &str)],
+) -> Vec<u8> {
+    let mut top = vec![AxNode::new(
+        "uses-sdk",
+        vec![
+            a(true, "minSdkVersion", AxVal::Int(min_sdk)),
+            a(true, "targetSdkVersion", AxVal::Int(target_sdk)),
+        ],
+        vec![],
+    )];
+    for p in uses_permissions {
+        top.push(AxNode::new(
+            "uses-permission",
+            vec![a(true, "name", AxVal::Str((*p).to_string()))],
+            vec![],
+        ));
+    }
+    for (name, level) in declared_permissions {
+        top.push(AxNode::new(
+            "permission",
+            vec![
+                a(true, "name", AxVal::Str((*name).to_string())),
+                a(true, "protectionLevel", AxVal::Str((*level).to_string())),
+            ],
+            vec![],
+        ));
+    }
+    let application = AxNode::new(
+        "application",
+        vec![],
+        vec![AxNode::new(
+            "activity",
+            vec![a(true, "name", AxVal::Str(activity_desc.to_string()))],
+            vec![AxNode::new(
+                "intent-filter",
+                vec![],
+                vec![AxNode::new(
+                    "action",
+                    vec![a(
+                        true,
+                        "name",
+                        AxVal::Str("android.intent.action.MAIN".to_string()),
+                    )],
+                    vec![],
+                )],
+            )],
+        )],
+    );
+    let mut children = top;
+    children.push(application);
+    let root = AxNode::new(
+        "manifest",
+        vec![
+            a(false, "package", AxVal::Str(package.to_string())),
+            a(true, "versionCode", AxVal::Int(1)),
+        ],
+        children,
+    );
+    build_axml(&root)
+}
+
 /// Variante com `uses-permission` declarados (MCP M5: ciclo de permissões
 /// grant/clear no registro da sessão).
 pub fn build_apk_sdk_perms(
@@ -840,6 +910,32 @@ pub fn build_apk_sdk_perms(
     for (name, data) in extras {
         z.add(name, data);
     }
+    z.build()
+}
+
+/// issue #69: APK com `<permission>` declarados (permissões do próprio app).
+pub fn build_apk_sdk_perms_declared(
+    package: &str,
+    activity_desc: &str,
+    arsc: Vec<u8>,
+    min_sdk: i32,
+    target_sdk: i32,
+    uses_permissions: &[&str],
+    declared_permissions: &[(&str, &str)],
+) -> Vec<u8> {
+    let mut z = ZipFix::new();
+    z.add(
+        "AndroidManifest.xml",
+        build_manifest_axml_sdk_perms_declared(
+            package,
+            activity_desc,
+            min_sdk,
+            target_sdk,
+            uses_permissions,
+            declared_permissions,
+        ),
+    );
+    z.add("resources.arsc", arsc);
     z.build()
 }
 

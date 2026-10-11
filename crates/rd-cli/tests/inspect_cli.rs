@@ -173,3 +173,117 @@ fn inspect_json_still_exposes_not_requested() {
         "auto_granted"
     );
 }
+
+/// issue #69: APK que declara a própria permissão (`<permission>`) — o
+/// `protectionLevel` tem de sair DECODIFICADO no JSON (com o bruto em campo
+/// separado) e o `rd perm audit` não pode acusar `UNKNOWN_PERMISSION`.
+#[test]
+fn declared_permissions_are_decoded_and_not_unknown() {
+    use rd_testsupport::apkfix::build_apk_sdk_perms_declared;
+
+    let tmp = tempfile_dir("declared");
+    let arsc = ArscFix::new();
+    let bytes = build_apk_sdk_perms_declared(
+        "com.example.declared",
+        "com.example.declared.Main",
+        arsc.build(),
+        26,
+        34,
+        &[
+            "android.permission.INTERNET",
+            "com.example.declared.permission.UPDATE_REPOS",
+            "com.example.declared.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+        ],
+        &[
+            (
+                "com.example.declared.permission.UPDATE_REPOS",
+                "18", // signature|privileged
+            ),
+            (
+                "com.example.declared.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+                "2", // signature
+            ),
+        ],
+    );
+    let apk = tmp.join("declared.apk");
+    std::fs::write(&apk, bytes).expect("apk");
+    let apk = apk.to_string_lossy().to_string();
+
+    // ── inspect --json: protection_level decodificado + bruto preservado ──
+    let out = run_rd(&["inspect", &apk, "--json"]);
+    assert_eq!(out.code, 0, "stderr: {}", out.stderr);
+    let v: serde_json::Value =
+        serde_json::from_str(&out.stdout).unwrap_or_else(|e| panic!("JSON: {e}; {}", out.stdout));
+    let declared = v["declared_permissions"].as_array().expect("array");
+    assert_eq!(declared.len(), 2, "{declared:?}");
+    let update = declared
+        .iter()
+        .find(|d| d["name"] == "com.example.declared.permission.UPDATE_REPOS")
+        .expect("UPDATE_REPOS");
+    assert_eq!(update["protection_level"], "signature|privileged");
+    assert_eq!(update["protection_level_raw"], 18);
+    let dyn_recv = declared
+        .iter()
+        .find(|d| d["name"] == "com.example.declared.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+        .expect("DYNAMIC_RECEIVER");
+    assert_eq!(dyn_recv["protection_level"], "signature");
+    assert_eq!(dyn_recv["protection_level_raw"], 2);
+
+    // ── estado: permissão do próprio app é `app_defined`, não `unknown` ──
+    let states = v["permissions_state"].as_object().expect("states");
+    assert_eq!(
+        states["com.example.declared.permission.UPDATE_REPOS"]["state"],
+        "app_defined"
+    );
+    assert_eq!(
+        states["com.example.declared.permission.UPDATE_REPOS"]["granted_by"],
+        "self-declared"
+    );
+
+    // ── resumo textual: categorias somam o total (inclui app-defined) ──
+    let text = run_rd(&["inspect", &apk]);
+    let summary = text
+        .stdout
+        .lines()
+        .find(|l| l.contains("auto-granted:"))
+        .expect("resumo");
+    let total: usize = text
+        .stdout
+        .lines()
+        .find_map(|l| l.strip_prefix("permissions ("))
+        .and_then(|r| r.split(" declaradas").next())
+        .map(|n| n.parse().expect("total"))
+        .expect("linha do total");
+    let sum = category(summary, "auto-granted")
+        + category(summary, "runtime-pending")
+        + category(summary, "special")
+        + category(summary, "unknown")
+        + category(summary, "not requested")
+        + category(summary, "app-defined");
+    assert_eq!(sum, total, "soma fecha: {summary:?}");
+    assert_eq!(category(summary, "app-defined"), 2, "{summary:?}");
+    assert_eq!(category(summary, "unknown"), 0, "{summary:?}");
+
+    // ── perm audit: nenhum UNKNOWN_PERMISSION para as duas do app ──
+    let audit = run_rd(&["perm", "audit", &apk, "--json"]);
+    assert_eq!(audit.code, 0, "stderr: {}", audit.stderr);
+    let findings: serde_json::Value = serde_json::from_str(&audit.stdout)
+        .unwrap_or_else(|e| panic!("JSON do audit: {e}; {}", audit.stdout));
+    let arr = findings
+        .as_array()
+        .or_else(|| findings.get("findings").and_then(|f| f.as_array()))
+        .expect("findings");
+    let unknown: Vec<&str> = arr
+        .iter()
+        .filter(|f| f["code"] == "UNKNOWN_PERMISSION")
+        .filter_map(|f| f["permission"].as_str())
+        .collect();
+    assert!(
+        unknown.is_empty(),
+        "issue #69: UNKNOWN_PERMISSION para permissão declarada pelo APK: {unknown:?}"
+    );
+    assert!(
+        arr.iter().any(|f| f["code"] == "APP_DEFINED_PERMISSION"),
+        "esperava INFO APP_DEFINED_PERMISSION: {arr:?}"
+    );
+}
