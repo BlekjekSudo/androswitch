@@ -338,6 +338,21 @@ impl Engine {
         package_name: &str,
         intent_extras: Vec<(String, Value)>,
     ) -> Result<ObjRef, VmExit> {
+        // issue #82: resolver a classe ANTES de alocar. Uma classe ausente do
+        // DEX não pode ser lançada (no Android o `am start` falharia com
+        // ActivityNotFoundException); antes a VM alocava a instância vazia
+        // mesmo assim e devolvia sucesso — o chamador (rd mcp launch) relatava
+        // `launched: true` para um estado que nunca existiu.
+        if self.cp.find_class(activity_desc).is_none() {
+            return Err(crate::err::with_suggestion(
+                crate::err::vm_error(
+                    "MISSING_ENTRY",
+                    format!("classe {activity_desc} não existe no DEX — não há o que lançar"),
+                ),
+                "confira o nome da activity (package_list/ui_tree) ou lance sem `activity` para usar a LAUNCHER declarada no AndroidManifest.xml",
+            )
+            .into());
+        }
         self.fw.package_name = package_name.to_string();
         self.ensure_initialized(activity_desc)?;
         let r = self
