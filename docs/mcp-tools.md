@@ -190,7 +190,7 @@ Catálogo HONESTO das lacunas de compatibilidade do runtime v1 (notificações M
 
 ### `batch`
 
-Executa uma lista de chamadas [{name, arguments}] EM ORDEM, uma vez cada, com resultados por passo. stop_on_error (default true) para no 1º erro; `resume_from` pula os N primeiros passos já executados — retomada idempotente. Cap RD_MCP_MAX_BATCH (default 64). batch não aninha.
+Executa uma lista de chamadas [{name, arguments}] EM ORDEM, uma vez cada, com resultados por passo. stop_on_error (default true) para no 1º erro; `resume_from` pula os N primeiros passos já executados — retomada idempotente. Cap RD_MCP_MAX_BATCH (default 64). batch não aninha. Validação de formato (name obrigatório/não vazio, sem batch aninhado, arguments objeto) rola sobre o lote INTEIRO antes de executar: passo inválido ⇒ NADA é executado (issue #80).
 
 - Parâmetros: `calls, resume_from, stop_on_error` · obrigatórios: `calls`
 
