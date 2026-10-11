@@ -203,3 +203,56 @@ Stage Summary:
 - Pendências conhecidas (registradas, não bloqueiam): fonte tipográfica real
   (M8/M9); seleção de configs por device-config no resolve (M4 round 2);
   renderers winit/web (M11).
+
+---
+Task ID: 9
+Agent: Z.ai Code (sessão Issues→M5)
+Task: Resolver as 14 issues da auditoria rodada 5 (#53–#66) e então começar M5
+
+Work Log:
+- 14 issues lidas via API (#53–#66) — audit pós-M4: dump uiautomator,
+  layout, VM, CLI, fuzz-campaign, docs e suíte.
+- #53 (high): ui_dump escapava só text/class — package/resource-id cru
+  injetava nós falsos e chars < 0x20 quebravam XML. Agora todos os campos
+  escapam; \t\n\r → &#x9;/&#xA;/&#xD;; proibidos → U+FFFD.
+- #54: index por-irmãos (antes DFS global), focusable próprio (não fudge
+  de clickable), resource-id honesto (nunca "id/123" fabricado; pid 0x01 →
+  "android:", package_for SEM fallback first — arsc hostil não sequestra
+  namespace); NCK documentados como compat-gap.
+- #57: sget/sput resolvem a classe DECLARANTE (JVMS 5.4.3.2) — antes sget
+  herdado via subclasse lia default e sput criava slot divergente;
+  NoSuchFieldError capturável (hierarquia builtin).
+- #58/#65 fuzz-campaign.sh reescrito no veredito: por ARTIFACTS (crash/
+  leak/oom/timeout), crash/leak primeiro, falha genuína = sem pulsos;
+  trap INT/TERM, SECS=0 rejeitado, guard na contagem, assert APK≤max_len,
+  nota wall-clock. 8 cenários com stubs + ShellCheck 0.10.0 limpo.
+- #59: teto de dimensão POR EIXO (720×1440) — 400dp de altura não é mais
+  INFLATE falso; layout_width explícito respeitado (w_explicit).
+- #60: divisor horizontal ignora GONE ([GONE, Button] → 720; [A,GONE,B] →
+  360+360).
+- #61: @dimen/@bool resolvem do arsc (resolve_value tipado, cadeias de
+  Reference, INFLATE tipado se não resolver); seleção de config pontua
+  qualificadores (retrato/dia); layoutfoo nunca é fallback.
+- #62: saturating_add no dump e no renderer (i32::MAX não panic na API
+  pública), marcador <!-- truncated -->, budget 64 MB com erro tipado.
+- #55: rd_vm::HostOut (Std/Stderr/Buffer) — CLI roteia System.out do app
+  para stderr (stdout = artefato); println testado por conteúdo.
+- #56: path duplicado do rd app removido (exit 64 na forma documentada);
+  e2e do binário exercita a linha do ROADMAP.
+- #63: module_id rd-cli nos erros nascidos no CLI (sem window, scripts,
+  writes de --out).
+- #64: README ':76' com M4 landed; deferrals "M4" re-apontados no código.
+- #66: println asserido (antes falso-verde), 3 comentários corrigidos
+  (clinit inexistente → clinit real; DOS time 19:56:00; 600 níveis),
+  3 probes promovidos a testes (clinit A→B, EIIE engine fresco, res_id
+  do resource map) + layoutfoo negativo.
+- Infra: crate rd-testsupport (fixtures DexBuilder/apkfix compartilhados
+  rd-vm ⇄ rd-cli); ArscFix ganhou add_dimen_dp/add_bool.
+
+Stage Summary:
+- 14/14 issues resolvidas; suíte 220 → 241 testes, 0 falhas;
+  clippy -D warnings 0; fmt ok; ShellCheck limpo.
+- Commits: 057a007 (testsupport) · 6847e40 (dump/layout/refs) ·
+  ce19616 (#57) · 5186295 (CLI) · 32ebb90 (fuzz script) · docs/worklog.
+- Próximo: M5 — Agente MCP v1 (~20 tools): LLM instala, navega e assera
+  estado só com as tools (DoD no ROADMAP).

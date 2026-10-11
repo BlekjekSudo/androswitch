@@ -73,7 +73,7 @@ APKs below the floor are inspected fine but refuse to run with a structured `BEL
 
 ---
 
-## 🚧 Status — M0 + M1 + M2 + M3 landed (2026-10)
+## 🚧 Status — M0 + M1 + M2 + M3 + M4 landed (2026-10)
 
 The foundation is **real, tested code** — verified end-to-end against the F-Droid client APK (973 zip entries, 36 components, 31 permissions):
 
