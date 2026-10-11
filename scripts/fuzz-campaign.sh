@@ -58,7 +58,7 @@ Passo a passo recomendado (WSL2):
   ./scripts/fuzz-campaign.sh 600            # smoke 10 min — valida build/execução
   ./scripts/fuzz-campaign.sh                # campanha 24 h (dentro do tmux!)
 
-Exit: 0 = ✅ sem crash (DoD ok) · 1 = ❌ crash achado (P0) · 2 = ❌ target não concluiu
+Exit: 0 = ✅ sem crash/leak (DoD ok) · 1 = ❌ crash/leak achado (P0, issue #58) · 2 = ❌ target não executou
 EOF
 }
 
@@ -80,6 +80,14 @@ LOGDIR="${REPO}/fuzz-logs/$(date +%Y%m%d-%H%M%S)"
 if [ "${SEEDS_ONLY}" -eq 0 ]; then
     case "${SECS}" in ''|*[!0-9]*)
         echo "ERRO: SECS deve ser um número inteiro de segundos (ex.: 600, 86400)" >&2; usage; exit 1;; esac
+    # issue #65: SECS=0 no libFuzzer (-max_total_time=0) = campanha INFINITA —
+    # rejeitar explicitamente (o check de dígitos puro deixava 0 passar)
+    if [ "${SECS}" -eq 0 ]; then
+        echo "ERRO: SECS=0 significa SEM LIMITE (-max_total_time=0 = infinito no libFuzzer)" >&2
+        echo "      Passe os segundos de verdade: ex. 600 (smoke), 86400 (24h)" >&2
+        usage
+        exit 1
+    fi
     case "${WORKERS}" in ''|*[!0-9]*)
         echo "ERRO: WORKERS deve ser um número inteiro (0 = auto)" >&2; usage; exit 1;; esac
 fi
@@ -146,8 +154,26 @@ if [ ! -s "${APK}" ]; then
     echo "    APK golden ausente; baixando via golden-apks/fetch.sh"
     bash "${REPO}/golden-apks/fetch.sh"
 fi
+# issue #65: assert APK ≤ max_len ANTES de qualquer preparação — APK maior
+# seria truncado silenciosamente pelo libFuzzer (o EOCD morre e a campanha
+# do apk_full/zip inteira viraria lixo sem ninguém saber).
+APK_MAX_LEN=16777216
+if [ -s "${APK}" ]; then
+    APK_BYTES="$(wc -c < "${APK}")"
+    if [ "${APK_BYTES}" -gt "${APK_MAX_LEN}" ]; then
+        echo "ERRO PRÉ-VOO: APK golden tem ${APK_BYTES} bytes > max_len ${APK_MAX_LEN}" >&2
+        echo "  O libFuzzer truncaria a seed (EOCD do ZIP morto) — apk_full/zip viriam lixo." >&2
+        echo "  → use um APK menor no golden-apks/ ou aumente o max_len do apk_full/zip no script." >&2
+        exit 1
+    fi
+fi
+
 TMP="$(mktemp -d)"
+# issue #65: trap de SAÍDA (limpeza) + trap de SINAIS — kill do script NÃO
+# pode órfar os 5 cargo-fuzz (reproduzido no audit: filho sobreviveu ao pai
+# e continuaria 24h). kill 0 alcança o processo-grupo inteiro (script + filhos).
 trap 'rm -rf "${TMP}"' EXIT
+trap 'trap - INT TERM; kill 0 2>/dev/null || true; exit 130' INT TERM
 # -j = caminhos achatados; classes*.dex cobre classes.dex/classes2/3.dex
 if ! unzip -o -j -q "${APK}" 'classes*.dex' 'resources.arsc' 'AndroidManifest.xml' -d "${TMP}"; then
     echo "ERRO: falha ao extrair seeds de ${APK} — APK corrompido/incompleto?" >&2
@@ -176,6 +202,7 @@ if [ -d "${TMP}/res" ]; then
     find "${TMP}/res" -name '*.xml' -size -1048576c 2>/dev/null \
         | head -50 > "${TMP}/axml-seeds.txt" || true
     while IFS= read -r f; do
+        # shellcheck disable=SC2015  # cp falho em seed individual não aborta
         [ -n "${f}" ] && cp "${f}" "${APK_CORPUS}/axml/" || true
     done < "${TMP}/axml-seeds.txt"
 fi
@@ -268,6 +295,7 @@ done
 # ------------------------------------------------------------ execução ----
 # max_len ≥ maior seed (senão o libFuzzer TRUNCA a seed — mata o EOCD do ZIP):
 #   apk_full/zip: 16 MB · dex: 10 MB · arsc: 4 MB · axml: 2 MB
+# (assert APK ≤ max_len no pré-voo, issue #65)
 pids=()
 names=()
 run_target() { # crate target max_len
@@ -295,10 +323,16 @@ for spec in "rd-apk apk_full 16777216" "rd-apk zip 16777216" "rd-apk axml 209715
     sleep 2   # espaçar builds iniciais (o cargo serializa o lock, sem erro)
 done
 FAILED=()
+RCS=()
 for i in "${!pids[@]}"; do
-    if ! wait "${pids[$i]}"; then
+    set +e
+    wait "${pids[$i]}"
+    rc=$?
+    set -e
+    RCS+=("${rc}")
+    if [ "${rc}" -ne 0 ]; then
         FAILED+=("${names[$i]}")
-        echo "[$(date +%H:%M:%S)] FALHA: ${names[$i]} — ver ${LOGDIR}/${names[$i]//\//-}.log"
+        echo "[$(date +%H:%M:%S)] saída ${rc}: ${names[$i]} — ver ${LOGDIR}/${names[$i]//\//-}.log"
     fi
 done
 
@@ -310,7 +344,8 @@ if [ -f "${LOGDIR}/done.txt" ]; then
     echo "Conclusões em ordem real:"
     sed 's/^/  /' "${LOGDIR}/done.txt"
 fi
-for f in "${LOGDIR}"/*.log; do
+for i in "${!names[@]}"; do
+    f="${LOGDIR}/${names[$i]//\//-}.log"
     [ -e "${f}" ] || continue
     # fork mode não imprime o bloco stat::; o total executado está no último
     # pulso "#N:"; fallback: exec/s do pulso; fallback: n/a
@@ -322,24 +357,58 @@ for f in "${LOGDIR}"/*.log; do
         execs="$(grep -oE 'exec/s: [0-9]+' "${f}" | tail -1 | grep -oE '[0-9]+$' || true)"
     fi
     [ -n "${execs}" ] || execs='n/a (ver log)'
-    printf '%-28s %s unidades\n' "$(basename "${f}" .log):" "${execs}"
+    printf '%-28s %s unidades (exit %s)\n' "$(basename "${f}" .log):" "${execs}" "${RCS[$i]:-?}"
 done
 echo
-# cargo-fuzz grava artifacts em fuzz/artifacts/<target>/crash-<hash> (com
-# SUBDIRETÓRIO por target) — casar por NOME dentro de artifacts/, não por path
-# exato, senão o relatório daria "SEM CRASH" falso.
-CRASH="$(find "${REPO}/crates" -type f -name 'crash-*' -path '*/fuzz/artifacts/*' 2>/dev/null | wc -l || true)"
-OOM="$(find   "${REPO}/crates" -type f -name 'oom-*'    -path '*/fuzz/artifacts/*' 2>/dev/null | wc -l || true)"
-TMO="$(find   "${REPO}/crates" -type f -name 'timeout-*' -path '*/fuzz/artifacts/*' 2>/dev/null | wc -l || true)"
-echo "crashes: ${CRASH} · oom: ${OOM} · timeouts: ${TMO} · targets com falha: ${#FAILED[@]}"
+
+# issue #58: o veredito é por ARTIFACTS, não pelo exit code — no modo fork do
+# libFuzzer o exit é o do ÚLTIMO JOB (FuzzerFork.cpp): 70=timeout/71=oom/
+# 77=achado descartado podem sair de uma campanha que consumiu os SECS
+# íntegros. E leak-* (LSan, filho sai 77) nunca era contado.
+count_artifacts() { # <pattern> — com GUARD: find falho ≠ contagem 0 silenciosa
+    local n
+    if ! n="$(find "${REPO}/crates" -type f -name "$1" -path '*/fuzz/artifacts/*' 2>/dev/null | wc -l)"; then
+        echo "ERRO: falha ao contar artifacts ($1) — veredito indefinido" >&2
+        exit 2
+    fi
+    printf '%s' "${n}"
+}
+CRASH="$(count_artifacts 'crash-*')"
+LEAK="$(count_artifacts 'leak-*')"
+OOM="$(count_artifacts 'oom-*')"
+TMO="$(count_artifacts 'timeout-*')"
+echo "crashes: ${CRASH} · leaks: ${LEAK} · oom: ${OOM} · timeouts: ${TMO} · targets com exit≠0: ${#FAILED[@]}"
 echo
 echo "Uso de disco do corpus (cresceu durante a campanha):"
 du -sh "${REPO}/crates/rd-apk/fuzz/corpus"/* "${REPO}/crates/rd-dex/fuzz/corpus"/* 2>/dev/null | sed 's/^/  /' || true
 
-if [ "${#FAILED[@]}" -gt 0 ]; then
-    echo; echo "RESULTADO: ❌ ${#FAILED[@]} target(s) NÃO concluíram (build/execução): ${FAILED[*]}"
+# ── veredito (issue #58: crash/leak PRIMEIRO — P0 nunca subnotificado) ─────
+if [ "${CRASH}" -gt 0 ] || [ "${LEAK}" -gt 0 ]; then
+    echo; echo "RESULTADO: ❌ ${CRASH} crash-* + ${LEAK} leak-* — bug P0 (Lei nº 1):"
+    find "${REPO}/crates" -type f \( -name 'crash-*' -o -name 'leak-*' \) -path '*/fuzz/artifacts/*' 2>/dev/null | sed 's/^/  /'
+    echo "Reproduzir:   (cd crates/<crate> && cargo fuzz run <target> -- <arquivo-do-artifact>)"
+    echo "Minimizar:    (cd crates/<crate> && cargo fuzz run <target> -- -minimize_crash=1 -runs=10000 <arquivo>)"
+    exit 1
+fi
+
+# falha GENUINA = exit≠0 SEM evidência de progresso (build morto/execução
+# nunca começou). Exit 70/71/77 do fork parent COM pulsos de progresso =
+# campanha consumiu os SECS (último job terminou nesses estados) — não é
+# fracasso (issue #58: antes vira exit 2 falso).
+GENUINE_FAILED=()
+for i in "${!names[@]}"; do
+    [ "${RCS[$i]:-0}" -eq 0 ] || {
+        f="${LOGDIR}/${names[$i]//\//-}.log"
+        if grep -qE '^#[0-9]+:' "${f}" 2>/dev/null; then
+            continue  # rodou (pulsos de execução) — estado do último job é aviso
+        fi
+        GENUINE_FAILED+=("${names[$i]}")
+    }
+done
+if [ "${#GENUINE_FAILED[@]}" -gt 0 ]; then
+    echo; echo "RESULTADO: ❌ ${#GENUINE_FAILED[@]} target(s) NÃO executaram (build/execução): ${GENUINE_FAILED[*]}"
     echo "    SEM os 5 targets íntegros NÃO há como atestar 'fuzz 24h sem crash'."
-    for n in "${FAILED[@]}"; do
+    for n in "${GENUINE_FAILED[@]}"; do
         f="${LOGDIR}/${n//\//-}.log"
         echo "--- ${f} (últimas 15 linhas)"
         tail -15 "${f}" 2>/dev/null || true
@@ -347,15 +416,19 @@ if [ "${#FAILED[@]}" -gt 0 ]; then
     echo "    Corrija (veja o log) e rode de novo — o corpus acumulado é preservado."
     exit 2
 fi
-if [ "${CRASH}" -eq 0 ]; then
-    echo "RESULTADO: ✅ SEM CRASH e 5/5 targets íntegros — DoD do M1 ('fuzz 24h sem crash') satisfeito"
+
+if [ "${CRASH}" -eq 0 ] && [ "${LEAK}" -eq 0 ]; then
+    echo "RESULTADO: ✅ SEM CRASH/LEAK e 5/5 targets rodaram — DoD do M1 ('fuzz 24h sem crash') satisfeito"
     if [ "${OOM}" -gt 0 ] || [ "${TMO}" -gt 0 ]; then
         echo "           (⚠ ${OOM} oom + ${TMO} timeout arquivados — investigar depois; não são crash)"
     fi
+    for i in "${!names[@]}"; do
+        case "${RCS[$i]:-0}" in
+            70|71|77)
+                echo "           (⚠ exit ${RCS[$i]} em ${names[$i]} = estado do ÚLTIMO job do fork parent; a campanha consumiu os ${SECS}s — issue #58)" ;;
+        esac
+    done
+    # issue #65: honestidade — o tempo é wall-clock
+    echo "           (nota: SECS é wall-clock — suspend do notebook conta como tempo de campanha)"
     exit 0
 fi
-echo "RESULTADO: ❌ ${CRASH} crash-* — bug P0 (Lei nº 1):"
-find "${REPO}/crates" -type f -name 'crash-*' -path '*/fuzz/artifacts/*' 2>/dev/null | sed 's/^/  /'
-echo "Reproduzir:   (cd crates/<crate> && cargo fuzz run <target> -- <arquivo-do-artifact>)"
-echo "Minimizar:    (cd crates/<crate> && cargo fuzz run <target> -- -minimize_crash=1 -runs=10000 <arquivo>)"
-exit 1
