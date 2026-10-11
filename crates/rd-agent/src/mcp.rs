@@ -18,7 +18,7 @@
 //! JSON-RPC (-32601/-32700). Lei 1: nunca pânico, nunca silêncio.
 
 use std::io::BufRead;
-use std::path::{Component, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use rd_apk::manifest::ComponentKind;
@@ -198,7 +198,28 @@ impl Policy {
             )
         })?;
         Self::ensure_inside(canon_parent.clone(), raw, roots)?;
-        Ok(canon_parent.join(p.file_name().unwrap_or_default()))
+        let out = canon_parent.join(p.file_name().unwrap_or_default());
+        // issue #67: o último componente NÃO pode ser symlink. Canonizar só o
+        // pai deixava o arquivo do outro lado do link ser sobrescrito — e a
+        // resposta informava o caminho do link (dentro do sandbox), escondendo
+        // a escrita real.
+        if let Ok(md) = out.symlink_metadata() {
+            if md.file_type().is_symlink() {
+                return Err(agent_error(
+                    "SYMLINK_NOT_ALLOWED",
+                    format!(
+                        "{} é um symlink: escrita recusada (o alvo do link pode estar fora do sandbox)",
+                        out.display()
+                    ),
+                    Some("remova o link e use um caminho de arquivo real dentro do sandbox"),
+                ));
+            }
+            // arquivo/diretório existente: canonizar o próprio destino e
+            // reconferir o sandbox (defesa extra sobre o pai já canonizado)
+            let canon = out.canonicalize().unwrap_or_else(|_| out.clone());
+            Self::ensure_inside(canon, raw, roots)?;
+        }
+        Ok(out)
     }
 
     /// Checagens comuns: não-vazio, sem esquema de URL (URLs não
@@ -241,6 +262,47 @@ impl Policy {
                 "mova o arquivo para dentro do sandbox ou ajuste RD_MCP_SANDBOX no processo do servidor",
             ),
         ))
+    }
+}
+
+/// issue #67: escreve SEM seguir symlink no último componente.
+///
+/// A checagem em `check_write_path` acontece ANTES da escrita; entre as duas,
+/// o caminho validado pode ser trocado por um link (TOCTOU). `O_EXCL` na
+/// criação e `O_NOFOLLOW` na reabertura fecham a janela: o arquivo escrito é
+/// sempre o arquivo validado, dentro do sandbox.
+fn write_no_follow(path: &Path, data: &[u8]) -> Result<(), RdError> {
+    use std::io::Write;
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).truncate(true);
+    // O_NOFOLLOW: 0x20000 (Linux/Android) · 0x100 (Darwin). Demais unixes
+    // ficam só com O_EXCL (POSIX: `open(O_CREAT|O_EXCL)` nunca segue link).
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.custom_flags(0x2_0000);
+    }
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.custom_flags(0x0_0100);
+    }
+    let io_err = |e: std::io::Error| {
+        RdError::new(
+            "IO_ERROR",
+            format!("escrevendo {}: {e}", path.display()),
+            MODULE_ID,
+        )
+    };
+    match opts.create_new(true).open(path) {
+        Ok(mut f) => f.write_all(data).map_err(io_err),
+        // já existe (arquivo real validado em check_write_path): truncar
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => opts
+            .create_new(false)
+            .open(path)
+            .and_then(|mut f| f.write_all(data))
+            .map_err(io_err),
+        Err(e) => Err(io_err(e)),
     }
 }
 
@@ -550,7 +612,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "screenshot",
             description:
-                "Screenshot PNG determinístico 720×1440. Com `path` escreve o arquivo (DENTRO do sandbox — RD_MCP_SANDBOX); sem, devolve o PNG em base64 (conteúdo image).",
+                "Screenshot PNG determinístico 720×1440. Com `path` escreve o arquivo (DENTRO do sandbox — RD_MCP_SANDBOX; symlink no destino é recusado: SYMLINK_NOT_ALLOWED, issue #67); sem, devolve o PNG em base64 (conteúdo image).",
             schema: obj(
                 serde_json::json!({ "path": { "type": "string", "description": "arquivo de saída (.png) dentro do sandbox" } }),
                 &[],
@@ -1275,13 +1337,9 @@ impl AgentSession {
             Some(p) if !p.is_empty() => {
                 // Controle M5: escrita de arquivo SÓ dentro do sandbox
                 let out = self.policy.check_write_path(p, &self.roots)?;
-                std::fs::write(&out, &png).map_err(|e| {
-                    RdError::new(
-                        "IO_ERROR",
-                        format!("escrevendo {}: {e}", out.display()),
-                        MODULE_ID,
-                    )
-                })?;
+                // issue #67: nem `fs::write` — ele segue o link se o caminho
+                // for trocado entre a checagem e a escrita.
+                write_no_follow(&out, &png)?;
                 Ok(ToolResult::json(&serde_json::json!({
                     "path": out.display().to_string(),
                     "bytes": png.len(),
@@ -3386,6 +3444,97 @@ mod tests {
         assert_eq!(
             v["resume_hint"], 2,
             "próximo passo pendente é o índice 2 (1 pulado + 1 executado): {v}"
+        );
+    }
+
+    /// issue #67: `check_write_path` canonizava só o diretório PAI e depois
+    /// gravava em `pai.join(nome)`. Se o último componente fosse um symlink
+    /// pré-existente dentro do sandbox, a escrita seguia o link e sobrescrevia
+    /// o alvo FORA das raízes — e a resposta ainda informava o caminho do link
+    /// (dentro do sandbox), escondendo a escrita real.
+    #[cfg(unix)]
+    #[test]
+    fn screenshot_refuses_symlink_escape() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let base = std::env::temp_dir().join(format!(
+            "rd-agent-symlink-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let sandbox = base.join("sandbox");
+        let outside = base.join("outside");
+        std::fs::create_dir_all(&sandbox).expect("sandbox");
+        std::fs::create_dir_all(&outside).expect("outside");
+        let victim = outside.join("victim.png");
+        let original = b"ORIGINAL-10".to_vec();
+        std::fs::write(&victim, &original).expect("victim");
+        // symlink DENTRO da raiz permitida apontando para FORA
+        let link = sandbox.join("shot.png");
+        std::os::unix::fs::symlink(&victim, &link).expect("symlink");
+
+        // o APK do fixture precisa estar legível (install) — o symlink fica
+        // na raiz `sandbox`, que é a que o screenshot usa como destino
+        let fixture_dir = std::path::Path::new(&apk_path)
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let mut s = AgentSession::new().with_policy(Policy {
+            roots: vec![sandbox.clone(), fixture_dir],
+            max_apk_bytes: 256 * 1024 * 1024,
+            max_wait_ms: 1_000,
+            max_batch_steps: 64,
+        });
+        install_ok(&mut s, &apk_path);
+        launch_ok(&mut s, serde_json::json!({}));
+
+        let (v, err) = call(
+            &mut s,
+            "screenshot",
+            serde_json::json!({"path": link.to_string_lossy()}),
+        );
+        assert!(err, "screenshot via symlink deve ser erro, veio {v}");
+        assert_eq!(v["code"], "SYMLINK_NOT_ALLOWED", "{v}");
+        assert!(!v["suggestion"].is_null(), "erro traz suggestion: {v}");
+        assert_eq!(
+            std::fs::read(&victim).expect("victim legível"),
+            original,
+            "issue #67: o alvo fora do sandbox permanece byte a byte igual"
+        );
+
+        // escrita normal dentro do sandbox continua funcionando (e sobrescreve
+        // um arquivo existente — o `create_new` do helper trata o AlreadyExists)
+        let real = sandbox.join("real.png");
+        std::fs::write(&real, b"lixo").expect("seed");
+        let (v, err) = call(
+            &mut s,
+            "screenshot",
+            serde_json::json!({"path": real.to_string_lossy()}),
+        );
+        assert!(!err, "screenshot normal dentro do sandbox: {v}");
+        assert_eq!(v["path"], real.to_string_lossy().to_string(), "{v}");
+        let bytes = std::fs::read(&real).expect("png");
+        assert!(
+            bytes.starts_with(b"\x89PNG"),
+            "PNG gravado no caminho real: {v}"
+        );
+
+        // e um caminho novo (sem arquivo pré-existente) também grava
+        let fresh = sandbox.join("fresh.png");
+        let (v, err) = call(
+            &mut s,
+            "screenshot",
+            serde_json::json!({"path": fresh.to_string_lossy()}),
+        );
+        assert!(!err, "screenshot em arquivo novo: {v}");
+        assert!(
+            std::fs::read(&fresh)
+                .expect("fresh")
+                .starts_with(b"\x89PNG"),
+            "arquivo novo gravado: {v}"
         );
     }
 
