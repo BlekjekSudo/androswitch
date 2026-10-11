@@ -90,7 +90,14 @@ enum Cmd {
         sub: AppSub,
     },
     /// M5: servidor MCP v1 (JSON-RPC 2.0 stdio — ADR 001) para agentes LLM
-    Mcp,
+    Mcp {
+        /// Imprime o catálogo JSON das tools (mesmo shape de tools/list) e sai
+        #[arg(long)]
+        describe_tools: bool,
+        /// Escreve a documentação GERADA do catálogo no arquivo e sai
+        #[arg(long)]
+        gen_docs: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -341,7 +348,37 @@ fn run(cli: Cli) -> i32 {
                 out,
             } => cmd_app_shot(path, activity.as_deref(), out),
         },
-        Cmd::Mcp => {
+        Cmd::Mcp {
+            describe_tools,
+            gen_docs,
+        } => {
+            // M5 (DoD): o conjunto publicado corresponde ao --describe-tools
+            // e à documentação gerada — ambos saem do MESMO tool_defs().
+            if *describe_tools {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&rd_agent::mcp::tools_list_json())
+                        .expect("catálogo serializa")
+                );
+                return 0;
+            }
+            if let Some(path) = gen_docs {
+                return match std::fs::write(path, rd_agent::mcp::tools_markdown()) {
+                    Ok(()) => {
+                        println!("docs geradas em {}", path.display());
+                        0
+                    }
+                    Err(e) => {
+                        let err = RdError::new(
+                            "IO_ERROR",
+                            format!("escrevendo {}: {e}", path.display()),
+                            "rd-cli",
+                        );
+                        let _ = writeln!(std::io::stderr(), "{}", to_json(&err));
+                        1
+                    }
+                };
+            }
             // M5: o stdout É o canal do protocolo — nada mais pode escrever
             // nele (o app roteia saída para o buffer da sessão, ADR 001).
             // O erro sai pelo caminho padrão do contrato (JSON no stderr).

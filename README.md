@@ -59,7 +59,7 @@ RustyDroid is a **"Wine for Android"**: instead of emulating an entire Android O
 | **M2** | ✅ **DONE** — minimal Dalvik interpreter: **150/150 golden vectors PASS vs real JVM execution** + real APK pure methods verified |
 | **M3** | ✅ **DONE** — Essential framework: Activity lifecycle, Handler/Looper, LayoutInflater, Resources |
 | **M4** | ✅ **DONE** — software rendering determinístico + UI dump uiautomator-compatible |
-| **M5** | ✅ **DONE** — MCP agent v1 (`rd mcp`, JSON-RPC stdio, ~20 tools: install/launch/tap/ui_tree/screenshot/logs/assert/permissions) |
+| **M5** | ✅ **DONE** — MCP agent v1 (`rd mcp`, JSON-RPC stdio, **30 tools**: pacote (install/list/remove/clear/launch), input (tap/swipe/type/key), observação (ui_tree/screenshot/logs), wait/wait_for + asserts, permissões, runtime_health, compat_gaps, batch idempotente, sandbox+caps de segurança, `--describe-tools` + docs geradas) |
 | **M6** | Test executor: scenario DSL, JUnit XML, automated compat matrix |
 | **M7** | Performance + **Moto E5 floor gate** (release blocked if budgets blown) |
 | **M8** | Real-world compat: RecyclerView, Fragments, OkHttp shim, SQLite/Room, Services |

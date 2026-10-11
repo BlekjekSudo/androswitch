@@ -299,3 +299,26 @@ Stage Summary:
 - Commits: mcp server + CLI + testes + ADR + docs.
 - Próximo (M6): executor de testes — suíte JSON → JUnit XML; compat-matrix
   automatizada (run_scenario + coverage AG-09).
+
+---
+Task ID: 10
+Agent: Z.ai Code (sessão M5 completa)
+Task: "Adicione oq falta dessa lista ao MCP M5 — Agente MCP v1" — fechar as lacunas do enunciado da milestone no servidor MCP existente (20 tools → catálogo completo + controles + DoD restante).
+
+Work Log:
+- Issue check prévio: 0 issues abertas na API (as 14 pós-M4 já fechadas) — pré-requisito satisfeito.
+- Gap analysis do mcp.rs v1 (20 tools): faltavam pacote list/rem/clear, swipe/type/key, wait_for, runtime_health, compat_gaps, batch; controles de sandbox/APK/URL/tempo; sessionId/package nos resultados; --describe-tools + docs geradas.
+- rd-vm (framework.rs): primitivas do agente — swipe_app (8 amostras, dedupe de views atravessadas, down+up na MESMA view = clique via dispatch_click; clock avança ms), type_text (primeira EditText visível+habilitada; replace flag; find_edit_text DFS), key_event (BACK=finish do host, DEL apaga último char da EditText, ENTER entregue sem efeito, resto NOT_IMPLEMENTED com lista), looper_pending (fila do Looper p/ health). Structs SwipeReport/CrossedView/KeyReport + SUPPORTED_KEYS.
+- rd-agent (mcp.rs): Policy (RD_MCP_SANDBOX/RD_MCP_MAX_APK_MB/RD_MCP_MAX_WAIT_MS/RD_MCP_MAX_BATCH; check_read_path/check_write_path — URL recusada URL_NOT_ALLOWED, `..` e fora-das-raízes PATH_OUTSIDE_SANDBOX, APK_TOO_LARGE antes de ler); AgentSession reestruturada (session_id sess-<pid>-<nanos>, registro multi-app installed: Vec<InstalledApp>, active, engine_package, kill_engine_if_running p/ consistência); install transacional (valida tudo antes de mutar; reinstalar mesmo package mata o engine, outro package não); launch com package explícito (multi-app); 10 tools novas (package_list/package_remove/package_clear — remove mata app em execução, clear reseta PermissionEngine; swipe/type_text/key/wait_for — poll com clock virtual, found=false honesto; runtime_health sem exigir app; compat_gaps — catálogo de 9 lacunas; batch — ordem, stop_on_error, resume_from idempotente, sem aninhamento, cap de passos); wait/swipe/wait_for com LIMIT_EXCEEDED; screenshot com check_write_path; envelope tools/call carrega sessionId + package; tools_list_json público + tools_markdown (docs geradas).
+- rd-cli: `rd mcp --describe-tools` (catálogo JSON = tools/list) e `rd mcp --gen-docs FILE` (escreve docs geradas; exit 0/1 com contrato no stderr).
+- rd-testsupport: build_apk_sdk_perms/build_manifest_axml_sdk_perms (uses-permission no fixture — ciclo grant/clear real).
+- docs/mcp-tools.md GERADA e commitada (teste generated_docs_match_catalog falha se divergir — regen com rd mcp --gen-docs).
+- Testes: +8 unit no rd-agent (catálogo==dispatch+schemas required⊆props; sandbox/URL/APK/caps; batch resume/cap/aninhamento; registro multi-app lifecycle com clear resetando CAMERA; session ids + isolamento; wait_for polls/caps; swipe/type/key no fixture com formulário FQCN EditText + android:onClick; docs consistency) — rd-agent 14/14; e2e rd-cli estendido (30 tools, sessionId/package no envelope, swipe/wait_for/package_list/runtime_health/compat_gaps/batch na fio, --describe-tools == tools/list) — 2/2; rd-vm 11 ok; rd-testsupport ok.
+- Suíte total: 27 suítes ok, 0 falhas; clippy --workspace --all-targets 0 warnings; fmt ok.
+- Docs: README M5 atualizado (30 tools + controles + describe-tools); ROADMAP M5 "30 tools + controles".
+
+Stage Summary:
+- Enunciado M5 100% coberto: pacote (listar/instalar/remover/limpar/launch) ✓, input (tap/swipe/type/key) ✓, observação ✓, espera/assert (wait/wait_for/4 asserts) ✓, permissões ✓, estado/saúde (app_info/device_profile/runtime_health) ✓, lacunas (compat_gaps+behavior_switches) ✓, descrição automática (--describe-tools + tools/list do mesmo registro) ✓, batch idempotente (resume_from) ✓, erros {code,cause,suggestion,module_id} ✓, sessionId/package em TODO resultado ✓, controles (sandbox/APK excessivo/URLs/tempo ilimitado/estado inconsistente) ✓.
+- DoD M5: cliente em processo separado (e2e McpProc com binário real) instala/inicia/interage/observa/asserta sem comandos manuais ✓; testes de schema/JSON/timeout/erro/batch/isolamento ✓; conjunto publicado == --describe-tools == docs geradas (teste trava a convergência) ✓.
+- Catálogo: 20 → 30 tools. Novos erros tipados: PATH_OUTSIDE_SANDBOX, URL_NOT_ALLOWED, APK_TOO_LARGE, LIMIT_EXCEEDED, PACKAGE_NOT_INSTALLED.
+- Próximo (M6): executor de testes — suíte JSON → JUnit XML; compat-matrix automatizada.

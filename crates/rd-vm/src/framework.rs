@@ -166,6 +166,37 @@ impl HostState {
     }
 }
 
+// ── relatórios de input do agente (M5) ──────────────────────────────────
+
+/// View atravessada por um swipe (identidade pela classe + bounds).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrossedView {
+    pub class: String,
+    /// (x, y, w, h) em px do viewport.
+    pub bounds: (i32, i32, i32, i32),
+}
+
+/// Resultado de um swipe: views únicas atravessadas (em ordem do gesto) e
+/// se o gesto terminou como clique (down e up na mesma view — semântica
+/// Android de tap vs scroll).
+#[derive(Debug, Clone)]
+pub struct SwipeReport {
+    pub crossed: Vec<CrossedView>,
+    pub clicked: bool,
+}
+
+/// Resultado de um evento de tecla: se foi entregue e o efeito observável.
+#[derive(Debug, Clone)]
+pub struct KeyReport {
+    pub key: String,
+    pub delivered: bool,
+    pub effect: String,
+}
+
+/// Teclas suportadas pelo modelo v1 (honesto: o resto é NOT_IMPLEMENTED
+/// com sugestão apontando esta lista).
+pub const SUPPORTED_KEYS: &[&str] = &["BACK", "ENTER", "DEL"];
+
 impl Engine {
     /// M3.2: injeta o APK aberto como fonte de Resources (layouts AXML +
     /// resources.arsc). O CLI `rd app run` chama isto UMA vez por execução.
@@ -444,6 +475,241 @@ impl Engine {
             eprintln!("[fw] touch: alvo #{target} ({cls}) sem listener nem android:onClick");
         }
         Ok(false)
+    }
+
+    /// M5 — swipe determinístico do agente: amostra o caminho em passos
+    /// fixos (8 inclusive as pontas), hit-testa cada amostra e registra as
+    /// views únicas atravessadas em ordem. Android: down e up na MESMA view
+    /// viram clique (dispatch do listener); caminhos que cruzam views
+    /// distintas são scroll/fling (v1: só relatório honesto, sem efeito).
+    /// O clock virtual avança `ms` (duração do gesto) — determinístico.
+    pub fn swipe_app(
+        &mut self,
+        x1: i32,
+        y1: i32,
+        x2: i32,
+        y2: i32,
+        ms: u64,
+    ) -> Result<SwipeReport, VmExit> {
+        let Some(activity) = self.fw.current_activity else {
+            return Err(crate::err::vm_error(
+                "INVALID_STATE",
+                "nenhum app em execução (launch_app primeiro)",
+            )
+            .into());
+        };
+        let Some(content) = self.window_content_of(activity) else {
+            // sem setContentView: nada a atravessar (mesma política do touch)
+            return Ok(SwipeReport {
+                crossed: Vec::new(),
+                clicked: false,
+            });
+        };
+        const STEPS: i32 = 8;
+        let mut crossed: Vec<CrossedView> = Vec::new();
+        let mut first: Option<ObjRef> = None;
+        let mut last: Option<ObjRef> = None;
+        for i in 0..=STEPS {
+            let t = i as f32 / STEPS as f32;
+            let x = x1 + ((x2 - x1) as f32 * t).round() as i32;
+            let y = y1 + ((y2 - y1) as f32 * t).round() as i32;
+            let Some(target) = self.hit_test(content, x, y) else {
+                continue;
+            };
+            if first.is_none() {
+                first = Some(target);
+            }
+            last = Some(target);
+            let cls = self.heap.class_of(target)?.to_string();
+            let entry = CrossedView {
+                class: cls,
+                bounds: self.view_bounds(target),
+            };
+            if crossed.last() != Some(&entry) {
+                crossed.push(entry);
+            }
+        }
+        if ms > 0 {
+            self.advance_clock(ms)?;
+        }
+        let mut clicked = false;
+        if let (Some(f), Some(l)) = (first, last) {
+            if f == l {
+                clicked = self.dispatch_click(l)?;
+            }
+        }
+        Ok(SwipeReport { crossed, clicked })
+    }
+
+    fn view_bounds(&self, r: ObjRef) -> (i32, i32, i32, i32) {
+        match self.fw.get(r) {
+            Some(HostObj::View { x, y, w, h, .. }) => (*x, *y, *w, *h),
+            _ => (0, 0, 0, 0),
+        }
+    }
+
+    /// M5 — digitação no "foco": o modelo host ainda não rastreia foco real
+    /// (issue #54 — focusable é honesto=false até o modelo rastrear); a
+    /// política v1 digita na PRIMEIRA EditText visível+habilitada da árvore
+    /// (padrão de telas single-input). `replace=true` substitui; default
+    /// (false) anexa — semântica de digitação. Devolve o texto final.
+    pub fn type_text(&mut self, text: &str, replace: bool) -> Result<String, VmExit> {
+        let Some(activity) = self.fw.current_activity else {
+            return Err(crate::err::vm_error(
+                "INVALID_STATE",
+                "nenhum app em execução (launch_app primeiro)",
+            )
+            .into());
+        };
+        let Some(content) = self.window_content_of(activity) else {
+            return Err(crate::err::vm_error(
+                "INVALID_STATE",
+                "sem window/content (setContentView primeiro)",
+            )
+            .into());
+        };
+        let Some(target) = self.find_edit_text(content, 0)? else {
+            return Err(crate::err::with_suggestion(
+                crate::err::vm_error(
+                    "INVALID_STATE",
+                    "nenhuma EditText visível+habilitada na árvore da activity corrente",
+                ),
+                "o modelo v1 digita em EditText; crie um EditText no layout do app",
+            )
+            .into());
+        };
+        let cur = self.view_text(target)?;
+        let final_text = if replace {
+            text.to_string()
+        } else {
+            format!("{cur}{text}")
+        };
+        self.set_view_text(target, final_text.clone())?;
+        Ok(final_text)
+    }
+
+    /// Primeira EditText (classe contém "EditText" — subclasses do app
+    /// incluídas) visível+habilitada na árvore, DFS (mesma ordem do dump).
+    fn find_edit_text(&self, root: ObjRef, depth: usize) -> Result<Option<ObjRef>, VmExit> {
+        if depth > MAX_VIEW_DEPTH {
+            return Ok(None);
+        }
+        let (vis, enabled, children) = match self.fw.get(root) {
+            Some(HostObj::View {
+                vis,
+                enabled,
+                children,
+                ..
+            }) => (*vis, *enabled, children.clone()),
+            _ => return Ok(None),
+        };
+        if vis == Vis::Visible && enabled {
+            let cls = self.heap.class_of(root)?.to_string();
+            if cls.contains("EditText") {
+                return Ok(Some(root));
+            }
+        }
+        for c in children {
+            if let Some(hit) = self.find_edit_text(c, depth + 1)? {
+                return Ok(Some(hit));
+            }
+        }
+        Ok(None)
+    }
+
+    /// M5 — evento de tecla. BACK finaliza a activity corrente (mesma
+    /// semântica do host `(ACTIVITY, "finish")`); DEL apaga o último
+    /// caractere da EditText (política de foco da type_text); ENTER é
+    /// entregue sem efeito (v1 sem IME action). Outras teclas: erro tipado
+    /// NOT_IMPLEMENTED listando as suportadas — nunca silêncio.
+    pub fn key_event(&mut self, key: &str) -> Result<KeyReport, VmExit> {
+        let key = key.to_ascii_uppercase();
+        let require_activity = |fw: &HostState| -> Result<ObjRef, VmExit> {
+            fw.current_activity.ok_or_else(|| {
+                crate::err::vm_error(
+                    "INVALID_STATE",
+                    "nenhum app em execução (launch_app primeiro)",
+                )
+                .into()
+            })
+        };
+        match key.as_str() {
+            "BACK" => {
+                let activity = require_activity(&self.fw)?;
+                if let Some(HostObj::Activity { finished, .. }) = self.fw.objects.get_mut(&activity)
+                {
+                    *finished = true;
+                }
+                Ok(KeyReport {
+                    key: "BACK".into(),
+                    delivered: true,
+                    effect: "activity finalizada (finish)".into(),
+                })
+            }
+            "DEL" => {
+                let activity = require_activity(&self.fw)?;
+                let Some(content) = self.window_content_of(activity) else {
+                    return Err(crate::err::vm_error(
+                        "INVALID_STATE",
+                        "sem window/content (setContentView primeiro)",
+                    )
+                    .into());
+                };
+                let Some(target) = self.find_edit_text(content, 0)? else {
+                    return Err(crate::err::with_suggestion(
+                        crate::err::vm_error(
+                            "INVALID_STATE",
+                            "DEL sem EditText na árvore (política de foco da type_text)",
+                        ),
+                        "crie um EditText no layout do app",
+                    )
+                    .into());
+                };
+                let mut cur = self.view_text(target)?;
+                let effect = if cur.pop().is_none() {
+                    "texto já vazio".to_string()
+                } else {
+                    self.set_view_text(target, cur.clone())?;
+                    format!("texto agora {cur:?}")
+                };
+                Ok(KeyReport {
+                    key: "DEL".into(),
+                    delivered: true,
+                    effect,
+                })
+            }
+            "ENTER" => {
+                require_activity(&self.fw)?;
+                Ok(KeyReport {
+                    key: "ENTER".into(),
+                    delivered: true,
+                    effect: "entregue, sem IME action no modelo v1".into(),
+                })
+            }
+            other => Err(crate::err::with_suggestion(
+                crate::err::not_implemented(format!(
+                    "tecla {other} fora do modelo v1 (input de teclado)"
+                )),
+                format!("teclas suportadas: {}", SUPPORTED_KEYS.join(", ")),
+            )
+            .into()),
+        }
+    }
+
+    /// M5 — mensagens pendentes na fila do Looper principal (saúde do
+    /// runtime na tool `runtime_health`).
+    pub fn looper_pending(&self) -> usize {
+        let Some(l) = self.fw.main_looper else {
+            return 0;
+        };
+        self.fw
+            .objects
+            .get(&l)
+            .map(|h| match h {
+                HostObj::Looper { queue } => queue.len(),
+                _ => 0,
+            })
+            .unwrap_or(0)
     }
 
     /// Avança o clock virtual e executa as mensagens vencidas (postDelayed).

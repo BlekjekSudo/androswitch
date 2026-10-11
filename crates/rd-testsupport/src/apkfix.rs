@@ -371,6 +371,74 @@ pub fn build_manifest_axml_sdk(
     build_axml(&root)
 }
 
+/// Variante do manifest com `<uses-permission>` declarados (M5).
+pub fn build_manifest_axml_sdk_perms(
+    package: &str,
+    activity_desc: &str,
+    min_sdk: i32,
+    target_sdk: i32,
+    uses_permissions: &[&str],
+) -> Vec<u8> {
+    let mut top = vec![AxNode::new(
+        "uses-sdk",
+        vec![
+            a(true, "minSdkVersion", AxVal::Int(min_sdk)),
+            a(true, "targetSdkVersion", AxVal::Int(target_sdk)),
+        ],
+        vec![],
+    )];
+    for p in uses_permissions {
+        top.push(AxNode::new(
+            "uses-permission",
+            vec![a(true, "name", AxVal::Str((*p).to_string()))],
+            vec![],
+        ));
+    }
+    let application = AxNode::new(
+        "application",
+        vec![],
+        vec![AxNode::new(
+            "activity",
+            vec![a(true, "name", AxVal::Str(activity_desc.to_string()))],
+            vec![AxNode::new(
+                "intent-filter",
+                vec![],
+                vec![
+                    AxNode::new(
+                        "action",
+                        vec![a(
+                            true,
+                            "name",
+                            AxVal::Str("android.intent.action.MAIN".to_string()),
+                        )],
+                        vec![],
+                    ),
+                    AxNode::new(
+                        "category",
+                        vec![a(
+                            true,
+                            "name",
+                            AxVal::Str("android.intent.category.LAUNCHER".to_string()),
+                        )],
+                        vec![],
+                    ),
+                ],
+            )],
+        )],
+    );
+    let mut children = top;
+    children.push(application);
+    let root = AxNode::new(
+        "manifest",
+        vec![
+            a(false, "package", AxVal::Str(package.to_string())),
+            a(true, "versionCode", AxVal::Int(1)),
+        ],
+        children,
+    );
+    build_axml(&root)
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // ZIP (STORED) — local headers + central directory + EOCD, CRC verificado.
 
@@ -735,10 +803,38 @@ pub fn build_apk_sdk(
     min_sdk: i32,
     target_sdk: i32,
 ) -> Vec<u8> {
+    build_apk_sdk_perms(
+        package,
+        activity_desc,
+        arsc,
+        extras,
+        min_sdk,
+        target_sdk,
+        &[],
+    )
+}
+
+/// Variante com `uses-permission` declarados (MCP M5: ciclo de permissões
+/// grant/clear no registro da sessão).
+pub fn build_apk_sdk_perms(
+    package: &str,
+    activity_desc: &str,
+    arsc: Vec<u8>,
+    extras: Vec<(&str, Vec<u8>)>,
+    min_sdk: i32,
+    target_sdk: i32,
+    uses_permissions: &[&str],
+) -> Vec<u8> {
     let mut z = ZipFix::new();
     z.add(
         "AndroidManifest.xml",
-        build_manifest_axml_sdk(package, activity_desc, min_sdk, target_sdk),
+        build_manifest_axml_sdk_perms(
+            package,
+            activity_desc,
+            min_sdk,
+            target_sdk,
+            uses_permissions,
+        ),
     );
     z.add("resources.arsc", arsc);
     for (name, data) in extras {
