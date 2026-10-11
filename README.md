@@ -39,7 +39,7 @@ RustyDroid is a **"Wine for Android"**: instead of emulating an entire Android O
 | Guest OS in RAM | 2–4 GB | **0** (no guest OS) |
 | Boot time | minutes | **seconds** (no boot at all) |
 | Runs in a plain container | rarely | ✅ designed for it |
-| AI-agent control plane | adb, screen scraping | **MCP + ~40 structured tools** |
+| AI-agent control plane | adb, screen scraping | **MCP + 30 structured tools** (JSON-RPC próprio — ADR 001) |
 | Perf baseline | modern desktop | **Motorola Moto E5 (2 GB RAM)** floor |
 
 ### 🤖 Built with AI — heavily
@@ -114,7 +114,7 @@ rustydroid/
 │   ├── rd-engine-*/   # language bridges (flutter/rn/mono/wasm…) feature-gated (M11)
 │   ├── rd-framework/  # android.* natively in Rust: fd-permissions ✅, fd-devices ✅, fd-behavior ✅
 │   ├── rd-render/     # headless / window / web renderers + UI dump     (M4)
-│   ├── rd-agent/      # MCP (rmcp) + JSON-RPC + scenario DSL + coverage (M5)
+│   ├── rd-agent/      # MCP (JSON-RPC próprio, ADR 001) + scenario DSL + coverage (M5) · 30 tools
 │   └── rd-cli/        # the `rd` binary: inspect / perm / device / behavior / dex / vm / app
 ├── data/              # permissions.toml (175), devices.toml (6, incl. moto-e5), behavior-switches.toml (25) · api-coverage.toml (planned)
 ├── golden-apks/       # open-source APK test suite (download script, no binaries)
@@ -153,7 +153,7 @@ Dual-licensed under [`MIT`](./LICENSE-MIT) OR [`Apache-2.0`](./LICENSE-APACHE) �
 **RustyDroid** é uma "Wine para Android": em vez de emular um sistema Android inteiro
 (lento sem KVM), ele parseia APKs diretamente e executa o bytecode Dalvik numa **VM
 escrita em Rust**, com as APIs `android.*` implementadas nativamente, renderização por
-software e um **modo dedicado a agentes de IA (MCP)** com ~40 ferramentas estruturadas.
+software e um **modo dedicado a agentes de IA (MCP)** com 30 ferramentas estruturadas.
 
 - **Piso de performance:** Motorola Moto E5 (Snapdragon 425, 2 GB RAM) — todos os
   budgets de performance são calibrados nele, não em emuladores modernos

@@ -1,6 +1,6 @@
 [package]
 name = "rd-agent"
-description = "RustyDroid: MCP (rmcp) + JSON-RPC + scenario DSL + coverage + batch"
+description = "RustyDroid: servidor MCP v1 (JSON-RPC 2.0 próprio — ADR 001) 30 tools + batch + policy sandbox"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
