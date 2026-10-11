@@ -301,3 +301,49 @@ fn describe_tools_matches_server_catalog() {
         "--describe-tools == tools/list"
     );
 }
+
+/// issue #74: o README anunciava "~40 structured tools" e "MCP (rmcp)". O
+/// catálogo real tem 30 tools e o crate NÃO depende de rmcp — a stack é
+/// JSON-RPC próprio, por decisão do ADR 001 (MSRV). Este teste trava o número
+/// publicado no README contra `rd mcp --describe-tools`.
+#[test]
+fn readme_tool_count_matches_catalog() {
+    let out = Command::new(env!("CARGO_BIN_EXE_rd"))
+        .args(["mcp", "--describe-tools"])
+        .output()
+        .expect("rd mcp --describe-tools");
+    assert!(out.status.success());
+    let described: serde_json::Value = serde_json::from_slice(&out.stdout).expect("catálogo JSON");
+    let live = described["tools"].as_array().expect("tools").len();
+
+    // README (raiz do repositório, relativo ao diretório do crate)
+    let readme = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("README.md"),
+    )
+    .expect("README.md");
+    let expected = format!("{live} structured tools");
+    assert!(
+        readme.contains(&expected),
+        "README não anuncia {expected:?} — catálogo mudou ou a doc ficou defasada (issue #74)"
+    );
+    assert!(
+        !readme.contains("~40") && !readme.contains("rmcp"),
+        "README voltou a citar '~40' ferramentas ou 'rmcp' (issue #74)"
+    );
+
+    // o crate também não pode descrever a stack errada
+    let cargo = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("rd-agent")
+            .join("Cargo.toml"),
+    )
+    .expect("crates/rd-agent/Cargo.toml");
+    assert!(
+        !cargo.contains("rmcp"),
+        "rd-agent não depende de rmcp (ADR 001) — corrigir a description (issue #74)"
+    );
+}
