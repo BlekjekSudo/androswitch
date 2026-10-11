@@ -44,6 +44,10 @@ pub struct Zip {
     /// Offset do central directory já resolvido (ZIP64-aware) — fonte única
     /// para a detecção de assinatura (issue #35: o re-scan duplicado em
     /// lib.rs tinha off-by-one e perdia o sentinela ZIP64).
+    /// issue #84: nomes que aparecem MAIS DE UMA VEZ no central directory
+    /// (ambiguidade: qual entrada o sistema instalaria?). O rd segue lendo a
+    /// 1ª ocorrência, mas a duplicidade é reportada — nunca silenciosa.
+    duplicates: Vec<String>,
     cd_offset: u64,
 }
 
@@ -139,9 +143,20 @@ impl Zip {
             p += 46 + name_len + extra_len + comment_len;
         }
 
+        // issue #84: detecção de nomes repetidos (ordem de aparição).
+        let mut seen = std::collections::HashSet::new();
+        let mut dup_seen = std::collections::HashSet::new();
+        let mut duplicates = Vec::new();
+        for e in &entries {
+            if !seen.insert(e.name.as_str()) && dup_seen.insert(e.name.as_str()) {
+                duplicates.push(e.name.clone());
+            }
+        }
+
         Ok(Zip {
             data,
             entries,
+            duplicates,
             cd_offset,
         })
     }
@@ -366,6 +381,12 @@ impl Zip {
         self.entries.len()
     }
 
+    /// issue #84: nomes de entrada repetidos (ordem de aparição no CD).
+    /// Vazio na imensa maioria dos APKs — é o sinal de um container ambíguo.
+    pub fn duplicates(&self) -> &[String] {
+        &self.duplicates
+    }
+
     /// Offset do central directory já resolvido (ZIP64-aware) — o mesmo valor
     /// usado no parse; garante que a detecção de assinatura e o leitor de
     /// entradas nunca divergem (issue #35).
@@ -450,6 +471,60 @@ mod tests {
         v.extend(cd_size.to_le_bytes());
         v.extend(cd_start.to_le_bytes());
         v.extend(0u16.to_le_bytes()); // comment len
+        v
+    }
+
+    /// Monta um ZIP STORED com N entradas (nomes podem repetir — issue #84).
+    fn handcrafted_zip_multi(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut v = Vec::new();
+        let mut central = Vec::new();
+        for (name, content) in entries {
+            let crc = crc32(content);
+            let local_offset = v.len() as u32;
+            v.extend(LOCAL_HEADER_SIG.to_le_bytes());
+            v.extend(20u16.to_le_bytes());
+            v.extend(0u16.to_le_bytes());
+            v.extend(METHOD_STORED.to_le_bytes());
+            v.extend(0u16.to_le_bytes());
+            v.extend(0u16.to_le_bytes());
+            v.extend(crc.to_le_bytes());
+            v.extend((content.len() as u32).to_le_bytes());
+            v.extend((content.len() as u32).to_le_bytes());
+            v.extend((name.len() as u16).to_le_bytes());
+            v.extend(0u16.to_le_bytes());
+            v.extend_from_slice(name.as_bytes());
+            v.extend_from_slice(content);
+
+            central.extend(CD_ENTRY_SIG.to_le_bytes());
+            central.extend(20u16.to_le_bytes());
+            central.extend(20u16.to_le_bytes());
+            central.extend(0u16.to_le_bytes());
+            central.extend(METHOD_STORED.to_le_bytes());
+            central.extend(0u16.to_le_bytes());
+            central.extend(0u16.to_le_bytes());
+            central.extend(crc.to_le_bytes());
+            central.extend((content.len() as u32).to_le_bytes());
+            central.extend((content.len() as u32).to_le_bytes());
+            central.extend((name.len() as u16).to_le_bytes());
+            central.extend(0u16.to_le_bytes());
+            central.extend(0u16.to_le_bytes());
+            central.extend(0u16.to_le_bytes());
+            central.extend(0u16.to_le_bytes());
+            central.extend(0u32.to_le_bytes());
+            central.extend(local_offset.to_le_bytes());
+            central.extend_from_slice(name.as_bytes());
+        }
+        let cd_start = v.len() as u32;
+        v.extend(&central);
+        let cd_size = v.len() as u32 - cd_start;
+        v.extend(EOCD_SIG.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend((entries.len() as u16).to_le_bytes());
+        v.extend((entries.len() as u16).to_le_bytes());
+        v.extend(cd_size.to_le_bytes());
+        v.extend(cd_start.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
         v
     }
 
@@ -589,6 +664,36 @@ mod tests {
         let err = zip.read("big.bin").unwrap_err();
         assert_eq!(err.code, "INVALID_FORMAT");
         assert!(err.cause.contains("teto global"), "mensagem: {}", err.cause);
+    }
+
+    /// issue #84: dois central-directory entries com o mesmo nome. O rd NÃO
+    /// rejeita o container (um APK ambíguo é justamente o que uma ferramenta
+    /// de análise precisa descrever), mas expõe a duplicidade.
+    #[test]
+    fn duplicate_entry_names_are_reported_not_silently_picked() {
+        let bytes = handcrafted_zip_multi(&[
+            ("classes.dex", b"dex-primeira-ocorrencia"),
+            ("classes2.dex", b"dex-2"),
+            ("classes.dex", b"DEX-SEGUNDA-OCORRENCIA"),
+        ]);
+        let zip = Zip::parse(bytes).expect("zip com duplicata parseia");
+        assert_eq!(zip.entry_count(), 3, "3 entradas zip (o container é real)");
+        assert_eq!(
+            zip.duplicates(),
+            ["classes.dex"],
+            "só o repetido: {:?}",
+            zip.duplicates()
+        );
+        // find/read seguem na 1ª ocorrência — decisão explícita e documentada
+        assert_eq!(
+            zip.read("classes.dex").unwrap(),
+            b"dex-primeira-ocorrencia".to_vec(),
+            "leitura usa a 1ª ocorrência"
+        );
+        // sem duplicata não há sinal
+        let clean = handcrafted_zip_multi(&[("a.dex", b"a"), ("b.dex", b"b")]);
+        let zip = Zip::parse(clean).unwrap();
+        assert!(zip.duplicates().is_empty(), "APK normal: sem aviso");
     }
 
     /// Entrada DEFLATE legítima (declaração honesta) continua inflando igual.

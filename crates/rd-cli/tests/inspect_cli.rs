@@ -287,3 +287,89 @@ fn declared_permissions_are_decoded_and_not_unknown() {
         "esperava INFO APP_DEFINED_PERMISSION: {arr:?}"
     );
 }
+
+/// issue #84: APK com `classes.dex` DUPLICADO no ZIP. Antes o `inspect`
+/// contava as duas entradas como DEX distintos e não avisava nada — o resumo
+/// descrevia um APK que não corresponde ao que é instalado.
+#[test]
+fn inspect_flags_duplicate_zip_entries_and_counts_dex_once() {
+    let tmp = tempfile_dir("dupdex");
+    let arsc = ArscFix::new();
+    let bytes = build_apk_sdk_perms(
+        "com.example.dupdex",
+        "com.example.dupdex.Main",
+        arsc.build(),
+        vec![
+            ("classes.dex", b"dex-primeira-ocorrencia".to_vec()),
+            ("classes2.dex", b"dex-2".to_vec()),
+            ("classes.dex", b"DEX-SEGUNDA-OCORRENCIA".to_vec()),
+        ],
+        26,
+        26,
+        &["android.permission.INTERNET"],
+    );
+    let path = tmp.join("dupdex.apk");
+    std::fs::write(&path, &bytes).expect("apk");
+    let apk = path.to_string_lossy().to_string();
+
+    // ── saída humana: avisa e conta por nome único ──
+    let text = run_rd(&["inspect", &apk]);
+    assert_eq!(text.code, 0, "stderr: {}", text.stderr);
+    let content_line = text
+        .stdout
+        .lines()
+        .find(|l| l.starts_with("content"))
+        .unwrap_or_else(|| panic!("linha de conteúdo ausente: {}", text.stdout));
+    assert!(
+        content_line.contains("5 entradas zip"),
+        "5 entradas (o container é real): {content_line:?}"
+    );
+    assert!(
+        content_line.contains("· 2 dex ·"),
+        "issue #84: DEX conta por nome ÚNICO (antes vinha 3): {content_line:?}"
+    );
+    let warn = text
+        .stdout
+        .lines()
+        .find(|l| l.starts_with("zip duplicates"))
+        .unwrap_or_else(|| panic!("aviso de duplicata ausente: {}", text.stdout));
+    assert!(
+        warn.contains("classes.dex"),
+        "nome repetido citado: {warn:?}"
+    );
+    assert!(
+        warn.contains("1ª ocorrência"),
+        "política explícita: {warn:?}"
+    );
+
+    // ── JSON: a ambiguidade é dado, não silêncio ──
+    let json = run_rd(&["inspect", &apk, "--json"]);
+    assert_eq!(json.code, 0, "stderr: {}", json.stderr);
+    let v: serde_json::Value = serde_json::from_str(&json.stdout).expect("json do inspect");
+    assert_eq!(
+        v["zip_duplicates"][0], "classes.dex",
+        "json expõe a duplicata: {v}"
+    );
+    assert_eq!(
+        v["dex_files"].as_array().map(|a| a.len()),
+        Some(2),
+        "dex_files sem repetição: {v}"
+    );
+
+    // ── APK normal: sem aviso, sem campo novo (sem regressão) ──
+    let tmp2 = tempfile_dir("cleandex");
+    let clean = build_apk(&tmp2, 26);
+    let text = run_rd(&["inspect", &clean]);
+    assert_eq!(text.code, 0, "stderr: {}", text.stderr);
+    assert!(
+        !text.stdout.contains("zip duplicates"),
+        "APK sem duplicata não deve avisar: {}",
+        text.stdout
+    );
+    let json = run_rd(&["inspect", &clean, "--json"]);
+    let v: serde_json::Value = serde_json::from_str(&json.stdout).expect("json do inspect");
+    assert!(
+        v.get("zip_duplicates").is_none(),
+        "sem duplicata ⇒ campo ausente: {v}"
+    );
+}

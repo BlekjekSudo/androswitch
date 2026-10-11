@@ -48,6 +48,11 @@ pub struct Apk {
     pub res_count: usize,
     pub resources_arsc: bool,
     pub zip_entry_count: usize,
+    /// issue #84: nomes de entrada repetidos no ZIP (ambiguidade). Vazio nos
+    /// APKs normais; quando presente, o inventário abaixo conta por nome
+    /// ÚNICO e o `inspect` avisa explicitamente.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub zip_duplicates: Vec<String>,
     pub file_size_bytes: u64,
 }
 
@@ -98,7 +103,13 @@ impl Apk {
         let mut abis = Vec::new();
         let mut assets = Vec::new();
         let mut res_count = 0usize;
+        // issue #84: inventário por nome ÚNICO — uma entrada repetida não
+        // vira "dois DEX" (o que distorcia o resumo do `inspect`).
+        let mut seen_names = std::collections::HashSet::new();
         for name in zip.names() {
+            if !seen_names.insert(name) {
+                continue;
+            }
             if name.ends_with(".dex") && !name.contains('/') {
                 dex_files.push(name.to_string());
             } else if let Some(rest) = name.strip_prefix("lib/") {
@@ -129,6 +140,8 @@ impl Apk {
         };
 
         let zip_entry_count = zip.entry_count();
+        // issue #84: capturado antes de `zip` ser movido para a struct
+        let zip_duplicates = zip.duplicates().to_vec();
 
         Ok(Apk {
             manifest_entry: manifest_entry.to_string(),
@@ -143,6 +156,7 @@ impl Apk {
             assets,
             res_count,
             zip_entry_count,
+            zip_duplicates,
             file_size_bytes,
         })
     }

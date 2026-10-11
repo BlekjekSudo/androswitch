@@ -99,6 +99,8 @@ permissions (31 declaradas; tabela: 175 permissões)
 
 Build it yourself: `cargo build -p rd-cli` → `./target/debug/rd inspect your.apk`.
 
+APKs with duplicate ZIP entries (two `classes.dex`, for instance) are **accepted but flagged**: the inventory counts each name once and `inspect` prints a `zip duplicates` warning (plus a `zip_duplicates` key in `--json`); reads follow the first occurrence. Policy and rationale: [ADR 002](docs/adr/002-zip-duplicate-entries.md).
+
 ---
 
 ## 📦 Repository layout
