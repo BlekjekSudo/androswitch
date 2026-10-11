@@ -715,13 +715,23 @@ fn cmd_inspect(path: &Path, json: bool, device: Option<&str>, dd: &DataDir) -> R
         states.len(),
         engine.table.len()
     ));
+    // issue #76: `not requested` existia no JSON mas não no resumo textual —
+    // as quatro categorias antigas não somavam o total declarado e o usuário
+    // não conseguia explicar a diferença.
+    let not_requested = count(|s| s == GrantState::NotRequested);
     out.push_str(&format!(
-        "  auto-granted: {} · runtime-pending: {} · special: {} · unknown: {}\n",
+        "  auto-granted: {} · runtime-pending: {} · special: {} · unknown: {} · not requested: {}\n",
         count(|s| s == GrantState::AutoGranted),
         count(|s| s == GrantState::RuntimePending),
         count(|s| s == GrantState::SpecialPending),
         count(|s| s == GrantState::Unknown),
+        not_requested,
     ));
+    if not_requested > 0 {
+        out.push_str(
+            "    (not requested = fora da janela do targetSdk: maxSdkVersion vencido ou since_api acima do alvo)\n",
+        );
+    }
     for group in ["dangerous (runtime-pending)", "special access", "unknown"] {
         let want = match group {
             "dangerous (runtime-pending)" => GrantState::RuntimePending,
