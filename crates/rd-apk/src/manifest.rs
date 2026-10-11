@@ -47,8 +47,14 @@ pub struct UsesPermission {
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct DeclaredPermission {
     pub name: String,
+    /// `android:protectionLevel` DECODIFICADO (ex.: `"signature|privileged"`).
+    /// issue #69: antes era a string numérica crua ("18"), ilegível para
+    /// humanos e agentes.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub protection_level: Option<String>,
+    /// Valor numérico bruto do `protectionLevel` (ex.: `18`), preservado.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub protection_level_raw: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -434,9 +440,13 @@ pub fn build(doc: &AxmlDocument, arsc: Option<&Arsc>) -> RdResult<Manifest> {
 
     for perm in root.children_named("permission") {
         if let Some(name) = attr_str(perm, "name") {
+            let (pl_raw, pl_decoded) = attr_str(perm, "protectionLevel")
+                .map(|raw| decode_protection_level(&raw))
+                .unwrap_or((None, None));
             m.declared_permissions.push(DeclaredPermission {
                 name,
-                protection_level: attr_str(perm, "protectionLevel"),
+                protection_level: pl_decoded,
+                protection_level_raw: pl_raw,
                 group: attr_str(perm, "permissionGroup"),
                 label: attr_str(perm, "label"),
                 description: attr_str(perm, "description"),
@@ -720,6 +730,74 @@ fn build_intent_filter(f: &XmlElement, order: usize) -> IntentFilter {
     filter
 }
 
+// ─── proteção de permissões declaradas (issue #69) ─────────────────────────
+
+/// Decodifica `android:protectionLevel` do AXML.
+///
+/// O atributo é um bitfield: base em `0x0–0x3` (`PROTECTION_MASK_BASE`) mais
+/// flags a partir de `0x10` — o AOSP faz o mesmo em
+/// `PermissionInfo.protectionToString`. Devolve `(bruto, decodificado)`;
+/// quando o valor já vem em forma textual (`"signature"`), não há bruto.
+pub fn decode_protection_level(raw: &str) -> (Option<u32>, Option<String>) {
+    let t = raw.trim();
+    let value = if let Some(hex) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
+        u32::from_str_radix(hex, 16).ok()
+    } else {
+        t.parse::<u32>().ok()
+    };
+    match value {
+        Some(v) => (Some(v), Some(describe_protection_level(v))),
+        None if t.is_empty() => (None, None),
+        // forma textual no próprio AXML — nada a decodificar
+        None => (None, Some(t.to_string())),
+    }
+}
+
+/// Texto de um `protectionLevel` numérico: base + flags, nas constantes de
+/// `android.content.pm.PermissionInfo` / `R.attr.protectionLevel`. Bits não
+/// conhecidos são preservados em hexadecimal (nunca perdidos, nunca inventados).
+pub fn describe_protection_level(v: u32) -> String {
+    let base = match v & 0xF {
+        0 => "normal",
+        1 => "dangerous",
+        2 => "signature",
+        3 => "signatureOrSystem",
+        4 => "internal",
+        other => return format!("0x{other:x}"),
+    };
+    // 0x10 é `PROTECTION_FLAG_PRIVILEGED` (nome atual; o antigo
+    // `PROTECTION_FLAG_SYSTEM` era o mesmo bit e está deprecated desde API 23).
+    const FLAGS: &[(u32, &str)] = &[
+        (0x10, "privileged"),
+        (0x20, "development"),
+        (0x40, "appop"),
+        (0x80, "pre23"),
+        (0x100, "installer"),
+        (0x200, "verifier"),
+        (0x400, "preinstalled"),
+        (0x800, "setup"),
+        (0x1000, "instant"),
+        (0x2000, "runtimeOnly"),
+        (0x4000, "oem"),
+        (0x8000, "vendorPrivileged"),
+        (0x1_0000, "systemTextClassifier"),
+    ];
+    let mut out = base.to_string();
+    let mut known = 0u32;
+    for (bit, name) in FLAGS {
+        if v & bit != 0 {
+            out.push('|');
+            out.push_str(name);
+        }
+        known |= bit;
+    }
+    let rest = v & !0xF & !known;
+    if rest != 0 {
+        out.push_str(&format!("|0x{rest:x}"));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -743,6 +821,55 @@ mod tests {
             value: AttrValue::String(value.to_string()),
             res_id: None,
         }
+    }
+
+    /// issue #69: `protectionLevel` é um bitfield — 18 = 0x12 = signature (0x2)
+    /// | privileged (0x10). Antes o valor era exposto cru ("18").
+    #[test]
+    fn protection_level_is_decoded_and_keeps_the_raw_value() {
+        // caso real do F-Droid: org.fdroid.fdroid.permission.UPDATE_REPOS
+        assert_eq!(
+            decode_protection_level("18"),
+            (Some(18), Some("signature|privileged".to_string()))
+        );
+        // DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+        assert_eq!(
+            decode_protection_level("2"),
+            (Some(2), Some("signature".to_string()))
+        );
+        // bases
+        assert_eq!(
+            decode_protection_level("0"),
+            (Some(0), Some("normal".to_string()))
+        );
+        assert_eq!(
+            decode_protection_level("1"),
+            (Some(1), Some("dangerous".to_string()))
+        );
+        assert_eq!(
+            decode_protection_level("3"),
+            (Some(3), Some("signatureOrSystem".to_string()))
+        );
+        // hex + flag de desenvolvimento (50 = 0x32)
+        assert_eq!(
+            decode_protection_level("0x32"),
+            (
+                Some(50),
+                Some("signature|privileged|development".to_string())
+            )
+        );
+        // forma textual no próprio AXML: sem bruto, texto preservado
+        assert_eq!(
+            decode_protection_level("signature"),
+            (None, Some("signature".to_string()))
+        );
+        // bits desconhecidos são preservados em hexadecimal (nunca perdidos)
+        assert_eq!(
+            decode_protection_level("0x100002"),
+            (Some(0x100002), Some("signature|0x100000".to_string()))
+        );
+        // vazio
+        assert_eq!(decode_protection_level("  "), (None, None));
     }
 
     /// manifest mínimo com um componente arbitrário dentro de <application>.

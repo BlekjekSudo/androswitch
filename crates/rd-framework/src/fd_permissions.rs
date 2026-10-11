@@ -8,7 +8,7 @@
 use rd_apk::manifest::Manifest;
 use rd_apk::{RdError, RdResult};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const MODULE_ID: &str = "fd-permissions";
 
@@ -151,6 +151,10 @@ pub enum GrantState {
     Denied,
     /// não existe na tabela versionada (desconhecida para o motor).
     Unknown,
+    /// issue #69: declarada pelo PRÓPRIO APK (`<permission>` no manifesto).
+    /// Não é desconhecida — o app a define e a detém; o Android real só
+    /// concede a apps de terceiros conforme o `protectionLevel` declarado.
+    AppDefined,
     /// issue #31: nem chega a ser pedida — maxSdkVersion vencido, since_api
     /// acima do targetSdk, ou uses-permission-sdk-23 com target < 23 (o
     /// Android real nem registra a permissão nesses casos).
@@ -159,7 +163,10 @@ pub enum GrantState {
 
 impl GrantState {
     pub fn is_granted(self) -> bool {
-        matches!(self, GrantState::AutoGranted | GrantState::Granted)
+        matches!(
+            self,
+            GrantState::AutoGranted | GrantState::Granted | GrantState::AppDefined
+        )
     }
 }
 
@@ -189,6 +196,8 @@ pub enum Severity {
 pub struct PermissionEngine {
     pub table: PermissionTable,
     states: BTreeMap<String, GrantState>,
+    /// issue #69: nomes declarados pelo próprio manifesto (`<permission>`).
+    declared: BTreeSet<String>,
 }
 
 impl PermissionEngine {
@@ -218,6 +227,11 @@ impl PermissionEngine {
     ///     → `NotRequested` (POST_NOTIFICATIONS since 33 em target 26);
     /// (c) `uses-permission-sdk-23`: só pedida com target ≥ 23.
     pub fn install(manifest: &Manifest, table: PermissionTable) -> Self {
+        let declared: BTreeSet<String> = manifest
+            .declared_permissions
+            .iter()
+            .map(|d| d.name.clone())
+            .collect();
         let mut states = BTreeMap::new();
         for up in &manifest.uses_permissions {
             let gated_out = up.max_sdk.is_some_and(|max| manifest.target_sdk > max)
@@ -230,12 +244,25 @@ impl PermissionEngine {
                         GrantState::NotRequested
                     }
                     Some(def) => Self::initial_state(def),
+                    // issue #69: ausente da tabela MAS declarada pelo próprio
+                    // APK não é "desconhecida" — o app a define.
+                    None if declared.contains(&up.name) => GrantState::AppDefined,
                     None => GrantState::Unknown,
                 }
             };
             states.insert(up.name.clone(), state);
         }
-        PermissionEngine { table, states }
+        PermissionEngine {
+            table,
+            states,
+            declared,
+        }
+    }
+
+    /// issue #69: permissões que o próprio APK declara via `<permission>`
+    /// (na ordem do manifesto), com o `protectionLevel` decodificado.
+    pub fn declared_permissions(&self) -> &BTreeSet<String> {
+        &self.declared
     }
 
     /// issue #31: marcador de confiança para o output — permissões de nível
@@ -244,6 +271,11 @@ impl PermissionEngine {
     /// as teriam NEGADAS. O JSON do CLI usa isto para não enganar agentes.
     /// issue #51: Internal é o mais system-only de todos — entrou no marker.
     pub fn granted_by(&self, name: &str) -> Option<&'static str> {
+        // issue #69: permissão definida pelo próprio APK — o app a detém, mas
+        // o agente precisa saber que a origem é a própria declaração.
+        if self.state(name) == Some(GrantState::AppDefined) {
+            return Some("self-declared");
+        }
         if self.state(name) == Some(GrantState::AutoGranted) {
             if let Some(def) = self.table.get(name) {
                 return matches!(
@@ -299,7 +331,12 @@ impl PermissionEngine {
     /// Revoga de volta ao estado inicial da instalação (unused-app auto-revoke usa isto).
     pub fn revoke(&mut self, name: &str) -> RdResult<GrantState> {
         let def = self.table.get(name).map(Self::initial_state);
-        let init = def.unwrap_or(GrantState::Unknown);
+        // issue #69: permissão do próprio app volta a AppDefined, não Unknown
+        let init = def.unwrap_or(if self.declared.contains(name) {
+            GrantState::AppDefined
+        } else {
+            GrantState::Unknown
+        });
         let cur = self
             .states
             .get_mut(name)
@@ -344,18 +381,42 @@ impl PermissionEngine {
         let mut findings = Vec::new();
 
         for up in &manifest.uses_permissions {
-            if self.table.get(&up.name).is_none() {
+            if self.table.get(&up.name).is_some() {
+                continue;
+            }
+            // issue #69: declarada no `<permission>` do próprio APK → INFO
+            // (é modelo do app, não um nome suspeito), com o nível decodificado.
+            if let Some(decl) = manifest
+                .declared_permissions
+                .iter()
+                .find(|d| d.name == up.name)
+            {
+                let level = decl
+                    .protection_level
+                    .clone()
+                    .unwrap_or_else(|| "não informado".to_string());
                 findings.push(AuditFinding {
-                    severity: Severity::Warning,
-                    code: "UNKNOWN_PERMISSION".into(),
+                    severity: Severity::Info,
+                    code: "APP_DEFINED_PERMISSION".into(),
                     message: format!(
-                        "permission {} is not in the versioned table — verify the exact name",
-                        up.name
+                        "permission {} is declared by this APK (<permission>) with protectionLevel={}",
+                        up.name, level
                     ),
                     permission: Some(up.name.clone()),
                     component: None,
                 });
+                continue;
             }
+            findings.push(AuditFinding {
+                severity: Severity::Warning,
+                code: "UNKNOWN_PERMISSION".into(),
+                message: format!(
+                    "permission {} is not in the versioned table — verify the exact name",
+                    up.name
+                ),
+                permission: Some(up.name.clone()),
+                component: None,
+            });
         }
 
         let pending = self.pending_runtime();
@@ -642,6 +703,109 @@ mod gating_tests {
         assert_eq!(
             e.state("android.permission.CAMERA"),
             Some(GrantState::RuntimePending)
+        );
+    }
+
+    /// issue #69: permissão declarada no `<permission>` do próprio APK é
+    /// modelo do app (não "desconhecida") e a auditoria emite INFO em vez do
+    /// falso positivo `UNKNOWN_PERMISSION`.
+    #[test]
+    fn app_declared_permission_is_not_unknown() {
+        use rd_apk::manifest::DeclaredPermission;
+
+        let table = PermissionTable::embedded().unwrap();
+        let mut m = manifest_target(34, &[("CAMERA", None, false)]);
+        m.uses_permissions.push(UsesPermission {
+            name: "com.t.permission.CUSTOM".to_string(),
+            max_sdk: None,
+            sdk23: false,
+        });
+        m.uses_permissions.push(UsesPermission {
+            name: "com.t.permission.GHOST".to_string(),
+            max_sdk: None,
+            sdk23: false,
+        });
+        m.declared_permissions.push(DeclaredPermission {
+            name: "com.t.permission.CUSTOM".to_string(),
+            protection_level: Some("signature|privileged".to_string()),
+            protection_level_raw: Some(18),
+            ..Default::default()
+        });
+
+        let engine = PermissionEngine::install(&m, table);
+        assert_eq!(
+            engine.state("com.t.permission.CUSTOM"),
+            Some(GrantState::AppDefined),
+            "declarada pelo APK: nem unknown, nem auto-grant de terceiro"
+        );
+        assert_eq!(
+            engine.granted_by("com.t.permission.CUSTOM"),
+            Some("self-declared")
+        );
+        assert!(engine
+            .state("com.t.permission.CUSTOM")
+            .unwrap()
+            .is_granted());
+        // não declarada em lugar nenhum: continua UNKNOWN_PERMISSION
+        assert_eq!(
+            engine.state("com.t.permission.GHOST"),
+            Some(GrantState::Unknown)
+        );
+
+        let findings = engine.audit(&m);
+        let codes: Vec<&str> = findings.iter().map(|f| f.code.as_str()).collect();
+        assert!(
+            codes.contains(&"APP_DEFINED_PERMISSION"),
+            "esperava INFO da permissão do app: {codes:?}"
+        );
+        assert!(
+            codes.contains(&"UNKNOWN_PERMISSION"),
+            "a realmente desconhecida continua sendo reportada: {codes:?}"
+        );
+        // e o UNKNOWN_PERMISSION NÃO é o nome declarado pelo app
+        for f in findings.iter().filter(|f| f.code == "UNKNOWN_PERMISSION") {
+            assert_eq!(
+                f.permission.as_deref(),
+                Some("com.t.permission.GHOST"),
+                "falso positivo sobre permissão declarada pelo APK (issue #69)"
+            );
+        }
+        // a mensagem do INFO traz o protectionLevel decodificado
+        let info = findings
+            .iter()
+            .find(|f| f.code == "APP_DEFINED_PERMISSION")
+            .expect("finding APP_DEFINED_PERMISSION");
+        assert!(
+            info.message
+                .contains("protectionLevel=signature|privileged"),
+            "mensagem: {}",
+            info.message
+        );
+    }
+
+    /// issue #69: `revoke` de permissão do próprio app volta a AppDefined
+    /// (e não a Unknown, que reintroduziria o falso positivo).
+    #[test]
+    fn revoke_app_declared_permission_keeps_it_defined() {
+        use rd_apk::manifest::DeclaredPermission;
+
+        let table = PermissionTable::embedded().unwrap();
+        let mut m = manifest_target(34, &[]);
+        m.uses_permissions.push(UsesPermission {
+            name: "com.t.permission.CUSTOM".to_string(),
+            max_sdk: None,
+            sdk23: false,
+        });
+        m.declared_permissions.push(DeclaredPermission {
+            name: "com.t.permission.CUSTOM".to_string(),
+            protection_level: Some("signature".to_string()),
+            protection_level_raw: Some(2),
+            ..Default::default()
+        });
+        let mut engine = PermissionEngine::install(&m, table);
+        assert_eq!(
+            engine.revoke("com.t.permission.CUSTOM").unwrap(),
+            GrantState::AppDefined
         );
     }
 

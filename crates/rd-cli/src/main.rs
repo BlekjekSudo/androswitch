@@ -719,13 +719,17 @@ fn cmd_inspect(path: &Path, json: bool, device: Option<&str>, dd: &DataDir) -> R
     // as quatro categorias antigas não somavam o total declarado e o usuário
     // não conseguia explicar a diferença.
     let not_requested = count(|s| s == GrantState::NotRequested);
+    // issue #69: `app-defined` entra como categoria para que a soma continue
+    // fechando com o total declarado (mesma regra da #76).
+    let app_defined = count(|s| s == GrantState::AppDefined);
     out.push_str(&format!(
-        "  auto-granted: {} · runtime-pending: {} · special: {} · unknown: {} · not requested: {}\n",
+        "  auto-granted: {} · runtime-pending: {} · special: {} · unknown: {} · not requested: {} · app-defined: {}\n",
         count(|s| s == GrantState::AutoGranted),
         count(|s| s == GrantState::RuntimePending),
         count(|s| s == GrantState::SpecialPending),
         count(|s| s == GrantState::Unknown),
         not_requested,
+        app_defined,
     ));
     if not_requested > 0 {
         out.push_str(
