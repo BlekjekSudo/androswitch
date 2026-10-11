@@ -28,7 +28,7 @@ Instala um APK na sessão (abre, valida o piso API 26 e prepara o estado de perm
 
 ### `launch`
 
-Executa o app instalado: cria a activity (LAUNCHER ou `activity`) e roda o lifecycle até o onCreate completar. Com `package` lança outro app do registro (multi-app); sem, o app ativo (último install/launch).
+Executa o app instalado: cria a activity (LAUNCHER ou `activity`) e roda o lifecycle até o onCreate completar. `activity` precisa estar declarada como <activity> no AndroidManifest.xml E existir no DEX (issues #82/#83) — o Android recusa o que não está declarado. Com `package` lança outro app do registro (multi-app); sem, o app ativo (último install/launch).
 
 - Parâmetros: `activity, package`
 
