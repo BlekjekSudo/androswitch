@@ -82,8 +82,10 @@ enum Cmd {
         sub: VmSub,
     },
     /// Executa o app headless (M3: lifecycle + views + touch do agente)
+    /// issue #56: SEM path no nível externo — o path duplicado era obrigatório
+    /// e descartado (`Cmd::App { path: _, sub }`); a forma documentada no
+    /// ROADMAP (`rd app dump <apk>`) saía com exit 64.
     App {
-        path: PathBuf,
         #[command(subcommand)]
         sub: AppSub,
     },
@@ -221,6 +223,10 @@ enum DeviceSub {
 }
 
 fn main() {
+    // issue #55: stdout do processo host é do ARTEFATO do comando (dump XML,
+    // JSON, PNG status) — System.out do app vai para o stderr (o Android real
+    // manda saída do app para o logcat, nunca para o stream do dump).
+    rd_vm::route_app_stdout_to_stderr();
     // issue #34: clap sai com 2 em usage error — colide com o 2 =
     // NOT_IMPLEMENTED do contrato. Remapeado: help/version = 0; usage = 64
     // (EX_USAGE, convenção BSD) — o contrato JSON do projeto fica intacto.
@@ -314,7 +320,7 @@ fn run(cli: Cli) -> i32 {
                 *json,
             ),
         },
-        Cmd::App { path: _, sub } => match sub {
+        Cmd::App { sub } => match sub {
             AppSub::Run {
                 path,
                 activity,
@@ -416,6 +422,15 @@ fn load_permissions(dd: &DataDir) -> Result<PermissionTable, RdError> {
         }
         None => PermissionTable::embedded(),
     }
+}
+
+/// Converte o RdError do rd-render para o contrato do binário (mesma forma).
+fn render_err(e: rd_render::RdError) -> RdError {
+    let mut r = RdError::new(&e.code, &e.cause, &e.module_id);
+    if let Some(s) = e.suggestion {
+        r = r.with_suggestion(s);
+    }
+    r
 }
 
 fn open_apk(path: &Path) -> Result<Apk, RdError> {
@@ -1123,14 +1138,26 @@ fn cmd_app_run(
         match (parts[0], parts.get(1)) {
             ("tap", rest) => {
                 let (x, y) = rest.and_then(|r| r.split_once(',')).ok_or_else(|| {
-                    RdError::invalid_format(format!("script tap inválido: {script:?}"))
-                        .with_suggestion("use --script \"tap X,Y\" (px inteiros)")
+                    RdError::new(
+                        "INVALID_FORMAT",
+                        format!("script tap inválido: {script:?}"),
+                        "rd-cli",
+                    )
+                    .with_suggestion("use --script \"tap X,Y\" (px inteiros)")
                 })?;
                 let x: i32 = x.trim().parse().map_err(|_| {
-                    RdError::invalid_format(format!("tap X inválido em {script:?}"))
+                    RdError::new(
+                        "INVALID_FORMAT",
+                        format!("tap X inválido em {script:?}"),
+                        "rd-cli",
+                    )
                 })?;
                 let y: i32 = y.trim().parse().map_err(|_| {
-                    RdError::invalid_format(format!("tap Y inválido em {script:?}"))
+                    RdError::new(
+                        "INVALID_FORMAT",
+                        format!("tap Y inválido em {script:?}"),
+                        "rd-cli",
+                    )
                 })?;
                 let hit = eng.touch_app(x, y).map_err(vm_err_to_rd)?;
                 if !json {
@@ -1139,8 +1166,12 @@ fn cmd_app_run(
             }
             ("wait", rest) => {
                 let ms: u64 = rest.and_then(|r| r.trim().parse().ok()).ok_or_else(|| {
-                    RdError::invalid_format(format!("script wait inválido: {script:?}"))
-                        .with_suggestion("use --script \"wait 250\" (ms)")
+                    RdError::new(
+                        "INVALID_FORMAT",
+                        format!("script wait inválido: {script:?}"),
+                        "rd-cli",
+                    )
+                    .with_suggestion("use --script \"wait 250\" (ms)")
                 })?;
                 let ran = eng.advance_clock(ms).map_err(vm_err_to_rd)?;
                 if !json {
@@ -1157,10 +1188,10 @@ fn cmd_app_run(
             }
             ("xml", _) => {
                 // M4: dump uiautomator (get_ui_tree)
-                let tree = eng
-                    .view_tree()
-                    .ok_or_else(|| RdError::invalid_format("sem activity/window para dump"))?;
-                let xml = rd_render::uiautomator_xml(&tree, &package);
+                let tree = eng.view_tree().ok_or_else(|| {
+                    RdError::new("INVALID_FORMAT", "sem activity/window para dump", "rd-cli")
+                })?;
+                let xml = rd_render::uiautomator_xml(&tree, &package).map_err(render_err)?;
                 if !json {
                     print!("{xml}");
                 } else {
@@ -1173,12 +1204,20 @@ fn cmd_app_run(
                     .map(|r| r.trim())
                     .filter(|r| !r.is_empty())
                     .ok_or_else(|| {
-                        RdError::invalid_format(format!("script shot inválido: {script:?}"))
-                            .with_suggestion("use --script \"shot tela.png\"")
+                        RdError::new(
+                            "INVALID_FORMAT",
+                            format!("script shot inválido: {script:?}"),
+                            "rd-cli",
+                        )
+                        .with_suggestion("use --script \"shot tela.png\"")
                     })?;
                 let file = file.strip_prefix("--out ").map(str::trim).unwrap_or(file);
                 let tree = eng.view_tree().ok_or_else(|| {
-                    RdError::invalid_format("sem activity/window para screenshot")
+                    RdError::new(
+                        "INVALID_FORMAT",
+                        "sem activity/window para screenshot",
+                        "rd-cli",
+                    )
                 })?;
                 let png = rd_render::render_snapshot(&tree).to_png();
                 std::fs::write(file, &png).map_err(|e| {
@@ -1190,9 +1229,11 @@ fn cmd_app_run(
                 shots.push(file.to_string());
             }
             (other, _) => {
-                return Err(RdError::invalid_format(format!(
-                    "ação de script desconhecida: {other:?}"
-                ))
+                return Err(RdError::new(
+                    "INVALID_FORMAT",
+                    format!("ação de script desconhecida: {other:?}"),
+                    "rd-cli",
+                )
                 .with_suggestion("ações válidas: tap X,Y · wait MS · dump"));
             }
         }
@@ -1269,8 +1310,8 @@ fn cmd_app_dump(
     }
     let tree = eng
         .view_tree()
-        .ok_or_else(|| RdError::invalid_format("sem activity/window para dump"))?;
-    let xml = rd_render::uiautomator_xml(&tree, &package);
+        .ok_or_else(|| RdError::new("INVALID_FORMAT", "sem activity/window para dump", "rd-cli"))?;
+    let xml = rd_render::uiautomator_xml(&tree, &package).map_err(render_err)?;
     if json {
         println!(
             "{}",
@@ -1290,9 +1331,13 @@ fn cmd_app_dump(
 /// software renderer determinístico do rd-render.
 fn cmd_app_shot(path: &Path, activity: Option<&str>, out: &Path) -> Result<(), RdError> {
     let (eng, _activity, _package) = boot_app(path, activity)?;
-    let tree = eng
-        .view_tree()
-        .ok_or_else(|| RdError::invalid_format("sem activity/window para screenshot"))?;
+    let tree = eng.view_tree().ok_or_else(|| {
+        RdError::new(
+            "INVALID_FORMAT",
+            "sem activity/window para screenshot",
+            "rd-cli",
+        )
+    })?;
     let png = rd_render::render_snapshot(&tree).to_png();
     std::fs::write(out, &png).map_err(|e| {
         RdError::new(
@@ -1524,11 +1569,20 @@ fn cmd_dex_disasm(
                 let file = dir.join(disasm::smali_file_name(desc));
                 // o path mapping cria subdiretórios (ex.: org/fdroid/fdroid/…)
                 // — criar o pai do arquivo, não só a raiz de --out
+                // issue #63: E/S nascida no rd-cli (path de SAÍDA escolhido pelo
+                // usuário) — module_id rd-cli, não o rd-apk herdado de RdError::io
                 if let Some(parent) = file.parent() {
-                    std::fs::create_dir_all(parent)
-                        .map_err(|e| RdError::io(&e, "criando diretórios de --out"))?;
+                    std::fs::create_dir_all(parent).map_err(|e| {
+                        RdError::new(
+                            "IO_ERROR",
+                            format!("criando diretórios de --out: {e}"),
+                            "rd-cli",
+                        )
+                    })?;
                 }
-                std::fs::write(&file, &text).map_err(|e| RdError::io(&e, "escrevendo smali"))?;
+                std::fs::write(&file, &text).map_err(|e| {
+                    RdError::new("IO_ERROR", format!("escrevendo smali: {e}"), "rd-cli")
+                })?;
                 println!("{} -> {} ({} bytes)", desc, file.display(), text.len());
             } else if json {
                 println!(

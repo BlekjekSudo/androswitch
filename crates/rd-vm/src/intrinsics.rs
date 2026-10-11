@@ -91,16 +91,63 @@ pub(crate) fn object_to_string(vm: &mut Engine, r: crate::heap::ObjRef) -> Resul
 /// (spec de java.io.PrintStream) — engolir falha de E/S é a semântica correta.
 fn host_print(fd: i32, s: &str) {
     use std::io::Write;
-    match fd {
-        2 => {
-            let _ = std::io::stderr().write_all(s.as_bytes());
-            let _ = std::io::stderr().flush();
-        }
-        _ => {
+    if fd == 2 {
+        let _ = std::io::stderr().write_all(s.as_bytes());
+        let _ = std::io::stderr().flush();
+        return;
+    }
+    // issue #55: fd=1 do app segue o modo configurado — o CLI roteia para o
+    // stderr do host (stdout reservado ao artefato do comando: dump XML/JSON);
+    // default da LIB continua stdout (comportamento Java real).
+    let mode = app_stdout_mode();
+    match mode {
+        HostOut::Std => {
             let _ = std::io::stdout().write_all(s.as_bytes());
             let _ = std::io::stdout().flush();
         }
+        HostOut::Stderr => {
+            let _ = std::io::stderr().write_all(s.as_bytes());
+            let _ = std::io::stderr().flush();
+        }
+        HostOut::Buffer(buf) => {
+            buf.lock()
+                .expect("host out buffer")
+                .extend_from_slice(s.as_bytes());
+        }
     }
+}
+
+// ── issue #55: roteamento da saída do app ───────────────────────────────────
+
+/// Destino do fd=1 do app (System.out). fd=2 (System.err) é SEMPRE o stderr
+/// do host — Android real manda app stdout/Log para o logcat, nunca para o
+/// stream do dump.
+#[derive(Clone, Default, Debug)]
+pub enum HostOut {
+    /// stdout do host (default da biblioteca — semântica Java).
+    #[default]
+    Std,
+    /// stderr do host (modo CLI — stdout reservado ao artefato do comando).
+    Stderr,
+    /// Buffer em memória (testes — assert do conteúdo impresso).
+    Buffer(std::sync::Arc<std::sync::Mutex<Vec<u8>>>),
+}
+
+static APP_STDOUT: std::sync::Mutex<HostOut> = std::sync::Mutex::new(HostOut::Std);
+
+fn app_stdout_mode() -> HostOut {
+    APP_STDOUT.lock().expect("app stdout mode").clone()
+}
+
+/// Configura o destino do System.out do app (issue #55).
+pub fn set_app_stdout(mode: HostOut) {
+    *APP_STDOUT.lock().expect("app stdout mode") = mode;
+}
+
+/// Roteia System.out do app para o STDERR do host (contrato de máquina:
+/// stdout reservado ao artefato do comando — issue #55). Idempotente.
+pub fn route_app_stdout_to_stderr() {
+    set_app_stdout(HostOut::Stderr);
 }
 
 /// Intrínseco STATIC: chamado de invoke-static (e do entrypoint público).
