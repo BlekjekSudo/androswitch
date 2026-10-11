@@ -697,7 +697,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "batch",
             description:
-                "Executa uma lista de chamadas [{name, arguments}] EM ORDEM, uma vez cada, com resultados por passo. stop_on_error (default true) para no 1º erro; `resume_from` pula os N primeiros passos já executados — retomada idempotente. Cap RD_MCP_MAX_BATCH (default 64). batch não aninha.",
+                "Executa uma lista de chamadas [{name, arguments}] EM ORDEM, uma vez cada, com resultados por passo. stop_on_error (default true) para no 1º erro; `resume_from` pula os N primeiros passos já executados — retomada idempotente. Cap RD_MCP_MAX_BATCH (default 64). batch não aninha. Validação de formato (name obrigatório/não vazio, sem batch aninhado, arguments objeto) rola sobre o lote INTEIRO antes de executar: passo inválido ⇒ NADA é executado (issue #80).",
             schema: obj(
                 serde_json::json!({
                     "calls": { "type": "array", "items": { "type": "object" }, "description": "[{\"name\": \"tap\", \"arguments\": {…}}]" },
@@ -1769,6 +1769,45 @@ impl AgentSession {
                 Some("resume_from é o NÚMERO de passos já executados a pular"),
             ));
         }
+        // issue #80: validar o lote INTEIRO antes de executar qualquer passo.
+        // As checagens viviam dentro do laço: um passo inválido no meio
+        // abortava DEPOIS de executar os anteriores, e o erro devolvido não
+        // trazia `steps`, `executed` nem `resume_hint` — o cliente ficava sem
+        // saber o que mudou no app nem de onde retomar (retomada nada
+        // idempotente). Política escolhida: formato inválido → NADA executa.
+        for (i, c) in list.iter().enumerate() {
+            let step = c.as_object().ok_or_else(|| {
+                agent_error(
+                    "INVALID_FORMAT",
+                    format!("passo {i} não é um objeto"),
+                    Some("cada passo é {\"name\": …, \"arguments\": {…}}"),
+                )
+            })?;
+            let name = step.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            if name.is_empty() {
+                return Err(agent_error(
+                    "INVALID_FORMAT",
+                    format!("passo {i} sem \"name\""),
+                    Some("informe o nome da tool (ex.: {\"name\": \"launch\", \"arguments\": {}})"),
+                ));
+            }
+            if name == "batch" {
+                return Err(agent_error(
+                    "INVALID_FORMAT",
+                    format!("batch não aninha (passo {i})"),
+                    Some("chame as sub-chamadas direto no lote"),
+                ));
+            }
+            if let Some(args) = step.get("arguments") {
+                if !args.is_object() {
+                    return Err(agent_error(
+                        "INVALID_FORMAT",
+                        format!("passo {i} ({name:?}): \"arguments\" precisa ser um objeto"),
+                        Some("use {\"arguments\": {…}} ou omita o campo"),
+                    ));
+                }
+            }
+        }
         let mut steps: Vec<serde_json::Value> = Vec::new();
         let mut executed = 0usize;
         let mut stopped_early = false;
@@ -1781,21 +1820,8 @@ impl AgentSession {
                 }));
                 continue;
             }
+            // issue #80: o formato já foi validado para o lote inteiro acima
             let name = c.get("name").and_then(|v| v.as_str()).unwrap_or("");
-            if name == "batch" {
-                return Err(agent_error(
-                    "INVALID_FORMAT",
-                    format!("batch não aninha (passo {i})"),
-                    Some("chame as sub-chamadas direto no lote"),
-                ));
-            }
-            if name.is_empty() {
-                return Err(agent_error(
-                    "INVALID_FORMAT",
-                    format!("passo {i} sem \"name\""),
-                    None,
-                ));
-            }
             let args = c.get("arguments").cloned().unwrap_or(serde_json::json!({}));
             let r = self.call_tool(name, &args);
             let content_json: serde_json::Value = match &r.content[0] {
@@ -3215,6 +3241,85 @@ mod tests {
         let (v, err) = call(&mut s, "launch", serde_json::json!({}));
         assert!(!err, "launch sem activity: {v}");
         assert_eq!(v["launched"], true, "{v}");
+    }
+
+    /// issue #80: as checagens de formato viviam dentro do laço de execução,
+    /// então um passo inválido no meio abortava DEPOIS de rodar os anteriores
+    /// — e o erro não trazia `steps`/`executed`/`resume_hint` (o cliente não
+    /// sabia o que mudou no app nem de onde retomar).
+    #[test]
+    fn batch_invalid_step_runs_nothing() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+
+        // passo inválido na posição 1 (depois de um `launch` válido): o
+        // `launch` do passo 0 NÃO pode ter sido executado
+        for (label, bad) in [
+            ("sem name", serde_json::json!({"arguments": {}})),
+            (
+                "name vazio",
+                serde_json::json!({"name": "", "arguments": {}}),
+            ),
+            (
+                "batch aninhado",
+                serde_json::json!({"name": "batch", "arguments": {"calls": []}}),
+            ),
+            (
+                "arguments não-objeto",
+                serde_json::json!({"name": "tap", "arguments": 7}),
+            ),
+            ("passo não-objeto", serde_json::json!("tap")),
+        ] {
+            let (v, err) = call(
+                &mut s,
+                "batch",
+                serde_json::json!({"calls": [{"name": "launch", "arguments": {}}, bad]}),
+            );
+            assert!(err, "{label}: lote com passo inválido é erro, veio {v}");
+            assert_eq!(v["code"], "INVALID_FORMAT", "{label}: {v}");
+            assert!(
+                v["cause"].as_str().unwrap_or_default().contains("1"),
+                "{label}: causa cita o índice do passo: {v}"
+            );
+            // efeito colateral zero: nada foi lançado
+            let (h, herr) = call(&mut s, "runtime_health", serde_json::json!({}));
+            assert!(!herr, "runtime_health: {h}");
+            assert_eq!(
+                h["running"], false,
+                "{label}: issue #80 — lote inválido não pode executar o passo 0: {h}"
+            );
+        }
+
+        // passo inválido na posição 0 também não executa nada (e cita o índice)
+        let (v, err) = call(
+            &mut s,
+            "batch",
+            serde_json::json!({"calls": [{"name": "", "arguments": {}}, {"name": "wait", "arguments": {"ms": 1}}]}),
+        );
+        assert!(err, "passo 0 inválido: {v}");
+        assert_eq!(v["code"], "INVALID_FORMAT", "{v}");
+        assert!(
+            v["cause"].as_str().unwrap_or_default().contains("0"),
+            "causa cita o passo 0: {v}"
+        );
+
+        // lote válido continua executando tudo (sem regressão)
+        let (v, err) = call(
+            &mut s,
+            "batch",
+            serde_json::json!({"calls": [
+                {"name": "launch", "arguments": {}},
+                {"name": "wait", "arguments": {"ms": 10}},
+                {"name": "assert_text", "arguments": {"resource_id": "com.test:id/tv", "expected": "Olá do MCP"}},
+            ]}),
+        );
+        assert!(!err, "lote válido: {v}");
+        assert_eq!(v["executed"], 3, "{v}");
+        assert!(v["resume_hint"].is_null(), "{v}");
+        let (h, _) = call(&mut s, "runtime_health", serde_json::json!({}));
+        assert_eq!(h["running"], true, "lote válido lançou o app: {h}");
     }
 
     /// serve_stdio: sessão completa por linhas (loop real de E/S).
