@@ -1,0 +1,13 @@
+[package]
+name = "rd-testsupport"
+description = "RustyDroid: fixtures determinísticos (DexBuilder/apkfix) compartilhados pelos testes dos crates"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+rd-dex = { workspace = true }
+rd-vm = { path = "../rd-vm" }

@@ -22,3 +22,6 @@ clap.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+rd-testsupport = { path = "../rd-testsupport" }

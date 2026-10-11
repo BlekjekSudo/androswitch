@@ -243,6 +243,7 @@ dependencies = [
  "rd-dex",
  "rd-framework",
  "rd-render",
+ "rd-testsupport",
  "rd-vm",
  "serde",
  "serde_json",
@@ -293,12 +294,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "rd-testsupport"
+version = "0.1.0"
+dependencies = [
+ "rd-dex",
+ "rd-vm",
+]
+
+[[package]]
 name = "rd-vm"
 version = "0.1.0"
 dependencies = [
  "rd-apk",
  "rd-dex",
  "rd-render",
+ "rd-testsupport",
  "serde",
  "serde_json",
 ]

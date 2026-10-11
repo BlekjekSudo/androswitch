@@ -368,6 +368,12 @@ pub struct ZipFix {
     entries: Vec<(String, Vec<u8>)>,
 }
 
+impl Default for ZipFix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ZipFix {
     pub fn new() -> Self {
         ZipFix {
@@ -389,7 +395,8 @@ impl ZipFix {
             out.extend(20u16.to_le_bytes()); // version needed
             out.extend(0u16.to_le_bytes()); // flags
             out.extend(0u16.to_le_bytes()); // method = STORED
-            out.extend(0x9F00u16.to_le_bytes()); // mod time (12:30 — issue #47)
+                                            // 0x9F00 = 19:56:00 (hora 19 = 10011b, min 56 = 111000b, seg 0) — issue #47
+            out.extend(0x9F00u16.to_le_bytes()); // mod time
             out.extend(0x5D41u16.to_le_bytes()); // mod date (2026-10-01)
             out.extend(crc.to_le_bytes());
             out.extend((data.len() as u32).to_le_bytes()); // compressed
@@ -441,6 +448,10 @@ pub enum ArscVal {
     Str(String),
     Int(i32),
     Ref(u32),
+    /// issue #61: dimensão crua Res_value (mantissa<<8 | unit) — ex. (80<<8)|1 = 80dp
+    Dim(u32),
+    /// issue #61: boolean (TYPE_BOOLEAN, data 0/1)
+    Bool(bool),
 }
 
 pub struct ArscEntry {
@@ -521,6 +532,26 @@ impl ArscFix {
             lang: None,
         });
         self.resid_of("id", name)
+    }
+
+    /// issue #61: `@dimen/<name>` (dp) — o inflate resolve por referência.
+    pub fn add_dimen_dp(&mut self, name: &str, dp: i32) -> u32 {
+        self.slot("dimen").push(ArscEntry {
+            name: name.to_string(),
+            val: ArscVal::Dim(((dp as u32) << 8) | 1), // unit 1 = DIP
+            lang: None,
+        });
+        self.resid_of("dimen", name)
+    }
+
+    /// issue #61: `@bool/<name>` — o inflate resolve por referência.
+    pub fn add_bool(&mut self, name: &str, value: bool) -> u32 {
+        self.slot("bool").push(ArscEntry {
+            name: name.to_string(),
+            val: ArscVal::Bool(value),
+            lang: None,
+        });
+        self.resid_of("bool", name)
     }
 
     pub fn build(&self) -> Vec<u8> {
@@ -605,6 +636,8 @@ impl ArscFix {
                         ),
                         ArscVal::Int(i) => (TYPE_FIRST_INT, *i as u32),
                         ArscVal::Ref(r) => (TYPE_REFERENCE, *r),
+                        ArscVal::Dim(raw) => (TYPE_DIMENSION, *raw),
+                        ArscVal::Bool(b) => (TYPE_BOOLEAN, *b as u32),
                     };
                     body.extend(8u16.to_le_bytes()); // Res_value.size
                     body.push(0u8); // res0

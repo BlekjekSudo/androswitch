@@ -18,3 +18,4 @@ rd-apk = { workspace = true }
 
 [dev-dependencies]
 rd-render = { path = "../rd-render" }
+rd-testsupport = { path = "../rd-testsupport" }
