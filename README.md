@@ -78,7 +78,7 @@ APKs below the floor are inspected fine but refuse to run with a structured `BEL
 The foundation is **real, tested code** — verified end-to-end against the F-Droid client APK (973 zip entries, 36 components, 31 permissions):
 
 - ✅ `rd inspect <apk>` — full manifest decode: identity, SDKs + **API-floor check** (`BELOW_FLOOR`), features, all 4 component types + intent filters, resolved labels (chained resource refs), signing schemes v1/v2/v3, dex/native/asset inventory
-- ✅ **Permission engine** over versioned data: **175 permissions** (12 dangerous groups, 15 special-access, 35 signature…), install → grant/deny/revoke state machine + static audit (`exported` without guard, debuggable, cleartext…)
+- ✅ **Permission engine** over versioned data: **175 permissions** (12 dangerous groups, 15 special-access, 36 signature…), install → grant/deny/revoke state machine + static audit (`exported` without guard, debuggable, cleartext…)
 - ✅ **Device profiles** incl. the contractual **`moto-e5` hardware floor** (RSS ≤ 512 MB, app heap ≤ 256 MB, 25% single-thread)
 - ✅ **Behavior switches** per targetSdk 26→36 (25 entries, PRF-07)
 - ✅ Structured errors everywhere: `{code, cause, suggestion, module_id}` — never a silent failure (unimplemented modules answer `NOT_IMPLEMENTED`). **Exit codes (contrato público para agents): 0 ok · 1 erro · 2 NOT_IMPLEMENTED · 4 erro VM (`rd vm exec`) · 64 usage.**
