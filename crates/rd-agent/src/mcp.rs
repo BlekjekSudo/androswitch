@@ -526,7 +526,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "wait_for",
             description:
-                "Espera CONDICIONAL: avança o clock virtual em passos de `step_ms` (default 100) até a view (resource_id/text/class) existir ou `timeout_ms` vencer (cap RD_MCP_MAX_WAIT_MS). found=false é resposta honesta (não é erro) — o agente decide.",
+                "Espera CONDICIONAL: avança o clock virtual em passos de `step_ms` (default 100) até a view (resource_id/text/class) existir ou `timeout_ms` vencer (cap RD_MCP_MAX_WAIT_MS). `class` casa o nome completo ou o nome simples exato (issue #78). found=false é resposta honesta (não é erro) — o agente decide.",
             schema: obj(
                 serde_json::json!({
                     "resource_id": { "type": "string" },
@@ -582,7 +582,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "assert_view",
             description:
-                "Asserção de existência: procura view por resource-id (ex.: com.app:id/btn), texto ou classe. Retorna matches.",
+                "Asserção de existência: procura view por resource-id (ex.: com.app:id/btn), trecho de texto ou classe. `class` casa o nome COMPLETO (android.widget.TextView) ou o nome SIMPLES exato (TextView) — `View` NÃO casa TextView. Retorna matches.",
             schema: obj(
                 serde_json::json!({
                     "resource_id": { "type": "string" },
@@ -1899,6 +1899,13 @@ fn validate_view_criteria(
 }
 
 /// Busca DFS na árvore de UI por resource-id/text/class.
+/// issue #78: casamento de classe por nome COMPLETO ou pelo nome SIMPLES
+/// exato (segmento após o último `.`). O `ends_with` solto fazia `class="View"`
+/// casar `android.widget.TextView` — a asserção deixava de ser falsificável.
+fn class_matches(node_class: &str, want: &str) -> bool {
+    node_class == want || node_class.rsplit('.').next().unwrap_or(node_class).eq(want)
+}
+
 fn collect_matches(
     n: &UiNode,
     rid: Option<&str>,
@@ -1913,7 +1920,7 @@ fn collect_matches(
     let class = class.filter(|c| !c.trim().is_empty());
     let rid_hit = rid.map_or(true, |r| n.resource_id.as_deref() == Some(r));
     let text_hit = text.map_or(true, |t| n.text.contains(t));
-    let class_hit = class.map_or(true, |c| n.class == c || n.class.ends_with(c));
+    let class_hit = class.map_or(true, |c| class_matches(&n.class, c));
     if rid_hit && text_hit && class_hit {
         out.push(serde_json::json!({
             "class": n.class,
@@ -2954,6 +2961,83 @@ mod tests {
         assert_eq!(
             v["found"], false,
             "texto inexistente continua found=false: {v}"
+        );
+    }
+
+    /// issue #78: `collect_matches` casava classe por sufixo solto
+    /// (`ends_with`), então `class="View"` casava `android.widget.TextView` e
+    /// `class="Layout"` casava `LinearLayout` — asserção não falsificável.
+    #[test]
+    fn class_matching_requires_exact_full_or_simple_name() {
+        // regra pura (sem sessão)
+        assert!(class_matches(
+            "android.widget.TextView",
+            "android.widget.TextView"
+        ));
+        assert!(class_matches("android.widget.TextView", "TextView"));
+        assert!(
+            !class_matches("android.widget.TextView", "View"),
+            "View (parcial) não pode casar TextView"
+        );
+        assert!(!class_matches("android.widget.TextView", "extView"));
+        assert!(
+            !class_matches("android.widget.LinearLayout", "Layout"),
+            "Layout (parcial) não pode casar LinearLayout"
+        );
+        assert!(class_matches("android.widget.LinearLayout", "LinearLayout"));
+        // classe sem ponto também funciona
+        assert!(class_matches("TextView", "TextView"));
+        assert!(!class_matches("TextView", "View"));
+
+        // e na árvore real do app (TextView dentro de LinearLayout)
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+        launch_ok(&mut s, serde_json::json!({}));
+
+        let (v, err) = call(&mut s, "assert_view", serde_json::json!({"class": "View"}));
+        assert!(!err, "assert_view com classe: {v}");
+        assert_eq!(
+            v["found"], false,
+            "issue #78: `View` não deve casar a TextView: {v}"
+        );
+
+        let (v, err) = call(
+            &mut s,
+            "assert_view",
+            serde_json::json!({"class": "Layout"}),
+        );
+        assert!(!err, "{v}");
+        assert_eq!(
+            v["found"], false,
+            "issue #78: `Layout` não deve casar LinearLayout: {v}"
+        );
+
+        // os dois nomes legítimos continuam casando
+        for (label, want) in [
+            ("nome simples", "TextView"),
+            ("nome completo", "android.widget.TextView"),
+        ] {
+            let (v, err) = call(&mut s, "assert_view", serde_json::json!({"class": want}));
+            assert!(!err, "{label}: {v}");
+            assert_eq!(v["found"], true, "{label} ({want}) deveria casar: {v}");
+            assert_eq!(
+                v["matches"][0]["class"], "android.widget.TextView",
+                "{label}: {v}"
+            );
+        }
+
+        // wait_for com classe parcial: found=false até o timeout (não casa)
+        let (v, err) = call(
+            &mut s,
+            "wait_for",
+            serde_json::json!({"class": "View", "timeout_ms": 200, "step_ms": 50}),
+        );
+        assert!(!err, "wait_for: {v}");
+        assert_eq!(
+            v["found"], false,
+            "issue #78: wait_for com classe parcial não deve encontrar: {v}"
         );
     }
 
