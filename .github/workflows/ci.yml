@@ -79,6 +79,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build rd CLI
         run: cargo build --release -p rd-cli
+      # issue #72: o gate não pode ficar verde com 0 (ou 149) vetores comparados
+      - name: Gate rejects a wrong-sized golden set
+        run: bash golden/vm/test-gate.sh
       - name: Fetch harness tools (r8; ecj pulado — javac presente)
         run: bash golden/vm/fetch-tools.sh
       - name: Compile + dex golden cases
