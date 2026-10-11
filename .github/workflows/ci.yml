@@ -75,6 +75,18 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      # issue #86: os parsers (DEX, AXML, ARSC, ZIP) são críticos no SECURITY.md
+      # — `unsafe` fora de rd-ndk/rd-jni é erro de compilação (workspace lints)
+      # e também é barrado aqui, caso a configuração de lint seja removida.
+      - name: No `unsafe` outside rd-ndk/rd-jni
+        run: |
+          if grep -rnE '\bunsafe[[:space:]]*(\{|fn|impl|trait|extern)' \
+               crates xtask --include='*.rs' \
+               --exclude-dir=rd-ndk --exclude-dir=rd-jni --exclude-dir=target ; then
+            echo "::error::unsafe fora de rd-ndk/rd-jni (CONTRIBUTING item 5 / SECURITY.md)"
+            exit 1
+          fi
+          echo "✅ nenhum unsafe fora de rd-ndk/rd-jni"
       - name: smoke — rd CLI binary works
         run: |
           cargo build --release -p rd-cli

@@ -8,6 +8,12 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+# issue #86: exceção documentada (CONTRIBUTING item 5 / SECURITY.md) — `unsafe`
+# é esperado aqui (ponte nativa), mas cada bloco exige `#[allow]` local com
+# justificativa e ADR, em vez de ficar liberado no crate inteiro.
+[lints.rust]
+unsafe_code = "deny"
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true

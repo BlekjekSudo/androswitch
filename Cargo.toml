@@ -14,6 +14,13 @@ members = [
     "xtask",
 ]
 
+# issue #86: a regra "sem `unsafe` fora de rd-ndk/rd-jni" (CONTRIBUTING item 5,
+# SECURITY.md) passa a ser IMPOSTA pelo compilador. Cada crate herda isto via
+# `[lints] workspace = true`; rd-ndk e rd-jni fazem override para `deny`
+# (o `unsafe` nelas é esperado, mas precisa de `#[allow]` local + ADR).
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
