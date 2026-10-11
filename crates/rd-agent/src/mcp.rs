@@ -1846,7 +1846,11 @@ impl AgentSession {
             "total_steps": list.len(),
             "executed": executed,
             "stopped_early": stopped_early,
-            "resume_hint": if stopped_early || executed < list.len() {
+            // issue #81: `executed` só conta o que rodou NESTA chamada; num
+            // lote retomado (resume_from > 0) a comparação tem de incluir os
+            // passos já pulados — senão um lote COMPLETO devolvia um
+            // resume_hint não nulo, prometendo trabalho pendente que não há.
+            "resume_hint": if stopped_early || executed + resume_from < list.len() {
                 serde_json::json!(executed + resume_from)
             } else {
                 serde_json::json!(null)
@@ -3320,6 +3324,69 @@ mod tests {
         assert!(v["resume_hint"].is_null(), "{v}");
         let (h, _) = call(&mut s, "runtime_health", serde_json::json!({}));
         assert_eq!(h["running"], true, "lote válido lançou o app: {h}");
+    }
+
+    /// issue #81: num lote retomado (`resume_from > 0`) que executa todos os
+    /// passos restantes, `resume_hint` vinha preenchido — a condição comparava
+    /// `executed` com `list.len()` e ignorava os passos pulados. Um
+    /// `resume_hint` não nulo promete trabalho pendente que não existe.
+    #[test]
+    fn batch_resume_hint_is_null_when_batch_completes() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+        launch_ok(&mut s, serde_json::json!({}));
+
+        let calls = serde_json::json!([
+            {"name": "wait", "arguments": {"ms": 5}},
+            {"name": "tap", "arguments": {"x": 5, "y": 5}},
+        ]);
+
+        // lote completo sem retomada: resume_hint null (já era assim)
+        let (v, err) = call(&mut s, "batch", serde_json::json!({"calls": calls}));
+        assert!(!err, "lote completo: {v}");
+        assert_eq!(v["executed"], 2, "{v}");
+        assert!(v["resume_hint"].is_null(), "{v}");
+
+        // lote COMPLETO retomado: resume_from=1 → só o passo 1 roda e o lote
+        // termina ⇒ resume_hint precisa ser null (antes vinha 2)
+        for (label, resume_from) in [("resume_from=1", 1), ("resume_from=total", 2)] {
+            let (v, err) = call(
+                &mut s,
+                "batch",
+                serde_json::json!({"calls": calls, "resume_from": resume_from}),
+            );
+            assert!(!err, "{label}: {v}");
+            assert_eq!(
+                v["executed"],
+                2 - resume_from,
+                "{label}: só os pendentes rodam: {v}"
+            );
+            assert!(
+                v["resume_hint"].is_null(),
+                "{label}: lote terminou — resume_hint deve ser null, veio {}",
+                v["resume_hint"]
+            );
+        }
+
+        // lote INTERROMPIDO retomado: ainda há trabalho ⇒ índice do próximo
+        let calls3 = serde_json::json!([
+            {"name": "wait", "arguments": {"ms": 5}},
+            {"name": "assert_view", "arguments": {}}, // INVALID_FORMAT
+            {"name": "tap", "arguments": {"x": 1, "y": 1}},
+        ]);
+        let (v, err) = call(
+            &mut s,
+            "batch",
+            serde_json::json!({"calls": calls3, "resume_from": 1}),
+        );
+        assert!(!err, "lote com passo falho: {v}");
+        assert_eq!(v["stopped_early"], true, "{v}");
+        assert_eq!(
+            v["resume_hint"], 2,
+            "próximo passo pendente é o índice 2 (1 pulado + 1 executado): {v}"
+        );
     }
 
     /// serve_stdio: sessão completa por linhas (loop real de E/S).
