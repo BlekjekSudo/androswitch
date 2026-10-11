@@ -236,3 +236,36 @@ fn app_run_json_is_parseable() {
     });
     assert!(out.stderr.contains("hi do app"));
 }
+
+/// issue #77: `--help` é contrato público da CLI (consumido por agentes) —
+/// notas internas de desenvolvimento (histórico de issue, nomes de variantes
+/// do clap) não podem vazar para o texto de ajuda.
+#[test]
+fn help_text_has_no_internal_dev_notes() {
+    let run = |args: &[&str]| -> String {
+        let out = Command::new(env!("CARGO_BIN_EXE_rd"))
+            .args(args)
+            .output()
+            .expect("spawn rd");
+        String::from_utf8_lossy(&out.stdout).to_string()
+    };
+    for (label, text) in [
+        ("rd --help", run(&["--help"])),
+        ("rd app --help", run(&["app", "--help"])),
+    ] {
+        assert!(
+            !text.contains("issue #"),
+            "{label} vaza nota interna de desenvolvimento:\n{text}"
+        );
+        assert!(
+            !text.contains("Cmd::App"),
+            "{label} vaza nome interno de variante:\n{text}"
+        );
+    }
+    // a descrição curta e útil continua presente (não é só remoção)
+    let root = run(&["--help"]);
+    assert!(
+        root.contains("Executa o app headless"),
+        "descrição do subcomando `app` sumiu do --help:\n{root}"
+    );
+}

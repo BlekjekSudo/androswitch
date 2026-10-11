@@ -81,10 +81,12 @@ enum Cmd {
         #[command(subcommand)]
         sub: VmSub,
     },
-    /// Executa o app headless (M3: lifecycle + views + touch do agente)
-    /// issue #56: SEM path no nível externo — o path duplicado era obrigatório
-    /// e descartado (`Cmd::App { path: _, sub }`); a forma documentada no
-    /// ROADMAP (`rd app dump <apk>`) saía com exit 64.
+    /// Executa o app headless: lifecycle, views e toques do agente (M3)
+    //
+    // issue #56: SEM path no nível externo — o path duplicado era obrigatório
+    // e descartado (`Cmd::App { path: _, sub }`); a forma documentada no
+    // ROADMAP (`rd app dump <apk>`) saía com exit 64. issue #77: esta nota já
+    // foi texto de ajuda (doc comment) e poluía `rd --help` — virou comentário.
     App {
         #[command(subcommand)]
         sub: AppSub,
