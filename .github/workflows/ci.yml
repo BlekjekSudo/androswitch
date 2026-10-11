@@ -15,6 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # issue #73: o placar oficial é GERADO — o CI precisa da toolchain para
+      # provar que o arquivo versionado está em sincronia com `cargo xtask`.
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
 
       - name: Spec exists and carries the expected contracts
         run: |
@@ -26,6 +30,17 @@ jobs:
 
       - name: Internal markdown links resolve (incl. anchors)
         run: python3 scripts/check_md_links.py
+
+      # issue #73: `cargo xtask compat-report` (forma documentada no README e no
+      # CONTRIBUTING) precisa funcionar num clone limpo e o placar versionado
+      # tem de ser idêntico ao gerado — senão o gate falha.
+      - name: Documented `cargo xtask` alias works
+        run: cargo xtask --help
+
+      - name: Scoreboard is in sync with `cargo xtask compat-report`
+        run: |
+          cargo xtask compat-report /tmp/compat-matrix.generated.md
+          diff -u docs/compat-matrix.md /tmp/compat-matrix.generated.md
 
       - name: No token-like secrets committed
         run: |
