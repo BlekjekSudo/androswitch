@@ -1,0 +1,6 @@
+# issue #73: README, CONTRIBUTING e docs/compat-matrix.md documentam
+# `cargo xtask compat-report`, mas o repositório não versionava o alias — num
+# clone limpo o comando falhava com "no such command: `xtask`". Com este
+# arquivo (rastreado no git) o comando documentado funciona para todos.
+[alias]
+xtask = "run --package xtask --"

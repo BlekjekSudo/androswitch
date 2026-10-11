@@ -162,3 +162,54 @@ fn compat_report(root: &Path, out: &Path) -> Result<()> {
     println!("compat-matrix gerada: {}", out.display());
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Raiz do repositório (xtask/ sobe um nível).
+    fn repo_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("xtask/ tem diretório pai")
+            .to_path_buf()
+    }
+
+    /// issue #73: README, CONTRIBUTING e docs/compat-matrix.md documentam
+    /// `cargo xtask compat-report`. Sem o alias versionado em
+    /// `.cargo/config.toml`, num clone limpo o comando falha com
+    /// "no such command: `xtask`".
+    #[test]
+    fn cargo_alias_xtask_is_versioned() {
+        let cfg = std::fs::read_to_string(repo_root().join(".cargo/config.toml"))
+            .expect(".cargo/config.toml versionado (issue #73)");
+        let table: toml::Value = toml::from_str(&cfg).expect(".cargo/config.toml é TOML válido");
+        let alias = table
+            .get("alias")
+            .and_then(|a| a.get("xtask"))
+            .and_then(|v| v.as_str())
+            .unwrap_or_else(|| panic!("alias `xtask` ausente em .cargo/config.toml:\n{cfg}"));
+        assert!(
+            alias.contains("--package xtask") || alias.contains("-p xtask"),
+            "alias deve apontar para o pacote xtask: {alias:?}"
+        );
+    }
+
+    /// issue #73: o placar versionado precisa ser idêntico ao gerado (senão
+    /// quem seguir a documentação regenera algo diferente do commitado).
+    #[test]
+    fn compat_report_matches_versioned_scoreboard() {
+        let root = repo_root();
+        let generated =
+            std::env::temp_dir().join(format!("rd-xtask-compat-{}.md", std::process::id()));
+        compat_report(&root, &generated).expect("compat-report roda sobre os dados versionados");
+        let got = std::fs::read_to_string(&generated).expect("arquivo gerado");
+        let want = std::fs::read_to_string(root.join("docs/compat-matrix.md"))
+            .expect("docs/compat-matrix.md versionado");
+        let _ = std::fs::remove_file(&generated);
+        assert_eq!(
+            got, want,
+            "docs/compat-matrix.md desatualizado — rode `cargo xtask compat-report`"
+        );
+    }
+}
