@@ -10,7 +10,7 @@
 #[macro_use]
 mod common;
 
-use common::apkfix::{a, build_apk, AxNode, AxVal};
+use common::apkfix::{a, build_apk, build_axml, AxNode, AxVal};
 use common::*;
 use rd_vm::err::VmExit;
 use rd_vm::framework::HostObj;
@@ -516,7 +516,8 @@ fn inflate_builds_host_tree_shape() {
 
 // ── issue #40: cap de profundidade do LayoutInflater (AXML hostil)
 
-/// AXML aninhado além do cap (2.000 níveis) falha TIPADO (INFLATE) — antes:
+/// AXML aninhado além do cap (600 níveis no fixture; cap real = 512) falha
+/// TIPADO (INFLATE) — antes:
 /// estourava a stack Rust e ABORTAVA o processo (Lei 1 violada).
 #[test]
 fn hostile_deep_axml_is_typed_error_not_abort() {
@@ -810,14 +811,14 @@ fn m4_view_tree_has_ids_and_bounds() {
     assert_eq!(tv.class, "android.widget.TextView");
     assert_eq!(
         tv.resource_id.as_deref(),
-        Some("com.test.xml:id/tv"),
-        "ids certos (package do manifest)"
+        Some("com.test:id/tv"),
+        "issue #54: namespace = package do ARSC (fonte da nomeação; o fixture\n         declara com.test no arsc e com.test.xml no manifest)"
     );
     assert_eq!(tv.bounds, (0, 0, 720, 160), "80dp × DENSITY 2.0");
     assert_eq!(tv.text, "Olá do XML", "text resolvido do arsc");
     // filho 2: Button clickable (android:onClick)
     let btn = &tree.children[1];
-    assert_eq!(btn.resource_id.as_deref(), Some("com.test.xml:id/btn"));
+    assert_eq!(btn.resource_id.as_deref(), Some("com.test:id/btn"));
     assert!(btn.clickable, "onClick no XML → clickable=true");
     assert_eq!(btn.text, "Clique aqui");
 }
@@ -852,9 +853,9 @@ fn m4_screenshot_renders_real_tree() {
         .expect("launch");
 
     let tree = e.view_tree().expect("árvore");
-    let xml = rd_render::uiautomator_xml(&tree, "com.test.xml");
-    assert!(xml.contains("resource-id=\"com.test.xml:id/tv\""), "{xml}");
-    assert!(xml.contains("resource-id=\"com.test.xml:id/btn\""), "{xml}");
+    let xml = rd_render::uiautomator_xml(&tree, "com.test.xml").expect("dump ok");
+    assert!(xml.contains("resource-id=\"com.test:id/tv\""), "{xml}");
+    assert!(xml.contains("resource-id=\"com.test:id/btn\""), "{xml}");
 
     let fb = rd_render::render_snapshot(&tree);
     let px = |x: i32, y: i32| {
@@ -874,4 +875,384 @@ fn m4_screenshot_renders_real_tree() {
     assert_eq!(px(360, 160), (0x60, 0x60, 0x60), "borda clickable");
     // fora da raiz (208px): fundo da window
     assert_eq!(px(360, 700), (0xF6, 0xF6, 0xF6), "fundo fora da raiz");
+}
+
+// ── issue #59: teto de dimensão POR EIXO (largura ≤720, altura ≤1440) ───────
+
+/// Engine com activity que infla `layout` no onCreate (helper local).
+fn engine_with_layout(
+    apk_bytes: Vec<u8>,
+    activity: &str,
+    _pkg: &str,
+    layout: u32,
+) -> rd_vm::Engine {
+    let mut b = DexBuilder::new();
+    register_platform_classes(&mut b);
+    let refs = xml_refs(&mut b);
+    let main = b.class(activity, "Landroid/app/Activity;");
+    b.direct(
+        main,
+        "onCreate",
+        "V",
+        vec!["Landroid/os/Bundle;"],
+        ACC_PUBLIC,
+        Some(b.code(4, 2, 2, {
+            let mut u = op31i(0x14, 1, layout as i32);
+            u.extend(op35c(0x6E, 2, refs.set_content_i, [2, 1, 0, 0, 0]));
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+    e.set_resources(rd_apk::Apk::from_bytes(apk_bytes).expect("apk"));
+    e
+}
+
+/// issue #59: altura legal (400dp = 800px ≤ WINDOW_H 1440) é ACEITA — o teto
+/// antigo usava WINDOW_W (720) nos dois eixos e rejeitava com INFLATE
+/// falso-positivo; 721dp = 1442px excede POR ALTURA; largura 400dp = 800px
+/// excede POR LARGURA (720).
+#[test]
+fn dimension_cap_is_per_axis() {
+    let mut arsc = common::apkfix::ArscFix::new();
+    let l_ok = arsc.add_layout("h_ok");
+    let l_tall = arsc.add_layout("h_tall");
+    let l_wide = arsc.add_layout("w_wide");
+    let s_hi = arsc.add_string("hi", "alto");
+
+    let container = |tv: AxNode| {
+        AxNode::new(
+            "LinearLayout",
+            vec![
+                a(true, "orientation", AxVal::Int(1)),
+                a(true, "layout_width", AxVal::Int(-1)),
+                a(true, "layout_height", AxVal::Int(-1)),
+            ],
+            vec![tv],
+        )
+    };
+    let tv_h = |raw: u32| {
+        container(AxNode::new(
+            "TextView",
+            vec![
+                a(true, "text", AxVal::Ref(s_hi)),
+                a(true, "layout_width", AxVal::Int(-1)),
+                a(true, "layout_height", AxVal::Dim { raw }),
+            ],
+            vec![],
+        ))
+    };
+    let tv_w = container(AxNode::new(
+        "TextView",
+        vec![
+            a(true, "text", AxVal::Ref(s_hi)),
+            a(
+                true,
+                "layout_width",
+                AxVal::Dim {
+                    raw: (400 << 8) | 1,
+                },
+            ), // 400dp
+            a(true, "layout_height", AxVal::Int(-1)),
+        ],
+        vec![],
+    ));
+
+    let apk_bytes = build_apk(
+        "com.test.axis",
+        "LH;",
+        arsc.build(),
+        vec![
+            ("res/layout/h_ok.xml", build_axml(&tv_h((400 << 8) | 1))),
+            ("res/layout/h_tall.xml", build_axml(&tv_h((721 << 8) | 1))),
+            ("res/layout/w_wide.xml", build_axml(&tv_w)),
+        ],
+    );
+
+    // 400dp = 800px ≤ 1440 (altura): ACEITO (antes: INFLATE falso)
+    let mut e = engine_with_layout(apk_bytes.clone(), "LH;", "com.test.axis", l_ok);
+    e.launch_app("LH;", "com.test.axis", Vec::new())
+        .expect("400dp=800px é altura legal (teto por eixo)");
+    let tree = e.view_tree().expect("árvore");
+    assert_eq!(tree.children[0].bounds.3, 800, "altura 800px aplicada");
+
+    // 721dp = 1442px > 1440: INFLATE citando a ALTURA
+    let mut e = engine_with_layout(apk_bytes.clone(), "LH;", "com.test.axis", l_tall);
+    let err = e
+        .launch_app("LH;", "com.test.axis", Vec::new())
+        .expect_err("1442px excede WINDOW_H");
+    match err {
+        VmExit::Error(rde) => {
+            assert_eq!(rde.code, "INFLATE", "{rde}");
+            assert!(rde.cause.contains("1442"), "{rde}");
+            assert!(rde.cause.contains("altura"), "{rde}");
+        }
+        other => panic!("esperava INFLATE, veio {other:?}"),
+    }
+
+    // largura 400dp = 800px > 720: INFLATE citando a LARGURA (eixo certo)
+    let mut e = engine_with_layout(apk_bytes, "LH;", "com.test.axis", l_wide);
+    let err = e
+        .launch_app("LH;", "com.test.axis", Vec::new())
+        .expect_err("800px de largura excede WINDOW_W");
+    match err {
+        VmExit::Error(rde) => {
+            assert_eq!(rde.code, "INFLATE", "{rde}");
+            assert!(rde.cause.contains("largura"), "{rde}");
+        }
+        other => panic!("esperava INFLATE, veio {other:?}"),
+    }
+}
+
+// ── issue #61: @dimen/@bool por referência resolvem do ARSC ─────────────────
+
+/// Resíduo da deferral "M4" da #46: layout_height=@dimen/x e enabled=@bool/x
+/// RESOLVEM do arsc (typed values). Não resolve → INFLATE tipado — nunca
+/// default silencioso.
+#[test]
+fn dimen_and_bool_references_resolve_from_arsc() {
+    let mut arsc = common::apkfix::ArscFix::new();
+    let l_main = arsc.add_layout("main");
+    let s_hi = arsc.add_string("hi", "texto");
+    let d_tall = arsc.add_dimen_dp("tall", 300); // 600px
+    let _d_bad = arsc.add_dimen_dp("bad", 800); // 1600px > WINDOW_H
+    let _s_str = arsc.add_string("nao_dimen", "ops"); // string não-dimen (não usada aqui)
+    let b_off = arsc.add_bool("off", false);
+    let d_px = arsc.add_dimen_dp("px", 100); // para width? (200px ≤ 720)
+
+    let container = |kids: Vec<AxNode>| {
+        AxNode::new(
+            "LinearLayout",
+            vec![
+                a(true, "orientation", AxVal::Int(1)),
+                a(true, "layout_width", AxVal::Int(-1)),
+                a(true, "layout_height", AxVal::Int(-1)),
+            ],
+            kids,
+        )
+    };
+    // TextView com layout_height=@dimen/tall (REFERENCE) + Button enabled=@bool/off
+    let main = container(vec![
+        AxNode::new(
+            "TextView",
+            vec![
+                a(true, "text", AxVal::Ref(s_hi)),
+                a(true, "layout_width", AxVal::Int(-1)),
+                a(true, "layout_height", AxVal::Ref(d_tall)),
+            ],
+            vec![],
+        ),
+        AxNode::new(
+            "Button",
+            vec![
+                a(true, "text", AxVal::Str("b".into())),
+                a(true, "enabled", AxVal::Ref(b_off)),
+                a(true, "layout_width", AxVal::Int(-1)),
+                a(true, "layout_height", AxVal::Int(-2)),
+            ],
+            vec![],
+        ),
+    ]);
+    let apk_bytes = build_apk(
+        "com.test.refs",
+        "LR;",
+        arsc.build(),
+        vec![("res/layout/main.xml", build_axml(&main))],
+    );
+
+    let mut e = engine_with_layout(apk_bytes, "LR;", "com.test.refs", l_main);
+    e.launch_app("LR;", "com.test.refs", Vec::new())
+        .expect("@dimen/@bool resolvem");
+    let tree = e.view_tree().expect("árvore");
+    assert_eq!(
+        tree.children[0].bounds.3, 600,
+        "layout_height=@dimen/tall → 300dp × 2.0 = 600px"
+    );
+    // enabled do Button: inspeciona o estado host
+    let btn_ref = {
+        let w =
+            e.fw.objects
+                .iter()
+                .find_map(|(k, v)| matches!(v, HostObj::Window { .. }).then_some(*k))
+                .expect("window");
+        let content = match e.fw.get(w) {
+            Some(HostObj::Window { content }) => content.expect("content"),
+            _ => panic!("window"),
+        };
+        match e.fw.get(content) {
+            Some(HostObj::View { children, .. }) => children[1],
+            _ => panic!("raiz"),
+        }
+    };
+    match e.fw.get(btn_ref) {
+        Some(HostObj::View { enabled, .. }) => {
+            assert!(!enabled, "enabled=@bool/off → false (não default true)");
+        }
+        _ => panic!("btn host"),
+    }
+
+    // NÃO resolve → INFLATE tipado:
+    // (a) @dimen inexistente
+    let mut arsc2 = common::apkfix::ArscFix::new();
+    let l2 = arsc2.add_layout("main");
+    let d_fantasma = 0x7F99_0001u32; // resid que não existe no arsc
+    let bad = container(vec![AxNode::new(
+        "TextView",
+        vec![
+            a(true, "layout_width", AxVal::Int(-1)),
+            a(true, "layout_height", AxVal::Ref(d_fantasma)),
+        ],
+        vec![],
+    )]);
+    let apk2 = build_apk(
+        "com.test.refs2",
+        "LR2;",
+        arsc2.build(),
+        vec![("res/layout/main.xml", build_axml(&bad))],
+    );
+    let mut e = engine_with_layout(apk2, "LR2;", "com.test.refs2", l2);
+    let err = e
+        .launch_app("LR2;", "com.test.refs2", Vec::new())
+        .expect_err("@dimen fantasma não pode virar default silencioso");
+    match err {
+        VmExit::Error(rde) => {
+            assert_eq!(rde.code, "INFLATE", "{rde}");
+            assert!(rde.cause.contains("referência não resolvida"), "{rde}");
+        }
+        other => panic!("esperava INFLATE, veio {other:?}"),
+    }
+
+    // (b) tipo errado (@string onde se esperava dimensão)
+    let mut arsc3 = common::apkfix::ArscFix::new();
+    let l3 = arsc3.add_layout("main");
+    let s3 = arsc3.add_string("nao_dimen", "ops");
+    let wrong = container(vec![AxNode::new(
+        "TextView",
+        vec![
+            a(true, "layout_width", AxVal::Int(-1)),
+            a(true, "layout_height", AxVal::Ref(s3)),
+        ],
+        vec![],
+    )]);
+    let apk3 = build_apk(
+        "com.test.refs3",
+        "LR3;",
+        arsc3.build(),
+        vec![("res/layout/main.xml", build_axml(&wrong))],
+    );
+    let mut e = engine_with_layout(apk3, "LR3;", "com.test.refs3", l3);
+    let err = e
+        .launch_app("LR3;", "com.test.refs3", Vec::new())
+        .expect_err("@string em layout_height é erro tipado");
+    match err {
+        VmExit::Error(rde) => {
+            assert_eq!(rde.code, "INFLATE", "{rde}");
+            assert!(rde.cause.contains("esperado dimensão"), "{rde}");
+        }
+        other => panic!("esperava INFLATE, veio {other:?}"),
+    }
+    let _ = d_px;
+}
+
+// ── issue #61: seleção de config do layout NÃO é mais cega à ordem do ZIP ───
+
+/// Device virtual é retrato/tema dia: com default + -land disponíveis, o
+/// DEFAULT vence (antes: ordem do ZIP arbitrava); só -land → -land usado;
+/// res/layoutfoo/ NUNCA é fallback (não é config).
+#[test]
+fn layout_config_selection_prefers_matching_device() {
+    let node = |txt: &str| {
+        AxNode::new(
+            "LinearLayout",
+            vec![a(true, "orientation", AxVal::Int(1))],
+            vec![AxNode::new(
+                "TextView",
+                vec![a(true, "text", AxVal::Str(txt.into()))],
+                vec![],
+            )],
+        )
+    };
+
+    // (a) default + land: retrato vence
+    let mut arsc = common::apkfix::ArscFix::new();
+    let l = arsc.add_layout("main");
+    let apk = build_apk(
+        "com.test.cfg2",
+        "LC;",
+        arsc.build(),
+        vec![
+            ("res/layout/main.xml", build_axml(&node("retrato"))),
+            ("res/layout-land/main.xml", build_axml(&node("land"))),
+        ],
+    );
+    let mut e = engine_with_layout(apk, "LC;", "com.test.cfg2", l);
+    e.launch_app("LC;", "com.test.cfg2", Vec::new())
+        .expect("default existe");
+    let tree = e.view_tree().expect("árvore");
+    assert_eq!(tree.children[0].text, "retrato", "device retrato → default");
+
+    // (b) só land: land é usado
+    let mut arsc = common::apkfix::ArscFix::new();
+    let l = arsc.add_layout("main");
+    let apk = build_apk(
+        "com.test.cfg3",
+        "LC;",
+        arsc.build(),
+        vec![("res/layout-land/main.xml", build_axml(&node("land")))],
+    );
+    let mut e = engine_with_layout(apk, "LC;", "com.test.cfg3", l);
+    e.launch_app("LC;", "com.test.cfg3", Vec::new())
+        .expect("land existe");
+    let tree = e.view_tree().expect("árvore");
+    assert_eq!(tree.children[0].text, "land", "só -land → -land");
+
+    // (c) res/layoutfoo/ NÃO é config — INFLATE tipado (issue #66: probe
+    // negativo do fallback promovido a teste)
+    let mut arsc = common::apkfix::ArscFix::new();
+    let l = arsc.add_layout("main");
+    let apk = build_apk(
+        "com.test.cfg4",
+        "LC;",
+        arsc.build(),
+        vec![("res/layoutfoo/main.xml", build_axml(&node("foo")))],
+    );
+    let mut e = engine_with_layout(apk, "LC;", "com.test.cfg4", l);
+    let err = e
+        .launch_app("LC;", "com.test.cfg4", Vec::new())
+        .expect_err("res/layoutfoo não é fallback de config");
+    match err {
+        VmExit::Error(rde) => assert_eq!(rde.code, "INFLATE", "{rde}"),
+        other => panic!("esperava INFLATE, veio {other:?}"),
+    }
+}
+
+// ── issue #66: attr.res_id populado do resource map (probe promovido) ───────
+
+/// O build_axml do fixture emite resource map (0x0180) — o parser do rd-apk
+/// popula XmlAttribute.res_id para attrs android:* (base da resolução de
+/// referências tipadas do inflate).
+#[test]
+fn android_attrs_carry_res_id_from_resource_map() {
+    let node = AxNode::new(
+        "TextView",
+        vec![
+            a(true, "text", AxVal::Str("x".into())),
+            a(true, "layout_width", AxVal::Int(-1)),
+        ],
+        vec![],
+    );
+    let axml = build_axml(&node);
+    let doc = rd_apk::axml::parse(&axml).expect("axml parseia");
+    let attrs = &doc.root.attrs;
+    assert!(attrs.len() >= 2, "2 attrs android:*");
+    for at in attrs {
+        assert!(at.is_android(), "attr android namespace");
+        assert!(
+            at.res_id.is_some(),
+            "res_id do resource map presente para {:?}",
+            at.name
+        );
+        // ids do fixture são plausíveis (0x0101_0000+n)
+        assert!(at.res_id.unwrap() & 0xFFFF_0000 == 0x0101_0000);
+    }
 }

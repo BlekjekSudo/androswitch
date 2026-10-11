@@ -6,53 +6,116 @@
 //! bounds "[x1,y1][x2,y2]" em px do viewport. Views GONE não aparecem
 //! (comportamento do uiautomator real); INVISIBLE aparece com bounds (ocupa
 //! espaço, não desenha — issue #46).
+//!
+//! Contrato de fidelidade (issues #53/#54):
+//! - TODOS os valores interpolados passam por `xml_escape` (package e
+//!   resource-id incluídos — são controlados pelo APK hostil);
+//! - nenhum caractere de controle cru: `\t\n\r` viram referências de
+//!   caractere XML, os demais < 0x20 viram U+FFFD (XML 1.0 os proíbe — o
+//!   dump do Android real sai saneado por getText);
+//! - `index` é POR-IRMÃOS (reinicia 0 em cada pai), como no uiautomator real;
+//! - `focusable` é propriedade própria (não fudge de `clickable`).
+//!
+//! Atributos NCK (scrollable/checkable/checked/password/selected/long-clickable/
+//! focused/content-desc) são `false`/`""` constantes hoje: o modelo headless
+//! ainda não rastreia esses estados — compat-gap DOCUMENTADO no README (issue
+//! #54.3); `focusable` já é campo honesto do UiNode.
 
+use crate::RdError;
 use rd_vm::framework::{UiNode, Vis};
 
-/// Serializa a árvore no XML do uiautomator.
-pub fn uiautomator_xml(root: &UiNode, package: &str) -> String {
+/// issue #62: budget de tamanho do dump — um `text` de 8 MB com `&&&&` multiplica
+/// a saída 5×; acima disso é amplificação hostil → erro tipado (nunca silêncio).
+pub const MAX_DUMP_BYTES: usize = 64 * 1024 * 1024;
+
+/// Serializa a árvore no XML do uiautomator. Erro tipado se o dump excede
+/// `MAX_DUMP_BYTES` (amplificação hostil — issue #62).
+pub fn uiautomator_xml(root: &UiNode, package: &str) -> Result<String, RdError> {
     let mut out = String::from(
         "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<hierarchy rotation=\"0\">\n",
     );
-    let mut index = 0usize;
-    emit_node(root, package, 1, &mut index, &mut out);
+    // issue #54: index POR-IRMÃOS — o contador global DFS fazia o primeiro
+    // filho do root sair com index=1 (real: 0) e qualquer seletor
+    // node[@index='N'] gravado em dispositivo real divergir.
+    emit_node(root, package, 1, 0, &mut out)?;
     out.push_str("</hierarchy>\n");
-    out
+    Ok(out)
 }
 
-fn emit_node(n: &UiNode, package: &str, depth: usize, index: &mut usize, out: &mut String) {
+fn emit_node(
+    n: &UiNode,
+    package: &str,
+    depth: usize,
+    sibling_index: usize,
+    out: &mut String,
+) -> Result<(), RdError> {
     if n.visibility == Vis::Gone {
-        return; // uiautomator real: GONE não aparece no dump
+        return Ok(()); // uiautomator real: GONE não aparece no dump
+    }
+    if out.len() > MAX_DUMP_BYTES {
+        return Err(RdError {
+            code: "INVALID_FORMAT".into(),
+            cause: format!(
+                "dump uiautomator excede {} bytes — amplificação de saída hostil (issue #62)",
+                MAX_DUMP_BYTES
+            ),
+            suggestion: Some("árvore de views com text hostil; cap no framework do app".into()),
+            module_id: crate::MODULE_ID.into(),
+        });
     }
     let (x, y, w, h) = n.bounds;
-    let idx = *index;
-    *index += 1;
     let indent = "  ".repeat(depth);
-    let res = n.resource_id.clone().unwrap_or_default();
+    let res = xml_escape(n.resource_id.as_deref().unwrap_or_default());
+    // o PARÂMETRO cru desce para os filhos (escape é por nível — nunca duplo)
+    let pkg_esc = xml_escape(package);
     let clickable = if n.clickable { "true" } else { "false" };
     let enabled = if n.enabled { "true" } else { "false" };
-    let empty = n.children.is_empty();
+    let focusable = if n.focusable { "true" } else { "false" };
+    // issue #53: filhos GONE não são emitidos — se não sobra NENHUM, o nó é
+    // self-closing (não <node>…</node> vazio).
+    let empty = !n.children.iter().any(|c| c.visibility != Vis::Gone);
+    // issue #62: bounds hostis (i32::MAX + w) não podem panicar na API pública
+    let x2 = x.saturating_add(w);
+    let y2 = y.saturating_add(h);
     out.push_str(&format!(
-        "{indent}<node index=\"{idx}\" text=\"{}\" resource-id=\"{res}\" class=\"{}\" \
-package=\"{package}\" content-desc=\"\" checkable=\"false\" checked=\"false\" \
-clickable=\"{clickable}\" enabled=\"{enabled}\" focusable=\"{clickable}\" focused=\"false\" \
+        "{indent}<node index=\"{sibling_index}\" text=\"{}\" resource-id=\"{res}\" class=\"{}\" \
+package=\"{pkg_esc}\" content-desc=\"\" checkable=\"false\" checked=\"false\" \
+clickable=\"{clickable}\" enabled=\"{enabled}\" focusable=\"{focusable}\" focused=\"false\" \
 scrollable=\"false\" long-clickable=\"false\" password=\"false\" selected=\"false\" \
-bounds=\"[{x},{y}][{},{}]\"{}>\n",
+bounds=\"[{x},{y}][{x2},{y2}]\"{}>\n",
         xml_escape(&n.text),
         xml_escape(&n.class),
-        x + w,
-        y + h,
         if empty { "/" } else { "" }
     ));
-    for c in &n.children {
-        emit_node(c, package, depth + 1, index, out);
+    // issue #62: nó com subárvore cortada ganha marcador EXPLÍCITO — o agente
+    // não pode ler a árvore como completa.
+    if n.truncated {
+        out.push_str(&format!(
+            "{indent}<!-- truncated: subárvore além de 512 níveis (cap hostil) -->\n"
+        ));
+    }
+    for (i, c) in n
+        .children
+        .iter()
+        .filter(|c| c.visibility != Vis::Gone)
+        .enumerate()
+    {
+        emit_node(c, package, depth + 1, i, out)?;
     }
     if !empty {
         out.push_str(&format!("{indent}</node>\n"));
     }
+    Ok(())
 }
 
-/// Escape mínimo de XML (uiautomator escapa os 5 reservados).
+/// Escape mínimo de XML + saneamento de caracteres de controle (issue #53):
+/// - os 5 reservados (`& < > " '`) viram entidades — uiautomator real idem;
+/// - `\t\n\r` legais em XML 1.0 mas normalizados por parsers quando crus —
+///   viram referências `&#x9;`/`&#xA;`/`&#xD;` (o serializer do Android emite
+///   `&#10;` para texto multilinha);
+/// - os proibidos (U+0000–U+0008/U+000B/U+000C/U+000E–U+001F) viram U+FFFD —
+///   mesmo saneamento do getText do Android; o dump permanece XML válido
+///   (expat: "not well-formed" sem isto).
 fn xml_escape(s: &str) -> String {
     let mut o = String::with_capacity(s.len());
     for c in s.chars() {
@@ -62,6 +125,10 @@ fn xml_escape(s: &str) -> String {
             '>' => o.push_str("&gt;"),
             '"' => o.push_str("&quot;"),
             '\'' => o.push_str("&apos;"),
+            '\t' => o.push_str("&#x9;"),
+            '\n' => o.push_str("&#xA;"),
+            '\r' => o.push_str("&#xD;"),
+            c if (c as u32) < 0x20 => o.push('\u{FFFD}'),
             _ => o.push(c),
         }
     }
@@ -81,6 +148,8 @@ mod tests {
             visibility: Vis::Visible,
             enabled: true,
             clickable: false,
+            focusable: false,
+            truncated: false,
             children: Vec::new(),
         }
     }
@@ -99,7 +168,7 @@ mod tests {
             "Olá",
             (0, 0, 720, 48),
         ));
-        let xml = uiautomator_xml(&root, "com.test");
+        let xml = uiautomator_xml(&root, "com.test").unwrap();
         assert!(
             xml.contains("resource-id=\"com.test:id/tv\""),
             "ids certos: {xml}"
@@ -130,7 +199,7 @@ mod tests {
         inv.visibility = Vis::Invisible;
         root.children.push(gone);
         root.children.push(inv);
-        let xml = uiautomator_xml(&root, "com.test");
+        let xml = uiautomator_xml(&root, "com.test").unwrap();
         assert!(!xml.contains("com.test:id/gone"), "GONE não aparece: {xml}");
         assert!(
             xml.contains("com.test:id/inv"),
@@ -147,7 +216,122 @@ mod tests {
             "a<b>&\"c\"",
             (0, 0, 10, 10),
         );
-        let xml = uiautomator_xml(&root, "p");
+        let xml = uiautomator_xml(&root, "p").unwrap();
         assert!(xml.contains("text=\"a&lt;b&gt;&amp;&quot;c&quot;"), "{xml}");
+    }
+
+    /// issue #53 (PoC do audit): resource-id/hostil com `"` e `<` NÃO injeta
+    /// nós falsos — sai escapado; package idem.
+    #[test]
+    fn hostile_resource_id_and_package_cannot_inject_nodes() {
+        let root = node(
+            "android.widget.TextView",
+            Some("com.p\"/><node text=\"INJETADO"),
+            "",
+            (0, 0, 10, 10),
+        );
+        let xml = uiautomator_xml(&root, "com.p\" inj=\"1").unwrap();
+        // nenhum nó falso: o `"` do id/package sai como &quot;
+        assert!(!xml.contains("inj=\"1\""), "injeção via package: {xml}");
+        assert!(
+            !xml.contains("<node text=\"INJETADO\""),
+            "injeção via resource-id: {xml}"
+        );
+        assert!(xml.contains("resource-id=\"com.p&quot;/&gt;&lt;node text=&quot;INJETADO\""));
+        assert!(xml.contains("package=\"com.p&quot; inj=&quot;1\""));
+        // estrutura: exatamente 1 <node> no dump
+        assert_eq!(xml.matches("<node ").count(), 1);
+    }
+
+    /// issue #53: chars de controle não saem crus — \n vira referência
+    /// (texto multilinha sobrevive a parsers XML); U+0001 vira U+FFFD.
+    #[test]
+    fn control_chars_are_sanitized_not_raw() {
+        let root = node(
+            "android.widget.TextView",
+            None,
+            "linha1\nlinha2\u{1}fim",
+            (0, 0, 10, 10),
+        );
+        let xml = uiautomator_xml(&root, "p").unwrap();
+        assert!(
+            xml.contains("linha1&#xA;linha2"),
+            "newline referenciado: {xml}"
+        );
+        assert!(xml.contains('\u{FFFD}'), "U+0001 → U+FFFD: {xml}");
+        assert!(!xml.contains('\u{1}'), "nenhum controle cru: {xml}");
+        // atributo com \t também referenciado (normalização de parser corrompia)
+        let tab = node("C", Some("a\tb"), "", (0, 0, 1, 1));
+        let xml = uiautomator_xml(&tab, "p").unwrap();
+        assert!(xml.contains("resource-id=\"a&#x9;b\""), "{xml}");
+    }
+
+    /// issue #54.1: index por-irmãos — root=0, primeiro filho=0, segundo=1;
+    /// neto reinicia.
+    #[test]
+    fn index_is_per_sibling_not_global_dfs() {
+        let mut root = node("Root", None, "", (0, 0, 10, 10));
+        let mut a = node("A", None, "", (0, 0, 5, 5));
+        a.children.push(node("A1", None, "", (0, 0, 1, 1)));
+        a.children.push(node("A2", None, "", (0, 0, 1, 1)));
+        root.children.push(a);
+        root.children.push(node("B", None, "", (0, 5, 5, 5)));
+        let xml = uiautomator_xml(&root, "p").unwrap();
+        let root_idx = xml
+            .split("<node ")
+            .nth(1)
+            .and_then(|s| s.split("index=\"").nth(1).and_then(|t| t.split('"').next()));
+        assert_eq!(root_idx, Some("0"));
+        assert!(
+            xml.contains("<node index=\"0\" text=\"\" resource-id=\"\" class=\"A\""),
+            "{xml}"
+        );
+        assert!(
+            xml.contains("<node index=\"1\" text=\"\" resource-id=\"\" class=\"B\""),
+            "{xml}"
+        );
+        assert!(
+            xml.contains("<node index=\"0\" text=\"\" resource-id=\"\" class=\"A1\""),
+            "{xml}"
+        );
+        assert!(
+            xml.contains("<node index=\"1\" text=\"\" resource-id=\"\" class=\"A2\""),
+            "{xml}"
+        );
+    }
+
+    /// issue #54.2: focusable é campo próprio — false honesto mesmo com
+    /// clickable=true (TextView clicável NÃO é focável no Android real).
+    #[test]
+    fn focusable_is_not_fudged_from_clickable() {
+        let mut c = node("android.widget.Button", None, "ok", (0, 0, 10, 10));
+        c.clickable = true;
+        let xml = uiautomator_xml(&c, "p").unwrap();
+        assert!(xml.contains("clickable=\"true\""), "{xml}");
+        assert!(xml.contains("focusable=\"false\""), "{xml}");
+    }
+
+    /// issue #62: bounds hostis (i32::MAX) não panican — saturating.
+    #[test]
+    fn hostile_bounds_do_not_overflow() {
+        let n = node("C", None, "", (i32::MAX, 0, 1, 1));
+        let xml = uiautomator_xml(&n, "p").unwrap();
+        assert!(
+            xml.contains("bounds=\"[2147483647,0][2147483647,1]\""),
+            "{xml}"
+        );
+        let n = node("C", None, "", (0, i32::MIN, 2, i32::MAX));
+        let xml = uiautomator_xml(&n, "p").unwrap();
+        // MIN.saturating_add(MAX) = -1 — saturação honesta, sem panic nem wrap
+        assert!(xml.contains("bounds=\"[0,-2147483648][2,-1]\""), "{xml}");
+    }
+
+    /// issue #62.2: nó truncado ganha marcador no XML.
+    #[test]
+    fn truncated_node_is_marked_in_xml() {
+        let mut n = node("C", None, "", (0, 0, 1, 1));
+        n.truncated = true;
+        let xml = uiautomator_xml(&n, "p").unwrap();
+        assert!(xml.contains("<!-- truncated:"), "{xml}");
     }
 }

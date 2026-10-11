@@ -10,7 +10,7 @@
 //!    (hierarquia Android é BUILTIN no classpath — APKs reais não definem
 //!    android.* no DEX) + attrs aplicados + `add_child` recursivo.
 //!
-//! Semântica de attrs do modelo headless (M3 — render pixel é o M4):
+//! Semântica de attrs do modelo headless (M3 — o render pixel foi o M4 ✅):
 //! - `id` → resid numérico do view (findViewById e o dump do agente usam);
 //! - `text` → string crua OU `@string/x` resolvida no arsc (fallback nome);
 //! - `orientation`/`visibility`/`enabled` → estado host direto;
@@ -27,6 +27,7 @@ use crate::err::VmExit;
 use crate::framework;
 use crate::heap::ObjRef;
 
+use rd_apk::arsc::ResolvedValue;
 use rd_apk::axml::{AttrValue, ComplexUnit, XmlAttribute, XmlElement};
 
 /// Infla `layout_resid` (R.layout.x) do APK injetado e devolve a raiz da
@@ -64,32 +65,62 @@ pub fn inflate_resource(vm: &mut Engine, layout_resid: u32) -> Result<ObjRef, Vm
 }
 
 /// Entrada ZIP do layout: caminho canônico primeiro; fallback varre configs
-/// (`res/layout-land/…`, `res/layout-night/…` — primeira em ordem do ZIP,
-/// determinística). FALHA TIPADA se nenhuma existir.
+/// (`res/layout-land/…`, `res/layout-night/…`).
+/// issue #61: a escolha NÃO é mais cega à ordem do ZIP — pontua qualificadores
+/// conhecidos contra o device virtual (retrato, tema dia): qualificador que
+/// CONTRADIZ o device perde; empate → ordem lexicográfica (determinística).
+/// FALHA TIPADA se nenhuma existir.
 fn layout_entry(apk: &rd_apk::Apk, key: &str) -> Result<String, VmExit> {
     let canonical = format!("res/layout/{key}.xml");
     if apk.container().find(&canonical).is_some() {
         return Ok(canonical);
     }
     let suffix = format!("/{key}.xml");
+    let mut best: Option<(u32, &str)> = None;
     for n in apk.container().names_with_prefix("res/layout") {
         // issue #46: o prefixo cru casa "res/layoutfoo/" — exigir res/layout/
         // (canonical já tratado acima) ou res/layout-<config>/
         if !n["res/layout".len()..].starts_with('-') {
             continue;
         }
-        if n.ends_with(&suffix) {
-            return Ok(n.to_string());
+        if !n.ends_with(&suffix) {
+            continue;
+        }
+        let score = config_dir_score(n);
+        let better = match best {
+            None => true,
+            Some((bs, bn)) => score < bs || (score == bs && n < bn),
+        };
+        if better {
+            best = Some((score, n));
         }
     }
-    Err(crate::err::with_suggestion(
-        crate::err::vm_error(
-            "INFLATE",
-            format!("layout '{key}' não encontrado no APK (sem res/layout/{key}.xml)"),
-        ),
-        "confira se o resid é R.layout.* deste APK",
-    )
-    .into())
+    match best {
+        Some((_, n)) => Ok(n.to_string()),
+        None => Err(crate::err::with_suggestion(
+            crate::err::vm_error(
+                "INFLATE",
+                format!("layout '{key}' não encontrado no APK (sem res/layout/{key}.xml)"),
+            ),
+            "confira se o resid é R.layout.* deste APK",
+        )
+        .into()),
+    }
+}
+
+/// issue #61: penalidade de um diretório `res/layout-<cfg>/` contra o device
+/// virtual (retrato, tema dia, locale/densidade neutros no modelo headless).
+/// Qualificadores conhecidos que contradizem o device perdem; desconhecidos
+/// são neutros (o arquivo exato continua determinístico pelo desempate).
+fn config_dir_score(name: &str) -> u32 {
+    let mut s = 0u32;
+    if name.contains("-land") {
+        s += 4; // device é retrato
+    }
+    if name.contains("-night") {
+        s += 4; // device é tema dia
+    }
+    s
 }
 
 /// issue #40: cap de profundidade da inflação — AXML hostil aninhado (a
@@ -233,13 +264,10 @@ fn apply_attrs(vm: &mut Engine, r: ObjRef, el: &XmlElement) -> Result<(), VmExit
                 }
             }
             "enabled" => {
-                // issue #46: referência @bool/@string não resolvida NÃO pode
-                // virar true silencioso (resolução de typed-values chega no M4)
+                // issue #61: referência @bool/@string RESOLVE no arsc (o deferral
+                // "M4" da #46 quebrou — nunca mais default silencioso)
                 let en = match &a.value {
-                    AttrValue::Reference(_) => {
-                        debug_ref_unresolved("enabled", &a.value);
-                        true
-                    }
+                    AttrValue::Reference(res) => ref_bool(vm, "enabled", *res)?,
                     v => v.as_bool().unwrap_or(true),
                 };
                 if let Some(framework::HostObj::View { enabled, .. }) = vm.fw.objects.get_mut(&r) {
@@ -267,14 +295,41 @@ fn apply_attrs(vm: &mut Engine, r: ObjRef, el: &XmlElement) -> Result<(), VmExit
                 // FOLHA: dimensão explícita → px; match_parent/wrap_content
                 // mantêm o default do modelo (touch target). Contêineres têm
                 // a altura COMPUTADA pelo passe de layout (soma/max).
-                // issue #46: @dimen/x por referência não pode virar default
-                // silencioso (bounds errados sem pista) — avisa em debug
-                if let AttrValue::Reference(_) = &a.value {
-                    debug_ref_unresolved("layout_height", &a.value);
-                }
-                if let Some(px) = dimension_px(a)? {
+                // issue #61: @dimen/x por referência RESOLVE no arsc (deferral
+                // da #46 quebrou — bounds errados sem pista não volta).
+                let px = match &a.value {
+                    AttrValue::Reference(res) => Some(ref_dimension_px(
+                        vm,
+                        "layout_height",
+                        *res,
+                        framework::WINDOW_H,
+                    )?),
+                    _ => dimension_px(a, framework::WINDOW_H, "altura")?,
+                };
+                if let Some(px) = px {
                     if let Some(framework::HostObj::View { h, .. }) = vm.fw.objects.get_mut(&r) {
                         *h = px;
+                    }
+                }
+            }
+            "layout_width" => {
+                // issue #59/#61: largura explícita → w_explicit (vence o slot
+                // distribuído no layout); validada contra WINDOW_W (largura).
+                // match_parent/wrap_content/negativo → None (slot do pai).
+                let px = match &a.value {
+                    AttrValue::Reference(res) => Some(ref_dimension_px(
+                        vm,
+                        "layout_width",
+                        *res,
+                        framework::WINDOW_W,
+                    )?),
+                    _ => dimension_px(a, framework::WINDOW_W, "largura")?,
+                };
+                if let Some(px) = px {
+                    if let Some(framework::HostObj::View { w_explicit, .. }) =
+                        vm.fw.objects.get_mut(&r)
+                    {
+                        *w_explicit = Some(px);
                     }
                 }
             }
@@ -308,12 +363,16 @@ fn attr_text(vm: &mut Engine, a: &XmlAttribute) -> Result<String, VmExit> {
     }
 }
 
-/// `layout_height` com dimensão → px do modelo headless (DENSITY 2.0).
-/// `None` = match_parent/wrap_content/int negativo (usa default do modelo).
+/// `layout_height`/`layout_width` com dimensão → px do modelo headless
+/// (DENSITY 2.0). `None` = match_parent/wrap_content/int negativo (usa
+/// default do modelo).
 /// issue #45: dimensão que excede o viewport é ERRO TIPADO (antes: i32::MAX
 /// cru passava e os consumidores estouravam — panic em debug, wrap silencioso
 /// em release → coordenadas negativas → dump/hit-test corruptos).
-fn dimension_px(a: &XmlAttribute) -> Result<Option<i32>, VmExit> {
+/// issue #59: o teto é POR EIXO — largura ≤ WINDOW_W (720), altura ≤
+/// WINDOW_H (1440); usar WINDOW_W nos dois rejeitava layout_height legal
+/// de 361–1440px (falso-positivo INFLATE em apps reais comuns).
+fn dimension_px(a: &XmlAttribute, cap: i32, eixo: &str) -> Result<Option<i32>, VmExit> {
     let px = match &a.value {
         AttrValue::Dimension(v, u) => {
             let scale = match u {
@@ -327,21 +386,86 @@ fn dimension_px(a: &XmlAttribute) -> Result<Option<i32>, VmExit> {
     };
     match px {
         None => Ok(None),
-        Some(f) if f >= 0.0 && f <= framework::WINDOW_W as f32 => Ok(Some(f as i32)),
+        Some(f) if f >= 0.0 && f <= cap as f32 => Ok(Some(f as i32)),
         Some(f) => Err(inflate_error(format!(
-            "dimensão de layout {f}px excede o viewport de {}px (layout_width/height hostil ou bug do app)",
-            framework::WINDOW_W
+            "dimensão de layout {f}px excede o viewport de {cap}px no eixo {eixo} (hostil ou bug do app)"
         ))),
     }
 }
 
-/// issue #46: atributo conhecido em forma de referência (@dimen/@bool) não
-/// pode ser ignorado em silêncio — log em debug (resolução real de
-/// typed-values via arsc é M4/render, onde o consumidor conhece a config).
-fn debug_ref_unresolved(attr: &str, v: &AttrValue) {
-    if std::env::var("RD_FW_DEBUG").is_ok() {
-        eprintln!("[fw] inflate: android:{attr}={v:?} é referência — não resolvida no modelo headless (default aplicado); resolução de typed-values é M4");
+/// issue #61: `@dimen/x` por referência → px, validado contra o teto do eixo.
+/// Segue cadeias de Reference (alias) até 8 saltos. NÃO resolve (ou resolve
+/// para tipo errado) → INFLATE tipado — nunca default silencioso.
+fn ref_dimension_px(vm: &Engine, attr: &str, resid: u32, cap: i32) -> Result<i32, VmExit> {
+    let mut cur = resid;
+    for _ in 0..8 {
+        match vm.resolve_resource_value(cur).map_err(|e| {
+            inflate_error(format!(
+                "android:{attr}=@0x{resid:08x}: referência não resolvida ({})",
+                match &e {
+                    VmExit::Error(rd) => rd.cause.clone(),
+                    other => other.to_string(),
+                }
+            ))
+        })? {
+            ResolvedValue::Reference(next) => {
+                cur = next;
+            }
+            ResolvedValue::Dimension { value, unit } => {
+                let scale = match unit {
+                    ComplexUnit::Px => 1.0,
+                    _ => framework::DENSITY, // dip/sp/pt/in/mm → escala do viewport
+                };
+                let f = (value * scale).round();
+                if f < 0.0 || f > cap as f32 {
+                    return Err(inflate_error(format!(
+                        "android:{attr}=@0x{resid:08x}: dimensão {f}px excede o viewport de {cap}px no eixo (hostil ou bug do app)"
+                    )));
+                }
+                return Ok(f as i32);
+            }
+            ResolvedValue::Integer(i) if i >= 0 => return Ok(i), // px puro
+            other => {
+                return Err(inflate_error(format!(
+                    "android:{attr}=@0x{resid:08x}: resolve para {other:?} — esperado dimensão (@dimen)"
+                )))
+            }
+        }
     }
+    Err(inflate_error(format!(
+        "android:{attr}=@0x{resid:08x}: cadeia de referências além de 8 saltos (ciclo no arsc)"
+    )))
+}
+
+/// issue #61: `@bool/x` por referência → boolean (cadeias de Reference idem).
+/// NÃO resolve ou tipo errado → INFLATE tipado — nunca default silencioso.
+fn ref_bool(vm: &Engine, attr: &str, resid: u32) -> Result<bool, VmExit> {
+    let mut cur = resid;
+    for _ in 0..8 {
+        match vm.resolve_resource_value(cur).map_err(|e| {
+            inflate_error(format!(
+                "android:{attr}=@0x{resid:08x}: referência não resolvida ({})",
+                match &e {
+                    VmExit::Error(rd) => rd.cause.clone(),
+                    other => other.to_string(),
+                }
+            ))
+        })? {
+            ResolvedValue::Reference(next) => {
+                cur = next;
+            }
+            ResolvedValue::Boolean(b) => return Ok(b),
+            ResolvedValue::Integer(i) => return Ok(i != 0),
+            other => {
+                return Err(inflate_error(format!(
+                "android:{attr}=@0x{resid:08x}: resolve para {other:?} — esperado boolean (@bool)"
+            )))
+            }
+        }
+    }
+    Err(inflate_error(format!(
+        "android:{attr}=@0x{resid:08x}: cadeia de referências além de 8 saltos (ciclo no arsc)"
+    )))
 }
 
 fn inflate_error(cause: impl Into<String>) -> VmExit {

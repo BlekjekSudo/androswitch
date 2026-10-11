@@ -56,6 +56,7 @@ fn platform_method_refs(b: &mut DexBuilder) -> PlatRefs {
         add_view: b.method_idx("Landroid/widget/LinearLayout;", p_view, "addView"),
         set_click: b.method_idx("Landroid/view/View;", p_listener, "setOnClickListener"),
         set_content: b.method_idx("Landroid/app/Activity;", p_view, "setContentView"),
+        set_visibility: b.method_idx("Landroid/view/View;", p_i, "setVisibility"),
         handler_init: b.method_idx("Landroid/os/Handler;", p_void, "<init>"),
         post_delayed: b.method_idx("Landroid/os/Handler;", p_runnable_j_z, "postDelayed"),
         obj_init: b.method_idx("Ljava/lang/Object;", p_void, "<init>"),
@@ -74,6 +75,7 @@ struct PlatRefs {
     add_view: u16,
     set_click: u16,
     set_content: u16,
+    set_visibility: u16,
     handler_init: u16,
     post_delayed: u16,
     obj_init: u16,
@@ -599,4 +601,153 @@ fn post_delayed_i64_max_does_not_wrap() {
         .get(&("LTMax;".to_string(), "t".to_string()))
         .cloned();
     assert_eq!(t1, Some(Value::Int(0)), "run não pode ter disparado");
+}
+
+// ── issue #60: divisor horizontal NÃO conta filhos GONE ────────────────────
+
+/// LinearLayout horizontal [GONE, Button]: o Button ocupa a largura INTEIRA
+/// (720). Antes: o divisor `w / children.len()` contava o GONE e o visível
+/// recebia metade (360) com slot vazio.
+#[test]
+fn linear_horizontal_gone_child_does_not_consume_slot() {
+    let mut b = DexBuilder::new();
+    register_platform_classes(&mut b);
+    let refs = platform_method_refs(&mut b);
+    b.type_idx("Landroid/widget/LinearLayout;");
+    b.type_idx("Landroid/widget/TextView;");
+    b.type_idx("Landroid/widget/Button;");
+    let cls = b.class("LMain;", "Landroid/app/Activity;");
+    let t_ll = b.type_idx_cached("Landroid/widget/LinearLayout;");
+    let t_tv = b.type_idx_cached("Landroid/widget/TextView;");
+    let t_btn = b.type_idx_cached("Landroid/widget/Button;");
+    let s_x = b.intern("x") as u16;
+    let s_ok = b.intern("ok") as u16;
+
+    b.direct(
+        cls,
+        "<init>",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(1, 1, 1, {
+            let mut u = op35c(0x70, 1, refs.activity_init, [0, 0, 0, 0, 0]);
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    // onCreate: ll HORIZONTAL; tv1 → GONE antes do addView; btn visível
+    b.direct(
+        cls,
+        "onCreate",
+        "V",
+        vec!["Landroid/os/Bundle;"],
+        ACC_PUBLIC,
+        Some(b.code(6, 2, 2, {
+            let mut u = op21c(0x22, 0, t_ll); // v0 = ll
+            u.extend(op35c(0x70, 1, refs.ll_init, [0, 0, 0, 0, 0]));
+            u.extend(op11n(0x12, 1, 0)); // v1 = 0 (HORIZONTAL)
+            u.extend(op35c(0x6E, 2, refs.set_orientation, [0, 1, 0, 0, 0]));
+            u.extend(op21c(0x22, 1, t_tv)); // v1 = tv1
+            u.extend(op35c(0x70, 1, refs.tv_init, [1, 0, 0, 0, 0]));
+            u.extend(op21c(0x1A, 2, s_x)); // v2 = "x"
+            u.extend(op35c(0x6E, 2, refs.set_text, [1, 2, 0, 0, 0]));
+            u.extend(op11n(0x12, 2, 2)); // v2 = 2 (GONE)
+            u.extend(op35c(0x6E, 2, refs.set_visibility, [1, 2, 0, 0, 0]));
+            u.extend(op35c(0x6E, 2, refs.add_view, [0, 1, 0, 0, 0])); // addView(tv1 GONE)
+            u.extend(op21c(0x22, 1, t_btn)); // v1 = btn
+            u.extend(op35c(0x70, 1, refs.btn_init, [1, 0, 0, 0, 0]));
+            u.extend(op21c(0x1A, 2, s_ok)); // v2 = "ok"
+            u.extend(op35c(0x6E, 2, refs.set_text, [1, 2, 0, 0, 0]));
+            u.extend(op35c(0x6E, 2, refs.add_view, [0, 1, 0, 0, 0])); // addView(btn)
+            u.extend(op35c(0x6E, 2, refs.set_content, [4, 0, 0, 0, 0]));
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+    e.launch_app("LMain;", "com.exemplo.gone", Vec::new())
+        .expect("launch");
+    let dump = e.dump_ui();
+    // Button único visível: largura inteira, posição 0 (antes: [0,0 360x48])
+    assert!(
+        dump.contains("Button @id/0 [0,0 720x48]"),
+        "issue #60: Button ocupa 720 com GONE no slot: {dump}"
+    );
+    assert!(dump.contains("GONE"), "tv1 segue GONE no dump: {dump}");
+    assert!(!dump.contains("360x48"), "nenhum slot pela metade: {dump}");
+}
+
+/// [A, GONE, B] horizontais: A e B dividem igualmente (360 cada) — o GONE
+/// não entra no divisor nem deixa buraco.
+#[test]
+fn linear_horizontal_two_visible_split_with_gone_middle() {
+    let mut b = DexBuilder::new();
+    register_platform_classes(&mut b);
+    let refs = platform_method_refs(&mut b);
+    b.type_idx("Landroid/widget/LinearLayout;");
+    b.type_idx("Landroid/widget/TextView;");
+    let cls = b.class("LMain;", "Landroid/app/Activity;");
+    let t_ll = b.type_idx_cached("Landroid/widget/LinearLayout;");
+    let t_tv = b.type_idx_cached("Landroid/widget/TextView;");
+    let s_a = b.intern("a") as u16;
+    let s_m = b.intern("m") as u16;
+    let s_b = b.intern("b") as u16;
+
+    b.direct(
+        cls,
+        "<init>",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(1, 1, 1, {
+            let mut u = op35c(0x70, 1, refs.activity_init, [0, 0, 0, 0, 0]);
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    b.direct(
+        cls,
+        "onCreate",
+        "V",
+        vec!["Landroid/os/Bundle;"],
+        ACC_PUBLIC,
+        Some(b.code(6, 2, 2, {
+            let mut u = op21c(0x22, 0, t_ll); // v0 = ll
+            u.extend(op35c(0x70, 1, refs.ll_init, [0, 0, 0, 0, 0]));
+            u.extend(op11n(0x12, 1, 0)); // horizontal
+            u.extend(op35c(0x6E, 2, refs.set_orientation, [0, 1, 0, 0, 0]));
+            u.extend(op21c(0x22, 1, t_tv)); // v1 = tvA
+            u.extend(op35c(0x70, 1, refs.tv_init, [1, 0, 0, 0, 0]));
+            u.extend(op21c(0x1A, 2, s_a));
+            u.extend(op35c(0x6E, 2, refs.set_text, [1, 2, 0, 0, 0]));
+            u.extend(op35c(0x6E, 2, refs.add_view, [0, 1, 0, 0, 0]));
+            u.extend(op21c(0x22, 1, t_tv)); // v1 = tvM
+            u.extend(op35c(0x70, 1, refs.tv_init, [1, 0, 0, 0, 0]));
+            u.extend(op21c(0x1A, 2, s_m));
+            u.extend(op35c(0x6E, 2, refs.set_text, [1, 2, 0, 0, 0]));
+            u.extend(op11n(0x12, 2, 2)); // GONE
+            u.extend(op35c(0x6E, 2, refs.set_visibility, [1, 2, 0, 0, 0]));
+            u.extend(op35c(0x6E, 2, refs.add_view, [0, 1, 0, 0, 0]));
+            u.extend(op21c(0x22, 1, t_tv)); // v1 = tvB
+            u.extend(op35c(0x70, 1, refs.tv_init, [1, 0, 0, 0, 0]));
+            u.extend(op21c(0x1A, 2, s_b));
+            u.extend(op35c(0x6E, 2, refs.set_text, [1, 2, 0, 0, 0]));
+            u.extend(op35c(0x6E, 2, refs.add_view, [0, 1, 0, 0, 0]));
+            u.extend(op35c(0x6E, 2, refs.set_content, [4, 0, 0, 0, 0]));
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+    e.launch_app("LMain;", "com.exemplo.gone2", Vec::new())
+        .expect("launch");
+    let dump = e.dump_ui();
+    assert!(
+        dump.contains("[0,0 360x48]"),
+        "A com metade da largura: {dump}"
+    );
+    assert!(
+        dump.contains("[360,0 360x48]"),
+        "B colado em A (sem buraco do GONE): {dump}"
+    );
 }

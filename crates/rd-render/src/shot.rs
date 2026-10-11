@@ -42,8 +42,11 @@ impl Framebuffer {
     }
 
     pub fn rect(&mut self, x: i32, y: i32, w: i32, h: i32, c: Rgb) {
-        for yy in y.max(0)..(y + h).min(self.h as i32) {
-            for xx in x.max(0)..(x + w).min(self.w as i32) {
+        // issue #62: bounds hostis da API pública (UiNode de qualquer origem)
+        // não podem panicar em debug (x+w com i32::MAX) — saturating em ambos
+        // os extremos; retângulo fora do framebuffer simplesmente não pinta.
+        for yy in y.max(0)..y.saturating_add(h).min(self.h as i32) {
+            for xx in x.max(0)..x.saturating_add(w).min(self.w as i32) {
                 if let Some(p) = self.pixel_mut(xx, yy) {
                     p[0] = c.0;
                     p[1] = c.1;
@@ -55,9 +58,9 @@ impl Framebuffer {
 
     pub fn rect_border(&mut self, x: i32, y: i32, w: i32, h: i32, c: Rgb) {
         self.rect(x, y, w, 1, c);
-        self.rect(x, y + h.saturating_sub(1), w, 1, c);
+        self.rect(x, y.saturating_add(h.saturating_sub(1)), w, 1, c);
         self.rect(x, y, 1, h, c);
-        self.rect(x + w.saturating_sub(1), y, 1, h, c);
+        self.rect(x.saturating_add(w.saturating_sub(1)), y, 1, h, c);
     }
 
     /// Texto com glifos de bloco 3×7 (determinístico; fonte tipográfica real
@@ -67,7 +70,8 @@ impl Framebuffer {
         let mut cx = x;
         for ch in s.chars() {
             draw_glyph_block(self, cx, y, ch, c);
-            cx += 6; // 3 px de glifo + 3 de espaçamento
+            // issue #62: text hostil gigante não pode overflowar o cursor
+            cx = cx.saturating_add(6); // 3 px de glifo + 3 de espaçamento
         }
     }
 
@@ -159,7 +163,8 @@ fn draw_glyph_block(fb: &mut Framebuffer, x: i32, y: i32, ch: char, c: Rgb) {
                 true
             };
             if solid {
-                fb.rect(x + dx, y + dy, 1, 1, c);
+                // issue #62: cursor saturado (texto hostil gigante) não panic
+                fb.rect(x.saturating_add(dx), y.saturating_add(dy), 1, 1, c);
             }
         }
     }
@@ -195,7 +200,9 @@ fn paint(n: &UiNode, fb: &mut Framebuffer, depth: usize) {
         fb.rect_border(x, y, w, h, (0x60, 0x60, 0x60));
     }
     if !n.text.is_empty() {
-        fb.text(x + 4, y + ((h - 8).max(0) / 2), &n.text, (0x1B, 0x1B, 0x1B));
+        // issue #62: offsets/centralização saturados (bounds hostis)
+        let ty = y.saturating_add(h.saturating_sub(8).max(0) / 2);
+        fb.text(x.saturating_add(4), ty, &n.text, (0x1B, 0x1B, 0x1B));
     }
     for c in &n.children {
         paint(c, fb, depth + 1);
@@ -215,6 +222,8 @@ mod tests {
             visibility: Vis::Visible,
             enabled: true,
             clickable: false,
+            focusable: false,
+            truncated: false,
             children: Vec::new(),
         }
     }
@@ -271,5 +280,21 @@ mod tests {
         assert_eq!(&z[z.len() - 4..], &adler32(raw).to_be_bytes());
         // bloco stored: primeiro byte = BFINAL|BTYPE=00 → 1 (único bloco final)
         assert_eq!(z[2] & 0x01, 1);
+    }
+
+    /// issue #62: UiNode hostil (bounds i32::MAX/MIN) NÃO panic no render —
+    /// saturating; o rect fora do framebuffer simplesmente não pinta.
+    #[test]
+    fn hostile_bounds_do_not_panic_in_render() {
+        let n = node("C", "x", (i32::MAX, 0, 1, 1));
+        let _ = render_snapshot(&n); // sem panic = sucesso
+        let n = node("C", "x", (0, i32::MIN, i32::MAX, i32::MAX));
+        let _ = render_snapshot(&n);
+        let n = node("C", "x", (i32::MIN, i32::MIN, i32::MAX, i32::MAX));
+        let _ = render_snapshot(&n);
+        let mut root = node("Root", "", (0, 0, 720, 96));
+        root.children
+            .push(node("C", "y", (i32::MAX, i32::MAX, i32::MAX, i32::MAX)));
+        let _ = render_snapshot(&root);
     }
 }

@@ -113,6 +113,10 @@ pub enum HostObj {
         text: String,
         children: Vec<ObjRef>,
         orientation: i32, // 0 = horizontal, 1 = vertical (default Android)
+        /// issue #59: layout_width com dimensão explícita (px) — vence o slot
+        /// distribuído pelo pai (match_parent implícito = None). Sempre ≤
+        /// WINDOW_W (validado no inflate; clamp aqui por defesa em profundidade).
+        w_explicit: Option<i32>,
     },
     Handler {
         looper: ObjRef,
@@ -221,6 +225,7 @@ fn new_view() -> HostObj {
         text: String::new(),
         children: Vec::new(),
         orientation: 0,
+        w_explicit: None,
     }
 }
 
@@ -588,35 +593,63 @@ impl Engine {
         self.layout_depth(v, x, y, w, 0)
     }
 
-    fn layout_depth(&mut self, v: ObjRef, x: i32, y: i32, w: i32, depth: usize) {
+    fn layout_depth(&mut self, v: ObjRef, x: i32, y: i32, slot_w: i32, depth: usize) {
         // issue #40: cap — árvore programática profunda não aborta o processo
         if depth > MAX_VIEW_DEPTH {
             return;
         }
-        let (orientation, children, own_h) = match self.fw.get(v) {
+        let (orientation, children, own_h, own_w_explicit) = match self.fw.get(v) {
             Some(HostObj::View {
                 orientation,
                 children,
                 h,
+                w_explicit,
                 ..
-            }) => (*orientation, children.clone(), *h),
+            }) => (*orientation, children.clone(), *h, *w_explicit),
             _ => return,
         };
+        // issue #59: largura EXPLÍCITA vence o slot distribuído pelo pai
+        // (match_parent implícito = None → slot). Clamp de defesa: o inflate
+        // já valida ≤ WINDOW_W, mas a API host (addView em árvore
+        // programática) também pode chegar aqui com valores hostis.
+        let w = own_w_explicit.map_or(slot_w, |ew| ew.clamp(0, WINDOW_W));
         let mut acc_y = y;
         let mut acc_x = x;
         let mut max_h = 0i32;
-        // horizontal: os filhos dividem a largura igualmente (simplificação
-        // M3 — weight/layout gravity chegam com o render do M4)
-        let child_w = if orientation == 1 {
+        // issue #60: o divisor do ramo horizontal considera APENAS filhos
+        // não-GONE (antes: `w / children.len()` contava GONE e o filho
+        // visível recebia metade da largura com slot vazio) e respeita as
+        // larguras explícitas — os SEM largura dividem o restante igualmente
+        // (simplificação M3: weight/gravity ficaram de FORA do M4 — backlog pós-M5;
+        // issue #64: deferral re-apontado, o M4 não os implementou).
+        let visible: Vec<ObjRef> = children
+            .iter()
+            .copied()
+            .filter(|c| self.vis_of(*c) != Vis::Gone)
+            .collect();
+        let default_w = if orientation == 1 {
             w
         } else {
-            w / children.len().max(1) as i32
-        };
-        for c in &children {
-            // issue #46: GONE é removido do layout — não ocupa nem acumula
-            if self.vis_of(*c) == Vis::Gone {
-                continue;
+            let explicit: i32 = visible
+                .iter()
+                .filter_map(|c| self.w_explicit_of(*c))
+                .fold(0i32, |acc, ew| acc.saturating_add(ew.clamp(0, WINDOW_W)));
+            let free = visible.len()
+                - visible
+                    .iter()
+                    .filter(|c| self.w_explicit_of(**c).is_some())
+                    .count();
+            if free == 0 {
+                0
+            } else {
+                w.saturating_sub(explicit).max(0) / free as i32
             }
+        };
+        for c in &visible {
+            let child_w = match self.w_explicit_of(*c) {
+                Some(ew) => ew.clamp(0, WINDOW_W),
+                None => default_w,
+            };
             let (cx, cy) = match orientation {
                 1 => (x, acc_y),
                 _ => (acc_x, y),
@@ -651,6 +684,15 @@ impl Engine {
             } else {
                 max_h
             };
+        }
+    }
+
+    /// issue #59: largura explícita declarada por um view (layout_width px),
+    /// se houver.
+    fn w_explicit_of(&self, v: ObjRef) -> Option<i32> {
+        match self.fw.get(v) {
+            Some(HostObj::View { w_explicit, .. }) => *w_explicit,
+            _ => None,
         }
     }
 
@@ -945,6 +987,11 @@ pub fn call_host_instance(
             Ok(Some(Value::Null))
         }
         (VIEW, "setId") if is_view(vm) => {
+            // issue #54: setId aceita qualquer i32 (semântica Java real —
+            // findViewById precisa achar o que o app setou). O que NÃO acontece
+            // mais é o dump fabricar resource-id para id sem recurso: o
+            // build_ui_node só nomeia ids que RESOLVEM no arsc (namespace
+            // honesto — id cru tipo 123 sai com resource-id vazio).
             let v = args[0].as_int()?;
             if let Some(HostObj::View { id, .. }) = vm.fw.objects.get_mut(&recv) {
                 *id = v;
@@ -1410,8 +1457,10 @@ fn string_arg_of(vm: &Engine, v: Option<&Value>) -> Result<String, VmExit> {
 pub struct UiNode {
     /// Classe Java ("android.widget.TextView").
     pub class: String,
-    /// resource-id no formato uiautomator ("com.pkg:id/tv"), se o id casar no
-    /// arsc; ids não resolvidos viram "com.pkg:id/<número>".
+    /// resource-id no formato uiautomator ("com.pkg:id/tv") — issue #54:
+    /// SÓ ids que resolvem no arsc (nunca "com.pkg:id/123" fabricado);
+    /// package id 0x01 sai como "android:id/…" (nunca sequestrado pelo
+    /// package do app).
     pub resource_id: Option<String>,
     pub text: String,
     /// (x, y, w, h) em px do viewport.
@@ -1419,6 +1468,14 @@ pub struct UiNode {
     pub visibility: Vis,
     pub enabled: bool,
     pub clickable: bool,
+    /// issue #54: propriedade PRÓPRIA (antes era fudge de `clickable` — no
+    /// Android real são estados distintos: TextView clicável não é focável,
+    /// EditText é focável sem ser clicável). O modelo host ainda não rastreia
+    /// foco — honesto = false (documentado no README do formato).
+    pub focusable: bool,
+    /// issue #62: subárvore cortada pelo cap de profundidade — o dump emite
+    /// marcador para o agente NÃO ler a árvore como completa.
+    pub truncated: bool,
     pub children: Vec<UiNode>,
 }
 
@@ -1432,9 +1489,40 @@ impl Engine {
         Some(self.build_ui_node(content, 0))
     }
 
+    /// issue #54: resource-id HONESTO para o dump uiautomator:
+    /// - id sem nome no arsc → `None` (o uiautomator real também devolve
+    ///   vazio: viewIdResourceName só existe para ids de RECURSO — nunca
+    ///   fabricar "com.pkg:id/123" a partir de View.setId cru);
+    /// - package id 0x01 → prefixo "android" (ids de framework NUNCA ganham
+    ///   o package do app — um arsc hostil com package id 0x01 não sequestra
+    ///   android:id/…);
+    /// - demais: nome do package do arsc que DECLARA o id (fallback: package
+    ///   do app).
+    fn resource_ref_name(&self, resid: u32) -> Option<String> {
+        let pid = (resid >> 24) & 0xFF;
+        let apk = self.fw.resources.as_ref()?;
+        let arsc = apk.arsc.as_ref()?;
+        let name = arsc.resolve_name(resid)?; // "@type/key"
+        let name = name.trim_start_matches('@');
+        let prefix = if pid == 0x01 {
+            "android".to_string()
+        } else {
+            arsc.packages
+                .iter()
+                .find(|p| (p.id as u32) == pid)
+                .map(|p| p.name.clone())
+                .filter(|n| !n.is_empty())
+                .unwrap_or_else(|| self.fw.package_name.clone())
+        };
+        Some(format!("{prefix}:{name}"))
+    }
+
     fn build_ui_node(&self, v: ObjRef, depth: usize) -> UiNode {
-        // issue #40: mesmo cap do dump textual (árvore programática hostil)
-        let children_view: Vec<ObjRef> = if depth > MAX_VIEW_DEPTH {
+        // issue #40/#62: mesmo cap do dump textual (árvore programática
+        // hostil) — e o corte é SINALIZADO (truncated) para o dump XML marcar
+        // (antes: o agente via a subárvore cortada como se fosse completa).
+        let truncated = depth > MAX_VIEW_DEPTH;
+        let children_view: Vec<ObjRef> = if truncated {
             Vec::new()
         } else {
             match self.fw.get(v) {
@@ -1464,20 +1552,12 @@ impl Engine {
                         .trim_start_matches('L')
                         .trim_end_matches(';')
                         .replace('/', ".");
+                    // issue #54: só nomeia ids que resolvem no arsc (namespace
+                    // honesto — sem "id/123" fabricado, sem sequestro de android:id)
                     let resource_id = if *id == 0 {
                         None
                     } else {
-                        let name = self
-                            .fw
-                            .resources
-                            .as_ref()
-                            .and_then(|apk| apk.arsc.as_ref())
-                            .and_then(|a| a.resolve_name(*id as u32))
-                            .unwrap_or_else(|| format!("id/{id}"));
-                        // resolve_name devolve "@type/name" ou "type/name" —
-                        // uiautomator quer "package:type/name"
-                        let name = name.trim_start_matches('@');
-                        Some(format!("{}:{name}", self.fw.package_name))
+                        self.resource_ref_name(*id as u32)
                     };
                     (
                         class,
@@ -1511,6 +1591,8 @@ impl Engine {
             visibility,
             enabled,
             clickable,
+            focusable: false, // issue #54: honesto até o modelo rastrear foco
+            truncated,
             children,
         }
     }

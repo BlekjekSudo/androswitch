@@ -240,6 +240,56 @@ impl Engine {
         }
     }
 
+    /// issue #57 (JVMS 5.4.3.2): classe DECLARANTE do slot static de um campo
+    /// referenciado por `ref_class` — sobe superclasses/interfaces. Classe
+    /// fora do DEX (plataforma embutida, ex. System) declara nela mesma
+    /// (System.out/err é materializado no sget). Campo inexistente em toda a
+    /// cadeia → `NoSuchFieldError` CAPTURÁVEL (antes: default silencioso e,
+    /// no sput, slot divergente por referência).
+    pub(crate) fn resolve_static_owner(
+        &mut self,
+        ref_class: &str,
+        name: &str,
+    ) -> Result<String, VmExit> {
+        if self.cp.find_class(ref_class).is_none() {
+            return Ok(ref_class.to_string()); // builtin/plataforma: própria
+        }
+        if let Some(owner) = self.cp.resolve_static_field(ref_class, name) {
+            return Ok(owner);
+        }
+        Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/NoSuchFieldError;",
+            format!(
+                "campo estático '{name}' não existe em {ref_class} (nem na cadeia de superclasses/interfaces) — JVMS 5.4.3.2"
+            ),
+        )))
+    }
+
+    /// issue #61: valor TIPADO de um recurso (melhor config do arsc) — o que
+    /// o LayoutInflater usa para resolver `@dimen`/`@bool` por referência.
+    /// Erro tipado se o resid não existe ou o tipo não é representável
+    /// (nunca default silencioso — resíduo da deferral da #46).
+    pub fn resolve_resource_value(
+        &self,
+        resid: u32,
+    ) -> Result<rd_apk::arsc::ResolvedValue, VmExit> {
+        let apk = self.resources()?;
+        let arsc = apk
+            .arsc
+            .as_ref()
+            .ok_or_else(|| crate::err::vm_error("RESOURCES_MISSING", "APK sem resources.arsc"))?;
+        arsc.resolve_value(resid).ok_or_else(|| {
+            crate::err::with_suggestion(
+                crate::err::vm_error(
+                    "RESOURCE_NOT_FOUND",
+                    format!("recurso 0x{resid:08x} não resolvido no resources.arsc (inexistente ou tipo bag/complex)"),
+                ),
+                "resid inválido para este APK; entradas complexas (bags) não são valores tipados",
+            )
+            .into()
+        })
+    }
+
     fn initialize_class(&mut self, class: &str) -> Result<(), VmExit> {
         // issue #25: JLS 12.4.2 — a superclasse inicializa ANTES da subclasse
         // (o guard de re-entrância em ensure_initialized protege ciclos)

@@ -4,6 +4,7 @@
 //! com preferência pela config default. Valores complexos são marcados (`complex`)
 //! sem desdobrar bag/maps — suficiente para o inspect e para o motor de permissões.
 
+use crate::axml::ComplexUnit;
 use crate::error::{RdError, RdResult};
 use crate::pool::StringPool;
 use std::collections::BTreeMap;
@@ -94,6 +95,49 @@ impl Package {
         let type_name = self.type_strings.get((type_idx as u32).wrapping_sub(1))?;
         let key_name = self.key_strings.get(key.key_idx)?;
         Some(format!("@{type_name}/{key_name}"))
+    }
+}
+
+/// issue #61: valor TIPADO de uma entrada de recurso (melhor config) — o que
+/// o LayoutInflater precisa para resolver `@dimen`/`@bool` por referência.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ResolvedValue {
+    Str(String),
+    Boolean(bool),
+    Integer(i32),
+    Float(f32),
+    /// Valor complexo (mantissa×radix) com unidade — px/dp/sp/…
+    Dimension {
+        value: f32,
+        unit: ComplexUnit,
+    },
+    /// Referência a outro recurso (resid) — o caller decide se segue a cadeia.
+    Reference(u32),
+}
+
+/// complexToFloat (TypedValue) — mesma matemática do axml (mantissa bits
+/// 8–31 com sinal no bit 31, radix bits 4–5).
+fn complex_to_float(data: u32) -> f32 {
+    const RADIX_MULTS: [f32; 4] = [
+        0.003_906_25,   // radix 0: 2⁻⁸
+        3.051_758e-5,   // radix 1: 2⁻¹⁵
+        1.192_092_9e-7, // radix 2: 2⁻²³
+        4.656_613e-10,  // radix 3: 2⁻³¹
+    ];
+    let mantissa = (data & 0xFFFF_FF00) as i32;
+    mantissa as f32 * RADIX_MULTS[((data >> 4) & 0x3) as usize]
+}
+
+/// Unidade de um Res_value complexo (bits 0–3 — mesma tabela do axml).
+fn complex_unit_of(data: u32) -> ComplexUnit {
+    match (data & 0xF) as u8 {
+        0 => ComplexUnit::Px,
+        1 => ComplexUnit::Dip,
+        2 => ComplexUnit::Sp,
+        3 => ComplexUnit::Pt,
+        4 => ComplexUnit::In,
+        5 => ComplexUnit::Mm,
+        other => ComplexUnit::Unknown(other),
     }
 }
 
@@ -189,12 +233,37 @@ impl Arsc {
         pkg.resolve_name(res_id)
     }
 
+    /// issue #61: valor TIPADO da melhor config de um resid. `None` = resid
+    /// desconhecido ou tipo não representável (bag/complex — o caller falha
+    /// tipado; nunca default silencioso).
+    pub fn resolve_value(&self, res_id: u32) -> Option<ResolvedValue> {
+        let pkg = self.package_for(res_id)?;
+        let entries = pkg.entries.get(&res_id)?;
+        let best = entries
+            .iter()
+            .min_by_key(|e| (e.config.specificity(), !e.config.is_default()))?;
+        match best.data_type {
+            0x03 => best.string.clone().map(ResolvedValue::Str),
+            0x01 => Some(ResolvedValue::Reference(best.data)),
+            // INT_DEC (u32 com semântica i32 — TypedValue.data é cru)
+            0x10 => Some(ResolvedValue::Integer(best.data as i32)),
+            0x11 => Some(ResolvedValue::Integer(best.data as i32)),
+            0x12 => Some(ResolvedValue::Boolean(best.data != 0)),
+            0x04 => Some(ResolvedValue::Float(f32::from_bits(best.data))),
+            0x05 => Some(ResolvedValue::Dimension {
+                value: complex_to_float(best.data),
+                unit: complex_unit_of(best.data),
+            }),
+            _ => None,
+        }
+    }
+
     pub fn package_for(&self, res_id: u32) -> Option<&Package> {
         let pid = ((res_id >> 24) & 0xFF) as u8;
-        self.packages
-            .iter()
-            .find(|p| p.id == pid)
-            .or_else(|| self.packages.first())
+        // issue #54: SEM fallback para o primeiro package — um arsc hostil
+        // não pode nomear ids de package estranho (ex.: 0x01 = framework
+        // android:id/…). Package id inexistente → resolução honesta falha.
+        self.packages.iter().find(|p| p.id == pid)
     }
 }
 
