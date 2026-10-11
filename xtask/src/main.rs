@@ -195,6 +195,70 @@ mod tests {
         );
     }
 
+    /// issue #86: a regra "sem `unsafe` fora de rd-ndk/rd-jni" (CONTRIBUTING
+    /// item 5, SECURITY.md) é imposta pelo compilador. Este teste impede que
+    /// alguém remova a configuração de lint — sem ela, um `unsafe` em rd-vm,
+    /// rd-apk ou rd-dex compilaria e passaria em todos os jobs do CI.
+    #[test]
+    fn every_crate_declares_the_unsafe_policy() {
+        let root = repo_root();
+        let workspace: toml::Value = toml::from_str(
+            &std::fs::read_to_string(root.join("Cargo.toml")).expect("Cargo.toml da raiz"),
+        )
+        .expect("Cargo.toml da raiz é TOML válido");
+        let ws_unsafe = workspace
+            .get("workspace")
+            .and_then(|w| w.get("lints"))
+            .and_then(|l| l.get("rust"))
+            .and_then(|r| r.get("unsafe_code"))
+            .and_then(|v| v.as_str())
+            .unwrap_or_else(|| panic!("[workspace.lints.rust] unsafe_code ausente (issue #86)"));
+        assert_eq!(
+            ws_unsafe, "forbid",
+            "o default do workspace tem de ser forbid (issue #86)"
+        );
+
+        let members = workspace
+            .get("workspace")
+            .and_then(|w| w.get("members"))
+            .and_then(|m| m.as_array())
+            .expect("workspace.members");
+        assert!(!members.is_empty());
+        for member in members {
+            let dir = member.as_str().expect("member é string");
+            let crate_name = dir.rsplit('/').next().unwrap_or(dir);
+            let text = std::fs::read_to_string(root.join(dir).join("Cargo.toml"))
+                .unwrap_or_else(|e| panic!("Cargo.toml de {dir}: {e}"));
+            let table: toml::Value = toml::from_str(&text).expect("TOML válido");
+            let lints = table
+                .get("lints")
+                .unwrap_or_else(|| panic!("{dir} não declara [lints] (issue #86)"));
+            let inherited = lints.get("workspace").and_then(|v| v.as_bool()) == Some(true);
+            let own = lints
+                .get("rust")
+                .and_then(|r| r.get("unsafe_code"))
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            assert!(
+                inherited || own.is_some(),
+                "{dir} não herda nem declara unsafe_code (issue #86)"
+            );
+            let level = own.unwrap_or_else(|| ws_unsafe.to_string());
+            // rd-ndk/rd-jni são a exceção documentada (ponte nativa), mas nem
+            // elas podem liberar `unsafe` sem `#[allow]` local justificado.
+            let expected = if matches!(crate_name, "rd-ndk" | "rd-jni") {
+                "deny"
+            } else {
+                "forbid"
+            };
+            assert_eq!(
+                level, expected,
+                "{dir}: unsafe_code={level:?}, esperado {expected:?} (issue #86)"
+            );
+            assert_ne!(level, "allow", "{dir}: `allow` desliga a regra");
+        }
+    }
+
     /// issue #87: a spec (`RustyDroid.md`) citava Health Connect/HEALTH na API
     /// 36 enquanto os dados versionados usam 34 (Android 14 — Health Connect
     /// entrou na plataforma; `HealthPermissions` é "Added in API level 34").

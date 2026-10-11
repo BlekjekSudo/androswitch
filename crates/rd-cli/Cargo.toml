@@ -12,6 +12,10 @@ authors.workspace = true
 name = "rd"
 path = "src/main.rs"
 
+# issue #86: `unsafe` é erro de compilação neste crate (regra do CONTRIBUTING).
+[lints]
+workspace = true
+
 [dependencies]
 rd-apk = { workspace = true }
 rd-dex = { workspace = true }
