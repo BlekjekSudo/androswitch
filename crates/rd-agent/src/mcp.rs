@@ -738,7 +738,19 @@ impl AgentSession {
                         Some("use {\"x\": <int>, \"y\": <int>} (px do viewport 720×1440)"),
                     ));
                 };
-                self.tool_tap(x as i32, y as i32)
+                // issue #85: `as i32` truncava em silêncio (4294967396 virava
+                // 100) e a resposta ecoava o valor truncado — o agente não
+                // percebia que o toque não era o pedido.
+                let (Ok(x), Ok(y)) = (i32::try_from(x), i32::try_from(y)) else {
+                    return ToolResult::error(&agent_error(
+                        "INVALID_FORMAT",
+                        format!("tap: x/y fora da faixa de i32 (x={x}, y={y})"),
+                        Some(
+                            "use {\"x\": <int>, \"y\": <int>} dentro de -2147483648..=2147483647 (px do viewport 720×1440)",
+                        ),
+                    ));
+                };
+                self.tool_tap(x, y)
             }
             "swipe" => {
                 let (Some(x1), Some(y1), Some(x2), Some(y2)) = (
@@ -754,7 +766,22 @@ impl AgentSession {
                     ));
                 };
                 let ms = args.get("ms").and_then(|v| v.as_u64()).unwrap_or(300);
-                self.tool_swipe(x1 as i32, y1 as i32, x2 as i32, y2 as i32, ms)
+                // issue #85: sem truncamento silencioso (ver `tap`)
+                let (Ok(x1), Ok(y1), Ok(x2), Ok(y2)) = (
+                    i32::try_from(x1),
+                    i32::try_from(y1),
+                    i32::try_from(x2),
+                    i32::try_from(y2),
+                ) else {
+                    return ToolResult::error(&agent_error(
+                        "INVALID_FORMAT",
+                        format!("swipe: coordenada fora da faixa de i32 ({x1},{y1} → {x2},{y2})"),
+                        Some(
+                            "use coordenadas dentro de -2147483648..=2147483647 (px do viewport 720×1440)",
+                        ),
+                    ));
+                };
+                self.tool_swipe(x1, y1, x2, y2, ms)
             }
             "type_text" => {
                 let Some(text) = args.get("text").and_then(|v| v.as_str()) else {
@@ -1935,7 +1962,10 @@ fn json_args_to_values(sig: &str, args: &[serde_json::Value]) -> Result<Vec<Valu
     let mut out = Vec::new();
     for (ty, a) in types.iter().zip(args) {
         let v = match ty.as_str() {
-            "I" => Value::Int(a.as_i64().ok_or_else(|| bad_arg(ty, a))? as i32),
+            "I" => Value::Int(
+                i32::try_from(a.as_i64().ok_or_else(|| bad_arg(ty, a))?)
+                    .map_err(|_| bad_range(ty, a, "i32 (-2147483648..=2147483647)"))?,
+            ),
             "J" => Value::Long(a.as_i64().ok_or_else(|| bad_arg(ty, a))?),
             "F" => Value::Float(a.as_f64().ok_or_else(|| bad_arg(ty, a))? as f32),
             "D" => Value::Double(a.as_f64().ok_or_else(|| bad_arg(ty, a))?),
@@ -1945,8 +1975,16 @@ fn json_args_to_values(sig: &str, args: &[serde_json::Value]) -> Result<Vec<Valu
                 let c = s.chars().next().ok_or_else(|| bad_arg(ty, a))?;
                 Value::Int(c as i32)
             }
-            "B" => Value::Int(a.as_i64().ok_or_else(|| bad_arg(ty, a))? as i8 as i32),
-            "S" => Value::Int(a.as_i64().ok_or_else(|| bad_arg(ty, a))? as i16 as i32),
+            // issue #85: `as i8`/`as i16` truncavam em silêncio — 128 virava
+            // -128 e 40000 virava -25536, sem nenhum erro.
+            "B" => Value::Int(
+                i8::try_from(a.as_i64().ok_or_else(|| bad_arg(ty, a))?)
+                    .map_err(|_| bad_range(ty, a, "i8 (-128..=127)"))? as i32,
+            ),
+            "S" => Value::Int(
+                i16::try_from(a.as_i64().ok_or_else(|| bad_arg(ty, a))?)
+                    .map_err(|_| bad_range(ty, a, "i16 (-32768..=32767)"))? as i32,
+            ),
             "Ljava/lang/String;" => {
                 // alocação de objeto exige engine no site do caller — a sonda
                 // v1 aceita só primitivos (blocos de estado puro do app)
@@ -1975,6 +2013,16 @@ fn bad_arg(ty: &str, a: &serde_json::Value) -> RdError {
         "INVALID_FORMAT",
         format!("argumento {a} não é compatível com o tipo {ty}"),
         None,
+    )
+}
+
+/// issue #85: argumento fora da faixa do tipo do DEX — erro estruturado em vez
+/// da conversão com `as`, que truncava em silêncio.
+fn bad_range(ty: &str, a: &serde_json::Value, range: &str) -> RdError {
+    agent_error(
+        "INVALID_FORMAT",
+        format!("argumento {ty} = {a} fora da faixa {range}"),
+        Some("a sonda v1 não trunca — use um valor dentro da faixa do tipo"),
     )
 }
 
@@ -2738,6 +2786,90 @@ mod tests {
         assert_eq!(arr[1]["error"]["code"], -32600, "{arr:?}");
         assert!(arr[1]["id"].is_null(), "{arr:?}");
         assert!(arr[2].get("result").is_some(), "{arr:?}");
+    }
+
+    /// issue #85: `json_args_to_values` recusa valores fora da faixa do tipo
+    /// DEX em vez de truncar com `as` (128 → -128, 40000 → -25536…).
+    #[test]
+    fn invoke_args_out_of_range_are_invalid_format() {
+        let out_of_range: &[(&str, serde_json::Value)] = &[
+            ("I", serde_json::json!(2147483648i64)),  // i32::MAX + 1
+            ("I", serde_json::json!(-2147483649i64)), // i32::MIN - 1
+            ("B", serde_json::json!(128)),
+            ("B", serde_json::json!(-129)),
+            ("S", serde_json::json!(40000)),
+            ("S", serde_json::json!(-32769)),
+        ];
+        for (ty, value) in out_of_range {
+            let sig = format!("({ty})V");
+            let err = json_args_to_values(&sig, std::slice::from_ref(value))
+                .err()
+                .unwrap_or_else(|| panic!("{ty} = {value} deveria ser recusado"));
+            assert_eq!(
+                err.code, "INVALID_FORMAT",
+                "{ty} = {value}: código do erro (cause: {})",
+                err.cause
+            );
+            assert!(
+                err.cause.contains("fora da faixa"),
+                "{ty} = {value}: cause deveria citar a faixa: {}",
+                err.cause
+            );
+        }
+
+        // limites exatos continuam aceitos (sem regressão)
+        let ok: &[(&str, serde_json::Value, i32)] = &[
+            ("I", serde_json::json!(2147483647i64), 2147483647),
+            ("I", serde_json::json!(-2147483648i64), -2147483648),
+            ("B", serde_json::json!(127), 127),
+            ("B", serde_json::json!(-128), -128),
+            ("S", serde_json::json!(32767), 32767),
+            ("S", serde_json::json!(-32768), -32768),
+        ];
+        for (ty, value, want) in ok {
+            let sig = format!("({ty})V");
+            let values = json_args_to_values(&sig, std::slice::from_ref(value))
+                .unwrap_or_else(|e| panic!("{ty} = {value} deveria ser aceito: {}", e.cause));
+            let got = match &values[0] {
+                Value::Int(v) => *v,
+                other => panic!("{ty} = {value}: esperava Int, veio {other:?}"),
+            };
+            assert_eq!(got, *want, "{ty} = {value} truncado");
+        }
+    }
+
+    /// issue #85: `tap` com coordenada fora de i32 é INVALID_FORMAT e NÃO toca
+    /// na tela (antes virava x=100 e a resposta ecoava o valor truncado).
+    #[test]
+    fn tap_and_swipe_reject_coordinates_outside_i32() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+        launch_ok(&mut s, serde_json::json!({}));
+
+        let too_big = 4_294_967_396i64; // 0x1_0000_0064 → `as i32` daria 100
+        let (v, err) = call(&mut s, "tap", serde_json::json!({"x": too_big, "y": 5}));
+        assert!(err, "tap fora de i32 precisa ser erro: {v}");
+        assert_eq!(v["code"], "INVALID_FORMAT", "{v}");
+        assert!(v["cause"].as_str().unwrap_or("").contains("fora da faixa"));
+
+        let (v, err) = call(
+            &mut s,
+            "swipe",
+            serde_json::json!({"x1": too_big, "y1": 5, "x2": 100, "y2": 5, "ms": 10}),
+        );
+        assert!(err, "swipe fora de i32 precisa ser erro: {v}");
+        assert_eq!(v["code"], "INVALID_FORMAT", "{v}");
+
+        // e o limite exato continua aceito (ecoando o valor recebido)
+        let (v, err) = call(
+            &mut s,
+            "tap",
+            serde_json::json!({"x": i32::MAX, "y": i32::MIN}),
+        );
+        assert!(!err, "i32::MAX/MIN devem ser aceitos: {v}");
+        assert_eq!(v["tapped"], serde_json::json!([i32::MAX, i32::MIN]), "{v}");
     }
 
     /// serve_stdio: sessão completa por linhas (loop real de E/S).
