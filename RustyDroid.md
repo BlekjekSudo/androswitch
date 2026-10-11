@@ -122,7 +122,7 @@
 - [ ] **SYS-10** Serviços de sistema extensíveis: AccessibilityService, NotificationListenerService, InputMethodService(IME com teclado virtual), DeviceAdmin/ProfileOwner/DevicePolicyManager, VoiceInteraction/Assistant, CallScreening, Telecom/ConnectionService, PrintService, AutofillService, TileService(Quick Settings), Watch Face/Wear stubs
 - [ ] **SYS-11** Shortcuts (estáticos/dinâmicos/pinned), App Actions stub, Sharing (ACTION_SEND completo com VFS)
 - [ ] **SYS-12** PackageInstaller (instalação via API, session-based), splits/base rotated *(experimental)*
-- [ ] **SYS-13** Health Connect (dados de saúde estruturados, permissões granulares API 36) *(experimental)*
+- [ ] **SYS-13** Health Connect (dados de saúde estruturados, permissões granulares por tipo de dado — API 34) *(experimental)*
 
 ## 0.7 MODO AGENTE — ferramentas MCP
 
@@ -357,7 +357,7 @@ Pergunte SOMENTE se um bloqueio físico impedir o progresso.
 > Google Play exige **target API 36** a partir de 31/08/2026 — o parser normaliza
 > targetSdk 26→36 e aplica **comutadores de comportamento por targetSdk** (behavior
 > changes): scoped storage @29, roles @29, notifications runtime @33, exact alarms
-> @31/33/34, foreground-service types @34, edge-to-edge @35, Health Connect @36…
+> @31/33/34, foreground-service types @34, edge-to-edge @35, Health Connect @34…
 > Matriz em `data/behavior-switches.toml` — consultável pelo agente (PRF-07).
 
 ### A2 — Piso de hardware: Motorola Moto E5 (perfil `moto-e5` — contrato de validação)
@@ -398,7 +398,7 @@ Pergunte SOMENTE se um bloqueio físico impedir o progresso.
 | CALENDAR | READ_CALENDAR, WRITE_CALENDAR |
 | NEARBY_DEVICES | BLUETOOTH_SCAN, BLUETOOTH_CONNECT, BLUETOOTH_ADVERTISE, NEARBY_WIFI_DEVICES, UWB_RANGING |
 | NOTIFICATIONS | POST_NOTIFICATIONS |
-| HEALTH | READ_HEALTH_DATA, READ_HEALTH_DATA_IN_BACKGROUND, WRITE_HEALTH_DATA (Health Connect, API 36) |
+| HEALTH | READ_HEALTH_DATA, READ_HEALTH_DATA_IN_BACKGROUND, WRITE_HEALTH_DATA (Health Connect, API 34) |
 
 ### B3. Especiais (special app access — via AppOps/settings, não dialog comum)
 SYSTEM_ALERT_WINDOW · WRITE_SETTINGS · MANAGE_EXTERNAL_STORAGE · REQUEST_INSTALL_PACKAGES ·

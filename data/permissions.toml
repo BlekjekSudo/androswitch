@@ -339,6 +339,9 @@ flags = ["runtime"]
 description = "Post notifications visible to the user (runtime permission since API 33)."
 
 # --- grupo HEALTH ---
+# issue #87: API 34 (Android 14), não 36 — `android.health.connect.HealthPermissions`
+# está "Added in API level 34" (https://developer.android.com/reference/android/health/connect/HealthPermissions)
+# e Health Connect entrou na plataforma no Android 14. Decisão da #52 mantida.
 [[permission]]
 name = "health.READ_HEALTH_DATA"
 level = "dangerous"
