@@ -76,7 +76,7 @@ Dump da UI corrente: `xml` (uiautomator, formato dos seletores) ou `text` (árvo
 
 ### `screenshot`
 
-Screenshot PNG determinístico 720×1440. Com `path` escreve o arquivo (DENTRO do sandbox — RD_MCP_SANDBOX); sem, devolve o PNG em base64 (conteúdo image).
+Screenshot PNG determinístico 720×1440. Com `path` escreve o arquivo (DENTRO do sandbox — RD_MCP_SANDBOX; symlink no destino é recusado: SYMLINK_NOT_ALLOWED, issue #67); sem, devolve o PNG em base64 (conteúdo image).
 
 - Parâmetros: `path`
 
