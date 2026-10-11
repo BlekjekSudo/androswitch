@@ -59,7 +59,7 @@ RustyDroid is a **"Wine for Android"**: instead of emulating an entire Android O
 | **M2** | ✅ **DONE** — minimal Dalvik interpreter: **150/150 golden vectors PASS vs real JVM execution** + real APK pure methods verified |
 | **M3** | ✅ **DONE** — Essential framework: Activity lifecycle, Handler/Looper, LayoutInflater, Resources |
 | **M4** | ✅ **DONE** — software rendering determinístico + UI dump uiautomator-compatible |
-| **M5** | **AI-agent mode v1**: MCP server with ~20 tools |
+| **M5** | ✅ **DONE** — MCP agent v1 (`rd mcp`, JSON-RPC stdio, ~20 tools: install/launch/tap/ui_tree/screenshot/logs/assert/permissions) |
 | **M6** | Test executor: scenario DSL, JUnit XML, automated compat matrix |
 | **M7** | Performance + **Moto E5 floor gate** (release blocked if budgets blown) |
 | **M8** | Real-world compat: RecyclerView, Fragments, OkHttp shim, SQLite/Room, Services |
@@ -73,7 +73,7 @@ APKs below the floor are inspected fine but refuse to run with a structured `BEL
 
 ---
 
-## 🚧 Status — M0 + M1 + M2 + M3 + M4 landed (2026-10)
+## 🚧 Status — M0 + M1 + M2 + M3 + M4 + M5 landed (2026-10)
 
 The foundation is **real, tested code** — verified end-to-end against the F-Droid client APK (973 zip entries, 36 components, 31 permissions):
 

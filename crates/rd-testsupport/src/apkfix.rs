@@ -309,6 +309,16 @@ fn collect_android_attr_names(node: &AxNode, out: &mut Vec<String>) {
 /// uses-sdk e intent-filter MAIN/LAUNCHER — issue #47: fidelidade ao aapt;
 /// min/target=1 preserva o comportamento dos testes que assumem o default).
 pub fn build_manifest_axml(package: &str, activity_desc: &str) -> Vec<u8> {
+    build_manifest_axml_sdk(package, activity_desc, 1, 1)
+}
+
+/// Variante com SDKs explícitos (MCP/agent: fixtures acima do piso 26).
+pub fn build_manifest_axml_sdk(
+    package: &str,
+    activity_desc: &str,
+    min_sdk: i32,
+    target_sdk: i32,
+) -> Vec<u8> {
     let root = AxNode::new(
         "manifest",
         vec![
@@ -319,8 +329,8 @@ pub fn build_manifest_axml(package: &str, activity_desc: &str) -> Vec<u8> {
             AxNode::new(
                 "uses-sdk",
                 vec![
-                    a(true, "minSdkVersion", AxVal::Int(1)),
-                    a(true, "targetSdkVersion", AxVal::Int(1)),
+                    a(true, "minSdkVersion", AxVal::Int(min_sdk)),
+                    a(true, "targetSdkVersion", AxVal::Int(target_sdk)),
                 ],
                 vec![],
             ),
@@ -713,10 +723,22 @@ pub fn build_apk(
     arsc: Vec<u8>,
     extras: Vec<(&str, Vec<u8>)>,
 ) -> Vec<u8> {
+    build_apk_sdk(package, activity_desc, arsc, extras, 1, 1)
+}
+
+/// Variante com min/target SDK explícitos (piso API 26 para o agente MCP).
+pub fn build_apk_sdk(
+    package: &str,
+    activity_desc: &str,
+    arsc: Vec<u8>,
+    extras: Vec<(&str, Vec<u8>)>,
+    min_sdk: i32,
+    target_sdk: i32,
+) -> Vec<u8> {
     let mut z = ZipFix::new();
     z.add(
         "AndroidManifest.xml",
-        build_manifest_axml(package, activity_desc),
+        build_manifest_axml_sdk(package, activity_desc, min_sdk, target_sdk),
     );
     z.add("resources.arsc", arsc);
     for (name, data) in extras {

@@ -219,6 +219,12 @@ dependencies = [
 name = "rd-agent"
 version = "0.1.0"
 dependencies = [
+ "rd-apk",
+ "rd-dex",
+ "rd-framework",
+ "rd-render",
+ "rd-testsupport",
+ "rd-vm",
  "serde",
  "serde_json",
 ]
@@ -239,6 +245,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "rd-agent",
  "rd-apk",
  "rd-dex",
  "rd-framework",

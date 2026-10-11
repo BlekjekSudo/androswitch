@@ -1,7 +1,12 @@
-//! rd-agent — MCP (rmcp) + JSON-RPC + scenario DSL + coverage + batch.
+//! rd-agent — MCP v1 (JSON-RPC 2.0 stdio, ADR 001) + scenario DSL + coverage.
 //!
-//! M0: stub estruturado. Lei 1 (sem falha silenciosa): toda tentativa de uso
-//! responde `NOT_IMPLEMENTED` com o contrato {code, cause, suggestion, module_id}.
+//! M5: servidor MCP com ~20 tools (install/launch/input/ui_tree/screenshot/
+//! logs/assert/permissions/notifications) — o LLM instala, navega e assera
+//! estado só com as tools. Envelope JSON-RPC próprio (rmcp exige MSRV 1.88 >
+//! workspace 1.76 — docs/adr/001-mcp-sem-rmcp-msrv.md).
+//! Lei 1 (sem falha silenciosa): falhas fora do contrato respondem tipadas.
+
+pub mod mcp;
 
 use serde::{Deserialize, Serialize};
 

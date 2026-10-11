@@ -89,6 +89,8 @@ enum Cmd {
         #[command(subcommand)]
         sub: AppSub,
     },
+    /// M5: servidor MCP v1 (JSON-RPC 2.0 stdio — ADR 001) para agentes LLM
+    Mcp,
 }
 
 #[derive(Subcommand)]
@@ -339,6 +341,12 @@ fn run(cli: Cli) -> i32 {
                 out,
             } => cmd_app_shot(path, activity.as_deref(), out),
         },
+        Cmd::Mcp => {
+            // M5: o stdout É o canal do protocolo — nada mais pode escrever
+            // nele (o app roteia saída para o buffer da sessão, ADR 001).
+            // O erro sai pelo caminho padrão do contrato (JSON no stderr).
+            rd_agent::mcp::serve_stdio(std::io::stdin(), std::io::stdout())
+        }
         Cmd::Vm { sub } => match sub {
             VmSub::Exec {
                 path,

@@ -11,3 +11,11 @@ authors.workspace = true
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+rd-apk = { workspace = true }
+rd-dex = { workspace = true }
+rd-vm = { workspace = true }
+rd-render = { workspace = true }
+rd-framework = { workspace = true }
+
+[dev-dependencies]
+rd-testsupport = { path = "../rd-testsupport" }

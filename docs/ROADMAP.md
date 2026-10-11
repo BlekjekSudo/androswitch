@@ -12,7 +12,7 @@
 | M2 | VM Dalvik mínima | métodos puros de APK real retornam valores corretos | ✅ **implementado (2026-10)** |
 | M3 | Framework essencial | app trivial (activity+botão+texto) roda headless ponta a ponta | ✅ **implementado (2026-10, rounds 1+2)** |
 | M4 | Render+dump | screenshot correto; get_ui_tree com ids certos | ✅ |
-| M5 | Agente MCP v1 (~20 tools) | LLM instala, navega e assera estado só com as tools | ⬜ |
+| M5 | Agente MCP v1 (~20 tools) | LLM instala, navega e assera estado só com as tools | ✅ |
 | M6 | Executor de testes | suíte JSON → JUnit XML; compat-matrix automatizada | ⬜ |
 | M7 | Performance + gate piso E5 | startup < 2 s app trivial; suíte golden passa nos budgets moto-e5 | ⬜ |
 | M8 | Compat real | app OSS médio navega funcional; v0.9 | ⬜ |

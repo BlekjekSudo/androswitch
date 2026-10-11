@@ -256,3 +256,46 @@ Stage Summary:
   ce19616 (#57) · 5186295 (CLI) · 32ebb90 (fuzz script) · docs/worklog.
 - Próximo: M5 — Agente MCP v1 (~20 tools): LLM instala, navega e assera
   estado só com as tools (DoD no ROADMAP).
+
+---
+Task ID: 10
+Agent: Z.ai Code (sessão Issues→M5)
+Task: M5 — Agente MCP v1 (~20 tools): LLM instala, navega e assera estado só com as tools
+
+Work Log:
+- DoD lido no ROADMAP (M5) + spec PARTE 4 (install/launch/input/ui_tree/
+  screenshot/logs/assert/permissions/notifications).
+- ADR 001 (docs/adr/): rmcp atual exige MSRV 1.88 > workspace 1.76 (contrato
+  do CI) → envelope JSON-RPC 2.0 stdio próprio (protocolo idêntico na fio),
+  zero deps novas; tokio continua fora.
+- rd-agent::mcp: servidor MCP completo — initialize (2024-11-05) /
+  notifications/initialized (sem resposta) / tools/list / tools/call / ping;
+  desconhecidos → -32601/-32700; erros de tool no resultado com isError
+  (contrato {code, cause, suggestion, module_id: rd-agent}).
+- 20 tools: install (piso API 26 tipado), launch (LAUNCHER ou explícita),
+  tap, wait, ui_tree (xml/text), screenshot (arquivo OU image base64),
+  logs (buffer da SESSÃO — stdout do protocolo intocável, contrato #55),
+  invoke (sonda de estado geral), assert_view/assert_text/assert_activity/
+  assert_finished, app_info, permissions_list/grant/revoke/audit (motor
+  fd-permissions da sessão), device_profile (moto-e5), behavior_switches
+  (targetSdk), notifications (NOT_IMPLEMENTED honesto → M9).
+- Sessão: 1 app por processo (ADR 001); HostOut::Buffer da sessão para o
+  System.out do app; install troca de app mata a execução anterior.
+- rd-cli: subcomando `rd mcp` (stdio do processo é o canal do protocolo).
+- Fixtures: apkfix ganhou build_apk_sdk/build_manifest_axml_sdk (min/target
+  explícitos — fixtures do agente acima do piso 26).
+- Testes: +6 unit (golden flow install→launch→tap→wait→asserts→invoke→
+  ui_tree→screenshot→logs; tools sem app tipadas; notifications honesta;
+  envelope MCP; serve_stdio loop real; tools/list = 20) + 1 e2e do binário
+  (fluxo completo na fio). HostOut global serializado nos testes (1 sessão
+  por processo — mesma restrição do ADR).
+- Docs: ROADMAP M5 ✅ + seção "M5 concluído"; README M5 DONE; compat-matrix
+  atualizada (render M4/agente M5).
+
+Stage Summary:
+- M5 DoD ATINGIDO: um LLM conecta no `rd mcp` e instala, navega e assera
+  estado sem sair das tools (e2e com o binário real prova na fio).
+- Suíte: 241 → 247 testes, 0 falhas; clippy -D warnings 0; fmt ok.
+- Commits: mcp server + CLI + testes + ADR + docs.
+- Próximo (M6): executor de testes — suíte JSON → JUnit XML; compat-matrix
+  automatizada (run_scenario + coverage AG-09).
