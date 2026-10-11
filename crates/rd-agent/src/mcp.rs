@@ -2166,11 +2166,22 @@ pub fn handle_message(
         }
         "ping" => Some(Ok(jsonrpc_result(id, serde_json::json!({})))),
         m if m.starts_with("notifications/") => None, // notificações conhecidas: silêncio
-        other => Some(Err(jsonrpc_error(
-            id,
-            -32601,
-            &format!("método '{other}' não existe (initialize/tools/list/tools/call/ping)"),
-        ))),
+        other => {
+            // issue #71: JSON-RPC 2.0 §4.1 — o servidor NÃO responde a
+            // notificações (mensagem sem `id`), nem quando o método é
+            // desconhecido. Responder com `id: null` faz o cliente confundir o
+            // erro com a resposta de uma requisição pendente.
+            if is_notification {
+                eprintln!("[rd mcp] notificação ignorada (método desconhecido): {other}");
+                None
+            } else {
+                Some(Err(jsonrpc_error(
+                    id,
+                    -32601,
+                    &format!("método '{other}' não existe (initialize/tools/list/tools/call/ping)"),
+                )))
+            }
+        }
     }
 }
 
@@ -2509,6 +2520,45 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("UNKNOWN_TOOL"));
+    }
+
+    /// issue #71: JSON-RPC 2.0 §4.1 (Notification) — uma mensagem SEM `id` é
+    /// notificação e NÃO recebe resposta, mesmo quando o método é
+    /// desconhecido. Só requisições (com `id`) recebem `-32601`.
+    #[test]
+    fn unknown_method_notification_is_silent() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let mut s = AgentSession::new();
+
+        // notificações desconhecidas → silêncio (nenhuma resposta)
+        assert!(
+            handle_message(&mut s, r#"{"jsonrpc":"2.0","method":"foo/unknown"}"#).is_none(),
+            "notificação com método desconhecido não deve responder"
+        );
+        assert!(
+            handle_message(&mut s, r#"{"jsonrpc":"2.0","method":"foo"}"#).is_none(),
+            "notificação sem `id` nunca responde"
+        );
+
+        // a MESMA mensagem com `id` continua recebendo -32601, com o id ecoado
+        let r = handle_message(&mut s, r#"{"jsonrpc":"2.0","id":1,"method":"foo"}"#)
+            .unwrap()
+            .expect_err("requisição com método desconhecido é erro");
+        assert_eq!(r["error"]["code"], -32601);
+        assert_eq!(r["id"], 1);
+
+        // no loop real de E/S: nada é escrito no stdout do protocolo
+        let mut out: Vec<u8> = Vec::new();
+        serve_stdio(
+            "{\"jsonrpc\":\"2.0\",\"method\":\"foo/unknown\"}\n".as_bytes(),
+            &mut out,
+        )
+        .expect("stdio");
+        assert!(
+            out.is_empty(),
+            "notificação não produz saída: {}",
+            String::from_utf8_lossy(&out)
+        );
     }
 
     /// serve_stdio: sessão completa por linhas (loop real de E/S).
