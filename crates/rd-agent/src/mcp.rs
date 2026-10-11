@@ -1166,13 +1166,7 @@ impl AgentSession {
         timeout_ms: Option<u64>,
         step_ms: Option<u64>,
     ) -> Result<ToolResult, RdError> {
-        if resource_id.is_none() && text.is_none() && class.is_none() {
-            return Err(agent_error(
-                "INVALID_FORMAT",
-                "wait_for exige resource_id, text ou class",
-                None,
-            ));
-        }
+        validate_view_criteria("wait_for", resource_id, text, class)?;
         let timeout = timeout_ms.unwrap_or(5_000);
         if timeout > self.policy.max_wait_ms {
             return Err(agent_error(
@@ -1330,13 +1324,7 @@ impl AgentSession {
         text: Option<&str>,
         class: Option<&str>,
     ) -> Result<ToolResult, RdError> {
-        if resource_id.is_none() && text.is_none() && class.is_none() {
-            return Err(agent_error(
-                "INVALID_FORMAT",
-                "assert_view exige resource_id, text ou class",
-                None,
-            ));
-        }
+        validate_view_criteria("assert_view", resource_id, text, class)?;
         let tree = self
             .require_engine()?
             .view_tree()
@@ -1874,6 +1862,42 @@ fn grant_state_str(s: GrantState) -> &'static str {
     }
 }
 
+/// issue #79: critério de busca vazio (`""`) casava TUDO — `contains("")` e
+/// `ends_with("")` são sempre verdadeiros — então `assert_view {}` passava sem
+/// verificar nada (falso verde). Critérios vazios são entrada inválida.
+fn validate_view_criteria(
+    tool: &str,
+    resource_id: Option<&str>,
+    text: Option<&str>,
+    class: Option<&str>,
+) -> Result<(), RdError> {
+    if resource_id.is_none() && text.is_none() && class.is_none() {
+        return Err(agent_error(
+            "INVALID_FORMAT",
+            format!("{tool} exige resource_id, text ou class"),
+            None,
+        ));
+    }
+    for (label, value) in [
+        ("resource_id", resource_id),
+        ("text", text),
+        ("class", class),
+    ] {
+        if let Some(v) = value {
+            if v.trim().is_empty() {
+                return Err(agent_error(
+                    "INVALID_FORMAT",
+                    format!("{tool}: {label} vazio não é um critério de busca"),
+                    Some(
+                        "informe um valor não vazio ou omita o campo (ex.: {\"text\": \"Ok\"}, {\"class\": \"android.widget.TextView\"})",
+                    ),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Busca DFS na árvore de UI por resource-id/text/class.
 fn collect_matches(
     n: &UiNode,
@@ -1882,6 +1906,11 @@ fn collect_matches(
     class: Option<&str>,
     out: &mut Vec<serde_json::Value>,
 ) {
+    // issue #79: critério vazio é ignorado aqui também (a validação da tool já
+    // o recusa, mas `collect_matches` não pode casar tudo por `contains("")`).
+    let rid = rid.filter(|r| !r.trim().is_empty());
+    let text = text.filter(|t| !t.trim().is_empty());
+    let class = class.filter(|c| !c.trim().is_empty());
     let rid_hit = rid.map_or(true, |r| n.resource_id.as_deref() == Some(r));
     let text_hit = text.map_or(true, |t| n.text.contains(t));
     let class_hit = class.map_or(true, |c| n.class == c || n.class.ends_with(c));
@@ -2872,6 +2901,60 @@ mod tests {
         );
         assert!(!err, "i32::MAX/MIN devem ser aceitos: {v}");
         assert_eq!(v["tapped"], serde_json::json!([i32::MAX, i32::MIN]), "{v}");
+    }
+
+    /// issue #79: critério vazio (`""`) casava tudo — `contains("")` e
+    /// `ends_with("")` são sempre verdadeiros — então `assert_view`/`wait_for`
+    /// passavam sem verificar nada (falso verde em teste automatizado).
+    #[test]
+    fn empty_assert_criteria_are_invalid_format() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+        launch_ok(&mut s, serde_json::json!({}));
+
+        // os três critérios, vazios, em assert_view
+        for (label, args) in [
+            ("text", serde_json::json!({"text": ""})),
+            ("class", serde_json::json!({"class": ""})),
+            ("resource_id", serde_json::json!({"resource_id": ""})),
+            ("nenhum critério", serde_json::json!({})),
+        ] {
+            let (v, err) = call(&mut s, "assert_view", args);
+            assert!(err, "{label}: critério vazio deve ser erro, veio {v}");
+            assert_eq!(v["code"], "INVALID_FORMAT", "{label}: {v}");
+            assert!(
+                !v.get("found").is_some(),
+                "{label}: erro não pode trazer `found` (falso verde): {v}"
+            );
+        }
+
+        // wait_for: o mesmo, e sem `found=true` imediato
+        for (label, args) in [
+            ("text", serde_json::json!({"text": ""})),
+            ("class", serde_json::json!({"class": ""})),
+        ] {
+            let (v, err) = call(&mut s, "wait_for", args);
+            assert!(err, "{label}: wait_for com critério vazio: {v}");
+            assert_eq!(v["code"], "INVALID_FORMAT", "{label}: {v}");
+        }
+
+        // critérios REAIS continuam funcionando (sem regressão)
+        let (v, err) = call(&mut s, "assert_view", serde_json::json!({"text": "Olá"}));
+        assert!(!err, "assert_view com texto real: {v}");
+        assert_eq!(v["found"], true, "{v}");
+
+        let (v, err) = call(
+            &mut s,
+            "assert_view",
+            serde_json::json!({"text": "texto-que-nao-existe"}),
+        );
+        assert!(!err, "assert_view sem match não é erro: {v}");
+        assert_eq!(
+            v["found"], false,
+            "texto inexistente continua found=false: {v}"
+        );
     }
 
     /// serve_stdio: sessão completa por linhas (loop real de E/S).
