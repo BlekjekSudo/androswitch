@@ -460,7 +460,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "launch",
             description:
-                "Executa o app instalado: cria a activity (LAUNCHER ou `activity`) e roda o lifecycle até o onCreate completar. Com `package` lança outro app do registro (multi-app); sem, o app ativo (último install/launch).",
+                "Executa o app instalado: cria a activity (LAUNCHER ou `activity`) e roda o lifecycle até o onCreate completar. `activity` precisa estar declarada como <activity> no AndroidManifest.xml E existir no DEX (issues #82/#83) — o Android recusa o que não está declarado. Com `package` lança outro app do registro (multi-app); sem, o app ativo (último install/launch).",
             schema: obj(
                 serde_json::json!({
                     "activity": { "type": "string", "description": "classe da activity (com.ex.Main ou Lcom/ex/Main;). Default: LAUNCHER" },
@@ -1026,7 +1026,32 @@ impl AgentSession {
             )
         })?;
         let (desc, package_out) = match activity {
-            Some(a) => (normalize_activity_desc(a), app.apk.manifest.package.clone()),
+            Some(a) => {
+                let desc = normalize_activity_desc(a);
+                // issue #83: o Android só inicia activities DECLARADAS no
+                // AndroidManifest.xml — qualquer outra classe falha com
+                // ActivityNotFoundException. O caminho sem `activity` já
+                // consultava o manifest (LAUNCHER): os dois agora concordam.
+                let declared = app.apk.manifest.application.components.iter().any(|c| {
+                    matches!(
+                        c.kind,
+                        ComponentKind::Activity | ComponentKind::ActivityAlias
+                    ) && normalize_activity_desc(&c.class_name) == desc
+                });
+                if !declared {
+                    return Err(agent_error(
+                        "MISSING_ENTRY",
+                        format!(
+                            "activity {a} não está declarada como <activity> no AndroidManifest.xml (pacote {})",
+                            app.apk.manifest.package
+                        ),
+                        Some(
+                            "o Android recusa iniciar classe não declarada; use `inspect`/`package_list` para listar as activities do manifest, ou lance sem `activity` para usar a LAUNCHER",
+                        ),
+                    ));
+                }
+                (desc, app.apk.manifest.package.clone())
+            }
             None => {
                 let launcher = app
                     .apk
@@ -3119,6 +3144,77 @@ mod tests {
             v["activity"], "Lcom/test/mcp/Main;",
             "nenhum estado novo foi criado pelo launch inválido: {v}"
         );
+    }
+
+    /// issue #83: com `activity` explícito, `launch` não consultava o manifest
+    /// e lançava qualquer classe do DEX (ex.: a sonda `LState;`). O Android só
+    /// inicia activities declaradas — as não declaradas dão
+    /// ActivityNotFoundException.
+    #[test]
+    fn launch_rejects_activity_not_declared_in_manifest() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+
+        // o manifest do fixture só declara com.test.mcp.Main; `LState;` EXISTE
+        // no DEX (é a sonda de estado) mas não é uma <activity> declarada.
+        for (label, activity) in [
+            ("descritor", "LState;"),
+            ("FQCN", "com.test.mcp.State"),
+            ("inexistente no DEX e no manifest", "com.test.mcp.Nope"),
+        ] {
+            let (v, err) = call(&mut s, "launch", serde_json::json!({"activity": activity}));
+            assert!(
+                err,
+                "{label}: launch de activity não declarada deve ser erro, veio {v}"
+            );
+            assert_eq!(v["code"], "MISSING_ENTRY", "{label}: {v}");
+            assert!(
+                v.get("launched").is_none(),
+                "{label}: erro não pode trazer `launched`: {v}"
+            );
+            assert!(
+                v["cause"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("AndroidManifest.xml"),
+                "{label}: cause aponta o manifest: {v}"
+            );
+            assert!(!v["suggestion"].is_null(), "{label}: traz suggestion: {v}");
+        }
+
+        // nenhum estado de sessão criado pelas tentativas inválidas
+        let (v, err) = call(&mut s, "runtime_health", serde_json::json!({}));
+        assert!(!err, "runtime_health: {v}");
+        assert_eq!(
+            v["running"], false,
+            "issue #83: launch inválido não cria estado: {v}"
+        );
+
+        // a activity DECLARADA continua lançando — pelos dois caminhos
+        let (v, err) = call(
+            &mut s,
+            "launch",
+            serde_json::json!({"activity": "com.test.mcp.Main"}),
+        );
+        assert!(!err, "launch da activity declarada: {v}");
+        assert_eq!(v["launched"], true, "{v}");
+        assert_eq!(v["activity"], "Lcom/test/mcp/Main;", "{v}");
+
+        // e pelo descritor Dalvik da mesma classe declarada
+        let (v, err) = call(
+            &mut s,
+            "launch",
+            serde_json::json!({"activity": "Lcom/test/mcp/Main;"}),
+        );
+        assert!(!err, "launch pelo descritor da activity declarada: {v}");
+        assert_eq!(v["launched"], true, "{v}");
+
+        // caminho LAUNCHER (sem `activity`) segue resolvendo pelo manifest
+        let (v, err) = call(&mut s, "launch", serde_json::json!({}));
+        assert!(!err, "launch sem activity: {v}");
+        assert_eq!(v["launched"], true, "{v}");
     }
 
     /// serve_stdio: sessão completa por linhas (loop real de E/S).
