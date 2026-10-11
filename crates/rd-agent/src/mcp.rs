@@ -2107,9 +2107,70 @@ pub fn handle_message(
             )))
         }
     };
-    let method = msg.get("method").and_then(|m| m.as_str()).unwrap_or("");
+    // issue #70: JSON-RPC 2.0 §6 (Batch) — um array é um LOTE. Antes o array
+    // caía em `msg.get("method")` → `""` → `-32601 "método '' não existe"` e
+    // TODAS as requisições do lote eram descartadas em silêncio.
+    if let Some(items) = msg.as_array() {
+        return handle_batch(session, items);
+    }
+    handle_single(session, msg)
+}
+
+/// Lote JSON-RPC 2.0: uma resposta por requisição, na mesma ordem.
+/// Notificações não geram resposta; lote só de notificações → sem resposta.
+/// Lote vazio ou elemento inválido → `-32600 Invalid Request`.
+fn handle_batch(
+    session: &mut AgentSession,
+    items: &[serde_json::Value],
+) -> Option<Result<serde_json::Value, serde_json::Value>> {
+    if items.is_empty() {
+        return Some(Err(jsonrpc_error(
+            Option::<serde_json::Value>::None,
+            -32600,
+            "lote vazio: JSON-RPC 2.0 exige ao menos uma requisição",
+        )));
+    }
+    let mut responses: Vec<serde_json::Value> = Vec::new();
+    for item in items {
+        match handle_single(session, item.clone()) {
+            None => continue, // notificação: sem resposta
+            Some(Ok(v)) | Some(Err(v)) => responses.push(v),
+        }
+    }
+    if responses.is_empty() {
+        None
+    } else {
+        Some(Ok(serde_json::Value::Array(responses)))
+    }
+}
+
+/// Uma mensagem (objeto). Estrutura inválida → `-32600`, método desconhecido
+/// → `-32601`. Notificações (sem `id`) não respondem (§4.1 — issue #71).
+fn handle_single(
+    session: &mut AgentSession,
+    msg: serde_json::Value,
+) -> Option<Result<serde_json::Value, serde_json::Value>> {
+    if !msg.is_object() {
+        return Some(Err(jsonrpc_error(
+            Option::<serde_json::Value>::None,
+            -32600,
+            "requisição inválida: esperado um objeto JSON-RPC 2.0 (ou um lote)",
+        )));
+    }
     let id = msg.get("id").cloned();
     let is_notification = id.is_none();
+    // issue #70: NUNCA mais `unwrap_or("")` — `method` ausente/não-string é
+    // Invalid Request (-32600), não Method Not Found com nome vazio.
+    let method = match msg.get("method").and_then(|m| m.as_str()) {
+        Some(m) => m,
+        None => {
+            return Some(Err(jsonrpc_error(
+                id,
+                -32600,
+                "requisição inválida: `method` ausente ou não é string",
+            )))
+        }
+    };
 
     match method {
         "initialize" => Some(Ok(jsonrpc_result(
@@ -2559,6 +2620,124 @@ mod tests {
             "notificação não produz saída: {}",
             String::from_utf8_lossy(&out)
         );
+    }
+
+    /// issue #70: JSON-RPC 2.0 §6 (Batch) — um array é um lote: UMA resposta
+    /// por requisição, na mesma ordem. Antes o lote virava "método ''" e todas
+    /// as requisições eram descartadas em silêncio.
+    #[test]
+    fn batch_returns_one_response_per_request() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let mut s = AgentSession::new();
+
+        let r = handle_message(
+            &mut s,
+            r#"[{"jsonrpc":"2.0","id":2,"method":"ping"},{"jsonrpc":"2.0","id":3,"method":"ping"}]"#,
+        )
+        .unwrap()
+        .expect("lote processado");
+        let arr = r.as_array().expect("resposta de lote é array");
+        assert_eq!(arr.len(), 2, "uma resposta por requisição: {arr:?}");
+        assert_eq!(arr[0]["id"], 2);
+        assert_eq!(arr[1]["id"], 3);
+        assert!(arr[0].get("result").is_some(), "sem erro: {arr:?}");
+
+        // ferramenta de verdade dentro do lote também funciona (não só ping)
+        let r = handle_message(
+            &mut s,
+            r#"[{"jsonrpc":"2.0","id":7,"method":"tools/list"},{"jsonrpc":"2.0","id":8,"method":"initialize"}]"#,
+        )
+        .unwrap()
+        .expect("lote processado");
+        let arr = r.as_array().expect("array");
+        assert_eq!(arr.len(), 2);
+        assert_eq!(
+            arr[0]["result"]["tools"].as_array().expect("tools").len(),
+            30
+        );
+        assert_eq!(arr[1]["result"]["serverInfo"]["name"], SERVER_NAME);
+    }
+
+    /// issue #70: notificações dentro do lote não geram resposta; lote SÓ de
+    /// notificações não produz resposta alguma (§4.1 + §6).
+    #[test]
+    fn batch_notifications_are_not_answered() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let mut s = AgentSession::new();
+
+        let r = handle_message(
+            &mut s,
+            r#"[{"jsonrpc":"2.0","method":"notifications/initialized"},{"jsonrpc":"2.0","id":4,"method":"ping"}]"#,
+        )
+        .unwrap()
+        .expect("há uma requisição no lote");
+        let arr = r.as_array().expect("array");
+        assert_eq!(arr.len(), 1, "só a requisição responde: {arr:?}");
+        assert_eq!(arr[0]["id"], 4);
+
+        assert!(
+            handle_message(
+                &mut s,
+                r#"[{"jsonrpc":"2.0","method":"notifications/initialized"},{"jsonrpc":"2.0","method":"foo/bar"}]"#,
+            )
+            .is_none(),
+            "lote só de notificações não responde"
+        );
+    }
+
+    /// issue #70: estrutura inválida é Invalid Request (-32600) — nunca
+    /// "método ''". Quando o `id` é detectável ele é ecoado; quando a
+    /// estrutura não permite detectá-lo, é `null` (JSON-RPC 2.0 §5.1).
+    #[test]
+    fn invalid_structure_is_invalid_request_32600() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let mut s = AgentSession::new();
+
+        for (label, line, want_id) in [
+            ("lote vazio", "[]", None),
+            ("escalar", "42", None),
+            ("string", r#""texto""#, None),
+            ("nulo", "null", None),
+            // objeto válido detecta o id → ecoa
+            ("objeto sem method", r#"{"jsonrpc":"2.0","id":9}"#, Some(9)),
+            (
+                "method não-string",
+                r#"{"jsonrpc":"2.0","id":9,"method":5}"#,
+                Some(9),
+            ),
+        ] {
+            let r = handle_message(&mut s, line)
+                .unwrap_or_else(|| panic!("{label}: deveria responder com erro"))
+                .expect_err("{label}: deveria ser erro de protocolo");
+            assert_eq!(
+                r["error"]["code"], -32600,
+                "{label}: esperava -32600, veio {r}"
+            );
+            match want_id {
+                Some(want) => assert_eq!(r["id"], want, "{label}: id ecoado, veio {r}"),
+                None => assert!(r["id"].is_null(), "{label}: id precisa ser null, veio {r}"),
+            }
+            let msg = r["error"]["message"].as_str().unwrap_or_default();
+            assert!(
+                !msg.contains("método ''"),
+                "{label}: nunca mensagem de método vazio: {msg}"
+            );
+        }
+
+        // elemento inválido DENTRO do lote: o lote responde com um array
+        // contendo o erro daquele elemento (§6), em vez de descartar tudo.
+        let r = handle_message(
+            &mut s,
+            r#"[{"jsonrpc":"2.0","id":1,"method":"ping"},5,{"jsonrpc":"2.0","id":2,"method":"ping"}]"#,
+        )
+        .unwrap()
+        .expect("lote responde");
+        let arr = r.as_array().expect("array");
+        assert_eq!(arr.len(), 3, "uma entrada por elemento: {arr:?}");
+        assert!(arr[0].get("result").is_some(), "{arr:?}");
+        assert_eq!(arr[1]["error"]["code"], -32600, "{arr:?}");
+        assert!(arr[1]["id"].is_null(), "{arr:?}");
+        assert!(arr[2].get("result").is_some(), "{arr:?}");
     }
 
     /// serve_stdio: sessão completa por linhas (loop real de E/S).
