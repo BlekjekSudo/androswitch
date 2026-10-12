@@ -56,7 +56,8 @@ rd test suite.json --json                                 # resumo em JSON (stdo
 2. **Isolamento.** Cada cenário roda em uma sessão nova do agente (um app por sessão — ADR 001). Um cenário não herda o APK instalado por outro.
 3. **Passo `ok` (padrão)** passa quando a tool completa **e** o resultado não diz que a condição falhou:
    - `isError = true` → falha, com o código e a causa devolvidos pela tool.
-   - `"ok": false` ou `"found": false` no resultado → **falha**. As asserções do MCP (`assert_text`, `assert_view`, `assert_activity`, `wait_for`…) devolvem sucesso na chamada com `ok:false` quando a condição não se confirma; o executor trata isso como falha. Sem essa regra, toda asserção errada passaria em verde.
+   - `"ok": false` ou `"found": false` no resultado → **falha**.
+   - `assert_finished` devolve `{"finished": bool}`: `"finished": false` → **falha**. As asserções do MCP (`assert_text`, `assert_view`, `assert_activity`, `wait_for`…) devolvem sucesso na chamada com `ok:false` quando a condição não se confirma; o executor trata isso como falha. Sem essa regra, toda asserção errada passaria em verde.
 4. **Passo `"expect": "error:CODIGO"`** passa somente quando a tool falha com exatamente aquele código estável (ex.: `NO_APP`, `NOT_RUNNING`, `INVALID_FORMAT`). Se a tool completar, ou falhar com outro código, o passo falha.
 5. **Primeira falha encerra o cenário.** Os passos seguintes são marcados `SKIP` no JUnit. Os outros cenários continuam.
 6. **Caminhos relativos.** `install.apk` relativo é resolvido a partir da pasta do arquivo de suíte, não do diretório atual. Caminhos com `..` não são reescritos (a policy de sandbox do agente decide).

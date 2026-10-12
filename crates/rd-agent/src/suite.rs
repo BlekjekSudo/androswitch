@@ -279,8 +279,13 @@ fn resolve_args(tool: &str, args: &Value, base: &Path) -> Value {
 
 /// Falha "suave": a tool completou, mas o resultado diz que a condição não se confirmou.
 /// Regra documentada em docs/suite-format.md: `"ok": false` ou `"found": false`.
-fn soft_failure(parsed: &Value) -> Option<String> {
-    let negative = parsed.get("ok") == Some(&Value::Bool(false))
+fn soft_failure(tool: &str, parsed: &Value) -> Option<String> {
+    // `assert_finished` não usa "ok": a asserção é "a activity terminou",
+    // então `finished: false` reprova. Sem esta regra o passo passaria sempre.
+    let finished_false =
+        tool == "assert_finished" && parsed.get("finished") == Some(&Value::Bool(false));
+    let negative = finished_false
+        || parsed.get("ok") == Some(&Value::Bool(false))
         || parsed.get("found") == Some(&Value::Bool(false));
     if !negative {
         return None;
@@ -331,7 +336,7 @@ pub fn run_scenario(scenario: &Scenario, base: &Path) -> ScenarioOutcome {
         let soft = if r.is_error {
             None
         } else {
-            soft_failure(&parsed)
+            soft_failure(&step.name, &parsed)
         };
         let status = match (&step.expect, r.is_error) {
             // asserções do MCP respondem isError=false com "ok": false (ou
@@ -572,12 +577,22 @@ mod tests {
 
     #[test]
     fn soft_failure_reads_ok_false_and_found_false() {
-        assert!(soft_failure(&serde_json::json!({"ok": true})).is_none());
-        assert!(soft_failure(&serde_json::json!({"ok": false, "actual": "x"})).is_some());
-        assert!(soft_failure(&serde_json::json!({"found": false})).is_some());
+        let none = "wait";
+        assert!(soft_failure(none, &serde_json::json!({"ok": true})).is_none());
+        assert!(soft_failure(none, &serde_json::json!({"ok": false, "actual": "x"})).is_some());
+        assert!(soft_failure("wait_for", &serde_json::json!({"found": false})).is_some());
         // ausência do campo não é falha: só o "não" explícito reprova
-        assert!(soft_failure(&serde_json::json!({"finished": false})).is_none());
-        assert!(soft_failure(&serde_json::Value::Null).is_none());
+        assert!(soft_failure(none, &serde_json::json!({"finished": false})).is_none());
+        assert!(soft_failure(none, &serde_json::Value::Null).is_none());
+    }
+
+    #[test]
+    fn assert_finished_fails_when_activity_not_finished() {
+        // achado da revisão: assert_finished devolve só {"finished": bool}
+        assert!(soft_failure("assert_finished", &serde_json::json!({"finished": false})).is_some());
+        assert!(soft_failure("assert_finished", &serde_json::json!({"finished": true})).is_none());
+        // a mesma chave em outra tool não reprova (regra é por tool)
+        assert!(soft_failure("tap", &serde_json::json!({"finished": false})).is_none());
     }
 
     #[test]
