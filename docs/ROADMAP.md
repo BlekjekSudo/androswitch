@@ -14,7 +14,7 @@
 | M4 | Render+dump | screenshot correto; get_ui_tree com ids certos | ✅ |
 | M5 | Agente MCP v1 (30 tools + controles) | LLM instala, navega e assera estado só com as tools | ✅ |
 | M6 | Executor de testes | suíte JSON → JUnit XML; compat-matrix automatizada | ✅ **implementado (2026-10)** |
-| M7 | Performance + gate piso E5 | startup < 2 s app trivial; suíte golden passa nos budgets moto-e5 | ⬜ |
+| M7 | Performance + gate piso E5 | startup < 2 s app trivial; suíte golden passa nos budgets moto-e5 | 🟡 **parcial (2026-10)** — `rd perf` + gate de CI no app trivial (estimativa); golden pendente |
 | M8 | Compat real | app OSS médio navega funcional; v0.9 | ⬜ |
 | M9 | Componentes avançados + NDK | 5 APKs com .so rodando; widgets/IME/notificações ok | ⬜ |
 | M10 | Dispositivos virtuais | câmera/GPS/biometria programáveis pelo agente | ⬜ |
@@ -174,3 +174,28 @@ certos); configs específicas (land/locale/density) selecionáveis.
 
 **Fora do M6 (fica para as próximas rodadas):** coverage/`get_api_usage` (AG-09),
 `run_scenario` com retries e hooks (AG-07), timeout por passo.
+
+## 🟡 M7 em andamento — passo 1: gate de performance (2026-10)
+
+1. ✅ **`rd perf <apk> [--device moto-e5] [--runs N] [--json]`** (PRF-06):
+   mede `launch → primeiro frame` (frame = render do view tree via `screenshot`)
+   em dois regimes — **cold** (`AgentSession` nova por execução; registro do APK
+   fora do cronômetro) e **warm** (relançamento na mesma sessão). CPU por thread
+   via `/proc/self/task/*/schedstat`; RSS de pico via `VmHWM`. Exit `0` orçamentos
+   ok · `1` orçamento falhou ou erro de execução (`PERF_FAILED`).
+2. ✅ **Orçamentos do perfil `moto-e5`** (Apêndice A2): startup cold emulado
+   `< 2000 ms` (DoD do M7) · RSS de pico `≤ 512 MB` (falha fechado fora do
+   Linux) · heap do app (`256 MB`) **reportado como não medido**.
+3. ✅ **Gate de CI**: `crates/rd-cli/tests/perf_cli.rs` roda o binário sobre o
+   APK do fixture e exige `pass: true` — primeiro gate de performance bloqueante.
+4. ✅ `rd-testsupport::trivial_app`: builder do app trivial movido de
+   `mcp_cli.rs` para fixture compartilhado (MCP e perf usam os mesmos bytes).
+5. Medição local (host de desenvolvimento, 3 execuções): cold p50 ≈ 1244 ms
+   emulados, máximo ≈ 1510 ms; RSS de pico ≈ 27 MB. Tempo emulado =
+   `host_ms / cpu_single_thread_factor` (moto-e5 = 0.25 ⇒ ×4) — **estimativa**:
+   o fator não modela cache, IO, GPU nem o quota de 1 core.
+
+**Pendente para fechar o M7 (DoD):** gate golden (APKs golden não estão no
+repositório) · medição em Moto E5 real · aquecer o regime warm (hoje
+`tool_launch` recria o `Engine` a cada chamada) · medição do heap do app ·
+workflow de release bloqueante (hoje o gate é um teste de CI).
