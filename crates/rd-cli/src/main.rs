@@ -79,8 +79,8 @@ enum Cmd {
         #[command(subcommand)]
         sub: DexSub,
     },
-    /// Gate de performance (M7, PRF-06): startup cold/warm e RSS no perfil
-    /// de device (estimativa por fator de CPU; heap do app não medido)
+    /// Gate de performance (M7, PRF-06): startup cold/warm, RSS e heap do
+    /// app no perfil de device (estimativa por fator de CPU)
     Perf {
         /// APK a medir (dentro das raízes do sandbox: cwd ou temp)
         apk: PathBuf,

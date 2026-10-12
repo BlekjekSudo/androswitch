@@ -15,7 +15,8 @@
 //! Orçamentos avaliados:
 //! - startup cold emulado (pior das execuções) `< 2000 ms` (ROADMAP M7 DoD);
 //! - RSS de pico do processo `≤ ram_process_cap_mb` (512 MB, moto-e5);
-//! - heap do app `ram_app_heap_mb` (256 MB): NÃO medido — reportado como tal.
+//! - heap do app `≤ ram_app_heap_mb` (256 MB): marca d'água da arena da VM
+//!   (`runtime_health.heap_peak_bytes`), lida fora do cronômetro.
 //!
 //! Medição de RSS e CPU vem de `/proc` (Linux). Fora do Linux o orçamento de
 //! RSS falha fechado (`actual: null`), porque não foi medido.
@@ -45,6 +46,9 @@ pub struct Run {
     pub emulated_ms: f64,
     /// CPU consumida pelo processo durante a execução (ms). `None` sem /proc.
     pub cpu_ms: Option<f64>,
+    /// Marca d'água do heap do app (bytes) após o primeiro frame, lida do
+    /// `runtime_health` FORA do cronômetro. `None` se não reportado.
+    pub heap_peak_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -72,8 +76,10 @@ pub struct PerfReport {
     pub warm_p50_emulated_ms: f64,
     /// VmHWM do processo (MB) — pico acumulado de todas as execuções.
     pub peak_rss_mb: Option<f64>,
+    /// Pico do heap do app (MB) — maior marca d'água entre as execuções.
+    pub app_heap_peak_mb: Option<f64>,
     pub budgets: Vec<Budget>,
-    /// Heap do app (`ram_app_heap_mb`) — ainda sem medição.
+    /// Teto do heap do app (`ram_app_heap_mb`) — medido desde o M7 passo 2.
     pub heap_budget_mb: u32,
     pub heap_budget_status: &'static str,
     pub pass: bool,
@@ -91,6 +97,12 @@ pub fn startup_within_budget(actual_max_emulated_ms: f64) -> bool {
 
 /// RSS dentro do teto? Não medido = falha (fail-closed).
 pub fn rss_within_budget(actual_mb: Option<f64>, limit_mb: u32) -> bool {
+    matches!(actual_mb, Some(v) if v <= f64::from(limit_mb))
+}
+
+/// Heap do app dentro do teto (M7, `ram_app_heap_mb`): `None` (sem medição)
+/// falha fechado, como o RSS — orçamento sem número não passa.
+pub fn heap_within_budget(actual_mb: Option<f64>, limit_mb: u32) -> bool {
     matches!(actual_mb, Some(v) if v <= f64::from(limit_mb))
 }
 
@@ -144,6 +156,17 @@ fn tool_text(r: &ToolResult) -> String {
 
 /// Chama uma tool e converte `is_error` em `RdError` (o gate não ignora falha).
 fn call_ok(s: &mut AgentSession, name: &str, args: &serde_json::Value) -> Result<(), RdError> {
+    call_json(s, name, args)?;
+    Ok(())
+}
+
+/// Como `call_ok`, mas devolve o conteúdo texto do resultado parseado como
+/// JSON (`Value::Null` se não for JSON — o chamador decide o que fazer).
+fn call_json(
+    s: &mut AgentSession,
+    name: &str,
+    args: &serde_json::Value,
+) -> Result<serde_json::Value, RdError> {
     let r = s.call_tool(name, args);
     if r.is_error {
         return Err(RdError::new(
@@ -152,10 +175,11 @@ fn call_ok(s: &mut AgentSession, name: &str, args: &serde_json::Value) -> Result
             "rd-cli",
         ));
     }
-    Ok(())
+    Ok(serde_json::from_str(&tool_text(&r)).unwrap_or(serde_json::Value::Null))
 }
 
 /// Um ciclo cronometrado: launch + primeiro frame (screenshot do view tree).
+/// A leitura do heap (runtime_health) é feita DEPOIS de parar o cronômetro.
 fn timed_launch_frame(s: &mut AgentSession, device_factor: f64) -> Result<Run, RdError> {
     let cpu0 = process_cpu_ns();
     let t0 = Instant::now();
@@ -167,10 +191,14 @@ fn timed_launch_frame(s: &mut AgentSession, device_factor: f64) -> Result<Run, R
         (Some(a), Some(b)) => Some(b.saturating_sub(a) as f64 / 1_000_000.0),
         _ => None,
     };
+    // M7: marca d'água do heap do app — fora da janela cronometrada.
+    let health = call_json(s, "runtime_health", &serde_json::json!({}))?;
+    let heap_peak_bytes = health.get("heap_peak_bytes").and_then(|v| v.as_u64());
     Ok(Run {
         host_ms,
         emulated_ms: emulated_ms(host_ms, device_factor),
         cpu_ms,
+        heap_peak_bytes,
     })
 }
 
@@ -209,9 +237,12 @@ pub fn measure(apk: &Path, device: &DeviceProfile, runs: u32) -> Result<PerfRepo
     let warm_emu: Vec<f64> = warm.iter().map(|r| r.emulated_ms).collect();
     let cold_max = cold_emu.iter().copied().fold(f64::MIN, f64::max);
     let peak = peak_rss_mb();
+    // M7: marca d'água do heap do app = maior pico entre todas as execuções.
+    let app_heap_peak_mb = heap_peak_mb_max(&cold, &warm);
 
     let startup_ok = startup_within_budget(cold_max);
     let rss_ok = rss_within_budget(peak, device.ram_process_cap_mb);
+    let heap_ok = heap_within_budget(app_heap_peak_mb, device.ram_app_heap_mb);
     let budgets = vec![
         Budget {
             name: "startup_cold_emulated_max",
@@ -233,6 +264,14 @@ pub fn measure(apk: &Path, device: &DeviceProfile, runs: u32) -> Result<PerfRepo
                 "não medido: requer Linux /proc (falha fechada)"
             },
         },
+        Budget {
+            name: "app_heap_peak",
+            limit: f64::from(device.ram_app_heap_mb),
+            unit: "MB",
+            actual: app_heap_peak_mb.map(round1),
+            pass: heap_ok,
+            note: "marca d'água do heap do app (arena da VM, runtime_health)",
+        },
     ];
     let pass = budgets.iter().all(|b| b.pass);
 
@@ -248,11 +287,22 @@ pub fn measure(apk: &Path, device: &DeviceProfile, runs: u32) -> Result<PerfRepo
         cold_max_emulated_ms: round1(cold_max),
         warm_p50_emulated_ms: round1(p50(&warm_emu)),
         peak_rss_mb: peak.map(round1),
+        app_heap_peak_mb: app_heap_peak_mb.map(round1),
         budgets,
         heap_budget_mb: device.ram_app_heap_mb,
-        heap_budget_status: "not_measured",
+        heap_budget_status: "measured",
         pass,
     })
+}
+
+/// Maior marca d'água do heap do app (MB) entre as execuções; `None` se
+/// nenhuma execução reportou o valor (falha fechada no orçamento).
+fn heap_peak_mb_max(cold: &[Run], warm: &[Run]) -> Option<f64> {
+    cold.iter()
+        .chain(warm.iter())
+        .filter_map(|r| r.heap_peak_bytes)
+        .max()
+        .map(|b| b as f64 / (1024.0 * 1024.0))
 }
 
 fn round1(v: f64) -> f64 {
@@ -289,10 +339,13 @@ fn print_human(r: &PerfReport) {
             b.note
         );
     }
-    println!(
-        "[NÃO MEDIDO] heap do app: limite {} MB (ram_app_heap_mb)",
-        r.heap_budget_mb
-    );
+    match r.app_heap_peak_mb {
+        Some(v) => println!(
+            "heap do app (pico): {v} MB (limite {} MB)",
+            r.heap_budget_mb
+        ),
+        None => println!("heap do app (pico): não medido"),
+    }
     println!("resultado: {}", if r.pass { "PASSOU" } else { "FALHOU" });
 }
 
@@ -353,6 +406,35 @@ mod tests {
         assert_eq!(p50(&[]), 0.0);
         assert_eq!(p50(&[3.0, 1.0, 2.0]), 2.0);
         assert_eq!(p50(&[4.0, 1.0, 2.0, 3.0]), 2.5);
+    }
+
+    #[test]
+    fn heap_budget_inclusive_and_fail_closed() {
+        assert!(heap_within_budget(Some(100.0), 256));
+        assert!(heap_within_budget(Some(256.0), 256)); // limite é inclusivo
+        assert!(!heap_within_budget(Some(256.1), 256));
+        assert!(!heap_within_budget(None, 256)); // sem medição → falha fechada
+    }
+
+    #[test]
+    fn heap_peak_mb_max_takes_worst_run_and_fail_closed() {
+        let run = |b: Option<u64>| Run {
+            host_ms: 1.0,
+            emulated_ms: 1.0,
+            cpu_ms: None,
+            heap_peak_bytes: b,
+        };
+        // nada medido → None (orçamento falha fechado)
+        assert_eq!(heap_peak_mb_max(&[], &[]), None);
+        assert_eq!(heap_peak_mb_max(&[run(None)], &[]), None);
+        // maior marca d'água entre cold+warm, em MB
+        assert_eq!(
+            heap_peak_mb_max(
+                &[run(Some(1024 * 1024))],
+                &[run(Some(3 * 1024 * 1024)), run(Some(2 * 1024 * 1024))]
+            ),
+            Some(3.0)
+        );
     }
 
     #[test]

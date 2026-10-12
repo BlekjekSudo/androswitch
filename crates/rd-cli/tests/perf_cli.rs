@@ -47,9 +47,27 @@ fn perf_trivial_app_meets_moto_e5_budgets() {
     assert_eq!(v["pass"], true, "orçamento falhou: {v}");
     assert_eq!(v["cold"].as_array().unwrap().len(), 3);
     assert_eq!(v["warm"].as_array().unwrap().len(), 3);
-    // heap do app não é medido e precisa estar declarado como tal
-    assert_eq!(v["heap_budget_status"], "not_measured");
+    // heap do app: medido (marca d'água da arena da VM) e dentro do teto
+    // (o app trivial aloca centenas de bytes → 0.0 MB após arredondamento)
+    assert_eq!(v["heap_budget_status"], "measured");
     assert_eq!(v["heap_budget_mb"], 256);
+    let heap = v["app_heap_peak_mb"].as_f64().expect("pico do heap medido");
+    assert!(
+        (0.0..=256.0).contains(&heap),
+        "heap do app fora do teto: {heap}"
+    );
+    // cada execução reporta a marca d'água em bytes
+    assert!(v["cold"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|r| r["heap_peak_bytes"].is_u64()));
+    let budgets = v["budgets"].as_array().expect("orçamentos");
+    let heap_budget = budgets
+        .iter()
+        .find(|b| b["name"] == "app_heap_peak")
+        .expect("orçamento do heap do app");
+    assert_eq!(heap_budget["pass"], true, "orçamento heap falhou: {v}");
     let _ = std::fs::remove_dir_all(apk.parent().unwrap());
 }
 

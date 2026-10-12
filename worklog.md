@@ -436,3 +436,20 @@ Stage Summary:
 - GitHub: branch feat/m6-step-timeout → PR.
 - Adiados do M6 agora entregues: get_api_usage (AG-09 estático) + timeout por passo. Restam: get_coverage (instrumentação, M8+) e AG-07 (retries/hooks).
 - Próximo desta sessão: AG-07 retries/hooks ou avanço do M7 (medição de heap do app no rd perf).
+
+---
+Task ID: m7-app-heap-budget
+Agent: Arena Agent Mode (sessão autônoma 2h — iteração D)
+Task: M7 — medir o heap do app (orçamento ram_app_heap_mb = 256 MB), pendência do DoD do M7.
+
+Work Log:
+- rd-vm::Heap: campo peak (marca d'água do used, atualizado no único funil alloc()); API pub fn peak(). Engine: heap_peak().
+- rd-agent MCP: runtime_health ganha heap_peak_bytes ao lado de heap_used_bytes.
+- rd-cli perf: Run.heap_peak_bytes lido via runtime_health FORA do cronômetro (novo helper call_json); PerfReport.app_heap_peak_mb; heap_budget_status not_measured → measured; novo orçamento app_heap_peak ≤ ram_app_heap_mb (falha fechado se não medido, igual ao RSS); saída humana atualizada.
+- Docs: README (bullet rd perf), ROADMAP M7 (item 7 + pendências DoD sem heap), docstrings.
+- Testes: rd-vm peak_is_high_water_mark_of_used; perf heap_budget_inclusive_and_fail_closed + heap_peak_mb_max_takes_worst_run_and_fail_closed; perf_cli e2e agora exige measured + orçamento heap passando + heap_peak_bytes por execução.
+
+Stage Summary:
+- Workspace: 331 testes passam, 0 falham; fmt ok; clippy 0; links ok; compat-matrix sync; readme_inspect ok.
+- DoD do M7 restante: gate golden (APKs fora do repo), Moto E5 real, workflow de release.
+- Próximo: AG-07 (retries/hooks no run_scenario) — última pendência do M6.

@@ -76,6 +76,10 @@ pub struct OomError {
 pub struct Heap {
     budget: usize,
     used: usize,
+    /// Marca d'água (M7): maior `used` já observado — o RSS do heap do app
+    /// para o orçamento `ram_app_heap_mb` (a arena não libera objetos, então
+    /// na prática used == peak, mas o contrato do gate é o pico).
+    peak: usize,
     objects: Vec<HeapObj>,
 }
 
@@ -84,6 +88,7 @@ impl Heap {
         Heap {
             budget,
             used: 0,
+            peak: 0,
             objects: Vec::new(),
         }
     }
@@ -94,6 +99,11 @@ impl Heap {
 
     pub fn used(&self) -> usize {
         self.used
+    }
+
+    /// Maior `used` observado desde a criação da arena (M7, orçamento do app).
+    pub fn peak(&self) -> usize {
+        self.peak
     }
 
     pub fn len(&self) -> usize {
@@ -122,6 +132,7 @@ impl Heap {
             });
         }
         self.used = new_used;
+        self.peak = self.peak.max(new_used);
         self.objects.push(obj);
         Ok(self.objects.len() as ObjRef)
     }
@@ -311,6 +322,23 @@ mod tests {
         let err = h.alloc_string(big).unwrap_err();
         assert!(err.requested > 1000);
         assert_eq!(err.budget, 1000);
+    }
+
+    #[test]
+    fn peak_is_high_water_mark_of_used() {
+        let mut h = Heap::new(4096);
+        assert_eq!(h.peak(), 0);
+        h.alloc_string("abc".into()).unwrap();
+        let after_first = h.used();
+        assert_eq!(h.peak(), after_first);
+        h.alloc_instance("C".into(), vec![]).unwrap();
+        // pico cresce com cada alocação e nunca retrocede
+        assert!(h.peak() > after_first);
+        assert_eq!(h.peak(), h.used());
+        // OOM negado não altera o pico
+        let big = "x".repeat(3000);
+        let _ = h.alloc_string(big);
+        assert_eq!(h.peak(), h.used());
     }
 
     #[test]
