@@ -4,38 +4,111 @@
     {
       "name": "launch sem APK instalado responde NO_APP",
       "steps": [
-        {"name": "launch", "arguments": {}, "expect": "error:NO_APP"}
+        {
+          "name": "launch",
+          "arguments": {},
+          "expect": "error:NO_APP"
+        }
       ]
     },
     {
       "name": "app_info sem APK responde NO_APP",
       "steps": [
-        {"name": "app_info", "arguments": {}, "expect": "error:NO_APP"}
+        {
+          "name": "app_info",
+          "arguments": {},
+          "expect": "error:NO_APP"
+        }
       ]
     },
     {
       "name": "tap sem app em execução responde NOT_RUNNING",
       "steps": [
-        {"name": "tap", "arguments": {"x": 1, "y": 1}, "expect": "error:NOT_RUNNING"}
+        {
+          "name": "tap",
+          "arguments": {
+            "x": 1,
+            "y": 1
+          },
+          "expect": "error:NOT_RUNNING"
+        }
       ]
     },
     {
       "name": "device_profile funciona sem app (piso moto-e5)",
       "steps": [
-        {"name": "device_profile", "arguments": {}}
+        {
+          "name": "device_profile",
+          "arguments": {}
+        }
       ]
     },
     {
       "name": "runtime_health funciona sem app",
       "steps": [
-        {"name": "runtime_health", "arguments": {}}
+        {
+          "name": "runtime_health",
+          "arguments": {}
+        }
       ]
     },
     {
       "name": "passo após falha esperada é executado normalmente",
       "steps": [
-        {"name": "launch", "arguments": {}, "expect": "error:NO_APP"},
-        {"name": "device_profile", "arguments": {}}
+        {
+          "name": "launch",
+          "arguments": {},
+          "expect": "error:NO_APP"
+        },
+        {
+          "name": "device_profile",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "name": "hooks e retries (AG-07) + get_coverage sem app",
+      "setup": [
+        {
+          "name": "device_profile",
+          "arguments": {}
+        }
+      ],
+      "steps": [
+        {
+          "name": "launch",
+          "arguments": {},
+          "expect": "error:NO_APP",
+          "retries": 1
+        },
+        {
+          "name": "get_coverage",
+          "arguments": {},
+          "expect": "error:NOT_RUNNING",
+          "timeout_ms": 5000
+        }
+      ],
+      "teardown": [
+        {
+          "name": "runtime_health",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "name": "teardown com expect (AG-07) roda após os passos",
+      "steps": [
+        {
+          "name": "runtime_health",
+          "arguments": {}
+        }
+      ],
+      "teardown": [
+        {
+          "name": "launch",
+          "arguments": {},
+          "expect": "error:NO_APP"
+        }
       ]
     }
   ]
