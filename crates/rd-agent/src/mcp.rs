@@ -2030,6 +2030,8 @@ fn grant_state_str(s: GrantState) -> &'static str {
         GrantState::AutoGranted => "auto-granted",
         GrantState::Granted => "granted",
         GrantState::Denied => "denied",
+        // issue #110: signature-class fora da whitelist B5 — negada a terceiros
+        GrantState::DeniedSystem => "denied-system",
         GrantState::RuntimePending => "runtime-pending",
         GrantState::SpecialPending => "special-pending",
         GrantState::Unknown => "unknown",
@@ -4225,6 +4227,57 @@ mod tests {
         );
         assert!(err);
         assert_eq!(v["code"], "PACKAGE_NOT_INSTALLED", "{v}");
+    }
+
+    /// issue #110: o MCP reflete que signature-class FORA da whitelist B5 não
+    /// é concedida — `permissions_list` reporta `denied-system` e
+    /// `permissions_grant` não muda o estado (BATTERY_STATS: o Android real
+    /// não a entrega a apps de terceiros; a sessão não pode concedê-la).
+    #[test]
+    fn permissions_denied_system_for_signature_outside_b5() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let (arsc, layout, dex) = fixture_parts();
+        let manifest = rd_testsupport::apkfix::build_manifest_axml_sdk_perms(
+            "com.test.mcp",
+            "com.test.mcp.Main",
+            26,
+            30,
+            &["android.permission.BATTERY_STATS"],
+        );
+        let apk_path = fixture_apk_write(fixture_apk_zip(manifest, arsc, layout, dex));
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+
+        let (v, err) = call(&mut s, "permissions_list", serde_json::json!({}));
+        assert!(!err, "{v}");
+        let bs = v["permissions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["permission"] == "android.permission.BATTERY_STATS")
+            .expect("BATTERY_STATS listada")
+            .clone();
+        assert_eq!(bs["state"], "denied-system", "lista reflete a regra: {v}");
+
+        // grant não concede: reporta o mesmo estado (sem falso sucesso)
+        let (v, err) = call(
+            &mut s,
+            "permissions_grant",
+            serde_json::json!({"permission": "android.permission.BATTERY_STATS"}),
+        );
+        assert!(!err, "grant responde com o estado honesto: {v}");
+        assert_eq!(v["state"], "denied-system", "{v}");
+
+        // e a lista continua coerente depois da tentativa de grant
+        let (v, err) = call(&mut s, "permissions_list", serde_json::json!({}));
+        assert!(!err, "{v}");
+        let bs = v["permissions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["permission"] == "android.permission.BATTERY_STATS")
+            .expect("BATTERY_STATS listada");
+        assert_eq!(bs["state"], "denied-system", "grant não muda o estado: {v}");
     }
 
     /// DoD (isolamento + ids): sessões distintas têm ids distintos e

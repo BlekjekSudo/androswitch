@@ -95,12 +95,12 @@ SDK                min 24 · target 37 · compile 37
 api floor          ⚠ BELOW_FLOOR(minSdk=24, floor=26) — inspect ok; execução responde erro estruturado
 signing            v1, v2, v3
 permissions (31 declaradas; tabela: 175 permissões)
-  auto-granted: 14 · runtime-pending: 7 · special: 5 · unknown: 0 · not requested: 3 · app-defined: 2
+  auto-granted: 14 · runtime-pending: 7 · special: 5 · denied-system: 0 · unknown: 0 · not requested: 3 · app-defined: 2
     (not requested = fora da janela do targetSdk: maxSdkVersion vencido ou since_api acima do alvo)
 components (36: activity×10 · activity-alias×3 · provider×4 · receiver×9 · service×10)
 ```
 
-APK de referência: **F-Droid 2.0.1** (`v2.0.1 · 2000051`), baixado por `./golden-apks/fetch.sh` — `sha256 83d3fe522281c3cb89fce3bc05038f81b3c3b32c108536941f184c5f9bb53778`. Bloco regenerado em **2026-10-11** a partir do binário desta árvore; `cargo test -p rd-cli --test readme_inspect` falha se o exemplo divergir da saída real (o teste é ignorado quando o APK golden não está presente).
+APK de referência: **F-Droid 2.0.1** (`v2.0.1 · 2000051`), baixado por `./golden-apks/fetch.sh` — `sha256 83d3fe522281c3cb89fce3bc05038f81b3c3b32c108536941f184c5f9bb53778`. Bloco regenerado em **2026-10-12** a partir do binário desta árvore; `cargo test -p rd-cli --test readme_inspect` falha se o exemplo divergir da saída real (o teste é ignorado quando o APK golden não está presente).
 
 Build it yourself: `cargo build -p rd-cli` → `./target/debug/rd inspect your.apk`.
 

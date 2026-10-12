@@ -55,6 +55,12 @@ impl PermissionDef {
     pub fn is_appop(&self) -> bool {
         self.flags.iter().any(|f| f == "appop")
     }
+    /// issue #110: na whitelist B5 da spec (Apêndice B5) — a ÚNICA lista de
+    /// signature-class que o runtime concede ao app em análise ("o runtime é
+    /// o system", ver `initial_state`). Marcada no dado com a flag `b5`.
+    pub fn is_b5(&self) -> bool {
+        self.flags.iter().any(|f| f == "b5")
+    }
     pub fn group_name(&self) -> Option<&str> {
         self.group
             .as_deref()
@@ -139,7 +145,7 @@ impl PermissionTable {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GrantState {
-    /// normal/signature/internal — concedida automaticamente (B5).
+    /// normal/signature-B5/internal-B5 — concedida automaticamente (B5).
     AutoGranted,
     /// dangerous — exige diálogo runtime.
     RuntimePending,
@@ -149,6 +155,11 @@ pub enum GrantState {
     Granted,
     /// negada pelo usuário/agente.
     Denied,
+    /// issue #110: signature-class FORA da whitelist B5 da spec (Apêndice B5)
+    /// — o Android real nega a apps de terceiros (ex.: BATTERY_STATS). O
+    /// registro existe, mas não é concedida NEM concedível na sessão:
+    /// grant()/deny() a preservam (decisão registrada em RustyDroid.md §B5).
+    DeniedSystem,
     /// não existe na tabela versionada (desconhecida para o motor).
     Unknown,
     /// issue #69: declarada pelo PRÓPRIO APK (`<permission>` no manifesto).
@@ -209,11 +220,22 @@ impl PermissionEngine {
             match def.level {
                 ProtectionLevel::Normal => GrantState::AutoGranted,
                 ProtectionLevel::Dangerous => GrantState::RuntimePending,
-                // B5: signature/signatureOrSystem/internal são "concedidas" para
-                // o app em análise (o runtime é o "system" aqui)
+                // B5 (decisão da issue #110): signature-class só é "concedida"
+                // ao app em análise se estiver na WHITELIST do Apêndice B5 da
+                // spec (flag `b5` no dado) — para essas, o runtime se posiciona
+                // como system (marcador runtime-is-system). Fora da whitelist
+                // o Android real nega a app de terceiro (ex.: BATTERY_STATS,
+                // signature|privileged|development) — estado DeniedSystem,
+                // nem concedida nem concedível na sessão.
                 ProtectionLevel::Signature
                 | ProtectionLevel::SignatureOrSystem
-                | ProtectionLevel::Internal => GrantState::AutoGranted,
+                | ProtectionLevel::Internal => {
+                    if def.is_b5() {
+                        GrantState::AutoGranted
+                    } else {
+                        GrantState::DeniedSystem
+                    }
+                }
             }
         }
     }
@@ -824,11 +846,13 @@ mod gating_tests {
         assert_eq!(table.specials().count(), 15);
     }
 
-    /// issue #68: `BATTERY_STATS` é `signature|privileged|development` no
-    /// Android real — não pode ser `AutoGranted` "limpo" (sem marcador de
-    /// confiança), porque apps de terceiros não a recebem.
+    /// issue #110 (corrige o remanescente da #68): `BATTERY_STATS` é
+    /// `signature|privileged|development` no Android real e NÃO está na
+    /// whitelist B5 da spec — apps de terceiros não a recebem. Estado
+    /// `DeniedSystem`: nem concedida (inspect não conta em auto-granted) nem
+    /// concedível na sessão (grant/deny preservam; revoke restaura).
     #[test]
-    fn battery_stats_is_signature_with_trust_marker() {
+    fn battery_stats_is_denied_system_outside_b5_whitelist() {
         let table = PermissionTable::embedded().unwrap();
         let def = table
             .get("android.permission.BATTERY_STATS")
@@ -839,19 +863,82 @@ mod gating_tests {
             "flags: {:?}",
             def.flags
         );
+        assert!(
+            !def.is_b5(),
+            "BATTERY_STATS não pode entrar na whitelist B5: {:?}",
+            def.flags
+        );
         assert!(!def.description.contains("Apêndice B4"));
 
         let m = manifest_target(34, &[("BATTERY_STATS", None, false)]);
-        let e = PermissionEngine::install(&m, table);
+        let mut e = PermissionEngine::install(&m, table);
         assert_eq!(
             e.state("android.permission.BATTERY_STATS"),
-            Some(GrantState::AutoGranted)
+            Some(GrantState::DeniedSystem),
+            "fora da whitelist B5 o Android real nega a terceiros"
+        );
+        assert_eq!(e.granted_by("android.permission.BATTERY_STATS"), None);
+        assert!(!e
+            .state("android.permission.BATTERY_STATS")
+            .unwrap()
+            .is_granted());
+
+        // nem concedível: grant()/deny() preservam o estado
+        assert_eq!(
+            e.grant("android.permission.BATTERY_STATS").unwrap(),
+            GrantState::DeniedSystem
         );
         assert_eq!(
-            e.granted_by("android.permission.BATTERY_STATS"),
-            Some("runtime-is-system"),
-            "sem o marcador, o agente leria como concessão limpa a terceiros"
+            e.deny("android.permission.BATTERY_STATS").unwrap(),
+            GrantState::DeniedSystem
         );
+        // revoke restaura o estado inicial de instalação (DeniedSystem)
+        assert_eq!(
+            e.revoke("android.permission.BATTERY_STATS").unwrap(),
+            GrantState::DeniedSystem
+        );
+    }
+
+    /// issue #110: signature-class DENTRO da whitelist B5 segue `AutoGranted`
+    /// com marcador, e toda entrada signature/internal da tabela versionada
+    /// está em exatamente um dos dois lados da regra (sem zona cinza).
+    #[test]
+    fn signature_entries_are_partitioned_by_b5_whitelist() {
+        let table = PermissionTable::embedded().unwrap();
+        let m = manifest_target(34, &[("WRITE_SECURE_SETTINGS", None, false)]);
+        let e = PermissionEngine::install(&m, table.clone());
+        assert_eq!(
+            e.state("android.permission.WRITE_SECURE_SETTINGS"),
+            Some(GrantState::AutoGranted)
+        );
+
+        let mut b5 = 0usize;
+        let mut fora = 0usize;
+        for def in &table.permission {
+            if matches!(
+                def.level,
+                ProtectionLevel::Signature
+                    | ProtectionLevel::SignatureOrSystem
+                    | ProtectionLevel::Internal
+            ) {
+                if def.is_b5() {
+                    b5 += 1;
+                    assert_ne!(
+                        def.name, "BATTERY_STATS",
+                        "BATTERY_STATS jamais pode ser b5"
+                    );
+                } else {
+                    fora += 1;
+                    assert_eq!(
+                        def.name, "BATTERY_STATS",
+                        "signature-class fora da whitelist B5 hoje é só BATTERY_STATS: {}",
+                        def.name
+                    );
+                }
+            }
+        }
+        assert!(b5 >= 35, "whitelist B5 coberta no dado: {b5}");
+        assert_eq!(fora, 1, "único fora da whitelist: BATTERY_STATS");
     }
 
     /// issue #31: signature AutoGranted carrega marcador runtime-is-system

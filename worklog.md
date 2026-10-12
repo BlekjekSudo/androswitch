@@ -362,3 +362,26 @@ Stage Summary:
 - GitHub: branch fix/109-activity-alias-launch, PR com Closes #109.
 - Limitações conhecidas: none novo — warm do rd perf segue recriando o Engine (M7), não tocado aqui.
 - Próximo: issue #110 (BATTERY_STATS auto-granted) — depende de decidir/documentar a regra para permissões signature fora da lista B5 na spec (RustyDroid.md); sugerido decidir com o dono do repo antes de implementar. Depois: pendências do M7 (gate golden, medição em device real).
+
+---
+Task ID: fix-110
+Agent: Arena Agent Mode (sessão autônoma — bugfix, decisão autorizada pelo dono do repo)
+Task: Corrigir issue #110 — BATTERY_STATS seguia auto-granted apesar da #68: signature-class fora da whitelist B5 não era tratada.
+
+Work Log:
+- Leitura: issue #110 (critérios de aceite da #68 não atendidos), spec RustyDroid.md §B5, fd_permissions.rs (initial_state/granted_by), permissions.toml, inspect/perm-list no CLI, tools permissions_* do MCP.
+- DECISÃO (registrada na spec): a lista B5 é uma WHITELIST — só ela é auto-concedida ao app em análise (marcador runtime-is-system); signature-class fora da whitelist recebe o estado novo DeniedSystem (serde denied_system, MCP "denied-system"): nem concedida nem concedível na sessão (grant/deny preservam; revoke restaura). Motivo: o Android real nega essas permissões a apps de terceiros (fidelidade > conveniência "runtime é system").
+- data/permissions.toml: flag `b5` nas 38 entradas da whitelist (35 signature + 3 internal: DEVICE_POWER/REBOOT/FACTORY_TEST); BATTERY_STATS segue sem a flag; comentário da seção B5 registra a decisão.
+- rd-framework: PermissionDef::is_b5(); GrantState::DeniedSystem; initial_state decide pela flag; grant()/deny() preservam (wildcard), revoke restaura via initial_state; is_granted() exclui.
+- rd-cli: resumo do inspect ganha categoria `denied-system` (soma das categorias continua fechando com o total declarado — regra #76/#69); perm list imprime o estado via Debug/JSON serde.
+- rd-agent: grant_state_str → "denied-system"; permissions_list/permissions_grant refletem o estado (critério 3 da #110).
+- Spec: RustyDroid.md §B5 documenta a regra e o caso BATTERY_STATS.
+- Testes: battery_stats_is_denied_system_outside_b5_whitelist (estado, sem marker, grant/deny/revoke), signature_entries_are_partitioned_by_b5_whitelist (38 b5 / 1 fora), permissions_denied_system_for_signature_outside_b5 (MCP lista+grant).
+- README: bloco do `rd inspect` regenerado contra o F-Droid 2.0.1 real (fetch.sh; sha256 confere) — linha de contagens agora traz denied-system: 0; readme_inspect passa com o APK presente.
+- Verificações: cargo fmt --check ok; clippy --workspace --all-targets 0 warnings; cargo test --workspace 100% verde (readme_inspect incluído); check_md_links ok; cargo xtask compat-report byte-idêntico ao versionado.
+
+Stage Summary:
+- Critérios de aceite da #110: (1) initial_state de BATTERY_STATS ≠ AutoGranted — teste unitário ✓; (2) inspect não conta em auto-granted (categoria própria) ✓; (3) permissions_list/permissions_grant refletem denied-system ✓; (4) regra documentada em RustyDroid.md §B5 ✓. Critérios 2/3 da #68 agora atendidos.
+- GitHub: branch fix/110-signature-outside-b5, PR com Closes #110.
+- Limitações: nenhuma nova; o marcador runtime-is-system segue sendo o contrato de confiança para as b5 auto-granted.
+- Próximo: sem bugs abertos após esta; pendências do M7 (gate golden — requer APKs golden no runner, medição em Moto E5 real, warm, heap do app) ou itens fora do M6 (timeout por passo, retries/hooks AG-07, coverage AG-09).

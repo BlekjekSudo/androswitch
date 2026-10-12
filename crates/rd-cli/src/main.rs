@@ -801,11 +801,16 @@ fn cmd_inspect(path: &Path, json: bool, device: Option<&str>, dd: &DataDir) -> R
     // issue #69: `app-defined` entra como categoria para que a soma continue
     // fechando com o total declarado (mesma regra da #76).
     let app_defined = count(|s| s == GrantState::AppDefined);
+    // issue #110: `denied-system` (signature-class fora da whitelist B5) entra
+    // como categoria própria — apps de terceiros não a recebem no Android real,
+    // e a soma das categorias precisa continuar fechando com o total declarado.
+    let denied_system = count(|s| s == GrantState::DeniedSystem);
     out.push_str(&format!(
-        "  auto-granted: {} · runtime-pending: {} · special: {} · unknown: {} · not requested: {} · app-defined: {}\n",
+        "  auto-granted: {} · runtime-pending: {} · special: {} · denied-system: {} · unknown: {} · not requested: {} · app-defined: {}\n",
         count(|s| s == GrantState::AutoGranted),
         count(|s| s == GrantState::RuntimePending),
         count(|s| s == GrantState::SpecialPending),
+        denied_system,
         count(|s| s == GrantState::Unknown),
         not_requested,
         app_defined,

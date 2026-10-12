@@ -422,6 +422,15 @@ DISABLE_KEYGUARD, REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, UPDATE_PACKAGES_WITHOUT_
 DELIVER_COMPANION_MESSAGES…
 
 ### B5. SIGNATURE / system (implementadas como "concedidas" para o app em análise)
+> **Regra (issue #110):** a lista abaixo é uma **whitelist**. Somente as
+> permissões dela são auto-concedidas ao app em análise (`auto-granted`), com
+> o marcador de confiança `runtime-is-system` (o runtime se posiciona como
+> system). Toda permission **signature-class fora da whitelist** recebe estado
+> `denied_system`: o Android real a nega a apps de terceiros (ex.:
+> `BATTERY_STATS` = signature|privileged|development), e a sessão **não** a
+> concede — `grant()`/`deny()` a preservam. No dado, a whitelist é a flag
+> `b5` em `data/permissions.toml`; o motor decide por ela em `initial_state`.
+
 BIND_* (ACCESSIBILITY, DEVICE_ADMIN, INPUT_METHOD, NOTIFICATION_LISTENER, TELECOM_CONNECTION,
 VOICE_INTERACTION, VPN, WALLPAPER, DREAM, APPWIDGET, PRINT, MIDI, HOST_APDU, AUTOFILL,
 CALL_REDIRECTION, SCREENING, QUICK_ACCESS_WALLET…) · WRITE_SECURE_SETTINGS ·
