@@ -3,23 +3,23 @@
 > **GERADO** por `cargo xtask compat-report` — não editar à mão.
 > Lei de Ouro: nenhuma API ausente quebra o app em silêncio — tudo responde `NOT_IMPLEMENTED(id)` e aparece aqui.
 
-## Estado por fase (roadmap M0–M12)
+## Estado por fase (roadmap, lido de docs/ROADMAP.md)
 
 | Fase | Entrega | Status |
 |---|---|---|
-| M0 | workspace · rd-apk inspect · motor de permissões · devices · behavior | **✅ implementado** |
+| M0 | Workspace + CI + rd-apk + permissions.toml + devices.toml (moto-e5) + behavior-switches.toml + motor de permissões | **✅ implementado** |
 | M1 | rd-dex 100% + disassembler | **✅ implementado** |
 | M2 | VM Dalvik mínima | **✅ implementado** |
-| M3 | framework essencial headless | **✅ implementado (rounds 1+2: lifecycle/touch + LayoutInflater XML)** |
-| M4 | render + UI dump | ⬜ |
-| M5 | agente MCP v1 (~20 tools) | ⬜ |
-| M6 | executor de testes + compat automatizada | ⬜ |
-| M7 | performance + gate piso E5 | ⬜ |
-| M8 | compat real (views/rede/dados) | ⬜ |
-| M9 | componentes avançados + NDK | ⬜ |
-| M10 | dispositivos virtuais | ⬜ |
-| M11 | engines (Flutter/RN/Mono/wasm) | ⬜ |
-| M12 | ecossistema GH completo | ⬜ |
+| M3 | Framework essencial | **✅ implementado** |
+| M4 | Render+dump | **✅ implementado** |
+| M5 | Agente MCP v1 (30 tools + controles) | **✅ implementado** |
+| M6 | Executor de testes | **✅ implementado** |
+| M7 | Performance + gate piso E5 | ⬜ |
+| M8 | Compat real | ⬜ |
+| M9 | Componentes avançados + NDK | ⬜ |
+| M10 | Dispositivos virtuais | ⬜ |
+| M11 | Engines | ⬜ |
+| M12 | Ecossistema GH | ⬜ |
 
 ## Crates
 
@@ -27,13 +27,22 @@
 |---|---|---|
 | `rd-apk` | M0 | ZIP + AXML + arsc + assinaturas + manifest model completo |
 | `rd-framework` | M0 | fd-permissions (motor completo + gating maxSdk/since_api) · fd-devices · fd-behavior |
-| `rd-cli` | M0–M3 | inspect · perm · device · behavior · dex disasm · vm exec · app run (contrato de erro JSON) |
+| `rd-cli` | M0–M6 | inspect · perm · device · behavior · dex disasm · vm exec · app run · mcp · test (suítes JUnit, M6) |
 | `rd-dex` | M1 | parser DEX completo + disassembler smali validado vs baksmali + fuzz targets |
 | `rd-vm` | M2–M3 | interpretador Dalvik + golden harness vs JVM + framework host headless (Activity/View/Handler/Looper) + LayoutInflater AXML/ARSC |
-| `rd-render` | M4 | stub NOT_IMPLEMENTED |
-| `rd-agent` | M5 | stub NOT_IMPLEMENTED |
+| `rd-testsupport` | M0–M6 | fixtures de teste (APK/DEX/AXML/ARSC sintéticos; dev-only, fora do binário) |
+| `rd-render` | M4 | UI dump uiautomator + screenshot headless (software renderer determinístico + PNG sem deps); winit/web são stub → M11 |
+| `rd-agent` | M5–M6 | MCP v1 (30 tools + batch + policy sandbox) · executor de suítes `rd test` (JSON → JUnit XML, M6) |
 | `rd-jni` | M3+ | stub NOT_IMPLEMENTED |
 | `rd-ndk` | M9 | stub NOT_IMPLEMENTED |
+
+## Suítes automatizadas (`rd test`, M6)
+
+| Suíte | Arquivo | Cenários | Passos |
+|---|---|---|---|
+| contract-no-app | `tests/suites/contract-no-app.json` | 6 | 7 |
+
+Executar: `rd test tests/suites/<arquivo>.json --junit <saida>.xml` (formato em `docs/suite-format.md`).
 
 ## Dados versionados (M0)
 
