@@ -488,3 +488,19 @@ Stage Summary:
 - Workspace: 337 testes passam, 0 falham; fmt ok; clippy 0; links ok; compat-matrix sync; readme_inspect ok.
 - M6 COMPLETO: todos os adiamentos entregues (get_api_usage, timeout por passo, AG-07, get_coverage).
 - M7 pendente: gate golden (APKs fora do repo), Moto E5 real, workflow de release.
+
+---
+Task ID: suite-contract-ag07-coverage
+Agent: Arena Agent Mode (sessão autônoma 2h — iteração G)
+Task: CI exercitar de verdade AG-07 (hooks/retries/timeout) e get_coverage — suíte de contrato.
+
+Work Log:
+- DIVULGAÇÃO (iteração F): o commit de get_coverage (9a73cfa) foi feito e pushado DIRETO na main por engano (branch não criada antes do commit — erro de processo meu). Sem force-push para desfazer; a CI do push na main rodou e ficou 6/6 verde (mesmas verificações de um PR). A partir daqui o fluxo branch+PR está restabelecido.
+- tests/suites/contract-no-app.json: +2 cenários (6→8) — "hooks e retries (AG-07) + get_coverage sem app" (setup device_profile; launch expect NO_APP com retries:1; get_coverage expect NOT_RUNNING com timeout_ms:5000; teardown runtime_health) e "teardown com expect (AG-07) roda após os passos".
+- docs/compat-matrix.md regenerada (seção Suítes: 8 cenários/10 passos).
+- xtask: teste suites_are_collected_with_counts atualizado (trava derivação das contagens).
+
+Stage Summary:
+- rd test contract-no-app: 8/8 PASS exit 0 local; a CI passa a exercitar hooks, retries, timeout_ms e get_coverage NOT_RUNNING em todo push.
+- Workspace: 337 testes passam, 0 falham; fmt/clippy/links/matrix/readme_inspect ok.
+- GitHub: branch feat/suite-contract-ag07-coverage → PR.

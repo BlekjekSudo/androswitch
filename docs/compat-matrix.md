@@ -40,7 +40,7 @@
 
 | Suíte | Arquivo | Cenários | Passos |
 |---|---|---|---|
-| contract-no-app | `tests/suites/contract-no-app.json` | 6 | 7 |
+| contract-no-app | `tests/suites/contract-no-app.json` | 8 | 10 |
 
 Executar: `rd test tests/suites/<arquivo>.json --junit <saida>.xml` (formato em `docs/suite-format.md`).
 

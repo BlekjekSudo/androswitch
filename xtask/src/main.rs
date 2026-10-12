@@ -369,8 +369,8 @@ mod tests {
             .iter()
             .find(|s| s.file == "contract-no-app.json")
             .expect("suíte de contrato versionada");
-        assert_eq!(contract.scenarios, 6);
-        assert_eq!(contract.steps, 7);
+        assert_eq!(contract.scenarios, 8);
+        assert_eq!(contract.steps, 10);
     }
 
     /// issue #73: README, CONTRIBUTING e docs/compat-matrix.md documentam
