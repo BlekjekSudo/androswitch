@@ -567,9 +567,7 @@ fn map_intrinsic(
         }
         ("containsValue", _) => {
             // clone pequeno: evita briga de borrow entre fw e heap
-            let snapshot = match map_entries(vm, recv)? {
-                entries => entries.clone(),
-            };
+            let snapshot = map_entries(vm, recv)?.clone();
             let mut found = false;
             for (_, v) in &snapshot {
                 if values_equal(&vm.heap, v, &args[0])? {
