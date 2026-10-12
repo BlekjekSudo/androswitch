@@ -2476,3 +2476,233 @@ fn atomic_reference_intrinsics() {
         Some(Value::Null)
     );
 }
+
+/// M8 (compat real): HashMap/WeakHashMap host — gap do launch do org.primftpd
+/// (`WeakHashMap.<init>`). Chaves String por conteúdo, boxes por valor,
+/// senão identidade; put devolve o valor anterior.
+#[test]
+fn hash_map_host_intrinsics() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const HM: &str = "Ljava/util/HashMap;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let m = e.heap.alloc_instance(HM.to_string(), vec![]).unwrap();
+    let call = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic(e, HM, name, sig, m, &args).expect("intrínseco")
+    };
+
+    call(&mut e, "<init>", "()V", vec![]);
+    assert_eq!(call(&mut e, "size", "()I", vec![]), Some(Value::Int(0)));
+    assert_eq!(call(&mut e, "isEmpty", "()Z", vec![]), Some(Value::Int(1)));
+
+    // duas Strings com o MESMO conteúdo são a mesma chave (equals Java)
+    let k1 = e.heap.alloc_string("chave".into()).unwrap();
+    let k2 = e.heap.alloc_string("chave".into()).unwrap();
+    assert_eq!(
+        call(
+            &mut e,
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Obj(k1), Value::Int(1)]
+        ),
+        Some(Value::Null),
+        "put novo devolve null"
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Obj(k2), Value::Int(2)]
+        ),
+        Some(Value::Int(1)),
+        "mesma chave (conteúdo) substitui e devolve o anterior"
+    );
+    assert_eq!(call(&mut e, "size", "()I", vec![]), Some(Value::Int(1)));
+    assert_eq!(
+        call(
+            &mut e,
+            "get",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Obj(k2)]
+        ),
+        Some(Value::Int(2))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "containsKey",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Obj(k1)]
+        ),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "containsValue",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(1)]
+        ),
+        Some(Value::Int(0))
+    );
+    // chave Null
+    assert_eq!(
+        call(
+            &mut e,
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Null, Value::Int(7)]
+        ),
+        Some(Value::Null)
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "get",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Null]
+        ),
+        Some(Value::Int(7))
+    );
+    // remove devolve o valor e shrinks
+    assert_eq!(
+        call(
+            &mut e,
+            "remove",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Obj(k1)]
+        ),
+        Some(Value::Int(2))
+    );
+    assert_eq!(call(&mut e, "size", "()I", vec![]), Some(Value::Int(1)));
+    call(&mut e, "clear", "()V", vec![]);
+    assert_eq!(call(&mut e, "isEmpty", "()Z", vec![]), Some(Value::Int(1)));
+}
+
+/// M8: ArrayList host — add/get/set/indexOf/remove + OOB levanta
+/// IndexOutOfBoundsException materializada.
+#[test]
+fn array_list_host_intrinsics() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const AL: &str = "Ljava/util/ArrayList;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let l = e.heap.alloc_instance(AL.to_string(), vec![]).unwrap();
+    let call = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic(e, AL, name, sig, l, &args).expect("intrínseco")
+    };
+
+    call(&mut e, "<init>", "()V", vec![]);
+    assert_eq!(
+        call(&mut e, "add", "(Ljava/lang/Object;)Z", vec![Value::Int(10)]),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(&mut e, "add", "(Ljava/lang/Object;)Z", vec![Value::Int(20)]),
+        Some(Value::Int(1))
+    );
+    assert_eq!(call(&mut e, "size", "()I", vec![]), Some(Value::Int(2)));
+    assert_eq!(
+        call(&mut e, "get", "(I)Ljava/lang/Object;", vec![Value::Int(1)]),
+        Some(Value::Int(20))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "indexOf",
+            "(Ljava/lang/Object;)I",
+            vec![Value::Int(20)]
+        ),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "indexOf",
+            "(Ljava/lang/Object;)I",
+            vec![Value::Int(99)]
+        ),
+        Some(Value::Int(-1))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "contains",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(10)]
+        ),
+        Some(Value::Int(1))
+    );
+    // insert no meio
+    call(
+        &mut e,
+        "add",
+        "(ILjava/lang/Object;)V",
+        vec![Value::Int(1), Value::Int(15)],
+    );
+    assert_eq!(
+        call(&mut e, "get", "(I)Ljava/lang/Object;", vec![Value::Int(1)]),
+        Some(Value::Int(15))
+    );
+    assert_eq!(call(&mut e, "size", "()I", vec![]), Some(Value::Int(3)));
+    // set devolve o anterior
+    assert_eq!(
+        call(
+            &mut e,
+            "set",
+            "(ILjava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Int(0), Value::Int(11)]
+        ),
+        Some(Value::Int(10))
+    );
+    // remove por índice e por objeto
+    assert_eq!(
+        call(
+            &mut e,
+            "remove",
+            "(I)Ljava/lang/Object;",
+            vec![Value::Int(0)]
+        ),
+        Some(Value::Int(11))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "remove",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(20)]
+        ),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "remove",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(20)]
+        ),
+        Some(Value::Int(0))
+    );
+    assert_eq!(call(&mut e, "size", "()I", vec![]), Some(Value::Int(1)));
+
+    // OOB → exceção Java materializada (não erro do motor)
+    let oob = call_instance_intrinsic(
+        &mut e,
+        AL,
+        "get",
+        "(I)Ljava/lang/Object;",
+        l,
+        &[Value::Int(5)],
+    );
+    match oob {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/IndexOutOfBoundsException;");
+        }
+        other => panic!("esperava IndexOutOfBoundsException, got {other:?}"),
+    }
+}

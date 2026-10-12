@@ -131,6 +131,18 @@ pub enum HostObj {
     Bundle {
         map: Vec<(String, Value)>,
     },
+    /// M8: coleções java.util host — Map (HashMap/WeakHashMap) e List
+    /// (ArrayList/LinkedList). Estado linear (volumes pequenos); igualdade
+    /// de chave/elemento via `intrinsics::values_equal` (String/boxes por
+    /// valor, senão identidade). VM de arena não tem GC ⇒ WeakHashMap se
+    /// comporta como HashMap (entradas nunca são limpas) — limitação
+    /// documentada em compat_gaps.
+    Map {
+        entries: Vec<(Value, Value)>,
+    },
+    List {
+        elems: Vec<Value>,
+    },
 }
 
 #[derive(Debug, Clone)]

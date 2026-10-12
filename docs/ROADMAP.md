@@ -291,7 +291,16 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   compareAndSet/weakCompareAndSet/compareAndExchange` são intrínsecos (estado
   em campo de heap; CAS por identidade de referência; VM single-threaded ⇒
   CAS exato). Verificado no app real: o gap seguinte mudou.
-- ⬜ **Próximo gap (achado honesto)**: `java.util.WeakHashMap.<init>()V` —
-  coleções `java.util` (HashMap/ArrayList/WeakHashMap/…) são o próximo grupo
-  de compat do M8; entra no catálogo `compat_gaps` como
-  `java-util-collections` (not-implemented).
+- ✅ **Coleções `java.util` host (entregue nesta rodada)**: o gap seguinte
+  era `java.util.WeakHashMap.<init>()V`. Agora `HashMap`/`WeakHashMap`
+  (put/get/remove/containsKey/containsValue/size/isEmpty/clear + ctors) e
+  `ArrayList`/`LinkedList` (add/add(i)/get/set/remove(i)/remove(obj)/
+  contains/indexOf/size/isEmpty/clear) são intrínsecos com estado em
+  `HostObj::Map/List`. Igualdade Java nas chaves/elementos: String por
+  conteúdo, boxes por valor, senão identidade (equals de usuário NÃO é
+  consultado — limitação documentada). Sem GC na arena ⇒ WeakHashMap ≡
+  HashMap. Sem iteradores/entrySet/keySet ainda — catálogo `compat_gaps`
+  atualizado para `partial`.
+- ⬜ **Próximo gap (achado honesto)**: `java.lang.Enum.<init>(String,int)`
+  (wrapped em `ExceptionInInitializerError`) — suporte a enums é o próximo
+  grupo de compat do M8.
