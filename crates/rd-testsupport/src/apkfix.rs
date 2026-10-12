@@ -371,6 +371,80 @@ pub fn build_manifest_axml_sdk(
     build_axml(&root)
 }
 
+/// Variante com `<activity-alias>` (issue #109): a `<activity>` fica sem filtro
+/// e o alias carrega o intent-filter MAIN/LAUNCHER — padrão comum do Android
+/// para trocar ícone/rótulo sem renomear a activity. Passe um `target_desc`
+/// ausente do DEX para exercitar o caminho de erro estruturado.
+pub fn build_manifest_axml_sdk_alias(
+    package: &str,
+    activity_desc: &str,
+    alias_desc: &str,
+    target_desc: &str,
+    min_sdk: i32,
+    target_sdk: i32,
+) -> Vec<u8> {
+    let root = AxNode::new(
+        "manifest",
+        vec![
+            a(false, "package", AxVal::Str(package.to_string())),
+            a(true, "versionCode", AxVal::Int(1)),
+        ],
+        vec![
+            AxNode::new(
+                "uses-sdk",
+                vec![
+                    a(true, "minSdkVersion", AxVal::Int(min_sdk)),
+                    a(true, "targetSdkVersion", AxVal::Int(target_sdk)),
+                ],
+                vec![],
+            ),
+            AxNode::new(
+                "application",
+                vec![],
+                vec![
+                    AxNode::new(
+                        "activity",
+                        vec![a(true, "name", AxVal::Str(activity_desc.to_string()))],
+                        vec![],
+                    ),
+                    AxNode::new(
+                        "activity-alias",
+                        vec![
+                            a(true, "name", AxVal::Str(alias_desc.to_string())),
+                            a(true, "targetActivity", AxVal::Str(target_desc.to_string())),
+                        ],
+                        vec![AxNode::new(
+                            "intent-filter",
+                            vec![],
+                            vec![
+                                AxNode::new(
+                                    "action",
+                                    vec![a(
+                                        true,
+                                        "name",
+                                        AxVal::Str("android.intent.action.MAIN".to_string()),
+                                    )],
+                                    vec![],
+                                ),
+                                AxNode::new(
+                                    "category",
+                                    vec![a(
+                                        true,
+                                        "name",
+                                        AxVal::Str("android.intent.category.LAUNCHER".to_string()),
+                                    )],
+                                    vec![],
+                                ),
+                            ],
+                        )],
+                    ),
+                ],
+            ),
+        ],
+    );
+    build_axml(&root)
+}
+
 /// Variante do manifest com `<uses-permission>` declarados (M5).
 pub fn build_manifest_axml_sdk_perms(
     package: &str,

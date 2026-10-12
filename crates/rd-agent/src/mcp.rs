@@ -489,6 +489,33 @@ fn normalize_activity_desc(a: &str) -> String {
     format!("L{};", a.replace('.', "/"))
 }
 
+/// issue #109: resolve o componente de launch. Para `<activity>` a classe é a
+/// própria; para `<activity-alias>` o Android lança a `targetActivity`. Retorna
+/// o descritor Dalvik a passar para a VM e, quando via alias, o par
+/// `(alias, alvo)` (FQCN) para o resultado/erros estruturados.
+fn launch_desc_of_component(
+    c: &rd_apk::manifest::Component,
+) -> Result<(String, Option<(String, String)>), RdError> {
+    if matches!(c.kind, ComponentKind::ActivityAlias) {
+        let target = c.target_activity.clone().ok_or_else(|| {
+            agent_error(
+                "INVALID_FORMAT",
+                format!(
+                    "activity-alias {} declarada sem android:targetActivity no manifest",
+                    c.class_name
+                ),
+                Some("todo <activity-alias> precisa de targetActivity apontando uma <activity> declarada"),
+            )
+        })?;
+        Ok((
+            normalize_activity_desc(&target),
+            Some((c.class_name.clone(), target)),
+        ))
+    } else {
+        Ok((normalize_activity_desc(&c.class_name), None))
+    }
+}
+
 // ── as 30 tools do M5 ───────────────────────────────────────────────────────
 
 pub struct ToolDef {
@@ -522,7 +549,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "launch",
             description:
-                "Executa o app instalado: cria a activity (LAUNCHER ou `activity`) e roda o lifecycle até o onCreate completar. `activity` precisa estar declarada como <activity> no AndroidManifest.xml E existir no DEX (issues #82/#83) — o Android recusa o que não está declarado. Com `package` lança outro app do registro (multi-app); sem, o app ativo (último install/launch).",
+                "Executa o app instalado: cria a activity (LAUNCHER ou `activity`) e roda o lifecycle até o onCreate completar. `activity` precisa estar declarada como <activity>/<activity-alias> no AndroidManifest.xml E existir no DEX (issues #82/#83) — o Android recusa o que não está declarado; um <activity-alias> lança a sua targetActivity (issue #109). Com `package` lança outro app do registro (multi-app); sem, o app ativo (último install/launch).",
             schema: obj(
                 serde_json::json!({
                     "activity": { "type": "string", "description": "classe da activity (com.ex.Main ou Lcom/ex/Main;). Default: LAUNCHER" },
@@ -1087,53 +1114,67 @@ impl AgentSession {
                 Some("veja package_list — instale com `install` antes de lançar"),
             )
         })?;
-        let (desc, package_out) = match activity {
+        // issue #109: `<activity-alias>` declarada lança a `targetActivity`
+        // (comportamento do Android) — a resolução acontece AQUI; a VM só vê
+        // a classe real que precisa existir no DEX (checagem da #82 intacta).
+        let (desc, package_out, alias_of) = match activity {
             Some(a) => {
                 let desc = normalize_activity_desc(a);
                 // issue #83: o Android só inicia activities DECLARADAS no
                 // AndroidManifest.xml — qualquer outra classe falha com
                 // ActivityNotFoundException. O caminho sem `activity` já
                 // consultava o manifest (LAUNCHER): os dois agora concordam.
-                let declared = app.apk.manifest.application.components.iter().any(|c| {
-                    matches!(
-                        c.kind,
-                        ComponentKind::Activity | ComponentKind::ActivityAlias
-                    ) && normalize_activity_desc(&c.class_name) == desc
-                });
-                if !declared {
-                    return Err(agent_error(
-                        "MISSING_ENTRY",
-                        format!(
-                            "activity {a} não está declarada como <activity> no AndroidManifest.xml (pacote {})",
-                            app.apk.manifest.package
-                        ),
-                        Some(
-                            "o Android recusa iniciar classe não declarada; use `inspect`/`package_list` para listar as activities do manifest, ou lance sem `activity` para usar a LAUNCHER",
-                        ),
-                    ));
-                }
-                (desc, app.apk.manifest.package.clone())
+                let comp = app
+                    .apk
+                    .manifest
+                    .application
+                    .components
+                    .iter()
+                    .find(|c| {
+                        matches!(
+                            c.kind,
+                            ComponentKind::Activity | ComponentKind::ActivityAlias
+                        ) && normalize_activity_desc(&c.class_name) == desc
+                    })
+                    .ok_or_else(|| {
+                        agent_error(
+                            "MISSING_ENTRY",
+                            format!(
+                                "activity {a} não está declarada como <activity>/<activity-alias> no AndroidManifest.xml (pacote {})",
+                                app.apk.manifest.package
+                            ),
+                            Some(
+                                "o Android recusa iniciar classe não declarada; use `inspect`/`package_list` para listar as activities do manifest, ou lance sem `activity` para usar a LAUNCHER",
+                            ),
+                        )
+                    })?;
+                let (desc, alias_of) = launch_desc_of_component(comp)?;
+                (desc, app.apk.manifest.package.clone(), alias_of)
             }
             None => {
+                // issue #109: a entrada MAIN/LAUNCHER pode estar declarada num
+                // `<activity-alias>`, não só numa `<activity>`.
                 let launcher = app
                     .apk
                     .manifest
                     .application
                     .components
                     .iter()
-                    .find(|c| matches!(c.kind, ComponentKind::Activity) && c.is_launcher)
+                    .find(|c| {
+                        matches!(
+                            c.kind,
+                            ComponentKind::Activity | ComponentKind::ActivityAlias
+                        ) && c.is_launcher
+                    })
                     .ok_or_else(|| {
                         agent_error(
                             "MISSING_ENTRY",
-                            "activity LAUNCHER não encontrada no manifest",
+                            "activity LAUNCHER não encontrada no manifest (nem <activity> nem <activity-alias> com MAIN/LAUNCHER)",
                             Some("passe {\"activity\": \"com.ex.Main\"} explicitamente"),
                         )
                     })?;
-                let cls = launcher.class_name.clone();
-                (
-                    format!("L{};", cls.replace('.', "/")),
-                    app.apk.manifest.package.clone(),
-                )
+                let (desc, alias_of) = launch_desc_of_component(launcher)?;
+                (desc, app.apk.manifest.package.clone(), alias_of)
             }
         };
         let dexes = dexes_of_apk(&app.apk)?;
@@ -1141,17 +1182,40 @@ impl AgentSession {
         let mut eng = Engine::new(dexes, VmConfig::default());
         eng.set_resources(resources);
         eng.launch_app(&desc, &package_out, Vec::new())
-            .map_err(vm_exit_to_rd)?;
+            .map_err(|e| {
+                let rd = vm_exit_to_rd(e);
+                match (&alias_of, rd.code.as_str()) {
+                    // issue #109: o alvo do alias não existe no DEX — erro
+                    // estruturado nomeando alias E alvo (não o MISSING_ENTRY
+                    // genérico da VM, que citaria só a classe resolvida).
+                    (Some((alias, target)), "MISSING_ENTRY") => agent_error(
+                        "MISSING_ENTRY",
+                        format!(
+                            "activity-alias {alias} aponta para {target}, que não existe no DEX — não há o que lançar"
+                        ),
+                        Some(
+                            "confira o android:targetActivity do alias no manifest (`inspect` lista os componentes); o alvo precisa existir no DEX",
+                        ),
+                    ),
+                    _ => rd,
+                }
+            })?;
         self.engine = Some(eng);
         self.engine_package = Some(package_out.clone());
         self.activity = Some(desc.clone());
         self.active = Some(package_out.clone());
-        Ok(ToolResult::json(&serde_json::json!({
+        let mut out = serde_json::json!({
             "launched": true,
             "session_id": self.session_id,
             "activity": desc,
             "package": package_out,
-        })))
+        });
+        if let Some((alias, _)) = &alias_of {
+            // issue #109: o que foi pedido/declarado é o alias — o resultado
+            // registra qual alias resolveu o launch (a `activity` é o alvo).
+            out["alias"] = serde_json::json!(alias);
+        }
+        Ok(ToolResult::json(&out))
     }
 
     fn tool_tap(&mut self, x: i32, y: i32) -> Result<ToolResult, RdError> {
@@ -2501,7 +2565,8 @@ mod tests {
 
     /// APK fixture: Main.onCreate faz println("hi do mcp") + setContentView;
     /// layout LinearLayout{TextView @string/hello id/tv}; LState.get()I → 42.
-    fn fixture_apk_path() -> String {
+    /// Partes compartilhadas dos fixtures MCP (arsc, layout AXML, dex).
+    fn fixture_parts() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
         let mut arsc = ArscFix::new();
         let layout = arsc.add_layout("activity_main");
         let s_hello = arsc.add_string("hello", "Olá do MCP");
@@ -2569,6 +2634,67 @@ mod tests {
                 u
             })),
         );
+        (arsc.build(), build_axml(&layout_xml), b.finish())
+    }
+
+    fn fixture_apk_path() -> String {
+        let (arsc, layout, dex) = fixture_parts();
+        fixture_apk_write(rd_testsupport::apkfix::build_apk_sdk(
+            "com.test.mcp",
+            "com.test.mcp.Main",
+            arsc,
+            vec![
+                ("res/layout/activity_main.xml", layout),
+                ("classes.dex", dex),
+            ],
+            26,
+            30,
+        ))
+    }
+
+    /// issue #109: MESMO DEX/recursos de `fixture_apk_path`, mas o manifest
+    /// deixa `Main` sem filtro e põe o MAIN/LAUNCHER num `<activity-alias>`
+    /// (`Alias` → `Main`) — padrão comum para trocar ícone/rótulo.
+    fn fixture_apk_path_alias() -> String {
+        let (arsc, layout, dex) = fixture_parts();
+        let manifest = rd_testsupport::apkfix::build_manifest_axml_sdk_alias(
+            "com.test.mcp",
+            "com.test.mcp.Main",
+            "com.test.mcp.Alias",
+            "com.test.mcp.Main",
+            26,
+            30,
+        );
+        fixture_apk_write(fixture_apk_zip(manifest, arsc, layout, dex))
+    }
+
+    /// issue #109: variante com alias cujo `targetActivity` NÃO existe no DEX
+    /// (caminho de erro estruturado).
+    fn fixture_apk_path_alias_ghost_target() -> String {
+        let (arsc, layout, dex) = fixture_parts();
+        let manifest = rd_testsupport::apkfix::build_manifest_axml_sdk_alias(
+            "com.test.mcp",
+            "com.test.mcp.Main",
+            "com.test.mcp.Alias",
+            "com.test.mcp.Ghost",
+            26,
+            30,
+        );
+        fixture_apk_write(fixture_apk_zip(manifest, arsc, layout, dex))
+    }
+
+    /// Monta o zip do fixture com manifest arbitrário (mesma ordem de entradas
+    /// do `build_apk_sdk`: manifest, resources.arsc, extras).
+    fn fixture_apk_zip(manifest: Vec<u8>, arsc: Vec<u8>, layout: Vec<u8>, dex: Vec<u8>) -> Vec<u8> {
+        let mut z = rd_testsupport::apkfix::ZipFix::new();
+        z.add("AndroidManifest.xml", manifest);
+        z.add("resources.arsc", arsc);
+        z.add("res/layout/activity_main.xml", layout);
+        z.add("classes.dex", dex);
+        z.build()
+    }
+
+    fn fixture_apk_write(apk: Vec<u8>) -> String {
         let dir = std::env::temp_dir().join(format!(
             "rd-agent-mcp-{}-{}",
             std::process::id(),
@@ -2579,17 +2705,6 @@ mod tests {
         ));
         std::fs::create_dir_all(&dir).expect("tmpdir");
         let path = dir.join("app.apk");
-        let apk = rd_testsupport::apkfix::build_apk_sdk(
-            "com.test.mcp",
-            "com.test.mcp.Main",
-            arsc.build(),
-            vec![
-                ("res/layout/activity_main.xml", build_axml(&layout_xml)),
-                ("classes.dex", b.finish()),
-            ],
-            26,
-            30,
-        );
         std::fs::write(&path, apk).expect("apk fixture");
         path.to_string_lossy().to_string()
     }
@@ -3303,6 +3418,106 @@ mod tests {
         let (v, err) = call(&mut s, "launch", serde_json::json!({}));
         assert!(!err, "launch sem activity: {v}");
         assert_eq!(v["launched"], true, "{v}");
+    }
+
+    /// issue #109: `<activity-alias>` declarada no manifest não era lançável:
+    /// o caminho explícito parava na checagem de DEX da #82 (a classe do alias
+    /// não existe no DEX) e o caminho LAUNCHER ignorava alias no filtro
+    /// MAIN/LAUNCHER. No Android, iniciar o alias abre a `targetActivity`.
+    #[test]
+    fn launch_resolves_activity_alias_to_target() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path_alias();
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+
+        // 1) launch explícito do alias → roda a Main (alvo), nomeando o alias
+        let (v, err) = call(
+            &mut s,
+            "launch",
+            serde_json::json!({"activity": "com.test.mcp.Alias"}),
+        );
+        assert!(!err, "launch do alias deve resolver o alvo: {v}");
+        assert_eq!(v["launched"], true, "{v}");
+        assert_eq!(
+            v["activity"], "Lcom/test/mcp/Main;",
+            "a activity executada é o alvo do alias: {v}"
+        );
+        assert_eq!(
+            v["alias"], "com.test.mcp.Alias",
+            "o resultado registra qual alias resolveu: {v}"
+        );
+
+        // o alvo realmente executou: a ui_tree traz o texto do layout da Main
+        let (v, err) = call(&mut s, "ui_tree", serde_json::json!({}));
+        assert!(!err, "ui_tree após launch via alias: {v}");
+        assert!(
+            v.to_string().contains("Olá do MCP"),
+            "a Main inflou o layout (execução real, não instância vazia): {v}"
+        );
+
+        // 2) LAUNCHER declarada no alias: launch sem `activity` resolve
+        let (v, err) = call(&mut s, "launch", serde_json::json!({}));
+        assert!(!err, "launch LAUNCHER quando a LAUNCHER é um alias: {v}");
+        assert_eq!(v["launched"], true, "{v}");
+        assert_eq!(v["activity"], "Lcom/test/mcp/Main;", "{v}");
+        assert_eq!(v["alias"], "com.test.mcp.Alias", "{v}");
+
+        // 3) a activity comum continua lançando — sem campo `alias`
+        let (v, err) = call(
+            &mut s,
+            "launch",
+            serde_json::json!({"activity": "com.test.mcp.Main"}),
+        );
+        assert!(!err, "launch direto da activity declarada: {v}");
+        assert_eq!(v["launched"], true, "{v}");
+        assert_eq!(v["activity"], "Lcom/test/mcp/Main;", "{v}");
+        assert!(
+            v.get("alias").is_none(),
+            "launch direto não pode trazer `alias`: {v}"
+        );
+    }
+
+    /// issue #109: alias cujo `targetActivity` não existe no DEX devolve erro
+    /// estruturado nomeando alias E alvo — não o falso sucesso de antes nem um
+    /// MISSING_ENTRY que cita só a classe resolvida.
+    #[test]
+    fn launch_alias_with_ghost_target_is_structured_error() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path_alias_ghost_target();
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+
+        let (v, err) = call(
+            &mut s,
+            "launch",
+            serde_json::json!({"activity": "com.test.mcp.Alias"}),
+        );
+        assert!(err, "alias com alvo fora do DEX é erro: {v}");
+        assert_eq!(v["code"], "MISSING_ENTRY", "{v}");
+        assert!(
+            v.get("launched").is_none(),
+            "erro não pode trazer `launched` (falso sucesso): {v}"
+        );
+        let cause = v["cause"].as_str().unwrap_or_default();
+        assert!(
+            cause.contains("com.test.mcp.Alias") && cause.contains("com.test.mcp.Ghost"),
+            "cause nomeia o alias e o alvo: {v}"
+        );
+        assert!(!v["suggestion"].is_null(), "traz suggestion: {v}");
+
+        // nada foi lançado: a sessão continua sem app em execução
+        let (v, err) = call(&mut s, "runtime_health", serde_json::json!({}));
+        assert!(!err, "runtime_health: {v}");
+        assert_eq!(v["running"], false, "launch inválido não cria estado: {v}");
+
+        // e o caminho LAUNCHER herda o mesmo erro (a LAUNCHER é o alias)
+        let (v, err) = call(&mut s, "launch", serde_json::json!({}));
+        assert!(
+            err,
+            "LAUNCHER == alias com alvo fantasma também é erro: {v}"
+        );
+        assert_eq!(v["code"], "MISSING_ENTRY", "{v}");
     }
 
     /// issue #80: as checagens de formato viviam dentro do laço de execução,
