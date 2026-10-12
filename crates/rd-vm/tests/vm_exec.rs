@@ -2380,3 +2380,99 @@ fn coverage_snapshot_counts_executed_method_bodies() {
     assert_eq!(cov.classes[0].methods_total, 2);
     assert_eq!(cov.classes[0].methods_executed, 1);
 }
+
+/// M8 (compat real): AtomicReference host — gap encontrado no launch do
+/// org.primftpd 8.2 (<init>(Object) não resolvido). Estado no campo "value";
+/// CAS por identidade de referência; VM single-threaded ⇒ CAS exato.
+#[test]
+fn atomic_reference_intrinsics() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const AR: &str = "Ljava/util/concurrent/atomic/AtomicReference;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let r = e
+        .heap
+        .alloc_instance(AR.to_string(), vec![])
+        .expect("instância");
+    let sa = e.heap.alloc_string("a".into()).unwrap();
+    let sb = e.heap.alloc_string("b".into()).unwrap();
+
+    let call = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic(e, AR, name, sig, r, &args).expect("intrínseco")
+    };
+
+    // <init>(Object) + get
+    call(
+        &mut e,
+        "<init>",
+        "(Ljava/lang/Object;)V",
+        vec![Value::Obj(sa)],
+    );
+    assert_eq!(
+        call(&mut e, "get", "()Ljava/lang/Object;", vec![]),
+        Some(Value::Obj(sa))
+    );
+
+    // compareAndSet com esperado ERRADO → 0, valor intacto
+    assert_eq!(
+        call(
+            &mut e,
+            "compareAndSet",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Z",
+            vec![Value::Obj(sb), Value::Null]
+        ),
+        Some(Value::Int(0))
+    );
+    assert_eq!(
+        call(&mut e, "get", "()Ljava/lang/Object;", vec![]),
+        Some(Value::Obj(sa))
+    );
+
+    // compareAndSet com esperado CERTO → 1, valor trocado
+    assert_eq!(
+        call(
+            &mut e,
+            "compareAndSet",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Z",
+            vec![Value::Obj(sa), Value::Obj(sb)]
+        ),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(&mut e, "get", "()Ljava/lang/Object;", vec![]),
+        Some(Value::Obj(sb))
+    );
+
+    // getAndSet devolve o anterior
+    assert_eq!(
+        call(
+            &mut e,
+            "getAndSet",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Obj(sa)]
+        ),
+        Some(Value::Obj(sb))
+    );
+
+    // CAS com Null como esperado/atual (identidade Null==Null)
+    call(&mut e, "set", "(Ljava/lang/Object;)V", vec![Value::Null]);
+    assert_eq!(
+        call(
+            &mut e,
+            "compareAndSet",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Z",
+            vec![Value::Null, Value::Obj(sb)]
+        ),
+        Some(Value::Int(1))
+    );
+
+    // <init>()V → Null
+    let r2 = e.heap.alloc_instance(AR.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(&mut e, AR, "<init>", "()V", r2, &[]).unwrap();
+    assert_eq!(
+        call_instance_intrinsic(&mut e, AR, "get", "()Ljava/lang/Object;", r2, &[]).unwrap(),
+        Some(Value::Null)
+    );
+}

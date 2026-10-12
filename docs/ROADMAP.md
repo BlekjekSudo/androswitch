@@ -273,3 +273,25 @@ certos); configs específicas (land/locale/density) selecionáveis.
 **Pendente para fechar o M7 (DoD):** gate golden (APKs golden não estão no
 repositório) · medição em Moto E5 real · workflow de release bloqueante (hoje
 o gate é um teste de CI).
+
+## 🔎 M8 sondagem — compat real, primeiro app (2026-10)
+
+Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
+`golden-apks/fetch.sh org.primftpd`):
+
+- **App**: `org.primftpd` 8.2 (primitive ftpd, OSS) — minSdk 26 (**piso OK**),
+  target/compile 36, 11 MB, 5 DEX, 21 componentes, Kotlin/AndroidX, assinatura
+  v1+v2+v3.
+- ✅ **`rd inspect`**: completo (componentes, permissões 5 auto/2 runtime/1
+  special, features, LAUNCHER `MainTabsActivity` + alias leanback).
+- ✅ **`install` via MCP**: registrado na sessão com classificação de
+  permissões correta.
+- ✅ **`AtomicReference` host (entregue nesta rodada)**: o launch parava em
+  `AtomicReference.<init>(Object)` NOT_FOUND; agora `<init>/get/set/getAndSet/
+  compareAndSet/weakCompareAndSet/compareAndExchange` são intrínsecos (estado
+  em campo de heap; CAS por identidade de referência; VM single-threaded ⇒
+  CAS exato). Verificado no app real: o gap seguinte mudou.
+- ⬜ **Próximo gap (achado honesto)**: `java.util.WeakHashMap.<init>()V` —
+  coleções `java.util` (HashMap/ArrayList/WeakHashMap/…) são o próximo grupo
+  de compat do M8; entra no catálogo `compat_gaps` como
+  `java-util-collections` (not-implemented).

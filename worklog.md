@@ -504,3 +504,18 @@ Stage Summary:
 - rd test contract-no-app: 8/8 PASS exit 0 local; a CI passa a exercitar hooks, retries, timeout_ms e get_coverage NOT_RUNNING em todo push.
 - Workspace: 337 testes passam, 0 falham; fmt/clippy/links/matrix/readme_inspect ok.
 - GitHub: branch feat/suite-contract-ag07-coverage → PR.
+
+---
+Task ID: m8-atomic-reference
+Agent: Arena Agent Mode (sessão autônoma 2h — iteração H)
+Task: M8 sondagem com app real + fix do 1º gap de launch (AtomicReference host).
+
+Work Log:
+- Sondagem (sem commit de binário, GH-05): fetch.sh org.primftpd → primitive ftpd 8.2, minSdk 26 (PISO OK), 11 MB, 5 DEX, Kotlin/AndroidX. rd inspect completo; install MCP ok (permissões 5 auto/2 runtime/1 special).
+- Launch real falhou NOT_FOUND em AtomicReference.<init>(Object) → implementado host intrínseco completo (<init>()V/<init>(Object)/get/set/getAndSet/compareAndSet/weakCompareAndSet/compareAndExchange): estado no campo heap "value" (padrão StringBuilder); CAS por identidade de referência (Null==Null; Obj(i)==Obj(j) sse i==j); VM single-threaded ⇒ CAS exato.
+- Re-sondagem no app real: gap do AtomicReference SUMIU; próximo gap honesto = java.util.WeakHashMap.<init>()V (coleções java.util não são host). Registrado no catálogo compat_gaps (java-util-collections, not-implemented) e na nova seção ROADMAP "M8 sondagem".
+- Teste: atomic_reference_intrinsics (vm_exec) — init/get, CAS errado→0 (valor intacto), CAS certo→1 (troca), getAndSet devolve anterior, CAS Null==Null, <init>()V→Null.
+
+Stage Summary:
+- Workspace: 338 testes passam, 0 falham; fmt/clippy/links/matrix/readme_inspect ok.
+- Próxima iteração natural (M8): coleções java.util como host (WeakHashMap/HashMap/ArrayList) — é um grupo grande, merece iteração dedicada.
