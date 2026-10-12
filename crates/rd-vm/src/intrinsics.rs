@@ -11,6 +11,8 @@ use crate::value::Value;
 const STRING: &str = "Ljava/lang/String;";
 const SB: &str = "Ljava/lang/StringBuilder;";
 const OBJECT: &str = "Ljava/lang/Object;";
+/// M8 (compat real): primeiro gap de launch do app real org.primftpd 8.2.
+const ATOMIC_REF: &str = "Ljava/util/concurrent/atomic/AtomicReference;";
 const MATH: &str = "Ljava/lang/Math;";
 const INTEGER: &str = "Ljava/lang/Integer;";
 const LONG: &str = "Ljava/lang/Long;";
@@ -359,6 +361,17 @@ pub fn call_static_intrinsic(
 /// Intrínseco DE INSTÂNCIA (invoke-virtual/direct sobre objetos da VM).
 /// `receiver` já é Some(ref) — NPE foi tratada pelo chamador.
 /// `Ok(None)` = sem intrínseco → dispatch normal no DEX (classe do usuário).
+/// Igualdade de identidade de referências (o `==` do Java sobre refs) — usada
+/// pelo CAS do AtomicReference: Null == Null; Obj(i) == Obj(j) sse i == j.
+/// Valores não-ref (Int/Long/…) nunca são payload de AtomicReference via DEX.
+fn ref_identity_eq(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Null, Value::Null) => true,
+        (Value::Obj(x), Value::Obj(y)) => x == y,
+        _ => false,
+    }
+}
+
 pub fn call_instance_intrinsic(
     vm: &mut Engine,
     recv_class: &str,
@@ -369,6 +382,52 @@ pub fn call_instance_intrinsic(
 ) -> Result<Option<Value>, VmExit> {
     match (recv_class, name, sig) {
         (OBJECT, "<init>", "()V") => Ok(Some(Value::Null)), // ctor de Object = no-op
+
+        // ── AtomicReference (M8) ────────────────────────────────────────────
+        // Estado no campo "value" da instância (mesmo padrão do StringBuilder).
+        // VM single-threaded: CAS é EXATO (não há concorrência) e a igualdade
+        // é identidade de referência (Null == Null; Obj(i) == Obj(i)).
+        (ATOMIC_REF, "<init>", "()V") => {
+            crate::err::put_field_result(vm.heap.put_field(recv, "value", Value::Null))?;
+            Ok(Some(Value::Null))
+        }
+        (ATOMIC_REF, "<init>", "(Ljava/lang/Object;)V") => {
+            crate::err::put_field_result(vm.heap.put_field(recv, "value", args[0].clone()))?;
+            Ok(Some(Value::Null))
+        }
+        (ATOMIC_REF, "get", "()Ljava/lang/Object;") => Ok(Some(
+            vm.heap.get_field(recv, "value").unwrap_or(Value::Null),
+        )),
+        (ATOMIC_REF, "set", "(Ljava/lang/Object;)V") => {
+            crate::err::put_field_result(vm.heap.put_field(recv, "value", args[0].clone()))?;
+            Ok(Some(Value::Null))
+        }
+        (ATOMIC_REF, "getAndSet", "(Ljava/lang/Object;)Ljava/lang/Object;") => {
+            let old = vm.heap.get_field(recv, "value").unwrap_or(Value::Null);
+            crate::err::put_field_result(vm.heap.put_field(recv, "value", args[0].clone()))?;
+            Ok(Some(old))
+        }
+        (ATOMIC_REF, "compareAndSet", "(Ljava/lang/Object;Ljava/lang/Object;)Z")
+        | (ATOMIC_REF, "weakCompareAndSet", "(Ljava/lang/Object;Ljava/lang/Object;)Z") => {
+            let cur = vm.heap.get_field(recv, "value").unwrap_or(Value::Null);
+            if ref_identity_eq(&cur, &args[0]) {
+                crate::err::put_field_result(vm.heap.put_field(recv, "value", args[1].clone()))?;
+                Ok(Some(Value::Int(1)))
+            } else {
+                Ok(Some(Value::Int(0)))
+            }
+        }
+        (
+            ATOMIC_REF,
+            "compareAndExchange",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+        ) => {
+            let cur = vm.heap.get_field(recv, "value").unwrap_or(Value::Null);
+            if ref_identity_eq(&cur, &args[0]) {
+                crate::err::put_field_result(vm.heap.put_field(recv, "value", args[1].clone()))?;
+            }
+            Ok(Some(cur))
+        }
 
         (SB, "<init>", "()V") => {
             let buf = vm.heap.alloc_string(String::new())?;

@@ -1827,6 +1827,12 @@ impl AgentSession {
     fn tool_compat_gaps(&mut self) -> Result<ToolResult, RdError> {
         const GAPS: &[(&str, &str, &str, &str)] = &[
             (
+                "java-util-collections",
+                "vm",
+                "not-implemented",
+                "coleções java.util (HashMap/ArrayList/WeakHashMap/…) ainda não são host — launch de app real Kotlin/AndroidX para aí (M8). AtomicReference já é host",
+            ),
+            (
                 "notifications",
                 "ui",
                 "not-implemented",
