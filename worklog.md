@@ -343,3 +343,22 @@ Stage Summary:
 - Não entra no M6: coverage/get_api_usage (AG-09), run_scenario com retries/hooks (AG-07), timeout por passo.
 - M7–M10: não iniciados nesta rodada (ver ROADMAP). Cada um é um milestone de escopo próprio (M7 gate de performance no piso moto-e5; M8 compat real; M9 NDK/ELF; M10 dispositivos virtuais).
 - Próximo: abrir PR; próxima rodada sugerida: M7 (performance + gate E5), que depende de medições reais.
+
+---
+Task ID: fix-109
+Agent: Arena Agent Mode (sessão autônoma — bugfix)
+Task: Corrigir issue #109 — activity-alias declarada no manifest não era lançável pelo rd mcp (nem por `activity` explícito, nem como LAUNCHER).
+
+Work Log:
+- Leitura: worklog, issues abertas (#109 e #110), código de tool_launch (rd-agent), launch_app (rd-vm), parser de manifest (rd-apk). Baseline: cargo test --workspace verde antes das mudanças.
+- Escolha: #109 antes de #110 — a #110 pede uma decisão de regra que a própria issue diz que não toma (spec silente para signature fora da lista B5); a #109 tinha correção recomendada e critérios de aceite fechados.
+- rd-testsupport (apkfix.rs): builder novo build_manifest_axml_sdk_alias (activity sem filtro + alias com MAIN/LAUNCHER e targetActivity parametrizado).
+- rd-agent (mcp.rs): tool_launch resolve alias → targetActivity ANTES da VM (helper launch_desc_of_component); busca LAUNCHER passa a incluir ActivityAlias; alias sem targetActivity → INVALID_FORMAT; alvo ausente do DEX → MISSING_ENTRY nomeando alias E alvo (enriquecendo o erro da VM); resultado ganha campo `alias` quando o launch foi via alias; descrição da tool atualizada e docs/mcp-tools.md regenerada (teste generated_docs_match_catalog trava a convergência).
+- Testes: fixture_apk_path refatorado em fixture_parts + fixture_apk_write (mesmos bytes, ordem de entradas idêntica) + 2 fixtures novos (alias→Main, alias→Ghost); +2 testes cobrindo os 4 critérios de aceite da #109 (launch explícito do alias roda a Main com ui_tree provando execução real; launch {} com LAUNCHER no alias; activity comum segue ok sem campo alias; alvo fantasma → erro estruturado pelos dois caminhos, sem estado de sessão).
+- Regressões: testes das issues #82/#83 continuam passando (mensagens de erro só ganharam /<activity-alias>).
+
+Stage Summary:
+- Suíte: workspace todo verde (rd-agent 40 → 42 testes; 0 falhas). cargo fmt --check ok; clippy --workspace --all-targets sem warnings.
+- GitHub: branch fix/109-activity-alias-launch, PR com Closes #109.
+- Limitações conhecidas: none novo — warm do rd perf segue recriando o Engine (M7), não tocado aqui.
+- Próximo: issue #110 (BATTERY_STATS auto-granted) — depende de decidir/documentar a regra para permissões signature fora da lista B5 na spec (RustyDroid.md); sugerido decidir com o dono do repo antes de implementar. Depois: pendências do M7 (gate golden, medição em device real).
