@@ -25,6 +25,8 @@
 //! - Formato inválido da suíte → `INVALID_SUITE` ANTES de executar qualquer passo.
 //! - `install.apk` relativo é resolvido a partir da pasta da suíte (não do cwd).
 //! - `batch` não é aninhado dentro de suíte (mesma regra do próprio batch).
+//! - `timeout_ms` (opcional, > 0) dá orçamento de wall-clock ao passo: estourou
+//!   → falha `STEP_TIMEOUT` (medição, sem preempção) e resto do cenário pulado.
 
 use std::path::{Component, Path, PathBuf};
 use std::time::Instant;
@@ -51,6 +53,10 @@ pub struct Step {
     pub name: String,
     pub arguments: Value,
     pub expect: Expect,
+    /// Orçamento de wall-clock do passo (adiamento M6). `None` = sem teto.
+    /// Medido, não preemptivo: a chamada roda até o fim e o executor reprova
+    /// o passo se o teto estourar (STEP_TIMEOUT) — ver docs/suite-format.md.
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -243,10 +249,23 @@ fn parse_step(scenario: &str, pi: usize, pv: &Value) -> Result<Step, RdError> {
             )
         })?,
     };
+    let timeout_ms = match po.get("timeout_ms") {
+        None => None,
+        Some(t) => {
+            let ms = t.as_u64().filter(|v| *v > 0).ok_or_else(|| {
+                invalid(
+                    format!("{scenario:?} passo {pi} ({name}): \"timeout_ms\" inválido: {t}"),
+                    "use um inteiro > 0 (milissegundos) ou omita o campo",
+                )
+            })?;
+            Some(ms)
+        }
+    };
     Ok(Step {
         name,
         arguments,
         expect,
+        timeout_ms,
     })
 }
 
@@ -338,34 +357,48 @@ pub fn run_scenario(scenario: &Scenario, base: &Path) -> ScenarioOutcome {
         } else {
             soft_failure(&step.name, &parsed)
         };
-        let status = match (&step.expect, r.is_error) {
-            // asserções do MCP respondem isError=false com "ok": false (ou
-            // "found": false) quando a condição NÃO se confirma. Para um
-            // executor de testes isso é falha — senão toda asserção errada
-            // passaria em verde.
-            (Expect::Ok, false) if soft.is_some() => StepStatus::Failed(format!(
-                "passo {i} ({}): asserção falhou: {}",
+        let elapsed_ms = t0.elapsed().as_millis();
+        // adiado M6: orçamento de wall-clock por passo. É medição, não
+        // preempção — a chamada completou, mas estourou o teto: o passo é
+        // reprovado com código estável STEP_TIMEOUT (vale mesmo com `expect:
+        // error:…`, pois o orçamento é contrato do passo, não da tool).
+        let timed_out = step.timeout_ms.is_some_and(|t| elapsed_ms > u128::from(t));
+        let status = if timed_out {
+            StepStatus::Failed(format!(
+                "passo {i} ({}): STEP_TIMEOUT: {elapsed_ms} ms excedeu timeout_ms={} (a chamada completou, mas estourou o orçamento do passo)",
                 step.name,
-                soft.clone().unwrap_or_default()
-            )),
-            (Expect::Ok, false) => StepStatus::Passed,
-            (Expect::Ok, true) => StepStatus::Failed(format!(
-                "passo {i} ({}): esperado ok, obtido erro {}: {}",
-                step.name,
-                if code.is_empty() { "?" } else { &code },
-                cause
-            )),
-            (Expect::Error(want), true) if *want == code => StepStatus::Passed,
-            (Expect::Error(want), true) => StepStatus::Failed(format!(
-                "passo {i} ({}): esperado erro {want}, obtido {}: {}",
-                step.name,
-                if code.is_empty() { "?" } else { &code },
-                cause
-            )),
-            (Expect::Error(want), false) => StepStatus::Failed(format!(
-                "passo {i} ({}): esperado erro {want}, mas a tool completou sem erro",
-                step.name
-            )),
+                step.timeout_ms.unwrap_or(0)
+            ))
+        } else {
+            match (&step.expect, r.is_error) {
+                // asserções do MCP respondem isError=false com "ok": false (ou
+                // "found": false) quando a condição NÃO se confirma. Para um
+                // executor de testes isso é falha — senão toda asserção errada
+                // passaria em verde.
+                (Expect::Ok, false) if soft.is_some() => StepStatus::Failed(format!(
+                    "passo {i} ({}): asserção falhou: {}",
+                    step.name,
+                    soft.clone().unwrap_or_default()
+                )),
+                (Expect::Ok, false) => StepStatus::Passed,
+                (Expect::Ok, true) => StepStatus::Failed(format!(
+                    "passo {i} ({}): esperado ok, obtido erro {}: {}",
+                    step.name,
+                    if code.is_empty() { "?" } else { &code },
+                    cause
+                )),
+                (Expect::Error(want), true) if *want == code => StepStatus::Passed,
+                (Expect::Error(want), true) => StepStatus::Failed(format!(
+                    "passo {i} ({}): esperado erro {want}, obtido {}: {}",
+                    step.name,
+                    if code.is_empty() { "?" } else { &code },
+                    cause
+                )),
+                (Expect::Error(want), false) => StepStatus::Failed(format!(
+                    "passo {i} ({}): esperado erro {want}, mas a tool completou sem erro",
+                    step.name
+                )),
+            }
         };
         if let StepStatus::Failed(msg) = &status {
             failure = Some(msg.clone());
@@ -374,7 +407,7 @@ pub fn run_scenario(scenario: &Scenario, base: &Path) -> ScenarioOutcome {
             index: i,
             tool: step.name.clone(),
             status,
-            elapsed_ms: t0.elapsed().as_millis(),
+            elapsed_ms,
             output: text,
         });
     }
@@ -530,9 +563,98 @@ mod tests {
         let s = parse_suite(OK_SUITE).unwrap();
         assert_eq!(s.name, "demo");
         assert_eq!(s.scenarios[0].steps[0].expect, Expect::Ok);
+        assert_eq!(s.scenarios[0].steps[0].timeout_ms, None);
         assert_eq!(
             s.scenarios[0].steps[1].expect,
             Expect::Error("NO_APP".into())
+        );
+        // timeout_ms válido é aceito
+        let s = parse_suite(
+            r#"{"name": "t", "scenarios": [{"name": "c", "steps": [
+                {"name": "tap", "arguments": {"x": 1, "y": 1}, "timeout_ms": 500}]}]}"#,
+        )
+        .unwrap();
+        assert_eq!(s.scenarios[0].steps[0].timeout_ms, Some(500));
+    }
+
+    /// APK mínimo (1 classe) para os testes de timeout por passo.
+    fn timeout_fixture_apk() -> String {
+        use rd_testsupport::apkfix::build_apk_sdk;
+        use rd_testsupport::apkfix::ArscFix;
+        use rd_testsupport::vm::DexBuilder;
+        let arsc = ArscFix::new();
+        let mut b = DexBuilder::new();
+        b.class("Lcom/test/to/Main;", "Landroid/app/Activity;");
+        let apk = build_apk_sdk(
+            "com.test.to",
+            "com.test.to.Main",
+            arsc.build(),
+            vec![("classes.dex", b.finish())],
+            26,
+            30,
+        );
+        let dir = std::env::temp_dir().join(format!(
+            "rd-agent-suite-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).expect("tmpdir");
+        let path = dir.join("app.apk");
+        std::fs::write(&path, apk).expect("apk fixture");
+        path.to_string_lossy().to_string()
+    }
+
+    /// Adiado M6 — timeout por passo: orçamento estourado reprova o passo com
+    /// STEP_TIMEOUT e pula os restantes; orçamento folgadoo deixa passar.
+    /// (Medição de wall-clock em build de teste: o parse do APK na instalação
+    /// custa muito mais que 1 ms.)
+    #[test]
+    fn step_timeout_fails_the_step_and_skips_the_rest() {
+        let apk = timeout_fixture_apk();
+
+        let suite = parse_suite(&format!(
+            r#"{{"name": "to", "scenarios": [{{"name": "estoura", "steps": [
+                {{"name": "install", "arguments": {{"apk": "{apk}"}}, "timeout_ms": 1}},
+                {{"name": "device_profile", "arguments": {{}}}}
+            ]}}]}}"#
+        ))
+        .unwrap();
+        let report = run_suite(&suite, Path::new("."));
+        assert!(!report.all_passed(), "estouro de orçamento é falha");
+        let sc = &report.scenarios[0];
+        assert!(
+            sc.failure.as_deref().unwrap_or("").contains("STEP_TIMEOUT"),
+            "falha nomeia o código estável: {:?}",
+            sc.failure
+        );
+        assert!(
+            matches!(sc.steps[0].status, StepStatus::Failed(_)),
+            "{:?}",
+            sc.steps[0]
+        );
+        assert!(
+            matches!(sc.steps[1].status, StepStatus::Skipped),
+            "passos seguintes são pulados: {:?}",
+            sc.steps[1]
+        );
+        assert_eq!(report.exit_code(), 1);
+
+        // o MESMO cenário com orçamento folgado passa inteiro
+        let suite = parse_suite(&format!(
+            r#"{{"name": "to", "scenarios": [{{"name": "folgado", "steps": [
+                {{"name": "install", "arguments": {{"apk": "{apk}"}}, "timeout_ms": 60000}},
+                {{"name": "device_profile", "arguments": {{}}}}
+            ]}}]}}"#
+        ))
+        .unwrap();
+        let report = run_suite(&suite, Path::new("."));
+        assert!(
+            report.all_passed(),
+            "orçamento folgado não interfere: {:?}",
+            report.scenarios[0].failure
         );
     }
 
@@ -562,6 +684,19 @@ mod tests {
             (
                 r#"{"name": "x", "scenarios": [{"name": "c", "steps": [{"name": "tap", "expect": "error:"}]}]}"#,
                 "expect",
+            ),
+            // adiado M6: timeout_ms precisa ser inteiro > 0
+            (
+                r#"{"name": "x", "scenarios": [{"name": "c", "steps": [{"name": "tap", "timeout_ms": 0}]}]}"#,
+                "timeout_ms",
+            ),
+            (
+                r#"{"name": "x", "scenarios": [{"name": "c", "steps": [{"name": "tap", "timeout_ms": -5}]}]}"#,
+                "timeout_ms",
+            ),
+            (
+                r#"{"name": "x", "scenarios": [{"name": "c", "steps": [{"name": "tap", "timeout_ms": "logo"}]}]}"#,
+                "timeout_ms",
             ),
         ];
         for (text, needle) in cases {
