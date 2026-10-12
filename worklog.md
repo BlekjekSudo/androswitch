@@ -519,3 +519,21 @@ Work Log:
 Stage Summary:
 - Workspace: 338 testes passam, 0 falham; fmt/clippy/links/matrix/readme_inspect ok.
 - Próxima iteração natural (M8): coleções java.util como host (WeakHashMap/HashMap/ArrayList) — é um grupo grande, merece iteração dedicada.
+
+---
+Task ID: m8-java-util-collections
+Agent: Arena Agent Mode (sessão autônoma 2h — iteração I)
+Task: M8 — coleções java.util host (gap do WeakHashMap achado na sondagem real).
+
+Work Log:
+- rd-vm framework: HostObj::Map{entries}/HostObj::List{elems}.
+- rd-vm intrinsics: HashMap/WeakHashMap (<init>()V/(I)V/(IF)V/(Map)V, put/get/remove/containsKey/containsValue/size/isEmpty/clear) e ArrayList/LinkedList (<init>, add/add(i)/get/set/remove(i)/remove(obj)/contains/indexOf/size/isEmpty/clear). Estado lazy-defensivo; OOB → IndexOutOfBoundsException materializada; values_equal: Null==Null, String por conteúdo, boxes (Integer/Long/Boolean/Double/Float) por valor, senão identidade — equals de usuário NÃO consultado (limitação documentada). Sem GC na arena ⇒ WeakHashMap ≡ HashMap (documentado).
+- Braços do match só capturam (name,sig) suportados → métodos não cobertos seguem para Object fallback/NOT_FOUND tipado (iterators/entrySet ainda NÃO existem).
+- compat_gaps: java-util-collections not-implemented → partial (sem iteradores; próximo gap real: java.lang.Enum).
+- ROADMAP "M8 sondagem": coleções ✅ + próximo gap honesto (Enum.<init> via EIIE no launch do primftpd).
+- Testes: hash_map_host_intrinsics (put substitui por conteúdo de chave, chave Null, remove/clear) + array_list_host_intrinsics (add/insert/set/remove/indexOf + OOB exceção Java).
+- Re-sondagem app real: WeakHashMap resolvido; launch avança até ExceptionInInitializerError em java.lang.Enum.<init>(String,I) — registrado.
+
+Stage Summary:
+- Workspace: 340 testes passam, 0 falham; gates todos verdes.
+- Sequência de gaps do primftpd: AtomicReference ✅ → WeakHashMap ✅ → Enum (próximo).

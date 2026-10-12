@@ -14,6 +14,17 @@ const OBJECT: &str = "Ljava/lang/Object;";
 /// M8 (compat real): primeiro gap de launch do app real org.primftpd 8.2.
 const ATOMIC_REF: &str = "Ljava/util/concurrent/atomic/AtomicReference;";
 const MATH: &str = "Ljava/lang/Math;";
+/// M8 (compat real): coleções java.util host — segundo gap de launch do
+/// org.primftpd (`WeakHashMap.<init>`). WeakHashMap ≡ HashMap (sem GC na
+/// arena, entradas nunca são limpas — limitação documentada); LinkedList
+/// ≡ ArrayList (mesmo contrato de List para os métodos suportados).
+const HASH_MAP: &str = "Ljava/util/HashMap;";
+const WEAK_MAP: &str = "Ljava/util/WeakHashMap;";
+const ARRAY_LIST: &str = "Ljava/util/ArrayList;";
+const LINKED_LIST: &str = "Ljava/util/LinkedList;";
+const BOOLEAN: &str = "Ljava/lang/Boolean;";
+const DOUBLE: &str = "Ljava/lang/Double;";
+const FLOAT: &str = "Ljava/lang/Float;";
 const INTEGER: &str = "Ljava/lang/Integer;";
 const LONG: &str = "Ljava/lang/Long;";
 const PRINTSTREAM: &str = "Ljava/io/PrintStream;";
@@ -361,6 +372,320 @@ pub fn call_static_intrinsic(
 /// Intrínseco DE INSTÂNCIA (invoke-virtual/direct sobre objetos da VM).
 /// `receiver` já é Some(ref) — NPE foi tratada pelo chamador.
 /// `Ok(None)` = sem intrínseco → dispatch normal no DEX (classe do usuário).
+/// (name, sig) de Map suportados como host (M8).
+fn map_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("<init>", "()V")
+            | ("<init>", "(I)V")
+            | ("<init>", "(IF)V")
+            | ("<init>", "(Ljava/util/Map;)V")
+            | (
+                "put",
+                "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"
+            )
+            | ("get", "(Ljava/lang/Object;)Ljava/lang/Object;")
+            | ("remove", "(Ljava/lang/Object;)Ljava/lang/Object;")
+            | ("containsKey", "(Ljava/lang/Object;)Z")
+            | ("containsValue", "(Ljava/lang/Object;)Z")
+            | ("size", "()I")
+            | ("isEmpty", "()Z")
+            | ("clear", "()V")
+    )
+}
+
+/// (name, sig) de List suportados como host (M8).
+fn list_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("<init>", "()V")
+            | ("<init>", "(I)V")
+            | ("add", "(Ljava/lang/Object;)Z")
+            | ("add", "(ILjava/lang/Object;)V")
+            | ("get", "(I)Ljava/lang/Object;")
+            | ("set", "(ILjava/lang/Object;)Ljava/lang/Object;")
+            | ("remove", "(I)Ljava/lang/Object;")
+            | ("remove", "(Ljava/lang/Object;)Z")
+            | ("contains", "(Ljava/lang/Object;)Z")
+            | ("indexOf", "(Ljava/lang/Object;)I")
+            | ("size", "()I")
+            | ("isEmpty", "()Z")
+            | ("clear", "()V")
+    )
+}
+
+/// Igualdade JAVA para chaves/elementos de coleções (M8): Null==Null;
+/// String por conteúdo; boxes (Integer/Long/Boolean/Double/Float) por valor;
+/// senão identidade de referência (default de Object.equals). Classe de
+/// usuário que sobrescreve equals NÃO é consultada — limitação documentada
+/// em compat_gaps (`java-util-collections`).
+pub fn values_equal(heap: &crate::heap::Heap, a: &Value, b: &Value) -> Result<bool, VmExit> {
+    match (a, b) {
+        (Value::Null, Value::Null) => Ok(true),
+        (Value::Null, _) | (_, Value::Null) => Ok(false),
+        (Value::Int(x), Value::Int(y)) => Ok(x == y),
+        (Value::Long(x), Value::Long(y)) => Ok(x == y),
+        (Value::Obj(x), Value::Obj(y)) => {
+            if x == y {
+                return Ok(true);
+            }
+            let cx = heap.class_of(*x).unwrap_or("");
+            let cy = heap.class_of(*y).unwrap_or("");
+            if cx != cy {
+                return Ok(false);
+            }
+            match cx {
+                STRING => Ok(heap.as_str(*x)? == heap.as_str(*y)?),
+                INTEGER | LONG | BOOLEAN => Ok(heap.get_field(*x, "value")?.as_int()?
+                    == heap.get_field(*y, "value")?.as_int()?),
+                DOUBLE => Ok(heap.get_field(*x, "value")?.as_double()?
+                    == heap.get_field(*y, "value")?.as_double()?),
+                FLOAT => Ok(heap.get_field(*x, "value")?.as_float()?
+                    == heap.get_field(*y, "value")?.as_float()?),
+                _ => Ok(false), // identidade (já comparada acima)
+            }
+        }
+        _ => Ok(false),
+    }
+}
+
+fn map_entries(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+) -> Result<&mut Vec<(Value, Value)>, VmExit> {
+    match vm.fw.objects.get_mut(&recv) {
+        Some(crate::framework::HostObj::Map { entries }) => Ok(entries),
+        _ => Err(
+            crate::err::vm_error("VM_TYPE_ERROR", "coleção java.util sem estado host (Map)").into(),
+        ),
+    }
+}
+
+fn list_elems(vm: &mut Engine, recv: crate::heap::ObjRef) -> Result<&mut Vec<Value>, VmExit> {
+    match vm.fw.objects.get_mut(&recv) {
+        Some(crate::framework::HostObj::List { elems }) => Ok(elems),
+        _ => Err(
+            crate::err::vm_error("VM_TYPE_ERROR", "coleção java.util sem estado host (List)")
+                .into(),
+        ),
+    }
+}
+
+fn find_key(vm: &Engine, recv: crate::heap::ObjRef, key: &Value) -> Result<Option<usize>, VmExit> {
+    let Some(crate::framework::HostObj::Map { entries }) = vm.fw.objects.get(&recv) else {
+        return Ok(None);
+    };
+    for (i, (k, _)) in entries.iter().enumerate() {
+        if values_equal(&vm.heap, k, key)? {
+            return Ok(Some(i));
+        }
+    }
+    Ok(None)
+}
+
+fn find_elem(
+    vm: &Engine,
+    recv: crate::heap::ObjRef,
+    target: &Value,
+) -> Result<Option<usize>, VmExit> {
+    let Some(crate::framework::HostObj::List { elems }) = vm.fw.objects.get(&recv) else {
+        return Ok(None);
+    };
+    for (i, e) in elems.iter().enumerate() {
+        if values_equal(&vm.heap, e, target)? {
+            return Ok(Some(i));
+        }
+    }
+    Ok(None)
+}
+
+fn iobe(msg: String) -> VmExit {
+    VmExit::Exception(Throwable::new("Ljava/lang/IndexOutOfBoundsException;", msg))
+}
+
+/// HashMap/WeakHashMap host (M8). Estado em `HostObj::Map`; sem GC na arena
+/// ⇒ WeakHashMap nunca limpa entradas (comportamento documentado).
+fn map_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    use crate::framework::HostObj;
+    if name == "<init>" {
+        let entries = if sig == "(Ljava/util/Map;)V" {
+            match args.first() {
+                Some(Value::Obj(other)) => match vm.fw.objects.get(other) {
+                    Some(HostObj::Map { entries }) => entries.clone(),
+                    _ => Vec::new(),
+                },
+                _ => Vec::new(),
+            }
+        } else {
+            Vec::new() // capacidade inicial/fator de carga: só performance
+        };
+        vm.fw.objects.insert(recv, HostObj::Map { entries });
+        return Ok(Some(Value::Null));
+    }
+    if !matches!(vm.fw.objects.get(&recv), Some(HostObj::Map { .. })) {
+        // defensivo: instância alocada sem <init> não existe em DEX válido
+        vm.fw.objects.insert(
+            recv,
+            HostObj::Map {
+                entries: Vec::new(),
+            },
+        );
+    }
+    match (name, sig) {
+        ("put", _) => {
+            let k = args[0].clone();
+            let v = args[1].clone();
+            let idx = find_key(vm, recv, &k)?;
+            let entries = map_entries(vm, recv)?;
+            if let Some(i) = idx {
+                let old = std::mem::replace(&mut entries[i].1, v);
+                Ok(Some(old))
+            } else {
+                entries.push((k, v));
+                Ok(Some(Value::Null))
+            }
+        }
+        ("get", _) => {
+            let idx = find_key(vm, recv, &args[0])?;
+            let entries = map_entries(vm, recv)?;
+            Ok(Some(idx.map_or(Value::Null, |i| entries[i].1.clone())))
+        }
+        ("remove", _) => {
+            let idx = find_key(vm, recv, &args[0])?;
+            let entries = map_entries(vm, recv)?;
+            Ok(Some(idx.map_or(Value::Null, |i| entries.remove(i).1)))
+        }
+        ("containsKey", _) => {
+            let found = find_key(vm, recv, &args[0])?.is_some();
+            Ok(Some(Value::Int(found as i32)))
+        }
+        ("containsValue", _) => {
+            // clone pequeno: evita briga de borrow entre fw e heap
+            let snapshot = match map_entries(vm, recv)? {
+                entries => entries.clone(),
+            };
+            let mut found = false;
+            for (_, v) in &snapshot {
+                if values_equal(&vm.heap, v, &args[0])? {
+                    found = true;
+                    break;
+                }
+            }
+            Ok(Some(Value::Int(found as i32)))
+        }
+        ("size", _) => {
+            let n = map_entries(vm, recv)?.len();
+            Ok(Some(Value::Int(n as i32)))
+        }
+        ("isEmpty", _) => {
+            let empty = map_entries(vm, recv)?.is_empty();
+            Ok(Some(Value::Int(empty as i32)))
+        }
+        ("clear", _) => {
+            map_entries(vm, recv)?.clear();
+            Ok(Some(Value::Null))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// ArrayList/LinkedList host (M8). Estado em `HostObj::List`; OOB levanta
+/// IndexOutOfBoundsException materializada (semântica Java).
+fn list_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    use crate::framework::HostObj;
+    if name == "<init>" {
+        vm.fw
+            .objects
+            .insert(recv, HostObj::List { elems: Vec::new() });
+        return Ok(Some(Value::Null));
+    }
+    if !matches!(vm.fw.objects.get(&recv), Some(HostObj::List { .. })) {
+        vm.fw
+            .objects
+            .insert(recv, HostObj::List { elems: Vec::new() });
+    }
+    match (name, sig) {
+        ("add", "(Ljava/lang/Object;)Z") => {
+            list_elems(vm, recv)?.push(args[0].clone());
+            Ok(Some(Value::Int(1))) // ArrayList.add sempre true
+        }
+        ("add", "(ILjava/lang/Object;)V") => {
+            let i = args[0].as_int()?;
+            let elems = list_elems(vm, recv)?;
+            if i < 0 || i as usize > elems.len() {
+                return Err(iobe(format!("add índice {i}, tamanho {}", elems.len())));
+            }
+            elems.insert(i as usize, args[1].clone());
+            Ok(Some(Value::Null))
+        }
+        ("get", _) => {
+            let i = args[0].as_int()?;
+            let elems = list_elems(vm, recv)?;
+            if i < 0 || i as usize >= elems.len() {
+                return Err(iobe(format!("get índice {i}, tamanho {}", elems.len())));
+            }
+            Ok(Some(elems[i as usize].clone()))
+        }
+        ("set", _) => {
+            let i = args[0].as_int()?;
+            let elems = list_elems(vm, recv)?;
+            if i < 0 || i as usize >= elems.len() {
+                return Err(iobe(format!("set índice {i}, tamanho {}", elems.len())));
+            }
+            let old = std::mem::replace(&mut elems[i as usize], args[1].clone());
+            Ok(Some(old))
+        }
+        ("remove", "(I)Ljava/lang/Object;") => {
+            let i = args[0].as_int()?;
+            let elems = list_elems(vm, recv)?;
+            if i < 0 || i as usize >= elems.len() {
+                return Err(iobe(format!("remove índice {i}, tamanho {}", elems.len())));
+            }
+            Ok(Some(elems.remove(i as usize)))
+        }
+        ("remove", "(Ljava/lang/Object;)Z") => {
+            let idx = find_elem(vm, recv, &args[0])?;
+            if let Some(i) = idx {
+                list_elems(vm, recv)?.remove(i);
+            }
+            Ok(Some(Value::Int(idx.is_some() as i32)))
+        }
+        ("contains", _) => {
+            let found = find_elem(vm, recv, &args[0])?.is_some();
+            Ok(Some(Value::Int(found as i32)))
+        }
+        ("indexOf", _) => {
+            let idx = find_elem(vm, recv, &args[0])?;
+            Ok(Some(Value::Int(idx.map_or(-1, |i| i as i32))))
+        }
+        ("size", _) => {
+            let n = list_elems(vm, recv)?.len();
+            Ok(Some(Value::Int(n as i32)))
+        }
+        ("isEmpty", _) => {
+            let empty = list_elems(vm, recv)?.is_empty();
+            Ok(Some(Value::Int(empty as i32)))
+        }
+        ("clear", _) => {
+            list_elems(vm, recv)?.clear();
+            Ok(Some(Value::Null))
+        }
+        _ => Ok(None),
+    }
+}
+
 /// Igualdade de identidade de referências (o `==` do Java sobre refs) — usada
 /// pelo CAS do AtomicReference: Null == Null; Obj(i) == Obj(j) sse i == j.
 /// Valores não-ref (Int/Long/…) nunca são payload de AtomicReference via DEX.
@@ -427,6 +752,16 @@ pub fn call_instance_intrinsic(
                 crate::err::put_field_result(vm.heap.put_field(recv, "value", args[1].clone()))?;
             }
             Ok(Some(cur))
+        }
+
+        // ── coleções java.util (M8) ─────────────────────────────────────────
+        // Só os (name, sig) suportados casam aqui; o resto segue o fluxo
+        // normal (Object fallback / DEX / NOT_FOUND tipado).
+        (c, name, sig) if (c == HASH_MAP || c == WEAK_MAP) && map_supported(name, sig) => {
+            map_intrinsic(vm, recv, name, sig, args)
+        }
+        (c, name, sig) if (c == ARRAY_LIST || c == LINKED_LIST) && list_supported(name, sig) => {
+            list_intrinsic(vm, recv, name, sig, args)
         }
 
         (SB, "<init>", "()V") => {

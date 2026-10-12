@@ -1829,8 +1829,8 @@ impl AgentSession {
             (
                 "java-util-collections",
                 "vm",
-                "not-implemented",
-                "coleções java.util (HashMap/ArrayList/WeakHashMap/…) ainda não são host — launch de app real Kotlin/AndroidX para aí (M8). AtomicReference já é host",
+                "partial",
+                "HashMap/WeakHashMap/ArrayList/LinkedList host com métodos essenciais (put/get/add/remove/size/…); SEM iteradores/entrySet/keySet; equals de usuário não consultado em chaves. Próximo gap real: java.lang.Enum",
             ),
             (
                 "notifications",
