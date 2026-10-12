@@ -194,8 +194,11 @@ certos); configs específicas (land/locale/density) selecionáveis.
    emulados, máximo ≈ 1510 ms; RSS de pico ≈ 27 MB. Tempo emulado =
    `host_ms / cpu_single_thread_factor` (moto-e5 = 0.25 ⇒ ×4) — **estimativa**:
    o fator não modela cache, IO, GPU nem o quota de 1 core.
+6. ✅ **Regime warm real**: `tool_launch` reutiliza o processo (Engine) quando
+   o package já está em execução — sem re-parse do DEX (`ensure_initialized`
+   idempotente, `<clinit>` não repete); o resultado do launch traz `warm`.
+   install/clear/remove continuam matando o processo (launch seguinte é frio).
 
 **Pendente para fechar o M7 (DoD):** gate golden (APKs golden não estão no
-repositório) · medição em Moto E5 real · aquecer o regime warm (hoje
-`tool_launch` recria o `Engine` a cada chamada) · medição do heap do app ·
+repositório) · medição em Moto E5 real · medição do heap do app ·
 workflow de release bloqueante (hoje o gate é um teste de CI).
