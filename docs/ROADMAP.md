@@ -173,8 +173,7 @@ certos); configs específicas (land/locale/density) selecionáveis.
    +4 do `xtask` (fases do ROADMAP, guarda de crates, contagem de suítes).
 
 **Fora do M6 (fica para as próximas rodadas):** `get_coverage` (metade do
-AG-09 que exige instrumentação do interpretador), `run_scenario` com retries e
-hooks (AG-07).
+AG-09 que exige instrumentação do interpretador).
 
 ## ✅ Adiados do M6 concluídos
 
@@ -203,6 +202,23 @@ hooks (AG-07).
 3. ✅ `docs/suite-format.md` (campo + regra 7) e módulo `rd-agent::suite`
    documentados; testes de parse + execução com APK real (estouro falha e
    pula o resto; orçamento folgado passa).
+
+### `run_scenario` com retries e hooks (AG-07)
+
+1. ✅ **Hooks por cenário**: `setup` (roda antes dos passos; falha aborta o
+   cenário — passos e teardown viram `SKIP`) e `teardown` (roda depois dos
+   passos MESMO se falharem — limpeza garantida, best-effort; falha no
+   teardown reprova o cenário). Mesma gramática de passo (`expect`,
+   `timeout_ms`, `retries`); JUnit marca a fase (`[setup 0]`, `[teardown 1]`).
+2. ✅ **Retries por passo**: `retries: N` (inteiro ≥ 0, padrão 0) = N
+   tentativas extras após falha (erro inesperado, asserção ou `STEP_TIMEOUT`);
+   a primeira que passa encerra; tempo = soma das tentativas; log da última;
+   `attempts` anotado no JUnit.
+3. ✅ Validação antes de executar: `retries` negativo/fracionário/texto e
+   hooks que não são listas → `INVALID_SUITE` (exit 64).
+4. ✅ Docs: `docs/suite-format.md` (campos, exemplo, regras 8-9) e módulo
+   `rd-agent::suite`; 8 testes novos (parse, ordem dos hooks, teardown após
+   falha, setup abortando, retries, curto-circuito, JUnit).
 
 ## 🟡 M7 em andamento — passo 1: gate de performance (2026-10)
 
