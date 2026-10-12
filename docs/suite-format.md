@@ -48,7 +48,7 @@ rd test suite.json --json                                 # resumo em JSON (stdo
 - `name` (suíte): obrigatório, não vazio.
 - `scenarios`: lista obrigatória, com pelo menos um cenário.
 - Cenário: `name` e `steps` (pelo menos um passo).
-- Passo: `name` = nome de uma tool MCP (ver `docs/mcp-tools.md`); `arguments` = objeto (opcional, padrão `{}`); `expect` (opcional, padrão `"ok"`).
+- Passo: `name` = nome de uma tool MCP (ver `docs/mcp-tools.md`); `arguments` = objeto (opcional, padrão `{}`); `expect` (opcional, padrão `"ok"`); `timeout_ms` (opcional, inteiro > 0 — orçamento de wall-clock do passo).
 
 ## Regras de execução
 
@@ -61,6 +61,7 @@ rd test suite.json --json                                 # resumo em JSON (stdo
 4. **Passo `"expect": "error:CODIGO"`** passa somente quando a tool falha com exatamente aquele código estável (ex.: `NO_APP`, `NOT_RUNNING`, `INVALID_FORMAT`). Se a tool completar, ou falhar com outro código, o passo falha.
 5. **Primeira falha encerra o cenário.** Os passos seguintes são marcados `SKIP` no JUnit. Os outros cenários continuam.
 6. **Caminhos relativos.** `install.apk` relativo é resolvido a partir da pasta do arquivo de suíte, não do diretório atual. Caminhos com `..` não são reescritos (a policy de sandbox do agente decide).
+7. **`timeout_ms` por passo.** Se presente, o passo tem orçamento de wall-clock: a chamada da tool roda até o fim (não há preempção) e, se o tempo medido exceder o teto, o passo falha com o código estável **`STEP_TIMEOUT`** e os passos seguintes são pulados. Vale mesmo com `expect: "error:…"` — o orçamento é contrato do passo, não da tool. `timeout_ms: 0`, negativo ou não numérico é `INVALID_SUITE` (validação antes de executar).
 
 ## Saída
 

@@ -419,3 +419,20 @@ Stage Summary:
 - Suíte: 325 passam, 0 falham; fmt ok; clippy 0 warnings; links ok; compat-matrix sync; readme_inspect ok.
 - GitHub: branch feat/ag09-get-api-usage → PR.
 - Próximo desta sessão: timeout por passo no executor de suítes (adiado M6) ou AG-07 (retries/hooks).
+
+---
+Task ID: m6-step-timeout
+Agent: Arena Agent Mode (sessão autônoma 2h — iteração C)
+Task: Entregar o adiado do M6 "timeout por passo" no executor de suítes (rd test).
+
+Work Log:
+- Decisão de design: timeout_ms opcional por passo (inteiro > 0), orçamento de WALL-CLOCK medido sem preempção (a chamada completa; o executor reprova com código estável STEP_TIMEOUT se estourar). Vale mesmo com expect:"error:…" (orçamento é contrato do passo). 0/negativo/não numérico → INVALID_SUITE antes de executar (Lei 1).
+- rd-agent::suite: Step.timeout_ms + parse/validação; checagem no run_scenario; docs do módulo.
+- docs/suite-format.md: campo documentado + regra 7.
+- Testes: parse (aceita válido; rejeita 0/-5/"logo") + execução com APK real (timeout_ms=1 → STEP_TIMEOUT falha e pula o resto; 60000 ms → passa inteiro).
+
+Stage Summary:
+- Suíte: 326 passam, 0 falham; fmt ok; clippy 0; links ok; compat-matrix sync.
+- GitHub: branch feat/m6-step-timeout → PR.
+- Adiados do M6 agora entregues: get_api_usage (AG-09 estático) + timeout por passo. Restam: get_coverage (instrumentação, M8+) e AG-07 (retries/hooks).
+- Próximo desta sessão: AG-07 retries/hooks ou avanço do M7 (medição de heap do app no rd perf).

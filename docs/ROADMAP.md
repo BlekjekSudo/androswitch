@@ -174,9 +174,11 @@ certos); configs específicas (land/locale/density) selecionáveis.
 
 **Fora do M6 (fica para as próximas rodadas):** `get_coverage` (metade do
 AG-09 que exige instrumentação do interpretador), `run_scenario` com retries e
-hooks (AG-07), timeout por passo.
+hooks (AG-07).
 
-## ✅ Adiado do M6 concluído — `get_api_usage` (AG-09, metade estática)
+## ✅ Adiados do M6 concluídos
+
+### `get_api_usage` (AG-09, metade estática)
 
 1. ✅ **Tool MCP `get_api_usage [--package]`**: análise ESTÁTICA dos DEX do app
    instalado — tipos `android.*` referenciados (`method_ids`/`field_ids`/
@@ -189,6 +191,18 @@ hooks (AG-07), timeout por passo.
    Activity/setContentView presentes; NO_APP e PACKAGE_NOT_INSTALLED tipados).
 4. Catálogo: 30 → 31 tools (README, `--describe-tools`, `docs/mcp-tools.md`
    regenerada; testes do issue #74 travam a convergência).
+
+### Timeout por passo no executor de suítes
+
+1. ✅ Campo opcional `timeout_ms` (inteiro > 0) por passo da suíte: orçamento
+   de wall-clock. É MEDIÇÃO, não preempção: a chamada completa e o executor
+   reprova o passo com o código estável `STEP_TIMEOUT` se o teto estourar
+   (vale mesmo com `expect: "error:…"`); passos seguintes são pulados.
+2. ✅ Validação antes de executar: `timeout_ms` ausente = sem teto; `0`,
+   negativo ou não numérico → `INVALID_SUITE` (exit 64).
+3. ✅ `docs/suite-format.md` (campo + regra 7) e módulo `rd-agent::suite`
+   documentados; testes de parse + execução com APK real (estouro falha e
+   pula o resto; orçamento folgado passa).
 
 ## 🟡 M7 em andamento — passo 1: gate de performance (2026-10)
 
