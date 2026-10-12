@@ -27,6 +27,10 @@
 //! - `batch` não é aninhado dentro de suíte (mesma regra do próprio batch).
 //! - `timeout_ms` (opcional, > 0) dá orçamento de wall-clock ao passo: estourou
 //!   → falha `STEP_TIMEOUT` (medição, sem preempção) e resto do cenário pulado.
+//! - `retries` (opcional, ≥ 0, AG-07): tentativas extras após falha; a primeira
+//!   tentativa que passa encerra; cada tentativa é julgada de novo.
+//! - Hooks (AG-07): `setup` roda antes dos passos (falha aborta o cenário) e
+//!   `teardown` roda depois mesmo com passos falhos (falha reprova o cenário).
 
 use std::path::{Component, Path, PathBuf};
 use std::time::Instant;
@@ -57,12 +61,41 @@ pub struct Step {
     /// Medido, não preemptivo: a chamada roda até o fim e o executor reprova
     /// o passo se o teto estourar (STEP_TIMEOUT) — ver docs/suite-format.md.
     pub timeout_ms: Option<u64>,
+    /// Tentativas EXTRAS após falha (AG-07). `0` = sem retry (padrão).
+    /// Cada tentativa é julgada de novo (expect + timeout_ms); a primeira
+    /// que passa encerra o retry.
+    pub retries: u32,
+}
+
+/// Fase do passo no cenário (AG-07 — hooks).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Phase {
+    Setup,
+    Step,
+    Teardown,
+}
+
+impl Phase {
+    /// Rótulo humano usado nas mensagens de falha e no log do JUnit.
+    pub fn label(self) -> &'static str {
+        match self {
+            Phase::Setup => "setup",
+            Phase::Step => "passo",
+            Phase::Teardown => "teardown",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scenario {
     pub name: String,
+    /// Hook de abertura (AG-07): roda antes dos passos; falha aqui aborta o
+    /// cenário (passos e teardown são pulados).
+    pub setup: Vec<Step>,
     pub steps: Vec<Step>,
+    /// Hook de fechamento (AG-07): roda mesmo se os passos falharem
+    /// (limpeza garantida); falha aqui reprova o cenário.
+    pub teardown: Vec<Step>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -81,11 +114,15 @@ pub enum StepStatus {
 #[derive(Debug, Clone, PartialEq)]
 pub struct StepOutcome {
     pub index: usize,
+    /// Fase do passo (AG-07): setup, passo normal ou teardown.
+    pub phase: Phase,
     pub tool: String,
     pub status: StepStatus,
     pub elapsed_ms: u128,
     /// Resultado cru da tool (texto), para o log do JUnit.
     pub output: String,
+    /// Tentativas executadas (AG-07): 1 sem retry; `0` se pulado.
+    pub attempts: u32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -199,17 +236,45 @@ pub fn parse_suite(text: &str) -> Result<Suite, RdError> {
         }
         let mut steps = Vec::with_capacity(steps_arr.len());
         for (pi, pv) in steps_arr.iter().enumerate() {
-            steps.push(parse_step(&sname, pi, pv)?);
+            steps.push(parse_step(&sname, "passo", pi, pv)?);
         }
-        scenarios.push(Scenario { name: sname, steps });
+        // hooks (AG-07): opcionais, mesma gramática dos passos
+        let setup = parse_hook(&sname, "setup", so.get("setup"))?;
+        let teardown = parse_hook(&sname, "teardown", so.get("teardown"))?;
+        scenarios.push(Scenario {
+            name: sname,
+            setup,
+            steps,
+            teardown,
+        });
     }
     Ok(Suite { name, scenarios })
 }
 
-fn parse_step(scenario: &str, pi: usize, pv: &Value) -> Result<Step, RdError> {
+/// Parse de um hook (`setup`/`teardown`): ausente → vazio; presente precisa
+/// ser lista de passos (pode ser vazia).
+fn parse_hook(scenario: &str, phase: &str, v: Option<&Value>) -> Result<Vec<Step>, RdError> {
+    match v {
+        None => Ok(Vec::new()),
+        Some(arr) => {
+            let arr = arr.as_array().ok_or_else(|| {
+                invalid(
+                    format!("cenário {scenario:?}: {phase:?} não é lista"),
+                    &format!("{phase} é uma lista de passos (ou omita o campo)"),
+                )
+            })?;
+            arr.iter()
+                .enumerate()
+                .map(|(pi, pv)| parse_step(scenario, phase, pi, pv))
+                .collect()
+        }
+    }
+}
+
+fn parse_step(scenario: &str, phase: &str, pi: usize, pv: &Value) -> Result<Step, RdError> {
     let po = pv.as_object().ok_or_else(|| {
         invalid(
-            format!("{scenario:?} passo {pi} não é objeto"),
+            format!("{scenario:?} {phase} {pi} não é objeto"),
             "cada passo é {\"name\": …, \"arguments\": {…}}",
         )
     })?;
@@ -219,14 +284,14 @@ fn parse_step(scenario: &str, pi: usize, pv: &Value) -> Result<Step, RdError> {
         .filter(|n| !n.trim().is_empty())
         .ok_or_else(|| {
             invalid(
-                format!("{scenario:?} passo {pi} sem \"name\""),
+                format!("{scenario:?} {phase} {pi} sem \"name\""),
                 "informe o nome da tool",
             )
         })?
         .to_string();
     if name == "batch" {
         return Err(invalid(
-            format!("{scenario:?} passo {pi}: batch não pode ser usado dentro de suíte"),
+            format!("{scenario:?} {phase} {pi}: batch não pode ser usado dentro de suíte"),
             "chame as tools diretamente como passos",
         ));
     }
@@ -235,7 +300,7 @@ fn parse_step(scenario: &str, pi: usize, pv: &Value) -> Result<Step, RdError> {
         Some(a) if a.is_object() => a.clone(),
         Some(_) => {
             return Err(invalid(
-                format!("{scenario:?} passo {pi} ({name}): \"arguments\" precisa ser objeto"),
+                format!("{scenario:?} {phase} {pi} ({name}): \"arguments\" precisa ser objeto"),
                 "use {\"arguments\": {…}} ou omita o campo",
             ))
         }
@@ -244,7 +309,7 @@ fn parse_step(scenario: &str, pi: usize, pv: &Value) -> Result<Step, RdError> {
         None => Expect::Ok,
         Some(e) => parse_expect(e).ok_or_else(|| {
             invalid(
-                format!("{scenario:?} passo {pi} ({name}): \"expect\" inválido: {e}"),
+                format!("{scenario:?} {phase} {pi} ({name}): \"expect\" inválido: {e}"),
                 "use \"ok\" ou \"error:CODIGO_ESTAVEL\" (ex.: \"error:INVALID_FORMAT\")",
             )
         })?,
@@ -254,18 +319,32 @@ fn parse_step(scenario: &str, pi: usize, pv: &Value) -> Result<Step, RdError> {
         Some(t) => {
             let ms = t.as_u64().filter(|v| *v > 0).ok_or_else(|| {
                 invalid(
-                    format!("{scenario:?} passo {pi} ({name}): \"timeout_ms\" inválido: {t}"),
+                    format!("{scenario:?} {phase} {pi} ({name}): \"timeout_ms\" inválido: {t}"),
                     "use um inteiro > 0 (milissegundos) ou omita o campo",
                 )
             })?;
             Some(ms)
         }
     };
+    // AG-07: retries — tentativas extras após falha (0 = padrão)
+    let retries = match po.get("retries") {
+        None => 0,
+        Some(r) => r
+            .as_u64()
+            .and_then(|v| u32::try_from(v).ok())
+            .ok_or_else(|| {
+                invalid(
+                    format!("{scenario:?} {phase} {pi} ({name}): \"retries\" inválido: {r}"),
+                    "use um inteiro ≥ 0 (tentativas extras) ou omita o campo",
+                )
+            })?,
+    };
     Ok(Step {
         name,
         arguments,
         expect,
         timeout_ms,
+        retries,
     })
 }
 
@@ -314,102 +393,186 @@ fn soft_failure(tool: &str, parsed: &Value) -> Option<String> {
     Some(format!("resultado {shown}"))
 }
 
-/// Executa um cenário numa sessão nova. Para na primeira falha.
+/// Uma tentativa do passo: chama a tool e julga o resultado (expect +
+/// timeout_ms). Devolve status, texto bruto e tempo da tentativa.
+fn attempt_step(
+    session: &mut AgentSession,
+    step: &Step,
+    base: &Path,
+    phase: Phase,
+    i: usize,
+) -> (StepStatus, String, u128) {
+    let label = phase.label();
+    let t0 = Instant::now();
+    let args = resolve_args(&step.name, &step.arguments, base);
+    let r = session.call_tool(&step.name, &args);
+    let text = match r.content.first() {
+        Some(ToolContent::Text(t)) => t.clone(),
+        Some(ToolContent::Image { mime, .. }) => format!("<imagem {mime}>"),
+        None => String::new(),
+    };
+    let parsed: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
+    let code = parsed
+        .get("code")
+        .and_then(|c| c.as_str())
+        .unwrap_or("")
+        .to_string();
+    let cause = parsed
+        .get("cause")
+        .and_then(|c| c.as_str())
+        .map(str::to_string)
+        .unwrap_or_else(|| text.clone());
+
+    let soft = if r.is_error {
+        None
+    } else {
+        soft_failure(&step.name, &parsed)
+    };
+    let elapsed_ms = t0.elapsed().as_millis();
+    // adiado M6: orçamento de wall-clock por passo. É medição, não
+    // preempção — a chamada completou, mas estourou o teto: o passo é
+    // reprovado com código estável STEP_TIMEOUT (vale mesmo com `expect:
+    // error:…`, pois o orçamento é contrato do passo, não da tool).
+    let timed_out = step.timeout_ms.is_some_and(|t| elapsed_ms > u128::from(t));
+    let status = if timed_out {
+        StepStatus::Failed(format!(
+            "{label} {i} ({}): STEP_TIMEOUT: {elapsed_ms} ms excedeu timeout_ms={} (a chamada completou, mas estourou o orçamento do passo)",
+            step.name,
+            step.timeout_ms.unwrap_or(0)
+        ))
+    } else {
+        match (&step.expect, r.is_error) {
+            // asserções do MCP respondem isError=false com "ok": false (ou
+            // "found": false) quando a condição NÃO se confirma. Para um
+            // executor de testes isso é falha — senão toda asserção errada
+            // passaria em verde.
+            (Expect::Ok, false) if soft.is_some() => StepStatus::Failed(format!(
+                "{label} {i} ({}): asserção falhou: {}",
+                step.name,
+                soft.clone().unwrap_or_default()
+            )),
+            (Expect::Ok, false) => StepStatus::Passed,
+            (Expect::Ok, true) => StepStatus::Failed(format!(
+                "{label} {i} ({}): esperado ok, obtido erro {}: {}",
+                step.name,
+                if code.is_empty() { "?" } else { &code },
+                cause
+            )),
+            (Expect::Error(want), true) if *want == code => StepStatus::Passed,
+            (Expect::Error(want), true) => StepStatus::Failed(format!(
+                "{label} {i} ({}): esperado erro {want}, obtido {}: {}",
+                step.name,
+                if code.is_empty() { "?" } else { &code },
+                cause
+            )),
+            (Expect::Error(want), false) => StepStatus::Failed(format!(
+                "{label} {i} ({}): esperado erro {want}, mas a tool completou sem erro",
+                step.name
+            )),
+        }
+    };
+    (status, text, elapsed_ms)
+}
+
+/// Executa um passo com retries (AG-07): até `1 + retries` tentativas; a
+/// primeira que passa encerra. `elapsed_ms` é a soma das tentativas;
+/// `output`/mensagem de falha são da última tentativa executada.
+fn run_step(
+    session: &mut AgentSession,
+    step: &Step,
+    base: &Path,
+    phase: Phase,
+    i: usize,
+) -> StepOutcome {
+    let mut total_ms: u128 = 0;
+    let mut attempts: u32 = 0;
+    let last;
+    loop {
+        attempts += 1;
+        let (status, text, ms) = attempt_step(session, step, base, phase, i);
+        total_ms += ms;
+        let passed = matches!(status, StepStatus::Passed);
+        if passed || u64::from(attempts) > u64::from(step.retries) {
+            last = (status, text);
+            break;
+        }
+    }
+    StepOutcome {
+        index: i,
+        phase,
+        tool: step.name.clone(),
+        status: last.0,
+        elapsed_ms: total_ms,
+        output: last.1,
+        attempts,
+    }
+}
+
+fn skipped(phase: Phase, i: usize, step: &Step) -> StepOutcome {
+    StepOutcome {
+        index: i,
+        phase,
+        tool: step.name.clone(),
+        status: StepStatus::Skipped,
+        elapsed_ms: 0,
+        output: String::new(),
+        attempts: 0,
+    }
+}
+
+/// Executa um cenário numa sessão nova: `setup` → passos → `teardown`.
+/// Primeira falha em setup/passos pula o resto da fase; teardown roda mesmo
+/// com passos falhos (limpeza garantida, best-effort) e só é pulado se o
+/// próprio setup falhou.
 pub fn run_scenario(scenario: &Scenario, base: &Path) -> ScenarioOutcome {
     let started = Instant::now();
     let mut session = AgentSession::new();
-    let mut steps = Vec::with_capacity(scenario.steps.len());
+    let mut steps =
+        Vec::with_capacity(scenario.setup.len() + scenario.steps.len() + scenario.teardown.len());
     let mut failure: Option<String> = None;
 
-    for (i, step) in scenario.steps.iter().enumerate() {
+    // setup (AG-07): falha aqui aborta o cenário inteiro
+    for (i, step) in scenario.setup.iter().enumerate() {
         if failure.is_some() {
-            steps.push(StepOutcome {
-                index: i,
-                tool: step.name.clone(),
-                status: StepStatus::Skipped,
-                elapsed_ms: 0,
-                output: String::new(),
-            });
+            steps.push(skipped(Phase::Setup, i, step));
             continue;
         }
-        let t0 = Instant::now();
-        let args = resolve_args(&step.name, &step.arguments, base);
-        let r = session.call_tool(&step.name, &args);
-        let text = match r.content.first() {
-            Some(ToolContent::Text(t)) => t.clone(),
-            Some(ToolContent::Image { mime, .. }) => format!("<imagem {mime}>"),
-            None => String::new(),
-        };
-        let parsed: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
-        let code = parsed
-            .get("code")
-            .and_then(|c| c.as_str())
-            .unwrap_or("")
-            .to_string();
-        let cause = parsed
-            .get("cause")
-            .and_then(|c| c.as_str())
-            .map(str::to_string)
-            .unwrap_or_else(|| text.clone());
-
-        let soft = if r.is_error {
-            None
-        } else {
-            soft_failure(&step.name, &parsed)
-        };
-        let elapsed_ms = t0.elapsed().as_millis();
-        // adiado M6: orçamento de wall-clock por passo. É medição, não
-        // preempção — a chamada completou, mas estourou o teto: o passo é
-        // reprovado com código estável STEP_TIMEOUT (vale mesmo com `expect:
-        // error:…`, pois o orçamento é contrato do passo, não da tool).
-        let timed_out = step.timeout_ms.is_some_and(|t| elapsed_ms > u128::from(t));
-        let status = if timed_out {
-            StepStatus::Failed(format!(
-                "passo {i} ({}): STEP_TIMEOUT: {elapsed_ms} ms excedeu timeout_ms={} (a chamada completou, mas estourou o orçamento do passo)",
-                step.name,
-                step.timeout_ms.unwrap_or(0)
-            ))
-        } else {
-            match (&step.expect, r.is_error) {
-                // asserções do MCP respondem isError=false com "ok": false (ou
-                // "found": false) quando a condição NÃO se confirma. Para um
-                // executor de testes isso é falha — senão toda asserção errada
-                // passaria em verde.
-                (Expect::Ok, false) if soft.is_some() => StepStatus::Failed(format!(
-                    "passo {i} ({}): asserção falhou: {}",
-                    step.name,
-                    soft.clone().unwrap_or_default()
-                )),
-                (Expect::Ok, false) => StepStatus::Passed,
-                (Expect::Ok, true) => StepStatus::Failed(format!(
-                    "passo {i} ({}): esperado ok, obtido erro {}: {}",
-                    step.name,
-                    if code.is_empty() { "?" } else { &code },
-                    cause
-                )),
-                (Expect::Error(want), true) if *want == code => StepStatus::Passed,
-                (Expect::Error(want), true) => StepStatus::Failed(format!(
-                    "passo {i} ({}): esperado erro {want}, obtido {}: {}",
-                    step.name,
-                    if code.is_empty() { "?" } else { &code },
-                    cause
-                )),
-                (Expect::Error(want), false) => StepStatus::Failed(format!(
-                    "passo {i} ({}): esperado erro {want}, mas a tool completou sem erro",
-                    step.name
-                )),
-            }
-        };
-        if let StepStatus::Failed(msg) = &status {
+        let out = run_step(&mut session, step, base, Phase::Setup, i);
+        if let StepStatus::Failed(msg) = &out.status {
             failure = Some(msg.clone());
         }
-        steps.push(StepOutcome {
-            index: i,
-            tool: step.name.clone(),
-            status,
-            elapsed_ms,
-            output: text,
-        });
+        steps.push(out);
+    }
+    let setup_ok = failure.is_none();
+
+    // passos: primeira falha encerra a fase
+    for (i, step) in scenario.steps.iter().enumerate() {
+        if !setup_ok || failure.is_some() {
+            steps.push(skipped(Phase::Step, i, step));
+            continue;
+        }
+        let out = run_step(&mut session, step, base, Phase::Step, i);
+        if let StepStatus::Failed(msg) = &out.status {
+            failure = Some(msg.clone());
+        }
+        steps.push(out);
+    }
+
+    // teardown (AG-07): roda mesmo com passos falhos; cada passo de teardown
+    // é executado (best-effort — um não pula os outros); falha aqui reprova
+    // o cenário se ele ainda não falhou.
+    for (i, step) in scenario.teardown.iter().enumerate() {
+        if !setup_ok {
+            steps.push(skipped(Phase::Teardown, i, step));
+            continue;
+        }
+        let out = run_step(&mut session, step, base, Phase::Teardown, i);
+        if let StepStatus::Failed(msg) = &out.status {
+            if failure.is_none() {
+                failure = Some(msg.clone());
+            }
+        }
+        steps.push(out);
     }
 
     ScenarioOutcome {
@@ -487,9 +650,20 @@ pub fn to_junit_xml(report: &SuiteReport) -> String {
                 StepStatus::Failed(m) => format!("FAIL {m}"),
                 StepStatus::Skipped => "SKIP".to_string(),
             };
+            // AG-07: passos de hook ganham prefixo de fase; retries > 1 são
+            // anotados. O formato do passo normal ([i] tool …) não muda.
+            let prefix = match st.phase {
+                Phase::Step => format!("{}", st.index),
+                p => format!("{} {}", p.label(), st.index),
+            };
+            let tries = if st.attempts > 1 {
+                format!(", {} tentativas", st.attempts)
+            } else {
+                String::new()
+            };
             log.push_str(&format!(
-                "[{}] {} {} ({} ms)\n",
-                st.index, st.tool, tag, st.elapsed_ms
+                "[{prefix}] {} {} ({} ms{tries})\n",
+                st.tool, tag, st.elapsed_ms
             ));
             if !st.output.is_empty() {
                 log.push_str(&st.output);
@@ -564,6 +738,10 @@ mod tests {
         assert_eq!(s.name, "demo");
         assert_eq!(s.scenarios[0].steps[0].expect, Expect::Ok);
         assert_eq!(s.scenarios[0].steps[0].timeout_ms, None);
+        // AG-07: padrões — sem retries, sem hooks
+        assert_eq!(s.scenarios[0].steps[0].retries, 0);
+        assert!(s.scenarios[0].setup.is_empty());
+        assert!(s.scenarios[0].teardown.is_empty());
         assert_eq!(
             s.scenarios[0].steps[1].expect,
             Expect::Error("NO_APP".into())
@@ -575,6 +753,131 @@ mod tests {
         )
         .unwrap();
         assert_eq!(s.scenarios[0].steps[0].timeout_ms, Some(500));
+        // AG-07: retries e hooks válidos são aceitos (mesma gramática de passo)
+        let s = parse_suite(
+            r#"{"name": "t", "scenarios": [{"name": "c",
+                "setup": [{"name": "install", "arguments": {"apk": "a.apk"}}],
+                "steps": [{"name": "launch", "retries": 3, "timeout_ms": 100}],
+                "teardown": [{"name": "package_clear", "expect": "error:NO_APP"}]}]}"#,
+        )
+        .unwrap();
+        assert_eq!(s.scenarios[0].setup.len(), 1);
+        assert_eq!(s.scenarios[0].steps[0].retries, 3);
+        assert_eq!(s.scenarios[0].steps[0].timeout_ms, Some(100));
+        assert_eq!(
+            s.scenarios[0].teardown[0].expect,
+            Expect::Error("NO_APP".into())
+        );
+    }
+
+    /// AG-07: teardown roda mesmo depois de falha nos passos (limpeza
+    /// garantida) e a falha registrada continua sendo a do passo.
+    #[test]
+    fn teardown_runs_even_after_step_failure() {
+        let suite = parse_suite(
+            r#"{"name": "hooks", "scenarios": [{"name": "c",
+                "setup": [{"name": "device_profile"}],
+                "steps": [{"name": "launch"}],
+                "teardown": [{"name": "device_profile"}]}]}"#,
+        )
+        .unwrap();
+        let out = run_scenario(&suite.scenarios[0], Path::new("."));
+        assert!(!out.passed);
+        assert_eq!(out.steps.len(), 3);
+        assert_eq!(out.steps[0].phase, Phase::Setup);
+        assert!(matches!(out.steps[0].status, StepStatus::Passed));
+        assert_eq!(out.steps[1].phase, Phase::Step);
+        assert!(matches!(out.steps[1].status, StepStatus::Failed(_)));
+        assert_eq!(out.steps[2].phase, Phase::Teardown);
+        assert!(
+            matches!(out.steps[2].status, StepStatus::Passed),
+            "teardown não é pulado por falha nos passos: {:?}",
+            out.steps[2].status
+        );
+        assert!(out.failure.unwrap().contains("passo 0 (launch)"));
+    }
+
+    /// AG-07: falha no teardown reprova um cenário cujos passos passaram.
+    #[test]
+    fn teardown_failure_fails_a_passed_scenario() {
+        let suite = parse_suite(
+            r#"{"name": "hooks", "scenarios": [{"name": "c",
+                "steps": [{"name": "device_profile"}],
+                "teardown": [{"name": "launch"}]}]}"#,
+        )
+        .unwrap();
+        let out = run_scenario(&suite.scenarios[0], Path::new("."));
+        assert!(!out.passed);
+        assert!(matches!(out.steps[0].status, StepStatus::Passed));
+        let msg = out.failure.unwrap();
+        assert!(msg.contains("teardown 0 (launch)"), "{msg}");
+    }
+
+    /// AG-07: falha no setup aborta o cenário — passos e teardown pulados.
+    #[test]
+    fn setup_failure_skips_steps_and_teardown() {
+        let suite = parse_suite(
+            r#"{"name": "hooks", "scenarios": [{"name": "c",
+                "setup": [{"name": "launch"}],
+                "steps": [{"name": "device_profile"}],
+                "teardown": [{"name": "device_profile"}]}]}"#,
+        )
+        .unwrap();
+        let out = run_scenario(&suite.scenarios[0], Path::new("."));
+        assert!(!out.passed);
+        assert!(out.failure.clone().unwrap().contains("setup 0 (launch)"));
+        assert_eq!(out.steps[1].phase, Phase::Step);
+        assert_eq!(out.steps[1].status, StepStatus::Skipped);
+        assert_eq!(out.steps[2].phase, Phase::Teardown);
+        assert_eq!(out.steps[2].status, StepStatus::Skipped);
+    }
+
+    /// AG-07: retries — passo que falha executa 1+retries tentativas; depois
+    /// da falha final o cenário segue a regra normal (resto pulado).
+    #[test]
+    fn retries_rerun_the_failed_step() {
+        let suite = parse_suite(
+            r#"{"name": "retries", "scenarios": [{"name": "c", "steps": [
+                {"name": "launch", "retries": 2},
+                {"name": "device_profile"}]}]}"#,
+        )
+        .unwrap();
+        let out = run_scenario(&suite.scenarios[0], Path::new("."));
+        assert!(!out.passed);
+        assert_eq!(out.steps[0].attempts, 3, "1 + retries tentativas");
+        assert!(matches!(out.steps[0].status, StepStatus::Failed(_)));
+        assert_eq!(out.steps[1].status, StepStatus::Skipped);
+        assert_eq!(out.steps[1].attempts, 0);
+    }
+
+    /// AG-07: passo que passa não retrya (curto-circuito na 1ª tentativa).
+    #[test]
+    fn success_does_not_retry() {
+        let suite = parse_suite(
+            r#"{"name": "retries", "scenarios": [{"name": "c", "steps": [
+                {"name": "device_profile", "retries": 4}]}]}"#,
+        )
+        .unwrap();
+        let out = run_scenario(&suite.scenarios[0], Path::new("."));
+        assert!(out.passed, "{:?}", out.failure);
+        assert_eq!(out.steps[0].attempts, 1);
+    }
+
+    /// AG-07: o log do JUnit marca a fase dos hooks e anota retries.
+    #[test]
+    fn junit_log_marks_hook_phase_and_retries() {
+        let suite = parse_suite(
+            r#"{"name": "hooks", "scenarios": [{"name": "c",
+                "setup": [{"name": "device_profile"}],
+                "steps": [{"name": "launch", "retries": 1}],
+                "teardown": [{"name": "device_profile"}]}]}"#,
+        )
+        .unwrap();
+        let report = run_suite(&suite, Path::new("."));
+        let xml = to_junit_xml(&report);
+        assert!(xml.contains("[setup 0] device_profile PASS"), "{xml}");
+        assert!(xml.contains("2 tentativas"), "{xml}");
+        assert!(xml.contains("[teardown 0] device_profile PASS"), "{xml}");
     }
 
     /// APK mínimo (1 classe) para os testes de timeout por passo.
@@ -697,6 +1000,28 @@ mod tests {
             (
                 r#"{"name": "x", "scenarios": [{"name": "c", "steps": [{"name": "tap", "timeout_ms": "logo"}]}]}"#,
                 "timeout_ms",
+            ),
+            // AG-07: retries precisa ser inteiro ≥ 0
+            (
+                r#"{"name": "x", "scenarios": [{"name": "c", "steps": [{"name": "tap", "retries": -1}]}]}"#,
+                "retries",
+            ),
+            (
+                r#"{"name": "x", "scenarios": [{"name": "c", "steps": [{"name": "tap", "retries": 1.5}]}]}"#,
+                "retries",
+            ),
+            (
+                r#"{"name": "x", "scenarios": [{"name": "c", "steps": [{"name": "tap", "retries": "muitas"}]}]}"#,
+                "retries",
+            ),
+            // AG-07: hooks precisam ser listas de passos válidos
+            (
+                r#"{"name": "x", "scenarios": [{"name": "c", "steps": [{"name": "tap"}], "setup": {}}]}"#,
+                "setup",
+            ),
+            (
+                r#"{"name": "x", "scenarios": [{"name": "c", "steps": [{"name": "tap"}], "teardown": [{"name": "batch"}]}]}"#,
+                "batch",
             ),
         ];
         for (text, needle) in cases {

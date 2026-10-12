@@ -453,3 +453,20 @@ Stage Summary:
 - Workspace: 331 testes passam, 0 falham; fmt ok; clippy 0; links ok; compat-matrix sync; readme_inspect ok.
 - DoD do M7 restante: gate golden (APKs fora do repo), Moto E5 real, workflow de release.
 - Próximo: AG-07 (retries/hooks no run_scenario) — última pendência do M6.
+
+---
+Task ID: ag07-retries-hooks
+Agent: Arena Agent Mode (sessão autônoma 2h — iteração E)
+Task: AG-07 — run_scenario com retries e hooks (última pendência do M6 além de get_coverage).
+
+Work Log:
+- Design: hooks por cenário (setup roda antes; falha aborta cenário — passos/teardown SKIP. teardown roda depois MESMO com passos falhos, best-effort; falha reprova o cenário) + retries por passo (N tentativas extras após falha; primeira que passa encerra; tempo = soma; log da última; attempts anotado).
+- suite.rs: enum Phase{Setup,Step,Teardown}; Step.retries; Scenario.setup/teardown; StepOutcome.phase/attempts; attempt_step + run_step (loop de tentativas) + skipped; run_scenario em 3 fases; parse_hook + retries no parse_step (inteiro ≥ 0 senão INVALID_SUITE); JUnit com prefixo de fase e "(N tentativas)".
+- Tests: 5 casos malformed novos (retries -1/1.5/"muitas"; setup não-lista; batch no teardown); parse defaults+hooks; 6 testes de execução (teardown após falha; teardown falho reprova; setup aborta; retries=2 → attempts 3; sucesso curto-circuita; JUnit marca fase/retries).
+- Docs: suite-format.md (campos, exemplo com hooks+retry, regras 8-9, "Limites atuais" corrigido — removidas linhas obsoletas de timeout/AG-07, defeito de doc da iteração C); ROADMAP (Fora do M6 só get_coverage; nova seção AG-07 ✅).
+- Smoke real via CLI: suíte com setup/steps(expect NO_APP+retries)/teardown → PASS; cenário com teardown falho → FAIL "teardown 0 (launch)"; exit 1; JUnit com [setup 0]/[teardown 0].
+
+Stage Summary:
+- Workspace: 335 testes passam, 0 falham; fmt ok; clippy 0; links ok; compat-matrix sync; readme_inspect ok.
+- M6: pendente só get_coverage (AG-09, instrumentação — M8+). M7: pendente gate golden, Moto E5 real, workflow de release.
+- Próximo desta sessão: revisar superfície restante (docs/README coerência) ou M7 passo 2 (medições adicionais).
