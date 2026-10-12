@@ -10,4 +10,5 @@
 //! Crate de DEV-DEPENDENCY: nunca é dependência de runtime dos crates.
 
 pub mod apkfix;
+pub mod trivial_app;
 pub mod vm;

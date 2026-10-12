@@ -7,6 +7,7 @@
 //! - `rd behavior`           — comutadores por targetSdk 26→36
 //! - `rd dex summary|disasm` — parser DEX 100% + disassembler smali (DoD do M1)
 //! - `rd vm exec`            — interpretador Dalvik mínimo (DoD do M2: métodos puros)
+//! - `rd perf <apk>`         — gate de performance (M7): startup cold/warm e RSS no piso moto-e5
 //!
 //! Códigos de saída (contrato API pública — issue #34):
 //! 0 ok · 1 erro estruturado · 2 NOT_IMPLEMENTED · 4 erro estruturado da VM
@@ -19,6 +20,8 @@ use rd_framework::fd_behavior::SwitchTable;
 use rd_framework::fd_devices::DeviceTable;
 use rd_framework::fd_permissions::{GrantState, PermissionEngine, PermissionTable};
 use rd_framework::DeviceProfile;
+mod perf;
+
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -75,6 +78,21 @@ enum Cmd {
     Dex {
         #[command(subcommand)]
         sub: DexSub,
+    },
+    /// Gate de performance (M7, PRF-06): startup cold/warm e RSS no perfil
+    /// de device (estimativa por fator de CPU; heap do app não medido)
+    Perf {
+        /// APK a medir (dentro das raízes do sandbox: cwd ou temp)
+        apk: PathBuf,
+        /// Perfil de device (ex.: moto-e5)
+        #[arg(long, default_value = "moto-e5")]
+        device: String,
+        /// Execuções por regime (cold e warm)
+        #[arg(long, default_value_t = 3)]
+        runs: u32,
+        /// Saída em JSON (contrato do agente)
+        #[arg(long)]
+        json: bool,
     },
     /// VM Dalvik mínima (M2): executa métodos static puros de APK/DEX real
     Vm {
@@ -401,6 +419,33 @@ fn run(cli: Cli) -> i32 {
             // nele (o app roteia saída para o buffer da sessão, ADR 001).
             // O erro sai pelo caminho padrão do contrato (JSON no stderr).
             rd_agent::mcp::serve_stdio(std::io::stdin(), std::io::stdout())
+        }
+        Cmd::Perf {
+            apk,
+            device,
+            runs,
+            json,
+        } => {
+            // exit 0 = passou · 1 = orçamento falhou ou erro de execução
+            return match dd
+                .require("devices.toml")
+                .and_then(|()| DeviceTable::load(dd.path.as_deref()))
+                .and_then(|table| {
+                    table.get(device).cloned().ok_or_else(|| {
+                        RdError::missing_entry(format!("device profile {device:?}"))
+                            .with_suggestion("run `rd device list`")
+                    })
+                })
+                .and_then(|profile| perf::cmd_perf(apk, &profile, *runs, *json))
+            {
+                Ok(true) => 0,
+                Ok(false) => 1,
+                Err(e) => {
+                    let mut stderr = std::io::stderr();
+                    let _ = writeln!(stderr, "{}", to_json(&e));
+                    1
+                }
+            };
         }
         // `rd test` devolve código de saída próprio (0/1/64): tratado acima
         Cmd::Test { .. } => unreachable!("rd test é despachado antes deste match"),
