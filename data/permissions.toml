@@ -1088,10 +1088,18 @@ since_api = 1
 flags = []
 description = "Write subscribed feeds (legacy, deprecated)."
 
-# ==================== B5 — SIGNATURE / SYSTEM (concedidas para o app em análise) ====================
-# issue #68: a documentação do Android define protectionLevel
-# signature|privileged|development; a entrada antiga (B4/normal, sem flags)
-# auto-concedia a permissão a apps de terceiros, o que o sistema real nega.
+# ==================== B5 — SIGNATURE / SYSTEM ====================
+# Decisão issue #110 (documentada em RustyDroid.md, Apêndice B5): a lista B5
+# da spec é uma WHITELIST — só as entradas com a flag `b5` são concedidas ao
+# app em análise (o runtime se posiciona como system; marcador
+# runtime-is-system). Signature-class FORA da whitelist (ex.: BATTERY_STATS)
+# recebe estado denied_system: o Android real nega a apps de terceiros e a
+# sessão não a concede.
+#
+# issue #68: a documentação do Android define BATTERY_STATS como
+# protectionLevel signature|privileged|development; a entrada antiga
+# (B4/normal, sem flags) auto-concedia a permissão a apps de terceiros, o que
+# o sistema real nega. Por isso ela NÃO carrega a flag b5.
 [[permission]]
 name = "BATTERY_STATS"
 level = "signature"
@@ -1105,7 +1113,7 @@ name = "BIND_DEVICE_ADMIN"
 level = "signature"
 group = ""
 since_api = 8
-flags = []
+flags = ["b5"]
 description = "Allow binding to the device administration service interface."
 
 [[permission]]
@@ -1113,7 +1121,7 @@ name = "BIND_INPUT_METHOD"
 level = "signature"
 group = ""
 since_api = 3
-flags = []
+flags = ["b5"]
 description = "Allow binding to the input method service interface."
 
 [[permission]]
@@ -1121,7 +1129,7 @@ name = "BIND_NOTIFICATION_LISTENER_SERVICE"
 level = "signature"
 group = ""
 since_api = 18
-flags = []
+flags = ["b5"]
 description = "Allow binding to the notification listener service interface."
 
 [[permission]]
@@ -1129,7 +1137,7 @@ name = "BIND_TELECOM_CONNECTION_SERVICE"
 level = "signature"
 group = ""
 since_api = 23
-flags = []
+flags = ["b5"]
 description = "Allow binding to telecom ConnectionService implementations."
 
 [[permission]]
@@ -1137,7 +1145,7 @@ name = "BIND_VOICE_INTERACTION"
 level = "signature"
 group = ""
 since_api = 21
-flags = []
+flags = ["b5"]
 description = "Allow binding to voice interaction services (assistant)."
 
 [[permission]]
@@ -1145,7 +1153,7 @@ name = "BIND_VPN_SERVICE"
 level = "signature"
 group = ""
 since_api = 14
-flags = []
+flags = ["b5"]
 description = "Allow binding to VPN service implementations."
 
 [[permission]]
@@ -1153,7 +1161,7 @@ name = "BIND_WALLPAPER"
 level = "signature"
 group = ""
 since_api = 7
-flags = []
+flags = ["b5"]
 description = "Allow binding to live wallpaper services."
 
 [[permission]]
@@ -1161,7 +1169,7 @@ name = "BIND_DREAM_SERVICE"
 level = "signature"
 group = ""
 since_api = 21
-flags = []
+flags = ["b5"]
 description = "Allow binding to dream (screensaver) services."
 
 [[permission]]
@@ -1169,7 +1177,7 @@ name = "BIND_APPWIDGET"
 level = "signature"
 group = ""
 since_api = 3
-flags = []
+flags = ["b5"]
 description = "Allow binding to app widget services and managing widgets."
 
 [[permission]]
@@ -1177,7 +1185,7 @@ name = "BIND_PRINT_SERVICE"
 level = "signature"
 group = ""
 since_api = 19
-flags = []
+flags = ["b5"]
 description = "Allow binding to print service implementations."
 
 [[permission]]
@@ -1185,7 +1193,7 @@ name = "BIND_MIDI_DEVICE_SERVICE"
 level = "signature"
 group = ""
 since_api = 23
-flags = []
+flags = ["b5"]
 description = "Allow binding to MIDI device services."
 
 [[permission]]
@@ -1193,7 +1201,7 @@ name = "BIND_NFC_SERVICE"
 level = "signature"
 group = ""
 since_api = 19
-flags = []
+flags = ["b5"]
 description = "Allow binding to NFC card emulation services (host APDU)."
 
 [[permission]]
@@ -1201,7 +1209,7 @@ name = "BIND_AUTOFILL_SERVICE"
 level = "signature"
 group = ""
 since_api = 26
-flags = []
+flags = ["b5"]
 description = "Allow binding to autofill service implementations."
 
 [[permission]]
@@ -1209,7 +1217,7 @@ name = "BIND_CALL_REDIRECTION_SERVICE"
 level = "signature"
 group = ""
 since_api = 29
-flags = []
+flags = ["b5"]
 description = "Allow binding to call redirection services."
 
 [[permission]]
@@ -1217,7 +1225,7 @@ name = "BIND_SCREENING_SERVICE"
 level = "signature"
 group = ""
 since_api = 24
-flags = []
+flags = ["b5"]
 description = "Allow binding to call screening services."
 
 [[permission]]
@@ -1225,7 +1233,7 @@ name = "BIND_QUICK_ACCESS_WALLET_SERVICE"
 level = "signature"
 group = ""
 since_api = 28
-flags = []
+flags = ["b5"]
 description = "Allow binding to quick access wallet services."
 
 [[permission]]
@@ -1233,7 +1241,7 @@ name = "BIND_INCALL_SERVICE"
 level = "signature"
 group = ""
 since_api = 26
-flags = []
+flags = ["b5"]
 description = "Allow binding to InCallService implementations for the in-call UI."
 
 [[permission]]
@@ -1241,7 +1249,7 @@ name = "BIND_CARRIER_SERVICES"
 level = "signature"
 group = ""
 since_api = 23
-flags = []
+flags = ["b5"]
 description = "Allow binding to carrier privileged services."
 
 [[permission]]
@@ -1249,7 +1257,7 @@ name = "BIND_CONDITION_PROVIDER_SERVICE"
 level = "signature"
 group = ""
 since_api = 24
-flags = []
+flags = ["b5"]
 description = "Allow binding to automatic Do Not Disturb condition provider services."
 
 [[permission]]
@@ -1257,7 +1265,7 @@ name = "BIND_CHOOSER_TARGET_SERVICE"
 level = "signature"
 group = ""
 since_api = 23
-flags = []
+flags = ["b5"]
 description = "Allow binding to chooser target services (deprecated since API 30)."
 
 [[permission]]
@@ -1265,7 +1273,7 @@ name = "BIND_TEXT_SERVICE"
 level = "signature"
 group = ""
 since_api = 16
-flags = []
+flags = ["b5"]
 description = "Allow binding to text services such as spell checkers."
 
 [[permission]]
@@ -1273,7 +1281,7 @@ name = "BIND_VR_LISTENER_SERVICE"
 level = "signature"
 group = ""
 since_api = 24
-flags = []
+flags = ["b5"]
 description = "Allow binding to VR listener services."
 
 [[permission]]
@@ -1281,7 +1289,7 @@ name = "BIND_VISUAL_VOICEMAIL_SERVICE"
 level = "signature"
 group = ""
 since_api = 26
-flags = []
+flags = ["b5"]
 description = "Allow binding to visual voicemail services."
 
 [[permission]]
@@ -1289,7 +1297,7 @@ name = "WRITE_SECURE_SETTINGS"
 level = "signature"
 group = ""
 since_api = 3
-flags = []
+flags = ["b5"]
 description = "Modify any secure system setting through Settings.Secure."
 
 [[permission]]
@@ -1297,7 +1305,7 @@ name = "READ_LOGS"
 level = "signature"
 group = ""
 since_api = 1
-flags = ["appop", "development"]
+flags = ["appop", "development", "b5"]
 description = "Read the low-level system log buffers."
 
 [[permission]]
@@ -1305,7 +1313,7 @@ name = "DUMP"
 level = "signature"
 group = ""
 since_api = 1
-flags = []
+flags = ["b5"]
 description = "Dump internal system state for debugging purposes."
 
 [[permission]]
@@ -1313,7 +1321,7 @@ name = "SET_DEBUG_APP"
 level = "signature"
 group = ""
 since_api = 1
-flags = []
+flags = ["b5"]
 description = "Configure an application for debugging."
 
 [[permission]]
@@ -1321,7 +1329,7 @@ name = "ACCESS_MOCK_LOCATION"
 level = "signature"
 group = ""
 since_api = 1
-flags = ["development"]
+flags = ["development", "b5"]
 description = "Inject mock location providers for development and testing."
 
 [[permission]]
@@ -1329,7 +1337,7 @@ name = "READ_FRAME_BUFFER"
 level = "signature"
 group = ""
 since_api = 1
-flags = []
+flags = ["b5"]
 description = "Read the frame buffer to capture screen contents."
 
 [[permission]]
@@ -1337,7 +1345,7 @@ name = "CLEAR_APP_CACHE"
 level = "signature"
 group = ""
 since_api = 1
-flags = []
+flags = ["b5"]
 description = "Delete cache files of all installed applications."
 
 [[permission]]
@@ -1345,7 +1353,7 @@ name = "MANAGE_DOCUMENTS"
 level = "signature"
 group = ""
 since_api = 19
-flags = []
+flags = ["b5"]
 description = "Manage documents in the storage manager on behalf of the user."
 
 [[permission]]
@@ -1353,7 +1361,7 @@ name = "GLOBAL_SEARCH"
 level = "signature"
 group = ""
 since_api = 4
-flags = []
+flags = ["b5"]
 description = "Access global search content and provide search suggestions."
 
 [[permission]]
@@ -1361,7 +1369,7 @@ name = "INSTALL_LOCATION_PROVIDER"
 level = "signature"
 group = ""
 since_api = 1
-flags = []
+flags = ["b5"]
 description = "Install a network location provider into the LocationManager."
 
 [[permission]]
@@ -1369,7 +1377,7 @@ name = "LOCATION_HARDWARE"
 level = "signature"
 group = ""
 since_api = 18
-flags = []
+flags = ["b5"]
 description = "Use location features implemented in hardware such as the geofencing engine."
 
 [[permission]]
@@ -1377,7 +1385,7 @@ name = "CONTROL_LOCATION_UPDATES"
 level = "signature"
 group = ""
 since_api = 1
-flags = []
+flags = ["b5"]
 description = "Control receiving of location update notifications."
 
 [[permission]]
@@ -1385,7 +1393,7 @@ name = "DEVICE_POWER"
 level = "internal"
 group = ""
 since_api = 1
-flags = []
+flags = ["b5"]
 description = "Power the device on or off (system-only)."
 
 [[permission]]
@@ -1393,7 +1401,7 @@ name = "REBOOT"
 level = "internal"
 group = ""
 since_api = 1
-flags = []
+flags = ["b5"]
 description = "Reboot the device (system-only)."
 
 [[permission]]
@@ -1401,7 +1409,7 @@ name = "FACTORY_TEST"
 level = "internal"
 group = ""
 since_api = 1
-flags = []
+flags = ["b5"]
 description = "Run as a manufacturer test application (system-only)."
 
 # ==================== B6 — ROLES (API 29+) ====================
