@@ -322,3 +322,24 @@ Stage Summary:
 - DoD M5: cliente em processo separado (e2e McpProc com binário real) instala/inicia/interage/observa/asserta sem comandos manuais ✓; testes de schema/JSON/timeout/erro/batch/isolamento ✓; conjunto publicado == --describe-tools == docs geradas (teste trava a convergência) ✓.
 - Catálogo: 20 → 30 tools. Novos erros tipados: PATH_OUTSIDE_SANDBOX, URL_NOT_ALLOWED, APK_TOO_LARGE, LIMIT_EXCEEDED, PACKAGE_NOT_INSTALLED.
 - Próximo (M6): executor de testes — suíte JSON → JUnit XML; compat-matrix automatizada.
+
+---
+Task ID: M6
+Agent: Agente de IA (sessão M6, rodada 1 — Never Hallucination)
+Task: "Trabalhe por 3 horas; objetivo M6 até M10" — escopo escolhido pelo usuário: M6 completo; publicação via branch + PR.
+
+Work Log:
+- Leitura do roadmap: M6 = executor de testes (suíte JSON → JUnit XML; compat-matrix automatizada). Spec: TST-01, AG-07, AG-09.
+- Baseline antes de qualquer mudança: `cargo test --workspace` → 288 passam, 0 falham. Toolchain stable 1.99.0; MSRV 1.76 validado com `cargo +1.76 check --workspace`.
+- rd-agent::suite (novo): parse/validação (INVALID_SUITE antes de executar), run_scenario (sessão nova por cenário, parada na primeira falha, `expect` ok|error:CODIGO), run_suite, JUnit XML (escape XML, system-out com passos), resumo humano.
+- Achado do teste e2e: asserções do MCP respondem isError=false com "ok": false/"found": false. Sem tratamento, asserção errada passaria em verde. Tratado em soft_failure() + teste unitário + e2e (exit 1).
+- rd-cli: `rd test <suite.json> [--junit FILE] [--json]`; exit 0/1/64. Despachado antes do match (contrato de exit próprio).
+- xtask compat-report: fases lidas de docs/ROADMAP.md (a lista fixa estava defasada: M4/M5 aparecia ⬜); guarda de drift (crate sem linha na tabela → erro); seção de suítes; CRATE_STATUS corrigido (rd-render M4 implementado, rd-agent M5–M6, rd-testsupport adicionado).
+- CI: job Rust executa `rd test tests/suites/contract-no-app.json --junit ...` (sem APK).
+
+Stage Summary:
+- Testes: 308 passam, 0 falham (baseline 288 + 12 suite + 4 e2e rd test + 4 xtask). cargo fmt --check ok; clippy --workspace --all-targets -D warnings ok; MSRV 1.76 check ok; check_md_links ok.
+- DoD M6 (ROADMAP): suíte JSON → JUnit XML ✓; compat-matrix automatizada ✓ (fases do roadmap, suítes, guarda de crates).
+- Não entra no M6: coverage/get_api_usage (AG-09), run_scenario com retries/hooks (AG-07), timeout por passo.
+- M7–M10: não iniciados nesta rodada (ver ROADMAP). Cada um é um milestone de escopo próprio (M7 gate de performance no piso moto-e5; M8 compat real; M9 NDK/ELF; M10 dispositivos virtuais).
+- Próximo: abrir PR; próxima rodada sugerida: M7 (performance + gate E5), que depende de medições reais.

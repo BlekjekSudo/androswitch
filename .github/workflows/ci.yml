@@ -75,6 +75,12 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      # M6 (TST-01): a suíte de contrato roda sem APK e gera JUnit XML.
+      # Exit 0 = todos os cenários passaram; qualquer falha derruba o job.
+      - name: Suíte de contrato (rd test → JUnit XML)
+        run: |
+          cargo build -p rd-cli
+          ./target/debug/rd test tests/suites/contract-no-app.json --junit target/junit-contract-no-app.xml
       # issue #86: os parsers (DEX, AXML, ARSC, ZIP) são críticos no SECURITY.md
       # — `unsafe` fora de rd-ndk/rd-jni é erro de compilação (workspace lints)
       # e também é barrado aqui, caso a configuração de lint seja removida.

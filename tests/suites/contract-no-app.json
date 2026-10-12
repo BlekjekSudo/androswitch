@@ -1,0 +1,42 @@
+{
+  "name": "contract-no-app",
+  "scenarios": [
+    {
+      "name": "launch sem APK instalado responde NO_APP",
+      "steps": [
+        {"name": "launch", "arguments": {}, "expect": "error:NO_APP"}
+      ]
+    },
+    {
+      "name": "app_info sem APK responde NO_APP",
+      "steps": [
+        {"name": "app_info", "arguments": {}, "expect": "error:NO_APP"}
+      ]
+    },
+    {
+      "name": "tap sem app em execução responde NOT_RUNNING",
+      "steps": [
+        {"name": "tap", "arguments": {"x": 1, "y": 1}, "expect": "error:NOT_RUNNING"}
+      ]
+    },
+    {
+      "name": "device_profile funciona sem app (piso moto-e5)",
+      "steps": [
+        {"name": "device_profile", "arguments": {}}
+      ]
+    },
+    {
+      "name": "runtime_health funciona sem app",
+      "steps": [
+        {"name": "runtime_health", "arguments": {}}
+      ]
+    },
+    {
+      "name": "passo após falha esperada é executado normalmente",
+      "steps": [
+        {"name": "launch", "arguments": {}, "expect": "error:NO_APP"},
+        {"name": "device_profile", "arguments": {}}
+      ]
+    }
+  ]
+}
