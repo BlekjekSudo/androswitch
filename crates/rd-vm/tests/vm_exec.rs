@@ -2332,3 +2332,51 @@ fn aput_object_unrelated_still_ase() {
         other => panic!("esperava ArrayStoreException, got {other:?}"),
     }
 }
+
+/// AG-09: cobertura de métodos — denominador = corpos DEX (abstract/native
+/// ficam fora), numerador = corpos que executaram neste Engine.
+#[test]
+fn coverage_snapshot_counts_executed_method_bodies() {
+    let mut b = DexBuilder::new();
+    let cls = b.class("LCov;", "Ljava/lang/Object;");
+    // run()V: return-void (será chamado)
+    b.direct(
+        cls,
+        "run",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(1, 0, 0, op10x(0x0e))),
+    );
+    // never()V: return-void (nunca chamado)
+    b.direct(
+        cls,
+        "never",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(1, 0, 0, op10x(0x0e))),
+    );
+    // abstract (ACC_ABSTRACT 0x400) sem corpo → fora do denominador
+    b.direct(
+        cls,
+        "abs",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC | 0x400,
+        None,
+    );
+
+    let mut e = engine_of(&b);
+    let cov = e.coverage_snapshot();
+    assert_eq!(cov.methods_total, 2, "abstract não entra no denominador");
+    assert_eq!(cov.methods_executed, 0);
+    assert_eq!(cov.classes_total, 1);
+    assert_eq!(cov.classes[0].class, "LCov;");
+
+    e.invoke_static("LCov;", "run", "()V", &[]).unwrap();
+    let cov = e.coverage_snapshot();
+    assert_eq!(cov.methods_executed, 1);
+    assert_eq!(cov.classes[0].methods_total, 2);
+    assert_eq!(cov.classes[0].methods_executed, 1);
+}

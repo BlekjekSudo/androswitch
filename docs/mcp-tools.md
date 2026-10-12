@@ -4,7 +4,7 @@
 
 Servidor `rustydroid-agent` v0.1.0 · protocolo `2024-11-05` · transporte stdio (JSON-RPC 2.0, uma mensagem por linha).
 
-Total: **31 tools**. Este catálogo é gerado de `rd_agent::mcp::tool_defs()` — o MESMO registro respondido em `tools/list` e impresso por `rd mcp --describe-tools`.
+Total: **32 tools**. Este catálogo é gerado de `rd_agent::mcp::tool_defs()` — o MESMO registro respondido em `tools/list` e impresso por `rd mcp --describe-tools`.
 
 ## Controles de segurança
 
@@ -196,9 +196,15 @@ Executa uma lista de chamadas [{name, arguments}] EM ORDEM, uma vez cada, com re
 
 ### `get_api_usage`
 
-AG-09 (metade estática): quais APIs android.* o app instalado REFERENCIA nos DEX — tipos (method_ids/field_ids/superclass/interfaces), métodos por classe e contagem por domínio (android.app, android.view…). É análise ESTÁTICA do DEX, não coverage de execução (get_coverage segue não implementado). Com `package` consulta outro app instalado; sem, o app ativo.
+AG-09 (metade estática): quais APIs android.* o app instalado REFERENCIA nos DEX — tipos (method_ids/field_ids/superclass/interfaces), métodos por classe e contagem por domínio (android.app, android.view…). É análise ESTÁTICA do DEX; para coverage de EXECUÇÃO use get_coverage. Com `package` consulta outro app instalado; sem, o app ativo.
 
 - Parâmetros: `package`
+
+### `get_coverage`
+
+AG-09 (metade dinâmica): cobertura de EXECUÇÃO do app em uso, nível de MÉTODO — instrumentação no interpretador registra cada corpo DEX executado. Requer app lançado (senão NOT_RUNNING); a contagem é do processo atual (reiniciar o app zera). Denominador: métodos com corpo nos DEX do app (abstract/native e classes host ficam fora).
+
+- Parâmetros: nenhum
 
 ### `notifications`
 

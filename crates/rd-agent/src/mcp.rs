@@ -532,9 +532,10 @@ fn obj(props: serde_json::Value, required: &[&str]) -> serde_json::Value {
     })
 }
 
-/// Registro das tools (30 do M5 + get_api_usage do AG-09: pacote list/rem/clear, input
-/// tap/swipe/type/key, observação, wait/wait_for, asserts, permissões,
-/// estado/saúde, lacunas de compat., batch — spec PARTE 4).
+/// Registro das tools (30 do M5 + AG-09: get_api_usage estático e
+/// get_coverage dinâmico; pacote list/rem/clear, input tap/swipe/type/key,
+/// observação, wait/wait_for, asserts, permissões, estado/saúde, lacunas de
+/// compat., batch — spec PARTE 4).
 pub fn tool_defs() -> Vec<ToolDef> {
     vec![
         ToolDef {
@@ -799,13 +800,19 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "get_api_usage",
             description:
-                "AG-09 (metade estática): quais APIs android.* o app instalado REFERENCIA nos DEX — tipos (method_ids/field_ids/superclass/interfaces), métodos por classe e contagem por domínio (android.app, android.view…). É análise ESTÁTICA do DEX, não coverage de execução (get_coverage segue não implementado). Com `package` consulta outro app instalado; sem, o app ativo.",
+                "AG-09 (metade estática): quais APIs android.* o app instalado REFERENCIA nos DEX — tipos (method_ids/field_ids/superclass/interfaces), métodos por classe e contagem por domínio (android.app, android.view…). É análise ESTÁTICA do DEX; para coverage de EXECUÇÃO use get_coverage. Com `package` consulta outro app instalado; sem, o app ativo.",
             schema: obj(
                 serde_json::json!({
                     "package": { "type": "string", "description": "package instalado a analisar. Default: o app ativo" },
                 }),
                 &[],
             ),
+        },
+        ToolDef {
+            name: "get_coverage",
+            description:
+                "AG-09 (metade dinâmica): cobertura de EXECUÇÃO do app em uso, nível de MÉTODO — instrumentação no interpretador registra cada corpo DEX executado. Requer app lançado (senão NOT_RUNNING); a contagem é do processo atual (reiniciar o app zera). Denominador: métodos com corpo nos DEX do app (abstract/native e classes host ficam fora).",
+            schema: obj(serde_json::json!({}), &[]),
         },
         ToolDef {
             name: "notifications",
@@ -1004,6 +1011,7 @@ impl AgentSession {
             ),
             "notifications" => self.tool_notifications(),
             "get_api_usage" => self.tool_api_usage(args.get("package").and_then(|v| v.as_str())),
+            "get_coverage" => self.tool_coverage(),
             other => {
                 return ToolResult::error(&agent_error(
                     "UNKNOWN_TOOL",
@@ -2049,6 +2057,36 @@ impl AgentSession {
         })?;
         Ok(ToolResult::json(&v))
     }
+
+    /// AG-09 (metade dinâmica): get_coverage reporta a cobertura de execução
+    /// em nível de método do app em uso — instrumentação no interpretador
+    /// (rd-vm), não análise estática. NOT_RUNNING sem app lançado.
+    fn tool_coverage(&mut self) -> Result<ToolResult, RdError> {
+        let pkg = self.engine_package.clone();
+        let eng = self.require_engine()?;
+        let snap = eng.coverage_snapshot();
+        // pct com 1 casa decimal; 0 métodos (app sem corpos DEX) → 0.0
+        let coverage_pct = if snap.methods_total > 0 {
+            (f64::from(snap.methods_executed) * 1000.0 / f64::from(snap.methods_total)).round()
+                / 10.0
+        } else {
+            0.0
+        };
+        let v = serde_json::json!({
+            "package": pkg,
+            "analysis": "method-entry-instrumentation",
+            "classes_total": snap.classes_total,
+            "methods_total": snap.methods_total,
+            "methods_executed": snap.methods_executed,
+            "coverage_pct": coverage_pct,
+            "classes": snap.classes.iter().map(|c| serde_json::json!({
+                "class": c.class,
+                "methods_total": c.methods_total,
+                "methods_executed": c.methods_executed,
+            })).collect::<Vec<_>>(),
+        });
+        Ok(ToolResult::json(&v))
+    }
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -2945,6 +2983,49 @@ mod tests {
         assert_eq!(v["code"], "PACKAGE_NOT_INSTALLED", "{v}");
     }
 
+    /// AG-09 (metade dinâmica): get_coverage mede a cobertura de execução
+    /// (nível de método) do app em uso; sem app lançado → NOT_RUNNING.
+    #[test]
+    fn get_coverage_reports_executed_methods() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        // nada instalado → NOT_RUNNING (é tool de runtime, como tap/screenshot)
+        let mut s0 = AgentSession::new();
+        let (v, err) = call(&mut s0, "get_coverage", serde_json::json!({}));
+        assert!(err, "{v}");
+        assert_eq!(v["code"], "NOT_RUNNING", "{v}");
+
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+        // instalado mas sem launch → NOT_RUNNING
+        let (v, err) = call(&mut s, "get_coverage", serde_json::json!({}));
+        assert!(err, "{v}");
+        assert_eq!(v["code"], "NOT_RUNNING", "{v}");
+
+        let (v, err) = call(&mut s, "launch", serde_json::json!({}));
+        assert!(!err, "{v}");
+        let (v, err) = call(&mut s, "get_coverage", serde_json::json!({}));
+        assert!(!err, "{v}");
+        assert_eq!(v["package"], "com.test.mcp", "{v}");
+        assert_eq!(v["analysis"], "method-entry-instrumentation", "{v}");
+        let total = v["methods_total"].as_u64().expect("methods_total");
+        let executed = v["methods_executed"].as_u64().expect("executed");
+        assert!(total > 0, "{v}");
+        assert!(executed >= 1, "launch executou onCreate: {v}");
+        assert!(executed <= total, "{v}");
+        let pct = v["coverage_pct"].as_f64().expect("coverage_pct");
+        assert!((0.0..=100.0).contains(&pct), "{v}");
+        let classes = v["classes"].as_array().expect("classes");
+        let main = classes
+            .iter()
+            .find(|c| c["class"] == "Lcom/test/mcp/Main;")
+            .unwrap_or_else(|| panic!("classe Main na cobertura: {v}"));
+        assert!(
+            main["methods_executed"].as_u64().unwrap_or(0) >= 1,
+            "onCreate contado: {main}"
+        );
+    }
+
     /// Envelope JSON-RPC no shape MCP.
     #[test]
     fn envelope_jsonrpc_is_mcp_shape() {
@@ -2973,8 +3054,8 @@ mod tests {
         let tools = r["result"]["tools"].as_array().expect("tools");
         assert_eq!(
             tools.len(),
-            31,
-            "catálogo completo: 30 do M5 + get_api_usage (AG-09)"
+            32,
+            "catálogo completo: 30 do M5 + get_api_usage/get_coverage (AG-09)"
         );
         for t in tools {
             assert!(t["name"].as_str().is_some());
@@ -3077,7 +3158,7 @@ mod tests {
         assert_eq!(arr.len(), 2);
         assert_eq!(
             arr[0]["result"]["tools"].as_array().expect("tools").len(),
-            31
+            32
         );
         assert_eq!(arr[1]["result"]["serverInfo"]["name"], SERVER_NAME);
     }
@@ -4089,7 +4170,7 @@ mod tests {
         let _guard = SESSION_LOCK.lock().unwrap();
         let mut s = AgentSession::new();
         let defs = tool_defs();
-        assert_eq!(defs.len(), 31);
+        assert_eq!(defs.len(), 32);
         for t in &defs {
             // schema: objeto com properties/required consistentes
             assert!(t.schema["type"] == "object", "{}: schema object", t.name);

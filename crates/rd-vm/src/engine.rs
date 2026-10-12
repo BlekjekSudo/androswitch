@@ -58,6 +58,30 @@ pub struct Engine {
     pub fw: crate::framework::HostState,
     depth: usize,
     pub(crate) fuel_used: u64,
+    /// AG-09: cobertura de métodos — chave `(dex_idx << 32) | method_idx`
+    /// de cada corpo DEX que chegou a executar neste Engine.
+    coverage: HashSet<u64>,
+}
+
+/// Cobertura por classe (AG-09, nível de método).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassCoverage {
+    /// Descritor da classe (ex.: `Lcom/x/Main;`).
+    pub class: String,
+    /// Métodos com corpo (`code_off != 0`) na classe.
+    pub methods_total: u32,
+    /// Quantos executaram neste Engine.
+    pub methods_executed: u32,
+}
+
+/// Snapshot de cobertura do Engine (AG-09).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CoverageSnapshot {
+    /// Classes com pelo menos um método executável.
+    pub classes_total: usize,
+    pub methods_total: u32,
+    pub methods_executed: u32,
+    pub classes: Vec<ClassCoverage>,
 }
 
 impl Engine {
@@ -74,6 +98,7 @@ impl Engine {
             fw: Default::default(),
             depth: 0,
             fuel_used: 0,
+            coverage: HashSet::new(),
         }
     }
 
@@ -182,10 +207,67 @@ impl Engine {
             )
             .into());
         };
+        // AG-09: cobertura de métodos — o corpo existe e vai executar.
+        self.coverage
+            .insert(((dex_idx as u64) << 32) | u64::from(m.method_idx));
         self.depth += 1;
         let ret = interp::exec_frame(self, dex_idx, code, ins);
         self.depth -= 1;
         ret
+    }
+
+    /// Snapshot de cobertura de métodos (AG-09): denominador = métodos com
+    /// corpo (`code_off != 0`) nos DEX do classpath; numerador = corpos que
+    /// executaram neste Engine. Classes host (framework/intrinsics) não
+    /// entram — não são código DEX do app.
+    pub fn coverage_snapshot(&mut self) -> CoverageSnapshot {
+        let mut classes = Vec::new();
+        let mut methods_total = 0u32;
+        let mut methods_executed = 0u32;
+        for dex_idx in 0..self.cp.dexes.len() {
+            // clone barato: ClassDef é pequeno e evita briga de borrow com
+            // class_data(&mut self)
+            let defs = self.cp.dexes[dex_idx].class_defs.clone();
+            for def in &defs {
+                let Ok(Some(data)) = self.cp.class_data(dex_idx, def) else {
+                    continue;
+                };
+                let mut total = 0u32;
+                let mut executed = 0u32;
+                for m in data
+                    .direct_methods
+                    .iter()
+                    .chain(data.virtual_methods.iter())
+                {
+                    if m.code_off == 0 {
+                        continue; // abstract/native — não executável aqui
+                    }
+                    total += 1;
+                    if self
+                        .coverage
+                        .contains(&(((dex_idx as u64) << 32) | u64::from(m.method_idx)))
+                    {
+                        executed += 1;
+                    }
+                }
+                if total == 0 {
+                    continue;
+                }
+                methods_total += total;
+                methods_executed += executed;
+                classes.push(ClassCoverage {
+                    class: self.cp.type_str(dex_idx, def.class_idx),
+                    methods_total: total,
+                    methods_executed: executed,
+                });
+            }
+        }
+        CoverageSnapshot {
+            classes_total: classes.len(),
+            methods_total,
+            methods_executed,
+            classes,
+        }
     }
 
     pub(super) fn method_label(&self, dex_idx: usize, m: &EncodedMethod) -> String {

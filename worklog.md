@@ -470,3 +470,21 @@ Stage Summary:
 - Workspace: 335 testes passam, 0 falham; fmt ok; clippy 0; links ok; compat-matrix sync; readme_inspect ok.
 - M6: pendente só get_coverage (AG-09, instrumentação — M8+). M7: pendente gate golden, Moto E5 real, workflow de release.
 - Próximo desta sessão: revisar superfície restante (docs/README coerência) ou M7 passo 2 (medições adicionais).
+
+---
+Task ID: ag09-get-coverage
+Agent: Arena Agent Mode (sessão autônoma 2h — iteração F)
+Task: AG-09 metade dinâmica — get_coverage (instrumentação do interpretador). Última pendência do M6.
+
+Work Log:
+- rd-vm: Engine.coverage (HashSet<u64> chave dex_idx<<32|method_idx) registrado em Engine::call (funil único de corpos DEX); coverage_snapshot() enumera classpath — denominador = métodos com code_off != 0 (abstract/native e classes host fora); structs ClassCoverage/CoverageSnapshot exportados.
+- rd-agent MCP: tool get_coverage (32ª) — require_engine (NOT_RUNNING sem launch), resposta {package, analysis: method-entry-instrumentation, classes_total, methods_total, methods_executed, coverage_pct, classes[]}; descrição do get_api_usage atualizada (cross-ref).
+- Catálogo 31→32: mcp.rs (catálogo/batch/defs.len), mcp_cli.rs (4 pontos), README (2 pontos), docs/mcp-tools.md regenerada (32 seções).
+- ROADMAP: "Fora do M6" → nada pendente; nova seção ✅ get_coverage com escopo honesto (contagem por processo, relançar zera).
+- Testes: rd-vm coverage_snapshot_counts_executed_method_bodies (abstract fora do denominador); MCP get_coverage_reports_executed_methods (NOT_RUNNING sem app e sem launch; launch→onCreate contado; pct 0-100; classe Main presente).
+- Smoke real: describe-tools → 32 tools; stdio JSON-RPC → get_coverage NOT_RUNNING tipado.
+
+Stage Summary:
+- Workspace: 337 testes passam, 0 falham; fmt ok; clippy 0; links ok; compat-matrix sync; readme_inspect ok.
+- M6 COMPLETO: todos os adiamentos entregues (get_api_usage, timeout por passo, AG-07, get_coverage).
+- M7 pendente: gate golden (APKs fora do repo), Moto E5 real, workflow de release.

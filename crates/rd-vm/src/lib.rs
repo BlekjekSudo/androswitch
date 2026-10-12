@@ -19,7 +19,7 @@ pub mod value;
 use rd_dex::annotations::EncodedValue;
 use rd_dex::Dex;
 
-pub use engine::{Engine, VmConfig};
+pub use engine::{ClassCoverage, CoverageSnapshot, Engine, VmConfig};
 pub use err::{Throwable, VmExit};
 pub use heap::ObjRef;
 pub use intrinsics::{route_app_stdout_to_stderr, set_app_stdout, HostOut};

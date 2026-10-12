@@ -172,8 +172,8 @@ certos); configs específicas (land/locale/density) selecionáveis.
    passa+JUnit, asserção errada → exit 1, suíte inválida → 64, arquivo ausente → 64),
    +4 do `xtask` (fases do ROADMAP, guarda de crates, contagem de suítes).
 
-**Fora do M6 (fica para as próximas rodadas):** `get_coverage` (metade do
-AG-09 que exige instrumentação do interpretador).
+**Fora do M6:** nada pendente — todos os adiamentos foram entregues
+(get_api_usage, timeout por passo, retries/hooks AG-07 e get_coverage abaixo).
 
 ## ✅ Adiados do M6 concluídos
 
@@ -184,8 +184,8 @@ AG-09 que exige instrumentação do interpretador).
    superclass/interfaces), métodos por classe e contagem por domínio
    (`android.app`, `android.view`, …). Sem app/package → erro tipado.
 2. ✅ Escopo honesto no resultado (`analysis: "static-dex-references"`): é o
-   que o app REFERENCIA, não coverage de execução — `get_coverage` segue
-   pendente (instrumentação, M8+).
+   que o app REFERENCIA, não coverage de execução — a metade dinâmica veio
+   na sequência (`get_coverage`, abaixo).
 3. Testes: unidade do scan (rd-agent::api_usage) + tool MCP (fixture:
    Activity/setContentView presentes; NO_APP e PACKAGE_NOT_INSTALLED tipados).
 4. Catálogo: 30 → 31 tools (README, `--describe-tools`, `docs/mcp-tools.md`
@@ -219,6 +219,25 @@ AG-09 que exige instrumentação do interpretador).
 4. ✅ Docs: `docs/suite-format.md` (campos, exemplo, regras 8-9) e módulo
    `rd-agent::suite`; 8 testes novos (parse, ordem dos hooks, teardown após
    falha, setup abortando, retries, curto-circuito, JUnit).
+
+### `get_coverage` (AG-09, metade dinâmica)
+
+1. ✅ **Instrumentação no interpretador (rd-vm)**: `Engine::call` é o funil
+   único de todo corpo DEX executado — registra `(dex_idx, method_idx)` num
+   conjunto de cobertura; `coverage_snapshot()` enumera o classpath e devolve
+   totais por classe. Denominador honesto: só métodos com corpo
+   (`code_off != 0`); abstract/native e classes host (framework/intrinsics)
+   ficam fora.
+2. ✅ **Tool MCP `get_coverage`** (32ª tool): exige app lançado
+   (`NOT_RUNNING` senão); responde `{package, analysis:
+   "method-entry-instrumentation", classes_total, methods_total,
+   methods_executed, coverage_pct, classes[]}`. A contagem é do processo
+   atual — relançar o app zera (arena-por-execução, M2).
+3. ✅ Testes: rd-vm (snapshot conta corpos executados; abstract fora do
+   denominador) + MCP (NO_APP→NOT_RUNNING, instalado sem launch→NOT_RUNNING,
+   app lançado→onCreate/`<clinit>` contabilizados, pct coerente).
+4. ✅ Catálogo: 31 → 32 tools (README, docs/mcp-tools.md regenerada, asserts
+   de contagem).
 
 ## 🟡 M7 em andamento — passo 1: gate de performance (2026-10)
 

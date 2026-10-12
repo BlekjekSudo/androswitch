@@ -39,7 +39,7 @@ RustyDroid is a **"Wine for Android"**: instead of emulating an entire Android O
 | Guest OS in RAM | 2–4 GB | **0** (no guest OS) |
 | Boot time | minutes | **seconds** (no boot at all) |
 | Runs in a plain container | rarely | ✅ designed for it |
-| AI-agent control plane | adb, screen scraping | **MCP + 31 structured tools** (JSON-RPC próprio — ADR 001) |
+| AI-agent control plane | adb, screen scraping | **MCP + 32 structured tools** (JSON-RPC próprio — ADR 001) |
 | Perf baseline | modern desktop | **Motorola Moto E5 (2 GB RAM)** floor |
 
 ### 🤖 Built with AI — heavily
@@ -121,7 +121,7 @@ rustydroid/
 │   ├── rd-engine-*/   # language bridges (flutter/rn/mono/wasm…) feature-gated (M11)
 │   ├── rd-framework/  # android.* natively in Rust: fd-permissions ✅, fd-devices ✅, fd-behavior ✅
 │   ├── rd-render/     # headless / window / web renderers + UI dump     (M4)
-│   ├── rd-agent/      # MCP (JSON-RPC próprio, ADR 001) + suite executor `rd test` (M6) + coverage · 31 tools
+│   ├── rd-agent/      # MCP (JSON-RPC próprio, ADR 001) + suite executor `rd test` (M6) + coverage · 32 tools
 │   └── rd-cli/        # the `rd` binary: inspect / perm / device / behavior / dex / vm / app / mcp / test / perf
 ├── data/              # permissions.toml (175), devices.toml (6, incl. moto-e5), behavior-switches.toml (25) · api-coverage.toml (planned)
 ├── golden-apks/       # open-source APK test suite (download script, no binaries)
