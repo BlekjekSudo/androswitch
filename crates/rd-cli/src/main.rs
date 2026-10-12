@@ -100,6 +100,18 @@ enum Cmd {
         #[arg(long)]
         gen_docs: Option<PathBuf>,
     },
+    /// M6: executa uma suíte JSON de cenários → resumo + JUnit XML (TST-01).
+    /// Exit: 0 tudo passou · 1 houve falha · 64 suíte inválida/IO (ver docs/suite-format.md)
+    Test {
+        /// Arquivo da suíte (JSON)
+        suite: PathBuf,
+        /// Grava o relatório JUnit XML neste arquivo
+        #[arg(long)]
+        junit: Option<PathBuf>,
+        /// Imprime o resumo em JSON (em vez do texto humano)
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -299,6 +311,10 @@ fn run(cli: Cli) -> i32 {
         // no embedded, sem o warning do require()
         explicit: cli.data.is_some() || std::env::var_os("RD_DATA_DIR").is_some(),
     };
+    // M6: `rd test` tem contrato de saída próprio (0 passou · 1 falhou · 64 inválida)
+    if let Cmd::Test { suite, junit, json } = &cli.cmd {
+        return cmd_test(suite, junit.as_deref(), *json);
+    }
     let result = match &cli.cmd {
         Cmd::Inspect { path, json, device } => cmd_inspect(path, *json, device.as_deref(), &dd),
         Cmd::Perm { sub } => match sub {
@@ -386,6 +402,8 @@ fn run(cli: Cli) -> i32 {
             // O erro sai pelo caminho padrão do contrato (JSON no stderr).
             rd_agent::mcp::serve_stdio(std::io::stdin(), std::io::stdout())
         }
+        // `rd test` devolve código de saída próprio (0/1/64): tratado acima
+        Cmd::Test { .. } => unreachable!("rd test é despachado antes deste match"),
         Cmd::Vm { sub } => match sub {
             VmSub::Exec {
                 path,
@@ -1752,4 +1770,69 @@ fn cmd_dex_disasm(
         }
     }
     Ok(())
+}
+
+/// M6 — `rd test <suite.json>`: roda os cenários e emite relatório.
+/// Suíte inválida ou arquivo ilegível → exit 64, antes de executar qualquer passo.
+fn cmd_test(suite_path: &Path, junit: Option<&Path>, json: bool) -> i32 {
+    let text = match std::fs::read_to_string(suite_path) {
+        Ok(t) => t,
+        Err(e) => {
+            let err = RdError::new(
+                "IO_ERROR",
+                format!("lendo {}: {e}", suite_path.display()),
+                "rd-cli",
+            );
+            let _ = writeln!(std::io::stderr(), "{}", to_json(&err));
+            return 64;
+        }
+    };
+    let suite = match rd_agent::suite::parse_suite(&text) {
+        Ok(s) => s,
+        Err(e) => {
+            let _ = writeln!(std::io::stderr(), "{}", to_json(&e));
+            return 64;
+        }
+    };
+    // caminhos relativos (install.apk) são resolvidos contra a pasta da suíte
+    let base = suite_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let report = rd_agent::suite::run_suite(&suite, base);
+
+    if json {
+        let summary = serde_json::json!({
+            "suite": report.name,
+            "scenarios": report.scenarios.len(),
+            "passed": report.passed_count(),
+            "failed": report.failed_count(),
+            "elapsed_ms": report.elapsed_ms,
+            "results": report.scenarios.iter().map(|s| serde_json::json!({
+                "name": s.name,
+                "passed": s.passed,
+                "elapsed_ms": s.elapsed_ms,
+                "failure": s.failure,
+            })).collect::<Vec<_>>(),
+        });
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&summary).unwrap_or_default()
+        );
+    } else {
+        print!("{}", rd_agent::suite::to_human(&report));
+    }
+
+    if let Some(path) = junit {
+        if let Err(e) = std::fs::write(path, rd_agent::suite::to_junit_xml(&report)) {
+            let err = RdError::new(
+                "IO_ERROR",
+                format!("escrevendo JUnit {}: {e}", path.display()),
+                "rd-cli",
+            );
+            let _ = writeln!(std::io::stderr(), "{}", to_json(&err));
+            return 1;
+        }
+    }
+    report.exit_code()
 }

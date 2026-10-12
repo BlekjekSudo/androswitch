@@ -13,7 +13,7 @@
 | M3 | Framework essencial | app trivial (activity+botão+texto) roda headless ponta a ponta | ✅ **implementado (2026-10, rounds 1+2)** |
 | M4 | Render+dump | screenshot correto; get_ui_tree com ids certos | ✅ |
 | M5 | Agente MCP v1 (30 tools + controles) | LLM instala, navega e assera estado só com as tools | ✅ |
-| M6 | Executor de testes | suíte JSON → JUnit XML; compat-matrix automatizada | ⬜ |
+| M6 | Executor de testes | suíte JSON → JUnit XML; compat-matrix automatizada | ✅ **implementado (2026-10)** |
 | M7 | Performance + gate piso E5 | startup < 2 s app trivial; suíte golden passa nos budgets moto-e5 | ⬜ |
 | M8 | Compat real | app OSS médio navega funcional; v0.9 | ⬜ |
 | M9 | Componentes avançados + NDK | 5 APKs com .so rodando; widgets/IME/notificações ok | ⬜ |
@@ -150,3 +150,27 @@ certos); configs específicas (land/locale/density) selecionáveis.
    determinístico (mesmo input → mesmos bytes); dump escape XML.
    Round 2 do M4: seleção de configs por device-config (land/locale) no
    resolve (o parse das 2 configs já chega no modelo — issue #47).
+
+## ✅ M6 concluído — executor de testes (2026-10)
+
+1. ✅ **`rd test <suite.json>`** (TST-01): suíte JSON → resumo humano + **JUnit XML**
+   (`--junit`) + `--json`. Exit: `0` tudo passou · `1` houve falha · `64` suíte inválida/IO.
+   Formato e regras em [`suite-format.md`](suite-format.md).
+2. ✅ **Núcleo em `rd-agent::suite`**: validação antes de executar (`INVALID_SUITE`),
+   uma sessão de agente nova por cenário (isolamento), parada na primeira falha,
+   `expect: "ok"` ou `"error:CODIGO"` (código estável exato).
+3. ✅ **Asserção reprovada conta como falha.** As tools `assert_*` e `wait_for` respondem
+   sucesso na chamada com `"ok": false`/`"found": false`; o executor trata isso como falha.
+   Sem essa regra, toda asserção errada passaria em verde (achado do próprio teste e2e).
+4. ✅ **compat-matrix automatizada** (`cargo xtask compat-report`):
+   - status das fases lido de `docs/ROADMAP.md` (a lista fixa estava defasada: M4/M5 aparecia ⬜);
+   - guarda de drift: crate nova em `crates/` sem linha na tabela quebra o relatório;
+   - seção "Suítes automatizadas" gerada a partir de `tests/suites/*.json`.
+5. ✅ **CI**: o job Rust roda `rd test tests/suites/contract-no-app.json` (sem APK) e
+   gera o JUnit XML. O job de docs continua exigindo o placar sincronizado.
+6. Testes: +12 unitários em `rd-agent::suite`, +4 e2e do binário (`rd-cli/tests/test_cli.rs`:
+   passa+JUnit, asserção errada → exit 1, suíte inválida → 64, arquivo ausente → 64),
+   +4 do `xtask` (fases do ROADMAP, guarda de crates, contagem de suítes).
+
+**Fora do M6 (fica para as próximas rodadas):** coverage/`get_api_usage` (AG-09),
+`run_scenario` com retries e hooks (AG-07), timeout por passo.

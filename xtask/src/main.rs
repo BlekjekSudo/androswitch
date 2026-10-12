@@ -58,8 +58,8 @@ const CRATE_STATUS: &[(&str, &str, &str)] = &[
     ),
     (
         "rd-cli",
-        "M0–M3",
-        "inspect · perm · device · behavior · dex disasm · vm exec · app run (contrato de erro JSON)",
+        "M0–M6",
+        "inspect · perm · device · behavior · dex disasm · vm exec · app run · mcp · test (suítes JUnit, M6)",
     ),
     (
         "rd-dex",
@@ -71,13 +71,34 @@ const CRATE_STATUS: &[(&str, &str, &str)] = &[
         "M2–M3",
         "interpretador Dalvik + golden harness vs JVM + framework host headless (Activity/View/Handler/Looper) + LayoutInflater AXML/ARSC",
     ),
-    ("rd-render", "M4", "stub NOT_IMPLEMENTED"),
-    ("rd-agent", "M5", "stub NOT_IMPLEMENTED"),
+    (
+        "rd-testsupport",
+        "M0–M6",
+        "fixtures de teste (APK/DEX/AXML/ARSC sintéticos; dev-only, fora do binário)",
+    ),
+    (
+        "rd-render",
+        "M4",
+        "UI dump uiautomator + screenshot headless (software renderer determinístico + PNG sem deps); winit/web são stub → M11",
+    ),
+    (
+        "rd-agent",
+        "M5–M6",
+        "MCP v1 (30 tools + batch + policy sandbox) · executor de suítes `rd test` (JSON → JUnit XML, M6)",
+    ),
     ("rd-jni", "M3+", "stub NOT_IMPLEMENTED"),
     ("rd-ndk", "M9", "stub NOT_IMPLEMENTED"),
 ];
 
 fn compat_report(root: &Path, out: &Path) -> Result<()> {
+    // M6: drift protection — crate nova sem linha na tabela quebra o relatório.
+    let missing = missing_crate_entries(root)?;
+    if !missing.is_empty() {
+        bail!(
+            "crates sem entrada em CRATE_STATUS (xtask/src/main.rs): {}",
+            missing.join(", ")
+        );
+    }
     let perm_toml = std::fs::read_to_string(root.join("data/permissions.toml"))
         .context("data/permissions.toml ausente")?;
     let devices_toml = std::fs::read_to_string(root.join("data/devices.toml"))
@@ -115,29 +136,40 @@ fn compat_report(root: &Path, out: &Path) -> Result<()> {
     md.push_str("> **GERADO** por `cargo xtask compat-report` — não editar à mão.\n");
     md.push_str("> Lei de Ouro: nenhuma API ausente quebra o app em silêncio — ");
     md.push_str("tudo responde `NOT_IMPLEMENTED(id)` e aparece aqui.\n\n");
-    md.push_str("## Estado por fase (roadmap M0–M12)\n\n");
+    // M6: o status das fases vem do docs/ROADMAP.md (fonte da verdade), não de
+    // uma lista fixa — a lista fixa ficou defasada (M4/M5 apareciam como ⬜).
+    let roadmap = std::fs::read_to_string(root.join("docs").join("ROADMAP.md"))
+        .context("docs/ROADMAP.md ausente")?;
+    let phases = parse_roadmap_phases(&roadmap)?;
+    md.push_str("## Estado por fase (roadmap, lido de docs/ROADMAP.md)\n\n");
     md.push_str("| Fase | Entrega | Status |\n|---|---|---|\n");
-    md.push_str("| M0 | workspace · rd-apk inspect · motor de permissões · devices · behavior | **✅ implementado** |\n");
-    md.push_str("| M1 | rd-dex 100% + disassembler | **✅ implementado** |\n");
-    md.push_str("| M2 | VM Dalvik mínima | **✅ implementado** |\n");
-    md.push_str("| M3 | framework essencial headless | **✅ implementado (rounds 1+2: lifecycle/touch + LayoutInflater XML)** |\n");
-    for (fase, entrega) in [
-        ("M4", "render + UI dump"),
-        ("M5", "agente MCP v1 (~20 tools)"),
-        ("M6", "executor de testes + compat automatizada"),
-        ("M7", "performance + gate piso E5"),
-        ("M8", "compat real (views/rede/dados)"),
-        ("M9", "componentes avançados + NDK"),
-        ("M10", "dispositivos virtuais"),
-        ("M11", "engines (Flutter/RN/Mono/wasm)"),
-        ("M12", "ecossistema GH completo"),
-    ] {
-        md.push_str(&format!("| {fase} | {entrega} | ⬜ |\n"));
+    for ph in &phases {
+        let status = if ph.done {
+            "**✅ implementado**"
+        } else {
+            "⬜"
+        };
+        md.push_str(&format!("| {} | {} | {} |\n", ph.id, ph.entrega, status));
     }
 
     md.push_str("\n## Crates\n\n| Crate | Fase | Escopo |\n|---|---|---|\n");
     for (name, fase, escopo) in CRATE_STATUS {
         md.push_str(&format!("| `{name}` | {fase} | {escopo} |\n"));
+    }
+
+    md.push_str("\n## Suítes automatizadas (`rd test`, M6)\n\n");
+    let suites = collect_suites(root)?;
+    if suites.is_empty() {
+        md.push_str("_nenhuma suíte em `tests/suites/`_\n");
+    } else {
+        md.push_str("| Suíte | Arquivo | Cenários | Passos |\n|---|---|---|---|\n");
+        for su in &suites {
+            md.push_str(&format!(
+                "| {} | `tests/suites/{}` | {} | {} |\n",
+                su.name, su.file, su.scenarios, su.steps
+            ));
+        }
+        md.push_str("\nExecutar: `rd test tests/suites/<arquivo>.json --junit <saida>.xml` (formato em `docs/suite-format.md`).\n");
     }
 
     md.push_str("\n## Dados versionados (M0)\n\n");
@@ -163,6 +195,126 @@ fn compat_report(root: &Path, out: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Linha da tabela de fases do docs/ROADMAP.md.
+#[derive(Debug, PartialEq)]
+struct PhaseRow {
+    id: String,
+    entrega: String,
+    done: bool,
+}
+
+/// Lê a tabela `| Fase | Entrega central | DoD | Status |` do ROADMAP.
+/// Só consome as linhas contíguas depois do cabeçalho; status ✅ = concluído.
+fn parse_roadmap_phases(text: &str) -> Result<Vec<PhaseRow>> {
+    let mut rows = Vec::new();
+    let mut in_table = false;
+    for line in text.lines() {
+        let t = line.trim();
+        if !in_table {
+            if t.starts_with("| Fase |") {
+                in_table = true;
+            }
+            continue;
+        }
+        if !t.starts_with('|') {
+            break; // fim da tabela
+        }
+        let cells: Vec<&str> = t.trim_matches('|').split('|').map(str::trim).collect();
+        if cells.len() < 4 {
+            continue; // separador |---|
+        }
+        let id = cells[0].trim_matches('*').trim();
+        let is_phase =
+            id.len() >= 2 && id.starts_with('M') && id[1..].chars().all(|c| c.is_ascii_digit());
+        if !is_phase {
+            continue;
+        }
+        rows.push(PhaseRow {
+            id: id.to_string(),
+            entrega: cells[1].to_string(),
+            done: cells[cells.len() - 1].contains('✅'),
+        });
+    }
+    if rows.is_empty() {
+        bail!("tabela de fases não encontrada em docs/ROADMAP.md (cabeçalho `| Fase |`)");
+    }
+    Ok(rows)
+}
+
+/// Crates em `crates/` que não aparecem em CRATE_STATUS.
+fn missing_crate_entries(root: &Path) -> Result<Vec<String>> {
+    let mut missing = Vec::new();
+    for entry in std::fs::read_dir(root.join("crates")).context("lendo crates/")? {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !CRATE_STATUS.iter().any(|(n, _, _)| *n == name) {
+            missing.push(name);
+        }
+    }
+    missing.sort();
+    Ok(missing)
+}
+
+/// Suíte em `tests/suites/*.json` (contagens lidas do próprio arquivo).
+struct SuiteInfo {
+    file: String,
+    name: String,
+    scenarios: usize,
+    steps: usize,
+}
+
+fn collect_suites(root: &Path) -> Result<Vec<SuiteInfo>> {
+    let dir = root.join("tests").join("suites");
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().and_then(|x| x.to_str()) == Some("json"))
+        .collect();
+    files.sort();
+    let mut out = Vec::new();
+    for path in files {
+        let file = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        let text = std::fs::read_to_string(&path)?;
+        let v: serde_json::Value = serde_json::from_str(&text)
+            .with_context(|| format!("suíte {file} não é JSON válido"))?;
+        let name = v
+            .get("name")
+            .and_then(|n| n.as_str())
+            .unwrap_or(&file)
+            .to_string();
+        let scen = v
+            .get("scenarios")
+            .and_then(|s| s.as_array())
+            .cloned()
+            .unwrap_or_default();
+        let steps = scen
+            .iter()
+            .map(|c| {
+                c.get("steps")
+                    .and_then(|s| s.as_array())
+                    .map(|a| a.len())
+                    .unwrap_or(0)
+            })
+            .sum();
+        out.push(SuiteInfo {
+            file,
+            name,
+            scenarios: scen.len(),
+            steps,
+        });
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,6 +325,52 @@ mod tests {
             .parent()
             .expect("xtask/ tem diretório pai")
             .to_path_buf()
+    }
+
+    /// M6: a tabela de fases vem do ROADMAP real (13 fases M0..M12, M0 concluída).
+    #[test]
+    fn phases_are_read_from_roadmap() {
+        let text = std::fs::read_to_string(repo_root().join("docs/ROADMAP.md")).expect("ROADMAP");
+        let rows = parse_roadmap_phases(&text).expect("tabela de fases");
+        assert_eq!(rows.len(), 13, "M0..M12");
+        assert_eq!(rows[0].id, "M0");
+        assert!(rows[0].done, "M0 está marcada como concluída no ROADMAP");
+    }
+
+    #[test]
+    fn roadmap_parser_only_takes_the_status_table() {
+        let sample = "| Fase | X | Y | Status |\n|---|---|---|---|\n| **M1** | a | b | ✅ |\n| **M2** | c | d | ⬜ |\n\nfora | M9 | x | ✅ |\n| M8 | depois | da | ✅ |\n";
+        let rows = parse_roadmap_phases(sample).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(
+            rows[0],
+            PhaseRow {
+                id: "M1".into(),
+                entrega: "a".into(),
+                done: true
+            }
+        );
+        assert!(!rows[1].done);
+        assert!(parse_roadmap_phases("sem tabela").is_err());
+    }
+
+    /// M6: toda crate do workspace precisa de linha na tabela (drift guard).
+    #[test]
+    fn every_workspace_crate_has_a_status_row() {
+        let missing = missing_crate_entries(&repo_root()).expect("lista crates/");
+        assert!(missing.is_empty(), "crates sem entrada: {missing:?}");
+    }
+
+    /// M6: as suítes versionadas são contadas a partir dos arquivos.
+    #[test]
+    fn suites_are_collected_with_counts() {
+        let suites = collect_suites(&repo_root()).expect("suítes");
+        let contract = suites
+            .iter()
+            .find(|s| s.file == "contract-no-app.json")
+            .expect("suíte de contrato versionada");
+        assert_eq!(contract.scenarios, 6);
+        assert_eq!(contract.steps, 7);
     }
 
     /// issue #73: README, CONTRIBUTING e docs/compat-matrix.md documentam
