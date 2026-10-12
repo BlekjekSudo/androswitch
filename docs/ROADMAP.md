@@ -214,7 +214,8 @@ hooks (AG-07).
    ok · `1` orçamento falhou ou erro de execução (`PERF_FAILED`).
 2. ✅ **Orçamentos do perfil `moto-e5`** (Apêndice A2): startup cold emulado
    `< 2000 ms` (DoD do M7) · RSS de pico `≤ 512 MB` (falha fechado fora do
-   Linux) · heap do app (`256 MB`) **reportado como não medido**.
+   Linux) · heap do app `≤ 256 MB` (marca d'água da arena da VM,
+   `runtime_health.heap_peak_bytes`, lida fora do cronômetro).
 3. ✅ **Gate de CI**: `crates/rd-cli/tests/perf_cli.rs` roda o binário sobre o
    APK do fixture e exige `pass: true` — primeiro gate de performance bloqueante.
 4. ✅ `rd-testsupport::trivial_app`: builder do app trivial movido de
@@ -228,6 +229,12 @@ hooks (AG-07).
    idempotente, `<clinit>` não repete); o resultado do launch traz `warm`.
    install/clear/remove continuam matando o processo (launch seguinte é frio).
 
+7. ✅ **Medição do heap do app**: `rd-vm::Heap` acompanha a marca d'água
+   (`peak()`, maior `used` observado); o `runtime_health` expõe
+   `heap_peak_bytes`; o `rd perf` lê o pico após o primeiro frame (fora do
+   cronômetro), reporta `app_heap_peak_mb` e avalia o orçamento
+   `app_heap_peak ≤ ram_app_heap_mb` (falha fechado se não medido).
+
 **Pendente para fechar o M7 (DoD):** gate golden (APKs golden não estão no
-repositório) · medição em Moto E5 real · medição do heap do app ·
-workflow de release bloqueante (hoje o gate é um teste de CI).
+repositório) · medição em Moto E5 real · workflow de release bloqueante (hoje
+o gate é um teste de CI).

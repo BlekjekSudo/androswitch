@@ -1802,6 +1802,8 @@ impl AgentSession {
                 v["finished"] = serde_json::json!(eng.activity_is_finished());
                 v["clock_ms"] = serde_json::json!(eng.fw.clock());
                 v["heap_used_bytes"] = serde_json::json!(eng.heap_used());
+                // M7: marca d'água do heap do app (orçamento ram_app_heap_mb)
+                v["heap_peak_bytes"] = serde_json::json!(eng.heap_peak());
                 v["fuel_used"] = serde_json::json!(eng.fuel_used());
                 v["looper_pending"] = serde_json::json!(eng.looper_pending());
             }

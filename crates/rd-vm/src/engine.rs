@@ -81,6 +81,11 @@ impl Engine {
         self.heap.used()
     }
 
+    /// Pico do heap do app (M7 — orçamento `ram_app_heap_mb`).
+    pub fn heap_peak(&self) -> usize {
+        self.heap.peak()
+    }
+
     pub fn fuel_used(&self) -> u64 {
         self.fuel_used
     }
