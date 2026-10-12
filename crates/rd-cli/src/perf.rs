@@ -4,7 +4,9 @@
 //! tree, via a tool `screenshot`) em dois regimes:
 //! - **cold**: `AgentSession` nova por execução; o APK é registrado antes (fora
 //!   do cronômetro) e o cronômetro cobre só o launch + primeiro frame;
-//! - **warm**: relançamento na MESMA sessão, que já tem o APK registrado.
+//! - **warm**: relançamento na MESMA sessão, que já tem o APK registrado —
+//!   reutiliza o processo (Engine) em execução, sem re-parse do DEX
+//!   (warm start do Android; resultado da tool traz `warm: true`).
 //!
 //! Tempo emulado = tempo do host / `cpu_single_thread_factor` do perfil
 //! (moto-e5: 0.25 ⇒ ×4). É uma ESTIMATIVA: o host não é um Moto E5, e o fator

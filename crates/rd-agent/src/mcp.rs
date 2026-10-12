@@ -549,7 +549,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "launch",
             description:
-                "Executa o app instalado: cria a activity (LAUNCHER ou `activity`) e roda o lifecycle até o onCreate completar. `activity` precisa estar declarada como <activity>/<activity-alias> no AndroidManifest.xml E existir no DEX (issues #82/#83) — o Android recusa o que não está declarado; um <activity-alias> lança a sua targetActivity (issue #109). Com `package` lança outro app do registro (multi-app); sem, o app ativo (último install/launch).",
+                "Executa o app instalado: cria a activity (LAUNCHER ou `activity`) e roda o lifecycle até o onCreate completar. `activity` precisa estar declarada como <activity>/<activity-alias> no AndroidManifest.xml E existir no DEX (issues #82/#83) — o Android recusa o que não está declarado; um <activity-alias> lança a sua targetActivity (issue #109). Se o MESMO package já está em execução, o relançamento reutiliza o processo (warm start: sem re-parse do DEX; o resultado traz warm=true) (M7). Com `package` lança outro app do registro (multi-app); sem, o app ativo (último install/launch).",
             schema: obj(
                 serde_json::json!({
                     "activity": { "type": "string", "description": "classe da activity (com.ex.Main ou Lcom/ex/Main;). Default: LAUNCHER" },
@@ -1177,30 +1177,50 @@ impl AgentSession {
                 (desc, app.apk.manifest.package.clone(), alias_of)
             }
         };
-        let dexes = dexes_of_apk(&app.apk)?;
-        let resources = app.apk.clone();
-        let mut eng = Engine::new(dexes, VmConfig::default());
-        eng.set_resources(resources);
-        eng.launch_app(&desc, &package_out, Vec::new())
-            .map_err(|e| {
-                let rd = vm_exit_to_rd(e);
-                match (&alias_of, rd.code.as_str()) {
-                    // issue #109: o alvo do alias não existe no DEX — erro
-                    // estruturado nomeando alias E alvo (não o MISSING_ENTRY
-                    // genérico da VM, que citaria só a classe resolvida).
-                    (Some((alias, target)), "MISSING_ENTRY") => agent_error(
-                        "MISSING_ENTRY",
-                        format!(
-                            "activity-alias {alias} aponta para {target}, que não existe no DEX — não há o que lançar"
-                        ),
-                        Some(
-                            "confira o android:targetActivity do alias no manifest (`inspect` lista os componentes); o alvo precisa existir no DEX",
-                        ),
+        // M7 (regime warm): se o package ainda está em execução na sessão, o
+        // relançamento REUTILIZA o processo (o Engine existente) — o Android
+        // não re-parseia o DEX num warm start; a activity é recriada no mesmo
+        // heap (`ensure_initialized` é idempotente, `<clinit>` não repete).
+        // Caminho frio (Engine novo, com parse dos DEX) só quando o package
+        // não está rodando. Falha no warm não derruba o app (mesma regra da
+        // issue #82).
+        let warm =
+            self.engine.is_some() && self.engine_package.as_deref() == Some(package_out.as_str());
+        let launch_result = if warm {
+            let eng = self
+                .engine
+                .as_mut()
+                .expect("engine presente: warm verificado acima");
+            eng.launch_app(&desc, &package_out, Vec::new())
+        } else {
+            let dexes = dexes_of_apk(&app.apk)?;
+            let resources = app.apk.clone();
+            let mut eng = Engine::new(dexes, VmConfig::default());
+            eng.set_resources(resources);
+            let r = eng.launch_app(&desc, &package_out, Vec::new());
+            if r.is_ok() {
+                self.engine = Some(eng);
+            }
+            r
+        };
+        launch_result.map_err(|e| {
+            let rd = vm_exit_to_rd(e);
+            match (&alias_of, rd.code.as_str()) {
+                // issue #109: o alvo do alias não existe no DEX — erro
+                // estruturado nomeando alias E alvo (não o MISSING_ENTRY
+                // genérico da VM, que citaria só a classe resolvida).
+                (Some((alias, target)), "MISSING_ENTRY") => agent_error(
+                    "MISSING_ENTRY",
+                    format!(
+                        "activity-alias {alias} aponta para {target}, que não existe no DEX — não há o que lançar"
                     ),
-                    _ => rd,
-                }
-            })?;
-        self.engine = Some(eng);
+                    Some(
+                        "confira o android:targetActivity do alias no manifest (`inspect` lista os componentes); o alvo precisa existir no DEX",
+                    ),
+                ),
+                _ => rd,
+            }
+        })?;
         self.engine_package = Some(package_out.clone());
         self.activity = Some(desc.clone());
         self.active = Some(package_out.clone());
@@ -1209,6 +1229,8 @@ impl AgentSession {
             "session_id": self.session_id,
             "activity": desc,
             "package": package_out,
+            // M7: true = warm start (processo reutilizado, sem re-parse do DEX)
+            "warm": warm,
         });
         if let Some((alias, _)) = &alias_of {
             // issue #109: o que foi pedido/declarado é o alias — o resultado
@@ -3520,6 +3542,54 @@ mod tests {
             "LAUNCHER == alias com alvo fantasma também é erro: {v}"
         );
         assert_eq!(v["code"], "MISSING_ENTRY", "{v}");
+    }
+
+    /// M7 (regime warm): o relançamento do package em execução reutiliza o
+    /// processo (Engine) — `warm: true`, sem re-parse do DEX. install/clear
+    /// matam o processo; o launch seguinte volta a ser frio.
+    #[test]
+    fn launch_warm_reuses_running_process() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+
+        // primeiro launch: frio (parse dos DEX + Engine novo)
+        let (v, err) = call(&mut s, "launch", serde_json::json!({}));
+        assert!(!err, "{v}");
+        assert_eq!(v["launched"], true, "{v}");
+        assert_eq!(v["warm"], false, "primeiro launch é cold: {v}");
+
+        // relançamento com o processo vivo: warm
+        let (v, err) = call(&mut s, "launch", serde_json::json!({}));
+        assert!(!err, "{v}");
+        assert_eq!(v["launched"], true, "{v}");
+        assert_eq!(v["warm"], true, "relançamento é warm: {v}");
+
+        // relançamento explícito da mesma activity também é warm
+        let (v, err) = call(
+            &mut s,
+            "launch",
+            serde_json::json!({"activity": "com.test.mcp.Main"}),
+        );
+        assert!(!err, "{v}");
+        assert_eq!(v["warm"], true, "{v}");
+
+        // o app continua funcional no processo reutilizado
+        let (v, err) = call(&mut s, "ui_tree", serde_json::json!({}));
+        assert!(!err, "{v}");
+        assert!(v.to_string().contains("Olá do MCP"), "{v}");
+
+        // clear mata o processo: próximo launch é frio de novo
+        let (v, _) = call(
+            &mut s,
+            "package_clear",
+            serde_json::json!({"package": "com.test.mcp"}),
+        );
+        assert_eq!(v["cleared"], true, "{v}");
+        let (v, err) = call(&mut s, "launch", serde_json::json!({}));
+        assert!(!err, "{v}");
+        assert_eq!(v["warm"], false, "clear mata o processo: launch frio: {v}");
     }
 
     /// issue #80: as checagens de formato viviam dentro do laço de execução,

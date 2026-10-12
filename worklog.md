@@ -385,3 +385,19 @@ Stage Summary:
 - GitHub: branch fix/110-signature-outside-b5, PR com Closes #110.
 - Limitações: nenhuma nova; o marcador runtime-is-system segue sendo o contrato de confiança para as b5 auto-granted.
 - Próximo: sem bugs abertos após esta; pendências do M7 (gate golden — requer APKs golden no runner, medição em Moto E5 real, warm, heap do app) ou itens fora do M6 (timeout por passo, retries/hooks AG-07, coverage AG-09).
+
+---
+Task ID: m7-warm
+Agent: Arena Agent Mode (sessão autônoma 2h — iteração A)
+Task: Resolver a limitação registrada no passo 1 do M7: regime warm não era mais rápido que o cold (tool_launch recriava o Engine a cada chamada).
+
+Work Log:
+- Escolha: projeto estável (0 issues/PRs); M7 é o milestone ativo e o worklog/ROADMAP listavam "aquecer o regime warm" como pendência concreta e verificável em sandbox.
+- rd-agent (mcp.rs): tool_launch reutiliza o Engine quando o package já está em execução (warm start do Android: processo vivo, activity recriada no mesmo heap; ensure_initialized idempotente — clinit não repete). Falha no warm não derruba o app (regra #82 preservada). Resultado do launch ganha `warm: true/false`. install/clear/remove continuam zerando o engine (kill_engine_if_running) — launch seguinte é frio.
+- Teste novo launch_warm_reuses_running_process: cold→warm→warm explícito→ui_tree funcional→clear→cold.
+- Docs: descrição da tool `launch` + mcp-tools.md regenerados; ROADMAP M7 (entrega 6 ✅; pendências sem o warm); docstring do rd perf.
+
+Stage Summary:
+- Suíte: 322 passam, 0 falham (baseline 319 +1 warm; demais contagens por doc-tests). fmt ok; clippy 0 warnings.
+- GitHub: branch perf/m7-warm-start → PR (Closes n/d — não há issue; resolve limitação registrada no PR #112).
+- Próximo desta sessão: timeout por passo no executor de suítes (adiamento M6) ou get_api_usage (AG-09); pendências maiores do M7 (gate golden, device real, heap do app) seguem listadas no ROADMAP.
