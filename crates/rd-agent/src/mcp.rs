@@ -532,7 +532,7 @@ fn obj(props: serde_json::Value, required: &[&str]) -> serde_json::Value {
     })
 }
 
-/// Registro das 30 tools (M5 completo: pacote list/rem/clear, input
+/// Registro das tools (30 do M5 + get_api_usage do AG-09: pacote list/rem/clear, input
 /// tap/swipe/type/key, observação, wait/wait_for, asserts, permissões,
 /// estado/saúde, lacunas de compat., batch — spec PARTE 4).
 pub fn tool_defs() -> Vec<ToolDef> {
@@ -797,6 +797,17 @@ pub fn tool_defs() -> Vec<ToolDef> {
             ),
         },
         ToolDef {
+            name: "get_api_usage",
+            description:
+                "AG-09 (metade estática): quais APIs android.* o app instalado REFERENCIA nos DEX — tipos (method_ids/field_ids/superclass/interfaces), métodos por classe e contagem por domínio (android.app, android.view…). É análise ESTÁTICA do DEX, não coverage de execução (get_coverage segue não implementado). Com `package` consulta outro app instalado; sem, o app ativo.",
+            schema: obj(
+                serde_json::json!({
+                    "package": { "type": "string", "description": "package instalado a analisar. Default: o app ativo" },
+                }),
+                &[],
+            ),
+        },
+        ToolDef {
             name: "notifications",
             description:
                 "Notificações do app. FORA DO ESCOPO do M5 (entram no M9 com widgets/IME) — responde erro tipado NOT_IMPLEMENTED (honesto).",
@@ -992,6 +1003,7 @@ impl AgentSession {
                     .unwrap_or(0) as usize,
             ),
             "notifications" => self.tool_notifications(),
+            "get_api_usage" => self.tool_api_usage(args.get("package").and_then(|v| v.as_str())),
             other => {
                 return ToolResult::error(&agent_error(
                     "UNKNOWN_TOOL",
@@ -2010,6 +2022,31 @@ impl AgentSession {
             Some("acompanhe docs/ROADMAP.md (M9)"),
         ))
     }
+
+    /// AG-09 (metade estática): uso de APIs android.* referenciadas nos DEX.
+    fn tool_api_usage(&mut self, package: Option<&str>) -> Result<ToolResult, RdError> {
+        let pkg = package
+            .map(str::to_string)
+            .or_else(|| self.active.clone())
+            .ok_or_else(|| agent_error("NO_APP", "instale um APK primeiro (tool install)", None))?;
+        let app = self.find_installed(&pkg).ok_or_else(|| {
+            agent_error(
+                "PACKAGE_NOT_INSTALLED",
+                format!("package {pkg:?} não está no registro desta sessão"),
+                Some("veja package_list — instale com `install` antes de analisar"),
+            )
+        })?;
+        let dexes = dexes_of_apk(&app.apk)?;
+        let usage = crate::api_usage::scan(&app.apk.manifest.package, &dexes);
+        let v = serde_json::to_value(&usage).map_err(|e| {
+            agent_error(
+                "INTERNAL",
+                format!("serializando o relatório de uso de API: {e}"),
+                None,
+            )
+        })?;
+        Ok(ToolResult::json(&v))
+    }
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -2863,6 +2900,49 @@ mod tests {
         assert_eq!(v["code"], "NOT_IMPLEMENTED");
     }
 
+    /// AG-09 (metade estática): get_api_usage reporta as APIs android.* que o
+    /// app referencia nos DEX (análise estática) e exige app instalado.
+    #[test]
+    fn get_api_usage_reports_android_references() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        // sem app: erro tipado
+        let mut s0 = AgentSession::new();
+        let (v, err) = call(&mut s0, "get_api_usage", serde_json::json!({}));
+        assert!(err, "{v}");
+        assert_eq!(v["code"], "NO_APP", "{v}");
+
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+        let (v, err) = call(&mut s, "get_api_usage", serde_json::json!({}));
+        assert!(!err, "{v}");
+        assert_eq!(v["package"], "com.test.mcp", "{v}");
+        assert_eq!(v["analysis"], "static-dex-references", "{v}");
+        let types = v["android_types"].as_array().expect("android_types");
+        let names: Vec<&str> = types.iter().filter_map(|t| t.as_str()).collect();
+        // o fixture estende android.app.Activity e chama setContentView
+        assert!(names.contains(&"android.app.Activity"), "{names:?}");
+        assert!(
+            v["android_methods"]["android.app.Activity"]
+                .as_array()
+                .is_some_and(|ms| ms.iter().any(|m| m == "setContentView")),
+            "métodos por classe: {v}"
+        );
+        assert!(
+            v["types_by_domain"]["android.app"].as_u64() >= Some(1),
+            "domínios: {v}"
+        );
+
+        // package não instalado → tipado
+        let (v, err) = call(
+            &mut s,
+            "get_api_usage",
+            serde_json::json!({"package": "nao.instalado"}),
+        );
+        assert!(err);
+        assert_eq!(v["code"], "PACKAGE_NOT_INSTALLED", "{v}");
+    }
+
     /// Envelope JSON-RPC no shape MCP.
     #[test]
     fn envelope_jsonrpc_is_mcp_shape() {
@@ -2889,7 +2969,11 @@ mod tests {
             .unwrap()
             .unwrap();
         let tools = r["result"]["tools"].as_array().expect("tools");
-        assert_eq!(tools.len(), 30, "catálogo M5 completo: 30 tools");
+        assert_eq!(
+            tools.len(),
+            31,
+            "catálogo completo: 30 do M5 + get_api_usage (AG-09)"
+        );
         for t in tools {
             assert!(t["name"].as_str().is_some());
             assert!(t["inputSchema"].is_object(), "schema por tool");
@@ -2991,7 +3075,7 @@ mod tests {
         assert_eq!(arr.len(), 2);
         assert_eq!(
             arr[0]["result"]["tools"].as_array().expect("tools").len(),
-            30
+            31
         );
         assert_eq!(arr[1]["result"]["serverInfo"]["name"], SERVER_NAME);
     }
@@ -4003,7 +4087,7 @@ mod tests {
         let _guard = SESSION_LOCK.lock().unwrap();
         let mut s = AgentSession::new();
         let defs = tool_defs();
-        assert_eq!(defs.len(), 30);
+        assert_eq!(defs.len(), 31);
         for t in &defs {
             // schema: objeto com properties/required consistentes
             assert!(t.schema["type"] == "object", "{}: schema object", t.name);

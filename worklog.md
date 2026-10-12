@@ -401,3 +401,21 @@ Stage Summary:
 - Suíte: 322 passam, 0 falham (baseline 319 +1 warm; demais contagens por doc-tests). fmt ok; clippy 0 warnings.
 - GitHub: branch perf/m7-warm-start → PR (Closes n/d — não há issue; resolve limitação registrada no PR #112).
 - Próximo desta sessão: timeout por passo no executor de suítes (adiamento M6) ou get_api_usage (AG-09); pendências maiores do M7 (gate golden, device real, heap do app) seguem listadas no ROADMAP.
+
+---
+Task ID: ag09-api-usage
+Agent: Arena Agent Mode (sessão autônoma 2h — iteração B)
+Task: Entregar o adiado do M6 get_api_usage (AG-09, metade estática): tool MCP que reporta as APIs android.* que o app referencia nos DEX.
+
+Work Log:
+- Escolha: após m7-warm (iteração A), o item de maior valor restante era o AG-09 estático (alimenta análise de risco de compat e o TST-09 "declared vs used"); get_coverage exige instrumentação e segue pendente (M8+).
+- rd-agent::api_usage (novo): scan estático dos DEX — method_ids (métodos invocados), field_ids (tipos implicados), superclass/interfaces dos class_defs; saída com android_types, android_methods por classe, types_by_domain, defined_classes e marker analysis="static-dex-references" (escopo honesto).
+- MCP: tool get_api_usage [--package] (31ª tool); NO_APP/PACKAGE_NOT_INSTALLED tipados; dispatch + catálogo + schema.
+- Testes: unidade do scan (DexBuilder sintético: Activity/setContentView/Build$VERSION + caso vazio honesto) + tool MCP no fixture (referências presentes; erros tipados). Contagens 30→31 atualizadas em todos os asserts (mcp.rs, mcp_cli.rs) e docs (README comparação/layout/PT-BR; mcp-tools.md regenerada).
+- Validação real (MCP de verdade): F-Droid 2.0.1 → install responde BELOW_FLOOR (minSdk 24 < piso 26, contrato correto) e get_api_usage responde NO_APP tipado — comportamento honesto confirmado ponta a ponta.
+- Achado do processo: um assert de contagem esquecido (batch tools/list) envenenava o SESSION_LOCK e derrubava a suíte em paralelo — localizado via teste isolado; todos os asserts de contagem agora travam 31.
+
+Stage Summary:
+- Suíte: 325 passam, 0 falham; fmt ok; clippy 0 warnings; links ok; compat-matrix sync; readme_inspect ok.
+- GitHub: branch feat/ag09-get-api-usage → PR.
+- Próximo desta sessão: timeout por passo no executor de suítes (adiado M6) ou AG-07 (retries/hooks).

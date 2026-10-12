@@ -172,8 +172,23 @@ certos); configs específicas (land/locale/density) selecionáveis.
    passa+JUnit, asserção errada → exit 1, suíte inválida → 64, arquivo ausente → 64),
    +4 do `xtask` (fases do ROADMAP, guarda de crates, contagem de suítes).
 
-**Fora do M6 (fica para as próximas rodadas):** coverage/`get_api_usage` (AG-09),
-`run_scenario` com retries e hooks (AG-07), timeout por passo.
+**Fora do M6 (fica para as próximas rodadas):** `get_coverage` (metade do
+AG-09 que exige instrumentação do interpretador), `run_scenario` com retries e
+hooks (AG-07), timeout por passo.
+
+## ✅ Adiado do M6 concluído — `get_api_usage` (AG-09, metade estática)
+
+1. ✅ **Tool MCP `get_api_usage [--package]`**: análise ESTÁTICA dos DEX do app
+   instalado — tipos `android.*` referenciados (`method_ids`/`field_ids`/
+   superclass/interfaces), métodos por classe e contagem por domínio
+   (`android.app`, `android.view`, …). Sem app/package → erro tipado.
+2. ✅ Escopo honesto no resultado (`analysis: "static-dex-references"`): é o
+   que o app REFERENCIA, não coverage de execução — `get_coverage` segue
+   pendente (instrumentação, M8+).
+3. Testes: unidade do scan (rd-agent::api_usage) + tool MCP (fixture:
+   Activity/setContentView presentes; NO_APP e PACKAGE_NOT_INSTALLED tipados).
+4. Catálogo: 30 → 31 tools (README, `--describe-tools`, `docs/mcp-tools.md`
+   regenerada; testes do issue #74 travam a convergência).
 
 ## 🟡 M7 em andamento — passo 1: gate de performance (2026-10)
 

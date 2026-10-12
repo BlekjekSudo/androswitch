@@ -6,6 +6,7 @@
 //! workspace 1.76 — docs/adr/001-mcp-sem-rmcp-msrv.md).
 //! Lei 1 (sem falha silenciosa): falhas fora do contrato respondem tipadas.
 
+pub mod api_usage;
 pub mod mcp;
 pub mod suite;
 
