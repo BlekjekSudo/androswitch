@@ -870,3 +870,33 @@ GitHub status:
 Stage Summary:
 - `ServiceLoader` deixa de bloquear a inicialização do APK real com um fallback determinístico e honesto, sem alegar suporte a SPI completo.
 - Próximo foco recomendado: implementar `LinkedHashSet` host (reaproveitando o estado `List`/semântica de `Set` já usada por `CopyOnWriteArraySet`), com construtores e operações mínimas sondadas, depois reexecutar o APK real.
+
+---
+Task ID: m8-linked-hash-set
+Agent: Arena Agent Mode
+Task: M8 — `java.util.LinkedHashSet` host para o 25º gap de launch real de `org.primftpd`.
+
+Work Log:
+- Operação solicitada pelo proprietário: substituí o loop de shell ruidoso por `/home/user/work_timer.py`, um timer Python durável e sem dependências que grava estado JSON atomicamente em `/home/user/agent_work_timer_state.json`. Ele suporta `start`, `status`, `watch` e `clear`; o ciclo temporário de 2 s (running → complete → clear) passou e uma sessão nova de 4 h foi iniciada às 2026-10-13 08:15:13 UTC (deadline 12:15:13 UTC). O script é uma ferramenta local fora do Git, portanto não polui a PR do runtime.
+- Avaliação: PR #144 (`ServiceLoader`) está limpa, aberta e com todos os checks concluídos em verde; a revisão humana continua pendente. Árvore limpa e `cargo test -p rd-vm` de baseline passou antes das mudanças.
+- `rd-vm`: `LinkedHashSet` agora é Set host sobre `HostObj::List`: `<init>()`, add/remove/contains/size/isEmpty/clear e iterator. O `Vec` mantém ordem de inserção e remove+add move o elemento ao fim; igualdade segue a política existente de coleções. A hierarquia builtin declara `LinkedHashSet → HashSet → AbstractSet` e as interfaces Set/Collection/Iterable/Cloneable/Serializable.
+- Teste novo `linked_hash_set_host_intrinsics`: deduplicação por conteúdo, contains, ordem do iterator, remoção+reinserção e subtipagem positiva/negativa.
+- Documentação e catálogo MCP atualizados. Re-sondagem real sobre `golden-apks/org.primftpd.apk` ultrapassou LinkedHashSet e encontrou o próximo gap tipado: `ClassLoader.getResources(String) → Enumeration`.
+
+Checks:
+- `python3 -m py_compile /home/user/work_timer.py` + ciclo de estado temporário — PASS.
+- `cargo fmt --all -- --check` — PASS.
+- `cargo clippy --workspace --all-targets -- -D warnings` — PASS.
+- `cargo test --workspace` — PASS (0 falhas; novo teste LinkedHashSet incluído).
+- `rustup run 1.76.0 cargo check --workspace` — PASS.
+- `python3 scripts/check_md_links.py` + `cargo xtask compat-report`/`diff` — PASS.
+- `rd app run golden-apks/org.primftpd.apk --json` — chega ao próximo gap estruturado de ClassLoader; APK local continua ignorado.
+- Revisão final: `git diff --check` e scan de token-like secrets fora de `.git`/`target` — PASS.
+
+GitHub status:
+- Branch `feat/m8-linked-hash-set`, commit funcional `ae3ab03`, enviado com o PAT fornecido pelo proprietário.
+- Pull request empilhada aberta: #145 — https://github.com/nadabgfccvd/RustyDroid/pull/145, com base em `feat/m8-service-loader`/#144 para manter cada compat-gap revisável. #144 deve receber revisão humana/merge antes de #145 seguir para `main`.
+
+Stage Summary:
+- LinkedHashSet não bloqueia mais o fluxo de inicialização do APK real e sua ordem de iteração é determinística.
+- Próximo foco recomendado: `ClassLoader.getResources(String)` com uma `Enumeration` host vazia ou baseada no APK, decidindo antes como expor somente recursos permitidos. O suporte SPI completo (`META-INF/services` + instanciação segura) permanece deliberadamente fora do escopo desta iteração.
