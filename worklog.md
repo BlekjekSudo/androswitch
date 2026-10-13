@@ -782,3 +782,18 @@ Work Log:
 
 Stage Summary:
 - Sequência de gaps do primftpd: … → ConcurrentHashMap ✅ → LinkedBlockingQueue ✅ → ThreadLocal (próximo).
+
+---
+Task ID: m8-thread-local
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração Z)
+Task: M8 — ThreadLocal + InheritableThreadLocal host (19º/20º gaps do launch real).
+
+Work Log:
+- rd-vm intrinsics: THREAD_LOCAL/INHERITABLE_TL — um valor por instância (campos heap tl_value/tl_set): get (chama initialValue() via resolve_method+Engine.call na 1ª leitura e memoiza — como na JDK; default null), set, remove, <init>. Guard: <init> só com mref declarando a classe host (ctor de subclasse segue DEX); get/set/remove por is_subtype(recv, ThreadLocal) E resolve_method none (override de usuário vence). Inheritable ≡ ThreadLocal (single-threaded).
+- classpath: ThreadLocal <: Object; InheritableThreadLocal <: ThreadLocal <: Object.
+- Teste: thread_local_host_intrinsics (plain get→null, set/get/remove; subclasse LMyTL com initialValue() DEX → "inicial" memoizado, set sobrescreve; InheritableThreadLocal init/set/get; subtipagem).
+- Re-sondagem app real (×2): ThreadLocal e InheritableThreadLocal resolvidos; launch avança até System.getProperty(String) (registrado — tabela de propriedades da plataforma).
+
+Stage Summary:
+- Sequência de gaps do primftpd: … → LinkedBlockingQueue ✅ → ThreadLocal(+Inheritable) ✅ → System.getProperty (próximo).
+- 20 gaps do app real fechados/registrados na sessão 2 (K–Z: 10 merges).

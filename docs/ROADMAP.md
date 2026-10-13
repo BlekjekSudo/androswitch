@@ -441,6 +441,16 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   → `IllegalStateException` materializado — bloquear sem outra thread seria
   deadlock; falha visível > pendurar. Hierarquia: `AbstractQueue →
   AbstractCollection` + `BlockingQueue`/`Queue`/`Collection`/`Serializable`.
-- ⬜ **Próximo gap (achado honesto)**: `java.lang.ThreadLocal.<init>()V` —
-  single-threaded ⇒ um valor por VM (`get`/`set`/`remove`/`withInitial` com
-  `initialValue`).
+- ✅ **`ThreadLocal`/`InheritableThreadLocal` host (entregue nesta rodada)**:
+  décimo nono e vigésimo gaps (`<init>()V` de ambos). Single-threaded ⇒ um
+  valor por instância (campos de heap `tl_value`+`tl_set`): `get` chama
+  `initialValue()` via resolução DEX na primeira leitura e memoiza (como na
+  JDK); `set`/`remove`; `<init>` só quando o mref declara a classe host
+  (ctor de subclasse segue o DEX); get/set/remove por subtipagem e só sem
+  declaração DEX (override vence). `InheritableThreadLocal` comporta-se
+  igual (herdar entre threads não se aplica). `withInitial(Supplier)` fora
+  (não sondado).
+- ⬜ **Próximo gap (achado honesto)**:
+  `java.lang.System.getProperty(String)` — tabela de propriedades da
+  plataforma (os.name/line.separator/java.io.tmpdir/user.dir…); null para
+  desconhecidas (semântica JDK).

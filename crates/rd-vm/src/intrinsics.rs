@@ -67,6 +67,15 @@ const CONCURRENT_MAP: &str = "Ljava/util/concurrent/ConcurrentHashMap;";
 /// com fila vazia materializam `IllegalStateException` tipado (honesto:
 /// prefere falha visível a pendurar). `offer`/`add`/`poll()`/`peek` normais.
 const BLOCKING_Q: &str = "Ljava/util/concurrent/LinkedBlockingQueue;";
+/// M8: 19º gap do launch real (`ThreadLocal.<init>`). Single-threaded ⇒ um
+/// valor por ThreadLocal (campo de heap "tl_value" + flag "tl_set"): `get`
+/// chama `initialValue()` (DEX) na primeira leitura, como na JDK;
+/// `withInitial(Supplier)` fica para sondagem futura (exige Callable host).
+const THREAD_LOCAL: &str = "Ljava/lang/ThreadLocal;";
+/// M8: subclasse direta (mesma família — sem ela o ThreadLocal host não
+/// cobria `new InheritableThreadLocal()`, 20º gap sondado). Single-threaded
+/// ⇒ "herdável" não tem efeito: comportamento idêntico ao ThreadLocal.
+const INHERITABLE_TL: &str = "Ljava/lang/InheritableThreadLocal;";
 const ARRAY_LIST: &str = "Ljava/util/ArrayList;";
 const LINKED_LIST: &str = "Ljava/util/LinkedList;";
 /// M8: coleções concorrentes — sexto gap do launch real
@@ -1161,6 +1170,67 @@ fn find_elem(
     Ok(None)
 }
 
+/// (name, sig) de ThreadLocal host suportados (M8).
+fn thread_local_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("<init>", "()V")
+            | ("get", "()Ljava/lang/Object;")
+            | ("set", "(Ljava/lang/Object;)V")
+            | ("remove", "()V")
+    )
+}
+
+/// ThreadLocal host (M8): single-threaded ⇒ um valor por instância.
+/// `get` sem set prévio chama `initialValue()` (resolução DEX; default de
+/// Object/ThreadLocal → null), como na JDK.
+fn thread_local_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    recv_class: &str,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match name {
+        "<init>" => {
+            crate::err::put_field_result(vm.heap.put_field(recv, "tl_value", Value::Null))?;
+            crate::err::put_field_result(vm.heap.put_field(recv, "tl_set", Value::Int(0)))?;
+            Ok(Some(Value::Null))
+        }
+        "set" => {
+            crate::err::put_field_result(vm.heap.put_field(recv, "tl_value", args[0].clone()))?;
+            crate::err::put_field_result(vm.heap.put_field(recv, "tl_set", Value::Int(1)))?;
+            Ok(Some(Value::Null))
+        }
+        "remove" => {
+            crate::err::put_field_result(vm.heap.put_field(recv, "tl_value", Value::Null))?;
+            crate::err::put_field_result(vm.heap.put_field(recv, "tl_set", Value::Int(0)))?;
+            Ok(Some(Value::Null))
+        }
+        "get" => {
+            let set = matches!(vm.heap.get_field(recv, "tl_set"), Ok(Value::Int(v)) if v != 0);
+            if set {
+                return Ok(Some(
+                    vm.heap.get_field(recv, "tl_value").unwrap_or(Value::Null),
+                ));
+            }
+            // primeira leitura: initialValue() via DEX (override de subclasse)
+            let initial = if let Some((d, def, m)) =
+                vm.cp
+                    .resolve_method(recv_class, "initialValue", "()Ljava/lang/Object;")
+            {
+                vm.call(d, def, &m, vec![Value::Obj(recv)])?
+            } else {
+                Value::Null
+            };
+            crate::err::put_field_result(vm.heap.put_field(recv, "tl_value", initial.clone()))?;
+            crate::err::put_field_result(vm.heap.put_field(recv, "tl_set", Value::Int(1)))?;
+            Ok(Some(initial))
+        }
+        _ => Ok(None),
+    }
+}
+
 /// (name, sig) de LinkedBlockingQueue host suportados (M8).
 fn queue_supported(name: &str, sig: &str) -> bool {
     matches!(
@@ -2098,6 +2168,20 @@ pub fn call_instance_intrinsic_mref(
         // LinkedBlockingQueue (M8): FIFO; bloqueantes fail-fast (sem deadlock)
         (c, name, sig) if c == BLOCKING_Q && queue_supported(name, sig) => {
             queue_intrinsic(vm, recv, name, sig, args)
+        }
+        // ThreadLocal (M8): um valor por VM. <init> só quando o mref DECLARA
+        // ThreadLocal (super() de subclasse inclusa; ctor da subclasse segue o
+        // DEX). get/set/remove por subtipagem e só sem declaração DEX
+        // (override de usuário vence).
+        (c, name, sig)
+            if thread_local_supported(name, sig)
+                && ((name == "<init>"
+                    && (mref_class == THREAD_LOCAL || mref_class == INHERITABLE_TL))
+                    || (name != "<init>"
+                        && (c == THREAD_LOCAL || vm.cp.is_subtype(recv_class, THREAD_LOCAL))
+                        && vm.cp.resolve_method(recv_class, name, sig).is_none())) =>
+        {
+            thread_local_intrinsic(vm, recv, recv_class, name, args)
         }
         // iterator() de List/Set host (incl. views de Map) — M8
         (c, name, sig)
