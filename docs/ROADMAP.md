@@ -328,8 +328,16 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   e devolve updater host; `get`/`set`/`getAndSet`/`compareAndSet`/
   `weakCompareAndSet` operam via `get_field`/`put_field` no alvo (CAS por
   identidade de referência; alvo null → NPE materializado).
-- ⬜ **Próximo gap (achado honesto)**:
-  `java.util.concurrent.CopyOnWriteArraySet.<init>()V` — coleções concorrentes
-  (`CopyOnWriteArraySet`/`CopyOnWriteArrayList`/`ConcurrentHashMap`…) são o
-  próximo grupo; podem reusar o estado `HostObj::List`/`Map` já existente
-  (single-threaded ⇒ cópia-em-escrita é irrelevante).
+- ✅ **`java.util.concurrent` host (entregue nesta rodada)**: sexto gap
+  (`CopyOnWriteArraySet.<init>`). `CopyOnWriteArraySet` vira Set host
+  (mesmo estado `List`, add DEDUPLICA por igualdade Java e devolve false
+  se já presente); `CopyOnWriteArrayList` ≡ `ArrayList`. VM single-threaded
+  ⇒ cópia-em-escrita é irrelevante. **Bug real corrigido no caminho**:
+  `check-cast COWSet → java/util/Set` estourava `ClassCastException` — as
+  tabelas `builtin_hierarchy`/`builtin_interfaces` do `is_subtype` não
+  conheciam as classes host do M8 (coleções/atomic/ref/Enum); agora têm
+  cadeias de classe e closures de interface completas (List/Set →
+  Collection → Iterable etc.).
+- ⬜ **Próximo gap (achado honesto)**: `LinkedHashMap.<init>()V` — mesmo
+  padrão do HashMap host (guarda do Map); ordem de iteração segue não
+  garantida (BTreeMap por chave string — documentado).

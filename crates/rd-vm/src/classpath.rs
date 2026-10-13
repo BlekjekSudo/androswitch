@@ -585,6 +585,44 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Landroid/widget/Button;" => Some(BUTTON.to_vec()),
         "Landroid/widget/LinearLayout;" => Some(LINEARLAYOUT.to_vec()),
         "Landroid/widget/FrameLayout;" => Some(FRAMELAYOUT.to_vec()),
+        // ── M8: classes host do compat real (cadeia completa de ancestrais) ──
+        "Ljava/util/AbstractCollection;" => Some(OBJECT.to_vec()),
+        "Ljava/util/AbstractList;" => {
+            Some(vec!["Ljava/util/AbstractCollection;", "Ljava/lang/Object;"])
+        }
+        "Ljava/util/AbstractSequentialList;" => Some(vec![
+            "Ljava/util/AbstractList;",
+            "Ljava/util/AbstractCollection;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/util/AbstractMap;" => Some(OBJECT.to_vec()),
+        "Ljava/util/HashMap;" => Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"]),
+        "Ljava/util/WeakHashMap;" => Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"]),
+        "Ljava/util/ArrayList;" => Some(vec![
+            "Ljava/util/AbstractList;",
+            "Ljava/util/AbstractCollection;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/util/LinkedList;" => Some(vec![
+            "Ljava/util/AbstractSequentialList;",
+            "Ljava/util/AbstractList;",
+            "Ljava/util/AbstractCollection;",
+            "Ljava/lang/Object;",
+        ]),
+        // CopyOnWrite*: na JDK real NÃO estendem Abstract* (implementam direto)
+        "Ljava/util/concurrent/CopyOnWriteArrayList;" => Some(OBJECT.to_vec()),
+        "Ljava/util/concurrent/CopyOnWriteArraySet;" => Some(OBJECT.to_vec()),
+        "Ljava/util/concurrent/atomic/AtomicReference;" => Some(OBJECT.to_vec()),
+        "Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;" => Some(OBJECT.to_vec()),
+        "Ljava/lang/Enum;" => Some(OBJECT.to_vec()),
+        "Ljava/lang/ref/Reference;" => Some(OBJECT.to_vec()),
+        "Ljava/lang/ref/WeakReference;" => {
+            Some(vec!["Ljava/lang/ref/Reference;", "Ljava/lang/Object;"])
+        }
+        "Ljava/lang/ref/SoftReference;" => {
+            Some(vec!["Ljava/lang/ref/Reference;", "Ljava/lang/Object;"])
+        }
+        "Ljava/lang/ref/ReferenceQueue;" => Some(OBJECT.to_vec()),
         _ => None,
     }
 }
@@ -598,9 +636,63 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/io/Serializable;",
     ];
     const SB_IFACES: &[&str] = &["Ljava/lang/CharSequence;", "Ljava/lang/Appendable;"];
+    // M8: closure transitiva explícita (List/Set → Collection → Iterable)
+    const COLL: &[&str] = &["Ljava/util/Collection;", "Ljava/lang/Iterable;"];
+    const LIST_IFACES: &[&str] = &[
+        "Ljava/util/List;",
+        "Ljava/util/Collection;",
+        "Ljava/lang/Iterable;",
+    ];
+    const MAP_IFACES: &[&str] = &["Ljava/util/Map;"];
     match class {
         "Ljava/lang/String;" => Some(STRING_IFACES.to_vec()),
         "Ljava/lang/StringBuilder;" => Some(SB_IFACES.to_vec()),
+        // ── M8: interfaces das classes host do compat real ──
+        "Ljava/util/AbstractCollection;" => Some(COLL.to_vec()),
+        "Ljava/util/AbstractList;" | "Ljava/util/AbstractSequentialList;" => {
+            Some(LIST_IFACES.to_vec())
+        }
+        "Ljava/util/AbstractMap;" => Some(MAP_IFACES.to_vec()),
+        "Ljava/util/HashMap;" => Some(vec![
+            "Ljava/util/Map;",
+            "Ljava/lang/Cloneable;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/WeakHashMap;" => Some(MAP_IFACES.to_vec()),
+        "Ljava/util/ArrayList;" => Some(vec![
+            "Ljava/util/List;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+            "Ljava/util/RandomAccess;",
+            "Ljava/lang/Cloneable;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/LinkedList;" => Some(vec![
+            "Ljava/util/List;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+            "Ljava/util/Deque;",
+            "Ljava/util/Queue;",
+            "Ljava/lang/Cloneable;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/concurrent/CopyOnWriteArrayList;" => Some(vec![
+            "Ljava/util/List;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+            "Ljava/util/RandomAccess;",
+            "Ljava/lang/Cloneable;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/concurrent/CopyOnWriteArraySet;" => Some(vec![
+            "Ljava/util/Set;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+            "Ljava/lang/Cloneable;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/concurrent/atomic/AtomicReference;" => Some(vec!["Ljava/io/Serializable;"]),
+        "Ljava/lang/Enum;" => Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
         _ => None,
     }
 }
@@ -619,6 +711,45 @@ pub fn unresolved_method(class: &str, name: &str, proto: &str) -> RdError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// M8: hierarquia das classes host do compat real — check-cast/instanceof
+    /// para interfaces de coleção (sexto gap do org.primftpd: COWSet → Set).
+    #[test]
+    fn host_collections_subtype_their_interfaces() {
+        let cp = Classpath::new(Vec::new());
+        // Set concorrente <: Set <: Collection <: Iterable <: Object
+        assert!(cp.is_subtype(
+            "Ljava/util/concurrent/CopyOnWriteArraySet;",
+            "Ljava/util/Set;"
+        ));
+        assert!(cp.is_subtype(
+            "Ljava/util/concurrent/CopyOnWriteArraySet;",
+            "Ljava/util/Collection;"
+        ));
+        assert!(cp.is_subtype(
+            "Ljava/util/concurrent/CopyOnWriteArraySet;",
+            "Ljava/lang/Iterable;"
+        ));
+        assert!(cp.is_subtype(
+            "Ljava/util/concurrent/CopyOnWriteArrayList;",
+            "Ljava/util/List;"
+        ));
+        // cadeias de classe
+        assert!(cp.is_subtype("Ljava/util/HashMap;", "Ljava/util/AbstractMap;"));
+        assert!(cp.is_subtype("Ljava/util/LinkedList;", "Ljava/util/AbstractList;"));
+        assert!(cp.is_subtype("Ljava/util/ArrayList;", "Ljava/lang/Object;"));
+        // interfaces
+        assert!(cp.is_subtype("Ljava/util/HashMap;", "Ljava/util/Map;"));
+        assert!(cp.is_subtype("Ljava/util/LinkedList;", "Ljava/util/Deque;"));
+        assert!(cp.is_subtype("Ljava/lang/Enum;", "Ljava/lang/Comparable;"));
+        assert!(cp.is_subtype("Ljava/lang/ref/WeakReference;", "Ljava/lang/ref/Reference;"));
+        // negativo: Map NÃO é List; Set NÃO é Map
+        assert!(!cp.is_subtype("Ljava/util/HashMap;", "Ljava/util/List;"));
+        assert!(!cp.is_subtype(
+            "Ljava/util/concurrent/CopyOnWriteArraySet;",
+            "Ljava/util/Map;"
+        ));
+    }
 
     /// issue #42: covariância de arrays no is_subtype (JLS 4.10.2/4.10.3).
     #[test]
