@@ -35,6 +35,14 @@ const FUTURE: &str = "Ljava/util/concurrent/Future;";
 /// `META-INF/services` no APK, o loader é deliberadamente vazio; isso mantém
 /// o caminho de inicialização vivo sem inventar providers que não existem.
 const SERVICE_LOADER: &str = "Ljava/util/ServiceLoader;";
+/// M8: 26º gap do launch real (`ClassLoader.getResources`). Enumeration é o
+/// cursor legado da JDK 1.0 — semanticamente o mesmo cursor do Iterator host,
+/// então reutiliza o estado `HostObj::Iter`. O runtime ainda não enumera
+/// entries do APK como recursos de classpath: a Enumeration host é vazia.
+const ENUMERATION: &str = "Ljava/util/Enumeration;";
+/// M8: ClassLoader canônico da VM (identidade por VM — ver
+/// `framework::class_loader_obj`). `getResources(String)` é o 26º gap real.
+const CLASS_LOADER: &str = "Ljava/lang/ClassLoader;";
 use crate::framework::{CLASS, THREAD};
 const MATH: &str = "Ljava/lang/Math;";
 /// M8 (compat real): coleções java.util host — segundo gap de launch do
@@ -832,6 +840,69 @@ fn service_loader_intrinsic(vm: &mut Engine) -> Result<Option<Value>, VmExit> {
         },
     );
     Ok(Some(Value::Obj(it)))
+}
+
+/// Aloca uma Enumeration host vazia (M8): cursor sobre zero elementos sobre o
+/// mesmo estado `HostObj::Iter` do Iterator host.
+fn alloc_empty_enumeration(vm: &mut Engine) -> Result<Value, VmExit> {
+    let e = vm.heap.alloc_instance(ENUMERATION.to_string(), vec![])?;
+    vm.fw.objects.insert(
+        e,
+        crate::framework::HostObj::Iter {
+            elems: Vec::new(),
+            pos: 0,
+        },
+    );
+    Ok(Value::Obj(e))
+}
+
+/// (name, sig) de Enumeration host suportados (M8).
+fn enumeration_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("hasMoreElements", "()Z") | ("nextElement", "()Ljava/lang/Object;")
+    )
+}
+
+/// Enumeration host (M8): cursor legado idêntico ao Iterator — só mudam os
+/// nomes (`hasMoreElements`/`nextElement`), então delega ao cursor de Iterator
+/// (`nextElement` vazio materializa `NoSuchElementException`, semântica Java).
+fn enumeration_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+) -> Result<Option<Value>, VmExit> {
+    let cursor_name = match name {
+        "hasMoreElements" => "hasNext",
+        _ => "next",
+    };
+    iterator_intrinsic(vm, recv, cursor_name)
+}
+
+/// (name, sig) de ClassLoader host suportados (M8).
+fn class_loader_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        (
+            "getResources",
+            "(Ljava/lang/String;)Ljava/util/Enumeration;"
+        )
+    )
+}
+
+/// `ClassLoader.getResources(String)` (M8, 26º gap do launch real): a VM não
+/// expõe entries do APK/DEX como recursos de classpath, então a Enumeration é
+/// deliberadamente vazia — nunca null (contrato JDK), sem inventar recursos
+/// inexistentes e sem varrer `META-INF/services` (descoberta SPI real segue
+/// fora do escopo). `name` null materializa NPE (`Objects.requireNonNull`).
+fn class_loader_get_resources(vm: &mut Engine, args: &[Value]) -> Result<Option<Value>, VmExit> {
+    if args[0].as_ref()?.is_none() {
+        return Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/NullPointerException;",
+            "ClassLoader.getResources com name null",
+        )));
+    }
+    alloc_empty_enumeration(vm).map(Some)
 }
 
 /// (name, sig) de Iterator host suportados (M8).
@@ -2313,6 +2384,15 @@ pub fn call_instance_intrinsic_mref(
         // iterator() é um Iterator host vazio, nunca uma falha silenciosa.
         (c, name, sig) if c == SERVICE_LOADER && service_loader_supported(name, sig) => {
             service_loader_intrinsic(vm)
+        }
+        // ClassLoader (M8): getResources(String) → Enumeration host vazia —
+        // recursos de classpath do APK ainda não são enumerados (26º gap real).
+        (c, name, sig) if c == CLASS_LOADER && class_loader_supported(name, sig) => {
+            class_loader_get_resources(vm, args)
+        }
+        // Enumeration host (M8): cursor legado ≡ Iterator (nomes JDK 1.0).
+        (c, name, sig) if c == ENUMERATION && enumeration_supported(name, sig) => {
+            enumeration_intrinsic(vm, recv, name)
         }
         // iterator() de List/Set host (incl. views de Map) — M8
         (c, name, sig)

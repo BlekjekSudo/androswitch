@@ -900,3 +900,36 @@ GitHub status:
 Stage Summary:
 - LinkedHashSet não bloqueia mais o fluxo de inicialização do APK real e sua ordem de iteração é determinística.
 - Próximo foco recomendado: `ClassLoader.getResources(String)` com uma `Enumeration` host vazia ou baseada no APK, decidindo antes como expor somente recursos permitidos. O suporte SPI completo (`META-INF/services` + instanciação segura) permanece deliberadamente fora do escopo desta iteração.
+
+---
+Task ID: m8-classloader-getresources
+Agent: Arena Agent Mode (sessão 2026-10-13, início 09:30 UTC)
+Task: M8 — ClassLoader.getResources(String) + Enumeration host (26º gap do launch real do org.primftpd); integração das PRs #144/#145 já verificadas.
+
+Work Log:
+- Timer: registrado timestamps UTC reais por etapa (loop `while; sleep` travaria a sessão não-interativa do sandbox; técnica equivalente adotada — início 09:30:06 UTC).
+- Avaliação: main verde (cargo test --workspace EXIT 0); 0 issues abertas. Achadas 2 PRs já implementadas, com CI 6/6 verde, aguardando merge: #144 (ServiceLoader, 24º gap) e #145 (LinkedHashSet, 25º gap, empilhada). Dep combina cargo 1.99 + MSRV 1.76 instaladas no sandbox (não havia Rust).
+- Integração pipeline: #144 mergida (merge commit c20c471 — padrão histórico), #145 retarguetada service-loader→main via API (mergeable: clean) e mergida (504950a). rd-vm re-testado no main mesclado: 82 testes ok.
+- rd-vm intrinsics (26º gap): consts ENUMERATION/CLASS_LOADER; `ClassLoader.getResources(String)` devolve Enumeration host VAZIA (nunca null — contrato JDK; runtime não enumera entries do APK como classpath e não varre META-INF/services → não inventa recursos); name null → NPE (Objects.requireNonNull JDK 9+). Enumeration host = cursor legado reutilizando HostObj::Iter: hasMoreElements→hasNext, nextElement→next (NoSuchElementException em vazio). Cada chamada devolve cursor novo.
+- Reuso deliberado: enumeration_intrinsic delega ao iterator_intrinsic (mesmo cursor, só mudam os nomes JDK 1.0) — zero duplicação de estado.
+- classpath: sem entrada nova (Enumeration é interface — mesmo precedente do Iterator, que não aparece na hierarquia builtin; uma assertion is_subtype(Enumeration, Object) minha falhou no teste exatamente por isso e foi removida — o modelo é o estabelecido).
+- Teste novo class_loader_get_resources_returns_empty_enumeration: loader canônico via getClass+getClassLoader; getResources → Enumeration vazia; hasMoreElements=0; nextElement → NoSuchElementException; cursor independente por chamada; NPE com name null.
+- Re-sondagem app real: launch atravessou getResources e avançou até o 27º gap NOT_FOUND: `ArrayList.<init>(Ljava/util/Collection;)V` (construtor de cópia a partir de Collection). App já executa init SLF4J no caminho (avisos SLF4J(W) no stderr).
+- Catálogo compat_gaps (mcp.rs) e docs/ROADMAP.md atualizados (26º ✅ / 27º re-sondado ⬜).
+
+Checks:
+- `cargo fmt --all -- --check` — PASS (1 reformatação aplicada antes).
+- `cargo clippy --workspace --all-targets -- -D warnings` — PASS.
+- `cargo test --workspace` — PASS (31 suites ok, 0 falhas; rd-vm vm_exec 66 testes — +1 novo).
+- `rustup run 1.76.0 cargo check --workspace` — PASS (MSRV).
+- `python3 scripts/check_md_links.py` — PASS (10 links / 12 arquivos).
+- `cargo xtask compat-report` + diff docs/compat-matrix.md — PASS (vazio).
+- `git diff --check` + scan de segredos tipo token fora de .git/target — PASS (limpo; PAT nunca gravado em arquivo).
+- `rd app run golden-apks/org.primftpd.apk --json` — avança além de getResources; para no 27º gap registrado. APKs locais ignorados (GH-05).
+
+GitHub status:
+- Base: main 504950a (pós-merge #144/#145). Branch feat/m8-classloader-getresources a ser enviada com o PAT do proprietário; PR a abrir; merge após CI verde, seguindo o fluxo histórico.
+
+Stage Summary:
+- Sequência de gaps do primftpd: … → ServiceLoader ✅ (#144) → LinkedHashSet ✅ (#145) → ClassLoader.getResources+Enumeration ✅ (esta) → ArrayList.<init>(Collection) (próximo, 27º).
+- Próximo foco: ArrayList.<init>(Collection) — snapshot do iterador da Collection origem sobre o List host; depois re-sondar.

@@ -478,7 +478,15 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   `LinkedHashSet → HashSet → AbstractSet` e interfaces Set/Collection/Iterable
   são conhecidas pelo classpath. Construtores com capacity/Collection seguem
   fora até uma sondagem exigir.
-- ⬜ **Próximo gap (re-sondado)**: `ClassLoader.getResources(String)` no
-  `org.primftpd` 8.2. Ele exige lookup de recursos e `Enumeration`; descoberta
-  SPI real continua fora do escopo até o runtime ler e instanciar com segurança
-  `META-INF/services`.
+- ✅ **`ClassLoader.getResources(String)` + `java.util.Enumeration` host
+  (entregue nesta rodada)**: vigésimo sexto gap. `getResources` nunca devolve
+  null (contrato JDK): retorna uma `Enumeration` host **vazia** — o runtime
+  ainda não enumera entries do APK como recursos de classpath e não varre
+  `META-INF/services`, logo não inventa recursos. `name` null materializa NPE
+  (`Objects.requireNonNull` da JDK 9+). A `Enumeration` reutiliza o cursor do
+  Iterator host com os nomes legados: `hasMoreElements()` é falso e
+  `nextElement()` materializa `NoSuchElementException`.
+- ⬜ **Próximo gap (re-sondado)**: `ArrayList.<init>(Ljava/util/Collection;)V`
+  no `org.primftpd` 8.2 — construtor de cópia a partir de Collection
+  (snapshot do iterador host). Lookup real de recursos do APK e descoberta
+  SPI por `META-INF/services` continuam fora do escopo.
