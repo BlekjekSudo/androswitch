@@ -462,6 +462,10 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   qualquer classe devolve o mesmo objeto; runtime single-classloader, a
   distinção bootstrap=null do Java não se aplica). `ClassLoader <: Object`.
   `loadClass` fora (não sondado).
+- ✅ **`System.getSecurityManager` (entregue nesta rodada)**: vigésimo
+  terceiro gap. Android não tem SecurityManager (deprecated na JDK; APIs de
+  segurança são no-op) ⇒ sempre **null** — semântica correta, uma linha.
 - ⬜ **Próximo gap (achado honesto)**:
-  `java.lang.System.getSecurityManager()` — Android não tem SecurityManager
-  (deprecated na JDK): devolver **null** é a semântica correta.
+  `java.util.ServiceLoader.load(Class,ClassLoader)` — mecanismo SPI;
+  substituto honesto: loader **vazio** (sem varredura de META-INF/services
+  no APK) com `iterator()` sem elementos.

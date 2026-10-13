@@ -446,6 +446,13 @@ pub fn call_static_intrinsic(
             )?;
             Ok(Some(Value::Obj(r)))
         }
+        // M8 (23º gap real): Android NÃO tem SecurityManager (deprecated na
+        // JDK; APIs de segurança são no-op) ⇒ sempre null.
+        (
+            "Ljava/lang/System;",
+            "getSecurityManager",
+            "()Ljava/lang/SecurityManager;",
+        ) => Ok(Some(Value::Null)),
         // M8 (21º gap real): System.getProperty — tabela da plataforma com
         // valores coerentes com o ambiente Android/VM; desconhecida → null
         // (semântica JDK). getProperty(k,def) devolve def; getProperties fora.
