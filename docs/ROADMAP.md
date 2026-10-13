@@ -530,8 +530,13 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   gap. A classe de fragment do app chama o ctor do super via `invokespecial`;
   o host não tem estado de construção, então é no-op — mesmo padrão de
   `Activity`/`Application`/`Context`. `Fragment <: Object` na hierarquia.
-- ⬜ **Próximo gap (re-sondado)**: `FragmentManager.executePendingTransactions()`
-  no `org.primftpd` 8.2 — no host o `commit` já aplica **sincronamente**; não
-  existe fila pendente, logo a resposta honesta é `false` (semântica AOSP:
-  "nothing was executed"). Lifecycle DEX de fragments, back stack e descoberta
-  SPI real continuam fora do escopo.
+- ✅ **`FragmentManager.executePendingTransactions()` host (entregue nesta
+  rodada)**: trigésimo terceiro gap. No host o `commit` aplica
+  **sincronamente** — não existe fila pendente, logo a resposta honesta é
+  `false` (AOSP: "nothing was executed"). Nunca `NOT_IMPLEMENTED`.
+- ⬜ **Próximo gap (re-sondado)**: `array.clone()` (`[Landroidx/lifecycle/
+  Lifecycle$Event;` — rastro do cache de `values()` do enum; JLS 10.7: arrays
+  são `Cloneable`, clone é shallow copy). Nota: a sondagem seguinte já mostra
+  o **novo regime pós-bootstrap**: exceção Java materializada durante a
+  execução (`NullPointerException: invoke em receiver null`) em vez de
+  `NOT_FOUND` — investigar o call site pede tracing, não só sondagem.

@@ -5732,3 +5732,58 @@ fn fragment_init_e_subtipagem() {
     assert!(e.cp.is_subtype("Lcom/exemplo/MiniFrag;", FRAG_CLS));
     assert!(e.cp.is_subtype(FRAG_CLS, "Ljava/lang/Object;"));
 }
+
+#[test]
+fn fragment_manager_execute_pending_sempre_false() {
+    use rd_vm::framework::call_host_instance;
+    use rd_vm::value::Value;
+    const ACT: &str = "Landroid/app/Activity;";
+    const FM: &str = "Landroid/app/FragmentManager;";
+
+    let mut b = DexBuilder::new();
+    b.class("Lcom/exemplo/PendAct;", ACT);
+    let mut e = engine_of(&b);
+    let act = e
+        .heap
+        .alloc_instance("Lcom/exemplo/PendAct;".to_string(), vec![])
+        .unwrap();
+    let fm = match call_host_instance(
+        &mut e,
+        ACT,
+        "getFragmentManager",
+        "()Landroid/app/FragmentManager;",
+        act,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getFragmentManager: {other:?}"),
+    };
+
+    // Sem transação alguma: false (nada executado).
+    assert_eq!(
+        call_host_instance(&mut e, FM, "executePendingTransactions", "()Z", fm, &[]).unwrap(),
+        Some(Value::Int(0))
+    );
+    // Após commit real: ainda false — o commit já aplicou sincronamente.
+    let tx = match call_host_instance(
+        &mut e,
+        FM,
+        "beginTransaction",
+        "()Landroid/app/FragmentTransaction;",
+        fm,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("beginTransaction: {other:?}"),
+    };
+    const FT: &str = "Landroid/app/FragmentTransaction;";
+    call_host_instance(&mut e, FT, "commit", "()I", tx, &[]).unwrap();
+    assert_eq!(
+        call_host_instance(&mut e, FM, "executePendingTransactions", "()Z", fm, &[]).unwrap(),
+        Some(Value::Int(0))
+    );
+}

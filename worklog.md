@@ -1081,3 +1081,25 @@ GitHub status:
 
 Stage Summary:
 - Sequência Fragments: beginTransaction+tx ✅ (#151) → Fragment.<init> ✅ (esta) → executePendingTransactions (próximo, 33º — false honesto: commit é síncrono).
+
+---
+Task ID: m8-execute-pending
+Agent: Arena Agent Mode (sessão 2026-10-13, início 09:30 UTC — continuação)
+Task: M8 — FragmentManager.executePendingTransactions → false (33º gap do launch real do org.primftpd).
+
+Work Log:
+- Contexto: PR #152 (32º, Fragment.<init>) mergida nesta sessão (6e178c68); sondagem dela parou em executePendingTransactions.
+- rd-vm: arm (FRAGMENT_MANAGER, executePendingTransactions) sig ()Z → Int(0) sempre — no host o commit aplica SINCRONAMENTE, não existe fila pendente; "false" = semântica AOSP "nothing was executed" (honesto — nunca NOT_IMPLEMENTED num caminho real).
+- Teste novo fragment_manager_execute_pending_sempre_false: false sem nenhuma transação e false APÓS um commit real (o commit já aplicou — nada fica pendente).
+- Re-sondagem app real (com array.clone já implementado na working tree — ver próxima entrada): launch atravessou executePending e expôs o 34º gap; após ele, MUDANÇA DE REGIME: exceção Java materializada (NPE "invoke em receiver null") em vez de NOT_FOUND — o bootstrap estrutural COMPLETOU; sondagens seguintes pedem tracing de call site.
+- Catálogo compat_gaps (mcp.rs) e ROADMAP atualizados (33º ✅ / 34º+ regime registrado).
+
+Checks:
+- fmt — PASS. clippy -D warnings — PASS. `cargo test --workspace` (working tree c/ 34º também presente) — PASS (31 suites, 0 falhas; vm_exec 73 nesta árvore). MSRV 1.76 — PASS. md links — PASS. compat-report — PASS (vazio).
+- Probe — regime novo documentado. Scan de segredos — limpo.
+
+GitHub status:
+- Branch feat/m8-execute-pending a ser enviada/PR; merge após CI verde.
+
+Stage Summary:
+- Sequência Fragments: Fragment.<init> ✅ (#152) → executePendingTransactions ✅ (esta) → array.clone (próximo, 34º — JLS 10.7 shallow copy) → pós-bootstrap = exceções materializadas.
