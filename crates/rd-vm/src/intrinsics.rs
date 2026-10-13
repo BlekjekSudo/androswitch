@@ -1452,6 +1452,8 @@ fn queue_supported(name: &str, sig: &str) -> bool {
             | ("isEmpty", "()Z")
             | ("clear", "()V")
             | ("remainingCapacity", "()I")
+            | ("drainTo", "(Ljava/util/Collection;)I")
+            | ("drainTo", "(Ljava/util/Collection;I)I")
     )
 }
 
@@ -1539,6 +1541,65 @@ fn queue_intrinsic(
         ("isEmpty", _) => {
             let empty = list_elems(vm, recv)?.is_empty();
             Ok(Some(Value::Int(empty as i32)))
+        }
+        ("drainTo", _) => {
+            // M8 (28º gap real): drena até maxElements (sem a sobrecarga: tudo)
+            // na ORDEM da fila para a Collection destino, respeitando o add do
+            // destino (Set deduplica — igual à JDK, que chama c.add(e)). O
+            // retorno conta os elementos RETIRADOS da fila (um duplicado
+            // rejeitado por Set.add já saiu daqui — semântica JDK). Destino
+            // null → NPE; drainTo(this) → IllegalArgumentException;
+            // maxElements <= 0 → 0 (JDK); destino fora da superfície de
+            // Collection host (coleção do app) → VM_TYPE_ERROR tipado, pois
+            // não dá para honrar c.add sem chamar DEX.
+            let Some(dst) = args[0].as_ref()? else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "drainTo com Collection destino null",
+                )));
+            };
+            if dst == recv {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/IllegalArgumentException;",
+                    "drainTo para a própria fila",
+                )));
+            }
+            let max = if sig == "(Ljava/util/Collection;I)I" {
+                args[1].as_int()?.max(0) as usize
+            } else {
+                usize::MAX
+            };
+            let is_set = matches!(
+                vm.heap.class_of(dst),
+                Ok(dc) if vm.cp.is_subtype(dc, "Ljava/util/Set;")
+            );
+            let is_collection = matches!(
+                vm.heap.class_of(dst),
+                Ok(dc) if vm.cp.is_subtype(dc, "Ljava/util/Collection;")
+            );
+            if !is_collection {
+                return Err(
+                    "drainTo: destino fora da superfície de Collection host (coleção do app)"
+                        .to_string()
+                        .into(),
+                );
+            }
+            // lazy-init do destino (mesmo estilo dos demais intrínsecos de coleção)
+            if !matches!(vm.fw.objects.get(&dst), Some(HostObj::List { .. })) {
+                vm.fw
+                    .objects
+                    .insert(dst, HostObj::List { elems: Vec::new() });
+            }
+            let k = list_elems(vm, recv)?.len().min(max);
+            let drained: Vec<Value> = list_elems(vm, recv)?.drain(..k).collect();
+            let mut taken = 0usize;
+            for v in drained {
+                if !(is_set && find_elem(vm, dst, &v)?.is_some()) {
+                    list_elems(vm, dst)?.push(v);
+                }
+                taken += 1; // JDK: retirado da fila conta como transferido
+            }
+            Ok(Some(Value::Int(taken as i32)))
         }
         ("clear", _) => {
             list_elems(vm, recv)?.clear();

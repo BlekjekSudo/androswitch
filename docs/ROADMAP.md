@@ -494,7 +494,17 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   sem estado host recebe erro tipado `VM_TYPE_ERROR` em vez de cópia
   silenciosamente vazia/errada. O mesmo construtor vale para
   `LinkedList`/`CopyOnWriteArrayList` via o helper compartilhado.
-- ⬜ **Próximo gap (re-sondado)**: `LinkedBlockingQueue.drainTo(Collection,int)`
-  no `org.primftpd` 8.2 — drenar até `maxElements` para uma Collection
-  destino. Iteração de coleções do app (fonte sem estado host) e descoberta
-  SPI real por `META-INF/services` continuam fora do escopo.
+- ✅ **`LinkedBlockingQueue.drainTo` host (entregue nesta rodada)**: vigésimo
+  oitavo gap. `drainTo(Collection)` e `drainTo(Collection,int)` drenam até
+  `maxElements` (ou tudo) **na ordem FIFO** para o destino, respeitando a
+  semântica de `add` dele (Set deduplica — como na JDK, que chama `c.add(e)`);
+  o retorno conta os **retirados** da fila. Contratos JDK honrados: destino
+  null → NPE, `drainTo(this)` → `IllegalArgumentException`, `maxElements`
+  ≤ 0 → 0. Destino fora da superfície de Collection host (coleção do app) →
+  `VM_TYPE_ERROR` tipado em vez de perda silenciosa; destino host ganha
+  lazy-init como os demais intrínsecos.
+- ⬜ **Próximo gap (re-sondado)**: `Activity.getFragmentManager()` no
+  `org.primftpd` 8.2 — primeiro gap fora de `java.util`: o app completou o
+  bootstrap de coleções e entrou em `android.app`. É o embrião do item
+  **Fragments** do M8 abaixo. Iteração de coleções do app e descoberta SPI
+  real por `META-INF/services` continuam fora do escopo.
