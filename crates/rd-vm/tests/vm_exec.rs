@@ -3278,3 +3278,202 @@ fn atomic_integer_intrinsics() {
     assert!(e.cp.is_subtype(AI, "Ljava/lang/Number;"));
     assert!(e.cp.is_subtype(AI, "Ljava/io/Serializable;"));
 }
+
+/// M8 (compat real): Executors/ExecutorService host — décimo gap do launch do
+/// org.primftpd (`newFixedThreadPool(I,ThreadFactory)`). VM single-threaded ⇒
+/// execução INLINE determinística: execute/submit rodam na hora; submit devolve
+/// Future já completado; pool/ThreadFactory ignorados.
+#[test]
+fn executors_host_inline_execution() {
+    use rd_vm::intrinsics::{call_instance_intrinsic, call_static_intrinsic};
+    use rd_vm::value::Value;
+    const EXECUTORS: &str = "Ljava/util/concurrent/Executors;";
+    const SVC: &str = "Ljava/util/concurrent/ExecutorService;";
+    const FUT: &str = "Ljava/util/concurrent/Future;";
+
+    // LTickX: run() { t++ } · call() { t += 10; return "ok-call" }
+    let mut b = DexBuilder::new();
+    let tick = b.class("LTickX;", "Ljava/lang/Object;");
+    let _ft = b.field_idx("LTickX;", "I", "t");
+    b.static_field(tick, "t", "I", SVal::Int(0));
+    let f_t = b.find_field("LTickX;", "I", "t") as u16;
+    b.direct(
+        tick,
+        "run",
+        "V",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(1, 1, 0, {
+            let mut u = op21c(0x60, 0, f_t); // sget v0, t
+            u.extend(op22b(0xD8, 0, 0, 1)); // add-int/lit8 v0, v0, 1
+            u.extend(op21c(0x67, 0, f_t)); // sput t, v0
+            u.extend(op10x(0x0E)); // return-void
+            u
+        })),
+    );
+    let s_ok = b.intern("ok-call") as u16;
+    b.direct(
+        tick,
+        "call",
+        "Ljava/lang/Object;",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(1, 1, 0, {
+            let mut u = op21c(0x60, 0, f_t); // sget v0, t
+            u.extend(op22b(0xD8, 0, 0, 10)); // add-int/lit8 v0, v0, 10
+            u.extend(op21c(0x67, 0, f_t)); // sput t, v0
+            u.extend(op21c(0x1A, 0, s_ok)); // const-string v0, "ok-call"
+            u.extend(op11x(0x11, 0)); // return v0
+            u
+        })),
+    );
+
+    let mut e = engine_of(&b);
+    let t_of = |e: &Engine| {
+        e.statics
+            .get(&("LTickX;".to_string(), "t".to_string()))
+            .cloned()
+    };
+    let tick_inst = e
+        .heap
+        .alloc_instance("LTickX;".to_string(), vec![])
+        .unwrap();
+
+    // newFixedThreadPool(I, ThreadFactory) → executor host
+    let ex = call_static_intrinsic(
+        &mut e,
+        EXECUTORS,
+        "newFixedThreadPool",
+        "(ILjava/util/concurrent/ThreadFactory;)Ljava/util/concurrent/ExecutorService;",
+        &[Value::Int(4), Value::Null],
+    )
+    .unwrap();
+    let ex = match ex {
+        Some(Value::Obj(r)) => r,
+        other => panic!("executor: {other:?}"),
+    };
+    assert_eq!(
+        call_instance_intrinsic(&mut e, SVC, "isShutdown", "()Z", ex, &[]).unwrap(),
+        Some(Value::Int(0))
+    );
+
+    // execute roda INLINE (síncrono — t já vale 1 na volta)
+    call_instance_intrinsic(
+        &mut e,
+        SVC,
+        "execute",
+        "(Ljava/lang/Runnable;)V",
+        ex,
+        &[Value::Obj(tick_inst)],
+    )
+    .unwrap();
+    assert_eq!(t_of(&e), Some(Value::Int(1)), "execute inline: t=1");
+
+    // submit(Runnable) → Future já completado com null
+    let f = call_instance_intrinsic(
+        &mut e,
+        SVC,
+        "submit",
+        "(Ljava/lang/Runnable;)Ljava/util/concurrent/Future;",
+        ex,
+        &[Value::Obj(tick_inst)],
+    )
+    .unwrap();
+    assert_eq!(
+        t_of(&e),
+        Some(Value::Int(2)),
+        "submit(Runnable) inline: t=2"
+    );
+    let f = match f {
+        Some(Value::Obj(r)) => r,
+        other => panic!("future: {other:?}"),
+    };
+    assert_eq!(
+        call_instance_intrinsic(&mut e, FUT, "isDone", "()Z", f, &[]).unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, FUT, "isCancelled", "()Z", f, &[]).unwrap(),
+        Some(Value::Int(0))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, FUT, "get", "()Ljava/lang/Object;", f, &[]).unwrap(),
+        Some(Value::Null)
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, FUT, "cancel", "(Z)Z", f, &[Value::Int(1)]).unwrap(),
+        Some(Value::Int(0)),
+        "Future já completado não é cancelável"
+    );
+
+    // submit(Callable) → roda call() e captura o resultado no Future
+    let f2 = call_instance_intrinsic(
+        &mut e,
+        SVC,
+        "submit",
+        "(Ljava/util/concurrent/Callable;)Ljava/util/concurrent/Future;",
+        ex,
+        &[Value::Obj(tick_inst)],
+    )
+    .unwrap();
+    assert_eq!(
+        t_of(&e),
+        Some(Value::Int(12)),
+        "submit(Callable) inline: t=12"
+    );
+    let f2 = match f2 {
+        Some(Value::Obj(r)) => r,
+        other => panic!("future2: {other:?}"),
+    };
+    let got = call_instance_intrinsic(&mut e, FUT, "get", "()Ljava/lang/Object;", f2, &[]).unwrap();
+    match got {
+        Some(Value::Obj(r)) => assert_eq!(e.heap.as_str(r).unwrap(), "ok-call"),
+        other => panic!("get do Callable: {other:?}"),
+    }
+
+    // submit(Runnable, result) → Future completado com o resultado dado
+    let f3 = call_instance_intrinsic(
+        &mut e,
+        SVC,
+        "submit",
+        "(Ljava/lang/Runnable;Ljava/lang/Object;)Ljava/util/concurrent/Future;",
+        ex,
+        &[Value::Obj(tick_inst), Value::Int(99)],
+    )
+    .unwrap();
+    let f3 = match f3 {
+        Some(Value::Obj(r)) => r,
+        other => panic!("future3: {other:?}"),
+    };
+    assert_eq!(
+        call_instance_intrinsic(&mut e, FUT, "get", "()Ljava/lang/Object;", f3, &[]).unwrap(),
+        Some(Value::Int(99))
+    );
+
+    // shutdown → isShutdown/isTerminated; shutdownNow → lista vazia
+    call_instance_intrinsic(&mut e, SVC, "shutdown", "()V", ex, &[]).unwrap();
+    assert_eq!(
+        call_instance_intrinsic(&mut e, SVC, "isShutdown", "()Z", ex, &[]).unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, SVC, "isTerminated", "()Z", ex, &[]).unwrap(),
+        Some(Value::Int(1))
+    );
+    let pending =
+        call_instance_intrinsic(&mut e, SVC, "shutdownNow", "()Ljava/util/List;", ex, &[]).unwrap();
+    match pending {
+        Some(Value::Obj(l)) => {
+            assert_eq!(
+                call_instance_intrinsic(&mut e, "Ljava/util/ArrayList;", "size", "()I", l, &[])
+                    .unwrap(),
+                Some(Value::Int(0)),
+                "execução inline ⇒ nada pendente"
+            );
+        }
+        other => panic!("shutdownNow: {other:?}"),
+    }
+
+    // subtipagem: ExecutorService <: Executor
+    assert!(e.cp.is_subtype(SVC, "Ljava/util/concurrent/Executor;"));
+}

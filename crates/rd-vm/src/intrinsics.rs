@@ -17,6 +17,14 @@ const ATOMIC_REF: &str = "Ljava/util/concurrent/atomic/AtomicReference;";
 /// AtomicReference (campo de heap `value`), aritmética i32 com semântica
 /// Java (overflow silencioso — wrapping). VM single-threaded ⇒ CAS exato.
 const ATOMIC_INT: &str = "Ljava/util/concurrent/atomic/AtomicInteger;";
+/// M8: décimo gap do launch real (`Executors.newFixedThreadPool`). A VM é
+/// single-threaded: substituto honesto é um executor que roda Runnables/
+/// Callables INLINE (síncrono/determinístico), ignorando tamanho de pool e
+/// ThreadFactory; `submit` devolve Future já completado.
+const EXECUTORS: &str = "Ljava/util/concurrent/Executors;";
+const EXECUTOR: &str = "Ljava/util/concurrent/Executor;";
+const EXECUTOR_SVC: &str = "Ljava/util/concurrent/ExecutorService;";
+const FUTURE: &str = "Ljava/util/concurrent/Future;";
 const MATH: &str = "Ljava/lang/Math;";
 /// M8 (compat real): coleções java.util host — segundo gap de launch do
 /// org.primftpd (`WeakHashMap.<init>`). WeakHashMap ≡ HashMap (sem GC na
@@ -408,6 +416,12 @@ pub fn call_static_intrinsic(
             )?;
             Ok(Some(Value::Obj(r)))
         }
+        // M8: fábricas de thread pool → executor host (execução inline).
+        // Tamanho do pool e ThreadFactory são ignorados (VM single-threaded).
+        (c, n, s) if c == EXECUTORS && executors_factory(n, s) => {
+            let r = vm.heap.alloc_instance(EXECUTOR_SVC.to_string(), vec![])?;
+            Ok(Some(Value::Obj(r)))
+        }
         _ => {
             if class.starts_with("Ljava/") || class.starts_with("Ljavax/") {
                 return Err(not_implemented(format!("intrínseco {class}->{name}{sig}")).into());
@@ -435,6 +449,183 @@ fn arg_i32(v: &Value) -> i32 {
         Value::Int(i) => *i,
         Value::Long(l) => *l as i32,
         _ => 0,
+    }
+}
+
+/// (name, sig) de fábricas `Executors` suportadas (M8).
+fn executors_factory(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        (
+            "newFixedThreadPool",
+            "(I)Ljava/util/concurrent/ExecutorService;"
+        ) | (
+            "newFixedThreadPool",
+            "(ILjava/util/concurrent/ThreadFactory;)Ljava/util/concurrent/ExecutorService;"
+        ) | (
+            "newSingleThreadExecutor",
+            "()Ljava/util/concurrent/ExecutorService;"
+        ) | (
+            "newSingleThreadExecutor",
+            "(Ljava/util/concurrent/ThreadFactory;)Ljava/util/concurrent/ExecutorService;"
+        ) | (
+            "newCachedThreadPool",
+            "()Ljava/util/concurrent/ExecutorService;"
+        ) | (
+            "newCachedThreadPool",
+            "(Ljava/util/concurrent/ThreadFactory;)Ljava/util/concurrent/ExecutorService;"
+        )
+    )
+}
+
+/// (name, sig) de ExecutorService host suportados (M8).
+fn exec_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("execute", "(Ljava/lang/Runnable;)V")
+            | (
+                "submit",
+                "(Ljava/lang/Runnable;)Ljava/util/concurrent/Future;"
+            )
+            | (
+                "submit",
+                "(Ljava/lang/Runnable;Ljava/lang/Object;)Ljava/util/concurrent/Future;"
+            )
+            | (
+                "submit",
+                "(Ljava/util/concurrent/Callable;)Ljava/util/concurrent/Future;"
+            )
+            | ("shutdown", "()V")
+            | ("shutdownNow", "()Ljava/util/List;")
+            | ("isShutdown", "()Z")
+            | ("isTerminated", "()Z")
+    )
+}
+
+/// (name, sig) de Future host suportados (M8) — sempre já completado.
+fn future_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("get", "()Ljava/lang/Object;")
+            | (
+                "get",
+                "(JLjava/util/concurrent/TimeUnit;)Ljava/lang/Object;"
+            )
+            | ("isDone", "()Z")
+            | ("isCancelled", "()Z")
+            | ("cancel", "(Z)Z")
+    )
+}
+
+/// Roda `Runnable.run()` inline (mesmo mecanismo do drain do Looper).
+fn exec_run_inline(vm: &mut Engine, r: crate::heap::ObjRef) -> Result<(), VmExit> {
+    let rclass = vm.heap.class_of(r)?.to_string();
+    let Some((d, def, m)) = vm.cp.resolve_method(&rclass, "run", "()V") else {
+        return Err(crate::classpath::unresolved_method(&rclass, "run", "()V").into());
+    };
+    vm.call(d, def, &m, vec![Value::Obj(r)])?;
+    Ok(())
+}
+
+/// Roda `Callable.call()` inline e devolve o valor produzido.
+fn exec_call_inline(vm: &mut Engine, r: crate::heap::ObjRef) -> Result<Value, VmExit> {
+    let rclass = vm.heap.class_of(r)?.to_string();
+    let Some((d, def, m)) = vm
+        .cp
+        .resolve_method(&rclass, "call", "()Ljava/lang/Object;")
+    else {
+        return Err(
+            crate::classpath::unresolved_method(&rclass, "call", "()Ljava/lang/Object;").into(),
+        );
+    };
+    vm.call(d, def, &m, vec![Value::Obj(r)])
+}
+
+/// Future já completado com `result` (campo de heap "future_result").
+fn exec_completed_future(vm: &mut Engine, result: Value) -> Result<Option<Value>, VmExit> {
+    let f = vm.heap.alloc_instance(FUTURE.to_string(), vec![])?;
+    crate::err::put_field_result(vm.heap.put_field(f, "future_result", result))?;
+    Ok(Some(Value::Obj(f)))
+}
+
+fn exec_npe(msg: &str) -> VmExit {
+    VmExit::Exception(Throwable::new("Ljava/lang/NullPointerException;", msg))
+}
+
+/// ExecutorService host (M8): execução inline determinística.
+fn exec_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match (name, sig) {
+        ("execute", _) => {
+            let Some(r) = args[0].as_ref()? else {
+                return Err(exec_npe("execute sem runnable"));
+            };
+            exec_run_inline(vm, r)?;
+            Ok(Some(Value::Null))
+        }
+        ("submit", "(Ljava/lang/Runnable;)Ljava/util/concurrent/Future;") => {
+            let Some(r) = args[0].as_ref()? else {
+                return Err(exec_npe("submit sem runnable"));
+            };
+            exec_run_inline(vm, r)?;
+            exec_completed_future(vm, Value::Null)
+        }
+        ("submit", "(Ljava/lang/Runnable;Ljava/lang/Object;)Ljava/util/concurrent/Future;") => {
+            let Some(r) = args[0].as_ref()? else {
+                return Err(exec_npe("submit sem runnable"));
+            };
+            exec_run_inline(vm, r)?;
+            exec_completed_future(vm, args[1].clone())
+        }
+        ("submit", "(Ljava/util/concurrent/Callable;)Ljava/util/concurrent/Future;") => {
+            let Some(r) = args[0].as_ref()? else {
+                return Err(exec_npe("submit sem callable"));
+            };
+            let v = exec_call_inline(vm, r)?;
+            exec_completed_future(vm, v)
+        }
+        ("shutdown", _) => {
+            crate::err::put_field_result(vm.heap.put_field(recv, "exec_shutdown", Value::Int(1)))?;
+            Ok(Some(Value::Null))
+        }
+        ("shutdownNow", _) => {
+            use crate::framework::HostObj;
+            crate::err::put_field_result(vm.heap.put_field(recv, "exec_shutdown", Value::Int(1)))?;
+            // execução é inline ⇒ nunca há fila pendente → lista vazia
+            let l = vm.heap.alloc_instance(ARRAY_LIST.to_string(), vec![])?;
+            vm.fw.objects.insert(l, HostObj::List { elems: Vec::new() });
+            Ok(Some(Value::Obj(l)))
+        }
+        ("isShutdown", _) | ("isTerminated", _) => {
+            let down =
+                matches!(vm.heap.get_field(recv, "exec_shutdown"), Ok(Value::Int(v)) if v != 0);
+            Ok(Some(Value::Int(down as i32)))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Future host (M8): sempre já completado (execução inline).
+fn future_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+) -> Result<Option<Value>, VmExit> {
+    match name {
+        "get" => Ok(Some(
+            vm.heap
+                .get_field(recv, "future_result")
+                .unwrap_or(Value::Null),
+        )),
+        "isDone" => Ok(Some(Value::Int(1))),
+        "isCancelled" => Ok(Some(Value::Int(0))),
+        "cancel" => Ok(Some(Value::Int(0))), // já completado → não cancelável
+        _ => Ok(None),
     }
 }
 
@@ -1217,6 +1408,21 @@ pub fn call_instance_intrinsic_mref(
         (ATOMIC_INT, "toString", "()Ljava/lang/String;") => {
             let t = atomic_int_cur(vm, recv).to_string();
             Ok(Some(Value::Obj(alloc_string(vm, t)?)))
+        }
+
+        // ── ExecutorService/Future host (M8) ────────────────────────────────
+        // Execução INLINE: execute/submit rodam o Runnable/Callable na hora
+        // (determinístico; tamanho do pool irrelevante). Exceções propagam
+        // imediatamente (em Java seriam capturadas no Future) — desvio
+        // documentado em compat_gaps.
+        (c, name, sig)
+            if (c == EXECUTOR_SVC || mref_class == EXECUTOR_SVC || mref_class == EXECUTOR)
+                && exec_supported(name, sig) =>
+        {
+            exec_intrinsic(vm, recv, name, sig, args)
+        }
+        (c, name, sig) if (c == FUTURE || mref_class == FUTURE) && future_supported(name, sig) => {
+            future_intrinsic(vm, recv, name)
         }
 
         // ── coleções java.util (M8) ─────────────────────────────────────────

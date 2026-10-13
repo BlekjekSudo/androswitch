@@ -702,6 +702,7 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
         ]),
         "Ljava/util/concurrent/atomic/AtomicReference;"
         | "Ljava/util/concurrent/atomic/AtomicInteger;" => Some(vec!["Ljava/io/Serializable;"]),
+        "Ljava/util/concurrent/ExecutorService;" => Some(vec!["Ljava/util/concurrent/Executor;"]),
         "Ljava/lang/Enum;" => Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
         _ => None,
     }
