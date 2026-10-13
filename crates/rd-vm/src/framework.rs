@@ -29,6 +29,9 @@ use crate::value::Value;
 
 pub const ACTIVITY: &str = "Landroid/app/Activity;";
 pub const APPLICATION: &str = "Landroid/app/Application;";
+/// M8: FragmentManager legacy (`android.app`, deprecated na API 28 mas ainda
+/// usado por apps reais como o org.primftpd — 29º gap do launch real).
+pub const FRAGMENT_MANAGER: &str = "Landroid/app/FragmentManager;";
 pub const CONTEXT: &str = "Landroid/content/Context;";
 pub const INTENT: &str = "Landroid/content/Intent;";
 pub const BUNDLE: &str = "Landroid/os/Bundle;";
@@ -179,6 +182,9 @@ pub struct HostState {
     /// M8: ClassLoader canônico (um por VM — single-classloader; a distinção
     /// bootstrap=null do Java não se aplica ao runtime host).
     class_loader: Option<ObjRef>,
+    /// M8: FragmentManager canônico do host (um por VM — identidade estável
+    /// como a do ClassLoader; 29º gap do launch real).
+    fragment_manager: Option<ObjRef>,
     /// activity em execução (o app trivial M3 tem uma por vez)
     pub current_activity: Option<ObjRef>,
     /// package do app (preenchido no launch_app; getPackageName)
@@ -434,6 +440,29 @@ impl Engine {
                 ))
             })?;
         self.fw.class_loader = Some(r);
+        Ok(r)
+    }
+
+    /// M8: FragmentManager canônico do host (lazy; identidade estável —
+    /// `getFragmentManager()` devolve sempre o mesmo objeto, como no Android
+    /// real por Activity; a VM tem uma única activity por execução).
+    pub(crate) fn fragment_manager_obj(&mut self) -> Result<ObjRef, VmExit> {
+        if let Some(f) = self.fw.fragment_manager {
+            return Ok(f);
+        }
+        let r = self
+            .heap
+            .alloc_instance(FRAGMENT_MANAGER.to_string(), Vec::new())
+            .map_err(|e| {
+                VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/OutOfMemoryError;",
+                    format!(
+                        "alocação de {} bytes excede o heap de {} bytes",
+                        e.requested, e.budget
+                    ),
+                ))
+            })?;
+        self.fw.fragment_manager = Some(r);
         Ok(r)
     }
 
@@ -1291,6 +1320,14 @@ pub fn call_host_instance(
                 Some(i) => Ok(Some(Value::Obj(i))),
                 None => Err(not_impl("getIntent antes do launch")),
             }
+        }
+        // ── M8 (29º gap real): Activity.getFragmentManager — FragmentManager
+        // canônico do host (identidade estável). O estado de fragments ainda
+        // não existe: back stack/transações seguem tipadas quando sondadas.
+        (ACTIVITY, "getFragmentManager")
+            if sig == "()Landroid/app/FragmentManager;" && is_activity(vm) =>
+        {
+            Ok(Some(Value::Obj(vm.fragment_manager_obj()?)))
         }
         (ACTIVITY, "getPackageName") | (CONTEXT, "getPackageName") if is_activity(vm) => {
             let s = vm.fw.package_name.clone();

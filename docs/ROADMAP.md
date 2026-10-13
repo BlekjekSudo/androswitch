@@ -503,8 +503,15 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   ≤ 0 → 0. Destino fora da superfície de Collection host (coleção do app) →
   `VM_TYPE_ERROR` tipado em vez de perda silenciosa; destino host ganha
   lazy-init como os demais intrínsecos.
-- ⬜ **Próximo gap (re-sondado)**: `Activity.getFragmentManager()` no
-  `org.primftpd` 8.2 — primeiro gap fora de `java.util`: o app completou o
-  bootstrap de coleções e entrou em `android.app`. É o embrião do item
-  **Fragments** do M8 abaixo. Iteração de coleções do app e descoberta SPI
-  real por `META-INF/services` continuam fora do escopo.
+- ✅ **`Activity.getFragmentManager()` host (entregue nesta rodada)**: vigésimo
+  nono gap e o **primeiro em `android.app`** — o app completou o bootstrap
+  `java.util` e entrou no framework. Devolve o `FragmentManager` **canônico**
+  por VM (lazy, identidade estável — mesmo objeto em chamadas repetidas, como
+  no Android real por Activity; o runtime executa uma activity por vez).
+  O estado de fragments (back stack/transações) ainda não existe: métodos do
+  FM seguem sendo sondados um a um.
+- ⬜ **Próximo gap (re-sondado)**: `FragmentManager.findFragmentByTag(String)`
+  no `org.primftpd` 8.2 — com o FM do host ainda vazio, a resposta honesta é
+  `null`. Transações (`beginTransaction`/`add`/`replace`/`commit`) e estado de
+  fragments seguem fora até a sondagem exigir, assim como coleções do app e
+  descoberta SPI real por `META-INF/services`.
