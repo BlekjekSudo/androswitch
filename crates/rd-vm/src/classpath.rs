@@ -597,6 +597,11 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         ]),
         "Ljava/util/AbstractMap;" => Some(OBJECT.to_vec()),
         "Ljava/util/HashMap;" => Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"]),
+        "Ljava/util/LinkedHashMap;" => Some(vec![
+            "Ljava/util/HashMap;",
+            "Ljava/util/AbstractMap;",
+            "Ljava/lang/Object;",
+        ]),
         "Ljava/util/WeakHashMap;" => Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"]),
         "Ljava/util/ArrayList;" => Some(vec![
             "Ljava/util/AbstractList;",
@@ -658,7 +663,7 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",
         ]),
-        "Ljava/util/WeakHashMap;" => Some(MAP_IFACES.to_vec()),
+        "Ljava/util/WeakHashMap;" | "Ljava/util/LinkedHashMap;" => Some(MAP_IFACES.to_vec()),
         "Ljava/util/ArrayList;" => Some(vec![
             "Ljava/util/List;",
             "Ljava/util/Collection;",

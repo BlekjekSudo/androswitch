@@ -338,6 +338,12 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   conheciam as classes host do M8 (coleções/atomic/ref/Enum); agora têm
   cadeias de classe e closures de interface completas (List/Set →
   Collection → Iterable etc.).
-- ⬜ **Próximo gap (achado honesto)**: `LinkedHashMap.<init>()V` — mesmo
-  padrão do HashMap host (guarda do Map); ordem de iteração segue não
-  garantida (BTreeMap por chave string — documentado).
+- ✅ **`LinkedHashMap` host (entregue nesta rodada)**: sétimo gap
+  (`<init>()V`) — entra na guarda do Map (métodos essenciais ≡ HashMap;
+  ordem de iteração NÃO garantida, documentado) e na hierarquia
+  (`LinkedHashMap <: HashMap <: AbstractMap`, iface `Map`). Com isso o
+  launch real atravessa TODO o grupo java.util que era gap.
+- ⬜ **Próximo gap (achado honesto)**:
+  `android.os.SystemClock.uptimeMillis()J` — família nova (framework
+  Android host, domínio M3.2); `elapsedRealtime`/`sleep` provavelmente na
+  sequência.

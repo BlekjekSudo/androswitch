@@ -3091,3 +3091,70 @@ fn cow_collections_host_intrinsics() {
         Some(Value::Int(1))
     );
 }
+
+/// M8 (compat real): LinkedHashMap host — sétimo gap do launch do
+/// org.primftpd (`LinkedHashMap.<init>()V`). Métodos essenciais ≡ HashMap
+/// (ordem de iteração não garantida — documentado); subtipo de HashMap/Map.
+#[test]
+fn linked_hash_map_host_intrinsics() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const LHM: &str = "Ljava/util/LinkedHashMap;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let m = e.heap.alloc_instance(LHM.to_string(), vec![]).unwrap();
+    let call = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic(e, LHM, name, sig, m, &args).expect("intrínseco")
+    };
+
+    call(&mut e, "<init>", "()V", vec![]);
+    assert_eq!(call(&mut e, "isEmpty", "()Z", vec![]), Some(Value::Int(1)));
+    let k = e.heap.alloc_string("chave".into()).unwrap();
+    let v = e.heap.alloc_string("valor".into()).unwrap();
+    assert_eq!(
+        call(
+            &mut e,
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Obj(k), Value::Obj(v)]
+        ),
+        Some(Value::Null),
+        "put de chave nova → null (anterior)"
+    );
+    assert_eq!(call(&mut e, "size", "()I", vec![]), Some(Value::Int(1)));
+    assert_eq!(
+        call(
+            &mut e,
+            "get",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Obj(k)]
+        ),
+        Some(Value::Obj(v))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "containsKey",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Obj(k)]
+        ),
+        Some(Value::Int(1))
+    );
+    // subtipagem: LinkedHashMap <: HashMap <: AbstractMap e <: Map
+    assert!(e.cp.is_subtype(LHM, "Ljava/util/HashMap;"));
+    assert!(e.cp.is_subtype(LHM, "Ljava/util/AbstractMap;"));
+    assert!(e.cp.is_subtype(LHM, "Ljava/util/Map;"));
+    assert!(!e.cp.is_subtype(LHM, "Ljava/util/List;"));
+    // remove devolve o valor removido
+    assert_eq!(
+        call(
+            &mut e,
+            "remove",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Obj(k)]
+        ),
+        Some(Value::Obj(v))
+    );
+    assert_eq!(call(&mut e, "size", "()I", vec![]), Some(Value::Int(0)));
+}

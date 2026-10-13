@@ -607,3 +607,17 @@ Work Log:
 Stage Summary:
 - Workspace: 345 testes passam, 0 falham; fmt/clippy(0)/links/matrix verdes.
 - Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → ARFU ✅ → COW+casts ✅ → LinkedHashMap (próximo).
+
+---
+Task ID: m8-linked-hash-map
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração N)
+Task: M8 — LinkedHashMap host (7º gap do launch real do org.primftpd).
+
+Work Log:
+- rd-vm intrinsics: LINKED_MAP entra na guarda do arm de Map (map_supported: <init> variantes, put/get/remove/containsKey/containsValue/size/isEmpty/clear) — comportamento ≡ HashMap host; ordem de iteração NÃO garantida (BTreeMap por chave string, documentado).
+- classpath: builtin_hierarchy (LinkedHashMap <: HashMap <: AbstractMap <: Object) + builtin_interfaces (Map).
+- Teste: linked_hash_map_host_intrinsics (init/isEmpty/put→null/size/get/containsKey/remove→valor + subtipagem positiva e negativa).
+- Re-sondagem app real: gap resolvido; launch atravessa todo o grupo java.util e avança até android.os.SystemClock.uptimeMillis()J (família nova: framework Android — registrado como próximo gap).
+
+Stage Summary:
+- Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → ARFU ✅ → COW+casts ✅ → LinkedHashMap ✅ → SystemClock (próximo).
