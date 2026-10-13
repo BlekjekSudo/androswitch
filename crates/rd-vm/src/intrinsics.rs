@@ -31,6 +31,10 @@ const EXECUTORS: &str = "Ljava/util/concurrent/Executors;";
 const EXECUTOR: &str = "Ljava/util/concurrent/Executor;";
 const EXECUTOR_SVC: &str = "Ljava/util/concurrent/ExecutorService;";
 const FUTURE: &str = "Ljava/util/concurrent/Future;";
+/// M8: 24º gap do launch real (`ServiceLoader.load`). Sem leitura de
+/// `META-INF/services` no APK, o loader é deliberadamente vazio; isso mantém
+/// o caminho de inicialização vivo sem inventar providers que não existem.
+const SERVICE_LOADER: &str = "Ljava/util/ServiceLoader;";
 use crate::framework::{CLASS, THREAD};
 const MATH: &str = "Ljava/lang/Math;";
 /// M8 (compat real): coleções java.util host — segundo gap de launch do
@@ -492,6 +496,30 @@ pub fn call_static_intrinsic(
             };
             Ok(Some(Value::Obj(r)))
         }
+        // M8 (24º gap real): ServiceLoader sem providers. O runtime ainda não
+        // lê `META-INF/services` do APK; devolver um loader vazio é explícito e
+        // seguro (sem descoberta/instanciação implícita de código desconhecido).
+        // O ClassLoader pode ser null (bootstrap) na API Java; só service é
+        // obrigatório e precisa preservar a NPE de contrato.
+        (
+            SERVICE_LOADER,
+            "load",
+            "(Ljava/lang/Class;)Ljava/util/ServiceLoader;",
+        )
+        | (
+            SERVICE_LOADER,
+            "load",
+            "(Ljava/lang/Class;Ljava/lang/ClassLoader;)Ljava/util/ServiceLoader;",
+        ) => {
+            if args[0].as_ref()?.is_none() {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "ServiceLoader.load com service null",
+                )));
+            }
+            let r = vm.heap.alloc_instance(SERVICE_LOADER.to_string(), vec![])?;
+            Ok(Some(Value::Obj(r)))
+        }
         // M8: fábricas de thread pool → executor host (execução inline).
         // Tamanho do pool e ThreadFactory são ignorados (VM single-threaded).
         (c, n, s) if c == EXECUTORS && executors_factory(n, s) => {
@@ -781,6 +809,26 @@ fn future_intrinsic(
         "cancel" => Ok(Some(Value::Int(0))), // já completado → não cancelável
         _ => Ok(None),
     }
+}
+
+/// (name, sig) de `ServiceLoader` suportados (M8). O loader host é sempre
+/// vazio enquanto a leitura de `META-INF/services` não fizer parte do runtime.
+fn service_loader_supported(name: &str, sig: &str) -> bool {
+    matches!((name, sig), ("iterator", "()Ljava/util/Iterator;"))
+}
+
+/// `ServiceLoader` vazio (M8): a descoberta SPI não é implementada, mas o
+/// fluxo normal `ServiceLoader.load(...).iterator()` é seguro e determinístico.
+fn service_loader_intrinsic(vm: &mut Engine) -> Result<Option<Value>, VmExit> {
+    let it = vm.heap.alloc_instance(ITERATOR.to_string(), vec![])?;
+    vm.fw.objects.insert(
+        it,
+        crate::framework::HostObj::Iter {
+            elems: Vec::new(),
+            pos: 0,
+        },
+    );
+    Ok(Some(Value::Obj(it)))
 }
 
 /// (name, sig) de Iterator host suportados (M8).
@@ -2253,6 +2301,11 @@ pub fn call_instance_intrinsic_mref(
                         && vm.cp.resolve_method(recv_class, name, sig).is_none())) =>
         {
             thread_local_intrinsic(vm, recv, recv_class, name, args)
+        }
+        // ServiceLoader (M8): descoberta SPI fora do escopo por enquanto;
+        // iterator() é um Iterator host vazio, nunca uma falha silenciosa.
+        (c, name, sig) if c == SERVICE_LOADER && service_loader_supported(name, sig) => {
+            service_loader_intrinsic(vm)
         }
         // iterator() de List/Set host (incl. views de Map) — M8
         (c, name, sig)
