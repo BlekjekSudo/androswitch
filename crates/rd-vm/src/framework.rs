@@ -1575,6 +1575,10 @@ pub fn call_host_instance(
         (FRAGMENT_TX, _) if fragment_tx_supported(name, sig) => {
             fragment_tx_intrinsic(vm, recv, name, args)
         }
+        // ── M8 (33º gap real): executePendingTransactions — no host o commit
+        // aplica SINCRONAMENTE, nunca há fila pendente; resposta honesta é
+        // false (AOSP: "nothing was executed"). Nunca NOT_IMPLEMENTED.
+        (FRAGMENT_MANAGER, "executePendingTransactions") if sig == "()Z" => Ok(Some(Value::Int(0))),
         (ACTIVITY, "getPackageName") | (CONTEXT, "getPackageName") if is_activity(vm) => {
             let s = vm.fw.package_name.clone();
             Ok(Some(Value::Obj(intrinsics::alloc_string(vm, s)?)))
