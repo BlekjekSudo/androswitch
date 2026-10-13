@@ -5181,3 +5181,163 @@ fn array_list_collection_ctor_snapshots_source() {
         other => panic!("esperava VM_TYPE_ERROR, got {other:?}"),
     }
 }
+
+#[test]
+fn linked_blocking_queue_drain_to_host() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const Q: &str = "Ljava/util/concurrent/LinkedBlockingQueue;";
+    const AL: &str = "Ljava/util/ArrayList;";
+    const LHS: &str = "Ljava/util/LinkedHashSet;";
+    const DRAIN: &str = "(Ljava/util/Collection;)I";
+    const DRAIN_N: &str = "(Ljava/util/Collection;I)I";
+
+    let mut b = DexBuilder::new();
+    b.class("Lcom/exemplo/Dst;", "Ljava/lang/Object;");
+    let mut e = engine_of(&b);
+
+    let mk_queue = |e: &mut Engine, vals: &[&str]| {
+        let q = e.heap.alloc_instance(Q.to_string(), vec![]).unwrap();
+        call_instance_intrinsic(e, Q, "<init>", "()V", q, &[]).unwrap();
+        for s in vals {
+            let o = e.heap.alloc_string((*s).into()).unwrap();
+            call_instance_intrinsic(e, Q, "add", "(Ljava/lang/Object;)Z", q, &[Value::Obj(o)])
+                .unwrap();
+        }
+        q
+    };
+    let mk_list = |e: &mut Engine| {
+        let l = e.heap.alloc_instance(AL.to_string(), vec![]).unwrap();
+        call_instance_intrinsic(e, AL, "<init>", "()V", l, &[]).unwrap();
+        l
+    };
+
+    // drainTo(c): esvazia na ordem FIFO; retorno = retirados.
+    let q = mk_queue(&mut e, &["a", "b", "c"]);
+    let list = mk_list(&mut e);
+    assert_eq!(
+        call_instance_intrinsic(&mut e, Q, "drainTo", DRAIN, q, &[Value::Obj(list)]).unwrap(),
+        Some(Value::Int(3))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, Q, "size", "()I", q, &[]).unwrap(),
+        Some(Value::Int(0))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, AL, "size", "()I", list, &[]).unwrap(),
+        Some(Value::Int(3))
+    );
+    for (i, want) in ["a", "b", "c"].iter().enumerate() {
+        match call_instance_intrinsic(
+            &mut e,
+            AL,
+            "get",
+            "(I)Ljava/lang/Object;",
+            list,
+            &[Value::Int(i as i32)],
+        )
+        .unwrap()
+        {
+            Some(Value::Obj(r)) => assert_eq!(e.heap.as_str(r).unwrap(), *want),
+            other => panic!("get({i}): {other:?}"),
+        }
+    }
+
+    // drainTo(c, max): só os primeiros `max`; o resto permanece na fila.
+    let q2 = mk_queue(&mut e, &["x", "y", "z"]);
+    let list2 = mk_list(&mut e);
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            Q,
+            "drainTo",
+            DRAIN_N,
+            q2,
+            &[Value::Obj(list2), Value::Int(2)]
+        )
+        .unwrap(),
+        Some(Value::Int(2))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, Q, "size", "()I", q2, &[]).unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, AL, "size", "()I", list2, &[]).unwrap(),
+        Some(Value::Int(2))
+    );
+
+    // maxElements <= 0 → 0, nada se move (JDK).
+    let q3 = mk_queue(&mut e, &["s"]);
+    let list3 = mk_list(&mut e);
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            Q,
+            "drainTo",
+            DRAIN_N,
+            q3,
+            &[Value::Obj(list3), Value::Int(0)]
+        )
+        .unwrap(),
+        Some(Value::Int(0))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, Q, "size", "()I", q3, &[]).unwrap(),
+        Some(Value::Int(1))
+    );
+
+    // Destino Set: deduplica no add, mas o retorno conta os RETIRADOS (JDK).
+    let q4 = mk_queue(&mut e, &["a", "a", "b"]);
+    let set = e.heap.alloc_instance(LHS.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(&mut e, LHS, "<init>", "()V", set, &[]).unwrap();
+    assert_eq!(
+        call_instance_intrinsic(&mut e, Q, "drainTo", DRAIN, q4, &[Value::Obj(set)]).unwrap(),
+        Some(Value::Int(3))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, LHS, "size", "()I", set, &[]).unwrap(),
+        Some(Value::Int(2))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, Q, "size", "()I", q4, &[]).unwrap(),
+        Some(Value::Int(0))
+    );
+
+    // Destino lazy-init (ArrayList sem <init> host interceptado antes).
+    let q5 = mk_queue(&mut e, &["w"]);
+    let lazy = e.heap.alloc_instance(AL.to_string(), vec![]).unwrap();
+    assert_eq!(
+        call_instance_intrinsic(&mut e, Q, "drainTo", DRAIN, q5, &[Value::Obj(lazy)]).unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, AL, "size", "()I", lazy, &[]).unwrap(),
+        Some(Value::Int(1))
+    );
+
+    // Contratos: null → NPE; drainTo(this) → IllegalArgumentException; destino
+    // do app (sem superfície Collection host) → VM_TYPE_ERROR sem drenar nada.
+    let q6 = mk_queue(&mut e, &["k"]);
+    match call_instance_intrinsic(&mut e, Q, "drainTo", DRAIN, q6, &[Value::Null]) {
+        Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/lang/NullPointerException;"),
+        other => panic!("esperava NPE, got {other:?}"),
+    }
+    match call_instance_intrinsic(&mut e, Q, "drainTo", DRAIN, q6, &[Value::Obj(q6)]) {
+        Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/lang/IllegalArgumentException;"),
+        other => panic!("esperava IllegalArgumentException, got {other:?}"),
+    }
+    let app = e
+        .heap
+        .alloc_instance("Lcom/exemplo/Dst;".to_string(), vec![])
+        .unwrap();
+    match call_instance_intrinsic(&mut e, Q, "drainTo", DRAIN, q6, &[Value::Obj(app)]) {
+        Err(VmExit::Error(err)) => assert_eq!(err.code, "VM_TYPE_ERROR"),
+        other => panic!("esperava VM_TYPE_ERROR, got {other:?}"),
+    }
+    assert_eq!(
+        call_instance_intrinsic(&mut e, Q, "size", "()I", q6, &[]).unwrap(),
+        Some(Value::Int(1)),
+        "falha de contrato não pode drenar a fila"
+    );
+}

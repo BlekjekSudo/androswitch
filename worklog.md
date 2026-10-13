@@ -961,3 +961,29 @@ GitHub status:
 
 Stage Summary:
 - Sequência: … → getResources+Enumeration ✅ (#146) → ArrayList(Collection) ✅ (esta) → LinkedBlockingQueue.drainTo(Collection,int) (próximo, 28º).
+
+---
+Task ID: m8-lbq-drainto
+Agent: Arena Agent Mode (sessão 2026-10-13, início 09:30 UTC — continuação)
+Task: M8 — LinkedBlockingQueue.drainTo(Collection)/(Collection,int) host (28º gap do launch real do org.primftpd).
+
+Work Log:
+- Contexto: PR #147 (27º, ArrayList(Collection)) mergida nesta sessão (d85db284) após CI 6/6 verde; sondagem dela parou em drainTo. Trabalho movido para branch própria (feat/m8-lbq-drainto).
+- rd-vm: queue_supported += drainTo (2 sobrecargas); queue_intrinsic drena até max (ou tudo) na ordem FIFO p/ destino host, respeitando o add do destino (Set deduplica via find_elem — JDK chama c.add). Retorno = RETIRADOS da fila (dup rejeitado por Set.add já saiu — semântica JDK). Contratos: null → NPE; drainTo(this) → IllegalArgumentException; max<=0 → 0. Destino aceito = subtipo conhecido de Collection (lazy-init no estilo dos outros intrínsecos); coleção do app → VM_TYPE_ERROR (From<String> → vm_error — sem drenar nada primeiro: validação ANTES da mutação).
+- Bug de processo pego pelos gates: clippy useless_format na 1ª versão (format! com literal) → trocado para to_string; gates re-rodados.
+- Teste novo linked_blocking_queue_drain_to_host: ordem FIFO + retorno 3 e fila vazia; max=2 deixa 1 na fila; max=0 → 0; Set dedup com retorno 3 (retirados) e set size 2; destino lazy-init ArrayList; NPE/IAE/VM_TYPE_ERROR com fila INTACTA após falha de contrato.
+- Re-sondagem app real: launch atravessou drainTo e COMPLETOU toda a sequência java.util do bootstrap — agora para no 29º gap NOT_FOUND, o primeiro em android.app: `Activity.getFragmentManager()` (embrião do item Fragments do roadmap).
+- Catálogo compat_gaps (mcp.rs) e ROADMAP atualizados (28º ✅ / 29º re-sondado ⬜ android.app).
+
+Checks:
+- `cargo fmt --all -- --check` — PASS. `cargo clippy --workspace --all-targets -- -D warnings` — PASS (após fix useless_format).
+- `cargo test --workspace` — PASS (31 suites, 0 falhas; vm_exec 68 testes — +1 novo).
+- `rustup run 1.76.0 cargo check --workspace` — PASS. md links — PASS. compat-report diff — PASS (vazio).
+- `rd app run golden-apks/org.primftpd.apk --json` — avança além de drainTo; para no 29º gap registrado. Scan de segredos — limpo.
+
+GitHub status:
+- Branch feat/m8-lbq-drainto a ser enviada/PR; merge após CI verde.
+
+Stage Summary:
+- Sequência: … → ArrayList(Collection) ✅ (#147) → drainTo ✅ (esta) → Activity.getFragmentManager (próximo, 29º — PRIMEIRO gap android.app; transição java.util → framework).
+- Nota arquitetural p/ o próximo: getFragmentManager abre o item Fragments (M8): FM canônico por Activity (estilo class_loader_obj), FragmentTransaction com add/replace/commit gravando estado; beginTransactionFragment/Attach de preference-fragment é o uso provável do primftpd. Escopo mínimo honesto: devolver FM host vazio + tipar o que ainda não for tratado.
