@@ -833,3 +833,101 @@ fn system_clock_host_statics() {
         Some(Value::Long(2000))
     );
 }
+
+/// M8 (compat real): Looper.getThread/Thread host — 11º gap do launch do
+/// org.primftpd. VM single-threaded ⇒ UMA thread sintética "main" (id 1,
+/// não-daemon): getThread/currentThread devolvem sempre o mesmo objeto.
+/// Dispatch real: Looper.getThread via framework (Landroid/); Thread
+/// (Ljava/) via intrinsics — statics E métodos de instância.
+#[test]
+fn looper_thread_host_single_thread() {
+    use rd_vm::framework::{call_host_instance, call_host_static};
+    use rd_vm::intrinsics::{call_instance_intrinsic, call_static_intrinsic};
+    const THREAD: &str = "Ljava/lang/Thread;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+
+    // Looper.getThread (instância, framework) — sobre o Looper main
+    let looper = call_host_static(
+        &mut e,
+        "Landroid/os/Looper;",
+        "getMainLooper",
+        "()Landroid/os/Looper;",
+        &[],
+    )
+    .expect("getMainLooper");
+    let looper = match looper {
+        Some(Value::Obj(r)) => r,
+        other => panic!("looper: {other:?}"),
+    };
+    let t = call_host_instance(
+        &mut e,
+        "Landroid/os/Looper;",
+        "getThread",
+        "()Ljava/lang/Thread;",
+        looper,
+        &[],
+    )
+    .expect("getThread");
+    let t = match t {
+        Some(Value::Obj(r)) => r,
+        other => panic!("thread: {other:?}"),
+    };
+
+    // Thread.currentThread (static, intrinsics) → MESMO objeto (identidade)
+    let cur = call_static_intrinsic(&mut e, THREAD, "currentThread", "()Ljava/lang/Thread;", &[])
+        .expect("currentThread");
+    assert_eq!(cur, Some(Value::Obj(t)), "thread única: mesma referência");
+
+    // métodos da Thread host (instância, intrinsics)
+    let call_t = |e: &mut rd_vm::engine::Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic(e, THREAD, name, sig, t, &args).expect("thread method")
+    };
+    assert_eq!(call_t(&mut e, "getId", "()J", vec![]), Some(Value::Long(1)));
+    assert_eq!(
+        call_t(&mut e, "threadId", "()I", vec![]),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call_t(&mut e, "isDaemon", "()Z", vec![]),
+        Some(Value::Int(0))
+    );
+    assert_eq!(
+        call_t(&mut e, "isAlive", "()Z", vec![]),
+        Some(Value::Int(1))
+    );
+    let nm = call_t(&mut e, "getName", "()Ljava/lang/String;", vec![]);
+    match nm {
+        Some(Value::Obj(r)) => assert_eq!(e.heap.as_str(r).unwrap(), "main"),
+        other => panic!("getName: {other:?}"),
+    }
+    assert_eq!(
+        call_t(
+            &mut e,
+            "setName",
+            "(Ljava/lang/String;)V",
+            vec![Value::Null]
+        ),
+        Some(Value::Null)
+    );
+    let ts = call_t(&mut e, "toString", "()Ljava/lang/String;", vec![]);
+    match ts {
+        Some(Value::Obj(r)) => assert_eq!(e.heap.as_str(r).unwrap(), "Thread[main,1,main]"),
+        other => panic!("toString: {other:?}"),
+    }
+
+    // classe e subtipagem: Thread <: Object; Thread implementa Runnable
+    assert_eq!(e.heap.class_of(t).unwrap(), THREAD);
+    assert!(e.cp.is_subtype(THREAD, "Ljava/lang/Runnable;"));
+
+    // Thread.sleep(ms) avança o relógio virtual (≡ SystemClock.sleep); yield é no-op
+    e.advance_clock(100).expect("clock");
+    call_static_intrinsic(&mut e, THREAD, "sleep", "(J)V", &[Value::Long(250)]).expect("sleep");
+    assert_eq!(e.fw.clock(), 350);
+    call_static_intrinsic(&mut e, THREAD, "yield", "()V", &[]).expect("yield");
+    assert_eq!(e.fw.clock(), 350);
+    // sleep negativo → relógio não retrocede
+    call_static_intrinsic(&mut e, THREAD, "sleep", "(J)V", &[Value::Long(-5)]).expect("sleep");
+    assert_eq!(e.fw.clock(), 350);
+}

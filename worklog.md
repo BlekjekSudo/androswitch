@@ -666,3 +666,18 @@ Work Log:
 
 Stage Summary:
 - Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → ARFU ✅ → COW+casts ✅ → LinkedHashMap ✅ → SystemClock ✅ → AtomicInteger ✅ → Executors ✅ → Looper.getThread (próximo).
+
+---
+Task ID: m8-looper-thread
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração R)
+Task: M8 — Looper.getThread + Thread host single-threaded (11º gap do launch real).
+
+Work Log:
+- framework: HostState.main_thread (lazy, como main_looper) + main_thread_obj() pub(crate); call_host_instance (LOOPER,"getThread") → thread "main". THREAD arms que estavam no framework foram REMOVIDOS (Ljava/lang/Thread; despacha via intrinsics, não Landroid/) — aprendizado de dispatch registrado.
+- intrinsics: statics Thread.currentThread (→ mesma ref), sleep(J)V/(JI)V (avança relógio virtual, ms<0 ignorado), yield (no-op); instância (c == THREAD, whitelist): getName "main", setName ignorado, getId 1L, threadId 1, isDaemon 0, isAlive 1, toString "Thread[main,1,main]".
+- classpath: Thread <: Object + implements Runnable.
+- Teste: looper_thread_host_single_thread (getThread ≡ currentThread por identidade; todos os getters; sleep/yield sobre o relógio virtual; sleep negativo não retrocede).
+- Re-sondagem app real: gap resolvido; launch atravessa android.os e avança até androidx.lifecycle.Lifecycle$State.compareTo(Ljava/lang/Enum;)I — enum do APP herda compareTo do Enum host sem DEX (registrado: fallback de subtipagem + compareTo).
+
+Stage Summary:
+- Sequência de gaps do primftpd: … → AtomicInteger ✅ → Executors ✅ → Thread ✅ → Enum.compareTo herdado (próximo).
