@@ -61,6 +61,12 @@ const LINKED_MAP: &str = "Ljava/util/LinkedHashMap;";
 /// single-threaded ⇒ sem segmentação/concorrência: mesmo estado e métodos do
 /// HashMap host. `putIfAbsent`/`computeIfAbsent` ficam para sondagem futura.
 const CONCURRENT_MAP: &str = "Ljava/util/concurrent/ConcurrentHashMap;";
+/// M8: 18º gap do launch real (`LinkedBlockingQueue.<init>`). FIFO sobre o
+/// estado List. BLOQUEANTES (take/put com condição) são fail-fast em VM
+/// single-threaded: bloquear sem outra thread = deadlock ⇒ `take`/`poll(J,…)`
+/// com fila vazia materializam `IllegalStateException` tipado (honesto:
+/// prefere falha visível a pendurar). `offer`/`add`/`poll()`/`peek` normais.
+const BLOCKING_Q: &str = "Ljava/util/concurrent/LinkedBlockingQueue;";
 const ARRAY_LIST: &str = "Ljava/util/ArrayList;";
 const LINKED_LIST: &str = "Ljava/util/LinkedList;";
 /// M8: coleções concorrentes — sexto gap do launch real
@@ -1155,6 +1161,130 @@ fn find_elem(
     Ok(None)
 }
 
+/// (name, sig) de LinkedBlockingQueue host suportados (M8).
+fn queue_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("<init>", "()V")
+            | ("<init>", "(I)V")
+            | ("offer", "(Ljava/lang/Object;)Z")
+            | (
+                "offer",
+                "(Ljava/lang/Object;JLjava/util/concurrent/TimeUnit;)Z"
+            )
+            | ("add", "(Ljava/lang/Object;)Z")
+            | ("put", "(Ljava/lang/Object;)V")
+            | ("poll", "()Ljava/lang/Object;")
+            | (
+                "poll",
+                "(JLjava/util/concurrent/TimeUnit;)Ljava/lang/Object;"
+            )
+            | ("take", "()Ljava/lang/Object;")
+            | ("peek", "()Ljava/lang/Object;")
+            | ("element", "()Ljava/lang/Object;")
+            | ("remove", "(Ljava/lang/Object;)Z")
+            | ("contains", "(Ljava/lang/Object;)Z")
+            | ("size", "()I")
+            | ("isEmpty", "()Z")
+            | ("clear", "()V")
+            | ("remainingCapacity", "()I")
+    )
+}
+
+fn queue_blocked() -> VmExit {
+    VmExit::Exception(Throwable::new(
+        "Ljava/lang/IllegalStateException;",
+        "fila vazia: take/poll bloqueante é deadlock em VM single-threaded (substituto honesto: falha visível)",
+    ))
+}
+
+/// LinkedBlockingQueue host (M8): FIFO sobre `HostObj::List` (frente = 0).
+/// Capacidade é ignorada (unbounded — como o default da JDK); null rejeitado.
+fn queue_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    use crate::framework::HostObj;
+    if name == "<init>" {
+        vm.fw
+            .objects
+            .insert(recv, HostObj::List { elems: Vec::new() });
+        return Ok(Some(Value::Null));
+    }
+    if !matches!(vm.fw.objects.get(&recv), Some(HostObj::List { .. })) {
+        vm.fw
+            .objects
+            .insert(recv, HostObj::List { elems: Vec::new() });
+    }
+    match (name, sig) {
+        ("offer", _) | ("add", _) | ("put", _) => {
+            if matches!(args[0], Value::Null) {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "LinkedBlockingQueue não aceita null (como na JDK)",
+                )));
+            }
+            // capacidade ignorada ⇒ offer/put nunca bloqueiam (unbounded)
+            list_elems(vm, recv)?.push(args[0].clone());
+            Ok(Some(if name == "put" {
+                Value::Null
+            } else {
+                Value::Int(1)
+            }))
+        }
+        ("poll", "()Ljava/lang/Object;") | ("peek", _) => {
+            let v = {
+                let elems = list_elems(vm, recv)?;
+                elems.first().cloned()
+            };
+            if name == "poll" {
+                if v.is_none() {
+                    return Ok(Some(Value::Null));
+                }
+                list_elems(vm, recv)?.remove(0);
+            }
+            Ok(Some(v.unwrap_or(Value::Null)))
+        }
+        ("poll", _) | ("take", _) | ("element", _) => {
+            // bloqueantes/element em fila vazia → falha visível (sem deadlock)
+            let elems = list_elems(vm, recv)?;
+            if elems.is_empty() {
+                if name == "element" {
+                    return Err(deque_empty_nse());
+                }
+                return Err(queue_blocked());
+            }
+            Ok(Some(elems.remove(0)))
+        }
+        ("remove", _) | ("contains", _) => {
+            let idx = find_elem(vm, recv, &args[0])?;
+            if name == "remove" {
+                if let Some(i) = idx {
+                    list_elems(vm, recv)?.remove(i);
+                }
+            }
+            Ok(Some(Value::Int(idx.is_some() as i32)))
+        }
+        ("size", _) => {
+            let n = list_elems(vm, recv)?.len();
+            Ok(Some(Value::Int(n as i32)))
+        }
+        ("isEmpty", _) => {
+            let empty = list_elems(vm, recv)?.is_empty();
+            Ok(Some(Value::Int(empty as i32)))
+        }
+        ("clear", _) => {
+            list_elems(vm, recv)?.clear();
+            Ok(Some(Value::Null))
+        }
+        ("remainingCapacity", _) => Ok(Some(Value::Int(i32::MAX))), // unbounded
+        _ => Ok(None),
+    }
+}
+
 /// (name, sig) de ArrayDeque host suportados (M8).
 fn deque_supported(name: &str, sig: &str) -> bool {
     matches!(
@@ -1964,6 +2094,10 @@ pub fn call_instance_intrinsic_mref(
         // ArrayDeque (M8): Deque host sobre o estado List (frente = índice 0)
         (c, name, sig) if c == ARRAY_DEQUE && deque_supported(name, sig) => {
             deque_intrinsic(vm, recv, name, sig, args)
+        }
+        // LinkedBlockingQueue (M8): FIFO; bloqueantes fail-fast (sem deadlock)
+        (c, name, sig) if c == BLOCKING_Q && queue_supported(name, sig) => {
+            queue_intrinsic(vm, recv, name, sig, args)
         }
         // iterator() de List/Set host (incl. views de Map) — M8
         (c, name, sig)
