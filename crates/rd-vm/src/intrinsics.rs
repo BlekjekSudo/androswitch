@@ -57,6 +57,9 @@ const SOFT_REF: &str = "Ljava/lang/ref/SoftReference;";
 const REF_QUEUE: &str = "Ljava/lang/ref/ReferenceQueue;";
 const HASH_MAP: &str = "Ljava/util/HashMap;";
 const WEAK_MAP: &str = "Ljava/util/WeakHashMap;";
+/// M8: 25º gap do launch real (`LinkedHashSet.<init>`). Reusa o estado List
+/// dos demais Sets: deduplicação por igualdade Java e ordem de inserção.
+const LINKED_SET: &str = "Ljava/util/LinkedHashSet;";
 /// M8: sétimo gap do launch real (`LinkedHashMap.<init>`). Estado Map é
 /// `Vec<(chave, valor)>` ⇒ ordem de INSERÇÃO (como LinkedHashMap real); para
 /// os métodos essenciais o comportamento é o do HashMap.
@@ -1663,7 +1666,7 @@ fn deque_intrinsic(
     }
 }
 
-/// (name, sig) de Set host suportados (M8, CopyOnWriteArraySet).
+/// (name, sig) de Set host suportados (M8, CopyOnWriteArraySet/LinkedHashSet).
 fn set_supported(name: &str, sig: &str) -> bool {
     matches!(
         (name, sig),
@@ -1677,7 +1680,9 @@ fn set_supported(name: &str, sig: &str) -> bool {
     )
 }
 
-/// CopyOnWriteArraySet host (M8): reusa `HostObj::List` com add deduplicado.
+/// Set host (M8): reusa `HostObj::List` com add deduplicado. Para
+/// LinkedHashSet o Vec também preserva a ordem de inserção; para
+/// CopyOnWriteArraySet a VM single-threaded torna a cópia-em-escrita irrelevante.
 fn set_intrinsic(
     vm: &mut Engine,
     recv: crate::heap::ObjRef,
@@ -2274,10 +2279,12 @@ pub fn call_instance_intrinsic_mref(
         {
             list_intrinsic(vm, recv, name, sig, args)
         }
-        // CopyOnWriteArraySet (M8): Set host — mesmo estado List, mas o add
-        // DEDUPLICA por igualdade Java (values_equal) e devolve false se já
-        // presente. Iteradores seguem fora (compat_gaps).
-        (c, name, sig) if (c == COW_SET || c == VIEW_SET) && set_supported(name, sig) => {
+        // Sets host (M8): mesmo estado List, mas add DEDUPLICA por igualdade
+        // Java (values_equal) e devolve false se já presente. LinkedHashSet
+        // preserva ordem de inserção porque o estado é Vec.
+        (c, name, sig)
+            if (c == COW_SET || c == VIEW_SET || c == LINKED_SET) && set_supported(name, sig) =>
+        {
             set_intrinsic(vm, recv, name, sig, args)
         }
         // ArrayDeque (M8): Deque host sobre o estado List (frente = índice 0)
@@ -2314,6 +2321,7 @@ pub fn call_instance_intrinsic_mref(
                 || c == COW_LIST
                 || c == COW_SET
                 || c == VIEW_SET
+                || c == LINKED_SET
                 || c == ARRAY_DEQUE)
                 && name == "iterator"
                 && sig == "()Ljava/util/Iterator;" =>

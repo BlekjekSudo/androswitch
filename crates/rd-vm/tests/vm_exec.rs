@@ -3159,6 +3159,118 @@ fn linked_hash_map_host_intrinsics() {
     assert_eq!(call(&mut e, "size", "()I", vec![]), Some(Value::Int(0)));
 }
 
+/// M8 (compat real): LinkedHashSet host — 25º gap do launch de org.primftpd.
+/// Reusa Set/List, mas preserva a ordem de inserção como a classe JDK.
+#[test]
+fn linked_hash_set_host_intrinsics() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const LHS: &str = "Ljava/util/LinkedHashSet;";
+    const IT: &str = "Ljava/util/Iterator;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let set = e.heap.alloc_instance(LHS.to_string(), vec![]).unwrap();
+    let call = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic(e, LHS, name, sig, set, &args).expect("intrínseco")
+    };
+
+    call(&mut e, "<init>", "()V", vec![]);
+    let first = e.heap.alloc_string("first".into()).unwrap();
+    let duplicate = e.heap.alloc_string("first".into()).unwrap();
+    let second = e.heap.alloc_string("second".into()).unwrap();
+    assert_eq!(
+        call(
+            &mut e,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Obj(first)]
+        ),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Obj(second)]
+        ),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Obj(duplicate)]
+        ),
+        Some(Value::Int(0)),
+        "valor igual não pode duplicar no Set"
+    );
+    assert_eq!(call(&mut e, "size", "()I", vec![]), Some(Value::Int(2)));
+    assert_eq!(
+        call(
+            &mut e,
+            "contains",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Obj(duplicate)]
+        ),
+        Some(Value::Int(1))
+    );
+
+    let ordered_values = |e: &mut Engine| -> Vec<String> {
+        let iterator =
+            match call_instance_intrinsic(e, LHS, "iterator", "()Ljava/util/Iterator;", set, &[])
+                .unwrap()
+            {
+                Some(Value::Obj(r)) => r,
+                other => panic!("iterator: {other:?}"),
+            };
+        let mut values = Vec::new();
+        while call_instance_intrinsic(e, IT, "hasNext", "()Z", iterator, &[]).unwrap()
+            == Some(Value::Int(1))
+        {
+            let value =
+                call_instance_intrinsic(e, IT, "next", "()Ljava/lang/Object;", iterator, &[])
+                    .unwrap();
+            match value {
+                Some(Value::Obj(r)) => values.push(e.heap.as_str(r).unwrap().to_string()),
+                other => panic!("iterator next: {other:?}"),
+            }
+        }
+        values
+    };
+    assert_eq!(ordered_values(&mut e), vec!["first", "second"]);
+
+    // Remover e inserir novamente desloca o elemento para o fim (JDK).
+    assert_eq!(
+        call(
+            &mut e,
+            "remove",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Obj(first)]
+        ),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Obj(first)]
+        ),
+        Some(Value::Int(1))
+    );
+    assert_eq!(ordered_values(&mut e), vec!["second", "first"]);
+
+    assert!(e.cp.is_subtype(LHS, "Ljava/util/HashSet;"));
+    assert!(e.cp.is_subtype(LHS, "Ljava/util/AbstractSet;"));
+    assert!(e.cp.is_subtype(LHS, "Ljava/util/Set;"));
+    assert!(e.cp.is_subtype(LHS, "Ljava/util/Collection;"));
+    assert!(e.cp.is_subtype(LHS, "Ljava/lang/Iterable;"));
+    assert!(!e.cp.is_subtype(LHS, "Ljava/util/List;"));
+}
+
 /// M8 (compat real): AtomicInteger host — nono gap do launch do org.primftpd
 /// (`<init>()V`). Mesmo padrão do AtomicReference (campo "value"); aritmética
 /// i32 com overflow wrapping (semântica Java); CAS exato (VM single-threaded).
