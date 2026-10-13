@@ -29,6 +29,12 @@ pub struct VmConfig {
     pub max_depth: usize,
     /// heap do app em bytes — 256 MB = piso E5 (PRF-06)
     pub heap_budget: usize,
+    /// Observabilidade OPT-IN (default OFF para preservar todas as saídas
+    /// existentes, incl. golden vectors byte-idênticos): exceções Java
+    /// não tratadas anotam uma linha `\n  at classe->metodo(proto)` por
+    /// frame enquanto desempilham — o stack trace da JVM, innermost-first.
+    /// Erros estruturados da VM (NOT_FOUND/…) não recebem frames.
+    pub exception_trace: bool,
 }
 
 impl Default for VmConfig {
@@ -37,6 +43,7 @@ impl Default for VmConfig {
             fuel: 200_000_000,
             max_depth: 512,
             heap_budget: crate::heap::DEFAULT_HEAP_BUDGET,
+            exception_trace: false,
         }
     }
 }
@@ -211,8 +218,18 @@ impl Engine {
         self.coverage
             .insert(((dex_idx as u64) << 32) | u64::from(m.method_idx));
         self.depth += 1;
-        let ret = interp::exec_frame(self, dex_idx, code, ins);
+        let mut ret = interp::exec_frame(self, dex_idx, code, ins);
         self.depth -= 1;
+        // Observabilidade opt-in (default off — nenhuma saída existente muda):
+        // exceção Java que este frame NÃO tratou recebe a linha "at" do frame
+        // ao desempilhar (estilo JVM, innermost primeiro). Erros estruturados
+        // da VM não são Java e não ganham frames.
+        if self.config.exception_trace {
+            if let Err(VmExit::Exception(ref mut t)) = ret {
+                let line = format!("\n  at {}", self.method_label(dex_idx, m));
+                t.message.get_or_insert_with(String::new).push_str(&line);
+            }
+        }
         ret
     }
 
@@ -268,6 +285,27 @@ impl Engine {
             methods_executed,
             classes,
         }
+    }
+
+    /// Rótulos (`Lcls;->nome(proto)`) dos corpos DEX que executaram neste
+    /// Engine, ordenados alfabeticamente (o conjunto interno não tem ordem —
+    /// a saída ordenada é determinística para diffs/relatórios). Cobertura de
+    /// **entrada de método** (AG-09), gravada sempre pelo interpretador —
+    /// zero custo de config; métodos host (framework/intrinsics) não entram.
+    /// Uso: postmortem de diagnóstico (ex.: `rd app run --trace` lista o que
+    /// executou antes de uma exceção não capturada).
+    pub fn executed_labels(&self) -> Vec<String> {
+        let mut out = Vec::with_capacity(self.coverage.len());
+        for key in &self.coverage {
+            let dex_idx = (key >> 32) as usize;
+            let method_idx = (*key & 0xffff_ffff) as u32;
+            if let Ok(r) = self.cp.method_ref(dex_idx, method_idx) {
+                out.push(format!("{}->{}{}", r.class, r.name, r.proto));
+            }
+        }
+        out.sort_unstable();
+        out.dedup();
+        out
     }
 
     pub(super) fn method_label(&self, dex_idx: usize, m: &EncodedMethod) -> String {

@@ -543,10 +543,25 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   correção de semântica relacionada: `Enum.clone()` materializa
   `CloneNotSupportedException` capturável (é `final` na JDK/libcore e sempre
   lança — nunca copia).
-- ⬜ **Próximo gap (re-sondado) — MUDANÇA DE REGIME**: a sondagem seguinte já
-  não para em `NOT_FOUND`: o launch executa e falha com exceção Java
-  **materializada** (`java.lang.NullPointerException: invoke em receiver
-  null`). O bootstrap estrutural de classes/interfaces do app está completo;
-  a próxima investigação precisa de **tracing do call site** (qual método
-  chamou com receiver null) — distinguir "app esperando um resultado nosso"
-  de "estado do host que ainda não existe".
+- ✅ **Observabilidade: stack trace Java opt-in (entregue nesta rodada) —
+  `VmConfig::exception_trace` + `rd app run --trace`**. Exceções Java não
+  capturadas anotam `\n  at classe->metodo(proto)` por frame ao desempilhar
+  (estilo JVM, innermost-first). Default OFF: nenhuma saída existente muda
+  (golden vectors seguem byte-idênticos; `rd vm exec` intocado). Resultado
+  real: o NPE pós-bootstrap do `org.primftpd` foi localizado em
+  `androidx.fragment.app.FragmentManager.dispatchCreate()V` ←
+  `FragmentController` ← `FragmentActivity.onCreate` ←
+  `MainTabsActivity.onCreate` — ou seja, o app usa **androidx FragmentActivity**
+  e o call site do receiver null já está identificado.
+- ⬜ **Próximo gap (re-sondado): `ClassLoader.getResources(String) →
+  Enumeration<URL>`** — próximo `NOT_FOUND` após LinkedHashSet
+  (`getResources("org/slf4j/impl/StaticLoggerBinder.class")` do
+  LoggerFactory.findPossibleStaticLoggerBinderPathSet — Logback probe; o
+  PRM continua controlado antes). Replica encontrada: suíte
+  `org.primftpd.log.PrimFtpdLoggerFactoryTest`. Necessário (canto-canto):
+  Enumeration minimal (`hasMoreElements`/`nextElement`,
+  `NoSuchElementException`) + getResources vazio (Java 9+: NPE em name null).
+  Follow-ups da Enumeration: `Collections.emptyEnumeration` e
+  `Collections.list(Enumeration)` no mesmo host; `ClassLoader.getResource`
+  (singular) coberto por exceção quando o launch pedir; bloco `java.net.URL`
+  quando a sequência real exigir URL.
