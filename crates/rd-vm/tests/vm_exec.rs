@@ -5787,3 +5787,116 @@ fn fragment_manager_execute_pending_sempre_false() {
         Some(Value::Int(0))
     );
 }
+
+#[test]
+fn enum_clone_lanca_clone_not_supported() {
+    use rd_vm::intrinsics::call_instance_intrinsic_mref;
+    use rd_vm::value::Value;
+    const ENUM: &str = "Ljava/lang/Enum;";
+    const MY: &str = "LCor;";
+
+    let mut b = DexBuilder::new();
+    b.class(MY, ENUM);
+    let mut e = engine_of(&b);
+
+    let cor = e.heap.alloc_instance(MY.to_string(), vec![]).unwrap();
+    let nome = e.heap.alloc_string("VERMELHO".into()).unwrap();
+    call_instance_intrinsic_mref(
+        &mut e,
+        MY,
+        ENUM,
+        "<init>",
+        "(Ljava/lang/String;I)V",
+        cor,
+        &[Value::Obj(nome), Value::Int(0)],
+    )
+    .unwrap();
+
+    // 34º gap real: Enum.clone() é final e SEMPRE lança (JDK/libcore).
+    // method ref DECLARA a subclasse (caso real do androidx Lifecycle$Event).
+    match call_instance_intrinsic_mref(&mut e, MY, MY, "clone", "()Ljava/lang/Object;", cor, &[]) {
+        Err(VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/CloneNotSupportedException;");
+            assert!(t
+                .message
+                .unwrap_or_default()
+                .contains("Cannot clone an enum"));
+        }
+        other => panic!("esperava CloneNotSupportedException, got {other:?}"),
+    }
+    // method ref declarando Enum diretamente: mesmo resultado.
+    match call_instance_intrinsic_mref(&mut e, MY, ENUM, "clone", "()Ljava/lang/Object;", cor, &[])
+    {
+        Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/lang/CloneNotSupportedException;"),
+        other => panic!("esperava CNSE via mref Enum, got {other:?}"),
+    }
+    // clone NÃO copiou nem corrompeu o estado: name/ordinal seguem íntegros.
+    assert_eq!(
+        call_instance_intrinsic_mref(&mut e, MY, MY, "name", "()Ljava/lang/String;", cor, &[])
+            .unwrap(),
+        Some(Value::Obj(nome))
+    );
+    assert_eq!(
+        call_instance_intrinsic_mref(&mut e, MY, MY, "ordinal", "()I", cor, &[]).unwrap(),
+        Some(Value::Int(0))
+    );
+}
+
+#[test]
+fn array_clone_e_shallow_copy_com_descritor() {
+    use rd_vm::intrinsics::call_instance_intrinsic_mref;
+    use rd_vm::value::Value;
+
+    let mut b = DexBuilder::new();
+    b.class("Lcom/exemplo/Evt;", "Ljava/lang/Object;");
+    let mut e = engine_of(&b);
+
+    // array de objetos [Lcom/exemplo/Evt; com 2 elementos (referências).
+    let src = e
+        .heap
+        .alloc_array(rd_vm::heap::ElemKind::Obj, 2, "[Lcom/exemplo/Evt;")
+        .unwrap();
+    let f0 = e
+        .heap
+        .alloc_instance("Lcom/exemplo/Evt;".to_string(), vec![])
+        .unwrap();
+    let f1 = e
+        .heap
+        .alloc_instance("Lcom/exemplo/Evt;".to_string(), vec![])
+        .unwrap();
+    {
+        let elems = e.heap.array_elems_mut(src).unwrap();
+        elems.push(Value::Obj(f0));
+        elems.push(Value::Obj(f1));
+    }
+
+    let dst = match call_instance_intrinsic_mref(
+        &mut e,
+        "[Lcom/exemplo/Evt;",
+        "[Lcom/exemplo/Evt;",
+        "clone",
+        "()Ljava/lang/Object;",
+        src,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("array.clone: {other:?}"),
+    };
+    assert_ne!(dst, src, "clone deve ser objeto novo");
+    assert_eq!(
+        e.heap.class_of(dst).unwrap(),
+        "[Lcom/exemplo/Evt;",
+        "descritor real preservado (issue #37)"
+    );
+    let elems = e.heap.as_array_elems(dst).unwrap().0;
+    assert_eq!(
+        elems,
+        &[Value::Obj(f0), Value::Obj(f1)],
+        "shallow: MESMAS referências"
+    );
+    // mutação no clone NÃO toca o original (cópia do Vec, compartilhamento dos elementos)
+    e.heap.array_elems_mut(dst).unwrap().remove(0);
+    assert_eq!(e.heap.as_array_elems(src).unwrap().0.len(), 2);
+}

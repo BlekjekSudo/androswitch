@@ -534,9 +534,19 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   rodada)**: trigésimo terceiro gap. No host o `commit` aplica
   **sincronamente** — não existe fila pendente, logo a resposta honesta é
   `false` (AOSP: "nothing was executed"). Nunca `NOT_IMPLEMENTED`.
-- ⬜ **Próximo gap (re-sondado)**: `array.clone()` (`[Landroidx/lifecycle/
-  Lifecycle$Event;` — rastro do cache de `values()` do enum; JLS 10.7: arrays
-  são `Cloneable`, clone é shallow copy). Nota: a sondagem seguinte já mostra
-  o **novo regime pós-bootstrap**: exceção Java materializada durante a
-  execução (`NullPointerException: invoke em receiver null`) em vez de
-  `NOT_FOUND` — investigar o call site pede tracing, não só sondagem.
+- ✅ **`array.clone()` host (entregue nesta rodada)**: trigésimo quarto gap.
+  Arrays são `Cloneable` (JLS 10.7) e o clone é **shallow copy**: novo objeto
+  com o mesmo descritor/`ElemKind` e as mesmas referências de elementos
+  (mutação estrutural no clone não toca o original). Cobre o rastro clássico
+  de `values()`/`$VALUES.clone()` de enums — ex.:
+  `[Landroidx/lifecycle/Lifecycle$Event;->clone()`. Na mesma rodada,
+  correção de semântica relacionada: `Enum.clone()` materializa
+  `CloneNotSupportedException` capturável (é `final` na JDK/libcore e sempre
+  lança — nunca copia).
+- ⬜ **Próximo gap (re-sondado) — MUDANÇA DE REGIME**: a sondagem seguinte já
+  não para em `NOT_FOUND`: o launch executa e falha com exceção Java
+  **materializada** (`java.lang.NullPointerException: invoke em receiver
+  null`). O bootstrap estrutural de classes/interfaces do app está completo;
+  a próxima investigação precisa de **tracing do call site** (qual método
+  chamou com receiver null) — distinguir "app esperando um resultado nosso"
+  de "estado do host que ainda não existe".

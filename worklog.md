@@ -1103,3 +1103,27 @@ GitHub status:
 
 Stage Summary:
 - Sequência Fragments: Fragment.<init> ✅ (#152) → executePendingTransactions ✅ (esta) → array.clone (próximo, 34º — JLS 10.7 shallow copy) → pós-bootstrap = exceções materializadas.
+
+---
+Task ID: m8-array-clone
+Agent: Arena Agent Mode (sessão 2026-10-13, início 09:30 UTC — continuação)
+Task: M8 — array.clone() host (+Enum.clone → CNSE) (34º gap do launch real do org.primftpd).
+
+Work Log:
+- Contexto: PR #153 (33º, executePending) aberta; sondagem dela falhava em `[Landroidx/lifecycle/Lifecycle$Event;->clone()`.
+- DIAGNÓSTICO aninhado: o `[` inicial no descritor (quase despercebido na 1ª leitura) revelou method ref de TIPO ARRAY — o gap real era array.clone() (rastro de values()/$VALUES.clone() de enum), NÃO Enum.clone. 1ª tentativa (só Enum.clone → CNSE) manteve o probe parado no mesmo ponto — provada pela re-sondagem antes do commit; investigação de interp.rs mapeou o caminho real (intrinsics ← call_instance_intrinsic_mref; androidx não entra no dispatch Landroid/*).
+- rd-vm: arm (c.starts_with('['), clone, ()Ljava/lang/Object;) em call_instance_intrinsic_mref → shallow copy JLS 10.7: HeapObj::Array clonado (elem/elem_class/elems — descritor real preservado, rastro issue #37) via alloc_array + extend; receiver não-array com mref de array devolve None (cai no erro de resolução normal).
+- Bônus de correção semântica (mesma história do probe, mantido): Enum.clone materializa CloneNotSupportedException capturável nos DOIS matchers de enum (mref declara Enum | mref declara subclasse do app) — final na JDK/libcore, sempre lança; name/ordinal intactos após a exceção.
+- Testes novos: array_clone_e_shallow_copy_com_descritor (objeto novo ≠; descritor preservado; mesmas referências; mutação no clone não toca original) e enum_clone_lanca_clone_not_supported (ambos os mref paths; mensagem; estado intacto).
+- Re-sondagem app real: atravessou array.clone(); REGIME NOVO confirmado — `VM_EXCEPTION: java.lang.NullPointerException: invoke em receiver null` (exceção materializada, não NOT_FOUND). Bootstrap estrutural completo; próximas investigações pedem TRACING do call site (quem chamou com receiver null — e o que o app esperava receber).
+- Catálogo compat_gaps (mcp.rs) e ROADMAP atualizados (34º ✅ / regime pós-bootstrap registrado).
+
+Checks:
+- fmt — PASS. clippy -D warnings — PASS. `cargo test --workspace` — PASS (31 suites, 0 falhas; vm_exec 75 — +2 novos). MSRV 1.76 — PASS. md links — PASS. compat-report — PASS (vazio).
+- Probe — regime novo documentado. Scan de segredos — limpo.
+
+GitHub status:
+- Branch feat/m8-array-clone a ser enviada/PR; merge após CI verde.
+
+Stage Summary:
+- 34º ✅ (esta) → PRÓXIMO INVESTIGAR (não é gap de API): NPE materializado no launch; recomenda-se iteração de OBSERVABILIDADE primeiro: modo trace em `rd app run` registrando a pilha DEX (classe/método/pc) no ponto da exceção não capturada — aí sim decidir qual estado do host falta. Semântica JDK bônus entregue: Enum.clone → CNSE.
