@@ -1033,3 +1033,29 @@ GitHub status:
 
 Stage Summary:
 - Sequência Fragments: getFragmentManager ✅ (#149) → find null ✅ (esta) → beginTransaction (próximo, 31º — FragmentTransaction com add/replace/commit + registro no FM).
+
+---
+Task ID: m8-fragment-transaction
+Agent: Arena Agent Mode (sessão 2026-10-13, início 09:30 UTC — continuação)
+Task: M8 — FragmentManager.beginTransaction + FragmentTransaction host com registro de fragments (31º gap do launch real do org.primftpd).
+
+Work Log:
+- Contexto: PR #150 (30º, finds null) mergida nesta sessão (7284792c); sondagem dela parou em beginTransaction. Decisão de escopo: transação só tem sentido como kernel coerente (add/replace/remove/commit + registro) — evitaria 4 PRs serializados sobre a mesma feature acoplada, então entrou como UMA iteração bounded.
+- rd-vm: FragRecord/FragOp/FragTxState + HostState.fragments (registro por commit) + frag_txs (transações abertas; sem variante nova em HostObj → zero impacto em matches exhaustivos). arms: beginTransaction (tx nova + estado), (FRAGMENT_TX,_) → fragment_tx_intrinsic; finds (30º) promovidos de null fixo para CONSULTA ao registro (rev — última registrada vence; findById ignora containerId 0, convenção AOSP; tag null → null).
+- fragment_tx_intrinsic: add(3 sobrecargas)/replace(2)/remove fluentes (ops pendentes — sem commit não há efeito observável); commit/commitAllowingStateLoss (state loss N/A — sem ciclo de estado no host): valida TUDO antes (Add de obj já registrada → ISE "already added") e aplica (Add: push; Replace: retain container≠ + push; Remove: retain obj≠); marca committed; 2º commit/uso pós-commit → ISE (frag_tx_open); fragment null → NPE (AOSP dereferencia mFragmentManager); retorno id opaco 0.
+- 2 fixes de compilação pego no check: heap.as_str devolve &str emprestado (tag/want precisavam de String próprio; E0308/E0658 str_as_str).
+- Teste novo fragment_transaction_commits_registered: tx nova por chamada; fluência; sem commit → find null; commit → findTag/findId veem; replace no mesmo container remove a anterior; commitAllowingStateLoss; remove; ISE em 2º commit/uso pós-commit/already-added (sem aplicação parcial); NPE add null.
+- Compat: teste do 30º (finds null c/ FM vazio) segue passando — registro vazio ⇒ lookup = null.
+- Re-sondagem app real: launch atravessou beginTransaction e parou no 32º gap NOT_FOUND: `Landroid/app/Fragment;-><init>()V` — o app INSTANCIA a própria fragment (ctor do super). Sondagem seguinte provável: métodos da fragment (getString/setArguments) ou commit da transação que a recebe.
+- Catálogo compat_gaps (mcp.rs) e ROADMAP atualizados (31º ✅ / 32º re-sondado ⬜).
+
+Checks:
+- fmt — PASS. clippy -D warnings — PASS. `cargo test --workspace` — PASS (31 suites, 0 falhas; vm_exec 71 — +1 novo; +2 fixes de compile). MSRV 1.76 — PASS. md links — PASS. compat-report diff — PASS (vazio).
+- Probe — avança além de beginTransaction; para no 32º gap registrado. Scan de segredos — limpo.
+
+GitHub status:
+- Branch feat/m8-fragment-transaction a ser enviada/PR; merge após CI verde.
+
+Stage Summary:
+- Sequência Fragments: find null ✅ (#150) → beginTransaction+tx+registro ✅ (esta) → Fragment.<init> (próximo, 32º — ctor no-op + hierarquia).
+- Fragments M8 agora tem NÚCLEO REAL: FM canônico, transações com commit e registro consultável. Pendências documentadas: lifecycle DEX (Fragment.onCreate/onCreateView/onAttach), back stack/popBackStack, animations, methods da própria fragment (getString/getActivity/setArguments).

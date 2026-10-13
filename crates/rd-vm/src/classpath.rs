@@ -578,6 +578,8 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Landroid/app/Application;" => Some(CONTEXT.to_vec()),
         // M8: FragmentManager legacy (29º gap real) — objeto simples do host.
         "Landroid/app/FragmentManager;" => Some(OBJECT.to_vec()),
+        // M8: FragmentTransaction legacy (31º gap real) — ops até o commit.
+        "Landroid/app/FragmentTransaction;" => Some(OBJECT.to_vec()),
         "Landroid/content/Intent;" => Some(OBJECT.to_vec()),
         "Landroid/os/Bundle;" => Some(OBJECT.to_vec()),
         "Landroid/os/Handler;" => Some(OBJECT.to_vec()),

@@ -5479,3 +5479,233 @@ fn fragment_manager_vazio_find_devolve_null() {
         Some(Value::Null)
     );
 }
+
+#[test]
+fn fragment_transaction_commits_registered() {
+    use rd_vm::framework::call_host_instance;
+    use rd_vm::value::Value;
+    const ACT: &str = "Landroid/app/Activity;";
+    const FM: &str = "Landroid/app/FragmentManager;";
+    const FT: &str = "Landroid/app/FragmentTransaction;";
+    const FRAG: &str = "Lcom/exemplo/PrefsFrag;";
+    const ADD_TS: &str =
+        "(Landroid/app/Fragment;Ljava/lang/String;)Landroid/app/FragmentTransaction;";
+    const ADD_I: &str = "(ILandroid/app/Fragment;)Landroid/app/FragmentTransaction;";
+    const ADD_ITS: &str =
+        "(ILandroid/app/Fragment;Ljava/lang/String;)Landroid/app/FragmentTransaction;";
+    const REPLACE_I: &str = "(ILandroid/app/Fragment;)Landroid/app/FragmentTransaction;";
+    const REMOVE_F: &str = "(Landroid/app/Fragment;)Landroid/app/FragmentTransaction;";
+    const FIND_TAG: &str = "(Ljava/lang/String;)Landroid/app/Fragment;";
+    const FIND_ID: &str = "(I)Landroid/app/Fragment;";
+
+    let mut b = DexBuilder::new();
+    b.class("Lcom/exemplo/TxAct;", ACT);
+    b.class(FRAG, "Ljava/lang/Object;");
+    let mut e = engine_of(&b);
+    let act = e
+        .heap
+        .alloc_instance("Lcom/exemplo/TxAct;".to_string(), vec![])
+        .unwrap();
+    let fm = match call_host_instance(
+        &mut e,
+        ACT,
+        "getFragmentManager",
+        "()Landroid/app/FragmentManager;",
+        act,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getFragmentManager: {other:?}"),
+    };
+    let new_frag = |e: &mut Engine| e.heap.alloc_instance(FRAG.to_string(), vec![]).unwrap();
+    let find_tag = |e: &mut Engine, t: &str| {
+        let ts = Value::Obj(e.heap.alloc_string(t.into()).unwrap());
+        call_host_instance(e, FM, "findFragmentByTag", FIND_TAG, fm, &[ts]).unwrap()
+    };
+    let find_id = |e: &mut Engine, id: i32| {
+        call_host_instance(e, FM, "findFragmentById", FIND_ID, fm, &[Value::Int(id)]).unwrap()
+    };
+
+    // beginTransaction: objeto novo por chamada; ops sem commit não têm efeito.
+    let tx0 = match call_host_instance(
+        &mut e,
+        FM,
+        "beginTransaction",
+        "()Landroid/app/FragmentTransaction;",
+        fm,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("beginTransaction: {other:?}"),
+    };
+    assert_eq!(e.heap.class_of(tx0).unwrap(), FT);
+    let f0 = new_frag(&mut e);
+    let tag0 = Value::Obj(e.heap.alloc_string("orcamento".into()).unwrap());
+    assert_eq!(
+        call_host_instance(&mut e, FT, "add", ADD_TS, tx0, &[Value::Obj(f0), tag0]).unwrap(),
+        Some(Value::Obj(tx0)),
+        "add deve ser fluente (devolve a própria tx)"
+    );
+    assert_eq!(
+        find_tag(&mut e, "orcamento"),
+        Some(Value::Null),
+        "sem commit não registra"
+    );
+
+    // commit aplica: find por tag/id passa a ver a fragment registrada.
+    let tx = match call_host_instance(
+        &mut e,
+        FM,
+        "beginTransaction",
+        "()Landroid/app/FragmentTransaction;",
+        fm,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("beginTransaction 2: {other:?}"),
+    };
+    assert_ne!(tx, tx0);
+    let prefs = new_frag(&mut e);
+    let tag_prefs = Value::Obj(e.heap.alloc_string("prefs".into()).unwrap());
+    call_host_instance(
+        &mut e,
+        FT,
+        "add",
+        ADD_TS,
+        tx,
+        &[Value::Obj(prefs), tag_prefs],
+    )
+    .unwrap();
+    let side = new_frag(&mut e);
+    call_host_instance(
+        &mut e,
+        FT,
+        "add",
+        ADD_I,
+        tx,
+        &[Value::Int(0x7f0a0001), Value::Obj(side)],
+    )
+    .unwrap();
+    assert_eq!(
+        call_host_instance(&mut e, FT, "commit", "()I", tx, &[]).unwrap(),
+        Some(Value::Int(0))
+    );
+    assert_eq!(find_tag(&mut e, "prefs"), Some(Value::Obj(prefs)));
+    assert_eq!(find_id(&mut e, 0x7f0a0001), Some(Value::Obj(side)));
+
+    // replace no MESMO container remove a anterior; commitAllowingStateLoss idem.
+    let tx2 = match call_host_instance(
+        &mut e,
+        FM,
+        "beginTransaction",
+        "()Landroid/app/FragmentTransaction;",
+        fm,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("beginTransaction 3: {other:?}"),
+    };
+    let newer = new_frag(&mut e);
+    call_host_instance(
+        &mut e,
+        FT,
+        "replace",
+        REPLACE_I,
+        tx2,
+        &[Value::Int(0x7f0a0001), Value::Obj(newer)],
+    )
+    .unwrap();
+    call_host_instance(&mut e, FT, "commitAllowingStateLoss", "()I", tx2, &[]).unwrap();
+    assert_eq!(find_id(&mut e, 0x7f0a0001), Some(Value::Obj(newer)));
+
+    // remove + contratos: 2º commit → ISE; add null → NPE; Add de fragment já
+    // registrada → ISE sem aplicação parcial; remove após commit → ISE.
+    let tx3 = match call_host_instance(
+        &mut e,
+        FM,
+        "beginTransaction",
+        "()Landroid/app/FragmentTransaction;",
+        fm,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("beginTransaction 4: {other:?}"),
+    };
+    call_host_instance(&mut e, FT, "remove", REMOVE_F, tx3, &[Value::Obj(newer)]).unwrap();
+    call_host_instance(&mut e, FT, "commit", "()I", tx3, &[]).unwrap();
+    assert_eq!(find_id(&mut e, 0x7f0a0001), Some(Value::Null));
+    match call_host_instance(&mut e, FT, "commit", "()I", tx3, &[]) {
+        Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/lang/IllegalStateException;"),
+        other => panic!("esperava ISE no 2º commit, got {other:?}"),
+    }
+    match call_host_instance(&mut e, FT, "remove", REMOVE_F, tx3, &[Value::Obj(prefs)]) {
+        Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/lang/IllegalStateException;"),
+        other => panic!("esperava ISE pós-commit, got {other:?}"),
+    }
+    let tx4 = match call_host_instance(
+        &mut e,
+        FM,
+        "beginTransaction",
+        "()Landroid/app/FragmentTransaction;",
+        fm,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("beginTransaction 5: {other:?}"),
+    };
+    match call_host_instance(
+        &mut e,
+        FT,
+        "add",
+        ADD_ITS,
+        tx4,
+        &[Value::Int(1), Value::Null, Value::Null],
+    ) {
+        Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/lang/NullPointerException;"),
+        other => panic!("esperava NPE add null, got {other:?}"),
+    }
+    let tx5 = match call_host_instance(
+        &mut e,
+        FM,
+        "beginTransaction",
+        "()Landroid/app/FragmentTransaction;",
+        fm,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("beginTransaction 6: {other:?}"),
+    };
+    let tag_dup = Value::Obj(e.heap.alloc_string("dup".into()).unwrap());
+    call_host_instance(
+        &mut e,
+        FT,
+        "add",
+        ADD_TS,
+        tx5,
+        &[Value::Obj(prefs), tag_dup],
+    )
+    .unwrap();
+    match call_host_instance(&mut e, FT, "commit", "()I", tx5, &[]) {
+        Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/lang/IllegalStateException;"),
+        other => panic!("esperava ISE already-added, got {other:?}"),
+    }
+    assert_eq!(
+        find_tag(&mut e, "dup"),
+        Some(Value::Null),
+        "falha de commit não aplica parcialmente"
+    );
+}
