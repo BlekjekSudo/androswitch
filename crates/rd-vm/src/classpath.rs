@@ -497,7 +497,9 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
     // M3.2 — cadeia do framework host (ancestrais completos em cada entrada;
     // simplificação documentada: Activity estende ContextThemeWrapper→…→Context)
     const OBJECT: &[&str] = &["Ljava/lang/Object;"];
-    const CONTEXT: &[&str] = &["Ljava/content/Context;", "Ljava/lang/Object;"];
+    // (bug M8: era "Ljava/content/Context;" — typo sem cobertura de teste até o
+    // app real exigir check-cast Activity→android.content.Context)
+    const CONTEXT: &[&str] = &["Landroid/content/Context;", "Ljava/lang/Object;"];
     const VIEW: &[&str] = &["Landroid/view/View;", "Ljava/lang/Object;"];
     const VIEWGROUP: &[&str] = &[
         "Landroid/view/ViewGroup;",
@@ -595,6 +597,14 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/util/AbstractCollection;",
             "Ljava/lang/Object;",
         ]),
+        "Ljava/util/AbstractSet;" => {
+            Some(vec!["Ljava/util/AbstractCollection;", "Ljava/lang/Object;"])
+        }
+        "Ljava/util/HashSet;" => Some(vec![
+            "Ljava/util/AbstractSet;",
+            "Ljava/util/AbstractCollection;",
+            "Ljava/lang/Object;",
+        ]),
         "Ljava/util/AbstractMap;" => Some(OBJECT.to_vec()),
         "Ljava/util/HashMap;" => Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"]),
         "Ljava/util/LinkedHashMap;" => Some(vec![
@@ -669,6 +679,13 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/io/Serializable;",
         ]),
         "Ljava/util/WeakHashMap;" | "Ljava/util/LinkedHashMap;" => Some(MAP_IFACES.to_vec()),
+        "Ljava/util/AbstractSet;" | "Ljava/util/HashSet;" => Some(vec![
+            "Ljava/util/Set;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+            "Ljava/lang/Cloneable;",
+            "Ljava/io/Serializable;",
+        ]),
         "Ljava/util/ArrayList;" => Some(vec![
             "Ljava/util/List;",
             "Ljava/util/Collection;",
@@ -762,6 +779,16 @@ mod tests {
             "Ljava/util/concurrent/CopyOnWriteArraySet;",
             "Ljava/util/Map;"
         ));
+    }
+
+    /// M8 (bug real do app org.primftpd): a cadeia builtin de Activity apontava
+    /// para "Ljava/content/Context;" (typo) — check-cast Activity→Context falhava.
+    #[test]
+    fn android_activity_is_android_context() {
+        let cp = Classpath::new(Vec::new());
+        assert!(cp.is_subtype("Landroid/app/Activity;", "Landroid/content/Context;"));
+        assert!(cp.is_subtype("Landroid/app/Application;", "Landroid/content/Context;"));
+        assert!(!cp.is_subtype("Landroid/app/Activity;", "Ljava/content/Context;"));
     }
 
     /// issue #42: covariância de arrays no is_subtype (JLS 4.10.2/4.10.3).

@@ -149,6 +149,12 @@ pub enum HostObj {
     List {
         elems: Vec<Value>,
     },
+    /// M8: iterador host — snapshot de elementos + cursor (determinístico;
+    /// `remove` não suportado, como em views imutáveis).
+    Iter {
+        elems: Vec<Value>,
+        pos: usize,
+    },
 }
 
 #[derive(Debug, Clone)]

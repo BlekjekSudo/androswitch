@@ -695,3 +695,20 @@ Work Log:
 
 Stage Summary:
 - Sequência de gaps do primftpd: … → Executors ✅ → Thread ✅ → Enum.compareTo ✅ → entrySet/iteradores (próximo).
+
+---
+Task ID: m8-collection-iterators
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração T)
+Task: M8 — views (entrySet/keySet/values) + Iterator/Map.Entry host (13º gap) + bug do Context.
+
+Work Log:
+- rd-vm framework: HostObj::Iter { elems, pos } (iterador = snapshot + cursor).
+- rd-vm intrinsics: Map.entrySet/keySet/values → view HashSet host (SNAPSHOT independente — em Java a view é viva, desvio documentado; ordem de inserção); Map.Entry host (campos heap entry_key/entry_value; getKey/getValue/setValue devolve anterior); iterator() para ArrayList/LinkedList/COW*/views → Iterator host: hasNext/next (NoSuchElementException quando esgota)/remove (UnsupportedOperationException). Hierarquia: AbstractSet/HashSet + interfaces Set/Collection/Iterable/Cloneable/Serializable.
+- BUG PRÉ-EXISTENTE (achado pelo app real, CCE em check-cast MainTabsActivity→Context): builtin_hierarchy tinha typo "Ljava/content/Context;" na cadeia de Activity/Application — nunca coberto por teste. Corrigido para "Landroid/content/Context;" + teste android_activity_is_android_context. Debug com binário temporário sobre o APK real (removido antes do commit).
+- Doc: comentário do LINKED_MAP corrigido (estado é Vec/ordem de inserção, não BTreeMap).
+- Teste: collection_views_and_iterators (mapa 2 pares; entrySet size/iteração for-each com getKey/getValue na ordem k1,k2; NSE no fim; UOE no remove; keySet contains; values size; setValue devolve anterior; iterator de List).
+- Re-sondagem app real: entrySet+CCE resolvidos; launch avança até Collections.synchronizedMap (registrado).
+
+Stage Summary:
+- Sequência de gaps do primftpd: … → Thread ✅ → Enum.compareTo ✅ → iteradores+Context ✅ → Collections statics (próximo).
+- 13 gaps do app real fechados nesta sessão (K–T); launch já entra no código do app (androidx lifecycle atravessado).

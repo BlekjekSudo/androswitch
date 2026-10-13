@@ -21,6 +21,12 @@ const ATOMIC_INT: &str = "Ljava/util/concurrent/atomic/AtomicInteger;";
 /// single-threaded: substituto honesto é um executor que roda Runnables/
 /// Callables INLINE (síncrono/determinístico), ignorando tamanho de pool e
 /// ThreadFactory; `submit` devolve Future já completado.
+/// M8: views/iteradores (13º gap: `LinkedHashMap.entrySet`). Views são
+/// SNAPSHOTS independentes da coleção de origem (em Java são vivas — desvio
+/// documentado); ordem = ordem de inserção (estado é Vec).
+const VIEW_SET: &str = "Ljava/util/HashSet;";
+const MAP_ENTRY: &str = "Ljava/util/Map$Entry;";
+const ITERATOR: &str = "Ljava/util/Iterator;";
 const EXECUTORS: &str = "Ljava/util/concurrent/Executors;";
 const EXECUTOR: &str = "Ljava/util/concurrent/Executor;";
 const EXECUTOR_SVC: &str = "Ljava/util/concurrent/ExecutorService;";
@@ -47,9 +53,9 @@ const SOFT_REF: &str = "Ljava/lang/ref/SoftReference;";
 const REF_QUEUE: &str = "Ljava/lang/ref/ReferenceQueue;";
 const HASH_MAP: &str = "Ljava/util/HashMap;";
 const WEAK_MAP: &str = "Ljava/util/WeakHashMap;";
-/// M8: sétimo gap do launch real (`LinkedHashMap.<init>`). Ordem de iteração
-/// NÃO é garantida (estado Map é BTreeMap por chave string — documentado em
-/// compat_gaps); para os métodos essenciais o comportamento é o do HashMap.
+/// M8: sétimo gap do launch real (`LinkedHashMap.<init>`). Estado Map é
+/// `Vec<(chave, valor)>` ⇒ ordem de INSERÇÃO (como LinkedHashMap real); para
+/// os métodos essenciais o comportamento é o do HashMap.
 const LINKED_MAP: &str = "Ljava/util/LinkedHashMap;";
 const ARRAY_LIST: &str = "Ljava/util/ArrayList;";
 const LINKED_LIST: &str = "Ljava/util/LinkedList;";
@@ -644,6 +650,95 @@ fn future_intrinsic(
     }
 }
 
+/// (name, sig) de Iterator host suportados (M8).
+fn iterator_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("hasNext", "()Z") | ("next", "()Ljava/lang/Object;") | ("remove", "()V")
+    )
+}
+
+/// Iterator host (M8): cursor sobre snapshot. `next` sem elemento →
+/// NoSuchElementException materializado (semântica Java).
+fn iterator_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+) -> Result<Option<Value>, VmExit> {
+    use crate::framework::HostObj;
+    match name {
+        "hasNext" => {
+            let more = match vm.fw.objects.get(&recv) {
+                Some(HostObj::Iter { elems, pos }) => *pos < elems.len(),
+                _ => false,
+            };
+            Ok(Some(Value::Int(more as i32)))
+        }
+        "next" => {
+            let Some(HostObj::Iter { elems, pos }) = vm.fw.objects.get_mut(&recv) else {
+                return Err(crate::err::vm_error(
+                    "VM_TYPE_ERROR",
+                    "Iterator host sem estado (use iterator())",
+                )
+                .into());
+            };
+            if *pos >= elems.len() {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/util/NoSuchElementException;",
+                    "Iterator.next sem próximo elemento",
+                )));
+            }
+            let v = elems[*pos].clone();
+            *pos += 1;
+            Ok(Some(v))
+        }
+        "remove" => Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/UnsupportedOperationException;",
+            "Iterator host: remove não suportado (snapshot)",
+        ))),
+        _ => Ok(None),
+    }
+}
+
+/// (name, sig) de Map.Entry host suportados (M8).
+fn entry_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("getKey", "()Ljava/lang/Object;")
+            | ("getValue", "()Ljava/lang/Object;")
+            | ("setValue", "(Ljava/lang/Object;)Ljava/lang/Object;")
+    )
+}
+
+/// Map.Entry host (M8): campos de heap do snapshot. setValue atualiza o par
+/// do snapshot (não propaga ao Map de origem — view independente, documentado).
+fn entry_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match name {
+        "getKey" => Ok(Some(
+            vm.heap.get_field(recv, "entry_key").unwrap_or(Value::Null),
+        )),
+        "getValue" => Ok(Some(
+            vm.heap
+                .get_field(recv, "entry_value")
+                .unwrap_or(Value::Null),
+        )),
+        "setValue" => {
+            let old = vm
+                .heap
+                .get_field(recv, "entry_value")
+                .unwrap_or(Value::Null);
+            crate::err::put_field_result(vm.heap.put_field(recv, "entry_value", args[0].clone()))?;
+            Ok(Some(old))
+        }
+        _ => Ok(None),
+    }
+}
+
 /// (name, sig) de Thread host suportados (M8).
 fn thread_supported(name: &str, sig: &str) -> bool {
     matches!(
@@ -858,6 +953,9 @@ fn map_supported(name: &str, sig: &str) -> bool {
             | ("size", "()I")
             | ("isEmpty", "()Z")
             | ("clear", "()V")
+            | ("entrySet", "()Ljava/util/Set;")
+            | ("keySet", "()Ljava/util/Set;")
+            | ("values", "()Ljava/util/Collection;")
     )
 }
 
@@ -1075,6 +1173,28 @@ fn map_intrinsic(
         );
     }
     match (name, sig) {
+        // views (M8): snapshot em ordem de inserção; Map.Entry host carrega
+        // chave/valor em campos de heap ("entry_key"/"entry_value").
+        ("entrySet", _) | ("keySet", _) | ("values", _) => {
+            let snapshot = map_entries(vm, recv)?.clone();
+            let mut elems = Vec::with_capacity(snapshot.len());
+            for (k, v) in snapshot {
+                let item = match name {
+                    "keySet" => k,
+                    "values" => v,
+                    _ => {
+                        let en = vm.heap.alloc_instance(MAP_ENTRY.to_string(), vec![])?;
+                        crate::err::put_field_result(vm.heap.put_field(en, "entry_key", k))?;
+                        crate::err::put_field_result(vm.heap.put_field(en, "entry_value", v))?;
+                        Value::Obj(en)
+                    }
+                };
+                elems.push(item);
+            }
+            let view = vm.heap.alloc_instance(VIEW_SET.to_string(), vec![])?;
+            vm.fw.objects.insert(view, HostObj::List { elems });
+            Ok(Some(Value::Obj(view)))
+        }
         ("put", _) => {
             let k = args[0].clone();
             let v = args[1].clone();
@@ -1538,8 +1658,33 @@ pub fn call_instance_intrinsic_mref(
         // CopyOnWriteArraySet (M8): Set host — mesmo estado List, mas o add
         // DEDUPLICA por igualdade Java (values_equal) e devolve false se já
         // presente. Iteradores seguem fora (compat_gaps).
-        (c, name, sig) if c == COW_SET && set_supported(name, sig) => {
+        (c, name, sig) if (c == COW_SET || c == VIEW_SET) && set_supported(name, sig) => {
             set_intrinsic(vm, recv, name, sig, args)
+        }
+        // iterator() de List/Set host (incl. views de Map) — M8
+        (c, name, sig)
+            if (c == ARRAY_LIST
+                || c == LINKED_LIST
+                || c == COW_LIST
+                || c == COW_SET
+                || c == VIEW_SET)
+                && name == "iterator"
+                && sig == "()Ljava/util/Iterator;" =>
+        {
+            let elems = list_elems(vm, recv)?.clone();
+            let it = vm.heap.alloc_instance(ITERATOR.to_string(), vec![])?;
+            vm.fw
+                .objects
+                .insert(it, crate::framework::HostObj::Iter { elems, pos: 0 });
+            Ok(Some(Value::Obj(it)))
+        }
+        // Iterator host (M8): hasNext/next sobre o snapshot; remove → UOE
+        (c, name, sig) if c == ITERATOR && iterator_supported(name, sig) => {
+            iterator_intrinsic(vm, recv, name)
+        }
+        // Map.Entry host (M8): par chave/valor do snapshot de entrySet
+        (c, name, sig) if c == MAP_ENTRY && entry_supported(name, sig) => {
+            entry_intrinsic(vm, recv, name, args)
         }
 
         (SB, "<init>", "()V") => {
