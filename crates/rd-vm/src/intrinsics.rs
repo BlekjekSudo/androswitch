@@ -446,6 +446,19 @@ pub fn call_static_intrinsic(
             )?;
             Ok(Some(Value::Obj(r)))
         }
+        // M8 (21º gap real): System.getProperty — tabela da plataforma com
+        // valores coerentes com o ambiente Android/VM; desconhecida → null
+        // (semântica JDK). getProperty(k,def) devolve def; getProperties fora.
+        ("Ljava/lang/System;", "getProperty", "(Ljava/lang/String;)Ljava/lang/String;") => Ok(
+            Some(system_get_property(vm, args)?.unwrap_or(Value::Null)),
+        ),
+        (
+            "Ljava/lang/System;",
+            "getProperty",
+            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+        ) => Ok(Some(
+            system_get_property(vm, args)?.unwrap_or_else(|| args[1].clone()),
+        )),
         // M8: Thread statics — VM single-threaded: UMA thread sintética
         // "main"; sleep/yield operam sobre o relógio virtual (≡ SystemClock).
         ("Ljava/lang/Thread;", "currentThread", "()Ljava/lang/Thread;") => {
@@ -1168,6 +1181,50 @@ fn find_elem(
         }
     }
     Ok(None)
+}
+
+/// System.getProperty host (M8): propriedades da plataforma com valores
+/// coerentes com a VM (Android/Linux, single-threaded, determinística).
+/// Chave desconhecida → `Ok(None)` (null, como na JDK).
+fn system_get_property(vm: &mut Engine, args: &[Value]) -> Result<Option<Value>, VmExit> {
+    let Some(key_ref) = args[0].as_ref()? else {
+        return Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/NullPointerException;",
+            "System.getProperty(null)",
+        )));
+    };
+    let key = vm.heap.as_str(key_ref)?.to_string();
+    let val: &str = match key.as_str() {
+        "os.name" => "Linux",
+        "os.arch" => "arm64-v8a",
+        "os.version" => "4.14.0-rustydroid",
+        "line.separator" => "\n",
+        "file.separator" => "/",
+        "path.separator" => ":",
+        "java.io.tmpdir" => "/tmp",
+        "user.dir" => "/",
+        "user.language" => "en",
+        "user.region" => "US",
+        "user.timezone" => "UTC",
+        "java.vendor" => "RustyDroid",
+        "java.version" => "0",
+        "java.specification.version" => "1.8",
+        "java.vm.name" => "RustyDroid VM",
+        "java.vm.vendor" => "RustyDroid",
+        "java.vm.version" => "0.8",
+        "java.class.path" => "",
+        "java.boot.class.path" => "",
+        "java.library.path" => "/system/lib64",
+        "java.home" => "/system",
+        "java.runtime.name" => "RustyDroid Runtime",
+        "java.runtime.version" => "0.8",
+        "java.specification.name" => "Java Platform API Specification",
+        "java.specification.vendor" => "RustyDroid",
+        "file.encoding" => "UTF-8",
+        "http.agent" => "RustyDroid/0.8",
+        _ => return Ok(None),
+    };
+    Ok(Some(Value::Obj(alloc_string(vm, val.to_string())?)))
 }
 
 /// (name, sig) de ThreadLocal host suportados (M8).

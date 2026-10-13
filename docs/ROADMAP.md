@@ -450,7 +450,14 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   declaração DEX (override vence). `InheritableThreadLocal` comporta-se
   igual (herdar entre threads não se aplica). `withInitial(Supplier)` fora
   (não sondado).
+- ✅ **`System.getProperty` host (entregue nesta rodada)**: vigésimo primeiro
+  gap. Tabela de propriedades coerente com a VM (os.name=Linux,
+  os.arch=arm64-v8a, line.separator=LF real, file/path.separator,
+  java.io.tmpdir, user.dir/language/region/timezone, java.vm.*,
+  file.encoding=UTF-8, http.agent…); chave desconhecida → **null**
+  (semântica JDK); variante `(key, def)` devolve **def**; key null → NPE
+  materializado. `getProperties()` (Properties completo) fora — não sondado.
 - ⬜ **Próximo gap (achado honesto)**:
-  `java.lang.System.getProperty(String)` — tabela de propriedades da
-  plataforma (os.name/line.separator/java.io.tmpdir/user.dir…); null para
-  desconhecidas (semântica JDK).
+  `java.lang.Class.getClassLoader()Ljava/lang/ClassLoader;` — extensão do
+  Class host (iteration W); ClassLoader host mínimo (loadClass provavelmente
+  na sequência).

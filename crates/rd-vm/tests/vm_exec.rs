@@ -4537,3 +4537,90 @@ fn thread_local_host_intrinsics() {
     );
     assert!(e.cp.is_subtype(ITL, TL));
 }
+
+/// M8 (compat real): System.getProperty host — 21º gap do launch do
+/// org.primftpd. Tabela da plataforma coerente com a VM; desconhecida → null;
+/// variante (key, def) devolve def; key null → NPE.
+#[test]
+fn system_get_property_host() {
+    use rd_vm::intrinsics::call_static_intrinsic;
+    use rd_vm::value::Value;
+    const SYS: &str = "Ljava/lang/System;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let k_os = Value::Obj(e.heap.alloc_string("os.name".into()).unwrap());
+    let k_sep = Value::Obj(e.heap.alloc_string("line.separator".into()).unwrap());
+    let k_none = Value::Obj(
+        e.heap
+            .alloc_string("propriedade.inexistente".into())
+            .unwrap(),
+    );
+    let k_def = Value::Obj(e.heap.alloc_string("fallback".into()).unwrap());
+
+    // conhecidas
+    let os = call_static_intrinsic(
+        &mut e,
+        SYS,
+        "getProperty",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+        &[k_os],
+    )
+    .unwrap();
+    match os {
+        Some(Value::Obj(r)) => assert_eq!(e.heap.as_str(r).unwrap(), "Linux"),
+        other => panic!("os.name: {other:?}"),
+    }
+    let sep = call_static_intrinsic(
+        &mut e,
+        SYS,
+        "getProperty",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+        &[k_sep],
+    )
+    .unwrap();
+    match sep {
+        Some(Value::Obj(r)) => assert_eq!(e.heap.as_str(r).unwrap(), "\n", "LF real"),
+        other => panic!("line.separator: {other:?}"),
+    }
+
+    // desconhecida → null (semântica JDK)
+    assert_eq!(
+        call_static_intrinsic(
+            &mut e,
+            SYS,
+            "getProperty",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            &[k_none.clone()]
+        )
+        .unwrap(),
+        Some(Value::Null)
+    );
+
+    // (key, def): desconhecida devolve def
+    assert_eq!(
+        call_static_intrinsic(
+            &mut e,
+            SYS,
+            "getProperty",
+            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+            &[k_none, k_def.clone()]
+        )
+        .unwrap(),
+        Some(k_def)
+    );
+
+    // key null → NPE materializado
+    match call_static_intrinsic(
+        &mut e,
+        SYS,
+        "getProperty",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+        &[Value::Null],
+    ) {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/NullPointerException;")
+        }
+        other => panic!("esperava NPE, got {other:?}"),
+    }
+}
