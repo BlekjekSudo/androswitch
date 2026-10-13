@@ -1185,6 +1185,14 @@ fn enum_intrinsic(
                 .unwrap_or(0);
             Ok(Some(Value::Int(a.wrapping_sub(b))))
         }
+        // M8 (34º gap real): Enum.clone() é FINAL na JDK/libcore e SEMPRE
+        // lança CloneNotSupportedException — nunca copia. Materializamos a
+        // exceção capturável (o app pode tratá-la e seguir, como em helpers
+        // reflectivos); silenciar ou copiar seria semântica inventada.
+        "clone" => Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/CloneNotSupportedException;",
+            "Cannot clone an enum (java.lang.Enum.clone é final e sempre lança)",
+        ))),
         _ => Ok(None),
     }
 }
@@ -2173,6 +2181,7 @@ pub fn call_instance_intrinsic_mref(
                         | ("name", "()Ljava/lang/String;")
                         | ("ordinal", "()I")
                         | ("compareTo", "(Ljava/lang/Enum;)I")
+                        | ("clone", "()Ljava/lang/Object;")
                 ) =>
         {
             enum_intrinsic(vm, recv, name, args)
@@ -2199,6 +2208,7 @@ pub fn call_instance_intrinsic_mref(
                         | ("ordinal", "()I")
                         | ("toString", "()Ljava/lang/String;")
                         | ("compareTo", "(Ljava/lang/Enum;)I")
+                        | ("clone", "()Ljava/lang/Object;")
                 )
                 && vm.cp.is_subtype(recv_class, ENUM)
                 && vm.cp.resolve_method(recv_class, name, sig).is_none() =>
@@ -2464,6 +2474,28 @@ pub fn call_instance_intrinsic_mref(
                         && vm.cp.resolve_method(recv_class, name, sig).is_none())) =>
         {
             thread_local_intrinsic(vm, recv, recv_class, name, args)
+        }
+        // M8 (34º gap real): array.clone() — arrays são Cloneable (JLS 10.7)
+        // e o clone é uma SHALLOW COPY com o mesmo descritor/ElemKind. É o
+        // rastro clássico de `values()`/`$VALUES.clone()` de enums (ex.:
+        // androidx Lifecycle$Event): o method ref declara o TIPO DO ARRAY
+        // (`[L...;`), não Enum. Enum.clone segue regra própria (CNSE) acima.
+        (c, name, sig)
+            if c.starts_with('[') && (name, sig) == ("clone", "()Ljava/lang/Object;") =>
+        {
+            let (elem, elems, elem_class) = match vm.heap.get(recv)? {
+                crate::heap::HeapObj::Array {
+                    elem,
+                    elems,
+                    elem_class,
+                } => (*elem, elems.clone(), elem_class.clone()),
+                // receiver não-array com method ref de array é ilegal — mas
+                // não é daqui: deixa o fluxo seguir para o erro de resolução.
+                _ => return Ok(None),
+            };
+            let dst = vm.heap.alloc_array(elem, elems.len(), &elem_class)?;
+            vm.heap.array_elems_mut(dst)?.extend(elems);
+            Ok(Some(Value::Obj(dst)))
         }
         // ServiceLoader (M8): descoberta SPI fora do escopo por enquanto;
         // iterator() é um Iterator host vazio, nunca uma falha silenciosa.
