@@ -388,8 +388,22 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   host (`name`/`ordinal`/`toString`/`compareTo`); override de usuário vence
   (resolve `Some`). `compareTo` = diferença de ordinais com `wrapping_sub`
   (comportamento documentado da JDK); `compareTo(null)` → NPE materializado.
+- ✅ **Views + iteradores host (entregue nesta rodada)**: décimo terceiro gap
+  (`LinkedHashMap.entrySet`). `entrySet`/`keySet`/`values` devolvem view
+  **snapshot** (classe `HashSet` host com cadeia `AbstractSet`; em Java a
+  view é viva — desvio documentado) em **ordem de inserção** (estado Map é
+  `Vec`); `Map.Entry` host com `getKey`/`getValue`/`setValue` (devolve o
+  anterior; não propaga ao Map). `iterator()` para List/Set/views →
+  `Iterator` host (`HostObj::Iter`, cursor sobre snapshot): `hasNext`/`next`
+  (`NoSuchElementException` quando esgota)/`remove`
+  (`UnsupportedOperationException`).
+- ✅ **Bug pré-existente corrigido no caminho (achado pelo app real)**:
+  `builtin_hierarchy` apontava a cadeia de `Activity` para
+  `Ljava/content/Context;` — **typo** de `Landroid/content/Context;` sem
+  cobertura de teste até o primftpd exigir check-cast
+  `MainTabsActivity → Context` (CCE espúrio). Corrigido + teste
+  `android_activity_is_android_context`.
 - ⬜ **Próximo gap (achado honesto)**:
-  `LinkedHashMap.entrySet()Ljava/util/Set;` — família de ITERADORES
-  (entrySet/keySet/values + Iterator/for-each), prevista desde a iteração I;
-  exige Set/Map view host sobre o estado existente + `iterator()` com
-  `hasNext`/`next`.
+  `java.util.Collections.synchronizedMap(Map)` — utilitários estáticos de
+  Collections (synchronized*/unmodifiable*/empty*/singleton*); VM
+  single-threaded ⇒ wrapper sincronizado pode devolver o próprio mapa.

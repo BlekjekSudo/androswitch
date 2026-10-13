@@ -3598,3 +3598,218 @@ fn enum_inherited_methods_and_compareto() {
     .expect("sem erro")
     .is_none());
 }
+
+/// M8 (compat real): views + iteradores host — 13º gap do launch do
+/// org.primftpd (`LinkedHashMap.entrySet`). entrySet/keySet/values devolvem
+/// SNAPSHOT (classe HashSet host, ordem de inserção); iterator() com
+/// hasNext/next; Map.Entry host com getKey/getValue/setValue.
+#[test]
+fn collection_views_and_iterators() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const HM: &str = "Ljava/util/HashMap;";
+    const AL: &str = "Ljava/util/ArrayList;";
+    const SET: &str = "Ljava/util/HashSet;";
+    const IT: &str = "Ljava/util/Iterator;";
+    const EN: &str = "Ljava/util/Map$Entry;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let k1 = e.heap.alloc_string("k1".into()).unwrap();
+    let k2 = e.heap.alloc_string("k2".into()).unwrap();
+    let v1 = e.heap.alloc_string("v1".into()).unwrap();
+    let v2 = e.heap.alloc_string("v2".into()).unwrap();
+
+    // mapa com 2 pares (ordem de inserção k1, k2)
+    let m = e.heap.alloc_instance(HM.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(&mut e, HM, "<init>", "()V", m, &[]).unwrap();
+    for (k, v) in [(k1, v1), (k2, v2)] {
+        call_instance_intrinsic(
+            &mut e,
+            HM,
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            m,
+            &[Value::Obj(k), Value::Obj(v)],
+        )
+        .unwrap();
+    }
+
+    // entrySet → view HashSet com size/contains do Set host
+    let es = call_instance_intrinsic(&mut e, HM, "entrySet", "()Ljava/util/Set;", m, &[]).unwrap();
+    let es = match es {
+        Some(Value::Obj(r)) => r,
+        other => panic!("entrySet: {other:?}"),
+    };
+    assert_eq!(e.heap.class_of(es).unwrap(), SET);
+    assert_eq!(
+        call_instance_intrinsic(&mut e, SET, "size", "()I", es, &[]).unwrap(),
+        Some(Value::Int(2))
+    );
+    assert!(e.cp.is_subtype(SET, "Ljava/util/Set;"));
+    assert!(e.cp.is_subtype(SET, "Ljava/util/AbstractSet;"));
+
+    // for-each: iterator → hasNext/next → Map.Entry getKey/getValue
+    let it = call_instance_intrinsic(&mut e, SET, "iterator", "()Ljava/util/Iterator;", es, &[])
+        .unwrap();
+    let it = match it {
+        Some(Value::Obj(r)) => r,
+        other => panic!("iterator: {other:?}"),
+    };
+    let mut seen = Vec::new();
+    loop {
+        let has = call_instance_intrinsic(&mut e, IT, "hasNext", "()Z", it, &[]).unwrap();
+        if has != Some(Value::Int(1)) {
+            break;
+        }
+        let n =
+            call_instance_intrinsic(&mut e, IT, "next", "()Ljava/lang/Object;", it, &[]).unwrap();
+        let entry = match n {
+            Some(Value::Obj(r)) => r,
+            other => panic!("next: {other:?}"),
+        };
+        assert_eq!(e.heap.class_of(entry).unwrap(), EN);
+        let key = call_instance_intrinsic(&mut e, EN, "getKey", "()Ljava/lang/Object;", entry, &[])
+            .unwrap();
+        let val =
+            call_instance_intrinsic(&mut e, EN, "getValue", "()Ljava/lang/Object;", entry, &[])
+                .unwrap();
+        let ks = match key {
+            Some(Value::Obj(r)) => e.heap.as_str(r).unwrap().to_string(),
+            other => panic!("getKey: {other:?}"),
+        };
+        let vs = match val {
+            Some(Value::Obj(r)) => e.heap.as_str(r).unwrap().to_string(),
+            other => panic!("getValue: {other:?}"),
+        };
+        seen.push((ks, vs));
+    }
+    assert_eq!(
+        seen,
+        vec![
+            ("k1".to_string(), "v1".to_string()),
+            ("k2".to_string(), "v2".to_string())
+        ],
+        "ordem de inserção"
+    );
+    // next esgotado → NoSuchElementException
+    match call_instance_intrinsic(&mut e, IT, "next", "()Ljava/lang/Object;", it, &[]) {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/util/NoSuchElementException;")
+        }
+        other => panic!("esperava NSE, got {other:?}"),
+    }
+    // remove do iterator → UnsupportedOperationException
+    match call_instance_intrinsic(&mut e, IT, "remove", "()V", it, &[]) {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/UnsupportedOperationException;")
+        }
+        other => panic!("esperava UOE, got {other:?}"),
+    }
+
+    // keySet / values
+    let ks = call_instance_intrinsic(&mut e, HM, "keySet", "()Ljava/util/Set;", m, &[]).unwrap();
+    let ks = match ks {
+        Some(Value::Obj(r)) => r,
+        other => panic!("keySet: {other:?}"),
+    };
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            SET,
+            "contains",
+            "(Ljava/lang/Object;)Z",
+            ks,
+            &[Value::Obj(k2)]
+        )
+        .unwrap(),
+        Some(Value::Int(1))
+    );
+    let vs =
+        call_instance_intrinsic(&mut e, HM, "values", "()Ljava/util/Collection;", m, &[]).unwrap();
+    let vs = match vs {
+        Some(Value::Obj(r)) => r,
+        other => panic!("values: {other:?}"),
+    };
+    assert_eq!(
+        call_instance_intrinsic(&mut e, SET, "size", "()I", vs, &[]).unwrap(),
+        Some(Value::Int(2))
+    );
+
+    // setValue no entry devolve o anterior e atualiza o par do snapshot
+    let it2 = call_instance_intrinsic(&mut e, SET, "iterator", "()Ljava/util/Iterator;", es, &[])
+        .unwrap();
+    let it2 = match it2 {
+        Some(Value::Obj(r)) => r,
+        other => panic!("it2: {other:?}"),
+    };
+    let first =
+        call_instance_intrinsic(&mut e, IT, "next", "()Ljava/lang/Object;", it2, &[]).unwrap();
+    let first = match first {
+        Some(Value::Obj(r)) => r,
+        other => panic!("first: {other:?}"),
+    };
+    let v9 = e.heap.alloc_string("v9".into()).unwrap();
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            EN,
+            "setValue",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            first,
+            &[Value::Obj(v9)]
+        )
+        .unwrap(),
+        Some(Value::Obj(v1)),
+        "setValue devolve o valor anterior"
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, EN, "getValue", "()Ljava/lang/Object;", first, &[])
+            .unwrap(),
+        Some(Value::Obj(v9))
+    );
+
+    // List também itera
+    let l = e.heap.alloc_instance(AL.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(&mut e, AL, "<init>", "()V", l, &[]).unwrap();
+    call_instance_intrinsic(
+        &mut e,
+        AL,
+        "add",
+        "(Ljava/lang/Object;)Z",
+        l,
+        &[Value::Int(11)],
+    )
+    .unwrap();
+    call_instance_intrinsic(
+        &mut e,
+        AL,
+        "add",
+        "(Ljava/lang/Object;)Z",
+        l,
+        &[Value::Int(22)],
+    )
+    .unwrap();
+    let lit =
+        call_instance_intrinsic(&mut e, AL, "iterator", "()Ljava/util/Iterator;", l, &[]).unwrap();
+    let lit = match lit {
+        Some(Value::Obj(r)) => r,
+        other => panic!("list iterator: {other:?}"),
+    };
+    assert_eq!(
+        call_instance_intrinsic(&mut e, IT, "hasNext", "()Z", lit, &[]).unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, IT, "next", "()Ljava/lang/Object;", lit, &[]).unwrap(),
+        Some(Value::Int(11))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, IT, "next", "()Ljava/lang/Object;", lit, &[]).unwrap(),
+        Some(Value::Int(22))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, IT, "hasNext", "()Z", lit, &[]).unwrap(),
+        Some(Value::Int(0))
+    );
+}
