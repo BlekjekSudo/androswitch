@@ -31,7 +31,7 @@ const EXECUTORS: &str = "Ljava/util/concurrent/Executors;";
 const EXECUTOR: &str = "Ljava/util/concurrent/Executor;";
 const EXECUTOR_SVC: &str = "Ljava/util/concurrent/ExecutorService;";
 const FUTURE: &str = "Ljava/util/concurrent/Future;";
-use crate::framework::THREAD;
+use crate::framework::{CLASS, THREAD};
 const MATH: &str = "Ljava/lang/Math;";
 /// M8 (compat real): coleções java.util host — segundo gap de launch do
 /// org.primftpd (`WeakHashMap.<init>`). WeakHashMap ≡ HashMap (sem GC na
@@ -510,6 +510,54 @@ fn collections_sync_wrapper(name: &str, sig: &str) -> bool {
                 "(Ljava/util/Collection;)Ljava/util/Collection;"
             )
     )
+}
+
+/// (name, sig) de `Class` host suportados (M8).
+fn class_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("getName", "()Ljava/lang/String;")
+            | ("getSimpleName", "()Ljava/lang/String;")
+            | ("toString", "()Ljava/lang/String;")
+    )
+}
+
+/// Descritor → nome binário Java ("Lcom/x/Y;" → "com.x.Y"; arrays/primitivos
+/// mantêm o descritor, como "[I").
+fn descriptor_to_class_name(desc: &str) -> String {
+    match desc.strip_prefix('L').and_then(|d| d.strip_suffix(';')) {
+        Some(inner) => inner.replace('/', "."),
+        None => desc.to_string(),
+    }
+}
+
+/// Class host (M8): nome vem do campo de heap "class_name" (descritor).
+fn class_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+) -> Result<Option<Value>, VmExit> {
+    let desc = match vm.heap.get_field(recv, "class_name") {
+        Ok(Value::Obj(r)) => vm.heap.as_str(r)?.to_string(),
+        _ => String::new(),
+    };
+    let bin = descriptor_to_class_name(&desc);
+    let out = match name {
+        "getName" => bin,
+        "getSimpleName" => {
+            // Java: sem pacote e sem classes externas ("La/b/C$D;" → "D")
+            let tail = desc.trim_start_matches('L').trim_end_matches(';');
+            let after_slash = tail.rsplit('/').next().unwrap_or(tail);
+            after_slash
+                .rsplit('$')
+                .next()
+                .unwrap_or(after_slash)
+                .to_string()
+        }
+        "toString" => format!("class {bin}"),
+        _ => return Ok(None),
+    };
+    Ok(Some(Value::Obj(alloc_string(vm, out)?)))
 }
 
 /// (name, sig) de fábricas `Executors` suportadas (M8).
@@ -1609,6 +1657,25 @@ pub fn call_instance_intrinsic_mref(
 ) -> Result<Option<Value>, VmExit> {
     match (recv_class, name, sig) {
         (OBJECT, "<init>", "()V") => Ok(Some(Value::Null)), // ctor de Object = no-op
+
+        // ── Object.getClass (M8, 16º gap real) ──────────────────────────────
+        // final: nenhuma classe DEX pode declará-lo ⇒ captura irrestrita é
+        // correta. Devolve o objeto Class canônico da classe do receiver
+        // (identidade estável por descritor — como na JVM).
+        (_, "getClass", "()Ljava/lang/Class;") => {
+            let cls = vm.heap.class_of(recv)?.to_string();
+            let c = vm.class_object_for(&cls)?;
+            Ok(Some(Value::Obj(c)))
+        }
+        // Métodos de Class host: só sem declaração DEX (app não define
+        // java.lang.Class; guarda defensiva contra shadowing).
+        (c, name, sig)
+            if c == CLASS
+                && class_supported(name, sig)
+                && vm.cp.resolve_method(recv_class, name, sig).is_none() =>
+        {
+            class_intrinsic(vm, recv, name)
+        }
 
         // ── java.lang.Enum (M8) ─────────────────────────────────────────────
         // Só quando o method ref DECLARA Enum: <init>/name/ordinal são finais

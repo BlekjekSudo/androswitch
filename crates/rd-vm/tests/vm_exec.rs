@@ -4115,3 +4115,101 @@ fn array_deque_host_intrinsics() {
     assert!(e.cp.is_subtype(DQ, "Ljava/util/AbstractCollection;"));
     assert!(!e.cp.is_subtype(DQ, "Ljava/util/List;"));
 }
+
+/// M8 (compat real): Object.getClass + Class host — 16º gap do launch do
+/// org.primftpd (`MainTabsActivity.getClass()`). getClass é final ⇒ captura
+/// irrestrita; objeto Class canônico por descritor (identidade estável);
+/// getName/getSimpleName/toString.
+#[test]
+fn get_class_and_class_host() {
+    use rd_vm::intrinsics::{call_instance_intrinsic, call_instance_intrinsic_mref};
+    use rd_vm::value::Value;
+    const CLS: &str = "Ljava/lang/Class;";
+
+    let mut b = DexBuilder::new();
+    b.class("Lcom/exemplo/MinhaClasse;", "Ljava/lang/Object;");
+    b.class("La/b/C$D;", "Ljava/lang/Object;");
+    let mut e = engine_of(&b);
+    let o = e
+        .heap
+        .alloc_instance("Lcom/exemplo/MinhaClasse;".to_string(), vec![])
+        .unwrap();
+    let nested = e
+        .heap
+        .alloc_instance("La/b/C$D;".to_string(), vec![])
+        .unwrap();
+
+    // getClass via mref de Object (caso real: método final herdado)
+    let g = call_instance_intrinsic_mref(
+        &mut e,
+        "Lcom/exemplo/MinhaClasse;",
+        "Ljava/lang/Object;",
+        "getClass",
+        "()Ljava/lang/Class;",
+        o,
+        &[],
+    )
+    .unwrap();
+    let c = match g {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getClass: {other:?}"),
+    };
+    assert_eq!(e.heap.class_of(c).unwrap(), CLS);
+
+    // identidade estável: segunda chamada → mesma referência
+    let g2 = call_instance_intrinsic(
+        &mut e,
+        "Lcom/exemplo/MinhaClasse;",
+        "getClass",
+        "()Ljava/lang/Class;",
+        o,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(g2, Some(Value::Obj(c)), "Class canônico: mesma ref");
+
+    // getName / getSimpleName / toString
+    let call_c = |e: &mut Engine, name: &str, r: rd_vm::heap::ObjRef| {
+        call_instance_intrinsic(e, CLS, name, "()Ljava/lang/String;", r, &[]).unwrap()
+    };
+    match call_c(&mut e, "getName", c) {
+        Some(Value::Obj(s)) => assert_eq!(e.heap.as_str(s).unwrap(), "com.exemplo.MinhaClasse"),
+        other => panic!("getName: {other:?}"),
+    }
+    match call_c(&mut e, "getSimpleName", c) {
+        Some(Value::Obj(s)) => assert_eq!(e.heap.as_str(s).unwrap(), "MinhaClasse"),
+        other => panic!("getSimpleName: {other:?}"),
+    }
+    match call_c(&mut e, "toString", c) {
+        Some(Value::Obj(s)) => {
+            assert_eq!(e.heap.as_str(s).unwrap(), "class com.exemplo.MinhaClasse")
+        }
+        other => panic!("toString: {other:?}"),
+    }
+
+    // classe aninhada: getSimpleName descarta pacote E classe externa
+    let gn = call_instance_intrinsic(
+        &mut e,
+        "La/b/C$D;",
+        "getClass",
+        "()Ljava/lang/Class;",
+        nested,
+        &[],
+    )
+    .unwrap();
+    let cn = match gn {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getClass nested: {other:?}"),
+    };
+    match call_c(&mut e, "getName", cn) {
+        Some(Value::Obj(s)) => assert_eq!(e.heap.as_str(s).unwrap(), "a.b.C$D"),
+        other => panic!("getName nested: {other:?}"),
+    }
+    match call_c(&mut e, "getSimpleName", cn) {
+        Some(Value::Obj(s)) => assert_eq!(e.heap.as_str(s).unwrap(), "D"),
+        other => panic!("getSimpleName nested: {other:?}"),
+    }
+
+    // Class <: Object
+    assert!(e.cp.is_subtype(CLS, "Ljava/lang/Object;"));
+}
