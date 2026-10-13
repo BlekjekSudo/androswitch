@@ -34,6 +34,10 @@ const SOFT_REF: &str = "Ljava/lang/ref/SoftReference;";
 const REF_QUEUE: &str = "Ljava/lang/ref/ReferenceQueue;";
 const HASH_MAP: &str = "Ljava/util/HashMap;";
 const WEAK_MAP: &str = "Ljava/util/WeakHashMap;";
+/// M8: sétimo gap do launch real (`LinkedHashMap.<init>`). Ordem de iteração
+/// NÃO é garantida (estado Map é BTreeMap por chave string — documentado em
+/// compat_gaps); para os métodos essenciais o comportamento é o do HashMap.
+const LINKED_MAP: &str = "Ljava/util/LinkedHashMap;";
 const ARRAY_LIST: &str = "Ljava/util/ArrayList;";
 const LINKED_LIST: &str = "Ljava/util/LinkedList;";
 /// M8: coleções concorrentes — sexto gap do launch real
@@ -1105,7 +1109,9 @@ pub fn call_instance_intrinsic_mref(
         // ── coleções java.util (M8) ─────────────────────────────────────────
         // Só os (name, sig) suportados casam aqui; o resto segue o fluxo
         // normal (Object fallback / DEX / NOT_FOUND tipado).
-        (c, name, sig) if (c == HASH_MAP || c == WEAK_MAP) && map_supported(name, sig) => {
+        (c, name, sig)
+            if (c == HASH_MAP || c == WEAK_MAP || c == LINKED_MAP) && map_supported(name, sig) =>
+        {
             map_intrinsic(vm, recv, name, sig, args)
         }
         (c, name, sig)

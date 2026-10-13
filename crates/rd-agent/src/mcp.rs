@@ -1830,7 +1830,7 @@ impl AgentSession {
                 "java-util-collections",
                 "vm",
                 "partial",
-                "HashMap/WeakHashMap/ArrayList/LinkedList/CopyOnWriteArrayList host com métodos essenciais (put/get/add/remove/size/…); CopyOnWriteArraySet host com add que deduplica; subtipagem completa (check-cast p/ List/Set/Map/Collection/Iterable); SEM iteradores/entrySet/keySet e SEM LinkedHashMap; equals de usuário não consultado em chaves. Enum é host (name/ordinal/toString)",
+                "HashMap/WeakHashMap/ArrayList/LinkedList/CopyOnWriteArrayList host com métodos essenciais (put/get/add/remove/size/…); CopyOnWriteArraySet host com add que deduplica; subtipagem completa (check-cast p/ List/Set/Map/Collection/Iterable); LinkedHashMap host (≡ HashMap; ordem de iteração não garantida); SEM iteradores/entrySet/keySet; equals de usuário não consultado em chaves. Enum é host (name/ordinal/toString)",
             ),
             (
                 "java-lang-ref",
