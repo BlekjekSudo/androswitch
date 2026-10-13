@@ -651,6 +651,9 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         }
         "Ljava/lang/Class;" => Some(OBJECT.to_vec()),
         "Ljava/lang/ClassLoader;" => Some(OBJECT.to_vec()),
+        // M8: ServiceLoader host é um Iterable vazio enquanto a descoberta
+        // `META-INF/services` do APK permanece fora do runtime.
+        "Ljava/util/ServiceLoader;" => Some(OBJECT.to_vec()),
         "Ljava/util/concurrent/atomic/AtomicInteger;" => {
             Some(vec!["Ljava/lang/Number;", "Ljava/lang/Object;"])
         }
@@ -769,6 +772,7 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/util/concurrent/atomic/AtomicReference;"
         | "Ljava/util/concurrent/atomic/AtomicInteger;" => Some(vec!["Ljava/io/Serializable;"]),
         "Ljava/util/concurrent/ExecutorService;" => Some(vec!["Ljava/util/concurrent/Executor;"]),
+        "Ljava/util/ServiceLoader;" => Some(vec!["Ljava/lang/Iterable;"]),
         "Ljava/lang/Enum;" => Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
         "Ljava/lang/Thread;" => Some(vec!["Ljava/lang/Runnable;"]),
         _ => None,

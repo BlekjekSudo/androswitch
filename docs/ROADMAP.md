@@ -465,7 +465,12 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
 - ✅ **`System.getSecurityManager` (entregue nesta rodada)**: vigésimo
   terceiro gap. Android não tem SecurityManager (deprecated na JDK; APIs de
   segurança são no-op) ⇒ sempre **null** — semântica correta, uma linha.
-- ⬜ **Próximo gap (achado honesto)**:
-  `java.util.ServiceLoader.load(Class,ClassLoader)` — mecanismo SPI;
-  substituto honesto: loader **vazio** (sem varredura de META-INF/services
-  no APK) com `iterator()` sem elementos.
+- ✅ **`java.util.ServiceLoader` host (entregue nesta rodada)**: vigésimo
+  quarto gap. `load(Class)` e `load(Class,ClassLoader)` criam um loader que
+  implementa `Iterable`; `iterator()` devolve um `Iterator` **vazio**. A VM
+  ainda não varre `META-INF/services` do APK, portanto não inventa providers:
+  `hasNext()` é falso e `next()` materializa `NoSuchElementException`. `service`
+  null preserva `NullPointerException`; `ClassLoader` null (bootstrap) é aceito.
+- ⬜ **Próximo gap (re-sondado)**: `java.util.LinkedHashSet.<init>()V` no
+  `org.primftpd` 8.2. Descoberta SPI real fica fora do escopo até o runtime ter
+  leitura e instanciação segura de `META-INF/services`.

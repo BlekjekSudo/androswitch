@@ -4735,3 +4735,94 @@ fn system_get_security_manager_is_null() {
         Some(rd_vm::value::Value::Null)
     );
 }
+
+/// M8 (compat real): ServiceLoader.load era o 24º gap do launch de
+/// org.primftpd. Sem leitura de META-INF/services, o host devolve um loader
+/// vazio: a iteração termina e `next` ainda respeita NoSuchElementException.
+#[test]
+fn service_loader_host_is_empty_and_iterable() {
+    use rd_vm::intrinsics::{call_instance_intrinsic, call_static_intrinsic};
+    use rd_vm::value::Value;
+    const SL: &str = "Ljava/util/ServiceLoader;";
+    const IT: &str = "Ljava/util/Iterator;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let marker = e
+        .heap
+        .alloc_instance("Lcom/example/Service;".to_string(), vec![])
+        .unwrap();
+    let service_class = match call_instance_intrinsic(
+        &mut e,
+        "Lcom/example/Service;",
+        "getClass",
+        "()Ljava/lang/Class;",
+        marker,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("service Class: {other:?}"),
+    };
+
+    // As duas sobrecargas relevantes retornam loaders vazios; loader null é
+    // permitido pela API (bootstrap), mas service null continua sendo NPE.
+    let one_arg = call_static_intrinsic(
+        &mut e,
+        SL,
+        "load",
+        "(Ljava/lang/Class;)Ljava/util/ServiceLoader;",
+        &[Value::Obj(service_class)],
+    )
+    .unwrap();
+    let two_args = call_static_intrinsic(
+        &mut e,
+        SL,
+        "load",
+        "(Ljava/lang/Class;Ljava/lang/ClassLoader;)Ljava/util/ServiceLoader;",
+        &[Value::Obj(service_class), Value::Null],
+    )
+    .unwrap();
+    let loader = match one_arg {
+        Some(Value::Obj(r)) => r,
+        other => panic!("ServiceLoader.load: {other:?}"),
+    };
+    assert!(matches!(two_args, Some(Value::Obj(_))));
+    assert_eq!(e.heap.class_of(loader).unwrap(), SL);
+
+    let it = match call_instance_intrinsic(
+        &mut e,
+        SL,
+        "iterator",
+        "()Ljava/util/Iterator;",
+        loader,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("ServiceLoader.iterator: {other:?}"),
+    };
+    assert_eq!(e.heap.class_of(it).unwrap(), IT);
+    assert_eq!(
+        call_instance_intrinsic(&mut e, IT, "hasNext", "()Z", it, &[]).unwrap(),
+        Some(Value::Int(0))
+    );
+    match call_instance_intrinsic(&mut e, IT, "next", "()Ljava/lang/Object;", it, &[]) {
+        Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/util/NoSuchElementException;"),
+        other => panic!("esperava NoSuchElementException, got {other:?}"),
+    }
+    match call_static_intrinsic(
+        &mut e,
+        SL,
+        "load",
+        "(Ljava/lang/Class;)Ljava/util/ServiceLoader;",
+        &[Value::Null],
+    ) {
+        Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/lang/NullPointerException;"),
+        other => panic!("esperava NPE, got {other:?}"),
+    }
+    assert!(e.cp.is_subtype(SL, "Ljava/lang/Iterable;"));
+    assert!(e.cp.is_subtype(SL, "Ljava/lang/Object;"));
+}
