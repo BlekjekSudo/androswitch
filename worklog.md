@@ -574,3 +574,21 @@ Stage Summary:
 - Workspace: 342 testes passam, 0 falham; fmt/clippy(0)/links/matrix/readme_inspect verdes.
 - Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → AtomicReferenceFieldUpdater.newUpdater (próximo).
 - Próxima iteração: newUpdater host (updater que opera get_field/put_field pelo nome capturado) OU Object[].clone()/iteradores.
+
+---
+Task ID: m8-atomic-field-updater
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração L)
+Task: M8 — AtomicReferenceFieldUpdater host (5º gap do launch real do org.primftpd).
+
+Work Log:
+- rd-vm intrinsics: newUpdater(Class,Class,String) static — classes IGNORADAS (sem access check; volatile não se aplica a VM single-thread), captura o nome do campo em campo de heap "arfu_name" e devolve instância host ARFU; fieldName null → NPE materializado.
+- Métodos de instância (dispatch c==ARFU || mref==ARFU, só sigs suportadas): get/set/getAndSet/compareAndSet/weakCompareAndSet operando via get_field/put_field no alvo; campo ausente → null; alvo null → NPE; CAS por identidade de referência (ref_identity_eq, mesma política do AtomicReference).
+- Antes: newUpdater caía no NOT_IMPLEMENTED tipado do catch-all Ljava/ — agora é host.
+- compat_gaps: java-lang-ref atualizado (ARFU host; próximo gap = coleções concorrentes).
+- ROADMAP "M8 sondagem": ARFU ✅ + próximo gap honesto (CopyOnWriteArraySet.<init> — grupo java.util.concurrent; pode reusar HostObj::List/Map).
+- Teste: atomic_field_updater_host_intrinsics (newUpdater+get ausente→null, set/get, CAS errado/certo, getAndSet devolve anterior, alvo null→NPE, fieldName null→NPE).
+- Re-sondagem app real: gap do ARFU resolvido; launch avança até CopyOnWriteArraySet.<init>()V (registrado).
+
+Stage Summary:
+- Workspace: 343 testes passam, 0 falham; fmt/clippy(0)/links/matrix/readme_inspect verdes.
+- Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → ARFU ✅ → CopyOnWriteArraySet (próximo).

@@ -321,8 +321,15 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   fila está permanentemente vazia, resposta honesta). Sem GC na arena ⇒
   referent vive até `clear()` (limitação documentada, mesma política do
   WeakHashMap).
+- ✅ **`AtomicReferenceFieldUpdater` host (entregue nesta rodada)**: quinto
+  gap (`newUpdater(Class,Class,String)` — antes `NOT_IMPLEMENTED` tipado do
+  catch-all `Ljava/`). `newUpdater` captura o NOME do campo (classes são
+  ignoradas: sem access check; `volatile` não se aplica a VM single-thread)
+  e devolve updater host; `get`/`set`/`getAndSet`/`compareAndSet`/
+  `weakCompareAndSet` operam via `get_field`/`put_field` no alvo (CAS por
+  identidade de referência; alvo null → NPE materializado).
 - ⬜ **Próximo gap (achado honesto)**:
-  `AtomicReferenceFieldUpdater.newUpdater(Class,Class,String)` (wrapped em
-  `ExceptionInInitializerError`; hoje responde `NOT_IMPLEMENTED` tipado) —
-  exige reflexão de campo por nome; candidato natural: devolver um updater
-  host que opera via `get_field`/`put_field` pelo nome capturado.
+  `java.util.concurrent.CopyOnWriteArraySet.<init>()V` — coleções concorrentes
+  (`CopyOnWriteArraySet`/`CopyOnWriteArrayList`/`ConcurrentHashMap`…) são o
+  próximo grupo; podem reusar o estado `HostObj::List`/`Map` já existente
+  (single-threaded ⇒ cópia-em-escrita é irrelevante).

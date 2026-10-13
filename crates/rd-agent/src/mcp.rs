@@ -1836,7 +1836,7 @@ impl AgentSession {
                 "java-lang-ref",
                 "vm",
                 "partial",
-                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater.newUpdater segue NOT_IMPLEMENTED",
+                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). Próximo gap real: coleções java.util.concurrent (CopyOnWriteArraySet…)",
             ),
             (
                 "notifications",
