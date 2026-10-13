@@ -5043,3 +5043,141 @@ fn class_loader_get_resources_returns_empty_enumeration() {
         other => panic!("esperava NPE, got {other:?}"),
     }
 }
+
+#[test]
+fn array_list_collection_ctor_snapshots_source() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const AL: &str = "Ljava/util/ArrayList;";
+    const LHS: &str = "Ljava/util/LinkedHashSet;";
+
+    let mut b = DexBuilder::new();
+    b.class("Lcom/exemplo/Col;", "Ljava/lang/Object;");
+    let mut e = engine_of(&b);
+
+    // Fonte 1: LinkedHashSet host — a cópia segue a ordem de inserção da fonte.
+    let set = e.heap.alloc_instance(LHS.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(&mut e, LHS, "<init>", "()V", set, &[]).unwrap();
+    let sb = e.heap.alloc_string("b".into()).unwrap();
+    let sa = e.heap.alloc_string("a".into()).unwrap();
+    call_instance_intrinsic(
+        &mut e,
+        LHS,
+        "add",
+        "(Ljava/lang/Object;)Z",
+        set,
+        &[Value::Obj(sb)],
+    )
+    .unwrap();
+    call_instance_intrinsic(
+        &mut e,
+        LHS,
+        "add",
+        "(Ljava/lang/Object;)Z",
+        set,
+        &[Value::Obj(sa)],
+    )
+    .unwrap();
+
+    let list = e.heap.alloc_instance(AL.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(
+        &mut e,
+        AL,
+        "<init>",
+        "(Ljava/util/Collection;)V",
+        list,
+        &[Value::Obj(set)],
+    )
+    .unwrap();
+    assert_eq!(
+        call_instance_intrinsic(&mut e, AL, "size", "()I", list, &[]).unwrap(),
+        Some(Value::Int(2))
+    );
+    for (i, want) in ["b", "a"].iter().enumerate() {
+        match call_instance_intrinsic(
+            &mut e,
+            AL,
+            "get",
+            "(I)Ljava/lang/Object;",
+            list,
+            &[Value::Int(i as i32)],
+        )
+        .unwrap()
+        {
+            Some(Value::Obj(r)) => assert_eq!(e.heap.as_str(r).unwrap(), *want),
+            other => panic!("get({i}): {other:?}"),
+        }
+    }
+
+    // Snapshot: remover da fonte NÃO altera a cópia (sem aliasing).
+    call_instance_intrinsic(
+        &mut e,
+        LHS,
+        "remove",
+        "(Ljava/lang/Object;)Z",
+        set,
+        &[Value::Obj(sb)],
+    )
+    .unwrap();
+    assert_eq!(
+        call_instance_intrinsic(&mut e, AL, "size", "()I", list, &[]).unwrap(),
+        Some(Value::Int(2)),
+        "cópia deve ser independente da fonte"
+    );
+
+    // Fonte 2: outra ArrayList host — duplicatas preservadas (dedup é da fonte).
+    call_instance_intrinsic(
+        &mut e,
+        AL,
+        "add",
+        "(Ljava/lang/Object;)Z",
+        list,
+        &[Value::Obj(sa)],
+    )
+    .unwrap();
+    let list2 = e.heap.alloc_instance(AL.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(
+        &mut e,
+        AL,
+        "<init>",
+        "(Ljava/util/Collection;)V",
+        list2,
+        &[Value::Obj(list)],
+    )
+    .unwrap();
+    assert_eq!(
+        call_instance_intrinsic(&mut e, AL, "size", "()I", list2, &[]).unwrap(),
+        Some(Value::Int(3))
+    );
+
+    // Fonte null → NPE (c.toArray() na JDK).
+    let list3 = e.heap.alloc_instance(AL.to_string(), vec![]).unwrap();
+    match call_instance_intrinsic(
+        &mut e,
+        AL,
+        "<init>",
+        "(Ljava/util/Collection;)V",
+        list3,
+        &[Value::Null],
+    ) {
+        Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/lang/NullPointerException;"),
+        other => panic!("esperava NPE, got {other:?}"),
+    }
+
+    // Fonte sem estado host (coleção do app) → erro tipado, nunca cópia errada.
+    let app_col = e
+        .heap
+        .alloc_instance("Lcom/exemplo/Col;".to_string(), vec![])
+        .unwrap();
+    match call_instance_intrinsic(
+        &mut e,
+        AL,
+        "<init>",
+        "(Ljava/util/Collection;)V",
+        list3,
+        &[Value::Obj(app_col)],
+    ) {
+        Err(VmExit::Error(err)) => assert_eq!(err.code, "VM_TYPE_ERROR"),
+        other => panic!("esperava VM_TYPE_ERROR, got {other:?}"),
+    }
+}

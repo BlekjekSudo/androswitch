@@ -1220,6 +1220,7 @@ fn list_supported(name: &str, sig: &str) -> bool {
         (name, sig),
         ("<init>", "()V")
             | ("<init>", "(I)V")
+            | ("<init>", "(Ljava/util/Collection;)V")
             | ("add", "(Ljava/lang/Object;)Z")
             | ("add", "(ILjava/lang/Object;)V")
             | ("get", "(I)Ljava/lang/Object;")
@@ -1936,9 +1937,32 @@ fn list_intrinsic(
 ) -> Result<Option<Value>, VmExit> {
     use crate::framework::HostObj;
     if name == "<init>" {
-        vm.fw
-            .objects
-            .insert(recv, HostObj::List { elems: Vec::new() });
+        // M8 (27º gap real): `<init>(Collection)` — snapshot na ordem do
+        // iterador da fonte host (ArrayList admite duplicatas; dedup fica a
+        // cargo da fonte). Fonte null → NPE (c.toArray() na JDK). Coleção do
+        // app sem estado host não é iterável sem chamar DEX: erro tipado
+        // honesto em vez de lista silenciosamente vazia/errada.
+        let elems = if sig == "(Ljava/util/Collection;)V" {
+            let Some(src) = args[0].as_ref()? else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "ArrayList.<init> com Collection null",
+                )));
+            };
+            match vm.fw.objects.get(&src) {
+                Some(HostObj::List { elems }) => elems.clone(),
+                _ => {
+                    return Err(crate::err::vm_error(
+                        "VM_TYPE_ERROR",
+                        "ArrayList.<init>(Collection): fonte sem estado host (coleção do app)",
+                    )
+                    .into())
+                }
+            }
+        } else {
+            Vec::new()
+        };
+        vm.fw.objects.insert(recv, HostObj::List { elems });
         return Ok(Some(Value::Null));
     }
     if !matches!(vm.fw.objects.get(&recv), Some(HostObj::List { .. })) {

@@ -933,3 +933,31 @@ GitHub status:
 Stage Summary:
 - Sequência de gaps do primftpd: … → ServiceLoader ✅ (#144) → LinkedHashSet ✅ (#145) → ClassLoader.getResources+Enumeration ✅ (esta) → ArrayList.<init>(Collection) (próximo, 27º).
 - Próximo foco: ArrayList.<init>(Collection) — snapshot do iterador da Collection origem sobre o List host; depois re-sondar.
+
+---
+Task ID: m8-arraylist-collection-ctor
+Agent: Arena Agent Mode (sessão 2026-10-13, início 09:30 UTC — continuação)
+Task: M8 — ArrayList.<init>(Ljava/util/Collection;)V host (27º gap do launch real do org.primftpd).
+
+Work Log:
+- Contexto: PR #146 (26º gap, ClassLoader.getResources+Enumeration) mergida nesta sessão (859da4ba) após CI 6/6 verde. Esta iteração partiu da sondagem dela, que parou em ArrayList.<init>(Collection).
+- rd-vm: list_supported += ("<init>", "(Ljava/util/Collection;)V"); list_intrinsic copia snapshot dos elems da fonte host (ordem do iterador; duplicatas preservadas — dedup é da fonte; sem aliasing). Fonte null → NPE (c.toArray() JDK); coleção do app sem estado host → VM_TYPE_ERROR tipado (zero cópia errada silenciosa). Vale também p/ LinkedList/CopyOnWriteArrayList (helper compartilhado — ambos têm o ctor na JDK).
+- Edição por posição (python) necessária: a guarda de lazy-init do list_intrinsic é textualmente idêntica ao bloco <init> — anchors de texto puro eram ambíguos.
+- Teste novo array_list_collection_ctor_snapshots_source: ordem de inserção da fonte LinkedHashSet ("b","a"); get/size por conteúdo; snapshot independente (remove na fonte não altera cópia); duplicatas de ArrayList preservadas (3 elems); NPE null; VM_TYPE_ERROR para coleção do app.
+- Re-sondagem app real: launch atravessou ArrayList(Collection) e parou no 28º gap NOT_FOUND: `LinkedBlockingQueue.drainTo(Ljava/util/Collection;I)I`.
+- Catálogo compat_gaps (mcp.rs) e ROADMAP atualizados (27º ✅ / 28º re-sondado ⬜).
+
+Checks:
+- `cargo fmt --all -- --check` — PASS (aplicado antes).
+- `cargo clippy --workspace --all-targets -- -D warnings` — PASS.
+- `cargo test --workspace` — PASS (31 suites ok, 0 falhas; vm_exec 67 testes — +1 novo).
+- `rustup run 1.76.0 cargo check --workspace` — PASS (MSRV).
+- `python3 scripts/check_md_links.py` — PASS. `cargo xtask compat-report` + diff — PASS (vazio).
+- `rd app run golden-apks/org.primftpd.apk --json` — avança além do ctor; para no 28º gap registrado.
+- Scan de segredos/diff — limpo; PAT nunca gravado em arquivo.
+
+GitHub status:
+- Branch feat/m8-arraylist-collection-ctor empilhada sobre d234e88 (já mergeado via #146); base da PR = main. Push + PR + merge após CI verde, fluxo histórico.
+
+Stage Summary:
+- Sequência: … → getResources+Enumeration ✅ (#146) → ArrayList(Collection) ✅ (esta) → LinkedBlockingQueue.drainTo(Collection,int) (próximo, 28º).
