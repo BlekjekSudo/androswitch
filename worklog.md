@@ -1150,3 +1150,25 @@ GitHub status:
 
 Stage Summary:
 - Observabilidade ✅ (esta) → próximo: diagnóstico do dispatchCreate androidx (disasm + estado do host ausente — provável embrião androidx.fragment.app.FragmentManager).
+
+---
+Task ID: m8-exception-trace (continuação — fase 2: postmortem AG-09)
+Agent: Arena Agent Mode (sessão 2026-10-13, início 09:30 UTC)
+Task: M8 — Observabilidade fase 2: postmortem de cobertura (Engine::executed_labels) no --trace; sondagem decisiva do NPE androidx; decisão arquitetural documentada.
+
+Work Log:
+- rd-vm::engine: `pub fn executed_labels()` — resolve o conjunto de cobertura (AG-09, sempre gravada na entrada de método) para rótulos `Lcls;->nome(proto)`, ordenados/dedup (determinístico). Zero custo de config; host não entra.
+- rd-cli: `rd app run --trace` com VM_EXCEPTION anexa ao cause o bloco `postmortem (--trace)`: N métodos DEX executados (teto 256 no payload). Foi descoberto que o teto inicial 64 truncava e produzia leituras falsas (suspeito cortado fora da lista) — ajustado e documentado.
+- Teste estendido: exception_trace_anota_frames_ao_desempilhar agora também asserta labels executados (bomba+chama presentes, saída ordenada).
+- Sondagem REAL decisiva (disasm estatico já tinha esgotado): postmortem provou que `FragmentController;->attachHost`, `FragmentManager;->attachController`, `ContextAwareHelper;->dispatchOnContextAvailable` e SINTANAM os lambdas de FragmentActivity.init NUNCA executaram — o `init()` da FragmentActivity que registra OnContextAvailableListener→attachHost (diferido por androidx.activity) nunca rodou; o NPE morre em dispatchCreate com mNonConfig null exatamente porque attachController não executou. Pai androidx/activity ComponentActivity.<init> AUSENTE da cobertura → cadeia de ctor androidx é a investigação seguinte.
+- Decisão arquitetural registrada: suporte a androidX Fragments (attachController e cia.) ADIADO para M9 — demanda real é pós-NPE, escopo não-elementar (ViewModelStore/Lifecycle/Listeners), e o regime atual prova com dados que o launch não depende da conclusão desse bloco até o ponto do NPE.
+- ROADMAP + catálogo mcp.rs atualizados com a decisão e o próximo gap real: cadeia de ctor androidx (ComponentActivity.<init> ausente) ou retomada de fragment launch pós-NPE.
+
+Checks:
+- fmt — PASS. clippy -D warnings — PASS. `cargo test --workspace` — PASS (31 suites; vm_exec 76 — o teste robustecido). MSRV 1.76 — PASS. md links — PASS. compat-report — PASS (vazio). Sondagem real com postmortem 256 — dados acima.
+
+GitHub status:
+- PR #155 (branch feat/m8-exception-trace) atualizada com fase 2.
+
+Stage Summary:
+- Observabilidade COMPLETA ✅ (trace + postmortem + decisão androidx documentada) → próximo: NPE dispatchCreate (o engine chega a despachar sem attachController — ou a classe da FragmentActivity carregada NÃO é a mesma do disasm… ou o launcher framework pula ctor DEX — próxima investigação: confirmar qual classe MainTabsActivity estende na cadeia DEX do APK e por que init() não rodou).

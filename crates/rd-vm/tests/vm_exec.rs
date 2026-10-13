@@ -5980,4 +5980,15 @@ fn exception_trace_anota_frames_ao_desempilhar() {
         msg_trace.starts_with("aget em null\n  at "),
         "mensagem original preservada no início: {msg_trace}"
     );
+
+    // Postmortem (AG-09): cobertura de entrada sempre gravada — os dois
+    // frames estão no conjunto executado, em saída ordenada/determinística.
+    // É o dado que responde "esse método rodou?" após o engine morrer.
+    let labels = e_trace.executed_labels();
+    assert!(labels.iter().any(|l| l == "LCaso;->bomba()V"));
+    assert!(labels.iter().any(|l| l == "LCaso;->chama()V"));
+    let mut sorted = labels.clone();
+    sorted.sort_unstable();
+    sorted.dedup();
+    assert_eq!(labels, sorted, "executed_labels ordenado/dedup");
 }

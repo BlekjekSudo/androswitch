@@ -1274,8 +1274,31 @@ fn boot_app(
     if let Some(a) = apk {
         eng.set_resources(a);
     }
-    eng.launch_app(&activity_desc, &package, Vec::new())
-        .map_err(vm_err_to_rd)?;
+    if let Err(e) = eng.launch_app(&activity_desc, &package, Vec::new()) {
+        let mut rd = vm_err_to_rd(e);
+        // Observabilidade (M8): com --trace, VM_EXCEPTION ganha postmortem —
+        // rótulos dos corpos DEX executados (cobertura de entrada, AG-09).
+        // Presença/ausência responde "esse método androidx rodou?" — o passo
+        // seguinte ao call site revelado pelas linhas "at". Teto fixo para
+        // manter o payload ordenável.
+        if exception_trace && rd.code == "VM_EXCEPTION" {
+            let labels = eng.executed_labels();
+            if !labels.is_empty() {
+                let mut post = format!(
+                    "\n\npostmortem (--trace): {} métodos DEX executados neste Engine (cobertura de entrada, ordem alfabética):",
+                    labels.len()
+                );
+                for l in labels.iter().take(256) {
+                    post.push_str(&format!("\n  {l}"));
+                }
+                if labels.len() > 256 {
+                    post.push_str(&format!("\n  ... (+{} mais)", labels.len() - 256));
+                }
+                rd.cause.push_str(&post);
+            }
+        }
+        return Err(rd);
+    }
     Ok((eng, activity_desc, package))
 }
 

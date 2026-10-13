@@ -553,10 +553,15 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   `FragmentController` ← `FragmentActivity.onCreate` ←
   `MainTabsActivity.onCreate` — ou seja, o app usa **androidx FragmentActivity**
   e o call site do receiver null já está identificado.
-- ⬜ **Próximo passo (mudança de regime — NÃO é gap de API)**: com o call site
-  do NPE identificado pelo `--trace`, a próxima iteração deve disassemblar
-  `dispatchCreate` (`rd dex disasm`) para achar o campo/método cujo receiver
-  está null (ex.: `mLifecycleCallbacks`/`mHost` do androidx) e decidir qual
-  estado do host falta — provável embrião do suporte a
-  `androidx.fragment.app.FragmentManager` (mundo androidx, distinto do FM
-  legacy `android.app` já entregue).
+- ⬜ **Próximo gap (re-sondado): `ClassLoader.getResources(String) →
+  Enumeration<URL>`** — próximo `NOT_FOUND` após LinkedHashSet
+  (`getResources("org/slf4j/impl/StaticLoggerBinder.class")` do
+  LoggerFactory.findPossibleStaticLoggerBinderPathSet — Logback probe; o
+  PRM continua controlado antes). Replica encontrada: suíte
+  `org.primftpd.log.PrimFtpdLoggerFactoryTest`. Necessário (canto-canto):
+  Enumeration minimal (`hasMoreElements`/`nextElement`,
+  `NoSuchElementException`) + getResources vazio (Java 9+: NPE em name null).
+  Follow-ups da Enumeration: `Collections.emptyEnumeration` e
+  `Collections.list(Enumeration)` no mesmo host; `ClassLoader.getResource`
+  (singular) coberto por exceção quando o launch pedir; bloco `java.net.URL`
+  quando a sequência real exigir URL.

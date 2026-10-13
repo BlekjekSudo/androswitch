@@ -287,6 +287,27 @@ impl Engine {
         }
     }
 
+    /// Rótulos (`Lcls;->nome(proto)`) dos corpos DEX que executaram neste
+    /// Engine, ordenados alfabeticamente (o conjunto interno não tem ordem —
+    /// a saída ordenada é determinística para diffs/relatórios). Cobertura de
+    /// **entrada de método** (AG-09), gravada sempre pelo interpretador —
+    /// zero custo de config; métodos host (framework/intrinsics) não entram.
+    /// Uso: postmortem de diagnóstico (ex.: `rd app run --trace` lista o que
+    /// executou antes de uma exceção não capturada).
+    pub fn executed_labels(&self) -> Vec<String> {
+        let mut out = Vec::with_capacity(self.coverage.len());
+        for key in &self.coverage {
+            let dex_idx = (key >> 32) as usize;
+            let method_idx = (*key & 0xffff_ffff) as u32;
+            if let Ok(r) = self.cp.method_ref(dex_idx, method_idx) {
+                out.push(format!("{}->{}{}", r.class, r.name, r.proto));
+            }
+        }
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
     pub(super) fn method_label(&self, dex_idx: usize, m: &EncodedMethod) -> String {
         match self.cp.method_ref(dex_idx, m.method_idx) {
             Ok(r) => format!("{}->{}{}", r.class, r.name, r.proto),
