@@ -57,6 +57,10 @@ const WEAK_MAP: &str = "Ljava/util/WeakHashMap;";
 /// `Vec<(chave, valor)>` ⇒ ordem de INSERÇÃO (como LinkedHashMap real); para
 /// os métodos essenciais o comportamento é o do HashMap.
 const LINKED_MAP: &str = "Ljava/util/LinkedHashMap;";
+/// M8: 17º gap do launch real (`ConcurrentHashMap.<init>`). VM
+/// single-threaded ⇒ sem segmentação/concorrência: mesmo estado e métodos do
+/// HashMap host. `putIfAbsent`/`computeIfAbsent` ficam para sondagem futura.
+const CONCURRENT_MAP: &str = "Ljava/util/concurrent/ConcurrentHashMap;";
 const ARRAY_LIST: &str = "Ljava/util/ArrayList;";
 const LINKED_LIST: &str = "Ljava/util/LinkedList;";
 /// M8: coleções concorrentes — sexto gap do launch real
@@ -1940,7 +1944,8 @@ pub fn call_instance_intrinsic_mref(
         // Só os (name, sig) suportados casam aqui; o resto segue o fluxo
         // normal (Object fallback / DEX / NOT_FOUND tipado).
         (c, name, sig)
-            if (c == HASH_MAP || c == WEAK_MAP || c == LINKED_MAP) && map_supported(name, sig) =>
+            if (c == HASH_MAP || c == WEAK_MAP || c == LINKED_MAP || c == CONCURRENT_MAP)
+                && map_supported(name, sig) =>
         {
             map_intrinsic(vm, recv, name, sig, args)
         }

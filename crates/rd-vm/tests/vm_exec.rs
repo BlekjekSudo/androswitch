@@ -4213,3 +4213,60 @@ fn get_class_and_class_host() {
     // Class <: Object
     assert!(e.cp.is_subtype(CLS, "Ljava/lang/Object;"));
 }
+
+/// M8 (compat real): ConcurrentHashMap host — 17º gap do launch do
+/// org.primftpd. Single-threaded ⇒ mesmo estado/métodos do HashMap;
+/// hierarquia JDK correta (NÃO estende HashMap; AbstractMap direto).
+#[test]
+fn concurrent_hash_map_host_intrinsics() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const CHM: &str = "Ljava/util/concurrent/ConcurrentHashMap;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let m = e.heap.alloc_instance(CHM.to_string(), vec![]).unwrap();
+    let call = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic(e, CHM, name, sig, m, &args).expect("intrínseco")
+    };
+
+    call(&mut e, "<init>", "()V", vec![]);
+    let k = e.heap.alloc_string("k".into()).unwrap();
+    let v = e.heap.alloc_string("v".into()).unwrap();
+    assert_eq!(
+        call(
+            &mut e,
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Obj(k), Value::Obj(v)]
+        ),
+        Some(Value::Null)
+    );
+    assert_eq!(call(&mut e, "size", "()I", vec![]), Some(Value::Int(1)));
+    assert_eq!(
+        call(
+            &mut e,
+            "get",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Obj(k)]
+        ),
+        Some(Value::Obj(v))
+    );
+    // entrySet também funciona (views host)
+    let es = call(&mut e, "entrySet", "()Ljava/util/Set;", vec![]);
+    match es {
+        Some(Value::Obj(r)) => {
+            assert_eq!(
+                call_instance_intrinsic(&mut e, "Ljava/util/HashSet;", "size", "()I", r, &[])
+                    .unwrap(),
+                Some(Value::Int(1))
+            );
+        }
+        other => panic!("entrySet: {other:?}"),
+    }
+    // hierarquia JDK: CHM <: AbstractMap, NÃO <: HashMap; ifaces Map/ConcurrentMap
+    assert!(e.cp.is_subtype(CHM, "Ljava/util/AbstractMap;"));
+    assert!(!e.cp.is_subtype(CHM, "Ljava/util/HashMap;"));
+    assert!(e.cp.is_subtype(CHM, "Ljava/util/concurrent/ConcurrentMap;"));
+    assert!(e.cp.is_subtype(CHM, "Ljava/util/Map;"));
+}

@@ -427,6 +427,12 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   (descritor → binário: `Lcom/x/Y;` → `com.x.Y`; arrays mantêm `[I`),
   `getSimpleName` (descarta pacote e classe externa: `La/b/C$D;` → `D`),
   `toString` (`class <nome>`); guarda defensiva: só sem declaração DEX.
+- ✅ **`ConcurrentHashMap` host (entregue nesta rodada)**: décimo sétimo gap
+  (`<init>()V`). Single-threaded ⇒ mesmo estado/métodos do HashMap host
+  (guarda estendida; entrySet/views funcionam). Hierarquia JDK correta:
+  **não** estende `HashMap` (`AbstractMap` direto) + interfaces
+  `Map`/`ConcurrentMap`/`Cloneable`/`Serializable`.
 - ⬜ **Próximo gap (achado honesto)**:
-  `java.util.concurrent.ConcurrentHashMap.<init>()V` — reuso direto da
-  guarda de Map host (single-threaded ⇒ sem segmentação/concorrência).
+  `java.util.concurrent.LinkedBlockingQueue.<init>()V` — família
+  BlockingQueue; métodos bloqueantes (`take`) exigem substituto honesto em
+  VM single-threaded (fila vazia → bloqueio seria deadlock: falhar tipado).
