@@ -681,3 +681,17 @@ Work Log:
 
 Stage Summary:
 - Sequência de gaps do primftpd: … → AtomicInteger ✅ → Executors ✅ → Thread ✅ → Enum.compareTo herdado (próximo).
+
+---
+Task ID: m8-enum-compareto
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração S)
+Task: M8 — Enum.compareTo + herança de métodos do Enum host por enums do app (12º gap).
+
+Work Log:
+- BUG de resolução corrigido: enums do APP (classe DEX <: Ljava/lang/Enum;) que chamam métodos herdados com mref declarando a SUBCLASSE (caso real: androidx Lifecycle$State.compareTo) caíam em NOT_FOUND — Enum host não tem DEX. Fallback novo: mref != ENUM && (name,sig) ∈ {name, ordinal, toString, compareTo} && is_subtype(recv, ENUM) && resolve_method(recv,name,sig) == None → enum_intrinsic. Override de usuário vence (resolve Some); classes não-enum não são sequestradas.
+- compareTo(Ljava/lang/Enum;)I implementado (também no arm mref==ENUM, que é final): diferença de ordinais wrapping_sub (comportamento JDK documentado); null → NPE materializado.
+- Teste: enum_inherited_methods_and_compareto (DEX real: LMyEnum <: Enum com A/B; compareTo -1/1/0 via mref da subclasse; name/ordinal/toString herdados; NPE; LNotEnum não sequestrado).
+- Re-sondagem app real: gap resolvido; launch atravessa androidx.lifecycle e avança até LinkedHashMap.entrySet()Ljava/util/Set; — família de iteradores confirmada como próximo gap (prevista desde a iteração I).
+
+Stage Summary:
+- Sequência de gaps do primftpd: … → Executors ✅ → Thread ✅ → Enum.compareTo ✅ → entrySet/iteradores (próximo).
