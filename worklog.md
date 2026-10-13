@@ -725,3 +725,17 @@ Work Log:
 
 Stage Summary:
 - Sequência de gaps do primftpd: … → iteradores+Context ✅ → Collections.synchronized* ✅ → ArrayDeque (próximo).
+
+---
+Task ID: m8-array-deque
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração V)
+Task: M8 — ArrayDeque host (15º gap do launch real do org.primftpd).
+
+Work Log:
+- rd-vm intrinsics: ARRAY_DEQUE sobre HostObj::List (frente = índice 0) — addFirst/addLast/offerFirst/offerLast/push/pop/add/offer; removeFirst/removeLast (NSE em vazio), pollFirst/pollLast/getFirst/getLast/peekFirst/peekLast; remove(Object)/removeFirstOccurrence/removeLastOccurrence (varredura reversa nova: find_elem_last); contains/size/isEmpty/clear; iterator() (guard estendida). Null REJEITADO (NPE, como na JDK).
+- classpath: ArrayDeque <: AbstractCollection <: Object; interfaces Deque/Queue/Collection/Iterable/Cloneable/Serializable.
+- Teste: array_deque_host_intrinsics (vazio: peek/poll null vs get/remove NSE; NPE no null; ordem [-1,0,1] via addLast/addFirst/push; pop; add/offer → true; removeLast/FirstOccurrence; contains/remove; iterator frente→fundo; clear; subtipagem + negativo List).
+- Re-sondagem app real: gap resolvido; launch avança até Object.getClass (MainTabsActivity.getClass) — registrado (Class host).
+
+Stage Summary:
+- Sequência de gaps do primftpd: … → Collections.synchronized* ✅ → ArrayDeque ✅ → getClass (próximo).

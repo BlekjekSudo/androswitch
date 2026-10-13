@@ -1830,13 +1830,13 @@ impl AgentSession {
                 "java-util-collections",
                 "vm",
                 "partial",
-                "HashMap/WeakHashMap/ArrayList/LinkedList/CopyOnWriteArrayList host com métodos essenciais (put/get/add/remove/size/…); CopyOnWriteArraySet host com add que deduplica; subtipagem completa (check-cast p/ List/Set/Map/Collection/Iterable); LinkedHashMap host (≡ HashMap; estado Vec = ordem de inserção); entrySet/keySet/values (views snapshot HashSet) + Iterator host (hasNext/next; remove → UOE) + Map.Entry host (getKey/getValue/setValue); equals de usuário não consultado em chaves; Collections.synchronized* devolve a própria coleção (identidade — single-threaded); unmodifiable*/empty*/singleton* e ArrayDeque seguem fora. Enum é host (name/ordinal/toString/compareTo — inclusive herdado por enums do app via subtipagem)",
+                "HashMap/WeakHashMap/ArrayList/LinkedList/CopyOnWriteArrayList host com métodos essenciais (put/get/add/remove/size/…); CopyOnWriteArraySet host com add que deduplica; subtipagem completa (check-cast p/ List/Set/Map/Collection/Iterable); LinkedHashMap host (≡ HashMap; estado Vec = ordem de inserção); entrySet/keySet/values (views snapshot HashSet) + Iterator host (hasNext/next; remove → UOE) + Map.Entry host (getKey/getValue/setValue); equals de usuário não consultado em chaves; Collections.synchronized* devolve a própria coleção (identidade — single-threaded); ArrayDeque host (Deque completo: addFirst/Last, push/pop, peek/poll, occurrences; null rejeitado, NSE em vazio); unmodifiable*/empty*/singleton* seguem fora. Enum é host (name/ordinal/toString/compareTo — inclusive herdado por enums do app via subtipagem)",
             ),
             (
                 "java-lang-ref",
                 "vm",
                 "partial",
-                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). AtomicInteger é host (get/set/CAS/increment/add com overflow wrapping). Executors/ExecutorService são host com execução INLINE (single-threaded): submit devolve Future já completado; exceções do Runnable propagam na hora. Próximo gap real: ArrayDeque (Deque host) e unmodifiable*/empty* de Collections",
+                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). AtomicInteger é host (get/set/CAS/increment/add com overflow wrapping). Executors/ExecutorService são host com execução INLINE (single-threaded): submit devolve Future já completado; exceções do Runnable propagam na hora. Próximo gap real: Object.getClass (Class host) e unmodifiable*/empty* de Collections",
             ),
             (
                 "android-framework-clock",

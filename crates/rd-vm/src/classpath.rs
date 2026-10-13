@@ -605,6 +605,9 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/util/AbstractCollection;",
             "Ljava/lang/Object;",
         ]),
+        "Ljava/util/ArrayDeque;" => {
+            Some(vec!["Ljava/util/AbstractCollection;", "Ljava/lang/Object;"])
+        }
         "Ljava/util/AbstractMap;" => Some(OBJECT.to_vec()),
         "Ljava/util/HashMap;" => Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"]),
         "Ljava/util/LinkedHashMap;" => Some(vec![
@@ -700,6 +703,14 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/lang/Iterable;",
             "Ljava/util/Deque;",
             "Ljava/util/Queue;",
+            "Ljava/lang/Cloneable;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/ArrayDeque;" => Some(vec![
+            "Ljava/util/Deque;",
+            "Ljava/util/Queue;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",
         ]),

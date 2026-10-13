@@ -3905,3 +3905,213 @@ fn collections_synchronized_wrappers_are_identity() {
     )
     .is_err());
 }
+
+/// M8 (compat real): ArrayDeque host — 15º gap do launch do org.primftpd.
+/// Deque sobre o estado List (frente = índice 0): addFirst/addLast, push/pop,
+/// peek/poll (null em vazio) vs get/remove (NoSuchElementException), rejeição
+/// de null (como na JDK), removeFirst/LastOccurrence.
+#[test]
+fn array_deque_host_intrinsics() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const DQ: &str = "Ljava/util/ArrayDeque;";
+    const IT: &str = "Ljava/util/Iterator;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let d = e.heap.alloc_instance(DQ.to_string(), vec![]).unwrap();
+    let call = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic(e, DQ, name, sig, d, &args)
+    };
+
+    call(&mut e, "<init>", "()V", vec![]).unwrap();
+    assert_eq!(
+        call(&mut e, "isEmpty", "()Z", vec![]).unwrap(),
+        Some(Value::Int(1))
+    );
+    // vazio: peek/poll → null; get/remove → NSE
+    assert_eq!(
+        call(&mut e, "peekFirst", "()Ljava/lang/Object;", vec![]).unwrap(),
+        Some(Value::Null)
+    );
+    assert_eq!(
+        call(&mut e, "pollLast", "()Ljava/lang/Object;", vec![]).unwrap(),
+        Some(Value::Null)
+    );
+    match call(&mut e, "removeFirst", "()Ljava/lang/Object;", vec![]) {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/util/NoSuchElementException;")
+        }
+        other => panic!("esperava NSE, got {other:?}"),
+    }
+    match call(&mut e, "getFirst", "()Ljava/lang/Object;", vec![]) {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/util/NoSuchElementException;")
+        }
+        other => panic!("esperava NSE, got {other:?}"),
+    }
+
+    // null rejeitado (JDK: ArrayDeque não aceita null)
+    match call(
+        &mut e,
+        "addFirst",
+        "(Ljava/lang/Object;)V",
+        vec![Value::Null],
+    ) {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/NullPointerException;")
+        }
+        other => panic!("esperava NPE, got {other:?}"),
+    }
+
+    // fila: addLast 1, addFirst 0, push -1 → [-1, 0, 1]
+    call(
+        &mut e,
+        "addLast",
+        "(Ljava/lang/Object;)V",
+        vec![Value::Int(1)],
+    )
+    .unwrap();
+    call(
+        &mut e,
+        "addFirst",
+        "(Ljava/lang/Object;)V",
+        vec![Value::Int(0)],
+    )
+    .unwrap();
+    assert_eq!(
+        call(
+            &mut e,
+            "push",
+            "(Ljava/lang/Object;)V",
+            vec![Value::Int(-1)]
+        )
+        .unwrap(),
+        Some(Value::Null)
+    );
+    assert_eq!(
+        call(&mut e, "size", "()I", vec![]).unwrap(),
+        Some(Value::Int(3))
+    );
+    assert_eq!(
+        call(&mut e, "getFirst", "()Ljava/lang/Object;", vec![]).unwrap(),
+        Some(Value::Int(-1))
+    );
+    assert_eq!(
+        call(&mut e, "getLast", "()Ljava/lang/Object;", vec![]).unwrap(),
+        Some(Value::Int(1))
+    );
+    // pop = removeFirst
+    assert_eq!(
+        call(&mut e, "pop", "()Ljava/lang/Object;", vec![]).unwrap(),
+        Some(Value::Int(-1))
+    );
+    // add(Object)Z = addLast → true
+    assert_eq!(
+        call(&mut e, "add", "(Ljava/lang/Object;)Z", vec![Value::Int(2)]).unwrap(),
+        Some(Value::Int(1))
+    );
+    // [0, 1, 2]
+    assert_eq!(
+        call(
+            &mut e,
+            "offer",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(1)]
+        )
+        .unwrap(),
+        Some(Value::Int(1))
+    );
+    // [0, 1, 2, 1]
+    assert_eq!(
+        call(
+            &mut e,
+            "removeLastOccurrence",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(1)]
+        )
+        .unwrap(),
+        Some(Value::Int(1))
+    );
+    // [0, 1, 2]
+    assert_eq!(
+        call(
+            &mut e,
+            "removeFirstOccurrence",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(1)]
+        )
+        .unwrap(),
+        Some(Value::Int(1))
+    );
+    // [0, 2]
+    assert_eq!(
+        call(
+            &mut e,
+            "contains",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(2)]
+        )
+        .unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "remove",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(0)]
+        )
+        .unwrap(),
+        Some(Value::Int(1))
+    );
+    // [2]
+    assert_eq!(
+        call(&mut e, "removeLast", "()Ljava/lang/Object;", vec![]).unwrap(),
+        Some(Value::Int(2))
+    );
+    assert_eq!(
+        call(&mut e, "isEmpty", "()Z", vec![]).unwrap(),
+        Some(Value::Int(1))
+    );
+
+    // iterator (frente → fundo) + clear
+    call(
+        &mut e,
+        "addLast",
+        "(Ljava/lang/Object;)V",
+        vec![Value::Int(7)],
+    )
+    .unwrap();
+    call(
+        &mut e,
+        "addLast",
+        "(Ljava/lang/Object;)V",
+        vec![Value::Int(8)],
+    )
+    .unwrap();
+    let it = call(&mut e, "iterator", "()Ljava/util/Iterator;", vec![]).unwrap();
+    let it = match it {
+        Some(Value::Obj(r)) => r,
+        other => panic!("iterator: {other:?}"),
+    };
+    assert_eq!(
+        call_instance_intrinsic(&mut e, IT, "next", "()Ljava/lang/Object;", it, &[]).unwrap(),
+        Some(Value::Int(7))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, IT, "next", "()Ljava/lang/Object;", it, &[]).unwrap(),
+        Some(Value::Int(8))
+    );
+    call(&mut e, "clear", "()V", vec![]).unwrap();
+    assert_eq!(
+        call(&mut e, "size", "()I", vec![]).unwrap(),
+        Some(Value::Int(0))
+    );
+
+    // subtipagem: ArrayDeque <: Deque/Queue/Collection; <: AbstractCollection
+    assert!(e.cp.is_subtype(DQ, "Ljava/util/Deque;"));
+    assert!(e.cp.is_subtype(DQ, "Ljava/util/Queue;"));
+    assert!(e.cp.is_subtype(DQ, "Ljava/util/AbstractCollection;"));
+    assert!(!e.cp.is_subtype(DQ, "Ljava/util/List;"));
+}
