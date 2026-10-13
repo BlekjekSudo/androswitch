@@ -4938,3 +4938,108 @@ fn service_loader_host_is_empty_and_iterable() {
     assert!(e.cp.is_subtype(SL, "Ljava/lang/Iterable;"));
     assert!(e.cp.is_subtype(SL, "Ljava/lang/Object;"));
 }
+
+#[test]
+fn class_loader_get_resources_returns_empty_enumeration() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const CLS: &str = "Ljava/lang/Class;";
+    const LOADER: &str = "Ljava/lang/ClassLoader;";
+    const EN: &str = "Ljava/util/Enumeration;";
+
+    let mut b = DexBuilder::new();
+    b.class("Lcom/exemplo/Res;", "Ljava/lang/Object;");
+    let mut e = engine_of(&b);
+    let marker = e
+        .heap
+        .alloc_instance("Lcom/exemplo/Res;".to_string(), vec![])
+        .unwrap();
+
+    // ClassLoader canônico via Class.getClassLoader (identidade estável por VM).
+    let class = match call_instance_intrinsic(
+        &mut e,
+        "Lcom/exemplo/Res;",
+        "getClass",
+        "()Ljava/lang/Class;",
+        marker,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getClass: {other:?}"),
+    };
+    let loader = match call_instance_intrinsic(
+        &mut e,
+        CLS,
+        "getClassLoader",
+        "()Ljava/lang/ClassLoader;",
+        class,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getClassLoader: {other:?}"),
+    };
+    assert_eq!(e.heap.class_of(loader).unwrap(), LOADER);
+
+    // getResources(nome) nunca devolve null (contrato JDK): Enumeration host
+    // vazia enquanto o runtime não enumera recursos do APK. Cada chamada
+    // devolve um cursor novo e independente.
+    let name = Value::Obj(
+        e.heap
+            .alloc_string("META-INF/services/com.exemplo.Res".into())
+            .unwrap(),
+    );
+    let en = match call_instance_intrinsic(
+        &mut e,
+        LOADER,
+        "getResources",
+        "(Ljava/lang/String;)Ljava/util/Enumeration;",
+        loader,
+        &[name],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getResources: {other:?}"),
+    };
+    assert_eq!(e.heap.class_of(en).unwrap(), EN);
+    assert_eq!(
+        call_instance_intrinsic(&mut e, EN, "hasMoreElements", "()Z", en, &[]).unwrap(),
+        Some(Value::Int(0))
+    );
+    match call_instance_intrinsic(&mut e, EN, "nextElement", "()Ljava/lang/Object;", en, &[]) {
+        Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/util/NoSuchElementException;"),
+        other => panic!("esperava NoSuchElementException, got {other:?}"),
+    }
+    let name2 = Value::Obj(e.heap.alloc_string("res/outro".into()).unwrap());
+    let en2 = match call_instance_intrinsic(
+        &mut e,
+        LOADER,
+        "getResources",
+        "(Ljava/lang/String;)Ljava/util/Enumeration;",
+        loader,
+        &[name2],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getResources 2: {other:?}"),
+    };
+    assert_ne!(en, en2);
+
+    // name null → NPE (Objects.requireNonNull na JDK 9+).
+    match call_instance_intrinsic(
+        &mut e,
+        LOADER,
+        "getResources",
+        "(Ljava/lang/String;)Ljava/util/Enumeration;",
+        loader,
+        &[Value::Null],
+    ) {
+        Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/lang/NullPointerException;"),
+        other => panic!("esperava NPE, got {other:?}"),
+    }
+}
