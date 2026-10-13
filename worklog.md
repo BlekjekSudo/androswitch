@@ -826,3 +826,17 @@ Work Log:
 
 Stage Summary:
 - Sequência de gaps do primftpd: … → System.getProperty ✅ → getClassLoader ✅ → getSecurityManager (próximo).
+
+---
+Task ID: m8-security-manager
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração AC)
+Task: M8 — System.getSecurityManager → null (23º gap do launch real).
+
+Work Log:
+- rd-vm intrinsics: static System.getSecurityManager() → Null sempre (Android não tem SecurityManager; deprecated na JDK — semântica correta é null).
+- Teste: system_get_security_manager_is_null.
+- Re-sondagem app real: gap resolvido; launch avança até ServiceLoader.load(Class,ClassLoader) (SPI — registrado: substituto honesto é loader vazio, sem varredura de META-INF/services).
+
+Stage Summary:
+- Sequência de gaps do primftpd: … → getClassLoader ✅ → getSecurityManager ✅ → ServiceLoader (próximo).
+- Sessão 2: 12 iterações (K–AC… 13), 12 PRs (#125–#143 pendente), 23 gaps do app real endereçados.

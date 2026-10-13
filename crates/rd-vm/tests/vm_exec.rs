@@ -4715,3 +4715,23 @@ fn class_get_class_loader_host() {
     .unwrap();
     assert_eq!(la2, Some(Value::Obj(l)));
 }
+
+/// M8 (compat real): System.getSecurityManager — 23º gap do launch do
+/// org.primftpd. Android não tem SecurityManager (deprecated na JDK) ⇒ null.
+#[test]
+fn system_get_security_manager_is_null() {
+    use rd_vm::intrinsics::call_static_intrinsic;
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    assert_eq!(
+        call_static_intrinsic(
+            &mut e,
+            "Ljava/lang/System;",
+            "getSecurityManager",
+            "()Ljava/lang/SecurityManager;",
+            &[]
+        )
+        .unwrap(),
+        Some(rd_vm::value::Value::Null)
+    );
+}
