@@ -409,6 +409,17 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   `SortedMap`/`List`/`Set`/`SortedSet`/`Collection`; null → NPE
   materializado. `unmodifiable*`/`empty*`/`singleton*` seguem fora (não
   sondados — sem especulação).
-- ⬜ **Próximo gap (achado honesto)**: `java.util.ArrayDeque.<init>()V` —
-  Deque host (addFirst/addLast/removeFirst/removeLast/peek/push/pop…) sobre
-  o estado `List` existente; `LinkedList` já cobre parte do contrato.
+- ✅ **`ArrayDeque` host (entregue nesta rodada)**: décimo quinto gap
+  (`<init>()V`). Deque sobre o estado `List` (frente = índice 0):
+  `addFirst`/`addLast`/`offerFirst`/`offerLast`/`push`/`pop`/`add`/`offer`,
+  `removeFirst`/`removeLast`/`pollFirst`/`pollLast`/`getFirst`/`getLast`/
+  `peekFirst`/`peekLast`, `remove`/`removeFirstOccurrence`/
+  `removeLastOccurrence`, `contains`/`size`/`isEmpty`/`clear` + `iterator`
+  (frente→fundo). Semântica JDK: **null rejeitado** (NPE); vazio em
+  get/remove/pop → `NoSuchElementException`; poll/peek → null. Hierarquia:
+  `ArrayDeque <: AbstractCollection` + `Deque`/`Queue`/`Collection`/
+  `Iterable`.
+- ⬜ **Próximo gap (achado honesto)**:
+  `MainTabsActivity.getClass()Ljava/lang/Class;` — `Object.getClass()` (final)
+  não resolvia para classes sem DEX de Object; exige objeto `Class` host
+  (nome da classe + métodos básicos como `getName`).

@@ -63,6 +63,10 @@ const LINKED_LIST: &str = "Ljava/util/LinkedList;";
 /// (`CopyOnWriteArraySet.<init>`). VM single-threaded ⇒ cópia-em-escrita é
 /// irrelevante: ArraySet vira Set host (add deduplica) e ArrayList segue o
 /// estado List comum.
+/// M8: 15º gap do launch real (`ArrayDeque.<init>`). Deque host sobre o
+/// estado `List` (frente = índice 0). Como na JDK: NÃO aceita null (NPE) e
+/// removeFirst/pop em vazio → NoSuchElementException; poll/peek → null.
+const ARRAY_DEQUE: &str = "Ljava/util/ArrayDeque;";
 const COW_SET: &str = "Ljava/util/concurrent/CopyOnWriteArraySet;";
 const COW_LIST: &str = "Ljava/util/concurrent/CopyOnWriteArrayList;";
 const BOOLEAN: &str = "Ljava/lang/Boolean;";
@@ -1099,6 +1103,195 @@ fn find_elem(
     Ok(None)
 }
 
+/// (name, sig) de ArrayDeque host suportados (M8).
+fn deque_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("<init>", "()V")
+            | ("<init>", "(I)V")
+            | ("addFirst", "(Ljava/lang/Object;)V")
+            | ("addLast", "(Ljava/lang/Object;)V")
+            | ("offerFirst", "(Ljava/lang/Object;)Z")
+            | ("offerLast", "(Ljava/lang/Object;)Z")
+            | ("removeFirst", "()Ljava/lang/Object;")
+            | ("removeLast", "()Ljava/lang/Object;")
+            | ("pollFirst", "()Ljava/lang/Object;")
+            | ("pollLast", "()Ljava/lang/Object;")
+            | ("getFirst", "()Ljava/lang/Object;")
+            | ("getLast", "()Ljava/lang/Object;")
+            | ("peekFirst", "()Ljava/lang/Object;")
+            | ("peekLast", "()Ljava/lang/Object;")
+            | ("push", "(Ljava/lang/Object;)V")
+            | ("pop", "()Ljava/lang/Object;")
+            | ("add", "(Ljava/lang/Object;)Z")
+            | ("offer", "(Ljava/lang/Object;)Z")
+            | ("remove", "()Ljava/lang/Object;")
+            | ("remove", "(Ljava/lang/Object;)Z")
+            | ("removeFirstOccurrence", "(Ljava/lang/Object;)Z")
+            | ("removeLastOccurrence", "(Ljava/lang/Object;)Z")
+            | ("contains", "(Ljava/lang/Object;)Z")
+            | ("size", "()I")
+            | ("isEmpty", "()Z")
+            | ("clear", "()V")
+    )
+}
+
+/// Última ocorrência de `target` (varredura reversa; igualdade Java).
+fn find_elem_last(
+    vm: &Engine,
+    recv: crate::heap::ObjRef,
+    target: &Value,
+) -> Result<Option<usize>, VmExit> {
+    let Some(crate::framework::HostObj::List { elems }) = vm.fw.objects.get(&recv) else {
+        return Ok(None);
+    };
+    for i in (0..elems.len()).rev() {
+        if values_equal(&vm.heap, &elems[i], target)? {
+            return Ok(Some(i));
+        }
+    }
+    Ok(None)
+}
+
+fn deque_null_rejected() -> VmExit {
+    VmExit::Exception(Throwable::new(
+        "Ljava/lang/NullPointerException;",
+        "ArrayDeque não aceita elemento null (como na JDK)",
+    ))
+}
+
+fn deque_empty_nse() -> VmExit {
+    VmExit::Exception(Throwable::new(
+        "Ljava/util/NoSuchElementException;",
+        "ArrayDeque vazio (removeFirst/pop/getFirst/getLast)",
+    ))
+}
+
+/// ArrayDeque host (M8): Deque sobre `HostObj::List` — frente = índice 0.
+fn deque_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    use crate::framework::HostObj;
+    if name == "<init>" {
+        vm.fw
+            .objects
+            .insert(recv, HostObj::List { elems: Vec::new() });
+        return Ok(Some(Value::Null));
+    }
+    if !matches!(vm.fw.objects.get(&recv), Some(HostObj::List { .. })) {
+        vm.fw
+            .objects
+            .insert(recv, HostObj::List { elems: Vec::new() });
+    }
+    match (name, sig) {
+        ("addFirst", _) | ("push", _) | ("offerFirst", _) => {
+            if matches!(args[0], Value::Null) {
+                return Err(deque_null_rejected());
+            }
+            list_elems(vm, recv)?.insert(0, args[0].clone());
+            Ok(Some(if name == "offerFirst" {
+                Value::Int(1)
+            } else {
+                Value::Null
+            }))
+        }
+        ("addLast", _) | ("add", _) | ("offerLast", _) | ("offer", _) => {
+            if matches!(args[0], Value::Null) {
+                return Err(deque_null_rejected());
+            }
+            list_elems(vm, recv)?.push(args[0].clone());
+            Ok(Some(if name == "addLast" {
+                Value::Null
+            } else {
+                Value::Int(1)
+            }))
+        }
+        ("removeFirst", _) | ("pop", _) | ("remove", "()Ljava/lang/Object;") => {
+            let elems = list_elems(vm, recv)?;
+            if elems.is_empty() {
+                return Err(deque_empty_nse());
+            }
+            Ok(Some(elems.remove(0)))
+        }
+        ("removeLast", _) => {
+            let elems = list_elems(vm, recv)?;
+            if elems.is_empty() {
+                return Err(deque_empty_nse());
+            }
+            Ok(Some(elems.pop().expect("não-vazio verificado")))
+        }
+        ("pollFirst", _) => {
+            let elems = list_elems(vm, recv)?;
+            Ok(if elems.is_empty() {
+                Some(Value::Null)
+            } else {
+                Some(elems.remove(0))
+            })
+        }
+        ("pollLast", _) => {
+            let elems = list_elems(vm, recv)?;
+            Ok(Some(elems.pop().unwrap_or(Value::Null)))
+        }
+        ("getFirst", _) => {
+            let elems = list_elems(vm, recv)?;
+            match elems.first() {
+                Some(v) => Ok(Some(v.clone())),
+                None => Err(deque_empty_nse()),
+            }
+        }
+        ("getLast", _) => {
+            let elems = list_elems(vm, recv)?;
+            match elems.last() {
+                Some(v) => Ok(Some(v.clone())),
+                None => Err(deque_empty_nse()),
+            }
+        }
+        ("peekFirst", _) => {
+            let v = list_elems(vm, recv)?.first().cloned();
+            Ok(Some(v.unwrap_or(Value::Null)))
+        }
+        ("peekLast", _) => {
+            let v = list_elems(vm, recv)?.last().cloned();
+            Ok(Some(v.unwrap_or(Value::Null)))
+        }
+        ("remove", _) | ("removeFirstOccurrence", _) => {
+            let idx = find_elem(vm, recv, &args[0])?;
+            if let Some(i) = idx {
+                list_elems(vm, recv)?.remove(i);
+            }
+            Ok(Some(Value::Int(idx.is_some() as i32)))
+        }
+        ("removeLastOccurrence", _) => {
+            let idx = find_elem_last(vm, recv, &args[0])?;
+            if let Some(i) = idx {
+                list_elems(vm, recv)?.remove(i);
+            }
+            Ok(Some(Value::Int(idx.is_some() as i32)))
+        }
+        ("contains", _) => {
+            let found = find_elem(vm, recv, &args[0])?.is_some();
+            Ok(Some(Value::Int(found as i32)))
+        }
+        ("size", _) => {
+            let n = list_elems(vm, recv)?.len();
+            Ok(Some(Value::Int(n as i32)))
+        }
+        ("isEmpty", _) => {
+            let empty = list_elems(vm, recv)?.is_empty();
+            Ok(Some(Value::Int(empty as i32)))
+        }
+        ("clear", _) => {
+            list_elems(vm, recv)?.clear();
+            Ok(Some(Value::Null))
+        }
+        _ => Ok(None),
+    }
+}
+
 /// (name, sig) de Set host suportados (M8, CopyOnWriteArraySet).
 fn set_supported(name: &str, sig: &str) -> bool {
     matches!(
@@ -1696,13 +1889,18 @@ pub fn call_instance_intrinsic_mref(
         (c, name, sig) if (c == COW_SET || c == VIEW_SET) && set_supported(name, sig) => {
             set_intrinsic(vm, recv, name, sig, args)
         }
+        // ArrayDeque (M8): Deque host sobre o estado List (frente = índice 0)
+        (c, name, sig) if c == ARRAY_DEQUE && deque_supported(name, sig) => {
+            deque_intrinsic(vm, recv, name, sig, args)
+        }
         // iterator() de List/Set host (incl. views de Map) — M8
         (c, name, sig)
             if (c == ARRAY_LIST
                 || c == LINKED_LIST
                 || c == COW_LIST
                 || c == COW_SET
-                || c == VIEW_SET)
+                || c == VIEW_SET
+                || c == ARRAY_DEQUE)
                 && name == "iterator"
                 && sig == "()Ljava/util/Iterator;" =>
         {
