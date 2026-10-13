@@ -486,7 +486,15 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   (`Objects.requireNonNull` da JDK 9+). A `Enumeration` reutiliza o cursor do
   Iterator host com os nomes legados: `hasMoreElements()` é falso e
   `nextElement()` materializa `NoSuchElementException`.
-- ⬜ **Próximo gap (re-sondado)**: `ArrayList.<init>(Ljava/util/Collection;)V`
-  no `org.primftpd` 8.2 — construtor de cópia a partir de Collection
-  (snapshot do iterador host). Lookup real de recursos do APK e descoberta
-  SPI por `META-INF/services` continuam fora do escopo.
+- ✅ **`ArrayList.<init>(Ljava/util/Collection;)V` host (entregue nesta
+  rodada)**: vigésimo sétimo gap. A cópia é um **snapshot** dos elementos na
+  ordem do iterador da fonte host (ArrayList admite duplicatas — dedup fica a
+  cargo da fonte; depois da cópia não há aliasing: mutar a fonte não toca a
+  lista). Fonte null materializa NPE (`c.toArray()` na JDK); coleção do app
+  sem estado host recebe erro tipado `VM_TYPE_ERROR` em vez de cópia
+  silenciosamente vazia/errada. O mesmo construtor vale para
+  `LinkedList`/`CopyOnWriteArrayList` via o helper compartilhado.
+- ⬜ **Próximo gap (re-sondado)**: `LinkedBlockingQueue.drainTo(Collection,int)`
+  no `org.primftpd` 8.2 — drenar até `maxElements` para uma Collection
+  destino. Iteração de coleções do app (fonte sem estado host) e descoberta
+  SPI real por `META-INF/services` continuam fora do escopo.
