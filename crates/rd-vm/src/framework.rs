@@ -34,6 +34,9 @@ pub const APPLICATION: &str = "Landroid/app/Application;";
 pub const FRAGMENT_MANAGER: &str = "Landroid/app/FragmentManager;";
 /// M8 (31º gap): FragmentTransaction legacy — ops pendentes até `commit`.
 pub const FRAGMENT_TX: &str = "Landroid/app/FragmentTransaction;";
+/// M8 (32º gap): Fragment legacy — a classe da fragment do app estende esta;
+/// o ctor do super precisa existir como no-op (como Activity/APPLICATION).
+pub const FRAGMENT_CLS: &str = "Landroid/app/Fragment;";
 pub const CONTEXT: &str = "Landroid/content/Context;";
 pub const INTENT: &str = "Landroid/content/Intent;";
 pub const BUNDLE: &str = "Landroid/os/Bundle;";
@@ -1497,6 +1500,10 @@ pub fn call_host_instance(
         (ACTIVITY, "<init>") | (APPLICATION, "<init>") | (CONTEXT, "<init>") => {
             Ok(Some(Value::Null))
         }
+        // ── M8 (32º gap real): Fragment.<init>()V — a fragment do app chama o
+        // ctor do super via invokespecial; o host não tem estado de ctor, que
+        // vira no-op (mesmo padrão de Activity/Application/Context).
+        (FRAGMENT_CLS, "<init>") if sig == "()V" => Ok(Some(Value::Null)),
         (ACTIVITY, "getIntent") | (CONTEXT, "getIntent") => {
             let intent = match vm.fw.get(recv) {
                 Some(HostObj::Activity { intent, .. }) => *intent,

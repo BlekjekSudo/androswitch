@@ -1059,3 +1059,25 @@ GitHub status:
 Stage Summary:
 - Sequência Fragments: find null ✅ (#150) → beginTransaction+tx+registro ✅ (esta) → Fragment.<init> (próximo, 32º — ctor no-op + hierarquia).
 - Fragments M8 agora tem NÚCLEO REAL: FM canônico, transações com commit e registro consultável. Pendências documentadas: lifecycle DEX (Fragment.onCreate/onCreateView/onAttach), back stack/popBackStack, animations, methods da própria fragment (getString/getActivity/setArguments).
+
+---
+Task ID: m8-fragment-init
+Agent: Arena Agent Mode (sessão 2026-10-13, início 09:30 UTC — continuação)
+Task: M8 — Fragment.<init>()V host (32º gap do launch real do org.primftpd).
+
+Work Log:
+- Contexto: PR #151 (31º, beginTransaction+tx) aberta; sondagem dela parou em Fragment.<init>()V (super ctor da fragment do app).
+- rd-vm: FRAGMENT_CLS const; arm (FRAGMENT_CLS, "<init>") sig ()V → no-op (padrão Activity/Application/Context — host não tem estado de ctor); classpath: Fragment <: Object (super das fragments do app).
+- Teste novo fragment_init_e_subtipagem: ctor no-op; subtipagem MiniFrag <: Fragment <: Object.
+- Re-sondagem app real: launch atravessou o ctor e parou no 33º gap NOT_FOUND: `FragmentManager.executePendingTransactions()Z` — no host commit já aplica sincronamente → nunca há pendentes → false (semântica AOSP "nothing was executed").
+- Catálogo compat_gaps (mcp.rs) e ROADMAP atualizados (32º ✅ / 33º re-sondado ⬜).
+
+Checks:
+- fmt — PASS. clippy -D warnings — PASS. `cargo test --workspace` — PASS (31 suites, 0 falhas; vm_exec 72 — +1 novo). MSRV 1.76 — PASS. md links — PASS. compat-report — PASS (vazio).
+- Probe — avança além do ctor; para no 33º gap registrado. Scan de segredos — limpo.
+
+GitHub status:
+- Branch feat/m8-fragment-init a ser enviada/PR; merge após CI verde.
+
+Stage Summary:
+- Sequência Fragments: beginTransaction+tx ✅ (#151) → Fragment.<init> ✅ (esta) → executePendingTransactions (próximo, 33º — false honesto: commit é síncrono).

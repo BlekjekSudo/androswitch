@@ -5709,3 +5709,26 @@ fn fragment_transaction_commits_registered() {
         "falha de commit não aplica parcialmente"
     );
 }
+
+#[test]
+fn fragment_init_e_subtipagem() {
+    use rd_vm::framework::call_host_instance;
+    use rd_vm::value::Value;
+    const FRAG_CLS: &str = "Landroid/app/Fragment;";
+
+    let mut b = DexBuilder::new();
+    b.class("Lcom/exemplo/MiniFrag;", FRAG_CLS);
+    let mut e = engine_of(&b);
+    let frag = e
+        .heap
+        .alloc_instance("Lcom/exemplo/MiniFrag;".to_string(), vec![])
+        .unwrap();
+
+    // ctor do super (invokespecial da fragment do app): no-op host, nunca erro.
+    assert_eq!(
+        call_host_instance(&mut e, FRAG_CLS, "<init>", "()V", frag, &[]).unwrap(),
+        Some(Value::Null)
+    );
+    assert!(e.cp.is_subtype("Lcom/exemplo/MiniFrag;", FRAG_CLS));
+    assert!(e.cp.is_subtype(FRAG_CLS, "Ljava/lang/Object;"));
+}
