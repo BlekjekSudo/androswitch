@@ -351,6 +351,16 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   `currentThreadTimeMillis` leem o clock; `sleep(J)V` o **avança e drena o
   Looper** (callbacks agendados disparam — consistente com o contrato do
   tempo da VM; nada de tempo de parede ⇒ testes reprodutíveis).
+- ✅ **`AtomicInteger` host (entregue nesta rodada)**: nono gap
+  (`<init>()V`). Mesmo padrão do `AtomicReference` (campo de heap `value`):
+  `<init>()V`/`(I)V`, `get`/`set`/`getAndSet`, `compareAndSet`/
+  `weakCompareAndSet` (exatos — VM single-threaded),
+  `incrementAndGet`/`decrementAndGet`/`getAndIncrement`/`getAndDecrement`/
+  `addAndGet`/`getAndAdd` com overflow **wrapping** (semântica Java),
+  conversões `Number` (`intValue`/`longValue`/`floatValue`/`doubleValue`) e
+  `toString`; hierarquia `AtomicInteger <: Number <: Object` + `Serializable`.
 - ⬜ **Próximo gap (achado honesto)**:
-  `java.util.concurrent.atomic.AtomicInteger.<init>()V` — mesma família do
-  `AtomicReference` já host (campo de heap `value`; aritmética i32).
+  `java.util.concurrent.Executors.newFixedThreadPool(I,ThreadFactory)` —
+  família de thread pools. VM é single-threaded: substituto honesto seria um
+  `ExecutorService` host que executa `Runnable`s **inline/síncrono**
+  (determinístico), com `submit` devolvendo Future já completado.

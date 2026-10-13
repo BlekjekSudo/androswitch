@@ -13,6 +13,10 @@ const SB: &str = "Ljava/lang/StringBuilder;";
 const OBJECT: &str = "Ljava/lang/Object;";
 /// M8 (compat real): primeiro gap de launch do app real org.primftpd 8.2.
 const ATOMIC_REF: &str = "Ljava/util/concurrent/atomic/AtomicReference;";
+/// M8: nono gap do launch real (`AtomicInteger.<init>`). Mesmo padrão do
+/// AtomicReference (campo de heap `value`), aritmética i32 com semântica
+/// Java (overflow silencioso — wrapping). VM single-threaded ⇒ CAS exato.
+const ATOMIC_INT: &str = "Ljava/util/concurrent/atomic/AtomicInteger;";
 const MATH: &str = "Ljava/lang/Math;";
 /// M8 (compat real): coleções java.util host — segundo gap de launch do
 /// org.primftpd (`WeakHashMap.<init>`). WeakHashMap ≡ HashMap (sem GC na
@@ -416,6 +420,24 @@ pub fn call_static_intrinsic(
 /// Intrínseco DE INSTÂNCIA (invoke-virtual/direct sobre objetos da VM).
 /// `receiver` já é Some(ref) — NPE foi tratada pelo chamador.
 /// `Ok(None)` = sem intrínseco → dispatch normal no DEX (classe do usuário).
+/// Valor atual de um AtomicInteger host (campo "value"; tolerante a Long).
+fn atomic_int_cur(vm: &Engine, recv: crate::heap::ObjRef) -> i32 {
+    match vm.heap.get_field(recv, "value") {
+        Ok(Value::Int(v)) => v,
+        Ok(Value::Long(v)) => v as i32,
+        _ => 0,
+    }
+}
+
+/// i32 de um argumento (Int direto; Long estreita; resto → 0).
+fn arg_i32(v: &Value) -> i32 {
+    match v {
+        Value::Int(i) => *i,
+        Value::Long(l) => *l as i32,
+        _ => 0,
+    }
+}
+
 /// (name, sig) de AtomicReferenceFieldUpdater suportados como host (M8).
 fn arfu_supported(name: &str, sig: &str) -> bool {
     matches!(
@@ -1104,6 +1126,97 @@ pub fn call_instance_intrinsic_mref(
                 crate::err::put_field_result(vm.heap.put_field(recv, "value", args[1].clone()))?;
             }
             Ok(Some(cur))
+        }
+
+        // ── AtomicInteger (M8) ──────────────────────────────────────────────
+        // Estado no campo "value" (Int). Overflow i32 segue a semântica Java
+        // (silencioso/wrapping); longValue/floatValue/doubleValue alargam.
+        (ATOMIC_INT, "<init>", "()V") => {
+            crate::err::put_field_result(vm.heap.put_field(recv, "value", Value::Int(0)))?;
+            Ok(Some(Value::Null))
+        }
+        (ATOMIC_INT, "<init>", "(I)V") => {
+            let v = arg_i32(&args[0]);
+            crate::err::put_field_result(vm.heap.put_field(recv, "value", Value::Int(v)))?;
+            Ok(Some(Value::Null))
+        }
+        (ATOMIC_INT, "get", "()I") | (ATOMIC_INT, "intValue", "()I") => {
+            Ok(Some(Value::Int(atomic_int_cur(vm, recv))))
+        }
+        (ATOMIC_INT, "set", "(I)V") => {
+            let v = arg_i32(&args[0]);
+            crate::err::put_field_result(vm.heap.put_field(recv, "value", Value::Int(v)))?;
+            Ok(Some(Value::Null))
+        }
+        (ATOMIC_INT, "getAndSet", "(I)I") => {
+            let cur = atomic_int_cur(vm, recv);
+            let v = arg_i32(&args[0]);
+            crate::err::put_field_result(vm.heap.put_field(recv, "value", Value::Int(v)))?;
+            Ok(Some(Value::Int(cur)))
+        }
+        (ATOMIC_INT, "compareAndSet", "(II)Z") | (ATOMIC_INT, "weakCompareAndSet", "(II)Z") => {
+            let cur = atomic_int_cur(vm, recv);
+            let expect = arg_i32(&args[0]);
+            if cur == expect {
+                let v = arg_i32(&args[1]);
+                crate::err::put_field_result(vm.heap.put_field(recv, "value", Value::Int(v)))?;
+                Ok(Some(Value::Int(1)))
+            } else {
+                Ok(Some(Value::Int(0)))
+            }
+        }
+        (ATOMIC_INT, "incrementAndGet", "()I") => {
+            let v = atomic_int_cur(vm, recv).wrapping_add(1);
+            crate::err::put_field_result(vm.heap.put_field(recv, "value", Value::Int(v)))?;
+            Ok(Some(Value::Int(v)))
+        }
+        (ATOMIC_INT, "decrementAndGet", "()I") => {
+            let v = atomic_int_cur(vm, recv).wrapping_sub(1);
+            crate::err::put_field_result(vm.heap.put_field(recv, "value", Value::Int(v)))?;
+            Ok(Some(Value::Int(v)))
+        }
+        (ATOMIC_INT, "getAndIncrement", "()I") => {
+            let cur = atomic_int_cur(vm, recv);
+            crate::err::put_field_result(vm.heap.put_field(
+                recv,
+                "value",
+                Value::Int(cur.wrapping_add(1)),
+            ))?;
+            Ok(Some(Value::Int(cur)))
+        }
+        (ATOMIC_INT, "getAndDecrement", "()I") => {
+            let cur = atomic_int_cur(vm, recv);
+            crate::err::put_field_result(vm.heap.put_field(
+                recv,
+                "value",
+                Value::Int(cur.wrapping_sub(1)),
+            ))?;
+            Ok(Some(Value::Int(cur)))
+        }
+        (ATOMIC_INT, "addAndGet", "(I)I") => {
+            let v = atomic_int_cur(vm, recv).wrapping_add(arg_i32(&args[0]));
+            crate::err::put_field_result(vm.heap.put_field(recv, "value", Value::Int(v)))?;
+            Ok(Some(Value::Int(v)))
+        }
+        (ATOMIC_INT, "getAndAdd", "(I)I") => {
+            let cur = atomic_int_cur(vm, recv);
+            crate::err::put_field_result(vm.heap.put_field(
+                recv,
+                "value",
+                Value::Int(cur.wrapping_add(arg_i32(&args[0]))),
+            ))?;
+            Ok(Some(Value::Int(cur)))
+        }
+        (ATOMIC_INT, "longValue", "()J") => Ok(Some(Value::Long(atomic_int_cur(vm, recv) as i64))),
+        (ATOMIC_INT, "floatValue", "()F") => {
+            Ok(Some(Value::Float(atomic_int_cur(vm, recv) as f32)))
+        }
+        (ATOMIC_INT, "doubleValue", "()D") => {
+            Ok(Some(Value::Double(atomic_int_cur(vm, recv) as f64)))
+        }
+        (ATOMIC_INT, "toString", "()Ljava/lang/String;") => {
+            let t = atomic_int_cur(vm, recv).to_string();
+            Ok(Some(Value::Obj(alloc_string(vm, t)?)))
         }
 
         // ── coleções java.util (M8) ─────────────────────────────────────────

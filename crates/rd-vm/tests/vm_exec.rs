@@ -3158,3 +3158,123 @@ fn linked_hash_map_host_intrinsics() {
     );
     assert_eq!(call(&mut e, "size", "()I", vec![]), Some(Value::Int(0)));
 }
+
+/// M8 (compat real): AtomicInteger host — nono gap do launch do org.primftpd
+/// (`<init>()V`). Mesmo padrão do AtomicReference (campo "value"); aritmética
+/// i32 com overflow wrapping (semântica Java); CAS exato (VM single-threaded).
+#[test]
+fn atomic_integer_intrinsics() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const AI: &str = "Ljava/util/concurrent/atomic/AtomicInteger;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let a = e.heap.alloc_instance(AI.to_string(), vec![]).unwrap();
+    let call = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic(e, AI, name, sig, a, &args).expect("intrínseco")
+    };
+
+    // <init>()V → 0; get/set
+    call(&mut e, "<init>", "()V", vec![]);
+    assert_eq!(call(&mut e, "get", "()I", vec![]), Some(Value::Int(0)));
+    call(&mut e, "set", "(I)V", vec![Value::Int(5)]);
+    assert_eq!(call(&mut e, "get", "()I", vec![]), Some(Value::Int(5)));
+
+    // increment/decrement (get- e -and-set variants)
+    assert_eq!(
+        call(&mut e, "incrementAndGet", "()I", vec![]),
+        Some(Value::Int(6))
+    );
+    assert_eq!(
+        call(&mut e, "getAndIncrement", "()I", vec![]),
+        Some(Value::Int(6))
+    );
+    assert_eq!(call(&mut e, "get", "()I", vec![]), Some(Value::Int(7)));
+    assert_eq!(
+        call(&mut e, "decrementAndGet", "()I", vec![]),
+        Some(Value::Int(6))
+    );
+    assert_eq!(
+        call(&mut e, "getAndDecrement", "()I", vec![]),
+        Some(Value::Int(6))
+    );
+    assert_eq!(call(&mut e, "get", "()I", vec![]), Some(Value::Int(5)));
+
+    // addAndGet/getAndAdd
+    assert_eq!(
+        call(&mut e, "getAndAdd", "(I)I", vec![Value::Int(10)]),
+        Some(Value::Int(5))
+    );
+    assert_eq!(
+        call(&mut e, "addAndGet", "(I)I", vec![Value::Int(-3)]),
+        Some(Value::Int(12))
+    );
+
+    // CAS exato
+    assert_eq!(
+        call(
+            &mut e,
+            "compareAndSet",
+            "(II)Z",
+            vec![Value::Int(99), Value::Int(1)]
+        ),
+        Some(Value::Int(0))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "compareAndSet",
+            "(II)Z",
+            vec![Value::Int(12), Value::Int(1)]
+        ),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(&mut e, "getAndSet", "(I)I", vec![Value::Int(42)]),
+        Some(Value::Int(1))
+    );
+
+    // overflow wrapping (semântica Java)
+    call(&mut e, "set", "(I)V", vec![Value::Int(i32::MAX)]);
+    assert_eq!(
+        call(&mut e, "incrementAndGet", "()I", vec![]),
+        Some(Value::Int(i32::MIN))
+    );
+
+    // conversões Number + toString
+    call(&mut e, "set", "(I)V", vec![Value::Int(42)]);
+    assert_eq!(
+        call(&mut e, "intValue", "()I", vec![]),
+        Some(Value::Int(42))
+    );
+    assert_eq!(
+        call(&mut e, "longValue", "()J", vec![]),
+        Some(Value::Long(42))
+    );
+    assert_eq!(
+        call(&mut e, "floatValue", "()F", vec![]),
+        Some(Value::Float(42.0))
+    );
+    assert_eq!(
+        call(&mut e, "doubleValue", "()D", vec![]),
+        Some(Value::Double(42.0))
+    );
+    let t = match call(&mut e, "toString", "()Ljava/lang/String;", vec![]) {
+        Some(Value::Obj(r)) => r,
+        other => panic!("toString: {other:?}"),
+    };
+    assert_eq!(e.heap.as_str(t).unwrap(), "42");
+
+    // <init>(I)V em instância nova
+    let a2 = e.heap.alloc_instance(AI.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(&mut e, AI, "<init>", "(I)V", a2, &[Value::Int(7)]).unwrap();
+    assert_eq!(
+        call_instance_intrinsic(&mut e, AI, "get", "()I", a2, &[]).unwrap(),
+        Some(Value::Int(7))
+    );
+
+    // subtipagem: AtomicInteger <: Number; Serializable
+    assert!(e.cp.is_subtype(AI, "Ljava/lang/Number;"));
+    assert!(e.cp.is_subtype(AI, "Ljava/io/Serializable;"));
+}

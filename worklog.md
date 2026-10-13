@@ -636,3 +636,17 @@ Work Log:
 
 Stage Summary:
 - Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → ARFU ✅ → COW+casts ✅ → LinkedHashMap ✅ → SystemClock ✅ → AtomicInteger (próximo).
+
+---
+Task ID: m8-atomic-integer
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração P)
+Task: M8 — AtomicInteger host (9º gap do launch real do org.primftpd).
+
+Work Log:
+- rd-vm intrinsics: ATOMIC_INT — mesmo padrão do AtomicReference (campo de heap "value", Int): <init>()V/(I)V, get/intValue, set, getAndSet, compareAndSet/weakCompareAndSet (exatos — single-threaded), increment/decrement/add nas 6 variantes com overflow WRAPPING (semântica Java), longValue/floatValue/doubleValue (alargam), toString. Helpers atomic_int_cur (tolerante a Long) e arg_i32.
+- classpath: builtin_hierarchy (Number → Object; AtomicInteger → Number → Object) + builtin_interfaces (AtomicInteger: Serializable).
+- Teste: atomic_integer_intrinsics (init default 0, init(7), get/set, 4 variantes inc/dec, getAndAdd/addAndGet, CAS errado/certo, getAndSet, overflow MAX→MIN, conversões Number, toString "42", subtipagem).
+- Re-sondagem app real: gap resolvido; launch avança até Executors.newFixedThreadPool(I,ThreadFactory) (registrado; substituto honesto documentado: ExecutorService inline/síncrono).
+
+Stage Summary:
+- Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → ARFU ✅ → COW+casts ✅ → LinkedHashMap ✅ → SystemClock ✅ → AtomicInteger ✅ → Executors (próximo).
