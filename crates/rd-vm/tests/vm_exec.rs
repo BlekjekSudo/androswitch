@@ -4409,3 +4409,131 @@ fn linked_blocking_queue_host_intrinsics() {
     assert!(e.cp.is_subtype(Q, "Ljava/util/AbstractQueue;"));
     assert!(!e.cp.is_subtype(Q, "Ljava/util/List;"));
 }
+
+/// M8 (compat real): ThreadLocal host — 19º gap do launch do org.primftpd.
+/// Single-threaded ⇒ um valor por instância: get chama initialValue() (DEX)
+/// na primeira leitura (como na JDK); set/remove; override DEX vence.
+#[test]
+fn thread_local_host_intrinsics() {
+    use rd_vm::intrinsics::call_instance_intrinsic_mref;
+    use rd_vm::value::Value;
+    const TL: &str = "Ljava/lang/ThreadLocal;";
+
+    // LMyTL extends ThreadLocal com initialValue() { return "inicial" }
+    let mut b = DexBuilder::new();
+    let my = b.class("LMyTL;", TL);
+    let s_ini = b.intern("inicial") as u16;
+    b.direct(
+        my,
+        "initialValue",
+        "Ljava/lang/Object;",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(1, 1, 0, {
+            let mut u = op21c(0x1A, 0, s_ini); // const-string v0, "inicial"
+            u.extend(op11x(0x11, 0)); // return v0
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+
+    // ThreadLocal simples: get sem set → null (initialValue default)
+    let plain = e.heap.alloc_instance(TL.to_string(), vec![]).unwrap();
+    let call = |e: &mut Engine,
+                cls: &str,
+                r: rd_vm::heap::ObjRef,
+                name: &str,
+                sig: &str,
+                args: Vec<Value>| {
+        call_instance_intrinsic_mref(e, cls, cls, name, sig, r, &args).expect("intrínseco")
+    };
+    call(&mut e, TL, plain, "<init>", "()V", vec![]);
+    assert_eq!(
+        call(&mut e, TL, plain, "get", "()Ljava/lang/Object;", vec![]),
+        Some(Value::Null)
+    );
+    // set → get devolve o valor; remove → volta ao initialValue (null)
+    let v = e.heap.alloc_string("x".into()).unwrap();
+    call(
+        &mut e,
+        TL,
+        plain,
+        "set",
+        "(Ljava/lang/Object;)V",
+        vec![Value::Obj(v)],
+    );
+    assert_eq!(
+        call(&mut e, TL, plain, "get", "()Ljava/lang/Object;", vec![]),
+        Some(Value::Obj(v))
+    );
+    call(&mut e, TL, plain, "remove", "()V", vec![]);
+    assert_eq!(
+        call(&mut e, TL, plain, "get", "()Ljava/lang/Object;", vec![]),
+        Some(Value::Null)
+    );
+
+    // subclasse: primeira leitura chama initialValue() do DEX
+    let mine = e.heap.alloc_instance("LMyTL;".to_string(), vec![]).unwrap();
+    // super() via mref ThreadLocal (ctor da subclasse segue DEX; aqui o init host)
+    call_instance_intrinsic_mref(&mut e, "LMyTL;", TL, "<init>", "()V", mine, &[])
+        .expect("super init");
+    let g = call(
+        &mut e,
+        "LMyTL;",
+        mine,
+        "get",
+        "()Ljava/lang/Object;",
+        vec![],
+    );
+    match g {
+        Some(Value::Obj(r)) => assert_eq!(e.heap.as_str(r).unwrap(), "inicial"),
+        other => panic!("get com initialValue DEX: {other:?}"),
+    }
+    // segunda leitura usa o valor memoizado (set sobrescreve)
+    let v2 = e.heap.alloc_string("y".into()).unwrap();
+    call(
+        &mut e,
+        "LMyTL;",
+        mine,
+        "set",
+        "(Ljava/lang/Object;)V",
+        vec![Value::Obj(v2)],
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "LMyTL;",
+            mine,
+            "get",
+            "()Ljava/lang/Object;",
+            vec![]
+        ),
+        Some(Value::Obj(v2))
+    );
+    // ThreadLocal <: Object
+    assert!(e.cp.is_subtype(TL, "Ljava/lang/Object;"));
+
+    // InheritableThreadLocal (subclasse direta): mesmo host, mesma política
+    const ITL: &str = "Ljava/lang/InheritableThreadLocal;";
+    let inh = e.heap.alloc_instance(ITL.to_string(), vec![]).unwrap();
+    call_instance_intrinsic_mref(&mut e, ITL, ITL, "<init>", "()V", inh, &[])
+        .expect("ITL init")
+        .expect("capturado");
+    let v3 = e.heap.alloc_string("z".into()).unwrap();
+    call_instance_intrinsic_mref(
+        &mut e,
+        ITL,
+        ITL,
+        "set",
+        "(Ljava/lang/Object;)V",
+        inh,
+        &[Value::Obj(v3)],
+    )
+    .expect("ITL set");
+    assert_eq!(
+        call_instance_intrinsic_mref(&mut e, ITL, ITL, "get", "()Ljava/lang/Object;", inh, &[])
+            .expect("ITL get"),
+        Some(Value::Obj(v3))
+    );
+    assert!(e.cp.is_subtype(ITL, TL));
+}
