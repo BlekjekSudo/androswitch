@@ -5900,3 +5900,84 @@ fn array_clone_e_shallow_copy_com_descritor() {
     e.heap.array_elems_mut(dst).unwrap().remove(0);
     assert_eq!(e.heap.as_array_elems(src).unwrap().0.len(), 2);
 }
+
+#[test]
+fn exception_trace_anota_frames_ao_desempilhar() {
+    let mut b = DexBuilder::new();
+    let p_void = b.proto_idx("V", vec![]);
+    let caso = b.class("LCaso;", "Ljava/lang/Object;");
+    let bomba = b.method_idx("LCaso;", p_void, "bomba");
+    // bomba()V: aget em array null → NPE Java materializado
+    b.direct(
+        caso,
+        "bomba",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(2, 0, 0, {
+            let mut u = op11n(0x12, 0, 0); // const/4 v0, +0 (null)
+            u.extend(op23x(0x44, 1, 0, 0)); // aget v1, v0, v0
+            u.extend(op11x(0x0E, 0)); // return-void
+            u
+        })),
+    );
+    // chama()V: invoke-static bomba()V — frame intermediário do unwind
+    b.direct(
+        caso,
+        "chama",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(0, 0, 0, {
+            let mut u = op35c(0x71, 0, bomba, [0, 0, 0, 0, 0]); // invoke-static {}
+            u.extend(op11x(0x0E, 0));
+            u
+        })),
+    );
+
+    // Default: exceção LIMPA, sem linhas de trace (saídas existentes intactas).
+    let dex = rd_dex::Dex::parse(b.finish()).expect("dex");
+    let mut e_default = Engine::new(vec![dex.clone()], VmConfig::default());
+    let msg_default = match invoke(&mut e_default, "chama", "()V", &[]) {
+        Err(VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/NullPointerException;");
+            t.message.unwrap_or_default()
+        }
+        other => panic!("esperava NPE, got {other:?}"),
+    };
+    assert!(
+        !msg_default.contains("at LCaso;"),
+        "default NÃO pode anotar trace: {msg_default}"
+    );
+
+    // exception_trace ON: cada frame desempilhado anota a si mesmo,
+    // innermost primeiro (bomba → chama), como as linhas "at" da JVM.
+    let mut e_trace = Engine::new(
+        vec![dex],
+        VmConfig {
+            exception_trace: true,
+            ..VmConfig::default()
+        },
+    );
+    let msg_trace = match invoke(&mut e_trace, "chama", "()V", &[]) {
+        Err(VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/NullPointerException;");
+            t.message.unwrap_or_default()
+        }
+        other => panic!("esperava NPE (trace), got {other:?}"),
+    };
+    let bomba_ln = msg_trace
+        .find("at LCaso;->bomba()V")
+        .expect("frame bomba anotado");
+    let chama_ln = msg_trace
+        .find("at LCaso;->chama()V")
+        .expect("frame chama anotado");
+    assert!(
+        bomba_ln < chama_ln,
+        "innermost primeiro (bomba ~{bomba_ln} < chama ~{chama_ln}): {msg_trace}"
+    );
+    assert!(
+        msg_trace.starts_with("aget em null\n  at "),
+        "mensagem original preservada no início: {msg_trace}"
+    );
+}

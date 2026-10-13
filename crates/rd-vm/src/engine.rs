@@ -29,6 +29,12 @@ pub struct VmConfig {
     pub max_depth: usize,
     /// heap do app em bytes — 256 MB = piso E5 (PRF-06)
     pub heap_budget: usize,
+    /// Observabilidade OPT-IN (default OFF para preservar todas as saídas
+    /// existentes, incl. golden vectors byte-idênticos): exceções Java
+    /// não tratadas anotam uma linha `\n  at classe->metodo(proto)` por
+    /// frame enquanto desempilham — o stack trace da JVM, innermost-first.
+    /// Erros estruturados da VM (NOT_FOUND/…) não recebem frames.
+    pub exception_trace: bool,
 }
 
 impl Default for VmConfig {
@@ -37,6 +43,7 @@ impl Default for VmConfig {
             fuel: 200_000_000,
             max_depth: 512,
             heap_budget: crate::heap::DEFAULT_HEAP_BUDGET,
+            exception_trace: false,
         }
     }
 }
@@ -211,8 +218,18 @@ impl Engine {
         self.coverage
             .insert(((dex_idx as u64) << 32) | u64::from(m.method_idx));
         self.depth += 1;
-        let ret = interp::exec_frame(self, dex_idx, code, ins);
+        let mut ret = interp::exec_frame(self, dex_idx, code, ins);
         self.depth -= 1;
+        // Observabilidade opt-in (default off — nenhuma saída existente muda):
+        // exceção Java que este frame NÃO tratou recebe a linha "at" do frame
+        // ao desempilhar (estilo JVM, innermost primeiro). Erros estruturados
+        // da VM não são Java e não ganham frames.
+        if self.config.exception_trace {
+            if let Err(VmExit::Exception(ref mut t)) = ret {
+                let line = format!("\n  at {}", self.method_label(dex_idx, m));
+                t.message.get_or_insert_with(String::new).push_str(&line);
+            }
+        }
         ret
     }
 

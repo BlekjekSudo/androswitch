@@ -543,10 +543,20 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   correção de semântica relacionada: `Enum.clone()` materializa
   `CloneNotSupportedException` capturável (é `final` na JDK/libcore e sempre
   lança — nunca copia).
-- ⬜ **Próximo gap (re-sondado) — MUDANÇA DE REGIME**: a sondagem seguinte já
-  não para em `NOT_FOUND`: o launch executa e falha com exceção Java
-  **materializada** (`java.lang.NullPointerException: invoke em receiver
-  null`). O bootstrap estrutural de classes/interfaces do app está completo;
-  a próxima investigação precisa de **tracing do call site** (qual método
-  chamou com receiver null) — distinguir "app esperando um resultado nosso"
-  de "estado do host que ainda não existe".
+- ✅ **Observabilidade: stack trace Java opt-in (entregue nesta rodada) —
+  `VmConfig::exception_trace` + `rd app run --trace`**. Exceções Java não
+  capturadas anotam `\n  at classe->metodo(proto)` por frame ao desempilhar
+  (estilo JVM, innermost-first). Default OFF: nenhuma saída existente muda
+  (golden vectors seguem byte-idênticos; `rd vm exec` intocado). Resultado
+  real: o NPE pós-bootstrap do `org.primftpd` foi localizado em
+  `androidx.fragment.app.FragmentManager.dispatchCreate()V` ←
+  `FragmentController` ← `FragmentActivity.onCreate` ←
+  `MainTabsActivity.onCreate` — ou seja, o app usa **androidx FragmentActivity**
+  e o call site do receiver null já está identificado.
+- ⬜ **Próximo passo (mudança de regime — NÃO é gap de API)**: com o call site
+  do NPE identificado pelo `--trace`, a próxima iteração deve disassemblar
+  `dispatchCreate` (`rd dex disasm`) para achar o campo/método cujo receiver
+  está null (ex.: `mLifecycleCallbacks`/`mHost` do androidx) e decidir qual
+  estado do host falta — provável embrião do suporte a
+  `androidx.fragment.app.FragmentManager` (mundo androidx, distinto do FM
+  legacy `android.app` já entregue).

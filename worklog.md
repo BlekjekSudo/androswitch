@@ -1127,3 +1127,26 @@ GitHub status:
 
 Stage Summary:
 - 34º ✅ (esta) → PRÓXIMO INVESTIGAR (não é gap de API): NPE materializado no launch; recomenda-se iteração de OBSERVABILIDADE primeiro: modo trace em `rd app run` registrando a pilha DEX (classe/método/pc) no ponto da exceção não capturada — aí sim decidir qual estado do host falta. Semântica JDK bônus entregue: Enum.clone → CNSE.
+
+---
+Task ID: m8-exception-trace
+Agent: Arena Agent Mode (sessão 2026-10-13, início 09:30 UTC — continuação)
+Task: M8 — Observabilidade: stack trace Java opt-in (VmConfig::exception_trace + `rd app run --trace`) — resposta ao regime pós-bootstrap registrado na iteração anterior.
+
+Work Log:
+- Contexto: iteração 34º (array.clone) registrou o regime novo: exceções Java MATERIALIZADAS em vez de NOT_FOUND; investigar pede call site, não sondagem cega.
+- rd-vm: VmConfig.exception_trace (default FALSE — golden vectors e todas as saídas existentes intactas; construções de teste via ..Default::default() seguem compilando); Engine::call anota `\n  at <method_label>` por frame ao desempilhar VmExit::Exception (estilo JVM, innermost-first; erros VM estruturados não são Java e não ganham frames).
+- rd-cli: flag `--trace` em `rd app run` (boot_app(+trace) → VmConfig); dump/shot seguem false; `rd vm exec` explicitamente com exception_trace default OFF (harness golden).
+- Teste exception_trace_anota_frames_ao_desempilhar: default limpo (sem "at"); trace: NPE com "at LCaso;->bomba()V" ANTES de "at LCaso;->chama()V" e mensagem original preservada no início.
+- PAYOFF real: `rd app run primftpd --json --trace` localizou o NPE em androidx/fragment/app/FragmentManager.dispatchCreate()V ← FragmentController ← FragmentActivity.onCreate ← MainTabsActivity.onCreate — o app usa androidx FragmentActivity (mundo androidx, ≠ FM legacy android.app entregue). Próximo passo documentado no ROADMAP: rd dex disasm do dispatchCreate para achar o receiver null (mLifecycleCallbacks/mHost).
+- Catálogo/ROADMAP atualizados com o regime e o achado.
+
+Checks:
+- fmt — PASS. clippy -D warnings — PASS. `cargo test --workspace` — PASS (31 suites, 0 falhas; vm_exec 76 — +1 novo). MSRV 1.76 — PASS. md links — PASS. compat-report — PASS (vazio).
+- `rd app run --help` — flag renderizada ok. Probe com --trace — call site identificado acima. Scan de segredos — limpo.
+
+GitHub status:
+- Branch feat/m8-exception-trace a ser enviada/PR; merge após CI verde.
+
+Stage Summary:
+- Observabilidade ✅ (esta) → próximo: diagnóstico do dispatchCreate androidx (disasm + estado do host ausente — provável embrião androidx.fragment.app.FragmentManager).

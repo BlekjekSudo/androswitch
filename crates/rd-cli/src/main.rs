@@ -174,6 +174,10 @@ enum AppSub {
         /// Ação por passo: "tap X,Y" | "wait MS" | "dump" | "xml" | "shot FILE" (repetível)
         #[arg(long = "script")]
         scripts: Vec<String>,
+        /// Anexa linhas "at classe->metodo(proto)" a exceções Java não
+        /// capturadas (stack trace estilo JVM — diagnóstico de call site)
+        #[arg(long)]
+        trace: bool,
         #[arg(long)]
         json: bool,
     },
@@ -370,8 +374,9 @@ fn run(cli: Cli) -> i32 {
                 path,
                 activity,
                 scripts,
+                trace,
                 json,
-            } => cmd_app_run(path, activity.as_deref(), scripts, *json),
+            } => cmd_app_run(path, activity.as_deref(), scripts, *trace, *json),
             AppSub::Dump {
                 path,
                 activity,
@@ -1237,6 +1242,7 @@ fn vm_err_to_rd(e: rd_vm::VmExit) -> RdError {
 fn boot_app(
     path: &Path,
     activity: Option<&str>,
+    exception_trace: bool,
 ) -> Result<(rd_vm::Engine, String, String), RdError> {
     let apk = open_apk(path).ok();
     let files = match &apk {
@@ -1258,7 +1264,13 @@ fn boot_app(
             None => launcher_of_apk(path)?,
         },
     };
-    let mut eng = rd_vm::Engine::new(dexes, rd_vm::VmConfig::default());
+    let mut eng = rd_vm::Engine::new(
+        dexes,
+        rd_vm::VmConfig {
+            exception_trace,
+            ..rd_vm::VmConfig::default()
+        },
+    );
     if let Some(a) = apk {
         eng.set_resources(a);
     }
@@ -1271,9 +1283,10 @@ fn cmd_app_run(
     path: &Path,
     activity: Option<&str>,
     scripts: &[String],
+    trace: bool,
     json: bool,
 ) -> Result<(), RdError> {
-    let (mut eng, activity_desc, package) = boot_app(path, activity)?;
+    let (mut eng, activity_desc, package) = boot_app(path, activity, trace)?;
 
     let mut dumps: Vec<String> = Vec::new();
     let mut xmls: Vec<String> = Vec::new();
@@ -1436,7 +1449,7 @@ fn cmd_app_dump(
     text: bool,
     json: bool,
 ) -> Result<(), RdError> {
-    let (eng, activity_desc, package) = boot_app(path, activity)?;
+    let (eng, activity_desc, package) = boot_app(path, activity, false)?;
     if text {
         let d = eng.dump_ui();
         if json {
@@ -1475,7 +1488,7 @@ fn cmd_app_dump(
 /// M4 DoD "screenshot correto": PNG headless 720×1440 da tela corrente —
 /// software renderer determinístico do rd-render.
 fn cmd_app_shot(path: &Path, activity: Option<&str>, out: &Path) -> Result<(), RdError> {
-    let (eng, _activity, _package) = boot_app(path, activity)?;
+    let (eng, _activity, _package) = boot_app(path, activity, false)?;
     let tree = eng.view_tree().ok_or_else(|| {
         RdError::new(
             "INVALID_FORMAT",
@@ -1542,6 +1555,9 @@ fn cmd_vm_exec(
         fuel: fuel.unwrap_or(rd_vm::VmConfig::default().fuel),
         max_depth: depth.unwrap_or(rd_vm::VmConfig::default().max_depth),
         heap_budget,
+        // default OFF — `rd vm exec` é usado pelo harness golden (saídas
+        // byte-idênticas); trace opt-in existe em `rd app run --trace`.
+        ..rd_vm::VmConfig::default()
     };
     let mut eng = rd_vm::Engine::new(dexes, cfg);
 
