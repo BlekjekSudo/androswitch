@@ -32,6 +32,8 @@ pub const APPLICATION: &str = "Landroid/app/Application;";
 /// M8: FragmentManager legacy (`android.app`, deprecated na API 28 mas ainda
 /// usado por apps reais como o org.primftpd — 29º gap do launch real).
 pub const FRAGMENT_MANAGER: &str = "Landroid/app/FragmentManager;";
+/// M8 (31º gap): FragmentTransaction legacy — ops pendentes até `commit`.
+pub const FRAGMENT_TX: &str = "Landroid/app/FragmentTransaction;";
 pub const CONTEXT: &str = "Landroid/content/Context;";
 pub const INTENT: &str = "Landroid/content/Intent;";
 pub const BUNDLE: &str = "Landroid/os/Bundle;";
@@ -185,6 +187,12 @@ pub struct HostState {
     /// M8: FragmentManager canônico do host (um por VM — identidade estável
     /// como a do ClassLoader; 29º gap do launch real).
     fragment_manager: Option<ObjRef>,
+    /// M8 (31º gap): registro de fragments comittadas (estado mínimo —
+    /// sem lifecycle DEX, sem back stack/animations). Ordem = commit.
+    fragments: Vec<FragRecord>,
+    /// M8 (31º gap): transações abertas por objeto FragmentTransaction
+    /// (ops só tocam o registro no commit; 2º commit → IllegalStateException).
+    frag_txs: HashMap<ObjRef, FragTxState>,
     /// activity em execução (o app trivial M3 tem uma por vez)
     pub current_activity: Option<ObjRef>,
     /// package do app (preenchido no launch_app; getPackageName)
@@ -192,6 +200,38 @@ pub struct HostState {
     /// M3.2: APK aberto (Resources) — layouts AXML + resources.arsc para o
     /// LayoutInflater. Injetado via `Engine::set_resources` (CLI `rd app run`).
     pub resources: Option<rd_apk::Apk>,
+}
+
+/// M8 (31º gap): fragment registrada por um commit de FragmentTransaction.
+#[derive(Debug, Clone)]
+pub struct FragRecord {
+    pub obj: ObjRef,
+    /// containerViewId (0 = sem container — convenção AOSP; findFragmentById
+    /// nunca casa com 0).
+    pub container_id: i32,
+    pub tag: Option<String>,
+}
+
+/// M8 (31º gap): operação pendente de uma FragmentTransaction host.
+#[derive(Debug, Clone)]
+pub enum FragOp {
+    Add {
+        rec: FragRecord,
+    },
+    /// remove TODAS as fragments com o container e adiciona esta (AOSP).
+    Replace {
+        rec: FragRecord,
+    },
+    Remove {
+        obj: ObjRef,
+    },
+}
+
+/// M8 (31º gap): estado de uma FragmentTransaction host aberta.
+#[derive(Debug, Clone, Default)]
+pub struct FragTxState {
+    pub ops: Vec<FragOp>,
+    pub committed: bool,
 }
 
 impl HostState {
@@ -1276,6 +1316,152 @@ pub fn call_host_static(
 }
 
 /// invoke-virtual/direct sobre classes android/*. `recv` é o ObjRef do shell.
+/// (name, sig) de `FragmentTransaction` suportados (M8, 31º gap real):
+/// mutações fluentes (devolvem a própria transação) + commit.
+fn fragment_tx_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        (
+            "add",
+            "(Landroid/app/Fragment;Ljava/lang/String;)Landroid/app/FragmentTransaction;"
+        ) | (
+            "add",
+            "(ILandroid/app/Fragment;)Landroid/app/FragmentTransaction;"
+        ) | (
+            "add",
+            "(ILandroid/app/Fragment;Ljava/lang/String;)Landroid/app/FragmentTransaction;"
+        ) | (
+            "replace",
+            "(ILandroid/app/Fragment;)Landroid/app/FragmentTransaction;"
+        ) | (
+            "replace",
+            "(ILandroid/app/Fragment;Ljava/lang/String;)Landroid/app/FragmentTransaction;"
+        ) | (
+            "remove",
+            "(Landroid/app/Fragment;)Landroid/app/FragmentTransaction;"
+        ) | ("commit", "()I")
+            | ("commitAllowingStateLoss", "()I")
+    )
+}
+
+/// Estágio validado da transação: existe (veio de beginTransaction) e ainda
+/// não foi comittada — caso contrário IllegalStateException (contrato AOSP).
+fn frag_tx_open<'s>(
+    vm: &'s mut Engine,
+    tx: ObjRef,
+    action: &str,
+) -> Result<&'s mut FragTxState, VmExit> {
+    match vm.fw.frag_txs.get_mut(&tx) {
+        Some(s) if !s.committed => Ok(s),
+        Some(_) => Err(VmExit::Exception(crate::err::Throwable::new(
+            "Ljava/lang/IllegalStateException;",
+            format!("{action} após commit — transação já finalizada"),
+        ))),
+        None => Err(VmExit::Exception(crate::err::Throwable::new(
+            "Ljava/lang/IllegalStateException;",
+            format!("{action}: FragmentTransaction não criada por beginTransaction"),
+        ))),
+    }
+}
+
+/// M8 (31º gap real): FragmentTransaction host — ops pendentes até `commit`,
+/// que aplica no registro de fragments da VM (validação ANTES de mutar:
+/// transação nunca fica parcialmente aplicada). Fragment null → NPE (AOSP
+/// dereferecia o campo mFragmentManager); commit duplo → ISE. Ops sem commit
+/// não têm efeito observável no FragmentManager (descarte implícito).
+fn fragment_tx_intrinsic(
+    vm: &mut Engine,
+    recv: ObjRef,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match name {
+        "add" | "replace" => {
+            // formatos: (Fragment,String) | (int,Fragment) | (int,Fragment,String)
+            let (container_id, frag_idx, tag_idx) = match args.len() {
+                2 if matches!(args[0], Value::Obj(_) | Value::Null) => (0, 0, Some(1)),
+                2 => (args[0].as_int()?, 1, None),
+                _ => (args[0].as_int()?, 1, Some(2)),
+            };
+            let Value::Obj(frag) = args[frag_idx] else {
+                return Err(VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    format!("{name} com fragment null (AOSP dereferencia a fragment)"),
+                )));
+            };
+            let tag = match tag_idx {
+                Some(i) => match &args[i] {
+                    Value::Obj(r) => Some(vm.heap.as_str(*r)?.to_string()),
+                    _ => None,
+                },
+                None => None,
+            };
+            let rec = FragRecord {
+                obj: frag,
+                container_id,
+                tag,
+            };
+            let op = if name == "add" {
+                FragOp::Add { rec }
+            } else {
+                FragOp::Replace { rec }
+            };
+            frag_tx_open(vm, recv, name)?.ops.push(op);
+            Ok(Some(Value::Obj(recv)))
+        }
+        "remove" => {
+            let Value::Obj(frag) = args[0] else {
+                return Err(VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "remove com fragment null",
+                )));
+            };
+            frag_tx_open(vm, recv, name)?
+                .ops
+                .push(FragOp::Remove { obj: frag });
+            Ok(Some(Value::Obj(recv)))
+        }
+        "commit" | "commitAllowingStateLoss" => {
+            // state loss não se aplica: o host não tem ciclo de estado de
+            // Activity/Fragment — as duas variantes aplicam da mesma forma.
+            let ops = frag_tx_open(vm, recv, name)?.ops.clone();
+            // valida TUDO antes de tocar o registro (sem aplicação parcial):
+            // Add de fragment já registrada → ISE ("Fragment already added").
+            for op in &ops {
+                if let FragOp::Add { rec } = op {
+                    if vm.fw.fragments.iter().any(|f| f.obj == rec.obj) {
+                        return Err(VmExit::Exception(crate::err::Throwable::new(
+                            "Ljava/lang/IllegalStateException;",
+                            "Fragment already added ao registro do host",
+                        )));
+                    }
+                }
+            }
+            {
+                let st = frag_tx_open(vm, recv, name)?;
+                st.committed = true;
+                st.ops.clear();
+            }
+            for op in ops {
+                match op {
+                    FragOp::Add { rec } => vm.fw.fragments.push(rec),
+                    FragOp::Replace { rec } => {
+                        vm.fw
+                            .fragments
+                            .retain(|f| f.container_id != rec.container_id);
+                        vm.fw.fragments.push(rec);
+                    }
+                    FragOp::Remove { obj } => vm.fw.fragments.retain(|f| f.obj != obj),
+                }
+            }
+            // commit devolve um id opaco de back-stack entry; sem back stack
+            // no host, 0 é o marcador documentado (nenhuma semantic real).
+            Ok(Some(Value::Int(0)))
+        }
+        _ => Ok(None),
+    }
+}
+
 pub fn call_host_instance(
     vm: &mut Engine,
     mref_class: &str,
@@ -1332,17 +1518,55 @@ pub fn call_host_instance(
         {
             Ok(Some(Value::Obj(vm.fragment_manager_obj()?)))
         }
-        // ── M8 (30º gap real): FragmentManager ainda VAZIO (nenhuma transação
-        // host existe) ⇒ findFragmentByTag/findFragmentById respondem null —
-        // contrato Android para fragment não encontrado, nunca NOT_IMPLEMENTED.
-        // Tag null também devolve null (FragmentManagerImpl ignora tag null).
+        // ── M8 (30º/31º gaps reais): consultas ao registro de fragments do
+        // host. Sem commit prévio ⇒ null (contrato Android para fragment não
+        // encontrada, nunca NOT_IMPLEMENTED); tag null ⇒ null (a
+        // FragmentManagerImpl ignora tag null). Se houver mais de uma com o
+        // mesmo tag/id, a ÚLTIMA registrada vence (AOSP percorre do fim).
         (FRAGMENT_MANAGER, "findFragmentByTag")
             if sig == "(Ljava/lang/String;)Landroid/app/Fragment;" =>
         {
-            Ok(Some(Value::Null))
+            let want = match args.first() {
+                Some(Value::Obj(r)) => vm.heap.as_str(*r)?.to_string(),
+                _ => return Ok(Some(Value::Null)),
+            };
+            let found = vm
+                .fw
+                .fragments
+                .iter()
+                .rev()
+                .find(|f| f.tag.as_deref() == Some(want.as_str()));
+            Ok(Some(match found {
+                Some(f) => Value::Obj(f.obj),
+                None => Value::Null,
+            }))
         }
         (FRAGMENT_MANAGER, "findFragmentById") if sig == "(I)Landroid/app/Fragment;" => {
-            Ok(Some(Value::Null))
+            let id = args[0].as_int()?;
+            // containerViewId 0 = sem container (AOSP); nunca casa.
+            let found = vm
+                .fw
+                .fragments
+                .iter()
+                .rev()
+                .find(|f| id != 0 && f.container_id == id);
+            Ok(Some(match found {
+                Some(f) => Value::Obj(f.obj),
+                None => Value::Null,
+            }))
+        }
+        // ── M8 (31º gap real): beginTransaction → FragmentTransaction host
+        // nova por chamada; as ops ficam pendentes até o commit aplicar no
+        // registro. Sem back stack/animations/lifecycle DEX (documentado).
+        (FRAGMENT_MANAGER, "beginTransaction") if sig == "()Landroid/app/FragmentTransaction;" => {
+            let tx = vm
+                .heap
+                .alloc_instance(FRAGMENT_TX.to_string(), Vec::new())?;
+            vm.fw.frag_txs.insert(tx, FragTxState::default());
+            Ok(Some(Value::Obj(tx)))
+        }
+        (FRAGMENT_TX, _) if fragment_tx_supported(name, sig) => {
+            fragment_tx_intrinsic(vm, recv, name, args)
         }
         (ACTIVITY, "getPackageName") | (CONTEXT, "getPackageName") if is_activity(vm) => {
             let s = vm.fw.package_name.clone();

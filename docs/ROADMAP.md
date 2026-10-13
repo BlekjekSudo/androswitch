@@ -515,9 +515,18 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   resposta é **`null`** — contrato Android para fragment não encontrado (tag
   null também devolve null, como na `FragmentManagerImpl`). Nada de
   `NOT_IMPLEMENTED` para o caso vazio.
-- ⬜ **Próximo gap (re-sondado)**: `FragmentManager.beginTransaction()` no
-  `org.primftpd` 8.2 — abre `FragmentTransaction` (add/replace/commit) e o
-  **estado mínimo de fragments** do host: committar registra o fragment no FM
-  e `findFragmentByTag`/`Id` passam a consultar o registro. Lifecycle DEX de
-  fragments (onCreate/onCreateView) continua fora até a sondagem exigir, assim
-  como back stack/animations e descoberta SPI real.
+- ✅ **`FragmentManager.beginTransaction` + `FragmentTransaction` host
+  (entregue nesta rodada)**: trigésimo primeiro gap. `beginTransaction()`
+  devolve uma transação nova por chamada; `add`/`replace`/`remove` são
+  fluentes e gravam **ops pendentes**; `commit`/`commitAllowingStateLoss`
+  aplicam no registro de fragments da VM — com validação **antes** de mutar
+  (nada de aplicação parcial: `Add` de fragment já registrada →
+  `IllegalStateException`; 2º commit ou uso pós-commit → ISE; fragment null →
+  NPE — a AOSP dereferencia a fragment). `commit` devolve id opaco `0` (sem
+  back stack/animations/lifecycle DEX no host — documentado). A partir daí
+  `findFragmentByTag`/`findFragmentById` consultam o registro (a última
+  registrada vence; `containerViewId` 0 = sem container, nunca casa).
+- ⬜ **Próximo gap (re-sondado)**: `Fragment.<init>()V` no `org.primftpd` 8.2 —
+  o app agora **instancia a própria classe de fragment** (ctor do super).
+  Lifecycle DEX de fragments (onCreate/onCreateView/onAttach), back stack e
+  descoberta SPI real continuam fora do escopo.
