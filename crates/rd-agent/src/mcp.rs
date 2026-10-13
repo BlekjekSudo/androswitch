@@ -1836,7 +1836,7 @@ impl AgentSession {
                 "java-lang-ref",
                 "vm",
                 "partial",
-                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). AtomicInteger é host (get/set/CAS/increment/add com overflow wrapping). Executors/ExecutorService são host com execução INLINE (single-threaded): submit devolve Future já completado; exceções do Runnable propagam na hora. Object.getClass/Class host (getName/getSimpleName/toString; identidade canônica). ConcurrentHashMap host (≡ HashMap; hierarquia JDK: AbstractMap direto + ConcurrentMap). Próximo gap real: LinkedBlockingQueue (bloqueantes exigem substituto honesto) e unmodifiable*/empty* de Collections",
+                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). AtomicInteger é host (get/set/CAS/increment/add com overflow wrapping). Executors/ExecutorService são host com execução INLINE (single-threaded): submit devolve Future já completado; exceções do Runnable propagam na hora. Object.getClass/Class host (getName/getSimpleName/toString; identidade canônica). ConcurrentHashMap host (≡ HashMap; hierarquia JDK: AbstractMap direto + ConcurrentMap). LinkedBlockingQueue host (FIFO unbounded; take/poll bloqueante com fila vazia → IllegalStateException — fail-fast honesto anti-deadlock). Próximo gap real: ThreadLocal e unmodifiable*/empty* de Collections",
             ),
             (
                 "android-framework-clock",

@@ -432,7 +432,15 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   (guarda estendida; entrySet/views funcionam). Hierarquia JDK correta:
   **não** estende `HashMap` (`AbstractMap` direto) + interfaces
   `Map`/`ConcurrentMap`/`Cloneable`/`Serializable`.
-- ⬜ **Próximo gap (achado honesto)**:
-  `java.util.concurrent.LinkedBlockingQueue.<init>()V` — família
-  BlockingQueue; métodos bloqueantes (`take`) exigem substituto honesto em
-  VM single-threaded (fila vazia → bloqueio seria deadlock: falhar tipado).
+- ✅ **`LinkedBlockingQueue` host (entregue nesta rodada)**: décimo oitavo
+  gap (`<init>()V`). FIFO unbounded sobre o estado `List` (capacidade
+  ignorada — default da JDK; `remainingCapacity` = `Integer.MAX_VALUE`):
+  `offer`/`add`/`put`/`poll()`/`peek`/`element`/`remove`/`contains`/`size`/
+  `isEmpty`/`clear`; null rejeitado (NPE, como na JDK). **Bloqueantes
+  fail-fast** (substituto honesto): `take`/`poll(J,TimeUnit)` com fila vazia
+  → `IllegalStateException` materializado — bloquear sem outra thread seria
+  deadlock; falha visível > pendurar. Hierarquia: `AbstractQueue →
+  AbstractCollection` + `BlockingQueue`/`Queue`/`Collection`/`Serializable`.
+- ⬜ **Próximo gap (achado honesto)**: `java.lang.ThreadLocal.<init>()V` —
+  single-threaded ⇒ um valor por VM (`get`/`set`/`remove`/`withInitial` com
+  `initialValue`).

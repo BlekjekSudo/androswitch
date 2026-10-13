@@ -633,6 +633,14 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         ]),
         // CopyOnWrite*: na JDK real NÃO estendem Abstract* (implementam direto)
         "Ljava/util/concurrent/CopyOnWriteArrayList;" => Some(OBJECT.to_vec()),
+        "Ljava/util/concurrent/LinkedBlockingQueue;" => Some(vec![
+            "Ljava/util/AbstractQueue;",
+            "Ljava/util/AbstractCollection;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/util/AbstractQueue;" => {
+            Some(vec!["Ljava/util/AbstractCollection;", "Ljava/lang/Object;"])
+        }
         "Ljava/util/concurrent/CopyOnWriteArraySet;" => Some(OBJECT.to_vec()),
         "Ljava/util/concurrent/atomic/AtomicReference;" => Some(OBJECT.to_vec()),
         "Ljava/lang/Number;" => Some(OBJECT.to_vec()),
@@ -717,6 +725,18 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/util/Queue;",
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/concurrent/LinkedBlockingQueue;" => Some(vec![
+            "Ljava/util/concurrent/BlockingQueue;",
+            "Ljava/util/Queue;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/AbstractQueue;" => Some(vec![
+            "Ljava/util/Queue;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
         ]),
         "Ljava/util/ArrayDeque;" => Some(vec![
             "Ljava/util/Deque;",

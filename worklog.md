@@ -768,3 +768,17 @@ Work Log:
 
 Stage Summary:
 - Sequência de gaps do primftpd: … → getClass/Class ✅ → ConcurrentHashMap ✅ → LinkedBlockingQueue (próximo).
+
+---
+Task ID: m8-blocking-queue
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração Y)
+Task: M8 — LinkedBlockingQueue host (18º gap do launch real do org.primftpd).
+
+Work Log:
+- rd-vm intrinsics: BLOCKING_Q — FIFO unbounded sobre HostObj::List (capacidade ignorada; remainingCapacity=MAX_VALUE): offer/add/put (null → NPE como na JDK), poll()/peek (null em vazia), element (NSE), remove/contains/size/isEmpty/clear. BLOQUEANTES fail-fast: take/poll(J,TimeUnit) com fila vazia → IllegalStateException materializado (bloquear sem outra thread = deadlock; falha visível > pendurar — documentado).
+- classpath: LinkedBlockingQueue <: AbstractQueue <: AbstractCollection; interfaces BlockingQueue/Queue/Collection/Iterable/Serializable.
+- Teste: linked_blocking_queue_host_intrinsics (vazia: poll/peek null, take/poll(J)→ISE, element→NSE; NPE no null; FIFO offer/put/add → poll/take/peek; size/contains/remove; subtipagem + negativo List).
+- Re-sondagem app real: gap resolvido; launch avança até ThreadLocal.<init>()V (registrado — single-threaded: um valor por VM).
+
+Stage Summary:
+- Sequência de gaps do primftpd: … → ConcurrentHashMap ✅ → LinkedBlockingQueue ✅ → ThreadLocal (próximo).

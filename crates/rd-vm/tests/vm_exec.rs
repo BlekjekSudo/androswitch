@@ -4270,3 +4270,142 @@ fn concurrent_hash_map_host_intrinsics() {
     assert!(e.cp.is_subtype(CHM, "Ljava/util/concurrent/ConcurrentMap;"));
     assert!(e.cp.is_subtype(CHM, "Ljava/util/Map;"));
 }
+
+/// M8 (compat real): LinkedBlockingQueue host — 18º gap do launch do
+/// org.primftpd. FIFO unbounded sobre List; bloqueantes fail-fast em VM
+/// single-threaded (take/poll(J) com fila vazia → IllegalStateException;
+/// element → NSE); null rejeitado.
+#[test]
+fn linked_blocking_queue_host_intrinsics() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const Q: &str = "Ljava/util/concurrent/LinkedBlockingQueue;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let q = e.heap.alloc_instance(Q.to_string(), vec![]).unwrap();
+    let call = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic(e, Q, name, sig, q, &args)
+    };
+
+    call(&mut e, "<init>", "()V", vec![]).unwrap();
+    assert_eq!(
+        call(&mut e, "isEmpty", "()Z", vec![]).unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(&mut e, "remainingCapacity", "()I", vec![]).unwrap(),
+        Some(Value::Int(i32::MAX))
+    );
+
+    // vazia: poll()/peek → null; take/poll(J,TimeUnit) → ISE (fail-fast honesto)
+    assert_eq!(
+        call(&mut e, "poll", "()Ljava/lang/Object;", vec![]).unwrap(),
+        Some(Value::Null)
+    );
+    assert_eq!(
+        call(&mut e, "peek", "()Ljava/lang/Object;", vec![]).unwrap(),
+        Some(Value::Null)
+    );
+    match call(&mut e, "take", "()Ljava/lang/Object;", vec![]) {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/IllegalStateException;")
+        }
+        other => panic!("esperava ISE, got {other:?}"),
+    }
+    match call(
+        &mut e,
+        "poll",
+        "(JLjava/util/concurrent/TimeUnit;)Ljava/lang/Object;",
+        vec![Value::Long(10), Value::Null],
+    ) {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/IllegalStateException;")
+        }
+        other => panic!("esperava ISE, got {other:?}"),
+    }
+    match call(&mut e, "element", "()Ljava/lang/Object;", vec![]) {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/util/NoSuchElementException;")
+        }
+        other => panic!("esperava NSE, got {other:?}"),
+    }
+
+    // null rejeitado (JDK)
+    match call(&mut e, "offer", "(Ljava/lang/Object;)Z", vec![Value::Null]) {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/NullPointerException;")
+        }
+        other => panic!("esperava NPE, got {other:?}"),
+    }
+
+    // FIFO: offer 1, put 2, add 3 → poll 1, take 2, peek 3
+    assert_eq!(
+        call(
+            &mut e,
+            "offer",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(1)]
+        )
+        .unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(&mut e, "put", "(Ljava/lang/Object;)V", vec![Value::Int(2)]).unwrap(),
+        Some(Value::Null)
+    );
+    assert_eq!(
+        call(&mut e, "add", "(Ljava/lang/Object;)Z", vec![Value::Int(3)]).unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(&mut e, "size", "()I", vec![]).unwrap(),
+        Some(Value::Int(3))
+    );
+    assert_eq!(
+        call(&mut e, "poll", "()Ljava/lang/Object;", vec![]).unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(&mut e, "take", "()Ljava/lang/Object;", vec![]).unwrap(),
+        Some(Value::Int(2))
+    );
+    assert_eq!(
+        call(&mut e, "peek", "()Ljava/lang/Object;", vec![]).unwrap(),
+        Some(Value::Int(3))
+    );
+    assert_eq!(
+        call(&mut e, "size", "()I", vec![]).unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "contains",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(3)]
+        )
+        .unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "remove",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(3)]
+        )
+        .unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call(&mut e, "isEmpty", "()Z", vec![]).unwrap(),
+        Some(Value::Int(1))
+    );
+
+    // subtipagem JDK: <: AbstractQueue <: AbstractCollection; BlockingQueue/Queue
+    assert!(e.cp.is_subtype(Q, "Ljava/util/concurrent/BlockingQueue;"));
+    assert!(e.cp.is_subtype(Q, "Ljava/util/Queue;"));
+    assert!(e.cp.is_subtype(Q, "Ljava/util/AbstractQueue;"));
+    assert!(!e.cp.is_subtype(Q, "Ljava/util/List;"));
+}
