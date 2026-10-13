@@ -1836,13 +1836,13 @@ impl AgentSession {
                 "java-lang-ref",
                 "vm",
                 "partial",
-                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). AtomicInteger é host (get/set/CAS/increment/add com overflow wrapping). Executors/ExecutorService são host com execução INLINE (single-threaded): submit devolve Future já completado; exceções do Runnable propagam na hora. Próximo gap real: Looper.getThread/Thread e iteradores de coleção",
+                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). AtomicInteger é host (get/set/CAS/increment/add com overflow wrapping). Executors/ExecutorService são host com execução INLINE (single-threaded): submit devolve Future já completado; exceções do Runnable propagam na hora. Próximo gap real: Enum.compareTo herdado por enums do app e iteradores de coleção",
             ),
             (
                 "android-framework-clock",
                 "vm",
                 "partial",
-                "SystemClock host (uptimeMillis/elapsedRealtime(+Nanos)/currentThreadTimeMillis/sleep) sobre o relógio VIRTUAL determinístico da VM (mesmo clock do postDelayed/advance_clock; sleep avança e drena o Looper — sem tempo de parede). Looper getMainLooper/loop host. System.currentTimeMillis/nanoTime seguem fora",
+                "SystemClock host (uptimeMillis/elapsedRealtime(+Nanos)/currentThreadTimeMillis/sleep) sobre o relógio VIRTUAL determinístico da VM (mesmo clock do postDelayed/advance_clock; sleep avança e drena o Looper — sem tempo de parede). Looper getMainLooper/loop/getThread host. Thread host single-threaded: currentThread/getName (fixo main)/getId/isDaemon/isAlive + sleep avança o relógio virtual (yield no-op); start/interrupt fora. System.currentTimeMillis/nanoTime seguem fora",
             ),
             (
                 "notifications",

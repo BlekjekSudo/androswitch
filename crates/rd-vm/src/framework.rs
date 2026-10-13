@@ -42,6 +42,10 @@ pub const HANDLER: &str = "Landroid/os/Handler;";
 pub const LOOPER: &str = "Landroid/os/Looper;";
 /// M8: relógio host (relógio virtual determinístico — ver `call_host_static`).
 pub const SYSTEM_CLOCK: &str = "Landroid/os/SystemClock;";
+/// M8: Thread host — a VM é single-threaded: existe UMA thread sintética
+/// "main" (id 1, não-daemon), devolvida por `Looper.getThread`/
+/// `Thread.currentThread`.
+pub const THREAD: &str = "Ljava/lang/Thread;";
 pub const CLASS: &str = "Ljava/lang/Class;";
 
 /// Dimensões da window virtual (piso moto-e5 em px — 720x1440 HD+).
@@ -161,6 +165,8 @@ pub struct HostState {
     /// clock virtual (ms) — postDelayed/dispatch por ordem de tempo
     pub clock_ms: u64,
     main_looper: Option<ObjRef>,
+    /// M8: thread "main" sintética (VM single-threaded — ver `THREAD`)
+    main_thread: Option<ObjRef>,
     /// activity em execução (o app trivial M3 tem uma por vez)
     pub current_activity: Option<ObjRef>,
     /// package do app (preenchido no launch_app; getPackageName)
@@ -339,6 +345,28 @@ impl Engine {
             .objects
             .insert(r, HostObj::Looper { queue: Vec::new() });
         self.fw.main_looper = Some(r);
+        Ok(r)
+    }
+
+    /// M8: thread "main" sintética (lazy, como o Looper). Única thread da VM —
+    /// `Looper.getThread` e `Thread.currentThread` devolvem sempre esta.
+    pub(crate) fn main_thread_obj(&mut self) -> Result<ObjRef, VmExit> {
+        if let Some(t) = self.fw.main_thread {
+            return Ok(t);
+        }
+        let r = self
+            .heap
+            .alloc_instance(THREAD.to_string(), Vec::new())
+            .map_err(|e| {
+                VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/OutOfMemoryError;",
+                    format!(
+                        "alocação de {} bytes excede o heap de {} bytes",
+                        e.requested, e.budget
+                    ),
+                ))
+            })?;
+        self.fw.main_thread = Some(r);
         Ok(r)
     }
 
@@ -1180,6 +1208,9 @@ pub fn call_host_instance(
     };
 
     match (mref_class, name) {
+        // ── M8: Looper.getThread — thread "main" sintética (VM single-threaded).
+        // Métodos de Ljava/lang/Thread; despacham via intrinsics (não Landroid/).
+        (LOOPER, "getThread") => Ok(Some(Value::Obj(vm.main_thread_obj()?))),
         // ── Activity/Context ────────────────────────────────────────────────
         (ACTIVITY, "<init>") | (APPLICATION, "<init>") | (CONTEXT, "<init>") => {
             Ok(Some(Value::Null))

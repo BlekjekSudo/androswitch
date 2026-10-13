@@ -371,7 +371,17 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   Desvio documentado: exceções do Runnable **propagam imediatamente** (em
   Java seriam capturadas no Future). `ExecutorService <: Executor` na
   hierarquia builtin.
+- ✅ **`Looper.getThread`/`Thread` host (entregue nesta rodada)**: décimo
+  primeiro gap. VM single-threaded ⇒ UMA thread sintética **"main"** (lazy,
+  como o Looper): `Looper.getThread()` (framework) e
+  `Thread.currentThread()` (intrinsics) devolvem sempre a mesma referência;
+  `getName`="main", `getId`=1L, `threadId`=1, `isDaemon`=false,
+  `isAlive`=true, `setName` ignorado, `toString`="Thread[main,1,main]";
+  `Thread.sleep(J)V`/`(JI)V` avançam o relógio virtual (≡ SystemClock.sleep;
+  ms<0 ignorado), `yield()` é no-op. Hierarquia: `Thread <: Object` +
+  implements `Runnable`. `start()`/`interrupt()` seguem fora (não sondados).
 - ⬜ **Próximo gap (achado honesto)**:
-  `android.os.Looper.getThread()Ljava/lang/Thread;` — devolver a `Thread`
-  host do looper (a VM é single-threaded: uma Thread "main" sintética;
-  `Thread.currentThread` provavelmente na sequência).
+  `androidx.lifecycle.Lifecycle$State.compareTo(Ljava/lang/Enum;)I` — enum
+  do APP (DEX) herda `compareTo` do `Enum` host, que não tem DEX ⇒ resolução
+  falha. Correção: fallback de subtipagem (recv <: Enum sem declaração DEX →
+  intrínseco) + implementar `compareTo` (diferença de ordinais).

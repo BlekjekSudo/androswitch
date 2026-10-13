@@ -619,6 +619,7 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/util/concurrent/CopyOnWriteArraySet;" => Some(OBJECT.to_vec()),
         "Ljava/util/concurrent/atomic/AtomicReference;" => Some(OBJECT.to_vec()),
         "Ljava/lang/Number;" => Some(OBJECT.to_vec()),
+        "Ljava/lang/Thread;" => Some(OBJECT.to_vec()),
         "Ljava/util/concurrent/atomic/AtomicInteger;" => {
             Some(vec!["Ljava/lang/Number;", "Ljava/lang/Object;"])
         }
@@ -704,6 +705,7 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
         | "Ljava/util/concurrent/atomic/AtomicInteger;" => Some(vec!["Ljava/io/Serializable;"]),
         "Ljava/util/concurrent/ExecutorService;" => Some(vec!["Ljava/util/concurrent/Executor;"]),
         "Ljava/lang/Enum;" => Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
+        "Ljava/lang/Thread;" => Some(vec!["Ljava/lang/Runnable;"]),
         _ => None,
     }
 }

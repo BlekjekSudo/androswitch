@@ -25,6 +25,7 @@ const EXECUTORS: &str = "Ljava/util/concurrent/Executors;";
 const EXECUTOR: &str = "Ljava/util/concurrent/Executor;";
 const EXECUTOR_SVC: &str = "Ljava/util/concurrent/ExecutorService;";
 const FUTURE: &str = "Ljava/util/concurrent/Future;";
+use crate::framework::THREAD;
 const MATH: &str = "Ljava/lang/Math;";
 /// M8 (compat real): coleções java.util host — segundo gap de launch do
 /// org.primftpd (`WeakHashMap.<init>`). WeakHashMap ≡ HashMap (sem GC na
@@ -416,6 +417,20 @@ pub fn call_static_intrinsic(
             )?;
             Ok(Some(Value::Obj(r)))
         }
+        // M8: Thread statics — VM single-threaded: UMA thread sintética
+        // "main"; sleep/yield operam sobre o relógio virtual (≡ SystemClock).
+        ("Ljava/lang/Thread;", "currentThread", "()Ljava/lang/Thread;") => {
+            Ok(Some(Value::Obj(vm.main_thread_obj()?)))
+        }
+        ("Ljava/lang/Thread;", "sleep", "(J)V") | ("Ljava/lang/Thread;", "sleep", "(JI)V") => {
+            let ms = match args.first() {
+                Some(Value::Long(v)) => (*v).max(0) as u64,
+                _ => 0,
+            };
+            vm.advance_clock(ms)?;
+            Ok(Some(Value::Null))
+        }
+        ("Ljava/lang/Thread;", "yield", "()V") => Ok(Some(Value::Null)),
         // M8: fábricas de thread pool → executor host (execução inline).
         // Tamanho do pool e ThreadFactory são ignorados (VM single-threaded).
         (c, n, s) if c == EXECUTORS && executors_factory(n, s) => {
@@ -625,6 +640,37 @@ fn future_intrinsic(
         "isDone" => Ok(Some(Value::Int(1))),
         "isCancelled" => Ok(Some(Value::Int(0))),
         "cancel" => Ok(Some(Value::Int(0))), // já completado → não cancelável
+        _ => Ok(None),
+    }
+}
+
+/// (name, sig) de Thread host suportados (M8).
+fn thread_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("getName", "()Ljava/lang/String;")
+            | ("setName", "(Ljava/lang/String;)V")
+            | ("getId", "()J")
+            | ("threadId", "()I")
+            | ("isDaemon", "()Z")
+            | ("isAlive", "()Z")
+            | ("toString", "()Ljava/lang/String;")
+    )
+}
+
+/// Thread host (M8): a VM é single-threaded — uma única thread "main".
+fn thread_intrinsic(vm: &mut Engine, name: &str, _sig: &str) -> Result<Option<Value>, VmExit> {
+    match name {
+        "getName" => Ok(Some(Value::Obj(alloc_string(vm, "main".to_string())?))),
+        "setName" => Ok(Some(Value::Null)), // ignorado — thread única
+        "getId" => Ok(Some(Value::Long(1))),
+        "threadId" => Ok(Some(Value::Int(1))),
+        "isDaemon" => Ok(Some(Value::Int(0))),
+        "isAlive" => Ok(Some(Value::Int(1))),
+        "toString" => Ok(Some(Value::Obj(alloc_string(
+            vm,
+            "Thread[main,1,main]".to_string(),
+        )?))),
         _ => Ok(None),
     }
 }
@@ -1423,6 +1469,13 @@ pub fn call_instance_intrinsic_mref(
         }
         (c, name, sig) if (c == FUTURE || mref_class == FUTURE) && future_supported(name, sig) => {
             future_intrinsic(vm, recv, name)
+        }
+
+        // ── Thread host (M8) ────────────────────────────────────────────────
+        // Single-threaded: a instância é sempre a "main" sintética (nome fixo;
+        // setName é ignorado). start()/interrupt() seguem fora (não sondados).
+        (c, name, sig) if c == THREAD && thread_supported(name, sig) => {
+            thread_intrinsic(vm, name, sig)
         }
 
         // ── coleções java.util (M8) ─────────────────────────────────────────
