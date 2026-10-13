@@ -301,6 +301,16 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   consultado — limitação documentada). Sem GC na arena ⇒ WeakHashMap ≡
   HashMap. Sem iteradores/entrySet/keySet ainda — catálogo `compat_gaps`
   atualizado para `partial`.
-- ⬜ **Próximo gap (achado honesto)**: `java.lang.Enum.<init>(String,int)`
-  (wrapped em `ExceptionInInitializerError`) — suporte a enums é o próximo
-  grupo de compat do M8.
+- ✅ **`java.lang.Enum` host (entregue nesta rodada)**: terceiro gap do
+  launch (`ExceptionInInitializerError` → `Enum.<init>(String,int)`).
+  `<init>`/`name`/`ordinal`/`toString` (default = name) são intrínsecos com
+  estado nos campos de heap `name`/`ordinal`. Dispatch pela classe DECLARANTE
+  do method ref (`call_instance_intrinsic_mref`): a super-chamada `Enum.*`
+  cai no host, mas o construtor da classe de enum do app (código DEX) NÃO é
+  sequestrado; `toString` só é default quando ninguém na cadeia DEX o
+  declara. `values()`/`valueOf()` são estáticos sintéticos do app — rodam
+  normal no interpretador.
+- ⬜ **Próximo gap (achado honesto)**: `java.lang.ref.WeakReference.<init>(Object)`
+  — família `java.lang.ref` (WeakReference/SoftReference/ReferenceQueue) é o
+  próximo grupo; sem GC na arena, referências fracas nunca são limpas
+  (comportamento a documentar como no WeakHashMap).

@@ -18,6 +18,8 @@ const MATH: &str = "Ljava/lang/Math;";
 /// org.primftpd (`WeakHashMap.<init>`). WeakHashMap ≡ HashMap (sem GC na
 /// arena, entradas nunca são limpas — limitação documentada); LinkedList
 /// ≡ ArrayList (mesmo contrato de List para os métodos suportados).
+/// M8: base de enums — terceiro gap do launch real (EIIE em Enum.<init>).
+const ENUM: &str = "Ljava/lang/Enum;";
 const HASH_MAP: &str = "Ljava/util/HashMap;";
 const WEAK_MAP: &str = "Ljava/util/WeakHashMap;";
 const ARRAY_LIST: &str = "Ljava/util/ArrayList;";
@@ -372,6 +374,31 @@ pub fn call_static_intrinsic(
 /// Intrínseco DE INSTÂNCIA (invoke-virtual/direct sobre objetos da VM).
 /// `receiver` já é Some(ref) — NPE foi tratada pelo chamador.
 /// `Ok(None)` = sem intrínseco → dispatch normal no DEX (classe do usuário).
+/// Enum host (M8): estado nos campos de heap `name`/`ordinal` (padrão
+/// StringBuilder/Throwable). `values()`/`valueOf()` são estáticos sintéticos
+/// da classe do app (DEX) — executam normal no interpretador.
+fn enum_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match name {
+        "<init>" => {
+            // args: (String name, int ordinal) — name chega como Obj do DEX
+            crate::err::put_field_result(vm.heap.put_field(recv, "name", args[0].clone()))?;
+            crate::err::put_field_result(vm.heap.put_field(recv, "ordinal", args[1].clone()))?;
+            Ok(Some(Value::Null))
+        }
+        "name" | "toString" => Ok(Some(vm.heap.get_field(recv, "name").unwrap_or(Value::Null))),
+        "ordinal" => {
+            let v = vm.heap.get_field(recv, "ordinal").unwrap_or(Value::Int(0));
+            Ok(Some(Value::Int(v.as_int().unwrap_or(0))))
+        }
+        _ => Ok(None),
+    }
+}
+
 /// (name, sig) de Map suportados como host (M8).
 fn map_supported(name: &str, sig: &str) -> bool {
     matches!(
@@ -695,6 +722,8 @@ fn ref_identity_eq(a: &Value, b: &Value) -> bool {
     }
 }
 
+/// Versão sem classe declarante: a mref class é a própria classe do
+/// receiver (chamadas de teste e caminhos que não têm method ref).
 pub fn call_instance_intrinsic(
     vm: &mut Engine,
     recv_class: &str,
@@ -703,8 +732,50 @@ pub fn call_instance_intrinsic(
     recv: crate::heap::ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    call_instance_intrinsic_mref(vm, recv_class, recv_class, name, sig, recv, args)
+}
+
+/// Como `call_instance_intrinsic`, mas distingue a classe DECLARANTE do
+/// method ref (`mref_class`) da classe concreta do receiver. Necessário
+/// para Enum: a chamada super `Enum.<init>(String,int)` tem mref_class =
+/// `Ljava/lang/Enum;` mas receiver de classe do app — e o construtor da
+/// classe do app (DEX) NÃO pode ser sequestrado pelo intrínseco.
+pub fn call_instance_intrinsic_mref(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: crate::heap::ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     match (recv_class, name, sig) {
         (OBJECT, "<init>", "()V") => Ok(Some(Value::Null)), // ctor de Object = no-op
+
+        // ── java.lang.Enum (M8) ─────────────────────────────────────────────
+        // Só quando o method ref DECLARA Enum: <init>/name/ordinal são finais
+        // (ou direct), então não há override de usuário a respeitar. toString
+        // é virtual: só cai aqui se ninguém na cadeia DEX o declara.
+        (_, name, sig)
+            if mref_class == ENUM
+                && matches!(
+                    (name, sig),
+                    ("<init>", "(Ljava/lang/String;I)V")
+                        | ("name", "()Ljava/lang/String;")
+                        | ("ordinal", "()I")
+                ) =>
+        {
+            enum_intrinsic(vm, recv, name, args)
+        }
+        (_, "toString", "()Ljava/lang/String;")
+            if mref_class == ENUM
+                && vm
+                    .cp
+                    .resolve_method(recv_class, "toString", "()Ljava/lang/String;")
+                    .is_none() =>
+        {
+            enum_intrinsic(vm, recv, "toString", args)
+        }
 
         // ── AtomicReference (M8) ────────────────────────────────────────────
         // Estado no campo "value" da instância (mesmo padrão do StringBuilder).

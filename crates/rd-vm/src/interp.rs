@@ -1445,9 +1445,10 @@ fn do_invoke(
     let recv_class = vm.heap.class_of(recv)?.to_string();
 
     // intrínseco de instância (String/StringBuilder/Throwable/Object)
-    if let Some(v) = intrinsics::call_instance_intrinsic(
+    if let Some(v) = intrinsics::call_instance_intrinsic_mref(
         vm,
         &recv_class,
+        &mref.class,
         &mref.name,
         &mref.proto,
         recv,
