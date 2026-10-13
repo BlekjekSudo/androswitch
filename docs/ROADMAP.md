@@ -510,8 +510,14 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   no Android real por Activity; o runtime executa uma activity por vez).
   O estado de fragments (back stack/transações) ainda não existe: métodos do
   FM seguem sendo sondados um a um.
-- ⬜ **Próximo gap (re-sondado)**: `FragmentManager.findFragmentByTag(String)`
-  no `org.primftpd` 8.2 — com o FM do host ainda vazio, a resposta honesta é
-  `null`. Transações (`beginTransaction`/`add`/`replace`/`commit`) e estado de
-  fragments seguem fora até a sondagem exigir, assim como coleções do app e
-  descoberta SPI real por `META-INF/services`.
+- ✅ **`FragmentManager.findFragmentByTag`/`findFragmentById` host (entregue
+  nesta rodada)**: trigésimo gap. Enquanto não há transações committadas, a
+  resposta é **`null`** — contrato Android para fragment não encontrado (tag
+  null também devolve null, como na `FragmentManagerImpl`). Nada de
+  `NOT_IMPLEMENTED` para o caso vazio.
+- ⬜ **Próximo gap (re-sondado)**: `FragmentManager.beginTransaction()` no
+  `org.primftpd` 8.2 — abre `FragmentTransaction` (add/replace/commit) e o
+  **estado mínimo de fragments** do host: committar registra o fragment no FM
+  e `findFragmentByTag`/`Id` passam a consultar o registro. Lifecycle DEX de
+  fragments (onCreate/onCreateView) continua fora até a sondagem exigir, assim
+  como back stack/animations e descoberta SPI real.

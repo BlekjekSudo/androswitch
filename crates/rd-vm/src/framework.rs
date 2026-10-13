@@ -1324,10 +1324,25 @@ pub fn call_host_instance(
         // ── M8 (29º gap real): Activity.getFragmentManager — FragmentManager
         // canônico do host (identidade estável). O estado de fragments ainda
         // não existe: back stack/transações seguem tipadas quando sondadas.
+        // ── M8 (29º gap real): Activity.getFragmentManager — FragmentManager
+        // canônico do host (identidade estável). O estado de fragments ainda
+        // não existe: back stack/transações seguem tipadas quando sondadas.
         (ACTIVITY, "getFragmentManager")
             if sig == "()Landroid/app/FragmentManager;" && is_activity(vm) =>
         {
             Ok(Some(Value::Obj(vm.fragment_manager_obj()?)))
+        }
+        // ── M8 (30º gap real): FragmentManager ainda VAZIO (nenhuma transação
+        // host existe) ⇒ findFragmentByTag/findFragmentById respondem null —
+        // contrato Android para fragment não encontrado, nunca NOT_IMPLEMENTED.
+        // Tag null também devolve null (FragmentManagerImpl ignora tag null).
+        (FRAGMENT_MANAGER, "findFragmentByTag")
+            if sig == "(Ljava/lang/String;)Landroid/app/Fragment;" =>
+        {
+            Ok(Some(Value::Null))
+        }
+        (FRAGMENT_MANAGER, "findFragmentById") if sig == "(I)Landroid/app/Fragment;" => {
+            Ok(Some(Value::Null))
         }
         (ACTIVITY, "getPackageName") | (CONTEXT, "getPackageName") if is_activity(vm) => {
             let s = vm.fw.package_name.clone();
