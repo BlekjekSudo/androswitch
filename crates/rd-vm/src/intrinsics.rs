@@ -20,6 +20,13 @@ const MATH: &str = "Ljava/lang/Math;";
 /// ≡ ArrayList (mesmo contrato de List para os métodos suportados).
 /// M8: base de enums — terceiro gap do launch real (EIIE em Enum.<init>).
 const ENUM: &str = "Ljava/lang/Enum;";
+/// M8: família java.lang.ref — quarto gap do launch real (WeakReference.
+/// <init>). Sem GC na arena ⇒ referências fracas/soft NUNCA são limpas
+/// espontaneamente; o referent vive até `clear()` — limitação documentada
+/// (mesma política do WeakHashMap host).
+const WEAK_REF: &str = "Ljava/lang/ref/WeakReference;";
+const SOFT_REF: &str = "Ljava/lang/ref/SoftReference;";
+const REF_QUEUE: &str = "Ljava/lang/ref/ReferenceQueue;";
 const HASH_MAP: &str = "Ljava/util/HashMap;";
 const WEAK_MAP: &str = "Ljava/util/WeakHashMap;";
 const ARRAY_LIST: &str = "Ljava/util/ArrayList;";
@@ -374,6 +381,42 @@ pub fn call_static_intrinsic(
 /// Intrínseco DE INSTÂNCIA (invoke-virtual/direct sobre objetos da VM).
 /// `receiver` já é Some(ref) — NPE foi tratada pelo chamador.
 /// `Ok(None)` = sem intrínseco → dispatch normal no DEX (classe do usuário).
+/// `<init>` de WeakReference/SoftReference (M8): referent no campo de heap
+/// "referent". A variante com ReferenceQueue IGNORA a fila — sem GC na arena
+/// nada é enfileirado (documentado).
+fn ref_init(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let referent = if sig == "()V" {
+        Value::Null
+    } else {
+        args[0].clone()
+    };
+    crate::err::put_field_result(vm.heap.put_field(recv, "referent", referent))?;
+    Ok(Some(Value::Null))
+}
+
+/// get/clear de WeakReference/SoftReference (M8).
+fn ref_get_clear(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+) -> Result<Option<Value>, VmExit> {
+    match name {
+        "get" => Ok(Some(
+            vm.heap.get_field(recv, "referent").unwrap_or(Value::Null),
+        )),
+        "clear" => {
+            crate::err::put_field_result(vm.heap.put_field(recv, "referent", Value::Null))?;
+            Ok(Some(Value::Null))
+        }
+        _ => Ok(None),
+    }
+}
+
 /// Enum host (M8): estado nos campos de heap `name`/`ordinal` (padrão
 /// StringBuilder/Throwable). `values()`/`valueOf()` são estáticos sintéticos
 /// da classe do app (DEX) — executam normal no interpretador.
@@ -775,6 +818,54 @@ pub fn call_instance_intrinsic_mref(
                     .is_none() =>
         {
             enum_intrinsic(vm, recv, "toString", args)
+        }
+
+        // ── java.lang.ref (M8) ──────────────────────────────────────────────
+        // WeakReference/SoftReference host. <init> é direct: só casa quando o
+        // method ref DECLARA a classe (super-chamada de subclasse inclusa) —
+        // construtor de subclasse do app segue para o DEX. get/clear só são
+        // capturados sem declaração na cadeia DEX (override de usuário vence).
+        (_, name, sig)
+            if (mref_class == WEAK_REF || mref_class == SOFT_REF)
+                && matches!(
+                    (name, sig),
+                    ("<init>", "()V")
+                        | ("<init>", "(Ljava/lang/Object;)V")
+                        | (
+                            "<init>",
+                            "(Ljava/lang/Object;Ljava/lang/ref/ReferenceQueue;)V"
+                        )
+                ) =>
+        {
+            ref_init(vm, recv, sig, args)
+        }
+        (c, name, sig)
+            if (mref_class == WEAK_REF
+                || mref_class == SOFT_REF
+                || c == WEAK_REF
+                || c == SOFT_REF)
+                && matches!(
+                    (name, sig),
+                    ("get", "()Ljava/lang/Object;") | ("clear", "()V")
+                )
+                && vm.cp.resolve_method(recv_class, name, sig).is_none() =>
+        {
+            ref_get_clear(vm, recv, name)
+        }
+        // ReferenceQueue: sem GC nada é enfileirado — poll/remove devolvem
+        // null para sempre (na JVM real remove() BLOQUEIA; aqui a fila está
+        // permanentemente vazia, então null é a resposta honesta).
+        (c, name, sig)
+            if (mref_class == REF_QUEUE || c == REF_QUEUE)
+                && matches!(
+                    (name, sig),
+                    ("<init>", "()V")
+                        | ("poll", "()Ljava/lang/ref/Reference;")
+                        | ("remove", "()Ljava/lang/ref/Reference;")
+                        | ("remove", "(J)Ljava/lang/ref/Reference;")
+                ) =>
+        {
+            Ok(Some(Value::Null))
         }
 
         // ── AtomicReference (M8) ────────────────────────────────────────────

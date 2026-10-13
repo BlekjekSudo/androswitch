@@ -1830,7 +1830,13 @@ impl AgentSession {
                 "java-util-collections",
                 "vm",
                 "partial",
-                "HashMap/WeakHashMap/ArrayList/LinkedList host com métodos essenciais (put/get/add/remove/size/…); SEM iteradores/entrySet/keySet; equals de usuário não consultado em chaves. Enum é host (name/ordinal/toString). Próximo gap real: java.lang.ref (WeakReference)",
+                "HashMap/WeakHashMap/ArrayList/LinkedList host com métodos essenciais (put/get/add/remove/size/…); SEM iteradores/entrySet/keySet; equals de usuário não consultado em chaves. Enum é host (name/ordinal/toString)",
+            ),
+            (
+                "java-lang-ref",
+                "vm",
+                "partial",
+                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater.newUpdater segue NOT_IMPLEMENTED",
             ),
             (
                 "notifications",

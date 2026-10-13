@@ -2763,3 +2763,116 @@ fn enum_host_intrinsics() {
         Some(Value::Obj(nm))
     );
 }
+
+/// M8 (compat real): família java.lang.ref host — quarto gap do launch do
+/// org.primftpd (`WeakReference.<init>(Object)`). Sem GC na arena: o referent
+/// vive até `clear()`; ReferenceQueue está permanentemente vazia (poll → null).
+#[test]
+fn weak_soft_reference_host_intrinsics() {
+    use rd_vm::intrinsics::{call_instance_intrinsic, call_instance_intrinsic_mref};
+    use rd_vm::value::Value;
+    const WR: &str = "Ljava/lang/ref/WeakReference;";
+    const SR: &str = "Ljava/lang/ref/SoftReference;";
+    const RQ: &str = "Ljava/lang/ref/ReferenceQueue;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let r = e.heap.alloc_instance(WR.to_string(), vec![]).unwrap();
+    let payload = e.heap.alloc_string("alvo".into()).unwrap();
+
+    // <init>(Object) + get devolve o referent
+    let v = call_instance_intrinsic(
+        &mut e,
+        WR,
+        "<init>",
+        "(Ljava/lang/Object;)V",
+        r,
+        &[Value::Obj(payload)],
+    )
+    .unwrap();
+    assert_eq!(v, Some(Value::Null));
+    assert_eq!(
+        call_instance_intrinsic(&mut e, WR, "get", "()Ljava/lang/Object;", r, &[]).unwrap(),
+        Some(Value::Obj(payload))
+    );
+    // clear() → get devolve null (única forma de limpar: arena não tem GC)
+    call_instance_intrinsic(&mut e, WR, "clear", "()V", r, &[]).unwrap();
+    assert_eq!(
+        call_instance_intrinsic(&mut e, WR, "get", "()Ljava/lang/Object;", r, &[]).unwrap(),
+        Some(Value::Null)
+    );
+
+    // <init>() vazio e <init>(Object, ReferenceQueue) — fila ignorada
+    let r2 = e.heap.alloc_instance(SR.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(&mut e, SR, "<init>", "()V", r2, &[]).unwrap();
+    assert_eq!(
+        call_instance_intrinsic(&mut e, SR, "get", "()Ljava/lang/Object;", r2, &[]).unwrap(),
+        Some(Value::Null)
+    );
+    let rq = e.heap.alloc_instance(RQ.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(&mut e, RQ, "<init>", "()V", rq, &[]).unwrap();
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            SR,
+            "<init>",
+            "(Ljava/lang/Object;Ljava/lang/ref/ReferenceQueue;)V",
+            r2,
+            &[Value::Obj(payload), Value::Obj(rq)]
+        )
+        .unwrap(),
+        Some(Value::Null)
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, SR, "get", "()Ljava/lang/Object;", r2, &[]).unwrap(),
+        Some(Value::Obj(payload))
+    );
+    // fila permanentemente vazia (sem GC ⇒ nada é enfileirado)
+    assert_eq!(
+        call_instance_intrinsic(&mut e, RQ, "poll", "()Ljava/lang/ref/Reference;", rq, &[])
+            .unwrap(),
+        Some(Value::Null)
+    );
+
+    // subclasse do app: super-chamada (mref = WeakReference) cai no host…
+    let sub = e
+        .heap
+        .alloc_instance("LMyRef;".to_string(), vec![])
+        .unwrap();
+    let v = call_instance_intrinsic_mref(
+        &mut e,
+        "LMyRef;",
+        WR,
+        "<init>",
+        "(Ljava/lang/Object;)V",
+        sub,
+        &[Value::Obj(payload)],
+    )
+    .unwrap();
+    assert_eq!(v, Some(Value::Null));
+    assert_eq!(
+        call_instance_intrinsic_mref(
+            &mut e,
+            "LMyRef;",
+            WR,
+            "get",
+            "()Ljava/lang/Object;",
+            sub,
+            &[]
+        )
+        .unwrap(),
+        Some(Value::Obj(payload))
+    );
+    // …mas <init> declarado pela própria subclasse (mref = LMyRef;) é DEX
+    let hijack = call_instance_intrinsic_mref(
+        &mut e,
+        "LMyRef;",
+        "LMyRef;",
+        "<init>",
+        "(Ljava/lang/Object;)V",
+        sub,
+        &[Value::Obj(payload)],
+    )
+    .unwrap();
+    assert!(hijack.is_none(), "construtor da subclasse pertence ao DEX");
+}

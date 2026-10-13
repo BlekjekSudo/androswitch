@@ -310,7 +310,19 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   sequestrado; `toString` só é default quando ninguém na cadeia DEX o
   declara. `values()`/`valueOf()` são estáticos sintéticos do app — rodam
   normal no interpretador.
-- ⬜ **Próximo gap (achado honesto)**: `java.lang.ref.WeakReference.<init>(Object)`
-  — família `java.lang.ref` (WeakReference/SoftReference/ReferenceQueue) é o
-  próximo grupo; sem GC na arena, referências fracas nunca são limpas
-  (comportamento a documentar como no WeakHashMap).
+- ✅ **Família `java.lang.ref` host (entregue nesta rodada)**: quarto gap do
+  launch (`WeakReference.<init>(Object)`). `WeakReference`/`SoftReference`:
+  `<init>()V`/`(Object)V`/`(Object,ReferenceQueue)V` (fila ignorada),
+  `get`/`clear` — estado no campo de heap `referent`; dispatch pela classe
+  declarante do method ref (super-chamada de subclasse cai no host; construtor
+  da subclasse segue para o DEX) e `get`/`clear` só sem declaração na cadeia
+  DEX (override de usuário vence). `ReferenceQueue`: `poll`/`remove` →
+  `null` (sem GC nada é enfileirado; na JVM real `remove()` bloqueia — aqui a
+  fila está permanentemente vazia, resposta honesta). Sem GC na arena ⇒
+  referent vive até `clear()` (limitação documentada, mesma política do
+  WeakHashMap).
+- ⬜ **Próximo gap (achado honesto)**:
+  `AtomicReferenceFieldUpdater.newUpdater(Class,Class,String)` (wrapped em
+  `ExceptionInInitializerError`; hoje responde `NOT_IMPLEMENTED` tipado) —
+  exige reflexão de campo por nome; candidato natural: devolver um updater
+  host que opera via `get_field`/`put_field` pelo nome capturado.
