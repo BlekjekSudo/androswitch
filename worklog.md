@@ -650,3 +650,19 @@ Work Log:
 
 Stage Summary:
 - Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → ARFU ✅ → COW+casts ✅ → LinkedHashMap ✅ → SystemClock ✅ → AtomicInteger ✅ → Executors (próximo).
+
+---
+Task ID: m8-executors
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração Q)
+Task: M8 — Executors/ExecutorService host com execução inline (10º gap do launch real).
+
+Work Log:
+- rd-vm intrinsics: EXECUTORS fábricas (newFixedThreadPool(I)/(I,ThreadFactory), newSingleThreadExecutor, newCachedThreadPool — pool/ThreadFactory ignorados, VM single-threaded) → instância host ExecutorService.
+- ExecutorService: execute/submit(Runnable)/submit(Runnable,result)/submit(Callable) rodam INLINE via resolve_method+Engine.call (mesmo mecanismo do drain do Looper); shutdown/shutdownNow (ArrayList vazia — nada pendente)/isShutdown/isTerminated (campo heap "exec_shutdown").
+- Future host: já completado — get/get(J,TimeUnit) leem campo heap "future_result"; isDone=1; isCancelled=0; cancel=0. Desvio documentado: exceções do Runnable propagam imediatamente (Java capturaria no Future).
+- classpath: ExecutorService implementa Executor (builtin_interfaces).
+- Teste: executors_host_inline_execution (DEX real: LTickX run() t++ / call() t+=10 retorna "ok-call"; fábrica, execute síncrono, submit Runnable→Future null, submit Callable→resultado capturado, submit(Runnable,result), isDone/isCancelled/cancel, shutdown/isTerminated/shutdownNow vazio, subtipagem).
+- Re-sondagem app real: gap resolvido; launch avança até Looper.getThread()Ljava/lang/Thread; (registrado).
+
+Stage Summary:
+- Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → ARFU ✅ → COW+casts ✅ → LinkedHashMap ✅ → SystemClock ✅ → AtomicInteger ✅ → Executors ✅ → Looper.getThread (próximo).

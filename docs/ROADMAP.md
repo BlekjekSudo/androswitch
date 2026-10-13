@@ -359,8 +359,19 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   `addAndGet`/`getAndAdd` com overflow **wrapping** (semântica Java),
   conversões `Number` (`intValue`/`longValue`/`floatValue`/`doubleValue`) e
   `toString`; hierarquia `AtomicInteger <: Number <: Object` + `Serializable`.
+- ✅ **`Executors`/`ExecutorService` host (entregue nesta rodada)**: décimo
+  gap (`newFixedThreadPool(I,ThreadFactory)`). VM é single-threaded ⇒
+  substituto honesto: `newFixedThreadPool`/`newSingleThreadExecutor`/
+  `newCachedThreadPool` (com/sem ThreadFactory — ambos ignorados, como o
+  tamanho do pool) devolvem executor host que roda `Runnable`/`Callable`
+  **inline/síncrono** (determinístico; `execute`, `submit` ×3 sobrecargas);
+  `submit` devolve `Future` **já completado** (`get`/`get(J,TimeUnit)`/
+  `isDone`=true/`isCancelled`=false/`cancel`=false); `shutdown`/
+  `shutdownNow` (lista vazia — nada pendente)/`isShutdown`/`isTerminated`.
+  Desvio documentado: exceções do Runnable **propagam imediatamente** (em
+  Java seriam capturadas no Future). `ExecutorService <: Executor` na
+  hierarquia builtin.
 - ⬜ **Próximo gap (achado honesto)**:
-  `java.util.concurrent.Executors.newFixedThreadPool(I,ThreadFactory)` —
-  família de thread pools. VM é single-threaded: substituto honesto seria um
-  `ExecutorService` host que executa `Runnable`s **inline/síncrono**
-  (determinístico), com `submit` devolvendo Future já completado.
+  `android.os.Looper.getThread()Ljava/lang/Thread;` — devolver a `Thread`
+  host do looper (a VM é single-threaded: uma Thread "main" sintética;
+  `Thread.currentThread` provavelmente na sequência).
