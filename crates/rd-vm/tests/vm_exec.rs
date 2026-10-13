@@ -5341,3 +5341,72 @@ fn linked_blocking_queue_drain_to_host() {
         "falha de contrato não pode drenar a fila"
     );
 }
+
+#[test]
+fn activity_get_fragment_manager_canonical() {
+    use rd_vm::framework::call_host_instance;
+    use rd_vm::value::Value;
+    const ACT: &str = "Landroid/app/Activity;";
+    const FM: &str = "Landroid/app/FragmentManager;";
+
+    let mut b = DexBuilder::new();
+    b.class("Lcom/exemplo/MainAct;", ACT);
+    b.class("Lcom/exemplo/SubAct;", "Lcom/exemplo/MainAct;");
+    let mut e = engine_of(&b);
+    let act = e
+        .heap
+        .alloc_instance("Lcom/exemplo/MainAct;".to_string(), vec![])
+        .unwrap();
+
+    let fm1 = match call_host_instance(
+        &mut e,
+        ACT,
+        "getFragmentManager",
+        "()Landroid/app/FragmentManager;",
+        act,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getFragmentManager: {other:?}"),
+    };
+    assert_eq!(e.heap.class_of(fm1).unwrap(), FM);
+
+    // Identidade estável: chamadas repetidas devolvem o MESMO objeto host.
+    let fm2 = match call_host_instance(
+        &mut e,
+        ACT,
+        "getFragmentManager",
+        "()Landroid/app/FragmentManager;",
+        act,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getFragmentManager 2: {other:?}"),
+    };
+    assert_eq!(fm1, fm2, "FragmentManager deve ser canônico por VM");
+
+    // Subclasse de Activity também resolve (is_subtype) e compartilha o mesmo FM.
+    let sub = e
+        .heap
+        .alloc_instance("Lcom/exemplo/SubAct;".to_string(), vec![])
+        .unwrap();
+    let fm3 = match call_host_instance(
+        &mut e,
+        ACT,
+        "getFragmentManager",
+        "()Landroid/app/FragmentManager;",
+        sub,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getFragmentManager 3: {other:?}"),
+    };
+    assert_eq!(fm1, fm3);
+    assert!(e.cp.is_subtype(FM, "Ljava/lang/Object;"));
+}

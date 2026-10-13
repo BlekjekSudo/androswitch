@@ -987,3 +987,27 @@ GitHub status:
 Stage Summary:
 - Sequência: … → ArrayList(Collection) ✅ (#147) → drainTo ✅ (esta) → Activity.getFragmentManager (próximo, 29º — PRIMEIRO gap android.app; transição java.util → framework).
 - Nota arquitetural p/ o próximo: getFragmentManager abre o item Fragments (M8): FM canônico por Activity (estilo class_loader_obj), FragmentTransaction com add/replace/commit gravando estado; beginTransactionFragment/Attach de preference-fragment é o uso provável do primftpd. Escopo mínimo honesto: devolver FM host vazio + tipar o que ainda não for tratado.
+
+---
+Task ID: m8-get-fragment-manager
+Agent: Arena Agent Mode (sessão 2026-10-13, início 09:30 UTC — continuação)
+Task: M8 — Activity.getFragmentManager host (29º gap do launch real do org.primftpd; PRIMEIRO gap android.app — embrião do item Fragments).
+
+Work Log:
+- Contexto: PR #148 (28º, drainTo) aberta nesta sessão; sondagem dela completou toda a sequência java.util do bootstrap e parou em Activity.getFragmentManager — transição de fase java.util → framework.
+- rd-vm: FRAGMENT_MANAGER const + HostState.fragment_manager (canônico por VM, lazy — espelha class_loader_obj; identidade estável pois o runtime executa uma activity por vez, como o FM por Activity no Android real) + fragment_manager_obj() + arm no call_host_instance com guard is_activity + sig. classpath: FragmentManager <: Object (objeto simples do host). Escopo mínimo honesto: ESTADO de fragments (back stack/transações) segue tipado/sondado.
+- Bug de teste pego e corrigido durante a iteração: classe declarada no DexBuilder APÓS engine_of(&b) não existe no classpath do engine (third call devolvia None) — ambas as classes declaradas antes do engine.
+- Teste novo activity_get_fragment_manager_canonical: classe + canonical (fm1==fm2), subclasse de Activity resolve via is_subtype e compartilha o mesmo FM (fm1==fm3), FragmentManager <: Object.
+- Re-sondagem app real: launch atravessou getFragmentManager e parou no 30º gap NOT_FOUND: `FragmentManager.findFragmentByTag(Ljava/lang/String;)Landroid/app/Fragment;` — com FM do host vazio, resposta honesta é null.
+- Catálogo compat_gaps (mcp.rs) e ROADMAP atualizados (29º ✅ android.app / 30º re-sondado ⬜).
+
+Checks:
+- fmt — PASS. clippy -D warnings — PASS. `cargo test --workspace` — PASS (31 suites, 0 falhas; vm_exec 69 — +1 novo). MSRV 1.76 — PASS. md links — PASS. compat-report diff — PASS (vazio).
+- `rd app run golden-apks/org.primftpd.apk --json` — avança além de getFragmentManager; para no 30º gap registrado. Scan de segredos — limpo.
+
+GitHub status:
+- Branch feat/m8-fragment-manager a ser enviada/PR; merge após CI verde.
+
+Stage Summary:
+- Sequência: … → drainTo ✅ (#148) → getFragmentManager ✅ (esta) → findFragmentByTag (próximo, 30º — null honesto com FM vazio).
+- Fragments (M8) agora TEM embrião: após findFragmentByTag/Id (null), o caminho provável é beginTransaction → FragmentTransaction (add/replace/commit → estado mínimo de back stack) — avaliar o tamanho real na próxima sondagem antes de escopar.
