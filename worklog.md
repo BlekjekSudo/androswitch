@@ -754,3 +754,17 @@ Work Log:
 
 Stage Summary:
 - Sequência de gaps do primftpd: … → ArrayDeque ✅ → getClass/Class ✅ → ConcurrentHashMap (próximo).
+
+---
+Task ID: m8-concurrent-hash-map
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração X)
+Task: M8 — ConcurrentHashMap host (17º gap do launch real do org.primftpd).
+
+Work Log:
+- rd-vm intrinsics: CONCURRENT_MAP entra na guarda do Map host (mesmos métodos essenciais + views; single-threaded ⇒ sem segmentação). putIfAbsent/computeIfAbsent fora (não sondados).
+- classpath: hierarquia JDK correta — ConcurrentHashMap NÃO estende HashMap (AbstractMap direto); interfaces Map/ConcurrentMap/Cloneable/Serializable.
+- Teste: concurrent_hash_map_host_intrinsics (init/put/size/get/entrySet; subtipagem: <: AbstractMap, NÃO <: HashMap, <: ConcurrentMap/Map).
+- Re-sondagem app real: gap resolvido; launch avança até LinkedBlockingQueue.<init>()V (EIIE-wrapped; registrado — bloqueantes exigem substituto honesto).
+
+Stage Summary:
+- Sequência de gaps do primftpd: … → getClass/Class ✅ → ConcurrentHashMap ✅ → LinkedBlockingQueue (próximo).

@@ -615,6 +615,10 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/util/AbstractMap;",
             "Ljava/lang/Object;",
         ]),
+        // ConcurrentHashMap NÃO estende HashMap na JDK (AbstractMap direto)
+        "Ljava/util/concurrent/ConcurrentHashMap;" => {
+            Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"])
+        }
         "Ljava/util/WeakHashMap;" => Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"]),
         "Ljava/util/ArrayList;" => Some(vec![
             "Ljava/util/AbstractList;",
@@ -682,7 +686,14 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",
         ]),
-        "Ljava/util/WeakHashMap;" | "Ljava/util/LinkedHashMap;" => Some(MAP_IFACES.to_vec()),
+        "Ljava/util/WeakHashMap;"
+        | "Ljava/util/LinkedHashMap;"
+        | "Ljava/util/concurrent/ConcurrentHashMap;" => Some(vec![
+            "Ljava/util/Map;",
+            "Ljava/util/concurrent/ConcurrentMap;",
+            "Ljava/lang/Cloneable;",
+            "Ljava/io/Serializable;",
+        ]),
         "Ljava/util/AbstractSet;" | "Ljava/util/HashSet;" => Some(vec![
             "Ljava/util/Set;",
             "Ljava/util/Collection;",
