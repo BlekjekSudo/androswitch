@@ -343,7 +343,14 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   ordem de iteração NÃO garantida, documentado) e na hierarquia
   (`LinkedHashMap <: HashMap <: AbstractMap`, iface `Map`). Com isso o
   launch real atravessa TODO o grupo java.util que era gap.
+- ✅ **`android.os.SystemClock` host (entregue nesta rodada)**: oitavo gap
+  (`uptimeMillis()J`) — família nova (framework Android). Relógio é o
+  **virtual determinístico** da VM (`HostState.clock_ms`, o mesmo que
+  alimenta `postDelayed`/`advance_clock`): `uptimeMillis`,
+  `elapsedRealtime`, `elapsedRealtimeNanos` (×1e6) e
+  `currentThreadTimeMillis` leem o clock; `sleep(J)V` o **avança e drena o
+  Looper** (callbacks agendados disparam — consistente com o contrato do
+  tempo da VM; nada de tempo de parede ⇒ testes reprodutíveis).
 - ⬜ **Próximo gap (achado honesto)**:
-  `android.os.SystemClock.uptimeMillis()J` — família nova (framework
-  Android host, domínio M3.2); `elapsedRealtime`/`sleep` provavelmente na
-  sequência.
+  `java.util.concurrent.atomic.AtomicInteger.<init>()V` — mesma família do
+  `AtomicReference` já host (campo de heap `value`; aritmética i32).

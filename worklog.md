@@ -621,3 +621,18 @@ Work Log:
 
 Stage Summary:
 - Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → ARFU ✅ → COW+casts ✅ → LinkedHashMap ✅ → SystemClock (próximo).
+
+---
+Task ID: m8-system-clock
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração O)
+Task: M8 — android.os.SystemClock host sobre relógio virtual (8º gap do launch real).
+
+Work Log:
+- rd-vm framework call_host_static: SYSTEM_CLOCK — uptimeMillis/elapsedRealtime/currentThreadTimeMillis → Long(clock virtual); elapsedRealtimeNanos → clock×1e6; sleep(J)V → advance_clock(ms) (avança E drena o Looper; ms<0 ignorado). Relógio = HostState.clock_ms (determinístico, mesmo contrato do postDelayed — nada de tempo de parede).
+- compat_gaps: nova entrada "android-framework-clock" (partial); java-lang-ref: próximo gap atualizado (AtomicInteger).
+- ROADMAP "M8 sondagem": SystemClock ✅ + próximo gap honesto (AtomicInteger.<init> — mesma família do AtomicReference host).
+- Teste: system_clock_host_statics (clock nasce 0; reflete advance_clock; nanos ×1e6; sleep avança; sleep negativo não retrocede).
+- Re-sondagem app real: gap resolvido; launch avança até AtomicInteger.<init>()V (registrado).
+
+Stage Summary:
+- Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → ARFU ✅ → COW+casts ✅ → LinkedHashMap ✅ → SystemClock ✅ → AtomicInteger (próximo).

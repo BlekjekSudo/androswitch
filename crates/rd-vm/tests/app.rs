@@ -783,3 +783,53 @@ fn launch_app_rejects_activity_missing_from_dex() {
     e.launch_app("LMain;", "com.exemplo.trivial", Vec::new())
         .expect("LMain; está no DEX");
 }
+
+/// M8 (compat real): SystemClock host — oitavo gap do launch do org.primftpd
+/// (`uptimeMillis`). Relógio VIRTUAL determinístico: uptimeMillis/
+/// elapsedRealtime(+Nanos)/currentThreadTimeMillis leem `HostState.clock_ms`;
+/// `sleep(J)V` o avança e drena o Looper (contrato do tempo da VM).
+#[test]
+fn system_clock_host_statics() {
+    use rd_vm::framework::{call_host_static, SYSTEM_CLOCK};
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let call = |e: &mut rd_vm::engine::Engine, name: &str, args: Vec<Value>| {
+        call_host_static(e, SYSTEM_CLOCK, name, "", &args).expect("host static")
+    };
+
+    // relógio nasce em 0 (determinístico — nada de tempo de parede)
+    assert_eq!(call(&mut e, "uptimeMillis", vec![]), Some(Value::Long(0)));
+    assert_eq!(
+        call(&mut e, "elapsedRealtime", vec![]),
+        Some(Value::Long(0))
+    );
+    assert_eq!(
+        call(&mut e, "currentThreadTimeMillis", vec![]),
+        Some(Value::Long(0))
+    );
+
+    // reflete o avanço do relógio virtual
+    e.advance_clock(1500).expect("clock");
+    assert_eq!(
+        call(&mut e, "uptimeMillis", vec![]),
+        Some(Value::Long(1500))
+    );
+    assert_eq!(
+        call(&mut e, "elapsedRealtimeNanos", vec![]),
+        Some(Value::Long(1_500_000_000))
+    );
+
+    // sleep(ms) avança o relógio virtual
+    call(&mut e, "sleep", vec![Value::Long(500)]);
+    assert_eq!(
+        call(&mut e, "uptimeMillis", vec![]),
+        Some(Value::Long(2000))
+    );
+
+    // sleep negativo → relógio não retrocede
+    call(&mut e, "sleep", vec![Value::Long(-10)]);
+    assert_eq!(
+        call(&mut e, "uptimeMillis", vec![]),
+        Some(Value::Long(2000))
+    );
+}
