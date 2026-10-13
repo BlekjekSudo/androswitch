@@ -537,3 +537,20 @@ Work Log:
 Stage Summary:
 - Workspace: 340 testes passam, 0 falham; gates todos verdes.
 - Sequência de gaps do primftpd: AtomicReference ✅ → WeakHashMap ✅ → Enum (próximo).
+
+---
+Task ID: m8-enum-host
+Agent: Arena Agent Mode (sessão autônoma 2h — iteração J)
+Task: M8 — java.lang.Enum host (3º gap do launch real do org.primftpd).
+
+Work Log:
+- INCIDENTE DE INFRAESTRUTURA (divulgação): no meio desta iteração o sandbox reiniciou — ~/.cargo (toolchain), .git e target/ foram perdidos; o worktree com os edits sobreviveu no snapshot. Recuperação sem force-push: rustup reinstalado (stable 1.99.0 + shims), repo re-clonado e .git restaurado no worktree, bits de execução dos scripts restaurados (snapshot perdeu modos 755). Nenhum trabalho mergeado foi perdido; o timer de parede (.timer_start) marca muito mais que 2h de trabalho efetivo por causa da parada.
+- rd-vm intrinsics: Enum host — <init>(String,I)V/name()/ordinal()/toString() (default = name). Estado nos campos de heap name/ordinal (padrão StringBuilder/Throwable).
+- Dispatch correto: nova API call_instance_intrinsic_mref(recv_class, mref_class, …) — o interpretador agora passa a classe DECLARANTE do method ref. Super-chamada Enum.<init> (mref = Enum, receiver = classe do app) cai no host; construtor da classe de enum do app (mref = classe do app, corpo DEX) NÃO é sequestrado; toString default só quando resolve_method não acha declaração na cadeia DEX. call_instance_intrinsic antiga delega (mref = recv_class) — chamadores/testes inalterados.
+- compat_gaps: nota atualizada (Enum host; próximo gap java.lang.ref).
+- ROADMAP "M8 sondagem": Enum ✅ + próximo gap honesto (WeakReference.<init> — re-sondagem real confirmou).
+- Teste: enum_host_intrinsics (super-chamada preenche estado; name/ordinal/toString; guarda anti-sequestro do construtor do app).
+
+Stage Summary:
+- Workspace: 341 testes passam, 0 falham; fmt/clippy(0)/links/matrix/readme_inspect verdes.
+- Sequência de gaps do primftpd: AtomicReference ✅ → WeakHashMap/coleções ✅ → Enum ✅ → java.lang.ref.WeakReference (próximo).

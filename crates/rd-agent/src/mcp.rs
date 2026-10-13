@@ -1830,7 +1830,7 @@ impl AgentSession {
                 "java-util-collections",
                 "vm",
                 "partial",
-                "HashMap/WeakHashMap/ArrayList/LinkedList host com métodos essenciais (put/get/add/remove/size/…); SEM iteradores/entrySet/keySet; equals de usuário não consultado em chaves. Próximo gap real: java.lang.Enum",
+                "HashMap/WeakHashMap/ArrayList/LinkedList host com métodos essenciais (put/get/add/remove/size/…); SEM iteradores/entrySet/keySet; equals de usuário não consultado em chaves. Enum é host (name/ordinal/toString). Próximo gap real: java.lang.ref (WeakReference)",
             ),
             (
                 "notifications",

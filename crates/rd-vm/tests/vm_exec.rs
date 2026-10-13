@@ -2706,3 +2706,60 @@ fn array_list_host_intrinsics() {
         other => panic!("esperava IndexOutOfBoundsException, got {other:?}"),
     }
 }
+
+/// M8 (compat real): Enum host — super-chamada `Enum.<init>(String,int)`
+/// (mref declarante = Enum) preenche name/ordinal; name()/ordinal() finais e
+/// toString() default devolvem o nome. Construtor da classe do app
+/// (mref = classe do app) NÃO é sequestrado — pertence ao DEX.
+#[test]
+fn enum_host_intrinsics() {
+    use rd_vm::intrinsics::call_instance_intrinsic_mref;
+    use rd_vm::value::Value;
+    const ENUM: &str = "Ljava/lang/Enum;";
+    const MY: &str = "LMyEnum;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let r = e.heap.alloc_instance(MY.to_string(), vec![]).unwrap();
+    let nm = e.heap.alloc_string("CONST_A".into()).unwrap();
+
+    // construtor da classe do app (mref = MY) não é intrínseco
+    let hijack = call_instance_intrinsic_mref(
+        &mut e,
+        MY,
+        MY,
+        "<init>",
+        "(Ljava/lang/String;I)V",
+        r,
+        &[Value::Obj(nm), Value::Int(0)],
+    )
+    .unwrap();
+    assert!(hijack.is_none(), "construtor do app pertence ao DEX");
+
+    // super-chamada (mref = Enum) preenche o estado
+    let v = call_instance_intrinsic_mref(
+        &mut e,
+        MY,
+        ENUM,
+        "<init>",
+        "(Ljava/lang/String;I)V",
+        r,
+        &[Value::Obj(nm), Value::Int(3)],
+    )
+    .unwrap();
+    assert_eq!(v, Some(Value::Null));
+    assert_eq!(
+        call_instance_intrinsic_mref(&mut e, MY, ENUM, "name", "()Ljava/lang/String;", r, &[])
+            .unwrap(),
+        Some(Value::Obj(nm))
+    );
+    assert_eq!(
+        call_instance_intrinsic_mref(&mut e, MY, ENUM, "ordinal", "()I", r, &[]).unwrap(),
+        Some(Value::Int(3))
+    );
+    assert_eq!(
+        call_instance_intrinsic_mref(&mut e, MY, ENUM, "toString", "()Ljava/lang/String;", r, &[])
+            .unwrap(),
+        Some(Value::Obj(nm))
+    );
+}
