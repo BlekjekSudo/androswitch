@@ -5410,3 +5410,72 @@ fn activity_get_fragment_manager_canonical() {
     assert_eq!(fm1, fm3);
     assert!(e.cp.is_subtype(FM, "Ljava/lang/Object;"));
 }
+
+#[test]
+fn fragment_manager_vazio_find_devolve_null() {
+    use rd_vm::framework::call_host_instance;
+    use rd_vm::value::Value;
+    const ACT: &str = "Landroid/app/Activity;";
+    const FM: &str = "Landroid/app/FragmentManager;";
+
+    let mut b = DexBuilder::new();
+    b.class("Lcom/exemplo/FindAct;", ACT);
+    let mut e = engine_of(&b);
+    let act = e
+        .heap
+        .alloc_instance("Lcom/exemplo/FindAct;".to_string(), vec![])
+        .unwrap();
+    let fm = match call_host_instance(
+        &mut e,
+        ACT,
+        "getFragmentManager",
+        "()Landroid/app/FragmentManager;",
+        act,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getFragmentManager: {other:?}"),
+    };
+
+    // FM do host ainda não tem fragments registrados ⇒ null (contrato Android).
+    let tag = Value::Obj(e.heap.alloc_string("prefs".into()).unwrap());
+    assert_eq!(
+        call_host_instance(
+            &mut e,
+            FM,
+            "findFragmentByTag",
+            "(Ljava/lang/String;)Landroid/app/Fragment;",
+            fm,
+            &[tag],
+        )
+        .unwrap(),
+        Some(Value::Null)
+    );
+    // Tag null também devolve null (FragmentManagerImpl ignora tag null).
+    assert_eq!(
+        call_host_instance(
+            &mut e,
+            FM,
+            "findFragmentByTag",
+            "(Ljava/lang/String;)Landroid/app/Fragment;",
+            fm,
+            &[Value::Null],
+        )
+        .unwrap(),
+        Some(Value::Null)
+    );
+    assert_eq!(
+        call_host_instance(
+            &mut e,
+            FM,
+            "findFragmentById",
+            "(I)Landroid/app/Fragment;",
+            fm,
+            &[Value::Int(0x7f0a0001)],
+        )
+        .unwrap(),
+        Some(Value::Null)
+    );
+}

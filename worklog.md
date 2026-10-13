@@ -1011,3 +1011,25 @@ GitHub status:
 Stage Summary:
 - Sequência: … → drainTo ✅ (#148) → getFragmentManager ✅ (esta) → findFragmentByTag (próximo, 30º — null honesto com FM vazio).
 - Fragments (M8) agora TEM embrião: após findFragmentByTag/Id (null), o caminho provável é beginTransaction → FragmentTransaction (add/replace/commit → estado mínimo de back stack) — avaliar o tamanho real na próxima sondagem antes de escopar.
+
+---
+Task ID: m8-find-fragment-null
+Agent: Arena Agent Mode (sessão 2026-10-13, início 09:30 UTC — continuação)
+Task: M8 — FragmentManager.findFragmentByTag/findFragmentById → null com FM vazio (30º gap do launch real do org.primftpd).
+
+Work Log:
+- Contexto: PR #149 (29º, getFragmentManager) aberta; sondagem dela parou em findFragmentByTag. Iteração empilhada.
+- rd-vm: arms (FRAGMENT_MANAGER, findFragmentByTag) sig (String)Fragment e (FRAGMENT_MANAGER, findFragmentById) sig (I)Fragment → Value::Null enquanto não há transações committadas (contrato Android p/ fragment não encontrado; tag null → null igual FragmentManagerImpl). findFragmentById entrou junto por ser da mesma família de "consulta a registro vazio" (evita re-sondagem redundante; documentado).
+- Teste novo fragment_manager_vazio_find_devolve_null: tag presente → null; tag null → null; findFragmentById → null.
+- Re-sondagem app real: launch atravessou os finds e parou no 31º gap NOT_FOUND: `FragmentManager.beginTransaction()Landroid/app/FragmentTransaction;` — abre FragmentTransaction + estado mínimo de fragments.
+- Catálogo compat_gaps (mcp.rs) e ROADMAP atualizados (30º ✅ / 31º re-sondado ⬜).
+
+Checks:
+- fmt — PASS. clippy -D warnings — PASS. `cargo test --workspace` — PASS (31 suites, 0 falhas; vm_exec 70 — +1 novo). MSRV 1.76 — PASS. md links — PASS. compat-report diff — PASS (vazio).
+- Probe — avança além dos finds; para no 31º gap registrado. Scan de segredos — limpo.
+
+GitHub status:
+- Branch feat/m8-find-fragment-null a ser enviada/PR; merge após CI verde.
+
+Stage Summary:
+- Sequência Fragments: getFragmentManager ✅ (#149) → find null ✅ (esta) → beginTransaction (próximo, 31º — FragmentTransaction com add/replace/commit + registro no FM).
