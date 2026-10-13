@@ -2876,3 +2876,122 @@ fn weak_soft_reference_host_intrinsics() {
     .unwrap();
     assert!(hijack.is_none(), "construtor da subclasse pertence ao DEX");
 }
+
+/// M8 (compat real): AtomicReferenceFieldUpdater host — quinto gap do launch
+/// do org.primftpd (newUpdater caía no NOT_IMPLEMENTED do catch-all Ljava/).
+/// newUpdater captura o nome do campo; get/set/getAndSet/CAS operam no alvo.
+#[test]
+fn atomic_field_updater_host_intrinsics() {
+    use rd_vm::intrinsics::{call_instance_intrinsic_mref, call_static_intrinsic};
+    use rd_vm::value::Value;
+    const ARFU: &str = "Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;";
+    const NEWSIG: &str =
+        "(Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/String;)Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let fname = e.heap.alloc_string("holder".into()).unwrap();
+    let up = call_static_intrinsic(
+        &mut e,
+        ARFU,
+        "newUpdater",
+        NEWSIG,
+        &[Value::Null, Value::Null, Value::Obj(fname)],
+    )
+    .unwrap();
+    let up = match up {
+        Some(Value::Obj(r)) => r,
+        other => panic!("updater: {other:?}"),
+    };
+
+    let target = e.heap.alloc_instance("LApp;".to_string(), vec![]).unwrap();
+    let s1 = e.heap.alloc_string("v1".into()).unwrap();
+    let s2 = e.heap.alloc_string("v2".into()).unwrap();
+    let call = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic_mref(e, ARFU, ARFU, name, sig, up, &args).expect("intrínseco")
+    };
+
+    // get com campo ainda ausente → null
+    assert_eq!(
+        call(
+            &mut e,
+            "get",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Obj(target)]
+        ),
+        Some(Value::Null)
+    );
+    // set + get
+    call(
+        &mut e,
+        "set",
+        "(Ljava/lang/Object;Ljava/lang/Object;)V",
+        vec![Value::Obj(target), Value::Obj(s1)],
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "get",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Obj(target)]
+        ),
+        Some(Value::Obj(s1))
+    );
+    // CAS errado → 0 (valor intacto); certo → 1 (troca)
+    assert_eq!(
+        call(
+            &mut e,
+            "compareAndSet",
+            "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Z",
+            vec![Value::Obj(target), Value::Obj(s2), Value::Null]
+        ),
+        Some(Value::Int(0))
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            "compareAndSet",
+            "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Z",
+            vec![Value::Obj(target), Value::Obj(s1), Value::Obj(s2)]
+        ),
+        Some(Value::Int(1))
+    );
+    // getAndSet devolve o anterior
+    assert_eq!(
+        call(
+            &mut e,
+            "getAndSet",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![Value::Obj(target), Value::Obj(s1)]
+        ),
+        Some(Value::Obj(s2))
+    );
+    // alvo null → NPE materializado (semântica Java)
+    let npe = call_instance_intrinsic_mref(
+        &mut e,
+        ARFU,
+        ARFU,
+        "get",
+        "(Ljava/lang/Object;)Ljava/lang/Object;",
+        up,
+        &[Value::Null],
+    );
+    match npe {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/NullPointerException;")
+        }
+        other => panic!("esperava NPE, got {other:?}"),
+    }
+    // fieldName null → NPE no newUpdater
+    let npe2 = call_static_intrinsic(
+        &mut e,
+        ARFU,
+        "newUpdater",
+        NEWSIG,
+        &[Value::Null, Value::Null, Value::Null],
+    );
+    assert!(
+        matches!(npe2, Err(rd_vm::err::VmExit::Exception(_))),
+        "newUpdater(null) → NPE: {npe2:?}"
+    );
+}

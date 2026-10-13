@@ -24,6 +24,11 @@ const ENUM: &str = "Ljava/lang/Enum;";
 /// <init>). Sem GC na arena ⇒ referências fracas/soft NUNCA são limpas
 /// espontaneamente; o referent vive até `clear()` — limitação documentada
 /// (mesma política do WeakHashMap host).
+/// M8: quinto gap do launch real — `newUpdater(Class,Class,String)` caía no
+/// NOT_IMPLEMENTED tipado do catch-all `Ljava/`. Updater host: captura o NOME
+/// do campo e opera via get_field/put_field (sem volatile/checks — VM
+/// single-threaded, documentado).
+const ARFU: &str = "Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;";
 const WEAK_REF: &str = "Ljava/lang/ref/WeakReference;";
 const SOFT_REF: &str = "Ljava/lang/ref/SoftReference;";
 const REF_QUEUE: &str = "Ljava/lang/ref/ReferenceQueue;";
@@ -369,6 +374,26 @@ pub fn call_static_intrinsic(
                 }
             }
         }
+        // M8: AtomicReferenceFieldUpdater.newUpdater — as classes (tclass/
+        // vclass) são IGNORADAS (sem access check; volatile não se aplica a
+        // VM single-threaded); só o nome do campo é capturado no updater.
+        (
+            ARFU,
+            "newUpdater",
+            "(Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/String;)Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;",
+        ) => {
+            let Some(_) = args[2].as_ref()? else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "newUpdater com fieldName null",
+                )));
+            };
+            let r = vm.heap.alloc_instance(ARFU.to_string(), vec![])?;
+            crate::err::put_field_result(
+                vm.heap.put_field(r, "arfu_name", args[2].clone()),
+            )?;
+            Ok(Some(Value::Obj(r)))
+        }
         _ => {
             if class.starts_with("Ljava/") || class.starts_with("Ljavax/") {
                 return Err(not_implemented(format!("intrínseco {class}->{name}{sig}")).into());
@@ -381,6 +406,86 @@ pub fn call_static_intrinsic(
 /// Intrínseco DE INSTÂNCIA (invoke-virtual/direct sobre objetos da VM).
 /// `receiver` já é Some(ref) — NPE foi tratada pelo chamador.
 /// `Ok(None)` = sem intrínseco → dispatch normal no DEX (classe do usuário).
+/// (name, sig) de AtomicReferenceFieldUpdater suportados como host (M8).
+fn arfu_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("get", "(Ljava/lang/Object;)Ljava/lang/Object;")
+            | ("set", "(Ljava/lang/Object;Ljava/lang/Object;)V")
+            | (
+                "getAndSet",
+                "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"
+            )
+            | (
+                "compareAndSet",
+                "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Z"
+            )
+            | (
+                "weakCompareAndSet",
+                "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Z"
+            )
+    )
+}
+
+/// Métodos de instância do updater (M8): operam no campo capturado por
+/// `newUpdater` (campo de heap `arfu_name`) sobre o objeto alvo. Alvo null →
+/// NPE materializado (semântica Java). CAS por identidade de referência
+/// (mesma política do AtomicReference; VM single-threaded ⇒ exato).
+fn arfu_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let name_ref = vm
+        .heap
+        .get_field(recv, "arfu_name")
+        .map_err(|_| {
+            crate::err::vm_error(
+                "VM_TYPE_ERROR",
+                "AtomicReferenceFieldUpdater sem nome de campo (use newUpdater)",
+            )
+        })?
+        .as_ref()?
+        .ok_or_else(|| {
+            VmExit::Exception(Throwable::new(
+                "Ljava/lang/NullPointerException;",
+                "updater sem fieldName",
+            ))
+        })?;
+    let field = vm.heap.as_str(name_ref)?.to_string();
+    let Some(target) = args[0].as_ref()? else {
+        return Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/NullPointerException;",
+            format!("{name} em alvo null (campo {field})"),
+        )));
+    };
+    match name {
+        "get" => Ok(Some(
+            vm.heap.get_field(target, &field).unwrap_or(Value::Null),
+        )),
+        "set" => {
+            crate::err::put_field_result(vm.heap.put_field(target, &field, args[1].clone()))?;
+            Ok(Some(Value::Null))
+        }
+        "getAndSet" => {
+            let old = vm.heap.get_field(target, &field).unwrap_or(Value::Null);
+            crate::err::put_field_result(vm.heap.put_field(target, &field, args[1].clone()))?;
+            Ok(Some(old))
+        }
+        "compareAndSet" | "weakCompareAndSet" => {
+            let cur = vm.heap.get_field(target, &field).unwrap_or(Value::Null);
+            if ref_identity_eq(&cur, &args[1]) {
+                crate::err::put_field_result(vm.heap.put_field(target, &field, args[2].clone()))?;
+                Ok(Some(Value::Int(1)))
+            } else {
+                Ok(Some(Value::Int(0)))
+            }
+        }
+        _ => Ok(None),
+    }
+}
+
 /// `<init>` de WeakReference/SoftReference (M8): referent no campo de heap
 /// "referent". A variante com ReferenceQueue IGNORA a fila — sem GC na arena
 /// nada é enfileirado (documentado).
@@ -866,6 +971,13 @@ pub fn call_instance_intrinsic_mref(
                 ) =>
         {
             Ok(Some(Value::Null))
+        }
+
+        // ── AtomicReferenceFieldUpdater (M8) ───────────────────────────────
+        // Instância criada por newUpdater (classe concreta = ARFU); métodos
+        // operam no campo capturado do objeto alvo.
+        (c, name, sig) if (c == ARFU || mref_class == ARFU) && arfu_supported(name, sig) => {
+            arfu_intrinsic(vm, recv, name, args)
         }
 
         // ── AtomicReference (M8) ────────────────────────────────────────────
