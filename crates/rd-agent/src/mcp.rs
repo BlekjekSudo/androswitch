@@ -1836,7 +1836,7 @@ impl AgentSession {
                 "java-lang-ref",
                 "vm",
                 "partial",
-                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). Próximo gap real: AtomicInteger e iteradores de coleção",
+                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). AtomicInteger é host (get/set/CAS/increment/add com overflow wrapping). Próximo gap real: Executors/ExecutorService (thread pools) e iteradores de coleção",
             ),
             (
                 "android-framework-clock",
