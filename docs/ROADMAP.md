@@ -526,7 +526,12 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   back stack/animations/lifecycle DEX no host — documentado). A partir daí
   `findFragmentByTag`/`findFragmentById` consultam o registro (a última
   registrada vence; `containerViewId` 0 = sem container, nunca casa).
-- ⬜ **Próximo gap (re-sondado)**: `Fragment.<init>()V` no `org.primftpd` 8.2 —
-  o app agora **instancia a própria classe de fragment** (ctor do super).
-  Lifecycle DEX de fragments (onCreate/onCreateView/onAttach), back stack e
-  descoberta SPI real continuam fora do escopo.
+- ✅ **`Fragment.<init>()V` host (entregue nesta rodada)**: trigésimo segundo
+  gap. A classe de fragment do app chama o ctor do super via `invokespecial`;
+  o host não tem estado de construção, então é no-op — mesmo padrão de
+  `Activity`/`Application`/`Context`. `Fragment <: Object` na hierarquia.
+- ⬜ **Próximo gap (re-sondado)**: `FragmentManager.executePendingTransactions()`
+  no `org.primftpd` 8.2 — no host o `commit` já aplica **sincronamente**; não
+  existe fila pendente, logo a resposta honesta é `false` (semântica AOSP:
+  "nothing was executed"). Lifecycle DEX de fragments, back stack e descoberta
+  SPI real continuam fora do escopo.
