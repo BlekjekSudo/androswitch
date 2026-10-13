@@ -554,3 +554,23 @@ Work Log:
 Stage Summary:
 - Workspace: 341 testes passam, 0 falham; fmt/clippy(0)/links/matrix/readme_inspect verdes.
 - Sequência de gaps do primftpd: AtomicReference ✅ → WeakHashMap/coleções ✅ → Enum ✅ → java.lang.ref.WeakReference (próximo).
+
+---
+Task ID: m8-java-lang-ref
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração K)
+Task: M8 — família java.lang.ref host (4º gap do launch real do org.primftpd).
+
+Work Log:
+- Sessão nova: timer reiniciado (epoch 1791863243); baseline 341/0, zero issues/PRs, main local = remoto (ea1f7be).
+- rd-vm intrinsics: WeakReference/SoftReference host — <init>()V/(Object)V/(Object,ReferenceQueue)V (fila ignorada), get/clear com estado no campo de heap "referent". ReferenceQueue: <init>/poll/remove/remove(J) → null (sem GC a fila está permanentemente vazia; remove() bloqueante da JVM vira null honesto).
+- Dispatch: <init> só quando o method ref DECLARA a classe (super-chamada de subclasse cai no host; construtor da subclasse do app segue para o DEX — mesma disciplina do Enum via call_instance_intrinsic_mref); get/clear só sem declaração na cadeia DEX (override de usuário vence).
+- Semântica honesta: arena sem GC ⇒ referent vive até clear() (documentado, mesma política do WeakHashMap).
+- compat_gaps: nota de java-util-collections atualizada + nova entrada java-lang-ref (partial).
+- ROADMAP "M8 sondagem": java.lang.ref ✅ + próximo gap honesto (AtomicReferenceFieldUpdater.newUpdater, NOT_IMPLEMENTED tipado; exige reflexão de campo por nome).
+- Teste: weak_soft_reference_host_intrinsics (init/get/clear; SoftReference vazio; variante com fila; ReferenceQueue poll → null; super-chamada de subclasse capturada; construtor da subclasse NÃO sequestrado).
+- Re-sondagem app real: gap do WeakReference resolvido; launch avança até EIIE em AtomicReferenceFieldUpdater.newUpdater (registrado).
+
+Stage Summary:
+- Workspace: 342 testes passam, 0 falham; fmt/clippy(0)/links/matrix/readme_inspect verdes.
+- Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → AtomicReferenceFieldUpdater.newUpdater (próximo).
+- Próxima iteração: newUpdater host (updater que opera get_field/put_field pelo nome capturado) OU Object[].clone()/iteradores.
