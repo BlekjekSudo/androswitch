@@ -856,7 +856,7 @@ Work Log:
 Checks:
 - `cargo fmt --all -- --check` — PASS.
 - `cargo clippy --workspace --all-targets -- -D warnings` — PASS.
-- `cargo test --workspace` — PASS (360 testes; 0 falhas).
+- `cargo test --workspace` — PASS (0 falhas).
 - `rustup run 1.76.0 cargo check --workspace` — PASS.
 - `python3 scripts/check_md_links.py` — PASS (10 links / 12 arquivos).
 - `cargo xtask compat-report /tmp/compat-matrix.generated.md` + `diff` — PASS.
