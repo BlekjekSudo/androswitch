@@ -471,6 +471,14 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   ainda não varre `META-INF/services` do APK, portanto não inventa providers:
   `hasNext()` é falso e `next()` materializa `NoSuchElementException`. `service`
   null preserva `NullPointerException`; `ClassLoader` null (bootstrap) é aceito.
-- ⬜ **Próximo gap (re-sondado)**: `java.util.LinkedHashSet.<init>()V` no
-  `org.primftpd` 8.2. Descoberta SPI real fica fora do escopo até o runtime ter
-  leitura e instanciação segura de `META-INF/services`.
+- ✅ **`java.util.LinkedHashSet` host (entregue nesta rodada)**: vigésimo
+  quinto gap. `<init>()`, `add`/`remove`/`contains`/`size`/`isEmpty`/`clear` e
+  `iterator()` reutilizam o Set host; o `Vec` preserva a ordem de inserção e
+  remover+re-adicionar desloca o elemento para o fim. A hierarquia real
+  `LinkedHashSet → HashSet → AbstractSet` e interfaces Set/Collection/Iterable
+  são conhecidas pelo classpath. Construtores com capacity/Collection seguem
+  fora até uma sondagem exigir.
+- ⬜ **Próximo gap (re-sondado)**: `ClassLoader.getResources(String)` no
+  `org.primftpd` 8.2. Ele exige lookup de recursos e `Enumeration`; descoberta
+  SPI real continua fora do escopo até o runtime ler e instanciar com segurança
+  `META-INF/services`.

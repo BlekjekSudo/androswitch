@@ -605,6 +605,14 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/util/AbstractCollection;",
             "Ljava/lang/Object;",
         ]),
+        // M8: LinkedHashSet mantém a cadeia real de HashSet e, no host,
+        // preserva ordem de inserção no Vec usado pelo Set.
+        "Ljava/util/LinkedHashSet;" => Some(vec![
+            "Ljava/util/HashSet;",
+            "Ljava/util/AbstractSet;",
+            "Ljava/util/AbstractCollection;",
+            "Ljava/lang/Object;",
+        ]),
         "Ljava/util/ArrayDeque;" => {
             Some(vec!["Ljava/util/AbstractCollection;", "Ljava/lang/Object;"])
         }
@@ -710,13 +718,15 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",
         ]),
-        "Ljava/util/AbstractSet;" | "Ljava/util/HashSet;" => Some(vec![
-            "Ljava/util/Set;",
-            "Ljava/util/Collection;",
-            "Ljava/lang/Iterable;",
-            "Ljava/lang/Cloneable;",
-            "Ljava/io/Serializable;",
-        ]),
+        "Ljava/util/AbstractSet;" | "Ljava/util/HashSet;" | "Ljava/util/LinkedHashSet;" => {
+            Some(vec![
+                "Ljava/util/Set;",
+                "Ljava/util/Collection;",
+                "Ljava/lang/Iterable;",
+                "Ljava/lang/Cloneable;",
+                "Ljava/io/Serializable;",
+            ])
+        }
         "Ljava/util/ArrayList;" => Some(vec![
             "Ljava/util/List;",
             "Ljava/util/Collection;",
