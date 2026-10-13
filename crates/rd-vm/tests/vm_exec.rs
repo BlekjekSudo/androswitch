@@ -3477,3 +3477,124 @@ fn executors_host_inline_execution() {
     // subtipagem: ExecutorService <: Executor
     assert!(e.cp.is_subtype(SVC, "Ljava/util/concurrent/Executor;"));
 }
+
+/// M8 (compat real): Enum.compareTo + herança de métodos do Enum host por
+/// enums do APP — 12º gap do launch do org.primftpd
+/// (`Lifecycle$State.compareTo(Ljava/lang/Enum;)I`): o method ref declara a
+/// SUBCLASSE DEX, Enum não tem DEX ⇒ resolução falhava. Fallback por
+/// subtipagem (recv <: Enum, sem declaração DEX) + compareTo por ordinais.
+#[test]
+fn enum_inherited_methods_and_compareto() {
+    use rd_vm::intrinsics::call_instance_intrinsic_mref;
+    use rd_vm::value::Value;
+    const ENUM: &str = "Ljava/lang/Enum;";
+    const MY: &str = "LMyEnum;";
+
+    let mut b = DexBuilder::new();
+    b.class(MY, ENUM);
+    b.class("LNotEnum;", "Ljava/lang/Object;");
+    let mut e = engine_of(&b);
+
+    // duas constantes do enum "app": A(ordinal 0), B(ordinal 1)
+    let mk = |e: &mut Engine, name: &str, ord: i32| {
+        let r = e.heap.alloc_instance(MY.to_string(), vec![]).unwrap();
+        let s = e.heap.alloc_string(name.into()).unwrap();
+        call_instance_intrinsic_mref(
+            e,
+            MY,
+            ENUM,
+            "<init>",
+            "(Ljava/lang/String;I)V",
+            r,
+            &[Value::Obj(s), Value::Int(ord)],
+        )
+        .expect("enum <init>");
+        r
+    };
+    let a = mk(&mut e, "A", 0);
+    let bb = mk(&mut e, "B", 1);
+
+    // chamada herdada: mref DECLARA a subclasse (caso real do androidx)
+    let call = |e: &mut Engine, r: rd_vm::heap::ObjRef, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic_mref(e, MY, MY, name, sig, r, &args)
+            .expect("intrínseco")
+            .unwrap_or(Value::Null)
+    };
+    assert_eq!(
+        call(
+            &mut e,
+            a,
+            "compareTo",
+            "(Ljava/lang/Enum;)I",
+            vec![Value::Obj(bb)]
+        ),
+        Value::Int(-1)
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            bb,
+            "compareTo",
+            "(Ljava/lang/Enum;)I",
+            vec![Value::Obj(a)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            a,
+            "compareTo",
+            "(Ljava/lang/Enum;)I",
+            vec![Value::Obj(a)]
+        ),
+        Value::Int(0)
+    );
+    let nm = call_instance_intrinsic_mref(&mut e, MY, MY, "name", "()Ljava/lang/String;", a, &[])
+        .unwrap();
+    match nm {
+        Some(Value::Obj(r)) => assert_eq!(e.heap.as_str(r).unwrap(), "A"),
+        other => panic!("name herdado: {other:?}"),
+    }
+    assert_eq!(call(&mut e, a, "ordinal", "()I", vec![]), Value::Int(0));
+    let ts =
+        call_instance_intrinsic_mref(&mut e, MY, MY, "toString", "()Ljava/lang/String;", bb, &[])
+            .unwrap();
+    match ts {
+        Some(Value::Obj(r)) => assert_eq!(e.heap.as_str(r).unwrap(), "B"),
+        other => panic!("toString herdado: {other:?}"),
+    }
+
+    // compareTo(null) → NPE materializado
+    match call_instance_intrinsic_mref(
+        &mut e,
+        MY,
+        MY,
+        "compareTo",
+        "(Ljava/lang/Enum;)I",
+        a,
+        &[Value::Null],
+    ) {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/NullPointerException;")
+        }
+        other => panic!("esperava NPE, got {other:?}"),
+    }
+
+    // NÃO sequestra classes que não são enum
+    let ne = e
+        .heap
+        .alloc_instance("LNotEnum;".to_string(), vec![])
+        .unwrap();
+    assert!(call_instance_intrinsic_mref(
+        &mut e,
+        "LNotEnum;",
+        "LNotEnum;",
+        "compareTo",
+        "(Ljava/lang/Enum;)I",
+        ne,
+        &[Value::Obj(a)]
+    )
+    .expect("sem erro")
+    .is_none());
+}

@@ -380,8 +380,16 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   `Thread.sleep(J)V`/`(JI)V` avançam o relógio virtual (≡ SystemClock.sleep;
   ms<0 ignorado), `yield()` é no-op. Hierarquia: `Thread <: Object` +
   implements `Runnable`. `start()`/`interrupt()` seguem fora (não sondados).
+- ✅ **`Enum.compareTo` + herança por enums do app (entregue nesta rodada)**:
+  décimo segundo gap (`Lifecycle$State.compareTo(Ljava/lang/Enum;)I` — enum
+  do APP/DEX herda métodos do `Enum` host, que não tem DEX ⇒ resolução
+  falhava quando o method ref declara a SUBCLASSE). Fallback por subtipagem:
+  `recv <: Enum` e ninguém na cadeia DEX declara `(name,sig)` → intrínseco
+  host (`name`/`ordinal`/`toString`/`compareTo`); override de usuário vence
+  (resolve `Some`). `compareTo` = diferença de ordinais com `wrapping_sub`
+  (comportamento documentado da JDK); `compareTo(null)` → NPE materializado.
 - ⬜ **Próximo gap (achado honesto)**:
-  `androidx.lifecycle.Lifecycle$State.compareTo(Ljava/lang/Enum;)I` — enum
-  do APP (DEX) herda `compareTo` do `Enum` host, que não tem DEX ⇒ resolução
-  falha. Correção: fallback de subtipagem (recv <: Enum sem declaração DEX →
-  intrínseco) + implementar `compareTo` (diferença de ordinais).
+  `LinkedHashMap.entrySet()Ljava/util/Set;` — família de ITERADORES
+  (entrySet/keySet/values + Iterator/for-each), prevista desde a iteração I;
+  exige Set/Map view host sobre o estado existente + `iterator()` com
+  `hasNext`/`next`.

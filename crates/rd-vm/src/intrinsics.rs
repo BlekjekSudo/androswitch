@@ -812,6 +812,29 @@ fn enum_intrinsic(
             let v = vm.heap.get_field(recv, "ordinal").unwrap_or(Value::Int(0));
             Ok(Some(Value::Int(v.as_int().unwrap_or(0))))
         }
+        "compareTo" => {
+            // Java (Enum.compareTo): this.ordinal - other.ordinal — subtração
+            // simples, overflow inclusive (comportamento documentado na JDK).
+            let a = vm
+                .heap
+                .get_field(recv, "ordinal")
+                .unwrap_or(Value::Int(0))
+                .as_int()
+                .unwrap_or(0);
+            let Some(other) = args[0].as_ref()? else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "Enum.compareTo(null)",
+                )));
+            };
+            let b = vm
+                .heap
+                .get_field(other, "ordinal")
+                .unwrap_or(Value::Int(0))
+                .as_int()
+                .unwrap_or(0);
+            Ok(Some(Value::Int(a.wrapping_sub(b))))
+        }
         _ => Ok(None),
     }
 }
@@ -1250,6 +1273,7 @@ pub fn call_instance_intrinsic_mref(
                     ("<init>", "(Ljava/lang/String;I)V")
                         | ("name", "()Ljava/lang/String;")
                         | ("ordinal", "()I")
+                        | ("compareTo", "(Ljava/lang/Enum;)I")
                 ) =>
         {
             enum_intrinsic(vm, recv, name, args)
@@ -1262,6 +1286,25 @@ pub fn call_instance_intrinsic_mref(
                     .is_none() =>
         {
             enum_intrinsic(vm, recv, "toString", args)
+        }
+        // M8 (12º gap real): enums do APP herdam os métodos do Enum host —
+        // Enum não tem DEX, então a resolução falha quando o method ref
+        // declara a SUBCLASSE (ex.: Lifecycle$State.compareTo). Fallback:
+        // recv <: Enum e ninguém na cadeia DEX declara (name,sig) → host.
+        // Override de usuário (toString próprio etc.) vence — resolve Some.
+        (_, name, sig)
+            if mref_class != ENUM
+                && matches!(
+                    (name, sig),
+                    ("name", "()Ljava/lang/String;")
+                        | ("ordinal", "()I")
+                        | ("toString", "()Ljava/lang/String;")
+                        | ("compareTo", "(Ljava/lang/Enum;)I")
+                )
+                && vm.cp.is_subtype(recv_class, ENUM)
+                && vm.cp.resolve_method(recv_class, name, sig).is_none() =>
+        {
+            enum_intrinsic(vm, recv, name, args)
         }
 
         // ── java.lang.ref (M8) ──────────────────────────────────────────────
