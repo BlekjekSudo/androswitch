@@ -4591,7 +4591,7 @@ fn system_get_property_host() {
             SYS,
             "getProperty",
             "(Ljava/lang/String;)Ljava/lang/String;",
-            &[k_none.clone()]
+            std::slice::from_ref(&k_none)
         )
         .unwrap(),
         Some(Value::Null)
