@@ -457,7 +457,11 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   file.encoding=UTF-8, http.agent…); chave desconhecida → **null**
   (semântica JDK); variante `(key, def)` devolve **def**; key null → NPE
   materializado. `getProperties()` (Properties completo) fora — não sondado.
+- ✅ **`Class.getClassLoader` host (entregue nesta rodada)**: vigésimo
+  segundo gap. ClassLoader **canônico por VM** (lazy, identidade estável —
+  qualquer classe devolve o mesmo objeto; runtime single-classloader, a
+  distinção bootstrap=null do Java não se aplica). `ClassLoader <: Object`.
+  `loadClass` fora (não sondado).
 - ⬜ **Próximo gap (achado honesto)**:
-  `java.lang.Class.getClassLoader()Ljava/lang/ClassLoader;` — extensão do
-  Class host (iteration W); ClassLoader host mínimo (loadClass provavelmente
-  na sequência).
+  `java.lang.System.getSecurityManager()` — Android não tem SecurityManager
+  (deprecated na JDK): devolver **null** é a semântica correta.

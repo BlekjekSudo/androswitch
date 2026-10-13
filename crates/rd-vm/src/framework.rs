@@ -176,6 +176,9 @@ pub struct HostState {
     /// M8: objetos `Class` canônicos por descritor (getClass devolve sempre a
     /// mesma referência para a mesma classe — identidade como na JVM).
     class_objs: HashMap<String, ObjRef>,
+    /// M8: ClassLoader canônico (um por VM — single-classloader; a distinção
+    /// bootstrap=null do Java não se aplica ao runtime host).
+    class_loader: Option<ObjRef>,
     /// activity em execução (o app trivial M3 tem uma por vez)
     pub current_activity: Option<ObjRef>,
     /// package do app (preenchido no launch_app; getPackageName)
@@ -409,6 +412,28 @@ impl Engine {
         })?;
         crate::err::put_field_result(self.heap.put_field(r, "class_name", Value::Obj(name)))?;
         self.fw.class_objs.insert(desc.to_string(), r);
+        Ok(r)
+    }
+
+    /// M8: ClassLoader canônico da VM (lazy; identidade estável —
+    /// `getClassLoader()` de qualquer classe devolve o mesmo objeto).
+    pub(crate) fn class_loader_obj(&mut self) -> Result<ObjRef, VmExit> {
+        if let Some(l) = self.fw.class_loader {
+            return Ok(l);
+        }
+        let r = self
+            .heap
+            .alloc_instance("Ljava/lang/ClassLoader;".to_string(), Vec::new())
+            .map_err(|e| {
+                VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/OutOfMemoryError;",
+                    format!(
+                        "alocação de {} bytes excede o heap de {} bytes",
+                        e.requested, e.budget
+                    ),
+                ))
+            })?;
+        self.fw.class_loader = Some(r);
         Ok(r)
     }
 
