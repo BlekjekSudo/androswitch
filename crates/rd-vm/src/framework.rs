@@ -173,6 +173,9 @@ pub struct HostState {
     main_looper: Option<ObjRef>,
     /// M8: thread "main" sintética (VM single-threaded — ver `THREAD`)
     main_thread: Option<ObjRef>,
+    /// M8: objetos `Class` canônicos por descritor (getClass devolve sempre a
+    /// mesma referência para a mesma classe — identidade como na JVM).
+    class_objs: HashMap<String, ObjRef>,
     /// activity em execução (o app trivial M3 tem uma por vez)
     pub current_activity: Option<ObjRef>,
     /// package do app (preenchido no launch_app; getPackageName)
@@ -373,6 +376,39 @@ impl Engine {
                 ))
             })?;
         self.fw.main_thread = Some(r);
+        Ok(r)
+    }
+
+    /// M8: objeto `Class` canônico do descritor (lazy; identidade estável —
+    /// `a.getClass() == a.getClass()`). Campo de heap "class_name" guarda o
+    /// DESCRITOR (ex.: "Lcom/x/Y;"); os métodos de Class o convertem.
+    pub(crate) fn class_object_for(&mut self, desc: &str) -> Result<ObjRef, VmExit> {
+        if let Some(c) = self.fw.class_objs.get(desc) {
+            return Ok(*c);
+        }
+        let r = self
+            .heap
+            .alloc_instance(CLASS.to_string(), Vec::new())
+            .map_err(|e| {
+                VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/OutOfMemoryError;",
+                    format!(
+                        "alocação de {} bytes excede o heap de {} bytes",
+                        e.requested, e.budget
+                    ),
+                ))
+            })?;
+        let name = self.heap.alloc_string(desc.to_string()).map_err(|e| {
+            VmExit::Exception(crate::err::Throwable::new(
+                "Ljava/lang/OutOfMemoryError;",
+                format!(
+                    "alocação de {} bytes excede o heap de {} bytes",
+                    e.requested, e.budget
+                ),
+            ))
+        })?;
+        crate::err::put_field_result(self.heap.put_field(r, "class_name", Value::Obj(name)))?;
+        self.fw.class_objs.insert(desc.to_string(), r);
         Ok(r)
     }
 

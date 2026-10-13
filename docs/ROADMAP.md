@@ -419,7 +419,14 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   get/remove/pop → `NoSuchElementException`; poll/peek → null. Hierarquia:
   `ArrayDeque <: AbstractCollection` + `Deque`/`Queue`/`Collection`/
   `Iterable`.
+- ✅ **`Object.getClass` + `Class` host (entregue nesta rodada)**: décimo
+  sexto gap (`MainTabsActivity.getClass()`). `getClass` é **final** ⇒
+  captura irrestrita é correta; devolve o objeto `Class` **canônico** por
+  descritor (lazy, identidade estável — `a.getClass() == a.getClass()`).
+  Estado: campo de heap `class_name` (descritor). Métodos: `getName`
+  (descritor → binário: `Lcom/x/Y;` → `com.x.Y`; arrays mantêm `[I`),
+  `getSimpleName` (descarta pacote e classe externa: `La/b/C$D;` → `D`),
+  `toString` (`class <nome>`); guarda defensiva: só sem declaração DEX.
 - ⬜ **Próximo gap (achado honesto)**:
-  `MainTabsActivity.getClass()Ljava/lang/Class;` — `Object.getClass()` (final)
-  não resolvia para classes sem DEX de Object; exige objeto `Class` host
-  (nome da classe + métodos básicos como `getName`).
+  `java.util.concurrent.ConcurrentHashMap.<init>()V` — reuso direto da
+  guarda de Map host (single-threaded ⇒ sem segmentação/concorrência).

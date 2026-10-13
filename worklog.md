@@ -739,3 +739,18 @@ Work Log:
 
 Stage Summary:
 - Sequência de gaps do primftpd: … → Collections.synchronized* ✅ → ArrayDeque ✅ → getClass (próximo).
+
+---
+Task ID: m8-getclass
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração W)
+Task: M8 — Object.getClass + Class host (16º gap do launch real do org.primftpd).
+
+Work Log:
+- framework: HostState.class_objs (mapa descritor → ObjRef) + class_object_for() pub(crate) — objeto Class CANÔNICO por classe (identidade estável, como na JVM); campo heap "class_name" com o descritor.
+- intrinsics: arm wildcard (_, "getClass", "()Ljava/lang/Class;") — final ⇒ captura irrestrita correta; métodos de Class host (getName descritor→binário, getSimpleName descarta pacote+externa, toString "class X") com guarda defensiva resolve_method none (anti-shadowing). Helper descriptor_to_class_name.
+- classpath: Class <: Object.
+- Teste: get_class_and_class_host (classe do Class obj; identidade na 2ª chamada; getName/getSimpleName/toString; aninhada La/b/C$D; → a.b.C$D / D; subtipagem).
+- Re-sondagem app real: gap resolvido; launch avança até ConcurrentHashMap.<init>()V (EIIE-wrapped; registrado — reuso da guarda de Map).
+
+Stage Summary:
+- Sequência de gaps do primftpd: … → ArrayDeque ✅ → getClass/Class ✅ → ConcurrentHashMap (próximo).
