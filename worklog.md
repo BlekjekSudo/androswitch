@@ -797,3 +797,17 @@ Work Log:
 Stage Summary:
 - Sequência de gaps do primftpd: … → LinkedBlockingQueue ✅ → ThreadLocal(+Inheritable) ✅ → System.getProperty (próximo).
 - 20 gaps do app real fechados/registrados na sessão 2 (K–Z: 10 merges).
+
+---
+Task ID: m8-system-properties
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração AA)
+Task: M8 — System.getProperty host (21º gap do launch real do org.primftpd).
+
+Work Log:
+- rd-vm intrinsics: statics System.getProperty(String) e (String,String) — tabela de propriedades coerente com a VM (os.name=Linux, os.arch=arm64-v8a, os.version, line.separator=LF REAL, file.separator=/, path.separator=:, java.io.tmpdir=/tmp, user.dir//language/region/timezone, java.vendor/version/specification/vm/runtime/class.path/library.path/home, file.encoding=UTF-8, http.agent). Desconhecida → null (JDK); (key,def) → def; key null → NPE. user.home/user.name REMOVIDOS da tabela (Android não define → null honesto).
+- BUG de design pego no teste: primeira versão devolvia Ok(None) para chave desconhecida = "sem intrínseco" → fall-through NOT_FOUND (errado); reestruturado para Some(Null)/def nos arms.
+- Teste: system_get_property_host (os.name=Linux; line.separator=LF real; desconhecida→null; (key,def)→def; NPE).
+- Re-sondagem app real: gap resolvido; launch avança até Class.getClassLoader() (registrado — extensão do Class host).
+
+Stage Summary:
+- Sequência de gaps do primftpd: … → ThreadLocal(+Inheritable) ✅ → System.getProperty ✅ → Class.getClassLoader (próximo).
