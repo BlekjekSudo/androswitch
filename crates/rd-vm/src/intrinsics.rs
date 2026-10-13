@@ -36,6 +36,12 @@ const HASH_MAP: &str = "Ljava/util/HashMap;";
 const WEAK_MAP: &str = "Ljava/util/WeakHashMap;";
 const ARRAY_LIST: &str = "Ljava/util/ArrayList;";
 const LINKED_LIST: &str = "Ljava/util/LinkedList;";
+/// M8: coleções concorrentes — sexto gap do launch real
+/// (`CopyOnWriteArraySet.<init>`). VM single-threaded ⇒ cópia-em-escrita é
+/// irrelevante: ArraySet vira Set host (add deduplica) e ArrayList segue o
+/// estado List comum.
+const COW_SET: &str = "Ljava/util/concurrent/CopyOnWriteArraySet;";
+const COW_LIST: &str = "Ljava/util/concurrent/CopyOnWriteArrayList;";
 const BOOLEAN: &str = "Ljava/lang/Boolean;";
 const DOUBLE: &str = "Ljava/lang/Double;";
 const FLOAT: &str = "Ljava/lang/Float;";
@@ -674,6 +680,76 @@ fn find_elem(
     Ok(None)
 }
 
+/// (name, sig) de Set host suportados (M8, CopyOnWriteArraySet).
+fn set_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("<init>", "()V")
+            | ("add", "(Ljava/lang/Object;)Z")
+            | ("remove", "(Ljava/lang/Object;)Z")
+            | ("contains", "(Ljava/lang/Object;)Z")
+            | ("size", "()I")
+            | ("isEmpty", "()Z")
+            | ("clear", "()V")
+    )
+}
+
+/// CopyOnWriteArraySet host (M8): reusa `HostObj::List` com add deduplicado.
+fn set_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    _sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    use crate::framework::HostObj;
+    if name == "<init>" {
+        vm.fw
+            .objects
+            .insert(recv, HostObj::List { elems: Vec::new() });
+        return Ok(Some(Value::Null));
+    }
+    if !matches!(vm.fw.objects.get(&recv), Some(HostObj::List { .. })) {
+        vm.fw
+            .objects
+            .insert(recv, HostObj::List { elems: Vec::new() });
+    }
+    match name {
+        "add" => {
+            // Set: já presente → false (não duplica)
+            if find_elem(vm, recv, &args[0])?.is_some() {
+                return Ok(Some(Value::Int(0)));
+            }
+            list_elems(vm, recv)?.push(args[0].clone());
+            Ok(Some(Value::Int(1)))
+        }
+        "remove" => {
+            let idx = find_elem(vm, recv, &args[0])?;
+            if let Some(i) = idx {
+                list_elems(vm, recv)?.remove(i);
+            }
+            Ok(Some(Value::Int(idx.is_some() as i32)))
+        }
+        "contains" => {
+            let found = find_elem(vm, recv, &args[0])?.is_some();
+            Ok(Some(Value::Int(found as i32)))
+        }
+        "size" => {
+            let n = list_elems(vm, recv)?.len();
+            Ok(Some(Value::Int(n as i32)))
+        }
+        "isEmpty" => {
+            let empty = list_elems(vm, recv)?.is_empty();
+            Ok(Some(Value::Int(empty as i32)))
+        }
+        "clear" => {
+            list_elems(vm, recv)?.clear();
+            Ok(Some(Value::Null))
+        }
+        _ => Ok(None),
+    }
+}
+
 fn iobe(msg: String) -> VmExit {
     VmExit::Exception(Throwable::new("Ljava/lang/IndexOutOfBoundsException;", msg))
 }
@@ -1032,8 +1108,17 @@ pub fn call_instance_intrinsic_mref(
         (c, name, sig) if (c == HASH_MAP || c == WEAK_MAP) && map_supported(name, sig) => {
             map_intrinsic(vm, recv, name, sig, args)
         }
-        (c, name, sig) if (c == ARRAY_LIST || c == LINKED_LIST) && list_supported(name, sig) => {
+        (c, name, sig)
+            if (c == ARRAY_LIST || c == LINKED_LIST || c == COW_LIST)
+                && list_supported(name, sig) =>
+        {
             list_intrinsic(vm, recv, name, sig, args)
+        }
+        // CopyOnWriteArraySet (M8): Set host — mesmo estado List, mas o add
+        // DEDUPLICA por igualdade Java (values_equal) e devolve false se já
+        // presente. Iteradores seguem fora (compat_gaps).
+        (c, name, sig) if c == COW_SET && set_supported(name, sig) => {
+            set_intrinsic(vm, recv, name, sig, args)
         }
 
         (SB, "<init>", "()V") => {

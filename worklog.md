@@ -592,3 +592,18 @@ Work Log:
 Stage Summary:
 - Workspace: 343 testes passam, 0 falham; fmt/clippy(0)/links/matrix/readme_inspect verdes.
 - Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → ARFU ✅ → CopyOnWriteArraySet (próximo).
+
+---
+Task ID: m8-cow-collections
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração M)
+Task: M8 — coleções java.util.concurrent host (6º gap) + bug de subtipagem das classes host.
+
+Work Log:
+- rd-vm intrinsics: CopyOnWriteArraySet host — mesmo estado HostObj::List, mas add DEDUPLICA por igualdade Java (find_elem/values_equal) e devolve false se presente; remove/contains/size/isEmpty/clear; <init>. CopyOnWriteArrayList entra na guarda do arm de List (≡ ArrayList; single-threaded ⇒ cópia-em-escrita irrelevante).
+- BUG REAL corrigido (descoberto pela re-sondagem): check-cast COWSet → java/util/Set estourava ClassCastException — builtin_hierarchy/builtin_interfaces do is_subtype não conheciam as classes host do M8. Adicionadas cadeias completas (Abstract{Collection,List,SequentialList,Map}, HashMap/WeakHashMap, ArrayList/LinkedList, COW*, AtomicReference(+ARFU), Enum, Reference/Weak/Soft/ReferenceQueue) e closures de interface (List/Set→Collection→Iterable, Map, Deque/Queue, RandomAccess, Cloneable, Serializable, Comparable).
+- Testes: cow_collections_host_intrinsics (dedupe do Set vs duplicatas da List, contains/remove/size/clear, indexOf) + host_collections_subtype_their_interfaces (unit no classpath: positivos e negativos).
+- Re-sondagem app real: COWSet+CCE resolvidos; launch avança até LinkedHashMap.<init>()V (registrado como próximo gap).
+
+Stage Summary:
+- Workspace: 345 testes passam, 0 falham; fmt/clippy(0)/links/matrix verdes.
+- Sequência de gaps do primftpd: AtomicReference ✅ → coleções ✅ → Enum ✅ → java.lang.ref ✅ → ARFU ✅ → COW+casts ✅ → LinkedHashMap (próximo).

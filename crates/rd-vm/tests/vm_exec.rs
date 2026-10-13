@@ -2995,3 +2995,99 @@ fn atomic_field_updater_host_intrinsics() {
         "newUpdater(null) → NPE: {npe2:?}"
     );
 }
+
+/// M8 (compat real): coleções concorrentes host — sexto gap do launch do
+/// org.primftpd (`CopyOnWriteArraySet.<init>`). VM single-threaded ⇒
+/// cópia-em-escrita irrelevante: Set deduplica no add; COWArrayList ≡ ArrayList.
+#[test]
+fn cow_collections_host_intrinsics() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const CS: &str = "Ljava/util/concurrent/CopyOnWriteArraySet;";
+    const CL: &str = "Ljava/util/concurrent/CopyOnWriteArrayList;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+
+    // ── CopyOnWriteArraySet: add deduplica por igualdade Java ──
+    let st = e.heap.alloc_instance(CS.to_string(), vec![]).unwrap();
+    let call_s = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic(e, CS, name, sig, st, &args).expect("intrínseco")
+    };
+    call_s(&mut e, "<init>", "()V", vec![]);
+    assert_eq!(
+        call_s(&mut e, "isEmpty", "()Z", vec![]),
+        Some(Value::Int(1))
+    );
+    let s1 = e.heap.alloc_string("x".into()).unwrap();
+    let s1b = e.heap.alloc_string("x".into()).unwrap(); // mesmo conteúdo
+    assert_eq!(
+        call_s(&mut e, "add", "(Ljava/lang/Object;)Z", vec![Value::Obj(s1)]),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call_s(
+            &mut e,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Obj(s1b)]
+        ),
+        Some(Value::Int(0)),
+        "Set não duplica: add de elemento igual → false"
+    );
+    assert_eq!(call_s(&mut e, "size", "()I", vec![]), Some(Value::Int(1)));
+    assert_eq!(
+        call_s(
+            &mut e,
+            "contains",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Obj(s1b)]
+        ),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call_s(
+            &mut e,
+            "remove",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Obj(s1)]
+        ),
+        Some(Value::Int(1))
+    );
+    assert_eq!(call_s(&mut e, "size", "()I", vec![]), Some(Value::Int(0)));
+
+    // ── CopyOnWriteArrayList ≡ ArrayList ──
+    let lt = e.heap.alloc_instance(CL.to_string(), vec![]).unwrap();
+    let call_l = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic(e, CL, name, sig, lt, &args).expect("intrínseco")
+    };
+    call_l(&mut e, "<init>", "()V", vec![]);
+    assert_eq!(
+        call_l(&mut e, "add", "(Ljava/lang/Object;)Z", vec![Value::Int(7)]),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call_l(&mut e, "add", "(Ljava/lang/Object;)Z", vec![Value::Int(7)]),
+        Some(Value::Int(1)),
+        "List aceita duplicatas (diferente do Set)"
+    );
+    assert_eq!(call_l(&mut e, "size", "()I", vec![]), Some(Value::Int(2)));
+    assert_eq!(
+        call_l(&mut e, "get", "(I)Ljava/lang/Object;", vec![Value::Int(1)]),
+        Some(Value::Int(7))
+    );
+    assert_eq!(
+        call_l(
+            &mut e,
+            "indexOf",
+            "(Ljava/lang/Object;)I",
+            vec![Value::Int(7)]
+        ),
+        Some(Value::Int(0))
+    );
+    call_l(&mut e, "clear", "()V", vec![]);
+    assert_eq!(
+        call_l(&mut e, "isEmpty", "()Z", vec![]),
+        Some(Value::Int(1))
+    );
+}

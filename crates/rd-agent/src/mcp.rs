@@ -1830,13 +1830,13 @@ impl AgentSession {
                 "java-util-collections",
                 "vm",
                 "partial",
-                "HashMap/WeakHashMap/ArrayList/LinkedList host com métodos essenciais (put/get/add/remove/size/…); SEM iteradores/entrySet/keySet; equals de usuário não consultado em chaves. Enum é host (name/ordinal/toString)",
+                "HashMap/WeakHashMap/ArrayList/LinkedList/CopyOnWriteArrayList host com métodos essenciais (put/get/add/remove/size/…); CopyOnWriteArraySet host com add que deduplica; subtipagem completa (check-cast p/ List/Set/Map/Collection/Iterable); SEM iteradores/entrySet/keySet e SEM LinkedHashMap; equals de usuário não consultado em chaves. Enum é host (name/ordinal/toString)",
             ),
             (
                 "java-lang-ref",
                 "vm",
                 "partial",
-                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). Próximo gap real: coleções java.util.concurrent (CopyOnWriteArraySet…)",
+                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). Próximo gap real: LinkedHashMap.<init> e iteradores de coleção",
             ),
             (
                 "notifications",
