@@ -40,6 +40,8 @@ pub const LINEARLAYOUT: &str = "Landroid/widget/LinearLayout;";
 pub const FRAMELAYOUT: &str = "Landroid/widget/FrameLayout;";
 pub const HANDLER: &str = "Landroid/os/Handler;";
 pub const LOOPER: &str = "Landroid/os/Looper;";
+/// M8: relógio host (relógio virtual determinístico — ver `call_host_static`).
+pub const SYSTEM_CLOCK: &str = "Landroid/os/SystemClock;";
 pub const CLASS: &str = "Ljava/lang/Class;";
 
 /// Dimensões da window virtual (piso moto-e5 em px — 720x1440 HD+).
@@ -1116,7 +1118,7 @@ pub fn call_host_static(
     class: &str,
     name: &str,
     _sig: &str,
-    _args: &[Value],
+    args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     match (class, name) {
         (LOOPER, "getMainLooper") | (LOOPER, "myLooper") => {
@@ -1124,6 +1126,25 @@ pub fn call_host_static(
         }
         (LOOPER, "loop") => {
             vm.drain_looper()?;
+            Ok(Some(Value::Null))
+        }
+        // ── M8: SystemClock (oitavo gap do launch real — org.primftpd) ────
+        // O relógio é o VIRTUAL determinístico (`HostState.clock_ms`): mesmo
+        // contrato do Looper/postDelayed — nada de tempo de parede (testes
+        // reprodutíveis; `sleep` dispara callbacks agendados).
+        (SYSTEM_CLOCK, "uptimeMillis")
+        | (SYSTEM_CLOCK, "elapsedRealtime")
+        | (SYSTEM_CLOCK, "currentThreadTimeMillis") => Ok(Some(Value::Long(vm.fw.clock() as i64))),
+        (SYSTEM_CLOCK, "elapsedRealtimeNanos") => {
+            Ok(Some(Value::Long(vm.fw.clock() as i64 * 1_000_000)))
+        }
+        (SYSTEM_CLOCK, "sleep") => {
+            // sleep(ms): avança o relógio virtual e drena o Looper
+            let ms = match args.first() {
+                Some(Value::Long(v)) => (*v).max(0) as u64,
+                _ => 0,
+            };
+            vm.advance_clock(ms)?;
             Ok(Some(Value::Null))
         }
         _ => Ok(None),

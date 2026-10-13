@@ -1836,7 +1836,13 @@ impl AgentSession {
                 "java-lang-ref",
                 "vm",
                 "partial",
-                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). Próximo gap real: LinkedHashMap.<init> e iteradores de coleção",
+                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). Próximo gap real: AtomicInteger e iteradores de coleção",
+            ),
+            (
+                "android-framework-clock",
+                "vm",
+                "partial",
+                "SystemClock host (uptimeMillis/elapsedRealtime(+Nanos)/currentThreadTimeMillis/sleep) sobre o relógio VIRTUAL determinístico da VM (mesmo clock do postDelayed/advance_clock; sleep avança e drena o Looper — sem tempo de parede). Looper getMainLooper/loop host. System.currentTimeMillis/nanoTime seguem fora",
             ),
             (
                 "notifications",
