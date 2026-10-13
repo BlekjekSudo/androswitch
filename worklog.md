@@ -840,3 +840,33 @@ Work Log:
 Stage Summary:
 - Sequência de gaps do primftpd: … → getClassLoader ✅ → getSecurityManager ✅ → ServiceLoader (próximo).
 - Sessão 2: 12 iterações (K–AC… 13), 12 PRs (#125–#143 pendente), 23 gaps do app real endereçados.
+
+---
+Task ID: m8-service-loader
+Agent: Arena Agent Mode
+Task: M8 — `java.util.ServiceLoader` host para o 24º gap do launch real de `org.primftpd`.
+
+Work Log:
+- Avaliação: árvore inicial limpa em `main` (47aa7ce), zero issues/PRs abertas e CI do `main` verde. `cargo test --workspace` de baseline passou; o ambiente não tinha Rust instalado, então instalei as toolchains stable e MSRV 1.76 localmente antes dos gates.
+- `rd-vm`: `ServiceLoader.load(Class)` e `load(Class, ClassLoader)` retornam um host `ServiceLoader` vazio. `service == null` materializa `NullPointerException`; `ClassLoader == null` é aceito como bootstrap.
+- `ServiceLoader.iterator()` retorna o `Iterator` host vazio existente: `hasNext()` é falso e `next()` materializa `NoSuchElementException`. A classe agora é `Iterable` na hierarquia builtin. Não há leitura/instanciação de `META-INF/services`, portanto o runtime não inventa providers.
+- Teste novo `service_loader_host_is_empty_and_iterable`: ambas as sobrecargas, class/Iterable, iteração vazia, `NoSuchElementException` e NPE de service null.
+- Catálogo `compat_gaps` e `docs/ROADMAP.md` atualizados com a limitação explícita. Re-sondagem real após o build sobre `golden-apks/org.primftpd.apk` atravessou ServiceLoader e chegou ao próximo gap estruturado: `java.util.LinkedHashSet.<init>()V`.
+
+Checks:
+- `cargo fmt --all -- --check` — PASS.
+- `cargo clippy --workspace --all-targets -- -D warnings` — PASS.
+- `cargo test --workspace` — PASS (360 testes; 0 falhas).
+- `rustup run 1.76.0 cargo check --workspace` — PASS.
+- `python3 scripts/check_md_links.py` — PASS (10 links / 12 arquivos).
+- `cargo xtask compat-report /tmp/compat-matrix.generated.md` + `diff` — PASS.
+- `rd app run golden-apks/org.primftpd.apk --json` — executou além de ServiceLoader e falhou somente no próximo gap registrado; APKs são locais/ignorados, nunca commitados.
+- Revisão final: `git diff --check` e scan de token-like secrets fora de `.git`/`target` — PASS.
+
+GitHub status:
+- Branch `feat/m8-service-loader`, commit funcional `42db612`, enviado com o PAT fornecido pelo proprietário.
+- Pull request aberto: #144 — https://github.com/nadabgfccvd/RustyDroid/pull/144 (aguarda revisão humana e CI).
+
+Stage Summary:
+- `ServiceLoader` deixa de bloquear a inicialização do APK real com um fallback determinístico e honesto, sem alegar suporte a SPI completo.
+- Próximo foco recomendado: implementar `LinkedHashSet` host (reaproveitando o estado `List`/semântica de `Set` já usada por `CopyOnWriteArraySet`), com construtores e operações mínimas sondadas, depois reexecutar o APK real.
