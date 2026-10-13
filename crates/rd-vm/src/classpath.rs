@@ -650,6 +650,7 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
             Some(vec!["Ljava/lang/ThreadLocal;", "Ljava/lang/Object;"])
         }
         "Ljava/lang/Class;" => Some(OBJECT.to_vec()),
+        "Ljava/lang/ClassLoader;" => Some(OBJECT.to_vec()),
         "Ljava/util/concurrent/atomic/AtomicInteger;" => {
             Some(vec!["Ljava/lang/Number;", "Ljava/lang/Object;"])
         }

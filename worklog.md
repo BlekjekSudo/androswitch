@@ -811,3 +811,18 @@ Work Log:
 
 Stage Summary:
 - Sequência de gaps do primftpd: … → ThreadLocal(+Inheritable) ✅ → System.getProperty ✅ → Class.getClassLoader (próximo).
+
+---
+Task ID: m8-classloader
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração AB)
+Task: M8 — Class.getClassLoader + ClassLoader canônico (22º gap do launch real).
+
+Work Log:
+- framework: HostState.class_loader + class_loader_obj() pub(crate) (lazy, identidade estável — um ClassLoader por VM; runtime single-classloader, bootstrap=null não se aplica ao host).
+- intrinsics: class_supported += getClassLoader; class_intrinsic trata antes de ler o descritor.
+- classpath: ClassLoader <: Object.
+- Teste: class_get_class_loader_host (duas classes distintas → MESMO loader; classe do host obj; identidade na repetição; subtipagem).
+- Re-sondagem app real: gap resolvido; launch avança até System.getSecurityManager() (registrado — Android não tem SecurityManager; semântica correta é null).
+
+Stage Summary:
+- Sequência de gaps do primftpd: … → System.getProperty ✅ → getClassLoader ✅ → getSecurityManager (próximo).

@@ -4624,3 +4624,94 @@ fn system_get_property_host() {
         other => panic!("esperava NPE, got {other:?}"),
     }
 }
+
+/// M8 (compat real): Class.getClassLoader — 22º gap do launch do org.primftpd.
+/// ClassLoader canônico por VM (single-classloader; identidade estável).
+#[test]
+fn class_get_class_loader_host() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const CLS: &str = "Ljava/lang/Class;";
+    const LOADER: &str = "Ljava/lang/ClassLoader;";
+
+    let mut b = DexBuilder::new();
+    b.class("Lcom/exemplo/A;", "Ljava/lang/Object;");
+    b.class("Lcom/exemplo/B;", "Ljava/lang/Object;");
+    let mut e = engine_of(&b);
+    let a = e
+        .heap
+        .alloc_instance("Lcom/exemplo/A;".to_string(), vec![])
+        .unwrap();
+    let bb = e
+        .heap
+        .alloc_instance("Lcom/exemplo/B;".to_string(), vec![])
+        .unwrap();
+
+    let ca = match call_instance_intrinsic(
+        &mut e,
+        "Lcom/exemplo/A;",
+        "getClass",
+        "()Ljava/lang/Class;",
+        a,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getClass A: {other:?}"),
+    };
+    let cb = match call_instance_intrinsic(
+        &mut e,
+        "Lcom/exemplo/B;",
+        "getClass",
+        "()Ljava/lang/Class;",
+        bb,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getClass B: {other:?}"),
+    };
+
+    let la = call_instance_intrinsic(
+        &mut e,
+        CLS,
+        "getClassLoader",
+        "()Ljava/lang/ClassLoader;",
+        ca,
+        &[],
+    )
+    .unwrap();
+    let lb = call_instance_intrinsic(
+        &mut e,
+        CLS,
+        "getClassLoader",
+        "()Ljava/lang/ClassLoader;",
+        cb,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        la, lb,
+        "ClassLoader canônico: mesmo objeto para toda classe"
+    );
+    let l = match la {
+        Some(Value::Obj(r)) => r,
+        other => panic!("loader: {other:?}"),
+    };
+    assert_eq!(e.heap.class_of(l).unwrap(), LOADER);
+    assert!(e.cp.is_subtype(LOADER, "Ljava/lang/Object;"));
+
+    // chamada repetida → mesma referência (identidade estável)
+    let la2 = call_instance_intrinsic(
+        &mut e,
+        CLS,
+        "getClassLoader",
+        "()Ljava/lang/ClassLoader;",
+        ca,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(la2, Some(Value::Obj(l)));
+}

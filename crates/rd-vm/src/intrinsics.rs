@@ -551,6 +551,7 @@ fn class_supported(name: &str, sig: &str) -> bool {
         ("getName", "()Ljava/lang/String;")
             | ("getSimpleName", "()Ljava/lang/String;")
             | ("toString", "()Ljava/lang/String;")
+            | ("getClassLoader", "()Ljava/lang/ClassLoader;")
     )
 }
 
@@ -569,6 +570,12 @@ fn class_intrinsic(
     recv: crate::heap::ObjRef,
     name: &str,
 ) -> Result<Option<Value>, VmExit> {
+    // getClassLoader não precisa do descritor: um ClassLoader canônico por VM
+    // (single-classloader; a distinção bootstrap=null não se aplica ao host).
+    if name == "getClassLoader" {
+        let l = vm.class_loader_obj()?;
+        return Ok(Some(Value::Obj(l)));
+    }
     let desc = match vm.heap.get_field(recv, "class_name") {
         Ok(Value::Obj(r)) => vm.heap.as_str(r)?.to_string(),
         _ => String::new(),
