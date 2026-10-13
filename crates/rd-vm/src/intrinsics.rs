@@ -437,6 +437,18 @@ pub fn call_static_intrinsic(
             Ok(Some(Value::Null))
         }
         ("Ljava/lang/Thread;", "yield", "()V") => Ok(Some(Value::Null)),
+        // M8 (14º gap real): Collections.synchronized* — VM single-threaded,
+        // sincronização é no-op ⇒ o wrapper devolve a PRÓPRIA coleção
+        // (identidade; desvio documentado em compat_gaps). null → NPE.
+        ("Ljava/util/Collections;", n, s) if collections_sync_wrapper(n, s) => {
+            let Some(r) = args[0].as_ref()? else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "Collections.synchronized* com coleção null",
+                )));
+            };
+            Ok(Some(Value::Obj(r)))
+        }
         // M8: fábricas de thread pool → executor host (execução inline).
         // Tamanho do pool e ThreadFactory são ignorados (VM single-threaded).
         (c, n, s) if c == EXECUTORS && executors_factory(n, s) => {
@@ -471,6 +483,29 @@ fn arg_i32(v: &Value) -> i32 {
         Value::Long(l) => *l as i32,
         _ => 0,
     }
+}
+
+/// (name, sig) de wrappers sincronizados de `Collections` (M8): identidade —
+/// a VM é single-threaded, nada a sincronizar.
+fn collections_sync_wrapper(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("synchronizedMap", "(Ljava/util/Map;)Ljava/util/Map;")
+            | (
+                "synchronizedSortedMap",
+                "(Ljava/util/SortedMap;)Ljava/util/SortedMap;"
+            )
+            | ("synchronizedList", "(Ljava/util/List;)Ljava/util/List;")
+            | ("synchronizedSet", "(Ljava/util/Set;)Ljava/util/Set;")
+            | (
+                "synchronizedSortedSet",
+                "(Ljava/util/SortedSet;)Ljava/util/SortedSet;"
+            )
+            | (
+                "synchronizedCollection",
+                "(Ljava/util/Collection;)Ljava/util/Collection;"
+            )
+    )
 }
 
 /// (name, sig) de fábricas `Executors` suportadas (M8).

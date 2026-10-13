@@ -712,3 +712,16 @@ Work Log:
 Stage Summary:
 - Sequência de gaps do primftpd: … → Thread ✅ → Enum.compareTo ✅ → iteradores+Context ✅ → Collections statics (próximo).
 - 13 gaps do app real fechados nesta sessão (K–T); launch já entra no código do app (androidx lifecycle atravessado).
+
+---
+Task ID: m8-collections-sync
+Agent: Arena Agent Mode (sessão autônoma 2h #2 — iteração U)
+Task: M8 — Collections.synchronized* por identidade (14º gap do launch real).
+
+Work Log:
+- rd-vm intrinsics: statics Collections.synchronizedMap/SortedMap/List/Set/SortedSet/Collection — VM single-threaded ⇒ wrapper devolve a PRÓPRIA coleção (identidade); null → NPE materializado; whitelist exata de (name,sig) — sort etc. seguem para o catch-all tipado.
+- Teste: collections_synchronized_wrappers_are_identity (identidade da ref; mapa segue funcional; synchronizedList; NPE; sort fora da whitelist → erro tipado).
+- Re-sondagem app real: gap resolvido; launch avança até ArrayDeque.<init>()V (registrado — Deque host sobre estado List).
+
+Stage Summary:
+- Sequência de gaps do primftpd: … → iteradores+Context ✅ → Collections.synchronized* ✅ → ArrayDeque (próximo).

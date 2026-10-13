@@ -403,7 +403,12 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   cobertura de teste até o primftpd exigir check-cast
   `MainTabsActivity → Context` (CCE espúrio). Corrigido + teste
   `android_activity_is_android_context`.
-- ⬜ **Próximo gap (achado honesto)**:
-  `java.util.Collections.synchronizedMap(Map)` — utilitários estáticos de
-  Collections (synchronized*/unmodifiable*/empty*/singleton*); VM
-  single-threaded ⇒ wrapper sincronizado pode devolver o próprio mapa.
+- ✅ **`Collections.synchronized*` (entregue nesta rodada)**: décimo quarto
+  gap (`synchronizedMap(Map)`). VM single-threaded ⇒ sincronização é no-op:
+  o wrapper devolve a PRÓPRIA coleção (identidade) — `synchronizedMap`/
+  `SortedMap`/`List`/`Set`/`SortedSet`/`Collection`; null → NPE
+  materializado. `unmodifiable*`/`empty*`/`singleton*` seguem fora (não
+  sondados — sem especulação).
+- ⬜ **Próximo gap (achado honesto)**: `java.util.ArrayDeque.<init>()V` —
+  Deque host (addFirst/addLast/removeFirst/removeLast/peek/push/pop…) sobre
+  o estado `List` existente; `LinkedList` já cobre parte do contrato.

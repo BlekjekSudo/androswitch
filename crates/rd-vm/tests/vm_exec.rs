@@ -3813,3 +3813,95 @@ fn collection_views_and_iterators() {
         Some(Value::Int(0))
     );
 }
+
+/// M8 (compat real): Collections.synchronized* — 14º gap do launch do
+/// org.primftpd (`synchronizedMap(Map)`). VM single-threaded ⇒ wrapper é
+/// IDENTIDADE (devolve a própria coleção); null → NPE materializado.
+#[test]
+fn collections_synchronized_wrappers_are_identity() {
+    use rd_vm::intrinsics::{call_instance_intrinsic, call_static_intrinsic};
+    use rd_vm::value::Value;
+    const COLL: &str = "Ljava/util/Collections;";
+    const HM: &str = "Ljava/util/HashMap;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let m = e.heap.alloc_instance(HM.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(&mut e, HM, "<init>", "()V", m, &[]).unwrap();
+
+    // synchronizedMap devolve a MESMA referência (identidade)
+    let w = call_static_intrinsic(
+        &mut e,
+        COLL,
+        "synchronizedMap",
+        "(Ljava/util/Map;)Ljava/util/Map;",
+        &[Value::Obj(m)],
+    )
+    .unwrap();
+    assert_eq!(w, Some(Value::Obj(m)), "wrapper = identidade");
+
+    // e o mapa segue funcional pelos intrínsecos de Map
+    let k = e.heap.alloc_string("k".into()).unwrap();
+    let v = e.heap.alloc_string("v".into()).unwrap();
+    call_instance_intrinsic(
+        &mut e,
+        HM,
+        "put",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+        m,
+        &[Value::Obj(k), Value::Obj(v)],
+    )
+    .unwrap();
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            HM,
+            "get",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            m,
+            &[Value::Obj(k)]
+        )
+        .unwrap(),
+        Some(Value::Obj(v))
+    );
+
+    // synchronizedList mesma política
+    let l = e
+        .heap
+        .alloc_instance("Ljava/util/ArrayList;".to_string(), vec![])
+        .unwrap();
+    let wl = call_static_intrinsic(
+        &mut e,
+        COLL,
+        "synchronizedList",
+        "(Ljava/util/List;)Ljava/util/List;",
+        &[Value::Obj(l)],
+    )
+    .unwrap();
+    assert_eq!(wl, Some(Value::Obj(l)));
+
+    // null → NPE
+    match call_static_intrinsic(
+        &mut e,
+        COLL,
+        "synchronizedMap",
+        "(Ljava/util/Map;)Ljava/util/Map;",
+        &[Value::Null],
+    ) {
+        Err(rd_vm::err::VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/NullPointerException;")
+        }
+        other => panic!("esperava NPE, got {other:?}"),
+    }
+
+    // fora da whitelist (ex.: sort) NÃO é capturado aqui — segue o fluxo
+    // tipado existente (catch-all Ljava/ → NOT_IMPLEMENTED)
+    assert!(call_static_intrinsic(
+        &mut e,
+        COLL,
+        "sort",
+        "(Ljava/util/List;)V",
+        &[Value::Obj(l)]
+    )
+    .is_err());
+}
