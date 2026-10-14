@@ -500,40 +500,56 @@ LOCATION_HARDWARE · CONTROL_LOCATION_UPDATES · DEVICE_POWER · REBOOT · FACTO
 
 ## Apêndice G — TODAS as linguagens que podem gerar um APK (registro de engines)
 
+<!-- BEGIN ENGINE REGISTRY -->
 | # | Linguagem/Framework | Artefato no APK | Módulo | Estratégia | Status |
 |---|---|---|---|---|---|
-| 1 | Java | classes.dex | LANG-01 | VM DEX própria | ✅ núcleo |
-| 2 | Kotlin | classes.dex | LANG-01 | VM DEX (coroutines→threads nativas) | ✅ núcleo |
-| 3 | Kotlin Multiplatform / Compose MP | dex + runtime klib | LANG-10 | VM DEX + Compose runtime | 🟡 |
-| 4 | Scala / Clojure / Groovy | dex | LANG-01 | VM DEX (dyn. invoke) | ✅ |
-| 5 | C (NDK) | lib/*.so | LANG-02 | ELF+JNI | 🟡 |
-| 6 | C++ (NDK) | lib/*.so | LANG-02 | ELF+JNI+STL | 🟡 |
-| 7 | Rust (cargo-ndk) | lib/*.so | LANG-03 | ELF+JNI | 🟡 |
-| 8 | Go (gomobile) | lib/*.so | LANG-09 | ELF+JNI+gomobile bind | 🟡 |
-| 9 | Objective-C/C ( cross via NDK) | lib/*.so | LANG-02 | ELF+JNI | 🟡 raro |
-| 10 | Zig/other-LLVM | lib/*.so | LANG-02 | ELF+JNI | 🟡 |
-| 11 | Dart (Flutter) | libapp.so + flutter_assets | LANG-04 | Dart AOT interp + engine | 🟡 exp. |
-| 12 | JS/TS (React Native/Expo) | Hermes bytecode/JSC + JS bundle | LANG-05 | JS engine + RN bridge | 🟡 exp. |
-| 13 | HTML/JS (Cordova/Capacitor/Ionic) | www/ assets | LANG-06 | WebView headless | 🟡 exp. |
-| 14 | HTML/JS (TWA/PWA) | nada (web!) | LANG-06 | WebView | 🟡 exp. |
-| 15 | JS/TS (NativeScript) | runtime JS + libs | LANG-05/02 | híbrido | 🟡 exp. |
-| 16 | JS/TS (Tauri v2) | webview + rust .so | LANG-06+03 | WebView+JNI | 🟡 exp. |
-| 17 | C# (.NET MAUI/Xamarin) | assemblies IL | LANG-07 | Mono/IL interp | 🟡 exp. |
-| 18 | C# (Unity Mono) | Assembly-CSharp.dll | LANG-08 | Mono | 🟡 exp. |
-| 19 | C# (Unity IL2CPP) | libil2cpp.so + global-metadata | LANG-08 | interp nativo + stubs Unity | 🟡 longo |
-| 20 | C++ (Unreal) | libUE4.so/assets | LANG-09 | stubs engine | 🔴 longo |
-| 21 | GDScript/C# (Godot 3/4) | libgodot + .pck | LANG-09 | godot headless embed | 🟡 exp. |
-| 22 | Lua (Defold/Solar2D/Cocos2d-x) | bytecode Lua + assets | LANG-09 | mlua embed | 🟢 fácil |
-| 23 | Python (Kivy/Buildozer/Chaquopy/BeeWare) | .py/.pyc + libs | LANG-09 | CPython embed (PyO3) | 🟢 fácil |
-| 24 | Haxe (OpenFL/Heaps) | dex/lib | LANG-01/02 | via DEX ou NDK | 🟡 |
-| 25 | Qt/QML (C++) | lib + qml assets | LANG-09 | Qt headless embed | 🟡 exp. |
-| 26 | Avalonia (C#) | assemblies | LANG-07 | Mono + render próprio | 🟡 exp. |
-| 27 | B4X / App Inventor / Thunkable | dex | LANG-01/11 | VM DEX (são Java gerado) | ✅ |
-| 28 | WASM in-app | .wasm assets | LANG-12 | wasmtime embed | 🟡 exp. |
+| 1 | Java | classes*.dex | LANG-01 | VM DEX própria | Registro ✅; runtime DEX parcial |
+| 2 | Kotlin | classes*.dex | LANG-01 | VM DEX; coroutines/threads dependem da cobertura da VM | Registro ✅; runtime DEX parcial |
+| 3 | Kotlin Multiplatform / Compose MP | DEX; recursos Compose; klib nem sempre é distribuída | LANG-10 | Shared DEX + futuro render Compose MP | Registro ✅; runtime NOT_IMPLEMENTED |
+| 4 | Scala / Clojure / Groovy | classes*.dex | LANG-01 | VM DEX; invocações dinâmicas conforme cobertura | Registro ✅; runtime DEX parcial |
+| 5 | C (NDK) | lib/<abi>/*.so | LANG-02 | ELF + JNI | Registro ✅; runtime NOT_IMPLEMENTED |
+| 6 | C++ (NDK) | lib/<abi>/*.so; STL opcional | LANG-02 | ELF + JNI + STL | Registro ✅; runtime NOT_IMPLEMENTED |
+| 7 | Rust (cargo-ndk/xbuild) | lib/<abi>/*.so | LANG-03 | ELF + JNI | Registro ✅; runtime NOT_IMPLEMENTED |
+| 8 | Go (gomobile) | lib/<abi>/*.so; wrappers bind | LANG-09 | ELF + JNI + gomobile bind | Registro ✅; runtime NOT_IMPLEMENTED |
+| 9 | Objective-C/C (cross via NDK) | lib/<abi>/*.so | LANG-02 | ELF + JNI; runtime ObjC se necessário | Registro ✅; runtime NOT_IMPLEMENTED |
+| 10 | Zig / outras linguagens LLVM | lib/<abi>/*.so | LANG-02 | ELF + JNI | Registro ✅; runtime NOT_IMPLEMENTED |
+| 11 | Dart / Flutter | libapp.so; libflutter.so; flutter_assets | LANG-04 | Dart AOT + engine Flutter headless futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 12 | JS/TS (React Native / Expo) | bundle JS; Hermes bytecode/JSC; libs RN | LANG-05 | Engine JS + RN/Expo bridge futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 13 | HTML/JS (Cordova / Capacitor / Ionic) | assets/www/ ou assets/public/; configs bridge | LANG-06 | WebView headless + bridges futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 14 | HTML/JS (TWA / PWA) | Manifest/URL; pode não haver payload web local | LANG-06 | WebView/TWA futuro; rede não consultada | Registro ✅; runtime NOT_IMPLEMENTED |
+| 15 | JS/TS (NativeScript) | assets/app/; libNativeScript.so | LANG-05+LANG-02 | Engine JS + JNI + views futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 16 | JS/TS (Tauri v2) | assets web + Rust .so; markers Tauri opcionais | LANG-06+LANG-03 | WebView + Rust JNI futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 17 | C# (.NET MAUI / Xamarin) | assemblies/*.dll; Mono; blobs de assemblies | LANG-07 | Mono/IL + bridges futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 18 | C# (Unity Mono) | Assembly-CSharp.dll; libunity.so | LANG-08 | Mono + stubs/render Unity futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 19 | C# (Unity IL2CPP) | libil2cpp.so; global-metadata.dat | LANG-08 | Interp nativo + stubs/render Unity futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 20 | C++ (Unreal) | libUE4.so / libUnreal.so; pak/obb | LANG-09 | Engine/stubs Unreal futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 21 | GDScript/C# (Godot 3/4) | libgodot*.so; .pck/assets | LANG-09 | Godot headless embed futuro | Registro ✅; runtime NOT_IMPLEMENTED |
+| 22 | Lua (Defold / Solar2D / Cocos2d-x) | Lua source/bytecode; assets; libs engine | LANG-09 | Lua embed + bridges específicos futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 23 | Python (Kivy / Buildozer / Chaquopy / BeeWare) | Python source/bytecode; libs; payloads compactados | LANG-09 | CPython/PyO3 + bridges específicos futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 24 | Haxe (OpenFL / Heaps) | DEX ou lib/<abi>/*.so | LANG-01+LANG-02 | VM DEX ou ELF/JNI; bridge Haxe futuro | Registro ✅; runtime NOT_IMPLEMENTED |
+| 25 | Qt / QML (C++) | libQt*.so; QML assets/recursos | LANG-09 | Qt headless + JNI futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 26 | Avalonia (C#) | assemblies Avalonia; runtime managed | LANG-07 | Mono + render próprio futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 27 | B4X / App Inventor / Thunkable | classes*.dex | LANG-01+LANG-11 | VM DEX; fixtures específicas futuras | Registro ✅; runtime DEX parcial |
+| 28 | WebAssembly in-app | assets/*.wasm (ou containers opacos) | LANG-12 | Runtime WASM + bridge JNI/JS futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+<!-- END ENGINE REGISTRY -->
+
+**Estado verificável (2026-10-14):** registro e detecção dos **28 itens concluídos**;
+execução de novos runtimes **não incluída**. DEX/ELF compartilhados são candidatos,
+não identificação da linguagem de origem. Features `lang-01`…`lang-12` selecionam
+contratos e dependências, não implementam engines. A seleção de runtimes da PARTE 0
+permanece inalterada. JNI/NDK e M9/M11 continuam pendentes.
+
+Fonte da tabela: [`data/engines.toml`](data/engines.toml), validada pela crate
+`rd-engine-registry`. `cargo xtask engine-spec` regenera apenas a tabela marcada;
+`cargo xtask engine-report` gera [regras e contratos](docs/engine-registry.md).
+CLI: `rd engine list|detect|check`; `inspect --json` e MCP `app_info` incluem
+`engines`. Detecção não valida payload nem autoriza execução (ADR 003).
 
 > **Lei do registro:** cada engine nova = crate `rd-engine-<nome>` feature-gated, com
 > contract próprio: `parse(artifact) → process`, `syscall/event → engine`, teste golden
-> por engine. Nenhuma engine quebra as outras.
+> por engine. Nenhuma engine quebra as outras. Adaptadores ainda ausentes retornam
+> `NOT_IMPLEMENTED(LANG-xx)` em parse/event/syscall, mesmo com a feature habilitada.
+> Golden de detecção não satisfaz o golden flow de execução nem o gate Moto E5.
 
 ## Apêndice H — Catálogo de testes (o que "testar um APK" significa aqui)
 

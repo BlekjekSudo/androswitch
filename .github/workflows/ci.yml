@@ -99,6 +99,37 @@ jobs:
           ./target/release/rd --help
           ./target/release/rd device list
 
+  engine-registry:
+    name: Appendix G (minimal / individual / all features)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Minimum registry keeps all 28 records
+        run: cargo test -p rd-engine-registry --no-default-features --locked
+      - name: Each language contract is feature-isolated
+        run: |
+          for n in $(seq -w 1 12); do
+            cargo test -p rd-engine-registry --no-default-features --features "lang-$n" --locked
+          done
+      - name: All features still report missing execution honestly
+        run: cargo test -p rd-engine-registry --all-features --locked
+      - name: CLI minimum and feature forwarding compile
+        run: |
+          cargo check -p rd-cli --no-default-features --locked
+          cargo check -p rd-cli --all-features --locked
+      - name: Optional contracts are clippy clean
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Catalog, spec and generated documentation agree
+        run: |
+          cargo xtask engine-report /tmp/engine-registry.generated.md
+          diff -u docs/engine-registry.md /tmp/engine-registry.generated.md
+          cargo xtask engine-spec /tmp/RustyDroid.generated.md
+          diff -u RustyDroid.md /tmp/RustyDroid.generated.md
+
   vm-golden:
     name: VM golden vectors vs real JVM (M2 DoD)
     runs-on: ubuntu-latest
@@ -130,6 +161,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.76
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --workspace
+      - run: cargo check --workspace --all-features --locked
 
   fuzz-build:
     name: Fuzz targets build (nightly)

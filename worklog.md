@@ -1216,3 +1216,26 @@ GitHub status:
 
 Stage Summary:
 - Launch primftpd cadeia-completo (Application→Prefs→SLF4J→NOP faithful) ✅ → próximas rodadas: novos alvos/psi de apps + gaps estruturais pendentes do ROADMAP (getResources → Enumeration, unmodifiable* restantes — empty*, edit() de prefs quando pedido).
+
+
+---
+Task: Apêndice G — registro e detecção dos 28 engines
+Agent: Arena.ai (contribuição assistida por IA; revisão humana obrigatória)
+Date: 2026-10-14
+
+Work Log:
+- Escopo confirmado com o dono: registro/detecção completos, não execução de todos os runtimes. Preservados checkboxes/seleção LANG e os estados pendentes M9/M11; nenhuma engine ausente foi marcada como executável.
+- ADR 003 antes do código: separar catálogo/detecção de execução; formatos DEX/ELF são candidatos, não atribuição de linguagem; assinatura não valida payload. Nenhum código de ATL/Robolectric copiado e nenhum unsafe adicionado.
+- data/engines.toml: 28 IDs estáveis, 12 módulos/features, dependências/estratégias/limites/status e regras declarativas (all/any). Nova crate rd-engine-registry valida schema/IDs/deps/ciclos/regras; o tipo público Registry só nasce do caminho validado (documento de Deserialize privado).
+- Análise limitada por nomes ZIP canônicos + classes/metadados de componentes do manifest; no asset/lib payload reads, no extraction, no network, no runtime. Híbridos preservam múltiplos achados; duplicatas/paths hostis/ABIs desconhecidas são diagnósticos explícitos; 4 amostras por predicado, 100k entradas, catálogo 1 MiB.
+- Features opt-in lang-01…12 com transitividade e forwarding rd-cli/rd-agent; build mínimo conserva todo o catálogo sem downloads de engines. EngineAdapter parse/event/syscall: os 28 adaptadores do registro SEMPRE retornam NOT_IMPLEMENTED(LANG-xx); VM DEX existente continua separada e parcial.
+- CLI rd engine list|detect|check; engines em inspect --json e MCP app_info (32 tools, sem nova tool); --data/RD_DATA_DIR explícitos não têm fallback silencioso. Runtime não é lançado pela detecção.
+- 28 casos golden de DETECÇÃO em tests/engines/signatures.json, fixtures APK/AXML/ZIP geradas em memória; testes unitários, integração, contratos, teto ZIP64, ambiguidades, híbridos, samples, CLI/MCP e drift. CI adicionado para build mínimo/12 features/all-features e MSRV all-features.
+- xtask engine-report / engine-spec (só tabela marcada) / compat-report saem da mesma fonte. Spec, README, ROADMAP, manifest (registries separado de selected), mcp-tools e compat-matrix atualizados; relatório em docs/appendix-g-validation.md.
+
+Stage Summary:
+- Registro/detecção dos 28 itens ENTREGUES; novos runtimes NÃO implementados. M9/M11 continuam pendentes e budgets de execução Moto E5 não certificados nesta etapa.
+- Baseline 385 → 416 testes automatizados (+31), default e all-features: 0 falhas. 1 teste OSS explicitamente ignored no comando padrão, executado separadamente: PASS.
+- Mínimo + cada uma das 12 features isoladamente: 3 unitários + 17 integrações PASS em cada configuração. CLI no-default/all-features compila; fmt + clippy -D warnings (default/all) + MSRV 1.76 all + docs/drift + suite JUnit (8 cenários) verdes localmente.
+- APK real F-Droid 2.0.1: 12.537.183 bytes, 973 entradas ZIP, minSdk 24; SHA-256 83d3fe522281c3cb89fce3bc05038f81b3c3b32c108536941f184c5f9bb53778. Inventário detectado e comparado ao inspect.engines (idêntico); abaixo do piso de execução, logo NENHUMA execução alegada. Binário não commitado (GH-05).
+- Publicação planejada em branch separada + PR, nunca merge cego. Este log registra gates locais; status de GitHub Actions/revisão humana é separado. Nenhuma credencial em arquivos/commits.

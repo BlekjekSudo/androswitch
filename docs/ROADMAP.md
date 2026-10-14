@@ -21,6 +21,32 @@
 | M11 | Engines | Flutter → RN → Mono → wasm: 1 app de cada em golden flow | ⬜ |
 | M12 | Ecossistema GH | docs site, compat-matrix viva, releases; v1.0 | ⬜ |
 
+## ✅ Apêndice G — registro e detecção completos (2026-10-14)
+
+**Escopo aprovado: registro/detecção, não execução de engines.** M9/M11 e a
+seleção de runtimes no spec/manifest permanecem inalterados.
+
+- `data/engines.toml` + `rd-engine-registry`: 28 IDs estáveis, 12 módulos,
+  dependências e estratégias; schema validado e status de runtime honesto.
+- Detecção por nomes ZIP canônicos/classes/metadata do manifest; `signature`,
+  `candidate`, `not_detected`; APK híbrido mantém múltiplos resultados.
+  Não extrai/descomprime assets, não valida payload, não consulta rede e não
+  executa libs/bytecode. DEX/ELF não atribuem linguagem de origem.
+- Features opt-in `lang-01`…`lang-12`, transitivas e propagadas por CLI/MCP;
+  build mínimo conserva o catálogo, sem novas dependências de runtime nativo.
+- `EngineAdapter::parse`/`event`/`syscall`: 28 adaptadores indisponíveis retornam
+  `NOT_IMPLEMENTED(LANG-xx)`, mesmo com feature. Nenhum processo fictício.
+- `rd engine list|detect|check`, campo `engines` de `inspect --json` e MCP
+  `app_info`; overrides de catálogo explícitos falham sem fallback silencioso.
+- 28 fixtures golden de **detecção**, testes de contratos/paths/limites/híbridos,
+  CLI/MCP, drift e feature isolation. Integração OSS explícita via `RD_TEST_APK`.
+- Tabela do Apêndice G, [registro gerado](engine-registry.md) e compat-matrix
+  saem da mesma fonte (`cargo xtask engine-spec|engine-report|compat-report`).
+
+**DoD entregue:** todos os 28 registros consultáveis e testados; toda rota ausente
+responde erro tipado. **DoD de execução NÃO entregue:** cada engine futura precisa
+crate/adaptador real, golden flow de APK OSS e gate Moto E5 (ADR 003).
+
 ## O que o M0 entregou (verificado em APK real: F-Droid 2.0.1)
 
 - **Workspace Cargo** com 9 crates + xtask, dependências só apontam para baixo,

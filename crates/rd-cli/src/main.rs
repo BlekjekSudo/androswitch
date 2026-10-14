@@ -7,6 +7,7 @@
 //! - `rd behavior`           — comutadores por targetSdk 26→36
 //! - `rd dex summary|disasm` — parser DEX 100% + disassembler smali (DoD do M1)
 //! - `rd vm exec`            — interpretador Dalvik mínimo (DoD do M2: métodos puros)
+//! - `rd engine list|detect|check` — registro/detecção do Apêndice G (não execução)
 //! - `rd perf <apk>`         — gate de performance (M7): startup cold/warm e RSS no piso moto-e5
 //!
 //! Códigos de saída (contrato API pública — issue #34):
@@ -20,6 +21,7 @@ use rd_framework::fd_behavior::SwitchTable;
 use rd_framework::fd_devices::DeviceTable;
 use rd_framework::fd_permissions::{GrantState, PermissionEngine, PermissionTable};
 use rd_framework::DeviceProfile;
+mod engines;
 mod perf;
 
 use std::io::Write as _;
@@ -52,6 +54,11 @@ enum Cmd {
         /// Perfil de device para orçamentos (ex.: moto-e5)
         #[arg(long)]
         device: Option<String>,
+    },
+    /// Registro e detecção de engines (Apêndice G); não executa novos runtimes
+    Engine {
+        #[command(subcommand)]
+        sub: EngineSub,
     },
     /// Motor de permissões (Apêndice B — dado versionado)
     Perm {
@@ -127,6 +134,28 @@ enum Cmd {
         #[arg(long)]
         junit: Option<PathBuf>,
         /// Imprime o resumo em JSON (em vez do texto humano)
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum EngineSub {
+    /// Lista os 28 itens, módulos/features e estado real de runtime
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Analisa nomes ZIP/manifest sem carregar ou executar artefatos
+    Detect {
+        path: PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Verifica o contrato de runtime: indisponível responde NOT_IMPLEMENTED (exit 2)
+    Check {
+        id: String,
+        /// Erros são sempre JSON no stderr (contrato do CLI)
         #[arg(long)]
         json: bool,
     },
@@ -339,6 +368,7 @@ fn run(cli: Cli) -> i32 {
     }
     let result = match &cli.cmd {
         Cmd::Inspect { path, json, device } => cmd_inspect(path, *json, device.as_deref(), &dd),
+        Cmd::Engine { sub } => engines::run(sub, &dd),
         Cmd::Perm { sub } => match sub {
             PermSub::List { path, json } => cmd_perm_list(path, *json, &dd),
             PermSub::Info { name, json } => cmd_perm_info(name, *json, &dd),
@@ -659,6 +689,10 @@ fn cmd_inspect(path: &Path, json: bool, device: Option<&str>, dd: &DataDir) -> R
                 perms.insert(name.clone(), serde_json::Value::Object(o));
             }
             map.insert("permissions_state".into(), serde_json::Value::Object(perms));
+            map.insert(
+                "engines".into(),
+                serde_json::json!(engines::load_registry(dd)?.detect(&apk)?),
+            );
             map.insert(
                 "floor_status".into(),
                 serde_json::to_value(apk.floor_status())

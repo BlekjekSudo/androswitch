@@ -6,6 +6,7 @@ members = [
     "crates/rd-vm",
     "crates/rd-jni",
     "crates/rd-ndk",
+    "crates/rd-engine-registry",
     "crates/rd-framework",
     "crates/rd-render",
     "crates/rd-agent",
@@ -53,6 +54,7 @@ rd-vm = { path = "crates/rd-vm", version = "0.1.0" }
 rd-render = { path = "crates/rd-render", version = "0.1.0" }
 rd-framework = { path = "crates/rd-framework", version = "0.1.0" }
 rd-agent = { path = "crates/rd-agent", version = "0.1.0" }
+rd-engine-registry = { path = "crates/rd-engine-registry", version = "0.1.0", default-features = false }
 
 [profile.release]
 opt-level = 3

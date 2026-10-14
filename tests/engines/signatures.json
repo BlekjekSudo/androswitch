@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "scope": "artifact-signatures-not-runtime-goldens",
+  "cases": [
+    {
+      "number": 1,
+      "id": "java",
+      "entries": [
+        "classes.dex"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "candidate"
+    },
+    {
+      "number": 2,
+      "id": "kotlin",
+      "entries": [
+        "classes.dex",
+        "META-INF/main.kotlin_module"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "candidate"
+    },
+    {
+      "number": 3,
+      "id": "kotlin-multiplatform",
+      "entries": [
+        "classes.dex",
+        "assets/shared.klib"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "candidate"
+    },
+    {
+      "number": 4,
+      "id": "jvm-dynamic",
+      "entries": [
+        "classes2.dex"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "candidate"
+    },
+    {
+      "number": 5,
+      "id": "c-ndk",
+      "entries": [
+        "lib/x86_64/libnative.so"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "candidate"
+    },
+    {
+      "number": 6,
+      "id": "cpp-ndk",
+      "entries": [
+        "lib/arm64-v8a/libc++_shared.so"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "candidate"
+    },
+    {
+      "number": 7,
+      "id": "rust-ndk",
+      "entries": [
+        "lib/x86_64/librustdemo.so"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "candidate"
+    },
+    {
+      "number": 8,
+      "id": "go-mobile",
+      "entries": [
+        "lib/arm64-v8a/libgojni.so"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 9,
+      "id": "objective-c-ndk",
+      "entries": [
+        "lib/armeabi-v7a/libobjc_demo.so"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "candidate"
+    },
+    {
+      "number": 10,
+      "id": "zig-llvm",
+      "entries": [
+        "lib/x86_64/libzigdemo.so"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "candidate"
+    },
+    {
+      "number": 11,
+      "id": "flutter",
+      "entries": [
+        "lib/arm64-v8a/libapp.so",
+        "lib/arm64-v8a/libflutter.so",
+        "assets/flutter_assets/AssetManifest.bin"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 12,
+      "id": "react-native",
+      "entries": [
+        "lib/arm64-v8a/libreactnative.so",
+        "lib/arm64-v8a/libhermes.so",
+        "assets/index.android.bundle"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 13,
+      "id": "cordova",
+      "entries": [
+        "assets/www/index.html",
+        "assets/www/cordova.js"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 14,
+      "id": "twa-pwa",
+      "entries": [],
+      "manifest_class": "com.google.androidbrowserhelper.trusted.LauncherActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 15,
+      "id": "nativescript",
+      "entries": [
+        "lib/arm64-v8a/libNativeScript.so",
+        "assets/app/package.json"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 16,
+      "id": "tauri",
+      "entries": [
+        "assets/tauri.conf.json",
+        "assets/www/index.html",
+        "lib/arm64-v8a/libapp.so"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 17,
+      "id": "dotnet-maui",
+      "entries": [
+        "assemblies/App.dll",
+        "lib/arm64-v8a/libmonodroid.so"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 18,
+      "id": "unity-mono",
+      "entries": [
+        "lib/arm64-v8a/libunity.so",
+        "assets/bin/Data/Managed/Assembly-CSharp.dll"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 19,
+      "id": "unity-il2cpp",
+      "entries": [
+        "lib/arm64-v8a/libil2cpp.so",
+        "assets/bin/Data/Managed/Metadata/global-metadata.dat"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 20,
+      "id": "unreal",
+      "entries": [
+        "lib/arm64-v8a/libUnreal.so",
+        "assets/game.pak"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 21,
+      "id": "godot",
+      "entries": [
+        "lib/arm64-v8a/libgodot_android.so",
+        "assets/game.pck"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 22,
+      "id": "lua-engines",
+      "entries": [
+        "lib/arm64-v8a/libcorona.so",
+        "assets/main.lua"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 23,
+      "id": "python-engines",
+      "entries": [
+        "assets/chaquopy/app.imy",
+        "assets/app.py"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 24,
+      "id": "haxe",
+      "entries": [
+        "classes.dex",
+        "lib/arm64-v8a/libapplication.so"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "candidate"
+    },
+    {
+      "number": 25,
+      "id": "qt-qml",
+      "entries": [
+        "lib/arm64-v8a/libQt6Core_arm64-v8a.so",
+        "assets/qml/main.qml"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 26,
+      "id": "avalonia",
+      "entries": [
+        "assemblies/Avalonia.Android.dll",
+        "assemblies/App.dll"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "signature"
+    },
+    {
+      "number": 27,
+      "id": "generated-java",
+      "entries": [
+        "classes.dex"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "candidate"
+    },
+    {
+      "number": 28,
+      "id": "wasm",
+      "entries": [
+        "assets/modules/demo.wasm"
+      ],
+      "manifest_class": "com.example.GoldenActivity",
+      "expected_state": "candidate"
+    }
+  ]
+}

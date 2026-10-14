@@ -709,7 +709,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "app_info",
-            description: "Identidade do app ATIVO: package, versão, SDKs, floor e componentes do manifest.",
+            description: "Identidade do app ATIVO: package, versão, SDKs, floor e componentes do manifest. `engines` registra os 28 itens do Apêndice G e detecta assinaturas/candidatos por nomes ZIP/manifest; não valida payload nem promete execução. Features selecionam contratos, não runtimes.",
             schema: obj(serde_json::json!({}), &[]),
         },
         ToolDef {
@@ -1590,11 +1590,13 @@ impl AgentSession {
 
     fn tool_app_info(&mut self) -> Result<ToolResult, RdError> {
         let app = self.require_apk()?;
+        let engines = rd_engine_registry::Registry::embedded()?.detect(&app.apk)?;
         let m = &app.apk.manifest;
         Ok(ToolResult::json(&serde_json::json!({
             "package": m.package,
             "version_name": m.version_name,
             "version_code": m.version_code,
+            "engines": engines,
             "min_sdk": m.min_sdk,
             "target_sdk": m.target_sdk,
             "floor": serde_json::json!(match app.apk.floor_status() {
@@ -2932,6 +2934,49 @@ mod tests {
             v["logs"], "hi do mcp\n",
             "System.out do app no buffer da sessão"
         );
+    }
+
+    /// app_info exposes the same static registry report without launching or
+    /// parsing any executable artifact, including malformed native payloads.
+    #[test]
+    fn app_info_includes_all_engine_findings_without_runtime_claims() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let mut zip = rd_testsupport::apkfix::ZipFix::new();
+        zip.add(
+            "AndroidManifest.xml",
+            rd_testsupport::apkfix::build_manifest_axml_sdk(
+                "com.test.registry",
+                "com.test.registry.Main",
+                26,
+                36,
+            ),
+        );
+        for path in [
+            "classes.dex",
+            "lib/arm64-v8a/libflutter.so",
+            "assets/flutter_assets/AssetManifest.bin",
+        ] {
+            zip.add(path, b"not-executable".to_vec());
+        }
+        let bytes = zip.build();
+        let expected = rd_engine_registry::Registry::embedded()
+            .unwrap()
+            .detect(&Apk::from_bytes(bytes.clone()).unwrap())
+            .unwrap();
+        let apk_path = fixture_apk_write(bytes);
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+        let (v, err) = call(&mut s, "app_info", serde_json::json!({}));
+        assert!(!err, "app_info: {v}");
+        assert_eq!(v["engines"], serde_json::to_value(expected).unwrap());
+        assert_eq!(v["engines"]["registered_engines"], 28);
+        assert_eq!(v["engines"]["execution_claimed"], false);
+        assert!(
+            s.engine.is_none(),
+            "static detection must never create a process"
+        );
+        assert_eq!(tool_defs().len(), 32, "no additional MCP tool");
+        let _ = std::fs::remove_file(apk_path);
     }
 
     /// Sem app: tools falham tipadas (nunca pânico).

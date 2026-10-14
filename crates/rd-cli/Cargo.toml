@@ -16,7 +16,23 @@ path = "src/main.rs"
 [lints]
 workspace = true
 
+[features]
+default = []
+lang-01 = ["rd-engine-registry/lang-01", "rd-agent/lang-01"]
+lang-02 = ["rd-engine-registry/lang-02", "rd-agent/lang-02"]
+lang-03 = ["rd-engine-registry/lang-03", "rd-agent/lang-03"]
+lang-04 = ["rd-engine-registry/lang-04", "rd-agent/lang-04"]
+lang-05 = ["rd-engine-registry/lang-05", "rd-agent/lang-05"]
+lang-06 = ["rd-engine-registry/lang-06", "rd-agent/lang-06"]
+lang-07 = ["rd-engine-registry/lang-07", "rd-agent/lang-07"]
+lang-08 = ["rd-engine-registry/lang-08", "rd-agent/lang-08"]
+lang-09 = ["rd-engine-registry/lang-09", "rd-agent/lang-09"]
+lang-10 = ["rd-engine-registry/lang-10", "rd-agent/lang-10"]
+lang-11 = ["rd-engine-registry/lang-11", "rd-agent/lang-11"]
+lang-12 = ["rd-engine-registry/lang-12", "rd-agent/lang-12"]
+
 [dependencies]
+rd-engine-registry.workspace = true
 rd-apk = { workspace = true }
 rd-dex = { workspace = true }
 rd-vm = { workspace = true }

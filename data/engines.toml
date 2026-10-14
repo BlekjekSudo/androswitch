@@ -1,0 +1,689 @@
+# Apêndice G: metadados, não promessas de execução.
+schema_version = 1
+scope = "registry-and-detection-only"
+
+[[module]]
+id = "LANG-01"
+feature = "lang-01"
+depends_on = []
+notes = "DEX compartilhado; VM existente tem cobertura parcial."
+
+[[module]]
+id = "LANG-02"
+feature = "lang-02"
+depends_on = ["LANG-01"]
+notes = "ELF/JNI; loaders e JNI completos ainda não implementados."
+
+[[module]]
+id = "LANG-03"
+feature = "lang-03"
+depends_on = ["LANG-02"]
+notes = "Rust NDK reutiliza a fronteira ELF/JNI."
+
+[[module]]
+id = "LANG-04"
+feature = "lang-04"
+depends_on = ["LANG-02"]
+notes = "Flutter: Dart AOT e engine/render próprio pendentes."
+
+[[module]]
+id = "LANG-05"
+feature = "lang-05"
+depends_on = ["LANG-02"]
+notes = "JS/RN/NativeScript: engine JS e bridges pendentes."
+
+[[module]]
+id = "LANG-06"
+feature = "lang-06"
+depends_on = ["LANG-01"]
+notes = "WebView/bridges Android; não baixa páginas na detecção."
+
+[[module]]
+id = "LANG-07"
+feature = "lang-07"
+depends_on = ["LANG-02"]
+notes = "Mono/IL e render de MAUI/Avalonia pendentes."
+
+[[module]]
+id = "LANG-08"
+feature = "lang-08"
+depends_on = ["LANG-07"]
+notes = "União das rotas Unity Mono e IL2CPP; não implica suporte gráfico."
+
+[[module]]
+id = "LANG-09"
+feature = "lang-09"
+depends_on = ["LANG-02"]
+notes = "Pontes independentes de engines; não embute engines no registro."
+
+[[module]]
+id = "LANG-10"
+feature = "lang-10"
+depends_on = ["LANG-01"]
+notes = "Shared DEX é possível; render Compose MP exige trabalho adicional."
+
+[[module]]
+id = "LANG-11"
+feature = "lang-11"
+depends_on = ["LANG-01"]
+notes = "Java gerado; só o subconjunto DEX já disponível."
+
+[[module]]
+id = "LANG-12"
+feature = "lang-12"
+depends_on = ["LANG-01"]
+notes = "WASM in-app; bridge JNI/JS escolhida na implementação futura."
+
+[[engine]]
+number = 1
+id = "java"
+name = "Java"
+artifact = "classes*.dex"
+modules = ["LANG-01"]
+strategy = "VM DEX própria"
+adapter_crate = "rd-vm"
+runtime_status = "partial_dex"
+notes = "DEX tem suporte parcial, não execução universal de Java."
+
+[[engine.rule]]
+state = "candidate"
+all = ["root-dex"]
+any = []
+explanation = "DEX é compartilhado: não identifica a linguagem de origem."
+
+[[engine]]
+number = 2
+id = "kotlin"
+name = "Kotlin"
+artifact = "classes*.dex"
+modules = ["LANG-01"]
+strategy = "VM DEX; coroutines/threads dependem da cobertura da VM"
+adapter_crate = "rd-vm"
+runtime_status = "partial_dex"
+notes = "Dependências Kotlin não provam que o app foi escrito em Kotlin."
+
+[[engine.rule]]
+state = "candidate"
+all = ["root-dex"]
+any = []
+explanation = "DEX é compartilhado: não identifica a linguagem de origem."
+
+[[engine]]
+number = 3
+id = "kotlin-multiplatform"
+name = "Kotlin Multiplatform / Compose MP"
+artifact = "DEX; recursos Compose; klib nem sempre é distribuída"
+modules = ["LANG-10"]
+strategy = "Shared DEX + futuro render Compose MP"
+adapter_crate = "rd-engine-compose-mp"
+runtime_status = "not_implemented"
+notes = "Não é possível distinguir KMP/Compose MP apenas pela presença de DEX."
+
+[[engine.rule]]
+state = "candidate"
+all = ["root-dex"]
+any = []
+explanation = "DEX é compartilhado: não identifica a linguagem de origem."
+
+[[engine.rule]]
+state = "candidate"
+all = ["suffix:.klib"]
+any = []
+explanation = "klib é pista, não prova render Compose Multiplatform."
+
+[[engine]]
+number = 4
+id = "jvm-dynamic"
+name = "Scala / Clojure / Groovy"
+artifact = "classes*.dex"
+modules = ["LANG-01"]
+strategy = "VM DEX; invocações dinâmicas conforme cobertura"
+adapter_crate = "rd-vm"
+runtime_status = "partial_dex"
+notes = "invoke-custom/method handles e runtimes dinâmicos não são declarados completos."
+
+[[engine.rule]]
+state = "candidate"
+all = ["root-dex"]
+any = []
+explanation = "DEX é compartilhado: não identifica a linguagem de origem."
+
+[[engine]]
+number = 5
+id = "c-ndk"
+name = "C (NDK)"
+artifact = "lib/<abi>/*.so"
+modules = ["LANG-02"]
+strategy = "ELF + JNI"
+adapter_crate = "rd-ndk/rd-jni"
+runtime_status = "not_implemented"
+notes = "C não pode ser atribuído a uma .so genérica."
+
+[[engine.rule]]
+state = "candidate"
+all = ["native-so"]
+any = []
+explanation = "ELF é compartilhado: não identifica a linguagem de origem nem valida ABI/payload."
+
+[[engine]]
+number = 6
+id = "cpp-ndk"
+name = "C++ (NDK)"
+artifact = "lib/<abi>/*.so; STL opcional"
+modules = ["LANG-02"]
+strategy = "ELF + JNI + STL"
+adapter_crate = "rd-ndk/rd-jni"
+runtime_status = "not_implemented"
+notes = "libc++_shared.so indica dependência STL, não a linguagem do app."
+
+[[engine.rule]]
+state = "candidate"
+all = ["native-so"]
+any = []
+explanation = "ELF é compartilhado: não identifica a linguagem de origem nem valida ABI/payload."
+
+[[engine]]
+number = 7
+id = "rust-ndk"
+name = "Rust (cargo-ndk/xbuild)"
+artifact = "lib/<abi>/*.so"
+modules = ["LANG-03"]
+strategy = "ELF + JNI"
+adapter_crate = "rd-ndk/rd-jni"
+runtime_status = "not_implemented"
+notes = "Nome .so e símbolos removidos não provam Rust."
+
+[[engine.rule]]
+state = "candidate"
+all = ["native-so"]
+any = []
+explanation = "ELF é compartilhado: não identifica a linguagem de origem nem valida ABI/payload."
+
+[[engine]]
+number = 8
+id = "go-mobile"
+name = "Go (gomobile)"
+artifact = "lib/<abi>/*.so; wrappers bind"
+modules = ["LANG-09"]
+strategy = "ELF + JNI + gomobile bind"
+adapter_crate = "rd-engine-gomobile"
+runtime_status = "not_implemented"
+notes = "Marcador gojni é uma assinatura heurística, não análise de símbolos."
+
+[[engine.rule]]
+state = "candidate"
+all = ["native-so"]
+any = []
+explanation = "ELF é compartilhado: não identifica a linguagem de origem nem valida ABI/payload."
+
+[[engine.rule]]
+state = "signature"
+all = ["native:libgojni.so"]
+any = []
+explanation = "Marcador de bind gomobile."
+
+[[engine]]
+number = 9
+id = "objective-c-ndk"
+name = "Objective-C/C (cross via NDK)"
+artifact = "lib/<abi>/*.so"
+modules = ["LANG-02"]
+strategy = "ELF + JNI; runtime ObjC se necessário"
+adapter_crate = "rd-ndk/rd-jni"
+runtime_status = "not_implemented"
+notes = "Rota rara; uma .so genérica só produz candidato."
+
+[[engine.rule]]
+state = "candidate"
+all = ["native-so"]
+any = []
+explanation = "ELF é compartilhado: não identifica a linguagem de origem nem valida ABI/payload."
+
+[[engine]]
+number = 10
+id = "zig-llvm"
+name = "Zig / outras linguagens LLVM"
+artifact = "lib/<abi>/*.so"
+modules = ["LANG-02"]
+strategy = "ELF + JNI"
+adapter_crate = "rd-ndk/rd-jni"
+runtime_status = "not_implemented"
+notes = "ELF não preserva necessariamente a linguagem do compilador."
+
+[[engine.rule]]
+state = "candidate"
+all = ["native-so"]
+any = []
+explanation = "ELF é compartilhado: não identifica a linguagem de origem nem valida ABI/payload."
+
+[[engine]]
+number = 11
+id = "flutter"
+name = "Dart / Flutter"
+artifact = "libapp.so; libflutter.so; flutter_assets"
+modules = ["LANG-04"]
+strategy = "Dart AOT + engine Flutter headless futuros"
+adapter_crate = "rd-engine-flutter"
+runtime_status = "not_implemented"
+notes = "Não interpreta Dart AOT nem converte widgets nesta entrega."
+
+[[engine.rule]]
+state = "signature"
+all = ["native:libflutter.so", "prefix:assets/flutter_assets/"]
+any = []
+explanation = "Engine Flutter acompanhado de assets."
+
+[[engine.rule]]
+state = "candidate"
+all = ["native:libapp.so"]
+any = []
+explanation = "libapp.so isolada não prova Flutter."
+
+[[engine]]
+number = 12
+id = "react-native"
+name = "JS/TS (React Native / Expo)"
+artifact = "bundle JS; Hermes bytecode/JSC; libs RN"
+modules = ["LANG-05"]
+strategy = "Engine JS + RN/Expo bridge futuros"
+adapter_crate = "rd-engine-react-native"
+runtime_status = "not_implemented"
+notes = "Hermes sozinho não prova React Native; não valida bytecode."
+
+[[engine.rule]]
+state = "signature"
+all = ["path:assets/index.android.bundle"]
+any = ["native:libreactnativejni.so", "native:libreactnative.so"]
+explanation = "Lib React Native acompanhada de bundle."
+
+[[engine.rule]]
+state = "candidate"
+all = ["path:assets/index.android.bundle"]
+any = []
+explanation = "Bundle convencional isolado é apenas candidato."
+
+[[engine.rule]]
+state = "candidate"
+all = ["native:libhermes.so"]
+any = []
+explanation = "Hermes pode ser usado fora de React Native."
+
+[[engine]]
+number = 13
+id = "cordova"
+name = "HTML/JS (Cordova / Capacitor / Ionic)"
+artifact = "assets/www/ ou assets/public/; configs bridge"
+modules = ["LANG-06"]
+strategy = "WebView headless + bridges futuros"
+adapter_crate = "rd-engine-webview"
+runtime_status = "not_implemented"
+notes = "Assets web sem marcador específico são candidatos, não framework confirmado."
+
+[[engine.rule]]
+state = "signature"
+all = ["prefix:assets/www/", "path:assets/www/cordova.js"]
+any = []
+explanation = "www com bootstrap Cordova."
+
+[[engine.rule]]
+state = "signature"
+all = ["prefix:assets/public/", "path:assets/capacitor.config.json"]
+any = []
+explanation = "Assets web com configuração Capacitor."
+
+[[engine.rule]]
+state = "candidate"
+all = ["prefix:assets/www/"]
+any = []
+explanation = "Assets HTML compatíveis com engines web."
+
+[[engine.rule]]
+state = "candidate"
+all = ["prefix:assets/public/"]
+any = []
+explanation = "Assets HTML compatíveis com engines web."
+
+[[engine]]
+number = 14
+id = "twa-pwa"
+name = "HTML/JS (TWA / PWA)"
+artifact = "Manifest/URL; pode não haver payload web local"
+modules = ["LANG-06"]
+strategy = "WebView/TWA futuro; rede não consultada"
+adapter_crate = "rd-engine-webview"
+runtime_status = "not_implemented"
+notes = "Ausência de payload local não descarta TWA/PWA."
+
+[[engine.rule]]
+state = "signature"
+all = []
+any = ["class:com.google.androidbrowserhelper.trusted.", "class:android.support.customtabs.trusted.", "metadata:android.support.customtabs.trusted.DEFAULT_URL"]
+explanation = "Launcher/metadata de Trusted Web Activity."
+
+[[engine]]
+number = 15
+id = "nativescript"
+name = "JS/TS (NativeScript)"
+artifact = "assets/app/; libNativeScript.so"
+modules = ["LANG-05", "LANG-02"]
+strategy = "Engine JS + JNI + views futuros"
+adapter_crate = "rd-engine-nativescript"
+runtime_status = "not_implemented"
+notes = "Nenhum bridge JS/Android é executado pelo registro."
+
+[[engine.rule]]
+state = "signature"
+all = ["native:libNativeScript.so", "prefix:assets/app/"]
+any = []
+explanation = "Lib NativeScript e payload app."
+
+[[engine]]
+number = 16
+id = "tauri"
+name = "JS/TS (Tauri v2)"
+artifact = "assets web + Rust .so; markers Tauri opcionais"
+modules = ["LANG-06", "LANG-03"]
+strategy = "WebView + Rust JNI futuros"
+adapter_crate = "rd-engine-tauri"
+runtime_status = "not_implemented"
+notes = "Sem configuração Tauri, Rust+WebView não identifica Tauri unicamente."
+
+[[engine.rule]]
+state = "signature"
+all = ["path:assets/tauri.conf.json"]
+any = ["prefix:assets/www/", "prefix:assets/public/"]
+explanation = "Config Tauri embarcada acompanhada de assets web."
+
+[[engine.rule]]
+state = "candidate"
+all = ["native-so"]
+any = ["prefix:assets/www/", "prefix:assets/public/"]
+explanation = "Combinação de lib nativa e assets web é ambígua."
+
+[[engine]]
+number = 17
+id = "dotnet-maui"
+name = "C# (.NET MAUI / Xamarin)"
+artifact = "assemblies/*.dll; Mono; blobs de assemblies"
+modules = ["LANG-07"]
+strategy = "Mono/IL + bridges futuros"
+adapter_crate = "rd-engine-mono"
+runtime_status = "not_implemented"
+notes = "Assembly stores comprimidos/renomeados podem não ter .dll visível."
+
+[[engine.rule]]
+state = "signature"
+all = ["prefix:assemblies/"]
+any = ["native:libmonodroid.so", "native:libmonosgen-2.0.so"]
+explanation = "Payload managed acompanhado de runtime Mono."
+
+[[engine.rule]]
+state = "candidate"
+all = ["prefix:assemblies/"]
+any = []
+explanation = "Assemblies indicam payload managed, não MAUI unicamente."
+
+[[engine]]
+number = 18
+id = "unity-mono"
+name = "C# (Unity Mono)"
+artifact = "Assembly-CSharp.dll; libunity.so"
+modules = ["LANG-08"]
+strategy = "Mono + stubs/render Unity futuros"
+adapter_crate = "rd-engine-unity"
+runtime_status = "not_implemented"
+notes = "Identifica a rota Mono por marcadores, não executa o jogo."
+
+[[engine.rule]]
+state = "signature"
+all = ["native:libunity.so", "path:assets/bin/Data/Managed/Assembly-CSharp.dll"]
+any = []
+explanation = "Unity com Assembly-CSharp managed."
+
+[[engine.rule]]
+state = "candidate"
+all = ["path:assets/bin/Data/Managed/Assembly-CSharp.dll"]
+any = []
+explanation = "Assembly-CSharp isolado é apenas candidato."
+
+[[engine]]
+number = 19
+id = "unity-il2cpp"
+name = "C# (Unity IL2CPP)"
+artifact = "libil2cpp.so; global-metadata.dat"
+modules = ["LANG-08"]
+strategy = "Interp nativo + stubs/render Unity futuros"
+adapter_crate = "rd-engine-unity"
+runtime_status = "not_implemented"
+notes = "Não interpreta IL2CPP nem valida versão de global-metadata."
+
+[[engine.rule]]
+state = "signature"
+all = ["native:libil2cpp.so", "path:assets/bin/Data/Managed/Metadata/global-metadata.dat"]
+any = []
+explanation = "IL2CPP acompanhado de metadata."
+
+[[engine.rule]]
+state = "candidate"
+all = ["native:libil2cpp.so"]
+any = []
+explanation = "Lib IL2CPP sem metadata é assinatura incompleta."
+
+[[engine]]
+number = 20
+id = "unreal"
+name = "C++ (Unreal)"
+artifact = "libUE4.so / libUnreal.so; pak/obb"
+modules = ["LANG-09"]
+strategy = "Engine/stubs Unreal futuros"
+adapter_crate = "rd-engine-unreal"
+runtime_status = "not_implemented"
+notes = "Dados também podem vir de OBB fora do APK."
+
+[[engine.rule]]
+state = "signature"
+all = []
+any = ["native:libUE4.so", "native:libUnreal.so"]
+explanation = "Marcador de biblioteca Unreal."
+
+[[engine]]
+number = 21
+id = "godot"
+name = "GDScript/C# (Godot 3/4)"
+artifact = "libgodot*.so; .pck/assets"
+modules = ["LANG-09"]
+strategy = "Godot headless embed futuro"
+adapter_crate = "rd-engine-godot"
+runtime_status = "not_implemented"
+notes = "PCK isolado é candidato; C# demanda Mono além de Godot."
+
+[[engine.rule]]
+state = "signature"
+all = ["suffix:.pck"]
+any = ["native:libgodot_android.so", "native:libgodot.so"]
+explanation = "Biblioteca Godot e pacote/descritor do projeto."
+
+[[engine.rule]]
+state = "signature"
+all = ["path:assets/project.binary"]
+any = ["native:libgodot_android.so", "native:libgodot.so"]
+explanation = "Biblioteca Godot e project.binary."
+
+[[engine.rule]]
+state = "candidate"
+all = ["suffix:.pck"]
+any = []
+explanation = "Pacote .pck isolado não prova Godot."
+
+[[engine]]
+number = 22
+id = "lua-engines"
+name = "Lua (Defold / Solar2D / Cocos2d-x)"
+artifact = "Lua source/bytecode; assets; libs engine"
+modules = ["LANG-09"]
+strategy = "Lua embed + bridges específicos futuros"
+adapter_crate = "rd-engine-lua"
+runtime_status = "not_implemented"
+notes = "Bytecode/containers podem ser comprimidos; .lua é apenas candidato."
+
+[[engine.rule]]
+state = "signature"
+all = []
+any = ["native:libcorona.so", "native:libdefold.so"]
+explanation = "Marcador de engine Lua."
+
+[[engine.rule]]
+state = "candidate"
+all = ["suffix:.lua"]
+any = []
+explanation = "Payload Lua não distingue Defold/Solar2D/Cocos2d-x."
+
+[[engine.rule]]
+state = "candidate"
+all = ["suffix:.luac"]
+any = []
+explanation = "Bytecode Lua apenas por extensão; conteúdo não validado."
+
+[[engine.rule]]
+state = "candidate"
+all = ["native:libcocos2dcpp.so"]
+any = []
+explanation = "Cocos2d-x não implica uso de Lua."
+
+[[engine]]
+number = 23
+id = "python-engines"
+name = "Python (Kivy / Buildozer / Chaquopy / BeeWare)"
+artifact = "Python source/bytecode; libs; payloads compactados"
+modules = ["LANG-09"]
+strategy = "CPython/PyO3 + bridges específicos futuros"
+adapter_crate = "rd-engine-python"
+runtime_status = "not_implemented"
+notes = "Não descompacta private.mp3/stdlib.zip nem executa Python."
+
+[[engine.rule]]
+state = "signature"
+all = ["prefix:assets/chaquopy/"]
+any = []
+explanation = "Marcador de payload Chaquopy."
+
+[[engine.rule]]
+state = "candidate"
+all = []
+any = ["suffix:.py", "suffix:.pyc"]
+explanation = "Payload Python identificável por extensão."
+
+[[engine.rule]]
+state = "candidate"
+all = ["path:assets/private.mp3"]
+any = []
+explanation = "Container convencional python-for-android; conteúdo não verificado."
+
+[[engine]]
+number = 24
+id = "haxe"
+name = "Haxe (OpenFL / Heaps)"
+artifact = "DEX ou lib/<abi>/*.so"
+modules = ["LANG-01", "LANG-02"]
+strategy = "VM DEX ou ELF/JNI; bridge Haxe futuro"
+adapter_crate = "rd-engine-haxe"
+runtime_status = "not_implemented"
+notes = "Formato DEX/ELF não identifica Haxe; ambas as rotas são candidatos."
+
+[[engine.rule]]
+state = "candidate"
+all = ["root-dex"]
+any = []
+explanation = "DEX é compartilhado: não identifica a linguagem de origem."
+
+[[engine.rule]]
+state = "candidate"
+all = ["native-so"]
+any = []
+explanation = "ELF é compartilhado: não identifica a linguagem de origem nem valida ABI/payload."
+
+[[engine]]
+number = 25
+id = "qt-qml"
+name = "Qt / QML (C++)"
+artifact = "libQt*.so; QML assets/recursos"
+modules = ["LANG-09"]
+strategy = "Qt headless + JNI futuros"
+adapter_crate = "rd-engine-qt"
+runtime_status = "not_implemented"
+notes = "QML pode estar em recursos compilados, fora de assets visíveis."
+
+[[engine.rule]]
+state = "signature"
+all = ["suffix:.qml"]
+any = ["native-prefix:libQt5Core", "native-prefix:libQt6Core"]
+explanation = "Runtime Qt e payload QML."
+
+[[engine.rule]]
+state = "candidate"
+all = []
+any = ["native-prefix:libQt5Core", "native-prefix:libQt6Core"]
+explanation = "Runtime Qt por nome de lib."
+
+[[engine.rule]]
+state = "candidate"
+all = ["suffix:.qml"]
+any = []
+explanation = "QML isolado é candidato."
+
+[[engine]]
+number = 26
+id = "avalonia"
+name = "Avalonia (C#)"
+artifact = "assemblies Avalonia; runtime managed"
+modules = ["LANG-07"]
+strategy = "Mono + render próprio futuros"
+adapter_crate = "rd-engine-avalonia"
+runtime_status = "not_implemented"
+notes = "Assemblies em stores opacos podem não ser identificáveis."
+
+[[engine.rule]]
+state = "signature"
+all = []
+any = ["path:assemblies/Avalonia.Android.dll", "path:assemblies/Avalonia.Base.dll"]
+explanation = "Assembly Avalonia embarcada."
+
+[[engine.rule]]
+state = "candidate"
+all = ["prefix:assemblies/"]
+any = []
+explanation = "Payload managed genérico não prova Avalonia."
+
+[[engine]]
+number = 27
+id = "generated-java"
+name = "B4X / App Inventor / Thunkable"
+artifact = "classes*.dex"
+modules = ["LANG-01", "LANG-11"]
+strategy = "VM DEX; fixtures específicas futuras"
+adapter_crate = "rd-vm"
+runtime_status = "partial_dex"
+notes = "Java gerado não é distinguível de Java escrito à mão apenas pelo formato."
+
+[[engine.rule]]
+state = "candidate"
+all = ["root-dex"]
+any = []
+explanation = "DEX é compartilhado: não identifica a linguagem de origem."
+
+[[engine]]
+number = 28
+id = "wasm"
+name = "WebAssembly in-app"
+artifact = "assets/*.wasm (ou containers opacos)"
+modules = ["LANG-12"]
+strategy = "Runtime WASM + bridge JNI/JS futuros"
+adapter_crate = "rd-engine-wasm"
+runtime_status = "not_implemented"
+notes = "Extensão .wasm não valida magic/version/imports nem prova uso em runtime."
+
+[[engine.rule]]
+state = "candidate"
+all = ["suffix:.wasm"]
+any = []
+explanation = "Arquivo com extensão WASM; payload não validado."
