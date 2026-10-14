@@ -32,6 +32,12 @@ pub const APPLICATION: &str = "Landroid/app/Application;";
 /// M8: FragmentManager legacy (`android.app`, deprecated na API 28 mas ainda
 /// usado por apps reais como o org.primftpd — 29º gap do launch real).
 pub const FRAGMENT_MANAGER: &str = "Landroid/app/FragmentManager;";
+/// M8 (44º gap real): PreferenceManager/SharedPreferences host.
+pub const PREFERENCE_MANAGER: &str = "Landroid/preference/PreferenceManager;";
+/// Interface de plataforma (mref das chamadas das activities).
+pub const SHARED_PREFS: &str = "Landroid/content/SharedPreferences;";
+/// Classe impl canônica do host (SharedPreferencesImpl, como no AOSP).
+pub const SHARED_PREFS_IMPL: &str = "Landroid/content/SharedPreferencesImpl;";
 /// M8 (31º gap): FragmentTransaction legacy — ops pendentes até `commit`.
 pub const FRAGMENT_TX: &str = "Landroid/app/FragmentTransaction;";
 /// M8 (32º gap): Fragment legacy — a classe da fragment do app estende esta;
@@ -163,6 +169,16 @@ pub enum HostObj {
         elems: Vec<Value>,
         pos: usize,
     },
+    /// M8 (45º gap real — slf4j 2.x do primftpd): ServiceLoader host com os
+    /// providers descobertos em `META-INF/services/<nome binário da
+    /// interface>` (arquivo indexado de qualquer classes.dex do APK).
+    /// `service_desc` guarda o descritor da interface; `providers` são
+    /// descritores de classes impl (comentários `#` e linhas vazias
+    /// descartados como no formato java.util.ServiceLoader).
+    ServiceLoader {
+        service_desc: String,
+        providers: Vec<String>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -200,6 +216,17 @@ pub struct HostState {
     pub current_activity: Option<ObjRef>,
     /// package do app (preenchido no launch_app; getPackageName)
     pub package_name: String,
+    /// M8 (38º gap real): Application canônica do app — Android cria UMA por
+    /// processo antes de qualquer activity. Classe vem do android:name do
+    /// manifest (injetada por `Engine::set_application_class`) ou
+    /// Landroid/app/Application; quando o app não declara subclasse.
+    application: Option<ObjRef>,
+    /// M8 (38º gap): descritor da classe de Application do manifest.
+    pub application_class: Option<String>,
+    /// M8 (44º gap real): objeto canônico das SharedPreferences padrão
+    /// (getDefaultSharedPreferences) — SharedPreferencesImpl do host, vazio
+    /// (sem persistência em arquivo nesta milestone).
+    pub shared_prefs_impl: Option<ObjRef>,
     /// M3.2: APK aberto (Resources) — layouts AXML + resources.arsc para o
     /// LayoutInflater. Injetado via `Engine::set_resources` (CLI `rd app run`).
     pub resources: Option<rd_apk::Apk>,
@@ -509,6 +536,86 @@ impl Engine {
         Ok(r)
     }
 
+    /// M8 (38º gap real): Application canônica (uma por VM, identidade
+    /// estável como no Android). Lazy para TODAS as rotas de chamada —
+    /// criada também pelo launch (ver `launch_app`): a do manifest vence.
+    pub(crate) fn application_obj(&mut self) -> Result<ObjRef, VmExit> {
+        if let Some(a) = self.fw.application {
+            return Ok(a);
+        }
+        let r = self
+            .heap
+            .alloc_instance(APPLICATION.to_string(), Vec::new())
+            .map_err(|e| {
+                VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/OutOfMemoryError;",
+                    format!(
+                        "alocação de {} bytes excede o heap de {} bytes",
+                        e.requested, e.budget
+                    ),
+                ))
+            })?;
+        self.attach_host_state(APPLICATION, r)?;
+        self.fw.application = Some(r);
+        Ok(r)
+    }
+
+    /// M8 (45º gap real — providers de ServiceLoader): instancia uma classe
+    /// do DEX: aloca + anexa estado host + <clinit> (`ensure_initialized`) +
+    /// `<init>()V` quando declarado na própria classe. Classe ausente →
+    /// NoClassDefFoundError (espelha o runtime; o caller em ServiceLoader
+    /// converte/usa conforme a nota do 45º gap).
+    pub(crate) fn new_dex_instance(&mut self, desc: &str) -> Result<ObjRef, VmExit> {
+        if self.cp.find_class(desc).is_none() {
+            return Err(VmExit::Exception(crate::err::Throwable::new(
+                "Ljava/lang/NoClassDefFoundError;",
+                format!("{desc} não resolvido nos dex do app"),
+            )));
+        }
+        let r = self
+            .heap
+            .alloc_instance(desc.to_string(), Vec::new())
+            .map_err(|e| {
+                VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/OutOfMemoryError;",
+                    format!(
+                        "alocação de {} bytes excede o heap de {} bytes",
+                        e.requested, e.budget
+                    ),
+                ))
+            })?;
+        self.attach_host_state(desc, r)?;
+        self.ensure_initialized(desc)?;
+        if let Some((d, def, m)) = self.cp.resolve_method(desc, "<init>", "()V") {
+            self.call(d, def, &m, vec![Value::Obj(r)])?;
+        }
+        Ok(r)
+    }
+
+    /// M8 (44º gap real — SharedPreferences padrão para
+    /// `PreferenceManager.getDefaultSharedPreferences`): objeto canônico
+    /// (classe SharedPreferencesImpl, como no AOSP — a VM não persiste em
+    /// arquivo nesta milestone: prefs começam vazias e vivem nesta VM).
+    pub(crate) fn shared_prefs_obj(&mut self) -> Result<ObjRef, VmExit> {
+        if let Some(p) = self.fw.shared_prefs_impl {
+            return Ok(p);
+        }
+        let r = self
+            .heap
+            .alloc_instance(SHARED_PREFS_IMPL.to_string(), Vec::new())
+            .map_err(|e| {
+                VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/OutOfMemoryError;",
+                    format!(
+                        "alocação de {} bytes excede o heap de {} bytes",
+                        e.requested, e.budget
+                    ),
+                ))
+            })?;
+        self.fw.shared_prefs_impl = Some(r);
+        Ok(r)
+    }
+
     // ── driver do app trivial (DoD M3) ───────────────────────────────────
 
     /// Cria a activity, roda o lifecycle e devolve a ref. `package_name`
@@ -535,6 +642,32 @@ impl Engine {
             .into());
         }
         self.fw.package_name = package_name.to_string();
+        // M8 (38º gap real): Android cria a Application do processo ANTES
+        // da activity e roda Application.onCreate — o DEX do app depende
+        // disso (getApplication() devolve a instância do manifest).
+        {
+            let app_cls = self
+                .fw
+                .application_class
+                .clone()
+                .filter(|c| self.cp.find_class(c).is_some())
+                .unwrap_or_else(|| APPLICATION.to_string());
+            if self.fw.application.is_none() {
+                let ar = self.heap.alloc_instance(app_cls.clone(), Vec::new())?;
+                self.attach_host_state(&app_cls, ar)?;
+                self.fw.application = Some(ar);
+                // <init> da classe, se o DEX declara (super = host no-op).
+                if let Some((d, def, m)) = self.cp.resolve_method(&app_cls, "<init>", "()V") {
+                    self.call(d, def, &m, vec![Value::Obj(ar)])?;
+                }
+                // Android: Application.onCreate ANTES do onCreate da
+                // activity (só o que o DEX declara; framework já cobre
+                // APPLICATION.onCreate como no-op do runtime).
+                if let Some((d, def, m)) = self.cp.resolve_method(&app_cls, "onCreate", "()V") {
+                    self.call(d, def, &m, vec![Value::Obj(ar)])?;
+                }
+            }
+        }
         self.ensure_initialized(activity_desc)?;
         let r = self
             .heap
@@ -1305,6 +1438,12 @@ pub fn call_host_static(
         (SYSTEM_CLOCK, "elapsedRealtimeNanos") => {
             Ok(Some(Value::Long(vm.fw.clock() as i64 * 1_000_000)))
         }
+        // ── M8 (44º gap real — SharedPreferences padrão) ──
+        // getDefaultSharedPreferences: objeto canônico do host (vazio nesta
+        // milestone — não persiste em arquivo; o editor vem quando pedido).
+        (PREFERENCE_MANAGER, "getDefaultSharedPreferences") => {
+            Ok(Some(Value::Obj(vm.shared_prefs_obj()?)))
+        }
         (SYSTEM_CLOCK, "sleep") => {
             // sleep(ms): avança o relógio virtual e drena o Looper
             let ms = match args.first() {
@@ -1524,6 +1663,56 @@ pub fn call_host_instance(
             if sig == "()Landroid/app/FragmentManager;" && is_activity(vm) =>
         {
             Ok(Some(Value::Obj(vm.fragment_manager_obj()?)))
+        }
+        // ── SharedPreferences (M8, 44º gap real: LogController.readPrefs) ──
+        // Prefs do host COMEÇAM VAZIAS (sem persistência em arquivo nesta
+        // milestone): getXxx devolve o default da chamada — comportamento
+        // correto de prefs recém-criadas (AOSP devolve o default), não um
+        // stub inseguro. Chave null → NPE (AOSP levanta NPE em getStringWithDefault).
+        _ if recv_class == SHARED_PREFS_IMPL && mref_class == SHARED_PREFS => match (name, sig) {
+            ("getString", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
+            | ("getStringSet", "(Ljava/lang/String;Ljava/util/Set;)Ljava/util/Set;")
+            | ("getBoolean", "(Ljava/lang/String;Z)Z")
+            | ("getInt", "(Ljava/lang/String;I)I")
+            | ("getLong", "(Ljava/lang/String;J)J")
+            | ("getFloat", "(Ljava/lang/String;F)F") => {
+                if let Some(Value::Obj(_)) = args.first() {
+                    Ok(Some(args.get(1).cloned().unwrap_or(Value::Null)))
+                } else {
+                    Err(VmExit::Exception(crate::err::Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        format!("SharedPreferences.{name} com key null"),
+                    )))
+                }
+            }
+            ("contains", "(Ljava/lang/String;)Z") => {
+                if let Some(Value::Obj(_)) = args.first() {
+                    Ok(Some(Value::Int(0)))
+                } else {
+                    Err(VmExit::Exception(crate::err::Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "SharedPreferences.contains com key null",
+                    )))
+                }
+            }
+            _ => Ok(None),
+        },
+        // ── M8 (38º gap real): Activity.getApplication — final na
+        // plataforma; devolve a Application canônica da VM (criada no
+        // launch com a classe do manifest, ou Landroid/app/Application;
+        // por default). Para chamadas cujo mref_class é a própria classe
+        // do app (ex.: MainTabsActivity), o braço correspondente vive em
+        // intrinsics::call_instance_intrinsic_mref (o gate Landroid/ do
+        // interp não captura descritor de classe do app).
+        (ACTIVITY, "getApplication") if sig == "()Landroid/app/Application;" && is_activity(vm) => {
+            Ok(Some(Value::Obj(vm.application_obj()?)))
+        }
+        // ── M8 (39º gap real): Context.getApplicationContext — para
+        // activities é a mesma Application canônica de getApplication.
+        (ACTIVITY, "getApplicationContext") | (CONTEXT, "getApplicationContext")
+            if sig == "()Landroid/content/Context;" && is_activity(vm) =>
+        {
+            Ok(Some(Value::Obj(vm.application_obj()?)))
         }
         // ── M8 (30º/31º gaps reais): consultas ao registro de fragments do
         // host. Sem commit prévio ⇒ null (contrato Android para fragment não

@@ -1272,6 +1272,16 @@ fn boot_app(
         },
     );
     if let Some(a) = apk {
+        // M8 (38º gap): classe de Application do manifest → o launch cria a
+        // Application real do app antes da activity (getApplication).
+        if let Some(name) = &a.manifest.application.name {
+            let abs = if let Some(rel) = name.strip_prefix('.') {
+                format!("{}{}", a.manifest.package, rel)
+            } else {
+                name.clone()
+            };
+            eng.set_application_class(format!("L{};", abs.replace('.', "/")));
+        }
         eng.set_resources(a);
     }
     if let Err(e) = eng.launch_app(&activity_desc, &package, Vec::new()) {

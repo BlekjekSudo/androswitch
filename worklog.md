@@ -1194,3 +1194,25 @@ GitHub status:
 
 Stage Summary:
 - Semântica DEX de invokes ✅ (36º+37º + adjacente abstrato) → próximo: Activity.getApplication() host; Ljava.util.* host seguem completos.
+
+## 2026-10-14 02:17-04:50 UTC — Cadeia do launch real primftpd: Application + Collections + SharedPreferences + ServiceLoader
+
+Sondagem→implementação→teste→re-sondagem em 8 gaps reais consecutivos (38º–45º) até a cadeia do launch encerrar em comportamento fiel ao dispositivo:
+
+- **38º gap — Activity.getApplication()**: HostState ganha `application: Option<ObjRef>` + `application_class`; `Engine::application_obj()` lazy canônico; em `launch_app` instancia a classe do manifest (ou fallback AOSP `Landroid/app/Application;` quando a classe não está no DEX), roda `<init>`/`onCreate` DEX ANTES do da activity; arms no framework (mref Landroid/) e em `call_instance_intrinsic_mref` (mref = classe do app — o gate Landroid/ do despacho host não captura). `Engine::set_application_class` + wiring CLI/MCP a partir de `manifest.application.name` (relativo `.X` → absoluto). Teste: ordem Application(41)→Activity(42), canônica.
+- **39º gap — Context.getApplicationContext()**: mesma Application (arm duplo ACTIVITY|CONTEXT; subtype-guard incluindo APPLICATION/CONTEXT).
+- **40º–43º gaps — cadeia java.util.Collections do LogController**: `Collections.unmodifiableMap` (40º), `singletonList` (41º), `HashSet.<init>(Collection)` (42º — snapshot dedup), `Collections.unmodifiableSet` (43º). Views imutáveis de SNAPSHOT em classes-marcadoras JDK (`Collections$UnmodifiableMap/$UnmodifiableSet/$SingletonList`); leituras delegam; mutações → UOE tipada; null → NPE (exceto singletonList(null) — JDK aceita); coleção do app sem estado host → VM_TYPE_ERROR tipado (honestidade M8). Desvio snapshot≠view documentado (regime de synchronized*).
+- **44º gap — PreferenceManager.getDefaultSharedPreferences**: objeto canônico `Landroid/content/SharedPreferencesImpl;` (AOSP); prefs começam VAZIAS (getXxx → default da chamada; contains → false; key null → NPE); sem persistência em arquivo nesta milestone; `edit()` continua fora (falta tipada se o app escrever).
+- **45º gap — ServiceLoader discovery real**: `load(Class[,ClassLoader])` lê `META-INF/services/<nome binário>` do APK anexado (formato JDK: `#` comenta); `iterator()` INSTANCIA providers via DEX (helper `new_dex_instance`: alloc+<clinit>+<init>()V) no snapshot do Iter (eager ≠ lazy JDK — documentado); provider ausente → `ServiceConfigurationError` (JLS); sem APK/arquivo → loader vazio (contrato). Teste com APK sintético: provider instanciado ANTES do erro do provider ausente.
+- **Fim da cadeia (fiel)**: o launch executa `PftpdApp.onCreate()` inteiro, `LogController.<clinit>/init/readPrefs` e `setActiveConfig` e morre em `ClassCastException: NOPLoggerFactory → LoggerContext` — leitura do código-fonte upstream (github wolpi/prim-ftpd `LogController.setActiveConfig`: cast INCONDICIONAL); APK golden não embarca `META-INF/services` (strip do gradle) → slf4j 2.x cai no fallback NOP → cast explode exatamente como num dispositivo real com esse APK. Não é gap da VM: **fidelidade incorporada pelo launch cadeia-completo**.
+
+Erros próprios corrigidos no caminho: path errado em mk()/alloc (Result vs ObjRef), borrow parcial movido em matches! do teste (ref t), E0433 em intrinsics.rs (rd_vm:: vs Value::), regex python insegura (script com heredoc escapando mal), regex de rename clippy aplicada em demasia (vec!std::slice::... revertida), sed p_void renomeado em demasia (revertido; underscore só no teste novo).
+
+Checks:
+- fmt — PASS. clippy -D warnings — PASS. `cargo test --workspace` — PASS (31 suites; vm_exec 86 = 79 pós-PR#156 +7 novos: getApplication, unmodifiableMap, singletonList, hashset_init, unmodifiableSet, preferenceManager, serviceLoader_descobre). MSRV 1.76 — PASS. md — PASS. compat-report — PASS. Sondagem real — CCE tipada final acima.
+
+GitHub status:
+- Branch nova → PR; merge após CI verde.
+
+Stage Summary:
+- Launch primftpd cadeia-completo (Application→Prefs→SLF4J→NOP faithful) ✅ → próximas rodadas: novos alvos/psi de apps + gaps estruturais pendentes do ROADMAP (getResources → Enumeration, unmodifiable* restantes — empty*, edit() de prefs quando pedido).
