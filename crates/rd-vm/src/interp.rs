@@ -30,6 +30,7 @@ const OOME: &str = "Ljava/lang/OutOfMemoryError;";
 pub(crate) fn exec_frame(
     vm: &mut Engine,
     dex_idx: usize,
+    frame_super: Option<&str>,
     code: Arc<CodeItem>,
     ins: Vec<Value>,
 ) -> Result<Value, VmExit> {
@@ -806,7 +807,7 @@ pub(crate) fn exec_frame(
                     _ => return bad_kind(insn),
                 };
                 let invoke_op = insn.opcode;
-                match do_invoke(vm, dex_idx, invoke_op, midx, &slots) {
+                match do_invoke(vm, dex_idx, frame_super, invoke_op, midx, &slots) {
                     Ok(v) => last_result = v,
                     Err(VmExit::Exception(t)) => throw!(t),
                     Err(e) => return Err(e),
@@ -1368,14 +1369,25 @@ fn fill_array(
 fn do_invoke(
     vm: &mut Engine,
     dex_idx: usize,
+    frame_super: Option<&str>,
     invoke_op: u8,
     method_idx: u32,
     slots: &[Value],
 ) -> Result<Value, VmExit> {
     let mref = vm.cp.method_ref(dex_idx, method_idx)?;
+    // DEX opcodes (Dalvik spec): 6E virtual · 6F super · 70 direct ·
+    // 71 static · 72 interface · 74 virtual/range · 75 super/range ·
+    // 76 direct/range · 77 static/range · 78 interface/range.
+    // M8 (37º gap, real no launch do primftpd): as variantes /range de
+    // virtual e direct estavam TROCADAS (0x74 marcado como direct) — um
+    // invoke-virtual/range despachava NÃO-virtualmente (classe declarada) e
+    // um invoke-direct/range despachava VIRTUALMENTE (classe do receiver),
+    // fazendo ctor Kotlin `super(...)` (FunctionReferenceImpl.<init> da
+    // lambda de OnBackPressedDispatcher.addCallback) re-executar o próprio
+    // <init> em recursão infinita até VM_STACK_OVERFLOW/abort nativo.
     let is_static = matches!(invoke_op, 0x71 | 0x77);
     let is_super = matches!(invoke_op, 0x6F | 0x75);
-    let is_direct = matches!(invoke_op, 0x70 | 0x74);
+    let is_direct = matches!(invoke_op, 0x70 | 0x76);
 
     // static: intrínsecos de plataforma primeiro
     if is_static {
@@ -1477,9 +1489,22 @@ fn do_invoke(
 
     // classe inicial da resolução
     let start_class = if is_super {
-        vm.cp
-            .superclass_of(&mref.class)
-            .unwrap_or_else(|| mref.class.clone())
+        // Semântica DEX (Dalvik): invoke-super inicia a busca na SUPER da
+        // classe que DECLARA o método em execução (defining class) — não em
+        // `super(mref.class)`. Bug corrigido (M8, 36º gap): antes resolvia a
+        // partir da super da classe referenciada, pulando um nível inteiro da
+        // hierarquia — no launch real do primftpd isso fazia
+        // FragmentActivity.onCreate ignorar androidx/activity/
+        // ComponentActivity.onCreate (perdendo dispatchOnContextAvailable/
+        // attachHost) e cair direto em androidx/core/app/ComponentActivity.
+        frame_super.map_or_else(
+            || {
+                vm.cp
+                    .superclass_of(&mref.class)
+                    .unwrap_or_else(|| mref.class.clone())
+            },
+            |s| s.to_string(),
+        )
     } else if is_direct {
         // direct (<init>/private): NÃO despacha virtualmente
         mref.class.clone()

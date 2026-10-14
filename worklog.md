@@ -1172,3 +1172,25 @@ GitHub status:
 
 Stage Summary:
 - Observabilidade COMPLETA ✅ (trace + postmortem + decisão androidx documentada) → próximo: NPE dispatchCreate (o engine chega a despachar sem attachController — ou a classe da FragmentActivity carregada NÃO é a mesma do disasm… ou o launcher framework pula ctor DEX — próxima investigação: confirmar qual classe MainTabsActivity estende na cadeia DEX do APK e por que init() não rodou).
+
+---
+Task ID: m8-invoke-super-range
+Agent: Arena Agent Mode (sessão 2026-10-13/14, continuação; token PAT renovado em 2026-10-14)
+Task: M8 — Semântica DEX de invokes (36º/37º gaps reais do launch): invoke-super com busca na super da classe definidora; variantes /range direct×virtual destrocadas; <init>()V no-op de coleções abstratas host. NOTA OPERACIONAL: o .git local foi perdido na recriação do sandbox — repo re-inicializado via fetch (origin/main=01cf1a7), mudanças da árvore preservadas de /tmp/patch; toolchain rust reinstalada (permissão rustup corrigida via chmod +x).
+
+Work Log:
+- Diagnóstico com observabilidade nova (trace+postmortem entregues em #155): disasm estático esgotado (cadeia androidx inteira ROUDA e mesmo assim mNonConfig null) → postmortem 256 revelou FragmentActivity.init/ComponentActivity.<init> RODARAM e dispatchOnContextAvailable NÃO — contradição resolvida via instrumentação temporária local de do_invoke (revertida antes do commit): invoke-super de FragmentActivity.onCreate resolvia DIRETO para androidx/core/app/ComponentActivity.onCreate, pulando androidx/activity/ComponentActivity.
+- 36º gap (semântica, bug na VM): do_invoke usava superclass_of(mref.class) como start do invoke-super. Semântica DEX (Dalvik): busca inicia na SUPER da CLASSE DEFINIDORA do frame. Fix: Engine::call calcula frame_super a partir do ClassDef (type_str(superclass_idx), "" /"?"→None) e interp::exec_frame/do_invoke ganham o parâmetro; fallback antigo conservado se None. Teste de regressão invoke_super_comeca_na_super_da_classe_definidora (avo=7/pai=8 → esperado 8; sob o bug daria 7).
+- 37º gap (semântica, bug na VM): máscaras de invoke/range direto BINÁRIO errado — is_direct era 0x70|0x74 e o 0x76 (invoke-direct/range) ficava como virtual. Resultado ao executar onCreate androidx: OnBackPressedDispatcher.addCallback da activity criou objeto Kotlin (lambda→FunctionReferenceImpl) cujo <init> faz invoke-direct/range {..} para FunctionReference.<init> — despachado VIRTUALMENTE na classe do receiver re-executava Impl.<init> em loop infinito → VM_STACK_OVERFLOW a 512 (guard), e com pilha padrão ABORT NATIVO (pior que erro estruturado). Fix: máscaras 0x70|0x76=direct (spec Dalvik: 6E v, 6F s, 70 d, 71 st, 72 i, 74=virtual/range, 75=super/range, 76=direct/range, 77=static/range, 78=interface/range). Efeito colateral CORRIGIDO: invoke-virtual/range agora despacha de verdade (antes ia para a classe declarada). Teste invoke_range_direct_ao_declarado_e_virtual_com_dispatch cobre as duas direções (ctor avo com iput + override 7 vs 9).
+- Bug adjacente de <init> ctor abstrato: classe DEX estendendo diretamente java.util.AbstractList chama super() via invoke-direct → NOT_FOUND "método não resolvido". Arm host: ABSTRACT_COLLECTION_CTORS (AbstractCollection/List/SequentialList/Set/Map/Queue) com <init>()V no-op (sem estado; linha do <init> de Object/framework). Teste subclasse_dex_de_abstractlist_chama_super_init_noop.
+- Erros próprios corrigidos no caminho: bytecode de teste com op errado (0x0B clobberava receiver), const/4 overflow (lit 4-bit com sinal — 8 vira -8 → const/16), duplicações de b.class/truncamento via python; sed com $ literal corrompeu engine.rs (reparado).
+- Re-sondagem real: UI SLF4J → launch sai do NPE e do overflow e para em `método Lorg/primftpd/ui/MainTabsActivity;->getApplication()Landroid/app/Application; não resolvido` (NOT_FOUND tipado, sem exception) — próximo gap mapeado no ROADMAP.
+
+Checks:
+- fmt — PASS. clippy -D warnings — PASS. `cargo test --workspace` — PASS (31 suites; vm_exec 78 — +1 novo + ajustes já em membro). MSRV 1.76 — PASS. md links — PASS. compat-report — PASS. Sondagem real — dado acima.
+
+GitHub status:
+- Branch feat/m8-invoke-super-range → PR; merge após CI verde.
+
+Stage Summary:
+- Semântica DEX de invokes ✅ (36º+37º + adjacente abstrato) → próximo: Activity.getApplication() host; Ljava.util.* host seguem completos.

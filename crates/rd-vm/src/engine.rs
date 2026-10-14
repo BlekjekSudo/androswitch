@@ -183,7 +183,7 @@ impl Engine {
     pub(super) fn call(
         &mut self,
         dex_idx: usize,
-        _def: ClassDef,
+        def: ClassDef,
         m: &EncodedMethod,
         ins: Vec<Value>,
     ) -> Result<Value, VmExit> {
@@ -197,6 +197,18 @@ impl Engine {
             )
             .into());
         }
+        // Ponto de partida DEX-corrto do invoke-super: a SUPER da classe que
+        // DECLARA o frame atual (não `super(mref.class)` — Dalvik Reference).
+        // Resolvido aqui onde temos o ClassDef do frame em mãos.
+        let frame_super = {
+            let dex = &self.cp.dexes[dex_idx];
+            let s = dex.type_str(def.superclass_idx).to_string();
+            if s.is_empty() || s == "?" {
+                None
+            } else {
+                Some(s)
+            }
+        };
         let Some(code) = self.cp.code(dex_idx, m.code_off)? else {
             if m.access_flags & ACC_NATIVE != 0 {
                 return Err(crate::err::not_implemented(format!(
@@ -218,7 +230,7 @@ impl Engine {
         self.coverage
             .insert(((dex_idx as u64) << 32) | u64::from(m.method_idx));
         self.depth += 1;
-        let mut ret = interp::exec_frame(self, dex_idx, code, ins);
+        let mut ret = interp::exec_frame(self, dex_idx, frame_super.as_deref(), code, ins);
         self.depth -= 1;
         // Observabilidade opt-in (default off — nenhuma saída existente muda):
         // exceção Java que este frame NÃO tratou recebe a linha "at" do frame
