@@ -64,6 +64,13 @@ const WEAK_REF: &str = "Ljava/lang/ref/WeakReference;";
 const SOFT_REF: &str = "Ljava/lang/ref/SoftReference;";
 const REF_QUEUE: &str = "Ljava/lang/ref/ReferenceQueue;";
 const HASH_MAP: &str = "Ljava/util/HashMap;";
+/// M8 (40º gap real): classe-marcadora host da view de
+/// `Collections.unmodifiableMap` — mutações → UOE, leituras delegam.
+const UNMODIFIABLE_MAP: &str = "Ljava/util/Collections$UnmodifiableMap;";
+/// M8 (41º gap real): idem para `Collections.singletonList`.
+const SINGLETON_LIST: &str = "Ljava/util/Collections$SingletonList;";
+/// M8 (43º gap real): idem para `Collections.unmodifiableSet`.
+const UNMODIFIABLE_SET: &str = "Ljava/util/Collections$UnmodifiableSet;";
 const WEAK_MAP: &str = "Ljava/util/WeakHashMap;";
 /// M8: 25º gap do launch real (`LinkedHashSet.<init>`). Reusa o estado List
 /// dos demais Sets: deduplicação por igualdade Java e ordem de inserção.
@@ -518,11 +525,104 @@ pub fn call_static_intrinsic(
             };
             Ok(Some(Value::Obj(r)))
         }
-        // M8 (24º gap real): ServiceLoader sem providers. O runtime ainda não
-        // lê `META-INF/services` do APK; devolver um loader vazio é explícito e
-        // seguro (sem descoberta/instanciação implícita de código desconhecido).
-        // O ClassLoader pode ser null (bootstrap) na API Java; só service é
-        // obrigatório e precisa preservar a NPE de contrato.
+        // M8 (40º gap real): Collections.unmodifiableMap — pedido pelo
+        // launch real (PftpdApp.onCreate → LogController.<clinit>). View de
+        // leitura em classe-marcadora host: leituras delegam ao estado
+        // (SNAPSHOT das entradas na criação — desvio de view documentado
+        // como o de synchronized*); mutações pela view → UOE (JDK). null →
+        // NPE; coleção sem estado host → VM_TYPE_ERROR tipado.
+        (
+            "Ljava/util/Collections;",
+            "unmodifiableMap",
+            "(Ljava/util/Map;)Ljava/util/Map;",
+        ) => {
+            let Some(Value::Obj(src)) = args.first() else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "Collections.unmodifiableMap com coleção null",
+                )));
+            };
+            let entries = match vm.fw.objects.get(src) {
+                Some(crate::framework::HostObj::Map { entries }) => entries.clone(),
+                _ => {
+                    return Err(crate::err::vm_error(
+                        "VM_TYPE_ERROR",
+                        "unmodifiableMap sobre coleção sem estado host (Map)",
+                    )
+                    .into())
+                }
+            };
+            let r = vm
+                .heap
+                .alloc_instance(UNMODIFIABLE_MAP.to_string(), vec![])?;
+            vm.fw
+                .objects
+                .insert(r, crate::framework::HostObj::Map { entries });
+            Ok(Some(Value::Obj(r)))
+        }
+        // M8 (41º gap real): Collections.singletonList — pedido pelo launch
+        // real (LogController.readPrefs): lista host imutável de 1 elemento
+        // em classe-marcadora; mutações pela view → UOE (JDK). Elemento
+        // null é aceito (JDK não valida) — a lista contém literalmente null.
+        (
+            "Ljava/util/Collections;",
+            "singletonList",
+            "(Ljava/lang/Object;)Ljava/util/List;",
+        ) => {
+            let v = args
+                .first()
+                .cloned()
+                .unwrap_or(Value::Null);
+            let r = vm
+                .heap
+                .alloc_instance(SINGLETON_LIST.to_string(), vec![])?;
+            vm.fw
+                .objects
+                .insert(r, crate::framework::HostObj::List { elems: vec![v] });
+            Ok(Some(Value::Obj(r)))
+        }
+        // M8 (43º gap real): Collections.unmodifiableSet — pedido pelo
+        // launch real (LogController.readPrefs): view dedup de leitura em
+        // classe-marcadora (snapshot; desvio de view documentado —
+        // mesmo regime de unmodifiableMap); mutações → UOE; null → NPE;
+        // sem estado host → VM_TYPE_ERROR tipado.
+        (
+            "Ljava/util/Collections;",
+            "unmodifiableSet",
+            "(Ljava/util/Set;)Ljava/util/Set;",
+        ) => {
+            let Some(Value::Obj(src)) = args.first() else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "Collections.unmodifiableSet com coleção null",
+                )));
+            };
+            let elems = match vm.fw.objects.get(src) {
+                Some(crate::framework::HostObj::List { elems }) => elems.clone(),
+                _ => {
+                    return Err(crate::err::vm_error(
+                        "VM_TYPE_ERROR",
+                        "unmodifiableSet sobre coleção sem estado host (Set)",
+                    )
+                    .into())
+                }
+            };
+            let r = vm
+                .heap
+                .alloc_instance(UNMODIFIABLE_SET.to_string(), vec![])?;
+            vm.fw
+                .objects
+                .insert(r, crate::framework::HostObj::List { elems });
+            Ok(Some(Value::Obj(r)))
+        }
+        // M8 (24º gap real, elevado a descoberta real no 45º gap): providers
+        // vêm de `META-INF/services/<nome binário da interface>` quando o APK
+        // está anexado à Engine (`Engine::set_resources` — o mesmo objeto já
+        // usado para dex/AXML). Formato JDK: linhas, comentários `#`,
+        // nomes binários com pontos. Sem APK anexado ou sem arquivo →
+        // loader vazio (explícito e seguro como antes). O ClassLoader pode
+        // ser null (bootstrap) na API Java; só service é obrigatório e
+        // precisa preservar a NPE de contrato.
         (
             SERVICE_LOADER,
             "load",
@@ -533,13 +633,26 @@ pub fn call_static_intrinsic(
             "load",
             "(Ljava/lang/Class;Ljava/lang/ClassLoader;)Ljava/util/ServiceLoader;",
         ) => {
-            if args[0].as_ref()?.is_none() {
+            let Some(cr) = args[0].as_ref()? else {
                 return Err(VmExit::Exception(Throwable::new(
                     "Ljava/lang/NullPointerException;",
                     "ServiceLoader.load com service null",
                 )));
-            }
+            };
+            // descritor da interface do service a partir do objeto Class.
+            let service_desc = match vm.heap.get_field(cr, "class_name") {
+                Ok(Value::Obj(sr)) => vm.heap.as_str(sr)?.to_string(),
+                _ => String::new(),
+            };
+            let providers = service_providers_for(vm, &service_desc)?;
             let r = vm.heap.alloc_instance(SERVICE_LOADER.to_string(), vec![])?;
+            vm.fw.objects.insert(
+                r,
+                crate::framework::HostObj::ServiceLoader {
+                    service_desc,
+                    providers,
+                },
+            );
             Ok(Some(Value::Obj(r)))
         }
         // M8: fábricas de thread pool → executor host (execução inline).
@@ -576,6 +689,42 @@ fn arg_i32(v: &Value) -> i32 {
         Value::Long(l) => *l as i32,
         _ => 0,
     }
+}
+
+/// (name, sig) mutadores de Set bloqueados pela view de
+/// `Collections.unmodifiableSet` (JDK: UnsupportedOperationException).
+fn set_mutation_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("add", "(Ljava/lang/Object;)Z") | ("remove", "(Ljava/lang/Object;)Z") | ("clear", "()V")
+    )
+}
+
+/// (name, sig) mutadores de List bloqueados pela view de
+/// `Collections.singletonList` (JDK: UnsupportedOperationException).
+fn list_mutation_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("add", "(Ljava/lang/Object;)Z")
+            | ("add", "(ILjava/lang/Object;)V")
+            | ("set", "(ILjava/lang/Object;)Ljava/lang/Object;")
+            | ("remove", "(I)Ljava/lang/Object;")
+            | ("remove", "(Ljava/lang/Object;)Z")
+            | ("clear", "()V")
+    )
+}
+
+/// (name, sig) mutadores de Map bloqueados pela view de
+/// `Collections.unmodifiableMap` (JDK: UnsupportedOperationException).
+fn map_mutation_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        (
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"
+        ) | ("remove", "(Ljava/lang/Object;)Ljava/lang/Object;")
+            | ("clear", "()V")
+    )
 }
 
 /// (name, sig) de wrappers sincronizados de `Collections` (M8): identidade —
@@ -839,17 +988,76 @@ fn service_loader_supported(name: &str, sig: &str) -> bool {
     matches!((name, sig), ("iterator", "()Ljava/util/Iterator;"))
 }
 
-/// `ServiceLoader` vazio (M8): a descoberta SPI não é implementada, mas o
-/// fluxo normal `ServiceLoader.load(...).iterator()` é seguro e determinístico.
-fn service_loader_intrinsic(vm: &mut Engine) -> Result<Option<Value>, VmExit> {
+/// M8 (45º gap): parser do arquivo de configuração
+/// `META-INF/services/<nome binário>` do APK anexado (formato JDK: nomes
+/// binários, `#` comenta o restante da linha). Sem APK ou sem arquivo →
+/// lista vazia (contrato: "no providers found" — java.util.ServiceLoader).
+/// Erros de leitura do zip viram VM_ERROR tipado (configuração corrompida),
+/// não silêncio.
+fn service_providers_for(vm: &mut Engine, service_desc: &str) -> Result<Vec<String>, VmExit> {
+    let bin = service_desc
+        .trim_start_matches('L')
+        .trim_end_matches(';')
+        .replace('/', ".");
+    if bin.is_empty() {
+        return Ok(Vec::new());
+    }
+    let Some(apk) = &vm.fw.resources else {
+        return Ok(Vec::new());
+    };
+    let path = format!("META-INF/services/{bin}");
+    let Some(entry) = apk.zip.find(&path) else {
+        return Ok(Vec::new());
+    };
+    let bytes = apk.zip.read_entry(entry).map_err(|e| {
+        crate::err::vm_error(
+            "VM_ERROR",
+            format!("lendo {path} do APK para ServiceLoader: {}", e.cause),
+        )
+    })?;
+    let text = String::from_utf8_lossy(&bytes);
+    let mut out = Vec::new();
+    for line in text.lines() {
+        let clean = line.split('#').next().unwrap_or("").trim();
+        if !clean.is_empty() {
+            out.push(format!("L{};", clean.replace('.', "/")));
+        }
+    }
+    Ok(out)
+}
+
+/// M8 (24º/45º gaps): `ServiceLoader.iterator()` — instancia EAGER os
+/// providers descobertos (desvio de preguiça do JDK: iterador deveria
+/// instanciar sob demanda; documentado — volume de providers real = 1-3) e
+/// devolve o iterador host do snapshot. Provider ausente dos dex →
+/// ServiceConfigurationError (JLS: configuração inválida), não skip.
+/// Exceções dos ctores propagam-se (JDK as embrulha em
+/// ServiceConfigurationError — desvio documentado).
+fn service_loader_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+) -> Result<Option<Value>, VmExit> {
+    let descs = match vm.fw.objects.get(&recv) {
+        Some(crate::framework::HostObj::ServiceLoader { providers, .. }) => providers.clone(),
+        // loader antigo sem estado (garantia para objetos criados antes do
+        // 45º gap ter estado — defesa em profundidade): vazio e explícito.
+        _ => Vec::new(),
+    };
+    let mut elems = Vec::with_capacity(descs.len());
+    for d in descs {
+        if vm.cp.find_class(&d).is_none() {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/util/ServiceConfigurationError;",
+                format!("ServiceLoader: provider {d} ausente dos dex do app"),
+            )));
+        }
+        let obj = vm.new_dex_instance(&d)?;
+        elems.push(Value::Obj(obj));
+    }
     let it = vm.heap.alloc_instance(ITERATOR.to_string(), vec![])?;
-    vm.fw.objects.insert(
-        it,
-        crate::framework::HostObj::Iter {
-            elems: Vec::new(),
-            pos: 0,
-        },
-    );
+    vm.fw
+        .objects
+        .insert(it, crate::framework::HostObj::Iter { elems, pos: 0 });
     Ok(Some(Value::Obj(it)))
 }
 
@@ -1823,6 +2031,7 @@ fn set_supported(name: &str, sig: &str) -> bool {
     matches!(
         (name, sig),
         ("<init>", "()V")
+            | ("<init>", "(Ljava/util/Collection;)V")
             | ("add", "(Ljava/lang/Object;)Z")
             | ("remove", "(Ljava/lang/Object;)Z")
             | ("contains", "(Ljava/lang/Object;)Z")
@@ -1839,14 +2048,44 @@ fn set_intrinsic(
     vm: &mut Engine,
     recv: crate::heap::ObjRef,
     name: &str,
-    _sig: &str,
+    sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     use crate::framework::HostObj;
     if name == "<init>" {
-        vm.fw
-            .objects
-            .insert(recv, HostObj::List { elems: Vec::new() });
+        // M8 (42º gap real): `<init>(Collection)` — snapshot do iterador da
+        // fonte host COM dedup de Set (values_equal; ordem preservada —
+        // LinkedHashSet idem). Fonte null → NPE (c.toArray() na JDK); fonte
+        // sem estado host → VM_TYPE_ERROR tipado (não itera coleção do app).
+        let elems = if sig == "(Ljava/util/Collection;)V" {
+            let Some(src) = args[0].as_ref()? else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "Set.<init> com Collection null",
+                )));
+            };
+            let Some(HostObj::List { elems: src_elems }) = vm.fw.objects.get(&src) else {
+                return Err(crate::err::vm_error(
+                    "VM_TYPE_ERROR",
+                    "Set.<init>(Collection): fonte sem estado host (coleção do app)",
+                )
+                .into());
+            };
+            let src_snapshot = src_elems.clone();
+            let mut out: Vec<Value> = Vec::new();
+            'outer: for el in src_snapshot {
+                for x in &out {
+                    if values_equal(&vm.heap, x, &el)? {
+                        continue 'outer;
+                    }
+                }
+                out.push(el);
+            }
+            out
+        } else {
+            Vec::new()
+        };
+        vm.fw.objects.insert(recv, HostObj::List { elems });
         return Ok(Some(Value::Null));
     }
     if !matches!(vm.fw.objects.get(&recv), Some(HostObj::List { .. })) {
@@ -2181,6 +2420,30 @@ pub fn call_instance_intrinsic_mref(
             let c = vm.class_object_for(&cls)?;
             Ok(Some(Value::Obj(c)))
         }
+        // ── Activity.getApplication (M8, 38º gap real): final na plataforma;
+        // o DEX do app referencia o método pela PRÓPRIA classe do receiver
+        // (mref_class = ex.: Lorg/primftpd/ui/MainTabsActivity;), que não é
+        // Landroid/ e por isso nunca alcançaria o braço do framework. A
+        // identidade vive em `Engine::application_obj` (framework.rs) —
+        // criada no launch com a classe android:name do manifest. Captura
+        // irrestrita correta: getApplication é final — nada em DEX a
+        // reimplementa.
+        (_, "getApplication", "()Landroid/app/Application;")
+            if vm.cp.is_subtype(recv_class, crate::framework::ACTIVITY)
+                || vm.cp.is_subtype(recv_class, crate::framework::APPLICATION) =>
+        {
+            Ok(Some(Value::Obj(vm.application_obj()?)))
+        }
+        // ── Context.getApplicationContext (M8, 39º gap real): final na
+        // plataforma (ContextWrapper delega ao base); para Activities é o
+        // MESMO objeto de getApplication (o app registra si mesmo como base).
+        (.., "getApplicationContext", "()Landroid/content/Context;")
+            if vm.cp.is_subtype(recv_class, crate::framework::ACTIVITY)
+                || vm.cp.is_subtype(recv_class, crate::framework::APPLICATION)
+                || vm.cp.is_subtype(recv_class, crate::framework::CONTEXT) =>
+        {
+            Ok(Some(Value::Obj(vm.application_obj()?)))
+        }
         // Métodos de Class host: só sem declaração DEX (app não define
         // java.lang.Class; guarda defensiva contra shadowing).
         (c, name, sig)
@@ -2455,11 +2718,44 @@ pub fn call_instance_intrinsic_mref(
         // ── coleções java.util (M8) ─────────────────────────────────────────
         // Só os (name, sig) suportados casam aqui; o resto segue o fluxo
         // normal (Object fallback / DEX / NOT_FOUND tipado).
+        // ── Collections.unmodifiableSet (M8, 43º gap): mutações → UOE;
+        // leituras com semântica de SET (dedup) — mesma família da view Map.
+        (c, name, sig) if c == UNMODIFIABLE_SET && set_mutation_supported(name, sig) => {
+            Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/UnsupportedOperationException;",
+                "set imutável host (Collections.unmodifiableSet)",
+            )))
+        }
+        (c, name, sig) if c == UNMODIFIABLE_SET && set_supported(name, sig) => {
+            set_intrinsic(vm, recv, name, sig, args)
+        }
+        // ── Collections.unmodifiableMap (M8, 40º gap): mutações pela view →
+        // UOE como na JDK (throwable Java materializado); leituras delegam.
+        (c, name, sig) if c == UNMODIFIABLE_MAP && map_mutation_supported(name, sig) => {
+            Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/UnsupportedOperationException;",
+                "mapa imutável host (Collections.unmodifiableMap)",
+            )))
+        }
+        (c, name, sig) if c == UNMODIFIABLE_MAP && map_supported(name, sig) => {
+            map_intrinsic(vm, recv, name, sig, args)
+        }
         (c, name, sig)
             if (c == HASH_MAP || c == WEAK_MAP || c == LINKED_MAP || c == CONCURRENT_MAP)
                 && map_supported(name, sig) =>
         {
             map_intrinsic(vm, recv, name, sig, args)
+        }
+        // ── Collections.singletonList (M8, 41º gap): mutações pela view →
+        // UOE como na JDK; leituras delegam ao estado List normal.
+        (c, name, sig) if c == SINGLETON_LIST && list_mutation_supported(name, sig) => {
+            Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/UnsupportedOperationException;",
+                "lista imutável host (Collections.singletonList)",
+            )))
+        }
+        (c, name, sig) if c == SINGLETON_LIST && list_supported(name, sig) => {
+            list_intrinsic(vm, recv, name, sig, args)
         }
         (c, name, sig)
             if (c == ARRAY_LIST || c == LINKED_LIST || c == COW_LIST)
@@ -2519,10 +2815,10 @@ pub fn call_instance_intrinsic_mref(
             vm.heap.array_elems_mut(dst)?.extend(elems);
             Ok(Some(Value::Obj(dst)))
         }
-        // ServiceLoader (M8): descoberta SPI fora do escopo por enquanto;
-        // iterator() é um Iterator host vazio, nunca uma falha silenciosa.
+        // ServiceLoader (M8, 45º gap): iterator() instancia os providers
+        // descobertos em META-INF/services (ver service_loader_intrinsic).
         (c, name, sig) if c == SERVICE_LOADER && service_loader_supported(name, sig) => {
-            service_loader_intrinsic(vm)
+            service_loader_intrinsic(vm, recv)
         }
         // ClassLoader (M8): getResources(String) → Enumeration host vazia —
         // recursos de classpath do APK ainda não são enumerados (26º gap real).

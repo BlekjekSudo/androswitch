@@ -118,6 +118,14 @@ impl Engine {
         self.heap.peak()
     }
 
+    /// M8 (38º gap real): descritor da classe de `Application` declarada no
+    /// AndroidManifest.xml (`android:name`). Quando presente, `launch_app`
+    /// instancia ESSA classe (e não `Landroid/app/Application;`) e roda o
+    /// onCreate DEX dela antes do onCreate da activity — como o Android faz.
+    pub fn set_application_class(&mut self, application_desc: String) {
+        self.fw.application_class = Some(application_desc);
+    }
+
     pub fn fuel_used(&self) -> u64 {
         self.fuel_used
     }

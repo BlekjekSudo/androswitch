@@ -6283,3 +6283,725 @@ fn invoke_range_direct_ao_declarado_e_virtual_com_dispatch() {
         .expect("int");
     assert_eq!(f, 9, "invoke-virtual/range (0x74) despachou virtualmente");
 }
+
+#[test]
+fn get_application_devolve_application_canonica_do_manifest() {
+    // M8 (38º gap, real do launch do primftpd): MainTabsActivity.onCreate
+    // chamava getApplication() e o método não resolvia (mref pela própria
+    // classe do app — não Landroid/). Agora: launch cria a Application do
+    // android:name, roda o onCreate dela ANTES do da activity e
+    // getApplication() devolve SEMPRE a mesma instância (canônica).
+    let mut b = DexBuilder::new();
+    let _p_void = b.proto_idx("V", vec![]);
+    // LApp: Application custom com marcador estático escrito no onCreate
+    let app = b.class("LApp;", "Landroid/app/Application;");
+    b.static_field(app, "ordem", "I", SVal::Int(0));
+    let ordem = b.field_idx("LApp;", "I", "ordem");
+    b.direct(
+        app,
+        "onCreate",
+        "V",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(1, 1, 0, {
+            let mut u = op21s(0x13, 0, 41); // const/16 v0, 41
+            u.extend(op21c(0x67, 0, ordem)); // sput v0, LApp;->ordem:I
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    let p_i2 = b.proto_idx("I", vec![]);
+    b.direct(
+        app,
+        "le_ordem",
+        "I",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(1, 0, 0, {
+            let mut u = op21c(0x60, 0, ordem); // sget v0, ordem
+            u.extend(op11x(0x0F, 0)); // return v0
+            u
+        })),
+    );
+    let _ = p_i2;
+    // LMain: activity — onCreate escreve ordem+1 (provando que roda DEPOIS)
+    let main = b.class("LMain;", "Landroid/app/Activity;");
+    b.direct(
+        main,
+        "onCreate",
+        "V",
+        vec!["Landroid/os/Bundle;"],
+        ACC_PUBLIC,
+        Some(b.code(2, 2, 1, {
+            let mut u = op21c(0x60, 0, ordem); // sget v0, ordem
+            u.extend(op11n(0x12, 1, 1)); // const/4 v1, +1
+            u.extend(op23x(0x90, 0, 0, 1)); // add-int v0, v0, v1 → 42
+            u.extend(op21c(0x67, 0, ordem)); // sput v0, ordem
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    let dex = rd_dex::Dex::parse(b.finish()).expect("dex");
+    let mut e = Engine::new(vec![dex], VmConfig::default());
+    e.set_application_class("LApp;".to_string());
+    let act = e
+        .launch_app("LMain;", "com.ex.app", Vec::new())
+        .expect("launch roda Application+Activity");
+    // Ordem Android: LApp.onCreate (41) → LMain.onCreate (+1 = 42)
+    let ai = e
+        .invoke_static("LApp;", "le_ordem", "()I", &[])
+        .expect("le_ordem")
+        .as_int()
+        .expect("int");
+    assert_eq!(ai, 42, "Application.onCreate rodou ANTES do da activity");
+
+    // getApplication via classe do app (rota que falhava) — canônica.
+    let a1 = rd_vm::intrinsics::call_instance_intrinsic_mref(
+        &mut e,
+        "LMain;",
+        "LMain;",
+        "getApplication",
+        "()Landroid/app/Application;",
+        act,
+        &[],
+    )
+    .expect("arm")
+    .expect("getApplication devolve objeto");
+    let a2 = rd_vm::intrinsics::call_instance_intrinsic_mref(
+        &mut e,
+        "LMain;",
+        "LMain;",
+        "getApplication",
+        "()Landroid/app/Application;",
+        act,
+        &[],
+    )
+    .expect("arm")
+    .expect("getApplication devolve objeto");
+    assert_eq!(a1, a2, "canônica: mesma ObjRef nas duas chamadas");
+
+    // 39º gap: getApplicationContext devolve a MESMA Application (Android).
+    let c1 = rd_vm::intrinsics::call_instance_intrinsic_mref(
+        &mut e,
+        "LMain;",
+        "LMain;",
+        "getApplicationContext",
+        "()Landroid/content/Context;",
+        act,
+        &[],
+    )
+    .expect("arm")
+    .expect("getApplicationContext devolve objeto");
+    assert_eq!(c1, a1, "getApplicationContext ≡ getApplication na activity");
+    let rd_vm::Value::Obj(ar) = a1 else {
+        panic!("esperava Obj")
+    };
+    assert_eq!(
+        e.heap.class_of(ar).expect("class_of"),
+        "LApp;",
+        "instância da classe do manifest, não da plataforma"
+    );
+}
+
+#[test]
+fn unmodifiable_map_snapshot_le_e_bloqueia_mutacoes() {
+    // M8 (40º gap, real do launch: PftpdApp.onCreate → LogController.<clinit>):
+    // view de leitura; snapshot na criação; mutações → UOE (JDK); null → NPE.
+    use rd_vm::intrinsics::{call_instance_intrinsic, call_static_intrinsic};
+    const HM: &str = "Ljava/util/HashMap;";
+    const UM: &str = "Ljava/util/Collections$UnmodifiableMap;";
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+
+    // mapa-fonte host: {"k"→"v", "k2"→"v2"}
+    let mk = |e: &mut Engine, s: &str| {
+        e.heap
+            .alloc_string(s.to_string())
+            .map(rd_vm::value::Value::Obj)
+            .expect("alloc_string")
+    };
+    let src = e.heap.alloc_instance(HM.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(&mut e, HM, "<init>", "()V", src, &[]).unwrap();
+    let k = mk(&mut e, "k");
+    let v = mk(&mut e, "v");
+    let k2 = mk(&mut e, "k2");
+    let v2 = mk(&mut e, "v2");
+    call_instance_intrinsic(
+        &mut e,
+        HM,
+        "put",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+        src,
+        &[k.clone(), v.clone()],
+    )
+    .unwrap();
+    call_instance_intrinsic(
+        &mut e,
+        HM,
+        "put",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+        src,
+        &[k2.clone(), v2.clone()],
+    )
+    .unwrap();
+
+    // view: objeto de OUTRA classe-marcadora com as MESMAS entradas (snapshot)
+    let view = call_static_intrinsic(
+        &mut e,
+        "Ljava/util/Collections;",
+        "unmodifiableMap",
+        "(Ljava/util/Map;)Ljava/util/Map;",
+        &[rd_vm::value::Value::Obj(src)],
+    )
+    .expect("arm")
+    .expect("unmodifiableMap devolve objeto");
+    let rd_vm::value::Value::Obj(vr) = view else {
+        panic!("esperava Obj")
+    };
+    assert_ne!(vr, src, "view é objeto novo, não identidade");
+    assert_eq!(e.heap.class_of(vr).unwrap(), UM, "classe-marcadora host");
+    let sz = call_instance_intrinsic(&mut e, UM, "size", "()I", vr, &[]).expect("size");
+    assert_eq!(
+        sz,
+        Some(rd_vm::value::Value::Int(2)),
+        "leituras delegam (size)"
+    );
+    let got = call_instance_intrinsic(
+        &mut e,
+        UM,
+        "get",
+        "(Ljava/lang/Object;)Ljava/lang/Object;",
+        vr,
+        std::slice::from_ref(&k2),
+    )
+    .unwrap()
+    .expect("get devolve valor");
+    assert_eq!(got, v2, "leitura k2 → v2");
+
+    // mutações pela view → UnsupportedOperationException (JDK)
+    for (n, s, a) in [
+        (
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![k.clone(), v.clone()],
+        ),
+        ("remove", "(Ljava/lang/Object;)Ljava/lang/Object;", vec![k]),
+        ("clear", "()V", vec![]),
+    ] {
+        let r = call_instance_intrinsic(&mut e, UM, n, s, vr, &a);
+        assert!(
+            matches!(
+                r,
+                Err(rd_vm::VmExit::Exception(ref t)) if t.class == "Ljava/lang/UnsupportedOperationException;"
+            ),
+            "{n} pela view → UOE (got {r:?})"
+        );
+    }
+
+    // null → NPE
+    let npe = call_static_intrinsic(
+        &mut e,
+        "Ljava/util/Collections;",
+        "unmodifiableMap",
+        "(Ljava/util/Map;)Ljava/util/Map;",
+        &[rd_vm::value::Value::Null],
+    );
+    assert!(
+        matches!(npe, Err(rd_vm::VmExit::Exception(ref t)) if t.class == "Ljava/lang/NullPointerException;"),
+        "null → NPE"
+    );
+}
+
+#[test]
+fn singleton_list_um_elemento_le_e_bloqueia_mutacoes() {
+    // M8 (41º gap, real do launch: LogController.readPrefs): lista imutável
+    // de 1 elemento; leituras delegam; mutações → UOE; null é aceito (JDK).
+    use rd_vm::intrinsics::{call_instance_intrinsic, call_static_intrinsic};
+    const SL: &str = "Ljava/util/Collections$SingletonList;";
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let elem = e
+        .heap
+        .alloc_string("uno".to_string())
+        .map(rd_vm::value::Value::Obj)
+        .expect("alloc_string");
+    let sl = call_static_intrinsic(
+        &mut e,
+        "Ljava/util/Collections;",
+        "singletonList",
+        "(Ljava/lang/Object;)Ljava/util/List;",
+        std::slice::from_ref(&elem),
+    )
+    .expect("arm")
+    .expect("singletonList devolve objeto");
+    let rd_vm::value::Value::Obj(sr) = sl else {
+        panic!("esperava Obj")
+    };
+    assert_eq!(e.heap.class_of(sr).unwrap(), SL, "classe-marcadora host");
+    let sz = call_instance_intrinsic(&mut e, SL, "size", "()I", sr, &[]).expect("size");
+    assert_eq!(sz, Some(rd_vm::value::Value::Int(1)), "size 1");
+    let g0 = call_instance_intrinsic(
+        &mut e,
+        SL,
+        "get",
+        "(I)Ljava/lang/Object;",
+        sr,
+        &[rd_vm::value::Value::Int(0)],
+    )
+    .expect("get")
+    .expect("elemento");
+    assert_eq!(g0, elem, "get(0) devolve o elemento");
+    let has = call_instance_intrinsic(
+        &mut e,
+        SL,
+        "contains",
+        "(Ljava/lang/Object;)Z",
+        sr,
+        std::slice::from_ref(&elem),
+    )
+    .expect("contains");
+    assert_eq!(has, Some(rd_vm::value::Value::Int(1)), "contains");
+
+    for (n, sig, a) in [
+        ("add", "(Ljava/lang/Object;)Z", vec![elem.clone()]),
+        (
+            "set",
+            "(ILjava/lang/Object;)Ljava/lang/Object;",
+            vec![rd_vm::value::Value::Int(0), elem.clone()],
+        ),
+        (
+            "remove",
+            "(I)Ljava/lang/Object;",
+            vec![rd_vm::value::Value::Int(0)],
+        ),
+        ("clear", "()V", vec![]),
+    ] {
+        let r = call_instance_intrinsic(&mut e, SL, n, sig, sr, &a);
+        assert!(
+            matches!(
+                r,
+                Err(rd_vm::VmExit::Exception(ref t)) if t.class == "Ljava/lang/UnsupportedOperationException;"
+            ),
+            "{n} pela view → UOE"
+        );
+    }
+
+    // null é aceito (JDK): singletonList(null) = [null], get(0) = Null
+    let nul = call_static_intrinsic(
+        &mut e,
+        "Ljava/util/Collections;",
+        "singletonList",
+        "(Ljava/lang/Object;)Ljava/util/List;",
+        &[rd_vm::value::Value::Null],
+    )
+    .expect("arm")
+    .expect("singletonList(null)");
+    let rd_vm::value::Value::Obj(nr) = nul else {
+        panic!("esperava Obj")
+    };
+    let g = call_instance_intrinsic(
+        &mut e,
+        SL,
+        "get",
+        "(I)Ljava/lang/Object;",
+        nr,
+        &[rd_vm::value::Value::Int(0)],
+    )
+    .expect("get")
+    .expect("get devolve Null");
+    assert_eq!(
+        g,
+        rd_vm::value::Value::Null,
+        "singletonList(null) contém null"
+    );
+}
+
+#[test]
+fn hashset_init_collection_snapshot_dedup_encontrado() {
+    // M8 (42º gap, real do launch: LogController.readPrefs → new
+    // HashSet<>(String[]→List)): snapshot da fonte COM dedup em ordem;
+    // null → NPE; fonte do app → VM_TYPE_ERROR tipado.
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    const AL: &str = "Ljava/util/ArrayList;";
+    const HS: &str = "Ljava/util/HashSet;";
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let mk = |e: &mut Engine, s: &str| {
+        e.heap
+            .alloc_string(s.to_string())
+            .map(rd_vm::value::Value::Obj)
+            .expect("alloc_string")
+    };
+
+    // fonte: lista com dup ["a", "b", "a"] (posições 0,1,2)
+    let al = e.heap.alloc_instance(AL.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(&mut e, AL, "<init>", "()V", al, &[]).unwrap();
+    for s in ["a", "b", "a"] {
+        let v = mk(&mut e, s);
+        call_instance_intrinsic(&mut e, AL, "add", "(Ljava/lang/Object;)Z", al, &[v]).unwrap();
+    }
+
+    // ctor com coleção → snapshot dedup ["a", "b"]
+    let hs = e.heap.alloc_instance(HS.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(
+        &mut e,
+        HS,
+        "<init>",
+        "(Ljava/util/Collection;)V",
+        hs,
+        &[rd_vm::value::Value::Obj(al)],
+    )
+    .expect("HashSet.<init>(Collection) coberto");
+    let sz = call_instance_intrinsic(&mut e, HS, "size", "()I", hs, &[]).expect("size");
+    assert_eq!(sz, Some(rd_vm::value::Value::Int(2)), "dedup da fonte");
+    let vb = mk(&mut e, "b");
+    let has = call_instance_intrinsic(&mut e, HS, "contains", "(Ljava/lang/Object;)Z", hs, &[vb])
+        .expect("contains");
+    assert_eq!(has, Some(rd_vm::value::Value::Int(1)), "contains b");
+
+    // add de elemento da fonte agora → false (já presente)
+    let va = mk(&mut e, "a");
+    let dup = call_instance_intrinsic(&mut e, HS, "add", "(Ljava/lang/Object;)Z", hs, &[va])
+        .expect("add");
+    assert_eq!(dup, Some(rd_vm::value::Value::Int(0)), "add dup → false");
+
+    // Collection null → NPE
+    let hs2 = e.heap.alloc_instance(HS.to_string(), vec![]).unwrap();
+    let npe = call_instance_intrinsic(
+        &mut e,
+        HS,
+        "<init>",
+        "(Ljava/util/Collection;)V",
+        hs2,
+        &[rd_vm::value::Value::Null],
+    );
+    assert!(
+        matches!(npe, Err(rd_vm::VmExit::Exception(ref t)) if t.class == "Ljava/lang/NullPointerException;"),
+        "fonte null → NPE"
+    );
+}
+
+#[test]
+fn unmodifiable_set_snapshot_set_le_e_bloqueia_mutacoes() {
+    // M8 (43º gap, real do launch: LogController.readPrefs): view dedup de
+    // leitura (snapshot); mutações → UOE; null → NPE.
+    use rd_vm::intrinsics::{call_instance_intrinsic, call_static_intrinsic};
+    const HS: &str = "Ljava/util/HashSet;";
+    const US: &str = "Ljava/util/Collections$UnmodifiableSet;";
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let mk = |e: &mut Engine, s: &str| {
+        e.heap
+            .alloc_string(s.to_string())
+            .map(rd_vm::value::Value::Obj)
+            .expect("alloc_string")
+    };
+
+    let src = e.heap.alloc_instance(HS.to_string(), vec![]).unwrap();
+    call_instance_intrinsic(&mut e, HS, "<init>", "()V", src, &[]).unwrap();
+    let va = mk(&mut e, "a");
+    let vb2 = mk(&mut e, "b");
+    call_instance_intrinsic(
+        &mut e,
+        HS,
+        "add",
+        "(Ljava/lang/Object;)Z",
+        src,
+        std::slice::from_ref(&va),
+    )
+    .unwrap();
+    call_instance_intrinsic(&mut e, HS, "add", "(Ljava/lang/Object;)Z", src, &[vb2]).unwrap();
+
+    let view = call_static_intrinsic(
+        &mut e,
+        "Ljava/util/Collections;",
+        "unmodifiableSet",
+        "(Ljava/util/Set;)Ljava/util/Set;",
+        &[rd_vm::value::Value::Obj(src)],
+    )
+    .expect("arm")
+    .expect("unmodifiableSet devolve objeto");
+    let rd_vm::value::Value::Obj(vr) = view else {
+        panic!("esperava Obj")
+    };
+    assert_ne!(vr, src, "view é objeto novo");
+    assert_eq!(e.heap.class_of(vr).unwrap(), US, "classe-marcadora host");
+    let sz = call_instance_intrinsic(&mut e, US, "size", "()I", vr, &[]).expect("size");
+    assert_eq!(
+        sz,
+        Some(rd_vm::value::Value::Int(2)),
+        "leituras delegam (size 2)"
+    );
+    let has = call_instance_intrinsic(
+        &mut e,
+        US,
+        "contains",
+        "(Ljava/lang/Object;)Z",
+        vr,
+        std::slice::from_ref(&va),
+    )
+    .expect("contains");
+    assert_eq!(has, Some(rd_vm::value::Value::Int(1)), "contains a");
+
+    for (n, sig, a) in [
+        ("add", "(Ljava/lang/Object;)Z", vec![va.clone()]),
+        ("remove", "(Ljava/lang/Object;)Z", vec![va]),
+        ("clear", "()V", vec![]),
+    ] {
+        let r = call_instance_intrinsic(&mut e, US, n, sig, vr, &a);
+        assert!(
+            matches!(
+                r,
+                Err(rd_vm::VmExit::Exception(ref t)) if t.class == "Ljava/lang/UnsupportedOperationException;"
+            ),
+            "{n} pela view → UOE"
+        );
+    }
+
+    let npe = call_static_intrinsic(
+        &mut e,
+        "Ljava/util/Collections;",
+        "unmodifiableSet",
+        "(Ljava/util/Set;)Ljava/util/Set;",
+        &[rd_vm::value::Value::Null],
+    );
+    assert!(
+        matches!(npe, Err(rd_vm::VmExit::Exception(ref t)) if t.class == "Ljava/lang/NullPointerException;"),
+        "null → NPE"
+    );
+}
+
+#[test]
+fn preference_manager_prefs_padrao_comecam_vazias_devolvem_default() {
+    // M8 (44º gap, real do launch: PftpdApp.onCreate → LogController.readPrefs
+    // → PreferenceManager.getDefaultSharedPreferences): objeto canônico host;
+    // prefs vazias → getXxx devolve o default da chamada; key null → NPE.
+    use rd_vm::framework::{call_host_instance, call_host_static};
+    const PM: &str = "Landroid/preference/PreferenceManager;";
+    const SP: &str = "Landroid/content/SharedPreferences;";
+    const SP_IMPL: &str = "Landroid/content/SharedPreferencesImpl;";
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let c1 = call_host_static(
+        &mut e,
+        PM,
+        "getDefaultSharedPreferences",
+        "(Landroid/content/Context;)Landroid/content/SharedPreferences;",
+        &[rd_vm::value::Value::Null],
+    )
+    .expect("arm")
+    .expect("prefs objeto");
+    let rd_vm::value::Value::Obj(pr) = c1 else {
+        panic!("esperava Obj")
+    };
+    assert_eq!(e.heap.class_of(pr).unwrap(), SP_IMPL, "classe impl (AOSP)");
+    let c2 = call_host_static(
+        &mut e,
+        PM,
+        "getDefaultSharedPreferences",
+        "(Landroid/content/Context;)Landroid/content/SharedPreferences;",
+        &[rd_vm::value::Value::Null],
+    )
+    .expect("arm");
+    assert_eq!(
+        c2,
+        Some(rd_vm::value::Value::Obj(pr)),
+        "canônico (objeto da VM, igual)"
+    );
+
+    let mk = |e: &mut Engine, s: &str| {
+        e.heap
+            .alloc_string(s.to_string())
+            .map(rd_vm::value::Value::Obj)
+            .expect("alloc_string")
+    };
+    let key = mk(&mut e, "xfer_mode");
+    let def = mk(&mut e, "active");
+
+    // getString → default
+    let got = call_host_instance(
+        &mut e,
+        SP,
+        "getString",
+        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+        pr,
+        &[key.clone(), def.clone()],
+    )
+    .expect("getString")
+    .expect("valor");
+    assert_eq!(got, def, "prefs vazias → default");
+
+    // getBoolean com default true → true (prefs vazias) — regra do próprio
+    // default (o app espera enabled=true como no state inicial); getInt 41.
+    let gb = call_host_instance(
+        &mut e,
+        SP,
+        "getBoolean",
+        "(Ljava/lang/String;Z)Z",
+        pr,
+        &[key.clone(), rd_vm::value::Value::Int(1)],
+    )
+    .expect("getBoolean");
+    assert_eq!(gb, Some(rd_vm::value::Value::Int(1)), "default booleano");
+    let gi = call_host_instance(
+        &mut e,
+        SP,
+        "getInt",
+        "(Ljava/lang/String;I)I",
+        pr,
+        &[key.clone(), rd_vm::value::Value::Int(41)],
+    )
+    .expect("getInt");
+    assert_eq!(gi, Some(rd_vm::value::Value::Int(41)), "default inteiro");
+
+    // contains → false (prefs vazias)
+    let ct = call_host_instance(
+        &mut e,
+        SP,
+        "contains",
+        "(Ljava/lang/String;)Z",
+        pr,
+        std::slice::from_ref(&key),
+    )
+    .expect("contains");
+    assert_eq!(ct, Some(rd_vm::value::Value::Int(0)), "contains false");
+
+    // key null → NPE (AOSP)
+    let npe = call_host_instance(
+        &mut e,
+        SP,
+        "getString",
+        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+        pr,
+        &[rd_vm::value::Value::Null, rd_vm::value::Value::Null],
+    );
+    assert!(
+        matches!(npe, Err(rd_vm::VmExit::Exception(ref t)) if t.class == "Ljava/lang/NullPointerException;"),
+        "key null → NPE"
+    );
+}
+
+#[test]
+fn service_loader_descobre_provider_de_meta_inf_services() {
+    // M8 (45º gap, real do launch do primftpd — slf4j 2.x descobre logback via
+    // ServiceLoader): load guarda os providers de META-INF/services/<bin>;
+    // iterator() INSTANCIA cada classe impl (ctor roda); provider ausente dos
+    // dex → ServiceConfigurationError tipado (JLS), nunca skip silencioso.
+    use rd_vm::intrinsics::{call_instance_intrinsic, call_static_intrinsic};
+    use rd_vm::value::Value;
+    const SL: &str = "Ljava/util/ServiceLoader;";
+    const IT: &str = "Ljava/util/Iterator;";
+    let _ = IT;
+    let mut b = DexBuilder::new();
+    let _marker = b.class("Lsvc/Marker;", "Ljava/lang/Object;");
+    let prov = b.class("Lsvc/Prov;", "Ljava/lang/Object;");
+    b.static_field(prov, "count", "I", SVal::Int(0));
+    let count = b.field_idx("Lsvc/Prov;", "I", "count");
+    b.direct(
+        prov,
+        "<init>",
+        "V",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(1, 1, 0, {
+            let mut u = op21s(0x13, 0, 42); // const/16 v0, 42
+            u.extend(op21c(0x67, 0, count)); // sput v0, Lsvc/Prov;->count:I
+            u.extend(op10x(0x0E)); // return-void
+            u
+        })),
+    );
+    b.direct(
+        prov,
+        "le_count",
+        "I",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(1, 0, 0, {
+            let mut u = op21c(0x60, 0, count); // sget v0, count
+            u.extend(op11x(0x0F, 0)); // return v0
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+
+    // APK com provider real + um ausente (comentário # e linha vazia pulados)
+    let arsc = common::apkfix::ArscFix::new().build();
+    let apk_bytes = common::apkfix::build_apk(
+        "svc.t",
+        "Lsvc/Marker;",
+        arsc,
+        vec![(
+            "META-INF/services/svc.Marker",
+            b"# prov com comentario\nsvc.Prov\n\nsvc.Missing\n".to_vec(),
+        )],
+    );
+    e.set_resources(rd_apk::Apk::from_bytes(apk_bytes).expect("apk"));
+
+    // Class da interface de serviço via getClass (o canônico do host)
+    let m = e
+        .heap
+        .alloc_instance("Lsvc/Marker;".to_string(), vec![])
+        .unwrap();
+    let service_class = match call_instance_intrinsic(
+        &mut e,
+        "Lsvc/Marker;",
+        "getClass",
+        "()Ljava/lang/Class;",
+        m,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("service Class: {other:?}"),
+    };
+    let loaded = call_static_intrinsic(
+        &mut e,
+        SL,
+        "load",
+        "(Ljava/lang/Class;)Ljava/util/ServiceLoader;",
+        &[Value::Obj(service_class)],
+    )
+    .expect("arm")
+    .expect("loader");
+    let Value::Obj(loader) = loaded else {
+        panic!("esperava Obj")
+    };
+
+    // iterator(): instancia svc.Prov (ctor roda count=42), depois svc.Missing
+    // ausente → ServiceConfigurationError.
+    let r = call_instance_intrinsic(
+        &mut e,
+        SL,
+        "iterator",
+        "()Ljava/util/Iterator;",
+        loader,
+        &[],
+    );
+    match r {
+        Err(VmExit::Exception(ref t)) => {
+            assert_eq!(
+                t.class, "Ljava/util/ServiceConfigurationError;",
+                "provider ausente dos dex → ServiceConfigurationError (JLS)"
+            );
+            let msg = t.message.clone().unwrap_or_default();
+            assert!(
+                msg.contains("Lsvc/Missing;"),
+                "mensagem cita o provider ausente: {msg}"
+            );
+        }
+        other => panic!("esperava ServiceConfigurationError, got {other:?}"),
+    }
+
+    // O primeiro provider chegou a instanciar ANTES do erro do ausente:
+    // count=42 prova que o ctor DEX rodou (instantiate eager ordenado).
+    let got = e
+        .invoke_static("Lsvc/Prov;", "le_count", "()I", &[])
+        .expect("le_count")
+        .as_int()
+        .expect("int");
+    assert_eq!(
+        got, 42,
+        "ctor do provider rodou antes do provider ausente falhar"
+    );
+}

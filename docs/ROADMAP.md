@@ -577,12 +577,47 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   (super-do-frame, range-direct/virtual, subclasse-DEX-de-AbstractList).
   Resultado real: o launch sai do NPE e do overflow e para no próximo gap
   **`Activity.getApplication()`** (NOT_FOUND tipado, sem exception).
-- ⬜ **Próximo gap (re-sondado): `Activity.getApplication() → Application` host** —
-  o DEX do primftpd chama `getApplication()` na activity no `MainTabsActivity.onCreate`
-  (`método Lorg/primftpd/ui/MainTabsActivity;->getApplication()Landroid/app/Application; não
-  resolvido`): a classe do app redeclara a chamada até a Activity de plataforma; o framework
-  não serve `getApplication` em ACTIVITY. Arm host trivial + Application canônico por VM
-  (Application.<init> já é no-op host) + teste + re-sondagem.
+- ✅ **`Activity.getApplication()`/`Context.getApplicationContext()` → Application
+  canônica por VM (entregue nesta rodada, 38º/39º gaps reais)**: o launch cria a
+  Application do `android:name` do manifest (com fallback DEFAULT do AOSP — classe
+  ausente no DEX → `Landroid/app/Application;`), roda `<init>`/`onCreate` DEX dela
+  ANTES do da activity e devolve SEMPRE a mesma instância; mref pela classe do app
+  (ex.: `MainTabsActivity`) coberto em `call_instance_intrinsic_mref` e mref
+  `Landroid/...` no framework. Wiring: CLI `app run` e MCP `tool_launch` injetam
+  o descritor do manifest (`set_application_class`). Teste: ordem
+  Application.onCreate(41)→Activity.onCreate(42); canônica; contexto ≡ aplicação.
+- ✅ **Cadeia `java.util.Collections` do `LogController` (entregue nesta rodada,
+  40º–43º gaps reais):** `unmodifiableMap`/`unmodifiableSet`/`singletonList` host —
+  views imutáveis de SNAPSHOT em classes-marcadoras do JDK
+  (`Collections$UnmodifiableMap/$UnmodifiableSet/$SingletonList`): leituras
+  delegam (get/size/contains/…); mutações → `UnsupportedOperationException`
+  tipada como na JDK; null → NPE; coleção do app sem estado host →
+  `VM_TYPE_ERROR` tipado (não itera/instancia surpresa); `HashSet.<init>(Collection)`
+  com snapshot dedup na ordem do iterador. Desvio documentado: snapshot ≠ view
+  live (as mutações da fonte após a criação não refletem — já o regime de
+  synchronized*); instanciador de provider usa ctor acessível sem classe pai implícita.
+- ✅ **`SharedPreferences` padrão host (entregue nesta rodada, 44º gap real):**
+  `PreferenceManager.getDefaultSharedPreferences(Context)` devolve o objeto
+  canônico `Landroid/content/SharedPreferencesImpl;` (AOSP) — prefs começam
+  VAZIAS e não persistem em arquivo nesta milestone (getXxx → default da
+  chamada; contains → false; key null → NPE do AOSP). `edit()/apply/commit`
+  seguem fora (falta tipada na sondagem seguinte se o app escrever prefs).
+- ✅ **Descoberta real de `ServiceLoader` via `META-INF/services` (entregue
+  nesta rodada, 45º gap real — slf4j 2.x do primftpd):** `load(Class
+  [,ClassLoader])` lê `META-INF/services/<nome binário>` do APK anexado
+  (formato JDK: `#` comenta; linhas vazias puladas) e guarda os providers no
+  estado host; `iterator()` INSTANCIA cada provider via DEX
+  (`<clinit>`+`<init>()V`, helper `new_dex_instance`) no snapshot do Iter
+  (eager — desvio de preguiça do JDK documentado) e devolve iterador real;
+  provider ausente dos dex → `ServiceConfigurationError` tipado (JLS), sem
+  skip silencioso; sem APK/sem arquivo → loader vazio (contrato, como antes).
+  Resultado real da sondagem: `findServiceProviders` roda DEX, providers
+  seriam descobertos se o APK embarcasse os services — o APK golden NÃO tem
+  `META-INF/services` (o gradle strip dos packagingOptions) e a única factory
+  disponível cai no fallback NOP do slf4j; `LogController.setActiveConfig`
+  upstream casta `(LoggerContext)` INCONDICIONALMENTE → `ClassCastException`
+  tipada, idêntica ao que um dispositivo real entrega com esse APK (cadeia do
+  launch encerrada com comportamento fiel).
 - ⬜ **Legacy gap (postergado — superseded pela cadeia androidX resolvida acima):** o
   `ClassLoader.getResources(String) → Enumeration<URL>` abaixo pertence a probe anterior
   (SLF4J/LG já passou — o launch agora roda o onCreate inteiro). Reavaliar quando a
