@@ -91,6 +91,17 @@ const THREAD_LOCAL: &str = "Ljava/lang/ThreadLocal;";
 /// cobria `new InheritableThreadLocal()`, 20º gap sondado). Single-threaded
 /// ⇒ "herdável" não tem efeito: comportamento idêntico ao ThreadLocal.
 const INHERITABLE_TL: &str = "Ljava/lang/InheritableThreadLocal;";
+/// Coleções abstratas da plataforma modeladas no classpath cujo `<init>()V`
+/// é no-op host (M8, 37º gap) — ver `call_instance_intrinsic_mref`.
+const ABSTRACT_COLLECTION_CTORS: [&str; 6] = [
+    "Ljava/util/AbstractCollection;",
+    "Ljava/util/AbstractList;",
+    "Ljava/util/AbstractSequentialList;",
+    "Ljava/util/AbstractSet;",
+    "Ljava/util/AbstractMap;",
+    "Ljava/util/AbstractQueue;",
+];
+
 const ARRAY_LIST: &str = "Ljava/util/ArrayList;";
 const LINKED_LIST: &str = "Ljava/util/LinkedList;";
 /// M8: coleções concorrentes — sexto gap do launch real
@@ -2149,6 +2160,17 @@ pub fn call_instance_intrinsic_mref(
 ) -> Result<Option<Value>, VmExit> {
     match (recv_class, name, sig) {
         (OBJECT, "<init>", "()V") => Ok(Some(Value::Null)), // ctor de Object = no-op
+
+        // ── <init>()V de coleções abstratas da plataforma (M8, 37º gap) ─────
+        // Classe DEX estendendo DIRETAMENTE uma coleção abstrata host (ex.:
+        // guava estende AbstractList) chama o super ctor via invoke-direct.
+        // O corpo real é trivial (contadores em zero) e o estado vive no
+        // nosso modelo — no-op correto, na linha do <init> de Object/
+        // Activity/Application/Context/Fragment. Casa por mref.class: o
+        // receiver é subclasse DEX, então recv_class nunca bate o nome.
+        (_, "<init>", "()V") if ABSTRACT_COLLECTION_CTORS.contains(&mref_class) => {
+            Ok(Some(Value::Null))
+        }
 
         // ── Object.getClass (M8, 16º gap real) ──────────────────────────────
         // final: nenhuma classe DEX pode declará-lo ⇒ captura irrestrita é

@@ -553,6 +553,40 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   `FragmentController` ← `FragmentActivity.onCreate` ←
   `MainTabsActivity.onCreate` — ou seja, o app usa **androidx FragmentActivity**
   e o call site do receiver null já está identificado.
+- ✅ **Semântica DEX de invokes corrigida (rodada seguinte, 36º/37º gaps) —
+  tipos de bug mais profundos que os gaps declarativos de API:**  
+  (1) **`invoke-super` começava a busca em `super(mref.class)`** — semântica
+  DEX correta: inicia na **super da classe que declara o frame** (Dalvik).
+  No launch isso pulava `androidx/activity/ComponentActivity.onCreate` inteiro
+  → `dispatchOnContextAvailable` nunca rodava → `attachHost` nunca rodava →
+  `mNonConfig` null → o NPE acima. `Engine::call` agora calcula
+  `frame_super` do `ClassDef` do frame e o interp o usa como ponto de
+  partida.  
+  (2) **Variantes `/range` de invoke-virtual (0x74) e invoke-direct (0x76)
+  estavam TROCADAS**: `invoke-virtual/range` despachava NÃO-virtualmente
+  (classe declarada) e `invoke-direct/range` despachava VIRTUALMENTE —
+  fazendo o ctor Kotlin de lambda `FunctionReferenceImpl.<init> →
+  super(2, receiver, …)` (objeto de `OnBackPressedDispatcher.addCallback`)
+  re-executar o próprio `<init>` em **recursão infinita** (VM_STACK_OVERFLOW
+  a 512; abort nativo com pilha padrão). Máscaras corrigidas conforme o spec
+  Dalvik (0x70/0x76 = direct).  
+  (3) **`<init>()V` de coleções abstratas host no-op** (37º): classe DEX
+  estendendo Diretamente `java.util.AbstractList` e cia. chama `super()` via
+  invoke-direct; antes caía em NOT_FOUND (tipos de classe host sem bucket
+  java.util triviais). Testes: 3 regressões em `vm_exec`
+  (super-do-frame, range-direct/virtual, subclasse-DEX-de-AbstractList).
+  Resultado real: o launch sai do NPE e do overflow e para no próximo gap
+  **`Activity.getApplication()`** (NOT_FOUND tipado, sem exception).
+- ⬜ **Próximo gap (re-sondado): `Activity.getApplication() → Application` host** —
+  o DEX do primftpd chama `getApplication()` na activity no `MainTabsActivity.onCreate`
+  (`método Lorg/primftpd/ui/MainTabsActivity;->getApplication()Landroid/app/Application; não
+  resolvido`): a classe do app redeclara a chamada até a Activity de plataforma; o framework
+  não serve `getApplication` em ACTIVITY. Arm host trivial + Application canônico por VM
+  (Application.<init> já é no-op host) + teste + re-sondagem.
+- ⬜ **Legacy gap (postergado — superseded pela cadeia androidX resolvida acima):** o
+  `ClassLoader.getResources(String) → Enumeration<URL>` abaixo pertence a probe anterior
+  (SLF4J/LG já passou — o launch agora roda o onCreate inteiro). Reavaliar quando a
+  sequência real exigir SPI/classpath enumeration de novo.
 - ⬜ **Próximo gap (re-sondado): `ClassLoader.getResources(String) →
   Enumeration<URL>`** — próximo `NOT_FOUND` após LinkedHashSet
   (`getResources("org/slf4j/impl/StaticLoggerBinder.class")` do

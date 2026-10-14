@@ -1429,7 +1429,7 @@ fn clinit_failure_semantics_and_super_first() {
         vec![],
         ACC_STATIC | ACC_CONSTRUCTOR,
         Some(b.code(2, 0, 0, {
-            let mut u = op11n(0x12, 0, 7);
+            let mut u = op21s(0x13, 0, 7);
             u.extend(op10x(0x0E));
             u
         })),
@@ -1867,7 +1867,7 @@ fn system_out_println_executes() {
         vec![],
         ACC_PUBLIC | ACC_STATIC,
         Some(b.code(3, 0, 0, {
-            let mut u = op11n(0x12, 0, 7); // const/4 v0, 7
+            let mut u = op21s(0x13, 0, 7); // const/4 v0, 7
             u.extend(op35c(0x71, 1, i_value_of, [0, 0, 0, 0, 0])); // Integer.valueOf(v0)
             u.extend(op11x(0x0C, 0)); // move-result-object v0 → Integer(7)
             u.extend(op21c(0x60, 1, f_out)); // sget v1, System.out
@@ -5991,4 +5991,295 @@ fn exception_trace_anota_frames_ao_desempilhar() {
     sorted.sort_unstable();
     sorted.dedup();
     assert_eq!(labels, sorted, "executed_labels ordenado/dedup");
+}
+
+#[test]
+fn invoke_super_comeca_na_super_da_classe_definidora() {
+    // Semântica DEX (Dalvik): invoke-super inicia a busca na SUPER da classe
+    // ONDE a instrução está (defining class), NÃO em super(mref.class).
+    // LAvo.valor=7 ← LApai.valor=8 ← LAneto.chamaSuper: invoke-super
+    // LApai;->valor a partir de LAneto deve resolver para LApai.valor (8).
+    // Regra errada (super(mref.class)) resolveria para LAvo.valor (7) —
+    // bug real observado no launch do primftpd: FragmentActivity.onCreate
+    // pulava androidx/activity/ComponentActivity.onCreate direto para
+    // androidx/core/app/ComponentActivity.onCreate (issue de M8, 36º gap).
+    let mut b = DexBuilder::new();
+    let avo = b.class("LLAvo;", "Ljava/lang/Object;");
+    b.r#virtual(
+        avo,
+        "valor",
+        "I",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(2, 1, 0, {
+            let mut u = op21s(0x13, 0, 7);
+            u.extend(op11x(0x0F, 0)); // return v0
+            u
+        })),
+    );
+    let pai = b.class("LLPai;", "LLAvo;");
+    b.r#virtual(
+        pai,
+        "valor",
+        "I",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(2, 1, 0, {
+            let mut u = op21s(0x13, 0, 8);
+            u.extend(op11x(0x0F, 0));
+            u
+        })),
+    );
+    let neto = b.class("LLNeto;", "LLPai;");
+    b.r#virtual(
+        neto,
+        "valor",
+        "I",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(2, 1, 0, {
+            let mut u = op21s(0x13, 0, 9);
+            u.extend(op11x(0x0F, 0));
+            u
+        })),
+    );
+    let p_i = b.proto_idx("I", vec![]);
+    let valor_pai = b.method_idx("LLPai;", p_i, "valor");
+    b.r#virtual(
+        neto,
+        "chamaSuper",
+        "I",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(2, 1, 1, {
+            // regs: v0 scratch, v1=this(p0); invoke-super {v1} LLPai;->valor()I
+            let mut u = op35c(0x6F, 1, valor_pai, [1, 0, 0, 0, 0]);
+            u.extend(op11x(0x0A, 0)); // move-result v0
+            u.extend(op11x(0x0F, 0)); // return v0
+            u
+        })),
+    );
+    let neto_tidx = b.type_idx("LLNeto;");
+    let chama_super = b.method_idx("LLNeto;", p_i, "chamaSuper");
+    let caso = b.class("LCaso;", "Ljava/lang/Object;");
+    b.direct(
+        caso,
+        "despacha",
+        "I",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(2, 0, 1, {
+            let mut u = op21c(0x22, 0, neto_tidx); // new-instance v0, LLNeto (resultado já em v0)
+            u.extend(op35c(0x6E, 1, chama_super, [0, 0, 0, 0, 0])); // invoke-virtual
+            u.extend(op11x(0x0A, 1)); // move-result v1
+            u.extend(op11x(0x0F, 1)); // return v1
+            u
+        })),
+    );
+    let dex = rd_dex::Dex::parse(b.finish()).expect("dex");
+    let mut e = Engine::new(vec![dex], VmConfig::default());
+    let r = invoke(&mut e, "despacha", "()I", &[])
+        .expect("despacha")
+        .as_int()
+        .expect("int");
+    assert_eq!(
+        r, 8,
+        "invoke-super DEX-corrto: LApai.valor (8), não LAvo.valor (7)"
+    );
+}
+
+#[test]
+fn subclasse_dex_de_abstractlist_chama_super_init_noop() {
+    // M8 (37º gap, real no launch do primftpd pós-fix do invoke-super):
+    // classe DEX estendendo DIRETAMENTE java.util.AbstractList chama
+    // super() via invoke-direct → <init>()V host no-op (antes: NOT_FOUND
+    // "método Ljava/util/AbstractList;-><init>()V não resolvido").
+    let mut b = DexBuilder::new();
+    let p_void = b.proto_idx("V", vec![]);
+    let p_b = b.proto_idx("Z", vec![]);
+    let lista = b.class("LMinha;", "Ljava/util/AbstractList;");
+    let init_ab = b.method_idx("Ljava/util/AbstractList;", p_void, "<init>");
+    b.direct(
+        lista,
+        "<init>",
+        "V",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(1, 1, 1, {
+            let mut u = op35c(0x70, 1, init_ab, [0, 0, 0, 0, 0]); // invoke-direct {v0=this} AbstractList.<init>
+            u.extend(op11x(0x0E, 0)); // return-void
+            u
+        })),
+    );
+    let minha_tidx = b.type_idx("LMinha;");
+    let init_minha = b.method_idx("LMinha;", p_void, "<init>");
+    let caso = b.class("LCaso;", "Ljava/lang/Object;"); // assert via retorno
+
+    b.direct(
+        caso,
+        "main",
+        "Z",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(3, 0, 1, {
+            let mut u = op21c(0x22, 0, minha_tidx); // new-instance v0, LMinha
+            u.extend(op35c(0x70, 1, init_minha, [0, 0, 0, 0, 0])); // invoke-direct {v0} LMinha.<init>
+            u.extend(op11n(0x12, 1, 1)); // const/4 v1, +1
+            u.extend(op11x(0x0F, 1)); // return v1
+            u
+        })),
+    );
+    let _ = p_b;
+    let dex = rd_dex::Dex::parse(b.finish()).expect("dex");
+    let mut e = Engine::new(vec![dex], VmConfig::default());
+    let v = invoke(&mut e, "main", "()Z", &[])
+        .expect("main sem NOT_FOUND")
+        .as_int()
+        .expect("Z");
+    assert_eq!(
+        v, 1,
+        "subclasse DEX de AbstractList instanciou via super() no-op"
+    );
+}
+
+#[test]
+fn invoke_range_direct_ao_declarado_e_virtual_com_dispatch() {
+    // M8 (37º gap, real do launch do primftpd): as variantes /range de
+    // invoke-virtual (0x74) e invoke-direct (0x76) estavam TROCADAS no
+    // do_invoke. Sob o bug:
+    //   (a) invoke-direct/range despachava VIRTUALMENTE → ctor Kotlin de
+    //       lambda (FunctionReferenceImpl.<init> → super FunctionReference)
+    //       re-executava o próprio <init> em recursão infinita;
+    //   (b) invoke-virtual/range NÃO despachava virtualmente → resolvia na
+    //       classe DECLARADA em vez da classe do receiver.
+    // Formato 3rc do range invoke: [op | count<<8] [midx] [start_reg].
+    let range_invoke = |op: u8, count: u8, idx: u16, start: u8| -> Vec<u16> {
+        vec![(op as u16) | ((count as u16) << 8), idx, start as u16]
+    };
+    let mut b = DexBuilder::new();
+    let p_void = b.proto_idx("V", vec![]);
+    let p_iv = b.proto_idx("V", vec!["I".to_string()]);
+    let init_object = b.method_idx("Ljava/lang/Object;", p_void, "<init>");
+
+    // (a) LAvo.<init>(I)V guarda o arg no campo x (iput host-checável).
+    let avo = b.class("LAvo;", "Ljava/lang/Object;");
+    b.instance_field(avo, "x", "I");
+    let fx = b.field_idx("LAvo;", "I", "x");
+    b.direct(
+        avo,
+        "<init>",
+        "V",
+        vec!["I"],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(2, 2, 1, {
+            // regs=2 ins=2 → v0=p0(this), v1=p1(arg)
+            let mut u = op35c(0x70, 1, init_object, [0, 0, 0, 0, 0]); // Object.<init> {v0}
+            u.extend(op22c(0x59, 1, 0, fx)); // iput v1(arg), v0(this), x
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+
+    // LSub.<init>()V: chama o ctor do PAI via invoke-direct/range (0x76)
+    // com v1=42 — sob o bug re-executaria LSub.<init> (dispatch virtual
+    // por engano) em recursão infinita; correto: roda LAvo.<init>(42).
+    let sub = b.class("LSub;", "LAvo;");
+    let init_avo = b.method_idx("LAvo;", p_iv, "<init>");
+    b.direct(
+        sub,
+        "<init>",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(4, 1, 2, {
+            // regs=4 ins=1 → v3=p0(this); v0,v1 livres: copia this → v0
+            let mut u = op12x(0x07, 0, 3); // move-object v0, v3 (this)
+            u.extend(op21s(0x13, 1, 42)); // const/16 v1, 42 (arg)
+            u.extend(range_invoke(0x76, 2, init_avo, 0)); // invoke-direct/range {v0..v1} = {this, 42}
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+
+    // (b) LBaseF.f()I = 7; LSubF sobrescreve com 9 — invoke-virtual/range
+    // (0x74) TEM que despachar para a override (9), não para a declarada (7).
+    let basef = b.class("LBaseF;", "Ljava/lang/Object;");
+    b.r#virtual(
+        basef,
+        "f",
+        "I",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(2, 1, 0, {
+            let mut u = op21s(0x13, 0, 7);
+            u.extend(op11x(0x0F, 0));
+            u
+        })),
+    );
+    let subf = b.class("LSubF;", "LBaseF;");
+    b.r#virtual(
+        subf,
+        "f",
+        "I",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(2, 1, 0, {
+            let mut u = op21s(0x13, 0, 9);
+            u.extend(op11x(0x0F, 0));
+            u
+        })),
+    );
+
+    let p_i = b.proto_idx("I", vec![]);
+    let f_base = b.method_idx("LBaseF;", p_i, "f");
+    let sub_tidx = b.type_idx("LSub;");
+    let init_sub = b.method_idx("LSub;", p_void, "<init>");
+    let subf_tidx = b.type_idx("LSubF;");
+    let caso = b.class("LCaso;", "Ljava/lang/Object;");
+    // le_x()I: new LSub; iget x → esperado 42
+    b.direct(
+        caso,
+        "le_x",
+        "I",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(2, 0, 2, {
+            let mut u = op21c(0x22, 0, sub_tidx);
+            u.extend(op35c(0x70, 1, init_sub, [0, 0, 0, 0, 0]));
+            u.extend(op22c(0x52, 1, 0, fx)); // iget v1, v0, x
+            u.extend(op11x(0x0F, 1));
+            u
+        })),
+    );
+    // chama_f()I: new LSubF; invoke-virtual/range {v0} LBaseF.f → esperado 9
+    b.direct(
+        caso,
+        "chama_f",
+        "I",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(2, 0, 1, {
+            let mut u = op21c(0x22, 0, subf_tidx);
+            u.extend(op35c(0x70, 1, init_object, [0, 0, 0, 0, 0])); // Object.<init> (no-op)
+            u.extend(range_invoke(0x74, 1, f_base, 0)); // invoke-virtual/range {v0}
+            u.extend(op11x(0x0A, 1)); // move-result v1
+            u.extend(op11x(0x0F, 1));
+            u
+        })),
+    );
+    let dex = rd_dex::Dex::parse(b.finish()).expect("dex");
+    let mut e = Engine::new(vec![dex], VmConfig::default());
+    let x = invoke(&mut e, "le_x", "()I", &[])
+        .expect("le_x")
+        .as_int()
+        .expect("int");
+    assert_eq!(
+        x, 42,
+        "invoke-direct/range (0x76) resolveu na classe declarada"
+    );
+    let f = invoke(&mut e, "chama_f", "()I", &[])
+        .expect("chama_f")
+        .as_int()
+        .expect("int");
+    assert_eq!(f, 9, "invoke-virtual/range (0x74) despachou virtualmente");
 }
