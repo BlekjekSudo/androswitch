@@ -284,6 +284,9 @@ pub fn call_static_intrinsic(
     if let Some(v) = crate::xml_res::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
+    if let Some(v) = crate::android_colorspace::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
     if let Some(v) = crate::android_spannable::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
@@ -3300,6 +3303,14 @@ pub fn call_instance_intrinsic_mref(
     {
         if let Some(v) =
             call_instance_intrinsic_mref(vm, recv_class, recv_class, name, sig, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
+    // ColorSpace (android_colorspace.rs)
+    if recv_class == crate::android_colorspace::CS || recv_class == crate::android_colorspace::RGB {
+        if let Some(v) =
+            crate::android_colorspace::instance_intrinsic(vm, recv_class, name, recv, args)?
         {
             return Ok(Some(v));
         }

@@ -8,6 +8,7 @@
 pub(crate) mod activity_callbacks;
 pub(crate) mod activity_extras;
 pub mod android_build;
+pub(crate) mod android_colorspace;
 pub(crate) mod android_display;
 pub(crate) mod android_pm;
 pub(crate) mod android_res;

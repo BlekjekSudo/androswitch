@@ -359,6 +359,12 @@ impl Engine {
             )
             .into());
         }
+        if let Some(pat) = trace_method_pattern() {
+            let label = self.method_label(dex_idx, m);
+            if label.contains(pat) {
+                eprintln!("T/RustyDroid: call {label} depth={}", self.depth);
+            }
+        }
         // Ponto de partida DEX-corrto do invoke-super: a SUPER da classe que
         // DECLARA o frame atual (não `super(mref.class)` — Dalvik Reference).
         // Resolvido aqui onde temos o ClassDef do frame em mãos.
@@ -835,4 +841,16 @@ pub fn parse_param_types(sig: &str) -> Option<Vec<String>> {
         out.push(params[start..i].to_string());
     }
     Some(out)
+}
+
+/// `RD_TRACE_METHOD=<substring>`: log every guest method entry whose label
+/// (`Lpkg/Class;->name(sig)`) contains the substring (debugging aid).
+fn trace_method_pattern() -> Option<&'static str> {
+    static PAT: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    PAT.get_or_init(|| {
+        std::env::var("RD_TRACE_METHOD")
+            .ok()
+            .filter(|s| !s.is_empty())
+    })
+    .as_deref()
 }

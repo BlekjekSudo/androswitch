@@ -1425,6 +1425,9 @@ fn cmd_app_run(
                         eng.rasterize_frame(&mut fb.px, w, h);
                         if std::env::var_os("RD_TRACE_DRAW").is_some() {
                             eprintln!("D/RustyDroid: frame ops={ops}");
+                            if std::env::var("RD_TRACE_DRAW").as_deref() == Ok("2") {
+                                eprintln!("{}", eng.frame_summary());
+                            }
                         }
                     }
                     Ok(_) => {}

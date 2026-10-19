@@ -764,6 +764,13 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/lang/Object;",
         ]),
         "Landroid/content/ComponentName;" => Some(OBJECT.to_vec()),
+        "Landroid/graphics/ColorSpace;"
+        | "Landroid/graphics/ColorSpace$Named;"
+        | "Landroid/graphics/ColorSpace$Model;"
+        | "Landroid/graphics/ColorSpace$Rgb$TransferParameters;" => Some(OBJECT.to_vec()),
+        "Landroid/graphics/ColorSpace$Rgb;" => {
+            Some(vec!["Landroid/graphics/ColorSpace;", "Ljava/lang/Object;"])
+        }
         "Landroid/text/SpannableString;" | "Landroid/text/SpannableStringBuilder;" => {
             Some(OBJECT.to_vec())
         }

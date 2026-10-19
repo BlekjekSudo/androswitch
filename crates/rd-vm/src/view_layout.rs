@@ -321,43 +321,34 @@ pub(crate) fn instance_intrinsic(
         // translated to the child's parent-relative frame.
         ("drawChild", "(Landroid/graphics/Canvas;Landroid/view/View;J)Z") => {
             if let (Some(Value::Obj(c)), Some(Value::Obj(child))) = (args.first(), args.get(1)) {
-                let (c, child) = (*c, *child);
-                let visible = !matches!(
-                    vm.fw.get(child),
-                    Some(HostObj::View { vis, .. }) if *vis != crate::framework::Vis::Visible
-                );
-                if visible {
-                    let l = prop(vm, child, "rd_l").unwrap_or(0);
-                    let t = prop(vm, child, "rd_t").unwrap_or(0);
-                    let n = vm.canvas_translate(c, l as f32, t as f32);
-                    let drew = crate::jcollections::guest_call(
-                        vm,
-                        child,
-                        "draw",
-                        "(Landroid/graphics/Canvas;)V",
-                        &[Value::Obj(c)],
-                    )?
-                    .is_some();
-                    if !drew {
-                        crate::jcollections::guest_call(
-                            vm,
-                            child,
-                            "onDraw",
-                            "(Landroid/graphics/Canvas;)V",
-                            &[Value::Obj(c)],
-                        )?;
-                        crate::jcollections::guest_call(
-                            vm,
-                            child,
-                            "dispatchDraw",
-                            "(Landroid/graphics/Canvas;)V",
-                            &[Value::Obj(c)],
-                        )?;
-                    }
-                    vm.canvas_restore_to(c, n);
-                }
+                host_draw_child(vm, *c, *child)?;
             }
             Value::Int(0)
+        }
+        // AOSP ViewGroup.dispatchDraw (reached via `super.dispatchDraw`):
+        // draw each visible child in order through the (overridable)
+        // `drawChild(Canvas, View, long)`.
+        ("dispatchDraw", "(Landroid/graphics/Canvas;)V") => {
+            if let Some(Value::Obj(c)) = args.first() {
+                let c = *c;
+                let kids = match vm.fw.get(recv) {
+                    Some(HostObj::View { children, .. }) => children.clone(),
+                    _ => Vec::new(),
+                };
+                for child in kids {
+                    let over = crate::jcollections::guest_call(
+                        vm,
+                        recv,
+                        "drawChild",
+                        "(Landroid/graphics/Canvas;Landroid/view/View;J)Z",
+                        &[Value::Obj(c), Value::Obj(child), Value::Long(0)],
+                    )?;
+                    if over.is_none() {
+                        host_draw_child(vm, c, child)?;
+                    }
+                }
+            }
+            Value::Null
         }
         // move the frame without resizing (AOSP: no onSizeChanged/onLayout)
         ("offsetLeftAndRight", "(I)V") | ("offsetTopAndBottom", "(I)V") => {
@@ -634,4 +625,44 @@ impl Engine {
         }
         Ok(())
     }
+}
+
+/// AOSP `ViewGroup.drawChild`: draw `child` on the parent's canvas,
+/// translated to the child's parent-relative frame.
+fn host_draw_child(vm: &mut Engine, c: ObjRef, child: ObjRef) -> Result<(), VmExit> {
+    let visible = !matches!(
+        vm.fw.get(child),
+        Some(HostObj::View { vis, .. }) if *vis != crate::framework::Vis::Visible
+    );
+    if visible {
+        let l = prop(vm, child, "rd_l").unwrap_or(0);
+        let t = prop(vm, child, "rd_t").unwrap_or(0);
+        let n = vm.canvas_translate(c, l as f32, t as f32);
+        let drew = crate::jcollections::guest_call(
+            vm,
+            child,
+            "draw",
+            "(Landroid/graphics/Canvas;)V",
+            &[Value::Obj(c)],
+        )?
+        .is_some();
+        if !drew {
+            crate::jcollections::guest_call(
+                vm,
+                child,
+                "onDraw",
+                "(Landroid/graphics/Canvas;)V",
+                &[Value::Obj(c)],
+            )?;
+            crate::jcollections::guest_call(
+                vm,
+                child,
+                "dispatchDraw",
+                "(Landroid/graphics/Canvas;)V",
+                &[Value::Obj(c)],
+            )?;
+        }
+        vm.canvas_restore_to(c, n);
+    }
+    Ok(())
 }

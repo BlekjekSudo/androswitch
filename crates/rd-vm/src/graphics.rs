@@ -91,6 +91,13 @@ pub(crate) struct PaintSnap {
     argb: u32,
     style: i32,
     sw: f32,
+    /// `BlendMode.CLEAR` / `PorterDuff.Mode.CLEAR` transfer mode.
+    clear: bool,
+    /// Colour of a `SRC_IN`/`SRC_ATOP` colour filter (tint): the source's
+    /// coverage/alpha is kept and its colour replaced.
+    tint: Option<u32>,
+    /// Letter spacing (em), applied to the pen advance of text ops.
+    ls: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -435,9 +442,13 @@ pub(crate) fn cs_text(vm: &mut Engine, v: &Value) -> Result<String, VmExit> {
             })
             .collect());
     }
-    match crate::jcollections::guest_call(vm, *r, "toString", "()Ljava/lang/String;", &[])? {
-        Some(Value::Obj(s)) => Ok(vm.heap.as_str(s).map(str::to_string).unwrap_or_default()),
-        _ => Ok(String::new()),
+    // Full virtual dispatch: guest CharSequences *and* host ones
+    // (SpannableString, StringBuilder, …) answer `toString()`.
+    match vm.invoke_instance(*r, "toString", "()Ljava/lang/String;", &[]) {
+        Ok(Value::Obj(s)) => Ok(vm.heap.as_str(s).map(str::to_string).unwrap_or_default()),
+        Ok(_) => Ok(String::new()),
+        Err(VmExit::Exception(t)) => Err(VmExit::Exception(t)),
+        Err(_) => Ok(String::new()),
     }
 }
 fn sub(s: &str, a: i32, e: i32) -> String {
@@ -479,11 +490,37 @@ fn paint_of(vm: &Engine, v: Option<&Value>) -> PaintS {
         _ => PaintS::default(),
     }
 }
-fn snap(p: &PaintS) -> PaintSnap {
+fn snap(vm: &Engine, p: &PaintS) -> PaintSnap {
+    let ord_of = |v: Option<&Value>| match v {
+        Some(Value::Obj(r)) => vm
+            .heap
+            .get_field(*r, "rd_ord")
+            .ok()
+            .and_then(|v| v.as_int().ok()),
+        _ => None,
+    };
+    let field = |v: Option<&Value>, f: &str| match v {
+        Some(Value::Obj(r)) => vm.heap.get_field(*r, f).ok(),
+        _ => None,
+    };
+    // CLEAR = ordinal 0 in both BlendMode and PorterDuff.Mode
+    let clear = ord_of(p.misc.get("BlendMode")) == Some(0)
+        || ord_of(field(p.misc.get("Xfermode"), "rd_mode").as_ref()) == Some(0);
+    let cf = p.misc.get("ColorFilter");
+    let tint = match ord_of(field(cf, "rd_mode").as_ref()) {
+        // SRC_IN = 5, SRC_ATOP = 9 in both enums
+        Some(5 | 9) => field(cf, "rd_color")
+            .and_then(|v| v.as_int().ok())
+            .map(|c| c as u32),
+        _ => None,
+    };
     PaintSnap {
         argb: p.argb,
         style: p.style,
         sw: p.sw,
+        clear,
+        tint,
+        ls: p.letter_spacing,
     }
 }
 
@@ -1027,14 +1064,19 @@ pub(crate) fn static_intrinsic(
             }
         }
         ("Landroid/graphics/Bitmap;", "createBitmap" | "createScaledBitmap") => {
+            // Pick the `int` parameters by descriptor: a null reference
+            // (e.g. the `DisplayMetrics` of the API 26 overload) also
+            // arrives as `Int(0)` and must not be read as a width.
+            let types = crate::engine::parse_param_types(sig);
             let ints: Vec<i32> = args
                 .iter()
-                .filter_map(|v| {
-                    if let Value::Int(i) = v {
-                        Some(*i)
-                    } else {
-                        None
+                .enumerate()
+                .filter_map(|(i, v)| match (v, &types) {
+                    (Value::Int(x), Some(t)) if t.get(i).map(String::as_str) == Some("I") => {
+                        Some(*x)
                     }
+                    (Value::Int(x), None) => Some(*x),
+                    _ => None,
                 })
                 .collect();
             let src = args.iter().find_map(|v| match v {
@@ -1377,6 +1419,9 @@ pub(crate) fn instance_intrinsic(
                             argb: it(a(0)) as u32,
                             style: 0,
                             sw: 0.0,
+                            clear: false,
+                            tint: None,
+                            ls: 0.0,
                         },
                         k: OpK::Color(it(a(0)) as u32),
                     });
@@ -2402,7 +2447,7 @@ fn canvas_method(
         let t = cvf(vm, recv).top();
         t.m = mul(&t.m, &m);
     };
-    let paint_last = |vm: &Engine| snap(&paint_of(vm, args.last()));
+    let paint_last = |vm: &Engine| snap(vm, &paint_of(vm, args.last()));
     let out = match name {
         "save" => {
             let c = cvf(vm, recv);
@@ -2721,6 +2766,9 @@ fn canvas_method(
                     argb: if clear { 0 } else { c },
                     style: 0,
                     sw: 0.0,
+                    clear: false,
+                    tint: None,
+                    ls: 0.0,
                 },
                 OpK::Color(if clear { 0 } else { c }),
             );
@@ -2765,7 +2813,8 @@ fn canvas_method(
                 2 => x - w,
                 _ => x,
             };
-            record(vm, recv, snap(&p), OpK::Text(t, x, y, p.text_size));
+            let ps = snap(vm, &p);
+            record(vm, recv, ps, OpK::Text(t, x, y, p.text_size));
             Value::Null
         }
         "drawBitmap" => {
@@ -2783,7 +2832,7 @@ fn canvas_method(
             } else {
                 [f(1), f(2), f(1) + bw, f(2) + bh]
             };
-            let p = snap(&paint_of(vm, args.last()));
+            let p = snap(vm, &paint_of(vm, args.last()));
             record(vm, recv, p, OpK::Bitmap(bm.expect("checked"), dst));
             Value::Null
         }
@@ -2796,6 +2845,9 @@ fn canvas_method(
                         argb: 0,
                         style: 0,
                         sw: 0.0,
+                        clear: false,
+                        tint: None,
+                        ls: 0.0,
                     },
                     OpK::Node(n),
                 );
@@ -3088,6 +3140,38 @@ fn layout_method(
                         }
                         t.push('…');
                     }
+                    // AOSP Layout.draw draws through the canvas' virtual
+                    // drawText: a guest Canvas subclass (e.g. Compose's
+                    // TextAndroidCanvas) forwards to its wrapped canvas.
+                    let guest_canvas = vm
+                        .heap
+                        .class_of(c)
+                        .map(|k| k != "Landroid/graphics/Canvas;")
+                        .unwrap_or(false)
+                        && vm
+                            .cp
+                            .resolve_method(
+                                vm.heap.class_of(c).unwrap_or(""),
+                                "drawText",
+                                "(Ljava/lang/String;FFLandroid/graphics/Paint;)V",
+                            )
+                            .is_some();
+                    if guest_canvas {
+                        let js = Value::Obj(crate::intrinsics::alloc_string(vm, t)?);
+                        crate::jcollections::guest_call(
+                            vm,
+                            c,
+                            "drawText",
+                            "(Ljava/lang/String;FFLandroid/graphics/Paint;)V",
+                            &[
+                                js,
+                                Value::Float(l.line_left(i)),
+                                Value::Float(l.baseline(i)),
+                                l.paint.clone(),
+                            ],
+                        )?;
+                        continue;
+                    }
                     let p = paint_of(vm, Some(&l.paint));
                     record(
                         vm,
@@ -3096,6 +3180,9 @@ fn layout_method(
                             argb: p.argb,
                             style: 0,
                             sw: 0.0,
+                            clear: false,
+                            tint: None,
+                            ls: l.ls,
                         },
                         OpK::Text(t, l.line_left(i), l.baseline(i), l.size),
                     );
@@ -3117,6 +3204,8 @@ pub(crate) struct Raster<'a> {
     pub px: &'a mut [u8],
     pub w: usize,
     pub h: usize,
+    /// Active colour-filter tint while replaying a bitmap's ops.
+    pub tint: Option<u32>,
 }
 
 impl Raster<'_> {
@@ -3245,7 +3334,15 @@ impl Raster<'_> {
         }
     }
     #[allow(clippy::too_many_arguments)]
-    fn text(&mut self, s: &str, m: &M, x: f32, y: f32, size: f32, argb: u32, clip: [f32; 4]) {
+    fn text(
+        &mut self,
+        s: &str,
+        m: &M,
+        (x, y): (f32, f32),
+        (size, ls): (f32, f32),
+        argb: u32,
+        clip: [f32; 4],
+    ) {
         let at = atlas();
         // effective scale from the matrix (uniform approximation)
         let ms = (m[0] * m[0] + m[1] * m[1]).sqrt().max(1e-3);
@@ -3295,7 +3392,7 @@ impl Raster<'_> {
                     }
                 }
             }
-            pen += char_adv(c, size, 0.0) * ms;
+            pen += char_adv(c, size, ls) * ms;
         }
     }
 }
@@ -3351,8 +3448,17 @@ impl Engine {
             if clip[0] >= clip[2] || clip[1] >= clip[3] {
                 continue;
             }
+            // Bitmaps are replayed straight onto the target, so a CLEAR
+            // (e.g. Compose's vector-cache reset) is a no-op here.
+            if op.p.clear {
+                continue;
+            }
             let alpha = palpha * op.alpha;
-            let col = mod_alpha(op.p.argb, alpha);
+            let base = match r.tint {
+                Some(t) => (t & 0x00ff_ffff) | ((((t >> 24) * (op.p.argb >> 24)) / 255) << 24),
+                None => op.p.argb,
+            };
+            let col = mod_alpha(base, alpha);
             let shape = |r: &mut Raster<'_>, poly: Vec<(f32, f32)>| {
                 if op.p.style != 1 {
                     r.fill_polys(&[xform(&m, &poly)], col, clip, false);
@@ -3402,7 +3508,7 @@ impl Engine {
                         }
                     }
                 }
-                OpK::Text(s, x, y, size) => r.text(s, &m, *x, *y, *size, col, clip),
+                OpK::Text(s, x, y, size) => r.text(s, &m, (*x, *y), (*size, op.p.ls), col, clip),
                 OpK::Color(c) => {
                     let full = [
                         clip[0].max(0.0),
@@ -3477,8 +3583,61 @@ impl Engine {
                             clip[2].min(p0.0.max(p1.0)),
                             clip[3].min(p0.1.max(p1.1)),
                         ];
+                        let saved = r.tint;
+                        if op.p.tint.is_some() {
+                            r.tint = op.p.tint;
+                        }
                         self.raster_ops(r, bops, &s, bclip, alpha, depth + 1);
+                        r.tint = saved;
                     }
+                }
+            }
+        }
+    }
+
+    /// Debug dump of the recorded window display list (one line per op,
+    /// recursing into render nodes and bitmaps); used by `RD_TRACE_DRAW`.
+    pub fn frame_summary(&self) -> String {
+        let mut out = String::new();
+        self.summ_ops(&self.gfx.frame, 0, &mut out);
+        out
+    }
+
+    fn summ_ops(&self, ops: &[Op], depth: usize, out: &mut String) {
+        use std::fmt::Write;
+        if depth > 32 {
+            return;
+        }
+        for op in ops {
+            let pad = "  ".repeat(depth);
+            let head = format!(
+                "{pad}a={:.2} argb={:08x} clip={:?} ",
+                op.alpha,
+                op.p.argb,
+                op.clip.map(|v| v as i32)
+            );
+            match &op.k {
+                OpK::Node(n) => {
+                    let _ = writeln!(out, "{head}Node");
+                    if let Some(G::Node(ns)) = self.gfx.objs.get(n) {
+                        self.summ_ops(&ns.ops, depth + 1, out);
+                    }
+                }
+                OpK::Bitmap(b, dst) => {
+                    let _ = writeln!(out, "{head}Bitmap {:?}", dst.map(|v| v as i32));
+                    if let Some(G::Bitmap(w, h, bops)) = self.gfx.objs.get(b) {
+                        let _ = writeln!(out, "{pad}  ({w}x{h}, {} ops)", bops.len());
+                        self.summ_ops(bops, depth + 1, out);
+                    }
+                }
+                OpK::Text(t, x, y, sz) => {
+                    let _ = writeln!(out, "{head}Text {t:?} @{x},{y} sz={sz}");
+                }
+                OpK::Path(p, _) => {
+                    let _ = writeln!(out, "{head}Path {} contours", p.len());
+                }
+                k => {
+                    let _ = writeln!(out, "{head}{k:?}");
                 }
             }
         }
@@ -3491,7 +3650,12 @@ impl Engine {
 
     /// Paints the last recorded window display list onto `px` (RGB, w×h).
     pub fn rasterize_frame(&self, px: &mut [u8], w: usize, h: usize) {
-        let mut r = Raster { px, w, h };
+        let mut r = Raster {
+            px,
+            w,
+            h,
+            tint: None,
+        };
         let ops = self.gfx.frame.clone();
         self.raster_ops(&mut r, &ops, &ID, [0.0, 0.0, w as f32, h as f32], 1.0, 0);
     }
@@ -3538,6 +3702,9 @@ impl Engine {
                 argb,
                 style: 0,
                 sw: 0.0,
+                clear: false,
+                tint: None,
+                ls: 0.0,
             },
             OpK::Rect(x, y, x + w, y + h),
         );
@@ -3650,6 +3817,7 @@ mod tests {
             px: &mut px,
             w: 100,
             h: 50,
+            tint: None,
         };
         r.fill_polys(
             &[vec![(10.0, 10.0), (20.0, 10.0), (20.0, 20.0), (10.0, 20.0)]],
@@ -3660,9 +3828,8 @@ mod tests {
         r.text(
             "Hi",
             &ID,
-            30.0,
-            40.0,
-            20.0,
+            (30.0, 40.0),
+            (20.0, 0.0),
             0xFF000000,
             [0.0, 0.0, 100.0, 50.0],
         );
