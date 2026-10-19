@@ -420,7 +420,11 @@ pub fn call_m8_instance(
         return dialog(vm, name, sig, recv, args, true);
     }
     // ── SQLite ──────────────────────────────────────────────────────────
-    if mref_class == SQLITE_HELPER || vm.cp.is_subtype(&recv_class, SQLITE_HELPER) {
+    // A DEX subclass's own methods (its constructor, overrides) run as DEX;
+    // the host model only answers calls that land on SQLiteOpenHelper.
+    if mref_class == SQLITE_HELPER
+        || (vm.cp.is_subtype(&recv_class, SQLITE_HELPER) && vm.cp.resolve_method(mref_class, name, sig).is_none())
+    {
         return sqlite_helper(vm, name, sig, recv, args);
     }
     if mref_class == SQLITE_DB || recv_class == SQLITE_DB {

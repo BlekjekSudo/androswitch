@@ -30,12 +30,16 @@ available yet.
    XML (`painterResource`) and tinted with a `BlendModeColorFilter`.
 6. The side effects run: `WindowInsetsController` system-bar appearance and
    the permission-result callback.
-7. **It stops here:** a `NullPointerException` is raised by the interpreter
-   on a null dereference inside the Room/SQL coroutine path (the first DAO
-   query on `Dispatchers.IO`). It surfaces as kotlinx-coroutines'
-   "Fatal exception in coroutines machinery" (`S3.a`). The NPE is raised by
-   the host, so it carries no guest frames. Next step: give host-raised
-   exceptions the guest stack (see "What to improve").
+7. The Room open helper is constructed as DEX:
+   - process lock: `File`, `FileOutputStream`, `FileChannel.lock`;
+   - `getWritableDatabase`;
+   - Room's `onCreate`, which creates the schema.
+8. **It stops here:** Room's first query uses
+   `SQLiteDatabase.rawQueryWithFactory` with a `CursorFactory`
+   (`SQLiteCursor`/`SQLiteQuery` bind path). The in-memory m8 SQL subset does
+   not model it yet. This is the next work item: a SQLite engine able to run
+   Room's generated SQL (PRAGMA, `sqlite_master`, `INSERT OR REPLACE`,
+   bound statements).
 
 **Round-2 launch progress chain.** Each item is a failure found and fixed in
 general form:
@@ -53,7 +57,10 @@ general form:
 > `Window.getInsetsController` → host **panic** in permission delivery →
 > `Activity.onRequestPermissionsResult` →
 > `SQLiteOpenHelper.setWriteAheadLoggingEnabled` → `Class.getAnnotation` →
-> *(open)* NPE in the Room query path.
+> NPE (diagnosed with the new guest-stack trace: the m8 SQLiteOpenHelper hook
+> swallowed the DEX subclass's own constructor) → `Context.getCacheDir` →
+> `ReentrantLock`→`Lock` check-cast → `FileOutputStream`/`FileChannel.lock`
+> → *(open)* `rawQueryWithFactory`.
 
 **Round 1 (history).**
 - Blocker 1: the `Dex::find_class` linear scan, now an O(1) index.
@@ -98,6 +105,11 @@ general form:
 | s02 | launch | **278.1 ms** | ERR `JAVA_EXCEPTION` (same) |
 | s02 | get_coverage, shortcuts, notifications, widgets ×3, widget_screenshot, accessibility, ime, screenshot | 0.07–0.2 ms each | ERR `NOT_RUNNING` |
 | s02 | runtime_health / logs | 0.09 / 0.08 ms | OK |
+| s01e (final) | install | 23.5 ms | OK |
+| s01e | app_info / compat_gaps | 0.2 / 0.2 ms | OK |
+| s01e | launch | **241.6 ms** | ERR `NOT_FOUND` `SQLiteDatabase.rawQueryWithFactory` (Room's first query) |
+| s01e | runtime_health / logs | 0.1 / 0.1 ms | OK |
+| s01e | ui_tree / screenshot | 0.1 / 0.1 ms | ERR `NOT_RUNNING` |
 
 The raw rows are in `comprix/mcp-delays.jsonl`, outside this repository.
 
@@ -184,7 +196,10 @@ subclasses are covered too.
 | m8 (SQLite) | Helper/database journal and config knobs (`setWriteAheadLoggingEnabled`, `enableWriteAheadLogging`, `getPath`, …) |
 | perms | **Host panic fixed:** permission-result delivery wrote into an unsized array |
 | activity_extras | Base no-ops: `onRequestPermissionsResult`, `onLowMemory`, `onWindowFocusChanged`, … |
-| throwable, threads | Under `--trace`, guest-constructed Throwables record the guest stack; FATAL EXCEPTION logs print it |
+| throwable, threads, engine | Under `--trace`, Throwables record the guest stack, both when guest-constructed and (for VM-built ones) as frames unwind; FATAL EXCEPTION logs print it |
+| `jfile` (new) | `java.io.File` over a per-VM virtual filesystem; Context dirs (`getFilesDir`, `getCacheDir`, `getDatabasePath`, `getDir`, …); FileOutput/InputStream, FileChannel `lock`, FileLock, FileDescriptor |
+| m8 (SQLite) | The SQLiteOpenHelper hook no longer swallows a DEX subclass's own constructor or overrides: it only answers calls that resolve to the host class |
+| classpath | Interface closure for locks (`ReentrantLock`→`Lock`, RRWL→`ReadWriteLock`), File, streams |
 
 ## Documented deviations
 
@@ -235,6 +250,9 @@ subclasses are covered too.
   supported: `y M d H h m s S a E` and quotes.
 - **SQLite:** in-memory, with an SQL subset; WAL and journal settings have
   no effect.
+- **Filesystem:** virtual and in memory per VM; the host disk is never
+  touched. File locks always succeed (single process); `FileChannel.map` is
+  unsupported.
 - **Unsupported:** ML Kit OCR and barcode, which need `pthread_create` and
   direct ByteBuffers (accepted M9 limitations).
 

@@ -401,6 +401,21 @@ impl Engine {
                 Err(VmExit::Exception(ref mut t)) => {
                     let line = format!("\n  at {}", self.method_label(dex_idx, m));
                     t.message.get_or_insert_with(String::new).push_str(&line);
+                    // A VM-built exception already has its heap object, which
+                    // is what guest catch blocks see. Mirror the frame into
+                    // its `rd_trace` so caught-and-rethrown exceptions keep
+                    // the guest stack.
+                    if let Some(obj) = t.obj {
+                        let prev = match self.heap.get_field(obj, "rd_trace") {
+                            Ok(Value::Obj(r)) => self.heap.as_str(r).map(str::to_string).unwrap_or_default(),
+                            _ => String::new(),
+                        };
+                        if prev.matches("\n  at ").count() < 24 {
+                            if let Ok(r) = self.heap.alloc_string(prev + &line) {
+                                let _ = self.heap.put_field(obj, "rd_trace", Value::Obj(r));
+                            }
+                        }
+                    }
                 }
                 // Structured VM errors (NOT_FOUND/NOT_IMPLEMENTED/...) get
                 // the guest stack too, so an agent can see which app code

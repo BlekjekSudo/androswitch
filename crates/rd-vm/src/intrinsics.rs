@@ -284,6 +284,9 @@ pub fn call_static_intrinsic(
     if let Some(v) = crate::xml_res::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
+    if let Some(v) = crate::jfile::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
     // java.time values + DateTimeFormatter (jtime.rs)
     if let Some(v) = crate::jtime::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
@@ -3245,6 +3248,20 @@ pub fn call_instance_intrinsic_mref(
     // ClassLoader.loadClass (jlsystem.rs)
     if let Some(v) = crate::jlsystem::class_loader_intrinsic(vm, mref_class, name, sig, &[&[Value::Obj(recv)][..], args].concat()[if matches!(mref_class, "Ljava/lang/Class;" | "Ljava/lang/Package;") { 0 } else { 1 }..])? {
         return Ok(Some(v));
+    }
+    // java.io.File + Context directory getters (jfile.rs)
+    if let Some(v) = crate::jfile::instance_intrinsic(vm, recv_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    if matches!(
+        name,
+        "getFilesDir" | "getCacheDir" | "getCodeCacheDir" | "getNoBackupFilesDir" | "getDataDir" | "getDatabasePath" | "getDir"
+            | "getExternalFilesDir" | "getExternalCacheDir" | "databaseList" | "fileList" | "deleteDatabase"
+    ) && (mref_class.starts_with("Landroid/") || vm.cp.is_subtype(recv_class, "Landroid/content/Context;"))
+    {
+        if let Some(v) = crate::jfile::context_dirs(vm, name, sig, args)? {
+            return Ok(Some(v));
+        }
     }
     // java.time values + DateTimeFormatter (jtime.rs)
     if let Some(v) = crate::jtime::instance_intrinsic(vm, recv_class, name, sig, recv, args)? {

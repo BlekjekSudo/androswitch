@@ -35,6 +35,7 @@ pub(crate) mod android_util;
 pub(crate) mod jsorted;
 pub(crate) mod jlocks;
 pub(crate) mod jtime;
+pub(crate) mod jfile;
 pub(crate) mod xml_res;
 pub(crate) mod view_layout;
 pub(crate) mod atomics;
