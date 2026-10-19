@@ -1270,7 +1270,7 @@ impl Engine {
 
     // ── helpers internos da árvore ────────────────────────────────────────
 
-    fn window_content_of(&self, activity: ObjRef) -> Option<ObjRef> {
+    pub(crate) fn window_content_of(&self, activity: ObjRef) -> Option<ObjRef> {
         let w = match self.fw.get(activity)? {
             HostObj::Activity {
                 window: Some(w), ..

@@ -281,8 +281,18 @@ pub fn call_static_intrinsic(
     if let Some(v) = crate::boxes::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
     }
+    if let Some(v) = crate::xml_res::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    // java.time values + DateTimeFormatter (jtime.rs)
+    if let Some(v) = crate::jtime::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
     // java.lang.System: arraycopy/identityHashCode/virtual-clock time
     if let Some(v) = crate::jlsystem::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::view_layout::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
     if let Some(v) = crate::platform_base::vibrator_static(vm, class, name, args)? {
@@ -3226,7 +3236,22 @@ pub fn call_instance_intrinsic_mref(
         return Ok(Some(v));
     }
     // Resources/Configuration/DisplayMetrics/Theme/TypedArray/Locale + Context family (android_res.rs)
+    if let Some(v) = crate::xml_res::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
     if let Some(v) = crate::android_res::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // ClassLoader.loadClass (jlsystem.rs)
+    if let Some(v) = crate::jlsystem::class_loader_intrinsic(vm, mref_class, name, sig, &[&[Value::Obj(recv)][..], args].concat()[if matches!(mref_class, "Ljava/lang/Class;" | "Ljava/lang/Package;") { 0 } else { 1 }..])? {
+        return Ok(Some(v));
+    }
+    // java.time values + DateTimeFormatter (jtime.rs)
+    if let Some(v) = crate::jtime::instance_intrinsic(vm, recv_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // java.util.concurrent.locks (jlocks.rs)
+    if let Some(v) = crate::jlocks::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(v));
     }
     // TreeMap / TreeSet (jsorted.rs)
@@ -3291,6 +3316,10 @@ pub fn call_instance_intrinsic_mref(
     if let Some(v) = crate::view_attach::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
         return Ok(Some(v));
     }
+    // View measure/layout/location, ViewConfiguration (view_layout.rs)
+    if let Some(v) = crate::view_layout::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
     // stateless platform base classes (platform_base.rs)
     if let Some(v) = crate::platform_base::instance_intrinsic(mref_class, name, sig) {
         return Ok(Some(v));
@@ -3299,6 +3328,15 @@ pub fn call_instance_intrinsic_mref(
         return Ok(Some(v));
     }
     if let Some(v) = crate::platform_base::vibrator(vm, mref_class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::platform_base::value_builder(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::platform_base::insets_controller(vm, recv_class, mref_class, name, recv, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::platform_base::activity_manager(vm, mref_class, name, args)? {
         return Ok(Some(v));
     }
     // android.util sparse arrays / Size / Pair / Range / Rational (android_util.rs)
@@ -3376,6 +3414,25 @@ pub fn call_instance_intrinsic_mref(
             unsafe_intrinsic(vm, name, sig, args)
         }
         // java.lang.reflect.Field/AccessibleObject metadata captured by Class.
+        // AccessibleObject on a Method/Constructor: no runtime-visible
+        // annotations are modelled (documented deviation); access is granted
+        (_, name, sig)
+            if mref_class == "Ljava/lang/reflect/AccessibleObject;"
+                && !matches!(vm.fw.objects.get(&recv), Some(crate::framework::HostObj::ReflectField { .. })) =>
+        {
+            Ok(Some(match name {
+                "getAnnotations" | "getDeclaredAnnotations" => crate::arrays::new_array(vm, "[Ljava/lang/annotation/Annotation;", crate::heap::ElemKind::Obj, Vec::new())?,
+                "getAnnotation" | "getDeclaredAnnotation" => Value::Null,
+                "getAnnotationsByType" | "getDeclaredAnnotationsByType" => crate::arrays::new_array(vm, "[Ljava/lang/annotation/Annotation;", crate::heap::ElemKind::Obj, Vec::new())?,
+                "isAnnotationPresent" => Value::Int(0),
+                "isAccessible" | "trySetAccessible" | "canAccess" => Value::Int(1),
+                "setAccessible" => Value::Null,
+                _ => {
+                    let _ = sig;
+                    return Ok(None);
+                }
+            }))
+        }
         (_, name, sig)
             if (mref_class == REFLECT_FIELD
                 || mref_class == "Ljava/lang/reflect/AccessibleObject;") =>

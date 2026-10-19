@@ -1476,7 +1476,18 @@ impl AgentSession {
                 None,
             )
         })?;
-        let png = rd_render::render_snapshot(&tree).to_png();
+        // App-drawn content (Compose, custom views): run the host draw pass
+        // and rasterize the recorded frame over the host tree rendering.
+        let png = {
+            let eng = self.require_engine()?;
+            let ops = eng.draw_frame().unwrap_or(0);
+            let mut fb = rd_render::render_snapshot(&tree);
+            if ops > 0 && eng.has_frame() {
+                let (w, h) = (fb.w, fb.h);
+                eng.rasterize_frame(&mut fb.px, w, h);
+            }
+            fb.to_png()
+        };
         match path {
             Some(p) if !p.is_empty() => {
                 // Controle M5: escrita de arquivo SÓ dentro do sandbox

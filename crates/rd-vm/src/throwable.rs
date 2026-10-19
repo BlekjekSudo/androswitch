@@ -61,6 +61,15 @@ pub(crate) fn instance_intrinsic(
     {
         return Ok(None);
     }
+    // Opt-in observability (`exception_trace`, i.e. --trace): a Throwable
+    // constructed by guest code (Kotlin `!!`, checkNotNull, `throw new ..`)
+    // records the guest call stack at construction, innermost first, in
+    // `rd_trace`. Uncaught-exception logging prints it.
+    if name == "<init>" && vm.config.exception_trace {
+        let trace: String = vm.frame_labels.iter().rev().take(16).map(|l| format!("\n  at {l}")).collect();
+        let t = crate::intrinsics::alloc_string(vm, trace)?;
+        put(vm, recv, "rd_trace", Value::Obj(t))?;
+    }
     match (name, sig) {
         ("<init>", "(Ljava/lang/String;Ljava/lang/Throwable;)V")
         | ("<init>", "(Ljava/lang/String;Ljava/lang/Throwable;ZZ)V") => {

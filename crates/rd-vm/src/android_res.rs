@@ -80,13 +80,13 @@ fn env_u32(k: &str, d: u32) -> u32 {
     std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d)
 }
 
-struct Device {
+pub(crate) struct Device {
     w: u32,
     h: u32,
-    dpi: u32,
+    pub(crate) dpi: u32,
 }
 
-fn device() -> Device {
+pub(crate) fn device() -> Device {
     Device { w: env_u32("RD_SCREEN_W", 720), h: env_u32("RD_SCREEN_H", 1440), dpi: env_u32("RD_DENSITY_DPI", 280) }
 }
 
@@ -477,7 +477,14 @@ pub(crate) fn instance_intrinsic(
                     s(vm, out)?
                 }
                 ("newTheme", _) => Value::Obj(vm.heap.alloc_instance(THEME.to_string(), Vec::new())?),
-                ("obtainAttributes", _) | ("obtainTypedArray", _) => typed_array(vm, args.get(1))?,
+                ("obtainAttributes", _) => {
+                    let ta = typed_array(vm, args.get(1))?;
+                    if let Value::Obj(t) = ta {
+                        crate::xml_res::fill_typed_array(vm, t, args.first(), args.get(1));
+                    }
+                    ta
+                }
+                ("obtainTypedArray", _) => typed_array(vm, args.get(1))?,
                 ("updateConfiguration", _) | ("flushLayoutCache", _) => Value::Null,
                 _ => return Ok(None),
             }));
@@ -486,8 +493,12 @@ pub(crate) fn instance_intrinsic(
             return Ok(Some(match name {
                 "resolveAttribute" => Value::Int(0),
                 "obtainStyledAttributes" => {
-                    let attrs = args.iter().find(|v| matches!(v, Value::Obj(a) if vm.heap.as_array_elems(*a).is_ok()));
-                    typed_array(vm, attrs)?
+                    let attrs = args.iter().find(|v| matches!(v, Value::Obj(a) if vm.heap.as_array_elems(*a).is_ok())).cloned();
+                    let ta = typed_array(vm, attrs.as_ref())?;
+                    if let Value::Obj(t) = ta {
+                        crate::xml_res::fill_typed_array(vm, t, args.first(), attrs.as_ref());
+                    }
+                    ta
                 }
                 "applyStyle" | "setTo" | "rebase" => Value::Null,
                 "getResources" => Value::Obj(resources(vm)?),
@@ -754,8 +765,12 @@ pub(crate) fn instance_intrinsic(
         }
         ("setTheme", _) => Value::Null,
         ("obtainStyledAttributes", _) => {
-            let attrs = args.iter().find(|v| matches!(v, Value::Obj(a) if vm.heap.as_array_elems(*a).is_ok()));
-            typed_array(vm, attrs)?
+            let attrs = args.iter().find(|v| matches!(v, Value::Obj(a) if vm.heap.as_array_elems(*a).is_ok())).cloned();
+            let ta = typed_array(vm, attrs.as_ref())?;
+            if let Value::Obj(t) = ta {
+                crate::xml_res::fill_typed_array(vm, t, args.first(), attrs.as_ref());
+            }
+            ta
         }
         ("getMainLooper", _) => Value::Obj(vm.main_looper_obj()?),
         ("getBaseContext", _) => Value::Obj(recv),

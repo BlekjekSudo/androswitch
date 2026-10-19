@@ -816,6 +816,8 @@ pub(crate) fn exec_frame(
                         step!(crate::platform_base::host_static(vm, &owner, &fname))
                     {
                         vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) = step!(crate::jtime::host_static(vm, &owner, &fname)) {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
                     }
                 }
                 let v = vm

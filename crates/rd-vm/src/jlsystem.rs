@@ -147,3 +147,55 @@ fn class_for_name(vm: &mut Engine, sig: &str, args: &[Value]) -> Result<Option<V
     }
     Ok(Some(Value::Obj(vm.class_object_for(&desc)?)))
 }
+
+/// `ClassLoader.loadClass(name[, resolve])`: same resolution as
+/// `Class.forName` (app DEX + host classes; `ClassNotFoundException`
+/// otherwise). `getParent` is null (single app loader).
+pub(crate) fn class_loader_intrinsic(vm: &mut Engine, mref_class: &str, name: &str, sig: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+    // Class.getPackage / Package.getName: derived from the descriptor
+    // Runtime-visible annotations are not retained on classes (deviation,
+    // as for Method/Constructor): lookups report "absent".
+    if mref_class == "Ljava/lang/Class;" {
+        match name {
+            "getAnnotation" | "getDeclaredAnnotation" => return Ok(Some(Value::Null)),
+            "isAnnotationPresent" => return Ok(Some(Value::Int(0))),
+            "getAnnotations" | "getDeclaredAnnotations" | "getAnnotationsByType" | "getDeclaredAnnotationsByType" => {
+                let a = crate::arrays::new_array(vm, "[Ljava/lang/annotation/Annotation;", crate::heap::ElemKind::Obj, Vec::new())?;
+                return Ok(Some(a));
+            }
+            _ => {}
+        }
+    }
+    if mref_class == "Ljava/lang/Class;" && name == "getPackage" {
+        let desc = match args.first() {
+            Some(Value::Obj(c)) => match vm.heap.get_field(*c, "class_name") {
+                Ok(Value::Obj(s)) => vm.heap.as_str(s).map(str::to_string).unwrap_or_default(),
+                _ => String::new(),
+            },
+            _ => String::new(),
+        };
+        let bin = desc.trim_start_matches('L').trim_end_matches(';').replace('/', ".");
+        let pkg = bin.rsplit_once('.').map(|(p, _)| p.to_string()).unwrap_or_default();
+        let r = vm.heap.alloc_instance("Ljava/lang/Package;".into(), Vec::new())?;
+        let n = crate::intrinsics::alloc_string(vm, pkg)?;
+        crate::err::put_field_result(vm.heap.put_field(r, "rd_name", Value::Obj(n)))?;
+        return Ok(Some(Value::Obj(r)));
+    }
+    if mref_class == "Ljava/lang/Package;" {
+        return Ok(match (name, args.first()) {
+            ("getName" | "toString", Some(Value::Obj(p))) => Some(vm.heap.get_field(*p, "rd_name").unwrap_or(Value::Null)),
+            ("getImplementationVersion" | "getSpecificationVersion" | "getImplementationVendor", _) => Some(Value::Null),
+            _ => None,
+        });
+    }
+    if !matches!(mref_class, "Ljava/lang/ClassLoader;" | "Ldalvik/system/BaseDexClassLoader;" | "Ldalvik/system/PathClassLoader;") {
+        return Ok(None);
+    }
+    match (name, sig) {
+        ("loadClass", "(Ljava/lang/String;)Ljava/lang/Class;" | "(Ljava/lang/String;Z)Ljava/lang/Class;") => {
+            class_for_name(vm, "(Ljava/lang/String;)Ljava/lang/Class;", &args[..1])
+        }
+        ("getParent", _) => Ok(Some(Value::Null)),
+        _ => Ok(None),
+    }
+}

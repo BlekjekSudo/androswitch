@@ -102,11 +102,23 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
     let is_map = match (mref_class, recv_class) {
         (TREE_MAP, _) | (_, TREE_MAP) => true,
         (TREE_SET, _) | (_, TREE_SET) => false,
+        // DEX subclasses (Compose's DepthSortedSet extends TreeSet, …): the
+        // host-state check keeps the subtype walk off the hot path
+        // (the method ref may name the subclass or an inherited JDK
+        // declarer such as AbstractCollection)
+        _ if !recv_class.starts_with("Ljava/")
+            && matches!(vm.fw.objects.get(&recv), Some(HostObj::Map { .. } | HostObj::List { .. })) =>
+        {
+            if vm.cp.is_subtype(recv_class, TREE_SET) {
+                false
+            } else if vm.cp.is_subtype(recv_class, TREE_MAP) {
+                true
+            } else {
+                return Ok(None);
+            }
+        }
         _ => return Ok(None),
     };
-    if !(mref_class == TREE_MAP || mref_class == TREE_SET || mref_class.starts_with("Ljava/util/")) {
-        return Ok(None);
-    }
     let a0 = args.first().cloned().unwrap_or(Value::Null);
     if name == "<init>" {
         let mut cmp = None;

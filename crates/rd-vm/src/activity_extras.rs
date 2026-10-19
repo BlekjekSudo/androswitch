@@ -86,6 +86,11 @@ pub(crate) fn instance_intrinsic(
         | ("onTrimMemory", "(I)V")
         | ("onSaveInstanceState", "(Landroid/os/Bundle;)V")
         | ("onActivityResult", "(IILandroid/content/Intent;)V")
+        | ("onRequestPermissionsResult", "(I[Ljava/lang/String;[I)V")
+        | ("onLowMemory", "()V")
+        | ("onTopResumedActivityChanged", "(Z)V")
+        | ("onWindowFocusChanged", "(Z)V")
+        | ("onAttachedToWindow" | "onDetachedFromWindow" | "onContentChanged", "()V")
         | ("onPanelClosed", "(ILandroid/view/Menu;)V")
         | ("onMultiWindowModeChanged", _)
         | ("onPictureInPictureModeChanged", _) => Value::Null,

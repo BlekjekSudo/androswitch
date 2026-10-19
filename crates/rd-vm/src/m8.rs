@@ -985,6 +985,9 @@ fn sqlite_helper(
             Ok(Some(Value::Obj(d)))
         }
         "close" => Ok(Some(Value::Null)),
+        // journal/config knobs: the in-memory store has no journal, so they
+        // are accepted and have no effect
+        "setWriteAheadLoggingEnabled" | "setLookasideConfig" | "setOpenParams" | "setIdleConnectionTimeout" => Ok(Some(Value::Null)),
         "getDatabaseName" => {
             let n = vm.fw.m8.helpers_db.get(&recv).cloned().unwrap_or_default();
             Ok(Some(astr(vm, n)?))
@@ -1195,6 +1198,22 @@ fn sqlite_db(
             Ok(Some(Value::Null))
         }
         "isOpen" => Ok(Some(Value::Int(1))),
+        "enableWriteAheadLogging" => Ok(Some(Value::Int(1))),
+        "disableWriteAheadLogging" | "setForeignKeyConstraintsEnabled" | "setMaxSqlCacheSize" | "setLocale" | "setPageSize" => {
+            Ok(Some(Value::Null))
+        }
+        "isWriteAheadLoggingEnabled" | "isReadOnly" | "isDbLockedByCurrentThread" => Ok(Some(Value::Int(0))),
+        "getPath" => {
+            let n = db_name_of(vm, recv)?;
+            Ok(Some(astr(vm, format!("/data/data/app/databases/{n}"))?))
+        }
+        "getAttachedDbs" => {
+            let n = db_name_of(vm, recv)?;
+            Ok(Some(crate::collections::new_list(vm, "Ljava/util/ArrayList;", vec![Value::Null; 0]).map(|l| {
+                let _ = n;
+                l
+            })?))
+        }
         "close" => Ok(Some(Value::Null)),
         "compileStatement" => {
             // SQLiteStatement mínimo: devolve objeto; bind/execute tratados tipados se sondados.

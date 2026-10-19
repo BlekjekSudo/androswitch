@@ -408,6 +408,10 @@ impl Classpath {
             if cur == sup {
                 return true;
             }
+            // host (JDK/platform) interfaces: builtin super-interface closure
+            if builtin_interfaces(&cur).is_some_and(|v| v.contains(&sup)) {
+                return true;
+            }
             budget -= 1;
             if budget == 0 {
                 return false;
@@ -429,6 +433,11 @@ impl Classpath {
     /// (CharSequence/Comparable/…) vêm da tabela builtin.
     pub fn is_subtype(&self, sub: &str, sup: &str) -> bool {
         if sub == sup {
+            return true;
+        }
+        // JLS 4.10: every reference type (incl. unmodelled host classes such
+        // as android.content.res.Configuration) is a subtype of Object
+        if sup == "Ljava/lang/Object;" && (sub.starts_with('L') || sub.starts_with('[')) {
             return true;
         }
         // issue #42: subtipagem de ARRAYS (JLS 4.10.2/4.10.3) — antes arrays
@@ -882,8 +891,39 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
     match class {
         "Ljava/lang/String;" => Some(STRING_IFACES.to_vec()),
         "Ljava/lang/StringBuilder;" => Some(SB_IFACES.to_vec()),
+        // host XML resource parser (xml_res.rs) is a pull parser + AttributeSet
+        "Landroid/content/res/XmlResourceParser;" => {
+            Some(vec!["Lorg/xmlpull/v1/XmlPullParser;", "Landroid/util/AttributeSet;", "Ljava/lang/AutoCloseable;"])
+        }
         // ── M8: interfaces das classes host do compat real ──
         "Ljava/util/AbstractCollection;" => Some(COLL.to_vec()),
+        // JDK collection interfaces: super-interface closure, so a DEX class
+        // implementing Set/List/Queue/… is a Collection/Iterable (check-cast)
+        "Ljava/util/Collection;" => Some(vec!["Ljava/lang/Iterable;"]),
+        "Ljava/util/Set;" | "Ljava/util/List;" | "Ljava/util/Queue;" => Some(COLL.to_vec()),
+        "Ljava/util/Deque;" | "Ljava/util/concurrent/BlockingQueue;" => {
+            Some(vec!["Ljava/util/Queue;", "Ljava/util/Collection;", "Ljava/lang/Iterable;"])
+        }
+        "Ljava/util/SortedSet;" => Some(vec!["Ljava/util/Set;", "Ljava/util/Collection;", "Ljava/lang/Iterable;"]),
+        "Ljava/util/NavigableSet;" => Some(vec!["Ljava/util/SortedSet;", "Ljava/util/Set;", "Ljava/util/Collection;", "Ljava/lang/Iterable;"]),
+        "Ljava/util/SortedMap;" | "Ljava/util/concurrent/ConcurrentMap;" => Some(vec!["Ljava/util/Map;"]),
+        "Ljava/util/NavigableMap;" => Some(vec!["Ljava/util/SortedMap;", "Ljava/util/Map;"]),
+        "Ljava/util/TreeSet;" => Some(vec![
+            "Ljava/util/NavigableSet;",
+            "Ljava/util/SortedSet;",
+            "Ljava/util/Set;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+            "Ljava/lang/Cloneable;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/TreeMap;" => Some(vec![
+            "Ljava/util/NavigableMap;",
+            "Ljava/util/SortedMap;",
+            "Ljava/util/Map;",
+            "Ljava/lang/Cloneable;",
+            "Ljava/io/Serializable;",
+        ]),
         "Ljava/util/AbstractList;" | "Ljava/util/AbstractSequentialList;" => {
             Some(LIST_IFACES.to_vec())
         }

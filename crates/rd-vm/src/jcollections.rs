@@ -234,6 +234,14 @@ pub(crate) fn instance_intrinsic(
     if matches!(mref_class, "Ljava/util/ListIterator;" | "Ljava/util/Iterator;") {
         if let Some(HostObj::Iter { elems, pos }) = vm.fw.objects.get_mut(&recv) {
             return Ok(match (name, sig) {
+                ("hasNext", "()Z") => Some(Value::Int((*pos < elems.len()) as i32)),
+                ("next", "()Ljava/lang/Object;") => {
+                    if *pos >= elems.len() {
+                        return Err(exc("Ljava/util/NoSuchElementException;", ""));
+                    }
+                    *pos += 1;
+                    Some(elems[*pos - 1].clone())
+                }
                 ("hasPrevious", "()Z") => Some(Value::Int((*pos > 0) as i32)),
                 ("previous", "()Ljava/lang/Object;") => {
                     if *pos == 0 {

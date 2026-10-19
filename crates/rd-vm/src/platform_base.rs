@@ -43,6 +43,15 @@ const BASES: &[&str] = &[
     "Landroid/hardware/camera2/CameraCaptureSession$StateCallback;",
     "Landroid/hardware/camera2/CameraCaptureSession$CaptureCallback;",
     "Landroid/hardware/display/DisplayManager$DisplayListener;",
+    "Landroid/hardware/camera2/CameraManager$AvailabilityCallback;",
+    "Landroid/view/autofill/AutofillManager$AutofillCallback;",
+    "Landroid/view/WindowInsetsAnimation$Callback;",
+    "Landroid/view/TouchDelegate;",
+    "Landroid/text/SegmentFinder;",
+    "Landroid/widget/Filter;",
+    "Landroid/os/Binder;",
+    "Landroid/view/View$BaseSavedState;",
+    "Landroid/view/AbsSavedState;",
 ];
 
 /// ViewOutlineProvider statics (BACKGROUND/BOUNDS/PADDED_BOUNDS) are objects
@@ -181,4 +190,130 @@ fn int(v: Option<&Value>) -> i32 {
         Some(Value::Int(i)) => *i,
         _ => 0,
     }
+}
+
+/// Platform value builders with no richer model: `CursorAnchorInfo`,
+/// `EditorBoundsInfo`, `WindowInsets`, `Font`, `FontFamily`, `Typeface`,
+/// `LineBreakConfig`, `Magnifier`, `AudioFormat`, `ViewTranslationRequest`,
+/// `TtsSpan`.
+/// - Setters (methods returning the builder type) record their first argument
+///   in `rd_<name>` and return `this`.
+/// - `build()` returns an instance of the outer class carrying those fields.
+const BUILDERS: &[&str] = &[
+    "Landroid/view/inputmethod/CursorAnchorInfo$Builder;",
+    "Landroid/view/inputmethod/EditorBoundsInfo$Builder;",
+    "Landroid/view/WindowInsets$Builder;",
+    "Landroid/graphics/fonts/Font$Builder;",
+    "Landroid/graphics/fonts/FontFamily$Builder;",
+    "Landroid/graphics/Typeface$Builder;",
+    "Landroid/graphics/text/LineBreakConfig$Builder;",
+    "Landroid/widget/Magnifier$Builder;",
+    "Landroid/media/AudioFormat$Builder;",
+    "Landroid/view/translation/ViewTranslationRequest$Builder;",
+    "Landroid/text/style/TtsSpan$Builder;",
+];
+
+pub(crate) fn value_builder(vm: &mut Engine, mref_class: &str, name: &str, sig: &str, recv: crate::heap::ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+    if !BUILDERS.contains(&mref_class) {
+        return Ok(None);
+    }
+    if name == "<init>" {
+        return Ok(Some(Value::Null));
+    }
+    let ret = sig.rsplit(')').next().unwrap_or("V");
+    if ret == mref_class {
+        let v = args.first().cloned().unwrap_or(Value::Int(1));
+        crate::err::put_field_result(vm.heap.put_field(recv, &format!("rd_{name}"), v))?;
+        return Ok(Some(Value::Obj(recv)));
+    }
+    if name == "build" {
+        let outer = format!("{};", mref_class.trim_end_matches(';').trim_end_matches("$Builder"));
+        let r = vm.heap.alloc_instance(outer, Vec::new())?;
+        return Ok(Some(Value::Obj(r)));
+    }
+    if name == "reset" || ret == "V" {
+        return Ok(Some(Value::Null));
+    }
+    Ok(None)
+}
+
+/// `ActivityManager` for the virtual device: 2 GB, not low-RAM, memory class
+/// 256 MB (large 512 MB), not a monkey run, no background restriction.
+/// `getMemoryInfo` fills `MemoryInfo`'s public fields.
+pub(crate) fn activity_manager(vm: &mut Engine, mref_class: &str, name: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+    if mref_class != "Landroid/app/ActivityManager;" {
+        return Ok(None);
+    }
+    Ok(Some(match name {
+        "isLowRamDevice" | "isUserAMonkey" | "isBackgroundRestricted" | "isRunningInTestHarness" | "isRunningInUserTestHarness" | "clearApplicationUserData" => Value::Int(0),
+        "getMemoryClass" => Value::Int(256),
+        "getLargeMemoryClass" => Value::Int(512),
+        "getLauncherLargeIconDensity" => Value::Int(320),
+        "getLauncherLargeIconSize" => Value::Int(84),
+        "getMemoryInfo" => {
+            if let Some(Value::Obj(mi)) = args.first() {
+                let total: i64 = 2 << 30;
+                for (f, v) in [("totalMem", Value::Long(total)), ("availMem", Value::Long(total / 2)), ("threshold", Value::Long(total / 16))] {
+                    crate::err::put_field_result(vm.heap.put_field(*mi, f, v))?;
+                }
+                crate::err::put_field_result(vm.heap.put_field(*mi, "lowMemory", Value::Int(0)))?;
+            }
+            Value::Null
+        }
+        "getRunningAppProcesses" | "getAppTasks" | "getHistoricalProcessExitReasons" | "getRunningServices" => crate::collections::new_list(vm, "Ljava/util/ArrayList;", Vec::new())?,
+        _ => return Ok(None),
+    }))
+}
+
+/// `Window.getInsetsController()` returns a per-window
+/// `WindowInsetsController`. It records system-bar appearance, behavior and
+/// visible types as fields, which `getSystemBarsAppearance`/`Behavior` read
+/// back. `hide`/`show` update the `rd_hidden` type mask and log
+/// `I/RdInsets`. Listeners are accepted but never called: the emulated
+/// window's controllable insets do not change.
+pub(crate) fn insets_controller(vm: &mut Engine, recv_class: &str, mref_class: &str, name: &str, recv: crate::heap::ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+    const WIC: &str = "Landroid/view/WindowInsetsController;";
+    let int = |i: usize| match args.get(i) {
+        Some(Value::Int(v)) => *v,
+        _ => 0,
+    };
+    if mref_class == "Landroid/view/Window;" && name == "getInsetsController" {
+        if let Ok(Value::Obj(c)) = vm.heap.get_field(recv, "rd_insets_controller") {
+            return Ok(Some(Value::Obj(c)));
+        }
+        let c = vm.heap.alloc_instance(WIC.to_string(), Vec::new()).map_err(crate::err::oom_throwable)?;
+        crate::err::put_field_result(vm.heap.put_field(recv, "rd_insets_controller", Value::Obj(c)))?;
+        return Ok(Some(Value::Obj(c)));
+    }
+    if recv_class != WIC && mref_class != WIC {
+        return Ok(None);
+    }
+    let get = |vm: &Engine, f: &str| match vm.heap.get_field(recv, f) {
+        Ok(Value::Int(v)) => v,
+        _ => 0,
+    };
+    let put = |vm: &mut Engine, f: &str, v: i32| crate::err::put_field_result(vm.heap.put_field(recv, f, Value::Int(v)));
+    Ok(Some(match name {
+        "setSystemBarsAppearance" => {
+            let (appearance, mask) = (int(0), int(1));
+            let cur = get(vm, "rd_appearance");
+            put(vm, "rd_appearance", (cur & !mask) | (appearance & mask))?;
+            Value::Null
+        }
+        "getSystemBarsAppearance" => Value::Int(get(vm, "rd_appearance")),
+        "setSystemBarsBehavior" => {
+            put(vm, "rd_behavior", int(0))?;
+            Value::Null
+        }
+        "getSystemBarsBehavior" => Value::Int(get(vm, "rd_behavior")),
+        "hide" | "show" => {
+            let cur = get(vm, "rd_hidden");
+            let next = if name == "hide" { cur | int(0) } else { cur & !int(0) };
+            put(vm, "rd_hidden", next)?;
+            crate::intrinsics::host_print(1, &format!("I/RdInsets: {name} types=0x{:x}\n", int(0)));
+            Value::Null
+        }
+        "addOnControllableInsetsChangedListener" | "removeOnControllableInsetsChangedListener" | "controlWindowInsetsAnimation" => Value::Null,
+        _ => return Ok(None),
+    }))
 }

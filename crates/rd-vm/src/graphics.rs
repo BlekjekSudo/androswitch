@@ -722,7 +722,7 @@ pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, sig: &s
                 ("argb", "(IIII)I") => Value::Int(((it(a(0)) as u32 & 0xFF) << 24 | (it(a(1)) as u32 & 0xFF) << 16 | (it(a(2)) as u32 & 0xFF) << 8 | (it(a(3)) as u32 & 0xFF)) as i32),
                 ("rgb", "(III)I") => Value::Int((0xFF00_0000u32 | (it(a(0)) as u32 & 0xFF) << 16 | (it(a(1)) as u32 & 0xFF) << 8 | (it(a(2)) as u32 & 0xFF)) as i32),
                 ("argb", "(FFFF)I") => {
-                    let q = |i: usize| ((fl(a(i)).clamp(0.0, 1.0) * 255.0 + 0.5) as u32);
+                    let q = |i: usize| (fl(a(i)).clamp(0.0, 1.0) * 255.0 + 0.5) as u32;
                     Value::Int((q(0) << 24 | q(1) << 16 | q(2) << 8 | q(3)) as i32)
                 }
                 ("parseColor", _) => {
@@ -802,6 +802,9 @@ fn fill_metrics(vm: &mut Engine, m: ObjRef, size: f32, int: bool) -> Result<(), 
 /// Instance methods. Gate: host graphics/text class in the method ref, or a
 /// receiver that already has native graphics state (DEX subclasses).
 pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: &str, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+    if let Some(v) = color_filter(vm, recv_class, name, recv, args)? {
+        return Ok(Some(v));
+    }
     let host_ref = GFX_PREFIXES.iter().any(|p| mref_class.starts_with(p));
     if !host_ref && !vm.gfx.objs.contains_key(&recv) {
         return Ok(None);
@@ -2505,4 +2508,49 @@ mod tests {
         assert_eq!((at(15, 15), px[(15 * 100 + 15) * 3 + 1]), (255, 0));
         assert!((30..50).any(|x| (25..40).any(|y| at(x, y) < 128)), "text drew ink");
     }
+}
+
+/// `ColorFilter` value classes: `BlendModeColorFilter`,
+/// `PorterDuffColorFilter`, `LightingColorFilter`, `ColorMatrixColorFilter`.
+/// Their parameters are stored as fields (`rd_color`, `rd_mode`, `rd_mul`,
+/// `rd_add`, `rd_matrix`).
+///
+/// **Deviation:** the rasterizer does not apply color filters; a paint's
+/// filter is recorded but not rendered.
+fn color_filter(vm: &mut Engine, recv_class: &str, name: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+    const FILTERS: [&str; 4] = [
+        "Landroid/graphics/BlendModeColorFilter;",
+        "Landroid/graphics/PorterDuffColorFilter;",
+        "Landroid/graphics/LightingColorFilter;",
+        "Landroid/graphics/ColorMatrixColorFilter;",
+    ];
+    if !FILTERS.contains(&recv_class) {
+        return Ok(None);
+    }
+    let a = |i: usize| args.get(i).cloned().unwrap_or(Value::Null);
+    let put = |vm: &mut Engine, f: &str, v: Value| crate::err::put_field_result(vm.heap.put_field(recv, f, v));
+    Ok(Some(match name {
+        "<init>" => {
+            if recv_class.contains("Lighting") {
+                put(vm, "rd_mul", a(0))?;
+                put(vm, "rd_add", a(1))?;
+            } else if recv_class.contains("ColorMatrix") {
+                put(vm, "rd_matrix", a(0))?;
+            } else {
+                put(vm, "rd_color", a(0))?;
+                put(vm, "rd_mode", a(1))?;
+            }
+            Value::Null
+        }
+        "getColor" => vm.heap.get_field(recv, "rd_color").unwrap_or(Value::Int(0)),
+        "getMode" => vm.heap.get_field(recv, "rd_mode").unwrap_or(Value::Null),
+        "getColorMultiply" => vm.heap.get_field(recv, "rd_mul").unwrap_or(Value::Int(0)),
+        "getColorAdd" => vm.heap.get_field(recv, "rd_add").unwrap_or(Value::Int(0)),
+        "equals" => Value::Int((args.first() == Some(&Value::Obj(recv))) as i32),
+        "hashCode" => {
+            let c: i32 = vm.heap.get_field(recv, "rd_color").ok().and_then(|v| v.as_int().ok()).unwrap_or(0);
+            Value::Int(c.wrapping_mul(31))
+        }
+        _ => return Ok(None),
+    }))
 }

@@ -123,7 +123,7 @@ pub(crate) fn deliver_pending(vm: &mut Engine) -> Result<usize, VmExit> {
             .heap
             .alloc_array(ElemKind::Int, results.len(), "I")
             .map_err(crate::err::oom_throwable)?;
-        vm.heap.array_elems_mut(grants)?.clone_from_slice(&results);
+        *vm.heap.array_elems_mut(grants)? = results;
         let class = vm.heap.class_of(p.activity)?.to_string();
         if let Some((d, def, m)) =
             vm.cp

@@ -527,7 +527,12 @@ pub(crate) fn ueh_intrinsic(
         Ok(Value::Obj(m)) => vm.heap.as_str(m).ok().map(str::to_string),
         _ => None,
     };
-    let text = crate::intrinsics::object_to_string(vm, e)?;
+    let mut text = crate::intrinsics::object_to_string(vm, e)?;
+    if let Ok(Value::Obj(t)) = vm.heap.get_field(e, "rd_trace") {
+        if let Ok(t) = vm.heap.as_str(t) {
+            text.push_str(&t.replace("\n  at ", "\nE/AndroidRuntime:   at "));
+        }
+    }
     crate::intrinsics::host_print(1, &format!("E/AndroidRuntime: FATAL EXCEPTION: main\nE/AndroidRuntime: {text}\n"));
     Err(VmExit::Exception(crate::err::Throwable { class, message: msg, obj: Some(e) }))
 }
