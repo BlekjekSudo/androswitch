@@ -4,6 +4,8 @@
 # APKs are cached under golden-apks/cache/ (never committed, GH-05).
 # Requires: curl, sha256sum, python3 with unicorn==2.1.4 (or RD_NATIVE_PYTHON).
 # Output: target/m9-native-gate.json; exit 1 if any required phase fails.
+# RD_NATIVE_ABI=arm64-v8a|armeabi-v7a runs the same APKs' ARM libraries instead
+# (output: target/m9-native-gate-<abi>.json).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CACHE=golden-apks/cache; mkdir -p "$CACHE" target
@@ -21,7 +23,8 @@ fetch com.termux_1022.apk fdd476982cd74f2f00aac12d3683b1fa260a0b2d146411b94e09d7
 fetch eu.faircode.netguard_2026080101.apk 158b4308da0006298d22ed557adbff24b282fddeb1bc0b3468829a60f405a8c4
 fetch de.markusfisch.android.binaryeye_180.apk 568cec6598dbf42fbde9071af8747071ffea798473016a3d77b6ddb3bff944f1
 fetch org.woheller69.whobird_54.apk 77f13fa643f810ae264a6a3fbcd892d96e840eabcfb7b509eebfc8b8b1be9954
-R=target/m9-native-gate; mkdir -p "$R"
+SUFFIX=${RD_NATIVE_ABI:+-$RD_NATIVE_ABI}
+R=target/m9-native-gate$SUFFIX; mkdir -p "$R"
 # androidx.graphics.path: JNI_OnLoad RegisterNatives, then the real DEX
 # ConicConverter.convert() calls internalConicToQuadratics. Skia's
 # computeQuadPOW2 predicts 2^4 = 16 quadratics for this conic at tolerance 0.001.
@@ -43,7 +46,7 @@ TF='Lorg/tensorflow/lite/NativeInterpreterWrapper;'
 $G "$CACHE/org.woheller69.whobird_54.apk" tensorflowlite_jni \
   --call "$TF->createErrorReporter(I)J" 512 \
   --call "$TF->delete(JJJ)V" @ret:1 0 0 > "$R/whobird.json"
-python3 - "$R" <<'PY'
+python3 - "$R" "target/m9-native-gate$SUFFIX.json" <<'PY'
 import json, sys, pathlib
 r = pathlib.Path(sys.argv[1]); out = []; ok = True
 for f in sorted(r.glob("*.json")):
@@ -61,12 +64,12 @@ for f in sorted(r.glob("*.json")):
     if d["package"] == "org.woheller69.whobird":
         good &= isinstance(phases[1]["result"].get("value"), int) and phases[1]["result"]["value"] != 0
     ok &= good
-    out.append({"apk": d["package"], "sha256": d["sha256"], "passed": good,
+    out.append({"apk": d["package"], "sha256": d["sha256"], "passed": good, "abi": d["final"].get("abi"),
                 "native_instructions": d["final"].get("instructions"),
                 "registered_natives": d["final"].get("registered_methods"),
                 "libraries": d["final"].get("libraries"),
                 "jni_calls": [{"call": p["phase"], "result": p["result"], "native_instructions": p.get("native_instructions_delta")} for p in phases[1:]], "logs": d["final"].get("logs")})
-pathlib.Path("target/m9-native-gate.json").write_text(json.dumps({"passed": ok, "apks": out}, indent=2))
+pathlib.Path(sys.argv[2]).write_text(json.dumps({"passed": ok, "apks": out}, indent=2))
 print(json.dumps({"passed": ok, "apks": [(a["apk"], a["passed"], a["native_instructions"]) for a in out]}))
 sys.exit(0 if ok else 1)
 PY

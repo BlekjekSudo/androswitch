@@ -16,7 +16,7 @@
 | M6 | Executor de testes | suíte JSON → JUnit XML; compat-matrix automatizada | ✅ **implementado (2026-10)** |
 | M7 | Performance + gate piso E5 | startup < 2 s app trivial; suíte golden passa nos budgets moto-e5 | 🟡 **parcial (2026-10)** — `rd perf` + gate de CI no app trivial (estimativa); golden pendente |
 | M8 | Compat real | app OSS médio navega funcional; v0.9 | ✅ **implementado (2026-10)** |
-| M9 | Componentes avançados + NDK | 5 APKs com .so rodando; widgets/IME/notificações ok | ✅ **implementado (2026-10)** — 5 APKs reais com chamadas JNI verificadas; revisão humana pendente |
+| M9 | Componentes avançados + NDK | 5 APKs com .so rodando; widgets/IME/notificações ok | ✅ **implementado (2026-10)** — 5 APKs reais × 3 ABIs com chamadas JNI verificadas; revisão humana pendente |
 | M10 | Dispositivos virtuais | câmera/GPS/biometria programáveis pelo agente | ⬜ |
 | M11 | Engines | Flutter → RN → Mono → wasm: 1 app de cada em golden flow | ⬜ |
 | M12 | Ecossistema GH | docs site, compat-matrix viva, releases; v1.0 | ⬜ |
@@ -705,17 +705,22 @@ GPL fica fora do binário. Features: `advanced-components` (default) e `native`
    deslocados.
 7. ✅ **Gate real** (`golden-apks/native-gate.sh`, APKs fixados por SHA-256).
    Os 5 APKs fazem chamada JNI a partir do DEX real, e o script confere cada
-   resultado:
+   resultado. Passa também com as bibliotecas ARM dos mesmos APKs
+   (`RD_NATIVE_ABI=arm64-v8a|armeabi-v7a`): 15/15 execuções.
    - voicesmith: `ConicConverter.convert` dá 16 quadráticas, igual à previsão
      de `computeQuadPOW2` do Skia.
    - termux: `JNI.setPtyWindowSize` e `JNI.close`.
    - netguard: `jni_getprop("net.dns1")` devolve `""`.
-   - binaryeye: `encodeStringAsSvg` gera um SVG QR 21×21 (cerca de 1,09 bilhão
-     de instruções), e o `zbarimg` decodifica `RustyDroid`.
+   - binaryeye: `encodeStringAsSvg` gera um SVG QR 21×21 (cerca de 500 mil
+     instruções), e o `zbarimg` decodifica `RustyDroid` nas 3 ABIs.
    - whobird: `createErrorReporter` + `delete` (handle C++ real).
 
-Ressalvas: os APKs reais foram exercitados só em x86_64 (ARM/AArch64 cobertos
-por fixtures), e os componentes foram verificados no fixture `test.m9`. Também
+Correções que saíram do gate ARM: o detector de SVC confundia Thumb-2 com SVC,
+valores de 32 bits traziam lixo na metade alta e argumentos variádicos 64-bit
+não usavam par alinhado. Também foi corrigida a contagem de instruções, que
+somava totais acumulados.
+
+Ressalva: os componentes foram verificados no fixture `test.m9`. Também
 não há `Call*MethodV` (va_list), threads, `pthread_cond_wait` nem
 direct ByteBuffer (inferência TFLite); a reentrância nativa aninhada é
 recusada, os arrays JNI vão até 1M elementos e o JNA `libjnidispatch` não

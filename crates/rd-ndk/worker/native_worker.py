@@ -24,7 +24,7 @@ def main():
     from unicorn import Uc, UcError, UC_ARCH_X86, UC_ARCH_ARM64, UC_ARCH_ARM, UC_MODE_64, UC_MODE_ARM, UC_PROT_ALL, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED
     from unicorn.x86_const import UC_X86_REG_FS_BASE, UC_X86_REG_RIP, UC_X86_REG_RSP, UC_X86_REG_RAX, UC_X86_REG_RDI, UC_X86_REG_RSI, UC_X86_REG_RDX, UC_X86_REG_RCX, UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_XMM0
     from unicorn.arm64_const import UC_ARM64_REG_TPIDR_EL0, UC_ARM64_REG_PC, UC_ARM64_REG_SP, UC_ARM64_REG_X0, UC_ARM64_REG_X30, UC_ARM64_REG_Q0
-    from unicorn.arm_const import UC_ARM_REG_C13_C0_3, UC_ARM_REG_PC, UC_ARM_REG_SP, UC_ARM_REG_R0, UC_ARM_REG_LR, UC_ARM_REG_C1_C0_2, UC_ARM_REG_FPEXC
+    from unicorn.arm_const import UC_ARM_REG_C13_C0_3, UC_ARM_REG_PC, UC_ARM_REG_SP, UC_ARM_REG_R0, UC_ARM_REG_LR, UC_ARM_REG_C1_C0_2, UC_ARM_REG_FPEXC, UC_ARM_REG_CPSR
     uc = None
     abi = None
     mapped = 0
@@ -60,9 +60,16 @@ def main():
         else:
             # Fail closed on x86 SYSCALL/SYSENTER/int, ARM SVC and AArch64 SVC.
             b = bytes(emu.mem_read(address, size))
-            if (abi == 'x86_64' and (b[:2] in (b'\x0f\x05', b'\x0f\x34') or b[:1] == b'\xcd')) or (abi == 'arm64-v8a' and len(b) == 4 and (int.from_bytes(b, 'little') & 0xffe0001f) == 0xd4000001) or (abi == 'armeabi-v7a' and ((len(b) == 2 and b[1] == 0xdf) or (len(b) == 4 and b[3] & 0x0f == 0x0f))):
+            if (abi == 'x86_64' and (b[:2] in (b'\x0f\x05', b'\x0f\x34') or b[:1] == b'\xcd')) or (abi == 'arm64-v8a' and len(b) == 4 and (int.from_bytes(b, 'little') & 0xffe0001f) == 0xd4000001) or (abi == 'armeabi-v7a' and arm_svc(emu, b)):
                 event = {'event': 'error', 'code': 'NOT_IMPLEMENTED', 'cause': 'guest syscall/SVC is not permitted'}
                 emu.emu_stop()
+
+    def arm_svc(emu, b):
+        # Thumb (CPSR.T): SVC is the 16-bit 0xDFxx. ARM: cond|1111|imm24 with
+        # cond != 1111. Thumb-2 32-bit encodings must not be tested as ARM.
+        if emu.reg_read(UC_ARM_REG_CPSR) & 0x20:
+            return len(b) == 2 and b[1] == 0xdf
+        return len(b) == 4 and b[3] & 0x0f == 0x0f and b[3] >> 4 != 0x0f
 
     def on_unmapped(emu, access, address, size, value, data):
         fault['address'] = address

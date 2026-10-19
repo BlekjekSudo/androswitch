@@ -54,10 +54,19 @@ fn to_native(refs: &mut References, v: &Value) -> Result<u64> {
         _ => return Err(ndk("unsupported JNI value")),
     })
 }
-fn from_native(refs: &References, b: u64, ty: &str) -> Result<Value> {
+/// Converts a native register/jvalue word to a VM value. `narrow` (32-bit
+/// ARM) drops the upper half for every non-64-bit type: a jvalue's unused
+/// bytes and r1 of a 32-bit return are not part of the value.
+fn from_native(refs: &References, b: u64, ty: &str, narrow: bool) -> Result<Value> {
+    let b = if narrow && !matches!(ty, "J" | "D") {
+        b & 0xffff_ffff
+    } else {
+        b
+    };
     Ok(match ty.as_bytes().first() {
         Some(b'V') => Value::Null,
-        Some(b'Z') => Value::Int((b != 0) as i32),
+        // jboolean is one byte; the rest of a jvalue is unspecified
+        Some(b'Z') => Value::Int((b as u8 != 0) as i32),
         Some(b'B') => Value::Int(b as i8 as i32),
         Some(b'C') => Value::Int(b as u16 as i32),
         Some(b'S') => Value::Int(b as i16 as i32),
@@ -84,8 +93,12 @@ fn ensure(vm: &mut Engine) -> std::result::Result<(), VmExit> {
     }
     if vm.native.is_none() {
         let apk = vm.resources()?;
+        // RD_NATIVE_ABI (x86_64 | arm64-v8a | armeabi-v7a) pins the ABI, e.g.
+        // to run an APK's ARM libraries; default preference is x86_64 first.
+        let wanted = std::env::var("RD_NATIVE_ABI").ok();
         let abi = [Abi::X86_64, Abi::Arm64, Abi::Arm]
             .into_iter()
+            .filter(|a| wanted.as_deref().map_or(true, |w| w == a.android_name()))
             .find(|a| apk.abis.iter().any(|s| s == a.android_name()))
             .ok_or_else(|| {
                 vmerr(RdError::new(
@@ -223,7 +236,8 @@ pub fn invoke(
             } else {
                 r.bits
             };
-            from_native(&state.refs, bits, &ret)
+            let narrow = state.runtime.abi == Abi::Arm;
+            from_native(&state.refs, bits, &ret, narrow)
         })();
         let _ = state.refs.pop(0);
         result
@@ -427,12 +441,15 @@ fn bridge(
             else {
                 return Err(ndk("expected jfieldID"));
             };
-            let b = if sig == "F" || sig == "D" {
+            let b = if rt.abi == Abi::Arm && (sig == "J" || sig == "D") {
+                let mut i = 3;
+                arm_wide(rt, t, &mut i)?
+            } else if (sig == "F" || sig == "D") && rt.abi != Abi::Arm {
                 t.fp.first().copied().unwrap_or(a(3))
             } else {
                 rt.raw_argument(t, 3)?
             };
-            let v = from_native(refs, b, &sig)?;
+            let v = from_native(refs, b, &sig, rt.abi == Abi::Arm)?;
             if is_static {
                 vm.statics.insert((class, name), v);
             } else {
@@ -504,7 +521,7 @@ fn bridge(
                 return Err(ndk("object array length exceeds budget"));
             }
             let c = hclass(refs, a(2))?;
-            let init = from_native(refs, a(3), &c)?;
+            let init = from_native(refs, a(3), &c, rt.abi == Abi::Arm)?;
             let r = vm
                 .heap
                 .alloc_array(ElemKind::Obj, n as usize, &c)
@@ -749,6 +766,14 @@ fn bridge(
         fp_bits: None,
     })
 }
+/// ARM (AAPCS) 64-bit argument at raw index `i`: an even-aligned pair.
+fn arm_wide(rt: &mut Runtime, t: &Trap, i: &mut usize) -> Result<u64> {
+    *i += *i & 1;
+    let lo = rt.raw_argument(t, *i)? & 0xffff_ffff;
+    let hi = rt.raw_argument(t, *i + 1)? & 0xffff_ffff;
+    *i += 2;
+    Ok(lo | hi << 32)
+}
 fn primitive(i: usize) -> char {
     ['Z', 'B', 'C', 'S', 'I', 'J', 'F', 'D'][i]
 }
@@ -857,6 +882,15 @@ fn call_java(vm: &mut Engine, rt: &mut Runtime, refs: &mut References, t: &Trap)
         let b = if variant == 2 {
             let b = rt.read(array + i as u64 * 8, 8)?;
             u64::from_le_bytes(b.try_into().unwrap())
+        } else if rt.abi == Abi::Arm && (p == "J" || p == "D" || p == "F") {
+            // AAPCS variadic: 64-bit values (and floats, promoted to double)
+            // take an even-aligned register pair / 8-byte stack slot.
+            let v = arm_wide(rt, t, &mut raw_index)?;
+            if p == "F" {
+                (f64::from_bits(v) as f32).to_bits() as u64
+            } else {
+                v
+            }
         } else if (p == "F" || p == "D") && rt.abi != Abi::Arm {
             let v = t.fp.get(fpi).copied().unwrap_or(0);
             fpi += 1;
@@ -870,7 +904,7 @@ fn call_java(vm: &mut Engine, rt: &mut Runtime, refs: &mut References, t: &Trap)
             raw_index += 1;
             v
         };
-        args.push(from_native(refs, b, p)?);
+        args.push(from_native(refs, b, p, rt.abi == Abi::Arm)?);
     }
     let result = if static_call {
         vm.invoke_static(&class, &name, &sig, &args)

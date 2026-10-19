@@ -476,10 +476,13 @@ impl Runtime {
         F: FnMut(&mut Self, &Trap) -> Result<Return>,
     {
         let mut v = self.request(json!({"op":"call","address":address,"args":args,"fuel":fuel}))?;
+        // The worker reports a running per-call total with every event; only
+        // the increment since the previous event is new work.
+        let mut seen = 0u64;
         loop {
-            self.instructions = self
-                .instructions
-                .saturating_add(v["instructions"].as_u64().unwrap_or(0));
+            let total = v["instructions"].as_u64().unwrap_or(seen);
+            self.instructions = self.instructions.saturating_add(total.saturating_sub(seen));
+            seen = seen.max(total);
             match v["event"].as_str() {
                 Some("return") => {
                     return Ok(Return {
@@ -793,6 +796,29 @@ impl Runtime {
             | "pthread_cond_init"
             | "pthread_cond_destroy"
             | "pthread_key_delete" => 0,
+            // getauxval: page size and the CPU features Unicorn emulates
+            // (AArch64 FP+ASIMD; ARMv7 half/thumb/fastmult/VFP/EDSP/NEON/VFPv3/TLS).
+            "strstr" => {
+                let h = self.c_string(a[0])?;
+                let n = self.c_string(a[1])?;
+                if n.is_empty() {
+                    a[0]
+                } else {
+                    h.windows(n.len())
+                        .position(|w| w == n.as_slice())
+                        .map(|i| a[0] + i as u64)
+                        .unwrap_or(0)
+                }
+            }
+            "getauxval" => match a[0] & 0xffff_ffff {
+                6 => 4096,
+                16 => match self.abi {
+                    Abi::Arm64 => 0x3,
+                    Abi::Arm => 45270,
+                    Abi::X86_64 => 0,
+                },
+                _ => 0,
+            },
             "strchr" | "strrchr" | "__strchr_chk" => {
                 let s = self.c_string(a[0])?;
                 let c = a[1] as u8;
