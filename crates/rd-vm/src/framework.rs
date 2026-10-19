@@ -1349,6 +1349,16 @@ impl Engine {
         if depth > MAX_VIEW_DEPTH {
             return;
         }
+        // Views whose frame the guest set via `View.layout` (custom
+        // ViewGroups, Compose's AndroidComposeView and its layers) own their
+        // bounds and their subtree: this minimal host pass would otherwise
+        // overwrite them with its own wrap height (0 for a childless leaf).
+        if self
+            .view_props
+            .contains_key(&(v, "rd_laid_out".to_string()))
+        {
+            return;
+        }
         let (orientation, children, own_h, own_w_explicit) = match self.fw.get(v) {
             Some(HostObj::View {
                 orientation,

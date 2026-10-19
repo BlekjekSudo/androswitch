@@ -317,6 +317,48 @@ pub(crate) fn instance_intrinsic(
             Value::Int(prop(vm, recv, "MeasuredHeight").unwrap_or(h))
         }
         ("getMeasuredState", "()I") => Value::Int(0),
+        // AOSP ViewGroup.drawChild: draw `child` on the parent's canvas,
+        // translated to the child's parent-relative frame.
+        ("drawChild", "(Landroid/graphics/Canvas;Landroid/view/View;J)Z") => {
+            if let (Some(Value::Obj(c)), Some(Value::Obj(child))) = (args.first(), args.get(1)) {
+                let (c, child) = (*c, *child);
+                let visible = !matches!(
+                    vm.fw.get(child),
+                    Some(HostObj::View { vis, .. }) if *vis != crate::framework::Vis::Visible
+                );
+                if visible {
+                    let l = prop(vm, child, "rd_l").unwrap_or(0);
+                    let t = prop(vm, child, "rd_t").unwrap_or(0);
+                    let n = vm.canvas_translate(c, l as f32, t as f32);
+                    let drew = crate::jcollections::guest_call(
+                        vm,
+                        child,
+                        "draw",
+                        "(Landroid/graphics/Canvas;)V",
+                        &[Value::Obj(c)],
+                    )?
+                    .is_some();
+                    if !drew {
+                        crate::jcollections::guest_call(
+                            vm,
+                            child,
+                            "onDraw",
+                            "(Landroid/graphics/Canvas;)V",
+                            &[Value::Obj(c)],
+                        )?;
+                        crate::jcollections::guest_call(
+                            vm,
+                            child,
+                            "dispatchDraw",
+                            "(Landroid/graphics/Canvas;)V",
+                            &[Value::Obj(c)],
+                        )?;
+                    }
+                    vm.canvas_restore_to(c, n);
+                }
+            }
+            Value::Int(0)
+        }
         // move the frame without resizing (AOSP: no onSizeChanged/onLayout)
         ("offsetLeftAndRight", "(I)V") | ("offsetTopAndBottom", "(I)V") => {
             let d = a(0);
@@ -544,6 +586,7 @@ impl Engine {
                 &[Value::Obj(canvas)],
             )?
             .is_some();
+            let mut dispatched = false;
             if !drew {
                 crate::jcollections::guest_call(
                     self,
@@ -552,15 +595,29 @@ impl Engine {
                     "(Landroid/graphics/Canvas;)V",
                     &[Value::Obj(canvas)],
                 )?;
-                crate::jcollections::guest_call(
+                dispatched = crate::jcollections::guest_call(
                     self,
                     v,
                     "dispatchDraw",
                     "(Landroid/graphics/Canvas;)V",
                     &[Value::Obj(canvas)],
-                )?;
+                )?
+                .is_some();
             }
             self.canvas_restore_to(canvas, n);
+            // AOSP ViewGroup.dispatchDraw: without a DEX override the children
+            // are drawn by the framework (e.g. ComposeView → AndroidComposeView).
+            // Children translate to their own window origin.
+            if !dispatched
+                && self
+                    .cp
+                    .resolve_method(&class, "dispatchDraw", "(Landroid/graphics/Canvas;)V")
+                    .is_none()
+            {
+                for c in children {
+                    self.record_view(canvas, c, depth + 1)?;
+                }
+            }
             return Ok(());
         }
         let _ = (w, h);

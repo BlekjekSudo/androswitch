@@ -1423,6 +1423,9 @@ fn cmd_app_run(
                     Ok(ops) if ops > 0 && eng.has_frame() => {
                         let (w, h) = (fb.w, fb.h);
                         eng.rasterize_frame(&mut fb.px, w, h);
+                        if std::env::var_os("RD_TRACE_DRAW").is_some() {
+                            eprintln!("D/RustyDroid: frame ops={ops}");
+                        }
                     }
                     Ok(_) => {}
                     Err(e) => {
