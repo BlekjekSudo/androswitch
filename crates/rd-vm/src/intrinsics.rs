@@ -1859,6 +1859,11 @@ fn alfu_intrinsic(
             crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Long(next)))?;
             Ok(Some(Value::Long(next)))
         }
+        "getAndIncrement" | "getAndDecrement" => {
+            let next = if name == "getAndIncrement" { current.wrapping_add(1) } else { current.wrapping_sub(1) };
+            crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Long(next)))?;
+            Ok(Some(Value::Long(current)))
+        }
         "incrementAndGet" => {
             let next = current.wrapping_add(1);
             crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Long(next)))?;
@@ -1950,6 +1955,11 @@ fn aifu_intrinsic(
             let next = current.wrapping_add(delta);
             crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Int(next)))?;
             Ok(Some(Value::Int(next)))
+        }
+        "getAndIncrement" | "getAndDecrement" => {
+            let next = if name == "getAndIncrement" { current.wrapping_add(1) } else { current.wrapping_sub(1) };
+            crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Int(next)))?;
+            Ok(Some(Value::Int(current)))
         }
         "incrementAndGet" => {
             let next = current.wrapping_add(1);

@@ -108,7 +108,7 @@ fn lookup(vm: &Engine, class: &str, name: &str, params: &str, inherited: bool) -
     None
 }
 
-fn is_static(vm: &Engine, class: &str, name: &str, sig: &str) -> Option<bool> {
+fn is_static(vm: &mut Engine, class: &str, name: &str, sig: &str) -> Option<bool> {
     vm.cp
         .resolve_method(class, name, sig)
         .map(|(_, _, m)| m.access_flags & 0x0008 != 0)
