@@ -62,7 +62,10 @@ fn notify(vm: &mut Engine, view: ObjRef, attached: bool) -> Result<(), VmExit> {
     };
     for l in listeners {
         let class = vm.heap.class_of(l)?.to_string();
-        if let Some((d, def, m)) = vm.cp.resolve_method(&class, method, "(Landroid/view/View;)V") {
+        if let Some((d, def, m)) = vm
+            .cp
+            .resolve_method(&class, method, "(Landroid/view/View;)V")
+        {
             vm.call(d, def, &m, vec![Value::Obj(l), Value::Obj(view)])?;
         }
     }
@@ -147,7 +150,8 @@ pub(crate) fn instance_intrinsic(
     // the framework constructor still runs)
     if name == "<init>" && sig.starts_with("(Landroid/content/Context;") {
         if let Some(c) = args.first().and_then(|v| v.as_ref().ok().flatten()) {
-            vm.view_props.insert((recv, "rd_context".to_string()), Value::Obj(c));
+            vm.view_props
+                .insert((recv, "rd_context".to_string()), Value::Obj(c));
         }
         return Ok(None);
     }
@@ -180,9 +184,9 @@ pub(crate) fn instance_intrinsic(
         }
         // view-tree navigation from the host hierarchy. The decor's real
         // parent is ViewRootImpl (not a View); headless it is null.
-        ("getParent", "()Landroid/view/ViewParent;") => Ok(Some(
-            parent_of(vm, recv).map_or(Value::Null, Value::Obj),
-        )),
+        ("getParent", "()Landroid/view/ViewParent;") => {
+            Ok(Some(parent_of(vm, recv).map_or(Value::Null, Value::Obj)))
+        }
         ("getRootView", "()Landroid/view/View;") => {
             let mut cur = recv;
             while let Some(p) = parent_of(vm, cur) {
@@ -199,7 +203,9 @@ pub(crate) fn instance_intrinsic(
             let t = match vm.window_token {
                 Some(t) => t,
                 None => {
-                    let t = vm.heap.alloc_instance("Landroid/os/Binder;".to_string(), Vec::new())?;
+                    let t = vm
+                        .heap
+                        .alloc_instance("Landroid/os/Binder;".to_string(), Vec::new())?;
                     vm.window_token = Some(t);
                     t
                 }
@@ -212,12 +218,17 @@ pub(crate) fn instance_intrinsic(
             if !vm.attached_views.contains(&recv) {
                 return Ok(Some(Value::Null));
             }
-            let key = ("Landroid/view/View;".to_string(), "rd_attach_handler".to_string());
+            let key = (
+                "Landroid/view/View;".to_string(),
+                "rd_attach_handler".to_string(),
+            );
             if let Some(Value::Obj(h)) = vm.statics.get(&key) {
                 return Ok(Some(Value::Obj(*h)));
             }
             let looper = vm.main_looper_obj()?;
-            let h = vm.heap.alloc_instance("Landroid/os/Handler;".to_string(), Vec::new())?;
+            let h = vm
+                .heap
+                .alloc_instance("Landroid/os/Handler;".to_string(), Vec::new())?;
             vm.attach_host_state("Landroid/os/Handler;", h)?;
             crate::framework::call_host_instance(
                 vm,
@@ -230,7 +241,9 @@ pub(crate) fn instance_intrinsic(
             vm.statics.insert(key, Value::Obj(h));
             Ok(Some(Value::Obj(h)))
         }
-        ("isAttachedToWindow", "()Z") => Ok(Some(Value::Int(vm.attached_views.contains(&recv) as i32))),
+        ("isAttachedToWindow", "()Z") => {
+            Ok(Some(Value::Int(vm.attached_views.contains(&recv) as i32)))
+        }
         _ => Ok(None),
     }
 }

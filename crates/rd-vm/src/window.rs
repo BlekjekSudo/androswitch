@@ -53,7 +53,11 @@ pub(crate) fn decor_of(vm: &mut Engine, window: ObjRef) -> Result<(ObjRef, ObjRe
 }
 
 /// Put `content` under the content frame (idempotent; detaches others).
-pub(crate) fn attach_content(vm: &mut Engine, frame: ObjRef, content: ObjRef) -> Result<(), VmExit> {
+pub(crate) fn attach_content(
+    vm: &mut Engine,
+    frame: ObjRef,
+    content: ObjRef,
+) -> Result<(), VmExit> {
     if let Some(HostObj::View { children, .. }) = vm.fw.objects.get_mut(&frame) {
         if children.contains(&content) {
             return Ok(());
@@ -64,7 +68,11 @@ pub(crate) fn attach_content(vm: &mut Engine, frame: ObjRef, content: ObjRef) ->
 }
 
 /// Called by `set_content_view`: keep the decor tree in sync if it exists.
-pub(crate) fn on_content_set(vm: &mut Engine, window: ObjRef, content: ObjRef) -> Result<(), VmExit> {
+pub(crate) fn on_content_set(
+    vm: &mut Engine,
+    window: ObjRef,
+    content: ObjRef,
+) -> Result<(), VmExit> {
     if let Some((_, frame)) = vm.window_decor.get(&window).copied() {
         attach_content(vm, frame, content)?;
     }
@@ -171,7 +179,13 @@ pub(crate) fn layout_params_intrinsic(
     let int = |i: usize| args.get(i).and_then(|v| v.as_int().ok()).unwrap_or(0);
     match (name, sig) {
         ("<init>", _) => {
-            for f in ["leftMargin", "topMargin", "rightMargin", "bottomMargin", "gravity"] {
+            for f in [
+                "leftMargin",
+                "topMargin",
+                "rightMargin",
+                "bottomMargin",
+                "gravity",
+            ] {
                 put(vm, f, Value::Int(if f == "gravity" { -1 } else { 0 }))?;
             }
             put(vm, "weight", Value::Float(0.0))?;
@@ -201,10 +215,17 @@ pub(crate) fn layout_params_intrinsic(
                     let src = args.first().and_then(|v| v.as_ref().ok().flatten());
                     let from = |f: &str| src.and_then(|s| vm.heap.get_field(s, f).ok());
                     let (w, h) = (from("width"), from("height"));
-                    let copied: Vec<(&str, Option<Value>)> = ["leftMargin", "topMargin", "rightMargin", "bottomMargin", "gravity", "weight"]
-                        .iter()
-                        .map(|f| (*f, from(f)))
-                        .collect();
+                    let copied: Vec<(&str, Option<Value>)> = [
+                        "leftMargin",
+                        "topMargin",
+                        "rightMargin",
+                        "bottomMargin",
+                        "gravity",
+                        "weight",
+                    ]
+                    .iter()
+                    .map(|f| (*f, from(f)))
+                    .collect();
                     put(vm, "width", w.unwrap_or(Value::Int(-2)))?;
                     put(vm, "height", h.unwrap_or(Value::Int(-2)))?;
                     for (f, v) in copied {
@@ -217,7 +238,10 @@ pub(crate) fn layout_params_intrinsic(
             Ok(Some(Value::Null))
         }
         ("setMargins", "(IIII)V") => {
-            for (i, f) in ["leftMargin", "topMargin", "rightMargin", "bottomMargin"].iter().enumerate() {
+            for (i, f) in ["leftMargin", "topMargin", "rightMargin", "bottomMargin"]
+                .iter()
+                .enumerate()
+            {
                 put(vm, f, Value::Int(int(i)))?;
             }
             Ok(Some(Value::Null))
@@ -230,8 +254,16 @@ pub(crate) fn layout_params_intrinsic(
             put(vm, "rightMargin", Value::Int(int(0)))?;
             Ok(Some(Value::Null))
         }
-        ("getMarginStart", "()I") => Ok(Some(vm.heap.get_field(recv, "leftMargin").unwrap_or(Value::Int(0)))),
-        ("getMarginEnd", "()I") => Ok(Some(vm.heap.get_field(recv, "rightMargin").unwrap_or(Value::Int(0)))),
+        ("getMarginStart", "()I") => Ok(Some(
+            vm.heap
+                .get_field(recv, "leftMargin")
+                .unwrap_or(Value::Int(0)),
+        )),
+        ("getMarginEnd", "()I") => Ok(Some(
+            vm.heap
+                .get_field(recv, "rightMargin")
+                .unwrap_or(Value::Int(0)),
+        )),
         _ => Ok(None),
     }
 }

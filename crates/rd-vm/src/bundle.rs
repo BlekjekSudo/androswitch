@@ -119,7 +119,9 @@ fn new_string_set(vm: &mut Engine, keys: Vec<String>) -> Result<Value, VmExit> {
     for k in keys {
         elems.push(Value::Obj(crate::intrinsics::alloc_string(vm, k)?));
     }
-    let set = vm.heap.alloc_instance("Ljava/util/HashSet;".to_string(), Vec::new())?;
+    let set = vm
+        .heap
+        .alloc_instance("Ljava/util/HashSet;".to_string(), Vec::new())?;
     vm.fw.objects.insert(set, HostObj::List { elems });
     Ok(Value::Obj(set))
 }
@@ -169,7 +171,11 @@ fn typed_access(
         };
         list.into_iter().find(|(k, _)| *k == key).map(|(_, v)| v)
     };
-    let is_put = if is_intent { name == "putExtra" } else { name.starts_with("put") && name != "putAll" };
+    let is_put = if is_intent {
+        name == "putExtra"
+    } else {
+        name.starts_with("put") && name != "putAll"
+    };
     if is_put && params.len() == 2 {
         let v = args.get(1).cloned().unwrap_or(Value::Null);
         if is_intent {
@@ -200,16 +206,26 @@ fn typed_access(
     Ok(None)
 }
 
-fn bundle(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+fn bundle(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if map_mut(vm, recv).is_none() {
-        vm.fw.objects.insert(recv, HostObj::Bundle { map: Vec::new() });
+        vm.fw
+            .objects
+            .insert(recv, HostObj::Bundle { map: Vec::new() });
     }
     match (name, sig) {
         ("<init>", "()V") | ("<init>", "(I)V") | ("<init>", "(Ljava/lang/ClassLoader;)V") => {
             return Ok(Some(Value::Null))
         }
-        ("<init>", "(Landroid/os/Bundle;)V") | ("<init>", "(Landroid/os/PersistableBundle;)V")
-        | ("putAll", "(Landroid/os/Bundle;)V") | ("putAll", "(Landroid/os/PersistableBundle;)V") => {
+        ("<init>", "(Landroid/os/Bundle;)V")
+        | ("<init>", "(Landroid/os/PersistableBundle;)V")
+        | ("putAll", "(Landroid/os/Bundle;)V")
+        | ("putAll", "(Landroid/os/PersistableBundle;)V") => {
             let src = match args.first() {
                 Some(Value::Obj(o)) => map_of(vm, *o).unwrap_or_default(),
                 _ => Vec::new(),
@@ -223,8 +239,16 @@ fn bundle(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Value]) 
         }
         ("setClassLoader", _) | ("setDefusable", _) => return Ok(Some(Value::Null)),
         ("getClassLoader", "()Ljava/lang/ClassLoader;") => return Ok(Some(Value::Null)),
-        ("size", "()I") => return Ok(Some(Value::Int(map_of(vm, recv).map_or(0, |m| m.len()) as i32))),
-        ("isEmpty", "()Z") => return Ok(Some(Value::Int(map_of(vm, recv).is_none_or(|m| m.is_empty()) as i32))),
+        ("size", "()I") => {
+            return Ok(Some(Value::Int(
+                map_of(vm, recv).map_or(0, |m| m.len()) as i32
+            )))
+        }
+        ("isEmpty", "()Z") => {
+            return Ok(Some(Value::Int(
+                map_of(vm, recv).map_or(true, |m| m.is_empty()) as i32,
+            )))
+        }
         ("clear", "()V") => {
             if let Some(m) = map_mut(vm, recv) {
                 m.clear();
@@ -273,9 +297,21 @@ fn intent_meta(vm: &mut Engine, r: ObjRef) -> &mut IntentMeta {
     vm.intent_meta.entry(r).or_default()
 }
 
-fn intent(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+fn intent(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if !matches!(vm.fw.get(recv), Some(HostObj::Intent { .. })) {
-        vm.fw.objects.insert(recv, HostObj::Intent { component: None, extras: Vec::new() });
+        vm.fw.objects.insert(
+            recv,
+            HostObj::Intent {
+                component: None,
+                extras: Vec::new(),
+            },
+        );
     }
     let a0 = args.first().cloned().unwrap_or(Value::Null);
     let this = Some(Value::Obj(recv));
@@ -294,10 +330,18 @@ fn intent(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Value]) 
         ("<init>", "(Landroid/content/Intent;)V") => {
             if let Some(Value::Obj(src)) = args.first() {
                 let (c, e) = match vm.fw.get(*src) {
-                    Some(HostObj::Intent { component, extras }) => (component.clone(), extras.clone()),
+                    Some(HostObj::Intent { component, extras }) => {
+                        (component.clone(), extras.clone())
+                    }
                     _ => (None, Vec::new()),
                 };
-                vm.fw.objects.insert(recv, HostObj::Intent { component: c, extras: e });
+                vm.fw.objects.insert(
+                    recv,
+                    HostObj::Intent {
+                        component: c,
+                        extras: e,
+                    },
+                );
                 let meta = vm.intent_meta.get(src).cloned().unwrap_or_default();
                 vm.intent_meta.insert(recv, meta);
             }
@@ -311,7 +355,9 @@ fn intent(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Value]) 
             if extras.is_empty() {
                 Some(Value::Null) // AOSP: null when no extras were ever put
             } else {
-                let b = vm.heap.alloc_instance("Landroid/os/Bundle;".to_string(), Vec::new())?;
+                let b = vm
+                    .heap
+                    .alloc_instance("Landroid/os/Bundle;".to_string(), Vec::new())?;
                 vm.fw.objects.insert(b, HostObj::Bundle { map: extras });
                 Some(Value::Obj(b))
             }
@@ -344,14 +390,18 @@ fn intent(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Value]) 
             intent_meta(vm, recv).action = Some(a0);
             this
         }
-        ("getAction", "()Ljava/lang/String;") => Some(intent_meta(vm, recv).action.clone().unwrap_or(Value::Null)),
+        ("getAction", "()Ljava/lang/String;") => {
+            Some(intent_meta(vm, recv).action.clone().unwrap_or(Value::Null))
+        }
         ("setData", "(Landroid/net/Uri;)Landroid/content/Intent;") => {
             let m = intent_meta(vm, recv);
             m.data = Some(a0);
             m.mime = None; // AOSP: setData clears the type
             this
         }
-        ("getData", "()Landroid/net/Uri;") => Some(intent_meta(vm, recv).data.clone().unwrap_or(Value::Null)),
+        ("getData", "()Landroid/net/Uri;") => {
+            Some(intent_meta(vm, recv).data.clone().unwrap_or(Value::Null))
+        }
         ("setType", "(Ljava/lang/String;)Landroid/content/Intent;") => {
             let m = intent_meta(vm, recv);
             m.mime = Some(a0);
@@ -364,12 +414,16 @@ fn intent(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Value]) 
             m.mime = args.get(1).cloned();
             this
         }
-        ("getType", "()Ljava/lang/String;") => Some(intent_meta(vm, recv).mime.clone().unwrap_or(Value::Null)),
+        ("getType", "()Ljava/lang/String;") => {
+            Some(intent_meta(vm, recv).mime.clone().unwrap_or(Value::Null))
+        }
         ("setPackage", "(Ljava/lang/String;)Landroid/content/Intent;") => {
             intent_meta(vm, recv).package = Some(a0);
             this
         }
-        ("getPackage", "()Ljava/lang/String;") => Some(intent_meta(vm, recv).package.clone().unwrap_or(Value::Null)),
+        ("getPackage", "()Ljava/lang/String;") => {
+            Some(intent_meta(vm, recv).package.clone().unwrap_or(Value::Null))
+        }
         ("addFlags", "(I)Landroid/content/Intent;") => {
             let f = a0.as_int()?;
             intent_meta(vm, recv).flags |= f;
@@ -389,11 +443,17 @@ fn intent(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Value]) 
             intent_meta(vm, recv).component_obj = Some(a0);
             this
         }
-        ("getComponent", "()Landroid/content/ComponentName;") => {
-            Some(intent_meta(vm, recv).component_obj.clone().unwrap_or(Value::Null))
-        }
+        ("getComponent", "()Landroid/content/ComponentName;") => Some(
+            intent_meta(vm, recv)
+                .component_obj
+                .clone()
+                .unwrap_or(Value::Null),
+        ),
         ("setClassName", "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;")
-        | ("setClassName", "(Landroid/content/Context;Ljava/lang/String;)Landroid/content/Intent;") => {
+        | (
+            "setClassName",
+            "(Landroid/content/Context;Ljava/lang/String;)Landroid/content/Intent;",
+        ) => {
             if let Some(Value::Obj(c)) = args.get(1) {
                 let dotted = vm.heap.as_str(*c)?.to_string();
                 let desc = format!("L{};", dotted.replace('.', "/"));
@@ -424,8 +484,14 @@ mod tests {
 
     #[test]
     fn signature_parsing() {
-        assert_eq!(params_of("(Ljava/lang/String;I)V"), vec!["Ljava/lang/String;", "I"]);
-        assert_eq!(params_of("(Ljava/lang/String;[Ljava/lang/String;)V").len(), 2);
+        assert_eq!(
+            params_of("(Ljava/lang/String;I)V"),
+            vec!["Ljava/lang/String;", "I"]
+        );
+        assert_eq!(
+            params_of("(Ljava/lang/String;[Ljava/lang/String;)V").len(),
+            2
+        );
         assert_eq!(params_of("()V").len(), 0);
         assert_eq!(ret_of("(Ljava/lang/String;)J"), "J");
         assert!(matches!(typed_default("Z"), Value::Int(0)));

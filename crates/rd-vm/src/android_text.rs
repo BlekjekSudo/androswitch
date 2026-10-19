@@ -39,7 +39,7 @@ pub(crate) fn static_intrinsic(
     let v = match (name, sig) {
         ("isEmpty", "(Ljava/lang/CharSequence;)Z") => {
             let t = text(vm, args.first())?;
-            Value::Int(t.is_none_or(|t| t.is_empty()) as i32)
+            Value::Int(t.map_or(true, |t| t.is_empty()) as i32)
         }
         ("equals", "(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Z") => {
             let a = text(vm, args.first())?;
@@ -66,7 +66,10 @@ pub(crate) fn static_intrinsic(
         }
         ("concat", "([Ljava/lang/CharSequence;)Ljava/lang/CharSequence;") => {
             let arr = args[0].as_ref()?.ok_or_else(|| {
-                VmExit::Exception(Throwable::new("Ljava/lang/NullPointerException;", "concat(null)"))
+                VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "concat(null)",
+                ))
             })?;
             let elems = vm.heap.as_array_elems(arr)?.0.to_vec();
             let mut out = String::new();
@@ -79,7 +82,10 @@ pub(crate) fn static_intrinsic(
         | ("join", "(Ljava/lang/CharSequence;[Ljava/lang/Object;)Ljava/lang/String;") => {
             let delim = text(vm, args.first())?.unwrap_or_default();
             let src = args[1].as_ref()?.ok_or_else(|| {
-                VmExit::Exception(Throwable::new("Ljava/lang/NullPointerException;", "join(null)"))
+                VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "join(null)",
+                ))
             })?;
             let elems = if vm.heap.class_of(src)?.starts_with('[') {
                 vm.heap.as_array_elems(src)?.0.to_vec()

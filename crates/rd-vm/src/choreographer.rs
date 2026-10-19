@@ -33,7 +33,9 @@ fn instance(vm: &mut Engine) -> Result<ObjRef, VmExit> {
     if let Some(i) = vm.frames.instance {
         return Ok(i);
     }
-    let i = vm.heap.alloc_instance(CHOREOGRAPHER.to_string(), Vec::new())?;
+    let i = vm
+        .heap
+        .alloc_instance(CHOREOGRAPHER.to_string(), Vec::new())?;
     vm.frames.instance = Some(i);
     Ok(i)
 }
@@ -89,7 +91,9 @@ pub(crate) fn instance_intrinsic(
             Ok(Some(Value::Null))
         }
         ("getFrameTime", "()J") => Ok(Some(Value::Long(now as i64))),
-        ("getFrameTimeNanos", "()J") => Ok(Some(Value::Long((now as i64).saturating_mul(1_000_000)))),
+        ("getFrameTimeNanos", "()J") => {
+            Ok(Some(Value::Long((now as i64).saturating_mul(1_000_000))))
+        }
         _ => Ok(None),
     }
 }
@@ -110,7 +114,12 @@ pub(crate) fn run_frame(vm: &mut Engine) -> Result<usize, VmExit> {
     for (cb, _) in &due {
         let class = vm.heap.class_of(*cb)?.to_string();
         if let Some((d, def, m)) = vm.cp.resolve_method(&class, "doFrame", "(J)V") {
-            vm.call(d, def, &m, vec![Value::Obj(*cb), Value::Long(nanos), Value::WideHi])?;
+            vm.call(
+                d,
+                def,
+                &m,
+                vec![Value::Obj(*cb), Value::Long(nanos), Value::WideHi],
+            )?;
         }
     }
     Ok(due.len())

@@ -82,13 +82,25 @@ pub(crate) fn java_double_to_string(d: f64, is_float: bool) -> String {
         return "NaN".into();
     }
     if d.is_infinite() {
-        return if d > 0.0 { "Infinity".into() } else { "-Infinity".into() };
+        return if d > 0.0 {
+            "Infinity".into()
+        } else {
+            "-Infinity".into()
+        };
     }
     if d == 0.0 {
-        return if d.is_sign_negative() { "-0.0".into() } else { "0.0".into() };
+        return if d.is_sign_negative() {
+            "-0.0".into()
+        } else {
+            "0.0".into()
+        };
     }
     // shortest digits from Rust's float printing (round-trip exact)
-    let sci = if is_float { format!("{:e}", d as f32) } else { format!("{d:e}") };
+    let sci = if is_float {
+        format!("{:e}", d as f32)
+    } else {
+        format!("{d:e}")
+    };
     let (mant, exp) = sci.split_once('e').unwrap_or((&sci, "0"));
     let exp: i32 = exp.parse().unwrap_or(0);
     let neg = mant.starts_with('-');
@@ -103,7 +115,11 @@ pub(crate) fn java_double_to_string(d: f64, is_float: bool) -> String {
         } else if point as usize >= digits.len() {
             format!("{}{}.0", digits, "0".repeat(point as usize - digits.len()))
         } else {
-            format!("{}.{}", &digits[..point as usize], &digits[point as usize..])
+            format!(
+                "{}.{}",
+                &digits[..point as usize],
+                &digits[point as usize..]
+            )
         };
         format!("{sign}{s}")
     } else {
@@ -148,8 +164,10 @@ fn canonical_fbits(f: f32) -> i32 {
 fn java_whitespace(c: char) -> bool {
     // Character.isWhitespace: Unicode space separators except non-breaking
     // ones, plus \t \n VT \f \r FS GS RS US
-    matches!(c, '\t' | '\n' | '\u{0B}' | '\u{0C}' | '\r' | '\u{1C}'..='\u{1F}')
-        || (c.is_whitespace() && !matches!(c, '\u{A0}' | '\u{2007}' | '\u{202F}') && c != '\u{85}')
+    matches!(
+        c,
+        '\t' | '\n' | '\u{0B}' | '\u{0C}' | '\r' | '\u{1C}'..='\u{1F}'
+    ) || (c.is_whitespace() && !matches!(c, '\u{A0}' | '\u{2007}' | '\u{202F}') && c != '\u{85}')
 }
 
 pub(crate) fn static_intrinsic(
@@ -159,7 +177,10 @@ pub(crate) fn static_intrinsic(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    let cls = match class.strip_prefix("Ljava/lang/").and_then(|c| c.strip_suffix(';')) {
+    let cls = match class
+        .strip_prefix("Ljava/lang/")
+        .and_then(|c| c.strip_suffix(';'))
+    {
         Some(c) => c,
         None => return Ok(None),
     };
@@ -179,7 +200,11 @@ pub(crate) fn static_intrinsic(
         ("Integer", "numberOfTrailingZeros", "(I)I") => Value::Int(i(0).trailing_zeros() as i32),
         ("Integer", "highestOneBit", "(I)I") => {
             let x = i(0) as u32;
-            Value::Int(if x == 0 { 0 } else { (1u32 << (31 - x.leading_zeros())) as i32 })
+            Value::Int(if x == 0 {
+                0
+            } else {
+                (1u32 << (31 - x.leading_zeros())) as i32
+            })
         }
         ("Integer", "lowestOneBit", "(I)I") => Value::Int(i(0) & i(0).wrapping_neg()),
         ("Integer", "rotateLeft", "(II)I") => Value::Int(i(0).rotate_left((i(1) & 31) as u32)),
@@ -189,22 +214,37 @@ pub(crate) fn static_intrinsic(
         ("Integer", "signum", "(I)I") => Value::Int(i(0).signum()),
         ("Integer", "hashCode", "(I)I") => Value::Int(i(0)),
         ("Integer", "compare", "(II)I") => Value::Int(i(0).cmp(&i(1)) as i32),
-        ("Integer", "compareUnsigned", "(II)I") => Value::Int((i(0) as u32).cmp(&(i(1) as u32)) as i32),
+        ("Integer", "compareUnsigned", "(II)I") => {
+            Value::Int((i(0) as u32).cmp(&(i(1) as u32)) as i32)
+        }
         ("Integer", "divideUnsigned", "(II)I") | ("Integer", "remainderUnsigned", "(II)I") => {
             if i(1) == 0 {
-                return Err(VmExit::Exception(Throwable::new("Ljava/lang/ArithmeticException;", "/ by zero")));
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/ArithmeticException;",
+                    "/ by zero",
+                )));
             }
             let (a, c) = (i(0) as u32, i(1) as u32);
-            Value::Int(if name == "divideUnsigned" { a / c } else { a % c } as i32)
+            Value::Int(if name == "divideUnsigned" {
+                a / c
+            } else {
+                a % c
+            } as i32)
         }
         ("Integer", "toUnsignedLong", "(I)J") => Value::Long(i(0) as u32 as i64),
         ("Integer", "max", "(II)I") => Value::Int(i(0).max(i(1))),
         ("Integer", "min", "(II)I") => Value::Int(i(0).min(i(1))),
         ("Integer", "sum", "(II)I") => Value::Int(i(0).wrapping_add(i(1))),
         ("Integer", "toHexString", "(I)Ljava/lang/String;") => s(vm, format!("{:x}", i(0) as u32))?,
-        ("Integer", "toBinaryString", "(I)Ljava/lang/String;") => s(vm, format!("{:b}", i(0) as u32))?,
-        ("Integer", "toOctalString", "(I)Ljava/lang/String;") => s(vm, format!("{:o}", i(0) as u32))?,
-        ("Integer", "toString", "(II)Ljava/lang/String;") => s(vm, to_radix(i(0) as i128, i(1) as u32))?,
+        ("Integer", "toBinaryString", "(I)Ljava/lang/String;") => {
+            s(vm, format!("{:b}", i(0) as u32))?
+        }
+        ("Integer", "toOctalString", "(I)Ljava/lang/String;") => {
+            s(vm, format!("{:o}", i(0) as u32))?
+        }
+        ("Integer", "toString", "(II)Ljava/lang/String;") => {
+            s(vm, to_radix(i(0) as i128, i(1) as u32))?
+        }
         ("Integer", "toString", "(I)Ljava/lang/String;") => s(vm, i(0).to_string())?,
         ("Integer", "parseInt", "(Ljava/lang/String;I)I") => {
             let t = str_arg(vm, args.first())?;
@@ -214,11 +254,16 @@ pub(crate) fn static_intrinsic(
             let t = str_arg(vm, args.first())?;
             Value::Int(parse_radix(&t, 10, i32::MIN as i128, i32::MAX as i128)? as i32)
         }
-        ("Integer", "valueOf", "(Ljava/lang/String;)Ljava/lang/Integer;") | ("Integer", "valueOf", "(Ljava/lang/String;I)Ljava/lang/Integer;") => {
+        ("Integer", "valueOf", "(Ljava/lang/String;)Ljava/lang/Integer;")
+        | ("Integer", "valueOf", "(Ljava/lang/String;I)Ljava/lang/Integer;") => {
             let t = str_arg(vm, args.first())?;
             let radix = if args.len() > 1 { i(1) } else { 10 };
             let n = parse_radix(&t, radix, i32::MIN as i128, i32::MAX as i128)? as i32;
-            Value::Obj(crate::boxes::box_value(vm, "Ljava/lang/Integer;", Value::Int(n))?)
+            Value::Obj(crate::boxes::box_value(
+                vm,
+                "Ljava/lang/Integer;",
+                Value::Int(n),
+            )?)
         }
         // ── Long ──
         ("Long", "bitCount", "(J)I") => Value::Int(j(0).count_ones() as i32),
@@ -226,7 +271,11 @@ pub(crate) fn static_intrinsic(
         ("Long", "numberOfTrailingZeros", "(J)I") => Value::Int(j(0).trailing_zeros() as i32),
         ("Long", "highestOneBit", "(J)J") => {
             let x = j(0) as u64;
-            Value::Long(if x == 0 { 0 } else { (1u64 << (63 - x.leading_zeros())) as i64 })
+            Value::Long(if x == 0 {
+                0
+            } else {
+                (1u64 << (63 - x.leading_zeros())) as i64
+            })
         }
         ("Long", "lowestOneBit", "(J)J") => Value::Long(j(0) & j(0).wrapping_neg()),
         ("Long", "rotateLeft", "(JI)J") => Value::Long(j(0).rotate_left((i(1) & 63) as u32)),
@@ -235,12 +284,16 @@ pub(crate) fn static_intrinsic(
         ("Long", "signum", "(J)I") => Value::Int(j(0).signum() as i32),
         ("Long", "hashCode", "(J)I") => Value::Int((j(0) ^ ((j(0) as u64) >> 32) as i64) as i32),
         ("Long", "compare", "(JJ)I") => Value::Int(j(0).cmp(&j(1)) as i32),
-        ("Long", "compareUnsigned", "(JJ)I") => Value::Int((j(0) as u64).cmp(&(j(1) as u64)) as i32),
+        ("Long", "compareUnsigned", "(JJ)I") => {
+            Value::Int((j(0) as u64).cmp(&(j(1) as u64)) as i32)
+        }
         ("Long", "max", "(JJ)J") => Value::Long(j(0).max(j(1))),
         ("Long", "min", "(JJ)J") => Value::Long(j(0).min(j(1))),
         ("Long", "sum", "(JJ)J") => Value::Long(j(0).wrapping_add(j(1))),
         ("Long", "toString", "(J)Ljava/lang/String;") => s(vm, j(0).to_string())?,
-        ("Long", "toString", "(JI)Ljava/lang/String;") => s(vm, to_radix(j(0) as i128, i(1) as u32))?,
+        ("Long", "toString", "(JI)Ljava/lang/String;") => {
+            s(vm, to_radix(j(0) as i128, i(1) as u32))?
+        }
         ("Long", "toHexString", "(J)Ljava/lang/String;") => s(vm, format!("{:x}", j(0) as u64))?,
         ("Long", "toBinaryString", "(J)Ljava/lang/String;") => s(vm, format!("{:b}", j(0) as u64))?,
         ("Long", "parseLong", "(Ljava/lang/String;I)J") => {
@@ -254,7 +307,11 @@ pub(crate) fn static_intrinsic(
         ("Long", "valueOf", "(Ljava/lang/String;)Ljava/lang/Long;") => {
             let t = str_arg(vm, args.first())?;
             let n = parse_radix(&t, 10, i64::MIN as i128, i64::MAX as i128)? as i64;
-            Value::Obj(crate::boxes::box_value(vm, "Ljava/lang/Long;", Value::Long(n))?)
+            Value::Obj(crate::boxes::box_value(
+                vm,
+                "Ljava/lang/Long;",
+                Value::Long(n),
+            )?)
         }
         // ── Float ──
         ("Float", "floatToIntBits", "(F)I") => Value::Int(canonical_fbits(f(0))),
@@ -265,9 +322,19 @@ pub(crate) fn static_intrinsic(
         ("Float", "isFinite", "(F)Z") => b(f(0).is_finite()),
         ("Float", "hashCode", "(F)I") => Value::Int(canonical_fbits(f(0))),
         ("Float", "compare", "(FF)I") => Value::Int(cmp_f64(f(0) as f64, f(1) as f64)),
-        ("Float", "max", "(FF)F") => Value::Float(if f(0).is_nan() || f(1).is_nan() { f32::NAN } else { f(0).max(f(1)) }),
-        ("Float", "min", "(FF)F") => Value::Float(if f(0).is_nan() || f(1).is_nan() { f32::NAN } else { f(0).min(f(1)) }),
-        ("Float", "toString", "(F)Ljava/lang/String;") => s(vm, java_double_to_string(f(0) as f64, true))?,
+        ("Float", "max", "(FF)F") => Value::Float(if f(0).is_nan() || f(1).is_nan() {
+            f32::NAN
+        } else {
+            f(0).max(f(1))
+        }),
+        ("Float", "min", "(FF)F") => Value::Float(if f(0).is_nan() || f(1).is_nan() {
+            f32::NAN
+        } else {
+            f(0).min(f(1))
+        }),
+        ("Float", "toString", "(F)Ljava/lang/String;") => {
+            s(vm, java_double_to_string(f(0) as f64, true))?
+        }
         ("Float", "parseFloat", "(Ljava/lang/String;)F") => {
             let t = str_arg(vm, args.first())?;
             Value::Float(parse_float(&t)? as f32)
@@ -275,7 +342,11 @@ pub(crate) fn static_intrinsic(
         ("Float", "valueOf", "(Ljava/lang/String;)Ljava/lang/Float;") => {
             let t = str_arg(vm, args.first())?;
             let x = parse_float(&t)? as f32;
-            Value::Obj(crate::boxes::box_value(vm, "Ljava/lang/Float;", Value::Float(x))?)
+            Value::Obj(crate::boxes::box_value(
+                vm,
+                "Ljava/lang/Float;",
+                Value::Float(x),
+            )?)
         }
         // ── Double ──
         ("Double", "doubleToLongBits", "(D)J") => Value::Long(canonical_bits(d(0))),
@@ -289,7 +360,9 @@ pub(crate) fn static_intrinsic(
             Value::Int((x ^ ((x as u64) >> 32) as i64) as i32)
         }
         ("Double", "compare", "(DD)I") => Value::Int(cmp_f64(d(0), d(1))),
-        ("Double", "toString", "(D)Ljava/lang/String;") => s(vm, java_double_to_string(d(0), false))?,
+        ("Double", "toString", "(D)Ljava/lang/String;") => {
+            s(vm, java_double_to_string(d(0), false))?
+        }
         ("Double", "parseDouble", "(Ljava/lang/String;)D") => {
             let t = str_arg(vm, args.first())?;
             Value::Double(parse_float(&t)?)
@@ -297,7 +370,11 @@ pub(crate) fn static_intrinsic(
         ("Double", "valueOf", "(Ljava/lang/String;)Ljava/lang/Double;") => {
             let t = str_arg(vm, args.first())?;
             let x = parse_float(&t)?;
-            Value::Obj(crate::boxes::box_value(vm, "Ljava/lang/Double;", Value::Double(x))?)
+            Value::Obj(crate::boxes::box_value(
+                vm,
+                "Ljava/lang/Double;",
+                Value::Double(x),
+            )?)
         }
         // ── Boolean ──
         ("Boolean", "parseBoolean", "(Ljava/lang/String;)Z") => match args.first() {
@@ -309,19 +386,26 @@ pub(crate) fn static_intrinsic(
         ("Boolean", "toString", "(Z)Ljava/lang/String;") => s(vm, (i(0) != 0).to_string())?,
         // ── Character ──
         ("Character", "charCount", "(I)I") => Value::Int(if i(0) >= 0x10000 { 2 } else { 1 }),
-        ("Character", "isDigit", _) => b(ch(0).is_some_and(|c| c.is_numeric() && c.to_digit(10).is_some() || ('\u{660}'..='\u{669}').contains(&c))),
+        ("Character", "isDigit", _) => b(ch(0).is_some_and(|c| {
+            c.is_numeric() && c.is_ascii_digit() || ('\u{660}'..='\u{669}').contains(&c)
+        })),
         ("Character", "isLetter", _) => b(ch(0).is_some_and(char::is_alphabetic)),
         ("Character", "isLetterOrDigit", _) => b(ch(0).is_some_and(char::is_alphanumeric)),
         ("Character", "isUpperCase", _) => b(ch(0).is_some_and(char::is_uppercase)),
         ("Character", "isLowerCase", _) => b(ch(0).is_some_and(char::is_lowercase)),
         ("Character", "isWhitespace", _) => b(ch(0).is_some_and(java_whitespace)),
-        ("Character", "isSpaceChar", _) => b(ch(0).is_some_and(|c| c == ' ' || c == '\u{A0}' || (c.is_whitespace() && !c.is_control()))),
+        ("Character", "isSpaceChar", _) => b(ch(0)
+            .is_some_and(|c| c == ' ' || c == '\u{A0}' || (c.is_whitespace() && !c.is_control()))),
         ("Character", "isISOControl", _) => b(ch(0).is_some_and(char::is_control)),
         ("Character", "isHighSurrogate", "(C)Z") => b((0xD800..=0xDBFF).contains(&i(0))),
         ("Character", "isLowSurrogate", "(C)Z") => b((0xDC00..=0xDFFF).contains(&i(0))),
         ("Character", "isSurrogate", "(C)Z") => b((0xD800..=0xDFFF).contains(&i(0))),
-        ("Character", "isSurrogatePair", "(CC)Z") => b((0xD800..=0xDBFF).contains(&i(0)) && (0xDC00..=0xDFFF).contains(&i(1))),
-        ("Character", "toCodePoint", "(CC)I") => Value::Int(((i(0) - 0xD800) << 10) + (i(1) - 0xDC00) + 0x10000),
+        ("Character", "isSurrogatePair", "(CC)Z") => {
+            b((0xD800..=0xDBFF).contains(&i(0)) && (0xDC00..=0xDFFF).contains(&i(1)))
+        }
+        ("Character", "toCodePoint", "(CC)I") => {
+            Value::Int(((i(0) - 0xD800) << 10) + (i(1) - 0xDC00) + 0x10000)
+        }
         ("Character", "toLowerCase", "(C)C") | ("Character", "toLowerCase", "(I)I") => {
             Value::Int(ch(0).map_or(i(0), |c| c.to_lowercase().next().map_or(i(0), |x| x as i32)))
         }
@@ -334,10 +418,14 @@ pub(crate) fn static_intrinsic(
                 }
             }))
         }
-        ("Character", "digit", "(CI)I") | ("Character", "digit", "(II)I") => {
-            Value::Int(ch(0).and_then(|c| c.to_digit(i(1).clamp(2, 36) as u32)).map_or(-1, |x| x as i32))
+        ("Character", "digit", "(CI)I") | ("Character", "digit", "(II)I") => Value::Int(
+            ch(0)
+                .and_then(|c| c.to_digit(i(1).clamp(2, 36) as u32))
+                .map_or(-1, |x| x as i32),
+        ),
+        ("Character", "getType", "(I)I") | ("Character", "getType", "(C)I") => {
+            Value::Int(char_type(ch(0)))
         }
-        ("Character", "getType", "(I)I") | ("Character", "getType", "(C)I") => Value::Int(char_type(ch(0))),
         ("Character", "getDirectionality", "(I)B") | ("Character", "getDirectionality", "(C)B") => {
             // L=0, R=1, AL=2, EN=3, WS=12, ON=13; rough but stable
             let c = ch(0).unwrap_or(' ');
@@ -350,34 +438,63 @@ pub(crate) fn static_intrinsic(
                 _ => 13,
             })
         }
-        ("Character", "codePointAt", "(Ljava/lang/CharSequence;I)I") | ("Character", "codePointBefore", "(Ljava/lang/CharSequence;I)I") => {
-            let Some(Value::Obj(r)) = args.first() else { return Ok(None) };
+        ("Character", "codePointAt", "(Ljava/lang/CharSequence;I)I")
+        | ("Character", "codePointBefore", "(Ljava/lang/CharSequence;I)I") => {
+            let Some(Value::Obj(r)) = args.first() else {
+                return Ok(None);
+            };
             let text: Vec<u16> = match vm.heap.as_str(*r) {
                 Ok(t) => t.encode_utf16().collect(),
-                Err(_) => crate::intrinsics::object_to_string(vm, *r)?.encode_utf16().collect(),
+                Err(_) => crate::intrinsics::object_to_string(vm, *r)?
+                    .encode_utf16()
+                    .collect(),
             };
             let idx = i(1);
-            let (start, valid) = if name == "codePointAt" { (idx, idx >= 0 && (idx as usize) < text.len()) } else { (idx - 1, idx >= 1 && (idx as usize) <= text.len()) };
+            let (start, valid) = if name == "codePointAt" {
+                (idx, idx >= 0 && (idx as usize) < text.len())
+            } else {
+                (idx - 1, idx >= 1 && (idx as usize) <= text.len())
+            };
             if !valid {
-                return Err(VmExit::Exception(Throwable::new("Ljava/lang/StringIndexOutOfBoundsException;", format!("index {idx}"))));
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/StringIndexOutOfBoundsException;",
+                    format!("index {idx}"),
+                )));
             }
             let mut p = start as usize;
-            if name == "codePointBefore" && p > 0 && (0xDC00..=0xDFFF).contains(&text[p]) && (0xD800..=0xDBFF).contains(&text[p - 1]) {
+            if name == "codePointBefore"
+                && p > 0
+                && (0xDC00..=0xDFFF).contains(&text[p])
+                && (0xD800..=0xDBFF).contains(&text[p - 1])
+            {
                 p -= 1;
             }
-            let cp = char::decode_utf16(text[p..].iter().copied()).next().and_then(|r| r.ok()).map_or(text[p] as i32, |c| c as i32);
+            let cp = char::decode_utf16(text[p..].iter().copied())
+                .next()
+                .and_then(|r| r.ok())
+                .map_or(text[p] as i32, |c| c as i32);
             Value::Int(cp)
         }
         ("Character", "toChars", "(I[CI)I") => {
-            let units: Vec<u16> = ch(0).map(|c| {
-                let mut buf = [0u16; 2];
-                c.encode_utf16(&mut buf).to_vec()
-            }).unwrap_or_else(|| vec![i(0) as u16]);
-            let Some(Value::Obj(arr)) = args.get(1) else { return Ok(None) };
+            let units: Vec<u16> = ch(0)
+                .map(|c| {
+                    let mut buf = [0u16; 2];
+                    c.encode_utf16(&mut buf).to_vec()
+                })
+                .unwrap_or_else(|| vec![i(0) as u16]);
+            let Some(Value::Obj(arr)) = args.get(1) else {
+                return Ok(None);
+            };
             let at = i(2) as usize;
-            let elems = vm.heap.array_elems_mut(*arr).map_err(|e| VmExit::from(crate::err::vm_error("VM_TYPE_ERROR", e)))?;
+            let elems = vm
+                .heap
+                .array_elems_mut(*arr)
+                .map_err(|e| VmExit::from(crate::err::vm_error("VM_TYPE_ERROR", e)))?;
             if at + units.len() > elems.len() {
-                return Err(VmExit::Exception(Throwable::new("Ljava/lang/ArrayIndexOutOfBoundsException;", format!("{at}"))));
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/ArrayIndexOutOfBoundsException;",
+                    format!("{at}"),
+                )));
             }
             for (k, u) in units.iter().enumerate() {
                 elems[at + k] = Value::Int(*u as i32);
@@ -407,11 +524,21 @@ pub(crate) fn static_intrinsic(
                 "rint" => {
                     // round half to even
                     let r = x.round();
-                    if (x - x.trunc()).abs() == 0.5 { 2.0 * (x / 2.0).round() } else { r }
+                    if (x - x.trunc()).abs() == 0.5 {
+                        2.0 * (x / 2.0).round()
+                    } else {
+                        r
+                    }
                 }
                 "toDegrees" => x.to_degrees(),
                 "toRadians" => x.to_radians(),
-                "signum" => if x.is_nan() || x == 0.0 { x } else { x.signum() },
+                "signum" => {
+                    if x.is_nan() || x == 0.0 {
+                        x
+                    } else {
+                        x.signum()
+                    }
+                }
                 "ulp" => {
                     let next = f64::from_bits(x.abs().to_bits() + 1);
                     next - x.abs()
@@ -421,7 +548,11 @@ pub(crate) fn static_intrinsic(
         }
         ("Math" | "StrictMath", "signum", "(F)F") => {
             let x = f(0);
-            Value::Float(if x.is_nan() || x == 0.0 { x } else { x.signum() })
+            Value::Float(if x.is_nan() || x == 0.0 {
+                x
+            } else {
+                x.signum()
+            })
         }
         ("Math" | "StrictMath", "copySign", "(DD)D") => Value::Double(d(0).copysign(d(1))),
         ("Math" | "StrictMath", "copySign", "(FF)F") => Value::Float(f(0).copysign(f(1))),
@@ -505,7 +636,10 @@ mod tests {
 
     #[test]
     fn radix() {
-        assert_eq!(parse_radix("-ff", 16, i32::MIN as i128, i32::MAX as i128).ok(), Some(-255));
+        assert_eq!(
+            parse_radix("-ff", 16, i32::MIN as i128, i32::MAX as i128).ok(),
+            Some(-255)
+        );
         assert!(parse_radix("2147483648", 10, i32::MIN as i128, i32::MAX as i128).is_err());
         assert!(parse_radix("", 10, 0, 10).is_err());
         assert_eq!(to_radix(-255, 16), "-ff");

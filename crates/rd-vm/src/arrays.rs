@@ -43,9 +43,18 @@ fn default_of(k: ElemKind) -> Value {
     }
 }
 
-pub(crate) fn new_array(vm: &mut Engine, desc: &str, k: ElemKind, items: Vec<Value>) -> Result<Value, VmExit> {
+pub(crate) fn new_array(
+    vm: &mut Engine,
+    desc: &str,
+    k: ElemKind,
+    items: Vec<Value>,
+) -> Result<Value, VmExit> {
     // alloc_array wants the element class for Obj arrays, the full desc otherwise
-    let elem_class = if k == ElemKind::Obj { desc.strip_prefix('[').unwrap_or(desc).to_string() } else { desc.to_string() };
+    let elem_class = if k == ElemKind::Obj {
+        desc.strip_prefix('[').unwrap_or(desc).to_string()
+    } else {
+        desc.to_string()
+    };
     let r = vm.heap.alloc_array(k, items.len(), &elem_class)?;
     let slot = vm
         .heap
@@ -68,9 +77,14 @@ pub(crate) fn obj_equals(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, 
     if crate::intrinsics::values_equal(&vm.heap, a, b)? {
         return Ok(true);
     }
-    let (Value::Obj(x), Value::Obj(_)) = (a, b) else { return Ok(false) };
+    let (Value::Obj(x), Value::Obj(_)) = (a, b) else {
+        return Ok(false);
+    };
     let class = vm.heap.class_of(*x)?.to_string();
-    if let Some((d, def, m)) = vm.cp.resolve_method(&class, "equals", "(Ljava/lang/Object;)Z") {
+    if let Some((d, def, m)) = vm
+        .cp
+        .resolve_method(&class, "equals", "(Ljava/lang/Object;)Z")
+    {
         let r = vm.call(d, def, &m, vec![a.clone(), b.clone()])?;
         return Ok(matches!(r, Value::Int(v) if v != 0));
     }
@@ -81,7 +95,9 @@ pub(crate) fn obj_equals(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, 
 pub(crate) fn obj_hash(vm: &mut Engine, v: &Value) -> Result<i32, VmExit> {
     let Value::Obj(r) = v else { return Ok(0) };
     if let Ok(s) = vm.heap.as_str(*r) {
-        return Ok(s.encode_utf16().fold(0i32, |h, c| h.wrapping_mul(31).wrapping_add(c as i32)));
+        return Ok(s
+            .encode_utf16()
+            .fold(0i32, |h, c| h.wrapping_mul(31).wrapping_add(c as i32)));
     }
     let class = vm.heap.class_of(*r)?.to_string();
     if let Some(k) = crate::boxes::kind(&class) {
@@ -98,11 +114,27 @@ fn prim_hash(k: char, v: &Value) -> i32 {
     match (k, v) {
         ('J', Value::Long(l)) => (*l ^ ((*l as u64) >> 32) as i64) as i32,
         ('D', Value::Double(d)) => {
-            let b = if d.is_nan() { 0x7ff8_0000_0000_0000 } else { d.to_bits() as i64 };
+            let b = if d.is_nan() {
+                0x7ff8_0000_0000_0000
+            } else {
+                d.to_bits() as i64
+            };
             (b ^ ((b as u64) >> 32) as i64) as i32
         }
-        ('F', Value::Float(f)) => if f.is_nan() { 0x7fc0_0000 } else { f.to_bits() as i32 },
-        ('Z', Value::Int(x)) => if *x != 0 { 1231 } else { 1237 },
+        ('F', Value::Float(f)) => {
+            if f.is_nan() {
+                0x7fc0_0000
+            } else {
+                f.to_bits() as i32
+            }
+        }
+        ('Z', Value::Int(x)) => {
+            if *x != 0 {
+                1231
+            } else {
+                1237
+            }
+        }
         (_, Value::Int(x)) => *x,
         _ => 0,
     }
@@ -121,8 +153,12 @@ fn elem_hash(k: ElemKind, desc: &str, v: &Value) -> i32 {
 
 fn prim_eq(a: &Value, b: &Value) -> bool {
     match (a, b) {
-        (Value::Float(x), Value::Float(y)) => (x.is_nan() && y.is_nan()) || x.to_bits() == y.to_bits(),
-        (Value::Double(x), Value::Double(y)) => (x.is_nan() && y.is_nan()) || x.to_bits() == y.to_bits(),
+        (Value::Float(x), Value::Float(y)) => {
+            (x.is_nan() && y.is_nan()) || x.to_bits() == y.to_bits()
+        }
+        (Value::Double(x), Value::Double(y)) => {
+            (x.is_nan() && y.is_nan()) || x.to_bits() == y.to_bits()
+        }
         (Value::Int(x), Value::Int(y)) => x == y,
         (Value::Long(x), Value::Long(y)) => x == y,
         _ => false,
@@ -134,7 +170,9 @@ fn elem_to_string(vm: &mut Engine, desc: &str, v: &Value, deep: bool) -> Result<
         Value::Null => "null".into(),
         Value::Int(x) => match desc {
             "[Z" => (*x != 0).to_string(),
-            "[C" => char::from_u32(*x as u32).map(String::from).unwrap_or_default(),
+            "[C" => char::from_u32(*x as u32)
+                .map(String::from)
+                .unwrap_or_default(),
             _ => x.to_string(),
         },
         Value::Long(x) => x.to_string(),
@@ -161,13 +199,27 @@ fn array_to_string(vm: &mut Engine, r: ObjRef, deep: bool) -> Result<String, VmE
 }
 
 /// Compare two elements: Comparator if given, else natural ordering.
-pub(crate) fn compare(vm: &mut Engine, cmp: Option<&Value>, a: &Value, b: &Value) -> Result<i32, VmExit> {
+pub(crate) fn compare(
+    vm: &mut Engine,
+    cmp: Option<&Value>,
+    a: &Value,
+    b: &Value,
+) -> Result<i32, VmExit> {
     if let Some(Value::Obj(c)) = cmp {
         let class = vm.heap.class_of(*c)?.to_string();
-        let Some((d, def, m)) = vm.cp.resolve_method(&class, "compare", "(Ljava/lang/Object;Ljava/lang/Object;)I") else {
-            return Err(exc("Ljava/lang/AbstractMethodError;", format!("{class}.compare")));
+        let Some((d, def, m)) =
+            vm.cp
+                .resolve_method(&class, "compare", "(Ljava/lang/Object;Ljava/lang/Object;)I")
+        else {
+            return Err(exc(
+                "Ljava/lang/AbstractMethodError;",
+                format!("{class}.compare"),
+            ));
         };
-        return Ok(vm.call(d, def, &m, vec![Value::Obj(*c), a.clone(), b.clone()])?.as_int().unwrap_or(0));
+        return Ok(vm
+            .call(d, def, &m, vec![Value::Obj(*c), a.clone(), b.clone()])?
+            .as_int()
+            .unwrap_or(0));
     }
     match (a, b) {
         (Value::Int(x), Value::Int(y)) => Ok(x.cmp(y) as i32),
@@ -176,20 +228,36 @@ pub(crate) fn compare(vm: &mut Engine, cmp: Option<&Value>, a: &Value, b: &Value
         (Value::Double(x), Value::Double(y)) => Ok(x.total_cmp(y) as i32),
         (Value::Obj(x), Value::Obj(y)) => {
             if let (Ok(s), Ok(t)) = (vm.heap.as_str(*x), vm.heap.as_str(*y)) {
-                let (u, w): (Vec<u16>, Vec<u16>) = (s.encode_utf16().collect(), t.encode_utf16().collect());
+                let (u, w): (Vec<u16>, Vec<u16>) =
+                    (s.encode_utf16().collect(), t.encode_utf16().collect());
                 return Ok(u.cmp(&w) as i32);
             }
             let class = vm.heap.class_of(*x)?.to_string();
             if crate::boxes::kind(&class).is_some() {
-                let (p, q) = (vm.heap.get_field(*x, "value")?, vm.heap.get_field(*y, "value")?);
+                let (p, q) = (
+                    vm.heap.get_field(*x, "value")?,
+                    vm.heap.get_field(*y, "value")?,
+                );
                 return compare(vm, None, &p, &q);
             }
-            match vm.cp.resolve_method(&class, "compareTo", "(Ljava/lang/Object;)I") {
-                Some((d, def, m)) => Ok(vm.call(d, def, &m, vec![a.clone(), b.clone()])?.as_int().unwrap_or(0)),
-                None => Err(exc("Ljava/lang/ClassCastException;", format!("{class} cannot be cast to java.lang.Comparable"))),
+            match vm
+                .cp
+                .resolve_method(&class, "compareTo", "(Ljava/lang/Object;)I")
+            {
+                Some((d, def, m)) => Ok(vm
+                    .call(d, def, &m, vec![a.clone(), b.clone()])?
+                    .as_int()
+                    .unwrap_or(0)),
+                None => Err(exc(
+                    "Ljava/lang/ClassCastException;",
+                    format!("{class} cannot be cast to java.lang.Comparable"),
+                )),
             }
         }
-        (Value::Null, _) | (_, Value::Null) => Err(exc("Ljava/lang/NullPointerException;", "null element in sort")),
+        (Value::Null, _) | (_, Value::Null) => Err(exc(
+            "Ljava/lang/NullPointerException;",
+            "null element in sort",
+        )),
         _ => Ok(0),
     }
 }
@@ -221,13 +289,22 @@ fn merge_sort(vm: &mut Engine, v: Vec<Value>, cmp: Option<&Value>) -> Result<Vec
 
 fn check_range(len: usize, from: i32, to: i32) -> Result<(usize, usize), VmExit> {
     if from > to {
-        return Err(exc("Ljava/lang/IllegalArgumentException;", format!("fromIndex({from}) > toIndex({to})")));
+        return Err(exc(
+            "Ljava/lang/IllegalArgumentException;",
+            format!("fromIndex({from}) > toIndex({to})"),
+        ));
     }
     if from < 0 {
-        return Err(exc("Ljava/lang/ArrayIndexOutOfBoundsException;", format!("Array index out of range: {from}")));
+        return Err(exc(
+            "Ljava/lang/ArrayIndexOutOfBoundsException;",
+            format!("Array index out of range: {from}"),
+        ));
     }
     if to as usize > len {
-        return Err(exc("Ljava/lang/ArrayIndexOutOfBoundsException;", format!("Array index out of range: {to}")));
+        return Err(exc(
+            "Ljava/lang/ArrayIndexOutOfBoundsException;",
+            format!("Array index out of range: {to}"),
+        ));
     }
     Ok((from as usize, to as usize))
 }
@@ -269,10 +346,16 @@ pub(crate) fn static_intrinsic(
             let (items, k, desc) = elems(vm, a)?;
             let (from, to) = (int(1), int(2));
             if from > to {
-                return Err(exc("Ljava/lang/IllegalArgumentException;", format!("{from} > {to}")));
+                return Err(exc(
+                    "Ljava/lang/IllegalArgumentException;",
+                    format!("{from} > {to}"),
+                ));
             }
             if from < 0 || from as usize > items.len() {
-                return Err(exc("Ljava/lang/ArrayIndexOutOfBoundsException;", format!("{from}")));
+                return Err(exc(
+                    "Ljava/lang/ArrayIndexOutOfBoundsException;",
+                    format!("{from}"),
+                ));
             }
             let desc = class_desc(vm, args.get(3)).unwrap_or(desc);
             let mut out: Vec<Value> = items[from as usize..(to as usize).min(items.len())].to_vec();
@@ -329,7 +412,11 @@ pub(crate) fn static_intrinsic(
                 let (items, k, desc) = elems(vm, *a)?;
                 let mut h: i32 = 1;
                 for v in &items {
-                    let eh = if k == ElemKind::Obj { obj_hash(vm, v)? } else { elem_hash(k, &desc, v) };
+                    let eh = if k == ElemKind::Obj {
+                        obj_hash(vm, v)?
+                    } else {
+                        elem_hash(k, &desc, v)
+                    };
                     h = h.wrapping_mul(31).wrapping_add(eh);
                 }
                 Value::Int(h)
@@ -347,7 +434,9 @@ pub(crate) fn static_intrinsic(
             let a = arr_arg(args, 0)?;
             let len = vm.heap.as_array_elems(a)?.0.len();
             let (from, to, cmp) = match sig {
-                s if s.starts_with("([Ljava/lang/Object;II") || (args.len() >= 3 && matches!(args.get(1), Some(Value::Int(_)))) => {
+                s if s.starts_with("([Ljava/lang/Object;II")
+                    || (args.len() >= 3 && matches!(args.get(1), Some(Value::Int(_)))) =>
+                {
                     let (f, t) = check_range(len, int(1), int(2))?;
                     (f, t, args.get(3).cloned())
                 }

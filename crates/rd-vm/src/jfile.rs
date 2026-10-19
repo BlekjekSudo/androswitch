@@ -66,7 +66,11 @@ fn absolute(p: &str) -> String {
 fn parent_of(p: &str) -> Option<String> {
     let i = p.rfind('/')?;
     if i == 0 {
-        if p.len() > 1 { Some("/".into()) } else { None }
+        if p.len() > 1 {
+            Some("/".into())
+        } else {
+            None
+        }
     } else {
         Some(p[..i].to_string())
     }
@@ -98,7 +102,10 @@ pub(crate) fn new_file(vm: &mut Engine, path: &str) -> Result<Value, VmExit> {
     let s = crate::intrinsics::alloc_string(vm, normalize(path))?;
     let r = vm
         .heap
-        .alloc_instance(FILE.to_string(), vec![("rd_path".to_string(), Value::Obj(s))])
+        .alloc_instance(
+            FILE.to_string(),
+            vec![("rd_path".to_string(), Value::Obj(s))],
+        )
         .map_err(crate::err::oom_throwable)?;
     Ok(Value::Obj(r))
 }
@@ -123,14 +130,27 @@ fn s(vm: &mut Engine, x: String) -> Result<Value, VmExit> {
 
 /// App-private directory `/data/user/0/<pkg>/<sub>`, created on demand.
 fn app_dir(vm: &mut Engine, sub: &str) -> Result<Value, VmExit> {
-    let pkg = if vm.fw.package_name.is_empty() { "app".to_string() } else { vm.fw.package_name.clone() };
-    let p = if sub.is_empty() { format!("/data/user/0/{pkg}") } else { format!("/data/user/0/{pkg}/{sub}") };
+    let pkg = if vm.fw.package_name.is_empty() {
+        "app".to_string()
+    } else {
+        vm.fw.package_name.clone()
+    };
+    let p = if sub.is_empty() {
+        format!("/data/user/0/{pkg}")
+    } else {
+        format!("/data/user/0/{pkg}/{sub}")
+    };
     mkdirs(&p);
     new_file(vm, &p)
 }
 
 /// Context directory getters. `None` when `name` is not one of them.
-pub fn context_dirs(vm: &mut Engine, name: &str, sig: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub fn context_dirs(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     Ok(Some(match (name, sig) {
         ("getFilesDir", "()Ljava/io/File;") => app_dir(vm, "files")?,
         ("getCacheDir", "()Ljava/io/File;") => app_dir(vm, "cache")?,
@@ -153,7 +173,9 @@ pub fn context_dirs(vm: &mut Engine, name: &str, sig: &str, args: &[Value]) -> R
         }
         ("getExternalFilesDir", _) | ("getExternalCacheDir", _) => {
             let pkg = vm.fw.package_name.clone();
-            let sub = if name == "getExternalCacheDir" { "cache".to_string() } else {
+            let sub = if name == "getExternalCacheDir" {
+                "cache".to_string()
+            } else {
                 match str_arg(vm, args.first()) {
                     Some(t) => format!("files/{t}"),
                     None => "files".into(),
@@ -165,8 +187,20 @@ pub fn context_dirs(vm: &mut Engine, name: &str, sig: &str, args: &[Value]) -> R
         }
         ("databaseList", _) | ("fileList", _) => {
             let pkg = vm.fw.package_name.clone();
-            let dir = if name == "databaseList" { format!("/data/user/0/{pkg}/databases/") } else { format!("/data/user/0/{pkg}/files/") };
-            let names: Vec<String> = VFS.with(|v| v.borrow().files.keys().filter_map(|k| k.strip_prefix(&dir)).filter(|k| !k.contains('/')).map(str::to_string).collect());
+            let dir = if name == "databaseList" {
+                format!("/data/user/0/{pkg}/databases/")
+            } else {
+                format!("/data/user/0/{pkg}/files/")
+            };
+            let names: Vec<String> = VFS.with(|v| {
+                v.borrow()
+                    .files
+                    .keys()
+                    .filter_map(|k| k.strip_prefix(&dir))
+                    .filter(|k| !k.contains('/'))
+                    .map(str::to_string)
+                    .collect()
+            });
             let mut vals = Vec::new();
             for n in names {
                 vals.push(s(vm, n)?);
@@ -183,7 +217,12 @@ pub fn context_dirs(vm: &mut Engine, name: &str, sig: &str, args: &[Value]) -> R
     }))
 }
 
-pub fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub fn static_intrinsic(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if class != FILE {
         return Ok(None);
     }
@@ -205,7 +244,14 @@ pub fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, args: &[Value]
     }))
 }
 
-pub fn instance_intrinsic(vm: &mut Engine, recv_class: &str, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub fn instance_intrinsic(
+    vm: &mut Engine,
+    recv_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if STREAMS.contains(&recv_class) {
         return stream_intrinsic(vm, recv_class, name, sig, recv, args);
     }
@@ -217,7 +263,9 @@ pub fn instance_intrinsic(vm: &mut Engine, recv_class: &str, name: &str, sig: &s
             "(Ljava/lang/String;)V" => str_arg(vm, args.first()).unwrap_or_default(),
             "(Ljava/io/File;Ljava/lang/String;)V" | "(Ljava/lang/String;Ljava/lang/String;)V" => {
                 let parent = match args.first() {
-                    Some(Value::Obj(p)) if sig.starts_with("(Ljava/io/File;") => Some(path_of(vm, *p)),
+                    Some(Value::Obj(p)) if sig.starts_with("(Ljava/io/File;") => {
+                        Some(path_of(vm, *p))
+                    }
                     other => str_arg(vm, other),
                 };
                 let child = str_arg(vm, args.get(1)).unwrap_or_default();
@@ -257,8 +305,18 @@ pub fn instance_intrinsic(vm: &mut Engine, recv_class: &str, name: &str, sig: &s
         "isAbsolute" => b(p.starts_with('/')),
         "isHidden" => b(p.rsplit('/').next().is_some_and(|n| n.starts_with('.'))),
         "canRead" | "canWrite" | "canExecute" => b(is_dir(&p) || is_file(&p)),
-        "length" => Value::Long(VFS.with(|v| v.borrow().files.get(&abs).map(|f| f.len() as i64).unwrap_or(0))),
-        "lastModified" => Value::Long(if is_dir(&p) || is_file(&p) { crate::jlsystem::epoch_ms() } else { 0 }),
+        "length" => Value::Long(VFS.with(|v| {
+            v.borrow()
+                .files
+                .get(&abs)
+                .map(|f| f.len() as i64)
+                .unwrap_or(0)
+        })),
+        "lastModified" => Value::Long(if is_dir(&p) || is_file(&p) {
+            crate::jlsystem::epoch_ms()
+        } else {
+            0
+        }),
         "mkdir" => {
             let ok = !is_dir(&p) && !is_file(&p) && parent_of(&abs).is_some_and(|x| is_dir(&x));
             if ok {
@@ -278,7 +336,11 @@ pub fn instance_intrinsic(vm: &mut Engine, recv_class: &str, name: &str, sig: &s
             if ok {
                 if let Some(par) = parent_of(&abs) {
                     if !is_dir(&par) {
-                        return Err(crate::err::Throwable::new("Ljava/io/IOException;", "No such file or directory".to_string()).into());
+                        return Err(crate::err::Throwable::new(
+                            "Ljava/io/IOException;",
+                            "No such file or directory".to_string(),
+                        )
+                        .into());
                     }
                 }
                 VFS.with(|v| v.borrow_mut().files.insert(abs.clone(), Vec::new()));
@@ -292,13 +354,19 @@ pub fn instance_intrinsic(vm: &mut Engine, recv_class: &str, name: &str, sig: &s
                     return true;
                 }
                 let prefix = format!("{abs}/");
-                let empty = !v.dirs.iter().any(|d| d.starts_with(&prefix)) && !v.files.keys().any(|f| f.starts_with(&prefix));
+                let empty = !v.dirs.iter().any(|d| d.starts_with(&prefix))
+                    && !v.files.keys().any(|f| f.starts_with(&prefix));
                 empty && v.dirs.remove(&abs)
             });
             b(ok)
         }
-        "deleteOnExit" | "setLastModified" | "setReadable" | "setWritable" | "setExecutable" | "setReadOnly" => {
-            if sig.ends_with('V') { Value::Null } else { b(true) }
+        "deleteOnExit" | "setLastModified" | "setReadable" | "setWritable" | "setExecutable"
+        | "setReadOnly" => {
+            if sig.ends_with('V') {
+                Value::Null
+            } else {
+                b(true)
+            }
         }
         "renameTo" => {
             let dst = match args.first() {
@@ -323,27 +391,49 @@ pub fn instance_intrinsic(vm: &mut Engine, recv_class: &str, name: &str, sig: &s
             if !is_dir(&p) {
                 return Ok(Some(Value::Null));
             }
-            let prefix = if abs == "/" { "/".to_string() } else { format!("{abs}/") };
+            let prefix = if abs == "/" {
+                "/".to_string()
+            } else {
+                format!("{abs}/")
+            };
             let names: Vec<String> = VFS.with(|v| {
                 let v = v.borrow();
-                v.dirs.iter().chain(v.files.keys()).filter_map(|k| k.strip_prefix(&prefix)).filter(|k| !k.is_empty() && !k.contains('/')).map(str::to_string).collect()
+                v.dirs
+                    .iter()
+                    .chain(v.files.keys())
+                    .filter_map(|k| k.strip_prefix(&prefix))
+                    .filter(|k| !k.is_empty() && !k.contains('/'))
+                    .map(str::to_string)
+                    .collect()
             });
             let mut vals = Vec::new();
             for n in names {
-                vals.push(if name == "list" { s(vm, n)? } else { new_file(vm, &format!("{prefix}{n}"))? });
+                vals.push(if name == "list" {
+                    s(vm, n)?
+                } else {
+                    new_file(vm, &format!("{prefix}{n}"))?
+                });
             }
-            let desc = if name == "list" { "[Ljava/lang/String;" } else { "[Ljava/io/File;" };
+            let desc = if name == "list" {
+                "[Ljava/lang/String;"
+            } else {
+                "[Ljava/io/File;"
+            };
             crate::arrays::new_array(vm, desc, ElemKind::Obj, vals)?
         }
         "equals" => {
             let o = match args.first() {
-                Some(Value::Obj(o)) if vm.heap.class_of(*o).map(|c| c == FILE).unwrap_or(false) => path_of(vm, *o),
+                Some(Value::Obj(o)) if vm.heap.class_of(*o).map(|c| c == FILE).unwrap_or(false) => {
+                    path_of(vm, *o)
+                }
                 _ => return Ok(Some(b(false))),
             };
             b(o == p)
         }
         "hashCode" => {
-            let h = p.encode_utf16().fold(0i32, |h, c| h.wrapping_mul(31).wrapping_add(c as i32));
+            let h = p
+                .encode_utf16()
+                .fold(0i32, |h, c| h.wrapping_mul(31).wrapping_add(c as i32));
             Value::Int(h ^ 1234321)
         }
         "compareTo" => {
@@ -370,7 +460,10 @@ fn with_path(vm: &mut Engine, class: &str, path: &str) -> Result<Value, VmExit> 
     let sv = crate::intrinsics::alloc_string(vm, path.to_string())?;
     let r = vm
         .heap
-        .alloc_instance(class.to_string(), vec![("rd_path".to_string(), Value::Obj(sv))])
+        .alloc_instance(
+            class.to_string(),
+            vec![("rd_path".to_string(), Value::Obj(sv))],
+        )
         .map_err(crate::err::oom_throwable)?;
     Ok(Value::Obj(r))
 }
@@ -380,7 +473,14 @@ fn bytes_of(vm: &Engine, v: Option<&Value>) -> Vec<u8> {
         Some(Value::Obj(a)) => vm
             .heap
             .as_array_elems(*a)
-            .map(|(e, _)| e.iter().map(|x| match x { Value::Int(i) => *i as u8, _ => 0 }).collect())
+            .map(|(e, _)| {
+                e.iter()
+                    .map(|x| match x {
+                        Value::Int(i) => *i as u8,
+                        _ => 0,
+                    })
+                    .collect()
+            })
             .unwrap_or_default(),
         _ => Vec::new(),
     }
@@ -394,17 +494,38 @@ fn int_arg(args: &[Value], i: usize) -> i64 {
     }
 }
 
-fn stream_intrinsic(vm: &mut Engine, class: &str, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+fn stream_intrinsic(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let fnf = |p: &str| -> VmExit {
-        crate::err::Throwable::new("Ljava/io/FileNotFoundException;", format!("{p}: open failed: ENOENT (No such file or directory)")).into()
+        crate::err::Throwable::new(
+            "Ljava/io/FileNotFoundException;",
+            format!("{p}: open failed: ENOENT (No such file or directory)"),
+        )
+        .into()
     };
     if name == "<init>" {
         let path = match args.first() {
             Some(Value::Obj(o)) => {
                 let c = vm.heap.class_of(*o).map(str::to_string).unwrap_or_default();
-                if c == FILE || c == FD { path_of(vm, *o) } else { vm.heap.as_str(*o).map(str::to_string).unwrap_or_default() }
+                if c == FILE || c == FD {
+                    path_of(vm, *o)
+                } else {
+                    vm.heap.as_str(*o).map(str::to_string).unwrap_or_default()
+                }
             }
-            _ => return Err(crate::err::Throwable::new("Ljava/lang/NullPointerException;", "file".to_string()).into()),
+            _ => {
+                return Err(crate::err::Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "file".to_string(),
+                )
+                .into())
+            }
         };
         let abs = absolute(&path);
         if class == FOS {
@@ -431,7 +552,9 @@ fn stream_intrinsic(vm: &mut Engine, class: &str, name: &str, sig: &str, recv: O
         Ok(Value::Long(x)) => x as usize,
         _ => 0,
     };
-    let set_pos = |vm: &mut Engine, x: usize| crate::err::put_field_result(vm.heap.put_field(recv, "rd_pos", Value::Long(x as i64)));
+    let set_pos = |vm: &mut Engine, x: usize| {
+        crate::err::put_field_result(vm.heap.put_field(recv, "rd_pos", Value::Long(x as i64)))
+    };
     let len = VFS.with(|v| v.borrow().files.get(&p).map(Vec::len).unwrap_or(0));
     Ok(Some(match (class, name) {
         (FOS, "write") => {
@@ -441,13 +564,23 @@ fn stream_intrinsic(vm: &mut Engine, class: &str, name: &str, sig: &str, recv: O
                 _ => {
                     let all = bytes_of(vm, args.first());
                     let (off, n) = (int_arg(args, 1) as usize, int_arg(args, 2) as usize);
-                    all.get(off..off.saturating_add(n)).map(<[u8]>::to_vec).unwrap_or_default()
+                    all.get(off..off.saturating_add(n))
+                        .map(<[u8]>::to_vec)
+                        .unwrap_or_default()
                 }
             };
-            VFS.with(|v| v.borrow_mut().files.entry(p.clone()).or_default().extend_from_slice(&data));
+            VFS.with(|v| {
+                v.borrow_mut()
+                    .files
+                    .entry(p.clone())
+                    .or_default()
+                    .extend_from_slice(&data)
+            });
             Value::Null
         }
-        (FOS | FIS, "flush" | "close") | (CHANNEL, "close" | "force") | (FLOCK, "release" | "close") => Value::Null,
+        (FOS | FIS, "flush" | "close")
+        | (CHANNEL, "close" | "force")
+        | (FLOCK, "release" | "close") => Value::Null,
         (FOS | FIS, "getChannel") => with_path(vm, CHANNEL, &p)?,
         (FOS | FIS, "getFD") => with_path(vm, FD, &p)?,
         (FD, "valid") => Value::Int(1),
@@ -469,17 +602,36 @@ fn stream_intrinsic(vm: &mut Engine, class: &str, name: &str, sig: &str, recv: O
                     None => Value::Int(-1),
                 }
             } else {
-                let Some(Value::Obj(arr)) = args.first().cloned() else { return Ok(None) };
-                let cap = vm.heap.as_array_elems(arr).map(|(e, _)| e.len()).unwrap_or(0);
-                let (off, want) = if sig == "([B)I" { (0, cap) } else { (int_arg(args, 1) as usize, int_arg(args, 2) as usize) };
+                let Some(Value::Obj(arr)) = args.first().cloned() else {
+                    return Ok(None);
+                };
+                let cap = vm
+                    .heap
+                    .as_array_elems(arr)
+                    .map(|(e, _)| e.len())
+                    .unwrap_or(0);
+                let (off, want) = if sig == "([B)I" {
+                    (0, cap)
+                } else {
+                    (int_arg(args, 1) as usize, int_arg(args, 2) as usize)
+                };
                 if want == 0 {
                     return Ok(Some(Value::Int(0)));
                 }
-                let chunk: Vec<u8> = VFS.with(|v| v.borrow().files.get(&p).map(|f| f[pos.min(f.len())..(pos + want).min(f.len())].to_vec()).unwrap_or_default());
+                let chunk: Vec<u8> = VFS.with(|v| {
+                    v.borrow()
+                        .files
+                        .get(&p)
+                        .map(|f| f[pos.min(f.len())..(pos + want).min(f.len())].to_vec())
+                        .unwrap_or_default()
+                });
                 if chunk.is_empty() {
                     return Ok(Some(Value::Int(-1)));
                 }
-                let elems = vm.heap.array_elems_mut(arr).map_err(|e| VmExit::from(crate::err::vm_error("INVALID_STATE", e)))?;
+                let elems = vm
+                    .heap
+                    .array_elems_mut(arr)
+                    .map_err(|e| VmExit::from(crate::err::vm_error("INVALID_STATE", e)))?;
                 for (i, b) in chunk.iter().enumerate() {
                     if let Some(slot) = elems.get_mut(off + i) {
                         *slot = Value::Int(*b as i8 as i32);

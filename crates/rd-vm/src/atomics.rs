@@ -56,8 +56,12 @@ pub(crate) fn instance_intrinsic(
                 put(vm, recv, Value::Int(0))?;
                 Value::Null
             }
-            ("<init>", "(Z)V") | ("set", "(Z)V") | ("lazySet", "(Z)V") | ("setPlain", "(Z)V")
-            | ("setRelease", "(Z)V") | ("setOpaque", "(Z)V") => {
+            ("<init>", "(Z)V")
+            | ("set", "(Z)V")
+            | ("lazySet", "(Z)V")
+            | ("setPlain", "(Z)V")
+            | ("setRelease", "(Z)V")
+            | ("setOpaque", "(Z)V") => {
                 put(vm, recv, b(a(0)))?;
                 Value::Null
             }
@@ -66,8 +70,13 @@ pub(crate) fn instance_intrinsic(
                 put(vm, recv, b(a(0)))?;
                 b(cur)
             }
-            ("compareAndSet" | "weakCompareAndSet" | "weakCompareAndSetPlain"
-            | "weakCompareAndSetVolatile", "(ZZ)Z") => {
+            (
+                "compareAndSet"
+                | "weakCompareAndSet"
+                | "weakCompareAndSetPlain"
+                | "weakCompareAndSetVolatile",
+                "(ZZ)Z",
+            ) => {
                 let ok = cur == a(0);
                 if ok {
                     put(vm, recv, b(a(1)))?;
@@ -75,7 +84,10 @@ pub(crate) fn instance_intrinsic(
                 b(ok)
             }
             ("toString", "()Ljava/lang/String;") => {
-                let s = crate::intrinsics::alloc_string(vm, if cur { "true" } else { "false" }.to_string())?;
+                let s = crate::intrinsics::alloc_string(
+                    vm,
+                    if cur { "true" } else { "false" }.to_string(),
+                )?;
                 Value::Obj(s)
             }
             _ => return Ok(None),

@@ -104,7 +104,10 @@ fn push(vm: &mut Engine, handler: ObjRef, entry: QueuedMsg) -> Result<(), VmExit
 }
 
 fn when_after(vm: &Engine, delay: i64) -> u64 {
-    vm.fw.clock_ms.checked_add(delay.max(0) as u64).unwrap_or(u64::MAX / 2)
+    vm.fw
+        .clock_ms
+        .checked_add(delay.max(0) as u64)
+        .unwrap_or(u64::MAX / 2)
 }
 
 fn enqueue_message(vm: &mut Engine, handler: ObjRef, m: ObjRef, when: u64) -> Result<(), VmExit> {
@@ -112,15 +115,33 @@ fn enqueue_message(vm: &mut Engine, handler: ObjRef, m: ObjRef, when: u64) -> Re
     push(
         vm,
         handler,
-        QueuedMsg { when_ms: when, runnable: m, handler: Some(handler), is_message: true, token: None },
+        QueuedMsg {
+            when_ms: when,
+            runnable: m,
+            handler: Some(handler),
+            is_message: true,
+            token: None,
+        },
     )
 }
 
-fn enqueue_runnable(vm: &mut Engine, handler: ObjRef, r: ObjRef, token: Option<ObjRef>, when: u64) -> Result<(), VmExit> {
+fn enqueue_runnable(
+    vm: &mut Engine,
+    handler: ObjRef,
+    r: ObjRef,
+    token: Option<ObjRef>,
+    when: u64,
+) -> Result<(), VmExit> {
     push(
         vm,
         handler,
-        QueuedMsg { when_ms: when, runnable: r, handler: Some(handler), is_message: false, token },
+        QueuedMsg {
+            when_ms: when,
+            runnable: r,
+            handler: Some(handler),
+            is_message: false,
+            token,
+        },
     )
 }
 
@@ -146,7 +167,11 @@ fn msg_what(vm: &Engine, m: ObjRef) -> i32 {
 }
 
 /// AOSP `Handler.dispatchMessage`.
-pub(crate) fn dispatch_message(vm: &mut Engine, handler: Option<ObjRef>, m: ObjRef) -> Result<(), VmExit> {
+pub(crate) fn dispatch_message(
+    vm: &mut Engine,
+    handler: Option<ObjRef>,
+    m: ObjRef,
+) -> Result<(), VmExit> {
     if let Value::Obj(cb) = field(vm, m, "callback") {
         let class = vm.heap.class_of(cb)?.to_string();
         if let Some((d, def, me)) = vm.cp.resolve_method(&class, "run", "()V") {
@@ -159,7 +184,10 @@ pub(crate) fn dispatch_message(vm: &mut Engine, handler: Option<ObjRef>, m: ObjR
     };
     if let Value::Obj(cb) = field(vm, h, "rd_handler_callback") {
         let class = vm.heap.class_of(cb)?.to_string();
-        if let Some((d, def, me)) = vm.cp.resolve_method(&class, "handleMessage", "(Landroid/os/Message;)Z") {
+        if let Some((d, def, me)) =
+            vm.cp
+                .resolve_method(&class, "handleMessage", "(Landroid/os/Message;)Z")
+        {
             let handled = vm.call(d, def, &me, vec![Value::Obj(cb), Value::Obj(m)])?;
             if matches!(handled, Value::Int(x) if x != 0) {
                 return Ok(());
@@ -167,7 +195,10 @@ pub(crate) fn dispatch_message(vm: &mut Engine, handler: Option<ObjRef>, m: ObjR
         }
     }
     let class = vm.heap.class_of(h)?.to_string();
-    if let Some((d, def, me)) = vm.cp.resolve_method(&class, "handleMessage", "(Landroid/os/Message;)V") {
+    if let Some((d, def, me)) =
+        vm.cp
+            .resolve_method(&class, "handleMessage", "(Landroid/os/Message;)V")
+    {
         vm.call(d, def, &me, vec![Value::Obj(h), Value::Obj(m)])?;
     }
     Ok(())
@@ -188,7 +219,12 @@ pub(crate) fn static_intrinsic(
         let h = vm.heap.alloc_instance(HANDLER.to_string(), Vec::new())?;
         vm.fw.objects.insert(h, HostObj::Handler { looper });
         if sig == "(Landroid/os/Looper;Landroid/os/Handler$Callback;)Landroid/os/Handler;" {
-            put(vm, h, "rd_handler_callback", args.get(1).cloned().unwrap_or(Value::Null))?;
+            put(
+                vm,
+                h,
+                "rd_handler_callback",
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
         }
         return Ok(Some(Value::Obj(h)));
     }
@@ -198,23 +234,51 @@ pub(crate) fn static_intrinsic(
     let int = |i: usize| args.get(i).and_then(|v| v.as_int().ok()).unwrap_or(0);
     let m = match sig {
         "()Landroid/os/Message;" => new_message(vm, None, 0, 0, 0, Value::Null, None)?,
-        "(Landroid/os/Handler;)Landroid/os/Message;" => new_message(vm, obj(args.first()), 0, 0, 0, Value::Null, None)?,
-        "(Landroid/os/Handler;I)Landroid/os/Message;" => new_message(vm, obj(args.first()), int(1), 0, 0, Value::Null, None)?,
+        "(Landroid/os/Handler;)Landroid/os/Message;" => {
+            new_message(vm, obj(args.first()), 0, 0, 0, Value::Null, None)?
+        }
+        "(Landroid/os/Handler;I)Landroid/os/Message;" => {
+            new_message(vm, obj(args.first()), int(1), 0, 0, Value::Null, None)?
+        }
         "(Landroid/os/Handler;ILjava/lang/Object;)Landroid/os/Message;" => {
             new_message(vm, obj(args.first()), int(1), 0, 0, args[2].clone(), None)?
         }
-        "(Landroid/os/Handler;III)Landroid/os/Message;" => new_message(vm, obj(args.first()), int(1), int(2), int(3), Value::Null, None)?,
-        "(Landroid/os/Handler;IIILjava/lang/Object;)Landroid/os/Message;" => {
-            new_message(vm, obj(args.first()), int(1), int(2), int(3), args[4].clone(), None)?
-        }
-        "(Landroid/os/Handler;Ljava/lang/Runnable;)Landroid/os/Message;" => {
-            new_message(vm, obj(args.first()), 0, 0, 0, Value::Null, obj(args.get(1)))?
-        }
+        "(Landroid/os/Handler;III)Landroid/os/Message;" => new_message(
+            vm,
+            obj(args.first()),
+            int(1),
+            int(2),
+            int(3),
+            Value::Null,
+            None,
+        )?,
+        "(Landroid/os/Handler;IIILjava/lang/Object;)Landroid/os/Message;" => new_message(
+            vm,
+            obj(args.first()),
+            int(1),
+            int(2),
+            int(3),
+            args[4].clone(),
+            None,
+        )?,
+        "(Landroid/os/Handler;Ljava/lang/Runnable;)Landroid/os/Message;" => new_message(
+            vm,
+            obj(args.first()),
+            0,
+            0,
+            0,
+            Value::Null,
+            obj(args.get(1)),
+        )?,
         "(Landroid/os/Message;)Landroid/os/Message;" => {
-            let Some(src) = obj(args.first()) else { return Ok(None) };
+            let Some(src) = obj(args.first()) else {
+                return Ok(None);
+            };
             let m = vm.heap.alloc_instance(MESSAGE.to_string(), Vec::new())?;
             init_message_fields(vm, m)?;
-            for f in ["what", "arg1", "arg2", "obj", "target", "callback", "data", "replyTo"] {
+            for f in [
+                "what", "arg1", "arg2", "obj", "target", "callback", "data", "replyTo",
+            ] {
                 let v = field(vm, src, f);
                 put(vm, m, f, v)?;
             }
@@ -260,54 +324,77 @@ pub(crate) fn instance_intrinsic(
                 None => vm.main_looper_obj()?,
             };
             vm.fw.objects.insert(recv, HostObj::Handler { looper: l });
-            put(vm, recv, "rd_handler_callback", args.get(1).cloned().unwrap_or(Value::Null))?;
+            put(
+                vm,
+                recv,
+                "rd_handler_callback",
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
             Value::Null
         }
         ("getLooper", "()Landroid/os/Looper;") => Value::Obj(looper_of(vm, recv)?),
         ("postDelayed", "(Ljava/lang/Runnable;Ljava/lang/Object;J)Z") => {
-            let Some(r) = obj(args.first()) else { return Ok(None) };
+            let Some(r) = obj(args.first()) else {
+                return Ok(None);
+            };
             let w = when_after(vm, long(2));
             enqueue_runnable(vm, recv, r, obj(args.get(1)), w)?;
             t
         }
         ("postAtTime", "(Ljava/lang/Runnable;J)Z") => {
-            let Some(r) = obj(args.first()) else { return Ok(None) };
+            let Some(r) = obj(args.first()) else {
+                return Ok(None);
+            };
             enqueue_runnable(vm, recv, r, None, long(1).max(0) as u64)?;
             t
         }
         ("postAtTime", "(Ljava/lang/Runnable;Ljava/lang/Object;J)Z") => {
-            let Some(r) = obj(args.first()) else { return Ok(None) };
+            let Some(r) = obj(args.first()) else {
+                return Ok(None);
+            };
             enqueue_runnable(vm, recv, r, obj(args.get(1)), long(2).max(0) as u64)?;
             t
         }
         ("postAtFrontOfQueue", "(Ljava/lang/Runnable;)Z") => {
-            let Some(r) = obj(args.first()) else { return Ok(None) };
+            let Some(r) = obj(args.first()) else {
+                return Ok(None);
+            };
             enqueue_runnable(vm, recv, r, None, 0)?;
             t
         }
         ("sendMessage", "(Landroid/os/Message;)Z") => {
-            let Some(m) = obj(args.first()) else { return Ok(None) };
+            let Some(m) = obj(args.first()) else {
+                return Ok(None);
+            };
             let w = vm.fw.clock_ms;
             enqueue_message(vm, recv, m, w)?;
             t
         }
         ("sendMessageDelayed", "(Landroid/os/Message;J)Z") => {
-            let Some(m) = obj(args.first()) else { return Ok(None) };
+            let Some(m) = obj(args.first()) else {
+                return Ok(None);
+            };
             let w = when_after(vm, long(1));
             enqueue_message(vm, recv, m, w)?;
             t
         }
         ("sendMessageAtTime", "(Landroid/os/Message;J)Z") => {
-            let Some(m) = obj(args.first()) else { return Ok(None) };
+            let Some(m) = obj(args.first()) else {
+                return Ok(None);
+            };
             enqueue_message(vm, recv, m, long(1).max(0) as u64)?;
             t
         }
         ("sendMessageAtFrontOfQueue", "(Landroid/os/Message;)Z") => {
-            let Some(m) = obj(args.first()) else { return Ok(None) };
+            let Some(m) = obj(args.first()) else {
+                return Ok(None);
+            };
             enqueue_message(vm, recv, m, 0)?;
             t
         }
-        ("sendEmptyMessage", "(I)Z") | ("sendEmptyMessageDelayed", "(IJ)Z") | ("sendEmptyMessageAtTime", "(IJ)Z") => {
+        ("sendEmptyMessage", "(I)Z")
+        | ("sendEmptyMessageDelayed", "(IJ)Z")
+        | ("sendEmptyMessageAtTime", "(IJ)Z") => {
             let m = new_message(vm, Some(recv), int(0), 0, 0, Value::Null, None)?;
             let w = match name {
                 "sendEmptyMessage" => vm.fw.clock_ms,
@@ -317,29 +404,68 @@ pub(crate) fn instance_intrinsic(
             enqueue_message(vm, recv, m, w)?;
             t
         }
-        ("obtainMessage", "()Landroid/os/Message;") => Value::Obj(new_message(vm, Some(recv), 0, 0, 0, Value::Null, None)?),
-        ("obtainMessage", "(I)Landroid/os/Message;") => Value::Obj(new_message(vm, Some(recv), int(0), 0, 0, Value::Null, None)?),
-        ("obtainMessage", "(ILjava/lang/Object;)Landroid/os/Message;") => {
-            Value::Obj(new_message(vm, Some(recv), int(0), 0, 0, args[1].clone(), None)?)
+        ("obtainMessage", "()Landroid/os/Message;") => {
+            Value::Obj(new_message(vm, Some(recv), 0, 0, 0, Value::Null, None)?)
         }
-        ("obtainMessage", "(III)Landroid/os/Message;") => Value::Obj(new_message(vm, Some(recv), int(0), int(1), int(2), Value::Null, None)?),
+        ("obtainMessage", "(I)Landroid/os/Message;") => Value::Obj(new_message(
+            vm,
+            Some(recv),
+            int(0),
+            0,
+            0,
+            Value::Null,
+            None,
+        )?),
+        ("obtainMessage", "(ILjava/lang/Object;)Landroid/os/Message;") => Value::Obj(new_message(
+            vm,
+            Some(recv),
+            int(0),
+            0,
+            0,
+            args[1].clone(),
+            None,
+        )?),
+        ("obtainMessage", "(III)Landroid/os/Message;") => Value::Obj(new_message(
+            vm,
+            Some(recv),
+            int(0),
+            int(1),
+            int(2),
+            Value::Null,
+            None,
+        )?),
         ("obtainMessage", "(IIILjava/lang/Object;)Landroid/os/Message;") => {
-            Value::Obj(new_message(vm, Some(recv), int(0), int(1), int(2), args[3].clone(), None)?)
+            Value::Obj(new_message(
+                vm,
+                Some(recv),
+                int(0),
+                int(1),
+                int(2),
+                args[3].clone(),
+                None,
+            )?)
         }
         ("removeCallbacks", "(Ljava/lang/Runnable;)V") => {
             let r = obj(args.first());
-            remove_where(vm, recv, |vm, e| !e.is_message && Some(e.runnable) == r
-                || e.is_message && matches!(vm.heap.get_field(e.runnable, "callback"), Ok(Value::Obj(c)) if Some(c) == r))?;
+            remove_where(vm, recv, |vm, e| {
+                !e.is_message && Some(e.runnable) == r
+                    || e.is_message
+                        && matches!(vm.heap.get_field(e.runnable, "callback"), Ok(Value::Obj(c)) if Some(c) == r)
+            })?;
             Value::Null
         }
         ("removeCallbacks", "(Ljava/lang/Runnable;Ljava/lang/Object;)V") => {
             let (r, tok) = (obj(args.first()), obj(args.get(1)));
-            remove_where(vm, recv, |_, e| !e.is_message && Some(e.runnable) == r && (tok.is_none() || e.token == tok))?;
+            remove_where(vm, recv, |_, e| {
+                !e.is_message && Some(e.runnable) == r && (tok.is_none() || e.token == tok)
+            })?;
             Value::Null
         }
         ("removeMessages", "(I)V") => {
             let w = int(0);
-            remove_where(vm, recv, |vm, e| e.is_message && msg_what(vm, e.runnable) == w)?;
+            remove_where(vm, recv, |vm, e| {
+                e.is_message && msg_what(vm, e.runnable) == w
+            })?;
             Value::Null
         }
         ("removeMessages", "(ILjava/lang/Object;)V") => {
@@ -347,7 +473,8 @@ pub(crate) fn instance_intrinsic(
             remove_where(vm, recv, |vm, e| {
                 e.is_message
                     && msg_what(vm, e.runnable) == w
-                    && (o.is_none() || matches!(vm.heap.get_field(e.runnable, "obj"), Ok(Value::Obj(x)) if Some(x) == o))
+                    && (o.is_none()
+                        || matches!(vm.heap.get_field(e.runnable, "obj"), Ok(Value::Obj(x)) if Some(x) == o))
             })?;
             Value::Null
         }
@@ -356,7 +483,8 @@ pub(crate) fn instance_intrinsic(
             remove_where(vm, recv, |vm, e| {
                 tok.is_none()
                     || e.token == tok
-                    || (e.is_message && matches!(vm.heap.get_field(e.runnable, "obj"), Ok(Value::Obj(x)) if Some(x) == tok))
+                    || (e.is_message
+                        && matches!(vm.heap.get_field(e.runnable, "obj"), Ok(Value::Obj(x)) if Some(x) == tok))
             })?;
             Value::Null
         }
@@ -364,9 +492,9 @@ pub(crate) fn instance_intrinsic(
             let w = int(0);
             let l = looper_of(vm, recv)?;
             let has = match vm.fw.get(l) {
-                Some(HostObj::Looper { queue }) => queue
-                    .iter()
-                    .any(|e| e.handler == Some(recv) && e.is_message && msg_what(vm, e.runnable) == w),
+                Some(HostObj::Looper { queue }) => queue.iter().any(|e| {
+                    e.handler == Some(recv) && e.is_message && msg_what(vm, e.runnable) == w
+                }),
                 _ => false,
             };
             Value::Int(has as i32)
@@ -375,7 +503,9 @@ pub(crate) fn instance_intrinsic(
             let r = obj(args.first());
             let l = looper_of(vm, recv)?;
             let has = match vm.fw.get(l) {
-                Some(HostObj::Looper { queue }) => queue.iter().any(|e| e.handler == Some(recv) && !e.is_message && Some(e.runnable) == r),
+                Some(HostObj::Looper { queue }) => queue
+                    .iter()
+                    .any(|e| e.handler == Some(recv) && !e.is_message && Some(e.runnable) == r),
                 _ => false,
             };
             Value::Int(has as i32)
@@ -392,7 +522,13 @@ pub(crate) fn instance_intrinsic(
     }))
 }
 
-fn message(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+fn message(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     Ok(Some(match (name, sig) {
         ("<init>", "()V") => {
             init_message_fields(vm, recv)?;
@@ -419,7 +555,9 @@ fn message(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Value])
         ("getData", "()Landroid/os/Bundle;") => match field(vm, recv, "data") {
             Value::Obj(b) => Value::Obj(b),
             _ => {
-                let b = vm.heap.alloc_instance("Landroid/os/Bundle;".to_string(), Vec::new())?;
+                let b = vm
+                    .heap
+                    .alloc_instance("Landroid/os/Bundle;".to_string(), Vec::new())?;
                 vm.fw.objects.insert(b, HostObj::Bundle { map: Vec::new() });
                 put(vm, recv, "data", Value::Obj(b))?;
                 Value::Obj(b)

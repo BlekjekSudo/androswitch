@@ -108,10 +108,18 @@ fn default_for(prop: &str, ret: &str) -> Option<Value> {
         "J" => Value::Long(0),
         "Z" => Value::Int(match prop {
             // AOSP defaults that are true
-            "Enabled" | "SaveEnabled" | "SoundEffectsEnabled" | "HapticFeedbackEnabled"
-            | "ClipChildren" | "ClipToPadding" | "ShowingLayoutBounds" | "DrawingCacheEnabled"
-            | "MotionEventSplittingEnabled" | "Shown" => {
-                (prop != "DrawingCacheEnabled" && prop != "ShowingLayoutBounds" && prop != "Shown") as i32
+            "Enabled"
+            | "SaveEnabled"
+            | "SoundEffectsEnabled"
+            | "HapticFeedbackEnabled"
+            | "ClipChildren"
+            | "ClipToPadding"
+            | "ShowingLayoutBounds"
+            | "DrawingCacheEnabled"
+            | "MotionEventSplittingEnabled"
+            | "Shown" => {
+                (prop != "DrawingCacheEnabled" && prop != "ShowingLayoutBounds" && prop != "Shown")
+                    as i32
             }
             _ => 0,
         }),
@@ -161,19 +169,25 @@ pub(crate) fn fallback(
     // onDetachedFromWindow, onSizeChanged, onDraw, onLayout, onFinishInflate,
     // onVisibilityChanged, …). Z-returning ones (onTouchEvent, onKeyDown, …)
     // report "not consumed".
-    if name.len() > 2 && name.starts_with("on") && name[2..].starts_with(|c: char| c.is_ascii_uppercase()) {
+    if name.len() > 2
+        && name.starts_with("on")
+        && name[2..].starts_with(|c: char| c.is_ascii_uppercase())
+    {
         match ret {
             "V" if name == "onMeasure" => {
                 // View.onMeasure default: setMeasuredDimension(getDefaultSize)
                 for (i, k) in ["MeasuredWidth", "MeasuredHeight"].iter().enumerate() {
                     let spec = args.get(i).and_then(|v| v.as_int().ok()).unwrap_or(0);
-                    vm.view_props.insert((recv, k.to_string()), Value::Int(spec & 0x3fff_ffff));
+                    vm.view_props
+                        .insert((recv, k.to_string()), Value::Int(spec & 0x3fff_ffff));
                 }
                 return Ok(Some(Value::Null));
             }
             "V" => return Ok(Some(Value::Null)),
             "Z" => return Ok(Some(Value::Int(0))),
-            "Landroid/os/Parcelable;" if name == "onSaveInstanceState" => return Ok(Some(Value::Null)),
+            "Landroid/os/Parcelable;" if name == "onSaveInstanceState" => {
+                return Ok(Some(Value::Null))
+            }
             _ => {}
         }
     }
@@ -188,11 +202,17 @@ pub(crate) fn fallback(
     }
     if name == "getTag" && sig == "(I)Ljava/lang/Object;" {
         let key = format!("Tag#{}", args[0].as_int()?);
-        return Ok(Some(vm.view_props.get(&(recv, key)).cloned().unwrap_or(Value::Null)));
+        return Ok(Some(
+            vm.view_props
+                .get(&(recv, key))
+                .cloned()
+                .unwrap_or(Value::Null),
+        ));
     }
     if let Some(prop) = name.strip_prefix("set") {
         if ret == "V" && args.len() == 1 && prop.starts_with(|c: char| c.is_ascii_uppercase()) {
-            vm.view_props.insert((recv, prop.to_string()), args[0].clone());
+            vm.view_props
+                .insert((recv, prop.to_string()), args[0].clone());
             return Ok(Some(Value::Null));
         }
         return Ok(None);
@@ -222,9 +242,15 @@ mod tests {
     #[test]
     fn defaults_follow_aosp() {
         assert!(matches!(default_for("Alpha", "F"), Some(Value::Float(f)) if f == 1.0));
-        assert!(matches!(default_for("ClipChildren", "Z"), Some(Value::Int(1))));
+        assert!(matches!(
+            default_for("ClipChildren", "Z"),
+            Some(Value::Int(1))
+        ));
         assert!(matches!(default_for("Focusable", "Z"), Some(Value::Int(0))));
-        assert!(matches!(default_for("DescendantFocusability", "I"), Some(Value::Int(0x40000))));
+        assert!(matches!(
+            default_for("DescendantFocusability", "I"),
+            Some(Value::Int(0x40000))
+        ));
         assert!(default_for("Background", "Landroid/graphics/drawable/Drawable;").is_none());
     }
 }

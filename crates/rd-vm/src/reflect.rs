@@ -65,7 +65,12 @@ fn params_desc(vm: &Engine, arr: Option<&Value>) -> Result<String, VmExit> {
         for v in vm.heap.as_array_elems(*a)?.0.iter() {
             match v {
                 Value::Obj(c) => s.push_str(&class_desc(vm, *c).unwrap_or_default()),
-                _ => return Err(exc("Ljava/lang/NullPointerException;", "parameter type is null")),
+                _ => {
+                    return Err(exc(
+                        "Ljava/lang/NullPointerException;",
+                        "parameter type is null",
+                    ))
+                }
             }
         }
     }
@@ -92,7 +97,13 @@ fn find_sig(vm: &Engine, class: &str, name: &str, params: &str) -> Option<String
     None
 }
 
-fn lookup(vm: &Engine, class: &str, name: &str, params: &str, inherited: bool) -> Option<(String, String)> {
+fn lookup(
+    vm: &Engine,
+    class: &str,
+    name: &str,
+    params: &str,
+    inherited: bool,
+) -> Option<(String, String)> {
     let mut cur = Some(class.to_string());
     let mut guard = 0;
     while let Some(c) = cur {
@@ -140,7 +151,10 @@ fn unbox(vm: &Engine, desc: &str, v: &Value) -> Result<Value, VmExit> {
         return Ok(v.clone());
     }
     let Value::Obj(b) = v else {
-        return Err(exc("Ljava/lang/IllegalArgumentException;", format!("null for primitive parameter {desc}")));
+        return Err(exc(
+            "Ljava/lang/IllegalArgumentException;",
+            format!("null for primitive parameter {desc}"),
+        ));
     };
     let raw = vm.heap.get_field(*b, "value").unwrap_or(Value::Int(0));
     Ok(match (desc, raw) {
@@ -173,17 +187,25 @@ fn wrap_target(vm: &mut Engine, e: VmExit) -> VmExit {
         VmExit::Exception(t) => {
             let cause = match t.obj {
                 Some(o) => Some(o),
-                None => vm.heap.alloc_instance(t.class.clone(), Vec::new()).ok().inspect(|o| {
-                    if let Some(m) = &t.message {
-                        if let Ok(s) = crate::intrinsics::alloc_string(vm, m.clone()) {
-                            let _ = vm.heap.put_field(*o, "message", Value::Obj(s));
+                None => vm
+                    .heap
+                    .alloc_instance(t.class.clone(), Vec::new())
+                    .ok()
+                    .inspect(|o| {
+                        if let Some(m) = &t.message {
+                            if let Ok(s) = crate::intrinsics::alloc_string(vm, m.clone()) {
+                                let _ = vm.heap.put_field(*o, "message", Value::Obj(s));
+                            }
                         }
-                    }
-                }),
+                    }),
             };
-            let Some(cause) = cause else { return VmExit::Exception(t) };
-            let Ok(ite) = vm.heap.alloc_instance("Ljava/lang/reflect/InvocationTargetException;".into(), Vec::new())
-            else {
+            let Some(cause) = cause else {
+                return VmExit::Exception(t);
+            };
+            let Ok(ite) = vm.heap.alloc_instance(
+                "Ljava/lang/reflect/InvocationTargetException;".into(),
+                Vec::new(),
+            ) else {
                 return VmExit::Exception(t);
             };
             let _ = vm.heap.put_field(ite, "cause", Value::Obj(cause));
@@ -220,10 +242,17 @@ fn invoke_args(vm: &Engine, sig: &str, arr: Option<&Value>) -> Result<Vec<Value>
     if given.len() != pts.len() {
         return Err(exc(
             "Ljava/lang/IllegalArgumentException;",
-            format!("Wrong number of arguments; expected {}, got {}", pts.len(), given.len()),
+            format!(
+                "Wrong number of arguments; expected {}, got {}",
+                pts.len(),
+                given.len()
+            ),
         ));
     }
-    pts.iter().zip(given.iter()).map(|(p, v)| unbox(vm, p, v)).collect()
+    pts.iter()
+        .zip(given.iter())
+        .map(|(p, v)| unbox(vm, p, v))
+        .collect()
 }
 
 pub(crate) fn instance_intrinsic(
@@ -237,16 +266,28 @@ pub(crate) fn instance_intrinsic(
     if mref_class == CLASS {
         return Ok(match (name, sig) {
             ("getMethod", "(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;")
-            | ("getDeclaredMethod", "(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;") => {
-                let Some(class) = class_desc(vm, recv) else { return Ok(None) };
+            | (
+                "getDeclaredMethod",
+                "(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;",
+            ) => {
+                let Some(class) = class_desc(vm, recv) else {
+                    return Ok(None);
+                };
                 let mname = match args.first() {
                     Some(Value::Obj(s)) => vm.heap.as_str(*s)?.to_string(),
                     _ => return Err(exc("Ljava/lang/NullPointerException;", "name == null")),
                 };
                 let params = params_desc(vm, args.get(1))?;
-                let Some((decl, msig)) = lookup(vm, &class, &mname, &params, name == "getMethod") else {
-                    let pretty = class.trim_start_matches('L').trim_end_matches(';').replace('/', ".");
-                    return Err(exc("Ljava/lang/NoSuchMethodException;", format!("{pretty}.{mname} {params}")));
+                let Some((decl, msig)) = lookup(vm, &class, &mname, &params, name == "getMethod")
+                else {
+                    let pretty = class
+                        .trim_start_matches('L')
+                        .trim_end_matches(';')
+                        .replace('/', ".");
+                    return Err(exc(
+                        "Ljava/lang/NoSuchMethodException;",
+                        format!("{pretty}.{mname} {params}"),
+                    ));
                 };
                 let m = vm.heap.alloc_instance(METHOD.to_string(), Vec::new())?;
                 put_str(vm, m, "rd_decl", &decl)?;
@@ -256,15 +297,23 @@ pub(crate) fn instance_intrinsic(
             }
             ("getConstructor", "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;")
             | ("getDeclaredConstructor", "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;") => {
-                let Some(class) = class_desc(vm, recv) else { return Ok(None) };
+                let Some(class) = class_desc(vm, recv) else {
+                    return Ok(None);
+                };
                 let params = params_desc(vm, args.first())?;
                 let csig = format!("{params}V");
                 let known = vm.cp.resolve_method(&class, "<init>", &csig).is_some()
                     || find_sig(vm, &class, "<init>", &params).is_some()
                     || (params == "()" && crate::classpath::host_class_known(&class));
                 if !known {
-                    let pretty = class.trim_start_matches('L').trim_end_matches(';').replace('/', ".");
-                    return Err(exc("Ljava/lang/NoSuchMethodException;", format!("{pretty}.<init> {params}")));
+                    let pretty = class
+                        .trim_start_matches('L')
+                        .trim_end_matches(';')
+                        .replace('/', ".");
+                    return Err(exc(
+                        "Ljava/lang/NoSuchMethodException;",
+                        format!("{pretty}.<init> {params}"),
+                    ));
                 }
                 let c = vm.heap.alloc_instance(CTOR.to_string(), Vec::new())?;
                 put_str(vm, c, "rd_decl", &class)?;
@@ -275,14 +324,18 @@ pub(crate) fn instance_intrinsic(
             _ => None,
         });
     }
-    if mref_class != METHOD && mref_class != CTOR && mref_class != "Ljava/lang/reflect/AccessibleObject;"
+    if mref_class != METHOD
+        && mref_class != CTOR
+        && mref_class != "Ljava/lang/reflect/AccessibleObject;"
         && mref_class != "Ljava/lang/reflect/Executable;"
     {
         return Ok(None);
     }
-    let (Some(decl), Some(mname), Some(msig)) =
-        (str_field(vm, recv, "rd_decl"), str_field(vm, recv, "rd_name"), str_field(vm, recv, "rd_sig"))
-    else {
+    let (Some(decl), Some(mname), Some(msig)) = (
+        str_field(vm, recv, "rd_decl"),
+        str_field(vm, recv, "rd_name"),
+        str_field(vm, recv, "rd_sig"),
+    ) else {
         return Ok(None);
     };
     let ret = msig.rsplit_once(')').map_or("V", |(_, r)| r).to_string();
@@ -291,7 +344,9 @@ pub(crate) fn instance_intrinsic(
         ("isAccessible", "()Z") => Value::Int(1),
         ("getName", "()Ljava/lang/String;") => {
             let n = if mname == "<init>" {
-                decl.trim_start_matches('L').trim_end_matches(';').replace('/', ".")
+                decl.trim_start_matches('L')
+                    .trim_end_matches(';')
+                    .replace('/', ".")
             } else {
                 mname
             };
@@ -301,18 +356,29 @@ pub(crate) fn instance_intrinsic(
         ("getReturnType", "()Ljava/lang/Class;") => Value::Obj(vm.class_object_for(&ret)?),
         ("getParameterTypes", "()[Ljava/lang/Class;") => new_class_array(vm, &param_types(&msig))?,
         ("getParameterCount", "()I") => Value::Int(param_types(&msig).len() as i32),
-        ("getModifiers", "()I") => Value::Int(1 | if is_static(vm, &decl, &mname, &msig) == Some(true) { 8 } else { 0 }),
+        ("getModifiers", "()I") => Value::Int(
+            1 | if is_static(vm, &decl, &mname, &msig) == Some(true) {
+                8
+            } else {
+                0
+            },
+        ),
         ("invoke", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;") => {
             let call_args = invoke_args(vm, &msig, args.get(1))?;
             let target = match args.first() {
-                Some(Value::Obj(r)) if is_static(vm, &decl, &mname, &msig) != Some(true) => Some(*r),
+                Some(Value::Obj(r)) if is_static(vm, &decl, &mname, &msig) != Some(true) => {
+                    Some(*r)
+                }
                 _ => None,
             };
             let res = match target {
                 Some(r) => vm.invoke_instance(r, &mname, &msig, &call_args),
                 None => {
                     if is_static(vm, &decl, &mname, &msig) == Some(false) {
-                        return Err(exc("Ljava/lang/NullPointerException;", "null receiver for instance method"));
+                        return Err(exc(
+                            "Ljava/lang/NullPointerException;",
+                            "null receiver for instance method",
+                        ));
                     }
                     vm.invoke_static(&decl, &mname, &msig, &call_args)
                 }
@@ -329,7 +395,8 @@ pub(crate) fn instance_intrinsic(
             vm.ensure_initialized(&decl)?;
             let r = vm.heap.alloc_instance(decl.clone(), Vec::new())?;
             vm.attach_host_state(&decl, r)?;
-            vm.invoke_instance(r, "<init>", &msig, &call_args).map_err(|e| wrap_target(vm, e))?;
+            vm.invoke_instance(r, "<init>", &msig, &call_args)
+                .map_err(|e| wrap_target(vm, e))?;
             Value::Obj(r)
         }
         ("toString", "()Ljava/lang/String;") => {

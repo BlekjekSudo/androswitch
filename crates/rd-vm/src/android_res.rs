@@ -77,7 +77,10 @@ const CONFIG_FIELDS: &[&str] = &[
 ];
 
 fn env_u32(k: &str, d: u32) -> u32 {
-    std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d)
+    std::env::var(k)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(d)
 }
 
 pub(crate) struct Device {
@@ -87,7 +90,11 @@ pub(crate) struct Device {
 }
 
 pub(crate) fn device() -> Device {
-    Device { w: env_u32("RD_SCREEN_W", 720), h: env_u32("RD_SCREEN_H", 1440), dpi: env_u32("RD_DENSITY_DPI", 280) }
+    Device {
+        w: env_u32("RD_SCREEN_W", 720),
+        h: env_u32("RD_SCREEN_H", 1440),
+        dpi: env_u32("RD_DENSITY_DPI", 280),
+    }
 }
 
 fn exc(c: &str, m: impl Into<String>) -> VmExit {
@@ -158,9 +165,21 @@ fn configuration(vm: &mut Engine) -> Result<ObjRef, VmExit> {
         put(vm, r, "screenWidthDp", Value::Int(wdp))?;
         put(vm, r, "screenHeightDp", Value::Int(hdp))?;
         put(vm, r, "smallestScreenWidthDp", Value::Int(wdp.min(hdp)))?;
-        put(vm, r, "orientation", Value::Int(if d.h >= d.w { 1 } else { 2 }))?;
-        let night = std::env::var("RD_NIGHT_MODE").map(|v| v == "1").unwrap_or(false);
-        put(vm, r, "uiMode", Value::Int(0x01 | if night { 0x20 } else { 0x10 }))?;
+        put(
+            vm,
+            r,
+            "orientation",
+            Value::Int(if d.h >= d.w { 1 } else { 2 }),
+        )?;
+        let night = std::env::var("RD_NIGHT_MODE")
+            .map(|v| v == "1")
+            .unwrap_or(false);
+        put(
+            vm,
+            r,
+            "uiMode",
+            Value::Int(0x01 | if night { 0x20 } else { 0x10 }),
+        )?;
         put(vm, r, "keyboard", Value::Int(1))?; // KEYBOARD_NOKEYS
         put(vm, r, "keyboardHidden", Value::Int(1))?;
         put(vm, r, "hardKeyboardHidden", Value::Int(2))?;
@@ -181,7 +200,11 @@ fn configuration(vm: &mut Engine) -> Result<ObjRef, VmExit> {
 
 fn new_locale(vm: &mut Engine, lang: &str, country: &str, variant: &str) -> Result<ObjRef, VmExit> {
     let r = vm.heap.alloc_instance(LOCALE.to_string(), Vec::new())?;
-    let (l, c, v) = (s(vm, lang.to_lowercase())?, s(vm, country.to_uppercase())?, s(vm, variant)?);
+    let (l, c, v) = (
+        s(vm, lang.to_lowercase())?,
+        s(vm, country.to_uppercase())?,
+        s(vm, variant)?,
+    );
     put(vm, r, "rd_lang", l)?;
     put(vm, r, "rd_country", c)?;
     put(vm, r, "rd_variant", v)?;
@@ -191,7 +214,10 @@ fn new_locale(vm: &mut Engine, lang: &str, country: &str, variant: &str) -> Resu
 fn parse_tag(tag: &str) -> (String, String) {
     let mut parts = tag.split(['-', '_']);
     let lang = parts.next().unwrap_or("").to_string();
-    let country = parts.find(|p| p.len() == 2 || (p.len() == 3 && p.chars().all(|c| c.is_ascii_digit()))).unwrap_or("").to_string();
+    let country = parts
+        .find(|p| p.len() == 2 || (p.len() == 3 && p.chars().all(|c| c.is_ascii_digit())))
+        .unwrap_or("")
+        .to_string();
     (if lang == "und" { String::new() } else { lang }, country)
 }
 
@@ -222,7 +248,9 @@ fn language_tag(vm: &Engine, r: ObjRef) -> String {
 }
 
 fn locale_list(vm: &mut Engine, locales: Vec<Value>) -> Result<ObjRef, VmExit> {
-    let r = vm.heap.alloc_instance(LOCALE_LIST.to_string(), Vec::new())?;
+    let r = vm
+        .heap
+        .alloc_instance(LOCALE_LIST.to_string(), Vec::new())?;
     let arr = crate::arrays::new_array(vm, "[Ljava/util/Locale;", ElemKind::Obj, locales)?;
     put(vm, r, "rd_locales", arr)?;
     Ok(r)
@@ -230,7 +258,11 @@ fn locale_list(vm: &mut Engine, locales: Vec<Value>) -> Result<ObjRef, VmExit> {
 
 fn locale_list_items(vm: &Engine, r: ObjRef) -> Vec<Value> {
     match get(vm, r, "rd_locales") {
-        Value::Obj(a) => vm.heap.as_array_elems(a).map(|(e, _)| e.to_vec()).unwrap_or_default(),
+        Value::Obj(a) => vm
+            .heap
+            .as_array_elems(a)
+            .map(|(e, _)| e.to_vec())
+            .unwrap_or_default(),
         _ => Vec::new(),
     }
 }
@@ -238,7 +270,10 @@ fn locale_list_items(vm: &Engine, r: ObjRef) -> Vec<Value> {
 // ── arsc-backed lookups ────────────────────────────────────────────────
 
 fn not_found(id: i32) -> VmExit {
-    exc("Landroid/content/res/Resources$NotFoundException;", format!("Resource ID #0x{:x}", id as u32))
+    exc(
+        "Landroid/content/res/Resources$NotFoundException;",
+        format!("Resource ID #0x{:x}", id as u32),
+    )
 }
 
 fn value_of(vm: &Engine, id: i32) -> Result<ResolvedValue, VmExit> {
@@ -276,14 +311,22 @@ fn dimension_px(vm: &Engine, v: &ResolvedValue, id: i32) -> Result<f32, VmExit> 
 }
 
 fn string_res(vm: &Engine, id: i32) -> Result<String, VmExit> {
-    match vm.fw.resources.as_ref().and_then(|a| a.arsc.as_ref()).and_then(|a| a.resolve_string(id as u32)) {
+    match vm
+        .fw
+        .resources
+        .as_ref()
+        .and_then(|a| a.arsc.as_ref())
+        .and_then(|a| a.resolve_string(id as u32))
+    {
         Some(t) => Ok(t),
         None => Err(not_found(id)),
     }
 }
 
 fn identifier(vm: &Engine, name: &str, def_type: Option<&str>, def_pkg: Option<&str>) -> i32 {
-    let Some(arsc) = vm.fw.resources.as_ref().and_then(|a| a.arsc.as_ref()) else { return 0 };
+    let Some(arsc) = vm.fw.resources.as_ref().and_then(|a| a.arsc.as_ref()) else {
+        return 0;
+    };
     // "pkg:type/entry" | "type/entry" | "entry"
     let (pkg, rest) = match name.split_once(':') {
         Some((p, r)) => (Some(p), r),
@@ -296,7 +339,9 @@ fn identifier(vm: &Engine, name: &str, def_type: Option<&str>, def_pkg: Option<&
     let Some(ty) = ty else { return 0 };
     let want = format!("@{ty}/{entry}");
     for p in &arsc.packages {
-        if pkg.is_some_and(|n| n != p.name && n != "android" && !p.name.is_empty()) && pkg != Some(p.name.as_str()) {
+        if pkg.is_some_and(|n| n != p.name && n != "android" && !p.name.is_empty())
+            && pkg != Some(p.name.as_str())
+        {
             continue;
         }
         for id in p.entries.keys() {
@@ -331,10 +376,16 @@ fn fill_typed_value(vm: &mut Engine, tv: ObjRef, id: i32, v: &ResolvedValue) -> 
 
 fn typed_array(vm: &mut Engine, attrs: Option<&Value>) -> Result<Value, VmExit> {
     let n = match attrs {
-        Some(Value::Obj(a)) => vm.heap.as_array_elems(*a).map(|(e, _)| e.len()).unwrap_or(0),
+        Some(Value::Obj(a)) => vm
+            .heap
+            .as_array_elems(*a)
+            .map(|(e, _)| e.len())
+            .unwrap_or(0),
         _ => 0,
     };
-    let r = vm.heap.alloc_instance(TYPED_ARRAY.to_string(), Vec::new())?;
+    let r = vm
+        .heap
+        .alloc_instance(TYPED_ARRAY.to_string(), Vec::new())?;
     put(vm, r, "rd_len", Value::Int(n as i32))?;
     Ok(Value::Obj(r))
 }
@@ -361,7 +412,8 @@ pub(crate) fn static_intrinsic(
         (LOCALE, "getDefault", "()Ljava/util/Locale;") => Value::Obj(default_locale(vm)?),
         (LOCALE, "setDefault", "(Ljava/util/Locale;)V") => {
             if let Some(Value::Obj(l)) = args.first() {
-                vm.statics.insert(("Lrd/Resources;".into(), "locale".into()), Value::Obj(*l));
+                vm.statics
+                    .insert(("Lrd/Resources;".into(), "locale".into()), Value::Obj(*l));
             }
             Value::Null
         }
@@ -404,14 +456,17 @@ pub(crate) fn instance_intrinsic(
             return Ok(Some(match (name, sig) {
                 ("getDisplayMetrics", _) => Value::Obj(metrics(vm)?),
                 ("getConfiguration", _) => Value::Obj(configuration(vm)?),
-                ("getString", "(I)Ljava/lang/String;") | ("getText", "(I)Ljava/lang/CharSequence;") => {
+                ("getString", "(I)Ljava/lang/String;")
+                | ("getText", "(I)Ljava/lang/CharSequence;") => {
                     let t = string_res(vm, int(0))?;
                     s(vm, t)?
                 }
-                ("getText", "(ILjava/lang/CharSequence;)Ljava/lang/CharSequence;") => match string_res(vm, int(0)) {
-                    Ok(t) => s(vm, t)?,
-                    Err(_) => args.get(1).cloned().unwrap_or(Value::Null),
-                },
+                ("getText", "(ILjava/lang/CharSequence;)Ljava/lang/CharSequence;") => {
+                    match string_res(vm, int(0)) {
+                        Ok(t) => s(vm, t)?,
+                        Err(_) => args.get(1).cloned().unwrap_or(Value::Null),
+                    }
+                }
                 ("getString", "(I[Ljava/lang/Object;)Ljava/lang/String;") => {
                     let t = string_res(vm, int(0))?;
                     format_string(vm, t, &args[1])?
@@ -425,7 +480,15 @@ pub(crate) fn instance_intrinsic(
                     let v = value_of(vm, int(0))?;
                     let f = dimension_px(vm, &v, int(0))?;
                     let r = (f + 0.5).floor() as i32;
-                    Value::Int(if r == 0 && f != 0.0 { if f > 0.0 { 1 } else { -1 } } else { r })
+                    Value::Int(if r == 0 && f != 0.0 {
+                        if f > 0.0 {
+                            1
+                        } else {
+                            -1
+                        }
+                    } else {
+                        r
+                    })
                 }
                 ("getDimensionPixelOffset", "(I)I") => {
                     let v = value_of(vm, int(0))?;
@@ -457,7 +520,9 @@ pub(crate) fn instance_intrinsic(
                     let p = str_of(vm, args.get(2).unwrap_or(&Value::Null));
                     Value::Int(identifier(vm, &n, t.as_deref(), p.as_deref()))
                 }
-                ("getResourceName", _) | ("getResourceEntryName", _) | ("getResourceTypeName", _)
+                ("getResourceName", _)
+                | ("getResourceEntryName", _)
+                | ("getResourceTypeName", _)
                 | ("getResourcePackageName", _) => {
                     let id = int(0) as u32;
                     let Some(arsc) = vm.fw.resources.as_ref().and_then(|a| a.arsc.as_ref()) else {
@@ -467,7 +532,11 @@ pub(crate) fn instance_intrinsic(
                         return Err(not_found(id as i32));
                     };
                     let pkg = p.name.clone();
-                    let (ty, entry) = nm.trim_start_matches('@').split_once('/').map(|(a, b)| (a.to_string(), b.to_string())).unwrap_or_default();
+                    let (ty, entry) = nm
+                        .trim_start_matches('@')
+                        .split_once('/')
+                        .map(|(a, b)| (a.to_string(), b.to_string()))
+                        .unwrap_or_default();
                     let out = match name {
                         "getResourceName" => format!("{pkg}:{ty}/{entry}"),
                         "getResourceEntryName" => entry,
@@ -476,7 +545,9 @@ pub(crate) fn instance_intrinsic(
                     };
                     s(vm, out)?
                 }
-                ("newTheme", _) => Value::Obj(vm.heap.alloc_instance(THEME.to_string(), Vec::new())?),
+                ("newTheme", _) => {
+                    Value::Obj(vm.heap.alloc_instance(THEME.to_string(), Vec::new())?)
+                }
                 ("obtainAttributes", _) => {
                     let ta = typed_array(vm, args.get(1))?;
                     if let Value::Obj(t) = ta {
@@ -493,7 +564,10 @@ pub(crate) fn instance_intrinsic(
             return Ok(Some(match name {
                 "resolveAttribute" => Value::Int(0),
                 "obtainStyledAttributes" => {
-                    let attrs = args.iter().find(|v| matches!(v, Value::Obj(a) if vm.heap.as_array_elems(*a).is_ok())).cloned();
+                    let attrs = args
+                        .iter()
+                        .find(|v| matches!(v, Value::Obj(a) if vm.heap.as_array_elems(*a).is_ok()))
+                        .cloned();
                     let ta = typed_array(vm, attrs.as_ref())?;
                     if let Value::Obj(t) = ta {
                         crate::xml_res::fill_typed_array(vm, t, args.first(), attrs.as_ref());
@@ -514,18 +588,37 @@ pub(crate) fn instance_intrinsic(
                 "getIndexCount" | "getChangingConfigurations" | "getType" => Value::Int(0),
                 "getIndex" => Value::Int(0),
                 "getResources" => Value::Obj(resources(vm)?),
-                "getBoolean" | "getInt" | "getInteger" | "getFloat" | "getColor" | "getResourceId"
-                | "getDimensionPixelSize" | "getDimensionPixelOffset" | "getDimension" | "getFraction"
-                | "getLayoutDimension" | "getSourceResourceId" => {
+                "getBoolean"
+                | "getInt"
+                | "getInteger"
+                | "getFloat"
+                | "getColor"
+                | "getResourceId"
+                | "getDimensionPixelSize"
+                | "getDimensionPixelOffset"
+                | "getDimension"
+                | "getFraction"
+                | "getLayoutDimension"
+                | "getSourceResourceId" => {
                     // (index, default) — getFraction(index, base, pbase, default); getLayoutDimension(index, name|default)
                     let last = args.len().saturating_sub(1);
                     if name == "getLayoutDimension" && sig.contains("Ljava/lang/String;") {
-                        return Err(exc("Ljava/lang/UnsupportedOperationException;", "attribute not specified"));
+                        return Err(exc(
+                            "Ljava/lang/UnsupportedOperationException;",
+                            "attribute not specified",
+                        ));
                     }
                     def(last)
                 }
-                "getString" | "getText" | "getNonResourceString" | "getDrawable" | "getColorStateList"
-                | "getFont" | "peekValue" | "getTextArray" | "getPositionDescription" => Value::Null,
+                "getString"
+                | "getText"
+                | "getNonResourceString"
+                | "getDrawable"
+                | "getColorStateList"
+                | "getFont"
+                | "peekValue"
+                | "getTextArray"
+                | "getPositionDescription" => Value::Null,
                 "getValue" => Value::Int(0),
                 "recycle" | "close" => Value::Null,
                 _ => return Ok(None),
@@ -544,7 +637,9 @@ pub(crate) fn instance_intrinsic(
                     Value::Null
                 }
                 ("updateFrom", _) | ("diff", _) => {
-                    let Some(Value::Obj(o)) = args.first().cloned() else { return Ok(Some(Value::Int(0))) };
+                    let Some(Value::Obj(o)) = args.first().cloned() else {
+                        return Ok(Some(Value::Int(0)));
+                    };
                     let mut changed = 0i32;
                     for (i, f) in CONFIG_FIELDS.iter().enumerate() {
                         let (a, b) = (get(vm, recv, f), get(vm, o, f));
@@ -558,7 +653,9 @@ pub(crate) fn instance_intrinsic(
                     Value::Int(changed)
                 }
                 ("equals", _) => {
-                    let Some(Value::Obj(o)) = args.first().cloned() else { return Ok(Some(Value::Int(0))) };
+                    let Some(Value::Obj(o)) = args.first().cloned() else {
+                        return Ok(Some(Value::Int(0)));
+                    };
                     let mut eq = true;
                     for f in CONFIG_FIELDS {
                         let (a, b) = (get(vm, recv, f), get(vm, o, f));
@@ -571,7 +668,14 @@ pub(crate) fn instance_intrinsic(
                 }
                 ("hashCode", "()I") => {
                     let mut h = 17i32;
-                    for f in ["fontScale", "densityDpi", "screenWidthDp", "screenHeightDp", "uiMode", "orientation"] {
+                    for f in [
+                        "fontScale",
+                        "densityDpi",
+                        "screenWidthDp",
+                        "screenHeightDp",
+                        "uiMode",
+                        "orientation",
+                    ] {
                         let v = match get(vm, recv, f) {
                             Value::Int(i) => i,
                             Value::Float(x) => x.to_bits() as i32,
@@ -601,7 +705,10 @@ pub(crate) fn instance_intrinsic(
                 ("setLocales", _) => {
                     let ll = args.first().cloned().unwrap_or(Value::Null);
                     if let Value::Obj(l) = ll {
-                        let first = locale_list_items(vm, l).first().cloned().unwrap_or(Value::Null);
+                        let first = locale_list_items(vm, l)
+                            .first()
+                            .cloned()
+                            .unwrap_or(Value::Null);
                         put(vm, recv, "locale", first)?;
                     }
                     put(vm, recv, "rd_locales", ll)?;
@@ -612,7 +719,9 @@ pub(crate) fn instance_intrinsic(
                     Value::Int(((ui & 0x30) == 0x20) as i32)
                 }
                 ("getLayoutDirection", _) => Value::Int(0),
-                ("isScreenRound", _) | ("isScreenWideColorGamut", _) | ("isScreenHdr", _) => Value::Int(0),
+                ("isScreenRound", _) | ("isScreenWideColorGamut", _) | ("isScreenHdr", _) => {
+                    Value::Int(0)
+                }
                 ("isLayoutSizeAtLeast", _) => Value::Int((int(0) <= 2) as i32),
                 _ => return Ok(None),
             }));
@@ -625,7 +734,15 @@ pub(crate) fn instance_intrinsic(
                         Some(Value::Obj(o)) => *o,
                         _ => metrics(vm)?,
                     };
-                    for f in ["density", "scaledDensity", "densityDpi", "widthPixels", "heightPixels", "xdpi", "ydpi"] {
+                    for f in [
+                        "density",
+                        "scaledDensity",
+                        "densityDpi",
+                        "widthPixels",
+                        "heightPixels",
+                        "xdpi",
+                        "ydpi",
+                    ] {
                         let v = get(vm, src, f);
                         put(vm, recv, f, v)?;
                     }
@@ -637,8 +754,12 @@ pub(crate) fn instance_intrinsic(
         TYPED_VALUE => {
             return Ok(match (name, sig) {
                 ("<init>", "()V") => Some(Value::Null),
-                ("getDimension", "(Landroid/util/DisplayMetrics;)F") => Some(Value::Float(get(vm, recv, "data").as_int().unwrap_or(0) as f32)),
-                ("getFloat", "()F") => Some(Value::Float(f32::from_bits(get(vm, recv, "data").as_int().unwrap_or(0) as u32))),
+                ("getDimension", "(Landroid/util/DisplayMetrics;)F") => Some(Value::Float(
+                    get(vm, recv, "data").as_int().unwrap_or(0) as f32,
+                )),
+                ("getFloat", "()F") => Some(Value::Float(f32::from_bits(
+                    get(vm, recv, "data").as_int().unwrap_or(0) as u32,
+                ))),
                 ("coerceToString", _) => Some(get(vm, recv, "string")),
                 _ => None,
             });
@@ -646,8 +767,15 @@ pub(crate) fn instance_intrinsic(
         LOCALE => {
             return Ok(Some(match (name, sig) {
                 ("<init>", _) => {
-                    let p: Vec<String> = args.iter().map(|a| str_of(vm, a).unwrap_or_default()).collect();
-                    let (l, c, v) = (p.first().cloned().unwrap_or_default(), p.get(1).cloned().unwrap_or_default(), p.get(2).cloned().unwrap_or_default());
+                    let p: Vec<String> = args
+                        .iter()
+                        .map(|a| str_of(vm, a).unwrap_or_default())
+                        .collect();
+                    let (l, c, v) = (
+                        p.first().cloned().unwrap_or_default(),
+                        p.get(1).cloned().unwrap_or_default(),
+                        p.get(2).cloned().unwrap_or_default(),
+                    );
                     let (l, c) = (s(vm, l.to_lowercase())?, s(vm, c.to_uppercase())?);
                     put(vm, recv, "rd_lang", l)?;
                     put(vm, recv, "rd_country", c)?;
@@ -685,14 +813,19 @@ pub(crate) fn instance_intrinsic(
                     s(vm, t)?
                 }
                 ("equals", _) => match args.first() {
-                    Some(Value::Obj(o)) if vm.heap.class_of(*o).map(|c| c == LOCALE).unwrap_or(false) => {
+                    Some(Value::Obj(o))
+                        if vm.heap.class_of(*o).map(|c| c == LOCALE).unwrap_or(false) =>
+                    {
                         Value::Int((locale_parts(vm, recv) == locale_parts(vm, *o)) as i32)
                     }
                     _ => Value::Int(0),
                 },
                 ("hashCode", _) => {
                     let t = language_tag(vm, recv);
-                    Value::Int(t.encode_utf16().fold(0i32, |h, c| h.wrapping_mul(31).wrapping_add(c as i32)))
+                    Value::Int(
+                        t.encode_utf16()
+                            .fold(0i32, |h, c| h.wrapping_mul(31).wrapping_add(c as i32)),
+                    )
                 }
                 _ => return Ok(None),
             }));
@@ -705,15 +838,27 @@ pub(crate) fn instance_intrinsic(
                         Some(Value::Obj(a)) => vm.heap.as_array_elems(*a)?.0.to_vec(),
                         _ => Vec::new(),
                     };
-                    let arr = crate::arrays::new_array(vm, "[Ljava/util/Locale;", ElemKind::Obj, ls)?;
+                    let arr =
+                        crate::arrays::new_array(vm, "[Ljava/util/Locale;", ElemKind::Obj, ls)?;
                     put(vm, recv, "rd_locales", arr)?;
                     Value::Null
                 }
-                ("get", "(I)Ljava/util/Locale;") => items.get(int(0) as usize).cloned().unwrap_or(Value::Null),
+                ("get", "(I)Ljava/util/Locale;") => {
+                    items.get(int(0) as usize).cloned().unwrap_or(Value::Null)
+                }
                 ("size", _) => Value::Int(items.len() as i32),
                 ("isEmpty", _) => Value::Int(items.is_empty() as i32),
                 ("toLanguageTags", _) => {
-                    let tags: Vec<String> = items.iter().filter_map(|v| if let Value::Obj(l) = v { Some(language_tag(vm, *l)) } else { None }).collect();
+                    let tags: Vec<String> = items
+                        .iter()
+                        .filter_map(|v| {
+                            if let Value::Obj(l) = v {
+                                Some(language_tag(vm, *l))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
                     s(vm, tags.join(","))?
                 }
                 ("indexOf", _) => {
@@ -735,8 +880,12 @@ pub(crate) fn instance_intrinsic(
     }
     // View.getResources
     if name == "getResources" && sig == "()Landroid/content/res/Resources;" {
-        if vm.cp.is_subtype(recv_class, "Landroid/content/Context;") || vm.cp.is_subtype(recv_class, "Landroid/view/View;")
-            || matches!(vm.fw.get(recv), Some(crate::framework::HostObj::View { .. }))
+        if vm.cp.is_subtype(recv_class, "Landroid/content/Context;")
+            || vm.cp.is_subtype(recv_class, "Landroid/view/View;")
+            || matches!(
+                vm.fw.get(recv),
+                Some(crate::framework::HostObj::View { .. })
+            )
         {
             return Ok(Some(Value::Obj(resources(vm)?)));
         }
@@ -745,8 +894,17 @@ pub(crate) fn instance_intrinsic(
     // the Context family, whatever class the method ref names
     if !matches!(
         name,
-        "getTheme" | "setTheme" | "obtainStyledAttributes" | "getMainLooper" | "getBaseContext" | "isRestricted"
-            | "getAttributionTag" | "getText" | "getString" | "getColor" | "getResources"
+        "getTheme"
+            | "setTheme"
+            | "obtainStyledAttributes"
+            | "getMainLooper"
+            | "getBaseContext"
+            | "isRestricted"
+            | "getAttributionTag"
+            | "getText"
+            | "getString"
+            | "getColor"
+            | "getResources"
     ) || !vm.cp.is_subtype(recv_class, "Landroid/content/Context;")
     {
         return Ok(None);
@@ -765,7 +923,10 @@ pub(crate) fn instance_intrinsic(
         }
         ("setTheme", _) => Value::Null,
         ("obtainStyledAttributes", _) => {
-            let attrs = args.iter().find(|v| matches!(v, Value::Obj(a) if vm.heap.as_array_elems(*a).is_ok())).cloned();
+            let attrs = args
+                .iter()
+                .find(|v| matches!(v, Value::Obj(a) if vm.heap.as_array_elems(*a).is_ok()))
+                .cloned();
             let ta = typed_array(vm, attrs.as_ref())?;
             if let Value::Obj(t) = ta {
                 crate::xml_res::fill_typed_array(vm, t, args.first(), attrs.as_ref());

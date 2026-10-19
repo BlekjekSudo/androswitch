@@ -199,7 +199,9 @@ fn byte_array(vm: &mut Engine, bytes: &[u8]) -> Result<Value, VmExit> {
 }
 
 fn int_elems(vm: &mut Engine, v: &Value) -> Result<Vec<i32>, VmExit> {
-    let Value::Obj(r) = v else { return Err(npe("array is null")) };
+    let Value::Obj(r) = v else {
+        return Err(npe("array is null"));
+    };
     let elems = vm
         .heap
         .array_elems_mut(*r)
@@ -220,8 +222,14 @@ fn charset_name(vm: &mut Engine, v: Option<&Value>) -> Result<String, VmExit> {
 
 fn encode(s: &str, cs: &str) -> Vec<u8> {
     match cs {
-        "ISO-8859-1" | "LATIN1" | "ISO8859_1" => s.chars().map(|c| if (c as u32) < 256 { c as u8 } else { b'?' }).collect(),
-        "US-ASCII" | "ASCII" => s.chars().map(|c| if c.is_ascii() { c as u8 } else { b'?' }).collect(),
+        "ISO-8859-1" | "LATIN1" | "ISO8859_1" => s
+            .chars()
+            .map(|c| if (c as u32) < 256 { c as u8 } else { b'?' })
+            .collect(),
+        "US-ASCII" | "ASCII" => s
+            .chars()
+            .map(|c| if c.is_ascii() { c as u8 } else { b'?' })
+            .collect(),
         "UTF-16" | "UTF-16BE" => s.encode_utf16().flat_map(|u| u.to_be_bytes()).collect(),
         "UTF-16LE" => s.encode_utf16().flat_map(|u| u.to_le_bytes()).collect(),
         _ => s.as_bytes().to_vec(),
@@ -231,7 +239,10 @@ fn encode(s: &str, cs: &str) -> Vec<u8> {
 fn decode(b: &[u8], cs: &str) -> String {
     match cs {
         "ISO-8859-1" | "LATIN1" | "ISO8859_1" => b.iter().map(|&x| x as char).collect(),
-        "US-ASCII" | "ASCII" => b.iter().map(|&x| if x < 128 { x as char } else { '\u{FFFD}' }).collect(),
+        "US-ASCII" | "ASCII" => b
+            .iter()
+            .map(|&x| if x < 128 { x as char } else { '\u{FFFD}' })
+            .collect(),
         _ => String::from_utf8_lossy(b).into_owned(),
     }
 }
@@ -244,7 +255,9 @@ pub(crate) fn instance_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    if mref_class != STRING && !(mref_class == "Ljava/lang/CharSequence;" && vm.heap.as_str(recv).is_ok()) {
+    if mref_class != STRING
+        && !(mref_class == "Ljava/lang/CharSequence;" && vm.heap.as_str(recv).is_ok())
+    {
         return Ok(None);
     }
     if name == "<init>" {
@@ -260,33 +273,53 @@ pub(crate) fn instance_intrinsic(
             let u = u16s(&this);
             let i = int(0);
             if i < 0 || i as usize >= u.len() {
-                return Err(exc("Ljava/lang/StringIndexOutOfBoundsException;", format!("index {i}")));
+                return Err(exc(
+                    "Ljava/lang/StringIndexOutOfBoundsException;",
+                    format!("index {i}"),
+                ));
             }
             let i = i as usize;
-            let cp = char::decode_utf16(u[i..].iter().copied()).next().and_then(|r| r.ok()).map_or(u[i] as i32, |c| c as i32);
+            let cp = char::decode_utf16(u[i..].iter().copied())
+                .next()
+                .and_then(|r| r.ok())
+                .map_or(u[i] as i32, |c| c as i32);
             Value::Int(cp)
         }
         ("compareTo", "(Ljava/lang/String;)I") | ("compareTo", "(Ljava/lang/Object;)I") => {
             let o = charseq(vm, &args[0])?;
             let (a, c) = (u16s(&this), u16s(&o));
-            let r = a.iter().zip(&c).find(|(x, y)| x != y).map_or(a.len() as i32 - c.len() as i32, |(x, y)| *x as i32 - *y as i32);
+            let r = a
+                .iter()
+                .zip(&c)
+                .find(|(x, y)| x != y)
+                .map_or(a.len() as i32 - c.len() as i32, |(x, y)| {
+                    *x as i32 - *y as i32
+                });
             Value::Int(r)
         }
         ("compareToIgnoreCase", "(Ljava/lang/String;)I") => {
             let o = charseq(vm, &args[0])?;
             let (a, c) = (u16s(&this.to_lowercase()), u16s(&o.to_lowercase()));
-            let r = a.iter().zip(&c).find(|(x, y)| x != y).map_or(a.len() as i32 - c.len() as i32, |(x, y)| *x as i32 - *y as i32);
+            let r = a
+                .iter()
+                .zip(&c)
+                .find(|(x, y)| x != y)
+                .map_or(a.len() as i32 - c.len() as i32, |(x, y)| {
+                    *x as i32 - *y as i32
+                });
             Value::Int(r)
         }
         ("contains", "(Ljava/lang/CharSequence;)Z") => b(this.contains(&charseq(vm, &args[0])?)),
-        ("contentEquals", "(Ljava/lang/CharSequence;)Z") | ("contentEquals", "(Ljava/lang/StringBuffer;)Z") => {
-            b(this == charseq(vm, &args[0])?)
-        }
+        ("contentEquals", "(Ljava/lang/CharSequence;)Z")
+        | ("contentEquals", "(Ljava/lang/StringBuffer;)Z") => b(this == charseq(vm, &args[0])?),
         ("equalsIgnoreCase", "(Ljava/lang/String;)Z") => match &args[0] {
             Value::Obj(_) => {
                 let o = charseq(vm, &args[0])?;
                 b(this.chars().count() == o.chars().count()
-                    && this.chars().zip(o.chars()).all(|(x, y)| x == y || x.to_lowercase().eq(y.to_lowercase())))
+                    && this
+                        .chars()
+                        .zip(o.chars())
+                        .all(|(x, y)| x == y || x.to_lowercase().eq(y.to_lowercase())))
             }
             _ => b(false),
         },
@@ -300,7 +333,9 @@ pub(crate) fn instance_intrinsic(
             let u = u16s(&this);
             Value::Int(last_index_of(&u, &char_units(int(0)), u.len() as i32))
         }
-        ("lastIndexOf", "(II)I") => Value::Int(last_index_of(&u16s(&this), &char_units(int(0)), int(1))),
+        ("lastIndexOf", "(II)I") => {
+            Value::Int(last_index_of(&u16s(&this), &char_units(int(0)), int(1)))
+        }
         ("lastIndexOf", "(Ljava/lang/String;)I") => {
             let n = charseq(vm, &args[0])?;
             let u = u16s(&this);
@@ -314,41 +349,61 @@ pub(crate) fn instance_intrinsic(
             let p = u16s(&charseq(vm, &args[0])?);
             let u = u16s(&this);
             let off = int(1);
-            b(off >= 0 && (off as usize) + p.len() <= u.len() && u[off as usize..off as usize + p.len()] == p[..])
+            b(off >= 0
+                && (off as usize) + p.len() <= u.len()
+                && u[off as usize..off as usize + p.len()] == p[..])
         }
-        ("regionMatches", "(ILjava/lang/String;II)Z") | ("regionMatches", "(ZILjava/lang/String;II)Z") => {
-            let (ic, base) = if sig.starts_with("(Z") { (int(0) != 0, 1) } else { (false, 0) };
+        ("regionMatches", "(ILjava/lang/String;II)Z")
+        | ("regionMatches", "(ZILjava/lang/String;II)Z") => {
+            let (ic, base) = if sig.starts_with("(Z") {
+                (int(0) != 0, 1)
+            } else {
+                (false, 0)
+            };
             let to = int(base);
             let other = charseq(vm, &args[base + 1])?;
             let oo = int(base + 2);
             let len = int(base + 3);
             let (a, o) = (u16s(&this), u16s(&other));
-            if to < 0 || oo < 0 || to as i64 + len as i64 > a.len() as i64 || oo as i64 + len as i64 > o.len() as i64 {
+            if to < 0
+                || oo < 0
+                || to as i64 + len as i64 > a.len() as i64
+                || oo as i64 + len as i64 > o.len() as i64
+            {
                 b(false)
             } else if len <= 0 {
                 b(true)
             } else {
                 let x = from_u16(&a[to as usize..(to + len) as usize]);
                 let y = from_u16(&o[oo as usize..(oo + len) as usize]);
-                b(if ic { x.to_lowercase() == y.to_lowercase() } else { x == y })
+                b(if ic {
+                    x.to_lowercase() == y.to_lowercase()
+                } else {
+                    x == y
+                })
             }
         }
         ("subSequence", "(II)Ljava/lang/CharSequence;") => {
             let u = u16s(&this);
             let (s, e) = (int(0), int(1));
             if s < 0 || e < s || e as usize > u.len() {
-                return Err(exc("Ljava/lang/StringIndexOutOfBoundsException;", format!("begin {s}, end {e}, length {}", u.len())));
+                return Err(exc(
+                    "Ljava/lang/StringIndexOutOfBoundsException;",
+                    format!("begin {s}, end {e}, length {}", u.len()),
+                ));
             }
             new_str(vm, from_u16(&u[s as usize..e as usize]))?
         }
-        ("toLowerCase", "()Ljava/lang/String;") | ("toLowerCase", "(Ljava/util/Locale;)Ljava/lang/String;") => {
+        ("toLowerCase", "()Ljava/lang/String;")
+        | ("toLowerCase", "(Ljava/util/Locale;)Ljava/lang/String;") => {
             if this.chars().all(|c| !c.is_uppercase()) {
                 Value::Obj(recv)
             } else {
                 new_str(vm, this.to_lowercase())?
             }
         }
-        ("toUpperCase", "()Ljava/lang/String;") | ("toUpperCase", "(Ljava/util/Locale;)Ljava/lang/String;") => {
+        ("toUpperCase", "()Ljava/lang/String;")
+        | ("toUpperCase", "(Ljava/util/Locale;)Ljava/lang/String;") => {
             if this.chars().all(|c| !c.is_lowercase()) {
                 Value::Obj(recv)
             } else {
@@ -370,7 +425,10 @@ pub(crate) fn instance_intrinsic(
         ("repeat", "(I)Ljava/lang/String;") => {
             let n = int(0);
             if n < 0 {
-                return Err(exc("Ljava/lang/IllegalArgumentException;", format!("count is negative: {n}")));
+                return Err(exc(
+                    "Ljava/lang/IllegalArgumentException;",
+                    format!("count is negative: {n}"),
+                ));
             }
             new_str(vm, this.repeat(n as usize))?
         }
@@ -388,7 +446,8 @@ pub(crate) fn instance_intrinsic(
                 new_str(vm, this.replace(&t, &r))?
             }
         }
-        ("split", "(Ljava/lang/String;)[Ljava/lang/String;") | ("split", "(Ljava/lang/String;I)[Ljava/lang/String;") => {
+        ("split", "(Ljava/lang/String;)[Ljava/lang/String;")
+        | ("split", "(Ljava/lang/String;I)[Ljava/lang/String;") => {
             let pat = charseq(vm, &args[0])?;
             let limit = if args.len() > 1 { int(1) } else { 0 };
             let re = compile(&pat)?;
@@ -397,12 +456,16 @@ pub(crate) fn instance_intrinsic(
         }
         ("replaceAll", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;") => {
             let (p, r) = (charseq(vm, &args[0])?, charseq(vm, &args[1])?);
-            let out = compile(&p)?.replace_all(&this, java_replacement(&r).as_str()).into_owned();
+            let out = compile(&p)?
+                .replace_all(&this, java_replacement(&r).as_str())
+                .into_owned();
             new_str(vm, out)?
         }
         ("replaceFirst", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;") => {
             let (p, r) = (charseq(vm, &args[0])?, charseq(vm, &args[1])?);
-            let out = compile(&p)?.replace(&this, java_replacement(&r).as_str()).into_owned();
+            let out = compile(&p)?
+                .replace(&this, java_replacement(&r).as_str())
+                .into_owned();
             new_str(vm, out)?
         }
         ("matches", "(Ljava/lang/String;)Z") => {
@@ -418,7 +481,12 @@ pub(crate) fn instance_intrinsic(
     }))
 }
 
-fn string_ctor(vm: &mut Engine, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+fn string_ctor(
+    vm: &mut Engine,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let s = match sig {
         "([B)V" => {
             let b: Vec<u8> = int_elems(vm, &args[0])?.iter().map(|x| *x as u8).collect();
@@ -433,9 +501,15 @@ fn string_ctor(vm: &mut Engine, sig: &str, recv: ObjRef, args: &[Value]) -> Resu
             let all = int_elems(vm, &args[0])?;
             let (o, n) = (args[1].as_int()?, args[2].as_int()?);
             if o < 0 || n < 0 || (o + n) as usize > all.len() {
-                return Err(exc("Ljava/lang/StringIndexOutOfBoundsException;", format!("offset {o}, count {n}, length {}", all.len())));
+                return Err(exc(
+                    "Ljava/lang/StringIndexOutOfBoundsException;",
+                    format!("offset {o}, count {n}, length {}", all.len()),
+                ));
             }
-            let b: Vec<u8> = all[o as usize..(o + n) as usize].iter().map(|x| *x as u8).collect();
+            let b: Vec<u8> = all[o as usize..(o + n) as usize]
+                .iter()
+                .map(|x| *x as u8)
+                .collect();
             let cs = charset_name(vm, args.get(3))?;
             decode(&b, &cs)
         }
@@ -443,13 +517,21 @@ fn string_ctor(vm: &mut Engine, sig: &str, recv: ObjRef, args: &[Value]) -> Resu
             let all = int_elems(vm, &args[0])?;
             let (o, n) = (args[1].as_int()?, args[2].as_int()?);
             if o < 0 || n < 0 || (o + n) as usize > all.len() {
-                return Err(exc("Ljava/lang/StringIndexOutOfBoundsException;", format!("offset {o}, count {n}")));
+                return Err(exc(
+                    "Ljava/lang/StringIndexOutOfBoundsException;",
+                    format!("offset {o}, count {n}"),
+                ));
             }
             let mut out = String::new();
             for cp in &all[o as usize..(o + n) as usize] {
                 match char::from_u32(*cp as u32) {
                     Some(c) => out.push(c),
-                    None => return Err(exc("Ljava/lang/IllegalArgumentException;", format!("invalid code point {cp}"))),
+                    None => {
+                        return Err(exc(
+                            "Ljava/lang/IllegalArgumentException;",
+                            format!("invalid code point {cp}"),
+                        ))
+                    }
                 }
             }
             out
@@ -479,7 +561,10 @@ pub(crate) fn static_intrinsic(
             let s = java_format(vm, &f, &items, ('.', ','))?;
             Ok(Some(new_str(vm, s)?))
         }
-        ("format", "(Ljava/util/Locale;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;") => {
+        (
+            "format",
+            "(Ljava/util/Locale;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;",
+        ) => {
             let seps = locale_seps(vm, args.first())?;
             let f = charseq(vm, &args[1])?;
             let items = obj_array(vm, args.get(2))?;
@@ -525,7 +610,11 @@ fn locale_seps(vm: &mut Engine, v: Option<&Value>) -> Result<(char, char), VmExi
         Some(Value::Obj(r)) => crate::intrinsics::object_to_string(vm, *r).unwrap_or_default(),
         _ => String::new(),
     };
-    let lang = tag.split(['_', '-']).next().unwrap_or("").to_ascii_lowercase();
+    let lang = tag
+        .split(['_', '-'])
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase();
     Ok(match lang.as_str() {
         "pt" | "de" | "es" | "it" | "nl" | "id" | "tr" | "da" | "ro" | "el" => (',', '.'),
         "fr" | "ru" | "pl" | "cs" | "sv" | "nb" | "fi" | "uk" => (',', '\u{a0}'),
@@ -573,7 +662,12 @@ fn group(digits: &str, sep: char) -> String {
 }
 
 /// `java.util.Formatter` subset (see the module docs).
-pub(crate) fn java_format(vm: &mut Engine, f: &str, args: &[Value], seps: (char, char)) -> Result<String, VmExit> {
+pub(crate) fn java_format(
+    vm: &mut Engine,
+    f: &str,
+    args: &[Value],
+    seps: (char, char),
+) -> Result<String, VmExit> {
     let (dec, grp) = seps;
     let mut out = String::new();
     let chars: Vec<char> = f.chars().collect();
@@ -633,7 +727,10 @@ pub(crate) fn java_format(vm: &mut Engine, f: &str, args: &[Value], seps: (char,
                 k
             });
             args.get(idx).cloned().ok_or_else(|| {
-                exc("Ljava/util/MissingFormatArgumentException;", format!("Format specifier '%{conv}'"))
+                exc(
+                    "Ljava/util/MissingFormatArgumentException;",
+                    format!("Format specifier '%{conv}'"),
+                )
             })
         };
         let body: String = match conv {
@@ -654,7 +751,11 @@ pub(crate) fn java_format(vm: &mut Engine, f: &str, args: &[Value], seps: (char,
                     Some(p) => s.chars().take(p).collect(),
                     None => s,
                 };
-                if conv == 'S' { s.to_uppercase() } else { s }
+                if conv == 'S' {
+                    s.to_uppercase()
+                } else {
+                    s
+                }
             }
             'b' | 'B' => {
                 let v = take()?;
@@ -666,7 +767,11 @@ pub(crate) fn java_format(vm: &mut Engine, f: &str, args: &[Value], seps: (char,
                     _ => true,
                 };
                 let s = t.to_string();
-                if conv == 'B' { s.to_uppercase() } else { s }
+                if conv == 'B' {
+                    s.to_uppercase()
+                } else {
+                    s
+                }
             }
             'c' => {
                 let v = take()?;
@@ -689,7 +794,11 @@ pub(crate) fn java_format(vm: &mut Engine, f: &str, args: &[Value], seps: (char,
                     Value::Obj(r) => format!("{r:x}"),
                     _ => "0".to_string(),
                 };
-                if conv == 'H' { h.to_uppercase() } else { h }
+                if conv == 'H' {
+                    h.to_uppercase()
+                } else {
+                    h
+                }
             }
             'd' | 'x' | 'X' | 'o' => {
                 let v = take()?;
@@ -699,7 +808,12 @@ pub(crate) fn java_format(vm: &mut Engine, f: &str, args: &[Value], seps: (char,
                         out.push_str(&pad("null".into(), width, &flags));
                         continue;
                     }
-                    _ => return Err(exc("Ljava/util/IllegalFormatConversionException;", format!("{conv} != {}", value_class(vm, &v)))),
+                    _ => {
+                        return Err(exc(
+                            "Ljava/util/IllegalFormatConversionException;",
+                            format!("{conv} != {}", value_class(vm, &v)),
+                        ))
+                    }
                 };
                 match conv {
                     'd' => {
@@ -712,8 +826,13 @@ pub(crate) fn java_format(vm: &mut Engine, f: &str, args: &[Value], seps: (char,
                     }
                     _ => {
                         // two's complement for negatives, at the arg width
-                        let wide = matches!(v, Value::Long(_)) || matches!(&v, Value::Obj(r) if vm.heap.class_of(*r).ok() == Some("Ljava/lang/Long;"));
-                        let u: u64 = if wide { n as i64 as u64 } else { n as i32 as u32 as u64 };
+                        let wide = matches!(v, Value::Long(_))
+                            || matches!(&v, Value::Obj(r) if vm.heap.class_of(*r).ok() == Some("Ljava/lang/Long;"));
+                        let u: u64 = if wide {
+                            n as i64 as u64
+                        } else {
+                            n as i32 as u32 as u64
+                        };
                         let mut s = match conv {
                             'x' => format!("{u:x}"),
                             'X' => format!("{u:X}"),
@@ -738,16 +857,30 @@ pub(crate) fn java_format(vm: &mut Engine, f: &str, args: &[Value], seps: (char,
                 let x = match as_num(vm, &v) {
                     Some(Num::F(x)) => x,
                     Some(Num::I(_)) => {
-                        return Err(exc("Ljava/util/IllegalFormatConversionException;", format!("{conv} != {}", value_class(vm, &v))))
+                        return Err(exc(
+                            "Ljava/util/IllegalFormatConversionException;",
+                            format!("{conv} != {}", value_class(vm, &v)),
+                        ))
                     }
                     None if matches!(v, Value::Null) => {
                         out.push_str(&pad("null".into(), width, &flags));
                         continue;
                     }
-                    None => return Err(exc("Ljava/util/IllegalFormatConversionException;", format!("{conv} != {}", value_class(vm, &v)))),
+                    None => {
+                        return Err(exc(
+                            "Ljava/util/IllegalFormatConversionException;",
+                            format!("{conv} != {}", value_class(vm, &v)),
+                        ))
+                    }
                 };
                 if x.is_nan() || x.is_infinite() {
-                    let s = if x.is_nan() { "NaN".to_string() } else if x > 0.0 { "Infinity".into() } else { "-Infinity".into() };
+                    let s = if x.is_nan() {
+                        "NaN".to_string()
+                    } else if x > 0.0 {
+                        "Infinity".into()
+                    } else {
+                        "-Infinity".into()
+                    };
                     pad(s, width, &flags)
                 } else {
                     let p = prec.unwrap_or(6);
@@ -756,26 +889,52 @@ pub(crate) fn java_format(vm: &mut Engine, f: &str, args: &[Value], seps: (char,
                     let body = match conv {
                         'f' => {
                             let s = format!("{a:.p$}");
-                            let (ip, fp) = s.split_once('.').map_or((s.clone(), String::new()), |(a, b)| (a.to_string(), b.to_string()));
-                            let ip = if flags.contains(',') { group(&ip, grp) } else { ip };
-                            if fp.is_empty() { ip } else { format!("{ip}{dec}{fp}") }
+                            let (ip, fp) = s
+                                .split_once('.')
+                                .map_or((s.clone(), String::new()), |(a, b)| {
+                                    (a.to_string(), b.to_string())
+                                });
+                            let ip = if flags.contains(',') {
+                                group(&ip, grp)
+                            } else {
+                                ip
+                            };
+                            if fp.is_empty() {
+                                ip
+                            } else {
+                                format!("{ip}{dec}{fp}")
+                            }
                         }
                         'e' | 'E' => {
                             let s = format!("{a:.p$e}");
                             let (m, e) = s.split_once('e').unwrap_or((&s, "0"));
                             let ev: i32 = e.parse().unwrap_or(0);
                             let m = m.replace('.', &dec.to_string());
-                            let r = format!("{m}e{}{:02}", if ev < 0 { '-' } else { '+' }, ev.abs());
-                            if conv == 'E' { r.to_uppercase() } else { r }
+                            let r =
+                                format!("{m}e{}{:02}", if ev < 0 { '-' } else { '+' }, ev.abs());
+                            if conv == 'E' {
+                                r.to_uppercase()
+                            } else {
+                                r
+                            }
                         }
                         _ => {
                             let p = if p == 0 { 1 } else { p };
-                            let exp = if a == 0.0 { 0 } else { a.log10().floor() as i32 };
+                            let exp = if a == 0.0 {
+                                0
+                            } else {
+                                a.log10().floor() as i32
+                            };
                             if a != 0.0 && (exp < -4 || exp >= p as i32) {
                                 let s = format!("{a:.*e}", p - 1);
                                 let (m, e) = s.split_once('e').unwrap_or((&s, "0"));
                                 let ev: i32 = e.parse().unwrap_or(0);
-                                format!("{}e{}{:02}", m.replace('.', &dec.to_string()), if ev < 0 { '-' } else { '+' }, ev.abs())
+                                format!(
+                                    "{}e{}{:02}",
+                                    m.replace('.', &dec.to_string()),
+                                    if ev < 0 { '-' } else { '+' },
+                                    ev.abs()
+                                )
                             } else {
                                 let decimals = (p as i32 - 1 - exp).max(0) as usize;
                                 format!("{a:.decimals$}").replace('.', &dec.to_string())
@@ -798,7 +957,13 @@ pub(crate) fn java_format(vm: &mut Engine, f: &str, args: &[Value], seps: (char,
 
 fn value_class(vm: &Engine, v: &Value) -> String {
     match v {
-        Value::Obj(r) => vm.heap.class_of(*r).unwrap_or("?").trim_start_matches('L').trim_end_matches(';').replace('/', "."),
+        Value::Obj(r) => vm
+            .heap
+            .class_of(*r)
+            .unwrap_or("?")
+            .trim_start_matches('L')
+            .trim_end_matches(';')
+            .replace('/', "."),
         Value::Int(_) => "java.lang.Integer".into(),
         Value::Long(_) => "java.lang.Long".into(),
         Value::Float(_) => "java.lang.Float".into(),
@@ -821,7 +986,11 @@ fn pad(s: String, width: usize, flags: &str) -> String {
 
 fn sign_pad(digits: String, neg: bool, width: usize, flags: &str) -> String {
     let (pre, post) = if neg {
-        if flags.contains('(') { ("(", ")") } else { ("-", "") }
+        if flags.contains('(') {
+            ("(", ")")
+        } else {
+            ("-", "")
+        }
     } else if flags.contains('+') {
         ("+", "")
     } else if flags.contains(' ') {

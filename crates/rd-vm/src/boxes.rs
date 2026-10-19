@@ -84,7 +84,10 @@ pub(crate) fn box_value(vm: &mut Engine, class: &str, v: Value) -> Result<ObjRef
 /// table, so `sget`, `valueOf` and `TRUE == valueOf(true)` all see the same
 /// identity.
 pub(crate) fn boolean_obj(vm: &mut Engine, b: bool) -> Result<ObjRef, VmExit> {
-    let key = (BOOLEAN.to_string(), if b { "TRUE" } else { "FALSE" }.to_string());
+    let key = (
+        BOOLEAN.to_string(),
+        if b { "TRUE" } else { "FALSE" }.to_string(),
+    );
     if let Some(Value::Obj(r)) = vm.statics.get(&key) {
         return Ok(*r);
     }
@@ -101,7 +104,11 @@ pub(crate) fn boolean_obj(vm: &mut Engine, b: bool) -> Result<ObjRef, VmExit> {
 
 /// Host static constants of JDK classes that are not in any DEX. Called by
 /// `sget` before falling back to the type default.
-pub(crate) fn host_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<Value>, VmExit> {
+pub(crate) fn host_static(
+    vm: &mut Engine,
+    owner: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
     Ok(Some(match (owner, field) {
         (BOOLEAN, "TRUE") => Value::Obj(boolean_obj(vm, true)?),
         (BOOLEAN, "FALSE") => Value::Obj(boolean_obj(vm, false)?),
@@ -253,7 +260,9 @@ pub(crate) fn static_intrinsic(
     let v = match name {
         "valueOf" if sig == format!("({p}){class}") => Value::Obj(box_value(vm, class, a0())?),
         "hashCode" if sig == format!("({p})I") => Value::Int(prim_hash(k, &a0())?),
-        "compare" if sig == format!("({p}{p})I") => Value::Int(prim_compare(k, &args[0], &args[1])?),
+        "compare" if sig == format!("({p}{p})I") => {
+            Value::Int(prim_compare(k, &args[0], &args[1])?)
+        }
         "toString" if sig == format!("({p})Ljava/lang/String;") => {
             let s = prim_to_string(k, &a0())?;
             Value::Obj(crate::intrinsics::alloc_string(vm, s)?)
@@ -269,9 +278,15 @@ pub(crate) fn static_intrinsic(
                 Value::Obj(boolean_obj(vm, b)?)
             }
         }
-        "logicalAnd" if k == 'Z' => Value::Int(((args[0].as_int()? != 0) & (args[1].as_int()? != 0)) as i32),
-        "logicalOr" if k == 'Z' => Value::Int(((args[0].as_int()? != 0) | (args[1].as_int()? != 0)) as i32),
-        "logicalXor" if k == 'Z' => Value::Int(((args[0].as_int()? != 0) ^ (args[1].as_int()? != 0)) as i32),
+        "logicalAnd" if k == 'Z' => {
+            Value::Int(((args[0].as_int()? != 0) & (args[1].as_int()? != 0)) as i32)
+        }
+        "logicalOr" if k == 'Z' => {
+            Value::Int(((args[0].as_int()? != 0) | (args[1].as_int()? != 0)) as i32)
+        }
+        "logicalXor" if k == 'Z' => {
+            Value::Int(((args[0].as_int()? != 0) ^ (args[1].as_int()? != 0)) as i32)
+        }
         "floatToIntBits" if k == 'F' => Value::Int(float_bits(args[0].as_float()?)),
         "floatToRawIntBits" if k == 'F' => Value::Int(args[0].as_float()?.to_bits() as i32),
         "intBitsToFloat" if k == 'F' => Value::Float(f32::from_bits(args[0].as_int()? as u32)),
@@ -280,8 +295,12 @@ pub(crate) fn static_intrinsic(
         "longBitsToDouble" if k == 'D' => Value::Double(f64::from_bits(args[0].as_long()? as u64)),
         "isNaN" if k == 'F' && sig == "(F)Z" => Value::Int(args[0].as_float()?.is_nan() as i32),
         "isNaN" if k == 'D' && sig == "(D)Z" => Value::Int(args[0].as_double()?.is_nan() as i32),
-        "isInfinite" if k == 'F' && sig == "(F)Z" => Value::Int(args[0].as_float()?.is_infinite() as i32),
-        "isInfinite" if k == 'D' && sig == "(D)Z" => Value::Int(args[0].as_double()?.is_infinite() as i32),
+        "isInfinite" if k == 'F' && sig == "(F)Z" => {
+            Value::Int(args[0].as_float()?.is_infinite() as i32)
+        }
+        "isInfinite" if k == 'D' && sig == "(D)Z" => {
+            Value::Int(args[0].as_double()?.is_infinite() as i32)
+        }
         "isFinite" if k == 'F' => Value::Int(args[0].as_float()?.is_finite() as i32),
         "isFinite" if k == 'D' => Value::Int(args[0].as_double()?.is_finite() as i32),
         _ => return Ok(None),
@@ -343,7 +362,10 @@ pub(crate) fn instance_intrinsic(
             if vm.heap.class_of(r)? != recv_class {
                 return Err(VmExit::Exception(Throwable::new(
                     "Ljava/lang/ClassCastException;",
-                    format!("{} cannot be compared to {recv_class}", vm.heap.class_of(r)?),
+                    format!(
+                        "{} cannot be compared to {recv_class}",
+                        vm.heap.class_of(r)?
+                    ),
                 )));
             }
             let other = vm.heap.get_field(r, "value")?;

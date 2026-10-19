@@ -47,16 +47,25 @@ fn release_for(sdk: i32) -> &'static str {
 }
 
 fn s(vm: &mut Engine, v: &str) -> Result<Value, VmExit> {
-    Ok(Value::Obj(crate::intrinsics::alloc_string(vm, v.to_string())?))
+    Ok(Value::Obj(crate::intrinsics::alloc_string(
+        vm,
+        v.to_string(),
+    )?))
 }
 
-pub(crate) fn host_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<Value>, VmExit> {
+pub(crate) fn host_static(
+    vm: &mut Engine,
+    owner: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
     let sdk = sdk_int();
     if owner == VERSION {
         return Ok(Some(match field {
             "SDK_INT" => Value::Int(sdk),
             "PREVIEW_SDK_INT" => Value::Int(0),
-            "RELEASE" | "RELEASE_OR_CODENAME" | "RELEASE_OR_PREVIEW_DISPLAY" => s(vm, release_for(sdk))?,
+            "RELEASE" | "RELEASE_OR_CODENAME" | "RELEASE_OR_PREVIEW_DISPLAY" => {
+                s(vm, release_for(sdk))?
+            }
             "CODENAME" => s(vm, "REL")?,
             "INCREMENTAL" => s(vm, "rustydroid")?,
             "SECURITY_PATCH" => s(vm, "2026-01-01")?,
@@ -79,7 +88,10 @@ pub(crate) fn host_static(vm: &mut Engine, owner: &str, field: &str) -> Result<O
             "TYPE" => s(vm, "user")?,
             "BOOTLOADER" | "RADIO" | "SERIAL" => s(vm, "unknown")?,
             "FINGERPRINT" => {
-                let f = format!("rustydroid/rustydroid/rustydroid:{}/RD1/1:user/release-keys", release_for(sdk));
+                let f = format!(
+                    "rustydroid/rustydroid/rustydroid:{}/RD1/1:user/release-keys",
+                    release_for(sdk)
+                );
                 s(vm, &f)?
             }
             "TIME" => Value::Long(1_767_225_600_000),
@@ -94,9 +106,11 @@ pub(crate) fn host_static(vm: &mut Engine, owner: &str, field: &str) -> Result<O
                 for a in abis {
                     elems.push(s(vm, a)?);
                 }
-                let arr = vm
-                    .heap
-                    .alloc_array(crate::heap::ElemKind::Obj, elems.len(), "Ljava/lang/String;")?;
+                let arr = vm.heap.alloc_array(
+                    crate::heap::ElemKind::Obj,
+                    elems.len(),
+                    "Ljava/lang/String;",
+                )?;
                 let slot = vm
                     .heap
                     .array_elems_mut(arr)

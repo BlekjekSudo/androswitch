@@ -265,7 +265,9 @@ pub(crate) fn instance_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    if !(mref_class == THREAD || is_thread_class(vm, recv_class)) || !is_thread_class(vm, recv_class) {
+    if !(mref_class == THREAD || is_thread_class(vm, recv_class))
+        || !is_thread_class(vm, recv_class)
+    {
         return Ok(None);
     }
     if name == "<init>" {
@@ -327,7 +329,10 @@ pub(crate) fn instance_intrinsic(
         ("start", "()V") => {
             let th = vm.threads.entry(recv);
             if th.state != ThreadState::New {
-                return Err(exc("Ljava/lang/IllegalThreadStateException;", "thread already started"));
+                return Err(exc(
+                    "Ljava/lang/IllegalThreadStateException;",
+                    "thread already started",
+                ));
             }
             th.state = ThreadState::Ready;
             vm.threads.ready.push_back(recv);
@@ -356,7 +361,10 @@ pub(crate) fn instance_intrinsic(
         ("setDaemon", "(Z)V") => {
             let th = vm.threads.entry(recv);
             if th.state != ThreadState::New {
-                return Err(exc("Ljava/lang/IllegalThreadStateException;", "setDaemon after start"));
+                return Err(exc(
+                    "Ljava/lang/IllegalThreadStateException;",
+                    "setDaemon after start",
+                ));
             }
             th.daemon = args.first().and_then(|v| v.as_int().ok()).unwrap_or(0) != 0;
             Value::Null
@@ -381,7 +389,10 @@ pub(crate) fn instance_intrinsic(
         ("getContextClassLoader", _) => return Ok(None),
         ("toString", "()Ljava/lang/String;") => {
             let n = vm.threads.entry(recv).name.clone();
-            Value::Obj(crate::intrinsics::alloc_string(vm, format!("Thread[{n},5,main]"))?)
+            Value::Obj(crate::intrinsics::alloc_string(
+                vm,
+                format!("Thread[{n},5,main]"),
+            )?)
         }
         _ => return Ok(None),
     };
@@ -454,7 +465,9 @@ fn wake_timed(vm: &mut Engine) {
         .threads
         .table
         .iter()
-        .filter(|(_, th)| th.state == ThreadState::Parked && th.wake_at_ms.is_some_and(|w| w <= now))
+        .filter(|(_, th)| {
+            th.state == ThreadState::Parked && th.wake_at_ms.is_some_and(|w| w <= now)
+        })
         .map(|(r, th)| (th.id, *r))
         .collect();
     due.sort(); // deterministic: by thread id
@@ -475,7 +488,9 @@ pub(crate) fn run_ready(vm: &mut Engine, max: usize) -> Result<usize, VmExit> {
     wake_timed(vm);
     let mut ran = 0;
     while ran < max {
-        let Some(t) = vm.threads.ready.pop_front() else { break };
+        let Some(t) = vm.threads.ready.pop_front() else {
+            break;
+        };
         if vm.threads.entry(t).state != ThreadState::Ready {
             continue;
         }
@@ -485,14 +500,17 @@ pub(crate) fn run_ready(vm: &mut Engine, max: usize) -> Result<usize, VmExit> {
     Ok(ran)
 }
 
-pub(crate) const KILL_HANDLER: &str = "Lcom/android/internal/os/RuntimeInit$KillApplicationHandler;";
+pub(crate) const KILL_HANDLER: &str =
+    "Lcom/android/internal/os/RuntimeInit$KillApplicationHandler;";
 
 /// The platform's last-resort handler (one instance per VM).
 fn kill_handler(vm: &mut Engine) -> Result<ObjRef, VmExit> {
     if let Some(h) = vm.threads.kill_handler {
         return Ok(h);
     }
-    let h = vm.heap.alloc_instance(KILL_HANDLER.to_string(), Vec::new())?;
+    let h = vm
+        .heap
+        .alloc_instance(KILL_HANDLER.to_string(), Vec::new())?;
     vm.threads.kill_handler = Some(h);
     Ok(h)
 }
@@ -507,7 +525,13 @@ pub(crate) fn ueh_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    if name != "uncaughtException" || vm.heap.class_of(recv).map(|c| c != KILL_HANDLER).unwrap_or(true) {
+    if name != "uncaughtException"
+        || vm
+            .heap
+            .class_of(recv)
+            .map(|c| c != KILL_HANDLER)
+            .unwrap_or(true)
+    {
         return Ok(None);
     }
     if let Some(h) = vm.threads.default_ueh.filter(|h| *h != recv) {
@@ -517,11 +541,18 @@ pub(crate) fn ueh_intrinsic(
             "uncaughtException",
             "(Ljava/lang/Thread;Ljava/lang/Throwable;)V",
         ) {
-            vm.call(d, def, &m, vec![Value::Obj(h), args[0].clone(), args[1].clone()])?;
+            vm.call(
+                d,
+                def,
+                &m,
+                vec![Value::Obj(h), args[0].clone(), args[1].clone()],
+            )?;
             return Ok(Some(Value::Null));
         }
     }
-    let Some(Value::Obj(e)) = args.get(1).cloned() else { return Ok(Some(Value::Null)) };
+    let Some(Value::Obj(e)) = args.get(1).cloned() else {
+        return Ok(Some(Value::Null));
+    };
     let class = vm.heap.class_of(e)?.to_string();
     let msg = match vm.heap.get_field(e, "message") {
         Ok(Value::Obj(m)) => vm.heap.as_str(m).ok().map(str::to_string),
@@ -533,6 +564,13 @@ pub(crate) fn ueh_intrinsic(
             text.push_str(&t.replace("\n  at ", "\nE/AndroidRuntime:   at "));
         }
     }
-    crate::intrinsics::host_print(1, &format!("E/AndroidRuntime: FATAL EXCEPTION: main\nE/AndroidRuntime: {text}\n"));
-    Err(VmExit::Exception(crate::err::Throwable { class, message: msg, obj: Some(e) }))
+    crate::intrinsics::host_print(
+        1,
+        &format!("E/AndroidRuntime: FATAL EXCEPTION: main\nE/AndroidRuntime: {text}\n"),
+    );
+    Err(VmExit::Exception(crate::err::Throwable {
+        class,
+        message: msg,
+        obj: Some(e),
+    }))
 }

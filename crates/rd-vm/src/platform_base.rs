@@ -56,8 +56,14 @@ const BASES: &[&str] = &[
 
 /// ViewOutlineProvider statics (BACKGROUND/BOUNDS/PADDED_BOUNDS) are objects
 /// of the base class.
-pub(crate) fn host_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<Value>, VmExit> {
-    if owner == "Landroid/view/ViewOutlineProvider;" && matches!(field, "BACKGROUND" | "BOUNDS" | "PADDED_BOUNDS") {
+pub(crate) fn host_static(
+    vm: &mut Engine,
+    owner: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    if owner == "Landroid/view/ViewOutlineProvider;"
+        && matches!(field, "BACKGROUND" | "BOUNDS" | "PADDED_BOUNDS")
+    {
         let r = vm.heap.alloc_instance(owner.to_string(), Vec::new())?;
         return Ok(Some(Value::Obj(r)));
     }
@@ -88,7 +94,13 @@ const A11Y: &str = "Landroid/view/accessibility/AccessibilityManager;";
 /// service lists, listener registration succeeds, events are dropped.
 /// MCP-driven accessibility (`a11y_*` tools) works on the view tree and does
 /// not go through this manager.
-pub(crate) fn a11y_manager(vm: &mut Engine, mref_class: &str, name: &str, sig: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn a11y_manager(
+    vm: &mut Engine,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if mref_class == "Landroid/view/autofill/AutofillManager;" {
         // autofill disabled (no autofill service on the headless device)
         return Ok(Some(match sig.rsplit(')').next().unwrap_or("V") {
@@ -102,10 +114,16 @@ pub(crate) fn a11y_manager(vm: &mut Engine, mref_class: &str, name: &str, sig: &
     }
     Ok(Some(match name {
         "isEnabled" | "isTouchExplorationEnabled" | "isAudioDescriptionRequested" => Value::Int(0),
-        "getEnabledAccessibilityServiceList" | "getInstalledAccessibilityServiceList" => crate::collections::new_list(vm, "Ljava/util/ArrayList;", Vec::new())?,
+        "getEnabledAccessibilityServiceList" | "getInstalledAccessibilityServiceList" => {
+            crate::collections::new_list(vm, "Ljava/util/ArrayList;", Vec::new())?
+        }
         "getRecommendedTimeoutMillis" => args.first().cloned().unwrap_or(Value::Int(0)),
         n if n.starts_with("add") || n.starts_with("remove") => {
-            if sig.ends_with(")Z") { Value::Int(1) } else { Value::Null }
+            if sig.ends_with(")Z") {
+                Value::Int(1)
+            } else {
+                Value::Null
+            }
         }
         "sendAccessibilityEvent" | "interrupt" => Value::Null,
         _ => return Ok(None),
@@ -116,7 +134,12 @@ pub(crate) fn a11y_manager(vm: &mut Engine, mref_class: &str, name: &str, sig: &
 /// vibrator with amplitude control. Each `vibrate` is written to logcat as
 /// `I/RdVibrator: …` so agents can assert haptic feedback via the MCP `logs`
 /// tool. `VibrationEffect` objects carry their description in `rd_desc`.
-pub(crate) fn vibrator_static(vm: &mut Engine, class: &str, name: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn vibrator_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if class != "Landroid/os/VibrationEffect;" {
         return Ok(None);
     }
@@ -124,10 +147,18 @@ pub(crate) fn vibrator_static(vm: &mut Engine, class: &str, name: &str, args: &[
         "createOneShot" => format!("oneShot {}ms amp={}", long(args.first()), int(args.get(1))),
         "createWaveform" => {
             let timings: Vec<String> = match args.first() {
-                Some(Value::Obj(a)) => vm.heap.as_array_elems(*a).map(|(e, _)| e.iter().map(|v| long(Some(v)).to_string()).collect()).unwrap_or_default(),
+                Some(Value::Obj(a)) => vm
+                    .heap
+                    .as_array_elems(*a)
+                    .map(|(e, _)| e.iter().map(|v| long(Some(v)).to_string()).collect())
+                    .unwrap_or_default(),
                 _ => Vec::new(),
             };
-            format!("waveform [{}] repeat={}", timings.join(","), int(args.last()))
+            format!(
+                "waveform [{}] repeat={}",
+                timings.join(","),
+                int(args.last())
+            )
         }
         "createPredefined" => format!("predefined {}", int(args.first())),
         _ => return Ok(None),
@@ -138,20 +169,32 @@ pub(crate) fn vibrator_static(vm: &mut Engine, class: &str, name: &str, args: &[
     Ok(Some(Value::Obj(r)))
 }
 
-pub(crate) fn vibrator(vm: &mut Engine, mref_class: &str, name: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn vibrator(
+    vm: &mut Engine,
+    mref_class: &str,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     match mref_class {
         "Landroid/os/VibratorManager;" => Ok(Some(match name {
             "getDefaultVibrator" | "getVibrator" => {
-                let k = ("Lrd/SystemServices;".to_string(), "Landroid/os/Vibrator;".to_string());
+                let k = (
+                    "Lrd/SystemServices;".to_string(),
+                    "Landroid/os/Vibrator;".to_string(),
+                );
                 if let Some(v) = vm.statics.get(&k) {
                     v.clone()
                 } else {
-                    let r = vm.heap.alloc_instance("Landroid/os/Vibrator;".into(), Vec::new())?;
+                    let r = vm
+                        .heap
+                        .alloc_instance("Landroid/os/Vibrator;".into(), Vec::new())?;
                     vm.statics.insert(k, Value::Obj(r));
                     Value::Obj(r)
                 }
             }
-            "getVibratorIds" => crate::arrays::new_array(vm, "[I", crate::heap::ElemKind::Int, vec![Value::Int(0)])?,
+            "getVibratorIds" => {
+                crate::arrays::new_array(vm, "[I", crate::heap::ElemKind::Int, vec![Value::Int(0)])?
+            }
             "vibrate" | "cancel" => Value::Null,
             _ => return Ok(None),
         })),
@@ -160,7 +203,9 @@ pub(crate) fn vibrator(vm: &mut Engine, mref_class: &str, name: &str, args: &[Va
             "vibrate" => {
                 let desc = match args.first() {
                     Some(Value::Obj(e)) => match vm.heap.get_field(*e, "rd_desc") {
-                        Ok(Value::Obj(s)) => vm.heap.as_str(s).map(str::to_string).unwrap_or_default(),
+                        Ok(Value::Obj(s)) => {
+                            vm.heap.as_str(s).map(str::to_string).unwrap_or_default()
+                        }
                         _ => "effect".into(),
                     },
                     Some(Value::Long(ms)) => format!("oneShot {ms}ms"),
@@ -213,7 +258,14 @@ const BUILDERS: &[&str] = &[
     "Landroid/text/style/TtsSpan$Builder;",
 ];
 
-pub(crate) fn value_builder(vm: &mut Engine, mref_class: &str, name: &str, sig: &str, recv: crate::heap::ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn value_builder(
+    vm: &mut Engine,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: crate::heap::ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if !BUILDERS.contains(&mref_class) {
         return Ok(None);
     }
@@ -227,7 +279,12 @@ pub(crate) fn value_builder(vm: &mut Engine, mref_class: &str, name: &str, sig: 
         return Ok(Some(Value::Obj(recv)));
     }
     if name == "build" {
-        let outer = format!("{};", mref_class.trim_end_matches(';').trim_end_matches("$Builder"));
+        let outer = format!(
+            "{};",
+            mref_class
+                .trim_end_matches(';')
+                .trim_end_matches("$Builder")
+        );
         let r = vm.heap.alloc_instance(outer, Vec::new())?;
         return Ok(Some(Value::Obj(r)));
     }
@@ -240,12 +297,22 @@ pub(crate) fn value_builder(vm: &mut Engine, mref_class: &str, name: &str, sig: 
 /// `ActivityManager` for the virtual device: 2 GB, not low-RAM, memory class
 /// 256 MB (large 512 MB), not a monkey run, no background restriction.
 /// `getMemoryInfo` fills `MemoryInfo`'s public fields.
-pub(crate) fn activity_manager(vm: &mut Engine, mref_class: &str, name: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn activity_manager(
+    vm: &mut Engine,
+    mref_class: &str,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if mref_class != "Landroid/app/ActivityManager;" {
         return Ok(None);
     }
     Ok(Some(match name {
-        "isLowRamDevice" | "isUserAMonkey" | "isBackgroundRestricted" | "isRunningInTestHarness" | "isRunningInUserTestHarness" | "clearApplicationUserData" => Value::Int(0),
+        "isLowRamDevice"
+        | "isUserAMonkey"
+        | "isBackgroundRestricted"
+        | "isRunningInTestHarness"
+        | "isRunningInUserTestHarness"
+        | "clearApplicationUserData" => Value::Int(0),
         "getMemoryClass" => Value::Int(256),
         "getLargeMemoryClass" => Value::Int(512),
         "getLauncherLargeIconDensity" => Value::Int(320),
@@ -253,14 +320,23 @@ pub(crate) fn activity_manager(vm: &mut Engine, mref_class: &str, name: &str, ar
         "getMemoryInfo" => {
             if let Some(Value::Obj(mi)) = args.first() {
                 let total: i64 = 2 << 30;
-                for (f, v) in [("totalMem", Value::Long(total)), ("availMem", Value::Long(total / 2)), ("threshold", Value::Long(total / 16))] {
+                for (f, v) in [
+                    ("totalMem", Value::Long(total)),
+                    ("availMem", Value::Long(total / 2)),
+                    ("threshold", Value::Long(total / 16)),
+                ] {
                     crate::err::put_field_result(vm.heap.put_field(*mi, f, v))?;
                 }
                 crate::err::put_field_result(vm.heap.put_field(*mi, "lowMemory", Value::Int(0)))?;
             }
             Value::Null
         }
-        "getRunningAppProcesses" | "getAppTasks" | "getHistoricalProcessExitReasons" | "getRunningServices" => crate::collections::new_list(vm, "Ljava/util/ArrayList;", Vec::new())?,
+        "getRunningAppProcesses"
+        | "getAppTasks"
+        | "getHistoricalProcessExitReasons"
+        | "getRunningServices" => {
+            crate::collections::new_list(vm, "Ljava/util/ArrayList;", Vec::new())?
+        }
         _ => return Ok(None),
     }))
 }
@@ -271,7 +347,14 @@ pub(crate) fn activity_manager(vm: &mut Engine, mref_class: &str, name: &str, ar
 /// back. `hide`/`show` update the `rd_hidden` type mask and log
 /// `I/RdInsets`. Listeners are accepted but never called: the emulated
 /// window's controllable insets do not change.
-pub(crate) fn insets_controller(vm: &mut Engine, recv_class: &str, mref_class: &str, name: &str, recv: crate::heap::ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn insets_controller(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    recv: crate::heap::ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     const WIC: &str = "Landroid/view/WindowInsetsController;";
     let int = |i: usize| match args.get(i) {
         Some(Value::Int(v)) => *v,
@@ -281,8 +364,15 @@ pub(crate) fn insets_controller(vm: &mut Engine, recv_class: &str, mref_class: &
         if let Ok(Value::Obj(c)) = vm.heap.get_field(recv, "rd_insets_controller") {
             return Ok(Some(Value::Obj(c)));
         }
-        let c = vm.heap.alloc_instance(WIC.to_string(), Vec::new()).map_err(crate::err::oom_throwable)?;
-        crate::err::put_field_result(vm.heap.put_field(recv, "rd_insets_controller", Value::Obj(c)))?;
+        let c = vm
+            .heap
+            .alloc_instance(WIC.to_string(), Vec::new())
+            .map_err(crate::err::oom_throwable)?;
+        crate::err::put_field_result(vm.heap.put_field(
+            recv,
+            "rd_insets_controller",
+            Value::Obj(c),
+        ))?;
         return Ok(Some(Value::Obj(c)));
     }
     if recv_class != WIC && mref_class != WIC {
@@ -292,7 +382,9 @@ pub(crate) fn insets_controller(vm: &mut Engine, recv_class: &str, mref_class: &
         Ok(Value::Int(v)) => v,
         _ => 0,
     };
-    let put = |vm: &mut Engine, f: &str, v: i32| crate::err::put_field_result(vm.heap.put_field(recv, f, Value::Int(v)));
+    let put = |vm: &mut Engine, f: &str, v: i32| {
+        crate::err::put_field_result(vm.heap.put_field(recv, f, Value::Int(v)))
+    };
     Ok(Some(match name {
         "setSystemBarsAppearance" => {
             let (appearance, mask) = (int(0), int(1));
@@ -308,12 +400,18 @@ pub(crate) fn insets_controller(vm: &mut Engine, recv_class: &str, mref_class: &
         "getSystemBarsBehavior" => Value::Int(get(vm, "rd_behavior")),
         "hide" | "show" => {
             let cur = get(vm, "rd_hidden");
-            let next = if name == "hide" { cur | int(0) } else { cur & !int(0) };
+            let next = if name == "hide" {
+                cur | int(0)
+            } else {
+                cur & !int(0)
+            };
             put(vm, "rd_hidden", next)?;
             crate::intrinsics::host_print(1, &format!("I/RdInsets: {name} types=0x{:x}\n", int(0)));
             Value::Null
         }
-        "addOnControllableInsetsChangedListener" | "removeOnControllableInsetsChangedListener" | "controlWindowInsetsAnimation" => Value::Null,
+        "addOnControllableInsetsChangedListener"
+        | "removeOnControllableInsetsChangedListener"
+        | "controlWindowInsetsAnimation" => Value::Null,
         _ => return Ok(None),
     }))
 }

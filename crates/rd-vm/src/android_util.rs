@@ -36,7 +36,10 @@ fn get(vm: &Engine, r: ObjRef, f: &str) -> Value {
     vm.heap.get_field(r, f).unwrap_or(Value::Null)
 }
 fn oob(i: i64) -> VmExit {
-    VmExit::Exception(Throwable::new("Ljava/lang/ArrayIndexOutOfBoundsException;", format!("index={i}")))
+    VmExit::Exception(Throwable::new(
+        "Ljava/lang/ArrayIndexOutOfBoundsException;",
+        format!("index={i}"),
+    ))
 }
 
 fn default_value(class: &str) -> Value {
@@ -47,11 +50,21 @@ fn default_value(class: &str) -> Value {
     }
 }
 
-fn sparse(vm: &mut Engine, class: &str, name: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+fn sparse(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let a = |i: usize| args.get(i);
-    let m = vm.sparse.entry(recv).or_insert_with(BTreeMap::new);
+    let m = vm.sparse.entry(recv).or_default();
     let nth = |m: &BTreeMap<i64, Value>, i: i64| -> Result<(i64, Value), VmExit> {
-        m.iter().nth(i.max(0) as usize).filter(|_| i >= 0).map(|(k, v)| (*k, v.clone())).ok_or_else(|| oob(i))
+        m.iter()
+            .nth(i.max(0) as usize)
+            .filter(|_| i >= 0)
+            .map(|(k, v)| (*k, v.clone()))
+            .ok_or_else(|| oob(i))
     };
     Ok(Some(match name {
         "<init>" => {
@@ -78,7 +91,12 @@ fn sparse(vm: &mut Engine, class: &str, name: &str, recv: ObjRef, args: &[Value]
         }
         "removeAtRange" => {
             let (i, n) = (key(a(0)), key(a(1)));
-            let ks: Vec<i64> = m.keys().skip(i.max(0) as usize).take(n.max(0) as usize).copied().collect();
+            let ks: Vec<i64> = m
+                .keys()
+                .skip(i.max(0) as usize)
+                .take(n.max(0) as usize)
+                .copied()
+                .collect();
             for k in ks {
                 m.remove(&k);
             }
@@ -92,7 +110,11 @@ fn sparse(vm: &mut Engine, class: &str, name: &str, recv: ObjRef, args: &[Value]
         }
         "keyAt" => {
             let (k, _) = nth(m, key(a(0)))?;
-            if class == "Landroid/util/LongSparseArray;" { Value::Long(k) } else { Value::Int(k as i32) }
+            if class == "Landroid/util/LongSparseArray;" {
+                Value::Long(k)
+            } else {
+                Value::Int(k as i32)
+            }
         }
         "valueAt" => nth(m, key(a(0)))?.1,
         "setValueAt" => {
@@ -100,10 +122,20 @@ fn sparse(vm: &mut Engine, class: &str, name: &str, recv: ObjRef, args: &[Value]
             m.insert(k, a(1).cloned().unwrap_or(Value::Null));
             Value::Null
         }
-        "indexOfKey" => Value::Int(m.keys().position(|k| *k == key(a(0))).map(|i| i as i32).unwrap_or(-1)),
+        "indexOfKey" => Value::Int(
+            m.keys()
+                .position(|k| *k == key(a(0)))
+                .map(|i| i as i32)
+                .unwrap_or(-1),
+        ),
         "indexOfValue" => {
             let v = a(0).cloned().unwrap_or(Value::Null);
-            Value::Int(m.values().position(|x| *x == v).map(|i| i as i32).unwrap_or(-1))
+            Value::Int(
+                m.values()
+                    .position(|x| *x == v)
+                    .map(|i| i as i32)
+                    .unwrap_or(-1),
+            )
         }
         "clone" => {
             let copy = m.clone();
@@ -119,18 +151,33 @@ fn sparse(vm: &mut Engine, class: &str, name: &str, recv: ObjRef, args: &[Value]
             Value::Null
         }
         "toString" => {
-            let s = format!("{{{}}}", m.iter().map(|(k, v)| format!("{k}={v:?}")).collect::<Vec<_>>().join(", "));
+            let s = format!(
+                "{{{}}}",
+                m.iter()
+                    .map(|(k, v)| format!("{k}={v:?}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
             Value::Obj(crate::intrinsics::alloc_string(vm, s)?)
         }
         _ => return Ok(None),
     }))
 }
 
-pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn static_intrinsic(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     match (class, name) {
         ("Landroid/util/Pair;", "create") | ("Landroid/util/Range;", "create") => {
             let r = vm.heap.alloc_instance(class.to_string(), Vec::new())?;
-            let (f0, f1) = if class.ends_with("Pair;") { ("first", "second") } else { ("rd_lower", "rd_upper") };
+            let (f0, f1) = if class.ends_with("Pair;") {
+                ("first", "second")
+            } else {
+                ("rd_lower", "rd_upper")
+            };
             put(vm, r, f0, args.first().cloned().unwrap_or(Value::Null))?;
             put(vm, r, f1, args.get(1).cloned().unwrap_or(Value::Null))?;
             Ok(Some(Value::Obj(r)))
@@ -139,7 +186,14 @@ pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, args: &
     }
 }
 
-pub(crate) fn instance_intrinsic(vm: &mut Engine, mref_class: &str, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn instance_intrinsic(
+    vm: &mut Engine,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if !mref_class.starts_with("Landroid/util/") {
         return Ok(None);
     }
@@ -156,7 +210,10 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, mref_class: &str, name: &str, 
     };
     let same = |vm: &Engine, o: &Value| -> bool {
         match o {
-            Value::Obj(o) => vm.heap.class_of(*o).ok() == vm.heap.class_of(recv).ok() && fields.iter().all(|f| get(vm, *o, f) == get(vm, recv, f)),
+            Value::Obj(o) => {
+                vm.heap.class_of(*o).ok() == vm.heap.class_of(recv).ok()
+                    && fields.iter().all(|f| get(vm, *o, f) == get(vm, recv, f))
+            }
             _ => false,
         }
     };
@@ -233,8 +290,16 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, mref_class: &str, name: &str, 
         }
         "toString" => {
             let s = match mref_class {
-                "Landroid/util/Size;" | "Landroid/util/SizeF;" => format!("{}x{}", fmt(&get(vm, recv, "rd_w")), fmt(&get(vm, recv, "rd_h"))),
-                "Landroid/util/Rational;" => format!("{}/{}", fmt(&get(vm, recv, "rd_num")), fmt(&get(vm, recv, "rd_den"))),
+                "Landroid/util/Size;" | "Landroid/util/SizeF;" => format!(
+                    "{}x{}",
+                    fmt(&get(vm, recv, "rd_w")),
+                    fmt(&get(vm, recv, "rd_h"))
+                ),
+                "Landroid/util/Rational;" => format!(
+                    "{}/{}",
+                    fmt(&get(vm, recv, "rd_num")),
+                    fmt(&get(vm, recv, "rd_den"))
+                ),
                 _ => return Ok(None),
             };
             Value::Obj(crate::intrinsics::alloc_string(vm, s)?)
@@ -247,7 +312,11 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, mref_class: &str, name: &str, 
 }
 
 fn gcd(a: i64, b: i64) -> i64 {
-    if b == 0 { a } else { gcd(b, a % b) }
+    if b == 0 {
+        a
+    } else {
+        gcd(b, a % b)
+    }
 }
 fn num(v: &Value) -> f64 {
     match v {
@@ -270,7 +339,9 @@ fn compare(vm: &mut Engine, a: &Value, b: &Value) -> Result<i32, VmExit> {
     let unbox = |vm: &Engine, v: &Value| -> Option<f64> {
         match v {
             Value::Obj(r) => match vm.heap.get_field(*r, "value") {
-                Ok(x @ (Value::Int(_) | Value::Long(_) | Value::Float(_) | Value::Double(_))) => Some(num(&x)),
+                Ok(x @ (Value::Int(_) | Value::Long(_) | Value::Float(_) | Value::Double(_))) => {
+                    Some(num(&x))
+                }
                 _ => None,
             },
             _ => None,
@@ -280,7 +351,13 @@ fn compare(vm: &mut Engine, a: &Value, b: &Value) -> Result<i32, VmExit> {
         return Ok(x.partial_cmp(&y).map(|o| o as i32).unwrap_or(0));
     }
     match a {
-        Value::Obj(r) => match crate::jcollections::guest_call(vm, *r, "compareTo", "(Ljava/lang/Object;)I", &[b.clone()])? {
+        Value::Obj(r) => match crate::jcollections::guest_call(
+            vm,
+            *r,
+            "compareTo",
+            "(Ljava/lang/Object;)I",
+            std::slice::from_ref(b),
+        )? {
             Some(Value::Int(i)) => Ok(i),
             _ => Ok(0),
         },

@@ -53,7 +53,9 @@ pub(crate) fn guest_call(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     let class = vm.heap.class_of(recv)?.to_string();
-    let Some((d, def, m)) = vm.cp.resolve_method(&class, name, sig) else { return Ok(None) };
+    let Some((d, def, m)) = vm.cp.resolve_method(&class, name, sig) else {
+        return Ok(None);
+    };
     if m.access_flags & ACC_ABSTRACT != 0 {
         return Ok(None);
     }
@@ -79,7 +81,12 @@ fn is_host_state(vm: &Engine, r: ObjRef) -> bool {
 pub(crate) fn elems_of(vm: &mut Engine, v: &Value) -> Result<Vec<Value>, VmExit> {
     let r = match v {
         Value::Obj(r) => *r,
-        _ => return Err(exc("Ljava/lang/NullPointerException;", "collection is null")),
+        _ => {
+            return Err(exc(
+                "Ljava/lang/NullPointerException;",
+                "collection is null",
+            ))
+        }
     };
     if let Some(e) = host_list(vm, r) {
         return Ok(e);
@@ -106,11 +113,17 @@ pub(crate) fn elems_of(vm: &mut Engine, v: &Value) -> Result<Vec<Value>, VmExit>
         return Ok(out);
     }
     let c = vm.heap.class_of(r)?.to_string();
-    Err(crate::err::vm_error("VM_TYPE_ERROR", format!("{c}: collection is not iterable by the host")).into())
+    Err(crate::err::vm_error(
+        "VM_TYPE_ERROR",
+        format!("{c}: collection is not iterable by the host"),
+    )
+    .into())
 }
 
 fn drain_iterator(vm: &mut Engine, it: Value) -> Result<Vec<Value>, VmExit> {
-    let Value::Obj(it) = it else { return Ok(Vec::new()) };
+    let Value::Obj(it) = it else {
+        return Ok(Vec::new());
+    };
     if let Some(e) = host_list(vm, it) {
         return Ok(e);
     }
@@ -125,7 +138,10 @@ fn drain_iterator(vm: &mut Engine, it: Value) -> Result<Vec<Value>, VmExit> {
             _ => break,
         }
         if out.len() > 10_000_000 {
-            return Err(exc("Ljava/lang/OutOfMemoryError;", "iterator does not terminate"));
+            return Err(exc(
+                "Ljava/lang/OutOfMemoryError;",
+                "iterator does not terminate",
+            ));
         }
     }
     Ok(out)
@@ -141,7 +157,10 @@ fn contains(vm: &mut Engine, items: &[Value], x: &Value) -> Result<bool, VmExit>
 }
 
 fn is_set(vm: &Engine, r: ObjRef) -> bool {
-    vm.heap.class_of(r).map(|c| c.contains("Set")).unwrap_or(false)
+    vm.heap
+        .class_of(r)
+        .map(|c| c.contains("Set"))
+        .unwrap_or(false)
 }
 
 fn new_host(vm: &mut Engine, class: &str, elems: Vec<Value>) -> Result<Value, VmExit> {
@@ -151,7 +170,9 @@ fn new_host(vm: &mut Engine, class: &str, elems: Vec<Value>) -> Result<Value, Vm
 }
 
 fn new_iter(vm: &mut Engine, elems: Vec<Value>, pos: usize) -> Result<Value, VmExit> {
-    let r = vm.heap.alloc_instance("Ljava/util/ListIterator;".to_string(), Vec::new())?;
+    let r = vm
+        .heap
+        .alloc_instance("Ljava/util/ListIterator;".to_string(), Vec::new())?;
     vm.fw.objects.insert(r, HostObj::Iter { elems, pos });
     Ok(Value::Obj(r))
 }
@@ -162,7 +183,10 @@ fn to_array(vm: &mut Engine, items: Vec<Value>, given: Option<&Value>) -> Result
             let (cur, _, desc) = crate::arrays::elems(vm, *a)?;
             if cur.len() >= items.len() {
                 let n = items.len();
-                let dst = vm.heap.array_elems_mut(*a).map_err(|e| crate::err::vm_error("INVALID_FORMAT", e))?;
+                let dst = vm
+                    .heap
+                    .array_elems_mut(*a)
+                    .map_err(|e| crate::err::vm_error("INVALID_FORMAT", e))?;
                 for (i, v) in items.into_iter().enumerate() {
                     dst[i] = v;
                 }
@@ -231,7 +255,10 @@ pub(crate) fn instance_intrinsic(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     // ListIterator navigation over host iterator state
-    if matches!(mref_class, "Ljava/util/ListIterator;" | "Ljava/util/Iterator;") {
+    if matches!(
+        mref_class,
+        "Ljava/util/ListIterator;" | "Ljava/util/Iterator;"
+    ) {
         if let Some(HostObj::Iter { elems, pos }) = vm.fw.objects.get_mut(&recv) {
             return Ok(match (name, sig) {
                 ("hasNext", "()Z") => Some(Value::Int((*pos < elems.len()) as i32)),
@@ -271,7 +298,10 @@ pub(crate) fn instance_intrinsic(
         None if name == "<init>"
             && sig == "(Ljava/util/Collection;)V"
             && !mref_class.contains("Abstract")
-            && !matches!(mref_class, "Ljava/util/Collection;" | "Ljava/util/List;" | "Ljava/util/Set;") =>
+            && !matches!(
+                mref_class,
+                "Ljava/util/Collection;" | "Ljava/util/List;" | "Ljava/util/Set;"
+            ) =>
         {
             Some(Vec::new())
         }
@@ -317,7 +347,8 @@ pub(crate) fn instance_intrinsic(
                 items.splice(at..at, add);
                 Value::Int(changed as i32)
             }
-            ("removeAll", "(Ljava/util/Collection;)Z") | ("retainAll", "(Ljava/util/Collection;)Z") => {
+            ("removeAll", "(Ljava/util/Collection;)Z")
+            | ("retainAll", "(Ljava/util/Collection;)Z") => {
                 let other = elems_of(vm, &args[0])?;
                 let keep_matching = name == "retainAll";
                 let before = items.len();
@@ -347,7 +378,11 @@ pub(crate) fn instance_intrinsic(
             }
             ("subList", "(II)Ljava/util/List;") => {
                 let (a, b) = range(items.len(), args[0].as_int()?, args[1].as_int()?)?;
-                return Ok(Some(new_host(vm, "Ljava/util/ArrayList;", items[a..b].to_vec())?));
+                return Ok(Some(new_host(
+                    vm,
+                    "Ljava/util/ArrayList;",
+                    items[a..b].to_vec(),
+                )?));
             }
             ("lastIndexOf", "(Ljava/lang/Object;)I") => {
                 let x = args.first().cloned().unwrap_or(Value::Null);
@@ -360,11 +395,16 @@ pub(crate) fn instance_intrinsic(
                 }
                 return Ok(Some(Value::Int(found)));
             }
-            ("listIterator", "()Ljava/util/ListIterator;") => return Ok(Some(new_iter(vm, items, 0)?)),
+            ("listIterator", "()Ljava/util/ListIterator;") => {
+                return Ok(Some(new_iter(vm, items, 0)?))
+            }
             ("listIterator", "(I)Ljava/util/ListIterator;") => {
                 let i = args[0].as_int()?;
                 if i < 0 || i as usize > items.len() {
-                    return Err(exc("Ljava/lang/IndexOutOfBoundsException;", format!("Index: {i}")));
+                    return Err(exc(
+                        "Ljava/lang/IndexOutOfBoundsException;",
+                        format!("Index: {i}"),
+                    ));
                 }
                 return Ok(Some(new_iter(vm, items, i as usize)?));
             }
@@ -381,7 +421,10 @@ pub(crate) fn instance_intrinsic(
     if rc.starts_with("Ljava/") {
         return Ok(None);
     }
-    let is_list = matches!(mref_class, "Ljava/util/AbstractList;" | "Ljava/util/List;" | "Ljava/util/AbstractSequentialList;");
+    let is_list = matches!(
+        mref_class,
+        "Ljava/util/AbstractList;" | "Ljava/util/List;" | "Ljava/util/AbstractSequentialList;"
+    );
     let me = Value::Obj(recv);
     Ok(Some(match (name, sig) {
         ("<init>", "()V") if mref_class.starts_with("Ljava/util/Abstract") => Value::Null,
@@ -389,7 +432,8 @@ pub(crate) fn instance_intrinsic(
             Some(n) => Value::Int((n.as_int()? == 0) as i32),
             None => return Ok(None),
         },
-        ("iterator", "()Ljava/util/Iterator;") | ("listIterator", "()Ljava/util/ListIterator;")
+        ("iterator", "()Ljava/util/Iterator;")
+        | ("listIterator", "()Ljava/util/ListIterator;")
         | ("listIterator", "(I)Ljava/util/ListIterator;")
             if is_list =>
         {
@@ -405,7 +449,11 @@ pub(crate) fn instance_intrinsic(
                     None => return Ok(None),
                 }
             }
-            let start = if sig == "(I)Ljava/util/ListIterator;" { args[0].as_int()?.max(0) as usize } else { 0 };
+            let start = if sig == "(I)Ljava/util/ListIterator;" {
+                args[0].as_int()?.max(0) as usize
+            } else {
+                0
+            };
             new_iter(vm, items, start.min(n.max(0) as usize))?
         }
         ("contains", "(Ljava/lang/Object;)Z") => {
@@ -434,7 +482,11 @@ pub(crate) fn instance_intrinsic(
         }
         ("indexOf", "(Ljava/lang/Object;)I") | ("lastIndexOf", "(Ljava/lang/Object;)I") => {
             let items = elems_of(vm, &me)?;
-            let idx: Vec<usize> = if name == "indexOf" { (0..items.len()).collect() } else { (0..items.len()).rev().collect() };
+            let idx: Vec<usize> = if name == "indexOf" {
+                (0..items.len()).collect()
+            } else {
+                (0..items.len()).rev().collect()
+            };
             let mut found = -1;
             for i in idx {
                 if crate::arrays::obj_equals(vm, &args[0], &items[i])? {
@@ -448,12 +500,23 @@ pub(crate) fn instance_intrinsic(
             let src = elems_of(vm, &args[0])?;
             let mut changed = false;
             for e in src {
-                match guest_call(vm, recv, "add", "(Ljava/lang/Object;)Z", &[e.clone()])? {
+                match guest_call(
+                    vm,
+                    recv,
+                    "add",
+                    "(Ljava/lang/Object;)Z",
+                    std::slice::from_ref(&e),
+                )? {
                     Some(v) => changed |= v.as_int().unwrap_or(0) != 0,
                     None => match guest_call(vm, recv, "size", "()I", &[])? {
                         Some(n) if is_list => {
-                            if guest_call(vm, recv, "add", "(ILjava/lang/Object;)V", &[n, e])?.is_none() {
-                                return Err(exc("Ljava/lang/UnsupportedOperationException;", "add"));
+                            if guest_call(vm, recv, "add", "(ILjava/lang/Object;)V", &[n, e])?
+                                .is_none()
+                            {
+                                return Err(exc(
+                                    "Ljava/lang/UnsupportedOperationException;",
+                                    "add",
+                                ));
                             }
                             changed = true;
                         }
@@ -464,14 +527,24 @@ pub(crate) fn instance_intrinsic(
             Value::Int(changed as i32)
         }
         ("addAll", "(ILjava/util/Collection;)Z") => {
-            let mut at = args[0].as_int()?;
+            let start = args[0].as_int()?;
             let src = elems_of(vm, &args[1])?;
             let changed = !src.is_empty();
-            for e in src {
-                if guest_call(vm, recv, "add", "(ILjava/lang/Object;)V", &[Value::Int(at), e])?.is_none() {
-                    return Err(exc("Ljava/lang/UnsupportedOperationException;", "add(int, E)"));
+            for (at, e) in (start..).zip(src) {
+                if guest_call(
+                    vm,
+                    recv,
+                    "add",
+                    "(ILjava/lang/Object;)V",
+                    &[Value::Int(at), e],
+                )?
+                .is_none()
+                {
+                    return Err(exc(
+                        "Ljava/lang/UnsupportedOperationException;",
+                        "add(int, E)",
+                    ));
                 }
-                at += 1;
             }
             Value::Int(changed as i32)
         }
@@ -494,8 +567,19 @@ pub(crate) fn instance_intrinsic(
             if is_list {
                 if let Some(n) = guest_call(vm, recv, "size", "()I", &[])? {
                     for i in (0..n.as_int()?).rev() {
-                        if guest_call(vm, recv, "remove", "(I)Ljava/lang/Object;", &[Value::Int(i)])?.is_none() {
-                            return Err(exc("Ljava/lang/UnsupportedOperationException;", "remove(int)"));
+                        if guest_call(
+                            vm,
+                            recv,
+                            "remove",
+                            "(I)Ljava/lang/Object;",
+                            &[Value::Int(i)],
+                        )?
+                        .is_none()
+                        {
+                            return Err(exc(
+                                "Ljava/lang/UnsupportedOperationException;",
+                                "remove(int)",
+                            ));
                         }
                     }
                 }
@@ -518,12 +602,18 @@ pub(crate) fn instance_intrinsic(
             let mut h: i32 = if is_list { 1 } else { 0 };
             for e in &items {
                 let eh = crate::arrays::obj_hash(vm, e)?;
-                h = if is_list { h.wrapping_mul(31).wrapping_add(eh) } else { h.wrapping_add(eh) };
+                h = if is_list {
+                    h.wrapping_mul(31).wrapping_add(eh)
+                } else {
+                    h.wrapping_add(eh)
+                };
             }
             Value::Int(h)
         }
         ("equals", "(Ljava/lang/Object;)Z") => {
-            let Some(Value::Obj(o)) = args.first().cloned() else { return Ok(Some(Value::Int(0))) };
+            let Some(Value::Obj(o)) = args.first().cloned() else {
+                return Ok(Some(Value::Int(0)));
+            };
             if o == recv {
                 return Ok(Some(Value::Int(1)));
             }
@@ -535,7 +625,11 @@ pub(crate) fn instance_intrinsic(
             let mut eq = a.len() == b.len();
             if eq {
                 for i in 0..a.len() {
-                    let ok = if is_list { crate::arrays::obj_equals(vm, &a[i], &b[i])? } else { contains(vm, &b, &a[i])? };
+                    let ok = if is_list {
+                        crate::arrays::obj_equals(vm, &a[i], &b[i])?
+                    } else {
+                        contains(vm, &b, &a[i])?
+                    };
                     if !ok {
                         eq = false;
                         break;

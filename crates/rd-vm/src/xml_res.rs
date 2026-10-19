@@ -35,9 +35,16 @@ const ANDROID_NS: &str = "http://schemas.android.com/apk/res/android";
 
 #[derive(Clone)]
 enum Ev {
-    Start { name: String, attrs: Vec<XmlAttribute>, depth: i32 },
+    Start {
+        name: String,
+        attrs: Vec<XmlAttribute>,
+        depth: i32,
+    },
     Text(String, i32),
-    End { name: String, depth: i32 },
+    End {
+        name: String,
+        depth: i32,
+    },
 }
 
 struct ParserState {
@@ -53,7 +60,11 @@ thread_local! {
 }
 
 fn flatten(e: &XmlElement, depth: i32, out: &mut Vec<Ev>) {
-    out.push(Ev::Start { name: e.name.clone(), attrs: e.attrs.clone(), depth });
+    out.push(Ev::Start {
+        name: e.name.clone(),
+        attrs: e.attrs.clone(),
+        depth,
+    });
     if let Some(t) = &e.text {
         if !t.trim().is_empty() {
             out.push(Ev::Text(t.clone(), depth));
@@ -62,7 +73,10 @@ fn flatten(e: &XmlElement, depth: i32, out: &mut Vec<Ev>) {
     for c in &e.children {
         flatten(c, depth + 1, out);
     }
-    out.push(Ev::End { name: e.name.clone(), depth });
+    out.push(Ev::End {
+        name: e.name.clone(),
+        depth,
+    });
 }
 
 fn exc(class: &str, msg: impl Into<String>) -> VmExit {
@@ -70,7 +84,10 @@ fn exc(class: &str, msg: impl Into<String>) -> VmExit {
 }
 
 fn not_found(id: i32) -> VmExit {
-    exc("Landroid/content/res/Resources$NotFoundException;", format!("Resource ID #0x{:x}", id as u32))
+    exc(
+        "Landroid/content/res/Resources$NotFoundException;",
+        format!("Resource ID #0x{:x}", id as u32),
+    )
 }
 
 /// Opens the compiled XML behind resource `id` as a parser object.
@@ -87,18 +104,36 @@ fn open_xml(vm: &mut Engine, id: i32) -> Result<Value, VmExit> {
             _ => break,
         }
     }
-    let path = path.filter(|p| p.ends_with(".xml")).ok_or_else(|| not_found(id))?;
+    let path = path
+        .filter(|p| p.ends_with(".xml"))
+        .ok_or_else(|| not_found(id))?;
     let bytes = {
         let apk = vm.fw.resources.as_ref().ok_or_else(|| not_found(id))?;
         let entry = apk.zip.find(&path).ok_or_else(|| not_found(id))?;
         apk.zip.read_entry(entry).map_err(|_| not_found(id))?
     };
-    let doc = rd_apk::axml::parse(&bytes)
-        .map_err(|e| exc("Landroid/content/res/Resources$NotFoundException;", format!("{path}: {}", e.cause)))?;
+    let doc = rd_apk::axml::parse(&bytes).map_err(|e| {
+        exc(
+            "Landroid/content/res/Resources$NotFoundException;",
+            format!("{path}: {}", e.cause),
+        )
+    })?;
     let mut events = Vec::new();
     flatten(&doc.root, 1, &mut events);
-    let r = vm.heap.alloc_instance(PARSER.to_string(), Vec::new()).map_err(crate::err::oom_throwable)?;
-    PARSERS.with(|p| p.borrow_mut().insert(r, ParserState { file: path, events, pos: -1 }));
+    let r = vm
+        .heap
+        .alloc_instance(PARSER.to_string(), Vec::new())
+        .map_err(crate::err::oom_throwable)?;
+    PARSERS.with(|p| {
+        p.borrow_mut().insert(
+            r,
+            ParserState {
+                file: path,
+                events,
+                pos: -1,
+            },
+        )
+    });
     Ok(Value::Obj(r))
 }
 
@@ -120,10 +155,19 @@ fn current_attrs(r: ObjRef) -> Option<Vec<XmlAttribute>> {
 
 /// Fills TypedArray `ta` from AttributeSet `set` for the `attrs` id array.
 /// No-op unless `set` is a parser created here.
-pub(crate) fn fill_typed_array(vm: &Engine, ta: ObjRef, set: Option<&Value>, attrs: Option<&Value>) {
-    let (Some(Value::Obj(s)), Some(Value::Obj(a))) = (set, attrs) else { return };
+pub(crate) fn fill_typed_array(
+    vm: &Engine,
+    ta: ObjRef,
+    set: Option<&Value>,
+    attrs: Option<&Value>,
+) {
+    let (Some(Value::Obj(s)), Some(Value::Obj(a))) = (set, attrs) else {
+        return;
+    };
     let Some(cur) = current_attrs(*s) else { return };
-    let Ok((ids, _)) = vm.heap.as_array_elems(*a) else { return };
+    let Ok((ids, _)) = vm.heap.as_array_elems(*a) else {
+        return;
+    };
     let vals: Vec<Option<XmlAttribute>> = ids
         .iter()
         .map(|id| {
@@ -132,7 +176,10 @@ pub(crate) fn fill_typed_array(vm: &Engine, ta: ObjRef, set: Option<&Value>, att
                 _ => return None,
             };
             cur.iter()
-                .find(|x| x.res_id == Some(id) && !matches!(x.value, AttrValue::Attribute(_) | AttrValue::Null))
+                .find(|x| {
+                    x.res_id == Some(id)
+                        && !matches!(x.value, AttrValue::Attribute(_) | AttrValue::Null)
+                })
                 .cloned()
         })
         .collect();
@@ -163,7 +210,12 @@ fn deref(vm: &Engine, v: &AttrValue) -> Option<rd_apk::arsc::ResolvedValue> {
         AttrValue::Int(i) => return Some(R::Integer(*i)),
         AttrValue::Bool(b) => return Some(R::Boolean(*b)),
         AttrValue::Float(f) => return Some(R::Float(*f)),
-        AttrValue::Dimension(f, u) => return Some(R::Dimension { value: *f, unit: *u }),
+        AttrValue::Dimension(f, u) => {
+            return Some(R::Dimension {
+                value: *f,
+                unit: *u,
+            })
+        }
         _ => return None,
     };
     for _ in 0..8 {
@@ -220,8 +272,16 @@ fn as_i32(vm: &Engine, v: &AttrValue) -> Option<i32> {
 }
 
 /// TypedArray reads backed by a filled index table. `None` = not ours.
-fn typed_array_get(vm: &mut Engine, recv: ObjRef, name: &str, sig: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
-    let Some(vals) = ARRAYS.with(|m| m.borrow().get(&recv).cloned()) else { return Ok(None) };
+fn typed_array_get(
+    vm: &mut Engine,
+    recv: ObjRef,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let Some(vals) = ARRAYS.with(|m| m.borrow().get(&recv).cloned()) else {
+        return Ok(None);
+    };
     let idx = match args.first() {
         Some(Value::Int(i)) => *i as usize,
         _ => usize::MAX,
@@ -232,7 +292,12 @@ fn typed_array_get(vm: &mut Engine, recv: ObjRef, name: &str, sig: &str, args: &
         "length" => Value::Int(vals.len() as i32),
         "getIndexCount" => Value::Int(vals.iter().filter(|v| v.is_some()).count() as i32),
         "getIndex" => {
-            let n = vals.iter().enumerate().filter(|(_, v)| v.is_some()).nth(idx).map(|(i, _)| i as i32);
+            let n = vals
+                .iter()
+                .enumerate()
+                .filter(|(_, v)| v.is_some())
+                .nth(idx)
+                .map(|(i, _)| i as i32);
             Value::Int(n.unwrap_or(0))
         }
         "recycle" | "close" => {
@@ -245,10 +310,24 @@ fn typed_array_get(vm: &mut Engine, recv: ObjRef, name: &str, sig: &str, args: &
                 "hasValue" | "hasValueOrEmpty" => Value::Int(1),
                 "getFloat" => as_f32(vm, &a.value).map(Value::Float).unwrap_or(def),
                 "getDimension" => as_f32(vm, &a.value).map(Value::Float).unwrap_or(def),
-                "getDimensionPixelSize" => as_f32(vm, &a.value).map(|f| Value::Int(if f > 0.0 { (f + 0.5).max(1.0) as i32 } else { f.round() as i32 })).unwrap_or(def),
-                "getDimensionPixelOffset" | "getLayoutDimension" => as_f32(vm, &a.value).map(|f| Value::Int(f as i32)).unwrap_or(def),
-                "getInt" | "getInteger" | "getColor" => as_i32(vm, &a.value).map(Value::Int).unwrap_or(def),
-                "getBoolean" => as_i32(vm, &a.value).map(|i| Value::Int((i != 0) as i32)).unwrap_or(def),
+                "getDimensionPixelSize" => as_f32(vm, &a.value)
+                    .map(|f| {
+                        Value::Int(if f > 0.0 {
+                            (f + 0.5).max(1.0) as i32
+                        } else {
+                            f.round() as i32
+                        })
+                    })
+                    .unwrap_or(def),
+                "getDimensionPixelOffset" | "getLayoutDimension" => as_f32(vm, &a.value)
+                    .map(|f| Value::Int(f as i32))
+                    .unwrap_or(def),
+                "getInt" | "getInteger" | "getColor" => {
+                    as_i32(vm, &a.value).map(Value::Int).unwrap_or(def)
+                }
+                "getBoolean" => as_i32(vm, &a.value)
+                    .map(|i| Value::Int((i != 0) as i32))
+                    .unwrap_or(def),
                 "getResourceId" | "getSourceResourceId" => match a.value {
                     AttrValue::Reference(id) => Value::Int(id as i32),
                     _ => def,
@@ -260,7 +339,9 @@ fn typed_array_get(vm: &mut Engine, recv: ObjRef, name: &str, sig: &str, args: &
                 },
                 "getType" => Value::Int(type_of(&a)),
                 "getValue" if sig.contains("TypedValue") => {
-                    let Some(Value::Obj(tv)) = args.get(1).cloned() else { return Ok(Some(Value::Int(0))) };
+                    let Some(Value::Obj(tv)) = args.get(1).cloned() else {
+                        return Ok(Some(Value::Int(0)));
+                    };
                     let ty = type_of(&a);
                     let data = match &a.value {
                         AttrValue::Reference(id) => *id as i32,
@@ -270,7 +351,15 @@ fn typed_array_get(vm: &mut Engine, recv: ObjRef, name: &str, sig: &str, args: &
                     };
                     let _ = vm.heap.put_field(tv, "type", Value::Int(ty));
                     let _ = vm.heap.put_field(tv, "data", Value::Int(data));
-                    let _ = vm.heap.put_field(tv, "resourceId", Value::Int(if let AttrValue::Reference(id) = a.value { id as i32 } else { 0 }));
+                    let _ = vm.heap.put_field(
+                        tv,
+                        "resourceId",
+                        Value::Int(if let AttrValue::Reference(id) = a.value {
+                            id as i32
+                        } else {
+                            0
+                        }),
+                    );
                     if let AttrValue::String(s) = &a.value {
                         let s = str_val(vm, s.clone())?;
                         let _ = vm.heap.put_field(tv, "string", s);
@@ -298,7 +387,11 @@ fn type_of(a: &XmlAttribute) -> i32 {
         AttrValue::Bool(_) => 0x12,
         AttrValue::Int(_) => {
             let n = a.name.to_ascii_lowercase();
-            if n.contains("color") || n.contains("tint") { 0x1c } else { 0x10 }
+            if n.contains("color") || n.contains("tint") {
+                0x1c
+            } else {
+                0x10
+            }
         }
         AttrValue::Raw { dtype, .. } => *dtype as i32,
     }
@@ -336,7 +429,10 @@ pub fn instance_intrinsic(
 ) -> Result<Option<Value>, VmExit> {
     if recv_class == RESOURCES || mref_class == RESOURCES {
         return Ok(match (name, sig) {
-            ("getXml" | "getLayout" | "getAnimation", "(I)Landroid/content/res/XmlResourceParser;") => {
+            (
+                "getXml" | "getLayout" | "getAnimation",
+                "(I)Landroid/content/res/XmlResourceParser;",
+            ) => {
                 let id = match args.first() {
                     Some(Value::Int(i)) => *i,
                     _ => 0,
@@ -356,7 +452,9 @@ pub fn instance_intrinsic(
     let state = PARSERS.with(|p| {
         let p = p.borrow();
         let st = &p[&recv];
-        let ev = usize::try_from(st.pos).ok().and_then(|i| st.events.get(i).cloned());
+        let ev = usize::try_from(st.pos)
+            .ok()
+            .and_then(|i| st.events.get(i).cloned());
         (st.pos, st.events.len() as isize, ev, st.file.clone())
     });
     let (pos, len, ev, file) = state;
@@ -382,11 +480,19 @@ pub fn instance_intrinsic(
     let v = match name {
         "next" | "nextToken" | "nextTag" => {
             if pos >= len {
-                return Err(exc("Lorg/xmlpull/v1/XmlPullParserException;", "END_DOCUMENT reached"));
+                return Err(exc(
+                    "Lorg/xmlpull/v1/XmlPullParserException;",
+                    "END_DOCUMENT reached",
+                ));
             }
             let mut np = pos + 1;
             if name == "nextTag" {
-                while np < len && matches!(PARSERS.with(|p| p.borrow()[&recv].events.get(np as usize).cloned()), Some(Ev::Text(..))) {
+                while np < len
+                    && matches!(
+                        PARSERS.with(|p| p.borrow()[&recv].events.get(np as usize).cloned()),
+                        Some(Ev::Text(..))
+                    )
+                {
                     np += 1;
                 }
             }
@@ -411,7 +517,9 @@ pub fn instance_intrinsic(
         }
         "isEmptyElementWhitespace" | "isWhitespace" => Value::Int(0),
         "getDepth" => Value::Int(match &ev {
-            Some(Ev::Start { depth, .. }) | Some(Ev::End { depth, .. }) | Some(Ev::Text(_, depth)) => *depth,
+            Some(Ev::Start { depth, .. })
+            | Some(Ev::End { depth, .. })
+            | Some(Ev::Text(_, depth)) => *depth,
             _ => 0,
         }),
         "getNamespace" => {
@@ -421,7 +529,9 @@ pub fn instance_intrinsic(
                 Value::Null
             }
         }
-        "getPositionDescription" => str_val(vm, format!("Binary XML file {file} event #{}", pos + 1))?,
+        "getPositionDescription" => {
+            str_val(vm, format!("Binary XML file {file} event #{}", pos + 1))?
+        }
         "getLineNumber" => Value::Int((pos + 1) as i32),
         "getColumnNumber" => Value::Int(-1),
         "close" => {
@@ -429,16 +539,28 @@ pub fn instance_intrinsic(
             Value::Null
         }
         "require" => Value::Null,
-        "getAttributeCount" => Value::Int(current_attrs(recv).map(|a| a.len() as i32).unwrap_or(-1)),
+        "getAttributeCount" => {
+            Value::Int(current_attrs(recv).map(|a| a.len() as i32).unwrap_or(-1))
+        }
         "getAttributeName" => {
             let a = find_attr(vm, recv, args, true).map(|a| a.name);
             opt_str(vm, a)?
         }
         "getAttributeNamespace" => {
-            let a = find_attr(vm, recv, args, true).map(|a| if a.is_android() { ANDROID_NS.to_string() } else { a.ns.unwrap_or_default() });
+            let a = find_attr(vm, recv, args, true).map(|a| {
+                if a.is_android() {
+                    ANDROID_NS.to_string()
+                } else {
+                    a.ns.unwrap_or_default()
+                }
+            });
             opt_str(vm, a)?
         }
-        "getAttributeNameResource" => Value::Int(find_attr(vm, recv, args, true).and_then(|a| a.res_id).unwrap_or(0) as i32),
+        "getAttributeNameResource" => Value::Int(
+            find_attr(vm, recv, args, true)
+                .and_then(|a| a.res_id)
+                .unwrap_or(0) as i32,
+        ),
         "getAttributeValue" => {
             let indexed = sig == "(I)Ljava/lang/String;";
             let a = find_attr(vm, recv, args, indexed).map(|a| match a.value {
@@ -448,7 +570,10 @@ pub fn instance_intrinsic(
             });
             opt_str(vm, a)?
         }
-        "getAttributeResourceValue" | "getAttributeIntValue" | "getAttributeUnsignedIntValue" | "getAttributeBooleanValue"
+        "getAttributeResourceValue"
+        | "getAttributeIntValue"
+        | "getAttributeUnsignedIntValue"
+        | "getAttributeBooleanValue"
         | "getAttributeFloatValue" => {
             let indexed = sig.starts_with("(I");
             let def = args.last().cloned().unwrap_or(Value::Int(0));
@@ -459,20 +584,33 @@ pub fn instance_intrinsic(
                         AttrValue::Reference(id) => Value::Int(id as i32),
                         _ => def,
                     },
-                    "getAttributeFloatValue" => as_f32(vm, &a.value).map(Value::Float).unwrap_or(def),
-                    "getAttributeBooleanValue" => a.as_bool().map(|b| Value::Int(b as i32)).unwrap_or(def),
+                    "getAttributeFloatValue" => {
+                        as_f32(vm, &a.value).map(Value::Float).unwrap_or(def)
+                    }
+                    "getAttributeBooleanValue" => {
+                        a.as_bool().map(|b| Value::Int(b as i32)).unwrap_or(def)
+                    }
                     _ => a.as_i32().map(Value::Int).unwrap_or(def),
                 },
             }
         }
         "getIdAttribute" | "getClassAttribute" => {
-            let n = if name == "getIdAttribute" { "id" } else { "class" };
-            let a = current_attrs(recv).and_then(|v| v.into_iter().find(|a| a.name == n)).map(|a| a.text());
+            let n = if name == "getIdAttribute" {
+                "id"
+            } else {
+                "class"
+            };
+            let a = current_attrs(recv)
+                .and_then(|v| v.into_iter().find(|a| a.name == n))
+                .map(|a| a.text());
             opt_str(vm, a)?
         }
         "getIdAttributeResourceValue" => {
             let d = args.first().cloned().unwrap_or(Value::Int(0));
-            match current_attrs(recv).and_then(|v| v.into_iter().find(|a| a.name == "id")).map(|a| a.value) {
+            match current_attrs(recv)
+                .and_then(|v| v.into_iter().find(|a| a.name == "id"))
+                .map(|a| a.value)
+            {
                 Some(AttrValue::Reference(id)) => Value::Int(id as i32),
                 _ => d,
             }
@@ -487,7 +625,12 @@ pub fn instance_intrinsic(
 
 /// `android.util.Xml.asAttributeSet(parser)`: a compiled-resource parser is
 /// its own AttributeSet, as `XmlBlock.Parser` is in AOSP.
-pub fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub fn static_intrinsic(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let _ = vm;
     if class != "Landroid/util/Xml;" || name != "asAttributeSet" {
         return Ok(None);

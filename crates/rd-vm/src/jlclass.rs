@@ -39,7 +39,10 @@ fn is_primitive(d: &str) -> bool {
 
 /// Runtime type descriptor of an object (arrays and strings included).
 fn runtime_desc(vm: &Engine, o: ObjRef) -> String {
-    vm.heap.class_of(o).map(str::to_string).unwrap_or_else(|_| "Ljava/lang/Object;".into())
+    vm.heap
+        .class_of(o)
+        .map(str::to_string)
+        .unwrap_or_else(|_| "Ljava/lang/Object;".into())
 }
 
 pub(crate) fn assignable(vm: &Engine, to: &str, from: &str) -> bool {
@@ -94,7 +97,9 @@ pub(crate) fn instance_intrinsic(
     if mref_class != CLASS {
         return Ok(None);
     }
-    let Some(d) = desc_of(vm, recv) else { return Ok(None) };
+    let Some(d) = desc_of(vm, recv) else {
+        return Ok(None);
+    };
     let b = |x: bool| Value::Int(x as i32);
     let arg_class = |vm: &Engine, i: usize| -> Option<String> {
         match args.get(i) {
@@ -110,15 +115,23 @@ pub(crate) fn instance_intrinsic(
             None => Value::Null,
         },
         ("isInterface", "()Z") => b(access_flags(vm, &d).is_some_and(|f| f & ACC_INTERFACE != 0)
-            || (crate::classpath::host_class_known(&d) && vm.cp.superclass_of(&d).is_none() && d != "Ljava/lang/Object;" && !d.starts_with('['))),
+            || (crate::classpath::host_class_known(&d)
+                && vm.cp.superclass_of(&d).is_none()
+                && d != "Ljava/lang/Object;"
+                && !d.starts_with('['))),
         ("isEnum", "()Z") => b(access_flags(vm, &d).is_some_and(|f| f & ACC_ENUM != 0)
             && vm.cp.superclass_of(&d).as_deref() == Some("Ljava/lang/Enum;")),
         ("isAnonymousClass", "()Z") => b(is_anonymous(&d)),
         ("isLocalClass", "()Z") => b(is_local(&d)),
-        ("isMemberClass", "()Z") => b(!last_segment(&d).is_empty() && !is_anonymous(&d) && !is_local(&d)),
+        ("isMemberClass", "()Z") => {
+            b(!last_segment(&d).is_empty() && !is_anonymous(&d) && !is_local(&d))
+        }
         ("isAssignableFrom", "(Ljava/lang/Class;)Z") => {
             let Some(o) = arg_class(vm, 0) else {
-                return Err(VmExit::Exception(Throwable::new("Ljava/lang/NullPointerException;", "isAssignableFrom(null)")));
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "isAssignableFrom(null)",
+                )));
             };
             b(assignable(vm, &d, &o))
         }
@@ -147,7 +160,10 @@ pub(crate) fn instance_intrinsic(
             Value::Obj(recv)
         }
         ("getSuperclass", "()Ljava/lang/Class;") => {
-            if is_primitive(&d) || access_flags(vm, &d).is_some_and(|f| f & ACC_INTERFACE != 0) || d == "Ljava/lang/Object;" {
+            if is_primitive(&d)
+                || access_flags(vm, &d).is_some_and(|f| f & ACC_INTERFACE != 0)
+                || d == "Ljava/lang/Object;"
+            {
                 Value::Null
             } else if d.starts_with('[') {
                 Value::Obj(vm.class_object_for("Ljava/lang/Object;")?)
@@ -164,7 +180,9 @@ pub(crate) fn instance_intrinsic(
             for i in ifaces {
                 elems.push(Value::Obj(vm.class_object_for(&i)?));
             }
-            let arr = vm.heap.alloc_array(crate::heap::ElemKind::Obj, elems.len(), CLASS)?;
+            let arr = vm
+                .heap
+                .alloc_array(crate::heap::ElemKind::Obj, elems.len(), CLASS)?;
             let slot = vm
                 .heap
                 .array_elems_mut(arr)
@@ -197,7 +215,11 @@ pub(crate) fn instance_intrinsic(
                 if is_anonymous(d) || is_local(d) {
                     return None;
                 }
-                Some(d.trim_start_matches('L').trim_end_matches(';').replace(['/', '$'], "."))
+                Some(
+                    d.trim_start_matches('L')
+                        .trim_end_matches(';')
+                        .replace(['/', '$'], "."),
+                )
             }
             match canon(&d) {
                 Some(s) => Value::Obj(crate::intrinsics::alloc_string(vm, s)?),

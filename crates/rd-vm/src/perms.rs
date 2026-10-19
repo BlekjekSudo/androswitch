@@ -37,7 +37,7 @@ impl Engine {
     pub(crate) fn permission_granted(&self, name: &str) -> bool {
         self.granted_permissions
             .as_ref()
-            .is_none_or(|g| g.contains(name))
+            .map_or(true, |g| g.contains(name))
     }
 }
 
@@ -73,7 +73,11 @@ pub(crate) fn instance_intrinsic(
                     "permission is null",
                 ))
             })?;
-            Ok(Some(Value::Int(if vm.permission_granted(&p) { 0 } else { -1 })))
+            Ok(Some(Value::Int(if vm.permission_granted(&p) {
+                0
+            } else {
+                -1
+            })))
         }
         ("shouldShowRequestPermissionRationale", "(Ljava/lang/String;)Z")
             if is_context(vm, recv_class) =>
@@ -125,10 +129,11 @@ pub(crate) fn deliver_pending(vm: &mut Engine) -> Result<usize, VmExit> {
             .map_err(crate::err::oom_throwable)?;
         *vm.heap.array_elems_mut(grants)? = results;
         let class = vm.heap.class_of(p.activity)?.to_string();
-        if let Some((d, def, m)) =
-            vm.cp
-                .resolve_method(&class, "onRequestPermissionsResult", "(I[Ljava/lang/String;[I)V")
-        {
+        if let Some((d, def, m)) = vm.cp.resolve_method(
+            &class,
+            "onRequestPermissionsResult",
+            "(I[Ljava/lang/String;[I)V",
+        ) {
             vm.call(
                 d,
                 def,

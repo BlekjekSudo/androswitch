@@ -643,13 +643,15 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/lang/Throwable;",
             "Ljava/lang/Object;",
         ]),
-        "Ljava/lang/AbstractMethodError;" | "Ljava/lang/IncompatibleClassChangeError;" => Some(vec![
-            "Ljava/lang/IncompatibleClassChangeError;",
-            "Ljava/lang/LinkageError;",
-            "Ljava/lang/Error;",
-            "Ljava/lang/Throwable;",
-            "Ljava/lang/Object;",
-        ]),
+        "Ljava/lang/AbstractMethodError;" | "Ljava/lang/IncompatibleClassChangeError;" => {
+            Some(vec![
+                "Ljava/lang/IncompatibleClassChangeError;",
+                "Ljava/lang/LinkageError;",
+                "Ljava/lang/Error;",
+                "Ljava/lang/Throwable;",
+                "Ljava/lang/Object;",
+            ])
+        }
         "Ljava/lang/NegativeArraySizeException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/IllegalStateException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/IllegalArgumentException;" => Some(RUNTIME.to_vec()),
@@ -892,33 +894,55 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/lang/String;" => Some(STRING_IFACES.to_vec()),
         "Ljava/lang/StringBuilder;" => Some(SB_IFACES.to_vec()),
         // java.util.concurrent.locks host classes (jlocks.rs)
-        "Ljava/util/concurrent/locks/ReentrantLock;" => Some(vec!["Ljava/util/concurrent/locks/Lock;", "Ljava/io/Serializable;"]),
-        "Ljava/util/concurrent/locks/ReentrantReadWriteLock;" => {
-            Some(vec!["Ljava/util/concurrent/locks/ReadWriteLock;", "Ljava/io/Serializable;"])
-        }
+        "Ljava/util/concurrent/locks/ReentrantLock;" => Some(vec![
+            "Ljava/util/concurrent/locks/Lock;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/concurrent/locks/ReentrantReadWriteLock;" => Some(vec![
+            "Ljava/util/concurrent/locks/ReadWriteLock;",
+            "Ljava/io/Serializable;",
+        ]),
         "Ljava/util/concurrent/locks/ReentrantReadWriteLock$ReadLock;"
-        | "Ljava/util/concurrent/locks/ReentrantReadWriteLock$WriteLock;" => {
-            Some(vec!["Ljava/util/concurrent/locks/Lock;", "Ljava/io/Serializable;"])
-        }
+        | "Ljava/util/concurrent/locks/ReentrantReadWriteLock$WriteLock;" => Some(vec![
+            "Ljava/util/concurrent/locks/Lock;",
+            "Ljava/io/Serializable;",
+        ]),
         "Ljava/io/File;" => Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
-        "Ljava/io/FileOutputStream;" | "Ljava/io/FileInputStream;" => Some(vec!["Ljava/io/Closeable;", "Ljava/lang/AutoCloseable;"]),
+        "Ljava/io/FileOutputStream;" | "Ljava/io/FileInputStream;" => {
+            Some(vec!["Ljava/io/Closeable;", "Ljava/lang/AutoCloseable;"])
+        }
         "Ljava/nio/channels/FileLock;" => Some(vec!["Ljava/lang/AutoCloseable;"]),
         // host XML resource parser (xml_res.rs) is a pull parser + AttributeSet
-        "Landroid/content/res/XmlResourceParser;" => {
-            Some(vec!["Lorg/xmlpull/v1/XmlPullParser;", "Landroid/util/AttributeSet;", "Ljava/lang/AutoCloseable;"])
-        }
+        "Landroid/content/res/XmlResourceParser;" => Some(vec![
+            "Lorg/xmlpull/v1/XmlPullParser;",
+            "Landroid/util/AttributeSet;",
+            "Ljava/lang/AutoCloseable;",
+        ]),
         // ── M8: interfaces das classes host do compat real ──
         "Ljava/util/AbstractCollection;" => Some(COLL.to_vec()),
         // JDK collection interfaces: super-interface closure, so a DEX class
         // implementing Set/List/Queue/… is a Collection/Iterable (check-cast)
         "Ljava/util/Collection;" => Some(vec!["Ljava/lang/Iterable;"]),
         "Ljava/util/Set;" | "Ljava/util/List;" | "Ljava/util/Queue;" => Some(COLL.to_vec()),
-        "Ljava/util/Deque;" | "Ljava/util/concurrent/BlockingQueue;" => {
-            Some(vec!["Ljava/util/Queue;", "Ljava/util/Collection;", "Ljava/lang/Iterable;"])
+        "Ljava/util/Deque;" | "Ljava/util/concurrent/BlockingQueue;" => Some(vec![
+            "Ljava/util/Queue;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+        ]),
+        "Ljava/util/SortedSet;" => Some(vec![
+            "Ljava/util/Set;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+        ]),
+        "Ljava/util/NavigableSet;" => Some(vec![
+            "Ljava/util/SortedSet;",
+            "Ljava/util/Set;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+        ]),
+        "Ljava/util/SortedMap;" | "Ljava/util/concurrent/ConcurrentMap;" => {
+            Some(vec!["Ljava/util/Map;"])
         }
-        "Ljava/util/SortedSet;" => Some(vec!["Ljava/util/Set;", "Ljava/util/Collection;", "Ljava/lang/Iterable;"]),
-        "Ljava/util/NavigableSet;" => Some(vec!["Ljava/util/SortedSet;", "Ljava/util/Set;", "Ljava/util/Collection;", "Ljava/lang/Iterable;"]),
-        "Ljava/util/SortedMap;" | "Ljava/util/concurrent/ConcurrentMap;" => Some(vec!["Ljava/util/Map;"]),
         "Ljava/util/NavigableMap;" => Some(vec!["Ljava/util/SortedMap;", "Ljava/util/Map;"]),
         "Ljava/util/TreeSet;" => Some(vec![
             "Ljava/util/NavigableSet;",

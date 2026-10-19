@@ -26,7 +26,10 @@ pub(crate) struct Observer {
 }
 
 fn root_of(vm: &Engine, mut v: ObjRef) -> ObjRef {
-    while let Some(HostObj::View { parent: Some(p), .. }) = vm.fw.get(v) {
+    while let Some(HostObj::View {
+        parent: Some(p), ..
+    }) = vm.fw.get(v)
+    {
         v = *p;
     }
     v
@@ -41,7 +44,13 @@ pub(crate) fn observer_for(vm: &mut Engine, view: ObjRef) -> Result<ObjRef, VmEx
     }
     let o = vm.heap.alloc_instance(VTO.to_string(), Vec::new())?;
     vm.vto_by_root.insert(root, o);
-    vm.vto.insert(o, Observer { listeners: Vec::new(), alive: true });
+    vm.vto.insert(
+        o,
+        Observer {
+            listeners: Vec::new(),
+            alive: true,
+        },
+    );
     Ok(o)
 }
 
@@ -75,7 +84,13 @@ fn fire(vm: &mut Engine, obs: ObjRef, kind: &str, method: &str, sig: &str) -> Re
     let ls: Vec<ObjRef> = vm
         .vto
         .get(&obs)
-        .map(|o| o.listeners.iter().filter(|(k, _)| k == kind).map(|(_, l)| *l).collect())
+        .map(|o| {
+            o.listeners
+                .iter()
+                .filter(|(k, _)| k == kind)
+                .map(|(_, l)| *l)
+                .collect()
+        })
         .unwrap_or_default();
     for l in ls {
         let class = vm.heap.class_of(l)?.to_string();

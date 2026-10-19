@@ -38,11 +38,16 @@ pub(crate) fn instance_intrinsic(
     }
     let app_or_ctx = matches!(
         mref_class,
-        "Landroid/app/Application;" | "Landroid/content/Context;" | "Landroid/content/ContextWrapper;"
+        "Landroid/app/Application;"
+            | "Landroid/content/Context;"
+            | "Landroid/content/ContextWrapper;"
     );
     if app_or_ctx {
         return Ok(match (name, sig) {
-            ("registerComponentCallbacks" | "unregisterComponentCallbacks", "(Landroid/content/ComponentCallbacks;)V") => {
+            (
+                "registerComponentCallbacks" | "unregisterComponentCallbacks",
+                "(Landroid/content/ComponentCallbacks;)V",
+            ) => {
                 // no configuration/trim-memory events are emitted headless
                 Some(Value::Null)
             }
@@ -72,14 +77,19 @@ pub(crate) fn instance_intrinsic(
             let d = match vm.back_dispatchers.get(&recv) {
                 Some(d) => *d,
                 None => {
-                    let d = vm.heap.alloc_instance(BACK_DISPATCHER.to_string(), Vec::new())?;
+                    let d = vm
+                        .heap
+                        .alloc_instance(BACK_DISPATCHER.to_string(), Vec::new())?;
                     vm.back_dispatchers.insert(recv, d);
                     d
                 }
             };
             Value::Obj(d)
         }
-        ("invalidateOptionsMenu" | "reportFullyDrawn" | "onUserInteraction" | "onUserLeaveHint", "()V")
+        (
+            "invalidateOptionsMenu" | "reportFullyDrawn" | "onUserInteraction" | "onUserLeaveHint",
+            "()V",
+        )
         | ("overridePendingTransition", "(II)V")
         | ("onConfigurationChanged", "(Landroid/content/res/Configuration;)V")
         | ("onNewIntent", "(Landroid/content/Intent;)V")
@@ -136,6 +146,7 @@ fn back_dispatcher(
 
 /// The callback the BACK key should invoke for `activity`: the highest
 /// priority, most recently registered (AOSP `WindowOnBackInvokedDispatcher`).
+#[allow(dead_code)] // used by the BACK-key path behind feature gates
 pub(crate) fn back_invoked_top(vm: &Engine, activity: ObjRef) -> Option<ObjRef> {
     let d = vm.back_dispatchers.get(&activity)?;
     let list = vm.back_callbacks.get(d)?;

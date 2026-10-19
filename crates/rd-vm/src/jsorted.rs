@@ -44,7 +44,10 @@ fn search(vm: &mut Engine, r: ObjRef, map: bool, k: &Value) -> Result<(bool, usi
     let cmp = cmp_of(vm, r);
     let ks = keys(vm, r, map);
     if cmp.is_none() && matches!(k, Value::Null) {
-        return Err(exc("Ljava/lang/NullPointerException;", "TreeMap/TreeSet null key"));
+        return Err(exc(
+            "Ljava/lang/NullPointerException;",
+            "TreeMap/TreeSet null key",
+        ));
     }
     let (mut lo, mut hi) = (0usize, ks.len());
     while lo < hi {
@@ -53,7 +56,11 @@ fn search(vm: &mut Engine, r: ObjRef, map: bool, k: &Value) -> Result<(bool, usi
         if c == 0 {
             return Ok((true, mid));
         }
-        if c < 0 { lo = mid + 1 } else { hi = mid }
+        if c < 0 {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
     }
     Ok((false, lo))
 }
@@ -64,12 +71,19 @@ fn entries(vm: &Engine, r: ObjRef) -> Vec<(Value, Value)> {
     }
 }
 fn entry(vm: &mut Engine, k: Value, v: Value) -> Result<Value, VmExit> {
-    let en = vm.heap.alloc_instance("Ljava/util/Map$Entry;".to_string(), vec![])?;
+    let en = vm
+        .heap
+        .alloc_instance("Ljava/util/Map$Entry;".to_string(), vec![])?;
     crate::err::put_field_result(vm.heap.put_field(en, "entry_key", k))?;
     crate::err::put_field_result(vm.heap.put_field(en, "entry_value", v))?;
     Ok(Value::Obj(en))
 }
-fn new_tree(vm: &mut Engine, class: &str, cmp: Option<Value>, st: HostObj) -> Result<Value, VmExit> {
+fn new_tree(
+    vm: &mut Engine,
+    class: &str,
+    cmp: Option<Value>,
+    st: HostObj,
+) -> Result<Value, VmExit> {
     let r = vm.heap.alloc_instance(class.to_string(), vec![])?;
     if let Some(c) = cmp {
         crate::err::put_field_result(vm.heap.put_field(r, "rd_cmp", c))?;
@@ -78,13 +92,21 @@ fn new_tree(vm: &mut Engine, class: &str, cmp: Option<Value>, st: HostObj) -> Re
     Ok(Value::Obj(r))
 }
 fn iter(vm: &mut Engine, elems: Vec<Value>) -> Result<Value, VmExit> {
-    let it = vm.heap.alloc_instance("Ljava/util/Iterator;".to_string(), vec![])?;
+    let it = vm
+        .heap
+        .alloc_instance("Ljava/util/Iterator;".to_string(), vec![])?;
     vm.fw.objects.insert(it, HostObj::Iter { elems, pos: 0 });
     Ok(Value::Obj(it))
 }
 
 /// Navigation: index of floor/ceiling/lower/higher for key `k`.
-fn nav(vm: &mut Engine, r: ObjRef, map: bool, k: &Value, kind: &str) -> Result<Option<usize>, VmExit> {
+fn nav(
+    vm: &mut Engine,
+    r: ObjRef,
+    map: bool,
+    k: &Value,
+    kind: &str,
+) -> Result<Option<usize>, VmExit> {
     let (found, i) = search(vm, r, map, k)?;
     let n = keys(vm, r, map).len();
     Ok(match kind {
@@ -98,7 +120,15 @@ fn nav(vm: &mut Engine, r: ObjRef, map: bool, k: &Value, kind: &str) -> Result<O
     })
 }
 
-pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: &str, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn instance_intrinsic(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let is_map = match (mref_class, recv_class) {
         (TREE_MAP, _) | (_, TREE_MAP) => true,
         (TREE_SET, _) | (_, TREE_SET) => false,
@@ -107,7 +137,10 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
         // (the method ref may name the subclass or an inherited JDK
         // declarer such as AbstractCollection)
         _ if !recv_class.starts_with("Ljava/")
-            && matches!(vm.fw.objects.get(&recv), Some(HostObj::Map { .. } | HostObj::List { .. })) =>
+            && matches!(
+                vm.fw.objects.get(&recv),
+                Some(HostObj::Map { .. } | HostObj::List { .. })
+            ) =>
         {
             if vm.cp.is_subtype(recv_class, TREE_SET) {
                 false
@@ -145,7 +178,16 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
         if let Some(c) = cmp {
             crate::err::put_field_result(vm.heap.put_field(recv, "rd_cmp", c))?;
         }
-        vm.fw.objects.insert(recv, if is_map { HostObj::Map { entries: Vec::new() } } else { HostObj::List { elems: Vec::new() } });
+        vm.fw.objects.insert(
+            recv,
+            if is_map {
+                HostObj::Map {
+                    entries: Vec::new(),
+                }
+            } else {
+                HostObj::List { elems: Vec::new() }
+            },
+        );
         for (k, v) in init_map {
             put(vm, recv, k, v)?;
         }
@@ -154,8 +196,20 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
         }
         return Ok(Some(Value::Null));
     }
-    if !matches!(vm.fw.objects.get(&recv), Some(HostObj::Map { .. } | HostObj::List { .. })) {
-        vm.fw.objects.insert(recv, if is_map { HostObj::Map { entries: Vec::new() } } else { HostObj::List { elems: Vec::new() } });
+    if !matches!(
+        vm.fw.objects.get(&recv),
+        Some(HostObj::Map { .. } | HostObj::List { .. })
+    ) {
+        vm.fw.objects.insert(
+            recv,
+            if is_map {
+                HostObj::Map {
+                    entries: Vec::new(),
+                }
+            } else {
+                HostObj::List { elems: Vec::new() }
+            },
+        );
     }
     let ks = keys(vm, recv, is_map);
     let n = ks.len();
@@ -164,7 +218,16 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
         "size" => Value::Int(n as i32),
         "isEmpty" => Value::Int((n == 0) as i32),
         "clear" => {
-            vm.fw.objects.insert(recv, if is_map { HostObj::Map { entries: Vec::new() } } else { HostObj::List { elems: Vec::new() } });
+            vm.fw.objects.insert(
+                recv,
+                if is_map {
+                    HostObj::Map {
+                        entries: Vec::new(),
+                    }
+                } else {
+                    HostObj::List { elems: Vec::new() }
+                },
+            );
             Value::Null
         }
         "comparator" => cmp_of(vm, recv).unwrap_or(Value::Null),
@@ -176,7 +239,9 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
             }
             iter(vm, e)?
         }
-        "toArray" => crate::arrays::new_array(vm, "[Ljava/lang/Object;", crate::heap::ElemKind::Obj, ks)?,
+        "toArray" => {
+            crate::arrays::new_array(vm, "[Ljava/lang/Object;", crate::heap::ElemKind::Obj, ks)?
+        }
         // ── set ──
         "add" if !is_map => Value::Int(add(vm, recv, a0)? as i32),
         "addAll" if !is_map => {
@@ -213,15 +278,21 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
                 }
             }
         }
-        "floor" | "ceiling" | "lower" | "higher" if !is_map => match nav(vm, recv, false, &a0, name)? {
-            Some(i) => ks[i].clone(),
-            None => Value::Null,
-        },
+        "floor" | "ceiling" | "lower" | "higher" if !is_map => {
+            match nav(vm, recv, false, &a0, name)? {
+                Some(i) => ks[i].clone(),
+                None => Value::Null,
+            }
+        }
         // ── map ──
         "put" => put(vm, recv, a0, args.get(1).cloned().unwrap_or(Value::Null))?,
         "get" | "getOrDefault" => {
             let (found, i) = search(vm, recv, true, &a0)?;
-            if found { entries(vm, recv)[i].1.clone() } else { args.get(1).cloned().unwrap_or(Value::Null) }
+            if found {
+                entries(vm, recv)[i].1.clone()
+            } else {
+                args.get(1).cloned().unwrap_or(Value::Null)
+            }
         }
         "remove" => {
             let (found, i) = search(vm, recv, true, &a0)?;
@@ -295,17 +366,23 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
                 entry(vm, k, v)?
             }
         }
-        "floorEntry" | "ceilingEntry" | "lowerEntry" | "higherEntry" | "floorKey" | "ceilingKey" | "lowerKey" | "higherKey" => {
+        "floorEntry" | "ceilingEntry" | "lowerEntry" | "higherEntry" | "floorKey"
+        | "ceilingKey" | "lowerKey" | "higherKey" => {
             let kind = name.trim_end_matches("Entry").trim_end_matches("Key");
             match nav(vm, recv, true, &a0, kind)? {
                 Some(i) => {
                     let (k, v) = entries(vm, recv)[i].clone();
-                    if name.ends_with("Key") { k } else { entry(vm, k, v)? }
+                    if name.ends_with("Key") {
+                        k
+                    } else {
+                        entry(vm, k, v)?
+                    }
                 }
                 None => Value::Null,
             }
         }
-        "headMap" | "tailMap" | "subMap" | "descendingMap" | "headSet" | "tailSet" | "subSet" | "descendingSet" => {
+        "headMap" | "tailMap" | "subMap" | "descendingMap" | "headSet" | "tailSet" | "subSet"
+        | "descendingSet" => {
             let all = entries(vm, recv);
             let elems = ks.clone();
             let incl = |args: &[Value], i: usize, d: bool| match args.get(i) {
@@ -324,10 +401,21 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
                 "subMap" | "subSet" => {
                     let four = args.len() == 4;
                     let (f0, i0) = search(vm, recv, is_map, &a0)?;
-                    let hi_key = args.get(if four { 2 } else { 1 }).cloned().unwrap_or(Value::Null);
+                    let hi_key = args
+                        .get(if four { 2 } else { 1 })
+                        .cloned()
+                        .unwrap_or(Value::Null);
                     let (f1, i1) = search(vm, recv, is_map, &hi_key)?;
-                    let lo = if f0 && four && !incl(args, 1, true) { i0 + 1 } else { i0 };
-                    let hi = if f1 && four && incl(args, 3, false) { i1 + 1 } else { i1 };
+                    let lo = if f0 && four && !incl(args, 1, true) {
+                        i0 + 1
+                    } else {
+                        i0
+                    };
+                    let hi = if f1 && four && incl(args, 3, false) {
+                        i1 + 1
+                    } else {
+                        i1
+                    };
                     (lo, hi.max(lo))
                 }
                 _ => (0, n),
@@ -337,7 +425,9 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
                 if is_map {
                     let mut e = all;
                     e.reverse();
-                    let r = vm.heap.alloc_instance("Ljava/util/LinkedHashMap;".to_string(), vec![])?;
+                    let r = vm
+                        .heap
+                        .alloc_instance("Ljava/util/LinkedHashMap;".to_string(), vec![])?;
                     vm.fw.objects.insert(r, HostObj::Map { entries: e });
                     Value::Obj(r)
                 } else {
@@ -346,12 +436,32 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
                     crate::collections::new_list(vm, "Ljava/util/LinkedHashSet;", e)?
                 }
             } else if is_map {
-                new_tree(vm, TREE_MAP, cmp, HostObj::Map { entries: all[lo..hi].to_vec() })?
+                new_tree(
+                    vm,
+                    TREE_MAP,
+                    cmp,
+                    HostObj::Map {
+                        entries: all[lo..hi].to_vec(),
+                    },
+                )?
             } else {
-                new_tree(vm, TREE_SET, cmp, HostObj::List { elems: elems[lo..hi].to_vec() })?
+                new_tree(
+                    vm,
+                    TREE_SET,
+                    cmp,
+                    HostObj::List {
+                        elems: elems[lo..hi].to_vec(),
+                    },
+                )?
             }
         }
-        "equals" => Value::Int((Some(recv) == match a0 { Value::Obj(o) => Some(o), _ => None }) as i32),
+        "equals" => Value::Int(
+            (Some(recv)
+                == match a0 {
+                    Value::Obj(o) => Some(o),
+                    _ => None,
+                }) as i32,
+        ),
         "hashCode" => Value::Int(recv as i32),
         _ => return Ok(None),
     }))

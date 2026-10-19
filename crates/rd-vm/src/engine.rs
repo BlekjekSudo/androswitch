@@ -79,7 +79,8 @@ pub struct Engine {
     pub granted_permissions: Option<HashSet<String>>,
     pub(crate) pending_permission_results: Vec<crate::perms::PendingPermissionResult>,
     /// window → (decor, content frame) (window.rs)
-    pub(crate) window_decor: HashMap<crate::heap::ObjRef, (crate::heap::ObjRef, crate::heap::ObjRef)>,
+    pub(crate) window_decor:
+        HashMap<crate::heap::ObjRef, (crate::heap::ObjRef, crate::heap::ObjRef)>,
     pub(crate) system_ui_visibility: HashMap<crate::heap::ObjRef, i32>,
     /// General View property store (view_props.rs): (view, property) → value
     pub(crate) view_props: HashMap<(crate::heap::ObjRef, String), Value>,
@@ -407,7 +408,9 @@ impl Engine {
                     // the guest stack.
                     if let Some(obj) = t.obj {
                         let prev = match self.heap.get_field(obj, "rd_trace") {
-                            Ok(Value::Obj(r)) => self.heap.as_str(r).map(str::to_string).unwrap_or_default(),
+                            Ok(Value::Obj(r)) => {
+                                self.heap.as_str(r).map(str::to_string).unwrap_or_default()
+                            }
                             _ => String::new(),
                         };
                         if prev.matches("\n  at ").count() < 24 {

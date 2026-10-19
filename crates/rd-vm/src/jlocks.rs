@@ -47,7 +47,15 @@ fn sub_lock(vm: &mut Engine, owner: ObjRef, class: &str, field: &str) -> Result<
     Ok(Value::Obj(r))
 }
 
-pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: &str, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn instance_intrinsic(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let class = match mref_class {
         RL | RWL | RLOCK | WLOCK | AOS => mref_class,
         LOCK | COND => recv_class,
@@ -56,10 +64,18 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
     if mref_class == AOS {
         return Ok(Some(match name {
             "setExclusiveOwnerThread" => {
-                put(vm, recv, "rd_owner_thread", args.first().cloned().unwrap_or(Value::Null))?;
+                put(
+                    vm,
+                    recv,
+                    "rd_owner_thread",
+                    args.first().cloned().unwrap_or(Value::Null),
+                )?;
                 Value::Null
             }
-            "getExclusiveOwnerThread" => vm.heap.get_field(recv, "rd_owner_thread").unwrap_or(Value::Null),
+            "getExclusiveOwnerThread" => vm
+                .heap
+                .get_field(recv, "rd_owner_thread")
+                .unwrap_or(Value::Null),
             _ => Value::Null, // <init>
         }));
     }
@@ -70,7 +86,11 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
             _ => Value::Null,
         }));
     }
-    let field = if class == RLOCK { "rd_readers" } else { "rd_holds" };
+    let field = if class == RLOCK {
+        "rd_readers"
+    } else {
+        "rd_holds"
+    };
     // read/write locks keep their counters on the owning ReentrantReadWriteLock
     let target = if class == RLOCK || class == WLOCK {
         match vm.heap.get_field(recv, "rd_owner") {
@@ -87,24 +107,39 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
         "lock" | "lockInterruptibly" | "tryLock" => {
             let n = get_i(vm, target, field);
             put(vm, target, field, Value::Int(n + 1))?;
-            if sig.ends_with(")Z") { Value::Int(1) } else { Value::Null }
+            if sig.ends_with(")Z") {
+                Value::Int(1)
+            } else {
+                Value::Null
+            }
         }
         "unlock" => {
             let n = get_i(vm, target, field);
             if n <= 0 {
-                return Err(VmExit::Exception(Throwable::new("Ljava/lang/IllegalMonitorStateException;", String::new())));
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/IllegalMonitorStateException;",
+                    String::new(),
+                )));
             }
             put(vm, target, field, Value::Int(n - 1))?;
             Value::Null
         }
         "isLocked" | "isWriteLocked" => Value::Int((get_i(vm, target, "rd_holds") > 0) as i32),
-        "isHeldByCurrentThread" | "isWriteLockedByCurrentThread" => Value::Int((get_i(vm, target, "rd_holds") > 0) as i32),
+        "isHeldByCurrentThread" | "isWriteLockedByCurrentThread" => {
+            Value::Int((get_i(vm, target, "rd_holds") > 0) as i32)
+        }
         "getHoldCount" | "getWriteHoldCount" => Value::Int(get_i(vm, target, "rd_holds")),
         "getReadLockCount" | "getReadHoldCount" => Value::Int(get_i(vm, target, "rd_readers")),
         "hasQueuedThreads" | "isFair" => Value::Int(0),
         "getQueueLength" => Value::Int(0),
-        "newCondition" => Value::Obj(vm.heap.alloc_instance("Lrd/Condition;".into(), Vec::new())?),
-        "toString" => Value::Obj(crate::intrinsics::alloc_string(vm, format!("{class}[holds={}]", get_i(vm, target, field)))?),
+        "newCondition" => Value::Obj(
+            vm.heap
+                .alloc_instance("Lrd/Condition;".into(), Vec::new())?,
+        ),
+        "toString" => Value::Obj(crate::intrinsics::alloc_string(
+            vm,
+            format!("{class}[holds={}]", get_i(vm, target, field)),
+        )?),
         _ => return Ok(None),
     }))
 }

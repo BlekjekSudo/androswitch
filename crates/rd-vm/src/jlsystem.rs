@@ -51,7 +51,9 @@ pub(crate) fn static_intrinsic(
     }
     Ok(Some(match (name, sig) {
         ("nanoTime", "()J") => Value::Long((vm.fw.clock() as i64).saturating_mul(1_000_000)),
-        ("currentTimeMillis", "()J") => Value::Long(epoch_ms().saturating_add(vm.fw.clock() as i64)),
+        ("currentTimeMillis", "()J") => {
+            Value::Long(epoch_ms().saturating_add(vm.fw.clock() as i64))
+        }
         ("identityHashCode", "(Ljava/lang/Object;)I") => match args[0].as_ref()? {
             Some(r) => Value::Int(r as i32),
             None => Value::Int(0),
@@ -60,14 +62,28 @@ pub(crate) fn static_intrinsic(
             Value::Obj(crate::intrinsics::alloc_string(vm, "\n".to_string())?)
         }
         ("arraycopy", "(Ljava/lang/Object;ILjava/lang/Object;II)V") => {
-            arraycopy(vm, &args[0], args[1].as_int()?, &args[2], args[3].as_int()?, args[4].as_int()?)?;
+            arraycopy(
+                vm,
+                &args[0],
+                args[1].as_int()?,
+                &args[2],
+                args[3].as_int()?,
+                args[4].as_int()?,
+            )?;
             Value::Null
         }
         _ => return Ok(None),
     }))
 }
 
-fn arraycopy(vm: &mut Engine, src: &Value, sp: i32, dst: &Value, dp: i32, len: i32) -> Result<(), VmExit> {
+fn arraycopy(
+    vm: &mut Engine,
+    src: &Value,
+    sp: i32,
+    dst: &Value,
+    dp: i32,
+    len: i32,
+) -> Result<(), VmExit> {
     const NPE: &str = "Ljava/lang/NullPointerException;";
     const ASE: &str = "Ljava/lang/ArrayStoreException;";
     const AIOOBE: &str = "Ljava/lang/ArrayIndexOutOfBoundsException;";
@@ -79,7 +95,10 @@ fn arraycopy(vm: &mut Engine, src: &Value, sp: i32, dst: &Value, dp: i32, len: i
         return Err(exc(ASE, format!("source of type {sd} is not an array")));
     }
     if !dd.starts_with('[') {
-        return Err(exc(ASE, format!("destination of type {dd} is not an array")));
+        return Err(exc(
+            ASE,
+            format!("destination of type {dd} is not an array"),
+        ));
     }
     let s_prim = !matches!(sd.as_bytes().get(1), Some(b'L') | Some(b'['));
     let d_prim = !matches!(dd.as_bytes().get(1), Some(b'L') | Some(b'['));
@@ -95,9 +114,7 @@ fn arraycopy(vm: &mut Engine, src: &Value, sp: i32, dst: &Value, dp: i32, len: i
     if sp < 0 || dp < 0 || len < 0 || sp64 + len64 > slen || dp64 + len64 > dlen {
         return Err(exc(
             AIOOBE,
-            format!(
-                "src.length={slen} srcPos={sp} dst.length={dlen} dstPos={dp} length={len}"
-            ),
+            format!("src.length={slen} srcPos={sp} dst.length={dlen} dstPos={dp} length={len}"),
         ));
     }
     if len == 0 {
@@ -125,7 +142,12 @@ fn class_for_name(vm: &mut Engine, sig: &str, args: &[Value]) -> Result<Option<V
     }
     let name = match args.first() {
         Some(Value::Obj(r)) => vm.heap.as_str(*r)?.to_string(),
-        _ => return Err(exc("Ljava/lang/NullPointerException;", "Class.forName(null)")),
+        _ => {
+            return Err(exc(
+                "Ljava/lang/NullPointerException;",
+                "Class.forName(null)",
+            ))
+        }
     };
     let initialize = !matches!(args.get(1), Some(Value::Int(0)));
     let desc = if name.starts_with('[') {
@@ -151,7 +173,13 @@ fn class_for_name(vm: &mut Engine, sig: &str, args: &[Value]) -> Result<Option<V
 /// `ClassLoader.loadClass(name[, resolve])`: same resolution as
 /// `Class.forName` (app DEX + host classes; `ClassNotFoundException`
 /// otherwise). `getParent` is null (single app loader).
-pub(crate) fn class_loader_intrinsic(vm: &mut Engine, mref_class: &str, name: &str, sig: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn class_loader_intrinsic(
+    vm: &mut Engine,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     // Class.getPackage / Package.getName: derived from the descriptor
     // Runtime-visible annotations are not retained on classes (deviation,
     // as for Method/Constructor): lookups report "absent".
@@ -159,8 +187,16 @@ pub(crate) fn class_loader_intrinsic(vm: &mut Engine, mref_class: &str, name: &s
         match name {
             "getAnnotation" | "getDeclaredAnnotation" => return Ok(Some(Value::Null)),
             "isAnnotationPresent" => return Ok(Some(Value::Int(0))),
-            "getAnnotations" | "getDeclaredAnnotations" | "getAnnotationsByType" | "getDeclaredAnnotationsByType" => {
-                let a = crate::arrays::new_array(vm, "[Ljava/lang/annotation/Annotation;", crate::heap::ElemKind::Obj, Vec::new())?;
+            "getAnnotations"
+            | "getDeclaredAnnotations"
+            | "getAnnotationsByType"
+            | "getDeclaredAnnotationsByType" => {
+                let a = crate::arrays::new_array(
+                    vm,
+                    "[Ljava/lang/annotation/Annotation;",
+                    crate::heap::ElemKind::Obj,
+                    Vec::new(),
+                )?;
                 return Ok(Some(a));
             }
             _ => {}
@@ -174,27 +210,46 @@ pub(crate) fn class_loader_intrinsic(vm: &mut Engine, mref_class: &str, name: &s
             },
             _ => String::new(),
         };
-        let bin = desc.trim_start_matches('L').trim_end_matches(';').replace('/', ".");
-        let pkg = bin.rsplit_once('.').map(|(p, _)| p.to_string()).unwrap_or_default();
-        let r = vm.heap.alloc_instance("Ljava/lang/Package;".into(), Vec::new())?;
+        let bin = desc
+            .trim_start_matches('L')
+            .trim_end_matches(';')
+            .replace('/', ".");
+        let pkg = bin
+            .rsplit_once('.')
+            .map(|(p, _)| p.to_string())
+            .unwrap_or_default();
+        let r = vm
+            .heap
+            .alloc_instance("Ljava/lang/Package;".into(), Vec::new())?;
         let n = crate::intrinsics::alloc_string(vm, pkg)?;
         crate::err::put_field_result(vm.heap.put_field(r, "rd_name", Value::Obj(n)))?;
         return Ok(Some(Value::Obj(r)));
     }
     if mref_class == "Ljava/lang/Package;" {
         return Ok(match (name, args.first()) {
-            ("getName" | "toString", Some(Value::Obj(p))) => Some(vm.heap.get_field(*p, "rd_name").unwrap_or(Value::Null)),
-            ("getImplementationVersion" | "getSpecificationVersion" | "getImplementationVendor", _) => Some(Value::Null),
+            ("getName" | "toString", Some(Value::Obj(p))) => {
+                Some(vm.heap.get_field(*p, "rd_name").unwrap_or(Value::Null))
+            }
+            (
+                "getImplementationVersion" | "getSpecificationVersion" | "getImplementationVendor",
+                _,
+            ) => Some(Value::Null),
             _ => None,
         });
     }
-    if !matches!(mref_class, "Ljava/lang/ClassLoader;" | "Ldalvik/system/BaseDexClassLoader;" | "Ldalvik/system/PathClassLoader;") {
+    if !matches!(
+        mref_class,
+        "Ljava/lang/ClassLoader;"
+            | "Ldalvik/system/BaseDexClassLoader;"
+            | "Ldalvik/system/PathClassLoader;"
+    ) {
         return Ok(None);
     }
     match (name, sig) {
-        ("loadClass", "(Ljava/lang/String;)Ljava/lang/Class;" | "(Ljava/lang/String;Z)Ljava/lang/Class;") => {
-            class_for_name(vm, "(Ljava/lang/String;)Ljava/lang/Class;", &args[..1])
-        }
+        (
+            "loadClass",
+            "(Ljava/lang/String;)Ljava/lang/Class;" | "(Ljava/lang/String;Z)Ljava/lang/Class;",
+        ) => class_for_name(vm, "(Ljava/lang/String;)Ljava/lang/Class;", &args[..1]),
         ("getParent", _) => Ok(Some(Value::Null)),
         _ => Ok(None),
     }

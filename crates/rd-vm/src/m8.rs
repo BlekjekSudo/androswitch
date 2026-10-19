@@ -423,7 +423,8 @@ pub fn call_m8_instance(
     // A DEX subclass's own methods (its constructor, overrides) run as DEX;
     // the host model only answers calls that land on SQLiteOpenHelper.
     if mref_class == SQLITE_HELPER
-        || (vm.cp.is_subtype(&recv_class, SQLITE_HELPER) && vm.cp.resolve_method(mref_class, name, sig).is_none())
+        || (vm.cp.is_subtype(&recv_class, SQLITE_HELPER)
+            && vm.cp.resolve_method(mref_class, name, sig).is_none())
     {
         return sqlite_helper(vm, name, sig, recv, args);
     }
@@ -498,7 +499,12 @@ pub fn call_m8_instance(
     if name == "getSystemServiceName" && sig == "(Ljava/lang/Class;)Ljava/lang/String;" {
         let cls = match args.first() {
             Some(Value::Obj(c)) => match vm.heap.get_field(*c, "class_name") {
-                Ok(Value::Obj(s)) => vm.heap.as_str(s).ok().map(str::to_string).unwrap_or_default(),
+                Ok(Value::Obj(s)) => vm
+                    .heap
+                    .as_str(s)
+                    .ok()
+                    .map(str::to_string)
+                    .unwrap_or_default(),
                 _ => String::new(),
             },
             _ => String::new(),
@@ -537,7 +543,10 @@ pub fn call_m8_instance(
         };
         // Class-keyed lookups return exactly that class; services are
         // per-class singletons (AOSP caches them per Context).
-        let class = if key.starts_with('L') && key.ends_with(';') && system_service_class(&key) == "Ljava/lang/Object;" {
+        let class = if key.starts_with('L')
+            && key.ends_with(';')
+            && system_service_class(&key) == "Ljava/lang/Object;"
+        {
             key.clone()
         } else {
             system_service_class(&key).to_string()
@@ -991,7 +1000,10 @@ fn sqlite_helper(
         "close" => Ok(Some(Value::Null)),
         // journal/config knobs: the in-memory store has no journal, so they
         // are accepted and have no effect
-        "setWriteAheadLoggingEnabled" | "setLookasideConfig" | "setOpenParams" | "setIdleConnectionTimeout" => Ok(Some(Value::Null)),
+        "setWriteAheadLoggingEnabled"
+        | "setLookasideConfig"
+        | "setOpenParams"
+        | "setIdleConnectionTimeout" => Ok(Some(Value::Null)),
         "getDatabaseName" => {
             let n = vm.fw.m8.helpers_db.get(&recv).cloned().unwrap_or_default();
             Ok(Some(astr(vm, n)?))
@@ -1203,20 +1215,26 @@ fn sqlite_db(
         }
         "isOpen" => Ok(Some(Value::Int(1))),
         "enableWriteAheadLogging" => Ok(Some(Value::Int(1))),
-        "disableWriteAheadLogging" | "setForeignKeyConstraintsEnabled" | "setMaxSqlCacheSize" | "setLocale" | "setPageSize" => {
-            Ok(Some(Value::Null))
+        "disableWriteAheadLogging"
+        | "setForeignKeyConstraintsEnabled"
+        | "setMaxSqlCacheSize"
+        | "setLocale"
+        | "setPageSize" => Ok(Some(Value::Null)),
+        "isWriteAheadLoggingEnabled" | "isReadOnly" | "isDbLockedByCurrentThread" => {
+            Ok(Some(Value::Int(0)))
         }
-        "isWriteAheadLoggingEnabled" | "isReadOnly" | "isDbLockedByCurrentThread" => Ok(Some(Value::Int(0))),
         "getPath" => {
             let n = db_name_of(vm, recv)?;
             Ok(Some(astr(vm, format!("/data/data/app/databases/{n}"))?))
         }
         "getAttachedDbs" => {
             let n = db_name_of(vm, recv)?;
-            Ok(Some(crate::collections::new_list(vm, "Ljava/util/ArrayList;", vec![Value::Null; 0]).map(|l| {
-                let _ = n;
-                l
-            })?))
+            Ok(Some(
+                crate::collections::new_list(vm, "Ljava/util/ArrayList;", vec![Value::Null; 0])
+                    .inspect(|_l| {
+                        let _ = n;
+                    })?,
+            ))
         }
         "close" => Ok(Some(Value::Null)),
         "compileStatement" => {
@@ -1908,10 +1926,16 @@ const SERVICES: &[(&str, &str)] = &[
     ("alarm", "Landroid/app/AlarmManager;"),
     ("notification", "Landroid/app/NotificationManager;"),
     ("connectivity", "Landroid/net/ConnectivityManager;"),
-    ("input_method", "Landroid/view/inputmethod/InputMethodManager;"),
+    (
+        "input_method",
+        "Landroid/view/inputmethod/InputMethodManager;",
+    ),
     ("location", "Landroid/location/LocationManager;"),
     ("sensor", "Landroid/hardware/SensorManager;"),
-    ("accessibility", "Landroid/view/accessibility/AccessibilityManager;"),
+    (
+        "accessibility",
+        "Landroid/view/accessibility/AccessibilityManager;",
+    ),
     ("autofill", "Landroid/view/autofill/AutofillManager;"),
     ("clipboard", "Landroid/content/ClipboardManager;"),
     ("vibrator", "Landroid/os/Vibrator;"),
@@ -1923,8 +1947,14 @@ const SERVICES: &[(&str, &str)] = &[
     ("uimode", "Landroid/app/UiModeManager;"),
     ("download", "Landroid/app/DownloadManager;"),
     ("storage", "Landroid/os/storage/StorageManager;"),
-    ("textservices", "Landroid/view/textservice/TextServicesManager;"),
-    ("textclassification", "Landroid/view/textclassifier/TextClassificationManager;"),
+    (
+        "textservices",
+        "Landroid/view/textservice/TextServicesManager;",
+    ),
+    (
+        "textclassification",
+        "Landroid/view/textclassifier/TextClassificationManager;",
+    ),
     ("user", "Landroid/os/UserManager;"),
     ("appops", "Landroid/app/AppOpsManager;"),
     ("batterymanager", "Landroid/os/BatteryManager;"),
@@ -1933,9 +1963,18 @@ const SERVICES: &[(&str, &str)] = &[
     ("shortcut", "Landroid/content/pm/ShortcutManager;"),
     ("appwidget", "Landroid/appwidget/AppWidgetManager;"),
     ("locale", "Landroid/app/LocaleManager;"),
-    ("content_capture", "Landroid/view/contentcapture/ContentCaptureManager;"),
-    ("translation", "Landroid/view/translation/TranslationManager;"),
-    ("media_session", "Landroid/media/session/MediaSessionManager;"),
+    (
+        "content_capture",
+        "Landroid/view/contentcapture/ContentCaptureManager;",
+    ),
+    (
+        "translation",
+        "Landroid/view/translation/TranslationManager;",
+    ),
+    (
+        "media_session",
+        "Landroid/media/session/MediaSessionManager;",
+    ),
     ("usagestats", "Landroid/app/usage/UsageStatsManager;"),
 ];
 

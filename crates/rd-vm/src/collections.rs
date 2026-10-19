@@ -20,8 +20,12 @@ use crate::value::Value;
 fn host_elems(vm: &Engine, v: Option<&Value>) -> Option<Vec<Value>> {
     match v {
         Some(Value::Obj(r)) => match vm.fw.objects.get(r) {
-            Some(HostObj::List { elems }) | Some(HostObj::Iter { elems, .. }) => Some(elems.clone()),
-            Some(HostObj::Map { entries }) => Some(entries.iter().map(|(k, _)| k.clone()).collect()),
+            Some(HostObj::List { elems }) | Some(HostObj::Iter { elems, .. }) => {
+                Some(elems.clone())
+            }
+            Some(HostObj::Map { entries }) => {
+                Some(entries.iter().map(|(k, _)| k.clone()).collect())
+            }
             _ => None,
         },
         _ => None,
@@ -50,9 +54,14 @@ pub(crate) fn static_intrinsic(
             Ok(Some(new_list(vm, "Ljava/util/LinkedHashSet;", init)?))
         }
         ("max", _) | ("min", _) => {
-            let Some(items) = host_elems(vm, args.first()) else { return Ok(None) };
+            let Some(items) = host_elems(vm, args.first()) else {
+                return Ok(None);
+            };
             if items.is_empty() {
-                return Err(VmExit::Exception(Throwable::new("Ljava/util/NoSuchElementException;", String::new())));
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/util/NoSuchElementException;",
+                    String::new(),
+                )));
             }
             let cmp = args.get(1).filter(|v| !matches!(v, Value::Null)).cloned();
             let mut best = items[0].clone();
@@ -74,18 +83,30 @@ pub(crate) fn static_intrinsic(
             Ok(None)
         }
         ("singletonMap", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/util/Map;") => {
-            let r = vm.heap.alloc_instance("Ljava/util/HashMap;".to_string(), Vec::new())?;
+            let r = vm
+                .heap
+                .alloc_instance("Ljava/util/HashMap;".to_string(), Vec::new())?;
             let e = vec![(args[0].clone(), args[1].clone())];
             vm.fw.objects.insert(r, HostObj::Map { entries: e });
             Ok(Some(Value::Obj(r)))
         }
         ("emptyIterator", "()Ljava/util/Iterator;") => {
-            let r = vm.heap.alloc_instance("Ljava/util/Iterator;".to_string(), Vec::new())?;
-            vm.fw.objects.insert(r, HostObj::Iter { elems: Vec::new(), pos: 0 });
+            let r = vm
+                .heap
+                .alloc_instance("Ljava/util/Iterator;".to_string(), Vec::new())?;
+            vm.fw.objects.insert(
+                r,
+                HostObj::Iter {
+                    elems: Vec::new(),
+                    pos: 0,
+                },
+            );
             Ok(Some(Value::Obj(r)))
         }
         ("list", "(Ljava/util/Enumeration;)Ljava/util/ArrayList;") => {
-            let Some(items) = host_elems(vm, args.first()) else { return Ok(None) };
+            let Some(items) = host_elems(vm, args.first()) else {
+                return Ok(None);
+            };
             Ok(Some(new_list(vm, "Ljava/util/ArrayList;", items)?))
         }
         ("addAll", "(Ljava/util/Collection;[Ljava/lang/Object;)Z") => {
@@ -93,7 +114,11 @@ pub(crate) fn static_intrinsic(
                 return Ok(None);
             };
             let add: Vec<Value> = vm.heap.as_array_elems(*a)?.0.to_vec();
-            let is_set = vm.heap.class_of(*c).map(|k| k.contains("Set")).unwrap_or(false);
+            let is_set = vm
+                .heap
+                .class_of(*c)
+                .map(|k| k.contains("Set"))
+                .unwrap_or(false);
             let heap_snapshot: Vec<Value>;
             let mut changed = false;
             if let Some(HostObj::List { elems }) = vm.fw.objects.get(c) {
@@ -103,7 +128,11 @@ pub(crate) fn static_intrinsic(
             }
             let mut out = heap_snapshot;
             for v in add {
-                if is_set && out.iter().any(|x| crate::intrinsics::values_equal(&vm.heap, x, &v).unwrap_or(false)) {
+                if is_set
+                    && out
+                        .iter()
+                        .any(|x| crate::intrinsics::values_equal(&vm.heap, x, &v).unwrap_or(false))
+                {
                     continue;
                 }
                 out.push(v);

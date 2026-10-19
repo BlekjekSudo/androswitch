@@ -40,11 +40,20 @@ pub(crate) struct ContentState {
 fn default_setting(key: &str) -> Option<&'static str> {
     let name = key.rsplit('/').next().unwrap_or(key);
     Some(match name {
-        "animator_duration_scale" | "transition_animation_scale" | "window_animation_scale" | "font_scale" => "1.0",
+        "animator_duration_scale"
+        | "transition_animation_scale"
+        | "window_animation_scale"
+        | "font_scale" => "1.0",
         "time_12_24" => "24",
         "auto_time" | "auto_time_zone" | "stay_on_while_plugged_in" => "1",
-        "development_settings_enabled" | "adb_enabled" | "airplane_mode_on" | "always_finish_activities"
-        | "accessibility_enabled" | "show_touches" | "wait_for_debugger" | "debug_app" => "0",
+        "development_settings_enabled"
+        | "adb_enabled"
+        | "airplane_mode_on"
+        | "always_finish_activities"
+        | "accessibility_enabled"
+        | "show_touches"
+        | "wait_for_debugger"
+        | "debug_app" => "0",
         "screen_brightness" => "128",
         "android_id" => "rustydroid0000001",
         _ => return None,
@@ -78,11 +87,18 @@ pub(crate) fn new_uri(vm: &mut Engine, s: String) -> Result<ObjRef, VmExit> {
 }
 
 fn lookup(vm: &Engine, key: &str) -> Option<String> {
-    vm.content.settings.get(key).cloned().or_else(|| default_setting(key).map(str::to_string))
+    vm.content
+        .settings
+        .get(key)
+        .cloned()
+        .or_else(|| default_setting(key).map(str::to_string))
 }
 
 fn not_found(name: &str) -> VmExit {
-    VmExit::Exception(Throwable::new("Landroid/provider/Settings$SettingNotFoundException;", name.to_string()))
+    VmExit::Exception(Throwable::new(
+        "Landroid/provider/Settings$SettingNotFoundException;",
+        name.to_string(),
+    ))
 }
 
 fn notify(vm: &mut Engine, uri: &str) -> Result<(), VmExit> {
@@ -96,8 +112,16 @@ fn notify(vm: &mut Engine, uri: &str) -> Result<(), VmExit> {
     for o in targets {
         let uri_obj = new_uri(vm, uri.to_string())?;
         let class = vm.heap.class_of(o)?.to_string();
-        if let Some((d, def, m)) = vm.cp.resolve_method(&class, "onChange", "(ZLandroid/net/Uri;)V") {
-            vm.call(d, def, &m, vec![Value::Obj(o), Value::Int(0), Value::Obj(uri_obj)])?;
+        if let Some((d, def, m)) = vm
+            .cp
+            .resolve_method(&class, "onChange", "(ZLandroid/net/Uri;)V")
+        {
+            vm.call(
+                d,
+                def,
+                &m,
+                vec![Value::Obj(o), Value::Int(0), Value::Obj(uri_obj)],
+            )?;
         } else if let Some((d, def, m)) = vm.cp.resolve_method(&class, "onChange", "(Z)V") {
             vm.call(d, def, &m, vec![Value::Obj(o), Value::Int(0)])?;
         }
@@ -115,7 +139,10 @@ pub(crate) fn static_intrinsic(
     if let Some(table) = table_of(class) {
         if name == "getUriFor" {
             let n = sarg(vm, args, 0)?.unwrap_or_default();
-            return Ok(Some(Value::Obj(new_uri(vm, format!("content://settings/{table}/{n}"))?)));
+            return Ok(Some(Value::Obj(new_uri(
+                vm,
+                format!("content://settings/{table}/{n}"),
+            )?)));
         }
         let n = sarg(vm, args, 1)?.unwrap_or_default();
         let key = format!("{table}/{n}");
@@ -153,8 +180,15 @@ pub(crate) fn static_intrinsic(
     }
     if class == URI {
         return Ok(match (name, sig) {
-            ("fromParts", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Landroid/net/Uri;") => {
-                let (s, ssp, frag) = (sarg(vm, args, 0)?.unwrap_or_default(), sarg(vm, args, 1)?.unwrap_or_default(), sarg(vm, args, 2)?);
+            (
+                "fromParts",
+                "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Landroid/net/Uri;",
+            ) => {
+                let (s, ssp, frag) = (
+                    sarg(vm, args, 0)?.unwrap_or_default(),
+                    sarg(vm, args, 1)?.unwrap_or_default(),
+                    sarg(vm, args, 2)?,
+                );
                 let mut u = format!("{s}:{}", encode(&ssp, ":/@"));
                 if let Some(f) = frag {
                     u.push('#');
@@ -222,7 +256,12 @@ fn parse(u: &str) -> Parts {
         None => (u, None),
     };
     let (scheme, rest) = match main.find(':') {
-        Some(i) if main[..i].chars().all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c)) && i > 0 => {
+        Some(i)
+            if main[..i]
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c))
+                && i > 0 =>
+        {
             (Some(main[..i].to_string()), &main[i + 1..])
         }
         _ => (None, main),
@@ -239,7 +278,14 @@ fn parse(u: &str) -> Parts {
         },
         None => (None, hier.to_string()),
     };
-    Parts { scheme, ssp, authority, path, query, fragment }
+    Parts {
+        scheme,
+        ssp,
+        authority,
+        path,
+        query,
+        fragment,
+    }
 }
 
 pub(crate) fn instance_intrinsic(
@@ -269,7 +315,10 @@ pub(crate) fn instance_intrinsic(
     };
     if mref_class == RESOLVER {
         return Ok(match (name, sig) {
-            ("registerContentObserver", "(Landroid/net/Uri;ZLandroid/database/ContentObserver;)V") => {
+            (
+                "registerContentObserver",
+                "(Landroid/net/Uri;ZLandroid/database/ContentObserver;)V",
+            ) => {
                 let u = uri_str(vm, args.first()).unwrap_or_default();
                 let desc = matches!(args.get(1), Some(Value::Int(x)) if *x != 0);
                 if let Some(Value::Obj(o)) = args.get(2) {
@@ -299,7 +348,15 @@ pub(crate) fn instance_intrinsic(
             ("onChange", "(ZLandroid/net/Uri;)V") => {
                 let class = vm.heap.class_of(recv)?.to_string();
                 if let Some((d, def, m)) = vm.cp.resolve_method(&class, "onChange", "(Z)V") {
-                    vm.call(d, def, &m, vec![Value::Obj(recv), args.first().cloned().unwrap_or(Value::Int(0))])?;
+                    vm.call(
+                        d,
+                        def,
+                        &m,
+                        vec![
+                            Value::Obj(recv),
+                            args.first().cloned().unwrap_or(Value::Int(0)),
+                        ],
+                    )?;
                 }
                 Some(Value::Null)
             }
@@ -308,7 +365,9 @@ pub(crate) fn instance_intrinsic(
         });
     }
     if mref_class == URI {
-        let Some(u) = vm.fw.m8.uris.get(&recv).cloned() else { return Ok(None) };
+        let Some(u) = vm.fw.m8.uris.get(&recv).cloned() else {
+            return Ok(None);
+        };
         let p = parse(&u);
         let opt = |vm: &mut Engine, s: Option<String>| -> Result<Value, VmExit> {
             match s {
@@ -321,14 +380,30 @@ pub(crate) fn instance_intrinsic(
             ("getScheme", "()Ljava/lang/String;") => opt(vm, p.scheme)?,
             ("getSchemeSpecificPart", "()Ljava/lang/String;") => new_str(vm, decode(&p.ssp))?,
             ("getAuthority", "()Ljava/lang/String;") => opt(vm, p.authority.map(|a| decode(&a)))?,
-            ("getHost", "()Ljava/lang/String;") => {
-                opt(vm, p.authority.map(|a| a.rsplit('@').next().unwrap_or("").split(':').next().unwrap_or("").to_string()))?
-            }
-            ("getPath", "()Ljava/lang/String;") => opt(vm, if p.path.is_empty() && p.authority.is_none() && p.scheme.is_some() { None } else { Some(decode(&p.path)) })?,
+            ("getHost", "()Ljava/lang/String;") => opt(
+                vm,
+                p.authority.map(|a| {
+                    a.rsplit('@')
+                        .next()
+                        .unwrap_or("")
+                        .split(':')
+                        .next()
+                        .unwrap_or("")
+                        .to_string()
+                }),
+            )?,
+            ("getPath", "()Ljava/lang/String;") => opt(
+                vm,
+                if p.path.is_empty() && p.authority.is_none() && p.scheme.is_some() {
+                    None
+                } else {
+                    Some(decode(&p.path))
+                },
+            )?,
             ("getQuery", "()Ljava/lang/String;") => opt(vm, p.query.map(|q| decode(&q)))?,
             ("getFragment", "()Ljava/lang/String;") => opt(vm, p.fragment.map(|f| decode(&f)))?,
             ("getLastPathSegment", "()Ljava/lang/String;") => {
-                opt(vm, p.path.split('/').filter(|s| !s.is_empty()).next_back().map(decode))?
+                opt(vm, p.path.split('/').rfind(|s| !s.is_empty()).map(decode))?
             }
             ("getQueryParameter", "(Ljava/lang/String;)Ljava/lang/String;") => {
                 let k = sarg(vm, args, 0)?.unwrap_or_default();
@@ -338,32 +413,51 @@ pub(crate) fn instance_intrinsic(
                 });
                 opt(vm, v)?
             }
-            ("getPathSegments", "()Ljava/util/List;") | ("getQueryParameters", "(Ljava/lang/String;)Ljava/util/List;") => {
+            ("getPathSegments", "()Ljava/util/List;")
+            | ("getQueryParameters", "(Ljava/lang/String;)Ljava/util/List;") => {
                 let items: Vec<String> = if name == "getPathSegments" {
-                    p.path.split('/').filter(|s| !s.is_empty()).map(decode).collect()
+                    p.path
+                        .split('/')
+                        .filter(|s| !s.is_empty())
+                        .map(decode)
+                        .collect()
                 } else {
                     let k = sarg(vm, args, 0)?.unwrap_or_default();
-                    p.query.as_deref().unwrap_or("").split('&').filter_map(|kv| {
-                        let (a, b) = kv.split_once('=').unwrap_or((kv, ""));
-                        (decode(a) == k).then(|| decode(&b.replace('+', " ")))
-                    }).collect()
+                    p.query
+                        .as_deref()
+                        .unwrap_or("")
+                        .split('&')
+                        .filter_map(|kv| {
+                            let (a, b) = kv.split_once('=').unwrap_or((kv, ""));
+                            (decode(a) == k).then(|| decode(&b.replace('+', " ")))
+                        })
+                        .collect()
                 };
                 let mut elems = Vec::new();
                 for s in items {
                     elems.push(new_str(vm, s)?);
                 }
-                let l = vm.heap.alloc_instance("Ljava/util/ArrayList;".to_string(), Vec::new())?;
-                vm.fw.objects.insert(l, crate::framework::HostObj::List { elems });
+                let l = vm
+                    .heap
+                    .alloc_instance("Ljava/util/ArrayList;".to_string(), Vec::new())?;
+                vm.fw
+                    .objects
+                    .insert(l, crate::framework::HostObj::List { elems });
                 Value::Obj(l)
             }
             ("isAbsolute", "()Z") => Value::Int(p.scheme.is_some() as i32),
             ("isRelative", "()Z") => Value::Int(p.scheme.is_none() as i32),
-            ("isHierarchical", "()Z") => Value::Int((p.scheme.is_none() || p.ssp.starts_with('/')) as i32),
+            ("isHierarchical", "()Z") => {
+                Value::Int((p.scheme.is_none() || p.ssp.starts_with('/')) as i32)
+            }
             ("equals", "(Ljava/lang/Object;)Z") => {
                 let other = uri_str(vm, args.first());
                 Value::Int((other.as_deref() == Some(u.as_str())) as i32)
             }
-            ("hashCode", "()I") => Value::Int(u.encode_utf16().fold(0i32, |h, c| h.wrapping_mul(31).wrapping_add(c as i32))),
+            ("hashCode", "()I") => Value::Int(
+                u.encode_utf16()
+                    .fold(0i32, |h, c| h.wrapping_mul(31).wrapping_add(c as i32)),
+            ),
             _ => return Ok(None),
         }));
     }
@@ -384,6 +478,9 @@ mod tests {
         assert_eq!(p.fragment.as_deref(), Some("f"));
         assert_eq!(decode("a%20b"), "a b");
         assert_eq!(encode("a b", ""), "a%20b");
-        assert_eq!(default_setting("global/animator_duration_scale"), Some("1.0"));
+        assert_eq!(
+            default_setting("global/animator_duration_scale"),
+            Some("1.0")
+        );
     }
 }

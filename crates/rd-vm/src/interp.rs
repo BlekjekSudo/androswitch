@@ -808,8 +808,7 @@ pub(crate) fn exec_frame(
                         step!(crate::android_build::host_static(vm, &owner, &fname))
                     {
                         vm.statics.insert((owner.clone(), fname.clone()), c);
-                    } else if let Some(c) =
-                        step!(crate::graphics::host_static(vm, &owner, &fname))
+                    } else if let Some(c) = step!(crate::graphics::host_static(vm, &owner, &fname))
                     {
                         vm.statics.insert((owner.clone(), fname.clone()), c);
                     } else if let Some(c) =
@@ -1594,12 +1593,12 @@ fn do_invoke(
                 &slots[1..],
             )? {
                 Some(v) => Ok(v),
-                None => Err(crate::classpath::unresolved_method(
-                    &mref.class,
-                    &mref.name,
-                    &mref.proto,
-                )
-                .into()),
+                None => {
+                    Err(
+                        crate::classpath::unresolved_method(&mref.class, &mref.name, &mref.proto)
+                            .into(),
+                    )
+                }
             },
         };
     }

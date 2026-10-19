@@ -66,7 +66,13 @@ pub(crate) fn instance_intrinsic(
     // records the guest call stack at construction, innermost first, in
     // `rd_trace`. Uncaught-exception logging prints it.
     if name == "<init>" && vm.config.exception_trace {
-        let trace: String = vm.frame_labels.iter().rev().take(16).map(|l| format!("\n  at {l}")).collect();
+        let trace: String = vm
+            .frame_labels
+            .iter()
+            .rev()
+            .take(16)
+            .map(|l| format!("\n  at {l}"))
+            .collect();
         let t = crate::intrinsics::alloc_string(vm, trace)?;
         put(vm, recv, "rd_trace", Value::Obj(t))?;
     }
@@ -93,7 +99,11 @@ pub(crate) fn instance_intrinsic(
         }
         ("getCause", "()Ljava/lang/Throwable;") => {
             let c = field(vm, recv, "cause");
-            Ok(Some(if c == Value::Obj(recv) { Value::Null } else { c }))
+            Ok(Some(if c == Value::Obj(recv) {
+                Value::Null
+            } else {
+                c
+            }))
         }
         ("initCause", "(Ljava/lang/Throwable;)Ljava/lang/Throwable;") => {
             if field(vm, recv, "rd_cause_set") == Value::Int(1) {
@@ -147,7 +157,11 @@ pub(crate) fn instance_intrinsic(
                 Value::Obj(a) => vm.heap.as_array_elems(a)?.0.to_vec(),
                 _ => Vec::new(),
             };
-            Ok(Some(Value::Obj(new_array(vm, "Ljava/lang/Throwable;", list)?)))
+            Ok(Some(Value::Obj(new_array(
+                vm,
+                "Ljava/lang/Throwable;",
+                list,
+            )?)))
         }
         ("setStackTrace", "([Ljava/lang/StackTraceElement;)V") => {
             match args.first() {
@@ -170,7 +184,11 @@ pub(crate) fn instance_intrinsic(
                 Value::Obj(a) => vm.heap.as_array_elems(a)?.0.to_vec(),
                 _ => Vec::new(),
             };
-            Ok(Some(Value::Obj(new_array(vm, "Ljava/lang/StackTraceElement;", elems)?)))
+            Ok(Some(Value::Obj(new_array(
+                vm,
+                "Ljava/lang/StackTraceElement;",
+                elems,
+            )?)))
         }
         ("fillInStackTrace", "()Ljava/lang/Throwable;") => Ok(Some(Value::Obj(recv))),
         ("printStackTrace", _) => {

@@ -32,7 +32,11 @@ const EXACTLY: i32 = 0x4000_0000;
 const VIEW_CONFIG: &str = "Landroid/view/ViewConfiguration;";
 
 fn density() -> f32 {
-    std::env::var("RD_DENSITY_DPI").ok().and_then(|v| v.parse::<f32>().ok()).unwrap_or(280.0) / 160.0
+    std::env::var("RD_DENSITY_DPI")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+        .unwrap_or(280.0)
+        / 160.0
 }
 fn dp(x: f32) -> i32 {
     (x * density() + 0.5) as i32
@@ -45,7 +49,9 @@ fn int(v: Option<&Value>) -> i32 {
 }
 fn bounds(vm: &Engine, v: ObjRef) -> Option<(i32, i32, i32, i32, Option<ObjRef>)> {
     match vm.fw.get(v) {
-        Some(HostObj::View { x, y, w, h, parent, .. }) => Some((*x, *y, *w, *h, *parent)),
+        Some(HostObj::View {
+            x, y, w, h, parent, ..
+        }) => Some((*x, *y, *w, *h, *parent)),
         _ => None,
     }
 }
@@ -63,21 +69,46 @@ fn set_prop(vm: &mut Engine, v: ObjRef, k: &str, x: i32) {
 pub(crate) fn measure(vm: &mut Engine, v: ObjRef, ws: i32, hs: i32) -> Result<(), VmExit> {
     set_prop(vm, v, "rd_wspec", ws);
     set_prop(vm, v, "rd_hspec", hs);
-    if crate::jcollections::guest_call(vm, v, "onMeasure", "(II)V", &[Value::Int(ws), Value::Int(hs)])?.is_none() {
+    if crate::jcollections::guest_call(
+        vm,
+        v,
+        "onMeasure",
+        "(II)V",
+        &[Value::Int(ws), Value::Int(hs)],
+    )?
+    .is_none()
+    {
         set_prop(vm, v, "MeasuredWidth", ws & 0x3fff_ffff);
         set_prop(vm, v, "MeasuredHeight", hs & 0x3fff_ffff);
     }
-    vm.view_props.remove(&(v, "rd_layout_requested".to_string()));
+    vm.view_props
+        .remove(&(v, "rd_layout_requested".to_string()));
     Ok(())
 }
 
 /// `View.layout`: parent-relative frame + window-space host bounds.
-pub(crate) fn layout(vm: &mut Engine, v: ObjRef, l: i32, t: i32, r: i32, b: i32) -> Result<(), VmExit> {
-    let Some((_, _, ow, oh, parent)) = bounds(vm, v) else { return Ok(()) };
-    let (px, py) = parent.and_then(|p| bounds(vm, p)).map(|(x, y, ..)| (x, y)).unwrap_or((0, 0));
+pub(crate) fn layout(
+    vm: &mut Engine,
+    v: ObjRef,
+    l: i32,
+    t: i32,
+    r: i32,
+    b: i32,
+) -> Result<(), VmExit> {
+    let Some((_, _, ow, oh, parent)) = bounds(vm, v) else {
+        return Ok(());
+    };
+    let (px, py) = parent
+        .and_then(|p| bounds(vm, p))
+        .map(|(x, y, ..)| (x, y))
+        .unwrap_or((0, 0));
     let (nw, nh) = ((r - l).max(0), (b - t).max(0));
     // views laid out by the guest: window position = parent origin + frame
-    let (ax, ay) = if prop(vm, v, "rd_host_root").is_some() { (l, t) } else { (px + l, py + t) };
+    let (ax, ay) = if prop(vm, v, "rd_host_root").is_some() {
+        (l, t)
+    } else {
+        (px + l, py + t)
+    };
     if let Some(HostObj::View { x, y, w, h, .. }) = vm.fw.objects.get_mut(&v) {
         *x = ax;
         *y = ay;
@@ -89,17 +120,49 @@ pub(crate) fn layout(vm: &mut Engine, v: ObjRef, l: i32, t: i32, r: i32, b: i32)
     let changed = nw != ow || nh != oh || prop(vm, v, "rd_laid_out").is_none();
     set_prop(vm, v, "rd_laid_out", 1);
     if changed {
-        crate::jcollections::guest_call(vm, v, "onSizeChanged", "(IIII)V", &[Value::Int(nw), Value::Int(nh), Value::Int(ow), Value::Int(oh)])?;
+        crate::jcollections::guest_call(
+            vm,
+            v,
+            "onSizeChanged",
+            "(IIII)V",
+            &[
+                Value::Int(nw),
+                Value::Int(nh),
+                Value::Int(ow),
+                Value::Int(oh),
+            ],
+        )?;
     }
-    crate::jcollections::guest_call(vm, v, "onLayout", "(ZIIII)V", &[Value::Int(changed as i32), Value::Int(l), Value::Int(t), Value::Int(r), Value::Int(b)])?;
+    crate::jcollections::guest_call(
+        vm,
+        v,
+        "onLayout",
+        "(ZIIII)V",
+        &[
+            Value::Int(changed as i32),
+            Value::Int(l),
+            Value::Int(t),
+            Value::Int(r),
+            Value::Int(b),
+        ],
+    )?;
     Ok(())
 }
 
-pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn static_intrinsic(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let a = |i: usize| int(args.get(i));
     Ok(Some(match (class, name) {
-        ("Landroid/view/View$MeasureSpec;", "makeMeasureSpec" | "makeSafeMeasureSpec") => Value::Int((a(0) & 0x3fff_ffff) | (a(1) & (0xC000_0000u32 as i32))),
-        ("Landroid/view/View$MeasureSpec;", "getMode") => Value::Int(a(0) & (0xC000_0000u32 as i32)),
+        ("Landroid/view/View$MeasureSpec;", "makeMeasureSpec" | "makeSafeMeasureSpec") => {
+            Value::Int((a(0) & 0x3fff_ffff) | (a(1) & (0xC000_0000u32 as i32)))
+        }
+        ("Landroid/view/View$MeasureSpec;", "getMode") => {
+            Value::Int(a(0) & (0xC000_0000u32 as i32))
+        }
         ("Landroid/view/View$MeasureSpec;", "getSize") => Value::Int(a(0) & 0x3fff_ffff),
         ("Landroid/view/View;", "resolveSize" | "resolveSizeAndState") => {
             let (size, spec) = (a(0), a(1));
@@ -110,7 +173,13 @@ pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, args: &
                 _ => size,
             })
         }
-        ("Landroid/view/View;", "getDefaultSize") => Value::Int(if a(1) & (0xC000_0000u32 as i32) == 0 { a(0) } else { a(1) & 0x3fff_ffff }),
+        ("Landroid/view/View;", "getDefaultSize") => {
+            Value::Int(if a(1) & (0xC000_0000u32 as i32) == 0 {
+                a(0)
+            } else {
+                a(1) & 0x3fff_ffff
+            })
+        }
         ("Landroid/view/View;", "combineMeasuredStates") => Value::Int(a(0) | a(1)),
         ("Landroid/view/View;", "generateViewId") => {
             let k = ("Lrd/View;".to_string(), "next_id".to_string());
@@ -126,7 +195,9 @@ pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, args: &
             if let Some(v) = vm.statics.get(&k) {
                 v.clone()
             } else {
-                let r = vm.heap.alloc_instance(VIEW_CONFIG.to_string(), Vec::new())?;
+                let r = vm
+                    .heap
+                    .alloc_instance(VIEW_CONFIG.to_string(), Vec::new())?;
                 vm.statics.insert(k, Value::Obj(r));
                 Value::Obj(r)
             }
@@ -155,7 +226,9 @@ pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, args: &
             "getDefaultActionModeHideDuration" => Value::Long(2000),
             _ => return Ok(None),
         },
-        ("Landroid/view/animation/AnimationUtils;", "currentAnimationTimeMillis") => Value::Long(vm.fw.clock() as i64),
+        ("Landroid/view/animation/AnimationUtils;", "currentAnimationTimeMillis") => {
+            Value::Long(vm.fw.clock() as i64)
+        }
         ("Landroid/os/Trace;", n) => match n {
             "isEnabled" => Value::Int(0),
             _ => Value::Null, // beginSection/endSection/async sections/counters: no tracer attached
@@ -164,7 +237,14 @@ pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, args: &
     }))
 }
 
-pub(crate) fn instance_intrinsic(vm: &mut Engine, mref_class: &str, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn instance_intrinsic(
+    vm: &mut Engine,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if mref_class == VIEW_CONFIG {
         return Ok(Some(match name {
             "getScaledTouchSlop" => Value::Int(dp(8.0)),
@@ -182,13 +262,21 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, mref_class: &str, name: &str, 
             "getScaledHandwritingSlop" => Value::Int(dp(2.0)),
             "getScaledHandwritingGestureLineMargin" => Value::Int(dp(16.0)),
             "getScaledAmbiguousGestureMultiplier" => Value::Float(2.0),
-            "getScaledHorizontalScrollFactor" | "getScaledVerticalScrollFactor" => Value::Float(dp(64.0) as f32),
+            "getScaledHorizontalScrollFactor" | "getScaledVerticalScrollFactor" => {
+                Value::Float(dp(64.0) as f32)
+            }
             "getScaledMaximumDrawingCacheSize" => Value::Int(720 * 1440 * 4),
             "getScaledMinimumFlingVelocity2" => Value::Int(dp(50.0)),
-            "hasPermanentMenuKey" | "isFadingMarqueeEnabled" | "shouldShowMenuShortcutsWhenKeyboardPresent" => Value::Int(0),
+            "hasPermanentMenuKey"
+            | "isFadingMarqueeEnabled"
+            | "shouldShowMenuShortcutsWhenKeyboardPresent" => Value::Int(0),
             _ if sig.ends_with(")I") => {
                 // (inputDeviceId, axis, source) fling thresholds (API 34)
-                Value::Int(if name.contains("Maximum") { dp(8000.0) } else { dp(50.0) })
+                Value::Int(if name.contains("Maximum") {
+                    dp(8000.0)
+                } else {
+                    dp(50.0)
+                })
             }
             _ => return Ok(None),
         }));
@@ -201,7 +289,11 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, mref_class: &str, name: &str, 
     }
     let Some((x, y, w, h, _)) = bounds(vm, recv) else {
         // ViewParent.requestDisallowInterceptTouchEvent on a non-host parent
-        return Ok(if name == "requestDisallowInterceptTouchEvent" { Some(Value::Null) } else { None });
+        return Ok(if name == "requestDisallowInterceptTouchEvent" {
+            Some(Value::Null)
+        } else {
+            None
+        });
     };
     let a = |i: usize| int(args.get(i));
     Ok(Some(match (name, sig) {
@@ -218,8 +310,12 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, mref_class: &str, name: &str, 
             set_prop(vm, recv, "MeasuredHeight", a(1) & 0x00ff_ffff);
             Value::Null
         }
-        ("getMeasuredWidth" | "getMeasuredWidthAndState", "()I") => Value::Int(prop(vm, recv, "MeasuredWidth").unwrap_or(w)),
-        ("getMeasuredHeight" | "getMeasuredHeightAndState", "()I") => Value::Int(prop(vm, recv, "MeasuredHeight").unwrap_or(h)),
+        ("getMeasuredWidth" | "getMeasuredWidthAndState", "()I") => {
+            Value::Int(prop(vm, recv, "MeasuredWidth").unwrap_or(w))
+        }
+        ("getMeasuredHeight" | "getMeasuredHeightAndState", "()I") => {
+            Value::Int(prop(vm, recv, "MeasuredHeight").unwrap_or(h))
+        }
         ("getMeasuredState", "()I") => Value::Int(0),
         ("getLeft", "()I") => Value::Int(prop(vm, recv, "rd_l").unwrap_or(x)),
         ("getTop", "()I") => Value::Int(prop(vm, recv, "rd_t").unwrap_or(y)),
@@ -236,19 +332,67 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, mref_class: &str, name: &str, 
             }
             Value::Null
         }
-        ("isLayoutRequested", "()Z") => Value::Int(prop(vm, recv, "rd_layout_requested").is_some() as i32),
+        ("isLayoutRequested", "()Z") => {
+            Value::Int(prop(vm, recv, "rd_layout_requested").is_some() as i32)
+        }
         ("isInTouchMode", "()Z") => Value::Int(1),
         ("hasWindowFocus", "()Z") => Value::Int(vm.attached_views.contains(&recv) as i32),
         ("isFocused" | "hasFocus" | "isAccessibilityFocused", "()Z") => Value::Int(0),
         ("findFocus", _) | ("focusSearch", _) => Value::Null,
         // no content-capture / autofill / translation service on the headless device
-        ("getContentCaptureSession" | "getAutofillId" | "getViewTranslationResponse" | "getRootSurfaceControl" | "getHandwritingDelegatorCallback", _) => Value::Null,
-        ("isImportantForContentCapture" | "isImportantForAutofill" | "isAutofilled" | "isShowingLayoutBounds" | "isTemporarilyDetached" | "isInLayout", "()Z") => Value::Int(0),
-        ("setImportantForContentCapture" | "setImportantForAutofill" | "setAutofillId" | "setContentCaptureSession" | "setHandwritingDelegatorCallback" | "setAutoHandwritingEnabled" | "setRevealOnFocusHint" | "setDefaultFocusHighlightEnabled" | "setFocusedByDefault" | "setKeyboardNavigationCluster" | "setAccessibilityPaneTitle" | "setScreenReaderFocusable" | "setAccessibilityHeading" | "setStateDescription" | "setSystemGestureExclusionRects" | "setPointerIcon" | "setTooltipText" | "setOnReceiveContentListener" | "setOnCapturedPointerListener", _) => Value::Null,
-        ("setOnDragListener", _) | ("requestDisallowInterceptTouchEvent", _) | ("setFocusableInTouchMode", _) | ("setOnHierarchyChangeListener", _) => Value::Null,
-        ("dispatchKeyEventPreIme" | "dispatchGenericMotionEvent" | "dispatchCapturedPointerEvent", _) => Value::Int(0),
+        (
+            "getContentCaptureSession"
+            | "getAutofillId"
+            | "getViewTranslationResponse"
+            | "getRootSurfaceControl"
+            | "getHandwritingDelegatorCallback",
+            _,
+        ) => Value::Null,
+        (
+            "isImportantForContentCapture"
+            | "isImportantForAutofill"
+            | "isAutofilled"
+            | "isShowingLayoutBounds"
+            | "isTemporarilyDetached"
+            | "isInLayout",
+            "()Z",
+        ) => Value::Int(0),
+        (
+            "setImportantForContentCapture"
+            | "setImportantForAutofill"
+            | "setAutofillId"
+            | "setContentCaptureSession"
+            | "setHandwritingDelegatorCallback"
+            | "setAutoHandwritingEnabled"
+            | "setRevealOnFocusHint"
+            | "setDefaultFocusHighlightEnabled"
+            | "setFocusedByDefault"
+            | "setKeyboardNavigationCluster"
+            | "setAccessibilityPaneTitle"
+            | "setScreenReaderFocusable"
+            | "setAccessibilityHeading"
+            | "setStateDescription"
+            | "setSystemGestureExclusionRects"
+            | "setPointerIcon"
+            | "setTooltipText"
+            | "setOnReceiveContentListener"
+            | "setOnCapturedPointerListener",
+            _,
+        ) => Value::Null,
+        ("setOnDragListener", _)
+        | ("requestDisallowInterceptTouchEvent", _)
+        | ("setFocusableInTouchMode", _)
+        | ("setOnHierarchyChangeListener", _) => Value::Null,
+        (
+            "dispatchKeyEventPreIme"
+            | "dispatchGenericMotionEvent"
+            | "dispatchCapturedPointerEvent",
+            _,
+        ) => Value::Int(0),
         ("generateDefaultLayoutParams", _) => {
-            let lp = vm.heap.alloc_instance("Landroid/view/ViewGroup$LayoutParams;".into(), Vec::new())?;
+            let lp = vm
+                .heap
+                .alloc_instance("Landroid/view/ViewGroup$LayoutParams;".into(), Vec::new())?;
             crate::err::put_field_result(vm.heap.put_field(lp, "width", Value::Int(-2)))?;
             crate::err::put_field_result(vm.heap.put_field(lp, "height", Value::Int(-2)))?;
             Value::Obj(lp)
@@ -256,7 +400,14 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, mref_class: &str, name: &str, 
         ("addViewInLayout", _) => {
             // ViewGroup.addViewInLayout(child, index, params[, preventRequestLayout])
             let child = args.first().cloned().unwrap_or(Value::Null);
-            crate::framework::call_host_instance(vm, "Landroid/view/ViewGroup;", "addView", "(Landroid/view/View;)V", recv, &[child])?;
+            crate::framework::call_host_instance(
+                vm,
+                "Landroid/view/ViewGroup;",
+                "addView",
+                "(Landroid/view/View;)V",
+                recv,
+                &[child],
+            )?;
             Value::Int(1)
         }
         _ => return Ok(None),
@@ -267,15 +418,24 @@ impl Engine {
     /// Host draw pass: measure/layout DEX views in the current window and
     /// record the frame display list. Returns the number of recorded ops.
     pub fn draw_frame(&mut self) -> Result<usize, VmExit> {
-        let Some(activity) = self.fw.current_activity else { return Ok(0) };
-        let Some(content) = self.window_content_of(activity) else { return Ok(0) };
+        let Some(activity) = self.fw.current_activity else {
+            return Ok(0);
+        };
+        let Some(content) = self.window_content_of(activity) else {
+            return Ok(0);
+        };
         let (fw_, fh_) = (crate::graphics::FB_W as i32, crate::graphics::FB_H as i32);
         // 1. measure/layout top-most DEX views
         let mut dex_roots = Vec::new();
         self.collect_dex_roots(content, &mut dex_roots, 0);
         for v in &dex_roots {
-            let Some((x, y, w, h, _)) = bounds(self, *v) else { continue };
-            let (w, h) = (if w > 0 { w } else { fw_ - x }, if h > 0 { h } else { fh_ - y });
+            let Some((x, y, w, h, _)) = bounds(self, *v) else {
+                continue;
+            };
+            let (w, h) = (
+                if w > 0 { w } else { fw_ - x },
+                if h > 0 { h } else { fh_ - y },
+            );
             measure(self, *v, EXACTLY | w, EXACTLY | h)?;
             set_prop(self, *v, "rd_host_root", 1);
             layout(self, *v, x, y, x + w, y + h)?;
@@ -312,17 +472,47 @@ impl Engine {
         if depth > 256 {
             return Ok(());
         }
-        let Some(HostObj::View { x, y, w, h, vis, children, .. }) = self.fw.get(v).cloned() else { return Ok(()) };
+        let Some(HostObj::View {
+            x,
+            y,
+            w,
+            h,
+            vis,
+            children,
+            ..
+        }) = self.fw.get(v).cloned()
+        else {
+            return Ok(());
+        };
         if vis != crate::framework::Vis::Visible {
             return Ok(());
         }
         let class = self.heap.class_of(v).unwrap_or("").to_string();
         if self.cp.find_class(&class).is_some() {
             let n = self.canvas_translate(canvas, x as f32, y as f32);
-            let drew = crate::jcollections::guest_call(self, v, "draw", "(Landroid/graphics/Canvas;)V", &[Value::Obj(canvas)])?.is_some();
+            let drew = crate::jcollections::guest_call(
+                self,
+                v,
+                "draw",
+                "(Landroid/graphics/Canvas;)V",
+                &[Value::Obj(canvas)],
+            )?
+            .is_some();
             if !drew {
-                crate::jcollections::guest_call(self, v, "onDraw", "(Landroid/graphics/Canvas;)V", &[Value::Obj(canvas)])?;
-                crate::jcollections::guest_call(self, v, "dispatchDraw", "(Landroid/graphics/Canvas;)V", &[Value::Obj(canvas)])?;
+                crate::jcollections::guest_call(
+                    self,
+                    v,
+                    "onDraw",
+                    "(Landroid/graphics/Canvas;)V",
+                    &[Value::Obj(canvas)],
+                )?;
+                crate::jcollections::guest_call(
+                    self,
+                    v,
+                    "dispatchDraw",
+                    "(Landroid/graphics/Canvas;)V",
+                    &[Value::Obj(canvas)],
+                )?;
             }
             self.canvas_restore_to(canvas, n);
             return Ok(());

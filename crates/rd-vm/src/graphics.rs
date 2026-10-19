@@ -167,7 +167,16 @@ pub(crate) struct CanvasS {
 }
 impl CanvasS {
     fn new(target: Target, w: i32, h: i32) -> Self {
-        CanvasS { target, stack: vec![St { m: ID, clip: [-1e9, -1e9, 1e9, 1e9], alpha: 1.0 }], w, h }
+        CanvasS {
+            target,
+            stack: vec![St {
+                m: ID,
+                clip: [-1e9, -1e9, 1e9, 1e9],
+                alpha: 1.0,
+            }],
+            w,
+            h,
+        }
     }
     fn top(&mut self) -> &mut St {
         self.stack.last_mut().expect("canvas stack never empty")
@@ -189,7 +198,18 @@ pub(crate) struct NodeS {
 }
 impl Default for NodeS {
     fn default() -> Self {
-        NodeS { l: 0, t: 0, r: 0, b: 0, f: HashMap::new(), clip_bounds: true, clip_outline: false, outline: None, ops: Vec::new(), has_dl: false }
+        NodeS {
+            l: 0,
+            t: 0,
+            r: 0,
+            b: 0,
+            f: HashMap::new(),
+            clip_bounds: true,
+            clip_outline: false,
+            outline: None,
+            ops: Vec::new(),
+            has_dl: false,
+        }
     }
 }
 impl NodeS {
@@ -201,8 +221,17 @@ impl NodeS {
         let px = self.g("pivotX", w / 2.0);
         let py = self.g("pivotY", h / 2.0);
         let local = mul(
-            &tr(px + self.g("translationX", 0.0), py + self.g("translationY", 0.0)),
-            &mul(&mul(&rot(self.g("rotationZ", 0.0)), &sc(self.g("scaleX", 1.0), self.g("scaleY", 1.0))), &tr(-px, -py)),
+            &tr(
+                px + self.g("translationX", 0.0),
+                py + self.g("translationY", 0.0),
+            ),
+            &mul(
+                &mul(
+                    &rot(self.g("rotationZ", 0.0)),
+                    &sc(self.g("scaleX", 1.0), self.g("scaleY", 1.0)),
+                ),
+                &tr(-px, -py),
+            ),
         );
         mul(&tr(self.l as f32, self.t as f32), &local)
     }
@@ -214,6 +243,7 @@ pub(crate) struct LayoutS {
     cs: Value,
     paint: Value,
     size: f32,
+    #[allow(dead_code)] // kept for span-colour queries
     argb: u32,
     ls: f32,
     width: i32,
@@ -290,16 +320,32 @@ fn atlas() -> &'static Atlas {
         let mut p = 12;
         for _ in 0..n {
             let cp = u32::from_le_bytes([d[p], d[p + 1], d[p + 2], d[p + 3]]);
-            let g = Glyph { adv: u16_at(p + 4) as f32 / 64.0, left: i16_at(p + 6), top: i16_at(p + 8), w: u16_at(p + 10), h: u16_at(p + 12), off: p + 14 };
+            let g = Glyph {
+                adv: u16_at(p + 4) as f32 / 64.0,
+                left: i16_at(p + 6),
+                top: i16_at(p + 8),
+                w: u16_at(p + 10),
+                h: u16_at(p + 12),
+                off: p + 14,
+            };
             p += 14 + g.w as usize * g.h as usize;
             map.insert(cp, g);
         }
-        Atlas { size, asc, desc, map, data: d }
+        Atlas {
+            size,
+            asc,
+            desc,
+            map,
+            data: d,
+        }
     })
 }
 fn glyph(c: char) -> &'static Glyph {
     let a = atlas();
-    a.map.get(&(c as u32)).or_else(|| a.map.get(&0xFFFD)).expect("replacement glyph in atlas")
+    a.map
+        .get(&(c as u32))
+        .or_else(|| a.map.get(&0xFFFD))
+        .expect("replacement glyph in atlas")
 }
 fn char_adv(c: char, size: f32, ls: f32) -> f32 {
     match c {
@@ -367,15 +413,20 @@ fn st(vm: &mut Engine, t: String) -> Result<Value, VmExit> {
 
 /// Text of a CharSequence (String fast path, else guest `toString()`).
 pub(crate) fn cs_text(vm: &mut Engine, v: &Value) -> Result<String, VmExit> {
-    let Value::Obj(r) = v else { return Ok(String::new()) };
+    let Value::Obj(r) = v else {
+        return Ok(String::new());
+    };
     if let Ok(s) = vm.heap.as_str(*r) {
         return Ok(s.to_string());
     }
     if let Ok((e, _)) = vm.heap.as_array_elems(*r) {
-        return Ok(e.iter().filter_map(|c| match c {
-            Value::Int(i) => char::from_u32(*i as u32),
-            _ => None,
-        }).collect());
+        return Ok(e
+            .iter()
+            .filter_map(|c| match c {
+                Value::Int(i) => char::from_u32(*i as u32),
+                _ => None,
+            })
+            .collect());
     }
     match crate::jcollections::guest_call(vm, *r, "toString", "()Ljava/lang/String;", &[])? {
         Some(Value::Obj(s)) => Ok(vm.heap.as_str(s).map(str::to_string).unwrap_or_default()),
@@ -390,13 +441,27 @@ fn sub(s: &str, a: i32, e: i32) -> String {
 
 fn rect_of(vm: &Engine, r: Option<ObjRef>) -> [f32; 4] {
     match r {
-        Some(r) => [getf(vm, r, "left"), getf(vm, r, "top"), getf(vm, r, "right"), getf(vm, r, "bottom")],
+        Some(r) => [
+            getf(vm, r, "left"),
+            getf(vm, r, "top"),
+            getf(vm, r, "right"),
+            getf(vm, r, "bottom"),
+        ],
         None => [0.0; 4],
     }
 }
 fn set_rect(vm: &mut Engine, r: ObjRef, v: [f32; 4], int: bool) -> Result<(), VmExit> {
     for (k, x) in ["left", "top", "right", "bottom"].iter().zip(v) {
-        put(vm, r, k, if int { Value::Int(x.round() as i32) } else { Value::Float(x) })?;
+        put(
+            vm,
+            r,
+            k,
+            if int {
+                Value::Int(x.round() as i32)
+            } else {
+                Value::Float(x)
+            },
+        )?;
     }
     Ok(())
 }
@@ -408,32 +473,143 @@ fn paint_of(vm: &Engine, v: Option<&Value>) -> PaintS {
     }
 }
 fn snap(p: &PaintS) -> PaintSnap {
-    PaintSnap { argb: p.argb, style: p.style, sw: p.sw }
+    PaintSnap {
+        argb: p.argb,
+        style: p.style,
+        sw: p.sw,
+    }
 }
 
 const ENUMS: &[(&str, &[&str])] = &[
-    ("Landroid/graphics/Paint$Style;", &["FILL", "STROKE", "FILL_AND_STROKE"]),
+    (
+        "Landroid/graphics/Paint$Style;",
+        &["FILL", "STROKE", "FILL_AND_STROKE"],
+    ),
     ("Landroid/graphics/Paint$Cap;", &["BUTT", "ROUND", "SQUARE"]),
-    ("Landroid/graphics/Paint$Join;", &["MITER", "ROUND", "BEVEL"]),
-    ("Landroid/graphics/Paint$Align;", &["LEFT", "CENTER", "RIGHT"]),
-    ("Landroid/graphics/Path$FillType;", &["WINDING", "EVEN_ODD", "INVERSE_WINDING", "INVERSE_EVEN_ODD"]),
+    (
+        "Landroid/graphics/Paint$Join;",
+        &["MITER", "ROUND", "BEVEL"],
+    ),
+    (
+        "Landroid/graphics/Paint$Align;",
+        &["LEFT", "CENTER", "RIGHT"],
+    ),
+    (
+        "Landroid/graphics/Path$FillType;",
+        &["WINDING", "EVEN_ODD", "INVERSE_WINDING", "INVERSE_EVEN_ODD"],
+    ),
     ("Landroid/graphics/Path$Direction;", &["CW", "CCW"]),
-    ("Landroid/graphics/Path$Op;", &["DIFFERENCE", "INTERSECT", "UNION", "XOR", "REVERSE_DIFFERENCE"]),
-    ("Landroid/graphics/Region$Op;", &["DIFFERENCE", "INTERSECT", "UNION", "XOR", "REVERSE_DIFFERENCE", "REPLACE"]),
-    ("Landroid/graphics/Matrix$ScaleToFit;", &["FILL", "START", "CENTER", "END"]),
+    (
+        "Landroid/graphics/Path$Op;",
+        &[
+            "DIFFERENCE",
+            "INTERSECT",
+            "UNION",
+            "XOR",
+            "REVERSE_DIFFERENCE",
+        ],
+    ),
+    (
+        "Landroid/graphics/Region$Op;",
+        &[
+            "DIFFERENCE",
+            "INTERSECT",
+            "UNION",
+            "XOR",
+            "REVERSE_DIFFERENCE",
+            "REPLACE",
+        ],
+    ),
+    (
+        "Landroid/graphics/Matrix$ScaleToFit;",
+        &["FILL", "START", "CENTER", "END"],
+    ),
     ("Landroid/graphics/Canvas$EdgeType;", &["BW", "AA"]),
-    ("Landroid/graphics/Bitmap$Config;", &["ALPHA_8", "RGB_565", "ARGB_4444", "ARGB_8888", "RGBA_F16", "HARDWARE", "RGBA_1010102"]),
-    ("Landroid/graphics/Bitmap$CompressFormat;", &["JPEG", "PNG", "WEBP", "WEBP_LOSSY", "WEBP_LOSSLESS"]),
-    ("Landroid/graphics/Shader$TileMode;", &["CLAMP", "REPEAT", "MIRROR", "DECAL"]),
-    ("Landroid/text/Layout$Alignment;", &["ALIGN_NORMAL", "ALIGN_OPPOSITE", "ALIGN_CENTER", "ALIGN_LEFT", "ALIGN_RIGHT"]),
-    ("Landroid/text/TextUtils$TruncateAt;", &["START", "MIDDLE", "END", "MARQUEE", "END_SMALL"]),
-    ("Landroid/graphics/PorterDuff$Mode;", &["CLEAR", "SRC", "DST", "SRC_OVER", "DST_OVER", "SRC_IN", "DST_IN", "SRC_OUT", "DST_OUT", "SRC_ATOP", "DST_ATOP", "XOR", "DARKEN", "LIGHTEN", "MULTIPLY", "SCREEN", "ADD", "OVERLAY"]),
-    ("Landroid/graphics/BlendMode;", &["CLEAR", "SRC", "DST", "SRC_OVER", "DST_OVER", "SRC_IN", "DST_IN", "SRC_OUT", "DST_OUT", "SRC_ATOP", "DST_ATOP", "XOR", "PLUS", "MODULATE", "SCREEN", "OVERLAY", "DARKEN", "LIGHTEN", "COLOR_DODGE", "COLOR_BURN", "HARD_LIGHT", "SOFT_LIGHT", "DIFFERENCE", "EXCLUSION", "MULTIPLY", "HUE", "SATURATION", "COLOR", "LUMINOSITY"]),
+    (
+        "Landroid/graphics/Bitmap$Config;",
+        &[
+            "ALPHA_8",
+            "RGB_565",
+            "ARGB_4444",
+            "ARGB_8888",
+            "RGBA_F16",
+            "HARDWARE",
+            "RGBA_1010102",
+        ],
+    ),
+    (
+        "Landroid/graphics/Bitmap$CompressFormat;",
+        &["JPEG", "PNG", "WEBP", "WEBP_LOSSY", "WEBP_LOSSLESS"],
+    ),
+    (
+        "Landroid/graphics/Shader$TileMode;",
+        &["CLAMP", "REPEAT", "MIRROR", "DECAL"],
+    ),
+    (
+        "Landroid/text/Layout$Alignment;",
+        &[
+            "ALIGN_NORMAL",
+            "ALIGN_OPPOSITE",
+            "ALIGN_CENTER",
+            "ALIGN_LEFT",
+            "ALIGN_RIGHT",
+        ],
+    ),
+    (
+        "Landroid/text/TextUtils$TruncateAt;",
+        &["START", "MIDDLE", "END", "MARQUEE", "END_SMALL"],
+    ),
+    (
+        "Landroid/graphics/PorterDuff$Mode;",
+        &[
+            "CLEAR", "SRC", "DST", "SRC_OVER", "DST_OVER", "SRC_IN", "DST_IN", "SRC_OUT",
+            "DST_OUT", "SRC_ATOP", "DST_ATOP", "XOR", "DARKEN", "LIGHTEN", "MULTIPLY", "SCREEN",
+            "ADD", "OVERLAY",
+        ],
+    ),
+    (
+        "Landroid/graphics/BlendMode;",
+        &[
+            "CLEAR",
+            "SRC",
+            "DST",
+            "SRC_OVER",
+            "DST_OVER",
+            "SRC_IN",
+            "DST_IN",
+            "SRC_OUT",
+            "DST_OUT",
+            "SRC_ATOP",
+            "DST_ATOP",
+            "XOR",
+            "PLUS",
+            "MODULATE",
+            "SCREEN",
+            "OVERLAY",
+            "DARKEN",
+            "LIGHTEN",
+            "COLOR_DODGE",
+            "COLOR_BURN",
+            "HARD_LIGHT",
+            "SOFT_LIGHT",
+            "DIFFERENCE",
+            "EXCLUSION",
+            "MULTIPLY",
+            "HUE",
+            "SATURATION",
+            "COLOR",
+            "LUMINOSITY",
+        ],
+    ),
 ];
 
 fn enum_const(vm: &mut Engine, class: &str, idx: usize) -> Result<Option<Value>, VmExit> {
-    let Some((c, names)) = ENUMS.iter().find(|(c, _)| *c == class) else { return Ok(None) };
-    let Some(n) = names.get(idx) else { return Ok(None) };
+    let Some((c, names)) = ENUMS.iter().find(|(c, _)| *c == class) else {
+        return Ok(None);
+    };
+    let Some(n) = names.get(idx) else {
+        return Ok(None);
+    };
     let k = (c.to_string(), n.to_string());
     if let Some(v) = vm.statics.get(&k) {
         return Ok(Some(v.clone()));
@@ -456,18 +632,27 @@ fn ord(vm: &Engine, v: Option<&Value>) -> i32 {
 }
 
 fn typeface(vm: &mut Engine, style: i32) -> Result<Value, VmExit> {
-    let k = ("Landroid/graphics/Typeface;".to_string(), format!("rd_style_{style}"));
+    let k = (
+        "Landroid/graphics/Typeface;".to_string(),
+        format!("rd_style_{style}"),
+    );
     if let Some(v) = vm.statics.get(&k) {
         return Ok(v.clone());
     }
-    let r = vm.heap.alloc_instance("Landroid/graphics/Typeface;".into(), Vec::new())?;
+    let r = vm
+        .heap
+        .alloc_instance("Landroid/graphics/Typeface;".into(), Vec::new())?;
     put(vm, r, "rd_style", Value::Int(style))?;
     vm.statics.insert(k, Value::Obj(r));
     Ok(Value::Obj(r))
 }
 
 /// `sget` on host graphics constants (enum values, `Typeface.DEFAULT`, …).
-pub(crate) fn host_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<Value>, VmExit> {
+pub(crate) fn host_static(
+    vm: &mut Engine,
+    owner: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
     if let Some((_, names)) = ENUMS.iter().find(|(c, _)| *c == owner) {
         if let Some(i) = names.iter().position(|n| *n == field) {
             return enum_const(vm, owner, i);
@@ -484,7 +669,19 @@ pub(crate) fn host_static(vm: &mut Engine, owner: &str, field: &str) -> Result<O
     Ok(None)
 }
 
-fn new_layout(vm: &mut Engine, cs: Value, text: String, paint: Value, width: i32, align: i32, max_lines: i32, ellipsize: bool, mult: f32, add: f32) -> LayoutS {
+#[allow(clippy::too_many_arguments)] // mirrors the StaticLayout constructor
+fn new_layout(
+    vm: &mut Engine,
+    cs: Value,
+    text: String,
+    paint: Value,
+    width: i32,
+    align: i32,
+    max_lines: i32,
+    ellipsize: bool,
+    mult: f32,
+    add: f32,
+) -> LayoutS {
     let p = paint_of(vm, Some(&paint));
     let (size, ls) = (p.text_size, p.letter_spacing);
     let chars: Vec<char> = text.chars().collect();
@@ -493,7 +690,11 @@ fn new_layout(vm: &mut Engine, cs: Value, text: String, paint: Value, width: i32
     let mut start = 0;
     while start <= chars.len() {
         // hard line end
-        let hard = chars[start..].iter().position(|c| *c == '\n').map(|i| start + i).unwrap_or(chars.len());
+        let hard = chars[start..]
+            .iter()
+            .position(|c| *c == '\n')
+            .map(|i| start + i)
+            .unwrap_or(chars.len());
         let mut s = start;
         loop {
             let mut w = 0.0;
@@ -515,8 +716,17 @@ fn new_layout(vm: &mut Engine, cs: Value, text: String, paint: Value, width: i32
                     end = sp + 1;
                 }
             }
-            let lw: f32 = chars[s..end].iter().rev().skip_while(|c| **c == ' ').map(|c| char_adv(*c, size, ls)).sum();
-            let incl_nl = if end == hard && hard < chars.len() { 1 } else { 0 };
+            let lw: f32 = chars[s..end]
+                .iter()
+                .rev()
+                .skip_while(|c| **c == ' ')
+                .map(|c| char_adv(*c, size, ls))
+                .sum();
+            let incl_nl = if end == hard && hard < chars.len() {
+                1
+            } else {
+                0
+            };
             lines.push((s, end + incl_nl, lw));
             s = end;
             if s >= hard {
@@ -543,7 +753,21 @@ fn new_layout(vm: &mut Engine, cs: Value, text: String, paint: Value, width: i32
     }
     let (asc, desc) = (ascent(size), descent(size));
     let lh = ((desc - asc) * if mult > 0.0 { mult } else { 1.0 } + add).ceil();
-    LayoutS { text, cs, paint, size, argb: p.argb, ls, width, align, lines, asc, desc, lh, ell }
+    LayoutS {
+        text,
+        cs,
+        paint,
+        size,
+        argb: p.argb,
+        ls,
+        width,
+        align,
+        lines,
+        asc,
+        desc,
+        lh,
+        ell,
+    }
 }
 
 impl LayoutS {
@@ -557,13 +781,23 @@ impl LayoutS {
     }
     fn line_for_offset(&self, off: i32) -> usize {
         let off = off.max(0) as usize;
-        self.lines.iter().position(|l| off < l.1).unwrap_or(self.lines.len() - 1)
+        self.lines
+            .iter()
+            .position(|l| off < l.1)
+            .unwrap_or(self.lines.len() - 1)
     }
     fn horiz(&self, off: i32) -> f32 {
         let i = self.line_for_offset(off);
         let (s, _, _) = self.lines[i];
         let o = (off.max(0) as usize).max(s);
-        self.line_left(i) + self.text.chars().skip(s).take(o - s).map(|c| char_adv(c, self.size, self.ls)).sum::<f32>()
+        self.line_left(i)
+            + self
+                .text
+                .chars()
+                .skip(s)
+                .take(o - s)
+                .map(|c| char_adv(c, self.size, self.ls))
+                .sum::<f32>()
     }
     fn top(&self, i: usize) -> f32 {
         i as f32 * self.lh
@@ -578,7 +812,13 @@ fn record(vm: &mut Engine, canvas: ObjRef, p: PaintSnap, k: OpK) {
         Some(G::Canvas(c)) => (c.target.clone(), *c.top()),
         _ => return,
     };
-    let op = Op { m: s.m, clip: s.clip, alpha: s.alpha, p, k };
+    let op = Op {
+        m: s.m,
+        clip: s.clip,
+        alpha: s.alpha,
+        p,
+        k,
+    };
     match target {
         Target::Node(n) => {
             if let Some(G::Node(ns)) = vm.gfx.objs.get_mut(&n) {
@@ -627,14 +867,20 @@ fn rrect_poly(l: f32, t: f32, r: f32, bt: f32, rad: [f32; 8]) -> Vec<(f32, f32)>
 }
 fn oval_poly(l: f32, t: f32, r: f32, bt: f32) -> Vec<(f32, f32)> {
     let (cx, cy, rx, ry) = ((l + r) / 2.0, (t + bt) / 2.0, (r - l) / 2.0, (bt - t) / 2.0);
-    (0..48).map(|i| {
-        let a = i as f32 / 48.0 * std::f32::consts::TAU;
-        (cx + rx * a.cos(), cy + ry * a.sin())
-    }).collect()
+    (0..48)
+        .map(|i| {
+            let a = i as f32 / 48.0 * std::f32::consts::TAU;
+            (cx + rx * a.cos(), cy + ry * a.sin())
+        })
+        .collect()
 }
 
 fn path_mut(vm: &mut Engine, r: ObjRef) -> &mut Vec<Vec<(f32, f32)>> {
-    let e = vm.gfx.objs.entry(r).or_insert_with(|| G::Path(Vec::new(), false));
+    let e = vm
+        .gfx
+        .objs
+        .entry(r)
+        .or_insert_with(|| G::Path(Vec::new(), false));
     if !matches!(e, G::Path(..)) {
         *e = G::Path(Vec::new(), false);
     }
@@ -650,7 +896,10 @@ fn path_of(vm: &Engine, r: Option<ObjRef>) -> Vec<Vec<(f32, f32)>> {
     }
 }
 fn last_pt(p: &[Vec<(f32, f32)>]) -> (f32, f32) {
-    p.last().and_then(|s| s.last()).copied().unwrap_or((0.0, 0.0))
+    p.last()
+        .and_then(|s| s.last())
+        .copied()
+        .unwrap_or((0.0, 0.0))
 }
 fn matrix_of(vm: &Engine, r: Option<ObjRef>) -> M {
     match r.and_then(|r| vm.gfx.objs.get(&r)) {
@@ -682,7 +931,13 @@ fn write_floats(vm: &mut Engine, v: Option<&Value>, xs: &[f32], at: usize) {
 
 const GFX_PREFIXES: [&str; 2] = ["Landroid/graphics/", "Landroid/text/"];
 
-pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, sig: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn static_intrinsic(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if !GFX_PREFIXES.iter().any(|p| class.starts_with(p)) {
         return Ok(None);
     }
@@ -693,13 +948,21 @@ pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, sig: &s
                 for i in 0..names.len() {
                     v.push(enum_const(vm, class, i)?.unwrap_or(Value::Null));
                 }
-                Ok(Some(crate::arrays::new_array(vm, &format!("[{class}"), ElemKind::Obj, v)?))
+                Ok(Some(crate::arrays::new_array(
+                    vm,
+                    &format!("[{class}"),
+                    ElemKind::Obj,
+                    v,
+                )?))
             }
             "valueOf" => {
                 let n = cs_text(vm, args.last().unwrap_or(&Value::Null))?;
                 match names.iter().position(|x| *x == n) {
                     Some(i) => enum_const(vm, class, i),
-                    None => Err(exc("Ljava/lang/IllegalArgumentException;", format!("No enum constant {n}"))),
+                    None => Err(exc(
+                        "Ljava/lang/IllegalArgumentException;",
+                        format!("No enum constant {n}"),
+                    )),
                 }
             }
             _ => Ok(None),
@@ -708,7 +971,17 @@ pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, sig: &s
     let a = |i: usize| args.get(i);
     Ok(Some(match (class, name) {
         ("Landroid/graphics/Typeface;", "create" | "defaultFromStyle") => {
-            let style = args.iter().rev().find_map(|v| if let Value::Int(i) = v { Some(*i) } else { None }).unwrap_or(0);
+            let style = args
+                .iter()
+                .rev()
+                .find_map(|v| {
+                    if let Value::Int(i) = v {
+                        Some(*i)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(0);
             typeface(vm, style & 1)?
         }
         ("Landroid/graphics/Typeface;", "createFromFile" | "createFromAsset") => typeface(vm, 0)?,
@@ -719,8 +992,18 @@ pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, sig: &s
                 ("red", "(I)I") => Value::Int(((c >> 16) & 0xFF) as i32),
                 ("green", "(I)I") => Value::Int(((c >> 8) & 0xFF) as i32),
                 ("blue", "(I)I") => Value::Int((c & 0xFF) as i32),
-                ("argb", "(IIII)I") => Value::Int(((it(a(0)) as u32 & 0xFF) << 24 | (it(a(1)) as u32 & 0xFF) << 16 | (it(a(2)) as u32 & 0xFF) << 8 | (it(a(3)) as u32 & 0xFF)) as i32),
-                ("rgb", "(III)I") => Value::Int((0xFF00_0000u32 | (it(a(0)) as u32 & 0xFF) << 16 | (it(a(1)) as u32 & 0xFF) << 8 | (it(a(2)) as u32 & 0xFF)) as i32),
+                ("argb", "(IIII)I") => Value::Int(
+                    ((it(a(0)) as u32 & 0xFF) << 24
+                        | (it(a(1)) as u32 & 0xFF) << 16
+                        | (it(a(2)) as u32 & 0xFF) << 8
+                        | (it(a(3)) as u32 & 0xFF)) as i32,
+                ),
+                ("rgb", "(III)I") => Value::Int(
+                    (0xFF00_0000u32
+                        | (it(a(0)) as u32 & 0xFF) << 16
+                        | (it(a(1)) as u32 & 0xFF) << 8
+                        | (it(a(2)) as u32 & 0xFF)) as i32,
+                ),
                 ("argb", "(FFFF)I") => {
                     let q = |i: usize| (fl(a(i)).clamp(0.0, 1.0) * 255.0 + 0.5) as u32;
                     Value::Int((q(0) << 24 | q(1) << 16 | q(2) << 8 | q(3)) as i32)
@@ -728,41 +1011,77 @@ pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, sig: &s
                 ("parseColor", _) => {
                     let s = cs_text(vm, a(0).unwrap_or(&Value::Null))?;
                     let h = s.trim_start_matches('#');
-                    let v = u32::from_str_radix(h, 16).map_err(|_| exc("Ljava/lang/IllegalArgumentException;", "Unknown color"))?;
+                    let v = u32::from_str_radix(h, 16).map_err(|_| {
+                        exc("Ljava/lang/IllegalArgumentException;", "Unknown color")
+                    })?;
                     Value::Int(if h.len() == 6 { 0xFF00_0000 | v } else { v } as i32)
                 }
                 _ => return Ok(None),
             }
         }
         ("Landroid/graphics/Bitmap;", "createBitmap" | "createScaledBitmap") => {
-            let ints: Vec<i32> = args.iter().filter_map(|v| if let Value::Int(i) = v { Some(*i) } else { None }).collect();
+            let ints: Vec<i32> = args
+                .iter()
+                .filter_map(|v| {
+                    if let Value::Int(i) = v {
+                        Some(*i)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
             let src = args.iter().find_map(|v| match v {
                 Value::Obj(r) if matches!(vm.gfx.objs.get(r), Some(G::Bitmap(..))) => Some(*r),
                 _ => None,
             });
             let (w, h) = match (name, src) {
-                ("createScaledBitmap", _) => (ints.first().copied().unwrap_or(1), ints.get(1).copied().unwrap_or(1)),
+                ("createScaledBitmap", _) => (
+                    ints.first().copied().unwrap_or(1),
+                    ints.get(1).copied().unwrap_or(1),
+                ),
                 (_, Some(_)) if ints.len() >= 4 => (ints[2], ints[3]),
                 (_, Some(s)) => match vm.gfx.objs.get(&s) {
                     Some(G::Bitmap(w, h, _)) => (*w, *h),
                     _ => (1, 1),
                 },
-                _ => (ints.first().copied().unwrap_or(1), ints.get(1).copied().unwrap_or(1)),
+                _ => (
+                    ints.first().copied().unwrap_or(1),
+                    ints.get(1).copied().unwrap_or(1),
+                ),
             };
             if w <= 0 || h <= 0 {
-                return Err(exc("Ljava/lang/IllegalArgumentException;", "width and height must be > 0"));
+                return Err(exc(
+                    "Ljava/lang/IllegalArgumentException;",
+                    "width and height must be > 0",
+                ));
             }
             let ops = match src.and_then(|s| vm.gfx.objs.get(&s)) {
                 Some(G::Bitmap(_, _, o)) => o.clone(),
                 _ => Vec::new(),
             };
-            let r = vm.heap.alloc_instance("Landroid/graphics/Bitmap;".into(), Vec::new())?;
+            let r = vm
+                .heap
+                .alloc_instance("Landroid/graphics/Bitmap;".into(), Vec::new())?;
             vm.gfx.objs.insert(r, G::Bitmap(w, h, ops));
             Value::Obj(r)
         }
         ("Landroid/text/StaticLayout$Builder;", "obtain") => {
             let r = vm.heap.alloc_instance(class.to_string(), Vec::new())?;
-            vm.gfx.objs.insert(r, G::Builder(BuilderS { cs: a(0).cloned().unwrap_or(Value::Null), start: it(a(1)), end: it(a(2)), paint: a(3).cloned().unwrap_or(Value::Null), width: it(a(4)), spacing_mult: 1.0, align: 0, max_lines: 0, ellipsize: false, spacing_add: 0.0 }));
+            vm.gfx.objs.insert(
+                r,
+                G::Builder(BuilderS {
+                    cs: a(0).cloned().unwrap_or(Value::Null),
+                    start: it(a(1)),
+                    end: it(a(2)),
+                    paint: a(3).cloned().unwrap_or(Value::Null),
+                    width: it(a(4)),
+                    spacing_mult: 1.0,
+                    align: 0,
+                    max_lines: 0,
+                    ellipsize: false,
+                    spacing_add: 0.0,
+                }),
+            );
             Value::Obj(r)
         }
         ("Landroid/text/BoringLayout;", "isBoring") => {
@@ -771,19 +1090,41 @@ pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, sig: &s
                 Value::Null
             } else {
                 let p = paint_of(vm, a(1));
-                let m = match args.iter().skip(2).rev().find_map(|v| obj(Some(v)).filter(|r| vm.heap.class_of(*r).map(|c| c.contains("Metrics")).unwrap_or(false))) {
+                let m = match args.iter().skip(2).rev().find_map(|v| {
+                    obj(Some(v)).filter(|r| {
+                        vm.heap
+                            .class_of(*r)
+                            .map(|c| c.contains("Metrics"))
+                            .unwrap_or(false)
+                    })
+                }) {
                     Some(m) => m,
-                    None => vm.heap.alloc_instance("Landroid/text/BoringLayout$Metrics;".into(), Vec::new())?,
+                    None => vm
+                        .heap
+                        .alloc_instance("Landroid/text/BoringLayout$Metrics;".into(), Vec::new())?,
                 };
                 fill_metrics(vm, m, p.text_size, true)?;
-                put(vm, m, "width", Value::Int(measure(&text, p.text_size, p.letter_spacing).ceil() as i32))?;
+                put(
+                    vm,
+                    m,
+                    "width",
+                    Value::Int(measure(&text, p.text_size, p.letter_spacing).ceil() as i32),
+                )?;
                 Value::Obj(m)
             }
         }
         ("Landroid/text/Layout;" | "Landroid/text/StaticLayout;", "getDesiredWidth") => {
             let text = cs_text(vm, a(0).unwrap_or(&Value::Null))?;
-            let (t, p) = if args.len() >= 4 { (sub(&text, it(a(1)), it(a(2))), paint_of(vm, a(3))) } else { (text, paint_of(vm, a(1))) };
-            Value::Float(t.split('\n').map(|l| measure(l, p.text_size, p.letter_spacing)).fold(0.0, f32::max))
+            let (t, p) = if args.len() >= 4 {
+                (sub(&text, it(a(1)), it(a(2))), paint_of(vm, a(3)))
+            } else {
+                (text, paint_of(vm, a(1)))
+            };
+            Value::Float(
+                t.split('\n')
+                    .map(|l| measure(l, p.text_size, p.letter_spacing))
+                    .fold(0.0, f32::max),
+            )
         }
         _ => return Ok(None),
     }))
@@ -791,7 +1132,13 @@ pub(crate) fn static_intrinsic(vm: &mut Engine, class: &str, name: &str, sig: &s
 
 fn fill_metrics(vm: &mut Engine, m: ObjRef, size: f32, int: bool) -> Result<(), VmExit> {
     let (a, d) = (ascent(size), descent(size));
-    let v = |x: f32| if int { Value::Int(if x < 0.0 { x.floor() } else { x.ceil() } as i32) } else { Value::Float(x) };
+    let v = |x: f32| {
+        if int {
+            Value::Int(if x < 0.0 { x.floor() } else { x.ceil() } as i32)
+        } else {
+            Value::Float(x)
+        }
+    };
     put(vm, m, "ascent", v(a))?;
     put(vm, m, "descent", v(d))?;
     put(vm, m, "top", v(a * 1.1))?;
@@ -801,7 +1148,15 @@ fn fill_metrics(vm: &mut Engine, m: ObjRef, size: f32, int: bool) -> Result<(), 
 
 /// Instance methods. Gate: host graphics/text class in the method ref, or a
 /// receiver that already has native graphics state (DEX subclasses).
-pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: &str, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+pub(crate) fn instance_intrinsic(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if let Some(v) = color_filter(vm, recv_class, name, recv, args)? {
         return Ok(Some(v));
     }
@@ -824,10 +1179,25 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
     }
     // heap-field structs
     match class {
-        "Landroid/graphics/Rect;" | "Landroid/graphics/RectF;" => return rect_method(vm, class == "Landroid/graphics/Rect;", name, sig, recv, args),
+        "Landroid/graphics/Rect;" | "Landroid/graphics/RectF;" => {
+            return rect_method(
+                vm,
+                class == "Landroid/graphics/Rect;",
+                name,
+                sig,
+                recv,
+                args,
+            )
+        }
         "Landroid/graphics/Point;" | "Landroid/graphics/PointF;" => {
             let int = class.ends_with("Point;");
-            let v = |x: f32| if int { Value::Int(x as i32) } else { Value::Float(x) };
+            let v = |x: f32| {
+                if int {
+                    Value::Int(x as i32)
+                } else {
+                    Value::Float(x)
+                }
+            };
             return Ok(Some(match name {
                 "<init>" | "set" => {
                     if args.len() == 2 {
@@ -844,22 +1214,43 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
                     Value::Null
                 }
                 "offset" => {
-                    let (x, y) = (getf(vm, recv, "x") + fl(a(0)), getf(vm, recv, "y") + fl(a(1)));
+                    let (x, y) = (
+                        getf(vm, recv, "x") + fl(a(0)),
+                        getf(vm, recv, "y") + fl(a(1)),
+                    );
                     put(vm, recv, "x", v(x))?;
                     put(vm, recv, "y", v(y))?;
                     Value::Null
                 }
                 "equals" => match obj(a(0)) {
-                    Some(o) => b(getf(vm, o, "x") == getf(vm, recv, "x") && getf(vm, o, "y") == getf(vm, recv, "y")),
+                    Some(o) => b(getf(vm, o, "x") == getf(vm, recv, "x")
+                        && getf(vm, o, "y") == getf(vm, recv, "y")),
                     None => b(false),
                 },
-                "hashCode" => Value::Int((getf(vm, recv, "x") as i32).wrapping_mul(31).wrapping_add(getf(vm, recv, "y") as i32)),
+                "hashCode" => Value::Int(
+                    (getf(vm, recv, "x") as i32)
+                        .wrapping_mul(31)
+                        .wrapping_add(getf(vm, recv, "y") as i32),
+                ),
                 _ => return Ok(None),
             }));
         }
-        "Landroid/graphics/Paint$FontMetricsInt;" | "Landroid/graphics/Paint$FontMetrics;" | "Landroid/text/BoringLayout$Metrics;" if name == "<init>" => {
+        "Landroid/graphics/Paint$FontMetricsInt;"
+        | "Landroid/graphics/Paint$FontMetrics;"
+        | "Landroid/text/BoringLayout$Metrics;"
+            if name == "<init>" =>
+        {
             for f in ["ascent", "descent", "top", "bottom", "leading"] {
-                put(vm, recv, f, if class.ends_with("FontMetrics;") { Value::Float(0.0) } else { Value::Int(0) })?;
+                put(
+                    vm,
+                    recv,
+                    f,
+                    if class.ends_with("FontMetrics;") {
+                        Value::Float(0.0)
+                    } else {
+                        Value::Int(0)
+                    },
+                )?;
             }
             if class.ends_with("Metrics;") && class.contains("Boring") {
                 put(vm, recv, "width", Value::Int(0))?;
@@ -910,14 +1301,29 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
             },
             "Landroid/graphics/RenderNode;" => G::Node(NodeS::default()),
             "Landroid/graphics/Outline;" => G::Outline(None, 0.0, 1.0),
-            "Landroid/text/StaticLayout;" | "Landroid/text/BoringLayout;" | "Landroid/text/DynamicLayout;" => {
+            "Landroid/text/StaticLayout;"
+            | "Landroid/text/BoringLayout;"
+            | "Landroid/text/DynamicLayout;" => {
                 // (CharSequence, TextPaint, int width, Alignment, float mult, float add, …)
                 let cs = a(0).cloned().unwrap_or(Value::Null);
                 let text = cs_text(vm, &cs)?;
                 let paint = a(1).cloned().unwrap_or(Value::Null);
                 let al = ord(vm, a(3)).max(0);
-                let ell = class.ends_with("BoringLayout;") && args.len() > 8 && !matches!(a(8), Some(Value::Null));
-                G::Layout(new_layout(vm, cs, text, paint, it(a(2)), al, if ell { 1 } else { 0 }, ell, fl(a(4)), fl(a(5))))
+                let ell = class.ends_with("BoringLayout;")
+                    && args.len() > 8
+                    && !matches!(a(8), Some(Value::Null));
+                G::Layout(new_layout(
+                    vm,
+                    cs,
+                    text,
+                    paint,
+                    it(a(2)),
+                    al,
+                    if ell { 1 } else { 0 },
+                    ell,
+                    fl(a(4)),
+                    fl(a(5)),
+                ))
             }
             _ => return Ok(None),
         };
@@ -927,7 +1333,10 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
     let Some(g) = vm.gfx.objs.get(&recv).cloned() else {
         // host graphics object created without our constructor (e.g. by reflection)
         return Ok(match (class, name) {
-            ("Landroid/graphics/Canvas;" | "Landroid/graphics/RecordingCanvas;", "isHardwareAccelerated") => Some(b(false)),
+            (
+                "Landroid/graphics/Canvas;" | "Landroid/graphics/RecordingCanvas;",
+                "isHardwareAccelerated",
+            ) => Some(b(false)),
             _ => None,
         });
     };
@@ -944,19 +1353,33 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
             "getByteCount" | "getAllocationByteCount" => Value::Int(w * h * 4),
             "isMutable" | "hasAlpha" => b(true),
             "isRecycled" | "compress" | "isPremultiplied" => b(name == "isPremultiplied"),
-            "getConfig" => enum_const(vm, "Landroid/graphics/Bitmap$Config;", 3)?.unwrap_or(Value::Null),
+            "getConfig" => {
+                enum_const(vm, "Landroid/graphics/Bitmap$Config;", 3)?.unwrap_or(Value::Null)
+            }
             "getDensity" => Value::Int(280),
             "getGenerationId" => Value::Int(recv as i32),
             "getColorSpace" => Value::Null,
             "eraseColor" => {
                 if let Some(G::Bitmap(_, _, ops)) = vm.gfx.objs.get_mut(&recv) {
                     ops.clear();
-                    ops.push(Op { m: ID, clip: [0.0, 0.0, w as f32, h as f32], alpha: 1.0, p: PaintSnap { argb: it(a(0)) as u32, style: 0, sw: 0.0 }, k: OpK::Color(it(a(0)) as u32) });
+                    ops.push(Op {
+                        m: ID,
+                        clip: [0.0, 0.0, w as f32, h as f32],
+                        alpha: 1.0,
+                        p: PaintSnap {
+                            argb: it(a(0)) as u32,
+                            style: 0,
+                            sw: 0.0,
+                        },
+                        k: OpK::Color(it(a(0)) as u32),
+                    });
                 }
                 Value::Null
             }
             "copy" => {
-                let r = vm.heap.alloc_instance("Landroid/graphics/Bitmap;".into(), Vec::new())?;
+                let r = vm
+                    .heap
+                    .alloc_instance("Landroid/graphics/Bitmap;".into(), Vec::new())?;
                 vm.gfx.objs.insert(r, g.clone());
                 Value::Obj(r)
             }
@@ -974,14 +1397,31 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
         })),
         G::Outline(r, rad, alpha) => Ok(Some(match name {
             "setRect" | "setRoundRect" => {
-                let rr = if let Some(o) = obj(a(0)) { rect_of(vm, Some(o)) } else { [fl(a(0)), fl(a(1)), fl(a(2)), fl(a(3))] };
-                let radius = if name == "setRoundRect" { fl(args.last()) } else { 0.0 };
-                vm.gfx.objs.insert(recv, G::Outline(Some(rr), radius, alpha));
+                let rr = if let Some(o) = obj(a(0)) {
+                    rect_of(vm, Some(o))
+                } else {
+                    [fl(a(0)), fl(a(1)), fl(a(2)), fl(a(3))]
+                };
+                let radius = if name == "setRoundRect" {
+                    fl(args.last())
+                } else {
+                    0.0
+                };
+                vm.gfx
+                    .objs
+                    .insert(recv, G::Outline(Some(rr), radius, alpha));
                 Value::Null
             }
             "setOval" => {
-                let rr = if let Some(o) = obj(a(0)) { rect_of(vm, Some(o)) } else { [fl(a(0)), fl(a(1)), fl(a(2)), fl(a(3))] };
-                vm.gfx.objs.insert(recv, G::Outline(Some(rr), (rr[2] - rr[0]).min(rr[3] - rr[1]) / 2.0, alpha));
+                let rr = if let Some(o) = obj(a(0)) {
+                    rect_of(vm, Some(o))
+                } else {
+                    [fl(a(0)), fl(a(1)), fl(a(2)), fl(a(3))]
+                };
+                vm.gfx.objs.insert(
+                    recv,
+                    G::Outline(Some(rr), (rr[2] - rr[0]).min(rr[3] - rr[1]) / 2.0, alpha),
+                );
                 Value::Null
             }
             "setConvexPath" | "setPath" => {
@@ -998,7 +1438,9 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
                 Value::Null
             }
             "set" => {
-                if let Some(o @ G::Outline(..)) = obj(a(0)).and_then(|o| vm.gfx.objs.get(&o)).cloned() {
+                if let Some(o @ G::Outline(..)) =
+                    obj(a(0)).and_then(|o| vm.gfx.objs.get(&o)).cloned()
+                {
                     vm.gfx.objs.insert(recv, o);
                 }
                 Value::Null
@@ -1018,9 +1460,30 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
         G::Builder(mut bs) => {
             if name == "build" {
                 let text = cs_text(vm, &bs.cs)?;
-                let t = sub(&text, bs.start, if bs.end <= 0 { text.chars().count() as i32 } else { bs.end });
-                let l = new_layout(vm, bs.cs.clone(), t, bs.paint.clone(), bs.width, bs.align, bs.max_lines, bs.ellipsize, bs.spacing_mult, bs.spacing_add);
-                let r = vm.heap.alloc_instance("Landroid/text/StaticLayout;".into(), Vec::new())?;
+                let t = sub(
+                    &text,
+                    bs.start,
+                    if bs.end <= 0 {
+                        text.chars().count() as i32
+                    } else {
+                        bs.end
+                    },
+                );
+                let l = new_layout(
+                    vm,
+                    bs.cs.clone(),
+                    t,
+                    bs.paint.clone(),
+                    bs.width,
+                    bs.align,
+                    bs.max_lines,
+                    bs.ellipsize,
+                    bs.spacing_mult,
+                    bs.spacing_add,
+                );
+                let r = vm
+                    .heap
+                    .alloc_instance("Landroid/text/StaticLayout;".into(), Vec::new())?;
                 vm.gfx.objs.insert(r, G::Layout(l));
                 return Ok(Some(Value::Obj(r)));
             }
@@ -1047,10 +1510,23 @@ pub(crate) fn instance_intrinsic(vm: &mut Engine, recv_class: &str, mref_class: 
     }
 }
 
-fn rect_method(vm: &mut Engine, int: bool, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+fn rect_method(
+    vm: &mut Engine,
+    int: bool,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let a = |i: usize| args.get(i);
     let r = rect_of(vm, Some(recv));
-    let num = |x: f32| if int { Value::Int(x as i32) } else { Value::Float(x) };
+    let num = |x: f32| {
+        if int {
+            Value::Int(x as i32)
+        } else {
+            Value::Float(x)
+        }
+    };
     Ok(Some(match name {
         "<init>" | "set" => {
             let v = match (args.len(), obj(a(0))) {
@@ -1067,8 +1543,16 @@ fn rect_method(vm: &mut Engine, int: bool, name: &str, sig: &str, recv: ObjRef, 
         }
         "width" => num(r[2] - r[0]),
         "height" => num(r[3] - r[1]),
-        "centerX" => num(if int { ((r[0] + r[2]) / 2.0).floor() } else { (r[0] + r[2]) / 2.0 }),
-        "centerY" => num(if int { ((r[1] + r[3]) / 2.0).floor() } else { (r[1] + r[3]) / 2.0 }),
+        "centerX" => num(if int {
+            ((r[0] + r[2]) / 2.0).floor()
+        } else {
+            (r[0] + r[2]) / 2.0
+        }),
+        "centerY" => num(if int {
+            ((r[1] + r[3]) / 2.0).floor()
+        } else {
+            (r[1] + r[3]) / 2.0
+        }),
         "exactCenterX" => Value::Float((r[0] + r[2]) / 2.0),
         "exactCenterY" => Value::Float((r[1] + r[3]) / 2.0),
         "isEmpty" => b(r[0] >= r[2] || r[1] >= r[3]),
@@ -1087,13 +1571,43 @@ fn rect_method(vm: &mut Engine, int: bool, name: &str, sig: &str, recv: ObjRef, 
             Value::Null
         }
         "intersect" | "setIntersect" | "intersects" | "union" => {
-            let o = if args.len() >= 4 { [fl(a(0)), fl(a(1)), fl(a(2)), fl(a(3))] } else { rect_of(vm, obj(a(0))) };
-            let o = if name == "setIntersect" { let p = rect_of(vm, obj(a(1))); let q = o; [p[0].max(q[0]), p[1].max(q[1]), p[2].min(q[2]), p[3].min(q[3])] } else { o };
+            let o = if args.len() >= 4 {
+                [fl(a(0)), fl(a(1)), fl(a(2)), fl(a(3))]
+            } else {
+                rect_of(vm, obj(a(0)))
+            };
+            let o = if name == "setIntersect" {
+                let p = rect_of(vm, obj(a(1)));
+                let q = o;
+                [
+                    p[0].max(q[0]),
+                    p[1].max(q[1]),
+                    p[2].min(q[2]),
+                    p[3].min(q[3]),
+                ]
+            } else {
+                o
+            };
             if name == "union" {
-                set_rect(vm, recv, [r[0].min(o[0]), r[1].min(o[1]), r[2].max(o[2]), r[3].max(o[3])], int)?;
+                set_rect(
+                    vm,
+                    recv,
+                    [
+                        r[0].min(o[0]),
+                        r[1].min(o[1]),
+                        r[2].max(o[2]),
+                        r[3].max(o[3]),
+                    ],
+                    int,
+                )?;
                 return Ok(Some(Value::Null));
             }
-            let i = [r[0].max(o[0]), r[1].max(o[1]), r[2].min(o[2]), r[3].min(o[3])];
+            let i = [
+                r[0].max(o[0]),
+                r[1].max(o[1]),
+                r[2].min(o[2]),
+                r[3].min(o[3]),
+            ];
             let hit = i[0] < i[2] && i[1] < i[3];
             if hit && name != "intersects" {
                 set_rect(vm, recv, if name == "setIntersect" { o } else { i }, int)?;
@@ -1101,22 +1615,43 @@ fn rect_method(vm: &mut Engine, int: bool, name: &str, sig: &str, recv: ObjRef, 
             b(hit)
         }
         "sort" => {
-            set_rect(vm, recv, [r[0].min(r[2]), r[1].min(r[3]), r[0].max(r[2]), r[1].max(r[3])], int)?;
+            set_rect(
+                vm,
+                recv,
+                [
+                    r[0].min(r[2]),
+                    r[1].min(r[3]),
+                    r[0].max(r[2]),
+                    r[1].max(r[3]),
+                ],
+                int,
+            )?;
             Value::Null
         }
         "round" | "roundOut" => {
             if let Some(o) = obj(a(0)) {
-                let v = if name == "round" { r.map(f32::round) } else { [r[0].floor(), r[1].floor(), r[2].ceil(), r[3].ceil()] };
+                let v = if name == "round" {
+                    r.map(f32::round)
+                } else {
+                    [r[0].floor(), r[1].floor(), r[2].ceil(), r[3].ceil()]
+                };
                 set_rect(vm, o, v, true)?;
             }
             Value::Null
         }
         "equals" => match obj(a(0)) {
-            Some(o) if vm.heap.class_of(o).ok() == vm.heap.class_of(recv).ok() => b(rect_of(vm, Some(o)) == r),
+            Some(o) if vm.heap.class_of(o).ok() == vm.heap.class_of(recv).ok() => {
+                b(rect_of(vm, Some(o)) == r)
+            }
             _ => b(false),
         },
-        "hashCode" => Value::Int(r.iter().fold(0i32, |h, x| h.wrapping_mul(31).wrapping_add(*x as i32))),
-        "toString" | "toShortString" => st(vm, format!("Rect({}, {} - {}, {})", r[0], r[1], r[2], r[3]))?,
+        "hashCode" => Value::Int(
+            r.iter()
+                .fold(0i32, |h, x| h.wrapping_mul(31).wrapping_add(*x as i32)),
+        ),
+        "toString" | "toShortString" => {
+            st(vm, format!("Rect({}, {} - {}, {})", r[0], r[1], r[2], r[3]))?
+        }
         _ => {
             let _ = sig;
             return Ok(None);
@@ -1124,7 +1659,14 @@ fn rect_method(vm: &mut Engine, int: bool, name: &str, sig: &str, recv: ObjRef, 
     }))
 }
 
-fn paint_method(vm: &mut Engine, mut p: PaintS, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+fn paint_method(
+    vm: &mut Engine,
+    mut p: PaintS,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let a = |i: usize| args.get(i);
     let mut changed = true;
     let out = match name {
@@ -1145,14 +1687,18 @@ fn paint_method(vm: &mut Engine, mut p: PaintS, name: &str, sig: &str, recv: Obj
         }
         "getAlpha" => Value::Int((p.argb >> 24) as i32),
         "setARGB" => {
-            p.argb = (it(a(0)) as u32 & 0xFF) << 24 | (it(a(1)) as u32 & 0xFF) << 16 | (it(a(2)) as u32 & 0xFF) << 8 | (it(a(3)) as u32 & 0xFF);
+            p.argb = (it(a(0)) as u32 & 0xFF) << 24
+                | (it(a(1)) as u32 & 0xFF) << 16
+                | (it(a(2)) as u32 & 0xFF) << 8
+                | (it(a(3)) as u32 & 0xFF);
             Value::Null
         }
         "setStyle" => {
             p.style = ord(vm, a(0)).max(0);
             Value::Null
         }
-        "getStyle" => enum_const(vm, "Landroid/graphics/Paint$Style;", p.style as usize)?.unwrap_or(Value::Null),
+        "getStyle" => enum_const(vm, "Landroid/graphics/Paint$Style;", p.style as usize)?
+            .unwrap_or(Value::Null),
         "setStrokeWidth" => {
             p.sw = fl(a(0));
             Value::Null
@@ -1168,7 +1714,8 @@ fn paint_method(vm: &mut Engine, mut p: PaintS, name: &str, sig: &str, recv: Obj
             Value::Null
         }
         "getFlags" => Value::Int(p.flags),
-        "setAntiAlias" | "setDither" | "setFilterBitmap" | "setUnderlineText" | "setStrikeThruText" | "setFakeBoldText" | "setLinearText" | "setSubpixelText" => {
+        "setAntiAlias" | "setDither" | "setFilterBitmap" | "setUnderlineText"
+        | "setStrikeThruText" | "setFakeBoldText" | "setLinearText" | "setSubpixelText" => {
             let bit = match name {
                 "setAntiAlias" => 1,
                 "setFilterBitmap" => 2,
@@ -1179,7 +1726,11 @@ fn paint_method(vm: &mut Engine, mut p: PaintS, name: &str, sig: &str, recv: Obj
                 "setLinearText" => 64,
                 _ => 128,
             };
-            if it(a(0)) != 0 { p.flags |= bit } else { p.flags &= !bit }
+            if it(a(0)) != 0 {
+                p.flags |= bit
+            } else {
+                p.flags &= !bit
+            }
             Value::Null
         }
         "isAntiAlias" => b(p.flags & 1 != 0),
@@ -1215,7 +1766,19 @@ fn paint_method(vm: &mut Engine, mut p: PaintS, name: &str, sig: &str, recv: Obj
         }
         "measureText" => {
             let t = cs_text(vm, a(0).unwrap_or(&Value::Null))?;
-            let t = if args.len() >= 3 { sub(&t, it(a(1)), if sig.starts_with("([C") { it(a(1)) + it(a(2)) } else { it(a(2)) }) } else { t };
+            let t = if args.len() >= 3 {
+                sub(
+                    &t,
+                    it(a(1)),
+                    if sig.starts_with("([C") {
+                        it(a(1)) + it(a(2))
+                    } else {
+                        it(a(2))
+                    },
+                )
+            } else {
+                t
+            };
             changed = false;
             Value::Float(measure(&t, p.text_size, p.letter_spacing) * p.scale_x)
         }
@@ -1256,12 +1819,24 @@ fn paint_method(vm: &mut Engine, mut p: PaintS, name: &str, sig: &str, recv: Obj
             let int = name.ends_with("Int");
             let m = match obj(a(0)) {
                 Some(m) => m,
-                None => vm.heap.alloc_instance(if int { "Landroid/graphics/Paint$FontMetricsInt;" } else { "Landroid/graphics/Paint$FontMetrics;" }.into(), Vec::new())?,
+                None => vm.heap.alloc_instance(
+                    if int {
+                        "Landroid/graphics/Paint$FontMetricsInt;"
+                    } else {
+                        "Landroid/graphics/Paint$FontMetrics;"
+                    }
+                    .into(),
+                    Vec::new(),
+                )?,
             };
             fill_metrics(vm, m, p.text_size, int)?;
             let sp = descent(p.text_size) - ascent(p.text_size);
             if a(0).is_some() {
-                if int { Value::Int(sp.ceil() as i32) } else { Value::Float(sp) }
+                if int {
+                    Value::Int(sp.ceil() as i32)
+                } else {
+                    Value::Float(sp)
+                }
             } else {
                 Value::Obj(m)
             }
@@ -1269,9 +1844,27 @@ fn paint_method(vm: &mut Engine, mut p: PaintS, name: &str, sig: &str, recv: Obj
         "getTextBounds" => {
             changed = false;
             let t = cs_text(vm, a(0).unwrap_or(&Value::Null))?;
-            let t = sub(&t, it(a(1)), if sig.starts_with("([C") { it(a(1)) + it(a(2)) } else { it(a(2)) });
+            let t = sub(
+                &t,
+                it(a(1)),
+                if sig.starts_with("([C") {
+                    it(a(1)) + it(a(2))
+                } else {
+                    it(a(2))
+                },
+            );
             if let Some(r) = obj(args.last()) {
-                set_rect(vm, r, [0.0, ascent(p.text_size), measure(&t, p.text_size, p.letter_spacing), descent(p.text_size)], true)?;
+                set_rect(
+                    vm,
+                    r,
+                    [
+                        0.0,
+                        ascent(p.text_size),
+                        measure(&t, p.text_size, p.letter_spacing),
+                        descent(p.text_size),
+                    ],
+                    true,
+                )?;
             }
             Value::Null
         }
@@ -1284,7 +1877,8 @@ fn paint_method(vm: &mut Engine, mut p: PaintS, name: &str, sig: &str, recv: Obj
         "getHinting" => Value::Int(0),
         "getStrokeMiter" => Value::Float(p.misc.get("miter").map(|v| fl(Some(v))).unwrap_or(4.0)),
         "setStrokeMiter" => {
-            p.misc.insert("miter".into(), a(0).cloned().unwrap_or(Value::Float(4.0)));
+            p.misc
+                .insert("miter".into(), a(0).cloned().unwrap_or(Value::Float(4.0)));
             Value::Null
         }
         "getTextSkewX" => Value::Float(p.misc.get("skew").map(|v| fl(Some(v))).unwrap_or(0.0)),
@@ -1295,22 +1889,46 @@ fn paint_method(vm: &mut Engine, mut p: PaintS, name: &str, sig: &str, recv: Obj
             let key = n[3..].to_string();
             let v = a(0).cloned().unwrap_or(Value::Null);
             p.misc.insert(key, v.clone());
-            if sig.ends_with(")V") { Value::Null } else { v }
+            if sig.ends_with(")V") {
+                Value::Null
+            } else {
+                v
+            }
         }
         n if n.starts_with("get") || n.starts_with("is") => {
             changed = false;
-            let key = n.trim_start_matches("get").trim_start_matches("is").to_string();
+            let key = n
+                .trim_start_matches("get")
+                .trim_start_matches("is")
+                .to_string();
             match p.misc.get(&key) {
                 Some(v) => v.clone(),
                 None => match sig.rsplit(')').next().unwrap_or("V") {
                     "I" | "Z" => Value::Int(0),
                     "F" => Value::Float(0.0),
                     _ => match key.as_str() {
-                        "StrokeCap" => enum_const(vm, "Landroid/graphics/Paint$Cap;", 0)?.unwrap_or(Value::Null),
-                        "StrokeJoin" => enum_const(vm, "Landroid/graphics/Paint$Join;", 0)?.unwrap_or(Value::Null),
-                        "TextAlign" => enum_const(vm, "Landroid/graphics/Paint$Align;", 0)?.unwrap_or(Value::Null),
-                        "TextLocale" => crate::android_res::static_intrinsic(vm, "Ljava/util/Locale;", "getDefault", "()Ljava/util/Locale;", &[])?.unwrap_or(Value::Null),
-                        "TextLocales" => crate::android_res::static_intrinsic(vm, "Landroid/os/LocaleList;", "getDefault", "()Landroid/os/LocaleList;", &[])?.unwrap_or(Value::Null),
+                        "StrokeCap" => enum_const(vm, "Landroid/graphics/Paint$Cap;", 0)?
+                            .unwrap_or(Value::Null),
+                        "StrokeJoin" => enum_const(vm, "Landroid/graphics/Paint$Join;", 0)?
+                            .unwrap_or(Value::Null),
+                        "TextAlign" => enum_const(vm, "Landroid/graphics/Paint$Align;", 0)?
+                            .unwrap_or(Value::Null),
+                        "TextLocale" => crate::android_res::static_intrinsic(
+                            vm,
+                            "Ljava/util/Locale;",
+                            "getDefault",
+                            "()Ljava/util/Locale;",
+                            &[],
+                        )?
+                        .unwrap_or(Value::Null),
+                        "TextLocales" => crate::android_res::static_intrinsic(
+                            vm,
+                            "Landroid/os/LocaleList;",
+                            "getDefault",
+                            "()Landroid/os/LocaleList;",
+                            &[],
+                        )?
+                        .unwrap_or(Value::Null),
                         _ => Value::Null,
                     },
                 },
@@ -1324,7 +1942,13 @@ fn paint_method(vm: &mut Engine, mut p: PaintS, name: &str, sig: &str, recv: Obj
     Ok(Some(out))
 }
 
-fn path_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+fn path_method(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let a = |i: usize| args.get(i);
     let f = |i: usize| fl(args.get(i));
     let dir_ccw = |vm: &Engine, v: Option<&Value>| ord(vm, v) == 1;
@@ -1341,14 +1965,22 @@ fn path_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Val
     Ok(Some(match name {
         "moveTo" | "rMoveTo" => {
             let p = path_mut(vm, recv);
-            let (x0, y0) = if name == "rMoveTo" { last_pt(p) } else { (0.0, 0.0) };
+            let (x0, y0) = if name == "rMoveTo" {
+                last_pt(p)
+            } else {
+                (0.0, 0.0)
+            };
             p.push(vec![(x0 + f(0), y0 + f(1))]);
             Value::Null
         }
         "lineTo" | "rLineTo" => {
             let p = path_mut(vm, recv);
             let (x0, y0) = last_pt(p);
-            let (x, y) = if name == "rLineTo" { (x0 + f(0), y0 + f(1)) } else { (f(0), f(1)) };
+            let (x, y) = if name == "rLineTo" {
+                (x0 + f(0), y0 + f(1))
+            } else {
+                (f(0), f(1))
+            };
             if p.is_empty() {
                 p.push(vec![(0.0, 0.0)]);
             }
@@ -1359,36 +1991,72 @@ fn path_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Val
             let p = path_mut(vm, recv);
             let (x0, y0) = last_pt(p);
             let rel = name.starts_with('r');
-            let o = |v: f32, axis: usize| if rel { v + if axis == 0 { x0 } else { y0 } } else { v };
+            let o = |v: f32, axis: usize| {
+                if rel {
+                    v + if axis == 0 { x0 } else { y0 }
+                } else {
+                    v
+                }
+            };
             if p.is_empty() {
                 p.push(vec![(0.0, 0.0)]);
             }
             let sp = p.last_mut().expect("non-empty");
             let n = 16;
             if name.contains("ubic") {
-                let (x1, y1, x2, y2, x3, y3) = (o(f(0), 0), o(f(1), 1), o(f(2), 0), o(f(3), 1), o(f(4), 0), o(f(5), 1));
+                let (x1, y1, x2, y2, x3, y3) = (
+                    o(f(0), 0),
+                    o(f(1), 1),
+                    o(f(2), 0),
+                    o(f(3), 1),
+                    o(f(4), 0),
+                    o(f(5), 1),
+                );
                 for i in 1..=n {
                     let t = i as f32 / n as f32;
                     let u = 1.0 - t;
-                    sp.push((u * u * u * x0 + 3.0 * u * u * t * x1 + 3.0 * u * t * t * x2 + t * t * t * x3, u * u * u * y0 + 3.0 * u * u * t * y1 + 3.0 * u * t * t * y2 + t * t * t * y3));
+                    sp.push((
+                        u * u * u * x0
+                            + 3.0 * u * u * t * x1
+                            + 3.0 * u * t * t * x2
+                            + t * t * t * x3,
+                        u * u * u * y0
+                            + 3.0 * u * u * t * y1
+                            + 3.0 * u * t * t * y2
+                            + t * t * t * y3,
+                    ));
                 }
             } else {
                 let (x1, y1, x2, y2) = (o(f(0), 0), o(f(1), 1), o(f(2), 0), o(f(3), 1));
                 for i in 1..=n {
                     let t = i as f32 / n as f32;
                     let u = 1.0 - t;
-                    sp.push((u * u * x0 + 2.0 * u * t * x1 + t * t * x2, u * u * y0 + 2.0 * u * t * y1 + t * t * y2));
+                    sp.push((
+                        u * u * x0 + 2.0 * u * t * x1 + t * t * x2,
+                        u * u * y0 + 2.0 * u * t * y1 + t * t * y2,
+                    ));
                 }
             }
             Value::Null
         }
         "arcTo" | "addArc" => {
-            let (r, s0, sw) = if let Some(o) = obj(a(0)) { (rect_of(vm, Some(o)), f(1), f(2)) } else { ([f(0), f(1), f(2), f(3)], f(4), f(5)) };
-            let (cx, cy, rx, ry) = ((r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0, (r[2] - r[0]) / 2.0, (r[3] - r[1]) / 2.0);
-            let pts: Vec<(f32, f32)> = (0..=24).map(|i| {
-                let t = (s0 + sw * i as f32 / 24.0).to_radians();
-                (cx + rx * t.cos(), cy + ry * t.sin())
-            }).collect();
+            let (r, s0, sw) = if let Some(o) = obj(a(0)) {
+                (rect_of(vm, Some(o)), f(1), f(2))
+            } else {
+                ([f(0), f(1), f(2), f(3)], f(4), f(5))
+            };
+            let (cx, cy, rx, ry) = (
+                (r[0] + r[2]) / 2.0,
+                (r[1] + r[3]) / 2.0,
+                (r[2] - r[0]) / 2.0,
+                (r[3] - r[1]) / 2.0,
+            );
+            let pts: Vec<(f32, f32)> = (0..=24)
+                .map(|i| {
+                    let t = (s0 + sw * i as f32 / 24.0).to_radians();
+                    (cx + rx * t.cos(), cy + ry * t.sin())
+                })
+                .collect();
             let p = path_mut(vm, recv);
             if name == "arcTo" && !p.is_empty() && !(args.last() == Some(&Value::Int(1))) {
                 p.last_mut().expect("non-empty").extend(pts);
@@ -1418,9 +2086,17 @@ fn path_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Val
             Value::Null
         }
         "addRect" => {
-            let (r, d) = if let Some(o) = obj(a(0)) { (rect_of(vm, Some(o)), a(1)) } else { ([f(0), f(1), f(2), f(3)], a(4)) };
+            let (r, d) = if let Some(o) = obj(a(0)) {
+                (rect_of(vm, Some(o)), a(1))
+            } else {
+                ([f(0), f(1), f(2), f(3)], a(4))
+            };
             let ccw = dir_ccw(vm, d);
-            add_poly(vm, vec![(r[0], r[1]), (r[2], r[1]), (r[2], r[3]), (r[0], r[3])], ccw);
+            add_poly(
+                vm,
+                vec![(r[0], r[1]), (r[2], r[1]), (r[2], r[3]), (r[0], r[3])],
+                ccw,
+            );
             Value::Null
         }
         "addOval" | "addCircle" => {
@@ -1435,7 +2111,12 @@ fn path_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Val
         }
         "addRoundRect" => {
             // (RectF,[F,Dir) (RectF,F,F,Dir) (FFFF,[F,Dir) (FFFF,F,F,Dir)
-            let (r, rest) = if let Some(o) = obj(a(0)).filter(|o| vm.heap.as_array_elems(*o).is_err()) { (rect_of(vm, Some(o)), 1) } else { ([f(0), f(1), f(2), f(3)], 4) };
+            let (r, rest) =
+                if let Some(o) = obj(a(0)).filter(|o| vm.heap.as_array_elems(*o).is_err()) {
+                    (rect_of(vm, Some(o)), 1)
+                } else {
+                    ([f(0), f(1), f(2), f(3)], 4)
+                };
             let rad = if sig.contains("[F") {
                 let v = float_array(vm, a(rest));
                 let mut q = [0.0f32; 8];
@@ -1454,7 +2135,13 @@ fn path_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Val
         }
         "addPath" => {
             let mut o = path_of(vm, obj(a(0)));
-            let m = if args.len() == 3 { tr(f(1), f(2)) } else if args.len() == 2 { matrix_of(vm, obj(a(1))) } else { ID };
+            let m = if args.len() == 3 {
+                tr(f(1), f(2))
+            } else if args.len() == 2 {
+                matrix_of(vm, obj(a(1)))
+            } else {
+                ID
+            };
             for sp in o.iter_mut() {
                 for pt in sp.iter_mut() {
                     *pt = ap(&m, pt.0, pt.1);
@@ -1464,25 +2151,39 @@ fn path_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Val
             Value::Null
         }
         "offset" | "transform" => {
-            let m = if name == "offset" { tr(f(0), f(1)) } else { matrix_of(vm, obj(a(0))) };
+            let m = if name == "offset" {
+                tr(f(0), f(1))
+            } else {
+                matrix_of(vm, obj(a(0)))
+            };
             let mut p = path_of(vm, Some(recv));
             for sp in p.iter_mut() {
                 for pt in sp.iter_mut() {
                     *pt = ap(&m, pt.0, pt.1);
                 }
             }
-            let dst = if name == "transform" { obj(a(1)) } else if args.len() == 3 { obj(a(2)) } else { None };
+            let dst = if name == "transform" {
+                obj(a(1))
+            } else if args.len() == 3 {
+                obj(a(2))
+            } else {
+                None
+            };
             vm.gfx.objs.insert(dst.unwrap_or(recv), G::Path(p, false));
             Value::Null
         }
         "op" => {
             // union approximation: (Path, Op) → this ∪ path ; (Path, Path, Op) → this = p1 ∪ p2
-            let (p1, p2) = if args.len() == 3 { (path_of(vm, obj(a(0))), path_of(vm, obj(a(1)))) } else { (path_of(vm, Some(recv)), path_of(vm, obj(a(0)))) };
+            let (p1, p2) = if args.len() == 3 {
+                (path_of(vm, obj(a(0))), path_of(vm, obj(a(1))))
+            } else {
+                (path_of(vm, Some(recv)), path_of(vm, obj(a(0))))
+            };
             let opn = ord(vm, args.last());
             let res = match opn {
-                0 => p1,                     // DIFFERENCE: keep first (approx.)
-                1 => p1,                     // INTERSECT approx.
-                4 => p2,                     // REVERSE_DIFFERENCE approx.
+                0 => p1, // DIFFERENCE: keep first (approx.)
+                1 => p1, // INTERSECT approx.
+                4 => p2, // REVERSE_DIFFERENCE approx.
                 _ => p1.into_iter().chain(p2).collect(),
             };
             vm.gfx.objs.insert(recv, G::Path(res, false));
@@ -1515,12 +2216,28 @@ fn path_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Val
     }))
 }
 
-fn matrix_method(vm: &mut Engine, m: M, name: &str, _sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+fn matrix_method(
+    vm: &mut Engine,
+    m: M,
+    name: &str,
+    _sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let a = |i: usize| args.get(i);
     let f = |i: usize| fl(args.get(i));
-    let about = |op: M, n: usize| if args.len() >= n + 2 { mul(&tr(f(n), f(n + 1)), &mul(&op, &tr(-f(n), -f(n + 1)))) } else { op };
+    let about = |op: M, n: usize| {
+        if args.len() >= n + 2 {
+            mul(&tr(f(n), f(n + 1)), &mul(&op, &tr(-f(n), -f(n + 1))))
+        } else {
+            op
+        }
+    };
     let op_of = |name: &str| -> M {
-        let base = name.trim_start_matches("set").trim_start_matches("pre").trim_start_matches("post");
+        let base = name
+            .trim_start_matches("set")
+            .trim_start_matches("pre")
+            .trim_start_matches("post");
         match base {
             "Translate" => tr(f(0), f(1)),
             "Scale" => about(sc(f(0), f(1)), 2),
@@ -1591,21 +2308,45 @@ fn matrix_method(vm: &mut Engine, m: M, name: &str, _sig: &str, recv: ObjRef, ar
             let (dst, src, di, si, n) = match args.len() {
                 1 => (a(0), a(0), 0usize, 0usize, usize::MAX),
                 2 => (a(0), a(1), 0, 0, usize::MAX),
-                _ => (a(0), a(2), it(a(1)) as usize, it(a(3)) as usize, it(a(4)) as usize),
+                _ => (
+                    a(0),
+                    a(2),
+                    it(a(1)) as usize,
+                    it(a(3)) as usize,
+                    it(a(4)) as usize,
+                ),
             };
             let v = float_array(vm, src);
-            let pts: Vec<f32> = v[si.min(v.len())..].chunks(2).take(n).flat_map(|c| {
-                let (x, y) = ap(&m, c[0], *c.get(1).unwrap_or(&0.0));
-                [x, y]
-            }).collect();
+            let pts: Vec<f32> = v[si.min(v.len())..]
+                .chunks(2)
+                .take(n)
+                .flat_map(|c| {
+                    let (x, y) = ap(&m, c[0], *c.get(1).unwrap_or(&0.0));
+                    [x, y]
+                })
+                .collect();
             write_floats(vm, dst, &pts, di);
             Value::Null
         }
         "mapRect" => {
-            let (dst, src) = if args.len() == 2 { (obj(a(0)), obj(a(1))) } else { (obj(a(0)), obj(a(0))) };
+            let (dst, src) = if args.len() == 2 {
+                (obj(a(0)), obj(a(1)))
+            } else {
+                (obj(a(0)), obj(a(0)))
+            };
             let r = rect_of(vm, src);
-            let c = [ap(&m, r[0], r[1]), ap(&m, r[2], r[1]), ap(&m, r[2], r[3]), ap(&m, r[0], r[3])];
-            let bb = [c.iter().map(|p| p.0).fold(f32::MAX, f32::min), c.iter().map(|p| p.1).fold(f32::MAX, f32::min), c.iter().map(|p| p.0).fold(f32::MIN, f32::max), c.iter().map(|p| p.1).fold(f32::MIN, f32::max)];
+            let c = [
+                ap(&m, r[0], r[1]),
+                ap(&m, r[2], r[1]),
+                ap(&m, r[2], r[3]),
+                ap(&m, r[0], r[3]),
+            ];
+            let bb = [
+                c.iter().map(|p| p.0).fold(f32::MAX, f32::min),
+                c.iter().map(|p| p.1).fold(f32::MAX, f32::min),
+                c.iter().map(|p| p.0).fold(f32::MIN, f32::max),
+                c.iter().map(|p| p.1).fold(f32::MIN, f32::max),
+            ];
             if let Some(d) = dst {
                 set_rect(vm, d, bb, false)?;
             }
@@ -1620,15 +2361,28 @@ fn matrix_method(vm: &mut Engine, m: M, name: &str, _sig: &str, recv: ObjRef, ar
                 sx = k;
                 sy = k;
             }
-            set(vm, mul(&tr(d[0], d[1]), &mul(&sc(sx, sy), &tr(-s[0], -s[1]))))
+            set(
+                vm,
+                mul(&tr(d[0], d[1]), &mul(&sc(sx, sy), &tr(-s[0], -s[1]))),
+            )
         }
-        "equals" => b(matches!(obj(a(0)).and_then(|o| vm.gfx.objs.get(&o)), Some(G::Matrix(o)) if *o == m)),
-        "hashCode" => Value::Int(m.iter().fold(0i32, |h, x| h.wrapping_mul(31).wrapping_add(x.to_bits() as i32))),
+        "equals" => {
+            b(matches!(obj(a(0)).and_then(|o| vm.gfx.objs.get(&o)), Some(G::Matrix(o)) if *o == m))
+        }
+        "hashCode" => Value::Int(m.iter().fold(0i32, |h, x| {
+            h.wrapping_mul(31).wrapping_add(x.to_bits() as i32)
+        })),
         _ => return Ok(None),
     }))
 }
 
-fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+fn canvas_method(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let a = |i: usize| args.get(i);
     let f = |i: usize| fl(args.get(i));
     fn cvf(vm: &mut Engine, recv: ObjRef) -> &mut CanvasS {
@@ -1651,14 +2405,25 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
         }
         "saveLayer" | "saveLayerAlpha" => {
             let alpha = if name == "saveLayerAlpha" {
-                let ai = args.iter().filter_map(|v| if let Value::Int(i) = v { Some(*i) } else { None }).next().unwrap_or(255);
+                let ai = args
+                    .iter()
+                    .filter_map(|v| {
+                        if let Value::Int(i) = v {
+                            Some(*i)
+                        } else {
+                            None
+                        }
+                    })
+                    .next()
+                    .unwrap_or(255);
                 ai as f32 / 255.0
             } else {
                 let p = args.iter().find_map(|v| match v {
                     Value::Obj(r) if matches!(vm.gfx.objs.get(r), Some(G::Paint(_))) => Some(*r),
                     _ => None,
                 });
-                p.map(|p| (paint_of(vm, Some(&Value::Obj(p))).argb >> 24) as f32 / 255.0).unwrap_or(1.0)
+                p.map(|p| (paint_of(vm, Some(&Value::Obj(p))).argb >> 24) as f32 / 255.0)
+                    .unwrap_or(1.0)
             };
             let c = cvf(vm, recv);
             let mut s = *c.top();
@@ -1671,7 +2436,10 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
             if c.stack.len() > 1 {
                 c.stack.pop();
             } else {
-                return Err(exc("Ljava/lang/IllegalStateException;", "Underflow in restore - more restores than saves"));
+                return Err(exc(
+                    "Ljava/lang/IllegalStateException;",
+                    "Underflow in restore - more restores than saves",
+                ));
             }
             Value::Null
         }
@@ -1687,12 +2455,20 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
             Value::Null
         }
         "scale" => {
-            let m = if args.len() == 4 { mul(&tr(f(2), f(3)), &mul(&sc(f(0), f(1)), &tr(-f(2), -f(3)))) } else { sc(f(0), f(1)) };
+            let m = if args.len() == 4 {
+                mul(&tr(f(2), f(3)), &mul(&sc(f(0), f(1)), &tr(-f(2), -f(3))))
+            } else {
+                sc(f(0), f(1))
+            };
             concat(vm, m);
             Value::Null
         }
         "rotate" => {
-            let m = if args.len() == 3 { mul(&tr(f(1), f(2)), &mul(&rot(f(0)), &tr(-f(1), -f(2)))) } else { rot(f(0)) };
+            let m = if args.len() == 3 {
+                mul(&tr(f(1), f(2)), &mul(&rot(f(0)), &tr(-f(1), -f(2))))
+            } else {
+                rot(f(0))
+            };
             concat(vm, m);
             Value::Null
         }
@@ -1717,7 +2493,9 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
                     Value::Null
                 }
                 None => {
-                    let r = vm.heap.alloc_instance("Landroid/graphics/Matrix;".into(), Vec::new())?;
+                    let r = vm
+                        .heap
+                        .alloc_instance("Landroid/graphics/Matrix;".into(), Vec::new())?;
                     set_matrix(vm, r, m);
                     Value::Obj(r)
                 }
@@ -1729,12 +2507,23 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
                 (_, Some(o)) => rect_of(vm, Some(o)),
                 _ => [f(0), f(1), f(2), f(3)],
             };
-            let difference = name.starts_with("clipOut") || (sig.contains("Region$Op") && ord(vm, args.last()) == 0);
+            let difference = name.starts_with("clipOut")
+                || (sig.contains("Region$Op") && ord(vm, args.last()) == 0);
             if !difference {
                 let t = cvf(vm, recv).top();
                 let c = [ap(&t.m, r[0], r[1]), ap(&t.m, r[2], r[3])];
-                let dr = [c[0].0.min(c[1].0), c[0].1.min(c[1].1), c[0].0.max(c[1].0), c[0].1.max(c[1].1)];
-                t.clip = [t.clip[0].max(dr[0]), t.clip[1].max(dr[1]), t.clip[2].min(dr[2]), t.clip[3].min(dr[3])];
+                let dr = [
+                    c[0].0.min(c[1].0),
+                    c[0].1.min(c[1].1),
+                    c[0].0.max(c[1].0),
+                    c[0].1.max(c[1].1),
+                ];
+                t.clip = [
+                    t.clip[0].max(dr[0]),
+                    t.clip[1].max(dr[1]),
+                    t.clip[2].min(dr[2]),
+                    t.clip[3].min(dr[3]),
+                ];
                 let k = t.clip;
                 b(k[0] < k[2] && k[1] < k[3])
             } else {
@@ -1747,9 +2536,19 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
                 (*c.top(), c.w, c.h)
             };
             let i = inv(&t.m).unwrap_or(ID);
-            let k = [t.clip[0].max(-1e6), t.clip[1].max(-1e6), t.clip[2].min(1e6), t.clip[3].min(1e6)];
+            let k = [
+                t.clip[0].max(-1e6),
+                t.clip[1].max(-1e6),
+                t.clip[2].min(1e6),
+                t.clip[3].min(1e6),
+            ];
             let (p0, p1) = (ap(&i, k[0], k[1]), ap(&i, k[2], k[3]));
-            let mut r = [p0.0.min(p1.0), p0.1.min(p1.1), p0.0.max(p1.0), p0.1.max(p1.1)];
+            let mut r = [
+                p0.0.min(p1.0),
+                p0.1.min(p1.1),
+                p0.0.max(p1.0),
+                p0.1.max(p1.1),
+            ];
             if r[2] - r[0] > 1e5 {
                 r = [0.0, 0.0, w as f32, h as f32];
             }
@@ -1757,7 +2556,9 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
                 set_rect(vm, o, r, true)?;
                 b(r[0] < r[2] && r[1] < r[3])
             } else {
-                let o = vm.heap.alloc_instance("Landroid/graphics/Rect;".into(), Vec::new())?;
+                let o = vm
+                    .heap
+                    .alloc_instance("Landroid/graphics/Rect;".into(), Vec::new())?;
                 set_rect(vm, o, r, true)?;
                 Value::Obj(o)
             }
@@ -1779,13 +2580,21 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
             Value::Null
         }
         "drawRect" => {
-            let r = if let Some(o) = obj(a(0)) { rect_of(vm, Some(o)) } else { [f(0), f(1), f(2), f(3)] };
+            let r = if let Some(o) = obj(a(0)) {
+                rect_of(vm, Some(o))
+            } else {
+                [f(0), f(1), f(2), f(3)]
+            };
             let p = paint_last(vm);
             record(vm, recv, p, OpK::Rect(r[0], r[1], r[2], r[3]));
             Value::Null
         }
         "drawRoundRect" => {
-            let (r, rx, ry) = if let Some(o) = obj(a(0)) { (rect_of(vm, Some(o)), f(1), f(2)) } else { ([f(0), f(1), f(2), f(3)], f(4), f(5)) };
+            let (r, rx, ry) = if let Some(o) = obj(a(0)) {
+                (rect_of(vm, Some(o)), f(1), f(2))
+            } else {
+                ([f(0), f(1), f(2), f(3)], f(4), f(5))
+            };
             let p = paint_last(vm);
             record(vm, recv, p, OpK::RRect(r[0], r[1], r[2], r[3], rx, ry));
             Value::Null
@@ -1801,12 +2610,23 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
             Value::Null
         }
         "drawArc" => {
-            let (r, s0, sw, center) = if let Some(o) = obj(a(0)) { (rect_of(vm, Some(o)), f(1), f(2), it(a(3)) != 0) } else { ([f(0), f(1), f(2), f(3)], f(4), f(5), it(a(6)) != 0) };
-            let (cx, cy, rx, ry) = ((r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0, (r[2] - r[0]) / 2.0, (r[3] - r[1]) / 2.0);
-            let mut pts: Vec<(f32, f32)> = (0..=32).map(|i| {
-                let t = (s0 + sw * i as f32 / 32.0).to_radians();
-                (cx + rx * t.cos(), cy + ry * t.sin())
-            }).collect();
+            let (r, s0, sw, center) = if let Some(o) = obj(a(0)) {
+                (rect_of(vm, Some(o)), f(1), f(2), it(a(3)) != 0)
+            } else {
+                ([f(0), f(1), f(2), f(3)], f(4), f(5), it(a(6)) != 0)
+            };
+            let (cx, cy, rx, ry) = (
+                (r[0] + r[2]) / 2.0,
+                (r[1] + r[3]) / 2.0,
+                (r[2] - r[0]) / 2.0,
+                (r[3] - r[1]) / 2.0,
+            );
+            let mut pts: Vec<(f32, f32)> = (0..=32)
+                .map(|i| {
+                    let t = (s0 + sw * i as f32 / 32.0).to_radians();
+                    (cx + rx * t.cos(), cy + ry * t.sin())
+                })
+                .collect();
             if center {
                 pts.push((cx, cy));
                 pts.push(pts[0]);
@@ -1824,10 +2644,19 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
             let p = paint_last(vm);
             if name == "drawPoint" {
                 let h = p.sw.max(1.0) / 2.0;
-                record(vm, recv, PaintSnap { style: 0, ..p }, OpK::Rect(f(0) - h, f(1) - h, f(0) + h, f(1) + h));
+                record(
+                    vm,
+                    recv,
+                    PaintSnap { style: 0, ..p },
+                    OpK::Rect(f(0) - h, f(1) - h, f(0) + h, f(1) + h),
+                );
             } else {
                 let v = float_array(vm, a(0));
-                let (off, cnt) = if args.len() >= 4 { (it(a(1)) as usize, it(a(2)) as usize) } else { (0, v.len()) };
+                let (off, cnt) = if args.len() >= 4 {
+                    (it(a(1)) as usize, it(a(2)) as usize)
+                } else {
+                    (0, v.len())
+                };
                 let v: Vec<f32> = v.into_iter().skip(off).take(cnt).collect();
                 if name == "drawLines" {
                     for c in v.chunks(4).filter(|c| c.len() == 4) {
@@ -1836,7 +2665,12 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
                 } else {
                     let h = p.sw.max(1.0) / 2.0;
                     for c in v.chunks(2).filter(|c| c.len() == 2) {
-                        record(vm, recv, PaintSnap { style: 0, ..p }, OpK::Rect(c[0] - h, c[1] - h, c[0] + h, c[1] + h));
+                        record(
+                            vm,
+                            recv,
+                            PaintSnap { style: 0, ..p },
+                            OpK::Rect(c[0] - h, c[1] - h, c[0] + h, c[1] + h),
+                        );
                     }
                 }
             }
@@ -1853,8 +2687,18 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
         }
         "drawColor" | "drawARGB" | "drawRGB" | "drawPaint" => {
             let c = match name {
-                "drawARGB" => (it(a(0)) as u32 & 0xFF) << 24 | (it(a(1)) as u32 & 0xFF) << 16 | (it(a(2)) as u32 & 0xFF) << 8 | (it(a(3)) as u32 & 0xFF),
-                "drawRGB" => 0xFF00_0000 | (it(a(0)) as u32 & 0xFF) << 16 | (it(a(1)) as u32 & 0xFF) << 8 | (it(a(2)) as u32 & 0xFF),
+                "drawARGB" => {
+                    (it(a(0)) as u32 & 0xFF) << 24
+                        | (it(a(1)) as u32 & 0xFF) << 16
+                        | (it(a(2)) as u32 & 0xFF) << 8
+                        | (it(a(3)) as u32 & 0xFF)
+                }
+                "drawRGB" => {
+                    0xFF00_0000
+                        | (it(a(0)) as u32 & 0xFF) << 16
+                        | (it(a(1)) as u32 & 0xFF) << 8
+                        | (it(a(2)) as u32 & 0xFF)
+                }
                 "drawPaint" => paint_of(vm, a(0)).argb,
                 _ => match a(0) {
                     Some(Value::Long(l)) => ((*l as u64) >> 32) as u32,
@@ -1863,22 +2707,51 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
             };
             // CLEAR mode (PorterDuff/BlendMode ordinal 0) clears to transparent
             let clear = args.len() >= 2 && ord(vm, a(1)) == 0;
-            record(vm, recv, PaintSnap { argb: if clear { 0 } else { c }, style: 0, sw: 0.0 }, OpK::Color(if clear { 0 } else { c }));
+            record(
+                vm,
+                recv,
+                PaintSnap {
+                    argb: if clear { 0 } else { c },
+                    style: 0,
+                    sw: 0.0,
+                },
+                OpK::Color(if clear { 0 } else { c }),
+            );
             Value::Null
         }
         "drawText" | "drawTextRun" => {
             // (String,FFP) (String,IIFFP) (CharSequence,IIFFP) ([C,IIFFP) ; drawTextRun(cs, start, end, ctxStart, ctxEnd, x, y, isRtl, paint)
             let text = cs_text(vm, a(0).unwrap_or(&Value::Null))?;
-            let ints: Vec<i32> = args[1..].iter().take_while(|v| matches!(v, Value::Int(_))).map(|v| it(Some(v))).collect();
-            let floats: Vec<f32> = args.iter().filter_map(|v| if let Value::Float(x) = v { Some(*x) } else { None }).collect();
+            let ints: Vec<i32> = args[1..]
+                .iter()
+                .take_while(|v| matches!(v, Value::Int(_)))
+                .map(|v| it(Some(v)))
+                .collect();
+            let floats: Vec<f32> = args
+                .iter()
+                .filter_map(|v| {
+                    if let Value::Float(x) = v {
+                        Some(*x)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
             let t = match (sig.starts_with("([C"), ints.len()) {
                 (true, n) if n >= 2 => sub(&text, ints[0], ints[0] + ints[1]),
                 (false, n) if n >= 2 => sub(&text, ints[0], ints[1]),
                 _ => text,
             };
             let p = paint_of(vm, args.last());
-            let (x, y) = (floats.first().copied().unwrap_or(0.0), floats.get(1).copied().unwrap_or(0.0));
-            let align = p.misc.get("TextAlign").map(|v| ord(vm, Some(v))).unwrap_or(0);
+            let (x, y) = (
+                floats.first().copied().unwrap_or(0.0),
+                floats.get(1).copied().unwrap_or(0.0),
+            );
+            let align = p
+                .misc
+                .get("TextAlign")
+                .map(|v| ord(vm, Some(v)))
+                .unwrap_or(0);
             let w = measure(&t, p.text_size, p.letter_spacing);
             let x = match align {
                 1 => x - w / 2.0,
@@ -1909,17 +2782,47 @@ fn canvas_method(vm: &mut Engine, name: &str, sig: &str, recv: ObjRef, args: &[V
         }
         "drawRenderNode" => {
             if let Some(n) = obj(a(0)) {
-                record(vm, recv, PaintSnap { argb: 0, style: 0, sw: 0.0 }, OpK::Node(n));
+                record(
+                    vm,
+                    recv,
+                    PaintSnap {
+                        argb: 0,
+                        style: 0,
+                        sw: 0.0,
+                    },
+                    OpK::Node(n),
+                );
             }
             Value::Null
         }
-        "setDensity" | "setDrawFilter" | "enableZ" | "disableZ" | "insertReorderBarrier" | "insertInorderBarrier" | "drawVertices" | "drawPicture" | "drawTextOnPath" | "drawDoubleRoundRect" | "drawPatch" | "drawMesh" | "drawGlyphs" | "drawBitmapMesh" | "drawTextRunMeasured" => Value::Null,
+        "setDensity"
+        | "setDrawFilter"
+        | "enableZ"
+        | "disableZ"
+        | "insertReorderBarrier"
+        | "insertInorderBarrier"
+        | "drawVertices"
+        | "drawPicture"
+        | "drawTextOnPath"
+        | "drawDoubleRoundRect"
+        | "drawPatch"
+        | "drawMesh"
+        | "drawGlyphs"
+        | "drawBitmapMesh"
+        | "drawTextRunMeasured" => Value::Null,
         _ => return Ok(None),
     };
     Ok(Some(out))
 }
 
-fn node_method(vm: &mut Engine, mut n: NodeS, name: &str, _sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+fn node_method(
+    vm: &mut Engine,
+    mut n: NodeS,
+    name: &str,
+    _sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let a = |i: usize| args.get(i);
     let key: Option<&'static str> = match name.trim_start_matches("set").trim_start_matches("get") {
         "TranslationX" => Some("translationX"),
@@ -1946,12 +2849,22 @@ fn node_method(vm: &mut Engine, mut n: NodeS, name: &str, _sig: &str, recv: ObjR
             n.f.insert(k, fl(a(0)));
             b(true)
         }
-        (n2, Some(k)) if n2.starts_with("get") => Value::Float(n.f.get(k).copied().unwrap_or(defaults(k))),
+        (n2, Some(k)) if n2.starts_with("get") => {
+            Value::Float(n.f.get(k).copied().unwrap_or(defaults(k)))
+        }
         ("beginRecording", _) => {
-            let (w, h) = if args.len() == 2 { (it(a(0)), it(a(1))) } else { (n.r - n.l, n.b - n.t) };
+            let (w, h) = if args.len() == 2 {
+                (it(a(0)), it(a(1)))
+            } else {
+                (n.r - n.l, n.b - n.t)
+            };
             n.ops.clear();
-            let c = vm.heap.alloc_instance("Landroid/graphics/RecordingCanvas;".into(), Vec::new())?;
-            vm.gfx.objs.insert(c, G::Canvas(CanvasS::new(Target::Node(recv), w, h)));
+            let c = vm
+                .heap
+                .alloc_instance("Landroid/graphics/RecordingCanvas;".into(), Vec::new())?;
+            vm.gfx
+                .objs
+                .insert(c, G::Canvas(CanvasS::new(Target::Node(recv), w, h)));
             n.f.insert("rd_canvas", f32::from_bits(c));
             vm.gfx.objs.insert(recv, G::Node(n));
             return Ok(Some(Value::Obj(c)));
@@ -1971,7 +2884,11 @@ fn node_method(vm: &mut Engine, mut n: NodeS, name: &str, _sig: &str, recv: ObjR
         }
         ("hasDisplayList", _) => b(n.has_dl),
         ("setPosition", _) => {
-            let r = if let Some(o) = obj(a(0)) { rect_of(vm, Some(o)) } else { [fl(a(0)), fl(a(1)), fl(a(2)), fl(a(3))] };
+            let r = if let Some(o) = obj(a(0)) {
+                rect_of(vm, Some(o))
+            } else {
+                [fl(a(0)), fl(a(1)), fl(a(2)), fl(a(3))]
+            };
             n.l = r[0] as i32;
             n.t = r[1] as i32;
             n.r = r[2] as i32;
@@ -2034,7 +2951,9 @@ fn node_method(vm: &mut Engine, mut n: NodeS, name: &str, _sig: &str, recv: ObjR
         ("hasOverlappingRendering", _) => b(true),
         ("getUseCompositingLayer", _) => b(false),
         ("getAmbientShadowColor" | "getSpotShadowColor", _) => Value::Int(0xFF00_0000u32 as i32),
-        ("computeApproximateMemoryUsage" | "computeApproximateMemoryAllocated", _) => Value::Long(0),
+        ("computeApproximateMemoryUsage" | "computeApproximateMemoryAllocated", _) => {
+            Value::Long(0)
+        }
         (n2, _) if n2.starts_with("set") => b(true), // overlapping, compositing layer, shadow colors, render effect, …
         _ => return Ok(None),
     };
@@ -2042,7 +2961,14 @@ fn node_method(vm: &mut Engine, mut n: NodeS, name: &str, _sig: &str, recv: ObjR
     Ok(Some(out))
 }
 
-fn layout_method(vm: &mut Engine, l: &LayoutS, name: &str, _sig: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
+fn layout_method(
+    vm: &mut Engine,
+    l: &LayoutS,
+    name: &str,
+    _sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let a = |i: usize| args.get(i);
     let line = |i: i32| (i.max(0) as usize).min(l.lines.len() - 1);
     let n = l.lines.len();
@@ -2052,12 +2978,22 @@ fn layout_method(vm: &mut Engine, l: &LayoutS, name: &str, _sig: &str, recv: Obj
         "getWidth" | "getEllipsizedWidth" => Value::Int(l.width),
         "getText" => l.cs.clone(),
         "getPaint" => l.paint.clone(),
-        "getLineTop" => Value::Int(if it(a(0)) as usize >= n { (n as f32 * l.lh) as i32 } else { l.top(line(it(a(0)))) as i32 }),
-        "getLineBottom" | "getLineBottomWithoutSpacing" => Value::Int(l.top(line(it(a(0)))) as i32 + l.lh as i32),
+        "getLineTop" => Value::Int(if it(a(0)) as usize >= n {
+            (n as f32 * l.lh) as i32
+        } else {
+            l.top(line(it(a(0)))) as i32
+        }),
+        "getLineBottom" | "getLineBottomWithoutSpacing" => {
+            Value::Int(l.top(line(it(a(0)))) as i32 + l.lh as i32)
+        }
         "getLineBaseline" => Value::Int(l.baseline(line(it(a(0)))).round() as i32),
         "getLineAscent" => Value::Int(l.asc.floor() as i32),
         "getLineDescent" => Value::Int(l.desc.ceil() as i32),
-        "getLineStart" => Value::Int(if it(a(0)) as usize >= n { l.text.chars().count() as i32 } else { l.lines[line(it(a(0)))].0 as i32 }),
+        "getLineStart" => Value::Int(if it(a(0)) as usize >= n {
+            l.text.chars().count() as i32
+        } else {
+            l.lines[line(it(a(0)))].0 as i32
+        }),
         "getLineEnd" | "getLineVisibleEnd" => {
             let (s, e, _) = l.lines[line(it(a(0)))];
             let mut e = e;
@@ -2076,7 +3012,9 @@ fn layout_method(vm: &mut Engine, l: &LayoutS, name: &str, _sig: &str, recv: Obj
         }
         "getLineWidth" | "getLineMax" => Value::Float(l.lines[line(it(a(0)))].2),
         "getLineForOffset" => Value::Int(l.line_for_offset(it(a(0))) as i32),
-        "getLineForVertical" => Value::Int(((it(a(0)).max(0) as f32 / l.lh.max(1.0)) as usize).min(n - 1) as i32),
+        "getLineForVertical" => {
+            Value::Int(((it(a(0)).max(0) as f32 / l.lh.max(1.0)) as usize).min(n - 1) as i32)
+        }
         "getOffsetForHorizontal" => {
             let i = line(it(a(0)));
             let x = fl(a(1)) - l.line_left(i);
@@ -2096,8 +3034,12 @@ fn layout_method(vm: &mut Engine, l: &LayoutS, name: &str, _sig: &str, recv: Obj
         "getPrimaryHorizontal" | "getSecondaryHorizontal" => Value::Float(l.horiz(it(a(0)))),
         "getParagraphDirection" => Value::Int(1),
         "isRtlCharAt" => b(false),
-        "getParagraphAlignment" => enum_const(vm, "Landroid/text/Layout$Alignment;", l.align as usize)?.unwrap_or(Value::Null),
-        "getAlignment" => enum_const(vm, "Landroid/text/Layout$Alignment;", l.align as usize)?.unwrap_or(Value::Null),
+        "getParagraphAlignment" => {
+            enum_const(vm, "Landroid/text/Layout$Alignment;", l.align as usize)?
+                .unwrap_or(Value::Null)
+        }
+        "getAlignment" => enum_const(vm, "Landroid/text/Layout$Alignment;", l.align as usize)?
+            .unwrap_or(Value::Null),
         "getEllipsisStart" | "getEllipsisCount" => Value::Int(0),
         "getTopPadding" | "getBottomPadding" => Value::Int(0),
         "getSpacingMultiplier" => Value::Float(1.0),
@@ -2111,7 +3053,11 @@ fn layout_method(vm: &mut Engine, l: &LayoutS, name: &str, _sig: &str, recv: Obj
                 let mut polys = Vec::new();
                 for i in ls_..=le {
                     let x0 = if i == ls_ { l.horiz(s) } else { l.line_left(i) };
-                    let x1 = if i == le { l.horiz(e) } else { l.line_left(i) + l.lines[i].2 };
+                    let x1 = if i == le {
+                        l.horiz(e)
+                    } else {
+                        l.line_left(i) + l.lines[i].2
+                    };
                     let (t, bt) = (l.top(i), l.top(i) + l.lh);
                     polys.push(vec![(x0, t), (x1, t), (x1, bt), (x0, bt), (x0, t)]);
                 }
@@ -2124,7 +3070,10 @@ fn layout_method(vm: &mut Engine, l: &LayoutS, name: &str, _sig: &str, recv: Obj
                 let chars: Vec<char> = l.text.chars().collect();
                 for i in 0..n {
                     let (s, e, _) = l.lines[i];
-                    let mut t: String = chars[s.min(chars.len())..e.min(chars.len())].iter().filter(|c| **c != '\n').collect();
+                    let mut t: String = chars[s.min(chars.len())..e.min(chars.len())]
+                        .iter()
+                        .filter(|c| **c != '\n')
+                        .collect();
                     if l.ell.iter().any(|(es, _)| *es == s) {
                         let maxw = l.width as f32 - char_adv('…', l.size, l.ls);
                         while measure(&t, l.size, l.ls) > maxw && !t.is_empty() {
@@ -2133,7 +3082,16 @@ fn layout_method(vm: &mut Engine, l: &LayoutS, name: &str, _sig: &str, recv: Obj
                         t.push('…');
                     }
                     let p = paint_of(vm, Some(&l.paint));
-                    record(vm, c, PaintSnap { argb: p.argb, style: 0, sw: 0.0 }, OpK::Text(t, l.line_left(i), l.baseline(i), l.size));
+                    record(
+                        vm,
+                        c,
+                        PaintSnap {
+                            argb: p.argb,
+                            style: 0,
+                            sw: 0.0,
+                        },
+                        OpK::Text(t, l.line_left(i), l.baseline(i), l.size),
+                    );
                 }
             }
             Value::Null
@@ -2165,9 +3123,9 @@ impl Raster<'_> {
         }
         let i = (y as usize * self.w + x as usize) * 3;
         let c = [(argb >> 16) as u8, (argb >> 8) as u8, argb as u8];
-        for k in 0..3 {
+        for (k, ck) in c.iter().enumerate() {
             let d = self.px[i + k] as f32;
-            self.px[i + k] = (d + (c[k] as f32 - d) * a.min(1.0)).round() as u8;
+            self.px[i + k] = (d + (*ck as f32 - d) * a.min(1.0)).round() as u8;
         }
     }
     fn fill_polys(&mut self, polys: &[Vec<(f32, f32)>], argb: u32, clip: [f32; 4], even_odd: bool) {
@@ -2186,7 +3144,12 @@ impl Raster<'_> {
         }
         // axis-aligned rect fast path
         if polys.len() == 1 && polys[0].len() <= 5 && is_axis_rect(&polys[0]) {
-            let (rx0, ry0, rx1, ry1) = (bb[0].max(clip[0]), bb[1].max(clip[1]), bb[2].min(clip[2]), bb[3].min(clip[3]));
+            let (rx0, ry0, rx1, ry1) = (
+                bb[0].max(clip[0]),
+                bb[1].max(clip[1]),
+                bb[2].min(clip[2]),
+                bb[3].min(clip[3]),
+            );
             for y in y0..y1 {
                 let cy = (ry1.min(y as f32 + 1.0) - ry0.max(y as f32)).clamp(0.0, 1.0);
                 for x in x0..x1 {
@@ -2229,7 +3192,10 @@ impl Raster<'_> {
                     if !inside {
                         continue;
                     }
-                    let (sa, sb) = (xs[i].0.max(clip[0]).max(x0 as f32), xs[i + 1].0.min(clip[2]).min(x1 as f32));
+                    let (sa, sb) = (
+                        xs[i].0.max(clip[0]).max(x0 as f32),
+                        xs[i + 1].0.min(clip[2]).min(x1 as f32),
+                    );
                     if sa >= sb {
                         continue;
                     }
@@ -2260,12 +3226,18 @@ impl Raster<'_> {
                 continue;
             }
             let (nx, ny) = (-dy / len * hw, dx / len * hw);
-            quads.push(vec![(a.0 + nx, a.1 + ny), (bq.0 + nx, bq.1 + ny), (bq.0 - nx, bq.1 - ny), (a.0 - nx, a.1 - ny)]);
+            quads.push(vec![
+                (a.0 + nx, a.1 + ny),
+                (bq.0 + nx, bq.1 + ny),
+                (bq.0 - nx, bq.1 - ny),
+                (a.0 - nx, a.1 - ny),
+            ]);
         }
         for q in quads {
             self.fill_polys(&[q], argb, clip, false);
         }
     }
+    #[allow(clippy::too_many_arguments)]
     fn text(&mut self, s: &str, m: &M, x: f32, y: f32, size: f32, argb: u32, clip: [f32; 4]) {
         let at = atlas();
         // effective scale from the matrix (uniform approximation)
@@ -2284,8 +3256,14 @@ impl Raster<'_> {
             let gx0 = pen + g.left as f32 * k;
             let gy0 = oy - g.top as f32 * k;
             let (gw, gh) = (g.w as f32 * k, g.h as f32 * k);
-            let (px0, py0) = (gx0.max(clip[0]).floor() as i32, gy0.max(clip[1]).floor() as i32);
-            let (px1, py1) = ((gx0 + gw).min(clip[2]).ceil() as i32, (gy0 + gh).min(clip[3]).ceil() as i32);
+            let (px0, py0) = (
+                gx0.max(clip[0]).floor() as i32,
+                gy0.max(clip[1]).floor() as i32,
+            );
+            let (px1, py1) = (
+                (gx0 + gw).min(clip[2]).ceil() as i32,
+                (gy0 + gh).min(clip[3]).ceil() as i32,
+            );
             for py in py0..py1 {
                 for pxx in px0..px1 {
                     // bilinear sample at pixel centre
@@ -2301,7 +3279,10 @@ impl Raster<'_> {
                     let (ux, vy) = (u.floor(), v.floor());
                     let (fx, fy) = (u - ux, v - vy);
                     let (ix, iy) = (ux as i32, vy as i32);
-                    let a = samp(ix, iy) * (1.0 - fx) * (1.0 - fy) + samp(ix + 1, iy) * fx * (1.0 - fy) + samp(ix, iy + 1) * (1.0 - fx) * fy + samp(ix + 1, iy + 1) * fx * fy;
+                    let a = samp(ix, iy) * (1.0 - fx) * (1.0 - fy)
+                        + samp(ix + 1, iy) * fx * (1.0 - fy)
+                        + samp(ix, iy + 1) * (1.0 - fx) * fy
+                        + samp(ix + 1, iy + 1) * fx * fy;
                     if a > 0.01 {
                         self.blend(pxx, py, argb, a);
                     }
@@ -2313,11 +3294,16 @@ impl Raster<'_> {
 }
 
 fn is_axis_rect(p: &[(f32, f32)]) -> bool {
-    let n = if p.len() == 5 && p[0] == p[4] { 4 } else { p.len() };
-    n == 4 && (0..4).all(|i| {
-        let (a, b) = (p[i], p[(i + 1) % 4]);
-        a.0 == b.0 || a.1 == b.1
-    })
+    let n = if p.len() == 5 && p[0] == p[4] {
+        4
+    } else {
+        p.len()
+    };
+    n == 4
+        && (0..4).all(|i| {
+            let (a, b) = (p[i], p[(i + 1) % 4]);
+            a.0 == b.0 || a.1 == b.1
+        })
 }
 
 fn xform(m: &M, poly: &[(f32, f32)]) -> Vec<(f32, f32)> {
@@ -2330,15 +3316,31 @@ fn mod_alpha(argb: u32, a: f32) -> u32 {
 
 impl Engine {
     /// Rasterizes a display list onto an RGB framebuffer.
-    pub(crate) fn raster_ops(&self, r: &mut Raster<'_>, ops: &[Op], parent: &M, pclip: [f32; 4], palpha: f32, depth: usize) {
+    pub(crate) fn raster_ops(
+        &self,
+        r: &mut Raster<'_>,
+        ops: &[Op],
+        parent: &M,
+        pclip: [f32; 4],
+        palpha: f32,
+        depth: usize,
+    ) {
         if depth > 64 {
             return;
         }
         for op in ops {
             let m = mul(parent, &op.m);
             // op.clip is in the recording surface's device space → map by parent
-            let cc = [ap(parent, op.clip[0].max(-1e6), op.clip[1].max(-1e6)), ap(parent, op.clip[2].min(1e6), op.clip[3].min(1e6))];
-            let clip = [pclip[0].max(cc[0].0.min(cc[1].0)), pclip[1].max(cc[0].1.min(cc[1].1)), pclip[2].min(cc[0].0.max(cc[1].0)), pclip[3].min(cc[0].1.max(cc[1].1))];
+            let cc = [
+                ap(parent, op.clip[0].max(-1e6), op.clip[1].max(-1e6)),
+                ap(parent, op.clip[2].min(1e6), op.clip[3].min(1e6)),
+            ];
+            let clip = [
+                pclip[0].max(cc[0].0.min(cc[1].0)),
+                pclip[1].max(cc[0].1.min(cc[1].1)),
+                pclip[2].min(cc[0].0.max(cc[1].0)),
+                pclip[3].min(cc[0].1.max(cc[1].1)),
+            ];
             if clip[0] >= clip[2] || clip[1] >= clip[3] {
                 continue;
             }
@@ -2358,15 +3360,28 @@ impl Engine {
                 }
             };
             match &op.k {
-                OpK::Rect(l, t, rr, bt) => shape(r, vec![(*l, *t), (*rr, *t), (*rr, *bt), (*l, *bt)]),
+                OpK::Rect(l, t, rr, bt) => {
+                    shape(r, vec![(*l, *t), (*rr, *t), (*rr, *bt), (*l, *bt)])
+                }
                 OpK::RRect(l, t, rr, bt, rx, ry) => {
-                    let (rx, ry) = (rx.min((rr - l) / 2.0).max(0.0), ry.min((bt - t) / 2.0).max(0.0));
-                    shape(r, rrect_poly(*l, *t, *rr, *bt, [rx, ry, rx, ry, rx, ry, rx, ry]))
+                    let (rx, ry) = (
+                        rx.min((rr - l) / 2.0).max(0.0),
+                        ry.min((bt - t) / 2.0).max(0.0),
+                    );
+                    shape(
+                        r,
+                        rrect_poly(*l, *t, *rr, *bt, [rx, ry, rx, ry, rx, ry, rx, ry]),
+                    )
                 }
                 OpK::Oval(l, t, rr, bt) => shape(r, oval_poly(*l, *t, *rr, *bt)),
                 OpK::Line(x0, y0, x1, y1) => {
                     let ms = (m[0] * m[0] + m[1] * m[1]).sqrt();
-                    r.stroke_polyline(&xform(&m, &[(*x0, *y0), (*x1, *y1)]), op.p.sw.max(1.0) * ms, col, clip)
+                    r.stroke_polyline(
+                        &xform(&m, &[(*x0, *y0), (*x1, *y1)]),
+                        op.p.sw.max(1.0) * ms,
+                        col,
+                        clip,
+                    )
                 }
                 OpK::Path(polys, eo) => {
                     let tp: Vec<Vec<(f32, f32)>> = polys.iter().map(|p| xform(&m, p)).collect();
@@ -2382,27 +3397,79 @@ impl Engine {
                 }
                 OpK::Text(s, x, y, size) => r.text(s, &m, *x, *y, *size, col, clip),
                 OpK::Color(c) => {
-                    let full = [clip[0].max(0.0), clip[1].max(0.0), clip[2].min(r.w as f32), clip[3].min(r.h as f32)];
+                    let full = [
+                        clip[0].max(0.0),
+                        clip[1].max(0.0),
+                        clip[2].min(r.w as f32),
+                        clip[3].min(r.h as f32),
+                    ];
                     let c = mod_alpha(*c, alpha);
-                    r.fill_polys(&[vec![(full[0], full[1]), (full[2], full[1]), (full[2], full[3]), (full[0], full[3])]], c, clip, false);
+                    r.fill_polys(
+                        &[vec![
+                            (full[0], full[1]),
+                            (full[2], full[1]),
+                            (full[2], full[3]),
+                            (full[0], full[3]),
+                        ]],
+                        c,
+                        clip,
+                        false,
+                    );
                 }
                 OpK::Node(n) => {
                     if let Some(G::Node(ns)) = self.gfx.objs.get(n) {
                         let nm = mul(&m, &ns.matrix());
                         let mut nclip = clip;
-                        let bounds = if ns.clip_outline { ns.outline.or(Some([0.0, 0.0, (ns.r - ns.l) as f32, (ns.b - ns.t) as f32])) } else if ns.clip_bounds { Some([0.0, 0.0, (ns.r - ns.l) as f32, (ns.b - ns.t) as f32]) } else { None };
+                        let bounds = if ns.clip_outline {
+                            ns.outline.or(Some([
+                                0.0,
+                                0.0,
+                                (ns.r - ns.l) as f32,
+                                (ns.b - ns.t) as f32,
+                            ]))
+                        } else if ns.clip_bounds {
+                            Some([0.0, 0.0, (ns.r - ns.l) as f32, (ns.b - ns.t) as f32])
+                        } else {
+                            None
+                        };
                         if let Some(bb) = bounds {
                             let (p0, p1) = (ap(&nm, bb[0], bb[1]), ap(&nm, bb[2], bb[3]));
-                            nclip = [nclip[0].max(p0.0.min(p1.0)), nclip[1].max(p0.1.min(p1.1)), nclip[2].min(p0.0.max(p1.0)), nclip[3].min(p0.1.max(p1.1))];
+                            nclip = [
+                                nclip[0].max(p0.0.min(p1.0)),
+                                nclip[1].max(p0.1.min(p1.1)),
+                                nclip[2].min(p0.0.max(p1.0)),
+                                nclip[3].min(p0.1.max(p1.1)),
+                            ];
                         }
-                        self.raster_ops(r, &ns.ops, &nm, nclip, alpha * ns.g("alpha", 1.0), depth + 1);
+                        self.raster_ops(
+                            r,
+                            &ns.ops,
+                            &nm,
+                            nclip,
+                            alpha * ns.g("alpha", 1.0),
+                            depth + 1,
+                        );
                     }
                 }
                 OpK::Bitmap(bm, dst) => {
                     if let Some(G::Bitmap(w, h, bops)) = self.gfx.objs.get(bm) {
-                        let s = mul(&m, &mul(&tr(dst[0], dst[1]), &sc((dst[2] - dst[0]) / (*w).max(1) as f32, (dst[3] - dst[1]) / (*h).max(1) as f32)));
+                        let s = mul(
+                            &m,
+                            &mul(
+                                &tr(dst[0], dst[1]),
+                                &sc(
+                                    (dst[2] - dst[0]) / (*w).max(1) as f32,
+                                    (dst[3] - dst[1]) / (*h).max(1) as f32,
+                                ),
+                            ),
+                        );
                         let (p0, p1) = (ap(&s, 0.0, 0.0), ap(&s, *w as f32, *h as f32));
-                        let bclip = [clip[0].max(p0.0.min(p1.0)), clip[1].max(p0.1.min(p1.1)), clip[2].min(p0.0.max(p1.0)), clip[3].min(p0.1.max(p1.1))];
+                        let bclip = [
+                            clip[0].max(p0.0.min(p1.0)),
+                            clip[1].max(p0.1.min(p1.1)),
+                            clip[2].min(p0.0.max(p1.0)),
+                            clip[3].min(p0.1.max(p1.1)),
+                        ];
                         self.raster_ops(r, bops, &s, bclip, alpha, depth + 1);
                     }
                 }
@@ -2428,13 +3495,15 @@ impl Engine {
             if d > 64 {
                 return 0;
             }
-            ops.iter().map(|o| match &o.k {
-                OpK::Node(n) => match e.gfx.objs.get(n) {
-                    Some(G::Node(ns)) => 1 + count(e, &ns.ops, d + 1),
+            ops.iter()
+                .map(|o| match &o.k {
+                    OpK::Node(n) => match e.gfx.objs.get(n) {
+                        Some(G::Node(ns)) => 1 + count(e, &ns.ops, d + 1),
+                        _ => 1,
+                    },
                     _ => 1,
-                },
-                _ => 1,
-            }).sum()
+                })
+                .sum()
         }
         count(self, &self.gfx.frame, 0)
     }
@@ -2443,7 +3512,9 @@ impl Engine {
     pub(crate) fn begin_frame_canvas(&mut self, w: i32, h: i32) -> Result<ObjRef, VmExit> {
         self.gfx.frame.clear();
         self.gfx.frame_valid = false;
-        let c = self.heap.alloc_instance("Landroid/graphics/Canvas;".into(), Vec::new())?;
+        let c = self
+            .heap
+            .alloc_instance("Landroid/graphics/Canvas;".into(), Vec::new())?;
         let mut cs = CanvasS::new(Target::Frame, w, h);
         cs.top().clip = [0.0, 0.0, w as f32, h as f32];
         self.gfx.objs.insert(c, G::Canvas(cs));
@@ -2453,7 +3524,16 @@ impl Engine {
     /// Records host-view backgrounds/text into the frame (for host views
     /// drawn around DEX content).
     pub(crate) fn frame_fill(&mut self, c: ObjRef, x: f32, y: f32, w: f32, h: f32, argb: u32) {
-        record(self, c, PaintSnap { argb, style: 0, sw: 0.0 }, OpK::Rect(x, y, x + w, y + h));
+        record(
+            self,
+            c,
+            PaintSnap {
+                argb,
+                style: 0,
+                sw: 0.0,
+            },
+            OpK::Rect(x, y, x + w, y + h),
+        );
     }
 
     pub(crate) fn canvas_translate(&mut self, c: ObjRef, dx: f32, dy: f32) -> usize {
@@ -2474,6 +3554,64 @@ impl Engine {
     pub(crate) fn end_frame(&mut self) {
         self.gfx.frame_valid = true;
     }
+}
+
+/// `ColorFilter` value classes: `BlendModeColorFilter`,
+/// `PorterDuffColorFilter`, `LightingColorFilter`, `ColorMatrixColorFilter`.
+/// Their parameters are stored as fields (`rd_color`, `rd_mode`, `rd_mul`,
+/// `rd_add`, `rd_matrix`).
+///
+/// **Deviation:** the rasterizer does not apply color filters; a paint's
+/// filter is recorded but not rendered.
+fn color_filter(
+    vm: &mut Engine,
+    recv_class: &str,
+    name: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    const FILTERS: [&str; 4] = [
+        "Landroid/graphics/BlendModeColorFilter;",
+        "Landroid/graphics/PorterDuffColorFilter;",
+        "Landroid/graphics/LightingColorFilter;",
+        "Landroid/graphics/ColorMatrixColorFilter;",
+    ];
+    if !FILTERS.contains(&recv_class) {
+        return Ok(None);
+    }
+    let a = |i: usize| args.get(i).cloned().unwrap_or(Value::Null);
+    let put = |vm: &mut Engine, f: &str, v: Value| {
+        crate::err::put_field_result(vm.heap.put_field(recv, f, v))
+    };
+    Ok(Some(match name {
+        "<init>" => {
+            if recv_class.contains("Lighting") {
+                put(vm, "rd_mul", a(0))?;
+                put(vm, "rd_add", a(1))?;
+            } else if recv_class.contains("ColorMatrix") {
+                put(vm, "rd_matrix", a(0))?;
+            } else {
+                put(vm, "rd_color", a(0))?;
+                put(vm, "rd_mode", a(1))?;
+            }
+            Value::Null
+        }
+        "getColor" => vm.heap.get_field(recv, "rd_color").unwrap_or(Value::Int(0)),
+        "getMode" => vm.heap.get_field(recv, "rd_mode").unwrap_or(Value::Null),
+        "getColorMultiply" => vm.heap.get_field(recv, "rd_mul").unwrap_or(Value::Int(0)),
+        "getColorAdd" => vm.heap.get_field(recv, "rd_add").unwrap_or(Value::Int(0)),
+        "equals" => Value::Int((args.first() == Some(&Value::Obj(recv))) as i32),
+        "hashCode" => {
+            let c: i32 = vm
+                .heap
+                .get_field(recv, "rd_color")
+                .ok()
+                .and_then(|v| v.as_int().ok())
+                .unwrap_or(0);
+            Value::Int(c.wrapping_mul(31))
+        }
+        _ => return Ok(None),
+    }))
 }
 
 #[cfg(test)]
@@ -2501,56 +3639,31 @@ mod tests {
     #[test]
     fn raster_fills_rect_and_text() {
         let mut px = vec![255u8; 100 * 50 * 3];
-        let mut r = Raster { px: &mut px, w: 100, h: 50 };
-        r.fill_polys(&[vec![(10.0, 10.0), (20.0, 10.0), (20.0, 20.0), (10.0, 20.0)]], 0xFFFF0000, [0.0, 0.0, 100.0, 50.0], false);
-        r.text("Hi", &ID, 30.0, 40.0, 20.0, 0xFF000000, [0.0, 0.0, 100.0, 50.0]);
+        let mut r = Raster {
+            px: &mut px,
+            w: 100,
+            h: 50,
+        };
+        r.fill_polys(
+            &[vec![(10.0, 10.0), (20.0, 10.0), (20.0, 20.0), (10.0, 20.0)]],
+            0xFFFF0000,
+            [0.0, 0.0, 100.0, 50.0],
+            false,
+        );
+        r.text(
+            "Hi",
+            &ID,
+            30.0,
+            40.0,
+            20.0,
+            0xFF000000,
+            [0.0, 0.0, 100.0, 50.0],
+        );
         let at = |x: usize, y: usize| px[(y * 100 + x) * 3];
         assert_eq!((at(15, 15), px[(15 * 100 + 15) * 3 + 1]), (255, 0));
-        assert!((30..50).any(|x| (25..40).any(|y| at(x, y) < 128)), "text drew ink");
+        assert!(
+            (30..50).any(|x| (25..40).any(|y| at(x, y) < 128)),
+            "text drew ink"
+        );
     }
-}
-
-/// `ColorFilter` value classes: `BlendModeColorFilter`,
-/// `PorterDuffColorFilter`, `LightingColorFilter`, `ColorMatrixColorFilter`.
-/// Their parameters are stored as fields (`rd_color`, `rd_mode`, `rd_mul`,
-/// `rd_add`, `rd_matrix`).
-///
-/// **Deviation:** the rasterizer does not apply color filters; a paint's
-/// filter is recorded but not rendered.
-fn color_filter(vm: &mut Engine, recv_class: &str, name: &str, recv: ObjRef, args: &[Value]) -> Result<Option<Value>, VmExit> {
-    const FILTERS: [&str; 4] = [
-        "Landroid/graphics/BlendModeColorFilter;",
-        "Landroid/graphics/PorterDuffColorFilter;",
-        "Landroid/graphics/LightingColorFilter;",
-        "Landroid/graphics/ColorMatrixColorFilter;",
-    ];
-    if !FILTERS.contains(&recv_class) {
-        return Ok(None);
-    }
-    let a = |i: usize| args.get(i).cloned().unwrap_or(Value::Null);
-    let put = |vm: &mut Engine, f: &str, v: Value| crate::err::put_field_result(vm.heap.put_field(recv, f, v));
-    Ok(Some(match name {
-        "<init>" => {
-            if recv_class.contains("Lighting") {
-                put(vm, "rd_mul", a(0))?;
-                put(vm, "rd_add", a(1))?;
-            } else if recv_class.contains("ColorMatrix") {
-                put(vm, "rd_matrix", a(0))?;
-            } else {
-                put(vm, "rd_color", a(0))?;
-                put(vm, "rd_mode", a(1))?;
-            }
-            Value::Null
-        }
-        "getColor" => vm.heap.get_field(recv, "rd_color").unwrap_or(Value::Int(0)),
-        "getMode" => vm.heap.get_field(recv, "rd_mode").unwrap_or(Value::Null),
-        "getColorMultiply" => vm.heap.get_field(recv, "rd_mul").unwrap_or(Value::Int(0)),
-        "getColorAdd" => vm.heap.get_field(recv, "rd_add").unwrap_or(Value::Int(0)),
-        "equals" => Value::Int((args.first() == Some(&Value::Obj(recv))) as i32),
-        "hashCode" => {
-            let c: i32 = vm.heap.get_field(recv, "rd_color").ok().and_then(|v| v.as_int().ok()).unwrap_or(0);
-            Value::Int(c.wrapping_mul(31))
-        }
-        _ => return Ok(None),
-    }))
 }

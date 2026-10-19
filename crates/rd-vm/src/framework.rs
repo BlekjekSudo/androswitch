@@ -2050,23 +2050,31 @@ pub fn call_host_instance(
             // Before, the receiver was treated as an activity, so
             // view.findViewById always returned null.
             if matches!(vm.fw.get(recv), Some(HostObj::View { .. })) {
-                return Ok(Some(vm.find_view_by_id(recv, want).map_or(Value::Null, Value::Obj)));
+                return Ok(Some(
+                    vm.find_view_by_id(recv, want)
+                        .map_or(Value::Null, Value::Obj),
+                ));
             }
             // Activity: the window decor when it exists (android.R.id.content
             // resolves, window.rs), else the content root.
             let decor = match vm.fw.get(recv) {
-                Some(HostObj::Activity { window: Some(w), .. }) => {
-                    vm.window_decor.get(w).map(|d| d.0)
-                }
+                Some(HostObj::Activity {
+                    window: Some(w), ..
+                }) => vm.window_decor.get(w).map(|d| d.0),
                 _ => None,
             };
             if let Some(d) = decor {
-                return Ok(Some(vm.find_view_by_id(d, want).map_or(Value::Null, Value::Obj)));
+                return Ok(Some(
+                    vm.find_view_by_id(d, want).map_or(Value::Null, Value::Obj),
+                ));
             }
             let Some(content) = vm.window_content_of(recv) else {
                 return Ok(Some(Value::Null));
             };
-            Ok(Some(vm.find_view_by_id(content, want).map_or(Value::Null, Value::Obj)))
+            Ok(Some(
+                vm.find_view_by_id(content, want)
+                    .map_or(Value::Null, Value::Obj),
+            ))
         }
         (ACTIVITY, "finish") => {
             if let Some(HostObj::Activity { finished, .. }) = vm.fw.objects.get_mut(&recv) {
@@ -2248,7 +2256,9 @@ pub fn call_host_instance(
             add_child(vm, recv, *child)?;
             Ok(Some(Value::Null))
         }
-        (VIEWGROUP, "getChildCount") | (LINEARLAYOUT, "getChildCount") | (FRAMELAYOUT, "getChildCount") => {
+        (VIEWGROUP, "getChildCount")
+        | (LINEARLAYOUT, "getChildCount")
+        | (FRAMELAYOUT, "getChildCount") => {
             let n = match vm.fw.get(recv) {
                 Some(HostObj::View { children, .. }) => children.len() as i32,
                 _ => 0,
@@ -2268,9 +2278,10 @@ pub fn call_host_instance(
         (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "indexOfChild") => {
             let c = args.first().and_then(|v| v.as_ref().ok().flatten());
             let idx = match (vm.fw.get(recv), c) {
-                (Some(HostObj::View { children, .. }), Some(c)) => {
-                    children.iter().position(|x| *x == c).map_or(-1, |p| p as i32)
-                }
+                (Some(HostObj::View { children, .. }), Some(c)) => children
+                    .iter()
+                    .position(|x| *x == c)
+                    .map_or(-1, |p| p as i32),
                 _ => -1,
             };
             Ok(Some(Value::Int(idx)))
