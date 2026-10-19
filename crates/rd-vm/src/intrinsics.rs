@@ -207,7 +207,7 @@ pub(crate) fn object_to_string(vm: &mut Engine, r: crate::heap::ObjRef) -> Resul
 
 /// Escreve no stdout/stderr do host. PrintStream Java NUNCA lança IOException
 /// (spec de java.io.PrintStream) — engolir falha de E/S é a semântica correta.
-fn host_print(fd: i32, s: &str) {
+pub(crate) fn host_print(fd: i32, s: &str) {
     use std::io::Write;
     if fd == 2 {
         let _ = std::io::stderr().write_all(s.as_bytes());
@@ -277,6 +277,53 @@ pub fn call_static_intrinsic(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    // java.lang primitive wrappers (boxes.rs): valueOf/hashCode/compare/bits
+    if let Some(v) = crate::boxes::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // java.lang.System: arraycopy/identityHashCode/virtual-clock time
+    if let Some(v) = crate::jlsystem::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // java.util.Collections extras (collections.rs)
+    if let Some(v) = crate::collections::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // Settings.* / Uri statics (content.rs)
+    if let Some(v) = crate::content::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // java.util.Arrays (arrays.rs)
+    if let Some(v) = crate::arrays::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // Integer/Long/Float/Double/Character/Math statics (numerics.rs)
+    if let Some(v) = crate::numerics::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // Handler.createAsync / Message.obtain (handler_msg.rs)
+    if let Some(v) = crate::handler_msg::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // String.format/join (jlstring.rs)
+    if let Some(v) = crate::jlstring::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // green threads (threads.rs): currentThread/interrupted/LockSupport
+    if let Some(v) = crate::threads::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // android.text.TextUtils
+    if let Some(v) = crate::android_text::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // android.util.Log → app output (MCP `logs`)
+    if let Some(v) = crate::choreographer::static_intrinsic(vm, class, name, sig)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_text::log_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
     match (class, name, sig) {
         ("Ljava/util/Arrays;", "asList", "([Ljava/lang/Object;)Ljava/util/List;") => {
             let array = args.first().and_then(|v| v.as_ref().ok().flatten()).ok_or_else(|| VmExit::Exception(Throwable::new("Ljava/lang/NullPointerException;", "Arrays.asList array null")))?;
@@ -2103,6 +2150,9 @@ fn map_supported(name: &str, sig: &str) -> bool {
                 "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"
             )
             | ("get", "(Ljava/lang/Object;)Ljava/lang/Object;")
+            | ("putAll", "(Ljava/util/Map;)V")
+            | ("putIfAbsent", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;")
+            | ("getOrDefault", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;")
             | ("remove", "(Ljava/lang/Object;)Ljava/lang/Object;")
             | ("containsKey", "(Ljava/lang/Object;)Z")
             | ("containsValue", "(Ljava/lang/Object;)Z")
@@ -2883,6 +2933,53 @@ fn map_intrinsic(
             let entries = map_entries(vm, recv)?;
             Ok(Some(idx.map_or(Value::Null, |i| entries[i].1.clone())))
         }
+        ("getOrDefault", _) => {
+            let idx = find_key(vm, recv, &args[0])?;
+            let entries = map_entries(vm, recv)?;
+            Ok(Some(idx.map_or(args[1].clone(), |i| entries[i].1.clone())))
+        }
+        ("putIfAbsent", _) => {
+            // Map.putIfAbsent: absent OR mapped to null → put; returns old
+            let idx = find_key(vm, recv, &args[0])?;
+            let entries = map_entries(vm, recv)?;
+            match idx {
+                Some(i) if !matches!(entries[i].1, Value::Null) => Ok(Some(entries[i].1.clone())),
+                Some(i) => {
+                    entries[i].1 = args[1].clone();
+                    Ok(Some(Value::Null))
+                }
+                None => {
+                    entries.push((args[0].clone(), args[1].clone()));
+                    Ok(Some(Value::Null))
+                }
+            }
+        }
+        ("putAll", _) => {
+            // source must be a host map (HashMap/LinkedHashMap/…); a DEX
+            // Map implementation stays an explicit gap instead of a silent
+            // no-op
+            let src = match args.first() {
+                Some(Value::Obj(o)) => match vm.fw.objects.get(o) {
+                    Some(HostObj::Map { entries }) => entries.clone(),
+                    _ => return Ok(None),
+                },
+                _ => {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "Map.putAll(null)",
+                    )))
+                }
+            };
+            for (k, v) in src {
+                let idx = find_key(vm, recv, &k)?;
+                let entries = map_entries(vm, recv)?;
+                match idx {
+                    Some(i) => entries[i].1 = v,
+                    None => entries.push((k, v)),
+                }
+            }
+            Ok(Some(Value::Null))
+        }
         ("remove", _) => {
             let idx = find_key(vm, recv, &args[0])?;
             let entries = map_entries(vm, recv)?;
@@ -3072,6 +3169,99 @@ pub fn call_instance_intrinsic_mref(
     recv: crate::heap::ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    // java.lang primitive wrappers (boxes.rs): xxxValue/equals/hashCode/…
+    if let Some(v) = crate::boxes::instance_intrinsic(vm, recv_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // green threads (threads.rs): Thread ctors/start/join/name/daemon/…
+    if let Some(v) =
+        crate::threads::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // runtime permissions (perms.rs): check*/requestPermissions
+    if let Some(v) =
+        crate::perms::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // Window decor/insets (window.rs) and View system-UI flags
+    if let Some(v) = crate::window::instance_intrinsic(vm, recv_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::window::layout_params_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // reflective member lookup: Class.getMethod / Method.invoke (reflect.rs)
+    if let Some(v) = crate::reflect::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // platform UncaughtExceptionHandler (threads.rs)
+    if let Some(v) = crate::threads::ueh_intrinsic(vm, name, recv, args)? {
+        return Ok(Some(v));
+    }
+    // Throwable cause/suppressed/stack (throwable.rs)
+    if let Some(v) = crate::throwable::instance_intrinsic(vm, recv_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // ContentResolver/ContentObserver/Uri (content.rs)
+    if let Some(v) = crate::content::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // Handler messaging / Message (handler_msg.rs)
+    if let Some(v) = crate::handler_msg::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // java.lang.Class type introspection (jlclass.rs)
+    if let Some(v) = crate::jlclass::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // java.lang.String extended surface (jlstring.rs)
+    if let Some(v) = crate::jlstring::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // Bundle/BaseBundle/PersistableBundle + Intent data (bundle.rs)
+    if let Some(v) = crate::bundle::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // Activity config/results/back dispatch (activity_extras.rs)
+    if let Some(v) = crate::activity_extras::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // ActivityLifecycleCallbacks (activity_callbacks.rs)
+    if let Some(v) =
+        crate::activity_callbacks::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // Choreographer frame callbacks (choreographer.rs)
+    if let Some(v) = crate::choreographer::instance_intrinsic(vm, mref_class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // ViewTreeObserver (vto.rs)
+    if let Some(v) = crate::vto::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // attach-to-window lifecycle (view_attach.rs)
+    if let Some(v) = crate::view_attach::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    if mref_class.starts_with("Landroid/view/") {
+        if let Some(v) = crate::window::view_intrinsic(vm, name, sig, recv, args)? {
+            return Ok(Some(v));
+        }
+    }
+    // AtomicBoolean/AtomicLong (atomics.rs), keyed on the declaring class
+    if let Some(v) = crate::atomics::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // DEX subclasses of AtomicInteger/AtomicReference (Compose's AtomicInt,
+    // …) dispatch through the declaring class: the state field is the same
+    let recv_class = if mref_class == ATOMIC_INT || mref_class == ATOMIC_REF {
+        mref_class
+    } else {
+        recv_class
+    };
     match (recv_class, name, sig) {
         (OBJECT, "<init>", "()V") => Ok(Some(Value::Null)), // ctor de Object = no-op
 
@@ -3514,7 +3704,7 @@ pub fn call_instance_intrinsic_mref(
             map_intrinsic(vm, recv, name, sig, args)
         }
         (c, name, sig)
-            if (c == HASH_MAP || c == WEAK_MAP || c == LINKED_MAP || c == CONCURRENT_MAP)
+            if (c == HASH_MAP || c == WEAK_MAP || c == "Ljava/util/IdentityHashMap;" || c == LINKED_MAP || c == CONCURRENT_MAP)
                 && map_supported(name, sig) =>
         {
             map_intrinsic(vm, recv, name, sig, args)
@@ -4078,7 +4268,7 @@ fn default_to_string(class_desc: &str, r: crate::heap::ObjRef) -> String {
     format!("{name}@{r:x}")
 }
 
-fn is_throwable_class(vm: &Engine, class: &str) -> bool {
+pub(crate) fn is_throwable_class(vm: &Engine, class: &str) -> bool {
     vm.cp.is_subtype(class, "Ljava/lang/Throwable;")
 }
 

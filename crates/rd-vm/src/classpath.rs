@@ -562,13 +562,90 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/lang/ArithmeticException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/NullPointerException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/ClassCastException;" => Some(RUNTIME.to_vec()),
-        "Ljava/lang/ArrayIndexOutOfBoundsException;" => Some(RUNTIME.to_vec()),
+        "Ljava/lang/ArrayIndexOutOfBoundsException;"
+        | "Ljava/lang/StringIndexOutOfBoundsException;" => Some(vec![
+            "Ljava/lang/IndexOutOfBoundsException;",
+            "Ljava/lang/RuntimeException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/lang/IndexOutOfBoundsException;"
+        | "Ljava/util/NoSuchElementException;"
+        | "Ljava/util/ConcurrentModificationException;"
+        | "Ljava/util/EmptyStackException;"
+        | "Ljava/lang/TypeNotPresentException;"
+        | "Ljava/time/DateTimeException;"
+        | "Ljava/io/UncheckedIOException;" => Some(RUNTIME.to_vec()),
+        "Ljava/util/concurrent/CancellationException;" => Some(vec![
+            "Ljava/lang/IllegalStateException;",
+            "Ljava/lang/RuntimeException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/util/regex/PatternSyntaxException;"
+        | "Ljava/util/IllegalFormatException;"
+        | "Ljava/nio/charset/IllegalCharsetNameException;"
+        | "Ljava/nio/charset/UnsupportedCharsetException;" => Some(vec![
+            "Ljava/lang/IllegalArgumentException;",
+            "Ljava/lang/RuntimeException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/util/UnknownFormatConversionException;"
+        | "Ljava/util/IllegalFormatConversionException;"
+        | "Ljava/util/MissingFormatArgumentException;" => Some(vec![
+            "Ljava/util/IllegalFormatException;",
+            "Ljava/lang/IllegalArgumentException;",
+            "Ljava/lang/RuntimeException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/lang/ReflectiveOperationException;"
+        | "Ljava/lang/InterruptedException;"
+        | "Ljava/lang/CloneNotSupportedException;"
+        | "Ljava/io/IOException;"
+        | "Ljava/util/concurrent/TimeoutException;"
+        | "Ljava/util/concurrent/ExecutionException;"
+        | "Landroid/util/AndroidException;" => Some(EXC.to_vec()),
+        "Ljava/lang/ClassNotFoundException;"
+        | "Ljava/lang/InstantiationException;"
+        | "Ljava/lang/NoSuchMethodException;"
+        | "Ljava/lang/NoSuchFieldException;"
+        | "Ljava/lang/IllegalAccessException;"
+        | "Ljava/lang/reflect/InvocationTargetException;" => Some(vec![
+            "Ljava/lang/ReflectiveOperationException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/io/FileNotFoundException;" | "Ljava/io/EOFException;" => Some(vec![
+            "Ljava/io/IOException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/provider/Settings$SettingNotFoundException;" => Some(vec![
+            "Landroid/util/AndroidException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/lang/AbstractMethodError;" | "Ljava/lang/IncompatibleClassChangeError;" => Some(vec![
+            "Ljava/lang/IncompatibleClassChangeError;",
+            "Ljava/lang/LinkageError;",
+            "Ljava/lang/Error;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
         "Ljava/lang/NegativeArraySizeException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/IllegalStateException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/IllegalArgumentException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/NumberFormatException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/ArrayStoreException;" => Some(RUNTIME.to_vec()),
-        "Ljava/lang/StringIndexOutOfBoundsException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/RuntimeException;" => Some(EXC.to_vec()),
         "Ljava/lang/UnsupportedOperationException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/StackOverflowError;" => Some(ERR.to_vec()),
@@ -721,7 +798,9 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/util/concurrent/ConcurrentHashMap;" => {
             Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"])
         }
-        "Ljava/util/WeakHashMap;" => Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"]),
+        "Ljava/util/WeakHashMap;" | "Ljava/util/IdentityHashMap;" => {
+            Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"])
+        }
         "Ljava/util/ArrayList;" => Some(vec![
             "Ljava/util/AbstractList;",
             "Ljava/util/AbstractCollection;",
@@ -746,6 +825,14 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/util/concurrent/CopyOnWriteArraySet;" => Some(OBJECT.to_vec()),
         "Ljava/util/concurrent/atomic/AtomicReference;" => Some(OBJECT.to_vec()),
         "Ljava/lang/Number;" => Some(OBJECT.to_vec()),
+        // primitive wrappers (boxes.rs): numeric ones extend Number
+        "Ljava/lang/Integer;"
+        | "Ljava/lang/Long;"
+        | "Ljava/lang/Short;"
+        | "Ljava/lang/Byte;"
+        | "Ljava/lang/Float;"
+        | "Ljava/lang/Double;" => Some(vec!["Ljava/lang/Number;", "Ljava/lang/Object;"]),
+        "Ljava/lang/Boolean;" | "Ljava/lang/Character;" => Some(OBJECT.to_vec()),
         "Ljava/lang/Thread;" => Some(OBJECT.to_vec()),
         "Ljava/lang/ThreadLocal;" => Some(OBJECT.to_vec()),
         "Ljava/lang/InheritableThreadLocal;" => {
@@ -756,9 +843,11 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         // M8: ServiceLoader host é um Iterable vazio enquanto a descoberta
         // `META-INF/services` do APK permanece fora do runtime.
         "Ljava/util/ServiceLoader;" => Some(OBJECT.to_vec()),
-        "Ljava/util/concurrent/atomic/AtomicInteger;" => {
+        "Ljava/util/concurrent/atomic/AtomicInteger;"
+        | "Ljava/util/concurrent/atomic/AtomicLong;" => {
             Some(vec!["Ljava/lang/Number;", "Ljava/lang/Object;"])
         }
+        "Ljava/util/concurrent/atomic/AtomicBoolean;" => Some(OBJECT.to_vec()),
         "Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;" => Some(OBJECT.to_vec()),
         "Ljava/lang/Enum;" => Some(OBJECT.to_vec()),
         "Ljava/lang/ref/Reference;" => Some(OBJECT.to_vec()),
@@ -805,6 +894,7 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/io/Serializable;",
         ]),
         "Ljava/util/WeakHashMap;"
+        | "Ljava/util/IdentityHashMap;"
         | "Ljava/util/LinkedHashMap;"
         | "Ljava/util/concurrent/ConcurrentHashMap;" => Some(vec![
             "Ljava/util/Map;",
@@ -873,8 +963,18 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",
         ]),
+        "Ljava/lang/Integer;"
+        | "Ljava/lang/Long;"
+        | "Ljava/lang/Short;"
+        | "Ljava/lang/Byte;"
+        | "Ljava/lang/Float;"
+        | "Ljava/lang/Double;"
+        | "Ljava/lang/Boolean;"
+        | "Ljava/lang/Character;" => Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
         "Ljava/util/concurrent/atomic/AtomicReference;"
-        | "Ljava/util/concurrent/atomic/AtomicInteger;" => Some(vec!["Ljava/io/Serializable;"]),
+        | "Ljava/util/concurrent/atomic/AtomicInteger;"
+        | "Ljava/util/concurrent/atomic/AtomicLong;"
+        | "Ljava/util/concurrent/atomic/AtomicBoolean;" => Some(vec!["Ljava/io/Serializable;"]),
         "Ljava/util/concurrent/ExecutorService;" => Some(vec!["Ljava/util/concurrent/Executor;"]),
         "Ljava/util/ServiceLoader;" => Some(vec!["Ljava/lang/Iterable;"]),
         "Ljava/lang/Enum;" => Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
@@ -884,6 +984,12 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
 }
 
 /// Erro de resolução com sugestão (Lei 1 — nunca silencioso).
+/// Whether the host runtime models `desc` (a JDK/platform type outside the
+/// app DEX).
+pub fn host_class_known(desc: &str) -> bool {
+    builtin_hierarchy(desc).is_some() || builtin_interfaces(desc).is_some()
+}
+
 pub fn unresolved_method(class: &str, name: &str, proto: &str) -> RdError {
     crate::err::with_suggestion(
         crate::err::vm_error(

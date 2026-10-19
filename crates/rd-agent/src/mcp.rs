@@ -1246,6 +1246,15 @@ impl AgentSession {
             if let Some(ad) = app_desc {
                 eng.set_application_class(ad);
             }
+            // perms.rs: checkSelfPermission/requestPermissions see the
+            // session's real grant state
+            eng.set_granted_permissions(
+                app.perms
+                    .all_states()
+                    .iter()
+                    .filter(|(_, s)| s.is_granted())
+                    .map(|(n, _)| n.clone()),
+            );
             let r = eng.launch_app(&desc, &package_out, Vec::new());
             if r.is_ok() {
                 self.engine = Some(eng);
@@ -1756,6 +1765,22 @@ impl AgentSession {
                 perms.revoke(permission).map_err(rd_to_rd)?
             }
         };
+        // keep the running engine's grant set in sync (perms.rs)
+        if self.engine_package == self.active {
+            let granted: Option<Vec<String>> = self.active.as_ref().and_then(|p| {
+                self.installed.iter().find(|a| &a.package == p).map(|a| {
+                    a.perms
+                        .all_states()
+                        .iter()
+                        .filter(|(_, s)| s.is_granted())
+                        .map(|(n, _)| n.clone())
+                        .collect()
+                })
+            });
+            if let (Some(e), Some(g)) = (self.engine.as_mut(), granted) {
+                e.set_granted_permissions(g);
+            }
+        }
         #[cfg(feature = "advanced-components")]
         if permission == "android.permission.POST_NOTIFICATIONS"
             && self.engine_package == self.active

@@ -27,6 +27,20 @@ const ASC: &str = "Ljava/lang/ArrayStoreException;";
 const OOME: &str = "Ljava/lang/OutOfMemoryError;";
 
 /// Executa um frame; `ins` já está em forma de registradores (wide = par).
+/// Live call stack (innermost first, capped) appended to VM_FUEL so an agent
+/// can see WHERE a guest spins instead of only that it did.
+fn fuel_stack(vm: &Engine) -> String {
+    let mut out = String::from("; pilha no esgotamento (innermost primeiro):");
+    for l in vm.frame_labels.iter().rev().take(24) {
+        out.push_str("\n  at ");
+        out.push_str(l);
+    }
+    if vm.frame_labels.len() > 24 {
+        out.push_str(&format!("\n  ... +{} frames", vm.frame_labels.len() - 24));
+    }
+    out
+}
+
 pub(crate) fn exec_frame(
     vm: &mut Engine,
     dex_idx: usize,
@@ -62,7 +76,11 @@ pub(crate) fn exec_frame(
             return Err(err::with_suggestion(
                 err::vm_error(
                     "VM_FUEL",
-                    format!("execução excedeu {} instruções", vm.config.fuel),
+                    format!(
+                        "execução excedeu {} instruções{}",
+                        vm.config.fuel,
+                        fuel_stack(vm)
+                    ),
                 ),
                 "aumente --fuel ou revise o método executado",
             )
@@ -288,15 +306,10 @@ pub(crate) fn exec_frame(
                     ))
                     .into());
                 }
-                let name_r = intrinsics::alloc_string(vm, desc)?;
-                // issue #49: OOM aqui é OutOfMemoryError capturável (não run-killer)
-                let r = step!(vm
-                    .heap
-                    .alloc_instance(
-                        "Ljava/lang/Class;".to_string(),
-                        vec![("name".to_string(), Value::Obj(name_r))],
-                    )
-                    .map_err(oom_exception));
+                // canonical Class object: `Foo.class == foo.getClass()` and
+                // `Foo.class == Foo.class` (identity keys in AndroidX/Compose).
+                // OOM surfaces as a catchable OutOfMemoryError (issue #49).
+                let r = step!(vm.class_object_for(&desc));
                 regs[*a as usize] = Value::Obj(r);
             }
 
@@ -785,6 +798,17 @@ pub(crate) fn exec_frame(
                     let unit = step!(vm.time_unit_obj(&fname));
                     vm.statics
                         .insert((owner.clone(), fname.clone()), Value::Obj(unit));
+                }
+                // JDK constants not backed by any DEX (Boolean.TRUE/FALSE,
+                // MAX_VALUE, NaN, ...) are materialized on first read.
+                if !vm.statics.contains_key(&(owner.clone(), fname.clone())) {
+                    if let Some(c) = step!(crate::boxes::host_static(vm, &owner, &fname)) {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
+                        step!(crate::android_build::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    }
                 }
                 let v = vm
                     .statics
@@ -1401,6 +1425,20 @@ fn do_invoke(
     slots: &[Value],
 ) -> Result<Value, VmExit> {
     let mref = vm.cp.method_ref(dex_idx, method_idx)?;
+    // Host dispatch (intrinsics, m8/m9, framework, native loader) receives
+    // LOGICAL arguments: one Value per parameter. Register slots carry a
+    // WideHi placeholder after each long/double, so before this a host
+    // reading a parameter after a wide one saw WideHi. For example
+    // AtomicLongFieldUpdater.compareAndSet(o, J, J) wrote 0 on every CAS,
+    // which made kotlinx.coroutines' lock-free queue spin forever.
+    // DEX callees still get the raw register form.
+    let raw = slots;
+    let logical: Vec<Value> = slots
+        .iter()
+        .filter(|v| !matches!(v, Value::WideHi))
+        .cloned()
+        .collect();
+    let slots: &[Value] = &logical;
     // DEX opcodes (Dalvik spec): 6E virtual · 6F super · 70 direct ·
     // 71 static · 72 interface · 74 virtual/range · 75 super/range ·
     // 76 direct/range · 77 static/range · 78 interface/range.
@@ -1470,7 +1508,7 @@ fn do_invoke(
             )
             .into());
         }
-        return vm.call(d2, def, &m, slots.to_vec());
+        return vm.call(d2, def, &m, raw.to_vec());
     }
 
     // não-static: receiver é o primeiro slot
@@ -1536,9 +1574,23 @@ fn do_invoke(
             &slots[1..],
         )? {
             Some(v) => Ok(v),
-            None => Err(
-                crate::classpath::unresolved_method(&mref.class, &mref.name, &mref.proto).into(),
-            ),
+            // last resort: general View property store (view_props.rs)
+            None => match crate::view_props::fallback(
+                vm,
+                &mref.class,
+                &mref.name,
+                &mref.proto,
+                recv,
+                &slots[1..],
+            )? {
+                Some(v) => Ok(v),
+                None => Err(crate::classpath::unresolved_method(
+                    &mref.class,
+                    &mref.name,
+                    &mref.proto,
+                )
+                .into()),
+            },
         };
     }
 
@@ -1572,7 +1624,7 @@ fn do_invoke(
             crate::classpath::unresolved_method(&start_class, &mref.name, &mref.proto).into(),
         );
     };
-    vm.call(d2, def, &m, slots.to_vec())
+    vm.call(d2, def, &m, raw.to_vec())
 }
 
 /// Renderização do resultado para humano/JSON do CLI (formato Java).

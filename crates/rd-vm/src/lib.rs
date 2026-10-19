@@ -5,6 +5,8 @@
 //! vectors vs execução real). Heap arena com o orçamento do piso moto-e5
 //! (heap ≤ 256 MB — PRF-06/A2); OOM é erro tipado, nunca abort (Lei 1).
 
+pub(crate) mod android_text;
+pub(crate) mod boxes;
 pub mod classpath;
 pub mod engine;
 pub mod err;
@@ -13,12 +15,34 @@ pub mod heap;
 pub mod inflate;
 pub mod interp;
 pub mod intrinsics;
+pub(crate) mod jlsystem;
 pub mod m8;
 #[cfg(feature = "advanced-components")]
 pub mod m9;
 #[cfg(feature = "native")]
 pub mod native;
+pub mod perms;
 pub mod repr;
+pub mod threads;
+pub mod android_build;
+pub(crate) mod activity_callbacks;
+pub(crate) mod activity_extras;
+pub(crate) mod arrays;
+pub(crate) mod atomics;
+pub(crate) mod handler_msg;
+pub(crate) mod jlclass;
+pub(crate) mod jlstring;
+pub(crate) mod numerics;
+pub(crate) mod bundle;
+pub(crate) mod collections;
+pub(crate) mod content;
+pub(crate) mod reflect;
+pub(crate) mod throwable;
+pub(crate) mod choreographer;
+pub(crate) mod view_attach;
+pub(crate) mod vto;
+pub(crate) mod view_props;
+pub(crate) mod window;
 pub mod value;
 
 use rd_dex::annotations::EncodedValue;

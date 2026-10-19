@@ -192,8 +192,15 @@ pub enum HostObj {
 #[derive(Debug, Clone)]
 pub struct QueuedMsg {
     pub when_ms: u64,
-    /// Runnable do app — o drain invoca run() via resolução DEX
+    /// Runnable do app — o drain invoca run() via resolução DEX. For a
+    /// Message entry (handler_msg.rs) this is the Message object.
     pub runnable: ObjRef,
+    /// target Handler (removeCallbacks/removeMessages scope)
+    pub handler: Option<ObjRef>,
+    /// true → `runnable` is an android.os.Message to dispatchMessage
+    pub is_message: bool,
+    /// `postDelayed(r, token, ms)` / `removeCallbacksAndMessages(token)`
+    pub token: Option<ObjRef>,
 }
 
 /// Estado de framework da Engine (host objects + clock virtual + launch).
@@ -204,7 +211,7 @@ pub struct HostState {
     pub clock_ms: u64,
     main_looper: Option<ObjRef>,
     /// M8: thread "main" sintética (VM single-threaded — ver `THREAD`)
-    main_thread: Option<ObjRef>,
+    pub(crate) main_thread: Option<ObjRef>,
     /// M8: objetos `Class` canônicos por descritor (getClass devolve sempre a
     /// mesma referência para a mesma classe — identidade como na JVM).
     class_objs: HashMap<String, ObjRef>,
@@ -437,7 +444,7 @@ impl Engine {
         Ok(())
     }
 
-    fn main_looper_obj(&mut self) -> Result<ObjRef, VmExit> {
+    pub(crate) fn main_looper_obj(&mut self) -> Result<ObjRef, VmExit> {
         if let Some(l) = self.fw.main_looper {
             return Ok(l);
         }
@@ -482,6 +489,14 @@ impl Engine {
         Ok(r)
     }
 
+    /// Allocate an instance of `desc` with its host state attached (the
+    /// `new-instance` path, for reflective construction).
+    pub(crate) fn new_object(&mut self, desc: &str) -> Result<ObjRef, VmExit> {
+        let r = self.heap.alloc_instance(desc.to_string(), Vec::new())?;
+        self.attach_host_state(desc, r)?;
+        Ok(r)
+    }
+
     /// M8: objeto `Class` canônico do descritor (lazy; identidade estável —
     /// `a.getClass() == a.getClass()`). Campo de heap "class_name" guarda o
     /// DESCRITOR (ex.: "Lcom/x/Y;"); os métodos de Class o convertem.
@@ -511,6 +526,8 @@ impl Engine {
             ))
         })?;
         crate::err::put_field_result(self.heap.put_field(r, "class_name", Value::Obj(name)))?;
+        // legacy field read by Intent(Context, Class)/setClass
+        crate::err::put_field_result(self.heap.put_field(r, "name", Value::Obj(name)))?;
         self.fw.class_objs.insert(desc.to_string(), r);
         Ok(r)
     }
@@ -776,6 +793,11 @@ impl Engine {
         )?;
         self.run_lifecycle_step(activity_desc, r, "onStart", "()V", Vec::new())?;
         self.run_lifecycle_step(activity_desc, r, "onResume", "()V", Vec::new())?;
+        // handleResumeActivity → makeVisible: ViewRootImpl attaches the
+        // window tree (onAttachedToWindow + attach listeners)
+        crate::view_attach::attach_activity_window(self, r)?;
+        // then the main Looper runs: posted messages, ready threads, frames
+        self.drain_looper()?;
         Ok(r)
     }
 
@@ -787,10 +809,20 @@ impl Engine {
         sig: &str,
         args: Vec<Value>,
     ) -> Result<(), VmExit> {
+        use crate::activity_callbacks::{dispatch, event_of, Phase};
+        let event = event_of(name);
+        let bundle = args.first().cloned();
+        if let Some(e) = event {
+            dispatch(self, activity, e, Phase::Pre, bundle.clone())?;
+        }
         if let Some((d, def, m)) = self.cp.resolve_method(activity_desc, name, sig) {
             let mut slots = vec![Value::Obj(activity)];
             slots.extend(args);
             self.call(d, def, &m, slots)?;
+        }
+        if let Some(e) = event {
+            dispatch(self, activity, e, Phase::Main, bundle.clone())?;
+            dispatch(self, activity, e, Phase::Post, bundle)?;
         }
         Ok(())
     }
@@ -1148,6 +1180,8 @@ impl Engine {
         let looper = self.main_looper_obj()?;
         let now = self.fw.clock_ms;
         let mut ran = 0usize;
+        // async results queued by requestPermissions (perms.rs)
+        ran += crate::perms::deliver_pending(self)?;
         loop {
             // menor deadline entre os vencidos; idx empata estável
             let due = self.fw.objects.get(&looper).and_then(|h| match h {
@@ -1172,12 +1206,42 @@ impl Engine {
                     now
                 );
             }
+            if msg.is_message {
+                crate::handler_msg::dispatch_message(self, msg.handler, msg.runnable)?;
+                ran += 1;
+                continue;
+            }
             let rclass = self.heap.class_of(msg.runnable)?.to_string();
             let Some((d, def, m)) = self.cp.resolve_method(&rclass, "run", "()V") else {
                 return Err(crate::classpath::unresolved_method(&rclass, "run", "()V").into());
             };
             self.call(d, def, &m, vec![Value::Obj(msg.runnable)])?;
             ran += 1;
+        }
+        // Main is idle: give ready green threads a turn (threads.rs). What
+        // they post to the Looper runs on the next pass; alternate until
+        // both are quiescent (fuel bounds pathological ping-pong).
+        if crate::threads::run_ready(self, usize::MAX)? > 0 {
+            ran += 1 + self.drain_looper()?;
+        }
+        // Looper idle → vsync: run due Choreographer frames (choreographer.rs),
+        // draining what each frame posts. Bounded per drain; nested drains
+        // don't pump frames.
+        if !self.frame_pump_active {
+            self.frame_pump_active = true;
+            let mut frames = 0;
+            let res = (|| -> Result<(), VmExit> {
+                while frames < crate::choreographer::MAX_FRAMES_PER_DRAIN
+                    && crate::choreographer::has_due(self)
+                {
+                    ran += crate::choreographer::run_frame(self)?;
+                    ran += self.drain_looper()?;
+                    frames += 1;
+                }
+                Ok(())
+            })();
+            self.frame_pump_active = false;
+            res?;
         }
         Ok(ran)
     }
@@ -1931,6 +1995,19 @@ pub fn call_host_instance(
             let s = vm.fw.package_name.clone();
             Ok(Some(Value::Obj(intrinsics::alloc_string(vm, s)?)))
         }
+        (ACTIVITY, "setContentView") | (ACTIVITY, "addContentView")
+            if sig == "(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V" =>
+        {
+            // window.rs: params are recorded on the view; the headless window
+            // lays the content root out at full size either way
+            let Some(Value::Obj(content)) = args.first() else {
+                return Err(
+                    crate::err::vm_error("INVALID_FORMAT", "setContentView sem view").into(),
+                );
+            };
+            set_content_view(vm, recv, *content)?;
+            Ok(Some(Value::Null))
+        }
         (ACTIVITY, "setContentView") if sig == "(Landroid/view/View;)V" => {
             let Some(Value::Obj(content)) = args.first() else {
                 return Err(
@@ -1969,10 +2046,27 @@ pub fn call_host_instance(
                     .into())
                 }
             };
+            // A View searches ITS OWN subtree (View.findViewById contract).
+            // Before, the receiver was treated as an activity, so
+            // view.findViewById always returned null.
+            if matches!(vm.fw.get(recv), Some(HostObj::View { .. })) {
+                return Ok(Some(vm.find_view_by_id(recv, want).map_or(Value::Null, Value::Obj)));
+            }
+            // Activity: the window decor when it exists (android.R.id.content
+            // resolves, window.rs), else the content root.
+            let decor = match vm.fw.get(recv) {
+                Some(HostObj::Activity { window: Some(w), .. }) => {
+                    vm.window_decor.get(w).map(|d| d.0)
+                }
+                _ => None,
+            };
+            if let Some(d) = decor {
+                return Ok(Some(vm.find_view_by_id(d, want).map_or(Value::Null, Value::Obj)));
+            }
             let Some(content) = vm.window_content_of(recv) else {
                 return Ok(Some(Value::Null));
             };
-            Ok(vm.find_view_by_id(content, want).map(Value::Obj))
+            Ok(Some(vm.find_view_by_id(content, want).map_or(Value::Null, Value::Obj)))
         }
         (ACTIVITY, "finish") => {
             if let Some(HostObj::Activity { finished, .. }) = vm.fw.objects.get_mut(&recv) {
@@ -2154,20 +2248,64 @@ pub fn call_host_instance(
             add_child(vm, recv, *child)?;
             Ok(Some(Value::Null))
         }
-        (VIEWGROUP, "getChildCount") | (LINEARLAYOUT, "getChildCount") => {
+        (VIEWGROUP, "getChildCount") | (LINEARLAYOUT, "getChildCount") | (FRAMELAYOUT, "getChildCount") => {
             let n = match vm.fw.get(recv) {
                 Some(HostObj::View { children, .. }) => children.len() as i32,
                 _ => 0,
             };
             Ok(Some(Value::Int(n)))
         }
-        (VIEWGROUP, "getChildAt") | (LINEARLAYOUT, "getChildAt") => {
-            let i = args[0].as_int()? as usize;
+        (VIEWGROUP, "getChildAt") | (LINEARLAYOUT, "getChildAt") | (FRAMELAYOUT, "getChildAt") => {
+            // Android: out-of-range index → null. `Ok(None)` would mean
+            // "not handled" and surfaced as NOT_FOUND.
+            let i = args[0].as_int()?;
             let child = match vm.fw.get(recv) {
-                Some(HostObj::View { children, .. }) => children.get(i).copied(),
+                Some(HostObj::View { children, .. }) if i >= 0 => children.get(i as usize).copied(),
                 _ => None,
             };
-            Ok(child.map(Value::Obj))
+            Ok(Some(child.map_or(Value::Null, Value::Obj)))
+        }
+        (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "indexOfChild") => {
+            let c = args.first().and_then(|v| v.as_ref().ok().flatten());
+            let idx = match (vm.fw.get(recv), c) {
+                (Some(HostObj::View { children, .. }), Some(c)) => {
+                    children.iter().position(|x| *x == c).map_or(-1, |p| p as i32)
+                }
+                _ => -1,
+            };
+            Ok(Some(Value::Int(idx)))
+        }
+        (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeView")
+        | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeViewAt")
+        | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeAllViews")
+        | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeAllViewsInLayout") => {
+            let removed: Vec<ObjRef> = match vm.fw.objects.get_mut(&recv) {
+                Some(HostObj::View { children, .. }) => match name {
+                    "removeView" => {
+                        let c = args.first().and_then(|v| v.as_ref().ok().flatten());
+                        let before = children.clone();
+                        children.retain(|x| Some(*x) != c);
+                        before.into_iter().filter(|x| Some(*x) == c).collect()
+                    }
+                    "removeViewAt" => {
+                        let i = args.first().and_then(|v| v.as_int().ok()).unwrap_or(-1);
+                        if i >= 0 && (i as usize) < children.len() {
+                            vec![children.remove(i as usize)]
+                        } else {
+                            Vec::new()
+                        }
+                    }
+                    _ => std::mem::take(children),
+                },
+                _ => Vec::new(),
+            };
+            for c in removed {
+                if let Some(HostObj::View { parent, .. }) = vm.fw.objects.get_mut(&c) {
+                    *parent = None;
+                }
+                crate::view_attach::dispatch_detach(vm, c)?;
+            }
+            Ok(Some(Value::Null))
         }
         (LINEARLAYOUT, "setOrientation") => {
             let v = args[0].as_int()?;
@@ -2420,6 +2558,7 @@ pub(crate) fn set_content_view(
     if let Some(HostObj::Window { content: c }) = vm.fw.objects.get_mut(&w) {
         *c = Some(content);
     }
+    crate::window::on_content_set(vm, w, content)?;
     // layout do root com as dimensões da window
     vm.layout(content, 0, 0, WINDOW_W);
     let _ = WINDOW_H;
@@ -2444,7 +2583,8 @@ pub(crate) fn attach_child(vm: &mut Engine, parent: ObjRef, child: ObjRef) -> Re
         Some(HostObj::View { children, .. }) => children.push(child),
         _ => return Err(crate::err::vm_error("INVALID_FORMAT", "addView em não-ViewGroup").into()),
     }
-    Ok(())
+    // inserted under an attached parent → attached now (ViewGroup.addViewInner)
+    crate::view_attach::on_child_added(vm, parent, child)
 }
 
 pub(crate) fn add_child(vm: &mut Engine, parent: ObjRef, child: ObjRef) -> Result<(), VmExit> {
@@ -2466,7 +2606,13 @@ fn enqueue(vm: &mut Engine, handler: ObjRef, runnable: ObjRef, when_ms: u64) -> 
     };
     match vm.fw.objects.get_mut(&looper) {
         Some(HostObj::Looper { queue }) => {
-            queue.push(QueuedMsg { when_ms, runnable });
+            queue.push(QueuedMsg {
+                when_ms,
+                runnable,
+                handler: Some(handler),
+                is_message: false,
+                token: None,
+            });
             Ok(())
         }
         _ => Err(crate::err::vm_error("INVALID_FORMAT", "looper host ausente").into()),

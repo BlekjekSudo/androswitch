@@ -73,6 +73,40 @@ pub struct Engine {
     /// de cada corpo DEX que chegou a executar neste Engine.
     coverage: HashSet<u64>,
     pub(crate) frame_labels: Vec<String>,
+    /// Cooperative green threads (threads.rs)
+    pub threads: crate::threads::Threads,
+    /// Session permission grant set (perms.rs); None = all granted.
+    pub granted_permissions: Option<HashSet<String>>,
+    pub(crate) pending_permission_results: Vec<crate::perms::PendingPermissionResult>,
+    /// window → (decor, content frame) (window.rs)
+    pub(crate) window_decor: HashMap<crate::heap::ObjRef, (crate::heap::ObjRef, crate::heap::ObjRef)>,
+    pub(crate) system_ui_visibility: HashMap<crate::heap::ObjRef, i32>,
+    /// General View property store (view_props.rs): (view, property) → value
+    pub(crate) view_props: HashMap<(crate::heap::ObjRef, String), Value>,
+    /// view_attach.rs: OnAttachStateChangeListeners per view
+    pub(crate) attach_listeners: HashMap<crate::heap::ObjRef, Vec<crate::heap::ObjRef>>,
+    /// view_attach.rs: views currently attached to a window
+    pub(crate) attached_views: HashSet<crate::heap::ObjRef>,
+    /// view_attach.rs: windows made visible (makeVisible)
+    pub(crate) window_attached: HashSet<crate::heap::ObjRef>,
+    /// vto.rs: ViewTreeObserver state, and the observer of each tree root
+    pub(crate) vto: HashMap<crate::heap::ObjRef, crate::vto::Observer>,
+    pub(crate) vto_by_root: HashMap<crate::heap::ObjRef, crate::heap::ObjRef>,
+    /// view_attach.rs: the window token handed to attached views
+    pub(crate) window_token: Option<crate::heap::ObjRef>,
+    /// choreographer.rs: frame callbacks
+    pub(crate) frames: crate::choreographer::FrameState,
+    pub(crate) frame_pump_active: bool,
+    /// activity_callbacks.rs: ActivityLifecycleCallbacks registry
+    pub(crate) activity_callbacks: crate::activity_callbacks::Registry,
+    /// activity_extras.rs: setResult, back dispatchers and their callbacks
+    pub(crate) activity_results: HashMap<crate::heap::ObjRef, (i32, Option<crate::heap::ObjRef>)>,
+    pub(crate) back_dispatchers: HashMap<crate::heap::ObjRef, crate::heap::ObjRef>,
+    pub(crate) back_callbacks: HashMap<crate::heap::ObjRef, Vec<(i32, crate::heap::ObjRef)>>,
+    /// bundle.rs: Intent action/data/type/flags/package/categories
+    pub(crate) intent_meta: HashMap<crate::heap::ObjRef, crate::bundle::IntentMeta>,
+    /// content.rs: ContentResolver observers + Settings table
+    pub(crate) content: crate::content::ContentState,
 }
 
 /// Cobertura por classe (AG-09, nível de método).
@@ -116,6 +150,26 @@ impl Engine {
             fuel_used: 0,
             coverage: HashSet::new(),
             frame_labels: Vec::new(),
+            threads: Default::default(),
+            granted_permissions: None,
+            pending_permission_results: Vec::new(),
+            window_decor: HashMap::new(),
+            system_ui_visibility: HashMap::new(),
+            view_props: HashMap::new(),
+            attach_listeners: HashMap::new(),
+            attached_views: HashSet::new(),
+            window_attached: HashSet::new(),
+            vto: HashMap::new(),
+            vto_by_root: HashMap::new(),
+            window_token: None,
+            frames: Default::default(),
+            frame_pump_active: false,
+            activity_callbacks: Default::default(),
+            activity_results: HashMap::new(),
+            back_dispatchers: HashMap::new(),
+            back_callbacks: HashMap::new(),
+            intent_meta: HashMap::new(),
+            content: Default::default(),
         }
     }
 
@@ -337,9 +391,20 @@ impl Engine {
         // ao desempilhar (estilo JVM, innermost primeiro). Erros estruturados
         // da VM não são Java e não ganham frames.
         if self.config.exception_trace {
-            if let Err(VmExit::Exception(ref mut t)) = ret {
-                let line = format!("\n  at {}", self.method_label(dex_idx, m));
-                t.message.get_or_insert_with(String::new).push_str(&line);
+            match ret {
+                Err(VmExit::Exception(ref mut t)) => {
+                    let line = format!("\n  at {}", self.method_label(dex_idx, m));
+                    t.message.get_or_insert_with(String::new).push_str(&line);
+                }
+                // Structured VM errors (NOT_FOUND/NOT_IMPLEMENTED/...) get
+                // the guest stack too, so an agent can see which app code
+                // hit the gap. The green-thread park signal is control flow,
+                // not an error.
+                Err(VmExit::Error(ref mut e)) if e.code != crate::threads::PARK_SIGNAL => {
+                    let line = format!("\n  at {}", self.method_label(dex_idx, m));
+                    e.cause.push_str(&line);
+                }
+                _ => {}
             }
         }
         ret
