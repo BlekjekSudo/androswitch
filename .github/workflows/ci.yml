@@ -149,6 +149,20 @@ jobs:
         env:
           RD_NATIVE_PYTHON: python
         run: cargo test -p rd-ndk -p rd-vm --features native
+      # M9 DoD: five real F-Droid APKs (pinned by SHA-256, never committed —
+      # GH-05) make JNI calls from their real DEX with checked results, on
+      # every ABI they ship.
+      - uses: actions/cache@v4
+        with:
+          path: golden-apks/cache
+          key: m9-gate-apks-${{ hashFiles('golden-apks/native-gate.sh') }}
+      - name: Real-APK native gate (x86_64, arm64-v8a, armeabi-v7a)
+        env:
+          RD_NATIVE_PYTHON: python
+        run: |
+          bash golden-apks/native-gate.sh
+          RD_NATIVE_ABI=arm64-v8a bash golden-apks/native-gate.sh
+          RD_NATIVE_ABI=armeabi-v7a bash golden-apks/native-gate.sh
 
   rust-msrv:
     name: Rust MSRV (1.76)
