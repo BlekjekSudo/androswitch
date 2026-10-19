@@ -325,27 +325,107 @@ pub(crate) fn instance_intrinsic(
             }
             Value::Int(0)
         }
+        // AOSP: post-concat the ancestors' offsets (view transforms such as
+        // rotation/scale are not modelled → pure window translation)
+        ("transformMatrixToGlobal" | "transformMatrixToLocal", "(Landroid/graphics/Matrix;)V") => {
+            if let Some(Value::Obj(m)) = args.first() {
+                let s = if name == "transformMatrixToGlobal" {
+                    1.0
+                } else {
+                    -1.0
+                };
+                vm.invoke_instance(
+                    *m,
+                    "postTranslate",
+                    "(FF)Z",
+                    &[Value::Float(s * x as f32), Value::Float(s * y as f32)],
+                )?;
+            }
+            Value::Null
+        }
+        // View transforms (rotation/scale/translation properties) are not
+        // modelled: the view matrix is the identity
+        ("getMatrix" | "getInverseMatrix", "()Landroid/graphics/Matrix;") => {
+            Value::Obj(crate::graphics::new_identity_matrix(vm)?)
+        }
+        ("hasIdentityMatrix", "()Z") => Value::Int(1),
+        // View.post* — the attached view's handler is the main looper
+        ("post" | "postOnAnimation", "(Ljava/lang/Runnable;)Z" | "(Ljava/lang/Runnable;)V") => {
+            if let Some(Value::Obj(r)) = args.first() {
+                view_post(vm, *r, 0)?;
+            }
+            if sig.ends_with('Z') {
+                Value::Int(1)
+            } else {
+                Value::Null
+            }
+        }
+        (
+            "postDelayed" | "postOnAnimationDelayed",
+            "(Ljava/lang/Runnable;J)Z" | "(Ljava/lang/Runnable;J)V",
+        ) => {
+            if let Some(Value::Obj(r)) = args.first() {
+                let d = match args.get(1) {
+                    Some(Value::Long(l)) => (*l).max(0) as u64,
+                    Some(Value::Int(i)) => (*i).max(0) as u64,
+                    _ => 0,
+                };
+                view_post(vm, *r, d)?;
+            }
+            if sig.ends_with('Z') {
+                Value::Int(1)
+            } else {
+                Value::Null
+            }
+        }
+        ("removeCallbacks", "(Ljava/lang/Runnable;)Z") => {
+            if let Some(Value::Obj(r)) = args.first() {
+                let r = *r;
+                let looper = vm.main_looper_obj()?;
+                if let Some(HostObj::Looper { queue }) = vm.fw.objects.get_mut(&looper) {
+                    queue.retain(|e| e.is_message || e.runnable != r);
+                }
+            }
+            Value::Int(1)
+        }
+        // AOSP ViewGroup/View touch defaults (reached via `super.…`)
+        ("dispatchTouchEvent", TOUCH_SIG) => match args.first() {
+            Some(Value::Obj(ev)) => Value::Int(host_dispatch_touch(vm, recv, *ev)? as i32),
+            _ => Value::Int(0),
+        },
+        ("onTouchEvent" | "onInterceptTouchEvent", TOUCH_SIG) => Value::Int(0),
         // AOSP ViewGroup.dispatchDraw (reached via `super.dispatchDraw`):
         // draw each visible child in order through the (overridable)
         // `drawChild(Canvas, View, long)`.
         ("dispatchDraw", "(Landroid/graphics/Canvas;)V") => {
             if let Some(Value::Obj(c)) = args.first() {
+                host_dispatch_draw(vm, recv, *c)?;
+            }
+            Value::Null
+        }
+        // AOSP View.draw(Canvas) called directly (e.g. Compose drawing its
+        // RippleHostView): onDraw, then dispatchDraw (DEX override or the
+        // ViewGroup default)
+        ("draw", "(Landroid/graphics/Canvas;)V") => {
+            if let Some(Value::Obj(c)) = args.first() {
                 let c = *c;
-                let kids = match vm.fw.get(recv) {
-                    Some(HostObj::View { children, .. }) => children.clone(),
-                    _ => Vec::new(),
-                };
-                for child in kids {
-                    let over = crate::jcollections::guest_call(
-                        vm,
-                        recv,
-                        "drawChild",
-                        "(Landroid/graphics/Canvas;Landroid/view/View;J)Z",
-                        &[Value::Obj(c), Value::Obj(child), Value::Long(0)],
-                    )?;
-                    if over.is_none() {
-                        host_draw_child(vm, c, child)?;
-                    }
+                crate::jcollections::guest_call(
+                    vm,
+                    recv,
+                    "onDraw",
+                    "(Landroid/graphics/Canvas;)V",
+                    &[Value::Obj(c)],
+                )?;
+                if crate::jcollections::guest_call(
+                    vm,
+                    recv,
+                    "dispatchDraw",
+                    "(Landroid/graphics/Canvas;)V",
+                    &[Value::Obj(c)],
+                )?
+                .is_none()
+                {
+                    host_dispatch_draw(vm, recv, c)?;
                 }
             }
             Value::Null
@@ -663,6 +743,122 @@ fn host_draw_child(vm: &mut Engine, c: ObjRef, child: ObjRef) -> Result<(), VmEx
             )?;
         }
         vm.canvas_restore_to(c, n);
+    }
+    Ok(())
+}
+
+const TOUCH_SIG: &str = "(Landroid/view/MotionEvent;)Z";
+
+fn truthy(v: Option<Value>) -> bool {
+    matches!(v, Some(Value::Int(i)) if i != 0)
+}
+
+/// Delivers `ev` (in `v`'s local coordinates) to `v` the way
+/// `ViewRootImpl` does: a DEX `dispatchTouchEvent` override runs first,
+/// otherwise the AOSP ViewGroup/View logic below.
+pub(crate) fn dispatch_touch(vm: &mut Engine, v: ObjRef, ev: ObjRef) -> Result<bool, VmExit> {
+    if let Some(r) =
+        crate::jcollections::guest_call(vm, v, "dispatchTouchEvent", TOUCH_SIG, &[Value::Obj(ev)])?
+    {
+        return Ok(truthy(Some(r)));
+    }
+    host_dispatch_touch(vm, v, ev)
+}
+
+/// AOSP ViewGroup.dispatchTouchEvent / View.dispatchTouchEvent (stateless):
+/// `onInterceptTouchEvent`, then the visible children under the point in
+/// reverse drawing order (event offset to the child's frame), then the
+/// view's own `onTouchEvent`. Subsequent events are routed again by
+/// position (no persistent touch target), which matches taps and
+/// in-bounds gestures.
+pub(crate) fn host_dispatch_touch(vm: &mut Engine, v: ObjRef, ev: ObjRef) -> Result<bool, VmExit> {
+    let Some(HostObj::View {
+        x: px,
+        y: py,
+        children,
+        ..
+    }) = vm.fw.get(v).cloned()
+    else {
+        return Ok(false);
+    };
+    let intercepted = truthy(crate::jcollections::guest_call(
+        vm,
+        v,
+        "onInterceptTouchEvent",
+        TOUCH_SIG,
+        &[Value::Obj(ev)],
+    )?);
+    if !intercepted {
+        let (ex, ey) = crate::android_motion::xy(vm, ev);
+        for c in children.iter().rev() {
+            let Some(HostObj::View {
+                x: cx,
+                y: cy,
+                w,
+                h,
+                vis,
+                ..
+            }) = vm.fw.get(*c).cloned()
+            else {
+                continue;
+            };
+            if vis != crate::framework::Vis::Visible {
+                continue;
+            }
+            let (l, t) = ((cx - px) as f32, (cy - py) as f32);
+            if ex < l || ey < t || ex >= l + w as f32 || ey >= t + h as f32 {
+                continue;
+            }
+            let e2 = crate::android_motion::copy_event(vm, ev)?;
+            crate::android_motion::offset(vm, e2, -l, -t)?;
+            if dispatch_touch(vm, *c, e2)? {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(truthy(crate::jcollections::guest_call(
+        vm,
+        v,
+        "onTouchEvent",
+        TOUCH_SIG,
+        &[Value::Obj(ev)],
+    )?))
+}
+
+/// `View.post*`: enqueue `r` on the main looper after `delay_ms`.
+fn view_post(vm: &mut Engine, r: ObjRef, delay_ms: u64) -> Result<(), VmExit> {
+    let looper = vm.main_looper_obj()?;
+    let when_ms = vm.fw.clock().saturating_add(delay_ms);
+    if let Some(HostObj::Looper { queue }) = vm.fw.objects.get_mut(&looper) {
+        queue.push(crate::framework::QueuedMsg {
+            when_ms,
+            runnable: r,
+            handler: None,
+            is_message: false,
+            token: None,
+        });
+    }
+    Ok(())
+}
+
+/// AOSP ViewGroup.dispatchDraw: each child in order through the
+/// (overridable) `drawChild(Canvas, View, long)`.
+fn host_dispatch_draw(vm: &mut Engine, recv: ObjRef, c: ObjRef) -> Result<(), VmExit> {
+    let kids = match vm.fw.get(recv) {
+        Some(HostObj::View { children, .. }) => children.clone(),
+        _ => Vec::new(),
+    };
+    for child in kids {
+        let over = crate::jcollections::guest_call(
+            vm,
+            recv,
+            "drawChild",
+            "(Landroid/graphics/Canvas;Landroid/view/View;J)Z",
+            &[Value::Obj(c), Value::Obj(child), Value::Long(0)],
+        )?;
+        if over.is_none() {
+            host_draw_child(vm, c, child)?;
+        }
     }
     Ok(())
 }

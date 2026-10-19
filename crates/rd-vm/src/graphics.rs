@@ -951,6 +951,14 @@ fn matrix_of(vm: &Engine, r: Option<ObjRef>) -> M {
         _ => ID,
     }
 }
+/// A new host `android.graphics.Matrix` set to identity.
+pub(crate) fn new_identity_matrix(vm: &mut Engine) -> Result<ObjRef, VmExit> {
+    let r = vm
+        .heap
+        .alloc_instance("Landroid/graphics/Matrix;".into(), Vec::new())?;
+    set_matrix(vm, r, ID);
+    Ok(r)
+}
 fn set_matrix(vm: &mut Engine, r: ObjRef, m: M) {
     vm.gfx.objs.insert(r, G::Matrix(m));
 }

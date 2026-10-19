@@ -295,6 +295,9 @@ pub fn call_m8_static(
     _sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(v) = crate::android_drawable::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
     if let Some(v) = crate::android_uri::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
@@ -359,6 +362,18 @@ pub fn call_m8_instance(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     let recv_class = vm.heap.class_of(recv).unwrap_or("").to_string();
+    // ── Drawable family / ColorStateList (android_drawable.rs) ──────────
+    if let Some(v) = crate::android_drawable::instance_intrinsic(
+        vm,
+        &recv_class,
+        mref_class,
+        name,
+        sig,
+        recv,
+        args,
+    )? {
+        return Ok(Some(v));
+    }
     // ── Fragments androidx ──────────────────────────────────────────────
     if mref_class == "Landroidx/fragment/app/FragmentManager;"
         || recv_class == "Landroidx/fragment/app/FragmentManager;"

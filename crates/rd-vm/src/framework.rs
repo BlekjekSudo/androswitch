@@ -76,6 +76,11 @@ pub const DENSITY: f32 = 2.0;
 /// estourar a stack Rust e abortar o processo. Mesmo teto do inflate.
 const MAX_VIEW_DEPTH: usize = 512;
 
+/// Virtual vsync period.
+const VSYNC_MS: u64 = 16;
+/// Cap on vsync-stepped ticks per `advance_clock` (about 64 s of animation).
+const MAX_VSYNC_TICKS: usize = 4000;
+
 /// Estado host de um objeto. O heap guarda apenas a classe; o estado Java
 /// real fica aqui. Um ObjRef = um HostObj.
 /// issue #46: visibilidade com 3 estados reais do Android — INVISIBLE ocupa
@@ -858,7 +863,62 @@ impl Engine {
             }
             return Ok(false);
         };
-        self.dispatch_click(target)
+        if self.click_listener_of(target).is_some() || self.click_method_of(target).is_some() {
+            return self.dispatch_click(target);
+        }
+        // No host-level click handler: deliver a real DOWN/UP MotionEvent
+        // pair through the view tree (custom views, Compose, gestures).
+        self.touch_sequence(content, &[(x, y)])
+    }
+
+    /// Sends DOWN at the first point, MOVE for the middle points and UP at
+    /// the last one through `root.dispatchTouchEvent` (16 ms apart, with
+    /// the looper drained between events). Returns whether the DOWN was
+    /// consumed.
+    pub fn touch_sequence(&mut self, root: ObjRef, pts: &[(i32, i32)]) -> Result<bool, VmExit> {
+        let Some(&(x0, y0)) = pts.first() else {
+            return Ok(false);
+        };
+        let (rx, ry) = match self.fw.get(root) {
+            Some(HostObj::View { x, y, .. }) => (*x, *y),
+            _ => (0, 0),
+        };
+        let down = self.fw.clock() as i64;
+        let n = pts.len().max(2);
+        let mut consumed = false;
+        for i in 0..n {
+            let (px, py) = if i == n - 1 {
+                *pts.last().unwrap_or(&(x0, y0))
+            } else {
+                pts[i.min(pts.len() - 1)]
+            };
+            let action = if i == 0 {
+                crate::android_motion::ACTION_DOWN
+            } else if i == n - 1 {
+                crate::android_motion::ACTION_UP
+            } else {
+                crate::android_motion::ACTION_MOVE
+            };
+            let now = self.fw.clock() as i64;
+            let ev = crate::android_motion::new_event(
+                self,
+                action,
+                (px - rx) as f32,
+                (py - ry) as f32,
+                rx as f32,
+                ry as f32,
+                down,
+                now,
+            )?;
+            let r = crate::view_layout::dispatch_touch(self, root, ev)?;
+            if i == 0 {
+                consumed = r;
+            }
+            if i != n - 1 {
+                self.advance_clock(16)?;
+            }
+        }
+        Ok(consumed)
     }
 
     /// M3.2: dispatch do clique em `target` — listener do app
@@ -1166,10 +1226,31 @@ impl Engine {
     /// Avança o clock virtual e executa as mensagens vencidas (postDelayed).
     /// Devolve quantas runnables rodaram.
     pub fn advance_clock(&mut self, ms: u64) -> Result<usize, VmExit> {
-        self.fw.clock_ms = self.fw.clock_ms.saturating_add(ms);
-        #[cfg(feature = "advanced-components")]
-        self.m9_expire_notifications()?;
-        self.drain_looper()
+        // While frame callbacks are pending (animations), time advances in
+        // 16 ms vsync ticks so each frame sees a later frameTimeNanos — a
+        // single jump would hand every frame the same timestamp and freeze
+        // animations. Without pending frames it jumps straight to the
+        // target, and drain_looper still runs messages in deadline order.
+        let target = self.fw.clock_ms.saturating_add(ms);
+        let mut ran = 0usize;
+        let mut ticks = 0usize;
+        loop {
+            let now = self.fw.clock_ms;
+            let step_to = if !self.frames.callbacks.is_empty() && ticks < MAX_VSYNC_TICKS {
+                ticks += 1;
+                // next vsync boundary after `now`
+                ((now / VSYNC_MS) + 1) * VSYNC_MS
+            } else {
+                target
+            };
+            self.fw.clock_ms = step_to.min(target).max(now);
+            #[cfg(feature = "advanced-components")]
+            self.m9_expire_notifications()?;
+            ran += self.drain_looper()?;
+            if self.fw.clock_ms >= target {
+                return Ok(ran);
+            }
+        }
     }
 
     /// Executa mensagens com `when_ms <= clock` — SEMPRE a de deadline mais
@@ -2297,12 +2378,30 @@ pub fn call_host_instance(
             Ok(Some(Value::Int(idx)))
         }
         (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeView")
+        | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeViewInLayout")
+        | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeViews")
+        | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeViewsInLayout")
         | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeViewAt")
         | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeAllViews")
         | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeAllViewsInLayout") => {
             let removed: Vec<ObjRef> = match vm.fw.objects.get_mut(&recv) {
                 Some(HostObj::View { children, .. }) => match name {
-                    "removeView" => {
+                    "removeViews" | "removeViewsInLayout" => {
+                        let st = args
+                            .first()
+                            .and_then(|v| v.as_int().ok())
+                            .unwrap_or(0)
+                            .max(0) as usize;
+                        let n = args
+                            .get(1)
+                            .and_then(|v| v.as_int().ok())
+                            .unwrap_or(0)
+                            .max(0) as usize;
+                        let st = st.min(children.len());
+                        let en = (st + n).min(children.len());
+                        children.drain(st..en).collect()
+                    }
+                    "removeView" | "removeViewInLayout" => {
                         let c = args.first().and_then(|v| v.as_ref().ok().flatten());
                         let before = children.clone();
                         children.retain(|x| Some(*x) != c);

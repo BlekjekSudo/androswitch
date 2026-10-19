@@ -764,6 +764,24 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/lang/Object;",
         ]),
         "Landroid/content/ComponentName;" => Some(OBJECT.to_vec()),
+        "Landroid/graphics/drawable/Drawable;" | "Landroid/content/res/ColorStateList;" => {
+            Some(OBJECT.to_vec())
+        }
+        "Landroid/graphics/drawable/ColorDrawable;"
+        | "Landroid/graphics/drawable/LayerDrawable;" => Some(vec![
+            "Landroid/graphics/drawable/Drawable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/graphics/drawable/RippleDrawable;" => Some(vec![
+            "Landroid/graphics/drawable/LayerDrawable;",
+            "Landroid/graphics/drawable/Drawable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/view/MotionEvent;" => {
+            Some(vec!["Landroid/view/InputEvent;", "Ljava/lang/Object;"])
+        }
+        "Landroid/view/MotionEvent$PointerCoords;"
+        | "Landroid/view/MotionEvent$PointerProperties;" => Some(OBJECT.to_vec()),
         "Landroid/graphics/ColorSpace;"
         | "Landroid/graphics/ColorSpace$Named;"
         | "Landroid/graphics/ColorSpace$Model;"

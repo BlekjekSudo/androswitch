@@ -10,6 +10,8 @@ pub(crate) mod activity_extras;
 pub mod android_build;
 pub(crate) mod android_colorspace;
 pub(crate) mod android_display;
+pub(crate) mod android_drawable;
+pub(crate) mod android_motion;
 pub(crate) mod android_pm;
 pub(crate) mod android_res;
 pub(crate) mod android_spannable;

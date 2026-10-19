@@ -284,6 +284,9 @@ pub fn call_static_intrinsic(
     if let Some(v) = crate::xml_res::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
+    if let Some(v) = crate::android_motion::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
     if let Some(v) = crate::android_colorspace::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
@@ -3303,6 +3306,14 @@ pub fn call_instance_intrinsic_mref(
     {
         if let Some(v) =
             call_instance_intrinsic_mref(vm, recv_class, recv_class, name, sig, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
+    // MotionEvent (android_motion.rs)
+    if recv_class.starts_with("Landroid/view/MotionEvent") {
+        if let Some(v) =
+            crate::android_motion::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
         {
             return Ok(Some(v));
         }
