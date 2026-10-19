@@ -28,7 +28,7 @@ fn host_elems(vm: &Engine, v: Option<&Value>) -> Option<Vec<Value>> {
     }
 }
 
-fn new_list(vm: &mut Engine, class: &str, elems: Vec<Value>) -> Result<Value, VmExit> {
+pub(crate) fn new_list(vm: &mut Engine, class: &str, elems: Vec<Value>) -> Result<Value, VmExit> {
     let r = vm.heap.alloc_instance(class.to_string(), Vec::new())?;
     vm.fw.objects.insert(r, HostObj::List { elems });
     Ok(Value::Obj(r))

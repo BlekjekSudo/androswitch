@@ -206,6 +206,30 @@ pub(crate) fn instance_intrinsic(
             };
             Ok(Some(Value::Obj(t)))
         }
+        // AOSP: mAttachInfo.mHandler (the window's main-looper Handler) while
+        // attached, null otherwise
+        ("getHandler", "()Landroid/os/Handler;") => {
+            if !vm.attached_views.contains(&recv) {
+                return Ok(Some(Value::Null));
+            }
+            let key = ("Landroid/view/View;".to_string(), "rd_attach_handler".to_string());
+            if let Some(Value::Obj(h)) = vm.statics.get(&key) {
+                return Ok(Some(Value::Obj(*h)));
+            }
+            let looper = vm.main_looper_obj()?;
+            let h = vm.heap.alloc_instance("Landroid/os/Handler;".to_string(), Vec::new())?;
+            vm.attach_host_state("Landroid/os/Handler;", h)?;
+            crate::framework::call_host_instance(
+                vm,
+                "Landroid/os/Handler;",
+                "<init>",
+                "(Landroid/os/Looper;)V",
+                h,
+                &[Value::Obj(looper)],
+            )?;
+            vm.statics.insert(key, Value::Obj(h));
+            Ok(Some(Value::Obj(h)))
+        }
         ("isAttachedToWindow", "()Z") => Ok(Some(Value::Int(vm.attached_views.contains(&recv) as i32))),
         _ => Ok(None),
     }

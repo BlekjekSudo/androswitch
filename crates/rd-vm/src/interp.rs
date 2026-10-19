@@ -808,6 +808,14 @@ pub(crate) fn exec_frame(
                         step!(crate::android_build::host_static(vm, &owner, &fname))
                     {
                         vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
+                        step!(crate::graphics::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
+                        step!(crate::platform_base::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
                     }
                 }
                 let v = vm

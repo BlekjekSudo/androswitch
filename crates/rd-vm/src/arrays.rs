@@ -27,7 +27,7 @@ fn exc(c: &str, m: impl Into<String>) -> VmExit {
     VmExit::Exception(Throwable::new(c, m))
 }
 
-fn elems(vm: &Engine, r: ObjRef) -> Result<(Vec<Value>, ElemKind, String), VmExit> {
+pub(crate) fn elems(vm: &Engine, r: ObjRef) -> Result<(Vec<Value>, ElemKind, String), VmExit> {
     let (e, k) = vm.heap.as_array_elems(r)?;
     let desc = vm.heap.class_of(r)?.to_string();
     Ok((e.to_vec(), k, desc))
@@ -43,7 +43,7 @@ fn default_of(k: ElemKind) -> Value {
     }
 }
 
-fn new_array(vm: &mut Engine, desc: &str, k: ElemKind, items: Vec<Value>) -> Result<Value, VmExit> {
+pub(crate) fn new_array(vm: &mut Engine, desc: &str, k: ElemKind, items: Vec<Value>) -> Result<Value, VmExit> {
     // alloc_array wants the element class for Obj arrays, the full desc otherwise
     let elem_class = if k == ElemKind::Obj { desc.strip_prefix('[').unwrap_or(desc).to_string() } else { desc.to_string() };
     let r = vm.heap.alloc_array(k, items.len(), &elem_class)?;

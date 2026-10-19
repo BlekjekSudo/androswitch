@@ -491,10 +491,26 @@ pub fn call_m8_instance(
         return intent_m8(vm, name, sig, recv, args);
     }
     // ── Context.getSystemService (probe real Breezy Weather) ───────────
+    if name == "getSystemServiceName" && sig == "(Ljava/lang/Class;)Ljava/lang/String;" {
+        let cls = match args.first() {
+            Some(Value::Obj(c)) => match vm.heap.get_field(*c, "class_name") {
+                Ok(Value::Obj(s)) => vm.heap.as_str(s).ok().map(str::to_string).unwrap_or_default(),
+                _ => String::new(),
+            },
+            _ => String::new(),
+        };
+        return Ok(Some(match SERVICES.iter().find(|(_, c)| *c == cls) {
+            Some((n, _)) => Value::Obj(crate::intrinsics::alloc_string(vm, n.to_string())?),
+            None => Value::Null,
+        }));
+    }
     if name == "getSystemService"
         && (mref_class == "Landroid/content/Context;"
             || mref_class == "Landroid/app/Activity;"
-            || mref_class == "Landroid/app/Application;")
+            || mref_class == "Landroid/app/Application;"
+            || mref_class == "Landroid/content/ContextWrapper;"
+            || mref_class == "Landroid/view/ContextThemeWrapper;"
+            || mref_class == "Landroid/app/Service;")
     {
         let key = if sig.contains("Ljava/lang/Class;") {
             match args.first() {
@@ -515,8 +531,22 @@ pub fn call_m8_instance(
         } else {
             sarg(vm, args, 0)?.unwrap_or_default()
         };
-        let class = system_service_class(&key);
-        let r = alloc(vm, class)?;
+        // Class-keyed lookups return exactly that class; services are
+        // per-class singletons (AOSP caches them per Context).
+        let class = if key.starts_with('L') && key.ends_with(';') && system_service_class(&key) == "Ljava/lang/Object;" {
+            key.clone()
+        } else {
+            system_service_class(&key).to_string()
+        };
+        if class == "Ljava/lang/Object;" {
+            return Ok(Some(Value::Null)); // unknown service name → null, as AOSP
+        }
+        let k = ("Lrd/SystemServices;".to_string(), class.clone());
+        if let Some(v) = vm.statics.get(&k) {
+            return Ok(Some(v.clone()));
+        }
+        let r = alloc(vm, &class)?;
+        vm.statics.insert(k, Value::Obj(r));
         return Ok(Some(Value::Obj(r)));
     }
     // ── Context: services / broadcasts / receivers ─────────────────────
@@ -1845,23 +1875,53 @@ fn okhttp(
 
 // ── Services / broadcasts ───────────────────────────────────────────────
 /// Nome (Context.XXX_SERVICE) ou classe -> classe host do serviço de sistema.
+/// `Context.*_SERVICE` names → manager classes.
+const SERVICES: &[(&str, &str)] = &[
+    ("jobscheduler", "Landroid/app/job/JobScheduler;"),
+    ("activity", "Landroid/app/ActivityManager;"),
+    ("window", "Landroid/view/WindowManager;"),
+    ("layout_inflater", "Landroid/view/LayoutInflater;"),
+    ("power", "Landroid/os/PowerManager;"),
+    ("alarm", "Landroid/app/AlarmManager;"),
+    ("notification", "Landroid/app/NotificationManager;"),
+    ("connectivity", "Landroid/net/ConnectivityManager;"),
+    ("input_method", "Landroid/view/inputmethod/InputMethodManager;"),
+    ("location", "Landroid/location/LocationManager;"),
+    ("sensor", "Landroid/hardware/SensorManager;"),
+    ("accessibility", "Landroid/view/accessibility/AccessibilityManager;"),
+    ("autofill", "Landroid/view/autofill/AutofillManager;"),
+    ("clipboard", "Landroid/content/ClipboardManager;"),
+    ("vibrator", "Landroid/os/Vibrator;"),
+    ("vibrator_manager", "Landroid/os/VibratorManager;"),
+    ("audio", "Landroid/media/AudioManager;"),
+    ("camera", "Landroid/hardware/camera2/CameraManager;"),
+    ("display", "Landroid/hardware/display/DisplayManager;"),
+    ("keyguard", "Landroid/app/KeyguardManager;"),
+    ("uimode", "Landroid/app/UiModeManager;"),
+    ("download", "Landroid/app/DownloadManager;"),
+    ("storage", "Landroid/os/storage/StorageManager;"),
+    ("textservices", "Landroid/view/textservice/TextServicesManager;"),
+    ("textclassification", "Landroid/view/textclassifier/TextClassificationManager;"),
+    ("user", "Landroid/os/UserManager;"),
+    ("appops", "Landroid/app/AppOpsManager;"),
+    ("batterymanager", "Landroid/os/BatteryManager;"),
+    ("wifi", "Landroid/net/wifi/WifiManager;"),
+    ("telephony", "Landroid/telephony/TelephonyManager;"),
+    ("shortcut", "Landroid/content/pm/ShortcutManager;"),
+    ("appwidget", "Landroid/appwidget/AppWidgetManager;"),
+    ("locale", "Landroid/app/LocaleManager;"),
+    ("content_capture", "Landroid/view/contentcapture/ContentCaptureManager;"),
+    ("translation", "Landroid/view/translation/TranslationManager;"),
+    ("media_session", "Landroid/media/session/MediaSessionManager;"),
+    ("usagestats", "Landroid/app/usage/UsageStatsManager;"),
+];
+
 fn system_service_class(key: &str) -> &'static str {
-    match key {
-        "jobscheduler" | "Landroid/app/job/JobScheduler;" => JOB_SCHEDULER,
-        "activity" | "Landroid/app/ActivityManager;" => "Landroid/app/ActivityManager;",
-        "window" | "Landroid/view/WindowManager;" => "Landroid/view/WindowManager;",
-        "layout_inflater" | "Landroid/view/LayoutInflater;" => "Landroid/view/LayoutInflater;",
-        "power" | "Landroid/os/PowerManager;" => "Landroid/os/PowerManager;",
-        "alarm" | "Landroid/app/AlarmManager;" => "Landroid/app/AlarmManager;",
-        "notification" | "Landroid/app/NotificationManager;" => "Landroid/app/NotificationManager;",
-        "connectivity" | "Landroid/net/ConnectivityManager;" => "Landroid/net/ConnectivityManager;",
-        "input_method" | "Landroid/view/inputmethod/InputMethodManager;" => {
-            "Landroid/view/inputmethod/InputMethodManager;"
-        }
-        "location" | "Landroid/location/LocationManager;" => "Landroid/location/LocationManager;",
-        "sensor" | "Landroid/hardware/SensorManager;" => "Landroid/hardware/SensorManager;",
-        _ => "Ljava/lang/Object;",
-    }
+    SERVICES
+        .iter()
+        .find(|(n, c)| *n == key || *c == key)
+        .map(|(_, c)| *c)
+        .unwrap_or("Ljava/lang/Object;")
 }
 
 fn context_services(

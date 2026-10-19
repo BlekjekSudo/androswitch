@@ -285,6 +285,20 @@ pub fn call_static_intrinsic(
     if let Some(v) = crate::jlsystem::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
     }
+    if let Some(v) = crate::platform_base::vibrator_static(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_util::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    // android.graphics / android.text layout statics (graphics.rs)
+    if let Some(v) = crate::graphics::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // Resources/Locale/LocaleList statics (android_res.rs)
+    if let Some(v) = crate::android_res::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
     // java.util.Collections extras (collections.rs)
     if let Some(v) = crate::collections::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
@@ -3144,9 +3158,14 @@ fn list_intrinsic(
 /// Igualdade de identidade de referências (o `==` do Java sobre refs) — usada
 /// pelo CAS do AtomicReference: Null == Null; Obj(i) == Obj(j) sse i == j.
 /// Valores não-ref (Int/Long/…) nunca são payload de AtomicReference via DEX.
+/// Reference identity for CAS-style comparisons. DEX materialises `null`
+/// as `const/4 vX, 0`, so a register holding `Int(0)` in an object position
+/// IS null: `CAS(expected = null)` against an unset field must succeed.
+/// Before this, every kotlinx `loopOnState`/`installParentHandle` CAS with
+/// a null expected value spun forever.
 fn ref_identity_eq(a: &Value, b: &Value) -> bool {
     match (a, b) {
-        (Value::Null, Value::Null) => true,
+        (Value::Null | Value::Int(0), Value::Null | Value::Int(0)) => true,
         (Value::Obj(x), Value::Obj(y)) => x == y,
         _ => false,
     }
@@ -3202,6 +3221,22 @@ pub fn call_instance_intrinsic_mref(
     if let Some(v) = crate::window::layout_params_intrinsic(vm, mref_class, name, sig, recv, args)? {
         return Ok(Some(v));
     }
+    // android.graphics recording pipeline + text layouts (graphics.rs)
+    if let Some(v) = crate::graphics::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // Resources/Configuration/DisplayMetrics/Theme/TypedArray/Locale + Context family (android_res.rs)
+    if let Some(v) = crate::android_res::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // TreeMap / TreeSet (jsorted.rs)
+    if let Some(v) = crate::jsorted::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // collection bulk ops + AbstractList/AbstractCollection templates (jcollections.rs)
+    if let Some(v) = crate::jcollections::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
     // reflective member lookup: Class.getMethod / Method.invoke (reflect.rs)
     if let Some(v) = crate::reflect::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
         return Ok(Some(v));
@@ -3254,6 +3289,20 @@ pub fn call_instance_intrinsic_mref(
     }
     // attach-to-window lifecycle (view_attach.rs)
     if let Some(v) = crate::view_attach::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // stateless platform base classes (platform_base.rs)
+    if let Some(v) = crate::platform_base::instance_intrinsic(mref_class, name, sig) {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::platform_base::a11y_manager(vm, mref_class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::platform_base::vibrator(vm, mref_class, name, args)? {
+        return Ok(Some(v));
+    }
+    // android.util sparse arrays / Size / Pair / Range / Rational (android_util.rs)
+    if let Some(v) = crate::android_util::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
         return Ok(Some(v));
     }
     if mref_class.starts_with("Landroid/view/") {

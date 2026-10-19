@@ -87,6 +87,10 @@ pub struct Engine {
     pub(crate) attach_listeners: HashMap<crate::heap::ObjRef, Vec<crate::heap::ObjRef>>,
     /// view_attach.rs: views currently attached to a window
     pub(crate) attached_views: HashSet<crate::heap::ObjRef>,
+    /// graphics.rs: native state of host graphics objects + window display list
+    pub(crate) gfx: crate::graphics::Gfx,
+    /// android_util.rs: sparse-array contents (sorted)
+    pub(crate) sparse: HashMap<crate::heap::ObjRef, std::collections::BTreeMap<i64, Value>>,
     /// view_attach.rs: windows made visible (makeVisible)
     pub(crate) window_attached: HashSet<crate::heap::ObjRef>,
     /// vto.rs: ViewTreeObserver state, and the observer of each tree root
@@ -158,6 +162,8 @@ impl Engine {
             view_props: HashMap::new(),
             attach_listeners: HashMap::new(),
             attached_views: HashSet::new(),
+            gfx: Default::default(),
+            sparse: HashMap::new(),
             window_attached: HashSet::new(),
             vto: HashMap::new(),
             vto_by_root: HashMap::new(),
