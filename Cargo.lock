@@ -314,6 +314,8 @@ version = "0.9.0"
 dependencies = [
  "rd-apk",
  "rd-dex",
+ "rd-jni",
+ "rd-ndk",
  "rd-render",
  "rd-testsupport",
  "serde",

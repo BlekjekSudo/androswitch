@@ -93,7 +93,7 @@ fn mcp_stdio_full_agent_flow() {
     // catálogo
     mcp.send(r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#);
     let r = mcp.read();
-    assert_eq!(r["result"]["tools"].as_array().map(|a| a.len()), Some(32));
+    assert_eq!(r["result"]["tools"].as_array().map(|a| a.len()), Some(39));
 
     // install → launch (envelope carrega sessionId/package — contrato M5)
     let r = mcp.call_tool(10, "install", serde_json::json!({"apk": apk_path}));
@@ -210,7 +210,7 @@ fn describe_tools_matches_server_catalog() {
     assert!(out.status.success());
     let described: serde_json::Value = serde_json::from_slice(&out.stdout).expect("catálogo JSON");
     let tools = described["tools"].as_array().expect("tools");
-    assert_eq!(tools.len(), 32, "mesmo catálogo do servidor");
+    assert_eq!(tools.len(), 39, "mesmo catálogo do servidor");
     for t in tools {
         assert!(t["name"].as_str().is_some());
         assert!(t["inputSchema"].is_object(), "schema por tool");
@@ -230,7 +230,7 @@ fn describe_tools_matches_server_catalog() {
 }
 
 /// issue #74: o README anunciava "~40 structured tools" e "MCP (rmcp)". O
-/// catálogo real tem 32 tools e o crate NÃO depende de rmcp — a stack é
+/// catálogo real tem 39 tools (M9) e o crate NÃO depende de rmcp — a stack é
 /// JSON-RPC próprio, por decisão do ADR 001 (MSRV). Este teste trava o número
 /// publicado no README contra `rd mcp --describe-tools`.
 #[test]

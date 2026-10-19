@@ -122,6 +122,34 @@ jobs:
       - name: Compare rd vm exec vs real JVM execution
         run: bash golden/vm/run-golden.sh target/release/rd
 
+  # M9 (LANG-02, ADR 004): native .so code runs in an isolated Unicorn worker.
+  # Fixtures are cross-compiled for x86_64/AArch64/ARM from golden/native/fixture.c.
+  native:
+    name: Native NDK/JNI (M9, 3 ABIs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Cross toolchains + Unicorn worker dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
+          python -m pip install unicorn==2.1.4
+      - name: Build three-ABI fixtures
+        run: bash golden/native/build.sh
+      - name: Clippy (all features)
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Native ABI + JNI bridge tests
+        env:
+          RD_NATIVE_PYTHON: python
+        run: cargo test -p rd-ndk -p rd-vm --features native
+
   rust-msrv:
     name: Rust MSRV (1.76)
     runs-on: ubuntu-latest

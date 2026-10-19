@@ -16,7 +16,7 @@
 | M6 | Executor de testes | **✅ implementado** |
 | M7 | Performance + gate piso E5 | ⬜ |
 | M8 | Compat real | **✅ implementado** |
-| M9 | Componentes avançados + NDK | ⬜ |
+| M9 | Componentes avançados + NDK | **✅ implementado** |
 | M10 | Dispositivos virtuais | ⬜ |
 | M11 | Engines | ⬜ |
 | M12 | Ecossistema GH | ⬜ |
@@ -29,12 +29,12 @@
 | `rd-framework` | M0 | fd-permissions (motor completo + gating maxSdk/since_api) · fd-devices · fd-behavior |
 | `rd-cli` | M0–M6 | inspect · perm · device · behavior · dex disasm · vm exec · app run · mcp · test (suítes JUnit, M6) |
 | `rd-dex` | M1 | parser DEX completo + disassembler smali validado vs baksmali + fuzz targets |
-| `rd-vm` | M2–M3 | interpretador Dalvik + golden harness vs JVM + framework host headless (Activity/View/Handler/Looper) + LayoutInflater AXML/ARSC |
+| `rd-vm` | M2–M9 | interpretador Dalvik + golden harness vs JVM + framework host headless (Activity/View/Handler/Looper) + LayoutInflater AXML/ARSC + componentes M9 (notificações/IME/widgets/a11y/atalhos) + ponte JNI (feature `native`) |
 | `rd-testsupport` | M0–M6 | fixtures de teste (APK/DEX/AXML/ARSC sintéticos; dev-only, fora do binário) |
 | `rd-render` | M4 | UI dump uiautomator + screenshot headless (software renderer determinístico + PNG sem deps); winit/web são stub → M11 |
-| `rd-agent` | M5–M6 | MCP v1 (30 tools + batch + policy sandbox) · executor de suítes `rd test` (JSON → JUnit XML, M6) |
-| `rd-jni` | M3+ | stub NOT_IMPLEMENTED |
-| `rd-ndk` | M9 | stub NOT_IMPLEMENTED |
+| `rd-agent` | M5–M9 | MCP (39 tools + batch + policy sandbox; M9: widgets/IME/a11y/shortcuts/native_state) · executor de suítes `rd test` (JSON → JUnit XML, M6) |
+| `rd-jni` | M9 | mangling JNI (curto/sobrecarga), descritores, MUTF-8, frames de refs locais/globais |
+| `rd-ndk` | M9 | parser ELF32/64 limitado (x86_64/AArch64/ARM) + runtime `native` em worker Unicorn isolado (ADR 004) |
 
 ## Suítes automatizadas (`rd test`, M6)
 

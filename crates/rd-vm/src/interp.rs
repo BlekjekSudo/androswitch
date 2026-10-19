@@ -1418,6 +1418,15 @@ fn do_invoke(
     // static: intrínsecos de plataforma primeiro
     if is_static {
         if let Some(v) =
+            intrinsics::call_native_loader(vm, &mref.class, &mref.name, &mref.proto, slots)?
+        {
+            return Ok(v);
+        }
+        #[cfg(feature = "advanced-components")]
+        if let Some(v) = crate::m9::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)? {
+            return Ok(v);
+        }
+        if let Some(v) =
             intrinsics::call_static_intrinsic(vm, &mref.class, &mref.name, &mref.proto, slots)?
         {
             return Ok(v);
@@ -1497,6 +1506,13 @@ fn do_invoke(
         recv,
         &slots[1..],
     )? {
+        return Ok(v);
+    }
+
+    #[cfg(feature = "advanced-components")]
+    if let Some(v) =
+        crate::m9::call_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+    {
         return Ok(v);
     }
 

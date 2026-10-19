@@ -247,6 +247,8 @@ pub struct HostState {
     /// Dialogs, OkHttp, SQLite/Room, Services/Broadcasts/DeepLinks,
     /// WorkManager, SharedPreferences stateful) — ver `crate::m8`.
     pub m8: crate::m8::M8State,
+    #[cfg(feature = "advanced-components")]
+    pub m9: crate::m9::State,
 }
 
 /// M8 (31º gap): fragment registrada por um commit de FragmentTransaction.
@@ -326,6 +328,11 @@ impl Engine {
     /// M3.2: injeta o APK aberto como fonte de Resources (layouts AXML +
     /// resources.arsc). O CLI `rd app run` chama isto UMA vez por execução.
     pub fn set_resources(&mut self, apk: rd_apk::Apk) {
+        #[cfg(feature = "advanced-components")]
+        {
+            self.fw.m9.target_sdk = apk.manifest.target_sdk;
+            self.fw.m9.notifications_allowed = apk.manifest.target_sdk < 33;
+        }
         self.fw.resources = Some(apk);
     }
 
@@ -975,14 +982,29 @@ impl Engine {
             )
             .into());
         };
+        #[cfg(feature = "advanced-components")]
+        {
+            let target = self.fw.m9.focused.unwrap_or(target);
+            self.m9_focus(target)?;
+            if replace {
+                let n = self.view_text(target)?.encode_utf16().count();
+                self.m9_set_selection(0, n)?;
+            }
+            self.m9_commit_text(text, 1, false)
+        }
+        #[cfg(not(feature = "advanced-components"))]
         let cur = self.view_text(target)?;
+        #[cfg(not(feature = "advanced-components"))]
         let final_text = if replace {
             text.to_string()
         } else {
             format!("{cur}{text}")
         };
-        self.set_view_text(target, final_text.clone())?;
-        Ok(final_text)
+        #[cfg(not(feature = "advanced-components"))]
+        {
+            self.set_view_text(target, final_text.clone())?;
+            Ok(final_text)
+        }
     }
 
     /// Primeira EditText (classe contém "EditText" — subclasses do app
@@ -1112,7 +1134,9 @@ impl Engine {
     /// Avança o clock virtual e executa as mensagens vencidas (postDelayed).
     /// Devolve quantas runnables rodaram.
     pub fn advance_clock(&mut self, ms: u64) -> Result<usize, VmExit> {
-        self.fw.clock_ms += ms;
+        self.fw.clock_ms = self.fw.clock_ms.saturating_add(ms);
+        #[cfg(feature = "advanced-components")]
+        self.m9_expire_notifications()?;
         self.drain_looper()
     }
 
@@ -1252,7 +1276,7 @@ impl Engine {
     /// Layout recursivo mínimo: largura uniforme (match_parent implícito no
     /// M3); altura = default do leaf (48px p/ TextView/Button) ou soma
     /// (vertical) / máximo (horizontal) dos filhos.
-    fn layout(&mut self, v: ObjRef, x: i32, y: i32, w: i32) {
+    pub(crate) fn layout(&mut self, v: ObjRef, x: i32, y: i32, w: i32) {
         self.layout_depth(v, x, y, w, 0)
     }
 
@@ -1436,7 +1460,7 @@ impl Engine {
         }
     }
 
-    fn find_view_by_id(&self, root: ObjRef, id: i32) -> Option<ObjRef> {
+    pub(crate) fn find_view_by_id(&self, root: ObjRef, id: i32) -> Option<ObjRef> {
         let (vid, children) = match self.fw.get(root)? {
             HostObj::View {
                 id: vid, children, ..
@@ -1456,7 +1480,7 @@ impl Engine {
 
     // ── writes de estado usados pela dispatch ─────────────────────────────
 
-    fn view_text(&self, r: ObjRef) -> Result<String, VmExit> {
+    pub(crate) fn view_text(&self, r: ObjRef) -> Result<String, VmExit> {
         match self.fw.get(r) {
             Some(HostObj::View { text, .. }) => Ok(text.clone()),
             _ => {
@@ -1465,7 +1489,7 @@ impl Engine {
         }
     }
 
-    fn set_view_text(&mut self, r: ObjRef, s: String) -> Result<(), VmExit> {
+    pub(crate) fn set_view_text(&mut self, r: ObjRef, s: String) -> Result<(), VmExit> {
         match self.fw.objects.get_mut(&r) {
             Some(HostObj::View { text, .. }) => {
                 *text = s;
@@ -2586,7 +2610,7 @@ impl Engine {
         Some(format!("{prefix}:{name}"))
     }
 
-    fn build_ui_node(&self, v: ObjRef, depth: usize) -> UiNode {
+    pub(crate) fn build_ui_node(&self, v: ObjRef, depth: usize) -> UiNode {
         // issue #40/#62: mesmo cap do dump textual (árvore programática
         // hostil) — e o corte é SINALIZADO (truncated) para o dump XML marcar
         // (antes: o agente via a subárvore cortada como se fosse completa).
@@ -2652,6 +2676,7 @@ impl Engine {
             .iter()
             .map(|c| self.build_ui_node(*c, depth + 1))
             .collect();
+        let focusable = cfg!(feature = "advanced-components") && class.ends_with("EditText");
         UiNode {
             class,
             resource_id,
@@ -2660,7 +2685,7 @@ impl Engine {
             visibility,
             enabled,
             clickable,
-            focusable: false, // issue #54: honesto até o modelo rastrear foco
+            focusable,
             truncated,
             children,
         }

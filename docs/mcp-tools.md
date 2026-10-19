@@ -4,7 +4,7 @@
 
 Servidor `rustydroid-agent` v0.9.0 · protocolo `2024-11-05` · transporte stdio (JSON-RPC 2.0, uma mensagem por linha).
 
-Total: **32 tools**. Este catálogo é gerado de `rd_agent::mcp::tool_defs()` — o MESMO registro respondido em `tools/list` e impresso por `rd mcp --describe-tools`.
+Total: **39 tools**. Este catálogo é gerado de `rd_agent::mcp::tool_defs()` — o MESMO registro respondido em `tools/list` e impresso por `rd mcp --describe-tools`.
 
 ## Controles de segurança
 
@@ -206,9 +206,51 @@ AG-09 (metade dinâmica): cobertura de EXECUÇÃO do app em uso, nível de MÉTO
 
 - Parâmetros: nenhum
 
-### `notifications`
+### `component_service`
 
-Notificações do app. FORA DO ESCOPO do M5 (entram no M9 com widgets/IME) — responde erro tipado NOT_IMPLEMENTED (honesto).
+M9: enable an APK-declared IME, accessibility, notification listener or widget provider. Runs its DEX lifecycle; returns the component object handle.
+
+- Parâmetros: `class, role` · obrigatórios: `class, role`
+
+### `widgets`
+
+M9: list/allocate/bind/delete widgets or click a RemoteViews PendingIntent. Provider is an object handle returned by component_service.
+
+- Parâmetros: `action, host, id, provider, view_id`
+
+### `widget_screenshot`
+
+M9: render the current RemoteViews widget through the normal deterministic PNG renderer.
+
+- Parâmetros: `id` · obrigatórios: `id`
+
+### `ime`
+
+M9: inspect/focus the editor, select UTF-16 range, commit/compose text, delete surrounding code units or finish composition.
+
+- Parâmetros: `action, after, before, codepoints, cursor, end, start, text, view`
+
+### `accessibility`
+
+M9: inspect visible accessibility nodes/events or perform a node action by object id. Action 16 click, 1 focus, 64 accessibility focus, 2097152 set text.
+
+- Parâmetros: `action, action_id, node, text`
+
+### `shortcuts`
+
+M9: list current dynamic/pinned shortcuts or launch an enabled shortcut by id.
+
+- Parâmetros: `action, id`
+
+### `native_state`
+
+M9: native feature availability, ABI, loaded ELF libraries and guest instruction/memory accounting. Never claims a library ran merely because it was loaded.
 
 - Parâmetros: nenhum
+
+### `notifications`
+
+M9: list active notifications/channels or click/cancel a notification (tag/id and optional action index). Uses the app NotificationManager state.
+
+- Parâmetros: `action, action_index, id, tag`
 

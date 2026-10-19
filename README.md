@@ -39,7 +39,7 @@ RustyDroid is a **"Wine for Android"**: instead of emulating an entire Android O
 | Guest OS in RAM | 2–4 GB | **0** (no guest OS) |
 | Boot time | minutes | **seconds** (no boot at all) |
 | Runs in a plain container | rarely | ✅ designed for it |
-| AI-agent control plane | adb, screen scraping | **MCP + 32 structured tools** (JSON-RPC próprio — ADR 001) |
+| AI-agent control plane | adb, screen scraping | **MCP + 39 structured tools** (JSON-RPC próprio — ADR 001) |
 | Perf baseline | modern desktop | **Motorola Moto E5 (2 GB RAM)** floor |
 
 ### 🤖 Built with AI — heavily
@@ -63,7 +63,7 @@ RustyDroid is a **"Wine for Android"**: instead of emulating an entire Android O
 | **M6** | ✅ **DONE** — test executor: `rd test suite.json` (cenários JSON, exit codes, **JUnit XML**), compat matrix gerada do roadmap + suítes |
 | **M7** | 🟡 **IN PROGRESS** — `rd perf` mede startup cold/warm + RSS no perfil moto-e5 com gate de CI sobre o app trivial (números emulados por fator de CPU); budgets da golden suite, medição em device real e gate de release ainda pendentes |
 | **M8** | ✅ **DONE (v0.9.0)** — Real-world compat: RecyclerView (DEX adapter populate), Fragments (legacy+androidx), Dialogs, OkHttp shim (offline deterministic), SQLite/Room (in-memory), Services/broadcasts/deep links, WorkManager, stateful SharedPreferences — `crates/rd-vm/src/m8.rs`, ADR 003 |
-| **M9** | Advanced components (widgets, IME, a11y) + NDK (`.so` via ELF/JNI) |
+| **M9** | ✅ **DONE (review pending)** — widgets (RemoteViews/AppWidgetProvider), IME (InputConnection/InputMethodService), accessibility, full notifications, shortcuts + NDK: ELF loader (x86_64/AArch64/ARM) and JNI bridge running `.so` code in an isolated Unicorn worker (feature `native`). 5 real F-Droid APKs make JNI method calls from their real DEX, each with a checked result, e.g. zxing-cpp renders a QR code that zbar decodes — [docs/m9.md](docs/m9.md), ADR 004 |
 | **M10** | Virtual devices: camera, GPS, sensors, biometrics — programmable by the agent |
 | **M11** | Engines: Flutter → React Native → Mono → WASM |
 | **M12** | Full GitHub ecosystem: docs site, live compat matrix, releases → **v1.0** |
@@ -73,7 +73,7 @@ APKs below the floor are inspected fine but refuse to run with a structured `BEL
 
 ---
 
-## 🚧 Status — M0→M6 landed · M7 started (2026-10)
+## 🚧 Status — M0→M6, M8, M9 landed · M7 started (2026-10)
 
 The foundation is **real, tested code** — verified end-to-end against the F-Droid client APK (973 zip entries, 36 components, 31 permissions):
 
@@ -116,12 +116,12 @@ rustydroid/
 │   ├── rd-apk/        # ZIP (+ZIP64, CRC), AXML, resources.arsc, signatures, manifest model
 │   ├── rd-dex/        # DEX 100% + disassembler + fuzz targets        (M1)
 │   ├── rd-vm/         # Dalvik VM in Rust (interpreter → Cranelift JIT) (M2)
-│   ├── rd-jni/        # JNI bridge (LANG-02/03/09)                      (M3+)
-│   ├── rd-ndk/        # ELF loader x86_64 + ARM interpreter             (M9)
+│   ├── rd-jni/        # JNI mangling, descriptors, MUTF-8, ref frames   (M9)
+│   ├── rd-ndk/        # ELF loader x86_64/AArch64/ARM + isolated worker (M9)
 │   ├── rd-engine-*/   # language bridges (flutter/rn/mono/wasm…) feature-gated (M11)
 │   ├── rd-framework/  # android.* natively in Rust: fd-permissions ✅, fd-devices ✅, fd-behavior ✅
 │   ├── rd-render/     # headless / window / web renderers + UI dump     (M4)
-│   ├── rd-agent/      # MCP (JSON-RPC próprio, ADR 001) + suite executor `rd test` (M6) + coverage · 32 tools
+│   ├── rd-agent/      # MCP (JSON-RPC próprio, ADR 001) + suite executor `rd test` (M6) + coverage · 39 tools
 │   └── rd-cli/        # the `rd` binary: inspect / perm / device / behavior / dex / vm / app / mcp / test / perf
 ├── data/              # permissions.toml (175), devices.toml (6, incl. moto-e5), behavior-switches.toml (25) · api-coverage.toml (planned)
 ├── golden-apks/       # open-source APK test suite (download script, no binaries)

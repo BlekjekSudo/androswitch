@@ -814,11 +814,18 @@ pub fn tool_defs() -> Vec<ToolDef> {
                 "AG-09 (metade dinâmica): cobertura de EXECUÇÃO do app em uso, nível de MÉTODO — instrumentação no interpretador registra cada corpo DEX executado. Requer app lançado (senão NOT_RUNNING); a contagem é do processo atual (reiniciar o app zera). Denominador: métodos com corpo nos DEX do app (abstract/native e classes host ficam fora).",
             schema: obj(serde_json::json!({}), &[]),
         },
+        ToolDef { name: "component_service", description: "M9: enable an APK-declared IME, accessibility, notification listener or widget provider. Runs its DEX lifecycle; returns the component object handle.", schema: obj(serde_json::json!({"class":{"type":"string"},"role":{"type":"string","enum":["ime","accessibility","notification_listener","widget"]}}), &["class","role"]) },
+        ToolDef { name: "widgets", description: "M9: list/allocate/bind/delete widgets or click a RemoteViews PendingIntent. Provider is an object handle returned by component_service.", schema: obj(serde_json::json!({"action":{"type":"string","enum":["list","allocate","bind","delete","click"]},"id":{"type":"integer"},"host":{"type":"integer"},"provider":{"type":"integer","minimum":1},"view_id":{"type":"integer"}}), &[]) },
+        ToolDef { name: "widget_screenshot", description: "M9: render the current RemoteViews widget through the normal deterministic PNG renderer.", schema: obj(serde_json::json!({"id":{"type":"integer"}}), &["id"]) },
+        ToolDef { name: "ime", description: "M9: inspect/focus the editor, select UTF-16 range, commit/compose text, delete surrounding code units or finish composition.", schema: obj(serde_json::json!({"action":{"type":"string","enum":["state","focus","select","commit","compose","delete","finish"]},"view":{"type":"integer","minimum":1},"start":{"type":"integer","minimum":0},"end":{"type":"integer","minimum":0},"text":{"type":"string"},"cursor":{"type":"integer"},"before":{"type":"integer","minimum":0},"after":{"type":"integer","minimum":0},"codepoints":{"type":"boolean"}}), &[]) },
+        ToolDef { name: "accessibility", description: "M9: inspect visible accessibility nodes/events or perform a node action by object id. Action 16 click, 1 focus, 64 accessibility focus, 2097152 set text.", schema: obj(serde_json::json!({"action":{"type":"string","enum":["tree","events","perform"]},"node":{"type":"integer","minimum":1},"action_id":{"type":"integer"},"text":{"type":"string"}}), &[]) },
+        ToolDef { name: "shortcuts", description: "M9: list current dynamic/pinned shortcuts or launch an enabled shortcut by id.", schema: obj(serde_json::json!({"action":{"type":"string","enum":["list","launch"]},"id":{"type":"string"}}), &[]) },
+        ToolDef { name: "native_state", description: "M9: native feature availability, ABI, loaded ELF libraries and guest instruction/memory accounting. Never claims a library ran merely because it was loaded.", schema: obj(serde_json::json!({}), &[]) },
         ToolDef {
             name: "notifications",
             description:
-                "Notificações do app. FORA DO ESCOPO do M5 (entram no M9 com widgets/IME) — responde erro tipado NOT_IMPLEMENTED (honesto).",
-            schema: obj(serde_json::json!({}), &[]),
+                "M9: list active notifications/channels or click/cancel a notification (tag/id and optional action index). Uses the app NotificationManager state.",
+            schema: obj(serde_json::json!({"action":{"type":"string","enum":["list","click","cancel"]},"tag":{"type":"string"},"id":{"type":"integer"},"action_index":{"type":"integer","minimum":0}}), &[]),
         },
     ]
 }
@@ -1009,7 +1016,9 @@ impl AgentSession {
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as usize,
             ),
-            "notifications" => self.tool_notifications(),
+            "notifications" => self.tool_notifications(&args),
+            "component_service" | "widgets" | "widget_screenshot" | "ime" | "accessibility"
+            | "shortcuts" | "native_state" => self.tool_m9(name, &args),
             "get_api_usage" => self.tool_api_usage(args.get("package").and_then(|v| v.as_str())),
             "get_coverage" => self.tool_coverage(),
             other => {
@@ -1214,6 +1223,12 @@ impl AgentSession {
             eng.launch_app(&desc, &package_out, Vec::new())
         } else {
             let dexes = dexes_of_apk(&app.apk)?;
+            #[cfg(feature = "advanced-components")]
+            let notification_permission = app
+                .perms
+                .state("android.permission.POST_NOTIFICATIONS")
+                .map(|s| s.is_granted())
+                .unwrap_or(app.apk.manifest.target_sdk < 33);
             let resources = app.apk.clone();
             // M8 (38º gap): Application do manifest como no boot_app do CLI.
             let app_desc = resources.manifest.application.name.as_ref().map(|name| {
@@ -1226,6 +1241,8 @@ impl AgentSession {
             });
             let mut eng = Engine::new(dexes, VmConfig::default());
             eng.set_resources(resources);
+            #[cfg(feature = "advanced-components")]
+            eng.m9_set_notification_permission(notification_permission);
             if let Some(ad) = app_desc {
                 eng.set_application_class(ad);
             }
@@ -1739,6 +1756,14 @@ impl AgentSession {
                 perms.revoke(permission).map_err(rd_to_rd)?
             }
         };
+        #[cfg(feature = "advanced-components")]
+        if permission == "android.permission.POST_NOTIFICATIONS"
+            && self.engine_package == self.active
+        {
+            if let Some(e) = self.engine.as_mut() {
+                e.m9_set_notification_permission(st.is_granted());
+            }
+        }
         Ok(ToolResult::json(&serde_json::json!({
             "permission": permission,
             "state": grant_state_str(st),
@@ -1868,7 +1893,7 @@ impl AgentSession {
                 "notifications",
                 "ui",
                 "not-implemented",
-                "notificações entram no M9 (widgets/IME/notificações)",
+                "M9: channels, notification builders, PendingIntents, actions, listener callbacks, timeout/cancel and agent controls; platform visual notification shade not modeled",
             ),
             (
                 "invoke-string-args",
@@ -1886,7 +1911,7 @@ impl AgentSession {
                 "focus-model",
                 "input",
                 "partial",
-                "sem foco real (issue #54): type_text digita na primeira EditText visível+habilitada",
+                "M9 focused EditText with UTF-16 selection/composition; initial typing auto-focuses first visible enabled editor",
             ),
             (
                 "key-events",
@@ -1916,7 +1941,7 @@ impl AgentSession {
                 "ime-widgets",
                 "ui",
                 "not-implemented",
-                "IME e widgets entram no M9",
+                "M9 IME InputConnection and RemoteViews widget rendering; unsupported methods fail typed (docs/m9.md)",
             ),
         ];
         let gaps: Vec<serde_json::Value> = GAPS
@@ -2061,14 +2086,6 @@ impl AgentSession {
             },
             "steps": steps,
         })))
-    }
-
-    fn tool_notifications(&mut self) -> Result<ToolResult, RdError> {
-        Err(agent_error(
-            "NOT_IMPLEMENTED",
-            "notificações entram no M9 (widgets/IME/notificações) — fora do escopo do agente v1",
-            Some("acompanhe docs/ROADMAP.md (M9)"),
-        ))
     }
 
     /// AG-09 (metade estática): uso de APIs android.* referenciadas nos DEX.
@@ -2682,6 +2699,8 @@ pub fn serve_stdio<R: std::io::Read, W: std::io::Write>(
     Ok(())
 }
 
+include!("m9_tools.rs");
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2970,12 +2989,12 @@ mod tests {
 
     /// notifications tool: honesta NOT_IMPLEMENTED (M9).
     #[test]
-    fn notifications_is_typed_not_implemented() {
+    fn notifications_without_running_app_is_typed() {
         let _guard = SESSION_LOCK.lock().unwrap();
         let mut s = AgentSession::new();
         let (v, err) = call(&mut s, "notifications", serde_json::json!({}));
         assert!(err);
-        assert_eq!(v["code"], "NOT_IMPLEMENTED");
+        assert_eq!(v["code"], "NOT_RUNNING");
     }
 
     /// AG-09 (metade estática): get_api_usage reporta as APIs android.* que o
@@ -3092,8 +3111,8 @@ mod tests {
         let tools = r["result"]["tools"].as_array().expect("tools");
         assert_eq!(
             tools.len(),
-            32,
-            "catálogo completo: 30 do M5 + get_api_usage/get_coverage (AG-09)"
+            39,
+            "catálogo completo: M5 + AG-09 + M9 (39 tools)"
         );
         for t in tools {
             assert!(t["name"].as_str().is_some());
@@ -3196,7 +3215,7 @@ mod tests {
         assert_eq!(arr.len(), 2);
         assert_eq!(
             arr[0]["result"]["tools"].as_array().expect("tools").len(),
-            32
+            39
         );
         assert_eq!(arr[1]["result"]["serverInfo"]["name"], SERVER_NAME);
     }
@@ -4208,7 +4227,7 @@ mod tests {
         let _guard = SESSION_LOCK.lock().unwrap();
         let mut s = AgentSession::new();
         let defs = tool_defs();
-        assert_eq!(defs.len(), 32);
+        assert_eq!(defs.len(), 39);
         for t in &defs {
             // schema: objeto com properties/required consistentes
             assert!(t.schema["type"] == "object", "{}: schema object", t.name);
@@ -4745,5 +4764,107 @@ mod tests {
                 std::fs::write(&path, &generated).expect("gera docs na primeira execução");
             }
         }
+    }
+    /// M9: the agent drives the SAME component state the app APIs use —
+    /// component activation from the manifest, IME, accessibility, widgets,
+    /// notification permission sync and shortcuts.
+    #[cfg(feature = "advanced-components")]
+    #[test]
+    fn m9_agent_tools_drive_components() {
+        let _guard = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mut s = AgentSession::new();
+        let apk = fixture_apk_write(rd_testsupport::m9_app::apk());
+        install_ok(&mut s, &apk);
+        launch_ok(&mut s, serde_json::json!({}));
+        // undeclared component is refused
+        let (v, err) = call(
+            &mut s,
+            "component_service",
+            serde_json::json!({"class":"test.m9.Nope","role":"ime"}),
+        );
+        assert!(err, "{v}");
+        let (v, err) = call(
+            &mut s,
+            "component_service",
+            serde_json::json!({"class":"test.m9.Accessibility","role":"accessibility"}),
+        );
+        assert!(!err, "{v}");
+        let (tree, err) = call(
+            &mut s,
+            "accessibility",
+            serde_json::json!({"action":"tree"}),
+        );
+        assert!(!err, "{tree}");
+        let editor = tree["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|n| n["editable"] == true)
+            .expect("editable")["id"]
+            .as_u64()
+            .unwrap();
+        let (v, err) = call(
+            &mut s,
+            "ime",
+            serde_json::json!({"action":"focus","view":editor}),
+        );
+        assert!(!err, "{v}");
+        let (v, err) = call(
+            &mut s,
+            "ime",
+            serde_json::json!({"action":"commit","text":"!"}),
+        );
+        assert!(!err, "{v}");
+        assert_eq!(v["text"], "A😀B!");
+        let (v, err) = call(
+            &mut s,
+            "accessibility",
+            serde_json::json!({"action":"perform","node":editor,"action_id":2097152,"text":"set"}),
+        );
+        assert!(!err && v["performed"] == true, "{v}");
+        let (v, _) = call(
+            &mut s,
+            "accessibility",
+            serde_json::json!({"action":"events"}),
+        );
+        assert!(!v["events"].as_array().unwrap().is_empty());
+        // widgets: allocate + bind a declared provider (DEX onUpdate runs)
+        let (p, err) = call(
+            &mut s,
+            "component_service",
+            serde_json::json!({"class":"test.m9.Widget","role":"widget"}),
+        );
+        assert!(!err, "{p}");
+        let (w, err) = call(&mut s, "widgets", serde_json::json!({"action":"allocate"}));
+        assert!(!err, "{w}");
+        let (v, err) = call(
+            &mut s,
+            "widgets",
+            serde_json::json!({"action":"bind","id":w["id"],"provider":p["object"]}),
+        );
+        assert!(!err, "{v}");
+        // notification permission (targetSdk 34) syncs into the running engine
+        let (v, _) = call(&mut s, "notifications", serde_json::json!({}));
+        assert_eq!(v["permission_granted"], false, "{v}");
+        let (_, err) = call(
+            &mut s,
+            "permissions_grant",
+            serde_json::json!({"permission":"android.permission.POST_NOTIFICATIONS"}),
+        );
+        assert!(!err);
+        let (v, _) = call(&mut s, "notifications", serde_json::json!({}));
+        assert_eq!(v["permission_granted"], true, "{v}");
+        let (v, err) = call(
+            &mut s,
+            "shortcuts",
+            serde_json::json!({"action":"launch","id":"missing"}),
+        );
+        assert!(err, "{v}");
+        let (v, err) = call(
+            &mut s,
+            "ime",
+            serde_json::json!({"action":"select","start":-1,"end":0}),
+        );
+        assert!(err, "{v}");
     }
 }

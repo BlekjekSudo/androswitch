@@ -4254,3 +4254,43 @@ fn java_pow(a: f64, b: f64) -> f64 {
     // Java Math.pow casos especiais mínimos cobertos por pow do Rust
     a.powf(b)
 }
+
+/// Native loading is never silently ignored, including in minimal builds.
+pub(crate) fn call_native_loader(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class != "Ljava/lang/System;"
+        || !matches!(name, "loadLibrary" | "load")
+        || sig != "(Ljava/lang/String;)V"
+    {
+        return Ok(None);
+    }
+    let name = match args.first() {
+        Some(Value::Obj(r)) => vm.heap.as_str(*r)?.to_string(),
+        _ => {
+            return Err(crate::err::Throwable::new(
+                "Ljava/lang/NullPointerException;",
+                "native library name",
+            )
+            .into())
+        }
+    };
+    #[cfg(feature = "native")]
+    {
+        crate::native::load(vm, &name)?;
+        Ok(Some(Value::Null))
+    }
+    #[cfg(not(feature = "native"))]
+    {
+        let _ = name;
+        Err(crate::err::Throwable::new(
+            "Ljava/lang/UnsatisfiedLinkError;",
+            "LANG-02 disabled: rebuild with --features native",
+        )
+        .into())
+    }
+}

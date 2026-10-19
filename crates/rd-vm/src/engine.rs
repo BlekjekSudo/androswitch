@@ -51,6 +51,10 @@ impl Default for VmConfig {
 /// Motor interpretador. Semântica de arena: o heap inteiro é descartado
 /// quando o Engine cai (M2: "GC" = arena-por-execução com teto contratual).
 pub struct Engine {
+    #[cfg(feature = "native")]
+    pub(crate) native: Option<crate::native::NativeState>,
+    #[cfg(feature = "native")]
+    pub(crate) native_active: bool,
     pub cp: Classpath,
     pub heap: Heap,
     pub config: VmConfig,
@@ -96,6 +100,10 @@ impl Engine {
     pub fn new(dexes: Vec<rd_dex::Dex>, config: VmConfig) -> Self {
         let budget = config.heap_budget;
         Engine {
+            #[cfg(feature = "native")]
+            native: None,
+            #[cfg(feature = "native")]
+            native_active: false,
             cp: Classpath::new(dexes),
             heap: Heap::new(budget),
             config,
@@ -166,6 +174,13 @@ impl Engine {
                 other => Ok(other.clone()),
             })
             .collect::<Result<Vec<_>, VmExit>>()?;
+        if let Some(v) = crate::intrinsics::call_native_loader(self, class, method, sig, &args)? {
+            return Ok(v);
+        }
+        #[cfg(feature = "advanced-components")]
+        if let Some(v) = crate::m9::call_static(self, class, method, sig, &args)? {
+            return Ok(v);
+        }
         if let Some(v) = intrinsics::call_static_intrinsic(self, class, method, sig, &args)? {
             return Ok(v);
         }
@@ -181,6 +196,65 @@ impl Engine {
         }
         self.ensure_initialized(class)?;
         let slots = slot_form(&args, &param_types);
+        self.call(dex_idx, def, &m, slots)
+    }
+
+    /// Public entry point: `new C()` — runs `<clinit>` (if pending), allocates
+    /// the instance, attaches host state and runs the no-arg constructor.
+    pub fn new_instance(&mut self, class: &str) -> Result<ObjRef, VmExit> {
+        self.ensure_initialized(class)?;
+        let r = self.heap.alloc_instance(class.to_string(), Vec::new())?;
+        self.attach_host_state(class, r)?;
+        self.invoke_instance(r, "<init>", "()V", &[])?;
+        Ok(r)
+    }
+
+    /// Public entry point: invoke an instance method on `recv`, resolved from
+    /// its runtime class (virtual dispatch). Native methods go through the JNI
+    /// bridge like any DEX call.
+    pub fn invoke_instance(
+        &mut self,
+        recv: ObjRef,
+        method: &str,
+        sig: &str,
+        args: &[Value],
+    ) -> Result<Value, VmExit> {
+        let param_types = parse_param_types(sig).ok_or_else(|| {
+            crate::err::vm_error("INVALID_ARG", format!("assinatura malformada: {sig}"))
+        })?;
+        if param_types.len() != args.len() {
+            return Err(crate::err::vm_error(
+                "INVALID_ARG",
+                format!(
+                    "{sig} pede {} argumentos, recebi {}",
+                    param_types.len(),
+                    args.len()
+                ),
+            )
+            .into());
+        }
+        let args: Vec<Value> = args
+            .iter()
+            .map(|v| match v {
+                Value::StrPlaceholder(s) => {
+                    intrinsics::alloc_string(self, s.clone()).map(Value::Obj)
+                }
+                other => Ok(other.clone()),
+            })
+            .collect::<Result<Vec<_>, VmExit>>()?;
+        let class = self.heap.class_of(recv)?.to_string();
+        let Some((dex_idx, def, m)) = self.cp.resolve_method(&class, method, sig) else {
+            return Err(crate::classpath::unresolved_method(&class, method, sig).into());
+        };
+        if m.access_flags & ACC_STATIC != 0 {
+            return Err(crate::err::vm_error(
+                "INVALID_ARG",
+                format!("{class}->{method}{sig} é static"),
+            )
+            .into());
+        }
+        let mut slots = vec![Value::Obj(recv)];
+        slots.extend(slot_form(&args, &param_types));
         self.call(dex_idx, def, &m, slots)
     }
 
@@ -221,6 +295,19 @@ impl Engine {
         };
         let Some(code) = self.cp.code(dex_idx, m.code_off)? else {
             if m.access_flags & ACC_NATIVE != 0 {
+                #[cfg(feature = "native")]
+                {
+                    let r = self.cp.method_ref(dex_idx, m.method_idx)?;
+                    return crate::native::invoke(
+                        self,
+                        &r.class,
+                        &r.name,
+                        &r.proto,
+                        m.access_flags & ACC_STATIC != 0,
+                        &ins,
+                    );
+                }
+                #[cfg(not(feature = "native"))]
                 return Err(crate::err::not_implemented(format!(
                     "método nativo {}",
                     self.method_label(dex_idx, m)

@@ -20,6 +20,15 @@ rd-dex = { workspace = true }
 # workspace (nível 0), logo rd-vm → rd-apk segue apontando para baixo (sem ciclo).
 rd-apk = { workspace = true }
 
+rd-ndk = { path = "../rd-ndk", optional = true }
+rd-jni = { path = "../rd-jni", optional = true }
+
 [dev-dependencies]
+rd-jni = { path = "../rd-jni" }
 rd-render = { path = "../rd-render" }
 rd-testsupport = { path = "../rd-testsupport" }
+
+[features]
+default = ["advanced-components"]
+advanced-components = []
+native = ["dep:rd-ndk", "dep:rd-jni", "rd-ndk/native"]

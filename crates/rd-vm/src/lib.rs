@@ -14,6 +14,10 @@ pub mod inflate;
 pub mod interp;
 pub mod intrinsics;
 pub mod m8;
+#[cfg(feature = "advanced-components")]
+pub mod m9;
+#[cfg(feature = "native")]
+pub mod native;
 pub mod repr;
 pub mod value;
 

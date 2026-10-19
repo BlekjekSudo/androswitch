@@ -193,6 +193,7 @@ fn view_desc_of(name: &str) -> Result<String, VmExit> {
     let known = match name {
         "View" => framework::VIEW,
         "TextView" => framework::TEXTVIEW,
+        "EditText" => "Landroid/widget/EditText;",
         "Button" => framework::BUTTON,
         "LinearLayout" => framework::LINEARLAYOUT,
         "androidx.recyclerview.widget.RecyclerView" => crate::m8::RECYCLER,

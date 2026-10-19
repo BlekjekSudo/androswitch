@@ -576,6 +576,14 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         // issue #41: hierarquia de ERROS de link/init — sem elas, EIIE/NCDFE
         // não casam nem com catch (Throwable) (não são subtipo de Throwable)
         "Ljava/lang/LinkageError;" => Some(ERR.to_vec()),
+        "Ljava/lang/UnsatisfiedLinkError;" | "Ljava/lang/NoSuchMethodError;" => Some(vec![
+            "Ljava/lang/LinkageError;",
+            "Ljava/lang/Error;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/lang/SecurityException;" => Some(RUNTIME.to_vec()),
+        "Landroid/app/PendingIntent$CanceledException;" => Some(EXC.to_vec()),
         "Ljava/lang/ExceptionInInitializerError;" => Some(vec![
             "Ljava/lang/LinkageError;",
             "Ljava/lang/Error;",
@@ -603,6 +611,23 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Landroid/content/Context;" => Some(OBJECT.to_vec()),
         "Landroid/app/Activity;" => Some(CONTEXT.to_vec()),
         "Landroid/app/Application;" => Some(CONTEXT.to_vec()),
+        "Landroid/app/Service;" => Some(CONTEXT.to_vec()),
+        "Landroid/inputmethodservice/InputMethodService;"
+        | "Landroid/accessibilityservice/AccessibilityService;"
+        | "Landroid/service/notification/NotificationListenerService;" => Some(vec![
+            "Landroid/app/Service;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/widget/EditText;" => Some(TEXTVIEW.to_vec()),
+        "Landroid/appwidget/AppWidgetProvider;" => Some(vec![
+            "Landroid/content/BroadcastReceiver;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/view/inputmethod/BaseInputConnection;" => Some(vec![
+            "Landroid/view/inputmethod/InputConnection;",
+            "Ljava/lang/Object;",
+        ]),
         // M8: FragmentManager legacy (29º gap real) — objeto simples do host.
         "Landroid/app/FragmentManager;" => Some(OBJECT.to_vec()),
         // M8: FragmentTransaction legacy (31º gap real) — ops até o commit.

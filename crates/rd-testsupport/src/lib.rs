@@ -12,3 +12,5 @@
 pub mod apkfix;
 pub mod trivial_app;
 pub mod vm;
+
+pub mod m9_app;

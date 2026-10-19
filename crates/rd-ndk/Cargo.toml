@@ -17,3 +17,7 @@ unsafe_code = "deny"
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+
+[features]
+default = []
+native = []
