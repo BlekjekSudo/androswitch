@@ -721,7 +721,7 @@ não usavam par alinhado. Também foi corrigida a contagem de instruções, que
 somava totais acumulados.
 
 Ressalva: os componentes foram verificados no fixture `test.m9`. Também
-não há `Call*MethodV` (va_list), threads, `pthread_cond_wait` nem
+`Call*MethodV` (va_list) é suportado nos 3 ABIs, mas não há threads, `pthread_cond_wait` nem
 direct ByteBuffer (inferência TFLite); a reentrância nativa aninhada é
 recusada, os arrays JNI vão até 1M elementos e o JNA `libjnidispatch` não
 inicializa.

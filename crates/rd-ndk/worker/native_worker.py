@@ -5,6 +5,7 @@ The Rust client embeds this script. Only stdin/stdout JSON-lines are protocol;
 tracebacks and dependency errors go to stderr. Unicorn is an optional dependency.
 """
 import json
+import os
 import struct
 import sys
 import time
@@ -19,6 +20,15 @@ TLS = 0x58000000
 TLS_SIZE = 0x10000
 STOP = TRAPS + 0x10000
 
+
+# Wall-clock safety net for one JNI call, including every trap round-trip.
+# The deterministic limit is the instruction fuel; this only bounds
+# pathological slowness (the per-segment emu_start timeout and the 7 s
+# per-message watchdog on the Rust side still apply).
+try:
+    CALL_SECS = min(max(float(os.environ.get('RD_NATIVE_CALL_SECS', '30')), 1.0), 120.0)
+except ValueError:
+    CALL_SECS = 30.0
 
 def main():
     from unicorn import Uc, UcError, UC_ARCH_X86, UC_ARCH_ARM64, UC_ARCH_ARM, UC_MODE_64, UC_MODE_ARM, UC_PROT_ALL, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED
@@ -161,7 +171,7 @@ def main():
             elif op == 'call':
                 remaining = min(q.get('fuel', 1000000), 20000000)
                 total = 0
-                deadline = time.monotonic() + 5
+                deadline = time.monotonic() + CALL_SECS
                 stack = STACK + STACK_SIZE - 256
                 for r in regs + fpregs:
                     uc.reg_write(r, 0)

@@ -95,7 +95,9 @@ fn ensure(vm: &mut Engine) -> std::result::Result<(), VmExit> {
         let apk = vm.resources()?;
         // RD_NATIVE_ABI (x86_64 | arm64-v8a | armeabi-v7a) pins the ABI, e.g.
         // to run an APK's ARM libraries; default preference is x86_64 first.
-        let wanted = std::env::var("RD_NATIVE_ABI").ok();
+        let wanted = std::env::var("RD_NATIVE_ABI")
+            .ok()
+            .filter(|w| !w.is_empty());
         let abi = [Abi::X86_64, Abi::Arm64, Abi::Arm]
             .into_iter()
             .filter(|a| wanted.as_deref().map_or(true, |w| w == a.android_name()))
@@ -864,12 +866,14 @@ fn call_java(vm: &mut Engine, rt: &mut Runtime, refs: &mut References, t: &Trap)
         34
     };
     let variant = (t.slot - base) % 3;
-    if variant == 1 {
-        return Err(RdError::new(
-            "NOT_IMPLEMENTED",
-            "JNI va_list callbacks require ABI-specific va_list decoding; use Call*MethodA",
-        ));
-    }
+    // Call*MethodV: decode the guest va_list with the ABI's rules (C++ JNI
+    // wrappers in jni.h always go through these entry points).
+    let va_words = if variant == 1 {
+        let va = rt.raw_argument(t, id_index + 1)?;
+        Some(rt.va_list_args(va, &params)?)
+    } else {
+        None
+    };
     let mut args = Vec::new();
     let mut raw_index = id_index + 1;
     let array = if variant == 2 {
@@ -879,7 +883,9 @@ fn call_java(vm: &mut Engine, rt: &mut Runtime, refs: &mut References, t: &Trap)
     };
     let mut fpi = 0;
     for (i, p) in params.iter().enumerate() {
-        let b = if variant == 2 {
+        let b = if let Some(w) = &va_words {
+            w[i]
+        } else if variant == 2 {
             let b = rt.read(array + i as u64 * 8, 8)?;
             u64::from_le_bytes(b.try_into().unwrap())
         } else if rt.abi == Abi::Arm && (p == "J" || p == "D" || p == "F") {

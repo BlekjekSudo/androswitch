@@ -42,3 +42,9 @@ jstring Java_test_Native_extras(JNIEnv *e,jclass c,jstring s,jfloat x) {(void)c;
   jint pending=JCALL(e,228,unsigned char(*)(JNIEnv*))(e);
   snprintf(buf,sizeof buf,"%s|%u,%u|%d|%.3f|%g|%.2e",sub,(unsigned)u[0],(unsigned)u[1],pending,(double)fmodf(x,2.0f),floor((double)x)+0.25,12345.678);
   return JCALL(e,167,jstring(*)(JNIEnv*,const char*))(e,buf);}
+/* Call*MethodV through a real C variadic wrapper (what jni.h's C++ API does). */
+typedef __builtin_va_list rd_va_list;
+static jint call_int_v(JNIEnv *e,jclass c,void *m,...) {rd_va_list ap;__builtin_va_start(ap,m);jint r=JCALL(e,130,jint(*)(JNIEnv*,jclass,void*,rd_va_list))(e,c,m,ap);__builtin_va_end(ap);return r;}
+static jlong call_long_v(JNIEnv *e,jclass c,void *m,...) {rd_va_list ap;__builtin_va_start(ap,m);jlong r=JCALL(e,133,jlong(*)(JNIEnv*,jclass,void*,rd_va_list))(e,c,m,ap);__builtin_va_end(ap);return r;}
+jint Java_test_Native_callbackv(JNIEnv *e,jclass c,jint value) {void *m=JCALL(e,113,void*(*)(JNIEnv*,jclass,const char*,const char*))(e,c,"twice","(I)I");return call_int_v(e,c,m,value);}
+jlong Java_test_Native_mixv(JNIEnv *e,jclass c) {void *m=JCALL(e,113,void*(*)(JNIEnv*,jclass,const char*,const char*))(e,c,"mix","(IJD)J");return call_long_v(e,c,m,(jint)3,(jlong)1000000000000LL,(jdouble)2.75);}

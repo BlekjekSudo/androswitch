@@ -1121,6 +1121,34 @@ impl Runtime {
             }
         }
     }
+    /// Reads JNI `Call*MethodV` arguments from a guest `va_list` for the given
+    /// descriptor types. C default promotions apply: `float` travels as
+    /// `double` (returned here as f32 bits), small integers as `int`.
+    /// x86-64 and AArch64 pass a pointer to the `va_list` object; 32-bit ARM
+    /// passes the `__ap` pointer itself.
+    pub fn va_list_args(&mut self, va: u64, types: &[String]) -> Result<Vec<u64>> {
+        if types.len() > 256 {
+            return Err(RdError::new("JNI_INVALID", "too many va_list arguments"));
+        }
+        let t = Trap {
+            slot: 0,
+            args: Vec::new(),
+            fp: Vec::new(),
+            sp: 0,
+        };
+        let mut src = VaSource::List(self.va_list(va)?);
+        let mut out = Vec::with_capacity(types.len());
+        for ty in types {
+            out.push(match ty.as_str() {
+                "F" => (self.next_fp_arg(&t, &mut src)? as f32).to_bits() as u64,
+                "D" => self.next_fp_arg(&t, &mut src)?.to_bits(),
+                "J" => self.next_arg(&t, &mut src, true)?,
+                // objects and int-class values: one pointer-sized slot
+                _ => self.next_arg(&t, &mut src, false)?,
+            });
+        }
+        Ok(out)
+    }
     /// Next `double` vararg (floats are promoted to double by C).
     fn next_fp_arg(&mut self, t: &Trap, src: &mut VaSource) -> Result<f64> {
         let bits = match src {

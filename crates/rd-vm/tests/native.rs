@@ -20,6 +20,8 @@ fn engine(abi: &str) -> Engine {
         ("spin", "I", vec![]),
         ("format", "Ljava/lang/String;", vec!["I"]),
         ("missing", "I", vec![]),
+        ("callbackv", "I", vec!["I"]),
+        ("mixv", "J", vec![]),
         (
             "extras",
             "Ljava/lang/String;",
@@ -32,6 +34,15 @@ fn engine(abi: &str) -> Engine {
     units.extend(op11x(0x0f, 0));
     let code = b.code(2, 1, 0, units);
     b.direct(c, "twice", "I", vec!["I"], 0x9, Some(code));
+    // static long mix(int a, long b, double d) { return a + b + (long) d; }
+    // locals v0..v3; ins: a=v4, b=v5:v6, d=v7:v8
+    let mut units = op12x(0x81, 0, 4); // int-to-long v0, v4
+    units.extend(op12x(0xbb, 0, 5)); // add-long/2addr v0, v5
+    units.extend(op12x(0x8b, 2, 7)); // double-to-long v2, v7
+    units.extend(op12x(0xbb, 0, 2)); // add-long/2addr v0, v2
+    units.extend(op11x(0x10, 0)); // return-wide v0
+    let code = b.code(9, 5, 0, units);
+    b.direct(c, "mix", "J", vec!["I", "J", "D"], 0x9, Some(code));
     let dex = b.finish();
     let mut z = ZipFix::new();
     z.add("AndroidManifest.xml", build_manifest_axml("test", C));
@@ -185,6 +196,18 @@ fn native_dalvik_jni_all_supported_abis() {
         assert_eq!(
             e.heap.as_str(x).unwrap(),
             "éll|104,233|0|1.500|5.25|1.23e+04",
+            "{abi}"
+        );
+        // Call*MethodV: guest va_list decoded per ABI (int, long, double)
+        assert_eq!(
+            e.invoke_static(C, "callbackv", "(I)I", &[Value::Int(21)])
+                .unwrap(),
+            Value::Int(42),
+            "{abi}"
+        );
+        assert_eq!(
+            e.invoke_static(C, "mixv", "()J", &[]).unwrap(),
+            Value::Long(1_000_000_000_005),
             "{abi}"
         );
         // an absent libc import is a typed NOT_IMPLEMENTED, never a crash
