@@ -381,9 +381,16 @@ fn getf(vm: &Engine, r: ObjRef, f: &str) -> f32 {
         _ => 0.0,
     }
 }
+/// A `float` argument. DEX registers are untyped, so a float can arrive as
+/// `Value::Int` holding its IEEE-754 bits (the VM convention, see
+/// `Value::as_float`). Ints whose magnitude is at least 2^23 are read as bits:
+/// every normal float except ±0 has such a bit pattern, while a genuine int
+/// that large is not a plausible graphics coordinate. Smaller ints are taken
+/// numerically, for host callers that pass ints to float parameters.
 fn fl(v: Option<&Value>) -> f32 {
     match v {
         Some(Value::Float(x)) => *x,
+        Some(Value::Int(i)) if i.unsigned_abs() >= 1 << 23 => f32::from_bits(*i as u32),
         Some(Value::Int(i)) => *i as f32,
         Some(Value::Double(d)) => *d as f32,
         Some(Value::Long(l)) => *l as f32,

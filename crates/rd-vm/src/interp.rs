@@ -805,6 +805,10 @@ pub(crate) fn exec_frame(
                     if let Some(c) = step!(crate::boxes::host_static(vm, &owner, &fname)) {
                         vm.statics.insert((owner.clone(), fname.clone()), c);
                     } else if let Some(c) =
+                        step!(crate::jtext_format::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
                         step!(crate::android_build::host_static(vm, &owner, &fname))
                     {
                         vm.statics.insert((owner.clone(), fname.clone()), c);
@@ -1555,6 +1559,29 @@ fn do_invoke(
     )? {
         return Ok(v);
     }
+    // Covariant bridge: `Appendable.append(..)Appendable` on a host
+    // StringBuilder (or any host method whose declared return is a supertype
+    // of the receiver) matches the intrinsic declared with the receiver type.
+    if let Some((params, ret)) = mref.proto.rsplit_once(')') {
+        if ret.starts_with('L')
+            && ret != recv_class
+            && vm.cp.find_class(&recv_class).is_none()
+            && vm.cp.is_subtype(&recv_class, ret)
+        {
+            let bridged = format!("{params}){recv_class}");
+            if let Some(v) = intrinsics::call_instance_intrinsic_mref(
+                vm,
+                &recv_class,
+                &recv_class,
+                &mref.name,
+                &bridged,
+                recv,
+                &slots[1..],
+            )? {
+                return Ok(v);
+            }
+        }
+    }
 
     #[cfg(feature = "advanced-components")]
     if let Some(v) =
@@ -1593,12 +1620,22 @@ fn do_invoke(
                 &slots[1..],
             )? {
                 Some(v) => Ok(v),
-                None => {
-                    Err(
-                        crate::classpath::unresolved_method(&mref.class, &mref.name, &mref.proto)
-                            .into(),
+                // No host model: virtual/interface dispatch on the receiver's
+                // own DEX class (an app class implementing a platform
+                // interface, e.g. Choreographer.FrameCallback.doFrame).
+                None => match (!is_direct && !is_super)
+                    .then(|| vm.cp.resolve_method(&recv_class, &mref.name, &mref.proto))
+                    .flatten()
+                {
+                    Some((d2, def, m)) => vm.call(d2, def, &m, raw.to_vec()),
+                    None => Err(crate::classpath::unresolved_method_on(
+                        &mref.class,
+                        &recv_class,
+                        &mref.name,
+                        &mref.proto,
                     )
-                }
+                    .into()),
+                },
             },
         };
     }

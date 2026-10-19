@@ -248,19 +248,92 @@ subclasses are covered too.
 - **java.time:** the device zone is UTC. The current time is the
   deterministic virtual wall clock (`RD_EPOCH_MS`). Pattern letters
   supported: `y M d H h m s S a E` and quotes.
-- **SQLite:** in-memory, with an SQL subset; WAL and journal settings have
-  no effect.
+- **SQLite:** real SQLite in a child process (ADR 005). The in-memory SQL
+  subset remains as a fallback.
 - **Filesystem:** virtual and in memory per VM; the host disk is never
   touched. File locks always succeed (single process); `FileChannel.map` is
   unsupported.
 - **Unsupported:** ML Kit OCR and barcode, which need `pthread_create` and
   direct ByteBuffers (accepted M9 limitations).
 
+## Round 3: the launch completes and the first Compose frame is laid out
+
+All calls go through `rd mcp`. The launch is **OK in 773–860 ms** (it
+failed in rounds 1–2). Every tool in `s01`/`s02` now runs against a live
+app. Composition, ViewModels, Navigation and Room all run. The draw pass
+measures and lays out the Compose tree, including its `ViewLayer`s. **The
+rasterized frame is still blank** (see the next blocker below).
+
+### Blockers fixed, in launch order (all general additions)
+
+| # | Failure | General fix |
+|---|---|---|
+| 1 | `rawQueryWithFactory` NOT_FOUND (Room) | real SQLite via a child process, `jsqlite.rs` (ADR 005) |
+| 2 | Room `check-cast` CCE on SQLite classes | SQLite hierarchy and interfaces in `classpath.rs` |
+| 3 | `Pattern`/`Matcher` missing | `jregex.rs` (UTF-16 indices; PatternSyntaxException for unsupported constructs) |
+| 4 | `Collections.unmodifiable*`/`empty*`/`singleton*` | factories plus marker interfaces |
+| 5 | `ComponentName`, `DecimalFormat(Symbols)`, `Charset` | `jtext_format.rs` |
+| 6 | `Choreographer$FrameCallback.doFrame` on a DEX receiver | interp: DEX receiver dispatch fallback |
+| 7 | `Collections.sort(List, Comparator)`, `StandardCharsets` | collections and charset hosts |
+| 8 | `OutputStreamWriter`/`BufferedReader`/BAOS (backup writer) | `jio_chars.rs`, plus the `invoke_instance` host fallback |
+| 9 | `StringBuilder.append(CharSequence)Appendable` bridge | covariant-bridge retry, plus the full `jsb.rs` StringBuilder/StringBuffer |
+| 10 | `@Navigator.Name` IAE (`getAnnotation` stub) | `jannotations.rs`: real DEX RUNTIME class annotations with defaults |
+| 11 | `Uri.getQueryParameterNames` | `android_uri.rs`: full `Uri` and `Uri.Builder` |
+| 12 | `UUID.randomUUID` (NavBackStackEntry ids) | `juuid.rs`: v4 (seeded, reproducible), v3 MD5, parse/format, JDK hashCode |
+| 13 | `ArrayDeque.iterator()` (Kotlin `G3/k` extends `AbstractList`) | jcollections picks the AbstractList template from the receiver hierarchy, not the invoke's declared class |
+| 14 | `Class.getConstructors()` (SavedStateViewModelFactory) | `getConstructors`/`getDeclaredConstructors`/`getMethods`/`getDeclaredMethods`, plus a fix for `new_class_array` writing into an empty array (panic) |
+| 15 | "must have parameters in the proper order" (`SingletonList.equals` was identity) | Object `equals`/`hashCode`/`toString` dispatch on host collection receivers with JDK List/Set semantics |
+| 16 | `Context.getPackageManager` | `android_pm.rs`: manifest-backed PackageManager (PackageInfo, ApplicationInfo, component infos, a phone feature profile) |
+| 17 | `View.getDisplay` | `android_display.rs`: default Display (size, metrics, 60 Hz, rotation) |
+| 18 | `Bundle` cannot be saved (Saveable `Parcelable.isInstance`) | Parcelable/Cloneable on framework value classes (Bundle, Intent, Rect, Point, Bitmap, …) |
+| 19 | `new Float(f)` left the box without its value | wrapper constructors (primitive and String) in `boxes.rs` |
+| 20 | Draw failures were invisible (`draw_frame().unwrap_or(0)`) | MCP screenshot logs `W/RustyDroid: draw pass failed` with the Java stack; the CLI `shot` runs the same draw pass |
+| 21 | `SpannableString` missing (Compose text) | `android_spannable.rs`: SpannableString and SpannableStringBuilder with span shifting |
+| 22 | Text height Int.MAX (`Size(0 x 2147483647)`) | graphics `fl()` reads float arguments that arrive as raw IEEE bits in untyped registers |
+| 23 | `View.offsetLeftAndRight` (ViewLayer) | `offsetLeftAndRight`/`offsetTopAndBottom`/`setLeft…setBottom` |
+
+### Next blocker
+
+The draw pass now completes without error, but the frame is blank. Two
+causes are visible in the UI tree:
+- `AndroidComposeView` (`B0/C`) keeps a 0 height even though its parent
+  (`B0/y0`) is 720×1440;
+- the `ViewLayer` x offsets accumulate in 22 px steps.
+
+The next steps are to trace `B0/a.onLayout` → `B0/C.layout`, and then the
+`RenderNode`/`ViewLayer.dispatchDraw` record path.
+
+### MCP delays (round 3, `mcp-delays.jsonl`)
+
+| Tool | Delay | Result |
+|---|---:|---|
+| install | 15–93 ms | OK |
+| app_info / compat_gaps / package_list / device_profile / permissions_* / behavior_switches | 0.1–0.4 ms | OK |
+| get_api_usage | 55 ms | OK (static scan; cacheable) |
+| **launch** | **773–860 ms** | **OK** (was ERR in rounds 1–2) |
+| get_coverage | 28–32 ms | OK |
+| runtime_health / logs / ui_tree / accessibility / ime / shortcuts / notifications / widgets | 0.1–0.3 ms | OK |
+| **screenshot** | 79 ms (host only), then **284–468 ms** (full Compose draw pass) | OK, blank frame |
+| native_state (before launch) | 0.1 ms | ERR NOT_RUNNING (expected) |
+| widget_screenshot | 0.1 ms | ERR: the widget has no RemoteViews until the provider's `onUpdate` runs |
+
+### Improvement notes added this round
+
+- Draw-pass errors must never be swallowed (done); surface them in
+  `runtime_health` too.
+- `screenshot` re-runs measure/layout every call (about 300–470 ms).
+  Cache the frame until something is invalidated.
+- `launch` is about 800 ms, mostly Compose and Room `<clinit>`. A
+  snapshot or warm start would help.
+- A `widgets add` without an `onUpdate` broadcast leaves the widget empty;
+  `widget_screenshot` should trigger `APPWIDGET_UPDATE`.
+- Host float parameters: a typed-argument layer would remove the `fl()`
+  bit-pattern heuristic.
+
 ## Features not yet exercised
 
-The first composition does run (Scaffold, icons, dates), but the activity
-dies on the first database query, before a frame is drawn. The following
-therefore remain untested through MCP:
+The app launches and lays out (round 3), but no pixels are drawn yet, so
+the following are still untested through MCP:
 - shopping list, prices, history and the "Gasto por mercado" chart;
 - the store comparison and its CSV export;
 - share, backup, the widget, and the camera/OCR features.

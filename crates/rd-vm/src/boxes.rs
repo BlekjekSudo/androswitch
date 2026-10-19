@@ -320,6 +320,37 @@ pub(crate) fn instance_intrinsic(
     let Some(k) = kind(recv_class) else {
         return Ok(None);
     };
+    // `new Float(f)`, `new Integer("12")`, …: the (deprecated but still
+    // emitted) wrapper constructors.
+    if name == "<init>" {
+        let v = match args.first() {
+            Some(Value::Obj(sr)) if sig == "(Ljava/lang/String;)V" => {
+                let s = vm.heap.as_str(*sr)?.trim().to_string();
+                let bad = || {
+                    VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NumberFormatException;",
+                        format!("For input string: \"{s}\""),
+                    ))
+                };
+                match k {
+                    'Z' => Value::Int(s.eq_ignore_ascii_case("true") as i32),
+                    'J' => Value::Long(s.parse().map_err(|_| bad())?),
+                    'F' => Value::Float(s.parse().map_err(|_| bad())?),
+                    'D' => Value::Double(s.parse().map_err(|_| bad())?),
+                    _ => Value::Int(narrow(k, s.parse().map_err(|_| bad())?)),
+                }
+            }
+            Some(a) => match k {
+                'J' => Value::Long(a.as_long()?),
+                'F' => Value::Float(a.as_float()?),
+                'D' => Value::Double(a.as_double()?),
+                _ => Value::Int(narrow(k, a.as_int()?)),
+            },
+            None => return Ok(None),
+        };
+        crate::err::put_field_result(vm.heap.put_field(recv, "value", v))?;
+        return Ok(Some(Value::Null));
+    }
     let mine = vm.heap.get_field(recv, "value")?;
     let numeric_kind = !matches!(k, 'Z' | 'C');
     let v = match (name, sig) {

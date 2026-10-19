@@ -317,6 +317,37 @@ pub(crate) fn instance_intrinsic(
             Value::Int(prop(vm, recv, "MeasuredHeight").unwrap_or(h))
         }
         ("getMeasuredState", "()I") => Value::Int(0),
+        // move the frame without resizing (AOSP: no onSizeChanged/onLayout)
+        ("offsetLeftAndRight", "(I)V") | ("offsetTopAndBottom", "(I)V") => {
+            let d = a(0);
+            let horiz = name == "offsetLeftAndRight";
+            let key = if horiz { "rd_l" } else { "rd_t" };
+            let cur = prop(vm, recv, key).unwrap_or(if horiz { x } else { y });
+            set_prop(vm, recv, key, cur + d);
+            if let Some(HostObj::View { x, y, .. }) = vm.fw.objects.get_mut(&recv) {
+                if horiz {
+                    *x += d;
+                } else {
+                    *y += d;
+                }
+            }
+            Value::Null
+        }
+        ("setLeft" | "setTop" | "setRight" | "setBottom", "(I)V") => {
+            let (l, t) = (
+                prop(vm, recv, "rd_l").unwrap_or(x),
+                prop(vm, recv, "rd_t").unwrap_or(y),
+            );
+            let (mut fl, mut ft, mut fr, mut fb) = (l, t, l + w, t + h);
+            match name {
+                "setLeft" => fl = a(0),
+                "setTop" => ft = a(0),
+                "setRight" => fr = a(0),
+                _ => fb = a(0),
+            }
+            layout(vm, recv, fl, ft, fr, fb)?;
+            Value::Null
+        }
         ("getLeft", "()I") => Value::Int(prop(vm, recv, "rd_l").unwrap_or(x)),
         ("getTop", "()I") => Value::Int(prop(vm, recv, "rd_t").unwrap_or(y)),
         ("getRight", "()I") => Value::Int(prop(vm, recv, "rd_l").unwrap_or(x) + w),
@@ -417,6 +448,21 @@ pub(crate) fn instance_intrinsic(
 impl Engine {
     /// Host draw pass: measure/layout DEX views in the current window and
     /// record the frame display list. Returns the number of recorded ops.
+    /// Recorded Java stack (`rd_trace`) of an exception exit, if any; used to
+    /// report failures of host-driven passes (draw, layout) with their call site.
+    pub fn exit_trace(&self, e: &VmExit) -> String {
+        let VmExit::Exception(t) = e else {
+            return String::new();
+        };
+        let Some(obj) = t.obj else {
+            return String::new();
+        };
+        match self.heap.get_field(obj, "rd_trace") {
+            Ok(Value::Obj(s)) => self.heap.as_str(s).map(str::to_string).unwrap_or_default(),
+            _ => String::new(),
+        }
+    }
+
     pub fn draw_frame(&mut self) -> Result<usize, VmExit> {
         let Some(activity) = self.fw.current_activity else {
             return Ok(0);

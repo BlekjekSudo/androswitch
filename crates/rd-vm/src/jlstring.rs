@@ -187,7 +187,7 @@ fn string_array(vm: &mut Engine, items: Vec<String>) -> Result<Value, VmExit> {
     Ok(Value::Obj(arr))
 }
 
-fn byte_array(vm: &mut Engine, bytes: &[u8]) -> Result<Value, VmExit> {
+pub(crate) fn byte_array(vm: &mut Engine, bytes: &[u8]) -> Result<Value, VmExit> {
     let arr = vm.heap.alloc_array(ElemKind::Int, bytes.len(), "[B")?;
     let slot = vm
         .heap
@@ -209,18 +209,22 @@ fn int_elems(vm: &mut Engine, v: &Value) -> Result<Vec<i32>, VmExit> {
     Ok(elems.iter().map(|e| e.as_int().unwrap_or(0)).collect())
 }
 
-fn charset_name(vm: &mut Engine, v: Option<&Value>) -> Result<String, VmExit> {
+pub(crate) fn charset_name(vm: &mut Engine, v: Option<&Value>) -> Result<String, VmExit> {
     Ok(match v {
         Some(Value::Obj(r)) => match vm.heap.as_str(*r) {
             Ok(s) => s.to_string(),
-            Err(_) => crate::intrinsics::object_to_string(vm, *r)?,
+            // host Charset (jtext_format) keeps its name in `rd_name`
+            Err(_) => match vm.heap.get_field(*r, "rd_name") {
+                Ok(Value::Obj(n)) => vm.heap.as_str(n).map(str::to_string).unwrap_or_default(),
+                _ => crate::intrinsics::object_to_string(vm, *r)?,
+            },
         },
         _ => "UTF-8".to_string(),
     }
     .to_ascii_uppercase())
 }
 
-fn encode(s: &str, cs: &str) -> Vec<u8> {
+pub(crate) fn encode(s: &str, cs: &str) -> Vec<u8> {
     match cs {
         "ISO-8859-1" | "LATIN1" | "ISO8859_1" => s
             .chars()
@@ -236,7 +240,7 @@ fn encode(s: &str, cs: &str) -> Vec<u8> {
     }
 }
 
-fn decode(b: &[u8], cs: &str) -> String {
+pub(crate) fn decode(b: &[u8], cs: &str) -> String {
     match cs {
         "ISO-8859-1" | "LATIN1" | "ISO8859_1" => b.iter().map(|&x| x as char).collect(),
         "US-ASCII" | "ASCII" => b

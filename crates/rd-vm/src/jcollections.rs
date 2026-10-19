@@ -424,7 +424,7 @@ pub(crate) fn instance_intrinsic(
     let is_list = matches!(
         mref_class,
         "Ljava/util/AbstractList;" | "Ljava/util/List;" | "Ljava/util/AbstractSequentialList;"
-    );
+    ) || crate::jlclass::assignable(vm, "Ljava/util/AbstractList;", &rc);
     let me = Value::Obj(recv);
     Ok(Some(match (name, sig) {
         ("<init>", "()V") if mref_class.starts_with("Ljava/util/Abstract") => Value::Null,
@@ -644,5 +644,87 @@ pub(crate) fn instance_intrinsic(
             Value::Obj(crate::intrinsics::alloc_string(vm, s)?)
         }
         _ => return Ok(None),
+    }))
+}
+
+/// `equals`/`hashCode`/`toString` for receivers with host List/Set state
+/// (ArrayList, Collections$SingletonList, HashSet, …), with JDK semantics:
+/// a List compares in order with any List, a Set compares membership with
+/// any Set. Called whatever the invoke's declared class is (`Object`,
+/// `List`, `Collection`, …).
+pub(crate) fn host_object_method(
+    vm: &mut Engine,
+    recv_class: &str,
+    recv: ObjRef,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if !matches!(
+        (name, sig),
+        ("equals", "(Ljava/lang/Object;)Z")
+            | ("hashCode", "()I")
+            | ("toString", "()Ljava/lang/String;")
+    ) {
+        return Ok(None);
+    }
+    let items = match vm.fw.objects.get(&recv) {
+        Some(HostObj::List { elems }) => elems.clone(),
+        _ => return Ok(None),
+    };
+    let is_set = vm.cp.is_subtype(recv_class, "Ljava/util/Set;");
+    Ok(Some(match name {
+        "hashCode" => {
+            let mut h: i32 = if is_set { 0 } else { 1 };
+            for e in &items {
+                let eh = crate::arrays::obj_hash(vm, e)?;
+                h = if is_set {
+                    h.wrapping_add(eh)
+                } else {
+                    h.wrapping_mul(31).wrapping_add(eh)
+                };
+            }
+            Value::Int(h)
+        }
+        "toString" => {
+            let s = to_string(vm, recv, &items)?;
+            Value::Obj(crate::intrinsics::alloc_string(vm, s)?)
+        }
+        _ => {
+            let Some(Value::Obj(o)) = args.first().cloned() else {
+                return Ok(Some(Value::Int(0)));
+            };
+            if o == recv {
+                return Ok(Some(Value::Int(1)));
+            }
+            let oc = vm.heap.class_of(o)?.to_string();
+            let want = if is_set {
+                "Ljava/util/Set;"
+            } else {
+                "Ljava/util/List;"
+            };
+            if !vm.cp.is_subtype(&oc, want) {
+                return Ok(Some(Value::Int(0)));
+            }
+            let b = match elems_of(vm, &Value::Obj(o)) {
+                Ok(b) => b,
+                Err(_) => return Ok(Some(Value::Int(0))),
+            };
+            let mut eq = items.len() == b.len();
+            if eq {
+                for i in 0..items.len() {
+                    let ok = if is_set {
+                        contains(vm, &b, &items[i])?
+                    } else {
+                        crate::arrays::obj_equals(vm, &items[i], &b[i])?
+                    };
+                    if !ok {
+                        eq = false;
+                        break;
+                    }
+                }
+            }
+            Value::Int(eq as i32)
+        }
     }))
 }

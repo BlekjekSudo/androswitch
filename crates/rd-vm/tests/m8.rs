@@ -26,6 +26,7 @@ fn obj(e: &mut Engine, class: &str) -> u32 {
 #[test]
 fn m8_sqlite_crud_cursor() {
     let mut e = engine();
+    e.use_sqlite_subset();
     let helper = obj(&mut e, SQLITE_HELPER);
     let name = s(&mut e, "app.db");
     let ctx = Value::Null;

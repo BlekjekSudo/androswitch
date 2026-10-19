@@ -84,8 +84,8 @@ fn env_u32(k: &str, d: u32) -> u32 {
 }
 
 pub(crate) struct Device {
-    w: u32,
-    h: u32,
+    pub(crate) w: u32,
+    pub(crate) h: u32,
     pub(crate) dpi: u32,
 }
 

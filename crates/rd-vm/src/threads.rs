@@ -515,6 +515,28 @@ fn kill_handler(vm: &mut Engine) -> Result<ObjRef, VmExit> {
     Ok(h)
 }
 
+/// `Throwable.toString()` as AOSP logs it: `pkg.Class: message` when the
+/// object has no DEX `toString` (host default would be `Class@id`).
+fn describe_throwable(vm: &mut Engine, e: ObjRef) -> Result<String, VmExit> {
+    let text = crate::intrinsics::object_to_string(vm, e)?;
+    let class = vm.heap.class_of(e)?.to_string();
+    let java = class
+        .trim_start_matches('L')
+        .trim_end_matches(';')
+        .replace('/', ".");
+    if !text.starts_with(&format!("{java}@")) {
+        return Ok(text);
+    }
+    let msg = match vm.heap.get_field(e, "message") {
+        Ok(Value::Obj(m)) => vm.heap.as_str(m).ok().map(str::to_string),
+        _ => None,
+    };
+    Ok(match msg {
+        Some(m) => format!("{java}: {m}"),
+        None => java,
+    })
+}
+
 /// `UncaughtExceptionHandler.uncaughtException(t, e)` on the platform
 /// handler. The app's default handler, if any, runs first, as the AOSP
 /// ThreadGroup does. Then `E/AndroidRuntime: FATAL EXCEPTION` is logged and
@@ -558,11 +580,29 @@ pub(crate) fn ueh_intrinsic(
         Ok(Value::Obj(m)) => vm.heap.as_str(m).ok().map(str::to_string),
         _ => None,
     };
-    let mut text = crate::intrinsics::object_to_string(vm, e)?;
+    let mut text = describe_throwable(vm, e)?;
     if let Ok(Value::Obj(t)) = vm.heap.get_field(e, "rd_trace") {
         if let Ok(t) = vm.heap.as_str(t) {
             text.push_str(&t.replace("\n  at ", "\nE/AndroidRuntime:   at "));
         }
+    }
+    // AOSP prints the cause chain ("Caused by: …") after the stack.
+    let mut cur = e;
+    for _ in 0..8 {
+        let Ok(Value::Obj(c)) = vm.heap.get_field(cur, "cause") else {
+            break;
+        };
+        if c == cur {
+            break;
+        }
+        text.push_str("\nE/AndroidRuntime: Caused by: ");
+        text.push_str(&describe_throwable(vm, c)?);
+        if let Ok(Value::Obj(t)) = vm.heap.get_field(c, "rd_trace") {
+            if let Ok(t) = vm.heap.as_str(t) {
+                text.push_str(&t.replace("\n  at ", "\nE/AndroidRuntime:   at "));
+            }
+        }
+        cur = c;
     }
     crate::intrinsics::host_print(
         1,

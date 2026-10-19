@@ -130,6 +130,8 @@ pub struct M8State {
     pub cursors: HashMap<ObjRef, CursorState>,
     pub content_values: HashMap<ObjRef, Vec<(String, Value)>>,
     pub helpers_db: HashMap<ObjRef, String>,
+    /// Real-SQLite backend state (jsqlite).
+    pub sqlx: crate::jsqlite::SqlState,
     pub uris: HashMap<ObjRef, String>,
     pub intents: HashMap<ObjRef, IntentState>,
     pub started_services: Vec<String>,
@@ -188,7 +190,7 @@ fn astr(vm: &mut Engine, s: String) -> Result<Value, VmExit> {
     Ok(Value::Obj(intrinsics::alloc_string(vm, s)?))
 }
 /// Invoca método DEX (virtual, pela classe do receiver) se declarado.
-fn call_dex(
+pub(crate) fn call_dex(
     vm: &mut Engine,
     recv: ObjRef,
     name: &str,
@@ -264,6 +266,13 @@ impl Engine {
             }
         }
     }
+    /// Use the built-in SQL subset instead of the real SQLite backend
+    /// (`jsqlite`) for this engine — same as `RD_SQLITE=subset`, without
+    /// touching the process environment. Tests that inspect
+    /// [`Engine::m8_database`] need it: only the subset fills that model.
+    pub fn use_sqlite_subset(&mut self) {
+        self.fw.m8.sqlx.unavailable = true;
+    }
     pub fn m8_database(&self, name: &str) -> Option<&Database> {
         self.fw.m8.databases.get(name)
     }
@@ -286,6 +295,12 @@ pub fn call_m8_static(
     _sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(v) = crate::android_uri::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::jsqlite::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
     match (class, name) {
         // Android Process host (probe Breezy Weather): ids determinísticos.
         ("Landroid/os/Process;", "myPid") => Ok(Some(Value::Int(10000))),
@@ -420,6 +435,17 @@ pub fn call_m8_instance(
         return dialog(vm, name, sig, recv, args, true);
     }
     // ── SQLite ──────────────────────────────────────────────────────────
+    // Real SQLite backend first (jsqlite); the subset below is the fallback.
+    if mref_class.starts_with("Landroid/database/")
+        || recv_class.starts_with("Landroid/database/")
+        || vm.cp.is_subtype(&recv_class, SQLITE_HELPER)
+    {
+        if let Some(v) =
+            crate::jsqlite::instance_intrinsic(vm, &recv_class, mref_class, name, sig, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
     // A DEX subclass's own methods (its constructor, overrides) run as DEX;
     // the host model only answers calls that land on SQLiteOpenHelper.
     if mref_class == SQLITE_HELPER
@@ -484,8 +510,19 @@ pub fn call_m8_instance(
         return file_host(vm, name, recv, args);
     }
     // ── Uri (instância) ─────────────────────────────────────────────────
-    if mref_class == URI || recv_class == URI {
-        return uri_instance(vm, name, recv, args);
+    if mref_class == URI
+        || recv_class == URI
+        || mref_class == "Landroid/net/Uri$Builder;"
+        || recv_class == "Landroid/net/Uri$Builder;"
+    {
+        if let Some(v) =
+            crate::android_uri::instance_intrinsic(vm, &recv_class, mref_class, name, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+        if mref_class == URI || recv_class == URI {
+            return uri_instance(vm, name, recv, args);
+        }
     }
     // ── JobScheduler ────────────────────────────────────────────────────
     if mref_class == JOB_SCHEDULER || recv_class == JOB_SCHEDULER {

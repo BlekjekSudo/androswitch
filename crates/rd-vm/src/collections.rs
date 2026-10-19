@@ -73,6 +73,26 @@ pub(crate) fn static_intrinsic(
             }
             Ok(Some(best))
         }
+        // Stable merge sort (the JDK's TimSort is stable too); a null
+        // comparator means natural ordering.
+        ("sort", "(Ljava/util/List;)V") | ("sort", "(Ljava/util/List;Ljava/util/Comparator;)V") => {
+            let Some(Value::Obj(r)) = args.first() else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "Collections.sort(null)",
+                )));
+            };
+            let Some(HostObj::List { elems }) = vm.fw.objects.get(r) else {
+                return Ok(None);
+            };
+            let items = elems.clone();
+            let cmp = args.get(1).filter(|v| !matches!(v, Value::Null)).cloned();
+            let sorted = crate::arrays::merge_sort(vm, items, cmp.as_ref())?;
+            if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(r) {
+                *elems = sorted;
+            }
+            Ok(Some(Value::Null))
+        }
         ("reverse", "(Ljava/util/List;)V") => {
             if let Some(Value::Obj(r)) = args.first() {
                 if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(r) {

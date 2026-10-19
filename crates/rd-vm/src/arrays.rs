@@ -263,7 +263,11 @@ pub(crate) fn compare(
 }
 
 /// Stable merge sort with a fallible comparator.
-fn merge_sort(vm: &mut Engine, v: Vec<Value>, cmp: Option<&Value>) -> Result<Vec<Value>, VmExit> {
+pub(crate) fn merge_sort(
+    vm: &mut Engine,
+    v: Vec<Value>,
+    cmp: Option<&Value>,
+) -> Result<Vec<Value>, VmExit> {
     if v.len() <= 1 {
         return Ok(v);
     }

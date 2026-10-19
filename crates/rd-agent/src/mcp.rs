@@ -1478,9 +1478,21 @@ impl AgentSession {
         })?;
         // App-drawn content (Compose, custom views): run the host draw pass
         // and rasterize the recorded frame over the host tree rendering.
+        let mut draw_err: Option<String> = None;
         let png = {
             let eng = self.require_engine()?;
-            let ops = eng.draw_frame().unwrap_or(0);
+            // a failing draw pass is reported in the app logs (it used to be
+            // swallowed, leaving a blank screenshot with no explanation)
+            let ops = match eng.draw_frame() {
+                Ok(n) => n,
+                Err(e) => {
+                    draw_err = Some(format!(
+                        "W/RustyDroid: draw pass failed: {e}{}\n",
+                        eng.exit_trace(&e)
+                    ));
+                    0
+                }
+            };
             let mut fb = rd_render::render_snapshot(&tree);
             if ops > 0 && eng.has_frame() {
                 let (w, h) = (fb.w, fb.h);
@@ -1488,6 +1500,12 @@ impl AgentSession {
             }
             fb.to_png()
         };
+        if let Some(msg) = draw_err {
+            self.logs
+                .lock()
+                .expect("logs")
+                .extend_from_slice(msg.as_bytes());
+        }
         match path {
             Some(p) if !p.is_empty() => {
                 // Controle M5: escrita de arquivo SÓ dentro do sandbox

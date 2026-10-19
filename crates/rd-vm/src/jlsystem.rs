@@ -181,9 +181,15 @@ pub(crate) fn class_loader_intrinsic(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     // Class.getPackage / Package.getName: derived from the descriptor
-    // Runtime-visible annotations are not retained on classes (deviation,
-    // as for Method/Constructor): lookups report "absent".
+    // Class annotations come from the DEX (jannotations.rs); host classes
+    // and Method/Constructor report "absent".
     if mref_class == "Ljava/lang/Class;" {
+        // Runtime-visible class annotations from the DEX (jannotations.rs).
+        if let Some(Value::Obj(c)) = args.first() {
+            if let Some(v) = crate::jannotations::class_intrinsic(vm, name, *c, &args[1..])? {
+                return Ok(Some(v));
+            }
+        }
         match name {
             "getAnnotation" | "getDeclaredAnnotation" => return Ok(Some(Value::Null)),
             "isAnnotationPresent" => return Ok(Some(Value::Int(0))),

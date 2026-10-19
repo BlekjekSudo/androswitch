@@ -305,6 +305,23 @@ impl Engine {
             .collect::<Result<Vec<_>, VmExit>>()?;
         let class = self.heap.class_of(recv)?.to_string();
         let Some((dex_idx, def, m)) = self.cp.resolve_method(&class, method, sig) else {
+            // Host receiver (String, collections, java.io, android.*): the
+            // same host chains the interpreter's invoke uses.
+            if let Some(v) = intrinsics::call_instance_intrinsic_mref(
+                self, &class, &class, method, sig, recv, &args,
+            )? {
+                return Ok(v);
+            }
+            if let Some(v) = crate::m8::call_m8_instance(self, &class, method, sig, recv, &args)? {
+                return Ok(v);
+            }
+            if class.starts_with("Landroid/") {
+                if let Some(v) =
+                    crate::framework::call_host_instance(self, &class, method, sig, recv, &args)?
+                {
+                    return Ok(v);
+                }
+            }
             return Err(crate::classpath::unresolved_method(&class, method, sig).into());
         };
         if m.access_flags & ACC_STATIC != 0 {

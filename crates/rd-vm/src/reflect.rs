@@ -49,7 +49,7 @@ fn str_field(vm: &Engine, r: ObjRef, f: &str) -> Option<String> {
     }
 }
 
-fn class_desc(vm: &Engine, c: ObjRef) -> Option<String> {
+pub(crate) fn class_desc(vm: &Engine, c: ObjRef) -> Option<String> {
     str_field(vm, c, "class_name").or_else(|| str_field(vm, c, "name"))
 }
 
@@ -226,10 +226,7 @@ fn new_class_array(vm: &mut Engine, descs: &[String]) -> Result<Value, VmExit> {
     for d in descs {
         vals.push(Value::Obj(vm.class_object_for(d)?));
     }
-    let dst = vm.heap.array_elems_mut(a)?;
-    for (i, v) in vals.into_iter().enumerate() {
-        dst[i] = v;
-    }
+    *vm.heap.array_elems_mut(a)? = vals;
     Ok(Value::Obj(a))
 }
 
@@ -294,6 +291,60 @@ pub(crate) fn instance_intrinsic(
                 put_str(vm, m, "rd_name", &mname)?;
                 put_str(vm, m, "rd_sig", &msig)?;
                 Some(Value::Obj(m))
+            }
+            ("getConstructors", "()[Ljava/lang/reflect/Constructor;")
+            | ("getDeclaredConstructors", "()[Ljava/lang/reflect/Constructor;")
+            | ("getMethods", "()[Ljava/lang/reflect/Method;")
+            | ("getDeclaredMethods", "()[Ljava/lang/reflect/Method;") => {
+                let Some(class) = class_desc(vm, recv) else {
+                    return Ok(None);
+                };
+                let ctors = name.contains("Constructor");
+                let public_only = !name.contains("Declared");
+                // getMethods walks superclasses (public members are inherited);
+                // the others look at the class itself only.
+                let mut classes = vec![class.clone()];
+                if name == "getMethods" {
+                    let mut cur = vm.cp.superclass_of(&class);
+                    while let Some(c) = cur {
+                        if classes.len() > 32 {
+                            break;
+                        }
+                        classes.push(c.clone());
+                        cur = vm.cp.superclass_of(&c);
+                    }
+                }
+                let mut seen = std::collections::HashSet::new();
+                let mut found: Vec<(String, String, String)> = Vec::new();
+                for c in &classes {
+                    for (mname, proto, flags) in vm.cp.declared_methods(c) {
+                        if mname == "<clinit>" || (mname == "<init>") != ctors {
+                            continue;
+                        }
+                        // skip synthetic/bridge members, and non-public ones when asked
+                        if flags & 0x1040 != 0 || (public_only && flags & 0x0001 == 0) {
+                            continue;
+                        }
+                        if seen.insert((mname.clone(), proto.clone())) {
+                            found.push((c.clone(), mname, proto));
+                        }
+                    }
+                }
+                if ctors && found.is_empty() && crate::classpath::host_class_known(&class) {
+                    found.push((class.clone(), "<init>".into(), "()V".into()));
+                }
+                let elem = if ctors { CTOR } else { METHOD };
+                let mut objs = Vec::new();
+                for (decl, mname, proto) in &found {
+                    let o = vm.heap.alloc_instance(elem.to_string(), Vec::new())?;
+                    put_str(vm, o, "rd_decl", decl)?;
+                    put_str(vm, o, "rd_name", mname)?;
+                    put_str(vm, o, "rd_sig", proto)?;
+                    objs.push(Value::Obj(o));
+                }
+                let a = vm.heap.alloc_array(ElemKind::Obj, objs.len(), elem)?;
+                *vm.heap.array_elems_mut(a)? = objs;
+                Some(Value::Obj(a))
             }
             ("getConstructor", "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;")
             | ("getDeclaredConstructor", "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;") => {

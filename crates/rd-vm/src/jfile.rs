@@ -650,6 +650,22 @@ fn stream_intrinsic(
     }))
 }
 
+/// Creates `p`'s parent directories (public entry for other host modules).
+pub(crate) fn mkdirs_pub(p: &str) {
+    mkdirs(p);
+}
+
+/// Ensures a file exists at `p` (parents included), keeping its content.
+pub(crate) fn touch(p: &str) {
+    let p = absolute(p);
+    if let Some(parent) = parent_of(&p) {
+        mkdirs(&parent);
+    }
+    VFS.with(|v| {
+        v.borrow_mut().files.entry(p).or_default();
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

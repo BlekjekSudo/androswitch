@@ -1417,7 +1417,19 @@ fn cmd_app_run(
                         "rd-cli",
                     )
                 })?;
-                let png = rd_render::render_snapshot(&tree).to_png();
+                // same pipeline as the MCP screenshot: host tree + DEX draw pass
+                let mut fb = rd_render::render_snapshot(&tree);
+                match eng.draw_frame() {
+                    Ok(ops) if ops > 0 && eng.has_frame() => {
+                        let (w, h) = (fb.w, fb.h);
+                        eng.rasterize_frame(&mut fb.px, w, h);
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        eprintln!("W/RustyDroid: draw pass failed: {e}{}", eng.exit_trace(&e))
+                    }
+                }
+                let png = fb.to_png();
                 std::fs::write(file, &png).map_err(|e| {
                     RdError::new("IO_ERROR", format!("escrevendo {file}: {e}"), "rd-cli")
                 })?;
