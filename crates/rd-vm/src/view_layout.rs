@@ -388,6 +388,35 @@ pub(crate) fn instance_intrinsic(
             }
             Value::Int(1)
         }
+        // Drawable.Callback (AOSP View implements it): scheduleDrawable
+        // posts the drawable's frame runnable at uptime `when`; a view
+        // redraws every frame here, so invalidate/unschedule need no state.
+        ("scheduleDrawable", "(Landroid/graphics/drawable/Drawable;Ljava/lang/Runnable;J)V") => {
+            if let Some(Value::Obj(r)) = args.get(1) {
+                let when = match args.get(2) {
+                    Some(Value::Long(l)) => (*l).max(0) as u64,
+                    Some(Value::Int(i)) => (*i).max(0) as u64,
+                    _ => 0,
+                };
+                view_post(vm, *r, when.saturating_sub(vm.fw.clock()))?;
+            }
+            Value::Null
+        }
+        ("unscheduleDrawable", "(Landroid/graphics/drawable/Drawable;Ljava/lang/Runnable;)V") => {
+            if let Some(Value::Obj(r)) = args.get(1) {
+                let r = *r;
+                let looper = vm.main_looper_obj()?;
+                if let Some(HostObj::Looper { queue }) = vm.fw.objects.get_mut(&looper) {
+                    queue.retain(|e| e.is_message || e.runnable != r);
+                }
+            }
+            Value::Null
+        }
+        (
+            "unscheduleDrawable" | "invalidateDrawable",
+            "(Landroid/graphics/drawable/Drawable;)V",
+        ) => Value::Null,
+        ("verifyDrawable", "(Landroid/graphics/drawable/Drawable;)Z") => Value::Int(0),
         // AOSP ViewGroup/View touch defaults (reached via `super.…`)
         ("dispatchTouchEvent", TOUCH_SIG) => match args.first() {
             Some(Value::Obj(ev)) => Value::Int(host_dispatch_touch(vm, recv, *ev)? as i32),
@@ -574,6 +603,27 @@ impl Engine {
             Ok(Value::Obj(s)) => self.heap.as_str(s).map(str::to_string).unwrap_or_default(),
             _ => String::new(),
         }
+    }
+
+    /// Lay the window out before input/inspection, as a device does after
+    /// the first traversal: if any DEX root under the content view is still
+    /// 0-sized (no frame has run yet), run one `draw_frame` pass.
+    pub fn ensure_laid_out(&mut self) -> Result<(), VmExit> {
+        let Some(activity) = self.fw.current_activity else {
+            return Ok(());
+        };
+        let Some(content) = self.window_content_of(activity) else {
+            return Ok(());
+        };
+        let mut roots = Vec::new();
+        self.collect_dex_roots(content, &mut roots, 0);
+        let needs_layout = roots
+            .iter()
+            .any(|r| matches!(bounds(self, *r), Some((_, _, w, h, _)) if w <= 0 || h <= 0));
+        if needs_layout {
+            self.draw_frame()?;
+        }
+        Ok(())
     }
 
     pub fn draw_frame(&mut self) -> Result<usize, VmExit> {

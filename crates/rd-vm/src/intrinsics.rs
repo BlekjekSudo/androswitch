@@ -3071,13 +3071,12 @@ fn map_intrinsic(
             }
         }
         ("putAll", _) => {
-            // source must be a host map (HashMap/LinkedHashMap/…); a DEX
-            // Map implementation stays an explicit gap instead of a silent
-            // no-op
+            // source: a host map directly, or any java.util.Map (DEX/Kotlin
+            // maps) through its entrySet().iterator() contract
             let src = match args.first() {
                 Some(Value::Obj(o)) => match vm.fw.objects.get(o) {
                     Some(HostObj::Map { entries }) => entries.clone(),
-                    _ => return Ok(None),
+                    _ => map_entries_via_iteration(vm, *o)?,
                 },
                 _ => {
                     return Err(VmExit::Exception(Throwable::new(
@@ -3282,6 +3281,25 @@ pub fn call_instance_intrinsic(
 /// `Ljava/lang/Enum;` mas receiver de classe do app — e o construtor da
 /// classe do app (DEX) NÃO pode ser sequestrado pelo intrínseco.
 pub fn call_instance_intrinsic_mref(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: crate::heap::ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // `List.subList` views: refresh from / write back to the backing list.
+    if vm.fw.sublists.contains_key(&recv) {
+        crate::jcollections::sublist_refresh(vm, recv);
+        let r = instance_intrinsic_dispatch(vm, recv_class, mref_class, name, sig, recv, args);
+        crate::jcollections::sublist_write_back(vm, recv);
+        return r;
+    }
+    instance_intrinsic_dispatch(vm, recv_class, mref_class, name, sig, recv, args)
+}
+
+fn instance_intrinsic_dispatch(
     vm: &mut Engine,
     recv_class: &str,
     mref_class: &str,
@@ -4854,4 +4872,30 @@ pub(crate) fn call_native_loader(
         )
         .into())
     }
+}
+
+/// Entries of any `java.util.Map` (host or DEX) via the interface contract:
+/// `entrySet().iterator()`, then `getKey`/`getValue` on each entry, all
+/// through virtual dispatch.
+fn map_entries_via_iteration(
+    vm: &mut Engine,
+    map: crate::heap::ObjRef,
+) -> Result<Vec<(Value, Value)>, VmExit> {
+    let set = vm.invoke_instance(map, "entrySet", "()Ljava/util/Set;", &[])?;
+    let Value::Obj(set) = set else {
+        return Ok(Vec::new());
+    };
+    let it = vm.invoke_instance(set, "iterator", "()Ljava/util/Iterator;", &[])?;
+    let Value::Obj(it) = it else {
+        return Ok(Vec::new());
+    };
+    let mut out = Vec::new();
+    while vm.invoke_instance(it, "hasNext", "()Z", &[])?.as_int()? != 0 {
+        let e = vm.invoke_instance(it, "next", "()Ljava/lang/Object;", &[])?;
+        let Value::Obj(e) = e else { continue };
+        let k = vm.invoke_instance(e, "getKey", "()Ljava/lang/Object;", &[])?;
+        let v = vm.invoke_instance(e, "getValue", "()Ljava/lang/Object;", &[])?;
+        out.push((k, v));
+    }
+    Ok(out)
 }

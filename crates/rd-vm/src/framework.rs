@@ -212,6 +212,10 @@ pub struct QueuedMsg {
 #[derive(Debug, Default)]
 pub struct HostState {
     pub objects: HashMap<ObjRef, HostObj>,
+    /// `List.subList` views: view → (parent, offset, len). See
+    /// `jcollections::sublist_*` (write-through semantics).
+    pub(crate) sublists: HashMap<ObjRef, (ObjRef, usize, usize)>,
+    pub(crate) sublist_order: std::collections::VecDeque<ObjRef>,
     /// clock virtual (ms) — postDelayed/dispatch por ordem de tempo
     pub clock_ms: u64,
     main_looper: Option<ObjRef>,
@@ -843,6 +847,8 @@ impl Engine {
             )
             .into());
         };
+        // input lands on a laid-out window (first traversal), as on a device
+        let _ = self.ensure_laid_out();
         let Some(content) = self.window_content_of(activity) else {
             if std::env::var("RD_FW_DEBUG").is_ok() {
                 eprintln!("[fw] touch: sem content (window vazia)");

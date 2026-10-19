@@ -124,11 +124,69 @@ pub(crate) fn instance_intrinsic(
         | ("setBackgroundDrawableResource", "(I)V")
         | ("setWindowAnimations", "(I)V")
         | ("setNavigationBarContrastEnforced$", _) => Value::Null,
+        ("setGravity", "(I)V")
+        | ("setDimAmount", "(F)V")
+        | ("setElevation", "(F)V")
+        | ("setTitle", "(Ljava/lang/CharSequence;)V") => Value::Null,
+        // Window features (FEATURE_NO_TITLE, …): recorded per window
+        ("requestFeature", "(I)Z") => {
+            let f = args.first().and_then(|v| v.as_int().ok()).unwrap_or(0);
+            let key = (recv, "win:features".to_string());
+            let cur = match vm.view_props.get(&key) {
+                Some(Value::Long(m)) => *m,
+                _ => 0,
+            };
+            if (0..63).contains(&f) {
+                vm.view_props.insert(key, Value::Long(cur | (1i64 << f)));
+            }
+            Value::Int(1)
+        }
+        ("hasFeature", "(I)Z") => {
+            let f = args.first().and_then(|v| v.as_int().ok()).unwrap_or(0);
+            let m = match vm.view_props.get(&(recv, "win:features".to_string())) {
+                Some(Value::Long(m)) => *m,
+                _ => 0,
+            };
+            Value::Int(((0..63).contains(&f) && m & (1i64 << f) != 0) as i32)
+        }
+        // Window attributes: one WindowManager.LayoutParams per window
+        // (MATCH_PARENT × MATCH_PARENT by default, as for a PhoneWindow)
+        ("getAttributes", "()Landroid/view/WindowManager$LayoutParams;") => {
+            Value::Obj(window_attributes(vm, recv)?)
+        }
+        ("setAttributes", "(Landroid/view/WindowManager$LayoutParams;)V") => {
+            if let Some(a @ Value::Obj(_)) = args.first() {
+                vm.view_props
+                    .insert((recv, "win:attrs".to_string()), a.clone());
+            }
+            Value::Null
+        }
+        ("setLayout", "(II)V") => {
+            let a = window_attributes(vm, recv)?;
+            let w = args.first().and_then(|v| v.as_int().ok()).unwrap_or(-1);
+            let h = args.get(1).and_then(|v| v.as_int().ok()).unwrap_or(-1);
+            crate::err::put_field_result(vm.heap.put_field(a, "width", Value::Int(w)))?;
+            crate::err::put_field_result(vm.heap.put_field(a, "height", Value::Int(h)))?;
+            Value::Null
+        }
+        ("superDispatchKeyEvent", "(Landroid/view/KeyEvent;)Z") => Value::Int(0),
         ("getStatusBarColor", "()I") | ("getNavigationBarColor", "()I") => Value::Int(0),
         ("isFloating", "()Z") => Value::Int(0),
         _ => return Ok(None),
     };
     Ok(Some(v))
+}
+
+fn window_attributes(vm: &mut Engine, window: ObjRef) -> Result<ObjRef, VmExit> {
+    let key = (window, "win:attrs".to_string());
+    if let Some(Value::Obj(a)) = vm.view_props.get(&key) {
+        return Ok(*a);
+    }
+    const LP: &str = "Landroid/view/WindowManager$LayoutParams;";
+    let a = vm.heap.alloc_instance(LP.to_string(), Vec::new())?;
+    layout_params_intrinsic(vm, LP, "<init>", "()V", a, &[])?;
+    vm.view_props.insert(key, Value::Obj(a));
+    Ok(a)
 }
 
 /// `View.setSystemUiVisibility`/`getSystemUiVisibility` (pre-API-30

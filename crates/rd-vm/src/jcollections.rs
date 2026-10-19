@@ -163,6 +163,63 @@ fn is_set(vm: &Engine, r: ObjRef) -> bool {
         .unwrap_or(false)
 }
 
+/// Most recent `subList` views tracked for write-through (older views fall
+/// back to snapshot semantics).
+const MAX_SUBLIST_VIEWS: usize = 1024;
+
+fn register_sublist(vm: &mut Engine, view: &Value, parent: ObjRef, offset: usize, len: usize) {
+    let Value::Obj(v) = view else { return };
+    vm.fw.sublists.insert(*v, (parent, offset, len));
+    vm.fw.sublist_order.push_back(*v);
+    while vm.fw.sublist_order.len() > MAX_SUBLIST_VIEWS {
+        if let Some(old) = vm.fw.sublist_order.pop_front() {
+            vm.fw.sublists.remove(&old);
+        }
+    }
+}
+
+/// `List.subList` is a *view* (JDK): before an operation on it, re-read
+/// its window of the parent so parent writes are visible through the view.
+pub(crate) fn sublist_refresh(vm: &mut Engine, view: ObjRef) {
+    let Some(&(parent, off, len)) = vm.fw.sublists.get(&view) else {
+        return;
+    };
+    sublist_refresh(vm, parent);
+    let window = match vm.fw.objects.get(&parent) {
+        Some(HostObj::List { elems }) if off + len <= elems.len() => elems[off..off + len].to_vec(),
+        _ => return,
+    };
+    if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&view) {
+        *elems = window;
+    }
+}
+
+/// After an operation on a `subList` view, write its contents back into
+/// the parent's window (and up the chain for nested views), so idioms such
+/// as `list.subList(a, b).clear()`, `Collections.sort(list.subList(..))`
+/// or `subList.set(i, x)` modify the backing list as on the JDK.
+pub(crate) fn sublist_write_back(vm: &mut Engine, view: ObjRef) {
+    let mut cur = view;
+    while let Some(&(parent, off, len)) = vm.fw.sublists.get(&cur) {
+        let now = match vm.fw.objects.get(&cur) {
+            Some(HostObj::List { elems }) => elems.clone(),
+            _ => return,
+        };
+        let new_len = now.len();
+        match vm.fw.objects.get_mut(&parent) {
+            Some(HostObj::List { elems }) if off + len <= elems.len() => {
+                if new_len == len && elems[off..off + len] == now[..] {
+                    return;
+                }
+                elems.splice(off..off + len, now);
+            }
+            _ => return,
+        }
+        vm.fw.sublists.insert(cur, (parent, off, new_len));
+        cur = parent;
+    }
+}
+
 fn new_host(vm: &mut Engine, class: &str, elems: Vec<Value>) -> Result<Value, VmExit> {
     let r = vm.heap.alloc_instance(class.to_string(), Vec::new())?;
     vm.fw.objects.insert(r, HostObj::List { elems });
@@ -378,11 +435,9 @@ pub(crate) fn instance_intrinsic(
             }
             ("subList", "(II)Ljava/util/List;") => {
                 let (a, b) = range(items.len(), args[0].as_int()?, args[1].as_int()?)?;
-                return Ok(Some(new_host(
-                    vm,
-                    "Ljava/util/ArrayList;",
-                    items[a..b].to_vec(),
-                )?));
+                let view = new_host(vm, "Ljava/util/ArrayList;", items[a..b].to_vec())?;
+                register_sublist(vm, &view, recv, a, b - a);
+                return Ok(Some(view));
             }
             ("lastIndexOf", "(Ljava/lang/Object;)I") => {
                 let x = args.first().cloned().unwrap_or(Value::Null);
@@ -595,7 +650,13 @@ pub(crate) fn instance_intrinsic(
         ("subList", "(II)Ljava/util/List;") if is_list => {
             let items = elems_of(vm, &me)?;
             let (a, b) = range(items.len(), args[0].as_int()?, args[1].as_int()?)?;
-            new_host(vm, "Ljava/util/ArrayList;", items[a..b].to_vec())?
+            let view = new_host(vm, "Ljava/util/ArrayList;", items[a..b].to_vec())?;
+            if let Value::Obj(parent) = me {
+                if vm.fw.objects.contains_key(&parent) {
+                    register_sublist(vm, &view, parent, a, b - a);
+                }
+            }
+            view
         }
         ("hashCode", "()I") => {
             let items = elems_of(vm, &me)?;

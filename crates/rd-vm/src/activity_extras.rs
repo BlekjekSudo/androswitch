@@ -36,6 +36,38 @@ pub(crate) fn instance_intrinsic(
     if mref_class == BACK_DISPATCHER || vm.back_dispatchers.values().any(|d| *d == recv) {
         return back_dispatcher(vm, name, sig, recv, args);
     }
+    // ContextWrapper / ContextThemeWrapper instantiated directly (e.g.
+    // Compose `Dialog` wraps its context in `ContextThemeWrapper(ctx, theme)`):
+    // the constructor records the base context; Context-family methods on
+    // the wrapper are answered by the Context intrinsics (single app
+    // context), and `getBaseContext` returns the recorded base.
+    if matches!(
+        mref_class,
+        "Landroid/content/ContextWrapper;" | "Landroid/view/ContextThemeWrapper;"
+    ) {
+        match (name, sig) {
+            ("<init>", "()V") => return Ok(Some(Value::Null)),
+            (
+                "<init>",
+                "(Landroid/content/Context;)V"
+                | "(Landroid/content/Context;I)V"
+                | "(Landroid/content/Context;Landroid/content/res/Resources$Theme;)V",
+            )
+            | ("attachBaseContext", "(Landroid/content/Context;)V") => {
+                if let Some(base @ Value::Obj(_)) = args.first() {
+                    vm.view_props
+                        .insert((recv, "ctx:mBase".to_string()), base.clone());
+                }
+                return Ok(Some(Value::Null));
+            }
+            ("getBaseContext", "()Landroid/content/Context;") => {
+                if let Some(b) = vm.view_props.get(&(recv, "ctx:mBase".to_string())) {
+                    return Ok(Some(b.clone()));
+                }
+            }
+            _ => {}
+        }
+    }
     let app_or_ctx = matches!(
         mref_class,
         "Landroid/app/Application;"

@@ -266,19 +266,32 @@ fn unb64(s: &str) -> Vec<u8> {
 fn sql_exc(kind: &str, msg: &str, sql: &str) -> VmExit {
     let class = match kind {
         "constraint" => "Landroid/database/sqlite/SQLiteConstraintException;",
-        _ if msg.contains("no such table")
-            || msg.contains("syntax error")
-            || msg.contains("no such column") =>
-        {
-            "Landroid/database/sqlite/SQLiteException;"
-        }
         _ => "Landroid/database/sqlite/SQLiteException;",
     };
-    Throwable::new(
-        class,
-        format!("{msg} (code 1 SQLITE_ERROR): , while compiling: {sql}"),
-    )
-    .into()
+    // AOSP SQLiteConnection message format: "<msg> (code N NAME)"
+    let code = if kind != "constraint" {
+        "1 SQLITE_ERROR"
+    } else if msg.contains("UNIQUE") || msg.contains("PRIMARY KEY") {
+        "2067 SQLITE_CONSTRAINT_UNIQUE"
+    } else if msg.contains("NOT NULL") {
+        "1299 SQLITE_CONSTRAINT_NOTNULL"
+    } else if msg.contains("FOREIGN KEY") {
+        "787 SQLITE_CONSTRAINT_FOREIGNKEY"
+    } else {
+        "19 SQLITE_CONSTRAINT"
+    };
+    let text = if kind == "constraint" {
+        format!("{msg} (code {code})")
+    } else {
+        format!("{msg} (code {code}): , while compiling: {sql}")
+    };
+    Throwable::new(class, text).into()
+}
+
+/// `RD_SQL_TRACE=1`: log every statement, its bound args and any error.
+fn sql_trace() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("RD_SQL_TRACE").is_ok_and(|v| v != "0"))
 }
 
 fn run(vm: &mut Engine, db: &str, sql: &str, args: &[Sv]) -> Result<Res, VmExit> {
@@ -302,6 +315,13 @@ fn run(vm: &mut Engine, db: &str, sql: &str, args: &[Sv]) -> Result<Res, VmExit>
     };
     let r: J = serde_json::from_str(&line)
         .map_err(|e| crate::err::vm_error("VM_ERROR", format!("SQLite backend reply: {e}")))?;
+    if sql_trace() {
+        eprintln!(
+            "S/RustyDroid: sql {sql} args={} err={}",
+            req["args"],
+            r.get("err").and_then(J::as_str).unwrap_or("-")
+        );
+    }
     if let Some(e) = r.get("err").and_then(J::as_str) {
         return Err(sql_exc(
             r.get("kind").and_then(J::as_str).unwrap_or(""),

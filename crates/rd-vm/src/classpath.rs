@@ -98,6 +98,9 @@ impl Classpath {
     pub fn find_class(&self, descriptor: &str) -> Option<(usize, &ClassDef)> {
         for (i, dex) in self.dexes.iter().enumerate() {
             if let Some(def) = dex.find_class(descriptor) {
+                if is_shadowed_platform_stub(descriptor, def.access_flags) {
+                    return None;
+                }
                 return Some((i, def));
             }
         }
@@ -684,6 +687,30 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/lang/NumberFormatException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/ArrayStoreException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/RuntimeException;" => Some(EXC.to_vec()),
+        // android.database exceptions (thrown by the SQLite backend; Room's
+        // @Upsert catches SQLiteConstraintException to fall back to UPDATE)
+        "Landroid/database/SQLException;" => Some(RUNTIME.to_vec()),
+        "Landroid/database/sqlite/SQLiteException;" => {
+            let mut v = vec!["Landroid/database/SQLException;"];
+            v.extend_from_slice(RUNTIME);
+            Some(v)
+        }
+        "Landroid/database/sqlite/SQLiteConstraintException;"
+        | "Landroid/database/sqlite/SQLiteCantOpenDatabaseException;"
+        | "Landroid/database/sqlite/SQLiteDiskIOException;"
+        | "Landroid/database/sqlite/SQLiteFullException;"
+        | "Landroid/database/sqlite/SQLiteDatabaseCorruptException;"
+        | "Landroid/database/sqlite/SQLiteDatabaseLockedException;"
+        | "Landroid/database/sqlite/SQLiteReadOnlyDatabaseException;"
+        | "Landroid/database/sqlite/SQLiteDoneException;"
+        | "Landroid/database/sqlite/SQLiteBlobTooBigException;" => {
+            let mut v = vec![
+                "Landroid/database/sqlite/SQLiteException;",
+                "Landroid/database/SQLException;",
+            ];
+            v.extend_from_slice(RUNTIME);
+            Some(v)
+        }
         "Ljava/lang/UnsupportedOperationException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/StackOverflowError;" => Some(ERR.to_vec()),
         "Ljava/lang/OutOfMemoryError;" => Some(ERR.to_vec()),
@@ -723,6 +750,12 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/lang/Error;" => Some(ERR.to_vec()),
         // ── M3.2: framework host Android ───────────────────────────────────
         "Landroid/content/Context;" => Some(OBJECT.to_vec()),
+        "Landroid/content/ContextWrapper;" => Some(CONTEXT.to_vec()),
+        "Landroid/view/ContextThemeWrapper;" => Some(vec![
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
         "Landroid/app/Activity;" => Some(CONTEXT.to_vec()),
         "Landroid/app/Application;" => Some(CONTEXT.to_vec()),
         "Landroid/app/Service;" => Some(CONTEXT.to_vec()),
@@ -1314,6 +1347,19 @@ pub fn unresolved_method(class: &str, name: &str, proto: &str) -> RdError {
         ),
         "a classe pode depender de plataforma fora do escopo M2",
     )
+}
+
+/// Parent-first class loading: a *synthetic* class that the app DEX defines
+/// in a platform package is an R8/D8 API stub (its `<clinit>` typically just
+/// throws `NoClassDefFoundError`, for devices below the API level that
+/// introduced the class). On a device the boot classpath class shadows it,
+/// so here the platform (host) class wins too.
+fn is_shadowed_platform_stub(descriptor: &str, access_flags: u32) -> bool {
+    const ACC_SYNTHETIC: u32 = 0x1000;
+    access_flags & ACC_SYNTHETIC != 0
+        && ["Landroid/", "Ljava/", "Ljavax/", "Ldalvik/"]
+            .iter()
+            .any(|p| descriptor.starts_with(p))
 }
 
 #[cfg(test)]

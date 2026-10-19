@@ -851,7 +851,49 @@ fn dialog(
     };
     map.entry(recv).or_default();
     match name {
-        "<init>" => Ok(Some(Value::Null)),
+        "<init>" => {
+            if !is_builder {
+                if let Some(ctx) = oarg(args, 0) {
+                    vm.view_props
+                        .insert((recv, "dlg:context".to_string()), Value::Obj(ctx));
+                }
+            }
+            Ok(Some(Value::Null))
+        }
+        "getContext" if !is_builder => Ok(Some(
+            vm.view_props
+                .get(&(recv, "dlg:context".to_string()))
+                .cloned()
+                .unwrap_or(Value::Null),
+        )),
+        // AOSP Dialog lifecycle hooks: the base implementations are empty
+        "onCreate" | "onStart" | "onStop" if !is_builder => Ok(Some(Value::Null)),
+        "onTouchEvent" if !is_builder => Ok(Some(Value::Int(0))),
+        "onSaveInstanceState" if !is_builder => {
+            const BUNDLE: &str = "Landroid/os/Bundle;";
+            let b = vm.heap.alloc_instance(BUNDLE.to_string(), Vec::new())?;
+            intrinsics::call_instance_intrinsic(vm, BUNDLE, "<init>", "()V", b, &[])?;
+            Ok(Some(Value::Obj(b)))
+        }
+        "getOnBackInvokedDispatcher" if !is_builder => crate::activity_extras::instance_intrinsic(
+            vm,
+            "Landroid/app/Activity;",
+            name,
+            _sig,
+            recv,
+            args,
+        ),
+        "onBackPressed" if !is_builder => {
+            dialog_set_showing(vm, recv, false)?;
+            Ok(Some(Value::Null))
+        }
+        "addContentView" if !is_builder => {
+            let has = vm.fw.m8.dialogs.get(&recv).and_then(|d| d.view).is_some();
+            if !has {
+                return dialog(vm, "setContentView", _sig, recv, args, false);
+            }
+            Ok(Some(Value::Null))
+        }
         "setTitle" | "setMessage" => {
             let txt = match name {
                 "setTitle" => sarg(vm, args, 0)?,
@@ -947,17 +989,13 @@ fn dialog(
                 vm.fw.m8.last_dialog = Some(d);
                 Ok(Some(Value::Obj(d)))
             } else {
-                if let Some(st) = vm.fw.m8.dialogs.get_mut(&recv) {
-                    st.showing = true;
-                }
                 vm.fw.m8.last_dialog = Some(recv);
+                dialog_set_showing(vm, recv, true)?;
                 Ok(Some(Value::Null))
             }
         }
         "dismiss" | "cancel" => {
-            if let Some(st) = vm.fw.m8.dialogs.get_mut(&recv) {
-                st.showing = false;
-            }
+            dialog_set_showing(vm, recv, false)?;
             Ok(Some(Value::Null))
         }
         "isShowing" => Ok(Some(Value::Int(
@@ -969,9 +1007,68 @@ fn dialog(
                 .unwrap_or(0),
         ))),
         "getButton" => Ok(Some(Value::Null)), // botão host não é View; clique via m8_click_dialog_button
+        // Each Dialog owns a host Window (AOSP: PhoneWindow created in the
+        // Dialog constructor); `setContentView(View)` sets its content.
+        "getWindow" if !is_builder => Ok(Some(Value::Obj(dialog_window(vm, recv)?))),
+        "setContentView" if !is_builder => {
+            if let Some(v) = oarg(args, 0) {
+                let w = dialog_window(vm, recv)?;
+                if let Some(crate::framework::HostObj::Window { content }) =
+                    vm.fw.objects.get_mut(&w)
+                {
+                    *content = Some(v);
+                }
+                if let Some(st) = vm.fw.m8.dialogs.get_mut(&recv) {
+                    st.view = Some(v);
+                }
+            }
+            Ok(Some(Value::Null))
+        }
         _ => Ok(None),
     }
 }
+/// AOSP `Dialog.show()`: the first show dispatches `onCreate(null)`, then
+/// every show `onStart()`; `dismiss()` dispatches `onStop()`. Virtual
+/// dispatch, so DEX subclasses (ComponentDialog, Compose DialogWrapper, …)
+/// run their overrides; the host base methods are no-ops.
+fn dialog_set_showing(vm: &mut Engine, dialog: ObjRef, show: bool) -> Result<(), VmExit> {
+    let was = vm
+        .fw
+        .m8
+        .dialogs
+        .get(&dialog)
+        .map(|d| d.showing)
+        .unwrap_or(false);
+    if let Some(st) = vm.fw.m8.dialogs.get_mut(&dialog) {
+        st.showing = show;
+    }
+    if show && !was {
+        let created = (dialog, "dlg:created".to_string());
+        if vm.view_props.insert(created, Value::Int(1)).is_none() {
+            vm.invoke_instance(dialog, "onCreate", "(Landroid/os/Bundle;)V", &[Value::Null])?;
+        }
+        vm.invoke_instance(dialog, "onStart", "()V", &[])?;
+    } else if !show && was {
+        vm.invoke_instance(dialog, "onStop", "()V", &[])?;
+    }
+    Ok(())
+}
+
+pub(crate) fn dialog_window(vm: &mut Engine, dialog: ObjRef) -> Result<ObjRef, VmExit> {
+    let key = (dialog, "dlg:window".to_string());
+    if let Some(Value::Obj(w)) = vm.view_props.get(&key) {
+        return Ok(*w);
+    }
+    let w = vm
+        .heap
+        .alloc_instance("Landroid/view/Window;".to_string(), Vec::new())?;
+    vm.fw
+        .objects
+        .insert(w, crate::framework::HostObj::Window { content: None });
+    vm.view_props.insert(key, Value::Obj(w));
+    Ok(w)
+}
+
 impl Engine {
     /// Clica um botão de dialog (which: -1 positivo, -2 negativo, -3 neutro),
     /// disparando o OnClickListener DEX registrado. Retorna false se ausente.

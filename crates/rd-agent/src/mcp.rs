@@ -1446,6 +1446,8 @@ impl AgentSession {
     // ── observação ──────────────────────────────────────────────────────────
 
     fn tool_ui_tree(&mut self, format: &str) -> Result<ToolResult, RdError> {
+        // inspect a laid-out window (bounds are 0×0 before the first frame)
+        let _ = self.require_engine()?.ensure_laid_out();
         let tree: UiNode = self
             .require_engine()?
             .view_tree()
