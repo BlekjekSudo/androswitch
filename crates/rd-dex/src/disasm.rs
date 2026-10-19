@@ -990,7 +990,11 @@ impl<'a> MethodRender<'a> {
                         ),
                         _ => {
                             // largura incomum — bytes brutos (tolerante)
-                            let hex: String = b.iter().map(|x| format!("{x:02x}")).collect();
+                            let hex: String = b.iter().fold(String::new(), |mut acc, x| {
+                                use std::fmt::Write as _;
+                                let _ = write!(acc, "{x:02x}");
+                                acc
+                            });
                             format!("0x{hex}")
                         }
                     };

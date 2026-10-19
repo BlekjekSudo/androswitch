@@ -327,6 +327,15 @@ pub(crate) fn exec_frame(
                 if let Some(r) = regs[*a as usize].as_ref()? {
                     let cls = vm.heap.class_of(r)?.to_string();
                     if cls != target && !vm.cp.is_subtype(&cls, &target) {
+                        if std::env::var_os("RD_VM_TRACE_CAST").is_some() {
+                            eprintln!(
+                                "[cast] {} pc={cur_pc}: {cls} -> {target}",
+                                vm.frame_labels
+                                    .last()
+                                    .map(String::as_str)
+                                    .unwrap_or("<unknown>")
+                            );
+                        }
                         throw_exc!(CCE, format!("{cls} cannot be cast to {target}"));
                     }
                 }
@@ -748,7 +757,7 @@ pub(crate) fn exec_frame(
                 // saída vai para stdout/stderr do host, spec PrintStream: nunca lança)
                 if owner == "Ljava/lang/System;" && (fname == "out" || fname == "err") {
                     let key = (owner.clone(), fname.clone());
-                    if !vm.statics.contains_key(&key) {
+                    if let std::collections::hash_map::Entry::Vacant(e) = vm.statics.entry(key) {
                         let fd = if fname == "err" { 2 } else { 1 };
                         let r = step!(vm
                             .heap
@@ -757,8 +766,25 @@ pub(crate) fn exec_frame(
                                 vec![("fd".to_string(), Value::Int(fd))],
                             )
                             .map_err(oom_exception));
-                        vm.statics.insert(key, Value::Obj(r));
+                        e.insert(Value::Obj(r));
                     }
+                }
+                if owner == "Ljava/util/concurrent/TimeUnit;"
+                    && !vm.statics.contains_key(&(owner.clone(), fname.clone()))
+                    && matches!(
+                        fname.as_str(),
+                        "NANOSECONDS"
+                            | "MICROSECONDS"
+                            | "MILLISECONDS"
+                            | "SECONDS"
+                            | "MINUTES"
+                            | "HOURS"
+                            | "DAYS"
+                    )
+                {
+                    let unit = step!(vm.time_unit_obj(&fname));
+                    vm.statics
+                        .insert((owner.clone(), fname.clone()), Value::Obj(unit));
                 }
                 let v = vm
                     .statics
@@ -1232,7 +1258,7 @@ fn aput(
         let desc = vm.heap.class_of(r)?.to_string();
         if let Some(elem_cls) = desc.strip_prefix('[') {
             match &v {
-                Value::Null => {}
+                Value::Null | Value::Int(0) => {}
                 Value::Obj(val) => {
                     let val_cls = vm.heap.class_of(*val)?.to_string();
                     if val_cls != elem_cls && !vm.cp.is_subtype(&val_cls, elem_cls) {
@@ -1396,6 +1422,11 @@ fn do_invoke(
         {
             return Ok(v);
         }
+        // M8: subsistemas de compat real (OkHttp/WorkManager/Room/Uri…)
+        if let Some(v) = crate::m8::call_m8_static(vm, &mref.class, &mref.name, &mref.proto, slots)?
+        {
+            return Ok(v);
+        }
         // M3: classes android/* são HOST (framework.rs) — nunca estão no DEX
         if mref.class.starts_with("Landroid/") {
             return match crate::framework::call_host_static(
@@ -1466,6 +1497,14 @@ fn do_invoke(
         recv,
         &slots[1..],
     )? {
+        return Ok(v);
+    }
+
+    // M8: compat real — host sequestra só os métodos listados em m8.rs;
+    // `None` cai para o DEX real da biblioteca (androidx/okhttp no APK).
+    if let Some(v) =
+        crate::m8::call_m8_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+    {
         return Ok(v);
     }
 

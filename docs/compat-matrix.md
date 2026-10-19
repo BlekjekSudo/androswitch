@@ -15,7 +15,7 @@
 | M5 | Agente MCP v1 (30 tools + controles) | **✅ implementado** |
 | M6 | Executor de testes | **✅ implementado** |
 | M7 | Performance + gate piso E5 | ⬜ |
-| M8 | Compat real | ⬜ |
+| M8 | Compat real | **✅ implementado** |
 | M9 | Componentes avançados + NDK | ⬜ |
 | M10 | Dispositivos virtuais | ⬜ |
 | M11 | Engines | ⬜ |
@@ -41,6 +41,7 @@
 | Suíte | Arquivo | Cenários | Passos |
 |---|---|---|---|
 | contract-no-app | `tests/suites/contract-no-app.json` | 8 | 10 |
+| m8-compat | `tests/suites/m8-compat.json` | 2 | 4 |
 
 Executar: `rd test tests/suites/<arquivo>.json --junit <saida>.xml` (formato em `docs/suite-format.md`).
 

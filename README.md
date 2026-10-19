@@ -62,7 +62,7 @@ RustyDroid is a **"Wine for Android"**: instead of emulating an entire Android O
 | **M5** | ✅ **DONE** — MCP agent v1 (`rd mcp`, JSON-RPC stdio, **30 tools**: pacote (install/list/remove/clear/launch), input (tap/swipe/type/key), observação (ui_tree/screenshot/logs), wait/wait_for + asserts, permissões, runtime_health, compat_gaps, batch idempotente, sandbox+caps de segurança, `--describe-tools` + docs geradas) |
 | **M6** | ✅ **DONE** — test executor: `rd test suite.json` (cenários JSON, exit codes, **JUnit XML**), compat matrix gerada do roadmap + suítes |
 | **M7** | 🟡 **IN PROGRESS** — `rd perf` mede startup cold/warm + RSS no perfil moto-e5 com gate de CI sobre o app trivial (números emulados por fator de CPU); budgets da golden suite, medição em device real e gate de release ainda pendentes |
-| **M8** | Real-world compat: RecyclerView, Fragments, OkHttp shim, SQLite/Room, Services |
+| **M8** | ✅ **DONE (v0.9.0)** — Real-world compat: RecyclerView (DEX adapter populate), Fragments (legacy+androidx), Dialogs, OkHttp shim (offline deterministic), SQLite/Room (in-memory), Services/broadcasts/deep links, WorkManager, stateful SharedPreferences — `crates/rd-vm/src/m8.rs`, ADR 003 |
 | **M9** | Advanced components (widgets, IME, a11y) + NDK (`.so` via ELF/JNI) |
 | **M10** | Virtual devices: camera, GPS, sensors, biometrics — programmable by the agent |
 | **M11** | Engines: Flutter → React Native → Mono → WASM |

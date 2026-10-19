@@ -2,7 +2,7 @@
 
 # Ferramentas do Agente MCP (M5)
 
-Servidor `rustydroid-agent` v0.1.0 · protocolo `2024-11-05` · transporte stdio (JSON-RPC 2.0, uma mensagem por linha).
+Servidor `rustydroid-agent` v0.9.0 · protocolo `2024-11-05` · transporte stdio (JSON-RPC 2.0, uma mensagem por linha).
 
 Total: **32 tools**. Este catálogo é gerado de `rd_agent::mcp::tool_defs()` — o MESMO registro respondido em `tools/list` e impresso por `rd mcp --describe-tools`.
 

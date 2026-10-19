@@ -15,7 +15,7 @@
 | M5 | Agente MCP v1 (30 tools + controles) | LLM instala, navega e assera estado só com as tools | ✅ |
 | M6 | Executor de testes | suíte JSON → JUnit XML; compat-matrix automatizada | ✅ **implementado (2026-10)** |
 | M7 | Performance + gate piso E5 | startup < 2 s app trivial; suíte golden passa nos budgets moto-e5 | 🟡 **parcial (2026-10)** — `rd perf` + gate de CI no app trivial (estimativa); golden pendente |
-| M8 | Compat real | app OSS médio navega funcional; v0.9 | ⬜ |
+| M8 | Compat real | app OSS médio navega funcional; v0.9 | ✅ **implementado (2026-10)** |
 | M9 | Componentes avançados + NDK | 5 APKs com .so rodando; widgets/IME/notificações ok | ⬜ |
 | M10 | Dispositivos virtuais | câmera/GPS/biometria programáveis pelo agente | ⬜ |
 | M11 | Engines | Flutter → RN → Mono → wasm: 1 app de cada em golden flow | ⬜ |
@@ -634,3 +634,40 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   `Collections.list(Enumeration)` no mesmo host; `ClassLoader.getResource`
   (singular) coberto por exceção quando o launch pedir; bloco `java.net.URL`
   quando a sequência real exigir URL.
+
+
+## ✅ M8 concluído (2026-10) — Compat real, escopo completo (v0.9.0)
+
+Interceptação seletiva (`crates/rd-vm/src/m8.rs`, ADR 003): o dispatch consulta
+o host M8 antes do DEX só para métodos listados; o resto roda o DEX real da
+biblioteca do APK. Estado real e consultável via `Engine::m8_*`; testes em
+`crates/rd-vm/tests/m8.rs` (9 testes) + suíte do agente `tests/suites/m8-compat.json`.
+
+1. ✅ **RecyclerView**: `setAdapter` pergunta `getItemCount()` ao adapter DEX,
+   cria ViewHolders via `onCreateViewHolder` DEX, vincula via `onBindViewHolder`,
+   anexa itemViews como filhos (cap 20 = viewport); `notify*` repopula e conta;
+   LayoutManager/Linear/Grid; inflate de `<androidx.recyclerview.widget.RecyclerView>`.
+2. ✅ **Fragments**: legacy completo (registro/transações) + androidx
+   FragmentManager/FragmentTransaction (add/replace/remove/commit/commitNow,
+   findByTag/Id, popBackStack, getSupportFragmentManager canônico).
+3. ✅ **Dialogs**: Dialog/AlertDialog/Builder (title/message/view/buttons),
+   show/dismiss/isShowing; clique dispara `OnClickListener` DEX
+   (`Engine::m8_click_dialog_button`).
+4. ✅ **OkHttp shim**: OkHttpClient/Request.Builder/Call.execute/enqueue
+   (síncrono, Callback DEX), Response/ResponseBody; resposta determinística
+   registrada (`m8_set_http_response`, default 200), URLs registradas. Sem rede.
+5. ✅ **SQLite/Room**: SQLite em memória (DDL CREATE/DROP, insert/replace/
+   update/delete, query/rawQuery SELECT…FROM, transações, ContentValues,
+   Cursor completo, `SQLiteOpenHelper.onCreate` DEX); Room
+   databaseBuilder/Builder/build sobre esse host.
+6. ✅ **Services/broadcasts/deep links**: start/stop/bindService registrados;
+   sendBroadcast entrega a receivers (`onReceive` DEX); Intent action/data +
+   Uri parse/scheme/host/path; startActivity VIEW registra deep link e navega
+   com handler registrado; JobScheduler host.
+7. ✅ **WorkManager**: getInstance canônico; enqueue* registra WorkRecord
+   (ENQUEUED → SUCCEEDED via `m8_complete_work`, cancel* → CANCELLED);
+   Operation/ListenableFuture completados. Sem thread de background.
+8. ✅ **SharedPreferences stateful**: Editor put/remove/clear + commit/apply
+   aplicam no storage da VM; getters leem o storage; contains/getAll reais.
+9. ✅ **Regressão real**: launch do `org.primftpd` inalterado (mesma
+   ClassCastException fiel do APK sem META-INF/services); workspace verde.

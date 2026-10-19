@@ -180,6 +180,9 @@ enum AppSub {
         trace: bool,
         #[arg(long)]
         json: bool,
+        /// Limite d’instructions DEX (anti-loop; default VmConfig::fuel)
+        #[arg(long)]
+        fuel: Option<u64>,
     },
     /// M4 DoD "get_ui_tree": dump UI — uiautomator XML (default) ou textual M3
     Dump {
@@ -376,7 +379,8 @@ fn run(cli: Cli) -> i32 {
                 scripts,
                 trace,
                 json,
-            } => cmd_app_run(path, activity.as_deref(), scripts, *trace, *json),
+                fuel,
+            } => cmd_app_run(path, activity.as_deref(), scripts, *trace, *json, *fuel),
             AppSub::Dump {
                 path,
                 activity,
@@ -1243,6 +1247,7 @@ fn boot_app(
     path: &Path,
     activity: Option<&str>,
     exception_trace: bool,
+    fuel: Option<u64>,
 ) -> Result<(rd_vm::Engine, String, String), RdError> {
     let apk = open_apk(path).ok();
     let files = match &apk {
@@ -1268,6 +1273,7 @@ fn boot_app(
         dexes,
         rd_vm::VmConfig {
             exception_trace,
+            fuel: fuel.unwrap_or(rd_vm::VmConfig::default().fuel),
             ..rd_vm::VmConfig::default()
         },
     );
@@ -1318,8 +1324,9 @@ fn cmd_app_run(
     scripts: &[String],
     trace: bool,
     json: bool,
+    fuel: Option<u64>,
 ) -> Result<(), RdError> {
-    let (mut eng, activity_desc, package) = boot_app(path, activity, trace)?;
+    let (mut eng, activity_desc, package) = boot_app(path, activity, trace, fuel)?;
 
     let mut dumps: Vec<String> = Vec::new();
     let mut xmls: Vec<String> = Vec::new();
@@ -1482,7 +1489,7 @@ fn cmd_app_dump(
     text: bool,
     json: bool,
 ) -> Result<(), RdError> {
-    let (eng, activity_desc, package) = boot_app(path, activity, false)?;
+    let (eng, activity_desc, package) = boot_app(path, activity, false, None)?;
     if text {
         let d = eng.dump_ui();
         if json {
@@ -1521,7 +1528,7 @@ fn cmd_app_dump(
 /// M4 DoD "screenshot correto": PNG headless 720×1440 da tela corrente —
 /// software renderer determinístico do rd-render.
 fn cmd_app_shot(path: &Path, activity: Option<&str>, out: &Path) -> Result<(), RdError> {
-    let (eng, _activity, _package) = boot_app(path, activity, false)?;
+    let (eng, _activity, _package) = boot_app(path, activity, false, None)?;
     let tree = eng.view_tree().ok_or_else(|| {
         RdError::new(
             "INVALID_FORMAT",

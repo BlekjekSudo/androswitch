@@ -217,7 +217,7 @@ dependencies = [
 
 [[package]]
 name = "rd-agent"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "rd-apk",
  "rd-dex",
@@ -231,7 +231,7 @@ dependencies = [
 
 [[package]]
 name = "rd-apk"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "flate2",
  "serde",
@@ -241,7 +241,7 @@ dependencies = [
 
 [[package]]
 name = "rd-cli"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -258,7 +258,7 @@ dependencies = [
 
 [[package]]
 name = "rd-dex"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -266,7 +266,7 @@ dependencies = [
 
 [[package]]
 name = "rd-framework"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "rd-apk",
  "serde",
@@ -277,7 +277,7 @@ dependencies = [
 
 [[package]]
 name = "rd-jni"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -285,7 +285,7 @@ dependencies = [
 
 [[package]]
 name = "rd-ndk"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -293,7 +293,7 @@ dependencies = [
 
 [[package]]
 name = "rd-render"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "rd-vm",
  "serde",
@@ -302,7 +302,7 @@ dependencies = [
 
 [[package]]
 name = "rd-testsupport"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "rd-dex",
  "rd-vm",
@@ -310,7 +310,7 @@ dependencies = [
 
 [[package]]
 name = "rd-vm"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "rd-apk",
  "rd-dex",
@@ -505,7 +505,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "rd-framework",

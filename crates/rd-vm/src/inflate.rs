@@ -195,6 +195,8 @@ fn view_desc_of(name: &str) -> Result<String, VmExit> {
         "TextView" => framework::TEXTVIEW,
         "Button" => framework::BUTTON,
         "LinearLayout" => framework::LINEARLAYOUT,
+        "androidx.recyclerview.widget.RecyclerView" => crate::m8::RECYCLER,
+        "RecyclerView" => crate::m8::RECYCLER,
         "FrameLayout" => framework::FRAMELAYOUT,
         other if other.contains('.') => {
             // FQCN — a checagem is_subtype(VIEW) no caller filtra o que o

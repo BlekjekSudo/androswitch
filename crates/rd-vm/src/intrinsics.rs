@@ -17,6 +17,7 @@ const ATOMIC_REF: &str = "Ljava/util/concurrent/atomic/AtomicReference;";
 /// AtomicReference (campo de heap `value`), aritmética i32 com semântica
 /// Java (overflow silencioso — wrapping). VM single-threaded ⇒ CAS exato.
 const ATOMIC_INT: &str = "Ljava/util/concurrent/atomic/AtomicInteger;";
+const ATOMIC_REF_ARRAY: &str = "Ljava/util/concurrent/atomic/AtomicReferenceArray;";
 /// M8: décimo gap do launch real (`Executors.newFixedThreadPool`). A VM é
 /// single-threaded: substituto honesto é um executor que roda Runnables/
 /// Callables INLINE (síncrono/determinístico), ignorando tamanho de pool e
@@ -43,6 +44,9 @@ const ENUMERATION: &str = "Ljava/util/Enumeration;";
 /// M8: ClassLoader canônico da VM (identidade por VM — ver
 /// `framework::class_loader_obj`). `getResources(String)` é o 26º gap real.
 const CLASS_LOADER: &str = "Ljava/lang/ClassLoader;";
+const REFLECT_FIELD: &str = "Ljava/lang/reflect/Field;";
+const UNSAFE_CLASS: &str = "Lsun/misc/Unsafe;";
+const TIME_UNIT: &str = "Ljava/util/concurrent/TimeUnit;";
 use crate::framework::{CLASS, THREAD};
 const MATH: &str = "Ljava/lang/Math;";
 /// M8 (compat real): coleções java.util host — segundo gap de launch do
@@ -60,6 +64,8 @@ const ENUM: &str = "Ljava/lang/Enum;";
 /// do campo e opera via get_field/put_field (sem volatile/checks — VM
 /// single-threaded, documentado).
 const ARFU: &str = "Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;";
+const ALFU: &str = "Ljava/util/concurrent/atomic/AtomicLongFieldUpdater;";
+const AIFU: &str = "Ljava/util/concurrent/atomic/AtomicIntegerFieldUpdater;";
 const WEAK_REF: &str = "Ljava/lang/ref/WeakReference;";
 const SOFT_REF: &str = "Ljava/lang/ref/SoftReference;";
 const REF_QUEUE: &str = "Ljava/lang/ref/ReferenceQueue;";
@@ -272,6 +278,22 @@ pub fn call_static_intrinsic(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     match (class, name, sig) {
+        ("Ljava/util/Arrays;", "asList", "([Ljava/lang/Object;)Ljava/util/List;") => {
+            let array = args.first().and_then(|v| v.as_ref().ok().flatten()).ok_or_else(|| VmExit::Exception(Throwable::new("Ljava/lang/NullPointerException;", "Arrays.asList array null")))?;
+            let elems = vm.heap.as_array_elems(array)?.0.to_vec();
+            let list = vm.heap.alloc_instance("Ljava/util/ArrayList;".to_string(), Vec::new()).map_err(crate::err::oom_throwable)?;
+            vm.fw.objects.insert(list, crate::framework::HostObj::List { elems });
+            Ok(Some(Value::Obj(list)))
+        }
+        ("Ljava/lang/Runtime;", "getRuntime", "()Ljava/lang/Runtime;") => {
+            Ok(Some(Value::Obj(vm.runtime_obj()?)))
+        }
+        ("Ljava/lang/reflect/Modifier;", "isStatic", "(I)Z") => {
+            Ok(Some(Value::Int((args[0].as_int()? & 0x0008 != 0) as i32)))
+        }
+        ("Ljava/lang/reflect/Modifier;", "isFinal", "(I)Z") => {
+            Ok(Some(Value::Int((args[0].as_int()? & 0x0010 != 0) as i32)))
+        }
         (MATH, "abs", "(I)I") => Ok(Some(Value::Int(args[0].as_int()?.wrapping_abs()))),
         (MATH, "abs", "(J)J") => Ok(Some(Value::Long(args[0].as_long()?.wrapping_abs()))),
         (MATH, "abs", "(F)F") => Ok(Some(Value::Float(args[0].as_float()?.abs()))),
@@ -385,6 +407,22 @@ pub fn call_static_intrinsic(
                 .map(|v| Ok(Some(Value::Long(v))))
                 .map_err(|e| VmExit::Exception(Throwable::new(NFE, e)))?
         }
+        (LONG, "getLong", "(Ljava/lang/String;J)Ljava/lang/Long;") => {
+            let property = system_get_property(vm, &args[..1])?;
+            let value = match property {
+                Some(Value::Obj(r)) => parse_long(vm.heap.as_str(r)?).ok(),
+                _ => None,
+            }
+            .unwrap_or(args[1].as_long()?);
+            let boxed = vm
+                .heap
+                .alloc_instance(
+                    LONG.to_string(),
+                    vec![("value".to_string(), Value::Long(value))],
+                )
+                .map_err(crate::err::oom_throwable)?;
+            Ok(Some(Value::Obj(boxed)))
+        }
         (STRING, "valueOf", "(I)Ljava/lang/String;") => {
             let v = args[0].as_int()?;
             Ok(Some(Value::Obj(alloc_string(vm, v.to_string())?)))
@@ -478,6 +516,22 @@ pub fn call_static_intrinsic(
                 vm.heap.put_field(r, "arfu_name", args[2].clone()),
             )?;
             Ok(Some(Value::Obj(r)))
+        }
+        (ALFU, "newUpdater", "(Ljava/lang/Class;Ljava/lang/String;)Ljava/util/concurrent/atomic/AtomicLongFieldUpdater;") => {
+            let Some(_) = args.get(1).ok_or_else(|| crate::err::vm_error("INVALID_ARG", "AtomicLongFieldUpdater.newUpdater field missing"))?.as_ref()? else {
+                return Err(VmExit::Exception(Throwable::new("Ljava/lang/NullPointerException;", "newUpdater with null fieldName")));
+            };
+            let updater = vm.heap.alloc_instance(ALFU.to_string(), Vec::new()).map_err(crate::err::oom_throwable)?;
+            crate::err::put_field_result(vm.heap.put_field(updater, "arfu_name", args[1].clone()))?;
+            Ok(Some(Value::Obj(updater)))
+        }
+        (AIFU, "newUpdater", "(Ljava/lang/Class;Ljava/lang/String;)Ljava/util/concurrent/atomic/AtomicIntegerFieldUpdater;") => {
+            let Some(_) = args.get(1).ok_or_else(|| crate::err::vm_error("INVALID_ARG", "AtomicIntegerFieldUpdater.newUpdater field missing"))?.as_ref()? else {
+                return Err(VmExit::Exception(Throwable::new("Ljava/lang/NullPointerException;", "newUpdater with null fieldName")));
+            };
+            let updater = vm.heap.alloc_instance(AIFU.to_string(), Vec::new()).map_err(crate::err::oom_throwable)?;
+            crate::err::put_field_result(vm.heap.put_field(updater, "arfu_name", args[1].clone()))?;
+            Ok(Some(Value::Obj(updater)))
         }
         // M8 (23º gap real): Android NÃO tem SecurityManager (deprecated na
         // JDK; APIs de segurança são no-op) ⇒ sempre null.
@@ -758,6 +812,11 @@ fn class_supported(name: &str, sig: &str) -> bool {
             | ("getSimpleName", "()Ljava/lang/String;")
             | ("toString", "()Ljava/lang/String;")
             | ("getClassLoader", "()Ljava/lang/ClassLoader;")
+            | (
+                "getDeclaredField",
+                "(Ljava/lang/String;)Ljava/lang/reflect/Field;"
+            )
+            | ("getDeclaredFields", "()[Ljava/lang/reflect/Field;")
     )
 }
 
@@ -775,6 +834,7 @@ fn class_intrinsic(
     vm: &mut Engine,
     recv: crate::heap::ObjRef,
     name: &str,
+    args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     // getClassLoader não precisa do descritor: um ClassLoader canônico por VM
     // (single-classloader; a distinção bootstrap=null não se aplica ao host).
@@ -782,10 +842,77 @@ fn class_intrinsic(
         let l = vm.class_loader_obj()?;
         return Ok(Some(Value::Obj(l)));
     }
-    let desc = match vm.heap.get_field(recv, "class_name") {
+    let class_name = vm
+        .heap
+        .get_field(recv, "class_name")
+        .or_else(|_| vm.heap.get_field(recv, "name"));
+    let desc = match class_name {
         Ok(Value::Obj(r)) => vm.heap.as_str(r)?.to_string(),
         _ => String::new(),
     };
+    if name == "getDeclaredField" {
+        let field_name = string_arg(vm, &args[0])?;
+        let metadata = if desc == UNSAFE_CLASS && field_name == "theUnsafe" {
+            Some((desc.clone(), field_name.clone(), desc.clone(), 0x001A, true))
+        } else {
+            vm.cp
+                .declared_fields_info(&desc)
+                .into_iter()
+                .find(|(_, name, _, _, _)| name == &field_name)
+        };
+        let Some((declaring_class, field_name, field_type, modifiers, is_static)) = metadata else {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/NoSuchFieldException;",
+                field_name,
+            )));
+        };
+        let field = vm
+            .heap
+            .alloc_instance(REFLECT_FIELD.to_string(), Vec::new())
+            .map_err(crate::err::oom_throwable)?;
+        vm.fw.objects.insert(
+            field,
+            crate::framework::HostObj::ReflectField {
+                declaring_class,
+                name: field_name,
+                field_type,
+                modifiers,
+                is_static,
+                accessible: false,
+            },
+        );
+        return Ok(Some(Value::Obj(field)));
+    }
+    if name == "getDeclaredFields" {
+        let fields = vm.cp.declared_fields_info(&desc);
+        let array = vm
+            .heap
+            .alloc_array(
+                crate::heap::ElemKind::Obj,
+                fields.len(),
+                "[Ljava/lang/reflect/Field;",
+            )
+            .map_err(crate::err::oom_throwable)?;
+        for (declaring_class, field_name, field_type, modifiers, is_static) in fields {
+            let field = vm
+                .heap
+                .alloc_instance(REFLECT_FIELD.to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            vm.fw.objects.insert(
+                field,
+                crate::framework::HostObj::ReflectField {
+                    declaring_class,
+                    name: field_name,
+                    field_type,
+                    modifiers,
+                    is_static,
+                    accessible: false,
+                },
+            );
+            vm.heap.array_elems_mut(array)?.push(Value::Obj(field));
+        }
+        return Ok(Some(Value::Obj(array)));
+    }
     let bin = descriptor_to_class_name(&desc);
     let out = match name {
         "getName" => bin,
@@ -803,6 +930,296 @@ fn class_intrinsic(
         _ => return Ok(None),
     };
     Ok(Some(Value::Obj(alloc_string(vm, out)?)))
+}
+
+fn unsafe_singleton(vm: &mut Engine, class: &str) -> Result<crate::heap::ObjRef, VmExit> {
+    if let Some(obj) = vm.fw.unsafe_singleton {
+        return Ok(obj);
+    }
+    let obj = vm
+        .heap
+        .alloc_instance(class.to_string(), Vec::new())
+        .map_err(crate::err::oom_throwable)?;
+    vm.fw.unsafe_singleton = Some(obj);
+    Ok(obj)
+}
+
+fn unsafe_offset_field(
+    vm: &Engine,
+    args: &[Value],
+) -> Result<(crate::heap::ObjRef, String), VmExit> {
+    let target = args
+        .first()
+        .and_then(|v| v.as_ref().ok().flatten())
+        .ok_or_else(|| {
+            VmExit::Exception(Throwable::new(
+                "Ljava/lang/NullPointerException;",
+                "Unsafe field target null",
+            ))
+        })?;
+    let offset = args
+        .get(1)
+        .ok_or_else(|| crate::err::vm_error("INVALID_ARG", "Unsafe field offset missing"))?
+        .as_long()?;
+    let (_, field_name, _) = vm.fw.unsafe_offsets.get(&offset).cloned().ok_or_else(|| {
+        crate::err::vm_error(
+            "INVALID_ARG",
+            format!("unknown synthetic field offset {offset}"),
+        )
+    })?;
+    Ok((target, field_name))
+}
+
+fn unsafe_ref_identity_eq(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Obj(x), Value::Obj(y)) => x == y,
+        (Value::Null | Value::Int(0), Value::Null | Value::Int(0)) => true,
+        _ => false,
+    }
+}
+
+fn unsafe_intrinsic(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match (name, sig) {
+        ("objectFieldOffset", "(Ljava/lang/reflect/Field;)J")
+        | ("staticFieldOffset", "(Ljava/lang/reflect/Field;)J") => {
+            let field_ref = args
+                .first()
+                .and_then(|v| v.as_ref().ok().flatten())
+                .ok_or_else(|| {
+                    VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "Unsafe.objectFieldOffset field null",
+                    ))
+                })?;
+            let meta = match vm.fw.objects.get(&field_ref) {
+                Some(crate::framework::HostObj::ReflectField {
+                    declaring_class,
+                    name,
+                    field_type,
+                    ..
+                }) => (declaring_class.clone(), name.clone(), field_type.clone()),
+                _ => {
+                    return Err(crate::err::vm_error(
+                        "VM_TYPE_ERROR",
+                        "Unsafe field offset requires reflected Field",
+                    )
+                    .into())
+                }
+            };
+            if let Some((offset, _)) = vm
+                .fw
+                .unsafe_offsets
+                .iter()
+                .find(|(_, existing)| **existing == meta)
+            {
+                return Ok(Some(Value::Long(*offset)));
+            }
+            let offset = (vm.fw.unsafe_offsets.len() as i64 + 1) * 8;
+            vm.fw.unsafe_offsets.insert(offset, meta);
+            Ok(Some(Value::Long(offset)))
+        }
+        ("getObjectVolatile", "(Ljava/lang/Object;J)Ljava/lang/Object;")
+        | ("getObject", "(Ljava/lang/Object;J)Ljava/lang/Object;") => {
+            let (target, field) = unsafe_offset_field(vm, args)?;
+            Ok(Some(
+                vm.heap.get_field(target, &field).unwrap_or(Value::Null),
+            ))
+        }
+        ("putObjectVolatile", "(Ljava/lang/Object;JLjava/lang/Object;)V")
+        | ("putObject", "(Ljava/lang/Object;JLjava/lang/Object;)V") => {
+            let (target, field) = unsafe_offset_field(vm, args)?;
+            let value = args.get(3).cloned().unwrap_or(Value::Null);
+            crate::err::put_field_result(vm.heap.put_field(target, &field, value))?;
+            Ok(Some(Value::Null))
+        }
+        ("getIntVolatile", "(Ljava/lang/Object;J)I") | ("getInt", "(Ljava/lang/Object;J)I") => {
+            let (target, field) = unsafe_offset_field(vm, args)?;
+            Ok(Some(Value::Int(
+                vm.heap
+                    .get_field(target, &field)
+                    .unwrap_or(Value::Int(0))
+                    .as_int()
+                    .unwrap_or(0),
+            )))
+        }
+        ("putIntVolatile", "(Ljava/lang/Object;JI)V") | ("putInt", "(Ljava/lang/Object;JI)V") => {
+            let (target, field) = unsafe_offset_field(vm, args)?;
+            let value = args.get(3).cloned().unwrap_or(Value::Int(0));
+            crate::err::put_field_result(vm.heap.put_field(target, &field, value))?;
+            Ok(Some(Value::Null))
+        }
+        ("getLongVolatile", "(Ljava/lang/Object;J)J") | ("getLong", "(Ljava/lang/Object;J)J") => {
+            let (target, field) = unsafe_offset_field(vm, args)?;
+            Ok(Some(Value::Long(
+                vm.heap
+                    .get_field(target, &field)
+                    .unwrap_or(Value::Long(0))
+                    .as_long()
+                    .unwrap_or(0),
+            )))
+        }
+        ("putLongVolatile", "(Ljava/lang/Object;JJ)V") | ("putLong", "(Ljava/lang/Object;JJ)V") => {
+            let (target, field) = unsafe_offset_field(vm, args)?;
+            let value = args.get(3).cloned().unwrap_or(Value::Long(0));
+            crate::err::put_field_result(vm.heap.put_field(target, &field, value))?;
+            Ok(Some(Value::Null))
+        }
+        ("compareAndSwapObject", "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z")
+        | ("compareAndSetObject", "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z") => {
+            let (target, field) = unsafe_offset_field(vm, args)?;
+            let current = vm.heap.get_field(target, &field).unwrap_or(Value::Null);
+            let expected = args.get(3).cloned().unwrap_or(Value::Null);
+            if unsafe_ref_identity_eq(&current, &expected) {
+                crate::err::put_field_result(vm.heap.put_field(
+                    target,
+                    &field,
+                    args.get(4).cloned().unwrap_or(Value::Null),
+                ))?;
+                Ok(Some(Value::Int(1)))
+            } else {
+                Ok(Some(Value::Int(0)))
+            }
+        }
+        ("compareAndSwapInt", "(Ljava/lang/Object;JII)Z")
+        | ("compareAndSetInt", "(Ljava/lang/Object;JII)Z") => {
+            let (target, field) = unsafe_offset_field(vm, args)?;
+            let current = vm.heap.get_field(target, &field).unwrap_or(Value::Int(0));
+            if current.as_int().unwrap_or(0)
+                == args.get(3).and_then(|v| v.as_int().ok()).unwrap_or(0)
+            {
+                crate::err::put_field_result(vm.heap.put_field(
+                    target,
+                    &field,
+                    args.get(4).cloned().unwrap_or(Value::Int(0)),
+                ))?;
+                Ok(Some(Value::Int(1)))
+            } else {
+                Ok(Some(Value::Int(0)))
+            }
+        }
+        ("compareAndSwapLong", "(Ljava/lang/Object;JJJ)Z")
+        | ("compareAndSetLong", "(Ljava/lang/Object;JJJ)Z") => {
+            let (target, field) = unsafe_offset_field(vm, args)?;
+            let current = vm.heap.get_field(target, &field).unwrap_or(Value::Long(0));
+            if current.as_long().unwrap_or(0)
+                == args.get(3).and_then(|v| v.as_long().ok()).unwrap_or(0)
+            {
+                crate::err::put_field_result(vm.heap.put_field(
+                    target,
+                    &field,
+                    args.get(5).cloned().unwrap_or(Value::Long(0)),
+                ))?;
+                Ok(Some(Value::Int(1)))
+            } else {
+                Ok(Some(Value::Int(0)))
+            }
+        }
+        ("ensureClassInitialized", "(Ljava/lang/Class;)V") => Ok(Some(Value::Null)),
+        ("shouldBeInitialized", "(Ljava/lang/Class;)Z") => Ok(Some(Value::Int(0))),
+        _ => Ok(None),
+    }
+}
+
+fn reflect_field_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let (declaring_class, field_name, field_type, modifiers, is_static) = match vm
+        .fw
+        .objects
+        .get(&recv)
+    {
+        Some(crate::framework::HostObj::ReflectField {
+            declaring_class,
+            name,
+            field_type,
+            modifiers,
+            is_static,
+            ..
+        }) => (
+            declaring_class.clone(),
+            name.clone(),
+            field_type.clone(),
+            *modifiers,
+            *is_static,
+        ),
+        _ => return Err(crate::err::vm_error("VM_TYPE_ERROR", "Field sem metadados host").into()),
+    };
+    match (name, sig) {
+        ("setAccessible", "(Z)V") | ("trySetAccessible", "()Z") => {
+            if let Some(crate::framework::HostObj::ReflectField { accessible, .. }) =
+                vm.fw.objects.get_mut(&recv)
+            {
+                *accessible = true;
+            }
+            Ok(Some(if sig == "()Z" {
+                Value::Int(1)
+            } else {
+                Value::Null
+            }))
+        }
+        ("getName", "()Ljava/lang/String;") => Ok(Some(Value::Obj(alloc_string(vm, field_name)?))),
+        ("getModifiers", "()I") => Ok(Some(Value::Int(modifiers as i32))),
+        ("getType", "()Ljava/lang/Class;") => {
+            Ok(Some(Value::Obj(vm.class_object_for(&field_type)?)))
+        }
+        ("get", "(Ljava/lang/Object;)Ljava/lang/Object;") => {
+            if declaring_class == UNSAFE_CLASS && field_name == "theUnsafe" {
+                return Ok(Some(Value::Obj(unsafe_singleton(vm, &declaring_class)?)));
+            }
+            if is_static {
+                return Ok(Some(
+                    vm.statics
+                        .get(&(declaring_class, field_name))
+                        .cloned()
+                        .unwrap_or(Value::Null),
+                ));
+            }
+            let Some(target) = args.first().and_then(|v| v.as_ref().ok().flatten()) else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "Field.get target null",
+                )));
+            };
+            Ok(Some(
+                vm.heap
+                    .get_field(target, &field_name)
+                    .map_err(|e| crate::err::vm_error("INVALID_FORMAT", e))?,
+            ))
+        }
+        ("getInt", "(Ljava/lang/Object;)I") | ("getLong", "(Ljava/lang/Object;)J") => {
+            let value = if is_static {
+                vm.statics
+                    .get(&(declaring_class, field_name))
+                    .cloned()
+                    .unwrap_or(Value::Int(0))
+            } else {
+                let Some(target) = args.first().and_then(|v| v.as_ref().ok().flatten()) else {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "Field.get target null",
+                    )));
+                };
+                vm.heap
+                    .get_field(target, &field_name)
+                    .unwrap_or(Value::Int(0))
+            };
+            if sig.ends_with(")J") {
+                Ok(Some(Value::Long(value.as_long().unwrap_or(0))))
+            } else {
+                Ok(Some(Value::Int(value.as_int().unwrap_or(0))))
+            }
+        }
+        _ => Ok(None),
+    }
 }
 
 /// (name, sig) de fábricas `Executors` suportadas (M8).
@@ -1240,6 +1657,263 @@ fn thread_intrinsic(vm: &mut Engine, name: &str, _sig: &str) -> Result<Option<Va
             vm,
             "Thread[main,1,main]".to_string(),
         )?))),
+        _ => Ok(None),
+    }
+}
+
+fn atomic_ref_array_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if name == "<init>" && sig == "(I)V" {
+        let len = usize::try_from(args[0].as_int()?).map_err(|_| {
+            VmExit::Exception(Throwable::new(
+                "Ljava/lang/NegativeArraySizeException;",
+                "negative AtomicReferenceArray length",
+            ))
+        })?;
+        let array = vm
+            .heap
+            .alloc_array(crate::heap::ElemKind::Obj, len, "[Ljava/lang/Object;")
+            .map_err(crate::err::oom_throwable)?;
+        vm.heap
+            .array_elems_mut(array)?
+            .extend(std::iter::repeat(Value::Null).take(len));
+        crate::err::put_field_result(vm.heap.put_field(recv, "elements", Value::Obj(array)))?;
+        return Ok(Some(Value::Null));
+    }
+    let array = vm
+        .heap
+        .get_field(recv, "elements")
+        .map_err(|_| crate::err::vm_error("VM_TYPE_ERROR", "AtomicReferenceArray not initialized"))?
+        .as_ref()?
+        .ok_or_else(|| {
+            crate::err::vm_error("VM_TYPE_ERROR", "AtomicReferenceArray storage null")
+        })?;
+    if name == "length" && sig == "()I" {
+        return Ok(Some(Value::Int(
+            vm.heap.as_array_elems(array)?.0.len() as i32
+        )));
+    }
+    let index = args
+        .first()
+        .ok_or_else(|| crate::err::vm_error("INVALID_ARG", "AtomicReferenceArray index missing"))?
+        .as_int()?;
+    let len = vm.heap.as_array_elems(array)?.0.len();
+    let pos = usize::try_from(index)
+        .ok()
+        .filter(|i| *i < len)
+        .ok_or_else(|| {
+            VmExit::Exception(Throwable::new(
+                "Ljava/lang/IndexOutOfBoundsException;",
+                format!("index {index}, length {len}"),
+            ))
+        })?;
+    let current = vm.heap.as_array_elems(array)?.0[pos].clone();
+    match (name, sig) {
+        ("get", "(I)Ljava/lang/Object;") => Ok(Some(current)),
+        ("set", "(ILjava/lang/Object;)V") | ("lazySet", "(ILjava/lang/Object;)V") => {
+            vm.heap.array_elems_mut(array)?[pos] = args.get(1).cloned().unwrap_or(Value::Null);
+            Ok(Some(Value::Null))
+        }
+        ("getAndSet", "(ILjava/lang/Object;)Ljava/lang/Object;") => {
+            vm.heap.array_elems_mut(array)?[pos] = args.get(1).cloned().unwrap_or(Value::Null);
+            Ok(Some(current))
+        }
+        ("compareAndSet", "(ILjava/lang/Object;Ljava/lang/Object;)Z")
+        | ("weakCompareAndSet", "(ILjava/lang/Object;Ljava/lang/Object;)Z") => {
+            if unsafe_ref_identity_eq(&current, args.get(1).unwrap_or(&Value::Null)) {
+                vm.heap.array_elems_mut(array)?[pos] = args.get(2).cloned().unwrap_or(Value::Null);
+                Ok(Some(Value::Int(1)))
+            } else {
+                Ok(Some(Value::Int(0)))
+            }
+        }
+        _ => Ok(None),
+    }
+}
+
+fn alfu_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let field_ref = vm
+        .heap
+        .get_field(recv, "arfu_name")
+        .map_err(|_| crate::err::vm_error("VM_TYPE_ERROR", "AtomicLongFieldUpdater sem fieldName"))?
+        .as_ref()?
+        .ok_or_else(|| {
+            VmExit::Exception(Throwable::new(
+                "Ljava/lang/NullPointerException;",
+                "updater fieldName null",
+            ))
+        })?;
+    let field = vm.heap.as_str(field_ref)?.to_string();
+    let target = args
+        .first()
+        .and_then(|v| v.as_ref().ok().flatten())
+        .ok_or_else(|| {
+            VmExit::Exception(Throwable::new(
+                "Ljava/lang/NullPointerException;",
+                "AtomicLongFieldUpdater target null",
+            ))
+        })?;
+    let current = vm
+        .heap
+        .get_field(target, &field)
+        .unwrap_or(Value::Long(0))
+        .as_long()
+        .unwrap_or(0);
+    match name {
+        "get" => Ok(Some(Value::Long(current))),
+        "set" | "lazySet" => {
+            crate::err::put_field_result(vm.heap.put_field(
+                target,
+                &field,
+                Value::Long(args.get(1).and_then(|v| v.as_long().ok()).unwrap_or(0)),
+            ))?;
+            Ok(Some(Value::Null))
+        }
+        "compareAndSet" | "weakCompareAndSet" => {
+            let expected = args.get(1).and_then(|v| v.as_long().ok()).unwrap_or(0);
+            if current == expected {
+                crate::err::put_field_result(vm.heap.put_field(
+                    target,
+                    &field,
+                    Value::Long(args.get(2).and_then(|v| v.as_long().ok()).unwrap_or(0)),
+                ))?;
+                Ok(Some(Value::Int(1)))
+            } else {
+                Ok(Some(Value::Int(0)))
+            }
+        }
+        "getAndSet" => {
+            let new = args.get(1).and_then(|v| v.as_long().ok()).unwrap_or(0);
+            crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Long(new)))?;
+            Ok(Some(Value::Long(current)))
+        }
+        "getAndAdd" => {
+            let delta = args.get(1).and_then(|v| v.as_long().ok()).unwrap_or(0);
+            crate::err::put_field_result(vm.heap.put_field(
+                target,
+                &field,
+                Value::Long(current.wrapping_add(delta)),
+            ))?;
+            Ok(Some(Value::Long(current)))
+        }
+        "addAndGet" => {
+            let delta = args.get(1).and_then(|v| v.as_long().ok()).unwrap_or(0);
+            let next = current.wrapping_add(delta);
+            crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Long(next)))?;
+            Ok(Some(Value::Long(next)))
+        }
+        "incrementAndGet" => {
+            let next = current.wrapping_add(1);
+            crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Long(next)))?;
+            Ok(Some(Value::Long(next)))
+        }
+        "decrementAndGet" => {
+            let next = current.wrapping_sub(1);
+            crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Long(next)))?;
+            Ok(Some(Value::Long(next)))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn aifu_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let field_ref = vm
+        .heap
+        .get_field(recv, "arfu_name")
+        .map_err(|_| {
+            crate::err::vm_error("VM_TYPE_ERROR", "AtomicIntegerFieldUpdater sem fieldName")
+        })?
+        .as_ref()?
+        .ok_or_else(|| {
+            VmExit::Exception(Throwable::new(
+                "Ljava/lang/NullPointerException;",
+                "updater fieldName null",
+            ))
+        })?;
+    let field = vm.heap.as_str(field_ref)?.to_string();
+    let target = args
+        .first()
+        .and_then(|v| v.as_ref().ok().flatten())
+        .ok_or_else(|| {
+            VmExit::Exception(Throwable::new(
+                "Ljava/lang/NullPointerException;",
+                "AtomicIntegerFieldUpdater target null",
+            ))
+        })?;
+    let current = vm
+        .heap
+        .get_field(target, &field)
+        .unwrap_or(Value::Int(0))
+        .as_int()
+        .unwrap_or(0);
+    match name {
+        "get" => Ok(Some(Value::Int(current))),
+        "set" | "lazySet" => {
+            crate::err::put_field_result(vm.heap.put_field(
+                target,
+                &field,
+                Value::Int(args.get(1).and_then(|v| v.as_int().ok()).unwrap_or(0)),
+            ))?;
+            Ok(Some(Value::Null))
+        }
+        "compareAndSet" | "weakCompareAndSet" => {
+            let expected = args.get(1).and_then(|v| v.as_int().ok()).unwrap_or(0);
+            if current == expected {
+                crate::err::put_field_result(vm.heap.put_field(
+                    target,
+                    &field,
+                    Value::Int(args.get(2).and_then(|v| v.as_int().ok()).unwrap_or(0)),
+                ))?;
+                Ok(Some(Value::Int(1)))
+            } else {
+                Ok(Some(Value::Int(0)))
+            }
+        }
+        "getAndSet" => {
+            let new = args.get(1).and_then(|v| v.as_int().ok()).unwrap_or(0);
+            crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Int(new)))?;
+            Ok(Some(Value::Int(current)))
+        }
+        "getAndAdd" => {
+            let delta = args.get(1).and_then(|v| v.as_int().ok()).unwrap_or(0);
+            crate::err::put_field_result(vm.heap.put_field(
+                target,
+                &field,
+                Value::Int(current.wrapping_add(delta)),
+            ))?;
+            Ok(Some(Value::Int(current)))
+        }
+        "addAndGet" => {
+            let delta = args.get(1).and_then(|v| v.as_int().ok()).unwrap_or(0);
+            let next = current.wrapping_add(delta);
+            crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Int(next)))?;
+            Ok(Some(Value::Int(next)))
+        }
+        "incrementAndGet" => {
+            let next = current.wrapping_add(1);
+            crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Int(next)))?;
+            Ok(Some(Value::Int(next)))
+        }
+        "decrementAndGet" => {
+            let next = current.wrapping_sub(1);
+            crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Int(next)))?;
+            Ok(Some(Value::Int(next)))
+        }
         _ => Ok(None),
     }
 }
@@ -2031,6 +2705,7 @@ fn set_supported(name: &str, sig: &str) -> bool {
     matches!(
         (name, sig),
         ("<init>", "()V")
+            | ("<init>", "(I)V")
             | ("<init>", "(Ljava/util/Collection;)V")
             | ("add", "(Ljava/lang/Object;)Z")
             | ("remove", "(Ljava/lang/Object;)Z")
@@ -2444,6 +3119,96 @@ pub fn call_instance_intrinsic_mref(
         {
             Ok(Some(Value::Obj(vm.application_obj()?)))
         }
+        // sun.misc.Unsafe (and Android's jdk.internal alias) use deterministic
+        // synthetic offsets backed by per-object heap fields.
+        (_, name, sig)
+            if mref_class == UNSAFE_CLASS || mref_class == "Ljdk/internal/misc/Unsafe;" =>
+        {
+            unsafe_intrinsic(vm, name, sig, args)
+        }
+        // java.lang.reflect.Field/AccessibleObject metadata captured by Class.
+        (_, name, sig)
+            if (mref_class == REFLECT_FIELD
+                || mref_class == "Ljava/lang/reflect/AccessibleObject;") =>
+        {
+            reflect_field_intrinsic(vm, recv, name, sig, args)
+        }
+        (_, "toNanos", "(J)J") if mref_class == TIME_UNIT => {
+            let scale = vm
+                .heap
+                .get_field(recv, "nanos_per_unit")
+                .unwrap_or(Value::Long(1))
+                .as_long()
+                .unwrap_or(1);
+            Ok(Some(Value::Long(args[0].as_long()?.saturating_mul(scale))))
+        }
+        (_, "toMillis", "(J)J") if mref_class == TIME_UNIT => {
+            let scale = vm
+                .heap
+                .get_field(recv, "nanos_per_unit")
+                .unwrap_or(Value::Long(1))
+                .as_long()
+                .unwrap_or(1);
+            Ok(Some(Value::Long(
+                args[0].as_long()?.saturating_mul(scale) / 1_000_000,
+            )))
+        }
+        (_, "toSeconds", "(J)J") if mref_class == TIME_UNIT => {
+            let scale = vm
+                .heap
+                .get_field(recv, "nanos_per_unit")
+                .unwrap_or(Value::Long(1))
+                .as_long()
+                .unwrap_or(1);
+            Ok(Some(Value::Long(
+                args[0].as_long()?.saturating_mul(scale) / 1_000_000_000,
+            )))
+        }
+        (_, "convert", "(JLjava/util/concurrent/TimeUnit;)J") if mref_class == TIME_UNIT => {
+            let target_scale = vm
+                .heap
+                .get_field(recv, "nanos_per_unit")
+                .unwrap_or(Value::Long(1))
+                .as_long()
+                .unwrap_or(1);
+            let source = args
+                .get(2)
+                .and_then(|v| v.as_ref().ok().flatten())
+                .ok_or_else(|| {
+                    VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "TimeUnit.convert source null",
+                    ))
+                })?;
+            let source_scale = vm
+                .heap
+                .get_field(source, "nanos_per_unit")
+                .unwrap_or(Value::Long(1))
+                .as_long()
+                .unwrap_or(1);
+            let value = args[0].as_long()?;
+            let nanos = value.saturating_mul(source_scale);
+            Ok(Some(Value::Long(if target_scale == 0 {
+                0
+            } else {
+                nanos / target_scale
+            })))
+        }
+        (_, "availableProcessors", "()I") if mref_class == "Ljava/lang/Runtime;" => {
+            Ok(Some(Value::Int(1)))
+        }
+        (_, "maxMemory", "()J") if mref_class == "Ljava/lang/Runtime;" => {
+            Ok(Some(Value::Long(vm.config.heap_budget as i64)))
+        }
+        (_, "totalMemory", "()J") if mref_class == "Ljava/lang/Runtime;" => {
+            Ok(Some(Value::Long(vm.heap.budget() as i64)))
+        }
+        (_, "freeMemory", "()J") if mref_class == "Ljava/lang/Runtime;" => Ok(Some(Value::Long(
+            vm.heap.budget().saturating_sub(vm.heap.used()) as i64,
+        ))),
+        (_, "gc", "()V") | (_, "runFinalization", "()V") if mref_class == "Ljava/lang/Runtime;" => {
+            Ok(Some(Value::Null))
+        }
         // Métodos de Class host: só sem declaração DEX (app não define
         // java.lang.Class; guarda defensiva contra shadowing).
         (c, name, sig)
@@ -2451,7 +3216,7 @@ pub fn call_instance_intrinsic_mref(
                 && class_supported(name, sig)
                 && vm.cp.resolve_method(recv_class, name, sig).is_none() =>
         {
-            class_intrinsic(vm, recv, name)
+            class_intrinsic(vm, recv, name, args)
         }
 
         // ── java.lang.Enum (M8) ─────────────────────────────────────────────
@@ -2548,6 +3313,14 @@ pub fn call_instance_intrinsic_mref(
         {
             Ok(Some(Value::Null))
         }
+
+        // ── AtomicReferenceArray (M8) ──────────────────────────────────────
+        (_, name, sig) if mref_class == ATOMIC_REF_ARRAY => {
+            atomic_ref_array_intrinsic(vm, recv, name, sig, args)
+        }
+        // ── AtomicLongFieldUpdater / AtomicIntegerFieldUpdater (M8) ────────
+        (_, name, _sig) if mref_class == ALFU => alfu_intrinsic(vm, recv, name, args),
+        (_, name, _sig) if mref_class == AIFU => aifu_intrinsic(vm, recv, name, args),
 
         // ── AtomicReferenceFieldUpdater (M8) ───────────────────────────────
         // Instância criada por newUpdater (classe concreta = ARFU); métodos
@@ -2837,6 +3610,7 @@ pub fn call_instance_intrinsic_mref(
                 || c == COW_SET
                 || c == VIEW_SET
                 || c == LINKED_SET
+                || c == SINGLETON_LIST
                 || c == ARRAY_DEQUE)
                 && name == "iterator"
                 && sig == "()Ljava/util/Iterator;" =>
@@ -2922,6 +3696,63 @@ pub fn call_instance_intrinsic_mref(
             Ok(Some(Value::Int(s.encode_utf16().count() as i32)))
         }
 
+        (STRING, "<init>", "([CII)V") => {
+            let array = args[0].as_ref()?.ok_or_else(|| {
+                VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "String char array null",
+                ))
+            })?;
+            let chars: Vec<u16> = vm
+                .heap
+                .as_array_elems(array)?
+                .0
+                .iter()
+                .map(|v| v.as_int().unwrap_or(0) as u16)
+                .collect();
+            let start = args[1].as_int()?;
+            let count = args[2].as_int()?;
+            if start < 0
+                || count < 0
+                || (start as usize).saturating_add(count as usize) > chars.len()
+            {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/StringIndexOutOfBoundsException;",
+                    format!("offset {start}, count {count}, length {}", chars.len()),
+                )));
+            }
+            let text = String::from_utf16_lossy(&chars[start as usize..(start + count) as usize]);
+            vm.heap
+                .initialize_string(recv, text)
+                .map_err(crate::err::oom_throwable)?;
+            Ok(Some(Value::Null))
+        }
+        (STRING, "<init>", "([C)V") => {
+            let array = args[0].as_ref()?.ok_or_else(|| {
+                VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "String char array null",
+                ))
+            })?;
+            let chars: Vec<u16> = vm
+                .heap
+                .as_array_elems(array)?
+                .0
+                .iter()
+                .map(|v| v.as_int().unwrap_or(0) as u16)
+                .collect();
+            vm.heap
+                .initialize_string(recv, String::from_utf16_lossy(&chars))
+                .map_err(crate::err::oom_throwable)?;
+            Ok(Some(Value::Null))
+        }
+        (STRING, "<init>", "(Ljava/lang/String;)V") => {
+            let text = string_arg(vm, &args[0])?;
+            vm.heap
+                .initialize_string(recv, text)
+                .map_err(crate::err::oom_throwable)?;
+            Ok(Some(Value::Null))
+        }
         (STRING, "length", "()I") => {
             let s = vm.heap.as_str(recv)?.to_string();
             Ok(Some(Value::Int(s.encode_utf16().count() as i32)))
@@ -2929,6 +3760,37 @@ pub fn call_instance_intrinsic_mref(
         (STRING, "isEmpty", "()Z") => {
             let s = vm.heap.as_str(recv)?;
             Ok(Some(Value::Int(s.is_empty() as i32)))
+        }
+        (STRING, "getChars", "(II[CI)V") => {
+            let source: Vec<u16> = vm.heap.as_str(recv)?.encode_utf16().collect();
+            let start = args[0].as_int()?;
+            let end = args[1].as_int()?;
+            let Some(destination) = args[2].as_ref()? else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "String.getChars destination null",
+                )));
+            };
+            let destination_start = args[3].as_int()?;
+            if start < 0 || end < start || end as usize > source.len() {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/StringIndexOutOfBoundsException;",
+                    format!("start {start}, end {end}, length {}", source.len()),
+                )));
+            }
+            let count = (end - start) as usize;
+            let dest_len = vm.heap.as_array_elems(destination)?.0.len();
+            if destination_start < 0 || destination_start as usize + count > dest_len {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/ArrayIndexOutOfBoundsException;",
+                    format!("destination index {destination_start}, length {dest_len}"),
+                )));
+            }
+            let dest = vm.heap.array_elems_mut(destination)?;
+            for (offset, ch) in source[start as usize..end as usize].iter().enumerate() {
+                dest[destination_start as usize + offset] = Value::Int(*ch as i32);
+            }
+            Ok(Some(Value::Null))
         }
         (STRING, "charAt", "(I)C") => {
             let s = vm.heap.as_str(recv)?.to_string();

@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn serializes_to_agent_contract_shape() {
         let e = RdError::parse("bad magic");
-        let json = serde_json::to_value(&e).unwrap();
+        let json = serde_json::to_value(e).unwrap();
         assert_eq!(json["code"], "PARSE_ERROR");
         assert_eq!(json["module_id"], "rd-dex");
     }

@@ -1,0 +1,19 @@
+{
+  "name": "m8-compat",
+  "scenarios": [
+    {
+      "name": "compat_gaps expõe os subsistemas M8",
+      "steps": [
+        { "name": "compat_gaps", "arguments": {} },
+        { "name": "runtime_health", "arguments": {} },
+        { "name": "device_profile", "arguments": {} }
+      ]
+    },
+    {
+      "name": "launch sem APK segue NO_APP (regressão M6)",
+      "steps": [
+        { "name": "launch", "arguments": {}, "expect": "error:NO_APP" }
+      ]
+    }
+  ]
+}

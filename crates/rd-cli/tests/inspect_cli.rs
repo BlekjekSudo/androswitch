@@ -309,7 +309,7 @@ fn inspect_flags_duplicate_zip_entries_and_counts_dex_once() {
         &["android.permission.INTERNET"],
     );
     let path = tmp.join("dupdex.apk");
-    std::fs::write(&path, &bytes).expect("apk");
+    std::fs::write(&path, bytes).expect("apk");
     let apk = path.to_string_lossy().to_string();
 
     // ── saída humana: avisa e conta por nome único ──

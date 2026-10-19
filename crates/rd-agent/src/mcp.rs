@@ -1838,6 +1838,14 @@ impl AgentSession {
     /// consulta antes de planejar — nunca descobre na unha.
     fn tool_compat_gaps(&mut self) -> Result<ToolResult, RdError> {
         const GAPS: &[(&str, &str, &str, &str)] = &[
+            ("m8-recyclerview", "ui", "supported", "RecyclerView host (M8 full): setAdapter pergunta getItemCount ao adapter DEX, cria ViewHolders via onCreateViewHolder DEX e vincula via onBindViewHolder (cap 20 = viewport headless), anexa itemViews como filhos (ui_tree/touch veem a lista); notify* repopula e conta notificações; LayoutManager/Linear/Grid registrados; Adapter/ViewHolder <init> host. Ver crates/rd-vm/src/m8.rs + tests/m8.rs"),
+            ("m8-fragments-androidx", "vm", "supported", "Fragments legacy (FragmentManager/transações/registro) + androidx FragmentManager/FragmentTransaction host: beginTransaction/add/replace/remove/commit/commitNow, findFragmentByTag/Id, popBackStack/getBackStackEntryCount, getSupportFragmentManager canônico. Sem animações nem lifecycle de view da fragment (documentado)"),
+            ("m8-dialogs", "ui", "supported", "Dialog/AlertDialog/AlertDialog.Builder host: setTitle/setMessage/setView/setCancelable/setPositive|Negative|NeutralButton, create/show/dismiss/isShowing; clique de botão via Engine::m8_click_dialog_button dispara OnClickListener DEX"),
+            ("m8-okhttp", "net", "supported", "OkHttp shim OFFLINE determinístico: OkHttpClient.newCall, Request.Builder(url/header/method/build), Call.execute/enqueue (síncrono, chama Callback DEX), Response code/message/isSuccessful/body, ResponseBody.string/bytes/contentLength. Resposta registrada via Engine::m8_set_http_response (default 200 vazio); requests ficam em m8_http_requests. Rede real NÃO é feita (sem socket) — desvio documentado M8"),
+            ("m8-sqlite-room", "data", "supported", "SQLite host em memória: SQLiteOpenHelper (getWritable/ReadableDatabase + onCreate DEX), SQLiteDatabase execSQL (CREATE/DROP TABLE), insert/replace/update/delete, query/rawQuery (SELECT…FROM subset), transações, ContentValues, Cursor completo (move/get*/getColumnIndex). Room: Room.databaseBuilder/inMemoryDatabaseBuilder + Builder fluente + build() instancia a DB; DAOs DEX rodam sobre o SQLite host. Sem arquivo nem SQL completo (documentado)"),
+            ("m8-services-broadcasts-deeplinks", "vm", "supported", "Context.startService/startForegroundService/stopService/bindService registrados (Engine::m8_started_services); sendBroadcast/sendOrderedBroadcast registram e entregam a receivers registrados (onReceive DEX); registerReceiver/unregisterReceiver; Intent setAction/getAction/setData/getData + Uri.parse/getScheme/getHost/getPath; startActivity VIEW/deep link registra (m8_deep_links) e navega quando há handler registrado (m8_register_deep_link) com classe no DEX; JobScheduler host (schedule/getAllPendingJobs/cancel)"),
+            ("m8-workmanager", "vm", "supported", "WorkManager host: getInstance canônico, enqueue/enqueueUnique* registram WorkRecord (worker class do WorkRequest, estado ENQUEUED; m8_complete_work -> SUCCEEDED; cancel* -> CANCELLED), Operation/ListenableFuture completados. Sem execução em background (single-thread determinístico; Worker.doWork não roda em thread — documentado)"),
+            ("m8-shared-preferences", "data", "supported", "SharedPreferences STATEFUL (M8 full): getSharedPreferences/getDefaultSharedPreferences com storage na VM; Editor put*/remove/clear + commit (true)/apply aplicam; getString/getInt/getLong/getFloat/getBoolean/getStringSet leem o storage (default só se ausente); contains/getAll reais; key null -> NPE. Sem persistência em arquivo (documentado)"),
             (
                 "java-util-collections",
                 "vm",
@@ -2078,7 +2086,7 @@ impl AgentSession {
         })?;
         let dexes = dexes_of_apk(&app.apk)?;
         let usage = crate::api_usage::scan(&app.apk.manifest.package, &dexes);
-        let v = serde_json::to_value(&usage).map_err(|e| {
+        let v = serde_json::to_value(usage).map_err(|e| {
             agent_error(
                 "INTERNAL",
                 format!("serializando o relatório de uso de API: {e}"),
@@ -3381,7 +3389,7 @@ mod tests {
             assert!(err, "{label}: critério vazio deve ser erro, veio {v}");
             assert_eq!(v["code"], "INVALID_FORMAT", "{label}: {v}");
             assert!(
-                !v.get("found").is_some(),
+                v.get("found").is_none(),
                 "{label}: erro não pode trazer `found` (falso verde): {v}"
             );
         }
@@ -3826,7 +3834,7 @@ mod tests {
             assert!(err, "{label}: lote com passo inválido é erro, veio {v}");
             assert_eq!(v["code"], "INVALID_FORMAT", "{label}: {v}");
             assert!(
-                v["cause"].as_str().unwrap_or_default().contains("1"),
+                v["cause"].as_str().unwrap_or_default().contains('1'),
                 "{label}: causa cita o índice do passo: {v}"
             );
             // efeito colateral zero: nada foi lançado
@@ -3847,7 +3855,7 @@ mod tests {
         assert!(err, "passo 0 inválido: {v}");
         assert_eq!(v["code"], "INVALID_FORMAT", "{v}");
         assert!(
-            v["cause"].as_str().unwrap_or_default().contains("0"),
+            v["cause"].as_str().unwrap_or_default().contains('0'),
             "causa cita o passo 0: {v}"
         );
 

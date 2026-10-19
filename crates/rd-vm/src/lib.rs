@@ -13,6 +13,7 @@ pub mod heap;
 pub mod inflate;
 pub mod interp;
 pub mod intrinsics;
+pub mod m8;
 pub mod repr;
 pub mod value;
 

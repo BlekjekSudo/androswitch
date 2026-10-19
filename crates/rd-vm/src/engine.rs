@@ -68,6 +68,7 @@ pub struct Engine {
     /// AG-09: cobertura de métodos — chave `(dex_idx << 32) | method_idx`
     /// de cada corpo DEX que chegou a executar neste Engine.
     coverage: HashSet<u64>,
+    pub(crate) frame_labels: Vec<String>,
 }
 
 /// Cobertura por classe (AG-09, nível de método).
@@ -106,6 +107,7 @@ impl Engine {
             depth: 0,
             fuel_used: 0,
             coverage: HashSet::new(),
+            frame_labels: Vec::new(),
         }
     }
 
@@ -237,9 +239,12 @@ impl Engine {
         // AG-09: cobertura de métodos — o corpo existe e vai executar.
         self.coverage
             .insert(((dex_idx as u64) << 32) | u64::from(m.method_idx));
+        let frame_label = self.method_label(dex_idx, m);
+        self.frame_labels.push(frame_label);
         self.depth += 1;
         let mut ret = interp::exec_frame(self, dex_idx, frame_super.as_deref(), code, ins);
         self.depth -= 1;
+        self.frame_labels.pop();
         // Observabilidade opt-in (default off — nenhuma saída existente muda):
         // exceção Java que este frame NÃO tratou recebe a linha "at" do frame
         // ao desempilhar (estilo JVM, innermost primeiro). Erros estruturados
@@ -600,6 +605,12 @@ pub fn slot_form(args: &[Value], param_types: &[String]) -> Vec<Value> {
 /// issue #37: assinatura malformada (ex. `(Lfoo)` sem `;`, `[` solto, letra
 /// inválida) devolve None — erro tipado no chamador, nunca pânico/abort
 /// (o loop antigo `while b[i] != b';'` estourava o buffer).
+/// M8: parâmetros de uma assinatura Dalvik (para slotize de chamadas DEX
+/// feitas pelo host, ex.: callbacks de adapter/dialog/broadcast).
+pub fn parse_params_for_m8(sig: &str) -> Vec<String> {
+    parse_param_types(sig).unwrap_or_default()
+}
+
 pub fn parse_param_types(sig: &str) -> Option<Vec<String>> {
     let rest = sig.strip_prefix('(')?;
     let close = rest.rfind(')')?;

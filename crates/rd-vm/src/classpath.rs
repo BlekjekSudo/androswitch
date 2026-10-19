@@ -233,6 +233,33 @@ impl Classpath {
         ))
     }
 
+    /// Declared field metadata for reflection: owner, name, type descriptor,
+    /// access flags, and whether storage is static.
+    pub fn declared_fields_info(
+        &mut self,
+        class_desc: &str,
+    ) -> Vec<(String, String, String, u32, bool)> {
+        let Some((dex_idx, class_def)) = self.find_class(class_desc) else {
+            return Vec::new();
+        };
+        let class_def = *class_def;
+        let Ok(Some(data)) = self.class_data(dex_idx, &class_def) else {
+            return Vec::new();
+        };
+        let mut fields = Vec::with_capacity(data.total_fields());
+        for (is_static, group) in [
+            (true, data.static_fields.as_slice()),
+            (false, data.instance_fields.as_slice()),
+        ] {
+            for field in group {
+                if let Some((owner, name, ty)) = self.field_info(dex_idx, field.field_idx) {
+                    fields.push((owner, name, ty, field.access_flags, is_static));
+                }
+            }
+        }
+        fields
+    }
+
     /// issue #57 (JVMS 5.4.3.2): classe DECLARANTE de um campo — caminha a
     /// cadeia de superclasses e, depois, a closure de interfaces (campos de
     /// interface são implicitamente public static final). `None` = não existe
@@ -583,6 +610,42 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         // M8: Fragment legacy (32º gap real) — super das fragments do app.
         "Landroid/app/Fragment;" => Some(OBJECT.to_vec()),
         "Landroid/content/Intent;" => Some(OBJECT.to_vec()),
+        // ── M8 full scope ─────────────────────────────────────────────
+        "Landroid/app/Dialog;" => Some(OBJECT.to_vec()),
+        "Landroid/app/AlertDialog;" => Some(vec!["Landroid/app/Dialog;", "Ljava/lang/Object;"]),
+        "Landroid/app/AlertDialog$Builder;" => Some(OBJECT.to_vec()),
+        "Landroid/database/sqlite/SQLiteDatabase;" => Some(OBJECT.to_vec()),
+        "Landroid/database/sqlite/SQLiteOpenHelper;" => Some(OBJECT.to_vec()),
+        "Landroid/content/ContentValues;" => Some(OBJECT.to_vec()),
+        "Landroid/net/Uri;" => Some(OBJECT.to_vec()),
+        "Landroid/app/job/JobScheduler;" => Some(OBJECT.to_vec()),
+        "Landroidx/recyclerview/widget/RecyclerView;" => Some(VIEWGROUP.to_vec()),
+        "Landroidx/recyclerview/widget/RecyclerView$Adapter;" => Some(OBJECT.to_vec()),
+        "Landroidx/recyclerview/widget/RecyclerView$ViewHolder;" => Some(OBJECT.to_vec()),
+        "Landroidx/recyclerview/widget/RecyclerView$LayoutManager;" => Some(OBJECT.to_vec()),
+        "Landroidx/recyclerview/widget/LinearLayoutManager;" => Some(vec![
+            "Landroidx/recyclerview/widget/RecyclerView$LayoutManager;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroidx/recyclerview/widget/GridLayoutManager;" => Some(vec![
+            "Landroidx/recyclerview/widget/LinearLayoutManager;",
+            "Landroidx/recyclerview/widget/RecyclerView$LayoutManager;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroidx/fragment/app/Fragment;" => Some(OBJECT.to_vec()),
+        "Landroidx/fragment/app/FragmentManager;" => Some(OBJECT.to_vec()),
+        "Landroidx/fragment/app/FragmentTransaction;" => Some(OBJECT.to_vec()),
+        "Lokhttp3/OkHttpClient;" => Some(OBJECT.to_vec()),
+        "Lokhttp3/Request;" => Some(OBJECT.to_vec()),
+        "Lokhttp3/Request$Builder;" => Some(OBJECT.to_vec()),
+        "Lokhttp3/Call;" => Some(OBJECT.to_vec()),
+        "Lokhttp3/Response;" => Some(OBJECT.to_vec()),
+        "Lokhttp3/ResponseBody;" => Some(OBJECT.to_vec()),
+        "Landroidx/work/WorkManager;" => Some(OBJECT.to_vec()),
+        "Landroidx/work/Operation;" => Some(OBJECT.to_vec()),
+        "Landroidx/work/WorkRequest;" => Some(OBJECT.to_vec()),
+        "Landroidx/room/RoomDatabase;" => Some(OBJECT.to_vec()),
+        "Landroidx/room/RoomDatabase$Builder;" => Some(OBJECT.to_vec()),
         "Landroid/os/Bundle;" => Some(OBJECT.to_vec()),
         "Landroid/os/Handler;" => Some(OBJECT.to_vec()),
         "Landroid/os/Looper;" => Some(OBJECT.to_vec()),

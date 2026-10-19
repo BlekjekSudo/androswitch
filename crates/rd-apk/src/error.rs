@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn serializes_to_agent_contract_shape() {
         let e = RdError::not_implemented("rd-dex", "M1");
-        let json = serde_json::to_value(&e).unwrap();
+        let json = serde_json::to_value(e).unwrap();
         assert_eq!(json["code"], "NOT_IMPLEMENTED");
         assert_eq!(json["module_id"], "rd-dex");
         assert!(json["cause"].as_str().unwrap().contains("M1"));

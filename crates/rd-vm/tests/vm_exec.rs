@@ -2289,6 +2289,34 @@ fn array_covariance_aput_and_instanceof() {
     assert_eq!(v, 1, "String[] <: CharSequence[] (String <: CharSequence)");
 }
 
+/// Dalvik's integer zero is a null reference at an object-array store site.
+#[test]
+fn aput_object_zero_register_is_null_reference() {
+    let mut b = DexBuilder::new();
+    let typed_array = b.type_idx("[Ljava/util/List;");
+    let cls = b.class("LCaso;", "Ljava/lang/Object;");
+    b.direct(
+        cls,
+        "storeNull",
+        "I",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(4, 0, 0, {
+            let mut u = op11n(0x12, 0, 1); // length = 1
+            u.extend(op22c(0x23, 1, 0, typed_array));
+            u.extend(op11n(0x12, 2, 0)); // Dalvik null literal
+            u.extend(op11n(0x12, 3, 0)); // index = 0
+            u.extend(op23x(0x4D, 2, 1, 3)); // aput-object null
+            u.extend(op11n(0x12, 0, 1));
+            u.extend(op11x(0x0F, 0));
+            u
+        })),
+    );
+    let mut engine = engine_of(&b);
+    let result = invoke(&mut engine, "storeNull", "()I", &[]).unwrap();
+    assert_eq!(result.as_int().unwrap(), 1);
+}
+
 /// issue #42: valor NÃO-relacionado continua ASE real (covariância de escrita
 /// com store check preservado).
 #[test]
@@ -2994,6 +3022,61 @@ fn atomic_field_updater_host_intrinsics() {
         matches!(npe2, Err(rd_vm::err::VmExit::Exception(_))),
         "newUpdater(null) → NPE: {npe2:?}"
     );
+}
+
+#[test]
+fn atomic_integer_field_updater_host_intrinsics() {
+    use rd_vm::intrinsics::{call_instance_intrinsic_mref, call_static_intrinsic};
+    use rd_vm::value::Value;
+    const AIFU: &str = "Ljava/util/concurrent/atomic/AtomicIntegerFieldUpdater;";
+    const NEWSIG: &str =
+        "(Ljava/lang/Class;Ljava/lang/String;)Ljava/util/concurrent/atomic/AtomicIntegerFieldUpdater;";
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let name = e.heap.alloc_string("count".into()).unwrap();
+    let updater = call_static_intrinsic(
+        &mut e,
+        AIFU,
+        "newUpdater",
+        NEWSIG,
+        &[Value::Null, Value::Obj(name)],
+    )
+    .unwrap()
+    .unwrap();
+    let Value::Obj(updater) = updater else {
+        panic!("updater object")
+    };
+    let target = e
+        .heap
+        .alloc_instance("LTarget;".into(), vec![("count".into(), Value::Int(3))])
+        .unwrap();
+    assert_eq!(
+        call_instance_intrinsic_mref(
+            &mut e,
+            AIFU,
+            AIFU,
+            "compareAndSet",
+            "(Ljava/lang/Object;II)Z",
+            updater,
+            &[Value::Obj(target), Value::Int(3), Value::Int(9)],
+        )
+        .unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call_instance_intrinsic_mref(
+            &mut e,
+            AIFU,
+            AIFU,
+            "getAndAdd",
+            "(Ljava/lang/Object;I)I",
+            updater,
+            &[Value::Obj(target), Value::Int(4)],
+        )
+        .unwrap(),
+        Some(Value::Int(9))
+    );
+    assert_eq!(e.heap.get_field(target, "count").unwrap(), Value::Int(13));
 }
 
 /// M8 (compat real): coleções concorrentes host — sexto gap do launch do
@@ -6551,6 +6634,37 @@ fn singleton_list_um_elemento_le_e_bloqueia_mutacoes() {
     .expect("get")
     .expect("elemento");
     assert_eq!(g0, elem, "get(0) devolve o elemento");
+    let iterator =
+        call_instance_intrinsic(&mut e, SL, "iterator", "()Ljava/util/Iterator;", sr, &[])
+            .expect("iterator")
+            .expect("iterator object");
+    let rd_vm::value::Value::Obj(iterator) = iterator else {
+        panic!("expected iterator object")
+    };
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            "Ljava/util/Iterator;",
+            "hasNext",
+            "()Z",
+            iterator,
+            &[],
+        )
+        .expect("hasNext"),
+        Some(rd_vm::value::Value::Int(1))
+    );
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            "Ljava/util/Iterator;",
+            "next",
+            "()Ljava/lang/Object;",
+            iterator,
+            &[],
+        )
+        .expect("next"),
+        Some(elem.clone())
+    );
     let has = call_instance_intrinsic(
         &mut e,
         SL,

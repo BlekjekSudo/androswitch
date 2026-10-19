@@ -142,6 +142,46 @@ impl Heap {
         self.alloc(bytes, HeapObj::Str(s))
     }
 
+    /// String constructors initialize an already allocated DEX `new-instance`
+    /// shell. Replace that shell in place so the existing ObjRef stays stable.
+    pub fn initialize_string(&mut self, r: ObjRef, s: String) -> Result<(), OomError> {
+        if r == 0 || r as usize > self.objects.len() {
+            return Err(OomError {
+                requested: 32,
+                budget: self.budget,
+            });
+        }
+        let index = (r - 1) as usize;
+        let old_bytes = match &self.objects[index] {
+            HeapObj::Instance { fields, .. } => {
+                32usize.saturating_add(fields.len().saturating_mul(24))
+            }
+            HeapObj::Str(old) => old.len().saturating_mul(2).saturating_add(32),
+            _ => {
+                return Err(OomError {
+                    requested: 32,
+                    budget: self.budget,
+                })
+            }
+        };
+        let new_bytes = s.len().saturating_mul(2).saturating_add(32);
+        let used_without_old = self.used.saturating_sub(old_bytes);
+        let new_used = used_without_old.checked_add(new_bytes).ok_or(OomError {
+            requested: new_bytes,
+            budget: self.budget,
+        })?;
+        if new_used > self.budget {
+            return Err(OomError {
+                requested: new_bytes,
+                budget: self.budget,
+            });
+        }
+        self.used = new_used;
+        self.peak = self.peak.max(new_used);
+        self.objects[index] = HeapObj::Str(s);
+        Ok(())
+    }
+
     pub fn alloc_array(
         &mut self,
         elem: ElemKind,
@@ -154,14 +194,28 @@ impl Heap {
         let bytes = len
             .saturating_mul(std::mem::size_of::<Value>())
             .saturating_add(16);
+        let array_desc = if elem_class.starts_with('[') {
+            elem_class.to_string()
+        } else if elem == ElemKind::Obj {
+            format!("[{elem_class}")
+        } else {
+            match elem {
+                ElemKind::Int => "[I".to_string(),
+                ElemKind::Long => "[J".to_string(),
+                ElemKind::Float => "[F".to_string(),
+                ElemKind::Double => "[D".to_string(),
+                ElemKind::Obj => unreachable!(),
+            }
+        };
         self.alloc(
             bytes,
             HeapObj::Array {
                 elem,
                 elems: Vec::new(),
-                // issue #37: arrays de objetos guardam o tipo do elemento
-                // (check-cast [LX; e ArrayStoreException precisam dele)
-                elem_class: elem_class.to_string(),
+                // Keep the full runtime array descriptor. ElemKind alone loses
+                // the distinction between char[], byte[], short[], boolean[],
+                // and int[] even though all use the same storage lane.
+                elem_class: array_desc,
             },
         )
     }
@@ -222,17 +276,7 @@ impl Heap {
         match self.get(r)? {
             HeapObj::Instance { class, .. } => Ok(class),
             HeapObj::Str(_) => Ok("Ljava/lang/String;"),
-            HeapObj::Array {
-                elem, elem_class, ..
-            } => match elem {
-                ElemKind::Int => Ok("[I"),
-                ElemKind::Long => Ok("[J"),
-                ElemKind::Float => Ok("[F"),
-                ElemKind::Double => Ok("[D"),
-                // issue #37: o descritor real do array de objetos ([LX;) —
-                // nunca "[Ljava/lang/Object;" genérico
-                ElemKind::Obj => Ok(elem_class),
-            },
+            HeapObj::Array { elem_class, .. } => Ok(elem_class),
         }
     }
 
@@ -349,6 +393,21 @@ mod tests {
         assert_eq!(h.as_str(r), Ok("abc"));
         assert!(h.as_str(2).is_err());
         assert!(h.as_str(0).is_err());
+    }
+
+    #[test]
+    fn primitive_array_runtime_descriptors_are_preserved() {
+        let mut heap = Heap::new(4096);
+        for (descriptor, elem) in [
+            ("[I", ElemKind::Int),
+            ("[C", ElemKind::Int),
+            ("[Z", ElemKind::Int),
+            ("[B", ElemKind::Int),
+            ("[S", ElemKind::Int),
+        ] {
+            let array = heap.alloc_array(elem, 1, descriptor).unwrap();
+            assert_eq!(heap.class_of(array), Ok(descriptor));
+        }
     }
 
     #[test]

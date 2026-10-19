@@ -179,6 +179,14 @@ pub enum HostObj {
         service_desc: String,
         providers: Vec<String>,
     },
+    ReflectField {
+        declaring_class: String,
+        name: String,
+        field_type: String,
+        modifiers: u32,
+        is_static: bool,
+        accessible: bool,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -223,6 +231,11 @@ pub struct HostState {
     application: Option<ObjRef>,
     /// M8 (38º gap): descritor da classe de Application do manifest.
     pub application_class: Option<String>,
+    /// Canonical synthetic Unsafe singleton used by Java/Kotlin reflection.
+    pub unsafe_singleton: Option<ObjRef>,
+    pub unsafe_offsets: HashMap<i64, (String, String, String)>,
+    pub runtime: Option<ObjRef>,
+    pub time_units: HashMap<String, ObjRef>,
     /// M8 (44º gap real): objeto canônico das SharedPreferences padrão
     /// (getDefaultSharedPreferences) — SharedPreferencesImpl do host, vazio
     /// (sem persistência em arquivo nesta milestone).
@@ -230,6 +243,10 @@ pub struct HostState {
     /// M3.2: APK aberto (Resources) — layouts AXML + resources.arsc para o
     /// LayoutInflater. Injetado via `Engine::set_resources` (CLI `rd app run`).
     pub resources: Option<rd_apk::Apk>,
+    /// M8 full scope: estado dos subsistemas de compat real (RecyclerView,
+    /// Dialogs, OkHttp, SQLite/Room, Services/Broadcasts/DeepLinks,
+    /// WorkManager, SharedPreferences stateful) — ver `crate::m8`.
+    pub m8: crate::m8::M8State,
 }
 
 /// M8 (31º gap): fragment registrada por um commit de FragmentTransaction.
@@ -513,6 +530,52 @@ impl Engine {
         Ok(r)
     }
 
+    /// One deterministic Runtime facade per Engine.
+    pub(crate) fn runtime_obj(&mut self) -> Result<ObjRef, VmExit> {
+        if let Some(runtime) = self.fw.runtime {
+            return Ok(runtime);
+        }
+        let runtime = self
+            .heap
+            .alloc_instance("Ljava/lang/Runtime;".to_string(), Vec::new())
+            .map_err(crate::err::oom_throwable)?;
+        self.fw.runtime = Some(runtime);
+        Ok(runtime)
+    }
+
+    /// Canonical enum singleton for java.util.concurrent.TimeUnit.
+    pub(crate) fn time_unit_obj(&mut self, name: &str) -> Result<ObjRef, VmExit> {
+        if let Some(obj) = self.fw.time_units.get(name) {
+            return Ok(*obj);
+        }
+        let nanos = match name {
+            "NANOSECONDS" => 1i64,
+            "MICROSECONDS" => 1_000,
+            "MILLISECONDS" => 1_000_000,
+            "SECONDS" => 1_000_000_000,
+            "MINUTES" => 60_000_000_000,
+            "HOURS" => 3_600_000_000_000,
+            "DAYS" => 86_400_000_000_000,
+            _ => return Err(crate::err::vm_error("NOT_FOUND", format!("TimeUnit.{name}")).into()),
+        };
+        let enum_name = self
+            .heap
+            .alloc_string(name.to_string())
+            .map_err(crate::err::oom_throwable)?;
+        let obj = self
+            .heap
+            .alloc_instance(
+                "Ljava/util/concurrent/TimeUnit;".to_string(),
+                vec![
+                    ("name".to_string(), Value::Obj(enum_name)),
+                    ("nanos_per_unit".to_string(), Value::Long(nanos)),
+                ],
+            )
+            .map_err(crate::err::oom_throwable)?;
+        self.fw.time_units.insert(name.to_string(), obj);
+        Ok(obj)
+    }
+
     /// M8: FragmentManager canônico do host (lazy; identidade estável —
     /// `getFragmentManager()` devolve sempre o mesmo objeto, como no Android
     /// real por Activity; a VM tem uma única activity por execução).
@@ -565,6 +628,11 @@ impl Engine {
     /// `<init>()V` quando declarado na própria classe. Classe ausente →
     /// NoClassDefFoundError (espelha o runtime; o caller em ServiceLoader
     /// converte/usa conforme a nota do 45º gap).
+    /// M8: wrapper público (crate) — Room.build instancia a DB do app.
+    pub fn new_dex_instance_pub(&mut self, desc: &str) -> Result<ObjRef, VmExit> {
+        self.new_dex_instance(desc)
+    }
+
     pub(crate) fn new_dex_instance(&mut self, desc: &str) -> Result<ObjRef, VmExit> {
         if self.cp.find_class(desc).is_none() {
             return Err(VmExit::Exception(crate::err::Throwable::new(
@@ -1669,15 +1737,74 @@ pub fn call_host_instance(
         // milestone): getXxx devolve o default da chamada — comportamento
         // correto de prefs recém-criadas (AOSP devolve o default), não um
         // stub inseguro. Chave null → NPE (AOSP levanta NPE em getStringWithDefault).
+        // ── M8 full: SharedPreferences$Editor stateful ──────────────────
+        _ if mref_class == "Landroid/content/SharedPreferences$Editor;" => match name {
+            "putString" | "putInt" | "putLong" | "putFloat" | "putBoolean" => {
+                let key = match args.first() {
+                    Some(Value::Obj(r)) => vm.heap.as_str(*r)?.to_string(),
+                    _ => {
+                        return Err(VmExit::Exception(crate::err::Throwable::new(
+                            "Ljava/lang/NullPointerException;",
+                            "Editor.put com key null",
+                        )))
+                    }
+                };
+                vm.fw
+                    .m8
+                    .prefs_editors
+                    .entry(recv)
+                    .or_default()
+                    .push((key, args.get(1).cloned()));
+                Ok(Some(Value::Obj(recv)))
+            }
+            "remove" => {
+                let key = match args.first() {
+                    Some(Value::Obj(r)) => vm.heap.as_str(*r)?.to_string(),
+                    _ => return Ok(Some(Value::Obj(recv))),
+                };
+                vm.fw
+                    .m8
+                    .prefs_editors
+                    .entry(recv)
+                    .or_default()
+                    .push((key, None));
+                Ok(Some(Value::Obj(recv)))
+            }
+            "clear" => {
+                vm.fw.m8.prefs_clear.insert(recv, true);
+                Ok(Some(Value::Obj(recv)))
+            }
+            "commit" => {
+                apply_prefs_editor(vm, recv);
+                Ok(Some(Value::Int(1)))
+            }
+            "apply" => {
+                apply_prefs_editor(vm, recv);
+                Ok(Some(Value::Null))
+            }
+            _ => Ok(None),
+        },
         _ if recv_class == SHARED_PREFS_IMPL && mref_class == SHARED_PREFS => match (name, sig) {
+            ("edit", "()Landroid/content/SharedPreferences$Editor;") => {
+                let e = vm.heap.alloc_instance(
+                    "Landroid/content/SharedPreferences$Editor;".to_string(),
+                    Vec::new(),
+                )?;
+                Ok(Some(Value::Obj(e)))
+            }
+            ("getAll", "()Ljava/util/Map;") => Ok(Some(Value::Obj(m8_prefs_get_all(vm)?))),
             ("getString", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
             | ("getStringSet", "(Ljava/lang/String;Ljava/util/Set;)Ljava/util/Set;")
             | ("getBoolean", "(Ljava/lang/String;Z)Z")
             | ("getInt", "(Ljava/lang/String;I)I")
             | ("getLong", "(Ljava/lang/String;J)J")
             | ("getFloat", "(Ljava/lang/String;F)F") => {
-                if let Some(Value::Obj(_)) = args.first() {
-                    Ok(Some(args.get(1).cloned().unwrap_or(Value::Null)))
+                if let Some(Value::Obj(kr)) = args.first() {
+                    let key = vm.heap.as_str(*kr)?.to_string();
+                    Ok(Some(match vm.fw.m8.prefs.get(&key) {
+                        Some(v) => v.clone(),
+                        None => args.get(1).cloned().unwrap_or(Value::Null),
+                    }))
                 } else {
                     Err(VmExit::Exception(crate::err::Throwable::new(
                         "Ljava/lang/NullPointerException;",
@@ -1686,8 +1813,9 @@ pub fn call_host_instance(
                 }
             }
             ("contains", "(Ljava/lang/String;)Z") => {
-                if let Some(Value::Obj(_)) = args.first() {
-                    Ok(Some(Value::Int(0)))
+                if let Some(Value::Obj(kr)) = args.first() {
+                    let key = vm.heap.as_str(*kr)?.to_string();
+                    Ok(Some(Value::Int(vm.fw.m8.prefs.contains_key(&key) as i32)))
                 } else {
                     Err(VmExit::Exception(crate::err::Throwable::new(
                         "Ljava/lang/NullPointerException;",
@@ -1695,6 +1823,7 @@ pub fn call_host_instance(
                     )))
                 }
             }
+            ("edit", _) => Ok(None),
             _ => Ok(None),
         },
         // ── M8 (38º gap real): Activity.getApplication — final na
@@ -1768,6 +1897,12 @@ pub fn call_host_instance(
         // aplica SINCRONAMENTE, nunca há fila pendente; resposta honesta é
         // false (AOSP: "nothing was executed"). Nunca NOT_IMPLEMENTED.
         (FRAGMENT_MANAGER, "executePendingTransactions") if sig == "()Z" => Ok(Some(Value::Int(0))),
+        (CONTEXT, "getSharedPreferences")
+            if sig == "(Ljava/lang/String;I)Landroid/content/SharedPreferences;"
+                && is_activity(vm) =>
+        {
+            Ok(Some(Value::Obj(vm.shared_prefs_obj()?)))
+        }
         (ACTIVITY, "getPackageName") | (CONTEXT, "getPackageName") if is_activity(vm) => {
             let s = vm.fw.package_name.clone();
             Ok(Some(Value::Obj(intrinsics::alloc_string(vm, s)?)))
@@ -2179,6 +2314,46 @@ pub fn call_host_instance(
 
 // ── helpers da dispatch ──────────────────────────────────────────────────────
 
+/// M8 full: aplica um Editor de SharedPreferences (commit/apply síncronos).
+fn apply_prefs_editor(vm: &mut Engine, editor: ObjRef) {
+    if vm.fw.m8.prefs_clear.remove(&editor).unwrap_or(false) {
+        vm.fw.m8.prefs.clear();
+    }
+    if let Some(edits) = vm.fw.m8.prefs_editors.remove(&editor) {
+        for (k, v) in edits {
+            match v {
+                Some(val) => {
+                    vm.fw.m8.prefs.insert(k, val);
+                }
+                None => {
+                    vm.fw.m8.prefs.remove(&k);
+                }
+            }
+        }
+    }
+}
+
+/// M8 full: `getAll()` — HashMap host com chaves String reais alocadas.
+fn m8_prefs_get_all(vm: &mut Engine) -> Result<ObjRef, VmExit> {
+    let r = vm
+        .heap
+        .alloc_instance("Ljava/util/HashMap;".to_string(), Vec::new())?;
+    let mut entries = Vec::new();
+    let keys: Vec<(String, Value)> = vm
+        .fw
+        .m8
+        .prefs
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    for (k, v) in keys {
+        let ks = intrinsics::alloc_string(vm, k)?;
+        entries.push((Value::Obj(ks), v));
+    }
+    vm.fw.objects.insert(r, HostObj::Map { entries });
+    Ok(r)
+}
+
 fn not_impl(what: &str) -> VmExit {
     crate::err::not_implemented(what).into()
 }
@@ -2231,6 +2406,12 @@ pub(crate) fn set_content_view(
 /// anexa child ao parent SEM re-layout — usado pela INFLAÇÃO (issue #45: o
 /// setContentView leita a raiz UMA vez no fim; re-layout por filho era
 /// O(N²) — Σ layout(prefixo) ≈ N²/2 walks no setContentView de app grande).
+/// M8: wrapper público (crate) de `attach_child` — RecyclerView anexa os
+/// itemViews dos ViewHolders como filhos host.
+pub fn attach_child_public(vm: &mut Engine, parent: ObjRef, child: ObjRef) -> Result<(), VmExit> {
+    attach_child(vm, parent, child)
+}
+
 pub(crate) fn attach_child(vm: &mut Engine, parent: ObjRef, child: ObjRef) -> Result<(), VmExit> {
     if let Some(HostObj::View { parent: p, .. }) = vm.fw.objects.get_mut(&child) {
         *p = Some(parent);

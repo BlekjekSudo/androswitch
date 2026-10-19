@@ -269,3 +269,20 @@ fn help_text_has_no_internal_dev_notes() {
         "descrição do subcomando `app` sumiu do --help:\n{root}"
     );
 }
+
+/// The app launcher exposes the VM's deterministic instruction budget, so
+/// malformed or runaway app code can be bounded in integration probes.
+#[test]
+fn app_run_fuel_exhaustion_is_a_structured_vm_error() {
+    let tmp = tempfile_dir();
+    let out = run_rd(&["run", "<APK>", "--json", "--fuel", "1"], &tmp);
+    assert_eq!(out.code, 1);
+    let json_start = out
+        .stderr
+        .find('{')
+        .unwrap_or_else(|| panic!("missing structured VM error: {:?}", out.stderr));
+    let error: serde_json::Value = serde_json::from_str(&out.stderr[json_start..])
+        .unwrap_or_else(|e| panic!("invalid JSON error: {e}; stderr: {}", out.stderr));
+    assert_eq!(error["code"], "VM_FUEL");
+    assert_eq!(error["module_id"], "rd-vm");
+}

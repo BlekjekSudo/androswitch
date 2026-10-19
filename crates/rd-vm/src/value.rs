@@ -25,6 +25,10 @@ impl Value {
     pub fn as_int(&self) -> Result<i32, String> {
         match self {
             Value::Int(v) => Ok(*v),
+            // Dalvik registers are untyped: move instructions preserve bits,
+            // and the consuming opcode determines whether those bits are int
+            // or float data.
+            Value::Float(v) => Ok(v.to_bits() as i32),
             other => Err(format!("esperado int, got {other:?}")),
         }
     }
@@ -32,6 +36,7 @@ impl Value {
     pub fn as_long(&self) -> Result<i64, String> {
         match self {
             Value::Long(v) => Ok(*v),
+            Value::Double(v) => Ok(v.to_bits() as i64),
             other => Err(format!("esperado long, got {other:?}")),
         }
     }
@@ -39,6 +44,7 @@ impl Value {
     pub fn as_float(&self) -> Result<f32, String> {
         match self {
             Value::Float(v) => Ok(*v),
+            Value::Int(v) => Ok(f32::from_bits(*v as u32)),
             other => Err(format!("esperado float, got {other:?}")),
         }
     }
@@ -46,6 +52,7 @@ impl Value {
     pub fn as_double(&self) -> Result<f64, String> {
         match self {
             Value::Double(v) => Ok(*v),
+            Value::Long(v) => Ok(f64::from_bits(*v as u64)),
             other => Err(format!("esperado double, got {other:?}")),
         }
     }
@@ -110,6 +117,16 @@ mod tests {
         assert_eq!(Value::Obj(3).as_ref(), Ok(Some(3)));
         assert!(!Value::WideHi.is_wide());
         assert!(Value::Long(0).is_wide());
+    }
+
+    #[test]
+    fn primitive_accessors_reinterpret_untyped_dalvik_bits() {
+        let f = 0.75f32;
+        assert_eq!(Value::Int(f.to_bits() as i32).as_float(), Ok(f));
+        assert_eq!(Value::Float(f).as_int(), Ok(f.to_bits() as i32));
+        let d = -12.5f64;
+        assert_eq!(Value::Long(d.to_bits() as i64).as_double(), Ok(d));
+        assert_eq!(Value::Double(d).as_long(), Ok(d.to_bits() as i64));
     }
 
     #[test]

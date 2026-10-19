@@ -46,7 +46,7 @@ fn real_dex_header_and_map_coverage() {
         eprintln!("RD_TEST_DEX não definida — fixture ausente, skip (CI-safe)");
         return;
     };
-    let data = std::fs::read(&path).expect("ler .dex");
+    let data = std::fs::read(path).expect("ler .dex");
     let dex = Dex::parse(data.clone()).expect("parse completo do dex real");
 
     // 1. header
@@ -148,7 +148,7 @@ fn real_dex_all_classes_code_roundtrip_and_annotations() {
     let Some(path) = dex_path() else {
         return;
     };
-    let data = std::fs::read(&path).expect("ler .dex");
+    let data = std::fs::read(path).expect("ler .dex");
     let dex = Dex::parse(data).expect("parse completo do dex real");
 
     let mut classes_with_data = 0usize;
@@ -296,7 +296,7 @@ fn real_dex_disasm_contract_renders_smali() {
     let Some(path) = dex_path() else {
         return;
     };
-    let data = std::fs::read(&path).expect("ler .dex");
+    let data = std::fs::read(path).expect("ler .dex");
     let dex = Dex::parse(data).expect("parse");
     // contrato pós-M1 (issue #36): o disassembler está implementado —
     // render_class produz saída smali textual para a classe 0 sem pânico e
