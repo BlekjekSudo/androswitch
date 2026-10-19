@@ -516,6 +516,14 @@ impl Engine {
         // 1. measure/layout top-most DEX views
         let mut dex_roots = Vec::new();
         self.collect_dex_roots(content, &mut dex_roots, 0);
+        // Host-only window: the host renderer already draws every view. An
+        // overlay frame would only paint its background over that rendering
+        // (blank screenshots) and cost a full-screen rasterization.
+        if dex_roots.is_empty() {
+            self.gfx.frame.clear();
+            self.gfx.frame_valid = false;
+            return Ok(0);
+        }
         for v in &dex_roots {
             let Some((x, y, w, h, _)) = bounds(self, *v) else {
                 continue;
