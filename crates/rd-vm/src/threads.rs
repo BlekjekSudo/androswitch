@@ -226,7 +226,28 @@ fn park(vm: &mut Engine, nanos: Option<i64>) -> Result<(), VmExit> {
             if std::mem::take(&mut vm.threads.main_permit) {
                 return Ok(());
             }
-            run_ready(vm, 1)?;
+            if run_ready(vm, 1)? == 0 {
+                // nothing runnable: a timed park lets that much virtual time
+                // pass, up to the earliest timed sleeper, so threads blocked
+                // in parkNanos/sleep (e.g. idle CoroutineScheduler workers)
+                // wake. The main Looper is not drained: a thread blocked in
+                // park does not process its queue on a device either.
+                if let Some(n) = nanos.filter(|n| *n > 0) {
+                    let now = vm.fw.clock();
+                    let limit = now.saturating_add((n as u64).div_ceil(1_000_000));
+                    let earliest = vm
+                        .threads
+                        .table
+                        .values()
+                        .filter(|th| th.state == ThreadState::Parked)
+                        .filter_map(|th| th.wake_at_ms)
+                        .min();
+                    if let Some(w) = earliest.filter(|w| *w <= limit) {
+                        vm.fw.clock_ms = w.max(now);
+                        run_ready(vm, 1)?;
+                    }
+                }
+            }
             Ok(())
         }
     }

@@ -22,15 +22,26 @@ app UI is available.
    (`Handler.createAsync`).
 6. Kotlin Flow collection for the animation-scale `Settings` observer runs.
 
-**Current blocker.** After step 6, the launch enters a deep recursion of
-guest calls with a host-side loop at the top that **does not consume VM
-fuel**. Neither `rd app run` nor MCP `launch` returns (see the s01b run
-below). `gdb` on the stripped release binary shows a repeated three-frame
-interpreter pattern.
+**Blocker 1 (fixed): the "hang" was a performance cliff.** A symbolized
+`gdb` backtrace showed every instance call running hook gates
+(`threads::is_thread_class`, `perms::is_context`). Each gate called
+`is_subtype`, and that called `Dex::find_class`, a linear scan over about
+10k ClassDefs repeated per hierarchy step. `Dex::find_class` now uses a
+lazily built descriptor index, which is O(1). The same probe that ran for
+more than 10 minutes now ends in 14 s.
 
-**Next step.** Make the interpreter's call path charge fuel on host
-re-entry, which turns the hang into a `VM_FUEL` report with the guest stack,
-then fix the underlying loop.
+**Blocker 2 (open).** Execution reaches kotlinx `BlockingCoroutine`
+(`runBlocking`), whose event loop (`e4/g.w`/`u`) spins without making
+progress. This is consistent with the coroutine waiting for work that the
+VM never schedules.
+- The CLI reports `VM_FUEL` at 50M instructions with the guest stack.
+- Timed main-thread `LockSupport.parkNanos` now advances virtual time to the
+  earliest timed green-thread sleeper, without draining the Looper. That
+  did not change this stack, so the pending work is probably queued on the
+  main Looper or on a scheduler not yet modelled.
+- MCP `launch` uses a much larger fuel budget, so it still exceeds the
+  harness's 60 s per-call deadline. MCP needs a wall-clock bound (see
+  below).
 
 ## Per-action MCP latency
 
@@ -48,7 +59,11 @@ then fix the underlying loop.
 | s01b | install | 15.1 ms | OK |
 | s01b | app_info | 0.1 ms | OK |
 | s01b | compat_gaps | 0.3 ms | OK |
-| s01b | launch | >60 000 ms | TIMEOUT (the host loop above) |
+| s01b | launch | >60 000 ms | TIMEOUT (blocker 1: `find_class` cliff) |
+| s01c | install | 14.1 ms | OK |
+| s01c | app_info | 0.1 ms | OK |
+| s01c | compat_gaps | 0.3 ms | OK |
+| s01c | launch | >60 000 ms | TIMEOUT (blocker 2: `runBlocking` spin under the MCP fuel budget) |
 
 The raw rows are in `comprix/mcp-delays.jsonl`, outside this repository.
 
@@ -96,6 +111,8 @@ subclasses are covered too.
 | `throwable` | `initCause` rules, `addSuppressed`, stack traces, `printStackTrace`, `(String, Throwable)` constructors |
 | classpath | About 30 JDK exception families (`IndexOutOfBounds` subclasses now catchable correctly) |
 | intrinsics | `AtomicLong`/`IntegerFieldUpdater` `getAndIncrement`/`getAndDecrement` |
+| rd-dex | O(1) `Dex::find_class` (lazy descriptor index): a general launch-time fix |
+| threads | Timed main-thread park advances virtual time to the earliest timed sleeper |
 
 ## Documented deviations
 
