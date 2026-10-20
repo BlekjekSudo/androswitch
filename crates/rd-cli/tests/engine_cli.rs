@@ -234,3 +234,72 @@ fn optional_engine_limit_does_not_break_basic_inspect() {
         "DETECTION_LIMIT",
     );
 }
+
+#[test]
+fn engine_run_preserves_availability_and_file_error_precedence() {
+    let t = Temp::new("run-unavailable");
+    // LANG/feature selection must not turn an unavailable adapter into IO_ERROR.
+    error(
+        &t.run(&["engine", "run", "wasm", "missing.apk", "--json"]),
+        2,
+        "NOT_IMPLEMENTED",
+    );
+    for id in ["c-ndk", "cpp-ndk", "rust-ndk"] {
+        // Use actual availability: Cargo may unify dependency features from
+        // another workspace package even without the CLI's forwarding flag.
+        let (exit, code) = if rd_engine_registry::native_execution_available(id) {
+            (1, "IO_ERROR")
+        } else {
+            (2, "NOT_IMPLEMENTED")
+        };
+        error(
+            &t.run(&["engine", "run", id, "missing.apk", "--json"]),
+            exit,
+            code,
+        );
+    }
+}
+
+#[cfg(feature = "native-engines")]
+#[test]
+#[ignore = "requires source-built APKs and Unicorn; set RD_NATIVE_LANGUAGE_APKS"]
+fn source_native_cli_run_keeps_stdout_json_and_captures_guest_logs() {
+    let t = Temp::new("run-native-json");
+    let root = std::fs::canonicalize(
+        std::env::var_os("RD_NATIVE_LANGUAGE_APKS")
+            .expect("set RD_NATIVE_LANGUAGE_APKS to source-built APK directory"),
+    )
+    .expect("source-built APK directory must exist");
+    for (id, file, language, tag) in [
+        ("c-ndk", "native-c.apk", "C", 1),
+        ("cpp-ndk", "native-cpp.apk", "C++", 2),
+        ("rust-ndk", "native-rust.apk", "Rust", 3),
+    ] {
+        let out = t
+            .command()
+            .args(["engine", "run", id])
+            .arg(root.join(file))
+            .arg("--json")
+            .output()
+            .unwrap();
+        let report = json(&out);
+        assert!(
+            out.stderr.is_empty(),
+            "guest logs must be captured in the JSON report: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert_eq!(report["engine"], id);
+        assert_eq!(report["launched"], true);
+        assert_eq!(report["execution_claimed"], true);
+        assert!(report["native"]["instructions"].as_u64().unwrap() > 0);
+        assert_eq!(report["native"]["missing_imports"], serde_json::json!([]));
+        assert!(report["logs"]
+            .as_str()
+            .unwrap()
+            .contains(&format!("Native {language} flavor={tag} boot=")));
+        assert!(report["ui"]
+            .as_str()
+            .unwrap()
+            .contains(&format!("{language} native workbench")));
+    }
+}

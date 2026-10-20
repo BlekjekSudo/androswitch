@@ -11,6 +11,10 @@ for abi in x86_64 arm64-v8a armeabi-v7a; do
   RD_NATIVE_ABI="$abi" RD_NATIVE_LANGUAGE_APKS="$OUT" \
     cargo test -p rd-engine-registry --features native-execution --locked \
     --test native_execution -- --ignored --nocapture
+  # The public CLI must emit one JSON artifact with guest stdout captured inside it.
+  RD_NATIVE_ABI="$abi" RD_NATIVE_LANGUAGE_APKS="$OUT" \
+    cargo test -p rd-cli --features native-engines,jit --locked \
+    --test engine_cli -- --ignored --nocapture
   for jit in off on; do
     python scripts/native-languages-mcp.py --rd "$ROOT/target/debug/rd" \
       --apks "$OUT" --out "$EVIDENCE/$jit/$abi" --abi "$abi" --jit "$jit"

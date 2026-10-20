@@ -102,6 +102,14 @@ Run it once per ABI using `RD_NATIVE_ABI`, or use the MCP matrix above. The
 external-APK test is explicitly ignored by ordinary offline unit tests; the
 availability/metadata tests and VM history/dispatch tests run without the SDK.
 
+The gate also runs the public `engine run --json` CLI regression test for all
+three languages on each ABI. It requires one clean JSON artifact on stdout,
+guest output captured in `logs`, an executing native report, and the expected
+UI text. Missing source APK fixtures fail the explicitly requested test rather
+than silently skipping it. Ordinary unit tests independently cover invocation
+validation at the unchanged 16 KiB payload and 16 signed-integer argument
+boundaries, including malformed JSON, duplicate/unknown fields and overflow.
+
 ## MCP selection
 
 After `install`, call:

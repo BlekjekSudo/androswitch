@@ -4,6 +4,34 @@ use rd_apk::{Apk, RdError, RdResult};
 use rd_vm::{Engine, Value, VmConfig, VmExit};
 use serde::Deserialize;
 
+// Keep parsing limits explicit and validate before invoking any guest code.
+const MAX_APK_BYTES: u64 = 256 * 1024 * 1024;
+const MAX_INVOKE_PAYLOAD_BYTES: usize = 16 * 1024;
+const MAX_INVOKE_ARGS: usize = 16;
+
+// Retain the original request type name to preserve Serde diagnostics.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Call {
+    class: String,
+    method: String,
+    args: Vec<i32>,
+}
+
+impl Call {
+    fn parse(payload: &[u8]) -> RdResult<Self> {
+        if payload.len() > MAX_INVOKE_PAYLOAD_BYTES {
+            return Err(error("INVALID_FORMAT", "invoke payload too large"));
+        }
+        let call: Self =
+            serde_json::from_slice(payload).map_err(|e| error("INVALID_FORMAT", e.to_string()))?;
+        if call.args.len() > MAX_INVOKE_ARGS {
+            return Err(error("INVALID_FORMAT", "at most16integer arguments"));
+        }
+        Ok(call)
+    }
+}
+
 pub struct NativeProcess {
     id: String,
     package: String,
@@ -40,7 +68,7 @@ fn vm_error(e: VmExit) -> RdError {
 }
 impl NativeProcess {
     pub(crate) fn parse(id: &str, artifact: Artifact<'_>) -> RdResult<Self> {
-        if artifact.bytes.len() > 256 * 1024 * 1024 {
+        if artifact.bytes.len() as u64 > MAX_APK_BYTES {
             return Err(error("APK_TOO_LARGE", "native adapter APK exceeds 256 MiB"));
         }
         Self::from_apk(id, Apk::from_bytes(artifact.bytes.to_vec())?)
@@ -53,7 +81,7 @@ impl NativeProcess {
                 "no executing native adapter for selected ID",
             ));
         }
-        if apk.file_size_bytes > 256 * 1024 * 1024 {
+        if apk.file_size_bytes > MAX_APK_BYTES {
             return Err(error("APK_TOO_LARGE", "native adapter APK exceeds 256 MiB"));
         }
         if apk.manifest.min_sdk < 26 {
@@ -111,7 +139,18 @@ impl NativeProcess {
     }
     pub fn report(&self) -> serde_json::Value {
         let native = self.engine.native_report();
-        serde_json::json!({"engine":self.id,"package":self.package,"activity":self.activity,"launched":self.launched,"execution_claimed":native["instructions"].as_u64().unwrap_or(0)>0,"language_attribution":"selected explicitly, not inferred from ELF","native":native,"last_result":self.last_result,"ui":self.engine.dump_ui(),"limitations":"bounded DEX/ELF/JNI subset; not universal NDK, STL or Rust std/async"})
+        serde_json::json!({
+            "engine": self.id,
+            "package": self.package,
+            "activity": self.activity,
+            "launched": self.launched,
+            "execution_claimed": native["instructions"].as_u64().unwrap_or(0) > 0,
+            "language_attribution": "selected explicitly, not inferred from ELF",
+            "native": native,
+            "last_result": self.last_result,
+            "ui": self.engine.dump_ui(),
+            "limitations": "bounded DEX/ELF/JNI subset; not universal NDK, STL or Rust std/async",
+        })
     }
     pub(crate) fn event(&mut self, event: EngineEvent<'_>) -> RdResult<()> {
         match event.name {
@@ -129,21 +168,7 @@ impl NativeProcess {
                 if !self.launched {
                     return Err(error("INVALID_STATE", "launch before invoking methods"));
                 }
-                #[derive(Deserialize)]
-                #[serde(deny_unknown_fields)]
-                struct Call {
-                    class: String,
-                    method: String,
-                    args: Vec<i32>,
-                }
-                if event.payload.len() > 16384 {
-                    return Err(error("INVALID_FORMAT", "invoke payload too large"));
-                }
-                let call: Call = serde_json::from_slice(event.payload)
-                    .map_err(|e| error("INVALID_FORMAT", e.to_string()))?;
-                if call.args.len() > 16 {
-                    return Err(error("INVALID_FORMAT", "at most16integer arguments"));
-                }
+                let call = Call::parse(event.payload)?;
                 let sig = format!("({})I", "I".repeat(call.args.len()));
                 let args: Vec<Value> = call.args.into_iter().map(Value::Int).collect();
                 let value = self
@@ -173,5 +198,83 @@ impl NativeProcess {
                 "arbitrary host syscalls are not exposed; advance_clock accepts one value <=60000",
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod invocation_tests {
+    use super::*;
+
+    fn invalid(payload: &[u8]) -> RdError {
+        let error = Call::parse(payload).unwrap_err();
+        assert_eq!(error.code, "INVALID_FORMAT");
+        assert_eq!(error.module_id, "rd-native-engines");
+        assert!(!error.cause.is_empty());
+        assert!(error.suggestion.as_deref().is_some_and(|s| !s.is_empty()));
+        error
+    }
+
+    #[test]
+    fn invocation_accepts_zero_and_sixteen_signed_arguments() {
+        for args in [vec![], [i32::MIN, i32::MAX].repeat(8)] {
+            let payload = serde_json::to_vec(&serde_json::json!({
+                "class": "Ldemo/Native;", "method": "digest", "args": args,
+            }))
+            .unwrap();
+            let call = Call::parse(&payload).unwrap();
+            assert_eq!(call.class, "Ldemo/Native;");
+            assert_eq!(call.method, "digest");
+            assert_eq!(call.args, args);
+        }
+    }
+
+    #[test]
+    fn invocation_enforces_exact_payload_byte_boundary_before_json_parsing() {
+        let mut payload = br#"{"class":"Ldemo/Native;","method":"digest","args":[]}"#.to_vec();
+        payload.resize(MAX_INVOKE_PAYLOAD_BYTES, b' ');
+        assert!(Call::parse(&payload).is_ok());
+        payload.push(b' ');
+        assert_eq!(invalid(&payload).cause, "invoke payload too large");
+        payload.fill(0xff);
+        assert_eq!(invalid(&payload).cause, "invoke payload too large");
+    }
+
+    #[test]
+    fn invocation_rejects_seventeen_arguments() {
+        let payload = serde_json::to_vec(&serde_json::json!({
+            "class": "Ldemo/Native;", "method": "digest", "args": vec![0; 17],
+        }))
+        .unwrap();
+        assert_eq!(invalid(&payload).cause, "at most16integer arguments");
+    }
+
+    #[test]
+    fn invocation_rejects_malformed_unknown_duplicate_and_non_integer_fields() {
+        for payload in [
+            b"".as_slice(),
+            b"\xff",
+            br#"null"#,
+            br#"{}"#,
+            br#"{"class":"Ldemo/Native;","args":[]}"#,
+            br#"{"class":"Ldemo/Native;","method":"digest","args":[],"unknown":1}"#,
+            br#"{"class":"a","class":"b","method":"digest","args":[]}"#,
+            br#"{"class":"a","method":"digest","args":[2147483648]}"#,
+            br#"{"class":"a","method":"digest","args":[-2147483649]}"#,
+            br#"{"class":"a","method":"digest","args":[1.0]}"#,
+            br#"{"class":"a","method":"digest","args":[true]}"#,
+            br#"{"class":"a","method":"digest","args":["1"]}"#,
+            br#"{"class":"a","method":"digest","args":[]}{}"#,
+        ] {
+            invalid(payload);
+        }
+        // Moving the DTO out of event() must not rename existing wire errors.
+        assert_eq!(
+            invalid(b"null").cause,
+            "invalid type: null, expected struct Call at line 1 column 4"
+        );
+        assert_eq!(
+            invalid(b"[]").cause,
+            "invalid length 0, expected struct Call with 3 elements at line 1 column 2"
+        );
     }
 }
