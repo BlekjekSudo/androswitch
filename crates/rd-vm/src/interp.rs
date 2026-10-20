@@ -1033,77 +1033,6 @@ fn lookup_next(
     Ok(index)
 }
 
-#[cfg(test)]
-mod fetch_tests {
-    use super::*;
-
-    #[test]
-    fn sequential_cursor_matches_binary_lookup_for_branches_handlers_and_bad_pcs() {
-        let instructions: Vec<_> = [0, 1, 3, 5, 6, 18, 20, 100]
-            .into_iter()
-            .map(|pc| {
-                (
-                    pc,
-                    Insn {
-                        opcode: 0,
-                        fmt: rd_dex::opcode::Format::F10x,
-                        size: 1,
-                        kind: Kind::Plain,
-                    },
-                )
-            })
-            .collect();
-        for initial in [0, 1, 7, 8, usize::MAX] {
-            let mut cursor = initial;
-            for pc in [0, 1, 3, 18, 20, 100, 0, 5, 6, 2, 0, usize::MAX, 100, 101] {
-                let expected = lookup(&instructions, pc);
-                let actual = lookup_next(&instructions, pc, &mut cursor);
-                assert_eq!(format!("{actual:?}"), format!("{expected:?}"));
-                if let Ok(i) = actual {
-                    assert_eq!(cursor, i + 1);
-                }
-            }
-        }
-        let mut cursor = 0;
-        assert_eq!(
-            format!("{:?}", lookup_next(&[], 0, &mut cursor)),
-            format!("{:?}", lookup(&[], 0))
-        );
-    }
-
-    #[test]
-    fn sequential_cursor_differential_random_walk() {
-        let instructions: Vec<_> = (0..1024)
-            .map(|i| {
-                (
-                    i * 3,
-                    Insn {
-                        opcode: 0,
-                        fmt: rd_dex::opcode::Format::F10x,
-                        size: 3,
-                        kind: Kind::Plain,
-                    },
-                )
-            })
-            .collect();
-        let mut state = 0x1234_5678u64;
-        let mut cursor = 0;
-        for _ in 0..32768 {
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            let pc = if state % 4 != 0 && cursor < instructions.len() {
-                instructions[cursor].0
-            } else {
-                (state as usize) % (instructions.len() * 3 + 16)
-            };
-            let expected = lookup(&instructions, pc);
-            let actual = lookup_next(&instructions, pc, &mut cursor);
-            assert_eq!(format!("{actual:?}"), format!("{expected:?}"));
-        }
-    }
-}
-
 fn lookup(instructions: &[(usize, Insn)], addr: usize) -> Result<usize, VmExit> {
     match instructions.binary_search_by_key(&addr, |(a, _)| *a) {
         Ok(i) => Ok(i),
@@ -1863,4 +1792,75 @@ pub fn render_result(v: &Value, return_type: &str) -> String {
 
 fn vm_obj_repr(r: &crate::heap::ObjRef) -> String {
     format!("<object #{r}>")
+}
+
+#[cfg(test)]
+mod fetch_tests {
+    use super::*;
+
+    #[test]
+    fn sequential_cursor_matches_binary_lookup_for_branches_handlers_and_bad_pcs() {
+        let instructions: Vec<_> = [0, 1, 3, 5, 6, 18, 20, 100]
+            .into_iter()
+            .map(|pc| {
+                (
+                    pc,
+                    Insn {
+                        opcode: 0,
+                        fmt: rd_dex::opcode::Format::F10x,
+                        size: 1,
+                        kind: Kind::Plain,
+                    },
+                )
+            })
+            .collect();
+        for initial in [0, 1, 7, 8, usize::MAX] {
+            let mut cursor = initial;
+            for pc in [0, 1, 3, 18, 20, 100, 0, 5, 6, 2, 0, usize::MAX, 100, 101] {
+                let expected = lookup(&instructions, pc);
+                let actual = lookup_next(&instructions, pc, &mut cursor);
+                assert_eq!(format!("{actual:?}"), format!("{expected:?}"));
+                if let Ok(i) = actual {
+                    assert_eq!(cursor, i + 1);
+                }
+            }
+        }
+        let mut cursor = 0;
+        assert_eq!(
+            format!("{:?}", lookup_next(&[], 0, &mut cursor)),
+            format!("{:?}", lookup(&[], 0))
+        );
+    }
+
+    #[test]
+    fn sequential_cursor_differential_random_walk() {
+        let instructions: Vec<_> = (0..1024)
+            .map(|i| {
+                (
+                    i * 3,
+                    Insn {
+                        opcode: 0,
+                        fmt: rd_dex::opcode::Format::F10x,
+                        size: 3,
+                        kind: Kind::Plain,
+                    },
+                )
+            })
+            .collect();
+        let mut state = 0x1234_5678u64;
+        let mut cursor = 0;
+        for _ in 0..32768 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let pc = if state % 4 != 0 && cursor < instructions.len() {
+                instructions[cursor].0
+            } else {
+                (state as usize) % (instructions.len() * 3 + 16)
+            };
+            let expected = lookup(&instructions, pc);
+            let actual = lookup_next(&instructions, pc, &mut cursor);
+            assert_eq!(format!("{actual:?}"), format!("{expected:?}"));
+        }
+    }
 }
