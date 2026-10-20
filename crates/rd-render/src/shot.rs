@@ -3,9 +3,9 @@
 //! Software renderer determinístico: framebuffer RGB 720×1440 (viewport do
 //! M3.2), pinta a árvore de views (retângulo por classe/estado + texto via
 //! glifos de bloco 3×7 — fonte tipográfica real é M8/M9, o Android real usa
-//! skia/FreeType), e codifica PNG: filtros de linha adaptativos (None/Sub/Up)
-//! + deflate rápido pelo flate2 puro-Rust já usado no rd-apk (antes: blocos
-//! STORED, ~3,1 MB por tela). Mesmo input → mesmos bytes.
+//! skia/FreeType), e codifica PNG com filtros de linha adaptativos
+//! (None/Sub/Up) e deflate rápido pelo flate2 puro-Rust já usado no rd-apk
+//! (antes: blocos STORED, ~3,1 MB por tela). Mesmo input → mesmos bytes.
 
 use rd_vm::framework::{UiNode, Vis};
 
