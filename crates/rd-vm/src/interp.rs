@@ -1818,10 +1818,12 @@ mod fetch_tests {
             let mut cursor = initial;
             for pc in [0, 1, 3, 18, 20, 100, 0, 5, 6, 2, 0, usize::MAX, 100, 101] {
                 let expected = lookup(&instructions, pc);
+                let previous = cursor;
                 let actual = lookup_next(&instructions, pc, &mut cursor);
                 assert_eq!(format!("{actual:?}"), format!("{expected:?}"));
-                if let Ok(i) = actual {
-                    assert_eq!(cursor, i + 1);
+                match actual {
+                    Ok(i) => assert_eq!(cursor, i + 1),
+                    Err(_) => assert_eq!(cursor, previous, "failed fetch must not advance"),
                 }
             }
         }
@@ -1859,8 +1861,13 @@ mod fetch_tests {
                 (state as usize) % (instructions.len() * 3 + 16)
             };
             let expected = lookup(&instructions, pc);
+            let previous = cursor;
             let actual = lookup_next(&instructions, pc, &mut cursor);
             assert_eq!(format!("{actual:?}"), format!("{expected:?}"));
+            match actual {
+                Ok(i) => assert_eq!(cursor, i + 1),
+                Err(_) => assert_eq!(cursor, previous, "failed fetch must not advance"),
+            }
         }
     }
 }

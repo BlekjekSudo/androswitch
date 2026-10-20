@@ -796,6 +796,48 @@ mod tests {
     }
 
     #[test]
+    fn streaming_scanner_exhausts_short_tokens_and_all_write_partitions() {
+        // Independent, non-saturating oracle: these short ASCII tokens fit in
+        // u64. Existing tests separately cover Unicode and saturating overflow.
+        // Enumerate every text over this alphabet, then every possible split
+        // between its bytes, including empty formatter writes at every split.
+        const ALPHABET: &[u8] = b"019|";
+        for len in 0usize..=6 {
+            for mut encoding in 0..ALPHABET.len().pow(len as u32) {
+                let mut bytes = vec![0; len];
+                for byte in &mut bytes {
+                    *byte = ALPHABET[encoding % ALPHABET.len()];
+                    encoding /= ALPHABET.len();
+                }
+                let text = std::str::from_utf8(&bytes).unwrap();
+                for n in [0, 1, 9, 99, crate::heap::MAX_OBJECTS] {
+                    let expected: Vec<ObjRef> = text
+                        .split('|')
+                        .filter_map(|token| token.parse::<u64>().ok())
+                        .filter(|value| (1..=n as u64).contains(value))
+                        .map(|value| value as ObjRef)
+                        .collect();
+                    for partitions in 0..(1usize << len.saturating_sub(1)) {
+                        let mut actual = Vec::new();
+                        let mut sink = RefScanner::new(n, |r| actual.push(r));
+                        let mut start = 0;
+                        for end in 1..len {
+                            if partitions & (1 << (end - 1)) != 0 {
+                                sink.write_str(&text[start..end]).unwrap();
+                                sink.write_str("").unwrap();
+                                start = end;
+                            }
+                        }
+                        sink.write_str(&text[start..]).unwrap();
+                        assert_eq!(sink.finish(), text.len());
+                        assert_eq!(actual, expected, "n={n} text={text:?} splits={partitions}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn streaming_scanner_matches_buffered_scanner_at_every_utf8_boundary() {
         let cases = [
             "",
