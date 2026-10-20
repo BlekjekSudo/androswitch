@@ -29,6 +29,8 @@ use crate::heap::ObjRef;
 use crate::value::Value;
 
 const EXACTLY: i32 = 0x4000_0000;
+/// MeasureSpec.AT_MOST (`2 << 30`).
+const AT_MOST: i32 = i32::MIN;
 const VIEW_CONFIG: &str = "Landroid/view/ViewConfiguration;";
 
 fn density() -> f32 {
@@ -388,6 +390,42 @@ pub(crate) fn instance_intrinsic(
             }
             Value::Int(1)
         }
+        // API 33: the OnBackInvokedDispatcher of the view's window — the
+        // dialog's for a view inside a dialog window, else the activity's
+        ("findOnBackInvokedDispatcher", "()Landroid/window/OnBackInvokedDispatcher;") => {
+            let mut root = recv;
+            for _ in 0..512 {
+                match bounds(vm, root) {
+                    Some((_, _, _, _, Some(p))) => root = p,
+                    _ => break,
+                }
+            }
+            let owner = crate::m8::showing_dialog_roots(vm)
+                .into_iter()
+                .chain(
+                    vm.fw
+                        .m8
+                        .dialogs
+                        .keys()
+                        .filter_map(|d| crate::m8::dialog_content(vm, *d).map(|c| (*d, c)))
+                        .collect::<Vec<_>>(),
+                )
+                .find(|(_, c)| *c == root)
+                .map(|(d, _)| d)
+                .or(vm.fw.current_activity);
+            match owner {
+                Some(o) => crate::activity_extras::instance_intrinsic(
+                    vm,
+                    "Landroid/app/Activity;",
+                    "getOnBackInvokedDispatcher",
+                    "()Landroid/window/OnBackInvokedDispatcher;",
+                    o,
+                    &[],
+                )?
+                .unwrap_or(Value::Null),
+                None => Value::Null,
+            }
+        }
         // Drawable.Callback (AOSP View implements it): scheduleDrawable
         // posts the drawable's frame runnable at uptime `when`; a view
         // redraws every frame here, so invalidate/unschedule need no state.
@@ -617,6 +655,11 @@ impl Engine {
         };
         let mut roots = Vec::new();
         self.collect_dex_roots(content, &mut roots, 0);
+        roots.extend(
+            crate::m8::showing_dialog_roots(self)
+                .into_iter()
+                .map(|(_, r)| r),
+        );
         let needs_layout = roots
             .iter()
             .any(|r| matches!(bounds(self, *r), Some((_, _, w, h, _)) if w <= 0 || h <= 0));
@@ -640,7 +683,8 @@ impl Engine {
         // Host-only window: the host renderer already draws every view. An
         // overlay frame would only paint its background over that rendering
         // (blank screenshots) and cost a full-screen rasterization.
-        if dex_roots.is_empty() {
+        let dialogs = crate::m8::showing_dialog_roots(self);
+        if dex_roots.is_empty() && dialogs.is_empty() {
             self.gfx.frame.clear();
             self.gfx.frame_valid = false;
             return Ok(0);
@@ -657,6 +701,10 @@ impl Engine {
             set_prop(self, *v, "rd_host_root", 1);
             layout(self, *v, x, y, x + w, y + h)?;
         }
+        // 1b. dialog windows above the activity (WindowManager z-order)
+        for (dlg, root) in &dialogs {
+            self.layout_dialog_window(*dlg, *root)?;
+        }
         // 2. let layout-triggered frame callbacks / posted work run
         let now = self.fw.clock();
         let _ = now;
@@ -665,8 +713,43 @@ impl Engine {
         let canvas = self.begin_frame_canvas(fw_, fh_)?;
         self.frame_fill(canvas, 0.0, 0.0, fw_ as f32, fh_ as f32, 0xFFFF_FFFF);
         self.record_view(canvas, content, 0)?;
+        for (_, root) in &dialogs {
+            // FLAG_DIM_BEHIND (Material dialog backgroundDimAmount 0.32)
+            self.frame_fill(canvas, 0.0, 0.0, fw_ as f32, fh_ as f32, 0x5200_0000);
+            self.record_view(canvas, *root, 0)?;
+        }
         self.end_frame();
         Ok(self.frame_op_count())
+    }
+
+    /// Measure/lay out a dialog's window content as a floating window:
+    /// the window LayoutParams size (MATCH_PARENT → screen, WRAP_CONTENT →
+    /// AT_MOST screen, px → EXACTLY), centered on screen (Gravity.CENTER).
+    fn layout_dialog_window(&mut self, dialog: ObjRef, root: ObjRef) -> Result<(), VmExit> {
+        let (fw_, fh_) = (crate::graphics::FB_W as i32, crate::graphics::FB_H as i32);
+        let (lw, lh) = crate::m8::dialog_window_size(self, dialog);
+        let spec = |want: i32, max: i32| match want {
+            -1 => EXACTLY | max,
+            w if w >= 0 => EXACTLY | w.min(max),
+            _ => AT_MOST | max,
+        };
+        measure(self, root, spec(lw, fw_), spec(lh, fh_))?;
+        let mw = prop(self, root, "MeasuredWidth").unwrap_or(fw_) & 0x00ff_ffff;
+        let mh = prop(self, root, "MeasuredHeight").unwrap_or(fh_) & 0x00ff_ffff;
+        let (mw, mh) = (mw.min(fw_), mh.min(fh_));
+        let (x, y) = ((fw_ - mw) / 2, (fh_ - mh) / 2);
+        if std::env::var("RD_TRACE_DRAW").is_ok() {
+            let kids = match self.fw.get(root) {
+                Some(HostObj::View { children, .. }) => children.len(),
+                _ => 0,
+            };
+            eprintln!(
+                "D/RustyDroid: dialog window {} spec=({lw},{lh}) measured={mw}x{mh} at ({x},{y}) children={kids}",
+                self.heap.class_of(root).unwrap_or("?")
+            );
+        }
+        set_prop(self, root, "rd_host_root", 1);
+        layout(self, root, x, y, x + mw, y + mh)
     }
 
     fn collect_dex_roots(&self, v: ObjRef, out: &mut Vec<ObjRef>, depth: usize) {

@@ -849,6 +849,45 @@ impl Engine {
         };
         // input lands on a laid-out window (first traversal), as on a device
         let _ = self.ensure_laid_out();
+        // the topmost dialog window takes the input (WindowManager z-order)
+        if let Some(&(dlg, root)) = crate::m8::showing_dialog_roots(self).last() {
+            let inside = matches!(self.fw.get(root),
+                Some(HostObj::View { x: rx, y: ry, w, h, .. })
+                    if x >= *rx && x < rx + w && y >= *ry && y < ry + h);
+            if inside {
+                if let Some(t) = self.hit_test(root, x, y) {
+                    if self.click_listener_of(t).is_some() || self.click_method_of(t).is_some() {
+                        return self.dispatch_click(t);
+                    }
+                }
+                return self.touch_sequence(root, &[(x, y)]);
+            }
+            // outside the dialog window: Dialog.onTouchEvent (DOWN, UP)
+            let now = self.fw.clock() as i64;
+            let mut consumed = false;
+            for action in [
+                crate::android_motion::ACTION_DOWN,
+                crate::android_motion::ACTION_UP,
+            ] {
+                let ev = crate::android_motion::new_event(
+                    self, action, x as f32, y as f32, 0.0, 0.0, now, now,
+                )?;
+                let r = self.invoke_instance(
+                    dlg,
+                    "onTouchEvent",
+                    "(Landroid/view/MotionEvent;)Z",
+                    &[Value::Obj(ev)],
+                )?;
+                consumed |= matches!(r, Value::Int(v) if v != 0);
+                if !crate::m8::showing_dialog_roots(self)
+                    .iter()
+                    .any(|(d, _)| *d == dlg)
+                {
+                    break;
+                }
+            }
+            return Ok(consumed);
+        }
         let Some(content) = self.window_content_of(activity) else {
             if std::env::var("RD_FW_DEBUG").is_ok() {
                 eprintln!("[fw] touch: sem content (window vazia)");
@@ -1153,14 +1192,42 @@ impl Engine {
         match key.as_str() {
             "BACK" => {
                 let activity = require_activity(&self.fw)?;
-                if let Some(HostObj::Activity { finished, .. }) = self.fw.objects.get_mut(&activity)
-                {
-                    *finished = true;
+                // the topmost dialog window gets BACK first (Dialog.onBackPressed;
+                // ComponentDialog routes it through its OnBackPressedDispatcher)
+                if let Some(&(dlg, _)) = crate::m8::showing_dialog_roots(self).last() {
+                    self.invoke_instance(dlg, "onBackPressed", "()V", &[])?;
+                    self.drain_looper()?;
+                    return Ok(KeyReport {
+                        key: "BACK".into(),
+                        delivered: true,
+                        effect: "dialog onBackPressed".into(),
+                    });
                 }
+                // AOSP: Activity.onBackPressed() — virtual, so ComponentActivity's
+                // OnBackPressedDispatcher (Navigation back stack, callbacks)
+                // runs; the base implementation finishes the activity
+                let r = self.invoke_instance(activity, "onBackPressed", "()V", &[]);
+                if r.is_err() {
+                    if let Some(HostObj::Activity { finished, .. }) =
+                        self.fw.objects.get_mut(&activity)
+                    {
+                        *finished = true;
+                    }
+                }
+                r?;
+                self.drain_looper()?;
+                let finished = matches!(
+                    self.fw.get(activity),
+                    Some(HostObj::Activity { finished: true, .. })
+                );
                 Ok(KeyReport {
                     key: "BACK".into(),
                     delivered: true,
-                    effect: "activity finalizada (finish)".into(),
+                    effect: if finished {
+                        "activity finalizada (finish)".into()
+                    } else {
+                        "onBackPressed tratado pelo app".into()
+                    },
                 })
             }
             "DEL" => {
@@ -2851,7 +2918,13 @@ impl Engine {
     pub fn view_tree(&self) -> Option<UiNode> {
         let activity = self.fw.current_activity?;
         let content = self.window_content_of(activity)?;
-        Some(self.build_ui_node(content, 0))
+        let mut root = self.build_ui_node(content, 0);
+        // showing dialog windows are part of the visible hierarchy (topmost
+        // last, as uiautomator lists windows)
+        for (_, d) in crate::m8::showing_dialog_roots(self) {
+            root.children.push(self.build_ui_node(d, 1));
+        }
+        Some(root)
     }
 
     /// issue #54: resource-id HONESTO para o dump uiautomator:

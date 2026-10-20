@@ -290,6 +290,9 @@ pub fn call_static_intrinsic(
     if let Some(v) = crate::android_colorspace::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
+    if let Some(v) = crate::jbreakiter::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
     if let Some(v) = crate::android_spannable::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
@@ -3296,7 +3299,35 @@ pub fn call_instance_intrinsic_mref(
         crate::jcollections::sublist_write_back(vm, recv);
         return r;
     }
-    instance_intrinsic_dispatch(vm, recv_class, mref_class, name, sig, recv, args)
+    let r = instance_intrinsic_dispatch(vm, recv_class, mref_class, name, sig, recv, args)?;
+    if r.is_some() || name == "<init>" {
+        return Ok(r);
+    }
+    // Inherited platform method named through a DEX subclass (e.g.
+    // `invoke-virtual LApp/MyRef;->get()` on `class MyRef extends
+    // WeakReference`): when no class in the DEX chain declares it, the
+    // nearest platform ancestor's implementation answers (JVMS 5.4.3.3).
+    if vm.cp.find_class(mref_class).is_some()
+        && vm.cp.resolve_method(mref_class, name, sig).is_none()
+    {
+        let mut c = mref_class.to_string();
+        for _ in 0..64 {
+            let Some(sup) = vm.cp.superclass_of(&c) else {
+                break;
+            };
+            if sup == c {
+                break;
+            }
+            if vm.cp.find_class(&sup).is_none() {
+                if sup == OBJECT {
+                    break;
+                }
+                return instance_intrinsic_dispatch(vm, recv_class, &sup, name, sig, recv, args);
+            }
+            c = sup;
+        }
+    }
+    Ok(None)
 }
 
 fn instance_intrinsic_dispatch(
@@ -3333,6 +3364,18 @@ fn instance_intrinsic_dispatch(
         if let Some(v) =
             crate::android_motion::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
         {
+            return Ok(Some(v));
+        }
+    }
+    // java.util.PriorityQueue (jpriorityqueue.rs)
+    if let Some(v) =
+        crate::jpriorityqueue::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // java.text.BreakIterator (jbreakiter.rs)
+    if recv_class == crate::jbreakiter::BI || vm.break_iters.contains_key(&recv) {
+        if let Some(v) = crate::jbreakiter::instance_intrinsic(vm, name, sig, recv, args)? {
             return Ok(Some(v));
         }
     }
@@ -3860,9 +3903,29 @@ fn instance_intrinsic_dispatch(
         {
             ref_init(vm, recv, sig, args)
         }
+        // java.lang.ref.Reference (the abstract base) — same referent field
+        (_, name, sig)
+            if mref_class == "Ljava/lang/ref/Reference;"
+                && matches!(
+                    (name, sig),
+                    ("refersTo", "(Ljava/lang/Object;)Z")
+                        | ("enqueue", "()Z")
+                        | ("isEnqueued", "()Z")
+                ) =>
+        {
+            Ok(Some(match name {
+                "refersTo" => {
+                    let cur = vm.heap.get_field(recv, "referent").unwrap_or(Value::Null);
+                    Value::Int(values_equal(&vm.heap, &cur, &args[0])? as i32)
+                }
+                // no GC/ReferenceQueue: never enqueued
+                _ => Value::Int(0),
+            }))
+        }
         (c, name, sig)
             if (mref_class == WEAK_REF
                 || mref_class == SOFT_REF
+                || mref_class == "Ljava/lang/ref/Reference;"
                 || c == WEAK_REF
                 || c == SOFT_REF)
                 && matches!(

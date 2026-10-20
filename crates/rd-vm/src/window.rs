@@ -177,7 +177,7 @@ pub(crate) fn instance_intrinsic(
     Ok(Some(v))
 }
 
-fn window_attributes(vm: &mut Engine, window: ObjRef) -> Result<ObjRef, VmExit> {
+pub(crate) fn window_attributes(vm: &mut Engine, window: ObjRef) -> Result<ObjRef, VmExit> {
     let key = (window, "win:attrs".to_string());
     if let Some(Value::Obj(a)) = vm.view_props.get(&key) {
         return Ok(*a);

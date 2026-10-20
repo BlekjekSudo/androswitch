@@ -84,6 +84,8 @@ pub struct Engine {
     pub(crate) system_ui_visibility: HashMap<crate::heap::ObjRef, i32>,
     /// General View property store (view_props.rs): (view, property) → value
     pub(crate) view_props: HashMap<(crate::heap::ObjRef, String), Value>,
+    /// `java.text.BreakIterator` state (jbreakiter.rs)
+    pub(crate) break_iters: HashMap<crate::heap::ObjRef, crate::jbreakiter::BreakState>,
     /// view_attach.rs: OnAttachStateChangeListeners per view
     pub(crate) attach_listeners: HashMap<crate::heap::ObjRef, Vec<crate::heap::ObjRef>>,
     /// view_attach.rs: views currently attached to a window
@@ -161,6 +163,7 @@ impl Engine {
             window_decor: HashMap::new(),
             system_ui_visibility: HashMap::new(),
             view_props: HashMap::new(),
+            break_iters: HashMap::new(),
             attach_listeners: HashMap::new(),
             attached_views: HashSet::new(),
             gfx: Default::default(),

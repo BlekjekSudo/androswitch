@@ -750,6 +750,19 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/lang/Error;" => Some(ERR.to_vec()),
         // ── M3.2: framework host Android ───────────────────────────────────
         "Landroid/content/Context;" => Some(OBJECT.to_vec()),
+        "Ljava/text/BreakIterator;" => Some(OBJECT.to_vec()),
+        // android.text layouts (graphics.rs): StaticLayout/BoringLayout/
+        // DynamicLayout are Layouts (Compose casts them to Layout)
+        "Landroid/text/Layout;" => Some(OBJECT.to_vec()),
+        "Landroid/text/StaticLayout;"
+        | "Landroid/text/BoringLayout;"
+        | "Landroid/text/DynamicLayout;" => {
+            Some(vec!["Landroid/text/Layout;", "Ljava/lang/Object;"])
+        }
+        "Landroid/text/BoringLayout$Metrics;" => Some(vec![
+            "Landroid/graphics/Paint$FontMetricsInt;",
+            "Ljava/lang/Object;",
+        ]),
         "Landroid/content/ContextWrapper;" => Some(CONTEXT.to_vec()),
         "Landroid/view/ContextThemeWrapper;" => Some(vec![
             "Landroid/content/ContextWrapper;",
@@ -966,6 +979,11 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/util/ArrayDeque;" => {
             Some(vec!["Ljava/util/AbstractCollection;", "Ljava/lang/Object;"])
         }
+        "Ljava/util/PriorityQueue;" => Some(vec![
+            "Ljava/util/AbstractQueue;",
+            "Ljava/util/AbstractCollection;",
+            "Ljava/lang/Object;",
+        ]),
         "Ljava/util/AbstractMap;" => Some(OBJECT.to_vec()),
         "Ljava/util/HashMap;" => Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"]),
         "Ljava/util/LinkedHashMap;" => Some(vec![
@@ -1273,6 +1291,12 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/util/Queue;",
             "Ljava/util/Collection;",
             "Ljava/lang/Iterable;",
+        ]),
+        "Ljava/util/PriorityQueue;" => Some(vec![
+            "Ljava/util/Queue;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+            "Ljava/io/Serializable;",
         ]),
         "Ljava/util/ArrayDeque;" => Some(vec![
             "Ljava/util/Deque;",

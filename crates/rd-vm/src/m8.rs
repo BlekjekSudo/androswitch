@@ -868,7 +868,40 @@ fn dialog(
         )),
         // AOSP Dialog lifecycle hooks: the base implementations are empty
         "onCreate" | "onStart" | "onStop" if !is_builder => Ok(Some(Value::Null)),
-        "onTouchEvent" if !is_builder => Ok(Some(Value::Int(0))),
+        // AOSP Dialog.onTouchEvent: a DOWN outside the window cancels a
+        // cancelable dialog when canceledOnTouchOutside (dialog themes'
+        // windowCloseOnTouchOutside default) — the caller only delivers
+        // events that fell outside the dialog's window
+        "onTouchEvent" if !is_builder => {
+            let action = match oarg(args, 0) {
+                Some(ev) => vm
+                    .invoke_instance(ev, "getActionMasked", "()I", &[])?
+                    .as_int()
+                    .unwrap_or(-1),
+                None => -1,
+            };
+            let cancelable = !vm
+                .view_props
+                .contains_key(&(recv, "dlg:noCancel".to_string()));
+            let outside = !vm
+                .view_props
+                .contains_key(&(recv, "dlg:noOutside".to_string()));
+            let showing = vm.fw.m8.dialogs.get(&recv).is_some_and(|d| d.showing);
+            if action == 0 && cancelable && outside && showing {
+                dialog_set_showing(vm, recv, false)?;
+                return Ok(Some(Value::Int(1)));
+            }
+            Ok(Some(Value::Int(0)))
+        }
+        "setCanceledOnTouchOutside" if !is_builder => {
+            let k = (recv, "dlg:noOutside".to_string());
+            if iarg(args, 0) == 0 {
+                vm.view_props.insert(k, Value::Int(1));
+            } else {
+                vm.view_props.remove(&k);
+            }
+            Ok(Some(Value::Null))
+        }
         "onSaveInstanceState" if !is_builder => {
             const BUNDLE: &str = "Landroid/os/Bundle;";
             let b = vm.heap.alloc_instance(BUNDLE.to_string(), Vec::new())?;
@@ -934,6 +967,14 @@ fn dialog(
         }
         "setCancelable" => {
             let v = iarg(args, 0) != 0;
+            if !is_builder {
+                let k = (recv, "dlg:noCancel".to_string());
+                if v {
+                    vm.view_props.remove(&k);
+                } else {
+                    vm.view_props.insert(k, Value::Int(1));
+                }
+            }
             let st = if is_builder {
                 vm.fw.m8.builders.get_mut(&recv).unwrap()
             } else {
@@ -1048,7 +1089,14 @@ fn dialog_set_showing(vm: &mut Engine, dialog: ObjRef, show: bool) -> Result<(),
             vm.invoke_instance(dialog, "onCreate", "(Landroid/os/Bundle;)V", &[Value::Null])?;
         }
         vm.invoke_instance(dialog, "onStart", "()V", &[])?;
+        // WindowManager.addView(decor): the dialog's window tree attaches
+        if let Some(c) = dialog_content(vm, dialog) {
+            crate::view_attach::dispatch_attach(vm, c)?;
+        }
     } else if !show && was {
+        if let Some(c) = dialog_content(vm, dialog) {
+            crate::view_attach::dispatch_detach(vm, c)?;
+        }
         vm.invoke_instance(dialog, "onStop", "()V", &[])?;
     }
     Ok(())
@@ -1066,7 +1114,53 @@ pub(crate) fn dialog_window(vm: &mut Engine, dialog: ObjRef) -> Result<ObjRef, V
         .objects
         .insert(w, crate::framework::HostObj::Window { content: None });
     vm.view_props.insert(key, Value::Obj(w));
+    // floating (dialog) windows are WRAP_CONTENT × WRAP_CONTENT
+    let a = crate::window::window_attributes(vm, w)?;
+    for f in ["width", "height"] {
+        crate::err::put_field_result(vm.heap.put_field(a, f, Value::Int(-2)))?;
+    }
     Ok(w)
+}
+
+/// Content root of a dialog's window, if any.
+pub(crate) fn dialog_content(vm: &Engine, dialog: ObjRef) -> Option<ObjRef> {
+    if let Some(Value::Obj(w)) = vm.view_props.get(&(dialog, "dlg:window".to_string())) {
+        if let Some(crate::framework::HostObj::Window { content: Some(c) }) = vm.fw.get(*w) {
+            return Some(*c);
+        }
+    }
+    vm.fw.m8.dialogs.get(&dialog).and_then(|d| d.view)
+}
+
+/// Showing dialogs that have a content view, as (dialog, content) in
+/// creation order: the last one is the topmost window.
+pub(crate) fn showing_dialog_roots(vm: &Engine) -> Vec<(ObjRef, ObjRef)> {
+    let mut v: Vec<(ObjRef, ObjRef)> = vm
+        .fw
+        .m8
+        .dialogs
+        .iter()
+        .filter(|(_, st)| st.showing)
+        .filter_map(|(d, _)| dialog_content(vm, *d).map(|c| (*d, c)))
+        .collect();
+    v.sort_unstable();
+    v
+}
+
+/// The dialog window's requested size (`WindowManager.LayoutParams`
+/// width/height: -1 MATCH_PARENT, -2 WRAP_CONTENT, else px).
+pub(crate) fn dialog_window_size(vm: &mut Engine, dialog: ObjRef) -> (i32, i32) {
+    let Ok(w) = dialog_window(vm, dialog) else {
+        return (-2, -2);
+    };
+    let Ok(a) = crate::window::window_attributes(vm, w) else {
+        return (-2, -2);
+    };
+    let get = |vm: &Engine, f: &str| match vm.heap.get_field(a, f) {
+        Ok(Value::Int(i)) => i,
+        _ => -2,
+    };
+    (get(vm, "width"), get(vm, "height"))
 }
 
 impl Engine {
