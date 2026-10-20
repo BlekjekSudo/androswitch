@@ -95,9 +95,9 @@ pub enum Vis {
 impl Vis {
     pub fn from_java(v: i32) -> Self {
         match v {
-            1 => Vis::Invisible,
-            2 => Vis::Gone,
-            _ => Vis::Visible, // 0 e valores desconhecidos → visible
+            1 | 4 => Vis::Invisible, // legacy XML ordinal / Android INVISIBLE
+            2 | 8 => Vis::Gone,      // legacy XML ordinal / Android GONE
+            _ => Vis::Visible,       // 0 e valores desconhecidos → visible
         }
     }
     pub fn to_java(self) -> i32 {
@@ -412,6 +412,17 @@ impl Engine {
                 )
             })?)
     }
+}
+
+#[inline]
+fn point_in_view_bounds(x: i32, y: i32, rect: (i32, i32, i32, i32)) -> bool {
+    let (left, top, width, height) = rect;
+    width > 0
+        && height > 0
+        && x >= left
+        && y >= top
+        && i64::from(x) < i64::from(left) + i64::from(width)
+        && i64::from(y) < i64::from(top) + i64::from(height)
 }
 
 fn new_view() -> HostObj {
@@ -1041,7 +1052,7 @@ impl Engine {
         if let Some(&(dlg, root)) = crate::m8::showing_dialog_roots(self).last() {
             let inside = matches!(self.fw.get(root),
                 Some(HostObj::View { x: rx, y: ry, w, h, .. })
-                    if x >= *rx && x < rx + w && y >= *ry && y < ry + h);
+                    if point_in_view_bounds(x, y, (*rx, *ry, *w, *h)));
             if inside {
                 if let Some(t) = self.hit_test(root, x, y) {
                     if self.click_listener_of(t).is_some() || self.click_method_of(t).is_some() {
@@ -1909,7 +1920,7 @@ impl Engine {
             return None;
         };
         // issue #46: invisible e gone não recebem toque (só visible)
-        if *vis != Vis::Visible || x < *vx || y < *vy || x >= vx + w || y >= vy + vh {
+        if *vis != Vis::Visible || !point_in_view_bounds(x, y, (*vx, *vy, *w, *vh)) {
             return None;
         }
         for c in children.iter().rev() {
@@ -2778,7 +2789,7 @@ fn call_host_instance_rooted(
         (VIEW, "setVisibility") if is_view(vm) => {
             let v = args[0].as_int()?;
             if let Some(HostObj::View { vis, .. }) = vm.fw.objects.get_mut(&recv) {
-                *vis = Vis::from_java(v); // 0/1/2 → visible/invisible/gone
+                *vis = Vis::from_java(v); // accepts Android 0/4/8 and legacy 0/1/2
             }
             Ok(Some(Value::Null))
         }
@@ -3356,9 +3367,21 @@ pub struct UiNode {
 }
 
 impl Engine {
-    /// M4 (DoD "get_ui_tree com ids certos"): árvore de UI da activity
-    /// corrente, estruturada — o rd-render formata (uiautomator XML) e pinta
-    /// (screenshot) a partir daqui. `None` = sem activity/window.
+    /// Read-only hit metadata (no child subtree) from the same foreground window as touch_app.
+    /// A point outside a modal dialog has no target: probing never dismisses it.
+    pub fn view_at_point(&self, x: i32, y: i32) -> Option<UiNode> {
+        let activity = self.fw.current_activity?;
+        let root = if let Some((_, root)) = crate::m8::showing_dialog_roots(self).last() {
+            *root
+        } else {
+            self.window_content_of(activity)?
+        };
+        self.hit_test(root, x, y)
+            .map(|r| self.build_ui_node_inner(r, 0, false))
+    }
+
+    /// M4: legacy structured activity tree, with dialog roots appended.
+    /// `None` means there is no current activity/content window.
     pub fn view_tree(&self) -> Option<UiNode> {
         let activity = self.fw.current_activity?;
         let content = self.window_content_of(activity)?;
@@ -3369,6 +3392,58 @@ impl Engine {
             root.children.push(self.build_ui_node(d, 1));
         }
         Some(root)
+    }
+
+    /// A bounded legacy-shaped snapshot. Dialogs are appended to the content
+    /// root for compatibility; use view_roots_bounded for independent windows.
+    pub fn view_tree_bounded(&self, max_nodes: usize) -> Option<UiNode> {
+        let mut roots = self.view_roots_bounded(max_nodes)?;
+        let mut root = roots.remove(0);
+        root.children.extend(roots);
+        Some(root)
+    }
+
+    /// Snapshot independent activity/dialog windows with a shared node budget.
+    /// This bounds construction, not just result traversal. Window visibility
+    /// must not inherit from the unrelated activity content root.
+    pub fn view_roots_bounded(&self, max_nodes: usize) -> Option<Vec<UiNode>> {
+        let activity = self.fw.current_activity?;
+        let mut remaining = max_nodes.max(1);
+        let mut roots = Vec::new();
+        if let Some(content) = self.window_content_of(activity) {
+            roots.push(self.build_ui_node_bounded(content, 0, &mut remaining));
+        }
+        for (_, dialog) in crate::m8::showing_dialog_roots(self) {
+            if remaining == 0 {
+                roots[0].truncated = true;
+                break;
+            }
+            roots.push(self.build_ui_node_bounded(dialog, 1, &mut remaining));
+        }
+        if roots.is_empty() {
+            None
+        } else {
+            Some(roots)
+        }
+    }
+
+    fn build_ui_node_bounded(&self, v: ObjRef, depth: usize, remaining: &mut usize) -> UiNode {
+        let mut node = self.build_ui_node_inner(v, depth, false);
+        *remaining -= 1;
+        if node.truncated {
+            return node;
+        }
+        if let Some(HostObj::View { children, .. }) = self.fw.get(v) {
+            for child in children {
+                if *remaining == 0 {
+                    node.truncated = true;
+                    break;
+                }
+                node.children
+                    .push(self.build_ui_node_bounded(*child, depth + 1, remaining));
+            }
+        }
+        node
     }
 
     /// issue #54: resource-id HONESTO para o dump uiautomator:
@@ -3400,11 +3475,15 @@ impl Engine {
     }
 
     pub(crate) fn build_ui_node(&self, v: ObjRef, depth: usize) -> UiNode {
+        self.build_ui_node_inner(v, depth, true)
+    }
+
+    fn build_ui_node_inner(&self, v: ObjRef, depth: usize, include_children: bool) -> UiNode {
         // issue #40/#62: mesmo cap do dump textual (árvore programática
         // hostil) — e o corte é SINALIZADO (truncated) para o dump XML marcar
         // (antes: o agente via a subárvore cortada como se fosse completa).
         let truncated = depth > MAX_VIEW_DEPTH;
-        let children_view: Vec<ObjRef> = if truncated {
+        let children_view: Vec<ObjRef> = if truncated || !include_children {
             Vec::new()
         } else {
             match self.fw.get(v) {
@@ -3478,5 +3557,200 @@ impl Engine {
             truncated,
             children,
         }
+    }
+}
+
+#[cfg(test)]
+mod point_hit_tests {
+    use super::*;
+    #[test]
+    fn bounded_windows_include_dialogs_without_activity_content() {
+        let mut vm = Engine::new(vec![], crate::VmConfig::default());
+        let activity = vm
+            .heap
+            .alloc_instance("Landroid/app/Activity;".into(), vec![])
+            .unwrap();
+        let dialog = vm
+            .heap
+            .alloc_instance("Landroid/app/Dialog;".into(), vec![])
+            .unwrap();
+        let root = vm
+            .heap
+            .alloc_instance("Landroid/view/View;".into(), vec![])
+            .unwrap();
+        vm.fw.current_activity = Some(activity);
+        vm.fw.objects.insert(
+            activity,
+            HostObj::Activity {
+                window: None,
+                finished: false,
+                intent: None,
+            },
+        );
+        let mut view = new_view();
+        if let HostObj::View { w, h, .. } = &mut view {
+            *w = 100;
+            *h = 100;
+        }
+        vm.fw.objects.insert(root, view);
+        vm.fw.m8.dialogs.insert(
+            dialog,
+            crate::m8::DialogState {
+                showing: true,
+                view: Some(root),
+                ..Default::default()
+            },
+        );
+        assert!(
+            vm.view_tree().is_none(),
+            "legacy API is deliberately unchanged"
+        );
+        let roots = vm.view_roots_bounded(1).unwrap();
+        assert_eq!(roots.len(), 1);
+        assert!(!roots[0].truncated);
+        assert_eq!(roots[0].bounds, (0, 0, 100, 100));
+        assert!(vm.view_at_point(50, 50).is_some());
+        vm.fw.m8.dialogs.get_mut(&dialog).unwrap().showing = false;
+        assert!(vm.view_roots_bounded(1).is_none());
+    }
+
+    #[test]
+    fn android_visibility_constants_extend_without_changing_legacy_ordinals() {
+        assert_eq!(Vis::from_java(4), Vis::Invisible);
+        assert_eq!(Vis::from_java(8), Vis::Gone);
+        for ordinal in 0..=2 {
+            assert_eq!(Vis::from_java(ordinal).to_java(), ordinal);
+        }
+        assert_eq!(Vis::from_java(3), Vis::Visible);
+    }
+
+    #[test]
+    fn bounded_snapshots_preserve_small_trees_and_mark_wide_cuts() {
+        let mut vm = Engine::new(vec![], crate::VmConfig::default());
+        let mut allocate = |class: &str| vm.heap.alloc_instance(class.into(), vec![]).unwrap();
+        let activity = allocate("Landroid/app/Activity;");
+        let window = allocate("Landroid/view/Window;");
+        let root = allocate("Landroid/view/View;");
+        let child = allocate("Landroid/view/View;");
+        vm.fw.objects.insert(
+            activity,
+            HostObj::Activity {
+                window: Some(window),
+                finished: false,
+                intent: None,
+            },
+        );
+        vm.fw.objects.insert(
+            window,
+            HostObj::Window {
+                content: Some(root),
+            },
+        );
+        let mut state = new_view();
+        if let HostObj::View { w, h, children, .. } = &mut state {
+            *w = 100;
+            *h = 100;
+            *children = vec![child; 20];
+        }
+        vm.fw.objects.insert(root, state);
+        let mut state = new_view();
+        if let HostObj::View { w, h, .. } = &mut state {
+            *w = 50;
+            *h = 50;
+        }
+        vm.fw.objects.insert(child, state);
+        vm.fw.current_activity = Some(activity);
+        let full = vm.view_tree().unwrap();
+        let same = vm.view_tree_bounded(21).unwrap();
+        assert_eq!(format!("{same:?}"), format!("{full:?}"));
+        let cut = vm.view_tree_bounded(3).unwrap();
+        assert_eq!(cut.children.len(), 2);
+        assert!(cut.truncated);
+        let cut = vm.view_tree_bounded(0).unwrap();
+        assert!(cut.children.is_empty());
+        assert!(cut.truncated);
+        let metadata = vm.view_at_point(75, 75).unwrap();
+        assert!(metadata.children.is_empty());
+        assert!(!metadata.truncated);
+        vm.fw.current_activity = None;
+        assert!(vm.view_at_point(75, 75).is_none());
+    }
+
+    #[test]
+    fn view_bounds_match_wide_integer_oracle_at_all_i32_edges() {
+        let values = [i32::MIN, i32::MIN + 1, -1, 0, 1, i32::MAX - 1, i32::MAX];
+        for x in values {
+            for y in values {
+                for left in values {
+                    for top in values {
+                        for width in values {
+                            for height in values {
+                                let expected = width > 0
+                                    && height > 0
+                                    && i128::from(x) >= i128::from(left)
+                                    && i128::from(y) >= i128::from(top)
+                                    && i128::from(x) < i128::from(left) + i128::from(width)
+                                    && i128::from(y) < i128::from(top) + i128::from(height);
+                                assert_eq!(
+                                    point_in_view_bounds(x, y, (left, top, width, height)),
+                                    expected,
+                                    "point=({x},{y}) rect=({left},{top},{width},{height})"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    #[test]
+    fn actual_hit_test_uses_safe_bounds_and_respects_z_order() {
+        let mut vm = Engine::new(vec![], crate::VmConfig::default());
+        let root = vm
+            .heap
+            .alloc_instance("Landroid/view/View;".into(), vec![])
+            .unwrap();
+        let front = vm
+            .heap
+            .alloc_instance("Landroid/view/View;".into(), vec![])
+            .unwrap();
+        let mut back_state = new_view();
+        if let HostObj::View {
+            x,
+            y,
+            w,
+            h,
+            children,
+            ..
+        } = &mut back_state
+        {
+            *x = i32::MIN;
+            *y = i32::MIN;
+            *w = i32::MAX;
+            *h = i32::MAX;
+            children.push(front);
+        }
+        vm.fw.objects.insert(root, back_state);
+        let mut front_state = new_view();
+        if let HostObj::View { x, y, w, h, .. } = &mut front_state {
+            *x = i32::MIN;
+            *y = i32::MIN;
+            *w = i32::MAX;
+            *h = i32::MAX;
+        }
+        vm.fw.objects.insert(front, front_state);
+        assert_eq!(vm.hit_test(root, -1, -1), None); // right/bottom edges are exclusive
+        assert_eq!(vm.hit_test(root, -2, -2), Some(front));
+        if let Some(HostObj::View { vis, .. }) = vm.fw.objects.get_mut(&front) {
+            *vis = Vis::Gone;
+        }
+        assert_eq!(vm.hit_test(root, -2, -2), Some(root));
+        if let Some(HostObj::View { x, y, w, h, .. }) = vm.fw.objects.get_mut(&root) {
+            *x = i32::MAX - 10;
+            *y = i32::MAX - 10;
+            *w = 100;
+            *h = 100;
+        }
+        assert_eq!(vm.hit_test(root, i32::MAX, i32::MAX), Some(root));
     }
 }

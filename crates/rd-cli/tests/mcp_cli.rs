@@ -74,7 +74,7 @@ fn tempfile_dir() -> std::path::PathBuf {
     d
 }
 
-/// DoD M5 ponta a ponta: initialize → tools/list (32) → install → launch →
+/// DoD M5 ponta a ponta: initialize → tools/list (47) → install → launch →
 /// navegação (tap/swipe/wait/wait_for) → asserções → observação → pacote →
 /// batch → runtime_health — SÓ via tools, com sessionId/package no envelope.
 #[test]
@@ -93,7 +93,7 @@ fn mcp_stdio_full_agent_flow() {
     // catálogo
     mcp.send(r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#);
     let r = mcp.read();
-    assert_eq!(r["result"]["tools"].as_array().map(|a| a.len()), Some(41));
+    assert_eq!(r["result"]["tools"].as_array().map(|a| a.len()), Some(47));
 
     // install → launch (envelope carrega sessionId/package — contrato M5)
     let r = mcp.call_tool(10, "install", serde_json::json!({"apk": apk_path}));
@@ -210,7 +210,7 @@ fn describe_tools_matches_server_catalog() {
     assert!(out.status.success());
     let described: serde_json::Value = serde_json::from_slice(&out.stdout).expect("catálogo JSON");
     let tools = described["tools"].as_array().expect("tools");
-    assert_eq!(tools.len(), 41, "mesmo catálogo do servidor");
+    assert_eq!(tools.len(), 47, "mesmo catálogo do servidor");
     for t in tools {
         assert!(t["name"].as_str().is_some());
         assert!(t["inputSchema"].is_object(), "schema por tool");
@@ -230,7 +230,7 @@ fn describe_tools_matches_server_catalog() {
 }
 
 /// issue #74: o README anunciava "~40 structured tools" e "MCP (rmcp)". O
-/// catálogo real tem 41 tools (M9 + observe/tap_text) e o crate NÃO depende de rmcp — a stack é
+/// catálogo real tem 47 tools (M9 + observe/tap_text) e o crate NÃO depende de rmcp — a stack é
 /// JSON-RPC próprio, por decisão do ADR 001 (MSRV). Este teste trava o número
 /// publicado no README contra `rd mcp --describe-tools`.
 #[test]
@@ -273,4 +273,89 @@ fn readme_tool_count_matches_catalog() {
         !cargo.contains("rmcp"),
         "rd-agent não depende de rmcp (ADR 001) — corrigir a description (issue #74)"
     );
+}
+
+#[test]
+fn mcp_stdio_structured_selector_actions_and_stale_tokens() {
+    let tmp = tempfile_dir();
+    let apk = build_apk_path(&tmp);
+    let mut mcp = McpProc::spawn();
+    mcp.send(r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#);
+    mcp.read();
+    mcp.send(r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#);
+    for (id, name, args) in [
+        (2, "install", serde_json::json!({"apk":apk})),
+        (3, "launch", serde_json::json!({})),
+    ] {
+        let r = mcp.call_tool(id, name, args);
+        assert_eq!(r["result"]["isError"], false, "{r}");
+    }
+    let r = mcp.call_tool(4, "find_views", serde_json::json!({"text":"Olá via MCP"}));
+    assert_eq!(r["result"]["isError"], false, "{r}");
+    let v: serde_json::Value =
+        serde_json::from_str(r["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(v["total"], 1);
+    assert_eq!(r["result"]["package"], "com.test.mcp");
+    let args = serde_json::json!({"text":"Olá via MCP","expected_token":v["tree_token"]});
+    let r = mcp.call_tool(5, "tap_view", args.clone());
+    assert_eq!(r["result"]["isError"], false, "{r}");
+    let r = mcp.call_tool(6, "tap_view", args);
+    assert_eq!(r["result"]["isError"], true, "{r}");
+    let v: serde_json::Value =
+        serde_json::from_str(r["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(v["code"], "STALE_VIEW");
+    let r = mcp.call_tool(
+        7,
+        "wait_for_view",
+        serde_json::json!({"text":"absent","state":"absent","timeout_ms":0}),
+    );
+    assert_eq!(r["result"]["isError"], false, "{r}");
+    let r = mcp.call_tool(
+        8,
+        "type_text",
+        serde_json::json!({"text":123,"replace":true}),
+    );
+    assert_eq!(r["result"]["isError"], true, "{r}");
+    mcp.kill();
+    std::fs::remove_dir_all(tmp).unwrap();
+}
+
+#[test]
+fn mcp_stdio_runtime_diagnostics_capture_errors_and_invalidate_log_cursors() {
+    let mut mcp = McpProc::spawn();
+    mcp.send(r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#);
+    mcp.read();
+    mcp.send(r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#);
+    fn decode(r: &serde_json::Value) -> serde_json::Value {
+        serde_json::from_str(r["result"]["content"][0]["text"].as_str().unwrap()).unwrap()
+    }
+    let r = mcp.call_tool(2, "session_info", serde_json::json!({}));
+    assert_eq!(r["result"]["isError"], false);
+    let v = decode(&r);
+    assert_eq!(v["running"], false);
+    assert_eq!(v["tool_count"], 47);
+    let r = mcp.call_tool(3, "tap", serde_json::json!({"x":"bad","y":0}));
+    assert_eq!(r["result"]["isError"], true);
+    let r = mcp.call_tool(4, "last_error", serde_json::json!({}));
+    let v = decode(&r);
+    assert_eq!(v["error"]["tool"], "tap");
+    assert_eq!(v["error"]["code"], "INVALID_FORMAT");
+    let r = mcp.call_tool(5, "logs_tail", serde_json::json!({"max_bytes":1}));
+    assert_eq!(r["result"]["isError"], false);
+    let cursor = decode(&r)["next_cursor"].clone();
+    let r = mcp.call_tool(6, "logs", serde_json::json!({"clear":true}));
+    assert_eq!(r["result"]["isError"], false);
+    let r = mcp.call_tool(7, "logs_tail", serde_json::json!({"cursor":cursor}));
+    assert_eq!(r["result"]["isError"], true);
+    assert_eq!(decode(&r)["code"], "STALE_LOG_CURSOR");
+    let r = mcp.call_tool(8, "last_error", serde_json::json!({"clear":true}));
+    let v = decode(&r);
+    assert_eq!(v["error"]["tool"], "logs_tail");
+    assert_eq!(v["tool_error_count"], 2);
+    let r = mcp.call_tool(9, "last_error", serde_json::json!({}));
+    assert!(decode(&r)["error"].is_null());
+    let r = mcp.call_tool(10, "session_info", serde_json::Value::Null);
+    assert_eq!(r["result"]["isError"], true);
+    assert_eq!(decode(&r)["code"], "INVALID_FORMAT");
+    mcp.kill();
 }

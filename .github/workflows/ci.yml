@@ -237,7 +237,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets --features rd-cli/jit -- -D warnings
 
   native-languages:
-    name: C/C++/Rust signed APKs, 3 ABIs, JIT off/on, 41 tools
+    name: C/C++/Rust signed APKs, 3 ABIs, JIT off/on, all registered tools
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

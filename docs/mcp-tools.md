@@ -4,7 +4,7 @@
 
 Servidor `rustydroid-agent` v0.9.0 · protocolo `2024-11-05` · transporte stdio (JSON-RPC 2.0, uma mensagem por linha).
 
-Total: **41 tools**. Este catálogo é gerado de `rd_agent::mcp::tool_defs()` — o MESMO registro respondido em `tools/list` e impresso por `rd mcp --describe-tools`.
+Total: **47 tools**. Este catálogo é gerado de `rd_agent::mcp::tool_defs()` — o MESMO registro respondido em `tools/list` e impresso por `rd mcp --describe-tools`.
 
 ## Controles de segurança
 
@@ -265,3 +265,39 @@ See the screen WITHOUT a screenshot: semantic model of the current frame derived
 Tap by visible label instead of coordinates: finds the tap target (or text) whose label matches `text` on the current frame (case/space-insensitive substring; exact=true for equality; nth picks among matches in reading order) and taps its center. Error VIEW_NOT_FOUND lists the visible texts. Works on Compose UIs (labels come from the drawn frame).
 
 - Parâmetros: `exact, nth, observe, text` · obrigatórios: `text`
+
+### `find_views`
+
+Find structured host views by AND-combined selectors. Text is exact by default; contains=true opts into substring. Reports bounded matches, total, truncation, xywh bounds and an opaque session/revision token. Snapshots visit at most 10000 nodes; returned text is a UTF-8 prefix of at most 4096 bytes with explicit text_bytes/text_truncated. Tokens expire after potentially mutating tools, including waits and failed attempts. Not a Canvas/Compose query: use observe for those.
+
+- Parâmetros: `class, clickable, contains, enabled, limit, resource_id, text, visible`
+
+### `tap_view`
+
+Tap a uniquely matched visible enabled host view, rejecting ambiguity, incomplete trees, stale expected_token and occluded centers before injecting input. Coordinates are clipped to the 720x1440 viewport. Does not claim listener success when none fired.
+
+- Parâmetros: `class, clickable, contains, enabled, expected_token, observe, resource_id, text, visible`
+
+### `wait_for_view`
+
+Wait for a host selector to become present or absent, polling virtual time under existing wait/fuel budgets. A timeout is condition_met=false, never a successful assertion. Limited to 1000 time steps. Incomplete trees cannot prove absence.
+
+- Parâmetros: `class, clickable, contains, enabled, observe, resource_id, state, step_ms, text, timeout_ms, visible`
+
+### `session_info`
+
+Inspect session identity, active versus running package, compiled capabilities and policy limits without launching an app or collecting garbage. Sandbox roots are reported only as a count, never paths. This complements runtime_health; compiled capability flags do not promise runtime availability.
+
+- Parâmetros: nenhum
+
+### `logs_tail`
+
+Read at most max_bytes raw log bytes (default 4096, cap 65536). Without cursor, returns the newest bytes; next_cursor supports lossless incremental reads. Cursors bind this session, a clear-generation and byte offset; logs(clear=true) invalidates old cursors even after the buffer regrows. data_b64 is authoritative across UTF-8 boundaries; text is explicitly lossy when needed. Read-only; does not clear or cap the underlying legacy log buffer.
+
+- Parâmetros: `cursor, max_bytes`
+
+### `last_error`
+
+Inspect the latest typed tool failure, including early validation failures, batch child failures and isolated runtime panics. Retains bounded UTF-8 error context, not input arguments; does not separately capture logs or stack traces. Original error messages may contain app-provided text. Successful tools do not erase it. clear=true clears only the snapshot, not the cumulative error count. Protocol parse/method errors are not tool failures.
+
+- Parâmetros: `clear`

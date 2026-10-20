@@ -18,6 +18,10 @@ const RES_LOGS: &str = "rustydroid://logs";
 
 /// Tools that never run app code (the screen stays valid across them).
 const READ_ONLY_TOOLS: &[&str] = &[
+    "find_views",
+    "session_info",
+    "logs_tail",
+    "last_error",
     "observe",
     "ui_tree",
     "screenshot",
@@ -40,7 +44,7 @@ const READ_ONLY_TOOLS: &[&str] = &[
 
 /// Action tools that accept `observe: true` (append the screen summary).
 const OBSERVE_AFTER_TOOLS: &[&str] = &[
-    "launch", "tap", "tap_text", "swipe", "type_text", "key", "wait", "wait_for",
+    "launch", "tap", "tap_text", "tap_view", "wait_for_view", "swipe", "type_text", "key", "wait", "wait_for",
 ];
 
 /// A clickable host view (from the view tree).
@@ -268,25 +272,26 @@ impl AgentSession {
         match r {
             Ok(r) => r,
             Err(p) => {
-                let msg = p
-                    .downcast_ref::<String>()
-                    .cloned()
+                let msg = p.downcast_ref::<String>().cloned()
                     .or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()))
                     .unwrap_or_else(|| "panic".into());
-                self.engine = None;
-                self.engine_package = None;
-                self.activity = None;
-                self.screen.snap = None;
-                self.screen.dirty = true;
-                self.logs
-                    .lock()
-                    .map(|mut l| l.extend_from_slice(format!("E/RustyDroid: runtime panic in '{name}': {msg}\n").as_bytes()))
-                    .ok();
-                ToolResult::error(&agent_error(
+                // Capture context before dropping the failed process. Never
+                // inspect guest frames/heap or acquire the log lock here.
+                let result = self.tool_error_result(name, &agent_error(
                     "INTERNAL_PANIC",
                     format!("runtime panic durante '{name}': {msg} — o app foi encerrado; a sessão continua"),
                     Some("relance com `launch` e reporte o bug (logs tem a mensagem)"),
-                ))
+                ));
+                self.engine = None;
+                self.engine_package = None;
+                self.native_engine = None;
+                self.activity = None;
+                self.screen.snap = None;
+                self.screen.dirty = true;
+                self.logs.lock()
+                    .map(|mut l| l.extend_from_slice(format!("E/RustyDroid: runtime panic in '{name}': {msg}\n").as_bytes()))
+                    .ok();
+                result
             }
         }
     }
@@ -420,6 +425,7 @@ impl AgentSession {
     /// optional `observe: true` argument appends the screen summary.
     fn screen_post_tool(&mut self, name: &str, args: &serde_json::Map<String, serde_json::Value>, out: &mut ToolResult) {
         if !READ_ONLY_TOOLS.contains(&name) {
+            self.ui_epoch = self.ui_epoch.saturating_add(1);
             self.screen.dirty = true;
         }
         let wants = args.get("observe").and_then(|v| v.as_bool()).unwrap_or(false);

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Auditable 41-tool end-to-end matrix for genuine C/C++/Rust Android APKs."""
+"""Auditable 47-tool end-to-end matrix for genuine C/C++/Rust Android APKs."""
 import argparse,base64,hashlib,json,os,selectors,signal,subprocess,time
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--rd',type=Path,required=True);p.add_argument('--apks',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--abi',default='x86_64');p.add_argument('--only',choices=['c','cpp','rust']);p.add_argument('--smoke',action='store_true');p.add_argument('--jit',choices=['on','off'],default='off');a=p.parse_args();a.rd=a.rd.resolve();a.apks=a.apks.resolve();a.out=a.out.resolve();a.out.mkdir(parents=True,exist_ok=True)
@@ -65,7 +65,7 @@ for ident,label,tag in [('c','C',1),('cpp','C++',2),('rust','Rust',3)]:
  try:
   init=s.rpc('initialize',{'protocolVersion':'2024-11-05','capabilities':{},'clientInfo':{'name':'native-language-gate','version':'1'}});assert 'result' in init
   s.notify('notifications/initialized')
-  tools=s.rpc('tools/list')['result']['tools'];s.schemas={t['name']:t['inputSchema'] for t in tools};names={t['name'] for t in tools};assert len(names)==41
+  tools=s.rpc('tools/list')['result']['tools'];s.schemas={t['name']:t['inputSchema'] for t in tools};names={t['name'] for t in tools};assert len(names)==47
   s.call('install',{'apk':str(a.apks/f'native-{ident}.apk')})
   info,_,_=s.call('app_info');assert info['package']==pkg
   assert info['engines']['execution_claimed'] is False
@@ -78,6 +78,14 @@ for ident,label,tag in [('c','C',1),('cpp','C++',2),('rust','Rust',3)]:
   native,_,_=s.call('native_state');assert native['selected_engine']=={'c':'c-ndk','cpp':'cpp-ndk','rust':'rust-ndk'}[ident] and native['enabled'] and native['instructions']>0 and not native['missing_imports'],native
   assert native['abi']=={'x86_64':'X86_64','arm64-v8a':'Arm64','armeabi-v7a':'Arm'}[a.abi],native
   initial_instructions=native['instructions'];summary['native_initial']=native
+  if not a.smoke:
+   views,_,_=s.call('find_views',{'resource_id':pkg+':id/compute','enabled':True});assert views['total']==1 and not views['truncated'],views
+   selected,_,_=s.call('tap_view',{'resource_id':pkg+':id/compute','expected_token':views['tree_token']});assert selected['listener_acionado'],selected
+   waited,_,_=s.call('wait_for_view',{'resource_id':pkg+':id/result','timeout_ms':0});assert waited['condition_met'] and waited['waited_ms']==0,waited
+   s.call('tap_view',{'resource_id':pkg+':id/compute','expected_token':views['tree_token']},error='STALE_VIEW')
+   failure,_,_=s.call('last_error');assert failure['error']['tool']=='tap_view' and failure['error']['code']=='STALE_VIEW',failure
+   info,_,_=s.call('session_info');assert info['tool_count']==47 and info['running_package']==pkg and info['running'],info
+   tail,_,_=s.call('logs_tail',{'max_bytes':31});assert len(base64.b64decode(tail['data_b64']))==tail['bytes']<=31,tail
   s.call('assert_text',{'resource_id':pkg+':id/result','expected':'Result: '+str(digest(tag,7,5))})
   # The result oracle is Python, independent of Java/native implementations.
   for x,y in [(42,9),(-17,3),(2147483647,-2147483648),(0,0)]:
