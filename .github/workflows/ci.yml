@@ -195,45 +195,6 @@ jobs:
           RD_NATIVE_ABI=arm64-v8a bash golden-apks/native-gate.sh
           RD_NATIVE_ABI=armeabi-v7a bash golden-apks/native-gate.sh
 
-  native-languages:
-    name: Source-built C/C++/Rust APKs (3 ABIs, JIT off/on, 41 tools)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-linux-android,aarch64-linux-android,armv7-linux-androideabi
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - uses: Swatinem/rust-cache@v2
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/native-language-sdk
-          key: native-language-sdk-${{ hashFiles('golden/native-languages/build.py') }}
-      - name: Android packaging and isolated guest worker prerequisites
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends aapt apksigner zipalign unzip
-          python -m pip install unicorn==2.1.4
-      - name: Signed source-built APKs, genuine execution and complete MCP matrix
-        env:
-          RD_NATIVE_PYTHON: python
-        run: bash golden/native-languages/gate.sh
-      - name: Preserve compiler provenance and assertion-bearing evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-language-regression-evidence
-          if-no-files-found: warn
-          path: |
-            target/native-languages/apks/provenance.json
-            target/native-languages/evidence/
-
   rust-msrv:
     name: Rust MSRV (1.76)
     runs-on: ubuntu-latest
@@ -276,7 +237,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets --features rd-cli/jit -- -D warnings
 
   native-languages:
-    name: C/C++/Rust signed APKs and all 41 MCP tools (three ABIs)
+    name: C/C++/Rust signed APKs, 3 ABIs, JIT off/on, 41 tools
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -292,10 +253,14 @@ jobs:
         with:
           path: ~/.cache/native-language-sdk
           key: native-languages-sdk-r27c-platform26-r8-8.5.35-v1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
       - name: Android packaging and isolated guest execution prerequisites
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y aapt apksigner zipalign unzip openjdk-17-jdk-headless
+          sudo apt-get install -y aapt apksigner zipalign unzip
           python -m pip install unicorn==2.1.4
       - name: Build source APKs, adapter API tests, and positive full MCP matrices
         run: bash golden/native-languages/gate.sh
