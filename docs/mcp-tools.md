@@ -118,7 +118,7 @@ Asserção: a activity corrente terminou (finish() chamado).
 
 ### `app_info`
 
-Identidade do app ATIVO: package, versão, SDKs, floor e componentes do manifest.
+Identidade do app ATIVO: package, versão, SDKs, floor e componentes do manifest. `engines` registra os 28 itens do Apêndice G e detecta assinaturas/candidatos por nomes ZIP/manifest; não valida payload nem promete execução. Features selecionam contratos, não runtimes.
 
 - Parâmetros: nenhum
 

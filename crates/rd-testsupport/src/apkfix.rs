@@ -537,6 +537,40 @@ impl ZipFix {
         self.entries.push((name.to_string(), data));
     }
 
+    /// ZIP64 EOCD count fixture (small offsets/sizes only, not >4 GiB payloads).
+    pub fn build_zip64(self) -> Vec<u8> {
+        let count = self.entries.len() as u64;
+        let mut bytes = self.build();
+        let eocd_offset = bytes.len() - 22;
+        let cd_size = u32::from_le_bytes(
+            bytes[eocd_offset + 12..eocd_offset + 16]
+                .try_into()
+                .unwrap(),
+        ) as u64;
+        let cd_offset = u32::from_le_bytes(
+            bytes[eocd_offset + 16..eocd_offset + 20]
+                .try_into()
+                .unwrap(),
+        ) as u64;
+        let mut eocd = bytes.split_off(eocd_offset);
+        let zip64_offset = bytes.len() as u64;
+        bytes.extend_from_slice(&0x0606_4b50u32.to_le_bytes());
+        bytes.extend_from_slice(&44u64.to_le_bytes());
+        bytes.extend_from_slice(&[45, 0, 45, 0]);
+        bytes.extend_from_slice(&[0; 8]);
+        bytes.extend_from_slice(&count.to_le_bytes());
+        bytes.extend_from_slice(&count.to_le_bytes());
+        bytes.extend_from_slice(&cd_size.to_le_bytes());
+        bytes.extend_from_slice(&cd_offset.to_le_bytes());
+        bytes.extend_from_slice(&0x0706_4b50u32.to_le_bytes());
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        bytes.extend_from_slice(&zip64_offset.to_le_bytes());
+        bytes.extend_from_slice(&1u32.to_le_bytes());
+        eocd[8..12].copy_from_slice(&[0xff; 4]);
+        bytes.extend_from_slice(&eocd);
+        bytes
+    }
+
     pub fn build(self) -> Vec<u8> {
         let mut out = Vec::new();
         let mut central = Vec::new();
@@ -1024,4 +1058,23 @@ impl Drop for AxNode {
             stack.extend(std::mem::take(&mut node.children));
         }
     }
+}
+
+/// Static APK inventory, with no executable payload; used to exercise metadata
+/// resource limits without loading a VM or committing a giant binary fixture.
+pub fn build_large_inventory_apk(asset_count: usize) -> Vec<u8> {
+    let mut zip = ZipFix::new();
+    zip.add(
+        "AndroidManifest.xml",
+        build_manifest_axml_sdk(
+            "com.example.inventory",
+            "com.example.inventory.Main",
+            26,
+            36,
+        ),
+    );
+    for i in 0..asset_count {
+        zip.add(&format!("assets/{i}"), Vec::new());
+    }
+    zip.build_zip64()
 }

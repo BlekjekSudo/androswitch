@@ -465,6 +465,7 @@ version = "0.9.0"
 dependencies = [
  "rd-apk",
  "rd-dex",
+ "rd-engine-registry",
  "rd-framework",
  "rd-render",
  "rd-testsupport",
@@ -492,6 +493,7 @@ dependencies = [
  "rd-agent",
  "rd-apk",
  "rd-dex",
+ "rd-engine-registry",
  "rd-framework",
  "rd-render",
  "rd-testsupport",
@@ -506,6 +508,17 @@ version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "rd-engine-registry"
+version = "0.9.0"
+dependencies = [
+ "rd-apk",
+ "rd-testsupport",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]
@@ -957,6 +970,7 @@ name = "xtask"
 version = "0.9.0"
 dependencies = [
  "anyhow",
+ "rd-engine-registry",
  "rd-framework",
  "serde",
  "serde_json",

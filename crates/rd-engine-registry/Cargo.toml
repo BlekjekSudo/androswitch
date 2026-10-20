@@ -1,0 +1,37 @@
+[package]
+name = "rd-engine-registry"
+description = "RustyDroid: Apêndice G — registro de 28 engines, detecção e contratos sem execução"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+# Registro/detecção sempre disponíveis; features selecionam contratos, não runtimes.
+[features]
+default = []
+lang-01 = []
+lang-02 = ["lang-01"]
+lang-03 = ["lang-02"]
+lang-04 = ["lang-02"]
+lang-05 = ["lang-02"]
+lang-06 = ["lang-01"]
+lang-07 = ["lang-02"]
+lang-08 = ["lang-07"]
+lang-09 = ["lang-02"]
+lang-10 = ["lang-01"]
+lang-11 = ["lang-01"]
+lang-12 = ["lang-01"]
+
+[dependencies]
+rd-apk.workspace = true
+serde.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+rd-testsupport = { path = "../rd-testsupport" }
+serde_json.workspace = true
