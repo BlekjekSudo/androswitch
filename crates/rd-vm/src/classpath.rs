@@ -161,7 +161,7 @@ impl Classpath {
             .chain(&data.virtual_methods)
             .find(|m| {
                 m.method_idx != rd_dex::strings::NO_INDEX
-                    && self.method_name(dex_idx, m.method_idx) == Some(name.to_string())
+                    && self.method_name(dex_idx, m.method_idx) == Some(name)
                     && self.method_proto(dex_idx, m.method_idx).as_deref() == Some(proto)
             })
             .cloned()
@@ -184,7 +184,7 @@ impl Classpath {
             .filter(|m| m.method_idx != rd_dex::strings::NO_INDEX)
             .filter_map(|m| {
                 Some((
-                    self.method_name(dex_idx, m.method_idx)?,
+                    self.method_name(dex_idx, m.method_idx)?.to_string(),
                     self.method_proto(dex_idx, m.method_idx)?,
                     m.access_flags,
                 ))
@@ -220,7 +220,7 @@ impl Classpath {
                     .chain(&data.virtual_methods)
                     .find(|m| {
                         m.method_idx != rd_dex::strings::NO_INDEX
-                            && self.method_name(dex_idx, m.method_idx) == Some(name.to_string())
+                            && self.method_name(dex_idx, m.method_idx) == Some(name)
                             && self.method_proto(dex_idx, m.method_idx).as_deref() == Some(proto)
                     })
                     .cloned();
@@ -366,7 +366,7 @@ impl Classpath {
                 .chain(&data.virtual_methods)
                 .find(|m| {
                     m.method_idx != rd_dex::strings::NO_INDEX
-                        && self.method_name(dex_idx, m.method_idx) == Some(name.to_string())
+                        && self.method_name(dex_idx, m.method_idx) == Some(name)
                         && self.method_proto(dex_idx, m.method_idx).as_deref() == Some(proto)
                 })
                 .cloned();
@@ -382,10 +382,10 @@ impl Classpath {
         None
     }
 
-    fn method_name(&self, dex_idx: usize, idx: u32) -> Option<String> {
+    fn method_name(&self, dex_idx: usize, idx: u32) -> Option<&str> {
         let d = self.dexes.get(dex_idx)?;
         let m = d.method(idx).ok()?;
-        Some(d.string(m.name_idx).to_string())
+        Some(d.string(m.name_idx))
     }
 
     fn method_proto(&self, dex_idx: usize, idx: u32) -> Option<String> {
@@ -1417,6 +1417,60 @@ fn is_shadowed_platform_stub(descriptor: &str, access_flags: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn borrowed_method_name_matches_owned_predicate_including_invalid_ids() {
+        use rd_testsupport::vm::DexBuilder;
+        let mut b = DexBuilder::new();
+        let c = b.class("LBorrowed;", "Ljava/lang/Object;");
+        b.direct(c, "pick", "V", vec![], 0x9, None);
+        b.direct(c, "pick", "I", vec!["I"], 0x9, None);
+        b.direct(c, "ω", "Ljava/lang/String;", vec!["[I"], 0x9, None);
+        let mut cp = Classpath::new(vec![Dex::parse(b.finish()).unwrap()]);
+        let count = cp.dexes[0].method_ids.len() as u32;
+        for pass in 0..2 {
+            if pass == 1 {
+                cp.dexes[0].method_ids[0].name_idx = u32::MAX;
+            }
+            for index in (0..count + 2).chain([rd_dex::strings::NO_INDEX]) {
+                let owned = cp.dexes[0]
+                    .method(index)
+                    .ok()
+                    .map(|m| cp.dexes[0].string(m.name_idx).to_string());
+                for name in ["pick", "ω", "", "missing"] {
+                    assert_eq!(
+                        cp.method_name(0, index) == Some(name),
+                        owned == Some(name.to_string())
+                    );
+                }
+            }
+            for name in ["pick", "ω", "", "missing"] {
+                for proto in ["()V", "(I)I", "([I)Ljava/lang/String;", "(I)V", "?"] {
+                    let (dex_idx, def) = cp.find_class("LBorrowed;").unwrap();
+                    let def = *def;
+                    let data = cp.class_data(dex_idx, &def).unwrap().unwrap();
+                    let expected = data
+                        .direct_methods
+                        .iter()
+                        .chain(&data.virtual_methods)
+                        .find(|m| {
+                            m.method_idx != rd_dex::strings::NO_INDEX
+                                && cp.dexes[0]
+                                    .method(m.method_idx)
+                                    .ok()
+                                    .map(|id| cp.dexes[0].string(id.name_idx).to_string())
+                                    == Some(name.to_string())
+                                && cp.method_proto(dex_idx, m.method_idx).as_deref() == Some(proto)
+                        })
+                        .map(|m| m.method_idx);
+                    let actual = cp
+                        .find_own_method("LBorrowed;", name, proto)
+                        .map(|(_, _, m)| m.method_idx);
+                    assert_eq!(actual, expected, "name={name} proto={proto}");
+                }
+            }
+        }
+        assert_eq!(cp.method_name(1, 0), None);
+    }
 
     /// M8: hierarquia das classes host do compat real — check-cast/instanceof
     /// para interfaces de coleção (sexto gap do org.primftpd: COWSet → Set).

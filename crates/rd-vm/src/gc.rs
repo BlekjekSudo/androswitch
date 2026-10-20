@@ -116,14 +116,40 @@ impl<F: FnMut(ObjRef)> RefScanner<F> {
 impl<F: FnMut(ObjRef)> std::fmt::Write for RefScanner<F> {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
         self.bytes = self.bytes.saturating_add(s.len());
-        for b in s.bytes() {
-            if b.is_ascii_digit() {
+        let bytes = s.as_bytes();
+        let mut i = 0;
+        // Complete a token split across formatter writes. Empty writes must
+        // not terminate it; a delimiter in this write must terminate it.
+        if self.pending != 0 {
+            while i < bytes.len() && bytes[i].is_ascii_digit() {
                 self.pending = self
                     .pending
                     .saturating_mul(10)
-                    .saturating_add(u64::from(b - b'0'));
+                    .saturating_add(u64::from(bytes[i] - b'0'));
+                i += 1;
+            }
+            if i == bytes.len() {
+                return Ok(());
+            }
+            self.flush();
+        }
+        // Most root text is non-numeric. Scan runs without resetting pending
+        // or testing the ObjRef range once per non-digit byte.
+        while i < bytes.len() {
+            if bytes[i].is_ascii_digit() {
+                let mut value = 0u64;
+                while i < bytes.len() && bytes[i].is_ascii_digit() {
+                    value = value
+                        .saturating_mul(10)
+                        .saturating_add(u64::from(bytes[i] - b'0'));
+                    i += 1;
+                }
+                self.pending = value;
+                if i < bytes.len() {
+                    self.flush();
+                }
             } else {
-                self.flush();
+                i += 1;
             }
         }
         Ok(())
