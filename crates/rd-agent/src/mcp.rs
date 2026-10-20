@@ -343,6 +343,7 @@ pub struct AgentSession {
     engine: Option<Engine>,
     /// package do app EM EXECUÇÃO (o engine é de UM app por vez).
     engine_package: Option<String>,
+    native_engine: Option<String>,
     activity: Option<String>,
     /// System.out do app (issue #55: buffer da sessão, tool `logs` lê).
     logs: Arc<Mutex<Vec<u8>>>,
@@ -383,6 +384,7 @@ impl AgentSession {
             active: None,
             engine: None,
             engine_package: None,
+            native_engine: None,
             activity: None,
             logs,
             devices: DeviceTable::embedded().expect("devices.toml embutido parseia"),
@@ -435,7 +437,10 @@ impl AgentSession {
     }
 
     fn current_activity(&self) -> Option<&str> {
-        self.activity.as_deref()
+        self.engine
+            .as_ref()
+            .and_then(|e| e.fw.current_activity.and_then(|r| e.heap.class_of(r).ok()))
+            .or(self.activity.as_deref())
     }
 
     /// Mata o engine se o app em execução é `package`. Devolve se matou.
@@ -445,6 +450,7 @@ impl AgentSession {
         if self.engine_package.as_deref() == Some(package) {
             self.engine = None;
             self.engine_package = None;
+            self.native_engine = None;
             self.activity = None;
             true
         } else {
@@ -557,6 +563,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
                 "Executa o app instalado: cria a activity (LAUNCHER ou `activity`) e roda o lifecycle até o onCreate completar. `activity` precisa estar declarada como <activity>/<activity-alias> no AndroidManifest.xml E existir no DEX (issues #82/#83) — o Android recusa o que não está declarado; um <activity-alias> lança a sua targetActivity (issue #109). Se o MESMO package já está em execução, o relançamento reutiliza o processo (warm start: sem re-parse do DEX; o resultado traz warm=true) (M7). Com `package` lança outro app do registro (multi-app); sem, o app ativo (último install/launch).",
             schema: obj(
                 serde_json::json!({
+                    "engine": {"type":"string","enum":["c-ndk","cpp-ndk","rust-ndk"],"description":"Explicit bounded native adapter; requires native-engines"},
                     "activity": { "type": "string", "description": "classe da activity (com.ex.Main ou Lcom/ex/Main;). Default: LAUNCHER" },
                     "package": { "type": "string", "description": "package do registro a lançar. Default: app ativo" },
                 }),
@@ -713,7 +720,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "app_info",
-            description: "Identidade do app ATIVO: package, versão, SDKs, floor e componentes do manifest.",
+            description: "Identidade do app ATIVO: package, versão, SDKs, floor e componentes do manifest. `engines` registra os 28 itens do Apêndice G e detecta assinaturas/candidatos por nomes ZIP/manifest; não valida payload nem promete execução. Features selecionam contratos, não runtimes.",
             schema: obj(serde_json::json!({}), &[]),
         },
         ToolDef {
@@ -887,10 +894,24 @@ impl AgentSession {
         let args = args.as_object().cloned().unwrap_or_default();
         let res: Result<ToolResult, RdError> = match name {
             "install" => self.tool_install(args.get("apk").and_then(|v| v.as_str()).unwrap_or("")),
-            "launch" => self.tool_launch(
-                args.get("activity").and_then(|v| v.as_str()),
-                args.get("package").and_then(|v| v.as_str()),
-            ),
+            "launch" => {
+                let engine = match args.get("engine") {
+                    None => None,
+                    Some(serde_json::Value::String(id)) => Some(id.as_str()),
+                    _ => {
+                        return ToolResult::error(&agent_error(
+                            "INVALID_FORMAT",
+                            "launch engine must be a string",
+                            None,
+                        ))
+                    }
+                };
+                self.tool_launch(
+                    args.get("activity").and_then(|v| v.as_str()),
+                    args.get("package").and_then(|v| v.as_str()),
+                    engine,
+                )
+            }
             "tap" => {
                 let (Some(x), Some(y)) = (
                     args.get("x").and_then(|v| v.as_i64()),
@@ -1210,6 +1231,7 @@ impl AgentSession {
         &mut self,
         activity: Option<&str>,
         package: Option<&str>,
+        engine: Option<&str>,
     ) -> Result<ToolResult, RdError> {
         // package explícito (multi-app) ou o ativo
         let pkg = package
@@ -1223,6 +1245,20 @@ impl AgentSession {
                 Some("veja package_list — instale com `install` antes de lançar"),
             )
         })?;
+        let selected_engine = engine.map(str::to_string).or_else(|| {
+            if self.engine_package.as_deref() == Some(pkg.as_str()) {
+                self.native_engine.clone()
+            } else {
+                None
+            }
+        });
+        if let Some(id) = selected_engine.as_deref() {
+            let registry = rd_engine_registry::Registry::embedded()?;
+            let descriptor = registry.get(id)?;
+            if !rd_engine_registry::native_execution_available(id) {
+                return Err(rd_apk::RdError::new("NOT_IMPLEMENTED",format!("engine {id} requires a supported executing native adapter and native-engines feature"),&descriptor.modules[0]));
+            }
+        }
         // issue #109: `<activity-alias>` declarada lança a `targetActivity`
         // (comportamento do Android) — a resolução acontece AQUI; a VM só vê
         // a classe real que precisa existir no DEX (checagem da #82 intacta).
@@ -1293,8 +1329,9 @@ impl AgentSession {
         // Caminho frio (Engine novo, com parse dos DEX) só quando o package
         // não está rodando. Falha no warm não derruba o app (mesma regra da
         // issue #82).
-        let warm =
-            self.engine.is_some() && self.engine_package.as_deref() == Some(package_out.as_str());
+        let warm = self.engine.is_some()
+            && self.engine_package.as_deref() == Some(package_out.as_str())
+            && self.native_engine == selected_engine;
         let launch_result = if warm {
             let eng = self
                 .engine
@@ -1302,7 +1339,6 @@ impl AgentSession {
                 .expect("engine presente: warm verificado acima");
             eng.launch_app(&desc, &package_out, Vec::new())
         } else {
-            let dexes = dexes_of_apk(&app.apk)?;
             #[cfg(feature = "advanced-components")]
             let notification_permission = app
                 .perms
@@ -1319,8 +1355,25 @@ impl AgentSession {
                 };
                 format!("L{};", abs.replace('.', "/"))
             });
-            let mut eng = Engine::new(dexes, VmConfig::default());
-            eng.set_resources(resources);
+            let mut eng = if let Some(id) = selected_engine.as_deref() {
+                #[cfg(feature = "native-engines")]
+                {
+                    rd_engine_registry::NativeProcess::from_apk(id, resources)?.into_engine()
+                }
+                #[cfg(not(feature = "native-engines"))]
+                {
+                    let _ = id;
+                    return Err(agent_error(
+                        "NOT_IMPLEMENTED",
+                        "MCP native selection requires native-engines",
+                        None,
+                    ));
+                }
+            } else {
+                let mut e = Engine::new(dexes_of_apk(&app.apk)?, VmConfig::default());
+                e.set_resources(resources);
+                e
+            };
             #[cfg(feature = "advanced-components")]
             eng.m9_set_notification_permission(notification_permission);
             if let Some(ad) = app_desc {
@@ -1360,10 +1413,12 @@ impl AgentSession {
             }
         })?;
         self.engine_package = Some(package_out.clone());
+        self.native_engine = selected_engine;
         self.activity = Some(desc.clone());
         self.active = Some(package_out.clone());
         let mut out = serde_json::json!({
             "launched": true,
+            "native_engine": self.native_engine,
             "session_id": self.session_id,
             "activity": desc,
             "package": package_out,
@@ -1724,11 +1779,13 @@ impl AgentSession {
 
     fn tool_app_info(&mut self) -> Result<ToolResult, RdError> {
         let app = self.require_apk()?;
+        let engines = rd_engine_registry::Registry::embedded()?.detect_for_inspection(&app.apk)?;
         let m = &app.apk.manifest;
         Ok(ToolResult::json(&serde_json::json!({
             "package": m.package,
             "version_name": m.version_name,
             "version_code": m.version_code,
+            "engines": engines,
             "min_sdk": m.min_sdk,
             "target_sdk": m.target_sdk,
             "floor": serde_json::json!(match app.apk.floor_status() {
@@ -1976,7 +2033,8 @@ impl AgentSession {
         });
         match self.engine.as_ref() {
             Some(eng) => {
-                v["activity"] = serde_json::json!(self.activity);
+                v["activity"] = serde_json::json!(self.current_activity());
+                v["native_engine"] = serde_json::json!(self.native_engine);
                 v["finished"] = serde_json::json!(eng.activity_is_finished());
                 v["clock_ms"] = serde_json::json!(eng.fw.clock());
                 v["heap_used_bytes"] = serde_json::json!(eng.heap_used());
@@ -2645,6 +2703,9 @@ pub fn tools_markdown() -> String {
             },
         ));
     }
+    // Keep generated Markdown canonical: one final newline, no blank EOF line.
+    out.truncate(out.trim_end().len());
+    out.push('\n');
     out
 }
 
@@ -3331,6 +3392,103 @@ mod tests {
             v["logs"], "hi do mcp\n",
             "System.out do app no buffer da sessão"
         );
+    }
+
+    #[test]
+    fn explicit_native_selection_never_falls_back_to_generic_android() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &path);
+        for id in ["c-ndk", "cpp-ndk", "rust-ndk"] {
+            let (v, failed) = call(&mut s, "launch", serde_json::json!({"engine":id}));
+            assert!(
+                failed,
+                "selected native route must reject an APK with no native libraries: {v}"
+            );
+            assert_eq!(
+                v["code"],
+                if cfg!(feature = "native-engines") {
+                    "MISSING_ENTRY"
+                } else {
+                    "NOT_IMPLEMENTED"
+                }
+            );
+            assert!(s.engine.is_none());
+            assert!(s.native_engine.is_none());
+        }
+        let launched = launch_ok(&mut s, serde_json::json!({}));
+        assert_eq!(launched["native_engine"], serde_json::Value::Null);
+        let (v, failed) = call(&mut s, "launch", serde_json::json!({"engine":"flutter"}));
+        assert!(failed);
+        assert_eq!(v["code"], "NOT_IMPLEMENTED");
+        assert!(s.engine.is_some());
+        assert!(s.native_engine.is_none());
+        let _ = std::fs::remove_file(path);
+    }
+
+    /// app_info exposes the same static registry report without launching or
+    /// parsing any executable artifact, including malformed native payloads.
+    #[test]
+    fn app_info_includes_all_engine_findings_without_runtime_claims() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let mut zip = rd_testsupport::apkfix::ZipFix::new();
+        zip.add(
+            "AndroidManifest.xml",
+            rd_testsupport::apkfix::build_manifest_axml_sdk(
+                "com.test.registry",
+                "com.test.registry.Main",
+                26,
+                36,
+            ),
+        );
+        for path in [
+            "classes.dex",
+            "lib/arm64-v8a/libflutter.so",
+            "assets/flutter_assets/AssetManifest.bin",
+        ] {
+            zip.add(path, b"not-executable".to_vec());
+        }
+        let bytes = zip.build();
+        let expected = rd_engine_registry::Registry::embedded()
+            .unwrap()
+            .detect(&Apk::from_bytes(bytes.clone()).unwrap())
+            .unwrap();
+        let apk_path = fixture_apk_write(bytes);
+        let mut s = AgentSession::new();
+        install_ok(&mut s, &apk_path);
+        let (v, err) = call(&mut s, "app_info", serde_json::json!({}));
+        assert!(!err, "app_info: {v}");
+        assert_eq!(v["engines"], serde_json::to_value(expected).unwrap());
+        assert_eq!(v["engines"]["registered_engines"], 28);
+        assert_eq!(v["engines"]["execution_claimed"], false);
+        assert!(
+            s.engine.is_none(),
+            "static detection must never create a process"
+        );
+        assert_eq!(
+            tool_defs().len(),
+            41,
+            "preserve the existing MCP tool contract"
+        );
+        let _ = std::fs::remove_file(apk_path);
+    }
+
+    #[test]
+    fn app_info_preserves_identity_when_optional_engine_analysis_is_limited() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path =
+            fixture_apk_write(rd_testsupport::apkfix::build_large_inventory_apk(100_000));
+        let mut session = AgentSession::new();
+        install_ok(&mut session, &apk_path);
+        let (info, error) = call(&mut session, "app_info", serde_json::json!({}));
+        assert!(!error, "basic app identity must remain available: {info}");
+        assert_eq!(info["package"], "com.example.inventory");
+        assert_eq!(info["engines"]["analysis_status"], "not_analyzed");
+        assert_eq!(info["engines"]["error"]["code"], "DETECTION_LIMIT");
+        assert_eq!(info["engines"]["execution_claimed"], false);
+        assert!(session.engine.is_none());
+        let _ = std::fs::remove_file(apk_path);
     }
 
     /// Sem app: tools falham tipadas (nunca pânico).
@@ -5125,6 +5283,8 @@ mod tests {
         let docs_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs");
         let path = docs_dir.join("mcp-tools.md");
         let generated = tools_markdown();
+        assert!(generated.ends_with('\n'));
+        assert!(!generated.ends_with("\n\n"), "no generated blank EOF line");
         match std::fs::read_to_string(&path) {
             Ok(committed) => {
                 assert_eq!(

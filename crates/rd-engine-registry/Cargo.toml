@@ -1,0 +1,41 @@
+[package]
+name = "rd-engine-registry"
+description = "RustyDroid: Apêndice G — registro de 28 engines, detecção e execução nativa opt-in limitada"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+# Registro/detecção sempre disponíveis; LANG seleciona contratos; native-execution executa 3 adapters limitados.
+[features]
+default = []
+native-execution = ["lang-03", "dep:rd-vm", "rd-vm/native", "dep:rd-dex", "dep:serde_json"]
+lang-01 = []
+lang-02 = ["lang-01"]
+lang-03 = ["lang-02"]
+lang-04 = ["lang-02"]
+lang-05 = ["lang-02"]
+lang-06 = ["lang-01"]
+lang-07 = ["lang-02"]
+lang-08 = ["lang-07"]
+lang-09 = ["lang-02"]
+lang-10 = ["lang-01"]
+lang-11 = ["lang-01"]
+lang-12 = ["lang-01"]
+
+[dependencies]
+rd-vm = { workspace = true, optional = true }
+rd-dex = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+rd-apk.workspace = true
+serde.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+rd-testsupport = { path = "../rd-testsupport" }
+serde_json.workspace = true

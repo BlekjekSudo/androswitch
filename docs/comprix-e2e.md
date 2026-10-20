@@ -547,7 +547,6 @@ host `List`/`Map`/`Iter` cut marking to 5–9 ms; steady-state forced cycle
 `s08` 46 → 37 ms, `s11` 42 → 35 ms, `s12` 20 → 12 ms — same bytes freed to
 the byte (the collector is deterministic).
 
-
 ## Runtime completion and strict regression (round 8, 2026-10-20)
 
 AI-assisted changes address the runtime blockers before integrating the feature

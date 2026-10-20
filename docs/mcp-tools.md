@@ -30,7 +30,7 @@ Instala um APK na sessão (abre, valida o piso API 26 e prepara o estado de perm
 
 Executa o app instalado: cria a activity (LAUNCHER ou `activity`) e roda o lifecycle até o onCreate completar. `activity` precisa estar declarada como <activity>/<activity-alias> no AndroidManifest.xml E existir no DEX (issues #82/#83) — o Android recusa o que não está declarado; um <activity-alias> lança a sua targetActivity (issue #109). Se o MESMO package já está em execução, o relançamento reutiliza o processo (warm start: sem re-parse do DEX; o resultado traz warm=true) (M7). Com `package` lança outro app do registro (multi-app); sem, o app ativo (último install/launch).
 
-- Parâmetros: `activity, observe, package`
+- Parâmetros: `activity, engine, observe, package`
 
 ### `tap`
 
@@ -118,7 +118,7 @@ Asserção: a activity corrente terminou (finish() chamado).
 
 ### `app_info`
 
-Identidade do app ATIVO: package, versão, SDKs, floor e componentes do manifest.
+Identidade do app ATIVO: package, versão, SDKs, floor e componentes do manifest. `engines` registra os 28 itens do Apêndice G e detecta assinaturas/candidatos por nomes ZIP/manifest; não valida payload nem promete execução. Features selecionam contratos, não runtimes.
 
 - Parâmetros: nenhum
 
@@ -265,4 +265,3 @@ See the screen WITHOUT a screenshot: semantic model of the current frame derived
 Tap by visible label instead of coordinates: finds the tap target (or text) whose label matches `text` on the current frame (case/space-insensitive substring; exact=true for equality; nth picks among matches in reading order) and taps its center. Error VIEW_NOT_FOUND lists the visible texts. Works on Compose UIs (labels come from the drawn frame).
 
 - Parâmetros: `exact, nth, observe, text` · obrigatórios: `text`
-

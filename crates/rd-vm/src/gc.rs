@@ -60,6 +60,7 @@ pub struct GcStats {
 }
 
 /// Pushes every integer token of `s` that is a valid `ObjRef` (1..=n).
+#[cfg(test)]
 fn scan_refs(s: &str, n: usize, out: &mut Vec<ObjRef>) {
     let b = s.as_bytes();
     let mut i = 0;
@@ -79,6 +80,82 @@ fn scan_refs(s: &str, n: usize, out: &mut Vec<ObjRef>) {
     }
 }
 
+/// Tokenizes the exact conservative Debug byte stream without buffering it.
+/// A numeric token may span any number of write_str/write_char calls. The
+/// saturating arithmetic and emitted order match the original scan_refs.
+struct RefScanner<F> {
+    limit: u64,
+    pending: u64,
+    bytes: usize,
+    emit: F,
+}
+
+impl<F: FnMut(ObjRef)> RefScanner<F> {
+    fn new(n: usize, emit: F) -> Self {
+        Self {
+            limit: n as u64,
+            pending: 0,
+            bytes: 0,
+            emit,
+        }
+    }
+
+    fn flush(&mut self) {
+        if self.pending >= 1 && self.pending <= self.limit {
+            (self.emit)(self.pending as ObjRef);
+        }
+        self.pending = 0;
+    }
+
+    fn finish(mut self) -> usize {
+        self.flush();
+        self.bytes
+    }
+}
+
+impl<F: FnMut(ObjRef)> std::fmt::Write for RefScanner<F> {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        self.bytes = self.bytes.saturating_add(s.len());
+        let bytes = s.as_bytes();
+        let mut i = 0;
+        // Complete a token split across formatter writes. Empty writes must
+        // not terminate it; a delimiter in this write must terminate it.
+        if self.pending != 0 {
+            while i < bytes.len() && bytes[i].is_ascii_digit() {
+                self.pending = self
+                    .pending
+                    .saturating_mul(10)
+                    .saturating_add(u64::from(bytes[i] - b'0'));
+                i += 1;
+            }
+            if i == bytes.len() {
+                return Ok(());
+            }
+            self.flush();
+        }
+        // Most root text is non-numeric. Scan runs without resetting pending
+        // or testing the ObjRef range once per non-digit byte.
+        while i < bytes.len() {
+            if bytes[i].is_ascii_digit() {
+                let mut value = 0u64;
+                while i < bytes.len() && bytes[i].is_ascii_digit() {
+                    value = value
+                        .saturating_mul(10)
+                        .saturating_add(u64::from(bytes[i] - b'0'));
+                    i += 1;
+                }
+                self.pending = value;
+                if i < bytes.len() {
+                    self.flush();
+                }
+            } else {
+                i += 1;
+            }
+        }
+        Ok(())
+    }
+}
+
 struct Marker {
     marked: Vec<bool>,
     stack: Vec<ObjRef>,
@@ -95,13 +172,13 @@ impl Marker {
 }
 
 impl Engine {
-    /// Conservative root text: every engine structure outside the heap,
-    /// except the weak host-object table (traced per reachable key).
-    fn gc_root_text(&mut self) -> String {
+    /// Conservative root rendering: every engine structure outside the heap,
+    /// except the weak host-object table (traced per reachable key). A generic
+    /// sink lets collection scan the identical Debug text without allocating it.
+    fn write_gc_roots(&mut self, s: &mut impl std::fmt::Write) {
         // the parsed APK (zip, arsc, layouts) holds no heap refs: skip it
         let objects = std::mem::take(&mut self.fw.objects);
         let resources = self.fw.resources.take();
-        let mut s = String::with_capacity(1 << 16);
         let _ = write!(s, "{:?}", self.fw);
         self.fw.objects = objects;
         self.fw.resources = resources;
@@ -137,7 +214,6 @@ impl Engine {
         {
             let _ = write!(s, "|{:?}", self.native);
         }
-        s
     }
 
     /// Full collection. Interpreter frames must have published roots; external
@@ -178,14 +254,13 @@ impl Engine {
             m.push(r);
         }
         let mut cand = Vec::new();
-        let roots = self.gc_root_text();
+        let root_len = {
+            let mut scanner = RefScanner::new(n, |r| m.push(r));
+            self.write_gc_roots(&mut scanner);
+            scanner.finish()
+        };
+        // Root phase now includes tokenization, rather than only formatting.
         let t_roots = t0.elapsed();
-        scan_refs(&roots, n, &mut cand);
-        let root_len = roots.len();
-        drop(roots);
-        for r in cand.drain(..) {
-            m.push(r);
-        }
         // objects with side state (host half, gfx object, module tables):
         // one bitmap built per cycle instead of ~5 hash lookups per object
         let mut side_keys: Vec<ObjRef> = Vec::new();
@@ -209,19 +284,20 @@ impl Engine {
         if minor {
             // Old side-state writes can introduce young refs without touching
             // Heap::get_mut. Scan these owners each minor; no missing barrier.
-            let mut seen = std::collections::HashSet::new();
+            // Arena indices are already unique; no auxiliary HashSet needed.
             for r in 1..=n as ObjRef {
-                if !self.heap.is_young(r) && has_side[r as usize] != 0 && seen.insert(r) {
+                if !self.heap.is_young(r) && has_side[r as usize] != 0 {
                     m.stack.push(r);
                 }
             }
         }
         let mut traced_objects = 0;
-        let mut text = String::new();
         // weak references: (reference, referent) pairs whose referent is not
         // traced through the reference; cleared after marking if unreached
         let mut weak: Vec<(ObjRef, ObjRef)> = Vec::new();
-        let mut is_weak_class: std::collections::HashMap<String, bool> = Default::default();
+        // Heap/class metadata is immutable throughout marking. Borrow the class
+        // descriptor rather than allocating its clone for every reference.
+        let mut is_weak_class: std::collections::HashMap<&str, bool> = Default::default();
         while let Some(r) = m.stack.pop() {
             traced_objects += 1;
             match self.heap.get(r) {
@@ -231,7 +307,7 @@ impl Engine {
                             if name == "referent" {
                                 let cp = &self.cp;
                                 let weak_ref =
-                                    *is_weak_class.entry(class.clone()).or_insert_with(|| {
+                                    *is_weak_class.entry(class.as_str()).or_insert_with(|| {
                                         cp.is_subtype(class, "Ljava/lang/ref/WeakReference;")
                                             || cp.is_subtype(
                                                 class,
@@ -295,31 +371,31 @@ impl Engine {
                     }
                 }
                 Some(h) => {
-                    text.clear();
-                    let _ = write!(text, "{h:?}");
-                    scan_refs(&text, n, &mut cand);
+                    let mut scanner = RefScanner::new(n, |x| cand.push(x));
+                    let _ = write!(scanner, "{h:?}");
+                    scanner.finish();
                 }
                 None => {}
             }
             // module side tables keyed by object (Matcher, Spannable, Reader…)
             if side & 2 != 0 {
-                text.clear();
-                crate::jregex::gc_entry(r, &mut text);
-                crate::android_spannable::gc_entry(r, &mut text);
-                crate::jio_chars::gc_entry(r, &mut text);
-                if !text.is_empty() {
-                    scan_refs(&text, n, &mut cand);
-                }
+                let mut scanner = RefScanner::new(n, |x| cand.push(x));
+                crate::jregex::gc_entry(r, &mut scanner);
+                crate::android_spannable::gc_entry(r, &mut scanner);
+                crate::jio_chars::gc_entry(r, &mut scanner);
+                scanner.finish();
             }
             if let Some(g) = self.gfx.objs.get(&r) {
-                text.clear();
-                let _ = write!(text, "{g:?}");
-                scan_refs(&text, n, &mut cand);
+                let mut scanner = RefScanner::new(n, |x| cand.push(x));
+                let _ = write!(scanner, "{g:?}");
+                scanner.finish();
             }
             for x in cand.drain(..) {
                 m.push(x);
             }
         }
+        // Release borrowed heap descriptors before weak-reference writes.
+        drop(is_weak_class);
         // clear weak references whose referent only they kept alive (ART
         // semantics; SoftReference stays strong — cleared only under memory
         // pressure on Android). ReferenceQueue enqueue is not modelled.
@@ -343,6 +419,12 @@ impl Engine {
         }
         let mut cleared_weak_keys = 0;
         for (r, host) in &mut self.fw.objects {
+            // Only Map host halves contain weak keys. Other host variants
+            // never entered the clearing body, so avoid resolving their class
+            // hierarchy (especially every View in a large UI tree).
+            let HostObj::Map { entries } = host else {
+                continue;
+            };
             if m.marked.get(*r as usize).copied().unwrap_or(false)
                 && self
                     .heap
@@ -350,14 +432,12 @@ impl Engine {
                     .map(|c| self.cp.is_subtype(c, "Ljava/util/WeakHashMap;"))
                     .unwrap_or(false)
             {
-                if let HostObj::Map { entries } = host {
-                    let before = entries.len();
-                    entries.retain(|(key, _)| match key {
-                        Value::Obj(k) => m.marked.get(*k as usize).copied().unwrap_or(false),
-                        _ => true,
-                    });
-                    cleared_weak_keys += before - entries.len();
-                }
+                let before = entries.len();
+                entries.retain(|(key, _)| match key {
+                    Value::Obj(k) => m.marked.get(*k as usize).copied().unwrap_or(false),
+                    _ => true,
+                });
+                cleared_weak_keys += before - entries.len();
             }
         }
         let t_mark = t0.elapsed();
@@ -524,6 +604,362 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn streaming_collector_matches_legacy_root_and_graph_oracle_across_seeded_heaps() {
+        for seed in 1..=64u64 {
+            let mut state = seed.wrapping_mul(0x1234_5678_9abc_def1);
+            let mut next = || {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                state
+            };
+            let mut vm = Engine::new(vec![], Default::default());
+            let mut refs = Vec::new();
+            for i in 0..192 {
+                let class = match i % 8 {
+                    0 => "Ljava/lang/ref/WeakReference;",
+                    1 => "Ljava/lang/ref/PhantomReference;",
+                    2 => "Ljava/lang/ref/SoftReference;",
+                    5 if i % 16 == 5 => "Ljava/util/WeakHashMap;",
+                    5 => "Ljava/util/HashMap;",
+                    _ => "LGraphNode;",
+                };
+                let r = if i % 8 == 3 {
+                    vm.heap
+                        .alloc_array(crate::heap::ElemKind::Obj, 2, "Ljava/lang/Object;")
+                        .unwrap()
+                } else {
+                    vm.heap.alloc_instance(class.into(), vec![]).unwrap()
+                };
+                refs.push(r);
+            }
+            for (i, &r) in refs.iter().enumerate() {
+                let left = refs[next() as usize % refs.len()];
+                let right = refs[next() as usize % refs.len()];
+                match i % 8 {
+                    0..=2 => {
+                        vm.heap.put_field(r, "referent", Value::Obj(left)).unwrap();
+                        vm.heap.put_field(r, "strong", Value::Obj(right)).unwrap();
+                    }
+                    3 => vm
+                        .heap
+                        .array_elems_mut(r)
+                        .unwrap()
+                        .extend([Value::Obj(left), Value::Obj(right)]),
+                    4 => {
+                        vm.fw.objects.insert(
+                            r,
+                            HostObj::List {
+                                elems: vec![Value::Obj(left), Value::Int(right as i32)],
+                            },
+                        );
+                    }
+                    5 => {
+                        vm.fw.objects.insert(
+                            r,
+                            HostObj::Map {
+                                entries: vec![
+                                    (Value::Obj(left), Value::Obj(right)),
+                                    (Value::Null, Value::Int(0)),
+                                ],
+                            },
+                        );
+                    }
+                    6 => {
+                        vm.fw.objects.insert(
+                            r,
+                            HostObj::Bundle {
+                                map: vec![(format!("numeric{left}"), Value::Int(right as i32))],
+                            },
+                        );
+                    }
+                    _ => {
+                        vm.heap.put_field(r, "child", Value::Obj(left)).unwrap();
+                    }
+                }
+            }
+            for i in 0..3 {
+                vm.statics.insert(
+                    ("LGraphRoots;".into(), format!("root{i}")),
+                    Value::Obj(refs[next() as usize % refs.len()]),
+                );
+            }
+            vm.statics.insert(
+                ("LGraphRoots;".into(), "conservative scalar".into()),
+                Value::Int(refs[next() as usize % refs.len()] as i32),
+            );
+            // Independent reference traversal: the original buffered tokenizer,
+            // manual precise edges, conservative non-collection host halves,
+            // and ephemeron/weak-key rules. No streaming scanner is used here.
+            let n = vm.heap.len();
+            let mut text = String::new();
+            vm.write_gc_roots(&mut text);
+            let mut stack = Vec::new();
+            scan_refs(&text, n, &mut stack);
+            let mut expected = vec![false; n + 1];
+            while let Some(r) = stack.pop() {
+                if r == 0 || r as usize > n || expected[r as usize] {
+                    continue;
+                }
+                expected[r as usize] = true;
+                match vm.heap.get(r).unwrap() {
+                    HeapObj::Instance { class, fields } => {
+                        for (name, value) in fields {
+                            if name == "referent"
+                                && matches!(
+                                    class.as_str(),
+                                    "Ljava/lang/ref/WeakReference;"
+                                        | "Ljava/lang/ref/PhantomReference;"
+                                )
+                            {
+                                continue;
+                            }
+                            if let Value::Obj(child) = value {
+                                stack.push(*child);
+                            }
+                        }
+                    }
+                    HeapObj::Array { elems, .. } => {
+                        for value in elems {
+                            if let Value::Obj(child) = value {
+                                stack.push(*child);
+                            }
+                        }
+                    }
+                    HeapObj::Str(_) => {}
+                }
+                match vm.fw.objects.get(&r) {
+                    Some(HostObj::List { elems }) | Some(HostObj::Iter { elems, .. }) => {
+                        for value in elems {
+                            if let Value::Obj(child) = value {
+                                stack.push(*child);
+                            }
+                        }
+                    }
+                    Some(HostObj::Map { entries }) => {
+                        for (key, value) in entries {
+                            if vm.heap.class_of(r).unwrap() != "Ljava/util/WeakHashMap;" {
+                                if let Value::Obj(child) = key {
+                                    stack.push(*child);
+                                }
+                            }
+                            if let Value::Obj(child) = value {
+                                stack.push(*child);
+                            }
+                        }
+                    }
+                    Some(host) => scan_refs(&format!("{host:?}"), n, &mut stack),
+                    None => {}
+                }
+            }
+            let stats = vm.gc();
+            assert_eq!(
+                stats.last_live_objects,
+                expected.iter().skip(1).filter(|v| **v).count(),
+                "seed={seed}"
+            );
+            assert_eq!(
+                stats.last_freed_objects,
+                n - stats.last_live_objects,
+                "seed={seed}"
+            );
+            for &r in &refs {
+                assert_eq!(
+                    vm.heap.class_of(r).unwrap() != FREED_CLASS,
+                    expected[r as usize],
+                    "seed={seed} object={r}"
+                );
+                if !expected[r as usize] {
+                    assert!(!vm.fw.objects.contains_key(&r));
+                    continue;
+                }
+                if matches!(
+                    vm.heap.class_of(r).unwrap(),
+                    "Ljava/lang/ref/WeakReference;" | "Ljava/lang/ref/PhantomReference;"
+                ) {
+                    if let Value::Obj(referent) = vm.heap.get_field(r, "referent").unwrap() {
+                        assert!(expected[referent as usize]);
+                    }
+                }
+                if vm.heap.class_of(r).unwrap() == "Ljava/util/WeakHashMap;" {
+                    if let Some(HostObj::Map { entries }) = vm.fw.objects.get(&r) {
+                        for (key, _) in entries {
+                            if let Value::Obj(key) = key {
+                                assert!(expected[*key as usize]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn streaming_scanner_exhausts_short_tokens_and_all_write_partitions() {
+        // Independent, non-saturating oracle: these short ASCII tokens fit in
+        // u64. Existing tests separately cover Unicode and saturating overflow.
+        // Enumerate every text over this alphabet, then every possible split
+        // between its bytes, including empty formatter writes at every split.
+        const ALPHABET: &[u8] = b"019|";
+        for len in 0usize..=6 {
+            for mut encoding in 0..ALPHABET.len().pow(len as u32) {
+                let mut bytes = vec![0; len];
+                for byte in &mut bytes {
+                    *byte = ALPHABET[encoding % ALPHABET.len()];
+                    encoding /= ALPHABET.len();
+                }
+                let text = std::str::from_utf8(&bytes).unwrap();
+                for n in [0, 1, 9, 99, crate::heap::MAX_OBJECTS] {
+                    let expected: Vec<ObjRef> = text
+                        .split('|')
+                        .filter_map(|token| token.parse::<u64>().ok())
+                        .filter(|value| (1..=n as u64).contains(value))
+                        .map(|value| value as ObjRef)
+                        .collect();
+                    for partitions in 0..(1usize << len.saturating_sub(1)) {
+                        let mut actual = Vec::new();
+                        let mut sink = RefScanner::new(n, |r| actual.push(r));
+                        let mut start = 0;
+                        for end in 1..len {
+                            if partitions & (1 << (end - 1)) != 0 {
+                                sink.write_str(&text[start..end]).unwrap();
+                                sink.write_str("").unwrap();
+                                start = end;
+                            }
+                        }
+                        sink.write_str(&text[start..]).unwrap();
+                        assert_eq!(sink.finish(), text.len());
+                        assert_eq!(actual, expected, "n={n} text={text:?} splits={partitions}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn streaming_scanner_matches_buffered_scanner_at_every_utf8_boundary() {
+        let cases = [
+            "",
+            "0",
+            "00000000001",
+            "12",
+            "1234",
+            "-1 +2 3.4 5e6 0x7f8",
+            "α12β345🌳٦٧٨9\n10\t11",
+            "\\u{0012} \\\"34\\\"",
+            "18446744073709551615 18446744073709551616 999999999999999999999999999999999999 2",
+            "[Some(1), Obj(234), Int(-56), Long(0), {name: \"789\"}]",
+        ];
+        for n in [0, 1, 9, 255, 1024, crate::heap::MAX_OBJECTS, usize::MAX] {
+            for text in cases {
+                let mut expected = Vec::new();
+                scan_refs(text, n, &mut expected);
+                for cut in (0..=text.len()).filter(|i| text.is_char_boundary(*i)) {
+                    let mut actual = Vec::new();
+                    let mut sink = RefScanner::new(n, |r| actual.push(r));
+                    sink.write_str(&text[..cut]).unwrap();
+                    sink.write_str("").unwrap();
+                    sink.write_str(&text[cut..]).unwrap();
+                    assert_eq!(sink.finish(), text.len());
+                    assert_eq!(actual, expected, "n={n} cut={cut} text={text:?}");
+                }
+                let mut actual = Vec::new();
+                let mut sink = RefScanner::new(n, |r| actual.push(r));
+                for c in text.chars() {
+                    sink.write_char(c).unwrap();
+                }
+                assert_eq!(sink.finish(), text.len());
+                assert_eq!(actual, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn streaming_scanner_differential_random_chunks_and_overflow() {
+        // Fixed seed: reproducible property-style differential coverage,
+        // independent of formatting chunk boundaries or an extra dependency.
+        let mut seed = 0x5eed_1234_2026_1020u64;
+        fn next(seed: &mut u64) -> u64 {
+            *seed ^= *seed << 13;
+            *seed ^= *seed >> 7;
+            *seed ^= *seed << 17;
+            *seed
+        }
+        let pieces = [
+            "0",
+            "1",
+            "9",
+            "00000",
+            "18446744073709551616",
+            "9876543210",
+            "|",
+            "-",
+            ".",
+            "e",
+            "α",
+            "🌳",
+            "٣",
+            "\n",
+            "\\u{12}",
+            "Obj(",
+        ];
+        for _ in 0..2048 {
+            let n = (next(&mut seed) as usize) & 0xffff;
+            let mut text = String::new();
+            for _ in 0..96 {
+                text.push_str(pieces[(next(&mut seed) as usize) % pieces.len()]);
+            }
+            let mut expected = Vec::new();
+            scan_refs(&text, n, &mut expected);
+            let mut actual = Vec::new();
+            let mut sink = RefScanner::new(n, |r| actual.push(r));
+            let mut start = 0;
+            while start < text.len() {
+                let mut end = (start + 1 + (next(&mut seed) % 23) as usize).min(text.len());
+                while !text.is_char_boundary(end) {
+                    end += 1;
+                }
+                sink.write_str(&text[start..end]).unwrap();
+                start = end;
+            }
+            assert_eq!(sink.finish(), text.len());
+            assert_eq!(actual, expected, "n={n} text={text:?}");
+        }
+    }
+
+    #[test]
+    fn streaming_engine_roots_equal_buffered_roots_and_restore_host_tables() {
+        let mut vm = Engine::new(vec![], Default::default());
+        for _ in 0..128 {
+            vm.heap.alloc_instance("LPad;".into(), vec![]).unwrap();
+        }
+        vm.statics
+            .insert(("LRoot123;".into(), "field9".into()), Value::Obj(99));
+        vm.statics.insert(
+            ("LRoot;".into(), "184467440737095516160🌳".into()),
+            Value::Long(123),
+        );
+        vm.fw.objects.insert(
+            100,
+            HostObj::Bundle {
+                map: vec![("hidden124".into(), Value::Obj(127))],
+            },
+        );
+        let before = format!("{:?}", vm.fw);
+        let mut text = String::new();
+        vm.write_gc_roots(&mut text);
+        let mut expected = Vec::new();
+        scan_refs(&text, vm.heap.len(), &mut expected);
+        let mut actual = Vec::new();
+        let mut scanner = RefScanner::new(vm.heap.len(), |r| actual.push(r));
+        vm.write_gc_roots(&mut scanner);
+        assert_eq!(scanner.finish(), text.len());
+        assert_eq!(actual, expected);
+        assert_eq!(format!("{:?}", vm.fw), before);
+        // Weak host-object contents must not accidentally become strong roots.
+        assert!(!actual.contains(&127));
+    }
 
     #[test]
     fn nested_host_scope_returns_stay_rooted_until_the_outer_callback_returns() {

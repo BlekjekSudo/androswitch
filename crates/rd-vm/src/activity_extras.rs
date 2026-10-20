@@ -19,7 +19,6 @@
 
 use crate::engine::Engine;
 use crate::err::VmExit;
-use crate::framework::HostObj;
 use crate::heap::ObjRef;
 use crate::value::Value;
 
@@ -149,9 +148,7 @@ pub(crate) fn instance_intrinsic(
             Value::Null
         }
         ("onBackPressed", "()V") => {
-            if let Some(HostObj::Activity { finished, .. }) = vm.fw.objects.get_mut(&recv) {
-                *finished = true;
-            }
+            vm.finish_activity(recv)?;
             Value::Null
         }
         ("getOnBackInvokedDispatcher", "()Landroid/window/OnBackInvokedDispatcher;") => {

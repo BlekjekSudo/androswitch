@@ -1,0 +1,6 @@
+{
+  "all_keys_edges_and_order_preserved": true,
+  "normalized_sha256": "02f97a38f15220749af4f38b80ef3bbd141e6b6508cdb13d7837902e08360aa2",
+  "vec_literals_removed": 122,
+  "constant_copies_removed": 100
+}

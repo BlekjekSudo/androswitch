@@ -21,6 +21,32 @@
 | M11 | Engines | Flutter → RN → Mono → wasm: 1 app de cada em golden flow | ⬜ |
 | M12 | Ecossistema GH | docs site, compat-matrix viva, releases; v1.0 | ⬜ |
 
+## ✅ Apêndice G — registro e detecção completos (2026-10-14)
+
+**Escopo aprovado: registro/detecção, não execução de engines.** As capacidades parciais de M9 e a
+seleção de runtimes no spec/manifest permanecem inalterados.
+
+- `data/engines.toml` + `rd-engine-registry`: 28 IDs estáveis, 12 módulos,
+  dependências e estratégias; schema validado e status de runtime honesto.
+- Detecção por nomes ZIP canônicos/classes/metadata do manifest; `signature`,
+  `candidate`, `not_detected`; APK híbrido mantém múltiplos resultados.
+  Não extrai/descomprime assets, não valida payload, não consulta rede e não
+  executa libs/bytecode. DEX/ELF não atribuem linguagem de origem.
+- Features opt-in `lang-01`…`lang-12`, transitivas e propagadas por CLI/MCP;
+  build mínimo conserva o catálogo, sem novas dependências de runtime nativo.
+- `EngineAdapter::parse`/`event`/`syscall`: 28 adaptadores indisponíveis retornam
+  `NOT_IMPLEMENTED(LANG-xx)`, mesmo com feature. Nenhum processo fictício.
+- `rd engine list|detect|check`, campo `engines` de `inspect --json` e MCP
+  `app_info`; overrides de catálogo explícitos falham sem fallback silencioso.
+- 28 fixtures golden de **detecção**, testes de contratos/paths/limites/híbridos,
+  CLI/MCP, drift e feature isolation. Integração OSS explícita via `RD_TEST_APK`.
+- Tabela do Apêndice G, [registro gerado](engine-registry.md) e compat-matrix
+  saem da mesma fonte (`cargo xtask engine-spec|engine-report|compat-report`).
+
+**DoD entregue:** todos os 28 registros consultáveis e testados; toda rota ausente
+responde erro tipado. **DoD de execução NÃO entregue:** cada engine futura precisa
+crate/adaptador real, golden flow de APK OSS e gate Moto E5 (ADR 003).
+
 ## O que o M0 entregou (verificado em APK real: F-Droid 2.0.1)
 
 - **Workspace Cargo** com 9 crates + xtask, dependências só apontam para baixo,
@@ -95,7 +121,7 @@
    classes HOST (`rd-vm::framework`) — estado fora do heap Dalvik, dispatch
    igual ao dos intrinsics.
 2. ✅ Handler/Looper/Message com clock virtual determinístico (post/postDelayed
-   + `advance_clock`); single-thread = UI thread.
+   \+ `advance_clock`); single-thread = UI thread.
 3. ✅ Lifecycle (onCreate/onStart/onResume/onPause) dirigido por `launch_app`;
    navegação via `Intent(Context, Class)` + `startActivity` (const-class host).
 4. ✅ Touch simulado: hit-test top-down + dispatch de onClick via resolução DEX.
@@ -635,7 +661,6 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   (singular) coberto por exceção quando o launch pedir; bloco `java.net.URL`
   quando a sequência real exigir URL.
 
-
 ## ✅ M8 concluído (2026-10) — Compat real, escopo completo (v0.9.0)
 
 Interceptação seletiva (`crates/rd-vm/src/m8.rs`, ADR 003): o dispatch consulta
@@ -664,8 +689,8 @@ biblioteca do APK. Estado real e consultável via `Engine::m8_*`; testes em
    sendBroadcast entrega a receivers (`onReceive` DEX); Intent action/data +
    Uri parse/scheme/host/path; startActivity VIEW registra deep link e navega
    com handler registrado; JobScheduler host.
-7. ✅ **WorkManager**: getInstance canônico; enqueue* registra WorkRecord
-   (ENQUEUED → SUCCEEDED via `m8_complete_work`, cancel* → CANCELLED);
+7. ✅ **WorkManager**: getInstance canônico; `enqueue*` registra WorkRecord
+   (ENQUEUED → SUCCEEDED via `m8_complete_work`, `cancel*` → CANCELLED);
    Operation/ListenableFuture completados. Sem thread de background.
 8. ✅ **SharedPreferences stateful**: Editor put/remove/clear + commit/apply
    aplicam no storage da VM; getters leem o storage; contains/getAll reais.

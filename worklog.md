@@ -80,7 +80,7 @@ Work Log:
 - Nada commitado/pushed (GitHub segue intocado); script aguarda liberação para commit.
 
 Stage Summary:
-- Campanha fuzz do DoD M1 agora é 1 comando: ./scripts/fuzz-campaign.sh (padrão 24h; smoke com ./scripts/fuzz-campaign.sh 600). DoD = nenhum crash-* em crates/*/fuzz/artifacts após o tempo total.
+- Campanha fuzz do DoD M1 agora é 1 comando: ./scripts/fuzz-campaign.sh (padrão 24h; smoke com ./scripts/fuzz-campaign.sh 600). DoD = nenhum `crash-*` em `crates/*/fuzz/artifacts` após o tempo total.
 
 ---
 Task ID: 6
@@ -90,7 +90,7 @@ Task: Revisão + validação executável do scripts/fuzz-campaign.sh + push (Git
 Work Log:
 - Revisão linha a linha encontrou 3 bugs reais (nenhum pego por bash -n):
   (1) find -path '*/fuzz/artifacts/crash-*' nunca casaria — cargo-fuzz grava
-      em artifacts/<target>/crash-* (SUBDIRETÓRIO) → relatório diria "SEM CRASH"
+      em `artifacts/<target>/crash-*` (SUBDIRETÓRIO) → relatório diria "SEM CRASH"
       com crash real (falso negativo do DoD). Fix: casar por NOME dentro de
       artifacts/ (-type f -name 'crash-*' -path '*/fuzz/artifacts/*'), provado
       com artifact falso (1 encontrado, 0 após remover).
@@ -179,7 +179,7 @@ Work Log:
   resource-id no formato package:id/nome resolvido do arsc, text, bounds,
   visibility/enabled/clickable, children) com cap de profundidade (#40).
 - rd-render (de stub M0 a real): ui_dump.rs (XML uiautomator fiel: index/
-  text/resource-id/class/package/bounds [x1,y1][x2,y2]/clickable/enabled;
+  text/resource-id/class/package/bounds `[x1,y1][x2,y2]`/clickable/enabled;
   GONE excluído como no uiautomator real, INVISIBLE mantido) + shot.rs
   (framebuffer RGB 720×1440 determinístico, painter por classe/estado,
   glifos de bloco 3×7 com nota de que fonte real é M8/M9, encoder PNG sem
@@ -865,7 +865,7 @@ Checks:
 
 GitHub status:
 - Branch `feat/m8-service-loader`, commit funcional `42db612`, enviado com o PAT fornecido pelo proprietário.
-- Pull request aberto: #144 — https://github.com/nadabgfccvd/RustyDroid/pull/144 (aguarda revisão humana e CI).
+- Pull request aberto: #144 — <https://github.com/nadabgfccvd/RustyDroid/pull/144> (aguarda revisão humana e CI).
 
 Stage Summary:
 - `ServiceLoader` deixa de bloquear a inicialização do APK real com um fallback determinístico e honesto, sem alegar suporte a SPI completo.
@@ -895,7 +895,7 @@ Checks:
 
 GitHub status:
 - Branch `feat/m8-linked-hash-set`, commit funcional `ae3ab03`, enviado com o PAT fornecido pelo proprietário.
-- Pull request empilhada aberta: #145 — https://github.com/nadabgfccvd/RustyDroid/pull/145, com base em `feat/m8-service-loader`/#144 para manter cada compat-gap revisável. #144 deve receber revisão humana/merge antes de #145 seguir para `main`.
+- Pull request empilhada aberta: #145 — <https://github.com/nadabgfccvd/RustyDroid/pull/145>, com base em `feat/m8-service-loader`/#144 para manter cada compat-gap revisável. #144 deve receber revisão humana/merge antes de #145 seguir para `main`.
 
 Stage Summary:
 - LinkedHashSet não bloqueia mais o fluxo de inicialização do APK real e sua ordem de iteração é determinística.
@@ -1215,7 +1215,7 @@ GitHub status:
 - Branch nova → PR; merge após CI verde.
 
 Stage Summary:
-- Launch primftpd cadeia-completo (Application→Prefs→SLF4J→NOP faithful) ✅ → próximas rodadas: novos alvos/psi de apps + gaps estruturais pendentes do ROADMAP (getResources → Enumeration, unmodifiable* restantes — empty*, edit() de prefs quando pedido).
+- Launch primftpd cadeia-completo (Application→Prefs→SLF4J→NOP faithful) ✅ → próximas rodadas: novos alvos/psi de apps + gaps estruturais pendentes do ROADMAP (getResources → Enumeration, `unmodifiable*` restantes — `empty*`, edit() de prefs quando pedido).
 
 ## 2026-10-18 — M8 full-phase continuation (workspace session)
 
@@ -1320,3 +1320,37 @@ Checks:
 Stage Summary:
 - M8 completo nos subsistemas da spec, com desvios documentados (ADR 003): single-thread síncrono, SQLite em memória/subconjunto, OkHttp sem rede, WorkManager sem background thread, RecyclerView cap 20 itens.
 - Continuação (mesma sessão): probe Breezy Weather avançou 3 gaps com host novo — `Context.getSystemService(String/Class)`, `android.os.Process.myPid/myUid/myTid/is64Bit`, `java.io.File` (path/exists/mkdirs/…); próximo gap registrado: `java.io.FileReader.<init>` (cadeia de I/O — próxima sondagem, não M8 core). Tasks segue com `MISSING_ENTRY` de LAUNCHER no CLI (pré-existente, fora do M8). Teste `m8_dex_callbacks_fire` prova callbacks DEX reais (dialog/OkHttp/broadcast); SQLite `whereArgs` agora compara o argumento de `col=?`.
+
+---
+Task: Apêndice G — registro e detecção dos 28 engines
+Agent: Arena.ai (contribuição assistida por IA; revisão humana obrigatória)
+Date: 2026-10-14
+
+Work Log:
+- Escopo confirmado com o dono: registro/detecção completos, não execução de todos os runtimes. Preservados checkboxes/seleção LANG e os estados pendentes M9/M11; nenhuma engine ausente foi marcada como executável.
+- ADR 003 antes do código: separar catálogo/detecção de execução; formatos DEX/ELF são candidatos, não atribuição de linguagem; assinatura não valida payload. Nenhum código de ATL/Robolectric copiado e nenhum unsafe adicionado.
+- data/engines.toml: 28 IDs estáveis, 12 módulos/features, dependências/estratégias/limites/status e regras declarativas (all/any). Nova crate rd-engine-registry valida schema/IDs/deps/ciclos/regras; o tipo público Registry só nasce do caminho validado (documento de Deserialize privado).
+- Análise limitada por nomes ZIP canônicos + classes/metadados de componentes do manifest; no asset/lib payload reads, no extraction, no network, no runtime. Híbridos preservam múltiplos achados; duplicatas/paths hostis/ABIs desconhecidas são diagnósticos explícitos; 4 amostras por predicado, 100k entradas, catálogo 1 MiB.
+- Features opt-in lang-01…12 com transitividade e forwarding rd-cli/rd-agent; build mínimo conserva todo o catálogo sem downloads de engines. EngineAdapter parse/event/syscall: os 28 adaptadores do registro SEMPRE retornam NOT_IMPLEMENTED(LANG-xx); VM DEX existente continua separada e parcial.
+- CLI rd engine list|detect|check; engines em inspect --json e MCP app_info (32 tools, sem nova tool); --data/RD_DATA_DIR explícitos não têm fallback silencioso. Runtime não é lançado pela detecção.
+- 28 casos golden de DETECÇÃO em tests/engines/signatures.json, fixtures APK/AXML/ZIP geradas em memória; testes unitários, integração, contratos, teto ZIP64, ambiguidades, híbridos, samples, CLI/MCP e drift. CI adicionado para build mínimo/12 features/all-features e MSRV all-features.
+- xtask engine-report / engine-spec (só tabela marcada) / compat-report saem da mesma fonte. Spec, README, ROADMAP, manifest (registries separado de selected), mcp-tools e compat-matrix atualizados; relatório em docs/appendix-g-validation.md.
+
+Stage Summary:
+- Registro/detecção dos 28 itens ENTREGUES; novos runtimes NÃO implementados. M9/M11 continuam pendentes e budgets de execução Moto E5 não certificados nesta etapa.
+- Baseline 385 → 416 testes automatizados (+31), default e all-features: 0 falhas. 1 teste OSS explicitamente ignored no comando padrão, executado separadamente: PASS.
+- Mínimo + cada uma das 12 features isoladamente: 3 unitários + 17 integrações PASS em cada configuração. CLI no-default/all-features compila; fmt + clippy -D warnings (default/all) + MSRV 1.76 all + docs/drift + suite JUnit (8 cenários) verdes localmente.
+- APK real F-Droid 2.0.1: 12.537.183 bytes, 973 entradas ZIP, minSdk 24; SHA-256 83d3fe522281c3cb89fce3bc05038f81b3c3b32c108536941f184c5f9bb53778. Inventário detectado e comparado ao inspect.engines (idêntico); abaixo do piso de execução, logo NENHUMA execução alegada. Binário não commitado (GH-05).
+- Publicação planejada em branch separada + PR, nunca merge cego. Este log registra gates locais; status de GitHub Actions/revisão humana é separado. Nenhuma credencial em arquivos/commits.
+
+## 2026-10-20 — Appendix G integration with native/JIT main
+
+Reconciled original registry branch30411ec with main7ce8ba3 in a local integration branch; no force-push or GitHub PR merge performed. Six text conflicts and duplicate feature tables resolved; defaults, native/JIT forwarding and0.9.0 versions preserved. Updated41-tool/default invariants and honest partial native route status. Catalog reads bounded even for growing streams.
+
+Local gates: 548 all-feature / 537 default tests passed; Clippy, fmt, minimal VM/CLI, Rust1.76 and generated docs passed. Registry all12 individual LANG configurations and explicit real-APK hook passed. JVM150/150, no-app contract8/8 and five real native APKs on each of3ABIs passed. Fresh typed Comprix20-cycle runs with JIT off/on both completed, item survived forced major GC; independent GC-off2-cycle baseline passed. Full details: docs/appendix-g-integration.md.
+
+AI assistance disclosed; updated-source remote CI and human review still required before merge. Source/cache recovery and command/tool ledger are preserved separately in the accompanying workspace worklog; no credential is committed.
+
+## 2026-10-20 — canonical MCP documentation follow-up
+
+The full rerun caught the generator EOF invariant after advisory Markdown cleanup. Fixed the generator itself (one final newline), retained exact generated-file equality, and added a no-blank-EOF assertion. Latest rebuilt native/JIT CLI completed both typed20-cycle Comprix campaigns again with strict title/item audits, forced-major item persistence, JVM150/150 and all15native APK/ABI combinations passing. Nightly fuzz targets build; pinned Markdown has29files/0issues. No remote write, new-head GitHub CI result or human review is fabricated.

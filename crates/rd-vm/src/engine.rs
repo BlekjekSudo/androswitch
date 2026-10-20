@@ -371,12 +371,13 @@ impl Engine {
             if let Some(v) = crate::m8::call_m8_instance(self, &class, method, sig, recv, &args)? {
                 return Ok(v);
             }
-            if class.starts_with("Landroid/") {
-                if let Some(v) =
-                    crate::framework::call_host_instance(self, &class, method, sig, recv, &args)?
-                {
-                    return Ok(v);
-                }
+            if let Some(v) =
+                crate::interp::inherited_android_host(self, &class, method, sig, recv, &args)?
+            {
+                return Ok(v);
+            }
+            if let Some(v) = crate::view_props::fallback(self, &class, method, sig, recv, &args)? {
+                return Ok(v);
             }
             return Err(crate::classpath::unresolved_method(&class, method, sig).into());
         };

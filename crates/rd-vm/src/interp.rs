@@ -68,6 +68,7 @@ pub(crate) fn exec_frame(
     let mut last_result = Value::Null;
     let mut pending_exc: Option<Throwable> = None;
     let mut pc: usize = 0;
+    let mut next_idx: usize = 0;
 
     'main: loop {
         // fuel por instrução (contra loop infinito em código hostil)
@@ -89,7 +90,10 @@ pub(crate) fn exec_frame(
 
         let cur_pc = pc;
         vm.last_pc = cur_pc;
-        let idx = lookup(&code.instructions, cur_pc)?;
+        // Decoded instructions are sorted by address. Sequential execution
+        // normally uses the next entry; branches and exception handlers still
+        // use the same checked binary lookup, including identical bad-PC errors.
+        let idx = lookup_next(&code.instructions, cur_pc, &mut next_idx)?;
         let insn = &code.instructions[idx].1;
         // Suspended callers must publish roots before any path that can
         // initialize a class or invoke guest code. Current roots are also
@@ -1015,6 +1019,20 @@ fn op_to_base(op: u8) -> u8 {
 
 // ── helpers do loop ─────────────────────────────────────────────────────────
 
+#[inline]
+fn lookup_next(
+    instructions: &[(usize, Insn)],
+    addr: usize,
+    next: &mut usize,
+) -> Result<usize, VmExit> {
+    let index = match instructions.get(*next) {
+        Some((pc, _)) if *pc == addr => *next,
+        _ => lookup(instructions, addr)?,
+    };
+    *next = index + 1;
+    Ok(index)
+}
+
 fn lookup(instructions: &[(usize, Insn)], addr: usize) -> Result<usize, VmExit> {
     match instructions.binary_search_by_key(&addr, |(a, _)| *a) {
         Ok(i) => Ok(i),
@@ -1629,7 +1647,19 @@ fn do_invoke(
     // M3: framework host (Activity/View/TextView/Button/LinearLayout/
     // Handler/Intent/Bundle) — a classe DECLARANTE do method ref é android/*
     if mref.class.starts_with("Landroid/") {
-        return match crate::framework::call_host_instance(
+        if !is_direct && !is_super {
+            if let Some((d2, def, m)) = vm.cp.resolve_method(&recv_class, &mref.name, &mref.proto) {
+                return vm.call(d2, def, &m, raw.to_vec());
+            }
+        }
+        if let Some(value) =
+            inherited_android_host(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+        {
+            return Ok(value);
+        }
+        // Generic property storage is strictly last: it must not swallow
+        // inherited View IDs, EditText text, or Activity/Context state.
+        if let Some(value) = crate::view_props::fallback(
             vm,
             &mref.class,
             &mref.name,
@@ -1637,35 +1667,15 @@ fn do_invoke(
             recv,
             &slots[1..],
         )? {
-            Some(v) => Ok(v),
-            // last resort: general View property store (view_props.rs)
-            None => match crate::view_props::fallback(
-                vm,
-                &mref.class,
-                &mref.name,
-                &mref.proto,
-                recv,
-                &slots[1..],
-            )? {
-                Some(v) => Ok(v),
-                // No host model: virtual/interface dispatch on the receiver's
-                // own DEX class (an app class implementing a platform
-                // interface, e.g. Choreographer.FrameCallback.doFrame).
-                None => match (!is_direct && !is_super)
-                    .then(|| vm.cp.resolve_method(&recv_class, &mref.name, &mref.proto))
-                    .flatten()
-                {
-                    Some((d2, def, m)) => vm.call(d2, def, &m, raw.to_vec()),
-                    None => Err(crate::classpath::unresolved_method_on(
-                        &mref.class,
-                        &recv_class,
-                        &mref.name,
-                        &mref.proto,
-                    )
-                    .into()),
-                },
-            },
-        };
+            return Ok(value);
+        }
+        return Err(crate::classpath::unresolved_method_on(
+            &mref.class,
+            &recv_class,
+            &mref.name,
+            &mref.proto,
+        )
+        .into());
     }
 
     // classe inicial da resolução
@@ -1694,11 +1704,72 @@ fn do_invoke(
     };
 
     let Some((d2, def, m)) = vm.cp.resolve_method(&start_class, &mref.name, &mref.proto) else {
+        // D8 may use an app subclass as the inherited Android method owner.
+        // DEX overrides above always win; direct app constructors stay direct.
+        if !is_direct || is_super {
+            if let Some(value) = inherited_android_host(
+                vm,
+                &start_class,
+                &mref.name,
+                &mref.proto,
+                recv,
+                &slots[1..],
+            )? {
+                return Ok(value);
+            }
+        }
         return Err(
             crate::classpath::unresolved_method(&start_class, &mref.name, &mref.proto).into(),
         );
     };
     vm.call(d2, def, &m, raw.to_vec())
+}
+
+/// Resolve only real inherited Android hosts; never invent an app method.
+pub(crate) fn inherited_android_host(
+    vm: &mut Engine,
+    start: &str,
+    name: &str,
+    sig: &str,
+    recv: crate::heap::ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let mut ancestor = start.to_string();
+    let mut visited = std::collections::BTreeSet::new();
+    for _ in 0..16 {
+        if !visited.insert(ancestor.clone()) {
+            break;
+        }
+        if ancestor.starts_with("Landroid/") {
+            #[cfg(feature = "advanced-components")]
+            if let Some(value) = crate::m9::call_instance(vm, &ancestor, name, sig, recv, args)? {
+                return Ok(Some(value));
+            }
+            if let Some(value) = crate::m8::call_m8_instance(vm, &ancestor, name, sig, recv, args)?
+            {
+                return Ok(Some(value));
+            }
+            if let Some(value) =
+                crate::framework::call_host_instance(vm, &ancestor, name, sig, recv, args)?
+            {
+                return Ok(Some(value));
+            }
+        }
+        let next = vm.cp.superclass_of(&ancestor).or_else(|| {
+            crate::classpath::builtin_hierarchy(&ancestor).and_then(|chain| {
+                chain
+                    .iter()
+                    .copied()
+                    .find(|s| *s != ancestor)
+                    .map(str::to_string)
+            })
+        });
+        match next {
+            Some(next) => ancestor = next,
+            None => break,
+        }
+    }
+    Ok(None)
 }
 
 /// Renderização do resultado para humano/JSON do CLI (formato Java).
@@ -1721,4 +1792,82 @@ pub fn render_result(v: &Value, return_type: &str) -> String {
 
 fn vm_obj_repr(r: &crate::heap::ObjRef) -> String {
     format!("<object #{r}>")
+}
+
+#[cfg(test)]
+mod fetch_tests {
+    use super::*;
+
+    #[test]
+    fn sequential_cursor_matches_binary_lookup_for_branches_handlers_and_bad_pcs() {
+        let instructions: Vec<_> = [0, 1, 3, 5, 6, 18, 20, 100]
+            .into_iter()
+            .map(|pc| {
+                (
+                    pc,
+                    Insn {
+                        opcode: 0,
+                        fmt: rd_dex::opcode::Format::F10x,
+                        size: 1,
+                        kind: Kind::Plain,
+                    },
+                )
+            })
+            .collect();
+        for initial in [0, 1, 7, 8, usize::MAX] {
+            let mut cursor = initial;
+            for pc in [0, 1, 3, 18, 20, 100, 0, 5, 6, 2, 0, usize::MAX, 100, 101] {
+                let expected = lookup(&instructions, pc);
+                let previous = cursor;
+                let actual = lookup_next(&instructions, pc, &mut cursor);
+                assert_eq!(format!("{actual:?}"), format!("{expected:?}"));
+                match actual {
+                    Ok(i) => assert_eq!(cursor, i + 1),
+                    Err(_) => assert_eq!(cursor, previous, "failed fetch must not advance"),
+                }
+            }
+        }
+        let mut cursor = 0;
+        assert_eq!(
+            format!("{:?}", lookup_next(&[], 0, &mut cursor)),
+            format!("{:?}", lookup(&[], 0))
+        );
+    }
+
+    #[test]
+    fn sequential_cursor_differential_random_walk() {
+        let instructions: Vec<_> = (0..1024)
+            .map(|i| {
+                (
+                    i * 3,
+                    Insn {
+                        opcode: 0,
+                        fmt: rd_dex::opcode::Format::F10x,
+                        size: 3,
+                        kind: Kind::Plain,
+                    },
+                )
+            })
+            .collect();
+        let mut state = 0x1234_5678u64;
+        let mut cursor = 0;
+        for _ in 0..32768 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let pc = if state % 4 != 0 && cursor < instructions.len() {
+                instructions[cursor].0
+            } else {
+                (state as usize) % (instructions.len() * 3 + 16)
+            };
+            let expected = lookup(&instructions, pc);
+            let previous = cursor;
+            let actual = lookup_next(&instructions, pc, &mut cursor);
+            assert_eq!(format!("{actual:?}"), format!("{expected:?}"));
+            match actual {
+                Ok(i) => assert_eq!(cursor, i + 1),
+                Err(_) => assert_eq!(cursor, previous, "failed fetch must not advance"),
+            }
+        }
+    }
 }

@@ -13,6 +13,7 @@ authors.workspace = true
 workspace = true
 
 [dependencies]
+rd-engine-registry.workspace = true
 rd-framework = { workspace = true }
 anyhow.workspace = true
 toml.workspace = true

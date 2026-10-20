@@ -1,0 +1,155 @@
+[
+  {
+    "workload": "roots",
+    "pairs": 25,
+    "baseline_ms": 431.581369,
+    "candidate_ms": 421.60959599999995,
+    "ratio_of_medians": 1.0236516746644448,
+    "median_paired_speedup": 1.005626198110695,
+    "paired_bootstrap_ci95": [
+      0.9719638068352356,
+      1.0200036908078345
+    ],
+    "baseline_rss_kib": 13400,
+    "candidate_rss_kib": 8144,
+    "rss_reduction_percent": 39.223880597014926,
+    "checksum": 210,
+    "cpu_interpretation": "CI includes parity"
+  },
+  {
+    "workload": "host",
+    "pairs": 25,
+    "baseline_ms": 427.035155,
+    "candidate_ms": 414.852556,
+    "ratio_of_medians": 1.0293660936248394,
+    "median_paired_speedup": 1.0390591021191826,
+    "paired_bootstrap_ci95": [
+      1.014931416212992,
+      1.0624124304700957
+    ],
+    "baseline_rss_kib": 13728,
+    "candidate_rss_kib": 9340,
+    "rss_reduction_percent": 31.963869463869464,
+    "checksum": 210,
+    "cpu_interpretation": "CI above parity"
+  },
+  {
+    "workload": "sweep",
+    "pairs": 25,
+    "baseline_ms": 52.736655999999996,
+    "candidate_ms": 52.567487,
+    "ratio_of_medians": 1.0032181298679923,
+    "median_paired_speedup": 0.9992570949954819,
+    "paired_bootstrap_ci95": [
+      0.9896038093109121,
+      1.0149928365232046
+    ],
+    "baseline_rss_kib": 14632,
+    "candidate_rss_kib": 14468,
+    "rss_reduction_percent": 1.1208310552214324,
+    "checksum": 1199995,
+    "cpu_interpretation": "CI includes parity"
+  },
+  {
+    "workload": "minor",
+    "pairs": 25,
+    "baseline_ms": 212.33233800000002,
+    "candidate_ms": 110.044275,
+    "ratio_of_medians": 1.9295173510843706,
+    "median_paired_speedup": 1.8911968478142094,
+    "paired_bootstrap_ci95": [
+      1.87211333501399,
+      2.006113510660041
+    ],
+    "baseline_rss_kib": 11988,
+    "candidate_rss_kib": 11904,
+    "rss_reduction_percent": 0.7007007007007007,
+    "checksum": 1000050,
+    "cpu_interpretation": "CI above parity"
+  },
+  {
+    "workload": "resolve",
+    "pairs": 25,
+    "baseline_ms": 689.405216,
+    "candidate_ms": 126.123717,
+    "ratio_of_medians": 5.466102905926885,
+    "median_paired_speedup": 5.5031146676351925,
+    "paired_bootstrap_ci95": [
+      5.388508115230111,
+      5.531208438477876
+    ],
+    "baseline_rss_kib": 4972,
+    "candidate_rss_kib": 4916,
+    "rss_reduction_percent": 1.1263073209975865,
+    "checksum": 25550000,
+    "cpu_interpretation": "CI above parity"
+  },
+  {
+    "workload": "interp",
+    "pairs": 25,
+    "baseline_ms": 146.115116,
+    "candidate_ms": 19.314505999999998,
+    "ratio_of_medians": 7.56504546375662,
+    "median_paired_speedup": 7.648978401034527,
+    "paired_bootstrap_ci95": [
+      7.579639779841323,
+      7.677250215071496
+    ],
+    "baseline_rss_kib": 6208,
+    "candidate_rss_kib": 6164,
+    "rss_reduction_percent": 0.7087628865979382,
+    "checksum": 20000,
+    "cpu_interpretation": "CI above parity"
+  },
+  {
+    "workload": "strings",
+    "pairs": 25,
+    "baseline_ms": 39.004323,
+    "candidate_ms": 16.130599,
+    "ratio_of_medians": 2.418033143096546,
+    "median_paired_speedup": 2.418237654427764,
+    "paired_bootstrap_ci95": [
+      2.3884662724705272,
+      2.4602130379826646
+    ],
+    "baseline_rss_kib": 5948,
+    "candidate_rss_kib": 5932,
+    "rss_reduction_percent": 0.26899798251513113,
+    "checksum": 10179955,
+    "cpu_interpretation": "CI above parity"
+  },
+  {
+    "workload": "subtype",
+    "pairs": 25,
+    "baseline_ms": 7.184945,
+    "candidate_ms": 2.7422779999999998,
+    "ratio_of_medians": 2.6200644136006637,
+    "median_paired_speedup": 2.586668174836582,
+    "paired_bootstrap_ci95": [
+      2.5460408306199582,
+      2.7599172684869315
+    ],
+    "baseline_rss_kib": 4200,
+    "candidate_rss_kib": 4200,
+    "rss_reduction_percent": 0.0,
+    "checksum": 46875,
+    "cpu_interpretation": "CI above parity"
+  },
+  {
+    "workload": "jit",
+    "pairs": 25,
+    "baseline_ms": 55.309189,
+    "candidate_ms": 60.084677000000006,
+    "ratio_of_medians": 0.920520701143155,
+    "median_paired_speedup": 1.0218785447017,
+    "paired_bootstrap_ci95": [
+      1.000213195110983,
+      1.0293156641279209
+    ],
+    "baseline_rss_kib": 7620,
+    "candidate_rss_kib": 7680,
+    "rss_reduction_percent": -0.7874015748031497,
+    "checksum": 214753364650000,
+    "cpu_interpretation": "CI above parity"
+  }
+]

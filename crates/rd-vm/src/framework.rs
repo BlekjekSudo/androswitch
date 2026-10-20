@@ -209,6 +209,17 @@ pub struct QueuedMsg {
 }
 
 /// Estado de framework da Engine (host objects + clock virtual + launch).
+/// Focus belongs to the paused window, not the currently visible Activity.
+#[derive(Debug, Clone, Copy)]
+pub struct SuspendedActivity {
+    pub activity: ObjRef,
+    pub focused_view: Option<ObjRef>,
+    pub ime_connection: Option<(ObjRef, ObjRef)>,
+    #[cfg(feature = "advanced-components")]
+    pub editor_focus: Option<ObjRef>,
+    #[cfg(feature = "advanced-components")]
+    pub keyboard_visible: bool,
+}
 #[derive(Debug, Default)]
 pub struct HostState {
     pub objects: HashMap<ObjRef, HostObj>,
@@ -250,6 +261,8 @@ pub struct HostState {
     frag_txs: HashMap<ObjRef, FragTxState>,
     /// activity em execução (o app trivial M3 tem uma por vez)
     pub current_activity: Option<ObjRef>,
+    /// Paused activities in this bounded single-task model; GC roots via HostState.
+    pub activity_stack: Vec<SuspendedActivity>,
     /// package do app (preenchido no launch_app; getPackageName)
     pub package_name: String,
     /// M8 (38º gap real): Application canônica do app — Android cria UMA por
@@ -733,7 +746,163 @@ impl Engine {
 
     /// Cria a activity, roda o lifecycle e devolve a ref. `package_name`
     /// alimenta getPackageName; extras vão no intent de launch.
+    fn capture_activity_focus(&self, activity: ObjRef) -> SuspendedActivity {
+        SuspendedActivity {
+            activity,
+            focused_view: self.fw.focused_view,
+            ime_connection: self.fw.ime_connection,
+            #[cfg(feature = "advanced-components")]
+            editor_focus: self.fw.m9.focused,
+            #[cfg(feature = "advanced-components")]
+            keyboard_visible: self.fw.m9.keyboard_visible,
+        }
+    }
+    fn restore_activity_focus(&mut self, state: SuspendedActivity) {
+        self.fw.focused_view = state.focused_view;
+        self.fw.ime_connection = state.ime_connection;
+        #[cfg(feature = "advanced-components")]
+        {
+            self.fw.m9.focused = state.editor_focus;
+            self.fw.m9.keyboard_visible = state.keyboard_visible;
+        }
+        self.fw.traversal_pending = true;
+    }
+    /// Bounded, single-task Activity history. It is strongly rooted for GC.
+    pub fn start_activity(
+        &mut self,
+        desc: &str,
+        package: &str,
+        extras: Vec<(String, Value)>,
+    ) -> Result<ObjRef, VmExit> {
+        if self.cp.find_class(desc).is_none() {
+            return Err(crate::err::vm_error(
+                "MISSING_ENTRY",
+                format!("activity {desc} is absent from DEX"),
+            )
+            .into());
+        }
+        let depth = self.fw.activity_stack.len();
+        if depth >= 64 {
+            return Err(crate::err::vm_error("LIMIT_EXCEEDED", "activity stack limit64").into());
+        }
+        let previous = self
+            .fw
+            .current_activity
+            .filter(|r| {
+                matches!(
+                    self.fw.get(*r),
+                    Some(HostObj::Activity {
+                        finished: false,
+                        ..
+                    })
+                )
+            })
+            .map(|r| self.capture_activity_focus(r));
+        if let Some(state) = previous {
+            let class = self.heap.class_of(state.activity)?.to_string();
+            self.run_lifecycle_step(&class, state.activity, "onPause", "()V", Vec::new())?;
+            self.fw.activity_stack.push(state);
+        }
+        match self.launch_activity_inner(desc, package, extras) {
+            Ok(r) => {
+                if let Some(state) = previous {
+                    if matches!(
+                        self.fw.get(state.activity),
+                        Some(HostObj::Activity {
+                            finished: false,
+                            ..
+                        })
+                    ) {
+                        let class = self.heap.class_of(state.activity)?.to_string();
+                        self.run_lifecycle_step(
+                            &class,
+                            state.activity,
+                            "onStop",
+                            "()V",
+                            Vec::new(),
+                        )?;
+                    }
+                }
+                Ok(r)
+            }
+            Err(e) => {
+                self.fw.activity_stack.truncate(depth);
+                if let Some(state) = previous {
+                    if matches!(
+                        self.fw.get(state.activity),
+                        Some(HostObj::Activity {
+                            finished: false,
+                            ..
+                        })
+                    ) {
+                        self.fw.current_activity = Some(state.activity);
+                        self.restore_activity_focus(state);
+                        let class = self.heap.class_of(state.activity)?.to_string();
+                        self.run_lifecycle_step(
+                            &class,
+                            state.activity,
+                            "onResume",
+                            "()V",
+                            Vec::new(),
+                        )?;
+                    }
+                }
+                Err(e)
+            }
+        }
+    }
+    /// Finish once and restore the prior live Activity (if any).
+    pub fn finish_activity(&mut self, activity: ObjRef) -> Result<(), VmExit> {
+        match self.fw.objects.get_mut(&activity) {
+            Some(HostObj::Activity { finished, .. }) if !*finished => {
+                *finished = true;
+            }
+            _ => return Ok(()),
+        }
+        let class = self.heap.class_of(activity)?.to_string();
+        self.run_lifecycle_step(&class, activity, "onPause", "()V", Vec::new())?;
+        self.run_lifecycle_step(&class, activity, "onStop", "()V", Vec::new())?;
+        self.run_lifecycle_step(&class, activity, "onDestroy", "()V", Vec::new())?;
+        if self.fw.current_activity == Some(activity) {
+            while let Some(state) = self.fw.activity_stack.pop() {
+                if !matches!(
+                    self.fw.get(state.activity),
+                    Some(HostObj::Activity {
+                        finished: false,
+                        ..
+                    })
+                ) {
+                    continue;
+                }
+                self.fw.current_activity = Some(state.activity);
+                self.restore_activity_focus(state);
+                let class = self.heap.class_of(state.activity)?.to_string();
+                self.run_lifecycle_step(&class, state.activity, "onRestart", "()V", Vec::new())?;
+                self.run_lifecycle_step(&class, state.activity, "onStart", "()V", Vec::new())?;
+                self.run_lifecycle_step(&class, state.activity, "onResume", "()V", Vec::new())?;
+                break;
+            }
+        }
+        Ok(())
+    }
+    /// An explicit root launch replaces old task history but preserves any
+    /// child activities launched by the new root's own onCreate callback.
     pub fn launch_app(
+        &mut self,
+        desc: &str,
+        package: &str,
+        extras: Vec<(String, Value)>,
+    ) -> Result<ObjRef, VmExit> {
+        let old_depth = self.fw.activity_stack.len();
+        let result = self.launch_activity_inner(desc, package, extras);
+        if result.is_ok() {
+            self.fw
+                .activity_stack
+                .drain(..old_depth.min(self.fw.activity_stack.len()));
+        }
+        result
+    }
+    fn launch_activity_inner(
         &mut self,
         activity_desc: &str,
         package_name: &str,
@@ -799,6 +968,13 @@ impl Engine {
             *intent = Some(ir);
         }
         self.fw.current_activity = Some(r);
+        self.fw.focused_view = None;
+        self.fw.ime_connection = None;
+        #[cfg(feature = "advanced-components")]
+        {
+            self.fw.m9.focused = None;
+            self.fw.m9.keyboard_visible = false;
+        }
 
         // <init>()V (se o DEX declara) — ins=1 (this)
         if let Some((d, def, m)) = self.cp.resolve_method(activity_desc, "<init>", "()V") {
@@ -2515,9 +2691,7 @@ fn call_host_instance_rooted(
             ))
         }
         (ACTIVITY, "finish") => {
-            if let Some(HostObj::Activity { finished, .. }) = vm.fw.objects.get_mut(&recv) {
-                *finished = true;
-            }
+            vm.finish_activity(recv)?;
             Ok(Some(Value::Null))
         }
         (ACTIVITY, "getWindow") => {
@@ -2541,17 +2715,12 @@ fn call_host_instance_rooted(
                 )
                 .into());
             };
-            // nova activity: pausa a corrente, cria a nova com o intent
-            if let Some(cur) = vm.fw.current_activity {
-                let cur_desc = vm.heap.class_of(cur)?.to_string(); // Stringown p/ borrow
-                vm.run_lifecycle_step(&cur_desc, cur, "onPause", "()V", Vec::new())?;
-            }
             let extras = match vm.fw.get(*ir) {
                 Some(HostObj::Intent { extras, .. }) => extras.clone(),
                 _ => Vec::new(),
             };
             let pkg = vm.fw.package_name.clone();
-            let _new = vm.launch_app(&target, &pkg, extras)?;
+            let _new = vm.start_activity(&target, &pkg, extras)?;
             Ok(Some(Value::Null))
         }
         // lifecycle via super (user chama super.onCreate etc.) → no-op host

@@ -30,6 +30,24 @@ fn run() -> Result<()> {
                 .unwrap_or_else(|| root.join("docs").join("compat-matrix.md"));
             compat_report(&root, &out)
         }
+        Some("engine-report") => {
+            let out = args
+                .next()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| root.join("docs/engine-registry.md"));
+            let registry = rd_engine_registry::Registry::load(&root.join("data/engines.toml"))?;
+            std::fs::write(&out, registry.markdown())
+                .with_context(|| format!("writing {}", out.display()))?;
+            println!("engine registry report: {}", out.display());
+            Ok(())
+        }
+        Some("engine-spec") => {
+            let out = args
+                .next()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| root.join("RustyDroid.md"));
+            engine_spec(&root, &out)
+        }
         Some("--help") | Some("help") | None => {
             println!("xtask — RustyDroid build tasks");
             println!();
@@ -37,6 +55,8 @@ fn run() -> Result<()> {
             println!();
             println!("COMMANDS:");
             println!("  compat-report [out.md]  gera docs/compat-matrix.md (placar oficial)");
+            println!("  engine-report [out.md]  gera docs/engine-registry.md (Apêndice G)");
+            println!("  engine-spec [out.md]    regenera apenas a tabela marcada em RustyDroid.md");
             Ok(())
         }
         Some(other) => bail!("unknown task {other:?} — try `cargo xtask --help`"),
@@ -96,6 +116,7 @@ const CRATE_STATUS: &[(&str, &str, &str)] = &[
         "M9",
         "parser ELF32/64 limitado (x86_64/AArch64/ARM) + runtime `native` em worker Unicorn isolado (ADR 004)",
     ),
+    ("rd-engine-registry", "Apêndice G", "registro/detecção dos 28 itens; features/contratos; NÃO executa engines"),
 ];
 
 fn compat_report(root: &Path, out: &Path) -> Result<()> {
@@ -180,6 +201,12 @@ fn compat_report(root: &Path, out: &Path) -> Result<()> {
         md.push_str("\nExecutar: `rd test tests/suites/<arquivo>.json --junit <saida>.xml` (formato em `docs/suite-format.md`).\n");
     }
 
+    let registry = rd_engine_registry::Registry::load(&root.join("data/engines.toml"))?;
+    md.push_str("\n## Engines (Apêndice G — registro/detecção, não execução)\n\n");
+    md.push_str("**28 registros completos; 12 módulos opt-in.** Features não implementam runtimes; todos os adaptadores do registro retornam `NOT_IMPLEMENTED(LANG-xx)`. DEX e ELF/JNI parciais pertencem às rotas existentes (native é opt-in), não aos adaptadores do registro. M11 continua pendente. Detecção golden não é golden de execução.\n\n");
+    md.push_str(&registry.appendix_table());
+    md.push_str("\nRegras, dependências e limites em [engine-registry.md](engine-registry.md); fonte: `data/engines.toml`.\n");
+
     md.push_str("\n## Dados versionados (M0)\n\n");
     md.push_str(&format!(
         "- permissions.toml: **{perm_count}** permissões + {role_count} roles (Apêndice B)\n"
@@ -195,11 +222,29 @@ fn compat_report(root: &Path, out: &Path) -> Result<()> {
         "- Núcleo (0.0): parcial (CORE-01..06 M0; rd-dex M1; VM M2 — métodos puros executam)\n",
     );
     md.push_str("- Framework (M3): Activity lifecycle + views host + Handler/Looper + touch + **LayoutInflater de layout XML real** (setContentView(I): resid → @layout/key no arsc → AXML do APK → árvore host; attrs id/text/orientation/visibility/enabled/onClick/layout_height; setText(I), getString(I), findViewById) — classes de view sem host (ImageView/…) e configs específicas (land/locale) respondem tipadas\n");
-    md.push_str("- Render/agente: `NOT_IMPLEMENTED(module_id)` estruturado (M4+)\n");
+    md.push_str("- Render/agente: render headless, árvore acessível e MCP já disponíveis em subconjuntos documentados; APIs ausentes retornam `NOT_IMPLEMENTED(module_id)`\n");
 
     std::fs::create_dir_all(out.parent().unwrap_or(Path::new(".")))?;
     std::fs::write(out, &md).with_context(|| format!("writing {}", out.display()))?;
     println!("compat-matrix gerada: {}", out.display());
+    Ok(())
+}
+
+/// Preserve the rest of the master spec byte-for-byte; only the marked table changes.
+fn engine_spec(root: &Path, out: &Path) -> Result<()> {
+    let spec = std::fs::read_to_string(root.join("RustyDroid.md"))?;
+    let registry = rd_engine_registry::Registry::load(&root.join("data/engines.toml"))?;
+    let start = "<!-- BEGIN ENGINE REGISTRY -->";
+    let end = "<!-- END ENGINE REGISTRY -->";
+    let (before, rest) = spec
+        .split_once(start)
+        .context("engine table start marker missing")?;
+    let (_, after) = rest
+        .split_once(end)
+        .context("engine table end marker missing")?;
+    let generated = format!("{before}{start}\n{}{end}{after}", registry.appendix_table());
+    std::fs::write(out, generated).with_context(|| format!("writing {}", out.display()))?;
+    println!("Appendix G table: {}", out.display());
     Ok(())
 }
 
@@ -593,6 +638,151 @@ mod tests {
         assert_eq!(
             got, want,
             "docs/compat-matrix.md desatualizado — rode `cargo xtask compat-report`"
+        );
+    }
+
+    #[test]
+    fn engine_report_and_appendix_table_match_the_versioned_catalog() {
+        let root = repo_root();
+        let registry = rd_engine_registry::Registry::load(&root.join("data/engines.toml")).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(root.join("docs/engine-registry.md")).unwrap(),
+            registry.markdown()
+        );
+        let spec = std::fs::read_to_string(root.join("RustyDroid.md")).unwrap();
+        let (_, table) = spec.split_once("<!-- BEGIN ENGINE REGISTRY -->\n").unwrap();
+        let (table, _) = table.split_once("<!-- END ENGINE REGISTRY -->").unwrap();
+        assert_eq!(
+            table,
+            registry.appendix_table(),
+            "run cargo xtask engine-spec"
+        );
+    }
+
+    #[test]
+    fn language_features_match_catalog_dependencies_and_forwarding() {
+        let root = repo_root();
+        let registry = rd_engine_registry::Registry::load(&root.join("data/engines.toml")).unwrap();
+        for pkg in ["rd-engine-registry", "rd-agent", "rd-cli"] {
+            let text =
+                std::fs::read_to_string(root.join("crates").join(pkg).join("Cargo.toml")).unwrap();
+            let cargo: toml::Value = toml::from_str(&text).unwrap();
+            let features = cargo.get("features").unwrap();
+            let defaults: Vec<&str> = features["default"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_str().unwrap())
+                .collect();
+            if pkg == "rd-engine-registry" {
+                assert!(
+                    defaults.is_empty(),
+                    "registry language contracts are opt-in"
+                );
+            } else {
+                assert_eq!(
+                    defaults,
+                    ["advanced-components"],
+                    "{pkg}: preserve existing defaults"
+                );
+                let expected_native: Vec<toml::Value> = if pkg == "rd-cli" {
+                    vec!["rd-vm/native", "rd-agent/native"]
+                } else {
+                    vec!["rd-vm/native"]
+                }
+                .into_iter()
+                .map(|s| toml::Value::String(s.into()))
+                .collect();
+                assert_eq!(
+                    features["native"].as_array().unwrap(),
+                    &expected_native,
+                    "native must reach the MCP native_state implementation too"
+                );
+                let native_engines: Vec<toml::Value> = if pkg == "rd-cli" {
+                    vec![
+                        "native",
+                        "rd-engine-registry/native-execution",
+                        "rd-agent/native-engines",
+                    ]
+                } else {
+                    vec!["native", "rd-engine-registry/native-execution"]
+                }
+                .into_iter()
+                .map(|s| toml::Value::String(s.into()))
+                .collect();
+                assert_eq!(
+                    features["native-engines"].as_array().unwrap(),
+                    &native_engines
+                );
+                assert_eq!(
+                    features["advanced-components"].as_array().unwrap(),
+                    &[toml::Value::String("rd-vm/advanced-components".into())],
+                    "{pkg}: preserve default component forwarding"
+                );
+                let expected_jit: Vec<toml::Value> = if pkg == "rd-cli" {
+                    vec!["rd-vm/jit", "rd-agent/jit"]
+                } else {
+                    vec!["rd-vm/jit"]
+                }
+                .into_iter()
+                .map(|s| toml::Value::String(s.into()))
+                .collect();
+                assert_eq!(
+                    features["jit"].as_array().unwrap(),
+                    &expected_jit,
+                    "{pkg}: preserve opt-in JIT forwarding"
+                );
+            }
+            assert!(
+                defaults.iter().all(|f| !f.starts_with("lang-")),
+                "{pkg}: language contracts are opt-in"
+            );
+            for module in registry.modules() {
+                let actual: Vec<String> = features
+                    .get(&module.feature)
+                    .unwrap()
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_str().unwrap().to_string())
+                    .collect();
+                let expected = match pkg {
+                    "rd-engine-registry" => {
+                        module.depends_on.iter().map(|d| d.to_lowercase()).collect()
+                    }
+                    "rd-agent" => vec![format!("rd-engine-registry/{}", module.feature)],
+                    _ => vec![
+                        format!("rd-engine-registry/{}", module.feature),
+                        format!("rd-agent/{}", module.feature),
+                    ],
+                };
+                assert_eq!(actual, expected, "{pkg}: {} drift", module.feature);
+            }
+        }
+    }
+
+    #[test]
+    fn manifest_explicitly_scopes_registry_without_selecting_new_runtimes() {
+        let root = repo_root();
+        let manifest: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(root.join("rustydroid.manifest.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(manifest["registries"]["appendix_g"]["engines"], 28);
+        assert_eq!(
+            manifest["registries"]["appendix_g"]["scope"],
+            rd_engine_registry::SCOPE
+        );
+        assert_eq!(
+            manifest["registries"]["appendix_g"]["runtime_selection_unchanged"],
+            true
+        );
+        let selected = manifest["selected"].as_array().unwrap();
+        assert!(
+            !selected
+                .iter()
+                .any(|m| m.as_str().unwrap().starts_with("LANG-")),
+            "registry delivery must not silently select runtime implementations"
         );
     }
 }
