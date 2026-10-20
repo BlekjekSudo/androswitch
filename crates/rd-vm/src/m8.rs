@@ -1083,6 +1083,11 @@ fn dialog_set_showing(vm: &mut Engine, dialog: ObjRef, show: bool) -> Result<(),
     if let Some(st) = vm.fw.m8.dialogs.get_mut(&dialog) {
         st.showing = show;
     }
+    if show != was {
+        // WindowManager.addView/removeView → ViewRootImpl.requestLayout:
+        // the next vsync traverses the new (or uncovered) window
+        vm.fw.traversal_pending = true;
+    }
     if show && !was {
         let created = (dialog, "dlg:created".to_string());
         if vm.view_props.insert(created, Value::Int(1)).is_none() {

@@ -689,22 +689,10 @@ impl Engine {
             self.gfx.frame_valid = false;
             return Ok(0);
         }
-        for v in &dex_roots {
-            let Some((x, y, w, h, _)) = bounds(self, *v) else {
-                continue;
-            };
-            let (w, h) = (
-                if w > 0 { w } else { fw_ - x },
-                if h > 0 { h } else { fh_ - y },
-            );
-            measure(self, *v, EXACTLY | w, EXACTLY | h)?;
-            set_prop(self, *v, "rd_host_root", 1);
-            layout(self, *v, x, y, x + w, y + h)?;
-        }
-        // 1b. dialog windows above the activity (WindowManager z-order)
-        for (dlg, root) in &dialogs {
-            self.layout_dialog_window(*dlg, *root)?;
-        }
+        self.fw.in_traversal = true;
+        let laid = self.layout_roots(&dex_roots, &dialogs);
+        self.fw.in_traversal = false;
+        laid?;
         // 2. let layout-triggered frame callbacks / posted work run
         let now = self.fw.clock();
         let _ = now;
@@ -720,6 +708,47 @@ impl Engine {
         }
         self.end_frame();
         Ok(self.frame_op_count())
+    }
+
+    /// One layout traversal (ViewRootImpl measure + layout) of the current
+    /// activity window and every showing dialog window, without recording a
+    /// frame. Run from `advance_clock` when a view requested a traversal.
+    pub(crate) fn layout_pass(&mut self) -> Result<(), VmExit> {
+        let Some(activity) = self.fw.current_activity else {
+            return Ok(());
+        };
+        let Some(content) = self.window_content_of(activity) else {
+            return Ok(());
+        };
+        let mut dex_roots = Vec::new();
+        self.collect_dex_roots(content, &mut dex_roots, 0);
+        let dialogs = crate::m8::showing_dialog_roots(self);
+        self.layout_roots(&dex_roots, &dialogs)
+    }
+
+    fn layout_roots(
+        &mut self,
+        dex_roots: &[ObjRef],
+        dialogs: &[(ObjRef, ObjRef)],
+    ) -> Result<(), VmExit> {
+        let (fw_, fh_) = (crate::graphics::FB_W as i32, crate::graphics::FB_H as i32);
+        for v in dex_roots {
+            let Some((x, y, w, h, _)) = bounds(self, *v) else {
+                continue;
+            };
+            let (w, h) = (
+                if w > 0 { w } else { fw_ - x },
+                if h > 0 { h } else { fh_ - y },
+            );
+            measure(self, *v, EXACTLY | w, EXACTLY | h)?;
+            set_prop(self, *v, "rd_host_root", 1);
+            layout(self, *v, x, y, x + w, y + h)?;
+        }
+        // 1b. dialog windows above the activity (WindowManager z-order)
+        for (dlg, root) in dialogs {
+            self.layout_dialog_window(*dlg, *root)?;
+        }
+        Ok(())
     }
 
     /// Measure/lay out a dialog's window content as a floating window:
@@ -752,7 +781,7 @@ impl Engine {
         layout(self, root, x, y, x + mw, y + mh)
     }
 
-    fn collect_dex_roots(&self, v: ObjRef, out: &mut Vec<ObjRef>, depth: usize) {
+    pub(crate) fn collect_dex_roots(&self, v: ObjRef, out: &mut Vec<ObjRef>, depth: usize) {
         if depth > 256 {
             return;
         }

@@ -1362,6 +1362,44 @@ fn cmd_app_run(
                     println!("[tap {x},{y}] listener acionado: {hit}");
                 }
             }
+            ("swipe", rest) => {
+                // swipe X1,Y1,X2,Y2[,MS] — same gesture as the MCP `swipe` tool
+                let nums: Vec<i64> = rest
+                    .copied()
+                    .unwrap_or("")
+                    .split(',')
+                    .filter_map(|t| t.trim().parse().ok())
+                    .collect();
+                if nums.len() < 4 {
+                    return Err(RdError::new(
+                        "INVALID_FORMAT",
+                        format!("script swipe inválido: {script:?}"),
+                        "rd-cli",
+                    )
+                    .with_suggestion("use --script \"swipe X1,Y1,X2,Y2[,MS]\""));
+                }
+                let ms = nums.get(4).copied().unwrap_or(300).max(0) as u64;
+                let rep = eng
+                    .swipe_app(
+                        nums[0] as i32,
+                        nums[1] as i32,
+                        nums[2] as i32,
+                        nums[3] as i32,
+                        ms,
+                    )
+                    .map_err(vm_err_to_rd)?;
+                if !json {
+                    println!(
+                        "[swipe {},{}→{},{} {ms}ms] views atravessadas: {} clique: {}",
+                        nums[0],
+                        nums[1],
+                        nums[2],
+                        nums[3],
+                        rep.crossed.len(),
+                        rep.clicked
+                    );
+                }
+            }
             ("wait", rest) => {
                 let ms: u64 = rest.and_then(|r| r.trim().parse().ok()).ok_or_else(|| {
                     RdError::new(

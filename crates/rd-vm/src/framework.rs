@@ -218,6 +218,11 @@ pub struct HostState {
     pub(crate) sublist_order: std::collections::VecDeque<ObjRef>,
     /// clock virtual (ms) — postDelayed/dispatch por ordem de tempo
     pub clock_ms: u64,
+    /// A view called invalidate/requestLayout: ViewRootImpl schedules a
+    /// traversal for the next vsync (`advance_clock` runs `layout_pass`).
+    pub(crate) traversal_pending: bool,
+    /// re-entrancy guard for the traversal run from `advance_clock`
+    pub(crate) in_traversal: bool,
     main_looper: Option<ObjRef>,
     /// M8: thread "main" sintética (VM single-threaded — ver `THREAD`)
     pub(crate) main_thread: Option<ObjRef>,
@@ -921,6 +926,16 @@ impl Engine {
     /// the looper drained between events). Returns whether the DOWN was
     /// consumed.
     pub fn touch_sequence(&mut self, root: ObjRef, pts: &[(i32, i32)]) -> Result<bool, VmExit> {
+        self.touch_sequence_timed(root, pts, 16)
+    }
+
+    /// `touch_sequence` with `step_ms` between consecutive events.
+    pub fn touch_sequence_timed(
+        &mut self,
+        root: ObjRef,
+        pts: &[(i32, i32)],
+        step_ms: u64,
+    ) -> Result<bool, VmExit> {
         let Some(&(x0, y0)) = pts.first() else {
             return Ok(false);
         };
@@ -960,7 +975,7 @@ impl Engine {
                 consumed = r;
             }
             if i != n - 1 {
-                self.advance_clock(16)?;
+                self.advance_clock(step_ms.max(1))?;
             }
         }
         Ok(consumed)
@@ -1046,7 +1061,52 @@ impl Engine {
                 clicked: false,
             });
         };
+        let _ = self.ensure_laid_out();
         const STEPS: i32 = 8;
+        // the topmost window under the start point takes the gesture
+        // (WindowManager z-order): a showing dialog, else the activity
+        let mut root = content;
+        if let Some(&(_, dr)) = crate::m8::showing_dialog_roots(self).last() {
+            if matches!(self.fw.get(dr),
+                Some(HostObj::View { x, y, w, h, .. })
+                    if x1 >= *x && x1 < x + w && y1 >= *y && y1 < y + h)
+            {
+                root = dr;
+            }
+        }
+        // DEX views (custom views, Compose, RecyclerView, …) handle drags
+        // themselves: deliver a real DOWN → MOVE… → UP MotionEvent stream.
+        let mut dex = Vec::new();
+        self.collect_dex_roots(root, &mut dex, 0);
+        if !dex.is_empty() || root != content {
+            let pts: Vec<(i32, i32)> = (0..=STEPS)
+                .map(|i| {
+                    let t = i as f32 / STEPS as f32;
+                    (
+                        x1 + ((x2 - x1) as f32 * t).round() as i32,
+                        y1 + ((y2 - y1) as f32 * t).round() as i32,
+                    )
+                })
+                .collect();
+            let step = (ms / STEPS as u64).max(16);
+            let mut crossed: Vec<CrossedView> = Vec::new();
+            for &(x, y) in &pts {
+                if let Some(t) = self.hit_test(root, x, y) {
+                    let entry = CrossedView {
+                        class: self.heap.class_of(t)?.to_string(),
+                        bounds: self.view_bounds(t),
+                    };
+                    if crossed.last() != Some(&entry) {
+                        crossed.push(entry);
+                    }
+                }
+            }
+            self.touch_sequence_timed(root, &pts, step)?;
+            return Ok(SwipeReport {
+                crossed,
+                clicked: false,
+            });
+        }
         let mut crossed: Vec<CrossedView> = Vec::new();
         let mut first: Option<ObjRef> = None;
         let mut last: Option<ObjRef> = None;
@@ -1309,7 +1369,8 @@ impl Engine {
         let mut ticks = 0usize;
         loop {
             let now = self.fw.clock_ms;
-            let step_to = if !self.frames.callbacks.is_empty() && ticks < MAX_VSYNC_TICKS {
+            let animating = !self.frames.callbacks.is_empty() || self.fw.traversal_pending;
+            let step_to = if animating && ticks < MAX_VSYNC_TICKS {
                 ticks += 1;
                 // next vsync boundary after `now`
                 ((now / VSYNC_MS) + 1) * VSYNC_MS
@@ -1320,6 +1381,35 @@ impl Engine {
             #[cfg(feature = "advanced-components")]
             self.m9_expire_notifications()?;
             ran += self.drain_looper()?;
+            // ViewRootImpl.performTraversals on this vsync: re-measure and
+            // re-lay out the window when a view asked for it, so layout-driven
+            // work (onGloballyPositioned, anchors of sheets/drawers, lazy
+            // lists) progresses without needing a screenshot.
+            if self.fw.traversal_pending && !self.fw.in_traversal {
+                self.fw.traversal_pending = false;
+                if std::env::var("RD_TRACE_DRAW").is_ok() {
+                    eprintln!(
+                        "D/RustyDroid: traversal at {} ms (frame callbacks {})",
+                        self.fw.clock_ms,
+                        self.frames.callbacks.len()
+                    );
+                }
+                self.fw.in_traversal = true;
+                let r = self.layout_pass();
+                self.fw.in_traversal = false;
+                if let Err(e) = r {
+                    match e {
+                        VmExit::Exception(t) => {
+                            eprintln!(
+                                "W/RustyDroid: traversal failed: {} {:?}",
+                                t.class, t.message
+                            )
+                        }
+                        other => return Err(other),
+                    }
+                }
+                ran += self.drain_looper()?;
+            }
             if self.fw.clock_ms >= target {
                 return Ok(ran);
             }
@@ -2752,6 +2842,7 @@ pub(crate) fn set_content_view(
         *c = Some(content);
     }
     crate::window::on_content_set(vm, w, content)?;
+    vm.fw.traversal_pending = true;
     // layout do root com as dimensões da window
     vm.layout(content, 0, 0, WINDOW_W);
     let _ = WINDOW_H;

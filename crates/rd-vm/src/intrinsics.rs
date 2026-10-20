@@ -3695,6 +3695,13 @@ fn instance_intrinsic_dispatch(
             let c = vm.class_object_for(&cls)?;
             Ok(Some(Value::Obj(c)))
         }
+        // ── Object monitor methods: final on Object, so no DEX class can
+        // declare them. The VM is single-threaded: notify/notifyAll have no
+        // waiter to wake, and wait(..) returns at once (a spurious wakeup,
+        // which the JLS allows; callers re-check their condition in a loop).
+        (_, "notify" | "notifyAll", "()V") | (_, "wait", "()V" | "(J)V" | "(JI)V") => {
+            Ok(Some(Value::Null))
+        }
         // ── Activity.getApplication (M8, 38º gap real): final na plataforma;
         // o DEX do app referencia o método pela PRÓPRIA classe do receiver
         // (mref_class = ex.: Lorg/primftpd/ui/MainTabsActivity;), que não é

@@ -191,6 +191,13 @@ pub(crate) fn fallback(
             _ => {}
         }
     }
+    if ret == "V" && matches!(name, "requestLayout" | "forceLayout") {
+        // requestLayout → ViewRootImpl schedules a layout traversal. Plain
+        // invalidate() only dirties the display list: headless there is
+        // nothing to draw until a screenshot records a frame, so it does
+        // not schedule work (and avoids per-vsync relayout churn).
+        vm.fw.traversal_pending = true;
+    }
     if ret == "V" && args.is_empty() && NOOP_ACTIONS.contains(&name) {
         return Ok(Some(Value::Null));
     }
