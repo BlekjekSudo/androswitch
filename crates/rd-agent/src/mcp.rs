@@ -2647,6 +2647,9 @@ pub fn tools_markdown() -> String {
             },
         ));
     }
+    // Keep generated Markdown canonical: one final newline, no blank EOF line.
+    out.truncate(out.trim_end().len());
+    out.push('\n');
     out
 }
 
@@ -5191,6 +5194,8 @@ mod tests {
         let docs_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs");
         let path = docs_dir.join("mcp-tools.md");
         let generated = tools_markdown();
+        assert!(generated.ends_with('\n'));
+        assert!(!generated.ends_with("\n\n"), "no generated blank EOF line");
         match std::fs::read_to_string(&path) {
             Ok(committed) => {
                 assert_eq!(

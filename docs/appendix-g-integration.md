@@ -31,6 +31,8 @@ The older [2026-10-14 report](appendix-g-validation.md) is historical and its
   when metadata is stale or the source is a growing/endless stream. Two tests
   exercise the read boundary; adapter tests still require `NOT_IMPLEMENTED`.
 
+- MCP documentation generation now emits exactly one final newline, with
+  an explicit regression assertion plus the unchanged exact-output check.
 - Fixed 20 advisory Markdown issues, including a malformed JNI table and
   literal glob/bounds syntax; no lint rule was disabled.
 
@@ -47,7 +49,7 @@ The older [2026-10-14 report](appendix-g-validation.md) is historical and its
 | Nightly fuzz builds, rd-apk and rd-dex | Passed with cargo-fuzz 0.13.2 / nightly 1.101.0 (2026-10-19) |
 | Minimal CLI and minimal VM | Passed |
 | Rust 1.76 workspace/all features/locked | Passed |
-| Generated engine report/spec/compatibility table | Exact equality |
+| Generated engine/MCP reports, spec and compatibility table | Exact equality |
 | Registry minimal, all features, each LANG individually | All 14 configurations passed |
 | Explicit real-APK registry integration | Passed on Comprix 1.6.0, 448 ZIP entries |
 | Real CLI detect vs inspect JSON | Equal; 28 rows; `execution_claimed: false` |
@@ -110,5 +112,5 @@ for supported subsets and limitations.
 - Nightly fuzz validation was build-only, not a 24-hour fuzzing campaign.
   Local CI-equivalent checks do not substitute the new GitHub checks.
 
-Report finalized 2026-10-20T08:51:23+00:00. Raw CLI/MCP/native/JVM evidence and the complete sectioned
+Report finalized 2026-10-20T09:03:17+00:00. Raw CLI/MCP/native/JVM evidence and the complete sectioned
 work log are retained in the accompanying workspace validation artifacts.

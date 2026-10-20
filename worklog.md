@@ -1350,3 +1350,7 @@ Reconciled original registry branch30411ec with main7ce8ba3 in a local integrati
 Local gates: 548 all-feature / 537 default tests passed; Clippy, fmt, minimal VM/CLI, Rust1.76 and generated docs passed. Registry all12 individual LANG configurations and explicit real-APK hook passed. JVM150/150, no-app contract8/8 and five real native APKs on each of3ABIs passed. Fresh typed Comprix20-cycle runs with JIT off/on both completed, item survived forced major GC; independent GC-off2-cycle baseline passed. Full details: docs/appendix-g-integration.md.
 
 AI assistance disclosed; updated-source remote CI and human review still required before merge. Source/cache recovery and command/tool ledger are preserved separately in the accompanying workspace worklog; no credential is committed.
+
+## 2026-10-20 — canonical MCP documentation follow-up
+
+The full rerun caught the generator EOF invariant after advisory Markdown cleanup. Fixed the generator itself (one final newline), retained exact generated-file equality, and added a no-blank-EOF assertion. Latest rebuilt native/JIT CLI completed both typed20-cycle Comprix campaigns again with strict title/item audits, forced-major item persistence, JVM150/150 and all15native APK/ABI combinations passing. Nightly fuzz targets build; pinned Markdown has29files/0issues. No remote write, new-head GitHub CI result or human review is fabricated.
