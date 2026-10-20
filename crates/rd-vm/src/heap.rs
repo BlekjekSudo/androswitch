@@ -182,6 +182,29 @@ impl Heap {
         Ok(())
     }
 
+    /// `alloc_array` with every element set to the JVM default for its kind
+    /// (0, 0L, 0.0f, 0.0, null) — use this for buffers handed to guest code
+    /// (`read(byte[], off, len)` scratch arrays, host-created arrays).
+    pub fn alloc_array_zeroed(
+        &mut self,
+        elem: ElemKind,
+        len: usize,
+        elem_class: &str,
+    ) -> Result<ObjRef, OomError> {
+        let r = self.alloc_array(elem, len, elem_class)?;
+        let fill = match elem {
+            ElemKind::Int => Value::Int(0),
+            ElemKind::Long => Value::Long(0),
+            ElemKind::Float => Value::Float(0.0),
+            ElemKind::Double => Value::Double(0.0),
+            ElemKind::Obj => Value::Null,
+        };
+        if let Ok(e) = self.array_elems_mut(r) {
+            e.resize(len, fill);
+        }
+        Ok(r)
+    }
+
     pub fn alloc_array(
         &mut self,
         elem: ElemKind,

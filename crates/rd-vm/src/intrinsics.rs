@@ -290,6 +290,12 @@ pub fn call_static_intrinsic(
     if let Some(v) = crate::android_colorspace::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
+    if let Some(v) = crate::jrandom::static_intrinsic(vm, class, name)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::jnormalizer::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
     if class.starts_with("Ljava/math/") {
         if let Some(v) = crate::jbigdecimal::static_intrinsic(vm, class, name, sig, args)? {
             return Ok(Some(v));
@@ -964,7 +970,48 @@ fn class_supported(name: &str, sig: &str) -> bool {
                 "(Ljava/lang/String;)Ljava/lang/reflect/Field;"
             )
             | ("getDeclaredFields", "()[Ljava/lang/reflect/Field;")
+            | ("getField", "(Ljava/lang/String;)Ljava/lang/reflect/Field;")
     )
+}
+
+/// Value of a platform static constant (Build.VERSION.SDK_INT, Integer.MAX_VALUE,
+/// BigDecimal.ZERO, …) through the same host hooks `sget` uses; cached in
+/// `vm.statics`.
+fn platform_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<Value>, VmExit> {
+    let key = (owner.to_string(), field.to_string());
+    if let Some(v) = vm.statics.get(&key) {
+        return Ok(Some(v.clone()));
+    }
+    let v = match crate::android_build::host_static(vm, owner, field)? {
+        Some(v) => Some(v),
+        None => match crate::boxes::host_static(vm, owner, field)? {
+            Some(v) => Some(v),
+            None => match crate::jbigdecimal::host_static(vm, owner, field)? {
+                Some(v) => Some(v),
+                None => crate::jnormalizer::host_static(vm, owner, field)?,
+            },
+        },
+    };
+    if let Some(v) = &v {
+        vm.statics.insert(key, v.clone());
+    }
+    Ok(v)
+}
+
+/// Field descriptor for a host static value (reflection metadata).
+fn type_of_value(vm: &Engine, v: &Value) -> String {
+    match v {
+        Value::Int(_) => "I".into(),
+        Value::Long(_) => "J".into(),
+        Value::Float(_) => "F".into(),
+        Value::Double(_) => "D".into(),
+        Value::Obj(r) => vm
+            .heap
+            .class_of(*r)
+            .unwrap_or("Ljava/lang/Object;")
+            .to_string(),
+        _ => "Ljava/lang/Object;".into(),
+    }
 }
 
 /// Descritor → nome binário Java ("Lcom/x/Y;" → "com.x.Y"; arrays/primitivos
@@ -997,6 +1044,58 @@ fn class_intrinsic(
         Ok(Value::Obj(r)) => vm.heap.as_str(r)?.to_string(),
         _ => String::new(),
     };
+    if name == "getField" {
+        // public fields of the class and its superclasses (JLS getField);
+        // platform classes without DEX metadata expose their host constants
+        let field_name = string_arg(vm, &args[0])?;
+        let mut cur = Some(desc.clone());
+        let mut found = None;
+        let mut depth = 0;
+        while let Some(c) = cur {
+            if depth > 32 {
+                break;
+            }
+            depth += 1;
+            if let Some(f) = vm
+                .cp
+                .declared_fields_info(&c)
+                .into_iter()
+                .find(|(_, n, _, m, _)| n == &field_name && m & 0x0001 != 0)
+            {
+                found = Some(f);
+                break;
+            }
+            cur = vm.cp.superclass_of(&c);
+        }
+        if found.is_none() && vm.cp.find_class(&desc).is_none() {
+            if let Some(v) = platform_static(vm, &desc, &field_name)? {
+                let ty = type_of_value(vm, &v);
+                found = Some((desc.clone(), field_name.clone(), ty, 0x0019, true));
+            }
+        }
+        let Some((declaring_class, field_name, field_type, modifiers, is_static)) = found else {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/NoSuchFieldException;",
+                field_name,
+            )));
+        };
+        let field = vm
+            .heap
+            .alloc_instance(REFLECT_FIELD.to_string(), Vec::new())
+            .map_err(crate::err::oom_throwable)?;
+        vm.fw.objects.insert(
+            field,
+            crate::framework::HostObj::ReflectField {
+                declaring_class,
+                name: field_name,
+                field_type,
+                modifiers,
+                is_static,
+                accessible: false,
+            },
+        );
+        return Ok(Some(Value::Obj(field)));
+    }
     if name == "getDeclaredField" {
         let field_name = string_arg(vm, &args[0])?;
         let metadata = if desc == UNSAFE_CLASS && field_name == "theUnsafe" {
@@ -1323,12 +1422,34 @@ fn reflect_field_intrinsic(
                 return Ok(Some(Value::Obj(unsafe_singleton(vm, &declaring_class)?)));
             }
             if is_static {
-                return Ok(Some(
-                    vm.statics
-                        .get(&(declaring_class, field_name))
-                        .cloned()
-                        .unwrap_or(Value::Null),
-                ));
+                let v = match vm
+                    .statics
+                    .get(&(declaring_class.clone(), field_name.clone()))
+                {
+                    Some(v) => v.clone(),
+                    None => {
+                        platform_static(vm, &declaring_class, &field_name)?.unwrap_or(Value::Null)
+                    }
+                };
+                // Field.get returns Object: primitives come back boxed
+                let wrapper = match field_type.as_str() {
+                    "I" => Some("Ljava/lang/Integer;"),
+                    "J" => Some("Ljava/lang/Long;"),
+                    "Z" => Some("Ljava/lang/Boolean;"),
+                    "F" => Some("Ljava/lang/Float;"),
+                    "D" => Some("Ljava/lang/Double;"),
+                    "S" => Some("Ljava/lang/Short;"),
+                    "B" => Some("Ljava/lang/Byte;"),
+                    "C" => Some("Ljava/lang/Character;"),
+                    _ => None,
+                };
+                return Ok(Some(match (wrapper, &v) {
+                    (
+                        Some(w),
+                        Value::Int(_) | Value::Long(_) | Value::Float(_) | Value::Double(_),
+                    ) => Value::Obj(crate::boxes::box_value(vm, w, v)?),
+                    _ => v,
+                }));
             }
             let Some(target) = args.first().and_then(|v| v.as_ref().ok().flatten()) else {
                 return Err(VmExit::Exception(Throwable::new(
@@ -2332,7 +2453,21 @@ pub fn values_equal(heap: &crate::heap::Heap, a: &Value, b: &Value) -> Result<bo
             }
             match cx {
                 STRING => Ok(heap.as_str(*x)? == heap.as_str(*y)?),
-                INTEGER | LONG | BOOLEAN => Ok(heap.get_field(*x, "value")?.as_int()?
+                // Long payloads are 64-bit (an Int payload widens)
+                LONG => {
+                    let wide = |v: Value| -> Result<i64, String> {
+                        match v {
+                            Value::Int(i) => Ok(i as i64),
+                            other => other.as_long(),
+                        }
+                    };
+                    Ok(wide(heap.get_field(*x, "value")?)? == wide(heap.get_field(*y, "value")?)?)
+                }
+                INTEGER
+                | BOOLEAN
+                | "Ljava/lang/Short;"
+                | "Ljava/lang/Byte;"
+                | "Ljava/lang/Character;" => Ok(heap.get_field(*x, "value")?.as_int()?
                     == heap.get_field(*y, "value")?.as_int()?),
                 DOUBLE => Ok(heap.get_field(*x, "value")?.as_double()?
                     == heap.get_field(*y, "value")?.as_double()?),
@@ -3288,6 +3423,23 @@ pub fn call_instance_intrinsic(
 /// para Enum: a chamada super `Enum.<init>(String,int)` tem mref_class =
 /// `Ljava/lang/Enum;` mas receiver de classe do app — e o construtor da
 /// classe do app (DEX) NÃO pode ser sequestrado pelo intrínseco.
+pub(crate) const CONTEXT_IMPL: &str = "Landroid/app/ContextImpl;";
+
+/// The process-wide `ContextImpl` singleton (base context of activities,
+/// services and the Application).
+pub(crate) fn context_impl(vm: &mut Engine) -> Result<crate::heap::ObjRef, VmExit> {
+    let key = (CONTEXT_IMPL.to_string(), "rd_instance".to_string());
+    if let Some(Value::Obj(r)) = vm.statics.get(&key) {
+        return Ok(*r);
+    }
+    let r = vm
+        .heap
+        .alloc_instance(CONTEXT_IMPL.to_string(), Vec::new())
+        .map_err(crate::err::oom_throwable)?;
+    vm.statics.insert(key, Value::Obj(r));
+    Ok(r)
+}
+
 pub fn call_instance_intrinsic_mref(
     vm: &mut Engine,
     recv_class: &str,
@@ -3303,6 +3455,17 @@ pub fn call_instance_intrinsic_mref(
         let r = instance_intrinsic_dispatch(vm, recv_class, mref_class, name, sig, recv, args);
         crate::jcollections::sublist_write_back(vm, recv);
         return r;
+    }
+    // ContextImpl (base of every ContextWrapper chain): platform calls are
+    // answered by the app's live context — the current activity, else the
+    // Application.
+    if recv_class == CONTEXT_IMPL && !matches!(name, "getBaseContext" | "<init>") {
+        let target = match vm.fw.current_activity {
+            Some(a) => a,
+            None => vm.application_obj()?,
+        };
+        let tc = vm.heap.class_of(target)?.to_string();
+        return call_instance_intrinsic_mref(vm, &tc, mref_class, name, sig, target, args);
     }
     let r = instance_intrinsic_dispatch(vm, recv_class, mref_class, name, sig, recv, args)?;
     if r.is_some() || name == "<init>" {
@@ -3375,6 +3538,12 @@ fn instance_intrinsic_dispatch(
     // java.util.PriorityQueue (jpriorityqueue.rs)
     if let Some(v) =
         crate::jpriorityqueue::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // java.util.Random / ThreadLocalRandom (jrandom.rs)
+    if let Some(v) =
+        crate::jrandom::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
     {
         return Ok(Some(v));
     }

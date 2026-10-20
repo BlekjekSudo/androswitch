@@ -88,6 +88,9 @@ pub struct Engine {
     pub(crate) break_iters: HashMap<crate::heap::ObjRef, crate::jbreakiter::BreakState>,
     /// BigDecimal/BigInteger values: (unscaled, scale) (jbigdecimal.rs).
     pub(crate) bignums: HashMap<crate::heap::ObjRef, (i128, i32)>,
+    /// dex pc of the instruction the interpreter executed last (diagnostics:
+    /// VM errors name the faulting instruction of the innermost frame)
+    pub(crate) last_pc: usize,
     /// view_attach.rs: OnAttachStateChangeListeners per view
     pub(crate) attach_listeners: HashMap<crate::heap::ObjRef, Vec<crate::heap::ObjRef>>,
     /// view_attach.rs: views currently attached to a window
@@ -167,6 +170,7 @@ impl Engine {
             view_props: HashMap::new(),
             break_iters: HashMap::new(),
             bignums: HashMap::new(),
+            last_pc: 0,
             attach_listeners: HashMap::new(),
             attached_views: HashSet::new(),
             gfx: Default::default(),
@@ -419,7 +423,7 @@ impl Engine {
         let frame_label = self.method_label(dex_idx, m);
         self.frame_labels.push(frame_label);
         self.depth += 1;
-        let mut ret = interp::exec_frame(self, dex_idx, frame_super.as_deref(), code, ins);
+        let mut ret = interp::exec_frame(self, dex_idx, frame_super.as_deref(), code.clone(), ins);
         self.depth -= 1;
         self.frame_labels.pop();
         // Observabilidade opt-in (default off — nenhuma saída existente muda):
@@ -454,6 +458,15 @@ impl Engine {
                 // hit the gap. The green-thread park signal is control flow,
                 // not an error.
                 Err(VmExit::Error(ref mut e)) if e.code != crate::threads::PARK_SIGNAL => {
+                    if !e.cause.contains("\n  at ") {
+                        // innermost frame: name the faulting instruction
+                        let pc = self.last_pc;
+                        if let Some((_, insn)) = code.instructions.iter().find(|(a, _)| *a == pc) {
+                            let mut d = format!("{insn:?}");
+                            d.truncate(160);
+                            e.cause.push_str(&format!(" [pc 0x{pc:x}: {d}]"));
+                        }
+                    }
                     let line = format!("\n  at {}", self.method_label(dex_idx, m));
                     e.cause.push_str(&line);
                 }

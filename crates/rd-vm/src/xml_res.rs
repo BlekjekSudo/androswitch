@@ -91,6 +91,29 @@ fn not_found(id: i32) -> VmExit {
 }
 
 /// Opens the compiled XML behind resource `id` as a parser object.
+/// Bytes of the APK file a file-based resource id resolves to
+/// (res/raw/*, res/xml/*, …), following resource references.
+fn resource_file_bytes(vm: &mut Engine, id: i32) -> Result<Vec<u8>, VmExit> {
+    let mut rid = id as u32;
+    let mut path = None;
+    for _ in 0..8 {
+        match vm.resolve_resource_value(rid).map_err(|_| not_found(id))? {
+            rd_apk::arsc::ResolvedValue::Str(s) => {
+                path = Some(s);
+                break;
+            }
+            rd_apk::arsc::ResolvedValue::Reference(r) => rid = r,
+            _ => break,
+        }
+    }
+    let path = path
+        .filter(|p| p.starts_with("res/"))
+        .ok_or_else(|| not_found(id))?;
+    let apk = vm.fw.resources.as_ref().ok_or_else(|| not_found(id))?;
+    let entry = apk.zip.find(&path).ok_or_else(|| not_found(id))?;
+    apk.zip.read_entry(entry).map_err(|_| not_found(id))
+}
+
 fn open_xml(vm: &mut Engine, id: i32) -> Result<Value, VmExit> {
     let mut rid = id as u32;
     let mut path = None;
@@ -438,6 +461,15 @@ pub fn instance_intrinsic(
                     _ => 0,
                 };
                 Some(open_xml(vm, id)?)
+            }
+            ("openRawResource", "(I)Ljava/io/InputStream;")
+            | ("openRawResource", "(ILandroid/util/TypedValue;)Ljava/io/InputStream;") => {
+                let id = match args.first() {
+                    Some(Value::Int(i)) => *i,
+                    _ => 0,
+                };
+                let bytes = resource_file_bytes(vm, id)?;
+                Some(crate::jio_chars::new_byte_input_stream(vm, bytes)?)
             }
             _ => None,
         });

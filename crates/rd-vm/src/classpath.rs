@@ -769,9 +769,22 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
             "Landroid/content/Context;",
             "Ljava/lang/Object;",
         ]),
-        "Landroid/app/Activity;" => Some(CONTEXT.to_vec()),
-        "Landroid/app/Application;" => Some(CONTEXT.to_vec()),
-        "Landroid/app/Service;" => Some(CONTEXT.to_vec()),
+        // AOSP: Activity → ContextThemeWrapper → ContextWrapper → Context;
+        // Application/Service → ContextWrapper (apps unwrap contexts with
+        // `while (c instanceof ContextWrapper)` looking for owners)
+        "Landroid/app/Activity;" => Some(vec![
+            "Landroid/view/ContextThemeWrapper;",
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/app/Application;" | "Landroid/app/Service;" => Some(vec![
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        // the base context ending every ContextWrapper chain
+        "Landroid/app/ContextImpl;" => Some(CONTEXT.to_vec()),
         "Landroid/inputmethodservice/InputMethodService;"
         | "Landroid/accessibilityservice/AccessibilityService;"
         | "Landroid/service/notification/NotificationListenerService;" => Some(vec![
@@ -1047,11 +1060,18 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/util/concurrent/atomic/AtomicBoolean;" => Some(OBJECT.to_vec()),
         "Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;" => Some(OBJECT.to_vec()),
         "Ljava/lang/Enum;" => Some(OBJECT.to_vec()),
+        // java.util.Random (jrandom.rs)
+        "Ljava/util/Random;" => Some(OBJECT.to_vec()),
+        "Ljava/util/concurrent/ThreadLocalRandom;" => {
+            Some(vec!["Ljava/util/Random;", "Ljava/lang/Object;"])
+        }
         // java.math (jbigdecimal.rs)
         "Ljava/math/BigDecimal;" | "Ljava/math/BigInteger;" => {
             Some(vec!["Ljava/lang/Number;", "Ljava/lang/Object;"])
         }
-        "Ljava/math/RoundingMode;" => Some(vec!["Ljava/lang/Enum;", "Ljava/lang/Object;"]),
+        "Ljava/math/RoundingMode;" | "Ljava/text/Normalizer$Form;" => {
+            Some(vec!["Ljava/lang/Enum;", "Ljava/lang/Object;"])
+        }
         "Ljava/lang/ref/Reference;" => Some(OBJECT.to_vec()),
         "Ljava/lang/ref/WeakReference;" => {
             Some(vec!["Ljava/lang/ref/Reference;", "Ljava/lang/Object;"])

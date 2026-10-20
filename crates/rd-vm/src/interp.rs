@@ -88,6 +88,7 @@ pub(crate) fn exec_frame(
         }
 
         let cur_pc = pc;
+        vm.last_pc = cur_pc;
         let idx = lookup(&code.instructions, cur_pc)?;
         let insn = &code.instructions[idx].1;
         pc += insn.size as usize;
@@ -803,6 +804,10 @@ pub(crate) fn exec_frame(
                 // MAX_VALUE, NaN, ...) are materialized on first read.
                 if !vm.statics.contains_key(&(owner.clone(), fname.clone())) {
                     if let Some(c) = step!(crate::boxes::host_static(vm, &owner, &fname)) {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
+                        step!(crate::jnormalizer::host_static(vm, &owner, &fname))
+                    {
                         vm.statics.insert((owner.clone(), fname.clone()), c);
                     } else if let Some(c) =
                         step!(crate::jbigdecimal::host_static(vm, &owner, &fname))

@@ -473,7 +473,7 @@ fn load(vm: &mut Engine, recv: ObjRef) -> Result<RState, VmExit> {
                 loop {
                     let arr = vm
                         .heap
-                        .alloc_array(ElemKind::Int, 4096, "[C")
+                        .alloc_array_zeroed(ElemKind::Int, 4096, "[C")
                         .map_err(crate::err::oom_throwable)?;
                     let n = vm
                         .invoke_instance(
@@ -497,7 +497,7 @@ fn load(vm: &mut Engine, recv: ObjRef) -> Result<RState, VmExit> {
             loop {
                 let arr = vm
                     .heap
-                    .alloc_array(ElemKind::Int, 8192, "[B")
+                    .alloc_array_zeroed(ElemKind::Int, 8192, "[B")
                     .map_err(crate::err::oom_throwable)?;
                 let n = vm
                     .invoke_instance(
@@ -712,6 +712,22 @@ fn reader(
 
 // ── byte array streams ──────────────────────────────────────────────────
 
+/// A host `ByteArrayInputStream` over `bytes` (raw resources, assets).
+pub(crate) fn new_byte_input_stream(vm: &mut Engine, bytes: Vec<u8>) -> Result<Value, VmExit> {
+    let r = vm.heap.alloc_instance(BAIS.to_string(), Vec::new())?;
+    BYTES_ST.with(|m| {
+        m.borrow_mut().insert(
+            r,
+            BState {
+                bytes,
+                pos: 0,
+                mark: 0,
+            },
+        )
+    });
+    Ok(Value::Obj(r))
+}
+
 fn bytes_stream(
     vm: &mut Engine,
     class: &str,
@@ -915,7 +931,7 @@ fn dex_base(
         (READER, "read", "()I") => {
             let arr = vm
                 .heap
-                .alloc_array(ElemKind::Int, 1, "[C")
+                .alloc_array_zeroed(ElemKind::Int, 1, "[C")
                 .map_err(crate::err::oom_throwable)?;
             let n = vm
                 .invoke_instance(

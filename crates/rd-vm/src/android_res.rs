@@ -934,7 +934,9 @@ pub(crate) fn instance_intrinsic(
             ta
         }
         ("getMainLooper", _) => Value::Obj(vm.main_looper_obj()?),
-        ("getBaseContext", _) => Value::Obj(recv),
+        // ContextWrapper with no attached base: the platform ContextImpl
+        // (not a ContextWrapper, so unwrap loops terminate)
+        ("getBaseContext", _) => Value::Obj(crate::intrinsics::context_impl(vm)?),
         ("isRestricted", _) => Value::Int(0),
         ("getAttributionTag", _) => Value::Null,
         ("getText", "(I)Ljava/lang/CharSequence;") | ("getString", "(I)Ljava/lang/String;") => {
