@@ -178,9 +178,9 @@ Comutadores de comportamento targetSdk 26→36 ativos para o app instalado (PRF-
 
 ### `runtime_health`
 
-Saúde do runtime: sessão, app em execução, activity, finished, clock virtual, heap, fuel, fila do Looper, bytes de log e tamanho do registro — sem exigir app (reporta o que existe).
+Saúde do runtime: sessão, app em execução, activity, finished, clock virtual, heap, fuel, fila do Looper, bytes de log e tamanho do registro — sem exigir app (reporta o que existe). Inclui `gc` (estatísticas do coletor mark-sweep); `gc=true` força um ciclo antes de reportar.
 
-- Parâmetros: nenhum
+- Parâmetros: `gc`
 
 ### `compat_gaps`
 

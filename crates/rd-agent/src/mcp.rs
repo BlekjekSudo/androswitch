@@ -779,8 +779,8 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "runtime_health",
             description:
-                "Saúde do runtime: sessão, app em execução, activity, finished, clock virtual, heap, fuel, fila do Looper, bytes de log e tamanho do registro — sem exigir app (reporta o que existe).",
-            schema: obj(serde_json::json!({}), &[]),
+                "Saúde do runtime: sessão, app em execução, activity, finished, clock virtual, heap, fuel, fila do Looper, bytes de log e tamanho do registro — sem exigir app (reporta o que existe). Inclui `gc` (estatísticas do coletor mark-sweep); `gc=true` força um ciclo antes de reportar.",
+            schema: obj(serde_json::json!({ "gc": { "type": "boolean" } }), &[]),
         },
         ToolDef {
             name: "compat_gaps",
@@ -1050,7 +1050,14 @@ impl AgentSession {
             "permissions_audit" => self.tool_permissions_audit(),
             "device_profile" => self.tool_device_profile(),
             "behavior_switches" => self.tool_behavior_switches(),
-            "runtime_health" => self.tool_runtime_health(),
+            "runtime_health" => {
+                if args.get("gc").and_then(|v| v.as_bool()) == Some(true) {
+                    if let Some(eng) = self.engine.as_mut() {
+                        eng.gc();
+                    }
+                }
+                self.tool_runtime_health()
+            }
             "compat_gaps" => self.tool_compat_gaps(),
             "batch" => self.tool_batch(
                 args.get("calls"),
@@ -1081,6 +1088,25 @@ impl AgentSession {
             Err(e) => ToolResult::error(&e),
         };
         self.screen_post_tool(name, &args, &mut out);
+        // safe point for the collector: no interpreter frame is live between
+        // tool calls (see rd-vm gc.rs); adaptive threshold, RD_GC=off disables
+        if let Some(eng) = self.engine.as_mut() {
+            if let Some(st) = eng.maybe_gc() {
+                let line = format!(
+                    "I/RdGc: freed {} objects / {} KB in {:.1} ms (live {}, heap {} -> {} KB)\n",
+                    st.last_freed_objects,
+                    st.last_freed_bytes / 1024,
+                    st.last_pause_ms,
+                    st.last_live_objects,
+                    st.last_used_before / 1024,
+                    st.last_used_after / 1024
+                );
+                self.logs
+                    .lock()
+                    .expect("logs")
+                    .extend_from_slice(line.as_bytes());
+            }
+        }
         out
     }
 
@@ -1367,10 +1393,24 @@ impl AgentSession {
                 Some("divida em chamadas menores ou eleve RD_MCP_MAX_WAIT_MS no processo do servidor"),
             ));
         }
-        let ran = self
-            .require_engine()?
-            .advance_clock(ms)
-            .map_err(vm_exit_to_rd)?;
+        // Long waits advance in 512 ms slices (a multiple of the 16 ms vsync)
+        // with a collector safe point between slices: no interpreter frame
+        // and no host-held reference is live there, and runnables still run
+        // in deadline order. Keeps a long animation/coroutine burst from
+        // filling the heap inside one call.
+        const SLICE_MS: u64 = 512;
+        let eng = self.require_engine()?;
+        let mut ran = 0;
+        let mut left = ms;
+        loop {
+            let step = left.min(SLICE_MS);
+            ran += eng.advance_clock(step).map_err(vm_exit_to_rd)?;
+            left -= step;
+            if left == 0 {
+                break;
+            }
+            let _ = eng.maybe_gc();
+        }
         Ok(ToolResult::json(&serde_json::json!({
             "avancado_ms": ms,
             "runnables_executados": ran,
@@ -1939,6 +1979,7 @@ impl AgentSession {
                 v["heap_peak_bytes"] = serde_json::json!(eng.heap_peak());
                 v["fuel_used"] = serde_json::json!(eng.fuel_used());
                 v["looper_pending"] = serde_json::json!(eng.looper_pending());
+                v["gc"] = serde_json::json!(eng.gc_stats());
             }
             None => {
                 v["activity"] = serde_json::json!(Option::<String>::None);

@@ -37,6 +37,11 @@ thread_local! {
     static INSTANCES: RefCell<HashSet<ObjRef>> = RefCell::new(HashSet::new());
 }
 
+/// GC: drop state of collected objects (slots are reused).
+pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
+    INSTANCES.with(|m| m.borrow_mut().retain(|k| alive(*k)));
+}
+
 /// Runtime annotations of `desc` as (dex index, annotation).
 fn class_annotations(
     vm: &Engine,

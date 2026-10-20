@@ -28,7 +28,7 @@ use crate::value::Value;
 pub(crate) const SS: &str = "Landroid/text/SpannableString;";
 pub(crate) const SSB: &str = "Landroid/text/SpannableStringBuilder;";
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct Span {
     what: Value,
     start: usize,
@@ -36,7 +36,7 @@ struct Span {
     flags: i32,
 }
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 struct State {
     text: Vec<u16>,
     spans: Vec<Span>,
@@ -44,6 +44,21 @@ struct State {
 
 thread_local! {
     static STATES: RefCell<HashMap<ObjRef, State>> = RefCell::new(HashMap::new());
+}
+
+/// GC ephemeron: state of a reachable object (holds heap refs).
+pub(crate) fn gc_entry(r: ObjRef, out: &mut String) {
+    use std::fmt::Write as _;
+    STATES.with(|m| {
+        if let Some(v) = m.borrow().get(&r) {
+            let _ = write!(out, "|{v:?}");
+        }
+    });
+}
+
+/// GC: drop state of collected objects (slots are reused).
+pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
+    STATES.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
 pub(crate) fn is_spannable(class: &str) -> bool {

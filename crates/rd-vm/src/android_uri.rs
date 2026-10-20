@@ -53,6 +53,11 @@ thread_local! {
     static BUILDERS: RefCell<HashMap<ObjRef, B>> = RefCell::new(HashMap::new());
 }
 
+/// GC: drop state of collected objects (slots are reused).
+pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
+    BUILDERS.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+}
+
 /// Encoded parts of a Uri string.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Parts {

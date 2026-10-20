@@ -59,6 +59,12 @@ thread_local! {
     static ARRAYS: RefCell<HashMap<ObjRef, Vec<Option<XmlAttribute>>>> = RefCell::new(HashMap::new());
 }
 
+/// GC: drop state of collected objects (slots are reused).
+pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
+    PARSERS.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+    ARRAYS.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+}
+
 fn flatten(e: &XmlElement, depth: i32, out: &mut Vec<Ev>) {
     out.push(Ev::Start {
         name: e.name.clone(),

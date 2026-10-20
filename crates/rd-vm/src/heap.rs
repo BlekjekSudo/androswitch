@@ -1,8 +1,9 @@
 //! Heap arena da VM com os orçamentos do piso moto-e5 (spec A2/PRF-06):
 //! heap do app ≤ 256 MB. Alocação que exceder o orçamento responde erro
-//! tipado `VM_OOM` — nunca abort (Lei 1). Semântica de arena: tudo é
-//! liberado de uma vez quando o `Engine` morre (M2 não tem GC por
-//! gerações; arena-por-execução é o "GC" contratual desta fase).
+//! tipado `VM_OOM` — nunca abort (Lei 1). Objetos inalcançáveis são
+//! coletados pelo mark-sweep de `crate::gc` em safe points (slots liberados
+//! viram tombstones e são reciclados pela free list); o resto é liberado de
+//! uma vez quando o `Engine` morre.
 
 use crate::value::Value;
 
@@ -77,10 +78,12 @@ pub struct Heap {
     budget: usize,
     used: usize,
     /// Marca d'água (M7): maior `used` já observado — o RSS do heap do app
-    /// para o orçamento `ram_app_heap_mb` (a arena não libera objetos, então
-    /// na prática used == peak, mas o contrato do gate é o pico).
+    /// para o orçamento `ram_app_heap_mb` (com o GC, `used` cai a cada ciclo;
+    /// o contrato do gate é o pico).
     peak: usize,
     objects: Vec<HeapObj>,
+    /// Slots freed by the GC, reused LIFO by `alloc` (see `gc.rs`).
+    free: Vec<ObjRef>,
 }
 
 impl Heap {
@@ -90,6 +93,7 @@ impl Heap {
             used: 0,
             peak: 0,
             objects: Vec::new(),
+            free: Vec::new(),
         }
     }
 
@@ -115,7 +119,7 @@ impl Heap {
     }
 
     fn alloc(&mut self, bytes: usize, obj: HeapObj) -> Result<ObjRef, OomError> {
-        if self.objects.len() >= MAX_OBJECTS {
+        if self.free.is_empty() && self.objects.len() >= MAX_OBJECTS {
             return Err(OomError {
                 requested: bytes,
                 budget: self.budget,
@@ -133,6 +137,10 @@ impl Heap {
         }
         self.used = new_used;
         self.peak = self.peak.max(new_used);
+        if let Some(r) = self.free.pop() {
+            self.objects[(r - 1) as usize] = obj;
+            return Ok(r);
+        }
         self.objects.push(obj);
         Ok(self.objects.len() as ObjRef)
     }
@@ -250,6 +258,46 @@ impl Heap {
     ) -> Result<ObjRef, OomError> {
         let bytes = 32 + fields.len().saturating_mul(24);
         self.alloc(bytes, HeapObj::Instance { class, fields })
+    }
+
+    /// GC sweep: drops the contents of slot `r`, leaving a tombstone instance
+    /// of `crate::gc::FREED_CLASS`, queues the slot for reuse, and returns
+    /// the bytes given back to the budget. `None` if `r` is invalid or
+    /// already freed.
+    /// Number of recycled slots waiting for reuse.
+    pub fn free_slots(&self) -> usize {
+        self.free.len()
+    }
+
+    pub fn free_slot(&mut self, r: ObjRef) -> Option<usize> {
+        if r == 0 || r as usize > self.objects.len() {
+            return None;
+        }
+        let slot = &mut self.objects[(r - 1) as usize];
+        let bytes = match slot {
+            HeapObj::Instance { class, .. } if class == crate::gc::FREED_CLASS => return None,
+            HeapObj::Instance { fields, .. } => {
+                fields
+                    .iter()
+                    .map(|(n, _)| std::mem::size_of::<Value>() + n.len())
+                    .sum::<usize>()
+                    .max(fields.len() * 24)
+                    + 32
+            }
+            HeapObj::Str(s) => s.len().saturating_mul(2).saturating_add(32),
+            HeapObj::Array { elems, .. } => elems
+                .len()
+                .saturating_mul(std::mem::size_of::<Value>())
+                .saturating_add(16),
+        };
+        *slot = HeapObj::Instance {
+            class: crate::gc::FREED_CLASS.to_string(),
+            fields: Vec::new(),
+        };
+        self.free.push(r);
+        let bytes = bytes.min(self.used);
+        self.used -= bytes;
+        Some(bytes)
     }
 
     pub fn get(&self, r: ObjRef) -> Result<&HeapObj, String> {

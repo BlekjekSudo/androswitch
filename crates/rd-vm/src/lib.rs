@@ -29,6 +29,7 @@ pub(crate) mod content;
 pub mod engine;
 pub mod err;
 pub mod framework;
+pub mod gc;
 pub mod graphics;
 pub(crate) mod handler_msg;
 pub mod heap;

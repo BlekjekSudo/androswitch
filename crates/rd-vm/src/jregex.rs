@@ -29,7 +29,7 @@ use crate::value::Value;
 const PATTERN: &str = "Ljava/util/regex/Pattern;";
 const MATCHER: &str = "Ljava/util/regex/Matcher;";
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 struct MState {
     pattern: ObjRef,
     input: String,
@@ -46,6 +46,21 @@ struct MState {
 thread_local! {
     static CACHE: RefCell<HashMap<(String, i32), regex::Regex>> = RefCell::new(HashMap::new());
     static MATCHERS: RefCell<HashMap<ObjRef, MState>> = RefCell::new(HashMap::new());
+}
+
+/// GC ephemeron: state of a reachable object (holds heap refs).
+pub(crate) fn gc_entry(r: ObjRef, out: &mut String) {
+    use std::fmt::Write as _;
+    MATCHERS.with(|m| {
+        if let Some(v) = m.borrow().get(&r) {
+            let _ = write!(out, "|{v:?}");
+        }
+    });
+}
+
+/// GC: drop state of collected objects (slots are reused).
+pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
+    MATCHERS.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
 fn exc(class: &str, msg: impl Into<String>) -> VmExit {

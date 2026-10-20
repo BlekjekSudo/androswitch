@@ -24,6 +24,11 @@ thread_local! {
     static UNIQ: RefCell<u64> = const { RefCell::new(0) };
 }
 
+/// GC: drop state of collected objects (slots are reused).
+pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
+    SEEDS.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+}
+
 fn scramble(seed: i64) -> u64 {
     (seed as u64 ^ MULT) & MASK
 }

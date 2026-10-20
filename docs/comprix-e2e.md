@@ -502,7 +502,31 @@ no emulator, no new dependencies (the HTTP viewer is `std::net`, the PNG
 encoder is the existing one), the model is computed from RustyDroid's own
 display list (tiny-skia-style raster path), and everything is exposed through
 the in-house JSON-RPC MCP (ADR 001) first. Gaps against the stated goals that
-remain the top priorities: **no GC** (the 256 MB no-GC heap is the main risk
-for the Moto E5 / 2 GB floor on long sessions), Cranelift JIT not started,
+remain the top priorities: Cranelift JIT not started (the GC landed — see
+`docs/gc.md`),
 regex look-around (above), Compose semantics (`contentDescription`) for icon
 labels. Compose `type_text` is done (fixes 89–92).
+
+## Garbage collector (round 7)
+
+The app heap used to be an arena: nothing was freed until the app exited, so a
+long session headed for the 256 MB budget (the main risk for the Moto E5 /
+2 GB floor). It now has a mark-sweep collector; design in `docs/gc.md`.
+
+Same scenarios, same results with GC on and off (identical OK/ERR steps), heap
+measured by `runtime_health`:
+
+| Scenario | GC off: heap at end | GC on: heap at end | GC on: peak | Cycles | Freed | Pause |
+|---|---:|---:|---:|---:|---:|---:|
+| `s12-gc` tab cycling (65 steps) | 44.8 MB (step 49) | 14.5 MB (step 49) | 22.8 MB | 4 | 37.4 MB | 19–65 ms |
+| `s14-long` label navigation (131 steps) | 40.0 MB | 18.1 MB | 26.3 MB | 1 | 21.8 MB | 36 ms |
+| `s08-observe` full flow (30 steps) | not measured | 16.9 MB | 27.9 MB | 3 | 55.7 MB | 52 ms |
+| `s11-type` Compose input (19 steps) | 41.2 MB (round 6, `r6k`) | 11.3 MB | 23.7 MB | 2 | 31.8 MB | 43 ms |
+
+The first cycle went from ~600 ms to ~55 ms once the parsed APK was excluded
+from the root scan (it holds no heap references). Note: Comprix's repeated tab
+navigation trips a pre-existing host-iterator bug (`Iterator.remove` on a
+snapshot iterator, also present with `RD_GC=off`), which limits how far the
+end-to-end stress can push; the unit test `long_session_stays_under_budget`
+covers the long-session property directly (8 MB budget, ~25× the budget
+allocated across 200 tool calls, live set intact; the arena OOMs before call 20).

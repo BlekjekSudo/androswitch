@@ -53,6 +53,14 @@ be subscribed to and push `notifications/resources/updated` on every real
 change. For humans, `rd mcp --live 0.0.0.0:7878` serves a browser page with
 the live frame and tap-target overlay. See [docs/mcp-observe.md](docs/mcp-observe.md).
 
+### ♻️ Garbage-collected app heap
+
+The app heap (256 MB budget, the Moto E5 floor) is collected by a safe-point
+mark-sweep GC: between MCP tool calls and inside long waits, with precise
+heap tracing, conservative roots over the host state and recycled slots. On
+Comprix it keeps the heap around 8–18 MB instead of 34–45 MB, with 20–65 ms
+pauses; `runtime_health` reports its stats. See [docs/gc.md](docs/gc.md).
+
 ### 🤖 Built with AI — heavily
 
 > **This project is developed with heavy AI assistance** — specification, architecture,

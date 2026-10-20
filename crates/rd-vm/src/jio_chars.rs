@@ -53,14 +53,14 @@ const BAIS: &str = "Ljava/io/ByteArrayInputStream;";
 const WRITERS: [&str; 5] = [SW, OSW, BW, PW, FW];
 const READERS: [&str; 4] = [SR, ISR, BR, FR];
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 enum Sink {
     Buffer,
     Writer(ObjRef),
     Stream(ObjRef, String),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct WState {
     sink: Sink,
     pending: String,
@@ -70,14 +70,14 @@ struct WState {
     closed: bool,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 enum Source {
     Text,
     Reader(ObjRef),
     Stream(ObjRef, String),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct RState {
     source: Source,
     loaded: bool,
@@ -87,7 +87,7 @@ struct RState {
     closed: bool,
 }
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 struct BState {
     bytes: Vec<u8>,
     pos: usize,
@@ -98,6 +98,33 @@ thread_local! {
     static WRITERS_ST: RefCell<HashMap<ObjRef, WState>> = RefCell::new(HashMap::new());
     static READERS_ST: RefCell<HashMap<ObjRef, RState>> = RefCell::new(HashMap::new());
     static BYTES_ST: RefCell<HashMap<ObjRef, BState>> = RefCell::new(HashMap::new());
+}
+
+/// GC ephemeron: state of a reachable object (holds heap refs).
+pub(crate) fn gc_entry(r: ObjRef, out: &mut String) {
+    use std::fmt::Write as _;
+    WRITERS_ST.with(|m| {
+        if let Some(v) = m.borrow().get(&r) {
+            let _ = write!(out, "|{v:?}");
+        }
+    });
+    READERS_ST.with(|m| {
+        if let Some(v) = m.borrow().get(&r) {
+            let _ = write!(out, "|{v:?}");
+        }
+    });
+    BYTES_ST.with(|m| {
+        if let Some(v) = m.borrow().get(&r) {
+            let _ = write!(out, "|{v:?}");
+        }
+    });
+}
+
+/// GC: drop state of collected objects (slots are reused).
+pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
+    WRITERS_ST.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+    READERS_ST.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+    BYTES_ST.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
 fn exc(class: &str, msg: impl Into<String>) -> VmExit {

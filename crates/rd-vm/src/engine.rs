@@ -48,8 +48,8 @@ impl Default for VmConfig {
     }
 }
 
-/// Motor interpretador. Semântica de arena: o heap inteiro é descartado
-/// quando o Engine cai (M2: "GC" = arena-por-execução com teto contratual).
+/// Motor interpretador. O heap é coletado por mark-sweep em safe points
+/// (`Engine::gc` / `maybe_gc`, ver `gc.rs`) e descartado quando o Engine cai.
 pub struct Engine {
     #[cfg(feature = "native")]
     pub(crate) native: Option<crate::native::NativeState>,
@@ -119,6 +119,8 @@ pub struct Engine {
     pub(crate) intent_meta: HashMap<crate::heap::ObjRef, crate::bundle::IntentMeta>,
     /// content.rs: ContentResolver observers + Settings table
     pub(crate) content: crate::content::ContentState,
+    /// Mark-sweep collector statistics (`gc.rs`).
+    pub(crate) gc_stats: crate::gc::GcStats,
 }
 
 /// Cobertura por classe (AG-09, nível de método).
@@ -187,6 +189,7 @@ impl Engine {
             back_callbacks: HashMap::new(),
             intent_meta: HashMap::new(),
             content: Default::default(),
+            gc_stats: Default::default(),
         }
     }
 
