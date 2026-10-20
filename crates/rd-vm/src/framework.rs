@@ -218,6 +218,13 @@ pub struct HostState {
     pub(crate) sublist_order: std::collections::VecDeque<ObjRef>,
     /// clock virtual (ms) — postDelayed/dispatch por ordem de tempo
     pub clock_ms: u64,
+    /// Last platform `InputConnection` + its `EditorInfo` opened by
+    /// `type_text` on a non-EditText editor (Compose): ENTER performs the
+    /// editor's IME action through it.
+    pub(crate) ime_connection: Option<(ObjRef, ObjRef)>,
+    /// The window's focused view (AOSP ViewRootImpl.mFocusedView); see
+    /// `view_layout::move_focus`.
+    pub(crate) focused_view: Option<ObjRef>,
     /// A view called invalidate/requestLayout: ViewRootImpl schedules a
     /// traversal for the next vsync (`advance_clock` runs `layout_pass`).
     pub(crate) traversal_pending: bool,
@@ -1178,6 +1185,11 @@ impl Engine {
             .into());
         };
         let Some(target) = self.find_edit_text(content, 0)? else {
+            // Compose / custom editors: the system IME path (focused editor →
+            // onCreateInputConnection → commitText), topmost window first
+            if let Some(done) = self.type_text_ime(content, text, replace)? {
+                return Ok(done);
+            }
             return Err(crate::err::with_suggestion(
                 crate::err::vm_error(
                     "INVALID_STATE",
@@ -1209,6 +1221,123 @@ impl Engine {
         {
             self.set_view_text(target, final_text.clone())?;
             Ok(final_text)
+        }
+    }
+
+    /// Types through the platform IME contract, the way Android's input
+    /// method does for editors that are not host EditTexts (Jetpack Compose
+    /// `BasicTextField`, custom editors): the visible view whose class
+    /// overrides `onCreateInputConnection` is asked for an `InputConnection`
+    /// (it returns one only while one of its editors has focus — tap the
+    /// field first), then `commitText` is called on it. `Ok(None)` = no
+    /// focused editor anywhere (the caller reports the usual error).
+    fn type_text_ime(
+        &mut self,
+        content: ObjRef,
+        text: &str,
+        replace: bool,
+    ) -> Result<Option<String>, VmExit> {
+        const SIG: &str =
+            "(Landroid/view/inputmethod/EditorInfo;)Landroid/view/inputmethod/InputConnection;";
+        let mut roots: Vec<ObjRef> = crate::m8::showing_dialog_roots(self)
+            .into_iter()
+            .map(|(_, d)| d)
+            .rev()
+            .collect();
+        roots.push(content);
+        let mut editors = Vec::new();
+        for r in roots {
+            self.collect_ime_views(r, 0, SIG, &mut editors);
+        }
+        for view in editors {
+            let info = self.heap.alloc_instance(
+                "Landroid/view/inputmethod/EditorInfo;".into(),
+                vec![
+                    ("inputType".into(), Value::Int(0)),
+                    ("imeOptions".into(), Value::Int(0)),
+                    ("initialSelStart".into(), Value::Int(-1)),
+                    ("initialSelEnd".into(), Value::Int(-1)),
+                    ("initialCapsMode".into(), Value::Int(0)),
+                    ("actionId".into(), Value::Int(0)),
+                    ("fieldId".into(), Value::Int(0)),
+                    ("privateImeOptions".into(), Value::Null),
+                    ("hintText".into(), Value::Null),
+                    ("label".into(), Value::Null),
+                    ("packageName".into(), Value::Null),
+                    ("extras".into(), Value::Null),
+                    ("contentMimeTypes".into(), Value::Null),
+                ],
+            )?;
+            let ic = match self.invoke_instance(
+                view,
+                "onCreateInputConnection",
+                SIG,
+                &[Value::Obj(info)],
+            )? {
+                Value::Obj(ic) if ic != 0 => ic,
+                _ => continue, // this view has no focused editor
+            };
+            if replace {
+                let _ = self.invoke_instance(ic, "beginBatchEdit", "()Z", &[])?;
+                let _ = self.invoke_instance(
+                    ic,
+                    "deleteSurroundingText",
+                    "(II)Z",
+                    &[Value::Int(i32::MAX / 2), Value::Int(i32::MAX / 2)],
+                )?;
+                let _ = self.invoke_instance(ic, "endBatchEdit", "()Z", &[])?;
+            }
+            let s = crate::intrinsics::alloc_string(self, text.to_string())?;
+            let _ = self.invoke_instance(
+                ic,
+                "commitText",
+                "(Ljava/lang/CharSequence;I)Z",
+                &[Value::Obj(s), Value::Int(1)],
+            )?;
+            // read back what the editor now holds (before + after cursor)
+            let read = |m: &str, e: &mut Engine| -> Result<String, VmExit> {
+                match e.invoke_instance(
+                    ic,
+                    m,
+                    "(II)Ljava/lang/CharSequence;",
+                    &[Value::Int(10_000), Value::Int(0)],
+                )? {
+                    Value::Obj(cs) if cs != 0 => crate::intrinsics::object_to_string(e, cs),
+                    _ => Ok(String::new()),
+                }
+            };
+            let before = read("getTextBeforeCursor", self)?;
+            let after = read("getTextAfterCursor", self)?;
+            self.fw.ime_connection = Some((ic, info));
+            return Ok(Some(format!("{before}{after}")));
+        }
+        Ok(None)
+    }
+
+    /// Visible views whose runtime class implements `onCreateInputConnection`
+    /// in app code (DFS, same order as the dump).
+    fn collect_ime_views(&mut self, root: ObjRef, depth: usize, sig: &str, out: &mut Vec<ObjRef>) {
+        if depth > MAX_VIEW_DEPTH {
+            return;
+        }
+        let (vis, children) = match self.fw.get(root) {
+            Some(HostObj::View { vis, children, .. }) => (*vis, children.clone()),
+            _ => return,
+        };
+        if vis != Vis::Visible {
+            return;
+        }
+        if let Ok(class) = self.heap.class_of(root).map(|c| c.to_string()) {
+            if self
+                .cp
+                .resolve_method(&class, "onCreateInputConnection", sig)
+                .is_some()
+            {
+                out.push(root);
+            }
+        }
+        for c in children {
+            self.collect_ime_views(c, depth + 1, sig, out);
         }
     }
 
@@ -1332,6 +1461,32 @@ impl Engine {
             }
             "ENTER" => {
                 require_activity(&self.fw)?;
+                if let Some((ic, info)) = self.fw.ime_connection {
+                    // IME action declared by the editor (EditorInfo.imeOptions
+                    // & IME_MASK_ACTION); unspecified/none → DONE, like the
+                    // stock keyboard's enter key
+                    let opts = match self.heap.get_field(info, "imeOptions") {
+                        Ok(Value::Int(v)) => v,
+                        _ => 0,
+                    };
+                    let action = match opts & 0xff {
+                        0 | 1 => 6,
+                        a => a,
+                    };
+                    let r = self.invoke_instance(
+                        ic,
+                        "performEditorAction",
+                        "(I)Z",
+                        &[Value::Int(action)],
+                    )?;
+                    return Ok(KeyReport {
+                        key: "ENTER".into(),
+                        delivered: matches!(r, Value::Int(1)),
+                        effect: format!(
+                            "IME action {action} enviada ao editor focado (performEditorAction)"
+                        ),
+                    });
+                }
                 Ok(KeyReport {
                     key: "ENTER".into(),
                     delivered: true,

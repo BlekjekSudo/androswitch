@@ -159,6 +159,20 @@ pub(crate) fn static_intrinsic(
 ) -> Result<Option<Value>, VmExit> {
     let a = |i: usize| int(args.get(i));
     Ok(Some(match (class, name) {
+        // WindowInsets.Type masks (AOSP constants, API 30+)
+        ("Landroid/view/WindowInsets$Type;", t) => Value::Int(match t {
+            "statusBars" => 1,
+            "navigationBars" => 2,
+            "captionBar" => 4,
+            "ime" => 8,
+            "systemGestures" => 16,
+            "mandatorySystemGestures" => 32,
+            "tappableElement" => 64,
+            "displayCutout" => 128,
+            "systemOverlays" => 256,
+            "systemBars" => 1 | 2 | 4,
+            _ => return Ok(None),
+        }),
         ("Landroid/view/View$MeasureSpec;", "makeMeasureSpec" | "makeSafeMeasureSpec") => {
             Value::Int((a(0) & 0x3fff_ffff) | (a(1) & (0xC000_0000u32 as i32)))
         }
@@ -237,6 +251,53 @@ pub(crate) fn static_intrinsic(
         },
         _ => return Ok(None),
     }))
+}
+
+/// The focused view if it is `v` or one of its descendants.
+fn focus_within(vm: &Engine, v: ObjRef) -> Option<ObjRef> {
+    let f = vm.fw.focused_view?;
+    let mut cur = Some(f);
+    for _ in 0..64 {
+        let c = cur?;
+        if c == v {
+            return Some(f);
+        }
+        cur = match vm.fw.objects.get(&c) {
+            Some(HostObj::View { parent, .. }) => *parent,
+            _ => None,
+        };
+    }
+    None
+}
+
+/// Moves window focus to `to` (None = clear), calling `onFocusChanged` on the
+/// view losing focus and then on the one gaining it. Re-requesting the
+/// current focus is a no-op (AOSP: `requestFocus` on a focused view returns
+/// true without callbacks) — this also breaks callback re-entrancy.
+fn move_focus(vm: &mut Engine, to: Option<ObjRef>, dir: i32) -> Result<(), VmExit> {
+    const SIG: &str = "(ZILandroid/graphics/Rect;)V";
+    let from = vm.fw.focused_view;
+    if from == to {
+        return Ok(());
+    }
+    vm.fw.focused_view = to;
+    if let Some(old) = from {
+        vm.invoke_instance(
+            old,
+            "onFocusChanged",
+            SIG,
+            &[Value::Int(0), Value::Int(dir), Value::Null],
+        )?;
+    }
+    if let Some(new) = to {
+        vm.invoke_instance(
+            new,
+            "onFocusChanged",
+            SIG,
+            &[Value::Int(1), Value::Int(dir), Value::Null],
+        )?;
+    }
+    Ok(())
 }
 
 pub(crate) fn instance_intrinsic(
@@ -548,7 +609,47 @@ pub(crate) fn instance_intrinsic(
         }
         ("isInTouchMode", "()Z") => Value::Int(1),
         ("hasWindowFocus", "()Z") => Value::Int(vm.attached_views.contains(&recv) as i32),
-        ("isFocused" | "hasFocus" | "isAccessibilityFocused", "()Z") => Value::Int(0),
+        // single-focus model of the window (AOSP ViewRootImpl.mFocusedView):
+        // requestFocus moves focus and notifies onFocusChanged (virtual —
+        // Compose's AndroidComposeView / app views override it)
+        ("requestFocus", "()Z" | "(I)Z" | "(ILandroid/graphics/Rect;)Z") => {
+            let dir = if sig == "()Z" { 130 } else { a(0) }; // FOCUS_DOWN
+            let vis = matches!(
+                vm.fw.objects.get(&recv),
+                Some(HostObj::View {
+                    vis: crate::framework::Vis::Visible,
+                    ..
+                })
+            );
+            if !vis {
+                Value::Int(0)
+            } else {
+                move_focus(vm, Some(recv), dir)?;
+                Value::Int(1)
+            }
+        }
+        ("clearFocus", "()V") => {
+            if vm.fw.focused_view == Some(recv) {
+                move_focus(vm, None, 0)?;
+            }
+            Value::Null
+        }
+        ("isFocused", "()Z") => Value::Int((vm.fw.focused_view == Some(recv)) as i32),
+        ("hasFocus", "()Z") => Value::Int(focus_within(vm, recv).is_some() as i32),
+        ("findFocus", "()Landroid/view/View;") => {
+            focus_within(vm, recv).map_or(Value::Null, Value::Obj)
+        }
+        ("onFocusChanged", "(ZILandroid/graphics/Rect;)V") => Value::Null,
+        ("isAccessibilityFocused", "()Z") => Value::Int(0),
+        // no floating text-selection toolbar window on the headless device:
+        // AOSP returns null when no window callback starts the mode
+        ("startActionMode", _) => Value::Null,
+        // no scrolling ancestor scrolls on the headless window (AOSP: false
+        // when no parent consumed the request)
+        (
+            "requestRectangleOnScreen",
+            "(Landroid/graphics/Rect;)Z" | "(Landroid/graphics/Rect;Z)Z",
+        ) => Value::Int(0),
         ("findFocus", _) | ("focusSearch", _) => Value::Null,
         // no content-capture / autofill / translation service on the headless device
         (

@@ -260,3 +260,155 @@ fn unknown_component_apis_are_not_fabricated_success() {
     .unwrap()
     .is_none());
 }
+
+/// Round 6 (Compose text input): the clipboard keeps one primary clip,
+/// EditorInfo stores the initial surrounding text and accepts newer setters,
+/// and the IMM accepts a non-EditText IME target (Compose's view edits
+/// through its own InputConnection) without touching the EditText model.
+#[test]
+fn clipboard_editorinfo_and_non_edittext_ime_target() {
+    let mut e = engine();
+    const CM: &str = "Landroid/content/ClipboardManager;";
+    let cm = e.heap.alloc_instance(CM.into(), Vec::new()).unwrap();
+    assert_eq!(
+        call(&mut e, CM, "hasPrimaryClip", "()Z", cm, &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            CM,
+            "getPrimaryClip",
+            "()Landroid/content/ClipData;",
+            cm,
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            CM,
+            "getPrimaryClipDescription",
+            "()Landroid/content/ClipDescription;",
+            cm,
+            &[]
+        ),
+        Value::Null
+    );
+    let clip = e
+        .heap
+        .alloc_instance("Landroid/content/ClipData;".into(), Vec::new())
+        .unwrap();
+    call(
+        &mut e,
+        CM,
+        "setPrimaryClip",
+        "(Landroid/content/ClipData;)V",
+        cm,
+        &[Value::Obj(clip)],
+    );
+    assert_eq!(
+        call(&mut e, CM, "hasPrimaryClip", "()Z", cm, &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            CM,
+            "getPrimaryClip",
+            "()Landroid/content/ClipData;",
+            cm,
+            &[]
+        ),
+        Value::Obj(clip)
+    );
+    call(&mut e, CM, "clearPrimaryClip", "()V", cm, &[]);
+    assert_eq!(
+        call(&mut e, CM, "hasPrimaryClip", "()Z", cm, &[]),
+        Value::Int(0)
+    );
+
+    const EI: &str = "Landroid/view/inputmethod/EditorInfo;";
+    let info = e.heap.alloc_instance(EI.into(), Vec::new()).unwrap();
+    let s = string(&mut e, "2 kg");
+    call(
+        &mut e,
+        EI,
+        "setInitialSurroundingSubText",
+        "(Ljava/lang/CharSequence;I)V",
+        info,
+        &[s.clone(), Value::Int(0)],
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            EI,
+            "getInitialTextBeforeCursor",
+            "(II)Ljava/lang/CharSequence;",
+            info,
+            &[Value::Int(9), Value::Int(0)]
+        ),
+        s
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            EI,
+            "setSupportedHandwritingGestures",
+            "(Ljava/util/List;)V",
+            info,
+            &[Value::Null]
+        ),
+        Value::Null
+    );
+
+    const IMM: &str = "Landroid/view/inputmethod/InputMethodManager;";
+    let imm = e.heap.alloc_instance(IMM.into(), Vec::new()).unwrap();
+    let plain = e
+        .heap
+        .alloc_instance("Landroid/view/View;".into(), Vec::new())
+        .unwrap();
+    let before = e.fw.m9.focused;
+    assert_eq!(
+        call(
+            &mut e,
+            IMM,
+            "showSoftInput",
+            "(Landroid/view/View;I)Z",
+            imm,
+            &[Value::Obj(plain), Value::Int(0)]
+        ),
+        Value::Int(1)
+    );
+    assert!(e.fw.m9.keyboard_visible);
+    assert_eq!(e.fw.m9.focused, before, "EditText editor model untouched");
+    assert_eq!(
+        call(
+            &mut e,
+            IMM,
+            "restartInput",
+            "(Landroid/view/View;)V",
+            imm,
+            &[Value::Obj(plain)]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut e,
+            IMM,
+            "updateSelection",
+            "(Landroid/view/View;IIII)V",
+            imm,
+            &[
+                Value::Obj(plain),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(-1),
+                Value::Int(-1)
+            ]
+        ),
+        Value::Null
+    );
+}

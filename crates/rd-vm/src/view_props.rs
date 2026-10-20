@@ -89,7 +89,7 @@ const NOOP_ACTIONS: &[&str] = &[
     "drawableStateChanged",
     "cancelPendingInputEvents",
     "resetPivot",
-    "clearFocus",
+    "clearFocusNoop",
     "invalidateDrawable",
     "requestFitSystemWindows",
 ];

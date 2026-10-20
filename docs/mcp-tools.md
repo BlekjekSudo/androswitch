@@ -46,13 +46,13 @@ Gesto de arraste determinístico (x1,y1)→(x2,y2) em `ms` (cap RD_MCP_MAX_WAIT_
 
 ### `type_text`
 
-Digita texto na primeira EditText visível+habilitada da activity (modelo v1 sem foco real — issue #54). `replace=true` substitui; default anexa. Devolve o texto final.
+Digita texto: na EditText focada/primeira visível; sem EditText (Jetpack Compose, editores custom) usa o caminho do IME da plataforma — a view focada cria o InputConnection (onCreateInputConnection) e recebe commitText; toque no campo antes. `replace=true` substitui; default anexa. Devolve o texto final lido do editor.
 
 - Parâmetros: `observe, replace, text` · obrigatórios: `text`
 
 ### `key`
 
-Evento de tecla: BACK (finaliza a activity corrente), DEL (apaga último caractere da EditText), ENTER (entregue, sem IME action no v1). Outras teclas: erro tipado NOT_IMPLEMENTED com a lista suportada.
+Evento de tecla: BACK (finaliza a activity corrente), DEL (apaga último caractere da EditText), ENTER (no editor do IME — Compose — executa a IME action do EditorInfo via performEditorAction; senão entregue sem efeito). Outras teclas: erro tipado NOT_IMPLEMENTED com a lista suportada.
 
 - Parâmetros: `key, observe` · obrigatórios: `key`
 

@@ -52,6 +52,7 @@ impl Engine {
         });
         let changed = self.fw.m9.focused != Some(target);
         self.fw.m9.focused = Some(target);
+        self.fw.focused_view = Some(target); // window focus follows the editor
         if changed {
             self.m9_accessibility_event(target, 8)?;
         }
@@ -216,6 +217,19 @@ impl Engine {
         Ok(())
     }
 }
+/// The m9 editor model (selection, composing, IME service) covers host
+/// EditTexts; any other view (Compose's AndroidComposeView, custom
+/// editors) is focused by the window model in `view_layout` and edits
+/// through its own `onCreateInputConnection`.
+fn is_edit_text(vm: &mut Engine, r: ObjRef) -> bool {
+    match vm.heap.class_of(r) {
+        Ok(c) => {
+            let c = c.to_string();
+            vm.cp.is_subtype(&c, "Landroid/widget/EditText;")
+        }
+        Err(_) => false,
+    }
+}
 pub(super) fn instance_call(
     vm: &mut Engine,
     class: &str,
@@ -226,18 +240,21 @@ pub(super) fn instance_call(
 ) -> Result<Option<Value>, VmExit> {
     if class.starts_with("Landroid/view/") || class.starts_with("Landroid/widget/") {
         match name {
-            "requestFocus" if sig.starts_with("()") => {
+            "requestFocus" if sig.starts_with("()") && is_edit_text(vm, recv) => {
                 vm.m9_focus(recv)?;
                 return Ok(Some(Value::Int(1)));
             }
-            "clearFocus" => {
+            "clearFocus" if is_edit_text(vm, recv) => {
+                if vm.fw.focused_view == Some(recv) {
+                    vm.fw.focused_view = None;
+                }
                 if vm.fw.m9.focused == Some(recv) {
                     vm.fw.m9.focused = None;
                     vm.fw.m9.keyboard_visible = false;
                 }
                 return Ok(Some(Value::Null));
             }
-            "isFocused" | "hasFocus" => {
+            "isFocused" | "hasFocus" if is_edit_text(vm, recv) => {
                 return Ok(Some(Value::Int((vm.fw.m9.focused == Some(recv)) as i32)))
             }
             "setSelection" => {
@@ -269,10 +286,84 @@ pub(super) fn instance_call(
             _ => {}
         }
     }
+    // EditorInfo built by the runtime for onCreateInputConnection (and by
+    // apps): the initial-surrounding-text API stores what the editor
+    // reports so IME-side reads return it
+    if class == "Landroid/view/inputmethod/EditorInfo;" {
+        let value = match name {
+            "<init>" => Value::Null,
+            "setInitialSurroundingText" | "setInitialSurroundingSubText" => {
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                crate::err::put_field_result(vm.heap.put_field(recv, "rd_surrounding", v))?;
+                Value::Null
+            }
+            "getInitialTextBeforeCursor"
+            | "getInitialSelectedText"
+            | "getInitialTextAfterCursor" => {
+                if name == "getInitialTextBeforeCursor" {
+                    vm.heap
+                        .get_field(recv, "rd_surrounding")
+                        .unwrap_or(Value::Null)
+                } else {
+                    Value::Null
+                }
+            }
+            // remaining API-33+ setters (handwriting gestures, preview
+            // ...) are accepted; getters answer the unset default
+            _ if sig.ends_with(")V") => Value::Null,
+            _ if sig.ends_with(")Z") || sig.ends_with(")I") => Value::Int(0),
+            _ if sig.contains(")L") => Value::Null,
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+    // ClipboardManager: one primary clip per device, kept on the service
+    // object (setPrimaryClip → getPrimaryClip/hasPrimaryClip read it back)
+    if class == "Landroid/content/ClipboardManager;" {
+        let clip = match vm.heap.get_field(recv, "rd_primary_clip") {
+            Ok(Value::Obj(c)) if c != 0 => Some(c),
+            _ => None,
+        };
+        let value = match name {
+            "setPrimaryClip" => {
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                crate::err::put_field_result(vm.heap.put_field(recv, "rd_primary_clip", v))?;
+                Value::Null
+            }
+            "clearPrimaryClip" => {
+                crate::err::put_field_result(vm.heap.put_field(
+                    recv,
+                    "rd_primary_clip",
+                    Value::Null,
+                ))?;
+                Value::Null
+            }
+            "getPrimaryClip" => clip.map_or(Value::Null, Value::Obj),
+            "hasPrimaryClip" | "hasText" => Value::Int(clip.is_some() as i32),
+            "getPrimaryClipDescription" => match clip {
+                Some(c) => vm.invoke_instance(
+                    c,
+                    "getDescription",
+                    "()Landroid/content/ClipDescription;",
+                    &[],
+                )?,
+                None => Value::Null,
+            },
+            "addPrimaryClipChangedListener" | "removePrimaryClipChangedListener" => Value::Null,
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
     if class == "Landroid/view/inputmethod/InputMethodManager;" {
         let value = match name {
             "showSoftInput" => {
                 let target = obj(args, 0).ok_or_else(|| illegal("showSoftInput view null"))?;
+                if !is_edit_text(vm, target) {
+                    // non-EditText IME target (Compose): keyboard up, the
+                    // view edits through its own InputConnection
+                    vm.fw.m9.keyboard_visible = true;
+                    return Ok(Some(Value::Int(1)));
+                }
                 vm.m9_focus(target)?;
                 vm.fw.m9.keyboard_visible = true;
                 vm.m9_start_input()?;
@@ -286,6 +377,18 @@ pub(super) fn instance_call(
                 }
                 Value::Int(was as i32)
             }
+            // editor -> IME notifications while typing: no on-screen IME
+            // to repaint, accepted
+            "updateSelection"
+            | "updateCursorAnchorInfo"
+            | "updateExtractedText"
+            | "invalidateInput"
+            | "viewClicked"
+            | "displayCompletions"
+            | "updateCursor"
+            | "startStylusHandwriting"
+            | "prepareStylusHandwritingDelegation" => Value::Null,
+            "isFullscreenMode" | "isInputMethodSuppressingSpellChecker" => Value::Int(0),
             "isActive" | "isAcceptingText" => Value::Int(
                 (vm.fw.m9.focused.is_some()
                     && (args.is_empty() || obj(args, 0) == vm.fw.m9.focused))
@@ -293,6 +396,9 @@ pub(super) fn instance_call(
             ),
             "restartInput" => {
                 if let Some(r) = obj(args, 0) {
+                    if !is_edit_text(vm, r) {
+                        return Ok(Some(Value::Null));
+                    }
                     vm.m9_focus(r)?;
                 }
                 vm.m9_start_input()?;

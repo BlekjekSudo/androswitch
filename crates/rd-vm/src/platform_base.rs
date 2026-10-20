@@ -375,6 +375,28 @@ pub(crate) fn insets_controller(
         ))?;
         return Ok(Some(Value::Obj(c)));
     }
+    // View.getWindowInsetsController (API 30): the controller of the
+    // window the view is attached to — one per activity window here
+    if name == "getWindowInsetsController" && mref_class.starts_with("Landroid/view/") {
+        let Some(act) = vm.fw.current_activity else {
+            return Ok(Some(Value::Null)); // detached view: AOSP returns null
+        };
+        if let Ok(Value::Obj(c)) = vm.heap.get_field(act, "rd_insets_controller") {
+            if c != 0 {
+                return Ok(Some(Value::Obj(c)));
+            }
+        }
+        let c = vm
+            .heap
+            .alloc_instance(WIC.to_string(), Vec::new())
+            .map_err(crate::err::oom_throwable)?;
+        crate::err::put_field_result(vm.heap.put_field(
+            act,
+            "rd_insets_controller",
+            Value::Obj(c),
+        ))?;
+        return Ok(Some(Value::Obj(c)));
+    }
     if recv_class != WIC && mref_class != WIC {
         return Ok(None);
     }
@@ -406,6 +428,11 @@ pub(crate) fn insets_controller(
                 cur & !int(0)
             };
             put(vm, "rd_hidden", next)?;
+            // WindowInsets.Type.ime() = 8: the soft keyboard follows it
+            #[cfg(feature = "advanced-components")]
+            if int(0) & 8 != 0 {
+                vm.fw.m9.keyboard_visible = name == "show";
+            }
             crate::intrinsics::host_print(1, &format!("I/RdInsets: {name} types=0x{:x}\n", int(0)));
             Value::Null
         }

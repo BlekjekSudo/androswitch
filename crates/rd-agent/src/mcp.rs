@@ -590,7 +590,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "type_text",
             description:
-                "Digita texto na primeira EditText visível+habilitada da activity (modelo v1 sem foco real — issue #54). `replace=true` substitui; default anexa. Devolve o texto final.",
+                "Digita texto: na EditText focada/primeira visível; sem EditText (Jetpack Compose, editores custom) usa o caminho do IME da plataforma — a view focada cria o InputConnection (onCreateInputConnection) e recebe commitText; toque no campo antes. `replace=true` substitui; default anexa. Devolve o texto final lido do editor.",
             schema: obj(
                 serde_json::json!({
                     "text": { "type": "string" },
@@ -602,7 +602,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "key",
             description:
-                "Evento de tecla: BACK (finaliza a activity corrente), DEL (apaga último caractere da EditText), ENTER (entregue, sem IME action no v1). Outras teclas: erro tipado NOT_IMPLEMENTED com a lista suportada.",
+                "Evento de tecla: BACK (finaliza a activity corrente), DEL (apaga último caractere da EditText), ENTER (no editor do IME — Compose — executa a IME action do EditorInfo via performEditorAction; senão entregue sem efeito). Outras teclas: erro tipado NOT_IMPLEMENTED com a lista suportada.",
             schema: obj(
                 serde_json::json!({ "key": { "type": "string", "enum": ["BACK", "ENTER", "DEL"] } }),
                 &["key"],

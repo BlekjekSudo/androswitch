@@ -480,6 +480,20 @@ only screenshots taken were two, to measure the cache.
 | 86 | `Intent.setExtrasClassLoader` (no-op: extras are host bundles) |
 | 87 | `panic = "unwind"` + `call_tool_isolated` → `INTERNAL_PANIC` tool error, app ended, session kept |
 | 88 | PNG encoder: adaptive None/Sub/Up row filters + fast deflate (flate2 pure-Rust backend already used by rd-apk) instead of stored blocks — 16.5× smaller screenshots (3.11 MB → 188 KB; base64 4.15 M → 251 K chars) |
+| 89 | Window focus model: `requestFocus()`/`(I)`/`(I,Rect)`, `clearFocus`, `isFocused`, `hasFocus` (subtree), `findFocus`, virtual `onFocusChanged` (Compose's `AndroidComposeView` overrides it); the m9 EditText editor model keeps window focus in sync |
+| 90 | `type_text` for non-EditText editors through the platform IME contract: the visible view overriding `onCreateInputConnection` (Compose, custom editors) gets an `EditorInfo`, then `commitText` (+ `deleteSurroundingText` for replace) and the text is read back with `getTextBefore/AfterCursor`; `key ENTER` → `performEditorAction(EditorInfo action, DONE if unspecified)`; the IMM accepts non-EditText targets |
+| 91 | `View.getWindowInsetsController` (one controller per activity window; `show/hide(ime())` drives the soft-keyboard state), `WindowInsets.Type` masks, `requestRectangleOnScreen` → false, `startActionMode` → null (no floating toolbar window) |
+| 92 | `EditorInfo` (initial surrounding text stored/read back; API 33+ setters accepted), `ClipboardManager` primary-clip model (set/get/has/clear/description), IMM editor notifications (`updateSelection`, `updateCursorAnchorInfo`, …) |
+
+### Compose text input (run `r6o`, scenario `s11-type.json`)
+
+| Step | MCP call | Delay | Result |
+|---|---|---:|---|
+| focus the quick-add field | `tap 250,308` | 300 ms | Compose focus → `requestFocus(I,Rect)` → `onFocusChanged` → `show(ime())` (`I/RdInsets: show types=0x8`) |
+| type | `type_text "2 kg de arroz"` + `observe` | 392 ms | `final_text: "2 kg de arroz"`; `observe` frame v5 shows `y292 [x53] 2 kg de arroz` inside the field |
+| submit | `key ENTER` | 15 ms | `performEditorAction` reached the app's submit handler, which then failed in app code: its item parser uses `\s+(?=\S)` and RustyDroid's `java.util.regex` (regex crate) has **no look-around** → `PatternSyntaxException` surfaced as a typed `JAVA_EXCEPTION` |
+
+New top gap from this: **`java.util.regex` look-around / back-references** (candidate: `fancy-regex`, which layers backtracking on the existing `regex` crate only for those constructs).
 
 ### Focus check (project goals vs. this round)
 
@@ -490,4 +504,5 @@ display list (tiny-skia-style raster path), and everything is exposed through
 the in-house JSON-RPC MCP (ADR 001) first. Gaps against the stated goals that
 remain the top priorities: **no GC** (the 256 MB no-GC heap is the main risk
 for the Moto E5 / 2 GB floor on long sessions), Cranelift JIT not started,
-Compose `type_text`, Compose semantics (`contentDescription`) for icon labels.
+regex look-around (above), Compose semantics (`contentDescription`) for icon
+labels. Compose `type_text` is done (fixes 89–92).
