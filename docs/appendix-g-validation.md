@@ -2,7 +2,7 @@
 
 > **Histórico:** os números abaixo pertencem ao branch original em 2026-10-14,
 > antes da integração com native/JIT e os defaults atuais. Não são o resultado
-> do gate integrado de 2026-10-20; o relatório atualizado será registrado separadamente.
+> do gate integrado de 2026-10-20; veja o [relatório integrado de 2026-10-20](appendix-g-integration.md).
 
 ## Escopo
 

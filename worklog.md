@@ -1343,3 +1343,11 @@ Stage Summary:
 - Mínimo + cada uma das 12 features isoladamente: 3 unitários + 17 integrações PASS em cada configuração. CLI no-default/all-features compila; fmt + clippy -D warnings (default/all) + MSRV 1.76 all + docs/drift + suite JUnit (8 cenários) verdes localmente.
 - APK real F-Droid 2.0.1: 12.537.183 bytes, 973 entradas ZIP, minSdk 24; SHA-256 83d3fe522281c3cb89fce3bc05038f81b3c3b32c108536941f184c5f9bb53778. Inventário detectado e comparado ao inspect.engines (idêntico); abaixo do piso de execução, logo NENHUMA execução alegada. Binário não commitado (GH-05).
 - Publicação planejada em branch separada + PR, nunca merge cego. Este log registra gates locais; status de GitHub Actions/revisão humana é separado. Nenhuma credencial em arquivos/commits.
+
+## 2026-10-20 — Appendix G integration with native/JIT main
+
+Reconciled original registry branch30411ec with main7ce8ba3 in a local integration branch; no force-push or GitHub PR merge performed. Six text conflicts and duplicate feature tables resolved; defaults, native/JIT forwarding and0.9.0 versions preserved. Updated41-tool/default invariants and honest partial native route status. Catalog reads bounded even for growing streams.
+
+Local gates: 548 all-feature / 537 default tests passed; Clippy, fmt, minimal VM/CLI, Rust1.76 and generated docs passed. Registry all12 individual LANG configurations and explicit real-APK hook passed. JVM150/150, no-app contract8/8 and five real native APKs on each of3ABIs passed. Fresh typed Comprix20-cycle runs with JIT off/on both completed, item survived forced major GC; independent GC-off2-cycle baseline passed. Full details: docs/appendix-g-integration.md.
+
+AI assistance disclosed; updated-source remote CI and human review still required before merge. Source/cache recovery and command/tool ledger are preserved separately in the accompanying workspace worklog; no credential is committed.

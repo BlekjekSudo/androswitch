@@ -187,7 +187,8 @@ Mono, WASM and game-engine adapters remain pending (M11). Existing CLI/agent
 
 See the [generated registry](docs/engine-registry.md),
 [ADR 003](docs/adr/003-appendix-g-engine-registry.md) and
-[local validation report](docs/appendix-g-validation.md).
+[current integration validation](docs/appendix-g-integration.md) and
+[historical branch validation](docs/appendix-g-validation.md).
 Regenerate with `cargo xtask engine-report`, `cargo xtask engine-spec` and
 `cargo xtask compat-report`; tests reject catalog/spec/scoreboard drift.
 
