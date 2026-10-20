@@ -67,6 +67,35 @@ pub enum HeapObj {
     },
 }
 
+/// Private arena storage: vacant slots need no per-slot tombstone String.
+/// The public HeapObj projection (including Debug and mutable access) retains
+/// the existing tombstone contract. ObjRef values and LIFO reuse do not change.
+#[repr(transparent)]
+struct HeapSlot(Option<HeapObj>);
+
+fn freed_object() -> &'static HeapObj {
+    static FREED: std::sync::OnceLock<HeapObj> = std::sync::OnceLock::new();
+    FREED.get_or_init(|| HeapObj::Instance {
+        class: crate::gc::FREED_CLASS.to_string(),
+        fields: Vec::new(),
+    })
+}
+
+impl HeapSlot {
+    fn value(&self) -> &HeapObj {
+        match &self.0 {
+            Some(value) => value,
+            None => freed_object(),
+        }
+    }
+}
+
+impl std::fmt::Debug for HeapSlot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.value(), f)
+    }
+}
+
 #[derive(Debug)]
 pub struct OomError {
     pub requested: usize,
@@ -81,7 +110,7 @@ pub struct Heap {
     /// para o orçamento `ram_app_heap_mb` (com o GC, `used` cai a cada ciclo;
     /// o contrato do gate é o pico).
     peak: usize,
-    objects: Vec<HeapObj>,
+    objects: Vec<HeapSlot>,
     /// Slots freed by the GC, reused LIFO by `alloc` (see `gc.rs`).
     free: Vec<ObjRef>,
     young: Vec<bool>,
@@ -224,14 +253,14 @@ impl Heap {
         self.used = new_used;
         self.peak = self.peak.max(new_used);
         if let Some(r) = self.free.pop() {
-            self.objects[(r - 1) as usize] = obj;
+            self.objects[(r - 1) as usize].0 = Some(obj);
             self.young[(r - 1) as usize] = true;
             self.allocation_clock += 1;
             self.births[(r - 1) as usize] = self.allocation_clock;
             self.pin_allocation(r);
             return Ok(r);
         }
-        self.objects.push(obj);
+        self.objects.push(HeapSlot(Some(obj)));
         self.young.push(true);
         self.allocation_clock += 1;
         self.births.push(self.allocation_clock);
@@ -255,7 +284,7 @@ impl Heap {
             });
         }
         let index = (r - 1) as usize;
-        let old_bytes = match &self.objects[index] {
+        let old_bytes = match self.objects[index].value() {
             HeapObj::Instance { fields, .. } => {
                 32usize.saturating_add(fields.len().saturating_mul(24))
             }
@@ -281,7 +310,7 @@ impl Heap {
         }
         self.used = new_used;
         self.peak = self.peak.max(new_used);
-        self.objects[index] = HeapObj::Str(s);
+        self.objects[index].0 = Some(HeapObj::Str(s));
         Ok(())
     }
 
@@ -369,7 +398,7 @@ impl Heap {
             return None;
         }
         let slot = &mut self.objects[(r - 1) as usize];
-        let bytes = match slot {
+        let bytes = match slot.0.as_ref()? {
             HeapObj::Instance { class, .. } if class == crate::gc::FREED_CLASS => return None,
             HeapObj::Instance { fields, .. } => {
                 fields
@@ -385,10 +414,7 @@ impl Heap {
                 .saturating_mul(std::mem::size_of::<Value>())
                 .saturating_add(16),
         };
-        *slot = HeapObj::Instance {
-            class: crate::gc::FREED_CLASS.to_string(),
-            fields: Vec::new(),
-        };
+        slot.0 = None;
         self.free.push(r);
         self.young[(r - 1) as usize] = true;
         self.remembered.remove(&r);
@@ -401,7 +427,7 @@ impl Heap {
         if r == 0 || r as usize > self.objects.len() {
             return Err(format!("referência inválida #{r}"));
         }
-        Ok(&self.objects[(r - 1) as usize])
+        Ok(self.objects[(r - 1) as usize].value())
     }
 
     pub fn get_mut(&mut self, r: ObjRef) -> Result<&mut HeapObj, String> {
@@ -411,7 +437,11 @@ impl Heap {
         if !self.young[(r - 1) as usize] {
             self.remembered.insert(r);
         }
-        Ok(&mut self.objects[(r - 1) as usize])
+        // Mutable access must never expose the shared immutable tombstone.
+        // Materialize the same owned instance lazily only if a caller requests it.
+        Ok(self.objects[(r - 1) as usize]
+            .0
+            .get_or_insert_with(|| freed_object().clone()))
     }
 
     pub fn as_str(&self, r: ObjRef) -> Result<&str, String> {
@@ -529,6 +559,131 @@ impl HeapObj {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn vacant_slot_layout_and_public_tombstone_contract_are_unchanged() {
+        assert_eq!(
+            std::mem::size_of::<HeapSlot>(),
+            std::mem::size_of::<HeapObj>()
+        );
+        let mut heap = Heap::new(1024);
+        let r = heap.alloc_instance("LOriginal;".into(), vec![]).unwrap();
+        assert_eq!(heap.free_slot(r), Some(32));
+        assert!(heap.objects[(r - 1) as usize].0.is_none());
+        assert_eq!(heap.class_of(r), Ok(crate::gc::FREED_CLASS));
+        let expected = HeapObj::Instance {
+            class: crate::gc::FREED_CLASS.to_string(),
+            fields: vec![],
+        };
+        assert_eq!(
+            format!("{:?}", heap.get(r).unwrap()),
+            format!("{expected:?}")
+        );
+        assert_eq!(
+            format!("{:#?}", heap.get(r).unwrap()),
+            format!("{expected:#?}")
+        );
+        assert_eq!(heap.free_slot(r), None);
+        // Never hand a mutable reference to the shared immutable projection.
+        if let HeapObj::Instance { fields, .. } = heap.get_mut(r).unwrap() {
+            fields.push(("private".into(), Value::Int(17)));
+        }
+        assert_eq!(heap.get_field(r, "private"), Ok(Value::Int(17)));
+        let mut another = Heap::new(1024);
+        let other = another.alloc_string("gone".into()).unwrap();
+        another.free_slot(other).unwrap();
+        assert!(another.get_field(other, "private").is_err());
+        assert_eq!(heap.alloc_string("replacement".into()).unwrap(), r);
+        assert_eq!(heap.as_str(r), Ok("replacement"));
+        assert_eq!(heap.free_slots(), 0);
+    }
+
+    #[test]
+    fn compact_slots_differential_against_materialized_legacy_tombstones() {
+        let mut compact = Heap::new(8192);
+        let mut legacy = Heap::new(8192);
+        let mut state = 0x7300_1020_5eedu64;
+        for step in 0..8192 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let reference = (state as usize % (compact.len() + 3)) as ObjRef;
+            match state % 7 {
+                0 => {
+                    let a = compact.alloc_instance(
+                        "LRecord;".into(),
+                        vec![("value".into(), Value::Int(step))],
+                    );
+                    let b = legacy.alloc_instance(
+                        "LRecord;".into(),
+                        vec![("value".into(), Value::Int(step))],
+                    );
+                    assert_eq!(format!("{a:?}"), format!("{b:?}"));
+                }
+                1 => {
+                    let text = "x🌳".repeat((state as usize >> 8) % 21);
+                    let a = compact.alloc_string(text.clone());
+                    let b = legacy.alloc_string(text);
+                    assert_eq!(format!("{a:?}"), format!("{b:?}"));
+                }
+                2 => {
+                    assert_eq!(compact.free_slot(reference), legacy.free_slot(reference));
+                    // This is exactly the old storage representation after a
+                    // free; the comparison heap keeps real owned tombstones.
+                    for slot in &mut legacy.objects {
+                        if slot.0.is_none() {
+                            slot.0 = Some(freed_object().clone());
+                        }
+                    }
+                }
+                3 => {
+                    let a = compact.put_field(reference, "value", Value::Int(step));
+                    let b = legacy.put_field(reference, "value", Value::Int(step));
+                    assert_eq!(format!("{a:?}"), format!("{b:?}"));
+                }
+                4 => {
+                    let a = compact.initialize_string(reference, "initialized🌳".into());
+                    let b = legacy.initialize_string(reference, "initialized🌳".into());
+                    assert_eq!(format!("{a:?}"), format!("{b:?}"));
+                }
+                5 => {
+                    compact.promote();
+                    legacy.promote();
+                }
+                _ => {
+                    let length = ((state >> 16) % 17) as usize;
+                    let a = compact.alloc_array_zeroed(ElemKind::Int, length, "[I");
+                    let b = legacy.alloc_array_zeroed(ElemKind::Int, length, "[I");
+                    assert_eq!(format!("{a:?}"), format!("{b:?}"));
+                }
+            }
+            assert_eq!(
+                (compact.used(), compact.peak(), compact.len()),
+                (legacy.used(), legacy.peak(), legacy.len())
+            );
+            assert_eq!(compact.free, legacy.free);
+            assert_eq!(compact.young, legacy.young);
+            assert_eq!(compact.births, legacy.births);
+            assert_eq!(compact.remembered, legacy.remembered);
+            assert_eq!(
+                format!("{:?}", compact.get(reference)),
+                format!("{:?}", legacy.get(reference))
+            );
+            if step % 127 == 0 {
+                for r in 0..=compact.len() as ObjRef + 1 {
+                    assert_eq!(
+                        format!("{:?}", compact.get(r)),
+                        format!("{:?}", legacy.get(r))
+                    );
+                }
+            }
+        }
+        // With no remembered-set entries, derived Heap Debug remains exactly
+        // equal too, despite the different private vacant-slot representation.
+        compact.promote();
+        legacy.promote();
+        assert_eq!(format!("{compact:?}"), format!("{legacy:?}"));
+        assert_eq!(format!("{compact:#?}"), format!("{legacy:#?}"));
+    }
 
     #[test]
     fn budget_is_enforced_with_typed_oom() {

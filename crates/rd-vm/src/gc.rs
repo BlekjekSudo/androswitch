@@ -295,7 +295,9 @@ impl Engine {
         // weak references: (reference, referent) pairs whose referent is not
         // traced through the reference; cleared after marking if unreached
         let mut weak: Vec<(ObjRef, ObjRef)> = Vec::new();
-        let mut is_weak_class: std::collections::HashMap<String, bool> = Default::default();
+        // Heap/class metadata is immutable throughout marking. Borrow the class
+        // descriptor rather than allocating its clone for every reference.
+        let mut is_weak_class: std::collections::HashMap<&str, bool> = Default::default();
         while let Some(r) = m.stack.pop() {
             traced_objects += 1;
             match self.heap.get(r) {
@@ -305,7 +307,7 @@ impl Engine {
                             if name == "referent" {
                                 let cp = &self.cp;
                                 let weak_ref =
-                                    *is_weak_class.entry(class.clone()).or_insert_with(|| {
+                                    *is_weak_class.entry(class.as_str()).or_insert_with(|| {
                                         cp.is_subtype(class, "Ljava/lang/ref/WeakReference;")
                                             || cp.is_subtype(
                                                 class,
@@ -392,6 +394,8 @@ impl Engine {
                 m.push(x);
             }
         }
+        // Release borrowed heap descriptors before weak-reference writes.
+        drop(is_weak_class);
         // clear weak references whose referent only they kept alive (ART
         // semantics; SoftReference stays strong — cleared only under memory
         // pressure on Android). ReferenceQueue enqueue is not modelled.
@@ -415,6 +419,12 @@ impl Engine {
         }
         let mut cleared_weak_keys = 0;
         for (r, host) in &mut self.fw.objects {
+            // Only Map host halves contain weak keys. Other host variants
+            // never entered the clearing body, so avoid resolving their class
+            // hierarchy (especially every View in a large UI tree).
+            let HostObj::Map { entries } = host else {
+                continue;
+            };
             if m.marked.get(*r as usize).copied().unwrap_or(false)
                 && self
                     .heap
@@ -422,14 +432,12 @@ impl Engine {
                     .map(|c| self.cp.is_subtype(c, "Ljava/util/WeakHashMap;"))
                     .unwrap_or(false)
             {
-                if let HostObj::Map { entries } = host {
-                    let before = entries.len();
-                    entries.retain(|(key, _)| match key {
-                        Value::Obj(k) => m.marked.get(*k as usize).copied().unwrap_or(false),
-                        _ => true,
-                    });
-                    cleared_weak_keys += before - entries.len();
-                }
+                let before = entries.len();
+                entries.retain(|(key, _)| match key {
+                    Value::Obj(k) => m.marked.get(*k as usize).copied().unwrap_or(false),
+                    _ => true,
+                });
+                cleared_weak_keys += before - entries.len();
             }
         }
         let t_mark = t0.elapsed();

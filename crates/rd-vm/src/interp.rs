@@ -1829,7 +1829,8 @@ pub(crate) fn inherited_android_host(
         let next = vm.cp.superclass_of(&ancestor).or_else(|| {
             crate::classpath::builtin_hierarchy(&ancestor).and_then(|chain| {
                 chain
-                    .into_iter()
+                    .iter()
+                    .copied()
                     .find(|s| *s != ancestor)
                     .map(str::to_string)
             })

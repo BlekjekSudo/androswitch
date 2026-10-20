@@ -33,13 +33,18 @@ for workload in a.workloads:
         rng.shuffle(order)
         pair = {}
         for label, binary in order:
-            with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+            with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err, tempfile.NamedTemporaryFile() as rss:
+                # GNU time forks after exec, so its measured child's peak does
+                # not include the Python runner's inherited pre-exec RSS floor.
+                use_time = Path('/usr/bin/time').is_file()
                 start = time.monotonic()
                 pid = os.fork()
                 if pid == 0:
                     os.dup2(out.fileno(), 1)
                     os.dup2(err.fileno(), 2)
                     env = dict(os.environ, RD_JIT="off", RD_GC="on")
+                    if use_time:
+                        os.execve('/usr/bin/time', ['/usr/bin/time', '-f', '%M', '-o', rss.name, str(binary.resolve()), workload], env)
                     os.execve(str(binary.resolve()), [str(binary.resolve()), workload], env)
                 _, status, usage = os.wait4(pid, 0)
                 out.seek(0)
@@ -48,9 +53,11 @@ for workload in a.workloads:
                 if status != 0:
                     raise RuntimeError(f"{label}/{workload} status={status}\n{stdout}\n{stderr}")
                 record = json.loads(stdout)
+                rss.seek(0)
+                peak_rss = int(rss.read().strip()) if use_time else usage.ru_maxrss
                 record.update(label=label, repetition=repetition, wall_seconds=time.monotonic()-start,
                               user_seconds=usage.ru_utime, system_seconds=usage.ru_stime,
-                              max_rss_kib=usage.ru_maxrss, stderr=stderr)
+                              max_rss_kib=peak_rss, rss_source='gnu-time-child' if use_time else 'wait4-includes-pre-exec', stderr=stderr)
                 results.append(record)
                 pair[label] = record
                 a.out.write_text(json.dumps(results, indent=2) + "\n")

@@ -159,6 +159,113 @@ fn main() {
             }
             report(&name, start, 50000, sum);
         }
+        "strings" => {
+            let texts = [
+                "RustyDroid ASCII 0123456789 ".repeat(64),
+                "αβ🌳ç漢字e\u{301}𝄞\0 ".repeat(64),
+            ];
+            let data: Vec<_> = texts
+                .into_iter()
+                .map(|text| {
+                    let units: Vec<u16> = text.encode_utf16().collect();
+                    (vm.heap.alloc_string(text).unwrap(), units)
+                })
+                .collect();
+            let start = Instant::now();
+            let mut sum = 0;
+            for i in 0..20000usize {
+                let (object, units) = &data[i % data.len()];
+                let index = (i * 13) % units.len();
+                let result = vm
+                    .invoke_instance(*object, "charAt", "(I)C", &[Value::Int(index as i32)])
+                    .unwrap();
+                let Value::Int(value) = result else {
+                    panic!("bad charAt result");
+                };
+                assert_eq!(value, units[index] as i32);
+                sum += value as u64;
+            }
+            report(&name, start, 20000, sum);
+        }
+        "subtype" => {
+            let classes = [
+                "Ljava/lang/String;",
+                "Ljava/lang/Integer;",
+                "Landroid/widget/Button;",
+                "Ljava/util/ArrayList;",
+                "Ljava/util/HashMap;",
+                "Landroid/app/Activity;",
+                "Ljava/lang/Thread;",
+                "Ljava/lang/ref/WeakReference;",
+            ];
+            let targets = [
+                "Ljava/lang/Object;",
+                "Ljava/lang/CharSequence;",
+                "Landroid/view/View;",
+                "Ljava/lang/Iterable;",
+                "Ljava/util/Map;",
+                "Landroid/content/Context;",
+                "Ljava/lang/Runnable;",
+                "Ljava/lang/ref/Reference;",
+            ];
+            let start = Instant::now();
+            let mut sum = 0;
+            for i in 0..200000usize {
+                sum += vm.cp.is_subtype(
+                    classes[i % classes.len()],
+                    targets[(i / classes.len()) % targets.len()],
+                ) as u64;
+            }
+            report(&name, start, 200000, sum);
+        }
+        #[cfg(feature = "jit")]
+        "jit" => {
+            let mut b = DexBuilder::new();
+            let cls = b.class("LBench;", "Ljava/lang/Object;");
+            b.direct(
+                cls,
+                "sum",
+                "I",
+                vec!["I", "I"],
+                0x9,
+                Some(CodeBlob {
+                    regs: 3,
+                    ins: 2,
+                    outs: 0,
+                    units: vec![0x0090, 0x0201, 0x000f],
+                    tries: vec![],
+                }),
+            );
+            let mut vm = Engine::new(
+                vec![rd_dex::Dex::parse(b.finish()).unwrap()],
+                Default::default(),
+            );
+            vm.enable_jit().unwrap();
+            for _ in 0..64 {
+                vm.invoke_static("LBench;", "sum", "(II)I", &[Value::Int(1), Value::Int(2)])
+                    .unwrap();
+            }
+            let before = vm.jit_stats().native_calls;
+            let start = Instant::now();
+            let mut sum = 0;
+            for i in 0..100000i32 {
+                let result = vm
+                    .invoke_static(
+                        "LBench;",
+                        "sum",
+                        "(II)I",
+                        &[Value::Int(i32::MAX), Value::Int(i)],
+                    )
+                    .unwrap();
+                let Value::Int(value) = result else {
+                    panic!("bad JIT result");
+                };
+                assert_eq!(value, i32::MAX.wrapping_add(i));
+                sum += value as u32 as u64;
+            }
+            assert_eq!(vm.jit_stats().native_calls - before, 100000);
+            report(&name, start, 100000, sum);
+        }
         _ => panic!("unknown workload {name}"),
     }
 }

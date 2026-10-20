@@ -4679,7 +4679,7 @@ fn instance_intrinsic_dispatch(
             Ok(Some(Value::Null))
         }
         (STRING, "length", "()I") => {
-            let s = vm.heap.as_str(recv)?.to_string();
+            let s = vm.heap.as_str(recv)?;
             Ok(Some(Value::Int(s.encode_utf16().count() as i32)))
         }
         (STRING, "isEmpty", "()Z") => {
@@ -4718,22 +4718,22 @@ fn instance_intrinsic_dispatch(
             Ok(Some(Value::Null))
         }
         (STRING, "charAt", "(I)C") => {
-            let s = vm.heap.as_str(recv)?.to_string();
+            let s = vm.heap.as_str(recv)?;
             let idx = args[0].as_int()? as usize;
-            let units: Vec<u16> = s.encode_utf16().collect();
-            if idx >= units.len() {
+            let Some(unit) = utf16_unit_at(s, idx) else {
+                let length = s.encode_utf16().count();
                 return Err(exception(
                     vm,
                     "Ljava/lang/StringIndexOutOfBoundsException;",
-                    format!("index {idx}, length {}", units.len()),
+                    format!("index {idx}, length {length}"),
                 )
                 .into());
-            }
-            Ok(Some(Value::Int(units[idx] as i32)))
+            };
+            Ok(Some(Value::Int(unit as i32)))
         }
         (STRING, "hashCode", "()I") => {
             // algoritmo especificado em java.lang.String.hashCode (unidades UTF-16)
-            let s = vm.heap.as_str(recv)?.to_string();
+            let s = vm.heap.as_str(recv)?;
             let mut h: i32 = 0;
             for u in s.encode_utf16() {
                 h = h.wrapping_mul(31).wrapping_add(u as i32);
@@ -5254,4 +5254,67 @@ fn map_entries_via_iteration(
         out.push((k, v));
     }
     Ok(out)
+}
+
+/// Java charAt addresses UTF-16 units, including either half of a surrogate
+/// pair. An ASCII prefix maps byte positions directly; the general path is
+/// an allocation-free UTF-16 iterator, not a Unicode-scalar approximation.
+fn utf16_unit_at(s: &str, index: usize) -> Option<u16> {
+    if index < s.len() && s.as_bytes()[..=index].is_ascii() {
+        Some(u16::from(s.as_bytes()[index]))
+    } else {
+        s.encode_utf16().nth(index)
+    }
+}
+
+#[cfg(test)]
+mod utf16_optimization_tests {
+    use super::*;
+
+    #[test]
+    fn allocation_free_char_at_matches_all_utf16_units_and_invalid_indices() {
+        for text in [
+            "",
+            "ascii",
+            "a🌳b",
+            "αβ",
+            "e\u{301}",
+            "\0a\r\n",
+            "𝄞漢字",
+            "�",
+            "ASCII followed by 🌳",
+        ] {
+            let reference: Vec<u16> = text.encode_utf16().collect();
+            for index in (0..reference.len() + 2).chain([usize::MAX]) {
+                assert_eq!(
+                    utf16_unit_at(text, index),
+                    reference.get(index).copied(),
+                    "{text:?} {index}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn allocation_free_char_at_differential_unicode_sequences() {
+        let mut state = 0x7300_1020_2026u64;
+        for _ in 0..2048 {
+            let mut text = String::new();
+            for _ in 0..48 {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                let value = if state % 3 == 0 {
+                    (state % 128) as u32
+                } else {
+                    (state % 0x110000) as u32
+                };
+                text.push(char::from_u32(value).unwrap_or('�'));
+            }
+            let reference: Vec<u16> = text.encode_utf16().collect();
+            for index in 0..=reference.len() {
+                assert_eq!(utf16_unit_at(&text, index), reference.get(index).copied());
+            }
+        }
+    }
 }
