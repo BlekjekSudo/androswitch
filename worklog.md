@@ -80,7 +80,7 @@ Work Log:
 - Nada commitado/pushed (GitHub segue intocado); script aguarda liberação para commit.
 
 Stage Summary:
-- Campanha fuzz do DoD M1 agora é 1 comando: ./scripts/fuzz-campaign.sh (padrão 24h; smoke com ./scripts/fuzz-campaign.sh 600). DoD = nenhum crash-* em crates/*/fuzz/artifacts após o tempo total.
+- Campanha fuzz do DoD M1 agora é 1 comando: ./scripts/fuzz-campaign.sh (padrão 24h; smoke com ./scripts/fuzz-campaign.sh 600). DoD = nenhum `crash-*` em `crates/*/fuzz/artifacts` após o tempo total.
 
 ---
 Task ID: 6
@@ -90,7 +90,7 @@ Task: Revisão + validação executável do scripts/fuzz-campaign.sh + push (Git
 Work Log:
 - Revisão linha a linha encontrou 3 bugs reais (nenhum pego por bash -n):
   (1) find -path '*/fuzz/artifacts/crash-*' nunca casaria — cargo-fuzz grava
-      em artifacts/<target>/crash-* (SUBDIRETÓRIO) → relatório diria "SEM CRASH"
+      em `artifacts/<target>/crash-*` (SUBDIRETÓRIO) → relatório diria "SEM CRASH"
       com crash real (falso negativo do DoD). Fix: casar por NOME dentro de
       artifacts/ (-type f -name 'crash-*' -path '*/fuzz/artifacts/*'), provado
       com artifact falso (1 encontrado, 0 após remover).
@@ -179,7 +179,7 @@ Work Log:
   resource-id no formato package:id/nome resolvido do arsc, text, bounds,
   visibility/enabled/clickable, children) com cap de profundidade (#40).
 - rd-render (de stub M0 a real): ui_dump.rs (XML uiautomator fiel: index/
-  text/resource-id/class/package/bounds [x1,y1][x2,y2]/clickable/enabled;
+  text/resource-id/class/package/bounds `[x1,y1][x2,y2]`/clickable/enabled;
   GONE excluído como no uiautomator real, INVISIBLE mantido) + shot.rs
   (framebuffer RGB 720×1440 determinístico, painter por classe/estado,
   glifos de bloco 3×7 com nota de que fonte real é M8/M9, encoder PNG sem
@@ -865,7 +865,7 @@ Checks:
 
 GitHub status:
 - Branch `feat/m8-service-loader`, commit funcional `42db612`, enviado com o PAT fornecido pelo proprietário.
-- Pull request aberto: #144 — https://github.com/nadabgfccvd/RustyDroid/pull/144 (aguarda revisão humana e CI).
+- Pull request aberto: #144 — <https://github.com/nadabgfccvd/RustyDroid/pull/144> (aguarda revisão humana e CI).
 
 Stage Summary:
 - `ServiceLoader` deixa de bloquear a inicialização do APK real com um fallback determinístico e honesto, sem alegar suporte a SPI completo.
@@ -895,7 +895,7 @@ Checks:
 
 GitHub status:
 - Branch `feat/m8-linked-hash-set`, commit funcional `ae3ab03`, enviado com o PAT fornecido pelo proprietário.
-- Pull request empilhada aberta: #145 — https://github.com/nadabgfccvd/RustyDroid/pull/145, com base em `feat/m8-service-loader`/#144 para manter cada compat-gap revisável. #144 deve receber revisão humana/merge antes de #145 seguir para `main`.
+- Pull request empilhada aberta: #145 — <https://github.com/nadabgfccvd/RustyDroid/pull/145>, com base em `feat/m8-service-loader`/#144 para manter cada compat-gap revisável. #144 deve receber revisão humana/merge antes de #145 seguir para `main`.
 
 Stage Summary:
 - LinkedHashSet não bloqueia mais o fluxo de inicialização do APK real e sua ordem de iteração é determinística.
@@ -1215,7 +1215,7 @@ GitHub status:
 - Branch nova → PR; merge após CI verde.
 
 Stage Summary:
-- Launch primftpd cadeia-completo (Application→Prefs→SLF4J→NOP faithful) ✅ → próximas rodadas: novos alvos/psi de apps + gaps estruturais pendentes do ROADMAP (getResources → Enumeration, unmodifiable* restantes — empty*, edit() de prefs quando pedido).
+- Launch primftpd cadeia-completo (Application→Prefs→SLF4J→NOP faithful) ✅ → próximas rodadas: novos alvos/psi de apps + gaps estruturais pendentes do ROADMAP (getResources → Enumeration, `unmodifiable*` restantes — `empty*`, edit() de prefs quando pedido).
 
 ## 2026-10-18 — M8 full-phase continuation (workspace session)
 
@@ -1320,7 +1320,6 @@ Checks:
 Stage Summary:
 - M8 completo nos subsistemas da spec, com desvios documentados (ADR 003): single-thread síncrono, SQLite em memória/subconjunto, OkHttp sem rede, WorkManager sem background thread, RecyclerView cap 20 itens.
 - Continuação (mesma sessão): probe Breezy Weather avançou 3 gaps com host novo — `Context.getSystemService(String/Class)`, `android.os.Process.myPid/myUid/myTid/is64Bit`, `java.io.File` (path/exists/mkdirs/…); próximo gap registrado: `java.io.FileReader.<init>` (cadeia de I/O — próxima sondagem, não M8 core). Tasks segue com `MISSING_ENTRY` de LAUNCHER no CLI (pré-existente, fora do M8). Teste `m8_dex_callbacks_fire` prova callbacks DEX reais (dialog/OkHttp/broadcast); SQLite `whereArgs` agora compara o argumento de `col=?`.
-
 
 ---
 Task: Apêndice G — registro e detecção dos 28 engines

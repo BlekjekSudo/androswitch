@@ -121,7 +121,7 @@ crate/adaptador real, golden flow de APK OSS e gate Moto E5 (ADR 003).
    classes HOST (`rd-vm::framework`) — estado fora do heap Dalvik, dispatch
    igual ao dos intrinsics.
 2. ✅ Handler/Looper/Message com clock virtual determinístico (post/postDelayed
-   + `advance_clock`); single-thread = UI thread.
+   \+ `advance_clock`); single-thread = UI thread.
 3. ✅ Lifecycle (onCreate/onStart/onResume/onPause) dirigido por `launch_app`;
    navegação via `Intent(Context, Class)` + `startActivity` (const-class host).
 4. ✅ Touch simulado: hit-test top-down + dispatch de onClick via resolução DEX.
@@ -661,7 +661,6 @@ Sondagem com APK real dentro do piso (sem commit de binário — GH-05;
   (singular) coberto por exceção quando o launch pedir; bloco `java.net.URL`
   quando a sequência real exigir URL.
 
-
 ## ✅ M8 concluído (2026-10) — Compat real, escopo completo (v0.9.0)
 
 Interceptação seletiva (`crates/rd-vm/src/m8.rs`, ADR 003): o dispatch consulta
@@ -690,8 +689,8 @@ biblioteca do APK. Estado real e consultável via `Engine::m8_*`; testes em
    sendBroadcast entrega a receivers (`onReceive` DEX); Intent action/data +
    Uri parse/scheme/host/path; startActivity VIEW registra deep link e navega
    com handler registrado; JobScheduler host.
-7. ✅ **WorkManager**: getInstance canônico; enqueue* registra WorkRecord
-   (ENQUEUED → SUCCEEDED via `m8_complete_work`, cancel* → CANCELLED);
+7. ✅ **WorkManager**: getInstance canônico; `enqueue*` registra WorkRecord
+   (ENQUEUED → SUCCEEDED via `m8_complete_work`, `cancel*` → CANCELLED);
    Operation/ListenableFuture completados. Sem thread de background.
 8. ✅ **SharedPreferences stateful**: Editor put/remove/clear + commit/apply
    aplicam no storage da VM; getters leem o storage; contains/getAll reais.

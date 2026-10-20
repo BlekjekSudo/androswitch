@@ -18,8 +18,8 @@ The older [2026-10-14 report](appendix-g-validation.md) is historical and its
 - CLI/agent each have one feature table. Their existing `advanced-components`
   defaults and exact `native`/`jit` forwarding remain intact; LANG contracts are
   separately opt-in. Tests guard these invariants.
-- MCP remains at 41 tools. `app_info` includes all 28 engine records without
-  launching a VM; no tool was removed to satisfy the old 32-tool assertion.
+- MCP remains at 41 tools. On analyzed APKs, `app_info` includes all 28
+  engine records without launching a VM; no tool was removed to satisfy the old 32-tool assertion.
 - Generated catalog/spec/scoreboard distinguish unavailable registry adapters
   from the existing partial DEX and opt-in ELF/JNI routes. `partial_native`
   describes bounded existing ELF/JNI capability, not language attribution,
@@ -31,6 +31,9 @@ The older [2026-10-14 report](appendix-g-validation.md) is historical and its
   when metadata is stale or the source is a growing/endless stream. Two tests
   exercise the read boundary; adapter tests still require `NOT_IMPLEMENTED`.
 
+- Fixed 20 advisory Markdown issues, including a malformed JNI table and
+  literal glob/bounds syntax; no lint rule was disabled.
+
 ## Local gates
 
 | Gate | Result |
@@ -39,6 +42,9 @@ The older [2026-10-14 report](appendix-g-validation.md) is historical and its
 | Workspace default features, locked | 537 passed, zero failed; 1 explicitly ignored real-APK hook |
 | Clippy all targets/all features | Passed with `-D warnings` |
 | Rustfmt and whitespace | Passed |
+| Default/JIT-only Clippy; native-only and JIT-only test variants | Passed |
+| Pinned Markdown lint 0.23.3 / Node 22 | 29 files; zero issues |
+| Nightly fuzz builds, rd-apk and rd-dex | Passed with cargo-fuzz 0.13.2 / nightly 1.101.0 (2026-10-19) |
 | Minimal CLI and minimal VM | Passed |
 | Rust 1.76 workspace/all features/locked | Passed |
 | Generated engine report/spec/compatibility table | Exact equality |
@@ -101,8 +107,8 @@ for supported subsets and limitations.
 - Human review of the updated integration remains mandatory before merging.
 - No physical Moto E5 timing, full Android/NDK support, new framework runtime,
   camera flow, incremental/concurrent collector or ARMv7 native JIT is claimed.
-- Nightly fuzz and advisory Markdown jobs are preserved in CI but were not
-  rerun locally as part of the checks listed above.
+- Nightly fuzz validation was build-only, not a 24-hour fuzzing campaign.
+  Local CI-equivalent checks do not substitute the new GitHub checks.
 
-Report prepared 2026-10-20T08:40:12+00:00. Raw CLI/MCP/native/JVM evidence and the complete sectioned
+Report finalized 2026-10-20T08:51:23+00:00. Raw CLI/MCP/native/JVM evidence and the complete sectioned
 work log are retained in the accompanying workspace validation artifacts.

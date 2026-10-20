@@ -11,7 +11,7 @@ rd test suite.json --junit out/junit.xml                  # + relatório JUnit X
 rd test suite.json --json                                 # resumo em JSON (stdout)
 ```
 
-**Códigos de saída**
+## Códigos de saída
 
 | exit | significado |
 |---|---|
@@ -80,7 +80,7 @@ rd test suite.json --json                                 # resumo em JSON (stdo
 
 ## Saída
 
-**Resumo humano**
+### Resumo humano
 
 ```
 Suíte: smoke (2 cenário(s))

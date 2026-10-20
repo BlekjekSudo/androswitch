@@ -265,4 +265,3 @@ See the screen WITHOUT a screenshot: semantic model of the current frame derived
 Tap by visible label instead of coordinates: finds the tap target (or text) whose label matches `text` on the current frame (case/space-insensitive substring; exact=true for equality; nth picks among matches in reading order) and taps its center. Error VIEW_NOT_FOUND lists the visible texts. Works on Compose UIs (labels come from the drawn frame).
 
 - Parâmetros: `exact, nth, observe, text` · obrigatórios: `text`
-
