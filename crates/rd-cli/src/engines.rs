@@ -126,17 +126,22 @@ pub(super) fn run(sub: &EngineSub, dd: &DataDir) -> RdResult<()> {
                     payload: &[],
                 },
             )?;
-            let report = process.report()?;
-            #[cfg(feature = "native-engines")]
-            let report = {
-                let mut report = report;
-                report["logs"] = serde_json::json!(String::from_utf8_lossy(
-                    &logs.lock().expect("CLI app log buffer")
-                )
-                .to_string());
-                report
+            let report_json = {
+                #[cfg(feature = "native-engines")]
+                {
+                    let mut report = process.report()?;
+                    report["logs"] = serde_json::json!(String::from_utf8_lossy(
+                        &logs.lock().expect("CLI app log buffer")
+                    )
+                    .to_string());
+                    crate::to_json(&report)
+                }
+                #[cfg(not(feature = "native-engines"))]
+                {
+                    crate::to_json(&process.report()?)
+                }
             };
-            println!("{}", crate::to_json(&report));
+            println!("{report_json}");
             Ok(())
         }
         EngineSub::Check { id, json: _ } => {
