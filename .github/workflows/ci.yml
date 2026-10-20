@@ -151,7 +151,7 @@ jobs:
       - name: Compile + dex golden cases
         run: bash golden/vm/build.sh
       - name: Compare rd vm exec vs real JVM execution
-        run: bash golden/vm/run-golden.sh target/release/rd
+        run: bash golden/vm/run-golden.sh "$GITHUB_WORKSPACE/target/release/rd"
 
   # M9 (LANG-02, ADR 004): native .so code runs in an isolated Unicorn worker.
   # Fixtures are cross-compiled for x86_64/AArch64/ARM from golden/native/fixture.c.
@@ -194,6 +194,45 @@ jobs:
           bash golden-apks/native-gate.sh
           RD_NATIVE_ABI=arm64-v8a bash golden-apks/native-gate.sh
           RD_NATIVE_ABI=armeabi-v7a bash golden-apks/native-gate.sh
+
+  native-languages:
+    name: Source-built C/C++/Rust APKs (3 ABIs, JIT off/on, 41 tools)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-linux-android,aarch64-linux-android,armv7-linux-androideabi
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/native-language-sdk
+          key: native-language-sdk-${{ hashFiles('golden/native-languages/build.py') }}
+      - name: Android packaging and isolated guest worker prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends aapt apksigner zipalign unzip
+          python -m pip install unicorn==2.1.4
+      - name: Signed source-built APKs, genuine execution and complete MCP matrix
+        env:
+          RD_NATIVE_PYTHON: python
+        run: bash golden/native-languages/gate.sh
+      - name: Preserve compiler provenance and assertion-bearing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-language-regression-evidence
+          if-no-files-found: warn
+          path: |
+            target/native-languages/apks/provenance.json
+            target/native-languages/evidence/
 
   rust-msrv:
     name: Rust MSRV (1.76)

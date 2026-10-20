@@ -1,0 +1,35 @@
+[
+  {
+    "mode": "unpinned",
+    "pairs": 100,
+    "affinity": [
+      0,
+      1
+    ],
+    "baseline_ms": 63.6696685,
+    "candidate_ms": 62.080648499999995,
+    "ratio_of_medians": 1.025596059938066,
+    "median_paired_speedup": 1.03007008370041,
+    "paired_ci95": [
+      1.0216090925290227,
+      1.0359591950665687
+    ],
+    "caveat": "Supplemental diagnostic of an unchanged JIT algorithm; all original 25-pair measurements remain included."
+  },
+  {
+    "mode": "fixed-cpu",
+    "pairs": 100,
+    "affinity": [
+      0
+    ],
+    "baseline_ms": 64.100485,
+    "candidate_ms": 62.570409,
+    "ratio_of_medians": 1.0244536678671863,
+    "median_paired_speedup": 1.0272332855187534,
+    "paired_ci95": [
+      1.0252080787943274,
+      1.0304728988996443
+    ],
+    "caveat": "Supplemental diagnostic of an unchanged JIT algorithm; all original 25-pair measurements remain included."
+  }
+]
