@@ -536,3 +536,11 @@ are now cleared when nothing else reaches them (SoftReference stays strong).
 Re-running the flows: identical OK/ERR outcomes; real Compose weak references
 were cleared (42 in an `s08-observe` cycle, 13 in `s11-type`, 30 per cycle in
 `s12-gc`) and `s12-gc` ends at 6.8 MB (was 7.6 MB with strong weak refs).
+
+**Pause tuning (same round).** `RD_GC_TRACE=1` phase timings showed roots
+<2 ms and marking ~11 ms dominant. A per-cycle side-table bitmap (one
+`Vec<u8>` check per object instead of ~5 hash lookups) plus precise tracing of
+host `List`/`Map`/`Iter` cut marking to 5–9 ms; steady-state forced cycle
+14 → 8 ms (live 38.6 k, identical live set), last automatic cycle per flow:
+`s08` 46 → 37 ms, `s11` 42 → 35 ms, `s12` 20 → 12 ms — same bytes freed to
+the byte (the collector is deterministic).

@@ -28,6 +28,7 @@
 //!   before growing, so the 2^20-slot cap bounds *live* objects, not
 //!   allocations. Every side table keyed by `ObjRef` is either a root, an
 //!   ephemeron, or purged at sweep, so a recycled slot inherits no state.
+use crate::framework::HostObj;
 use crate::heap::{HeapObj, ObjRef};
 use crate::{Engine, Value};
 use std::fmt::Write as _;
@@ -152,6 +153,26 @@ impl Engine {
         for r in cand.drain(..) {
             m.push(r);
         }
+        // objects with side state (host half, gfx object, module tables):
+        // one bitmap built per cycle instead of ~5 hash lookups per object
+        let mut side_keys: Vec<ObjRef> = Vec::new();
+        let mut module_keys: Vec<ObjRef> = Vec::new();
+        crate::jregex::gc_keys(&mut module_keys);
+        crate::android_spannable::gc_keys(&mut module_keys);
+        crate::jio_chars::gc_keys(&mut module_keys);
+        side_keys.extend(self.fw.objects.keys().copied());
+        side_keys.extend(self.gfx.objs.keys().copied());
+        let mut has_side = vec![0u8; n + 1];
+        for k in side_keys {
+            if let Some(b) = has_side.get_mut(k as usize) {
+                *b |= 1;
+            }
+        }
+        for k in module_keys {
+            if let Some(b) = has_side.get_mut(k as usize) {
+                *b |= 2;
+            }
+        }
         let mut text = String::new();
         // weak references: (reference, referent) pairs whose referent is not
         // traced through the reference; cleared after marking if unreached
@@ -190,19 +211,50 @@ impl Engine {
                 }
                 _ => {}
             }
+            let side = has_side.get(r as usize).copied().unwrap_or(0);
+            if side == 0 {
+                for x in cand.drain(..) {
+                    m.push(x);
+                }
+                continue;
+            }
             // ephemeron: the host half of a reachable host-backed object
-            if let Some(h) = self.fw.objects.get(&r) {
-                text.clear();
-                let _ = write!(text, "{h:?}");
-                scan_refs(&text, n, &mut cand);
+            match self.fw.objects.get(&r) {
+                // precise fast path for the most common host halves (their
+                // only fields are these values); everything else conservative
+                Some(HostObj::List { elems }) | Some(HostObj::Iter { elems, .. }) => {
+                    for v in elems {
+                        if let Value::Obj(x) = v {
+                            cand.push(*x);
+                        }
+                    }
+                }
+                Some(HostObj::Map { entries }) => {
+                    for (k, v) in entries {
+                        if let Value::Obj(x) = k {
+                            cand.push(*x);
+                        }
+                        if let Value::Obj(x) = v {
+                            cand.push(*x);
+                        }
+                    }
+                }
+                Some(h) => {
+                    text.clear();
+                    let _ = write!(text, "{h:?}");
+                    scan_refs(&text, n, &mut cand);
+                }
+                None => {}
             }
             // module side tables keyed by object (Matcher, Spannable, Reader…)
-            text.clear();
-            crate::jregex::gc_entry(r, &mut text);
-            crate::android_spannable::gc_entry(r, &mut text);
-            crate::jio_chars::gc_entry(r, &mut text);
-            if !text.is_empty() {
-                scan_refs(&text, n, &mut cand);
+            if side & 2 != 0 {
+                text.clear();
+                crate::jregex::gc_entry(r, &mut text);
+                crate::android_spannable::gc_entry(r, &mut text);
+                crate::jio_chars::gc_entry(r, &mut text);
+                if !text.is_empty() {
+                    scan_refs(&text, n, &mut cand);
+                }
             }
             if let Some(g) = self.gfx.objs.get(&r) {
                 text.clear();

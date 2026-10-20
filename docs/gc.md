@@ -53,5 +53,8 @@ allocations.
   keeps that object (and what it reaches) alive — harmless over-retention.
 - No collection *inside* a single long-running Java call (no frame maps); the
   slice safe points cover `wait`, other tools allocate little per call.
-- Pause is proportional to live objects + host state (~20–65 ms on Comprix,
-  live 30–70 k objects); generational/incremental marking would cut it.
+- Pause is proportional to live objects + host state: 8–37 ms on Comprix
+  (live 30–70 k objects; roots <2 ms, mark 5–9 ms, sweep the rest). Marking
+  consults side tables only for objects flagged in a per-cycle bitmap, and
+  host collections (`List`/`Map`/`Iter`) are traced precisely.
+  Generational/incremental marking would cut it further.

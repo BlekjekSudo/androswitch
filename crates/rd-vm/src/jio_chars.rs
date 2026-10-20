@@ -100,6 +100,14 @@ thread_local! {
     static BYTES_ST: RefCell<HashMap<ObjRef, BState>> = RefCell::new(HashMap::new());
 }
 
+/// GC: objects that have state here (marking consults `gc_entry` only
+/// for these).
+pub(crate) fn gc_keys(out: &mut Vec<ObjRef>) {
+    WRITERS_ST.with(|m| out.extend(m.borrow().keys().copied()));
+    READERS_ST.with(|m| out.extend(m.borrow().keys().copied()));
+    BYTES_ST.with(|m| out.extend(m.borrow().keys().copied()));
+}
+
 /// GC ephemeron: state of a reachable object (holds heap refs).
 pub(crate) fn gc_entry(r: ObjRef, out: &mut String) {
     use std::fmt::Write as _;

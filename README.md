@@ -58,7 +58,7 @@ the live frame and tap-target overlay. See [docs/mcp-observe.md](docs/mcp-observ
 The app heap (256 MB budget, the Moto E5 floor) is collected by a safe-point
 mark-sweep GC: between MCP tool calls and inside long waits, with precise
 heap tracing, conservative roots over the host state and recycled slots. On
-Comprix it keeps the heap around 8–18 MB instead of 34–45 MB, with 20–65 ms
+Comprix it keeps the heap around 7–18 MB instead of 34–45 MB, with 8–37 ms
 pauses; `runtime_health` reports its stats. See [docs/gc.md](docs/gc.md).
 
 ### 🤖 Built with AI — heavily
