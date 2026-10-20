@@ -28,7 +28,10 @@ and when collecting. The current frame additionally publishes last-result and
 pending-exception references. Suspended callers retain their published roots.
 Host-dispatch scopes pin allocations made in Rust host code; guest re-entry
 suspends allocation pinning while preserving earlier host temporaries. Guest
-object/exception return values are pinned into the surrounding host scope. Top-level
+object/exception return values are pinned into the surrounding host scope.
+Nested host calls transfer temporary pins to the enclosing host callback, but
+not through an intervening Java frame. Pins are released when that callback
+returns. Top-level
 Java entries conservatively pin pre-existing objects because their Rust caller
 may hold references not yet stored in engine state. Scope cleanup occurs on
 normal and error returns. This deliberately favors over-retention over dangling

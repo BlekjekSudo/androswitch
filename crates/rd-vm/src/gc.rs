@@ -491,7 +491,7 @@ impl Engine {
         let depth = self.heap.gc_scope_depth();
         self.heap.gc_host_enter(false);
         let out = f(self);
-        self.heap.gc_scope_restore(depth);
+        self.heap.gc_host_restore(depth);
         out
     }
 
@@ -524,6 +524,33 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nested_host_scope_returns_stay_rooted_until_the_outer_callback_returns() {
+        let mut vm = Engine::new(vec![], Default::default());
+        // Avoid small ObjRef ids retained by conservative scalar roots.
+        for _ in 0..64 {
+            vm.heap.alloc_instance("LPad;".into(), vec![]).unwrap();
+        }
+        vm.gc_frames.push(vec![]);
+        let r = vm.with_host_roots(|vm| {
+            let r = vm.with_host_roots(|vm| {
+                vm.heap
+                    .alloc_string("nested host temporary".into())
+                    .unwrap()
+            });
+            vm.gc();
+            assert_eq!(vm.heap.as_str(r).unwrap(), "nested host temporary");
+            r
+        });
+        vm.gc_frames.pop();
+        vm.gc();
+        assert_eq!(
+            vm.heap.class_of(r).unwrap(),
+            FREED_CLASS,
+            "pins must not leak after the enclosing callback ends"
+        );
+    }
 
     #[test]
     fn slot_pressure_does_not_recollect_unchanged_pinned_heap_each_instruction() {

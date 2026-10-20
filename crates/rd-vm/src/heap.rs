@@ -137,6 +137,21 @@ impl Heap {
         }
         self.gc_scopes.push(Some(Vec::new()));
     }
+    /// A nested Rust host call can return a temporary to its enclosing host
+    /// callback. Preserve all nested pins conservatively until that callback
+    /// returns, but never promote them through an intervening Java frame.
+    pub(crate) fn gc_host_restore(&mut self, depth: usize) {
+        let roots = self
+            .gc_scopes
+            .get_mut(depth)
+            .and_then(Option::take)
+            .unwrap_or_default();
+        self.gc_scope_restore(depth);
+        if let Some(Some(parent)) = self.gc_scopes.last_mut() {
+            parent.extend(roots);
+        }
+    }
+
     pub(crate) fn gc_guest_enter(&mut self) {
         self.gc_scopes.push(None);
     }

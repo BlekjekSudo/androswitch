@@ -38,8 +38,10 @@ counters; only cycles initiated by the agent's tool-boundary path produce its
   last-result and pending-exception references.
 - **Host temporaries**: a host-dispatch scope pins its allocations. Guest
   re-entry suspends allocation pinning for guest allocations but preserves
-  earlier host temporaries. Object/exception results returned to a host scope
-  are pinned until that scope exits. Top-level Java entries conservatively
+  earlier host temporaries. Nested host calls propagate their pins to an
+  enclosing host callback, never through an intervening Java frame.
+  Object/exception results returned to a host scope are pinned until that
+  scope exits. Top-level Java entries conservatively
   pin pre-existing objects, since Rust callers may hold otherwise untracked
   local references. Scope cleanup covers normal and error returns; direct
   consumers that catch runtime panics should discard the engine (MCP does).
