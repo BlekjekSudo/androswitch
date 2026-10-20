@@ -84,7 +84,7 @@ const CRATE_STATUS: &[(&str, &str, &str)] = &[
     (
         "rd-agent",
         "M5–M9",
-        "MCP (39 tools + batch + policy sandbox; M9: widgets/IME/a11y/shortcuts/native_state) · executor de suítes `rd test` (JSON → JUnit XML, M6)",
+        "MCP (41 tools + batch + policy sandbox + screen resources/live viewer; M9: widgets/IME/a11y/shortcuts/native_state) · executor de suítes `rd test` (JSON → JUnit XML, M6)",
     ),
     (
         "rd-jni",

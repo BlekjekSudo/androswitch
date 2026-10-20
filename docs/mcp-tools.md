@@ -4,7 +4,7 @@
 
 Servidor `rustydroid-agent` v0.9.0 · protocolo `2024-11-05` · transporte stdio (JSON-RPC 2.0, uma mensagem por linha).
 
-Total: **39 tools**. Este catálogo é gerado de `rd_agent::mcp::tool_defs()` — o MESMO registro respondido em `tools/list` e impresso por `rd mcp --describe-tools`.
+Total: **41 tools**. Este catálogo é gerado de `rd_agent::mcp::tool_defs()` — o MESMO registro respondido em `tools/list` e impresso por `rd mcp --describe-tools`.
 
 ## Controles de segurança
 
@@ -30,43 +30,43 @@ Instala um APK na sessão (abre, valida o piso API 26 e prepara o estado de perm
 
 Executa o app instalado: cria a activity (LAUNCHER ou `activity`) e roda o lifecycle até o onCreate completar. `activity` precisa estar declarada como <activity>/<activity-alias> no AndroidManifest.xml E existir no DEX (issues #82/#83) — o Android recusa o que não está declarado; um <activity-alias> lança a sua targetActivity (issue #109). Se o MESMO package já está em execução, o relançamento reutiliza o processo (warm start: sem re-parse do DEX; o resultado traz warm=true) (M7). Com `package` lança outro app do registro (multi-app); sem, o app ativo (último install/launch).
 
-- Parâmetros: `activity, package`
+- Parâmetros: `activity, observe, package`
 
 ### `tap`
 
 Toque simulado nas coordenadas (px do viewport 720×1440). Retorna se algum listener foi acionado.
 
-- Parâmetros: `x, y` · obrigatórios: `x, y`
+- Parâmetros: `observe, x, y` · obrigatórios: `x, y`
 
 ### `swipe`
 
 Gesto de arraste determinístico (x1,y1)→(x2,y2) em `ms` (cap RD_MCP_MAX_WAIT_MS). Reporta as views atravessadas em ordem; down+up na MESMA view vira clique (listener disparado) — semântica Android tap vs scroll.
 
-- Parâmetros: `ms, x1, x2, y1, y2` · obrigatórios: `x1, y1, x2, y2`
+- Parâmetros: `ms, observe, x1, x2, y1, y2` · obrigatórios: `x1, y1, x2, y2`
 
 ### `type_text`
 
 Digita texto na primeira EditText visível+habilitada da activity (modelo v1 sem foco real — issue #54). `replace=true` substitui; default anexa. Devolve o texto final.
 
-- Parâmetros: `replace, text` · obrigatórios: `text`
+- Parâmetros: `observe, replace, text` · obrigatórios: `text`
 
 ### `key`
 
 Evento de tecla: BACK (finaliza a activity corrente), DEL (apaga último caractere da EditText), ENTER (entregue, sem IME action no v1). Outras teclas: erro tipado NOT_IMPLEMENTED com a lista suportada.
 
-- Parâmetros: `key` · obrigatórios: `key`
+- Parâmetros: `key, observe` · obrigatórios: `key`
 
 ### `wait`
 
 Avança o clock virtual (ms) e executa os runnables do Looper com deadline vencida. Retorna quantos rodaram. Cap RD_MCP_MAX_WAIT_MS (default 60_000) — contra tempo ilimitado.
 
-- Parâmetros: `ms` · obrigatórios: `ms`
+- Parâmetros: `ms, observe` · obrigatórios: `ms`
 
 ### `wait_for`
 
 Espera CONDICIONAL: avança o clock virtual em passos de `step_ms` (default 100) até a view (resource_id/text/class) existir ou `timeout_ms` vencer (cap RD_MCP_MAX_WAIT_MS). `class` casa o nome completo ou o nome simples exato (issue #78). found=false é resposta honesta (não é erro) — o agente decide.
 
-- Parâmetros: `class, resource_id, step_ms, text, timeout_ms` · obrigatórios: `timeout_ms`
+- Parâmetros: `class, observe, resource_id, step_ms, text, timeout_ms` · obrigatórios: `timeout_ms`
 
 ### `ui_tree`
 
@@ -253,4 +253,16 @@ M9: native feature availability, ABI, loaded ELF libraries and guest instruction
 M9: list active notifications/channels or click/cancel a notification (tag/id and optional action index). Uses the app NotificationManager state.
 
 - Parâmetros: `action, action_index, id, tag`
+
+### `observe`
+
+See the screen WITHOUT a screenshot: semantic model of the current frame derived from the recorded display list (works for Views, Compose and custom canvases) merged with the host view tree. Returns visible texts with bounds, probable tap targets (label + center x,y; source frame|view), images and a frame `version` that only changes when visible content changes, plus a diff (+added/-removed texts) since the previous observe. format=text (default, compact, LLM-friendly) or json (structured; boxes=true adds drawn boxes). ~10-100x cheaper than screenshot (no rasterize/PNG). Also available as subscribable MCP resources rustydroid://screen and rustydroid://screen.txt.
+
+- Parâmetros: `boxes, diff, format`
+
+### `tap_text`
+
+Tap by visible label instead of coordinates: finds the tap target (or text) whose label matches `text` on the current frame (case/space-insensitive substring; exact=true for equality; nth picks among matches in reading order) and taps its center. Error VIEW_NOT_FOUND lists the visible texts. Works on Compose UIs (labels come from the drawn frame).
+
+- Parâmetros: `exact, nth, observe, text` · obrigatórios: `text`
 

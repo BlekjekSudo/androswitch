@@ -32,7 +32,7 @@
 | `rd-vm` | M2–M9 | interpretador Dalvik + golden harness vs JVM + framework host headless (Activity/View/Handler/Looper) + LayoutInflater AXML/ARSC + componentes M9 (notificações/IME/widgets/a11y/atalhos) + ponte JNI (feature `native`) |
 | `rd-testsupport` | M0–M6 | fixtures de teste (APK/DEX/AXML/ARSC sintéticos; dev-only, fora do binário) |
 | `rd-render` | M4 | UI dump uiautomator + screenshot headless (software renderer determinístico + PNG sem deps); winit/web são stub → M11 |
-| `rd-agent` | M5–M9 | MCP (39 tools + batch + policy sandbox; M9: widgets/IME/a11y/shortcuts/native_state) · executor de suítes `rd test` (JSON → JUnit XML, M6) |
+| `rd-agent` | M5–M9 | MCP (41 tools + batch + policy sandbox + screen resources/live viewer; M9: widgets/IME/a11y/shortcuts/native_state) · executor de suítes `rd test` (JSON → JUnit XML, M6) |
 | `rd-jni` | M9 | mangling JNI (curto/sobrecarga), descritores, MUTF-8, frames de refs locais/globais |
 | `rd-ndk` | M9 | parser ELF32/64 limitado (x86_64/AArch64/ARM) + runtime `native` em worker Unicorn isolado (ADR 004) |
 

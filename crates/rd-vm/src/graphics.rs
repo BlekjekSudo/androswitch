@@ -3796,6 +3796,8 @@ fn color_filter(
     }))
 }
 
+include!("screen_model.rs");
+
 #[cfg(test)]
 mod tests {
     use super::*;

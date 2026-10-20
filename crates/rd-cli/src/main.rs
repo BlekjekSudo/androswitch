@@ -117,6 +117,11 @@ enum Cmd {
         /// Escreve a documentação GERADA do catálogo no arquivo e sai
         #[arg(long)]
         gen_docs: Option<PathBuf>,
+        /// Live viewer: serve the current frame + visible texts over HTTP on
+        /// this address (e.g. 0.0.0.0:7878), updated after every tool call.
+        /// Same as env RD_MCP_LIVE.
+        #[arg(long)]
+        live: Option<String>,
     },
     /// M6: executa uma suíte JSON de cenários → resumo + JUnit XML (TST-01).
     /// Exit: 0 tudo passou · 1 houve falha · 64 suíte inválida/IO (ver docs/suite-format.md)
@@ -396,6 +401,7 @@ fn run(cli: Cli) -> i32 {
         Cmd::Mcp {
             describe_tools,
             gen_docs,
+            live,
         } => {
             // M5 (DoD): o conjunto publicado corresponde ao --describe-tools
             // e à documentação gerada — ambos saem do MESMO tool_defs().
@@ -427,7 +433,8 @@ fn run(cli: Cli) -> i32 {
             // M5: o stdout É o canal do protocolo — nada mais pode escrever
             // nele (o app roteia saída para o buffer da sessão, ADR 001).
             // O erro sai pelo caminho padrão do contrato (JSON no stderr).
-            rd_agent::mcp::serve_stdio(std::io::stdin(), std::io::stdout())
+            let live = live.clone().or_else(|| std::env::var("RD_MCP_LIVE").ok());
+            rd_agent::mcp::serve_stdio_with(std::io::stdin(), std::io::stdout(), live.as_deref())
         }
         Cmd::Perf {
             apk,

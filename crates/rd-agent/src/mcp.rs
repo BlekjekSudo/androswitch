@@ -348,6 +348,9 @@ pub struct AgentSession {
     logs: Arc<Mutex<Vec<u8>>>,
     devices: DeviceTable,
     behavior: SwitchTable,
+    /// Round 6: cached screen model / PNG per frame version, resource
+    /// subscriptions, pending notifications and the live viewer.
+    screen: ScreenState,
 }
 
 impl Default for AgentSession {
@@ -384,6 +387,7 @@ impl AgentSession {
             logs,
             devices: DeviceTable::embedded().expect("devices.toml embutido parseia"),
             behavior: SwitchTable::embedded().expect("behavior-switches.toml embutido parseia"),
+            screen: ScreenState::default(),
         }
     }
 
@@ -537,7 +541,7 @@ fn obj(props: serde_json::Value, required: &[&str]) -> serde_json::Value {
 /// observação, wait/wait_for, asserts, permissões, estado/saúde, lacunas de
 /// compat., batch — spec PARTE 4).
 pub fn tool_defs() -> Vec<ToolDef> {
-    vec![
+    let mut defs = vec![
         ToolDef {
             name: "install",
             description:
@@ -827,7 +831,48 @@ pub fn tool_defs() -> Vec<ToolDef> {
                 "M9: list active notifications/channels or click/cancel a notification (tag/id and optional action index). Uses the app NotificationManager state.",
             schema: obj(serde_json::json!({"action":{"type":"string","enum":["list","click","cancel"]},"tag":{"type":"string"},"id":{"type":"integer"},"action_index":{"type":"integer","minimum":0}}), &[]),
         },
-    ]
+        ToolDef {
+            name: "observe",
+            description:
+                "See the screen WITHOUT a screenshot: semantic model of the current frame derived from the recorded display list (works for Views, Compose and custom canvases) merged with the host view tree. Returns visible texts with bounds, probable tap targets (label + center x,y; source frame|view), images and a frame `version` that only changes when visible content changes, plus a diff (+added/-removed texts) since the previous observe. format=text (default, compact, LLM-friendly) or json (structured; boxes=true adds drawn boxes). ~10-100x cheaper than screenshot (no rasterize/PNG). Also available as subscribable MCP resources rustydroid://screen and rustydroid://screen.txt.",
+            schema: obj(
+                serde_json::json!({
+                    "format": { "type": "string", "enum": ["text", "json"], "description": "text (default) ou json" },
+                    "diff": { "type": "boolean", "description": "incluir mudanças desde o observe anterior (default true)" },
+                    "boxes": { "type": "boolean", "description": "json: incluir caixas desenhadas (default false)" },
+                }),
+                &[],
+            ),
+        },
+        ToolDef {
+            name: "tap_text",
+            description:
+                "Tap by visible label instead of coordinates: finds the tap target (or text) whose label matches `text` on the current frame (case/space-insensitive substring; exact=true for equality; nth picks among matches in reading order) and taps its center. Error VIEW_NOT_FOUND lists the visible texts. Works on Compose UIs (labels come from the drawn frame).",
+            schema: obj(
+                serde_json::json!({
+                    "text": { "type": "string", "description": "rótulo visível (ex.: \"Continuar\")" },
+                    "exact": { "type": "boolean", "description": "igualdade em vez de substring (default false)" },
+                    "nth": { "type": "integer", "minimum": 0, "description": "índice entre os candidatos (default 0)" },
+                }),
+                &["text"],
+            ),
+        },
+    ];
+    for d in defs.iter_mut() {
+        if OBSERVE_AFTER_TOOLS.contains(&d.name) {
+            if let Some(p) = d
+                .schema
+                .get_mut("properties")
+                .and_then(|p| p.as_object_mut())
+            {
+                p.insert(
+                    "observe".into(),
+                    serde_json::json!({ "type": "boolean", "description": "anexar o resumo `observe` (texto) da tela após a ação (default false)" }),
+                );
+            }
+        }
+    }
+    defs
 }
 
 impl AgentSession {
@@ -1021,6 +1066,8 @@ impl AgentSession {
             | "shortcuts" | "native_state" => self.tool_m9(name, &args),
             "get_api_usage" => self.tool_api_usage(args.get("package").and_then(|v| v.as_str())),
             "get_coverage" => self.tool_coverage(),
+            "observe" => self.tool_observe(&args),
+            "tap_text" => self.tool_tap_text(&args),
             other => {
                 return ToolResult::error(&agent_error(
                     "UNKNOWN_TOOL",
@@ -1029,10 +1076,12 @@ impl AgentSession {
                 ))
             }
         };
-        match res {
+        let mut out = match res {
             Ok(r) => r,
             Err(e) => ToolResult::error(&e),
-        }
+        };
+        self.screen_post_tool(name, &args, &mut out);
+        out
     }
 
     // ── install / launch / input ────────────────────────────────────────────
@@ -1471,43 +1520,18 @@ impl AgentSession {
     }
 
     fn tool_screenshot(&mut self, path: Option<&str>) -> Result<ToolResult, RdError> {
-        let tree = self.require_engine()?.view_tree().ok_or_else(|| {
-            agent_error(
+        if self.require_engine()?.view_tree().is_none() {
+            return Err(agent_error(
                 "INVALID_FORMAT",
                 "sem activity/window para screenshot",
                 None,
-            )
-        })?;
-        // App-drawn content (Compose, custom views): run the host draw pass
-        // and rasterize the recorded frame over the host tree rendering.
-        let mut draw_err: Option<String> = None;
-        let png = {
-            let eng = self.require_engine()?;
-            // a failing draw pass is reported in the app logs (it used to be
-            // swallowed, leaving a blank screenshot with no explanation)
-            let ops = match eng.draw_frame() {
-                Ok(n) => n,
-                Err(e) => {
-                    draw_err = Some(format!(
-                        "W/RustyDroid: draw pass failed: {e}{}\n",
-                        eng.exit_trace(&e)
-                    ));
-                    0
-                }
-            };
-            let mut fb = rd_render::render_snapshot(&tree);
-            if ops > 0 && eng.has_frame() {
-                let (w, h) = (fb.w, fb.h);
-                eng.rasterize_frame(&mut fb.px, w, h);
-            }
-            fb.to_png()
-        };
-        if let Some(msg) = draw_err {
-            self.logs
-                .lock()
-                .expect("logs")
-                .extend_from_slice(msg.as_bytes());
+            ));
         }
+        // App-drawn content (Compose, custom views): the host draw pass is
+        // recorded once per frame version and the PNG cached until app code
+        // runs again (round 6) — repeated screenshots are free.
+        let png = self.screen_png()?;
+        let draw_warning = self.screen.draw_error.clone();
         match path {
             Some(p) if !p.is_empty() => {
                 // Controle M5: escrita de arquivo SÓ dentro do sandbox
@@ -1521,13 +1545,21 @@ impl AgentSession {
                     "size": [720, 1440],
                 })))
             }
-            _ => Ok(ToolResult {
-                content: vec![ToolContent::Image {
+            _ => {
+                let mut content = vec![ToolContent::Image {
                     data_b64: base64_encode(&png),
                     mime: "image/png",
-                }],
-                is_error: false,
-            }),
+                }];
+                if let Some(w) = draw_warning {
+                    content.push(ToolContent::Text(format!(
+                        "warning: draw pass failed — app-drawn content may be missing: {w}"
+                    )));
+                }
+                Ok(ToolResult {
+                    content,
+                    is_error: false,
+                })
+            }
         }
     }
 
@@ -2652,7 +2684,10 @@ fn handle_single(
             id,
             serde_json::json!({
                 "protocolVersion": PROTOCOL_VERSION,
-                "capabilities": { "tools": {} },
+                "capabilities": {
+                    "tools": {},
+                    "resources": { "subscribe": true, "listChanged": false },
+                },
                 "serverInfo": { "name": SERVER_NAME, "version": SERVER_VERSION },
             }),
         ))),
@@ -2673,7 +2708,9 @@ fn handle_single(
                 .to_string();
             let empty = serde_json::json!({});
             let args = msg.pointer("/params/arguments").unwrap_or(&empty);
-            let result = session.call_tool(&name, args);
+            let t0 = std::time::Instant::now();
+            let result = session.call_tool_isolated(&name, args);
+            session.screen_after_call(&name, t0.elapsed().as_secs_f64() * 1000.0);
             let content: Vec<serde_json::Value> = result
                 .content
                 .iter()
@@ -2701,6 +2738,30 @@ fn handle_single(
             Some(Ok(jsonrpc_result(id, result_json)))
         }
         "ping" => Some(Ok(jsonrpc_result(id, serde_json::json!({})))),
+        "resources/list" => Some(Ok(jsonrpc_result(id, AgentSession::resources_list()))),
+        "resources/templates/list" => Some(Ok(jsonrpc_result(
+            id,
+            serde_json::json!({ "resourceTemplates": [] }),
+        ))),
+        "resources/read" | "resources/subscribe" | "resources/unsubscribe" => {
+            let Some(uri) = msg.pointer("/params/uri").and_then(|v| v.as_str()) else {
+                return Some(Err(jsonrpc_error(
+                    id,
+                    -32602,
+                    "params.uri (string) é obrigatório",
+                )));
+            };
+            let r = match method {
+                "resources/read" => session.resource_read(uri),
+                m => session
+                    .resource_subscribe(uri, m == "resources/subscribe")
+                    .map(|()| serde_json::json!({})),
+            };
+            Some(match r {
+                Ok(v) => Ok(jsonrpc_result(id, v)),
+                Err((code, m)) => Err(jsonrpc_error(id, code, &m)),
+            })
+        }
         m if m.starts_with("notifications/") => None, // notificações conhecidas: silêncio
         other => {
             // issue #71: JSON-RPC 2.0 §4.1 — o servidor NÃO responde a
@@ -2714,7 +2775,7 @@ fn handle_single(
                 Some(Err(jsonrpc_error(
                     id,
                     -32601,
-                    &format!("método '{other}' não existe (initialize/tools/list/tools/call/ping)"),
+                    &format!("método '{other}' não existe (initialize/tools/list/tools/call/resources/list|read|subscribe|unsubscribe/ping)"),
                 )))
             }
         }
@@ -2732,10 +2793,25 @@ fn jsonrpc_error(id: Option<serde_json::Value>, code: i64, message: &str) -> ser
 /// Loop stdio: uma linha = uma mensagem (LSP-style). Termina em EOF.
 pub fn serve_stdio<R: std::io::Read, W: std::io::Write>(
     input: R,
+    output: W,
+) -> Result<(), RdError> {
+    serve_stdio_with(input, output, std::env::var("RD_MCP_LIVE").ok().as_deref())
+}
+
+/// [`serve_stdio`] with an optional live viewer address (`rd mcp --live`):
+/// a std-only HTTP server showing the current frame, visible texts and tap
+/// targets, updated after every tool call (long-poll, no polling storm).
+pub fn serve_stdio_with<R: std::io::Read, W: std::io::Write>(
+    input: R,
     mut output: W,
+    live: Option<&str>,
 ) -> Result<(), RdError> {
     let reader = std::io::BufReader::new(input);
     let mut session = AgentSession::new();
+    if let Some(addr) = live.filter(|a| !a.is_empty()) {
+        let local = session.enable_live(addr)?;
+        eprintln!("[rd mcp] live viewer: http://{local}/");
+    }
     for line in reader.lines() {
         let line = line.map_err(|e| RdError::new("IO_ERROR", format!("stdin: {e}"), MODULE_ID))?;
         if line.trim().is_empty() {
@@ -2751,11 +2827,18 @@ pub fn serve_stdio<R: std::io::Read, W: std::io::Write>(
                     .map_err(|e| RdError::new("IO_ERROR", format!("stdout: {e}"), MODULE_ID))?;
             }
         }
+        // server → client notifications (resources/updated) after the reply
+        for n in session.take_notifications() {
+            writeln!(output, "{n}")
+                .and_then(|()| output.flush())
+                .map_err(|e| RdError::new("IO_ERROR", format!("stdout: {e}"), MODULE_ID))?;
+        }
     }
     Ok(())
 }
 
 include!("m9_tools.rs");
+include!("observe.rs");
 
 #[cfg(test)]
 mod tests {
@@ -2940,6 +3023,189 @@ mod tests {
             }
         };
         (content, r.is_error)
+    }
+
+    /// Round 6: the agent sees the screen without screenshots — `observe`
+    /// (text/json + diff), `tap_text`, cached screenshots, MCP resources with
+    /// subscriptions and `notifications/resources/updated`.
+    #[test]
+    fn observe_tap_text_and_screen_resources() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        let (v, err) = call(&mut s, "observe", serde_json::json!({}));
+        assert!(err, "observe sem app é erro tipado: {v}");
+        assert!(!call(&mut s, "install", serde_json::json!({"apk": apk_path})).1);
+        let r = s.call_tool("launch", &serde_json::json!({"observe": true}));
+        assert!(!r.is_error);
+        assert_eq!(r.content.len(), 2, "observe:true anexa o resumo");
+        match &r.content[1] {
+            ToolContent::Text(t) => assert!(t.contains("Olá do MCP"), "{t}"),
+            _ => panic!("resumo é texto"),
+        }
+        let (v, err) = call(&mut s, "observe", serde_json::json!({}));
+        assert!(!err);
+        let t = v.as_str().unwrap_or_default().to_string();
+        assert!(t.starts_with("frame v1"), "{t}");
+        assert!(t.contains("unchanged since last observe"), "{t}");
+        let (v, err) = call(&mut s, "observe", serde_json::json!({"format": "json"}));
+        assert!(!err);
+        assert_eq!(v["version"], 1);
+        assert_eq!(v["finished"], false);
+        assert!(
+            v["texts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|t| t["text"] == "Olá do MCP"),
+            "{v}"
+        );
+        let (v, err) = call(&mut s, "observe", serde_json::json!({"format": "xml"}));
+        assert!(err && v["code"] == "INVALID_FORMAT", "{v}");
+        // tap by label: a visible text resolves; a missing one lists texts
+        let (v, err) = call(
+            &mut s,
+            "tap_text",
+            serde_json::json!({"text": "olá   do mcp"}),
+        );
+        assert!(!err, "tap_text: {v}");
+        assert_eq!(v["label"], "Olá do MCP");
+        let (v, err) = call(
+            &mut s,
+            "tap_text",
+            serde_json::json!({"text": "nao existe"}),
+        );
+        assert!(err && v["code"] == "VIEW_NOT_FOUND", "{v}");
+        assert!(
+            v["suggestion"].as_str().unwrap().contains("Olá do MCP"),
+            "{v}"
+        );
+        let (v, err) = call(&mut s, "tap_text", serde_json::json!({}));
+        assert!(err && v["code"] == "INVALID_FORMAT", "{v}");
+        // screenshot twice: same frame version → identical cached PNG
+        let a = s.call_tool("screenshot", &serde_json::json!({}));
+        let b = s.call_tool("screenshot", &serde_json::json!({}));
+        match (&a.content[0], &b.content[0]) {
+            (ToolContent::Image { data_b64: x, .. }, ToolContent::Image { data_b64: y, .. }) => {
+                assert_eq!(x, y)
+            }
+            _ => panic!("screenshot devolve imagem"),
+        }
+        // resources over JSON-RPC
+        let rpc = |s: &mut AgentSession, m: &str| -> serde_json::Value {
+            match handle_message(s, m) {
+                Some(Ok(v)) | Some(Err(v)) => v,
+                None => serde_json::json!(null),
+            }
+        };
+        let init = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#,
+        );
+        assert_eq!(
+            init["result"]["capabilities"]["resources"]["subscribe"],
+            true
+        );
+        let l = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":2,"method":"resources/list"}"#,
+        );
+        let uris: Vec<&str> = l["result"]["resources"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|r| r["uri"].as_str())
+            .collect();
+        assert!(
+            uris.contains(&"rustydroid://screen") && uris.contains(&"rustydroid://screen.png"),
+            "{l}"
+        );
+        let rd = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"rustydroid://screen.txt"}}"#,
+        );
+        assert!(
+            rd["result"]["contents"][0]["text"]
+                .as_str()
+                .unwrap()
+                .contains("Olá do MCP"),
+            "{rd}"
+        );
+        let png = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":4,"method":"resources/read","params":{"uri":"rustydroid://screen.png"}}"#,
+        );
+        assert!(png["result"]["contents"][0]["blob"].as_str().unwrap().len() > 1000);
+        let bad = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":5,"method":"resources/read","params":{"uri":"rustydroid://nope"}}"#,
+        );
+        assert_eq!(bad["error"]["code"], -32002, "{bad}");
+        let bad = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":6,"method":"resources/subscribe","params":{"uri":"rustydroid://logs"}}"#,
+        );
+        assert_eq!(bad["error"]["code"], -32602, "{bad}");
+        let ok = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":7,"method":"resources/subscribe","params":{"uri":"rustydroid://screen"}}"#,
+        );
+        assert!(ok["result"].is_object(), "{ok}");
+        let _ = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"wait","arguments":{"ms":16}}}"#,
+        );
+        let n = s.take_notifications();
+        assert_eq!(
+            n.len(),
+            1,
+            "primeira versão observada após assinar → 1 aviso: {n:?}"
+        );
+        assert_eq!(n[0]["method"], "notifications/resources/updated");
+        assert_eq!(n[0]["params"]["uri"], "rustydroid://screen");
+        // same visible content → no further notification
+        let _ = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"wait","arguments":{"ms":16}}}"#,
+        );
+        assert!(s.take_notifications().is_empty());
+        // tools/list exposes the optional `observe` flag on action tools
+        let defs = tool_defs();
+        let tap = defs.iter().find(|d| d.name == "tap").unwrap();
+        assert!(tap.schema["properties"]["observe"].is_object());
+    }
+
+    /// Round 6: the live viewer serves the page, the state (long-poll) and
+    /// the frame PNG over plain HTTP.
+    #[test]
+    fn live_viewer_serves_page_state_and_frame() {
+        use std::io::{Read, Write};
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        let addr = s.enable_live("127.0.0.1:0").expect("bind");
+        let get = |path: &str| -> String {
+            let mut c = std::net::TcpStream::connect(addr).expect("connect");
+            write!(c, "GET {path} HTTP/1.1\r\nHost: x\r\n\r\n").unwrap();
+            let mut out = Vec::new();
+            c.read_to_end(&mut out).unwrap();
+            String::from_utf8_lossy(&out).to_string()
+        };
+        assert!(get("/").contains("RustyDroid"));
+        assert!(
+            get("/frame.png").starts_with("HTTP/1.1 204"),
+            "sem frame ainda"
+        );
+        assert!(!call(&mut s, "install", serde_json::json!({"apk": apk_path})).1);
+        let msg = r#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"launch","arguments":{}}}"#;
+        assert!(handle_message(&mut s, msg).is_some());
+        let st = get("/state.json?since=0");
+        assert!(
+            st.contains("Olá do MCP") && st.contains("\"last_tool\":\"launch\""),
+            "{st}"
+        );
+        assert!(get("/frame.png").contains("image/png"));
+        assert!(get("/nope").starts_with("HTTP/1.1 404"));
     }
 
     /// DoD M5 na unidade: instala → executa → navega → assera SÓ com as tools.
@@ -3167,8 +3433,8 @@ mod tests {
         let tools = r["result"]["tools"].as_array().expect("tools");
         assert_eq!(
             tools.len(),
-            39,
-            "catálogo completo: M5 + AG-09 + M9 (39 tools)"
+            41,
+            "catálogo completo: M5 + AG-09 + M9 + round 6 observe/tap_text (41 tools)"
         );
         for t in tools {
             assert!(t["name"].as_str().is_some());

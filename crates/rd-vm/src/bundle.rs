@@ -512,6 +512,8 @@ fn intent(
             this
         }
         ("getFlags", "()I") => Some(Value::Int(intent_meta(vm, recv).flags)),
+        // extras live in host bundles (no Parcel class-loading step)
+        ("setExtrasClassLoader", "(Ljava/lang/ClassLoader;)V") => Some(Value::Null),
         ("addCategory", "(Ljava/lang/String;)Landroid/content/Intent;") => {
             intent_meta(vm, recv).categories.push(a0);
             this

@@ -214,10 +214,9 @@ pub(crate) fn instance_intrinsic(
 }
 
 fn new_array(vm: &mut Engine, elem: &str, vals: Vec<Value>) -> Result<ObjRef, VmExit> {
+    // alloc_array leaves the element vector empty: assign it whole (indexing
+    // panicked and killed the MCP server on getStackTrace/getSuppressed)
     let a = vm.heap.alloc_array(ElemKind::Obj, vals.len(), elem)?;
-    let dst = vm.heap.array_elems_mut(a)?;
-    for (i, v) in vals.into_iter().enumerate() {
-        dst[i] = v;
-    }
+    *vm.heap.array_elems_mut(a)? = vals;
     Ok(a)
 }
