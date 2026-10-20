@@ -463,8 +463,8 @@ only screenshots taken were two, to measure the cache.
 | `tap_text` | 20–155 | resolve label + tap |
 | `wait 1000` + `observe:true` (onboarding) | 1 400–1 800 | was 1.4–3.3 s without the summary |
 | `wait 3000` after Criar + `observe:true` | 6 900 | Room insert + navigation |
-| `screenshot` fresh (frame already recorded) | 115–132 | rasterize + PNG only; was 300–1 576 ms |
-| `screenshot` repeated (same version) | 22 | cached PNG |
+| `screenshot` fresh (frame already recorded) | 115–132 → **76** | rasterize + PNG only; was 300–1 576 ms. Fix 88 (deflate) cut the PNG from 3.11 MB to 188 KB |
+| `screenshot` repeated (same version) | 22 → **1.4** | cached PNG |
 | `swipe 800 ms` | 600–740 | |
 | `key BACK` | 1 190–1 350 | |
 
@@ -479,6 +479,7 @@ only screenshots taken were two, to measure the cache.
 | 85 | `Throwable` host arrays (`getStackTrace`/`getSuppressed`) assigned whole — indexing an empty element vector panicked and killed `rd mcp` |
 | 86 | `Intent.setExtrasClassLoader` (no-op: extras are host bundles) |
 | 87 | `panic = "unwind"` + `call_tool_isolated` → `INTERNAL_PANIC` tool error, app ended, session kept |
+| 88 | PNG encoder: adaptive None/Sub/Up row filters + fast deflate (flate2 pure-Rust backend already used by rd-apk) instead of stored blocks — 16.5× smaller screenshots (3.11 MB → 188 KB; base64 4.15 M → 251 K chars) |
 
 ### Focus check (project goals vs. this round)
 

@@ -13,7 +13,7 @@ humans:
 | `observe: true` on `launch/tap/tap_text/swipe/type_text/key/wait/wait_for` | agents | the action result carries the new screen summary → 1 round-trip per step | +45 ms |
 | MCP resources `rustydroid://screen` (JSON), `rustydroid://screen.txt`, `rustydroid://screen.png`, `rustydroid://logs` | MCP clients | `resources/read` + `resources/subscribe` → `notifications/resources/updated` whenever visible content changes | — |
 | `rd mcp --live 0.0.0.0:7878` (or `RD_MCP_LIVE`) | humans | browser page with the RustyDroid-rendered frame, the screen text, tap-target overlay, last tool + latency; long-poll push | PNG encoded only when the version changes |
-| `screenshot` | both | PNG, now **cached per frame version** | 110–130 ms fresh · 22 ms repeated |
+| `screenshot` | both | PNG, now **cached per frame version** and **deflate-compressed** (adaptive row filters; ~190 KB instead of ~3.1 MB) | ~75 ms fresh · 1.4 ms repeated |
 
 Before round 6, the only way to see a Compose app was `screenshot`
 (0.3–1.6 s, ~3 MB base64 per call) — `ui_tree` shows one opaque

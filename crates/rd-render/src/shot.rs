@@ -3,8 +3,9 @@
 //! Software renderer determinístico: framebuffer RGB 720×1440 (viewport do
 //! M3.2), pinta a árvore de views (retângulo por classe/estado + texto via
 //! glifos de bloco 3×7 — fonte tipográfica real é M8/M9, o Android real usa
-//! skia/FreeType), e codifica PNG sem dependências externas (zlib com blocos
-//! STORED + crc32/adler32 próprios). Mesmo input → mesmos bytes.
+//! skia/FreeType), e codifica PNG: filtros de linha adaptativos (None/Sub/Up)
+//! + deflate rápido pelo flate2 puro-Rust já usado no rd-apk (antes: blocos
+//! STORED, ~3,1 MB por tela). Mesmo input → mesmos bytes.
 
 use rd_vm::framework::{UiNode, Vis};
 
@@ -89,14 +90,11 @@ impl Framebuffer {
             h.push(0); // interlace
             h
         });
-        // raw scanlines com filter byte 0
-        let mut raw = Vec::with_capacity(self.h * (1 + self.w * 3));
-        for y in 0..self.h {
-            raw.push(0);
-            let start = y * self.w * 3;
-            raw.extend_from_slice(&self.px[start..start + self.w * 3]);
-        }
-        chunk(&mut out, b"IDAT", zlib_stored(&raw));
+        chunk(
+            &mut out,
+            b"IDAT",
+            zlib_fast(&filtered_scanlines(&self.px, self.w, self.h)),
+        );
         chunk(&mut out, b"IEND", Vec::new());
         out
     }
@@ -112,21 +110,52 @@ fn chunk(out: &mut Vec<u8>, kind: &[u8; 4], data: Vec<u8>) {
     out.extend(crc32(&crc_input).to_be_bytes());
 }
 
-/// zlib stream com blocos STORED (BTYPE=00) — válido e sem dependências.
-fn zlib_stored(raw: &[u8]) -> Vec<u8> {
-    let mut z = vec![0x78, 0x01];
-    let mut i = 0usize;
-    while i < raw.len() {
-        let n = (raw.len() - i).min(65535);
-        let last = if i + n >= raw.len() { 1u8 } else { 0u8 };
-        z.push(last);
-        z.extend((n as u16).to_le_bytes());
-        z.extend((!(n as u16)).to_le_bytes());
-        z.extend_from_slice(&raw[i..i + n]);
-        i += n;
+/// PNG scanlines with a per-row adaptive filter (None/Sub/Up, smallest sum
+/// of absolute residuals — the libpng heuristic). Flat UI rows become runs
+/// of zeros that deflate to almost nothing.
+fn filtered_scanlines(px: &[u8], w: usize, h: usize) -> Vec<u8> {
+    let stride = w * 3;
+    let mut raw = Vec::with_capacity(h * (1 + stride));
+    let mut cand = [vec![0u8; stride], vec![0u8; stride], vec![0u8; stride]];
+    for y in 0..h {
+        let row = &px[y * stride..(y + 1) * stride];
+        let up = if y > 0 {
+            Some(&px[(y - 1) * stride..y * stride])
+        } else {
+            None
+        };
+        for i in 0..stride {
+            let a = if i >= 3 { row[i - 3] } else { 0 };
+            let b = up.map(|u| u[i]).unwrap_or(0);
+            cand[0][i] = row[i];
+            cand[1][i] = row[i].wrapping_sub(a);
+            cand[2][i] = row[i].wrapping_sub(b);
+        }
+        let score = |v: &[u8]| -> u64 { v.iter().map(|&x| (x as i8).unsigned_abs() as u64).sum() };
+        let (best, _) = cand
+            .iter()
+            .enumerate()
+            .map(|(k, v)| (k, score(v)))
+            .min_by_key(|&(_, sc)| sc)
+            .unwrap_or((0, 0));
+        raw.push(best as u8); // 0 None · 1 Sub · 2 Up
+        raw.extend_from_slice(&cand[best]);
     }
-    z.extend(adler32(raw).to_be_bytes());
-    z
+    raw
+}
+
+/// zlib stream (deflate, fast level) via flate2's pure-Rust backend — the
+/// same one rd-apk uses for ZIP entries. Screenshots went from ~3.1 MB
+/// (stored blocks) to tens of KB, deterministic for identical frames.
+fn zlib_fast(raw: &[u8]) -> Vec<u8> {
+    use std::io::Write;
+    let mut e = flate2::write::ZlibEncoder::new(
+        Vec::with_capacity(raw.len() / 16),
+        flate2::Compression::fast(),
+    );
+    // writing into a Vec cannot fail
+    let _ = e.write_all(raw);
+    e.finish().unwrap_or_default()
 }
 
 fn crc32(data: &[u8]) -> u32 {
@@ -139,15 +168,6 @@ fn crc32(data: &[u8]) -> u32 {
         }
     }
     !crc
-}
-
-fn adler32(data: &[u8]) -> u32 {
-    let (mut a, mut b) = (1u32, 0u32);
-    for &byte in data {
-        a = (a + byte as u32) % 65521;
-        b = (b + a) % 65521;
-    }
-    (b << 16) | a
 }
 
 fn draw_glyph_block(fb: &mut Framebuffer, x: i32, y: i32, ch: char, c: Rgb) {
@@ -273,13 +293,44 @@ mod tests {
     }
 
     #[test]
-    fn zlib_stored_roundtrips_with_adler() {
-        let raw = b"hello rustydroid hello rustydroid";
-        let z = zlib_stored(raw);
-        assert_eq!(z[0], 0x78);
-        assert_eq!(&z[z.len() - 4..], &adler32(raw).to_be_bytes());
-        // bloco stored: primeiro byte = BFINAL|BTYPE=00 → 1 (único bloco final)
-        assert_eq!(z[2] & 0x01, 1);
+    fn png_idat_roundtrips_and_is_compressed() {
+        use std::io::Read;
+        let mut root = node("android.widget.LinearLayout", "", (0, 0, 720, 400));
+        root.children
+            .push(node("android.widget.TextView", "olá", (0, 0, 720, 96)));
+        let fb = render_snapshot(&root);
+        let png = fb.to_png();
+        // IDAT payload: after signature (8) + IHDR chunk (25) + IDAT len/type (8)
+        let len = u32::from_be_bytes([png[33], png[34], png[35], png[36]]) as usize;
+        assert_eq!(&png[37..41], b"IDAT");
+        let mut raw = Vec::new();
+        flate2::read::ZlibDecoder::new(&png[41..41 + len])
+            .read_to_end(&mut raw)
+            .expect("valid zlib");
+        let stride = fb.w * 3;
+        assert_eq!(raw.len(), fb.h * (1 + stride));
+        // undo the filters and compare with the framebuffer
+        let mut prev = vec![0u8; stride];
+        for y in 0..fb.h {
+            let f = raw[y * (1 + stride)];
+            let mut row = raw[y * (1 + stride) + 1..(y + 1) * (1 + stride)].to_vec();
+            for i in 0..stride {
+                let a = if i >= 3 { row[i - 3] } else { 0 };
+                row[i] = match f {
+                    0 => row[i],
+                    1 => row[i].wrapping_add(a),
+                    2 => row[i].wrapping_add(prev[i]),
+                    _ => panic!("filter {f}"),
+                };
+            }
+            assert_eq!(&row[..], &fb.px[y * stride..(y + 1) * stride], "row {y}");
+            prev = row;
+        }
+        assert!(
+            png.len() < fb.px.len() / 20,
+            "flat UI compresses: {} bytes",
+            png.len()
+        );
     }
 
     /// issue #62: UiNode hostil (bounds i32::MAX/MIN) NÃO panic no render —
