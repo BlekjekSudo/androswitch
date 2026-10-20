@@ -1,8 +1,9 @@
 //! Heap arena da VM com os orçamentos do piso moto-e5 (spec A2/PRF-06):
 //! heap do app ≤ 256 MB. Alocação que exceder o orçamento responde erro
-//! tipado `VM_OOM` — nunca abort (Lei 1). Semântica de arena: tudo é
-//! liberado de uma vez quando o `Engine` morre (M2 não tem GC por
-//! gerações; arena-por-execução é o "GC" contratual desta fase).
+//! tipado `VM_OOM` — nunca abort (Lei 1). Objetos inalcançáveis são
+//! coletados pelo mark-sweep de `crate::gc` em safe points (slots liberados
+//! viram tombstones e são reciclados pela free list); o resto é liberado de
+//! uma vez quando o `Engine` morre.
 
 use crate::value::Value;
 
@@ -77,10 +78,19 @@ pub struct Heap {
     budget: usize,
     used: usize,
     /// Marca d'água (M7): maior `used` já observado — o RSS do heap do app
-    /// para o orçamento `ram_app_heap_mb` (a arena não libera objetos, então
-    /// na prática used == peak, mas o contrato do gate é o pico).
+    /// para o orçamento `ram_app_heap_mb` (com o GC, `used` cai a cada ciclo;
+    /// o contrato do gate é o pico).
     peak: usize,
     objects: Vec<HeapObj>,
+    /// Slots freed by the GC, reused LIFO by `alloc` (see `gc.rs`).
+    free: Vec<ObjRef>,
+    young: Vec<bool>,
+    remembered: std::collections::HashSet<ObjRef>,
+    // Some = host scope (pin allocations); None = guest execution.
+    gc_scopes: Vec<Option<Vec<ObjRef>>>,
+    births: Vec<u64>,
+    allocation_clock: u64,
+    existing_cutoffs: Vec<(usize, u64)>,
 }
 
 impl Heap {
@@ -90,6 +100,86 @@ impl Heap {
             used: 0,
             peak: 0,
             objects: Vec::new(),
+            free: Vec::new(),
+            young: Vec::new(),
+            remembered: Default::default(),
+            gc_scopes: Vec::new(),
+            births: Vec::new(),
+            allocation_clock: 0,
+            existing_cutoffs: Vec::new(),
+        }
+    }
+
+    pub(crate) fn is_young(&self, r: ObjRef) -> bool {
+        self.young
+            .get(r.wrapping_sub(1) as usize)
+            .copied()
+            .unwrap_or(true)
+    }
+    pub(crate) fn remembered(&self) -> impl Iterator<Item = ObjRef> + '_ {
+        self.remembered.iter().copied()
+    }
+    pub(crate) fn promote(&mut self) {
+        self.young.fill(false);
+        // Free slots are never old; keep them unmarked in minor collections.
+        for r in &self.free {
+            self.young[(*r - 1) as usize] = true;
+        }
+        self.remembered.clear();
+    }
+    pub(crate) fn gc_scope_depth(&self) -> usize {
+        self.gc_scopes.len()
+    }
+    pub(crate) fn gc_host_enter(&mut self, existing: bool) {
+        if existing {
+            self.existing_cutoffs
+                .push((self.gc_scopes.len(), self.allocation_clock));
+        }
+        self.gc_scopes.push(Some(Vec::new()));
+    }
+    /// A nested Rust host call can return a temporary to its enclosing host
+    /// callback. Preserve all nested pins conservatively until that callback
+    /// returns, but never promote them through an intervening Java frame.
+    pub(crate) fn gc_host_restore(&mut self, depth: usize) {
+        let roots = self
+            .gc_scopes
+            .get_mut(depth)
+            .and_then(Option::take)
+            .unwrap_or_default();
+        self.gc_scope_restore(depth);
+        if let Some(Some(parent)) = self.gc_scopes.last_mut() {
+            parent.extend(roots);
+        }
+    }
+
+    pub(crate) fn gc_guest_enter(&mut self) {
+        self.gc_scopes.push(None);
+    }
+    pub(crate) fn gc_scope_restore(&mut self, depth: usize) {
+        self.gc_scopes.truncate(depth);
+        self.existing_cutoffs.retain(|(d, _)| *d < depth);
+    }
+    pub(crate) fn gc_pinned_roots(&self) -> impl Iterator<Item = ObjRef> + '_ {
+        let cutoff = self
+            .existing_cutoffs
+            .iter()
+            .map(|(_, c)| *c)
+            .max()
+            .unwrap_or(0);
+        self.gc_scopes.iter().filter_map(Option::as_ref).flatten().copied().chain(
+            self.births.iter().enumerate().filter(move |(_, birth)| **birth <= cutoff)
+                .map(|(i, _)| (i + 1) as ObjRef).filter(|r|
+                    !matches!(self.get(*r), Ok(HeapObj::Instance { class, .. }) if class == crate::gc::FREED_CLASS)
+                )
+        )
+    }
+    pub(crate) fn gc_pin_return(&mut self, r: ObjRef) {
+        self.pin_allocation(r);
+    }
+
+    fn pin_allocation(&mut self, r: ObjRef) {
+        if let Some(Some(roots)) = self.gc_scopes.last_mut() {
+            roots.push(r);
         }
     }
 
@@ -115,7 +205,7 @@ impl Heap {
     }
 
     fn alloc(&mut self, bytes: usize, obj: HeapObj) -> Result<ObjRef, OomError> {
-        if self.objects.len() >= MAX_OBJECTS {
+        if self.free.is_empty() && self.objects.len() >= MAX_OBJECTS {
             return Err(OomError {
                 requested: bytes,
                 budget: self.budget,
@@ -133,8 +223,21 @@ impl Heap {
         }
         self.used = new_used;
         self.peak = self.peak.max(new_used);
+        if let Some(r) = self.free.pop() {
+            self.objects[(r - 1) as usize] = obj;
+            self.young[(r - 1) as usize] = true;
+            self.allocation_clock += 1;
+            self.births[(r - 1) as usize] = self.allocation_clock;
+            self.pin_allocation(r);
+            return Ok(r);
+        }
         self.objects.push(obj);
-        Ok(self.objects.len() as ObjRef)
+        self.young.push(true);
+        self.allocation_clock += 1;
+        self.births.push(self.allocation_clock);
+        let r = self.objects.len() as ObjRef;
+        self.pin_allocation(r);
+        Ok(r)
     }
 
     pub fn alloc_string(&mut self, s: String) -> Result<ObjRef, OomError> {
@@ -180,6 +283,29 @@ impl Heap {
         self.peak = self.peak.max(new_used);
         self.objects[index] = HeapObj::Str(s);
         Ok(())
+    }
+
+    /// `alloc_array` with every element set to the JVM default for its kind
+    /// (0, 0L, 0.0f, 0.0, null) — use this for buffers handed to guest code
+    /// (`read(byte[], off, len)` scratch arrays, host-created arrays).
+    pub fn alloc_array_zeroed(
+        &mut self,
+        elem: ElemKind,
+        len: usize,
+        elem_class: &str,
+    ) -> Result<ObjRef, OomError> {
+        let r = self.alloc_array(elem, len, elem_class)?;
+        let fill = match elem {
+            ElemKind::Int => Value::Int(0),
+            ElemKind::Long => Value::Long(0),
+            ElemKind::Float => Value::Float(0.0),
+            ElemKind::Double => Value::Double(0.0),
+            ElemKind::Obj => Value::Null,
+        };
+        if let Ok(e) = self.array_elems_mut(r) {
+            e.resize(len, fill);
+        }
+        Ok(r)
     }
 
     pub fn alloc_array(
@@ -229,6 +355,48 @@ impl Heap {
         self.alloc(bytes, HeapObj::Instance { class, fields })
     }
 
+    /// GC sweep: drops the contents of slot `r`, leaving a tombstone instance
+    /// of `crate::gc::FREED_CLASS`, queues the slot for reuse, and returns
+    /// the bytes given back to the budget. `None` if `r` is invalid or
+    /// already freed.
+    /// Number of recycled slots waiting for reuse.
+    pub fn free_slots(&self) -> usize {
+        self.free.len()
+    }
+
+    pub fn free_slot(&mut self, r: ObjRef) -> Option<usize> {
+        if r == 0 || r as usize > self.objects.len() {
+            return None;
+        }
+        let slot = &mut self.objects[(r - 1) as usize];
+        let bytes = match slot {
+            HeapObj::Instance { class, .. } if class == crate::gc::FREED_CLASS => return None,
+            HeapObj::Instance { fields, .. } => {
+                fields
+                    .iter()
+                    .map(|(n, _)| std::mem::size_of::<Value>() + n.len())
+                    .sum::<usize>()
+                    .max(fields.len() * 24)
+                    + 32
+            }
+            HeapObj::Str(s) => s.len().saturating_mul(2).saturating_add(32),
+            HeapObj::Array { elems, .. } => elems
+                .len()
+                .saturating_mul(std::mem::size_of::<Value>())
+                .saturating_add(16),
+        };
+        *slot = HeapObj::Instance {
+            class: crate::gc::FREED_CLASS.to_string(),
+            fields: Vec::new(),
+        };
+        self.free.push(r);
+        self.young[(r - 1) as usize] = true;
+        self.remembered.remove(&r);
+        let bytes = bytes.min(self.used);
+        self.used -= bytes;
+        Some(bytes)
+    }
+
     pub fn get(&self, r: ObjRef) -> Result<&HeapObj, String> {
         if r == 0 || r as usize > self.objects.len() {
             return Err(format!("referência inválida #{r}"));
@@ -239,6 +407,9 @@ impl Heap {
     pub fn get_mut(&mut self, r: ObjRef) -> Result<&mut HeapObj, String> {
         if r == 0 || r as usize > self.objects.len() {
             return Err(format!("referência inválida #{r}"));
+        }
+        if !self.young[(r - 1) as usize] {
+            self.remembered.insert(r);
         }
         Ok(&mut self.objects[(r - 1) as usize])
     }
@@ -318,6 +489,7 @@ impl Heap {
                 }));
             }
             self.used = new_used;
+            self.peak = self.peak.max(new_used);
         }
         match self.get_mut(r) {
             Ok(HeapObj::Instance { fields, .. }) => {

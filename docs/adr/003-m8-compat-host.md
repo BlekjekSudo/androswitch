@@ -29,8 +29,11 @@ OkHttp devolve a resposta registrada sem fingir rede.
 - Single-thread determinístico: `Call.enqueue`, broadcasts e commits de
   fragment são síncronos; WorkManager registra o pedido mas não roda
   `Worker.doWork()` em background (harness conclui via `m8_complete_work`).
-- SQLite em memória, subconjunto SQL (CREATE/DROP TABLE, SELECT … FROM,
-  insert/update/delete com `col=literal|?`); sem arquivo, sem JOIN/ORDER.
+- SQLite: desde a ADR 005 o backend padrão é SQLite real (processo filho
+  Python `sqlite3`, `jsqlite.rs`). O subconjunto SQL em memória (CREATE/DROP
+  TABLE, SELECT … FROM, insert/update/delete com `col=literal|?`; sem
+  arquivo, sem JOIN/ORDER) continua como fallback (`RD_SQLITE=subset`,
+  `Engine::use_sqlite_subset`, ou quando não há Python).
 - OkHttp é shim offline: nenhuma rede; resposta vem de
   `Engine::m8_set_http_response` (default 200 vazio) e toda URL é registrada.
 - RecyclerView popula no máximo 20 itens (viewport headless).

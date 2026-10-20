@@ -19,7 +19,20 @@ rd-dex = { workspace = true }
 # M3.2: LayoutInflater consome AXML/ARSC do APK aberto — rd-apk é a BASE do
 # workspace (nível 0), logo rd-vm → rd-apk segue apontando para baixo (sem ciclo).
 rd-apk = { workspace = true }
+regex = { workspace = true }
+
+rd-ndk = { path = "../rd-ndk", optional = true }
+rd-jni = { path = "../rd-jni", optional = true }
+fancy-regex = "=0.13.0"
 
 [dev-dependencies]
+rd-jni = { path = "../rd-jni" }
 rd-render = { path = "../rd-render" }
 rd-testsupport = { path = "../rd-testsupport" }
+
+[features]
+default = ["advanced-components"]
+advanced-components = []
+native = ["dep:rd-ndk", "dep:rd-jni", "rd-ndk/native"]
+
+jit = ["dep:rd-jni", "rd-jni/jit"]

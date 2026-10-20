@@ -16,7 +16,7 @@
 | M6 | Executor de testes | suíte JSON → JUnit XML; compat-matrix automatizada | ✅ **implementado (2026-10)** |
 | M7 | Performance + gate piso E5 | startup < 2 s app trivial; suíte golden passa nos budgets moto-e5 | 🟡 **parcial (2026-10)** — `rd perf` + gate de CI no app trivial (estimativa); golden pendente |
 | M8 | Compat real | app OSS médio navega funcional; v0.9 | ✅ **implementado (2026-10)** |
-| M9 | Componentes avançados + NDK | 5 APKs com .so rodando; widgets/IME/notificações ok | ⬜ |
+| M9 | Componentes avançados + NDK | 5 APKs com .so rodando; widgets/IME/notificações ok | ✅ **implementado (2026-10)** — 5 APKs reais × 3 ABIs com chamadas JNI verificadas; revisão humana pendente |
 | M10 | Dispositivos virtuais | câmera/GPS/biometria programáveis pelo agente | ⬜ |
 | M11 | Engines | Flutter → RN → Mono → wasm: 1 app de cada em golden flow | ⬜ |
 | M12 | Ecossistema GH | docs site, compat-matrix viva, releases; v1.0 | ⬜ |
@@ -671,3 +671,60 @@ biblioteca do APK. Estado real e consultável via `Engine::m8_*`; testes em
    aplicam no storage da VM; getters leem o storage; contains/getAll reais.
 9. ✅ **Regressão real**: launch do `org.primftpd` inalterado (mesma
    ClassCastException fiel do APK sem META-INF/services); workspace verde.
+
+## ✅ M9 concluído (2026-10) — Componentes avançados + NDK
+
+Arquitetura e limites: [`docs/m9.md`](m9.md); decisão: [ADR 004](adr/004-m9-native-isolation.md).
+O código nativo **nunca roda na CPU do host**. O ELF é carregado por `rd-ndk` e
+executado num worker Python/Unicorn 2.1.4 em processo separado. Esse worker tem
+fuel, watchdog, syscalls bloqueadas e libc fail-closed. Não há `unsafe` novo, e o
+GPL fica fora do binário. Features: `advanced-components` (default) e `native`
+(opt-in).
+
+1. ✅ **SYS-09 notificações**: canais e grupos, Builder/Compat, ações, BigText,
+   progress, timeout, permissão `POST_NOTIFICATIONS` (targetSdk ≥ 33),
+   PendingIntent com flag de mutabilidade (≥ 31), clique com auto-cancel,
+   `NotificationListenerService`. Tool `notifications` funcional.
+2. ✅ **SYS-09 IME**: foco/teclado em EditText, `InputConnection` (commit,
+   composing, delete surrounding, seleção, editor action) e ciclo de vida do
+   `InputMethodService` DEX. Unicode correto. Tool `ime`.
+3. ✅ **SYS-09 widgets**: AppWidgetManager/Host, ciclo do `AppWidgetProvider`
+   DEX e RemoteViews (texto, visibilidade, enabled, clique com PendingIntent),
+   renderizados na mesma árvore `UiNode`. Tools `widgets` e `widget_screenshot`.
+   ProgressBar e coleções → `NOT_IMPLEMENTED`.
+4. ✅ **SYS-10 acessibilidade e atalhos**: árvore de nós e eventos para
+   `AccessibilityService` DEX, ações focus/click/set_text (mesmo editor do IME);
+   `ShortcutManager` dinâmico/pinned. Tools `accessibility` e `shortcuts`.
+5. ✅ **LANG-02 ELF**: parser ELF32/64 limitado (x86_64/AArch64/ARM;
+   REL/RELA/JMPREL/RELR; hash GNU). A campanha de mutação rodou 164M casos em
+   12 min sem panic.
+6. ✅ **LANG-02 JNI**: tabela JNIEnv/JavaVM (FindClass, MethodID/FieldID,
+   `Call*Method[A]`, strings e regiões, arrays e críticos, weak globals,
+   exceções, `RegisterNatives`, `JNI_OnLoad`) com fixtures nas 3 ABIs
+   (`golden/native/`). Corrigido um bug de numeração: os slots 226–228 estavam
+   deslocados.
+7. ✅ **Gate real** (`golden-apks/native-gate.sh`, APKs fixados por SHA-256).
+   Os 5 APKs fazem chamada JNI a partir do DEX real, e o script confere cada
+   resultado. Passa também com as bibliotecas ARM dos mesmos APKs
+   (`RD_NATIVE_ABI=arm64-v8a|armeabi-v7a`): 15/15 execuções.
+   - voicesmith: `ConicConverter.convert` dá 16 quadráticas, igual à previsão
+     de `computeQuadPOW2` do Skia.
+   - termux: `JNI.setPtyWindowSize` e `JNI.close`.
+   - netguard: `jni_getprop("net.dns1")` devolve `""`.
+   - binaryeye: `encodeStringAsSvg` gera um SVG QR 21×21 (cerca de 500 mil
+     instruções), e o `zbarimg` decodifica `RustyDroid` nas 3 ABIs.
+   - whobird: `createErrorReporter` + `delete` (handle C++ real).
+
+Correções que saíram do gate ARM: o detector de SVC confundia Thumb-2 com SVC,
+valores de 32 bits traziam lixo na metade alta e argumentos variádicos 64-bit
+não usavam par alinhado. Também foi corrigida a contagem de instruções, que
+somava totais acumulados.
+
+Ressalva: os componentes foram verificados no fixture `test.m9`. Também
+`Call*MethodV` (va_list) é suportado nos 3 ABIs, mas não há threads, `pthread_cond_wait` nem
+direct ByteBuffer (inferência TFLite); a reentrância nativa aninhada é
+recusada, os arrays JNI vão até 1M elementos e o JNA `libjnidispatch` não
+inicializa.
+
+MCP: catálogo 32 → 39 tools (`component_service`, `widgets`,
+`widget_screenshot`, `ime`, `accessibility`, `shortcuts`, `native_state`).

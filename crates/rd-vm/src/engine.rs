@@ -48,9 +48,15 @@ impl Default for VmConfig {
     }
 }
 
-/// Motor interpretador. Semântica de arena: o heap inteiro é descartado
-/// quando o Engine cai (M2: "GC" = arena-por-execução com teto contratual).
+/// Motor interpretador. O heap é coletado por mark-sweep em safe points
+/// (`Engine::gc` / `maybe_gc`, ver `gc.rs`) e descartado quando o Engine cai.
 pub struct Engine {
+    #[cfg(feature = "jit")]
+    jit: crate::jit::JitState,
+    #[cfg(feature = "native")]
+    pub(crate) native: Option<crate::native::NativeState>,
+    #[cfg(feature = "native")]
+    pub(crate) native_active: bool,
     pub cp: Classpath,
     pub heap: Heap,
     pub config: VmConfig,
@@ -65,10 +71,61 @@ pub struct Engine {
     pub fw: crate::framework::HostState,
     depth: usize,
     pub(crate) fuel_used: u64,
+    pub(crate) fuel_window_start: u64,
     /// AG-09: cobertura de métodos — chave `(dex_idx << 32) | method_idx`
     /// de cada corpo DEX que chegou a executar neste Engine.
     coverage: HashSet<u64>,
     pub(crate) frame_labels: Vec<String>,
+    /// Cooperative green threads (threads.rs)
+    pub threads: crate::threads::Threads,
+    /// Session permission grant set (perms.rs); None = all granted.
+    pub granted_permissions: Option<HashSet<String>>,
+    pub(crate) pending_permission_results: Vec<crate::perms::PendingPermissionResult>,
+    /// window → (decor, content frame) (window.rs)
+    pub(crate) window_decor:
+        HashMap<crate::heap::ObjRef, (crate::heap::ObjRef, crate::heap::ObjRef)>,
+    pub(crate) system_ui_visibility: HashMap<crate::heap::ObjRef, i32>,
+    /// General View property store (view_props.rs): (view, property) → value
+    pub(crate) view_props: HashMap<(crate::heap::ObjRef, String), Value>,
+    /// `java.text.BreakIterator` state (jbreakiter.rs)
+    pub(crate) break_iters: HashMap<crate::heap::ObjRef, crate::jbreakiter::BreakState>,
+    /// BigDecimal/BigInteger values: (unscaled, scale) (jbigdecimal.rs).
+    pub(crate) bignums: HashMap<crate::heap::ObjRef, (i128, i32)>,
+    /// dex pc of the instruction the interpreter executed last (diagnostics:
+    /// VM errors name the faulting instruction of the innermost frame)
+    pub(crate) last_pc: usize,
+    /// view_attach.rs: OnAttachStateChangeListeners per view
+    pub(crate) attach_listeners: HashMap<crate::heap::ObjRef, Vec<crate::heap::ObjRef>>,
+    /// view_attach.rs: views currently attached to a window
+    pub(crate) attached_views: HashSet<crate::heap::ObjRef>,
+    /// graphics.rs: native state of host graphics objects + window display list
+    pub(crate) gfx: crate::graphics::Gfx,
+    /// android_util.rs: sparse-array contents (sorted)
+    pub(crate) sparse: HashMap<crate::heap::ObjRef, std::collections::BTreeMap<i64, Value>>,
+    /// view_attach.rs: windows made visible (makeVisible)
+    pub(crate) window_attached: HashSet<crate::heap::ObjRef>,
+    /// vto.rs: ViewTreeObserver state, and the observer of each tree root
+    pub(crate) vto: HashMap<crate::heap::ObjRef, crate::vto::Observer>,
+    pub(crate) vto_by_root: HashMap<crate::heap::ObjRef, crate::heap::ObjRef>,
+    /// view_attach.rs: the window token handed to attached views
+    pub(crate) window_token: Option<crate::heap::ObjRef>,
+    /// choreographer.rs: frame callbacks
+    pub(crate) frames: crate::choreographer::FrameState,
+    pub(crate) frame_pump_active: bool,
+    /// activity_callbacks.rs: ActivityLifecycleCallbacks registry
+    pub(crate) activity_callbacks: crate::activity_callbacks::Registry,
+    /// activity_extras.rs: setResult, back dispatchers and their callbacks
+    pub(crate) activity_results: HashMap<crate::heap::ObjRef, (i32, Option<crate::heap::ObjRef>)>,
+    pub(crate) back_dispatchers: HashMap<crate::heap::ObjRef, crate::heap::ObjRef>,
+    pub(crate) back_callbacks: HashMap<crate::heap::ObjRef, Vec<(i32, crate::heap::ObjRef)>>,
+    /// bundle.rs: Intent action/data/type/flags/package/categories
+    pub(crate) intent_meta: HashMap<crate::heap::ObjRef, crate::bundle::IntentMeta>,
+    /// content.rs: ContentResolver observers + Settings table
+    pub(crate) content: crate::content::ContentState,
+    /// Mark-sweep collector statistics (`gc.rs`).
+    pub(crate) gc_stats: crate::gc::GcStats,
+    pub(crate) gc_slots_after: usize,
+    pub(crate) gc_frames: Vec<Vec<crate::heap::ObjRef>>,
 }
 
 /// Cobertura por classe (AG-09, nível de método).
@@ -96,6 +153,10 @@ impl Engine {
     pub fn new(dexes: Vec<rd_dex::Dex>, config: VmConfig) -> Self {
         let budget = config.heap_budget;
         Engine {
+            #[cfg(feature = "native")]
+            native: None,
+            #[cfg(feature = "native")]
+            native_active: false,
             cp: Classpath::new(dexes),
             heap: Heap::new(budget),
             config,
@@ -106,9 +167,62 @@ impl Engine {
             fw: Default::default(),
             depth: 0,
             fuel_used: 0,
+            fuel_window_start: 0,
             coverage: HashSet::new(),
             frame_labels: Vec::new(),
+            threads: Default::default(),
+            granted_permissions: None,
+            pending_permission_results: Vec::new(),
+            window_decor: HashMap::new(),
+            system_ui_visibility: HashMap::new(),
+            view_props: HashMap::new(),
+            break_iters: HashMap::new(),
+            bignums: HashMap::new(),
+            last_pc: 0,
+            attach_listeners: HashMap::new(),
+            attached_views: HashSet::new(),
+            gfx: Default::default(),
+            sparse: HashMap::new(),
+            window_attached: HashSet::new(),
+            vto: HashMap::new(),
+            vto_by_root: HashMap::new(),
+            window_token: None,
+            frames: Default::default(),
+            frame_pump_active: false,
+            activity_callbacks: Default::default(),
+            activity_results: HashMap::new(),
+            back_dispatchers: HashMap::new(),
+            back_callbacks: HashMap::new(),
+            intent_meta: HashMap::new(),
+            content: Default::default(),
+            gc_stats: Default::default(),
+            gc_slots_after: 0,
+            gc_frames: Vec::new(),
+            #[cfg(feature = "jit")]
+            jit: {
+                let mut j = crate::jit::JitState::default();
+                if std::env::var("RD_JIT")
+                    .map(|v| v == "on" || v == "1")
+                    .unwrap_or(false)
+                {
+                    if let Err(e) = j.enable() {
+                        j.stats.last_error = Some(e);
+                    }
+                }
+                j
+            },
         }
+    }
+
+    /// Opt in to the bounded integer leaf JIT (default remains interpreter).
+    #[cfg(feature = "jit")]
+    pub fn enable_jit(&mut self) -> Result<(), String> {
+        self.jit.enable()
+    }
+
+    #[cfg(feature = "jit")]
+    pub fn jit_stats(&self) -> &crate::jit::JitStats {
+        &self.jit.stats
     }
 
     pub fn heap_used(&self) -> usize {
@@ -126,6 +240,17 @@ impl Engine {
     /// onCreate DEX dela antes do onCreate da activity — como o Android faz.
     pub fn set_application_class(&mut self, application_desc: String) {
         self.fw.application_class = Some(application_desc);
+    }
+
+    /// Start a new bounded host/tool operation without losing lifetime counters.
+    pub fn reset_fuel_window(&mut self) {
+        self.fuel_window_start = self.fuel_used;
+    }
+
+    pub fn fuel_remaining(&self) -> u64 {
+        self.config
+            .fuel
+            .saturating_sub(self.fuel_used.saturating_sub(self.fuel_window_start))
     }
 
     pub fn fuel_used(&self) -> u64 {
@@ -166,6 +291,13 @@ impl Engine {
                 other => Ok(other.clone()),
             })
             .collect::<Result<Vec<_>, VmExit>>()?;
+        if let Some(v) = crate::intrinsics::call_native_loader(self, class, method, sig, &args)? {
+            return Ok(v);
+        }
+        #[cfg(feature = "advanced-components")]
+        if let Some(v) = crate::m9::call_static(self, class, method, sig, &args)? {
+            return Ok(v);
+        }
         if let Some(v) = intrinsics::call_static_intrinsic(self, class, method, sig, &args)? {
             return Ok(v);
         }
@@ -181,6 +313,82 @@ impl Engine {
         }
         self.ensure_initialized(class)?;
         let slots = slot_form(&args, &param_types);
+        self.call(dex_idx, def, &m, slots)
+    }
+
+    /// Public entry point: `new C()` — runs `<clinit>` (if pending), allocates
+    /// the instance, attaches host state and runs the no-arg constructor.
+    pub fn new_instance(&mut self, class: &str) -> Result<ObjRef, VmExit> {
+        self.ensure_initialized(class)?;
+        let r = self.heap.alloc_instance(class.to_string(), Vec::new())?;
+        self.attach_host_state(class, r)?;
+        self.invoke_instance(r, "<init>", "()V", &[])?;
+        Ok(r)
+    }
+
+    /// Public entry point: invoke an instance method on `recv`, resolved from
+    /// its runtime class (virtual dispatch). Native methods go through the JNI
+    /// bridge like any DEX call.
+    pub fn invoke_instance(
+        &mut self,
+        recv: ObjRef,
+        method: &str,
+        sig: &str,
+        args: &[Value],
+    ) -> Result<Value, VmExit> {
+        let param_types = parse_param_types(sig).ok_or_else(|| {
+            crate::err::vm_error("INVALID_ARG", format!("assinatura malformada: {sig}"))
+        })?;
+        if param_types.len() != args.len() {
+            return Err(crate::err::vm_error(
+                "INVALID_ARG",
+                format!(
+                    "{sig} pede {} argumentos, recebi {}",
+                    param_types.len(),
+                    args.len()
+                ),
+            )
+            .into());
+        }
+        let args: Vec<Value> = args
+            .iter()
+            .map(|v| match v {
+                Value::StrPlaceholder(s) => {
+                    intrinsics::alloc_string(self, s.clone()).map(Value::Obj)
+                }
+                other => Ok(other.clone()),
+            })
+            .collect::<Result<Vec<_>, VmExit>>()?;
+        let class = self.heap.class_of(recv)?.to_string();
+        let Some((dex_idx, def, m)) = self.cp.resolve_method(&class, method, sig) else {
+            // Host receiver (String, collections, java.io, android.*): the
+            // same host chains the interpreter's invoke uses.
+            if let Some(v) = intrinsics::call_instance_intrinsic_mref(
+                self, &class, &class, method, sig, recv, &args,
+            )? {
+                return Ok(v);
+            }
+            if let Some(v) = crate::m8::call_m8_instance(self, &class, method, sig, recv, &args)? {
+                return Ok(v);
+            }
+            if class.starts_with("Landroid/") {
+                if let Some(v) =
+                    crate::framework::call_host_instance(self, &class, method, sig, recv, &args)?
+                {
+                    return Ok(v);
+                }
+            }
+            return Err(crate::classpath::unresolved_method(&class, method, sig).into());
+        };
+        if m.access_flags & ACC_STATIC != 0 {
+            return Err(crate::err::vm_error(
+                "INVALID_ARG",
+                format!("{class}->{method}{sig} é static"),
+            )
+            .into());
+        }
+        let mut slots = vec![Value::Obj(recv)];
+        slots.extend(slot_form(&args, &param_types));
         self.call(dex_idx, def, &m, slots)
     }
 
@@ -207,6 +415,12 @@ impl Engine {
             )
             .into());
         }
+        if let Some(pat) = trace_method_pattern() {
+            let label = self.method_label(dex_idx, m);
+            if label.contains(pat) {
+                eprintln!("T/RustyDroid: call {label} depth={}", self.depth);
+            }
+        }
         // Ponto de partida DEX-corrto do invoke-super: a SUPER da classe que
         // DECLARA o frame atual (não `super(mref.class)` — Dalvik Reference).
         // Resolvido aqui onde temos o ClassDef do frame em mãos.
@@ -221,6 +435,19 @@ impl Engine {
         };
         let Some(code) = self.cp.code(dex_idx, m.code_off)? else {
             if m.access_flags & ACC_NATIVE != 0 {
+                #[cfg(feature = "native")]
+                {
+                    let r = self.cp.method_ref(dex_idx, m.method_idx)?;
+                    return crate::native::invoke(
+                        self,
+                        &r.class,
+                        &r.name,
+                        &r.proto,
+                        m.access_flags & ACC_STATIC != 0,
+                        &ins,
+                    );
+                }
+                #[cfg(not(feature = "native"))]
                 return Err(crate::err::not_implemented(format!(
                     "método nativo {}",
                     self.method_label(dex_idx, m)
@@ -239,10 +466,48 @@ impl Engine {
         // AG-09: cobertura de métodos — o corpo existe e vai executar.
         self.coverage
             .insert(((dex_idx as u64) << 32) | u64::from(m.method_idx));
+        #[cfg(feature = "jit")]
+        if m.access_flags & ACC_STATIC != 0 && self.jit.stats.enabled {
+            let key = ((dex_idx as u64) << 32) | u64::from(m.method_idx);
+            let proto = self.cp.method_ref(dex_idx, m.method_idx)?.proto;
+            if let Some(value) = self
+                .jit
+                .run(key, &code, &proto, &ins, self.fuel_remaining())
+            {
+                self.fuel_used += code.instructions.len() as u64;
+                return Ok(Value::Int(value));
+            }
+        }
         let frame_label = self.method_label(dex_idx, m);
         self.frame_labels.push(frame_label);
         self.depth += 1;
-        let mut ret = interp::exec_frame(self, dex_idx, frame_super.as_deref(), code, ins);
+        let scope_depth = self.heap.gc_scope_depth();
+        if self.gc_frames.is_empty() {
+            self.heap.gc_host_enter(true);
+        }
+        self.heap.gc_guest_enter();
+        self.gc_frames.push(
+            ins.iter()
+                .filter_map(|v| match v {
+                    Value::Obj(r) => Some(*r),
+                    _ => None,
+                })
+                .collect(),
+        );
+        let mut ret = interp::exec_frame(self, dex_idx, frame_super.as_deref(), code.clone(), ins);
+        self.gc_frames.pop();
+        self.heap.gc_scope_restore(scope_depth);
+        // A guest allocation returned into a Rust host temporary must survive
+        // the host's next guest callback, even before it is stored in a table.
+        match &ret {
+            Ok(Value::Obj(r)) => self.heap.gc_pin_return(*r),
+            Err(VmExit::Exception(t)) => {
+                if let Some(r) = t.obj {
+                    self.heap.gc_pin_return(r);
+                }
+            }
+            _ => {}
+        }
         self.depth -= 1;
         self.frame_labels.pop();
         // Observabilidade opt-in (default off — nenhuma saída existente muda):
@@ -250,9 +515,46 @@ impl Engine {
         // ao desempilhar (estilo JVM, innermost primeiro). Erros estruturados
         // da VM não são Java e não ganham frames.
         if self.config.exception_trace {
-            if let Err(VmExit::Exception(ref mut t)) = ret {
-                let line = format!("\n  at {}", self.method_label(dex_idx, m));
-                t.message.get_or_insert_with(String::new).push_str(&line);
+            match ret {
+                Err(VmExit::Exception(ref mut t)) => {
+                    let line = format!("\n  at {}", self.method_label(dex_idx, m));
+                    t.message.get_or_insert_with(String::new).push_str(&line);
+                    // A VM-built exception already has its heap object, which
+                    // is what guest catch blocks see. Mirror the frame into
+                    // its `rd_trace` so caught-and-rethrown exceptions keep
+                    // the guest stack.
+                    if let Some(obj) = t.obj {
+                        let prev = match self.heap.get_field(obj, "rd_trace") {
+                            Ok(Value::Obj(r)) => {
+                                self.heap.as_str(r).map(str::to_string).unwrap_or_default()
+                            }
+                            _ => String::new(),
+                        };
+                        if prev.matches("\n  at ").count() < 24 {
+                            if let Ok(r) = self.heap.alloc_string(prev + &line) {
+                                let _ = self.heap.put_field(obj, "rd_trace", Value::Obj(r));
+                            }
+                        }
+                    }
+                }
+                // Structured VM errors (NOT_FOUND/NOT_IMPLEMENTED/...) get
+                // the guest stack too, so an agent can see which app code
+                // hit the gap. The green-thread park signal is control flow,
+                // not an error.
+                Err(VmExit::Error(ref mut e)) if e.code != crate::threads::PARK_SIGNAL => {
+                    if !e.cause.contains("\n  at ") {
+                        // innermost frame: name the faulting instruction
+                        let pc = self.last_pc;
+                        if let Some((_, insn)) = code.instructions.iter().find(|(a, _)| *a == pc) {
+                            let mut d = format!("{insn:?}");
+                            d.truncate(160);
+                            e.cause.push_str(&format!(" [pc 0x{pc:x}: {d}]"));
+                        }
+                    }
+                    let line = format!("\n  at {}", self.method_label(dex_idx, m));
+                    e.cause.push_str(&line);
+                }
+                _ => {}
             }
         }
         ret
@@ -642,4 +944,16 @@ pub fn parse_param_types(sig: &str) -> Option<Vec<String>> {
         out.push(params[start..i].to_string());
     }
     Some(out)
+}
+
+/// `RD_TRACE_METHOD=<substring>`: log every guest method entry whose label
+/// (`Lpkg/Class;->name(sig)`) contains the substring (debugging aid).
+fn trace_method_pattern() -> Option<&'static str> {
+    static PAT: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    PAT.get_or_init(|| {
+        std::env::var("RD_TRACE_METHOD")
+            .ok()
+            .filter(|s| !s.is_empty())
+    })
+    .as_deref()
 }

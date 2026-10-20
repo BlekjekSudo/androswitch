@@ -76,6 +76,11 @@ pub const DENSITY: f32 = 2.0;
 /// estourar a stack Rust e abortar o processo. Mesmo teto do inflate.
 const MAX_VIEW_DEPTH: usize = 512;
 
+/// Virtual vsync period.
+const VSYNC_MS: u64 = 16;
+/// Cap on vsync-stepped ticks per `advance_clock` (about 64 s of animation).
+const MAX_VSYNC_TICKS: usize = 4000;
+
 /// Estado host de um objeto. O heap guarda apenas a classe; o estado Java
 /// real fica aqui. Um ObjRef = um HostObj.
 /// issue #46: visibilidade com 3 estados reais do Android — INVISIBLE ocupa
@@ -154,9 +159,8 @@ pub enum HostObj {
     /// M8: coleções java.util host — Map (HashMap/WeakHashMap) e List
     /// (ArrayList/LinkedList). Estado linear (volumes pequenos); igualdade
     /// de chave/elemento via `intrinsics::values_equal` (String/boxes por
-    /// valor, senão identidade). VM de arena não tem GC ⇒ WeakHashMap se
-    /// comporta como HashMap (entradas nunca são limpas) — limitação
-    /// documentada em compat_gaps.
+    /// valor, senão identidade). WeakHashMap keys are weak during GC;
+    /// values remain strong and null-key entries are never GC-removed.
     Map {
         entries: Vec<(Value, Value)>,
     },
@@ -164,7 +168,8 @@ pub enum HostObj {
         elems: Vec<Value>,
     },
     /// M8: iterador host — snapshot de elementos + cursor (determinístico;
-    /// `remove` não suportado, como em views imutáveis).
+    /// removal writes through when rd$owner is set; immutable snapshots
+    /// still reject remove).
     Iter {
         elems: Vec<Value>,
         pos: usize,
@@ -192,19 +197,42 @@ pub enum HostObj {
 #[derive(Debug, Clone)]
 pub struct QueuedMsg {
     pub when_ms: u64,
-    /// Runnable do app — o drain invoca run() via resolução DEX
+    /// Runnable do app — o drain invoca run() via resolução DEX. For a
+    /// Message entry (handler_msg.rs) this is the Message object.
     pub runnable: ObjRef,
+    /// target Handler (removeCallbacks/removeMessages scope)
+    pub handler: Option<ObjRef>,
+    /// true → `runnable` is an android.os.Message to dispatchMessage
+    pub is_message: bool,
+    /// `postDelayed(r, token, ms)` / `removeCallbacksAndMessages(token)`
+    pub token: Option<ObjRef>,
 }
 
 /// Estado de framework da Engine (host objects + clock virtual + launch).
 #[derive(Debug, Default)]
 pub struct HostState {
     pub objects: HashMap<ObjRef, HostObj>,
+    /// `List.subList` views: view → (parent, offset, len). See
+    /// `jcollections::sublist_*` (write-through semantics).
+    pub(crate) sublists: HashMap<ObjRef, (ObjRef, usize, usize)>,
+    pub(crate) sublist_order: std::collections::VecDeque<ObjRef>,
     /// clock virtual (ms) — postDelayed/dispatch por ordem de tempo
     pub clock_ms: u64,
+    /// Last platform `InputConnection` + its `EditorInfo` opened by
+    /// `type_text` on a non-EditText editor (Compose): ENTER performs the
+    /// editor's IME action through it.
+    pub(crate) ime_connection: Option<(ObjRef, ObjRef)>,
+    /// The window's focused view (AOSP ViewRootImpl.mFocusedView); see
+    /// `view_layout::move_focus`.
+    pub(crate) focused_view: Option<ObjRef>,
+    /// A view called invalidate/requestLayout: ViewRootImpl schedules a
+    /// traversal for the next vsync (`advance_clock` runs `layout_pass`).
+    pub(crate) traversal_pending: bool,
+    /// re-entrancy guard for the traversal run from `advance_clock`
+    pub(crate) in_traversal: bool,
     main_looper: Option<ObjRef>,
     /// M8: thread "main" sintética (VM single-threaded — ver `THREAD`)
-    main_thread: Option<ObjRef>,
+    pub(crate) main_thread: Option<ObjRef>,
     /// M8: objetos `Class` canônicos por descritor (getClass devolve sempre a
     /// mesma referência para a mesma classe — identidade como na JVM).
     class_objs: HashMap<String, ObjRef>,
@@ -247,6 +275,8 @@ pub struct HostState {
     /// Dialogs, OkHttp, SQLite/Room, Services/Broadcasts/DeepLinks,
     /// WorkManager, SharedPreferences stateful) — ver `crate::m8`.
     pub m8: crate::m8::M8State,
+    #[cfg(feature = "advanced-components")]
+    pub m9: crate::m9::State,
 }
 
 /// M8 (31º gap): fragment registrada por um commit de FragmentTransaction.
@@ -326,6 +356,11 @@ impl Engine {
     /// M3.2: injeta o APK aberto como fonte de Resources (layouts AXML +
     /// resources.arsc). O CLI `rd app run` chama isto UMA vez por execução.
     pub fn set_resources(&mut self, apk: rd_apk::Apk) {
+        #[cfg(feature = "advanced-components")]
+        {
+            self.fw.m9.target_sdk = apk.manifest.target_sdk;
+            self.fw.m9.notifications_allowed = apk.manifest.target_sdk < 33;
+        }
         self.fw.resources = Some(apk);
     }
 
@@ -430,7 +465,7 @@ impl Engine {
         Ok(())
     }
 
-    fn main_looper_obj(&mut self) -> Result<ObjRef, VmExit> {
+    pub(crate) fn main_looper_obj(&mut self) -> Result<ObjRef, VmExit> {
         if let Some(l) = self.fw.main_looper {
             return Ok(l);
         }
@@ -475,6 +510,14 @@ impl Engine {
         Ok(r)
     }
 
+    /// Allocate an instance of `desc` with its host state attached (the
+    /// `new-instance` path, for reflective construction).
+    pub(crate) fn new_object(&mut self, desc: &str) -> Result<ObjRef, VmExit> {
+        let r = self.heap.alloc_instance(desc.to_string(), Vec::new())?;
+        self.attach_host_state(desc, r)?;
+        Ok(r)
+    }
+
     /// M8: objeto `Class` canônico do descritor (lazy; identidade estável —
     /// `a.getClass() == a.getClass()`). Campo de heap "class_name" guarda o
     /// DESCRITOR (ex.: "Lcom/x/Y;"); os métodos de Class o convertem.
@@ -504,6 +547,8 @@ impl Engine {
             ))
         })?;
         crate::err::put_field_result(self.heap.put_field(r, "class_name", Value::Obj(name)))?;
+        // legacy field read by Intent(Context, Class)/setClass
+        crate::err::put_field_result(self.heap.put_field(r, "name", Value::Obj(name)))?;
         self.fw.class_objs.insert(desc.to_string(), r);
         Ok(r)
     }
@@ -769,6 +814,11 @@ impl Engine {
         )?;
         self.run_lifecycle_step(activity_desc, r, "onStart", "()V", Vec::new())?;
         self.run_lifecycle_step(activity_desc, r, "onResume", "()V", Vec::new())?;
+        // handleResumeActivity → makeVisible: ViewRootImpl attaches the
+        // window tree (onAttachedToWindow + attach listeners)
+        crate::view_attach::attach_activity_window(self, r)?;
+        // then the main Looper runs: posted messages, ready threads, frames
+        self.drain_looper()?;
         Ok(r)
     }
 
@@ -780,10 +830,20 @@ impl Engine {
         sig: &str,
         args: Vec<Value>,
     ) -> Result<(), VmExit> {
+        use crate::activity_callbacks::{dispatch, event_of, Phase};
+        let event = event_of(name);
+        let bundle = args.first().cloned();
+        if let Some(e) = event {
+            dispatch(self, activity, e, Phase::Pre, bundle.clone())?;
+        }
         if let Some((d, def, m)) = self.cp.resolve_method(activity_desc, name, sig) {
             let mut slots = vec![Value::Obj(activity)];
             slots.extend(args);
             self.call(d, def, &m, slots)?;
+        }
+        if let Some(e) = event {
+            dispatch(self, activity, e, Phase::Main, bundle.clone())?;
+            dispatch(self, activity, e, Phase::Post, bundle)?;
         }
         Ok(())
     }
@@ -799,6 +859,47 @@ impl Engine {
             )
             .into());
         };
+        // input lands on a laid-out window (first traversal), as on a device
+        let _ = self.ensure_laid_out();
+        // the topmost dialog window takes the input (WindowManager z-order)
+        if let Some(&(dlg, root)) = crate::m8::showing_dialog_roots(self).last() {
+            let inside = matches!(self.fw.get(root),
+                Some(HostObj::View { x: rx, y: ry, w, h, .. })
+                    if x >= *rx && x < rx + w && y >= *ry && y < ry + h);
+            if inside {
+                if let Some(t) = self.hit_test(root, x, y) {
+                    if self.click_listener_of(t).is_some() || self.click_method_of(t).is_some() {
+                        return self.dispatch_click(t);
+                    }
+                }
+                return self.touch_sequence(root, &[(x, y)]);
+            }
+            // outside the dialog window: Dialog.onTouchEvent (DOWN, UP)
+            let now = self.fw.clock() as i64;
+            let mut consumed = false;
+            for action in [
+                crate::android_motion::ACTION_DOWN,
+                crate::android_motion::ACTION_UP,
+            ] {
+                let ev = crate::android_motion::new_event(
+                    self, action, x as f32, y as f32, 0.0, 0.0, now, now,
+                )?;
+                let r = self.invoke_instance(
+                    dlg,
+                    "onTouchEvent",
+                    "(Landroid/view/MotionEvent;)Z",
+                    &[Value::Obj(ev)],
+                )?;
+                consumed |= matches!(r, Value::Int(v) if v != 0);
+                if !crate::m8::showing_dialog_roots(self)
+                    .iter()
+                    .any(|(d, _)| *d == dlg)
+                {
+                    break;
+                }
+            }
+            return Ok(consumed);
+        }
         let Some(content) = self.window_content_of(activity) else {
             if std::env::var("RD_FW_DEBUG").is_ok() {
                 eprintln!("[fw] touch: sem content (window vazia)");
@@ -819,7 +920,72 @@ impl Engine {
             }
             return Ok(false);
         };
-        self.dispatch_click(target)
+        if self.click_listener_of(target).is_some() || self.click_method_of(target).is_some() {
+            return self.dispatch_click(target);
+        }
+        // No host-level click handler: deliver a real DOWN/UP MotionEvent
+        // pair through the view tree (custom views, Compose, gestures).
+        self.touch_sequence(content, &[(x, y)])
+    }
+
+    /// Sends DOWN at the first point, MOVE for the middle points and UP at
+    /// the last one through `root.dispatchTouchEvent` (16 ms apart, with
+    /// the looper drained between events). Returns whether the DOWN was
+    /// consumed.
+    pub fn touch_sequence(&mut self, root: ObjRef, pts: &[(i32, i32)]) -> Result<bool, VmExit> {
+        self.touch_sequence_timed(root, pts, 16)
+    }
+
+    /// `touch_sequence` with `step_ms` between consecutive events.
+    pub fn touch_sequence_timed(
+        &mut self,
+        root: ObjRef,
+        pts: &[(i32, i32)],
+        step_ms: u64,
+    ) -> Result<bool, VmExit> {
+        let Some(&(x0, y0)) = pts.first() else {
+            return Ok(false);
+        };
+        let (rx, ry) = match self.fw.get(root) {
+            Some(HostObj::View { x, y, .. }) => (*x, *y),
+            _ => (0, 0),
+        };
+        let down = self.fw.clock() as i64;
+        let n = pts.len().max(2);
+        let mut consumed = false;
+        for i in 0..n {
+            let (px, py) = if i == n - 1 {
+                *pts.last().unwrap_or(&(x0, y0))
+            } else {
+                pts[i.min(pts.len() - 1)]
+            };
+            let action = if i == 0 {
+                crate::android_motion::ACTION_DOWN
+            } else if i == n - 1 {
+                crate::android_motion::ACTION_UP
+            } else {
+                crate::android_motion::ACTION_MOVE
+            };
+            let now = self.fw.clock() as i64;
+            let ev = crate::android_motion::new_event(
+                self,
+                action,
+                (px - rx) as f32,
+                (py - ry) as f32,
+                rx as f32,
+                ry as f32,
+                down,
+                now,
+            )?;
+            let r = crate::view_layout::dispatch_touch(self, root, ev)?;
+            if i == 0 {
+                consumed = r;
+            }
+            if i != n - 1 {
+                self.advance_clock(step_ms.max(1))?;
+            }
+        }
+        Ok(consumed)
     }
 
     /// M3.2: dispatch do clique em `target` — listener do app
@@ -902,7 +1068,60 @@ impl Engine {
                 clicked: false,
             });
         };
+        let _ = self.ensure_laid_out();
         const STEPS: i32 = 8;
+        // the topmost window under the start point takes the gesture
+        // (WindowManager z-order): a showing dialog, else the activity
+        let mut root = content;
+        if let Some(&(_, dr)) = crate::m8::showing_dialog_roots(self).last() {
+            if matches!(self.fw.get(dr),
+                Some(HostObj::View { x, y, w, h, .. })
+                    if x1 >= *x && x1 < x + w && y1 >= *y && y1 < y + h)
+            {
+                root = dr;
+            }
+        }
+        // DEX views (custom views, Compose, RecyclerView, …) handle drags
+        // themselves: deliver a real DOWN → MOVE… → UP MotionEvent stream.
+        let mut dex = Vec::new();
+        self.collect_dex_roots(root, &mut dex, 0);
+        // down+up on the same view with a host click handler stays a click
+        // (Android tap-vs-scroll semantics of the host widget model)
+        let start_t = self.hit_test(root, x1, y1);
+        let host_click = start_t.is_some()
+            && start_t == self.hit_test(root, x2, y2)
+            && start_t.is_some_and(|t| {
+                self.click_listener_of(t).is_some() || self.click_method_of(t).is_some()
+            });
+        if !host_click && (!dex.is_empty() || root != content) {
+            let pts: Vec<(i32, i32)> = (0..=STEPS)
+                .map(|i| {
+                    let t = i as f32 / STEPS as f32;
+                    (
+                        x1 + ((x2 - x1) as f32 * t).round() as i32,
+                        y1 + ((y2 - y1) as f32 * t).round() as i32,
+                    )
+                })
+                .collect();
+            let step = (ms / STEPS as u64).max(16);
+            let mut crossed: Vec<CrossedView> = Vec::new();
+            for &(x, y) in &pts {
+                if let Some(t) = self.hit_test(root, x, y) {
+                    let entry = CrossedView {
+                        class: self.heap.class_of(t)?.to_string(),
+                        bounds: self.view_bounds(t),
+                    };
+                    if crossed.last() != Some(&entry) {
+                        crossed.push(entry);
+                    }
+                }
+            }
+            self.touch_sequence_timed(root, &pts, step)?;
+            return Ok(SwipeReport {
+                crossed,
+                clicked: false,
+            });
+        }
         let mut crossed: Vec<CrossedView> = Vec::new();
         let mut first: Option<ObjRef> = None;
         let mut last: Option<ObjRef> = None;
@@ -966,6 +1185,11 @@ impl Engine {
             .into());
         };
         let Some(target) = self.find_edit_text(content, 0)? else {
+            // Compose / custom editors: the system IME path (focused editor →
+            // onCreateInputConnection → commitText), topmost window first
+            if let Some(done) = self.type_text_ime(content, text, replace)? {
+                return Ok(done);
+            }
             return Err(crate::err::with_suggestion(
                 crate::err::vm_error(
                     "INVALID_STATE",
@@ -975,14 +1199,146 @@ impl Engine {
             )
             .into());
         };
+        #[cfg(feature = "advanced-components")]
+        {
+            let target = self.fw.m9.focused.unwrap_or(target);
+            self.m9_focus(target)?;
+            if replace {
+                let n = self.view_text(target)?.encode_utf16().count();
+                self.m9_set_selection(0, n)?;
+            }
+            self.m9_commit_text(text, 1, false)
+        }
+        #[cfg(not(feature = "advanced-components"))]
         let cur = self.view_text(target)?;
+        #[cfg(not(feature = "advanced-components"))]
         let final_text = if replace {
             text.to_string()
         } else {
             format!("{cur}{text}")
         };
-        self.set_view_text(target, final_text.clone())?;
-        Ok(final_text)
+        #[cfg(not(feature = "advanced-components"))]
+        {
+            self.set_view_text(target, final_text.clone())?;
+            Ok(final_text)
+        }
+    }
+
+    /// Types through the platform IME contract, the way Android's input
+    /// method does for editors that are not host EditTexts (Jetpack Compose
+    /// `BasicTextField`, custom editors): the visible view whose class
+    /// overrides `onCreateInputConnection` is asked for an `InputConnection`
+    /// (it returns one only while one of its editors has focus — tap the
+    /// field first), then `commitText` is called on it. `Ok(None)` = no
+    /// focused editor anywhere (the caller reports the usual error).
+    fn type_text_ime(
+        &mut self,
+        content: ObjRef,
+        text: &str,
+        replace: bool,
+    ) -> Result<Option<String>, VmExit> {
+        const SIG: &str =
+            "(Landroid/view/inputmethod/EditorInfo;)Landroid/view/inputmethod/InputConnection;";
+        let mut roots: Vec<ObjRef> = crate::m8::showing_dialog_roots(self)
+            .into_iter()
+            .map(|(_, d)| d)
+            .rev()
+            .collect();
+        roots.push(content);
+        let mut editors = Vec::new();
+        for r in roots {
+            self.collect_ime_views(r, 0, SIG, &mut editors);
+        }
+        for view in editors {
+            let info = self.heap.alloc_instance(
+                "Landroid/view/inputmethod/EditorInfo;".into(),
+                vec![
+                    ("inputType".into(), Value::Int(0)),
+                    ("imeOptions".into(), Value::Int(0)),
+                    ("initialSelStart".into(), Value::Int(-1)),
+                    ("initialSelEnd".into(), Value::Int(-1)),
+                    ("initialCapsMode".into(), Value::Int(0)),
+                    ("actionId".into(), Value::Int(0)),
+                    ("fieldId".into(), Value::Int(0)),
+                    ("privateImeOptions".into(), Value::Null),
+                    ("hintText".into(), Value::Null),
+                    ("label".into(), Value::Null),
+                    ("packageName".into(), Value::Null),
+                    ("extras".into(), Value::Null),
+                    ("contentMimeTypes".into(), Value::Null),
+                ],
+            )?;
+            let ic = match self.invoke_instance(
+                view,
+                "onCreateInputConnection",
+                SIG,
+                &[Value::Obj(info)],
+            )? {
+                Value::Obj(ic) if ic != 0 => ic,
+                _ => continue, // this view has no focused editor
+            };
+            if replace {
+                let _ = self.invoke_instance(ic, "beginBatchEdit", "()Z", &[])?;
+                let _ = self.invoke_instance(
+                    ic,
+                    "deleteSurroundingText",
+                    "(II)Z",
+                    &[Value::Int(i32::MAX / 2), Value::Int(i32::MAX / 2)],
+                )?;
+                let _ = self.invoke_instance(ic, "endBatchEdit", "()Z", &[])?;
+            }
+            let s = crate::intrinsics::alloc_string(self, text.to_string())?;
+            let _ = self.invoke_instance(
+                ic,
+                "commitText",
+                "(Ljava/lang/CharSequence;I)Z",
+                &[Value::Obj(s), Value::Int(1)],
+            )?;
+            // read back what the editor now holds (before + after cursor)
+            let read = |m: &str, e: &mut Engine| -> Result<String, VmExit> {
+                match e.invoke_instance(
+                    ic,
+                    m,
+                    "(II)Ljava/lang/CharSequence;",
+                    &[Value::Int(10_000), Value::Int(0)],
+                )? {
+                    Value::Obj(cs) if cs != 0 => crate::intrinsics::object_to_string(e, cs),
+                    _ => Ok(String::new()),
+                }
+            };
+            let before = read("getTextBeforeCursor", self)?;
+            let after = read("getTextAfterCursor", self)?;
+            self.fw.ime_connection = Some((ic, info));
+            return Ok(Some(format!("{before}{after}")));
+        }
+        Ok(None)
+    }
+
+    /// Visible views whose runtime class implements `onCreateInputConnection`
+    /// in app code (DFS, same order as the dump).
+    fn collect_ime_views(&mut self, root: ObjRef, depth: usize, sig: &str, out: &mut Vec<ObjRef>) {
+        if depth > MAX_VIEW_DEPTH {
+            return;
+        }
+        let (vis, children) = match self.fw.get(root) {
+            Some(HostObj::View { vis, children, .. }) => (*vis, children.clone()),
+            _ => return,
+        };
+        if vis != Vis::Visible {
+            return;
+        }
+        if let Ok(class) = self.heap.class_of(root).map(|c| c.to_string()) {
+            if self
+                .cp
+                .resolve_method(&class, "onCreateInputConnection", sig)
+                .is_some()
+            {
+                out.push(root);
+            }
+        }
+        for c in children {
+            self.collect_ime_views(c, depth + 1, sig, out);
+        }
     }
 
     /// Primeira EditText (classe contém "EditText" — subclasses do app
@@ -1033,14 +1389,42 @@ impl Engine {
         match key.as_str() {
             "BACK" => {
                 let activity = require_activity(&self.fw)?;
-                if let Some(HostObj::Activity { finished, .. }) = self.fw.objects.get_mut(&activity)
-                {
-                    *finished = true;
+                // the topmost dialog window gets BACK first (Dialog.onBackPressed;
+                // ComponentDialog routes it through its OnBackPressedDispatcher)
+                if let Some(&(dlg, _)) = crate::m8::showing_dialog_roots(self).last() {
+                    self.invoke_instance(dlg, "onBackPressed", "()V", &[])?;
+                    self.drain_looper()?;
+                    return Ok(KeyReport {
+                        key: "BACK".into(),
+                        delivered: true,
+                        effect: "dialog onBackPressed".into(),
+                    });
                 }
+                // AOSP: Activity.onBackPressed() — virtual, so ComponentActivity's
+                // OnBackPressedDispatcher (Navigation back stack, callbacks)
+                // runs; the base implementation finishes the activity
+                let r = self.invoke_instance(activity, "onBackPressed", "()V", &[]);
+                if r.is_err() {
+                    if let Some(HostObj::Activity { finished, .. }) =
+                        self.fw.objects.get_mut(&activity)
+                    {
+                        *finished = true;
+                    }
+                }
+                r?;
+                self.drain_looper()?;
+                let finished = matches!(
+                    self.fw.get(activity),
+                    Some(HostObj::Activity { finished: true, .. })
+                );
                 Ok(KeyReport {
                     key: "BACK".into(),
                     delivered: true,
-                    effect: "activity finalizada (finish)".into(),
+                    effect: if finished {
+                        "activity finalizada (finish)".into()
+                    } else {
+                        "onBackPressed tratado pelo app".into()
+                    },
                 })
             }
             "DEL" => {
@@ -1077,6 +1461,32 @@ impl Engine {
             }
             "ENTER" => {
                 require_activity(&self.fw)?;
+                if let Some((ic, info)) = self.fw.ime_connection {
+                    // IME action declared by the editor (EditorInfo.imeOptions
+                    // & IME_MASK_ACTION); unspecified/none → DONE, like the
+                    // stock keyboard's enter key
+                    let opts = match self.heap.get_field(info, "imeOptions") {
+                        Ok(Value::Int(v)) => v,
+                        _ => 0,
+                    };
+                    let action = match opts & 0xff {
+                        0 | 1 => 6,
+                        a => a,
+                    };
+                    let r = self.invoke_instance(
+                        ic,
+                        "performEditorAction",
+                        "(I)Z",
+                        &[Value::Int(action)],
+                    )?;
+                    return Ok(KeyReport {
+                        key: "ENTER".into(),
+                        delivered: matches!(r, Value::Int(1)),
+                        effect: format!(
+                            "IME action {action} enviada ao editor focado (performEditorAction)"
+                        ),
+                    });
+                }
                 Ok(KeyReport {
                     key: "ENTER".into(),
                     delivered: true,
@@ -1112,8 +1522,61 @@ impl Engine {
     /// Avança o clock virtual e executa as mensagens vencidas (postDelayed).
     /// Devolve quantas runnables rodaram.
     pub fn advance_clock(&mut self, ms: u64) -> Result<usize, VmExit> {
-        self.fw.clock_ms += ms;
-        self.drain_looper()
+        // While frame callbacks are pending (animations), time advances in
+        // 16 ms vsync ticks so each frame sees a later frameTimeNanos — a
+        // single jump would hand every frame the same timestamp and freeze
+        // animations. Without pending frames it jumps straight to the
+        // target, and drain_looper still runs messages in deadline order.
+        let target = self.fw.clock_ms.saturating_add(ms);
+        let mut ran = 0usize;
+        let mut ticks = 0usize;
+        loop {
+            let now = self.fw.clock_ms;
+            let animating = !self.frames.callbacks.is_empty() || self.fw.traversal_pending;
+            let step_to = if animating && ticks < MAX_VSYNC_TICKS {
+                ticks += 1;
+                // next vsync boundary after `now`
+                ((now / VSYNC_MS) + 1) * VSYNC_MS
+            } else {
+                target
+            };
+            self.fw.clock_ms = step_to.min(target).max(now);
+            #[cfg(feature = "advanced-components")]
+            self.m9_expire_notifications()?;
+            ran += self.drain_looper()?;
+            // ViewRootImpl.performTraversals on this vsync: re-measure and
+            // re-lay out the window when a view asked for it, so layout-driven
+            // work (onGloballyPositioned, anchors of sheets/drawers, lazy
+            // lists) progresses without needing a screenshot.
+            if self.fw.traversal_pending && !self.fw.in_traversal {
+                self.fw.traversal_pending = false;
+                if std::env::var("RD_TRACE_DRAW").is_ok() {
+                    eprintln!(
+                        "D/RustyDroid: traversal at {} ms (frame callbacks {})",
+                        self.fw.clock_ms,
+                        self.frames.callbacks.len()
+                    );
+                }
+                self.fw.in_traversal = true;
+                let r = self.layout_pass();
+                self.fw.in_traversal = false;
+                if let Err(e) = r {
+                    match e {
+                        VmExit::Exception(t) => {
+                            eprintln!(
+                                "W/RustyDroid: traversal failed: {} {:?}",
+                                t.class, t.message
+                            )
+                        }
+                        other => return Err(other),
+                    }
+                }
+                ran += self.drain_looper()?;
+            }
+            if self.fw.clock_ms >= target {
+                return Ok(ran);
+            }
+        }
     }
 
     /// Executa mensagens com `when_ms <= clock` — SEMPRE a de deadline mais
@@ -1124,6 +1587,8 @@ impl Engine {
         let looper = self.main_looper_obj()?;
         let now = self.fw.clock_ms;
         let mut ran = 0usize;
+        // async results queued by requestPermissions (perms.rs)
+        ran += crate::perms::deliver_pending(self)?;
         loop {
             // menor deadline entre os vencidos; idx empata estável
             let due = self.fw.objects.get(&looper).and_then(|h| match h {
@@ -1148,12 +1613,42 @@ impl Engine {
                     now
                 );
             }
+            if msg.is_message {
+                crate::handler_msg::dispatch_message(self, msg.handler, msg.runnable)?;
+                ran += 1;
+                continue;
+            }
             let rclass = self.heap.class_of(msg.runnable)?.to_string();
             let Some((d, def, m)) = self.cp.resolve_method(&rclass, "run", "()V") else {
                 return Err(crate::classpath::unresolved_method(&rclass, "run", "()V").into());
             };
             self.call(d, def, &m, vec![Value::Obj(msg.runnable)])?;
             ran += 1;
+        }
+        // Main is idle: give ready green threads a turn (threads.rs). What
+        // they post to the Looper runs on the next pass; alternate until
+        // both are quiescent (fuel bounds pathological ping-pong).
+        if crate::threads::run_ready(self, usize::MAX)? > 0 {
+            ran += 1 + self.drain_looper()?;
+        }
+        // Looper idle → vsync: run due Choreographer frames (choreographer.rs),
+        // draining what each frame posts. Bounded per drain; nested drains
+        // don't pump frames.
+        if !self.frame_pump_active {
+            self.frame_pump_active = true;
+            let mut frames = 0;
+            let res = (|| -> Result<(), VmExit> {
+                while frames < crate::choreographer::MAX_FRAMES_PER_DRAIN
+                    && crate::choreographer::has_due(self)
+                {
+                    ran += crate::choreographer::run_frame(self)?;
+                    ran += self.drain_looper()?;
+                    frames += 1;
+                }
+                Ok(())
+            })();
+            self.frame_pump_active = false;
+            res?;
         }
         Ok(ran)
     }
@@ -1182,7 +1677,7 @@ impl Engine {
 
     // ── helpers internos da árvore ────────────────────────────────────────
 
-    fn window_content_of(&self, activity: ObjRef) -> Option<ObjRef> {
+    pub(crate) fn window_content_of(&self, activity: ObjRef) -> Option<ObjRef> {
         let w = match self.fw.get(activity)? {
             HostObj::Activity {
                 window: Some(w), ..
@@ -1252,13 +1747,23 @@ impl Engine {
     /// Layout recursivo mínimo: largura uniforme (match_parent implícito no
     /// M3); altura = default do leaf (48px p/ TextView/Button) ou soma
     /// (vertical) / máximo (horizontal) dos filhos.
-    fn layout(&mut self, v: ObjRef, x: i32, y: i32, w: i32) {
+    pub(crate) fn layout(&mut self, v: ObjRef, x: i32, y: i32, w: i32) {
         self.layout_depth(v, x, y, w, 0)
     }
 
     fn layout_depth(&mut self, v: ObjRef, x: i32, y: i32, slot_w: i32, depth: usize) {
         // issue #40: cap — árvore programática profunda não aborta o processo
         if depth > MAX_VIEW_DEPTH {
+            return;
+        }
+        // Views whose frame the guest set via `View.layout` (custom
+        // ViewGroups, Compose's AndroidComposeView and its layers) own their
+        // bounds and their subtree: this minimal host pass would otherwise
+        // overwrite them with its own wrap height (0 for a childless leaf).
+        if self
+            .view_props
+            .contains_key(&(v, "rd_laid_out".to_string()))
+        {
             return;
         }
         let (orientation, children, own_h, own_w_explicit) = match self.fw.get(v) {
@@ -1436,7 +1941,7 @@ impl Engine {
         }
     }
 
-    fn find_view_by_id(&self, root: ObjRef, id: i32) -> Option<ObjRef> {
+    pub(crate) fn find_view_by_id(&self, root: ObjRef, id: i32) -> Option<ObjRef> {
         let (vid, children) = match self.fw.get(root)? {
             HostObj::View {
                 id: vid, children, ..
@@ -1456,7 +1961,7 @@ impl Engine {
 
     // ── writes de estado usados pela dispatch ─────────────────────────────
 
-    fn view_text(&self, r: ObjRef) -> Result<String, VmExit> {
+    pub(crate) fn view_text(&self, r: ObjRef) -> Result<String, VmExit> {
         match self.fw.get(r) {
             Some(HostObj::View { text, .. }) => Ok(text.clone()),
             _ => {
@@ -1465,7 +1970,7 @@ impl Engine {
         }
     }
 
-    fn set_view_text(&mut self, r: ObjRef, s: String) -> Result<(), VmExit> {
+    pub(crate) fn set_view_text(&mut self, r: ObjRef, s: String) -> Result<(), VmExit> {
         match self.fw.objects.get_mut(&r) {
             Some(HostObj::View { text, .. }) => {
                 *text = s;
@@ -1482,6 +1987,16 @@ impl Engine {
 
 /// invoke-static sobre classes android/* (Looper hoje).
 pub fn call_host_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    _sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_host_static_rooted(vm, class, name, _sig, args))
+}
+
+fn call_host_static_rooted(
     vm: &mut Engine,
     class: &str,
     name: &str,
@@ -1673,6 +2188,17 @@ fn fragment_tx_intrinsic(
 }
 
 pub fn call_host_instance(
+    vm: &mut Engine,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_host_instance_rooted(vm, mref_class, name, sig, recv, args))
+}
+
+fn call_host_instance_rooted(
     vm: &mut Engine,
     mref_class: &str,
     name: &str,
@@ -1907,6 +2433,19 @@ pub fn call_host_instance(
             let s = vm.fw.package_name.clone();
             Ok(Some(Value::Obj(intrinsics::alloc_string(vm, s)?)))
         }
+        (ACTIVITY, "setContentView") | (ACTIVITY, "addContentView")
+            if sig == "(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V" =>
+        {
+            // window.rs: params are recorded on the view; the headless window
+            // lays the content root out at full size either way
+            let Some(Value::Obj(content)) = args.first() else {
+                return Err(
+                    crate::err::vm_error("INVALID_FORMAT", "setContentView sem view").into(),
+                );
+            };
+            set_content_view(vm, recv, *content)?;
+            Ok(Some(Value::Null))
+        }
         (ACTIVITY, "setContentView") if sig == "(Landroid/view/View;)V" => {
             let Some(Value::Obj(content)) = args.first() else {
                 return Err(
@@ -1945,10 +2484,35 @@ pub fn call_host_instance(
                     .into())
                 }
             };
+            // A View searches ITS OWN subtree (View.findViewById contract).
+            // Before, the receiver was treated as an activity, so
+            // view.findViewById always returned null.
+            if matches!(vm.fw.get(recv), Some(HostObj::View { .. })) {
+                return Ok(Some(
+                    vm.find_view_by_id(recv, want)
+                        .map_or(Value::Null, Value::Obj),
+                ));
+            }
+            // Activity: the window decor when it exists (android.R.id.content
+            // resolves, window.rs), else the content root.
+            let decor = match vm.fw.get(recv) {
+                Some(HostObj::Activity {
+                    window: Some(w), ..
+                }) => vm.window_decor.get(w).map(|d| d.0),
+                _ => None,
+            };
+            if let Some(d) = decor {
+                return Ok(Some(
+                    vm.find_view_by_id(d, want).map_or(Value::Null, Value::Obj),
+                ));
+            }
             let Some(content) = vm.window_content_of(recv) else {
                 return Ok(Some(Value::Null));
             };
-            Ok(vm.find_view_by_id(content, want).map(Value::Obj))
+            Ok(Some(
+                vm.find_view_by_id(content, want)
+                    .map_or(Value::Null, Value::Obj),
+            ))
         }
         (ACTIVITY, "finish") => {
             if let Some(HostObj::Activity { finished, .. }) = vm.fw.objects.get_mut(&recv) {
@@ -2130,20 +2694,85 @@ pub fn call_host_instance(
             add_child(vm, recv, *child)?;
             Ok(Some(Value::Null))
         }
-        (VIEWGROUP, "getChildCount") | (LINEARLAYOUT, "getChildCount") => {
+        (VIEWGROUP, "getChildCount")
+        | (LINEARLAYOUT, "getChildCount")
+        | (FRAMELAYOUT, "getChildCount") => {
             let n = match vm.fw.get(recv) {
                 Some(HostObj::View { children, .. }) => children.len() as i32,
                 _ => 0,
             };
             Ok(Some(Value::Int(n)))
         }
-        (VIEWGROUP, "getChildAt") | (LINEARLAYOUT, "getChildAt") => {
-            let i = args[0].as_int()? as usize;
+        (VIEWGROUP, "getChildAt") | (LINEARLAYOUT, "getChildAt") | (FRAMELAYOUT, "getChildAt") => {
+            // Android: out-of-range index → null. `Ok(None)` would mean
+            // "not handled" and surfaced as NOT_FOUND.
+            let i = args[0].as_int()?;
             let child = match vm.fw.get(recv) {
-                Some(HostObj::View { children, .. }) => children.get(i).copied(),
+                Some(HostObj::View { children, .. }) if i >= 0 => children.get(i as usize).copied(),
                 _ => None,
             };
-            Ok(child.map(Value::Obj))
+            Ok(Some(child.map_or(Value::Null, Value::Obj)))
+        }
+        (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "indexOfChild") => {
+            let c = args.first().and_then(|v| v.as_ref().ok().flatten());
+            let idx = match (vm.fw.get(recv), c) {
+                (Some(HostObj::View { children, .. }), Some(c)) => children
+                    .iter()
+                    .position(|x| *x == c)
+                    .map_or(-1, |p| p as i32),
+                _ => -1,
+            };
+            Ok(Some(Value::Int(idx)))
+        }
+        (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeView")
+        | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeViewInLayout")
+        | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeViews")
+        | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeViewsInLayout")
+        | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeViewAt")
+        | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeAllViews")
+        | (VIEWGROUP | LINEARLAYOUT | FRAMELAYOUT, "removeAllViewsInLayout") => {
+            let removed: Vec<ObjRef> = match vm.fw.objects.get_mut(&recv) {
+                Some(HostObj::View { children, .. }) => match name {
+                    "removeViews" | "removeViewsInLayout" => {
+                        let st = args
+                            .first()
+                            .and_then(|v| v.as_int().ok())
+                            .unwrap_or(0)
+                            .max(0) as usize;
+                        let n = args
+                            .get(1)
+                            .and_then(|v| v.as_int().ok())
+                            .unwrap_or(0)
+                            .max(0) as usize;
+                        let st = st.min(children.len());
+                        let en = (st + n).min(children.len());
+                        children.drain(st..en).collect()
+                    }
+                    "removeView" | "removeViewInLayout" => {
+                        let c = args.first().and_then(|v| v.as_ref().ok().flatten());
+                        let before = children.clone();
+                        children.retain(|x| Some(*x) != c);
+                        before.into_iter().filter(|x| Some(*x) == c).collect()
+                    }
+                    "removeViewAt" => {
+                        let i = args.first().and_then(|v| v.as_int().ok()).unwrap_or(-1);
+                        if i >= 0 && (i as usize) < children.len() {
+                            vec![children.remove(i as usize)]
+                        } else {
+                            Vec::new()
+                        }
+                    }
+                    _ => std::mem::take(children),
+                },
+                _ => Vec::new(),
+            };
+            for c in removed {
+                if let Some(HostObj::View { parent, .. }) = vm.fw.objects.get_mut(&c) {
+                    *parent = None;
+                }
+                crate::view_attach::dispatch_detach(vm, c)?;
+            }
+            Ok(Some(Value::Null))
         }
         (LINEARLAYOUT, "setOrientation") => {
             let v = args[0].as_int()?;
@@ -2396,6 +3025,8 @@ pub(crate) fn set_content_view(
     if let Some(HostObj::Window { content: c }) = vm.fw.objects.get_mut(&w) {
         *c = Some(content);
     }
+    crate::window::on_content_set(vm, w, content)?;
+    vm.fw.traversal_pending = true;
     // layout do root com as dimensões da window
     vm.layout(content, 0, 0, WINDOW_W);
     let _ = WINDOW_H;
@@ -2420,7 +3051,8 @@ pub(crate) fn attach_child(vm: &mut Engine, parent: ObjRef, child: ObjRef) -> Re
         Some(HostObj::View { children, .. }) => children.push(child),
         _ => return Err(crate::err::vm_error("INVALID_FORMAT", "addView em não-ViewGroup").into()),
     }
-    Ok(())
+    // inserted under an attached parent → attached now (ViewGroup.addViewInner)
+    crate::view_attach::on_child_added(vm, parent, child)
 }
 
 pub(crate) fn add_child(vm: &mut Engine, parent: ObjRef, child: ObjRef) -> Result<(), VmExit> {
@@ -2442,7 +3074,13 @@ fn enqueue(vm: &mut Engine, handler: ObjRef, runnable: ObjRef, when_ms: u64) -> 
     };
     match vm.fw.objects.get_mut(&looper) {
         Some(HostObj::Looper { queue }) => {
-            queue.push(QueuedMsg { when_ms, runnable });
+            queue.push(QueuedMsg {
+                when_ms,
+                runnable,
+                handler: Some(handler),
+                is_message: false,
+                token: None,
+            });
             Ok(())
         }
         _ => Err(crate::err::vm_error("INVALID_FORMAT", "looper host ausente").into()),
@@ -2555,7 +3193,13 @@ impl Engine {
     pub fn view_tree(&self) -> Option<UiNode> {
         let activity = self.fw.current_activity?;
         let content = self.window_content_of(activity)?;
-        Some(self.build_ui_node(content, 0))
+        let mut root = self.build_ui_node(content, 0);
+        // showing dialog windows are part of the visible hierarchy (topmost
+        // last, as uiautomator lists windows)
+        for (_, d) in crate::m8::showing_dialog_roots(self) {
+            root.children.push(self.build_ui_node(d, 1));
+        }
+        Some(root)
     }
 
     /// issue #54: resource-id HONESTO para o dump uiautomator:
@@ -2586,7 +3230,7 @@ impl Engine {
         Some(format!("{prefix}:{name}"))
     }
 
-    fn build_ui_node(&self, v: ObjRef, depth: usize) -> UiNode {
+    pub(crate) fn build_ui_node(&self, v: ObjRef, depth: usize) -> UiNode {
         // issue #40/#62: mesmo cap do dump textual (árvore programática
         // hostil) — e o corte é SINALIZADO (truncated) para o dump XML marcar
         // (antes: o agente via a subárvore cortada como se fosse completa).
@@ -2652,6 +3296,7 @@ impl Engine {
             .iter()
             .map(|c| self.build_ui_node(*c, depth + 1))
             .collect();
+        let focusable = cfg!(feature = "advanced-components") && class.ends_with("EditText");
         UiNode {
             class,
             resource_id,
@@ -2660,7 +3305,7 @@ impl Engine {
             visibility,
             enabled,
             clickable,
-            focusable: false, // issue #54: honesto até o modelo rastrear foco
+            focusable,
             truncated,
             children,
         }

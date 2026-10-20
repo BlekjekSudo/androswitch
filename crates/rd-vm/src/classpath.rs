@@ -98,6 +98,9 @@ impl Classpath {
     pub fn find_class(&self, descriptor: &str) -> Option<(usize, &ClassDef)> {
         for (i, dex) in self.dexes.iter().enumerate() {
             if let Some(def) = dex.find_class(descriptor) {
+                if is_shadowed_platform_stub(descriptor, def.access_flags) {
+                    return None;
+                }
                 return Some((i, def));
             }
         }
@@ -163,6 +166,30 @@ impl Classpath {
             })
             .cloned()
             .map(|m| (dex_idx, def, m))
+    }
+
+    /// Methods declared by a DEX class itself, as `(name, proto, access_flags)`.
+    /// Used by reflection enumeration (`getDeclaredMethods`, `getConstructors`, …).
+    pub fn declared_methods(&mut self, class_desc: &str) -> Vec<(String, String, u32)> {
+        let Some((dex_idx, def)) = self.find_class(class_desc) else {
+            return Vec::new();
+        };
+        let def = *def;
+        let Some(data) = self.class_data(dex_idx, &def).ok().flatten() else {
+            return Vec::new();
+        };
+        data.direct_methods
+            .iter()
+            .chain(&data.virtual_methods)
+            .filter(|m| m.method_idx != rd_dex::strings::NO_INDEX)
+            .filter_map(|m| {
+                Some((
+                    self.method_name(dex_idx, m.method_idx)?,
+                    self.method_proto(dex_idx, m.method_idx)?,
+                    m.access_flags,
+                ))
+            })
+            .collect()
     }
 
     /// Resolve um método por (classe, nome, proto) caminhando a superclasse.
@@ -408,6 +435,10 @@ impl Classpath {
             if cur == sup {
                 return true;
             }
+            // host (JDK/platform) interfaces: builtin super-interface closure
+            if builtin_interfaces(&cur).is_some_and(|v| v.contains(&sup)) {
+                return true;
+            }
             budget -= 1;
             if budget == 0 {
                 return false;
@@ -429,6 +460,11 @@ impl Classpath {
     /// (CharSequence/Comparable/…) vêm da tabela builtin.
     pub fn is_subtype(&self, sub: &str, sup: &str) -> bool {
         if sub == sup {
+            return true;
+        }
+        // JLS 4.10: every reference type (incl. unmodelled host classes such
+        // as android.content.res.Configuration) is a subtype of Object
+        if sup == "Ljava/lang/Object;" && (sub.starts_with('L') || sub.starts_with('[')) {
             return true;
         }
         // issue #42: subtipagem de ARRAYS (JLS 4.10.2/4.10.3) — antes arrays
@@ -558,24 +594,137 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
     ];
     match class {
         "Ljava/lang/String;" => Some(vec!["Ljava/lang/Object;"]),
-        "Ljava/lang/StringBuilder;" => Some(vec!["Ljava/lang/Object;"]),
+        "Ljava/lang/StringBuilder;" | "Ljava/lang/StringBuffer;" => {
+            Some(vec!["Ljava/lang/Object;"])
+        }
         "Ljava/lang/ArithmeticException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/NullPointerException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/ClassCastException;" => Some(RUNTIME.to_vec()),
-        "Ljava/lang/ArrayIndexOutOfBoundsException;" => Some(RUNTIME.to_vec()),
+        "Ljava/lang/ArrayIndexOutOfBoundsException;"
+        | "Ljava/lang/StringIndexOutOfBoundsException;" => Some(vec![
+            "Ljava/lang/IndexOutOfBoundsException;",
+            "Ljava/lang/RuntimeException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/lang/IndexOutOfBoundsException;"
+        | "Ljava/util/NoSuchElementException;"
+        | "Ljava/util/ConcurrentModificationException;"
+        | "Ljava/util/EmptyStackException;"
+        | "Ljava/lang/TypeNotPresentException;"
+        | "Ljava/time/DateTimeException;"
+        | "Ljava/io/UncheckedIOException;" => Some(RUNTIME.to_vec()),
+        "Ljava/util/concurrent/CancellationException;" => Some(vec![
+            "Ljava/lang/IllegalStateException;",
+            "Ljava/lang/RuntimeException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/util/regex/PatternSyntaxException;"
+        | "Ljava/util/IllegalFormatException;"
+        | "Ljava/nio/charset/IllegalCharsetNameException;"
+        | "Ljava/nio/charset/UnsupportedCharsetException;" => Some(vec![
+            "Ljava/lang/IllegalArgumentException;",
+            "Ljava/lang/RuntimeException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/util/UnknownFormatConversionException;"
+        | "Ljava/util/IllegalFormatConversionException;"
+        | "Ljava/util/MissingFormatArgumentException;" => Some(vec![
+            "Ljava/util/IllegalFormatException;",
+            "Ljava/lang/IllegalArgumentException;",
+            "Ljava/lang/RuntimeException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/lang/ReflectiveOperationException;"
+        | "Ljava/lang/InterruptedException;"
+        | "Ljava/lang/CloneNotSupportedException;"
+        | "Ljava/io/IOException;"
+        | "Ljava/util/concurrent/TimeoutException;"
+        | "Ljava/util/concurrent/ExecutionException;"
+        | "Landroid/util/AndroidException;" => Some(EXC.to_vec()),
+        "Ljava/lang/ClassNotFoundException;"
+        | "Ljava/lang/InstantiationException;"
+        | "Ljava/lang/NoSuchMethodException;"
+        | "Ljava/lang/NoSuchFieldException;"
+        | "Ljava/lang/IllegalAccessException;"
+        | "Ljava/lang/reflect/InvocationTargetException;" => Some(vec![
+            "Ljava/lang/ReflectiveOperationException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/io/FileNotFoundException;" | "Ljava/io/EOFException;" => Some(vec![
+            "Ljava/io/IOException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/provider/Settings$SettingNotFoundException;" => Some(vec![
+            "Landroid/util/AndroidException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/lang/AbstractMethodError;" | "Ljava/lang/IncompatibleClassChangeError;" => {
+            Some(vec![
+                "Ljava/lang/IncompatibleClassChangeError;",
+                "Ljava/lang/LinkageError;",
+                "Ljava/lang/Error;",
+                "Ljava/lang/Throwable;",
+                "Ljava/lang/Object;",
+            ])
+        }
         "Ljava/lang/NegativeArraySizeException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/IllegalStateException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/IllegalArgumentException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/NumberFormatException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/ArrayStoreException;" => Some(RUNTIME.to_vec()),
-        "Ljava/lang/StringIndexOutOfBoundsException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/RuntimeException;" => Some(EXC.to_vec()),
+        // android.database exceptions (thrown by the SQLite backend; Room's
+        // @Upsert catches SQLiteConstraintException to fall back to UPDATE)
+        "Landroid/database/SQLException;" => Some(RUNTIME.to_vec()),
+        "Landroid/database/sqlite/SQLiteException;" => {
+            let mut v = vec!["Landroid/database/SQLException;"];
+            v.extend_from_slice(RUNTIME);
+            Some(v)
+        }
+        "Landroid/database/sqlite/SQLiteConstraintException;"
+        | "Landroid/database/sqlite/SQLiteCantOpenDatabaseException;"
+        | "Landroid/database/sqlite/SQLiteDiskIOException;"
+        | "Landroid/database/sqlite/SQLiteFullException;"
+        | "Landroid/database/sqlite/SQLiteDatabaseCorruptException;"
+        | "Landroid/database/sqlite/SQLiteDatabaseLockedException;"
+        | "Landroid/database/sqlite/SQLiteReadOnlyDatabaseException;"
+        | "Landroid/database/sqlite/SQLiteDoneException;"
+        | "Landroid/database/sqlite/SQLiteBlobTooBigException;" => {
+            let mut v = vec![
+                "Landroid/database/sqlite/SQLiteException;",
+                "Landroid/database/SQLException;",
+            ];
+            v.extend_from_slice(RUNTIME);
+            Some(v)
+        }
         "Ljava/lang/UnsupportedOperationException;" => Some(RUNTIME.to_vec()),
         "Ljava/lang/StackOverflowError;" => Some(ERR.to_vec()),
         "Ljava/lang/OutOfMemoryError;" => Some(ERR.to_vec()),
         // issue #41: hierarquia de ERROS de link/init — sem elas, EIIE/NCDFE
         // não casam nem com catch (Throwable) (não são subtipo de Throwable)
         "Ljava/lang/LinkageError;" => Some(ERR.to_vec()),
+        "Ljava/lang/UnsatisfiedLinkError;" | "Ljava/lang/NoSuchMethodError;" => Some(vec![
+            "Ljava/lang/LinkageError;",
+            "Ljava/lang/Error;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/lang/SecurityException;" => Some(RUNTIME.to_vec()),
+        "Landroid/app/PendingIntent$CanceledException;" => Some(EXC.to_vec()),
         "Ljava/lang/ExceptionInInitializerError;" => Some(vec![
             "Ljava/lang/LinkageError;",
             "Ljava/lang/Error;",
@@ -601,8 +750,57 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/lang/Error;" => Some(ERR.to_vec()),
         // ── M3.2: framework host Android ───────────────────────────────────
         "Landroid/content/Context;" => Some(OBJECT.to_vec()),
-        "Landroid/app/Activity;" => Some(CONTEXT.to_vec()),
-        "Landroid/app/Application;" => Some(CONTEXT.to_vec()),
+        "Ljava/text/BreakIterator;" => Some(OBJECT.to_vec()),
+        // android.text layouts (graphics.rs): StaticLayout/BoringLayout/
+        // DynamicLayout are Layouts (Compose casts them to Layout)
+        "Landroid/text/Layout;" => Some(OBJECT.to_vec()),
+        "Landroid/text/StaticLayout;"
+        | "Landroid/text/BoringLayout;"
+        | "Landroid/text/DynamicLayout;" => {
+            Some(vec!["Landroid/text/Layout;", "Ljava/lang/Object;"])
+        }
+        "Landroid/text/BoringLayout$Metrics;" => Some(vec![
+            "Landroid/graphics/Paint$FontMetricsInt;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/content/ContextWrapper;" => Some(CONTEXT.to_vec()),
+        "Landroid/view/ContextThemeWrapper;" => Some(vec![
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        // AOSP: Activity → ContextThemeWrapper → ContextWrapper → Context;
+        // Application/Service → ContextWrapper (apps unwrap contexts with
+        // `while (c instanceof ContextWrapper)` looking for owners)
+        "Landroid/app/Activity;" => Some(vec![
+            "Landroid/view/ContextThemeWrapper;",
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/app/Application;" | "Landroid/app/Service;" => Some(vec![
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        // the base context ending every ContextWrapper chain
+        "Landroid/app/ContextImpl;" => Some(CONTEXT.to_vec()),
+        "Landroid/inputmethodservice/InputMethodService;"
+        | "Landroid/accessibilityservice/AccessibilityService;"
+        | "Landroid/service/notification/NotificationListenerService;" => Some(vec![
+            "Landroid/app/Service;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/widget/EditText;" => Some(TEXTVIEW.to_vec()),
+        "Landroid/appwidget/AppWidgetProvider;" => Some(vec![
+            "Landroid/content/BroadcastReceiver;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/view/inputmethod/BaseInputConnection;" => Some(vec![
+            "Landroid/view/inputmethod/InputConnection;",
+            "Ljava/lang/Object;",
+        ]),
         // M8: FragmentManager legacy (29º gap real) — objeto simples do host.
         "Landroid/app/FragmentManager;" => Some(OBJECT.to_vec()),
         // M8: FragmentTransaction legacy (31º gap real) — ops até o commit.
@@ -616,8 +814,117 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Landroid/app/AlertDialog$Builder;" => Some(OBJECT.to_vec()),
         "Landroid/database/sqlite/SQLiteDatabase;" => Some(OBJECT.to_vec()),
         "Landroid/database/sqlite/SQLiteOpenHelper;" => Some(OBJECT.to_vec()),
+        // jtext_format
+        "Ljava/text/Format;" | "Ljava/text/DecimalFormatSymbols;" => Some(OBJECT.to_vec()),
+        "Ljava/text/NumberFormat;" => Some(vec!["Ljava/text/Format;", "Ljava/lang/Object;"]),
+        "Ljava/text/DecimalFormat;" => Some(vec![
+            "Ljava/text/NumberFormat;",
+            "Ljava/text/Format;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/content/ComponentName;" => Some(OBJECT.to_vec()),
+        "Landroid/graphics/drawable/Drawable;" | "Landroid/content/res/ColorStateList;" => {
+            Some(OBJECT.to_vec())
+        }
+        "Landroid/graphics/drawable/ColorDrawable;"
+        | "Landroid/graphics/drawable/LayerDrawable;" => Some(vec![
+            "Landroid/graphics/drawable/Drawable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/graphics/drawable/RippleDrawable;" => Some(vec![
+            "Landroid/graphics/drawable/LayerDrawable;",
+            "Landroid/graphics/drawable/Drawable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/view/MotionEvent;" => {
+            Some(vec!["Landroid/view/InputEvent;", "Ljava/lang/Object;"])
+        }
+        "Landroid/view/MotionEvent$PointerCoords;"
+        | "Landroid/view/MotionEvent$PointerProperties;" => Some(OBJECT.to_vec()),
+        "Landroid/graphics/ColorSpace;"
+        | "Landroid/graphics/ColorSpace$Named;"
+        | "Landroid/graphics/ColorSpace$Model;"
+        | "Landroid/graphics/ColorSpace$Rgb$TransferParameters;" => Some(OBJECT.to_vec()),
+        "Landroid/graphics/ColorSpace$Rgb;" => {
+            Some(vec!["Landroid/graphics/ColorSpace;", "Ljava/lang/Object;"])
+        }
+        "Landroid/text/SpannableString;" | "Landroid/text/SpannableStringBuilder;" => {
+            Some(OBJECT.to_vec())
+        }
+        "Landroid/content/pm/PackageManager;"
+        | "Landroid/view/Display;"
+        | "Landroid/content/pm/PackageInfo;"
+        | "Landroid/content/pm/PackageItemInfo;" => Some(OBJECT.to_vec()),
+        "Landroid/app/ApplicationPackageManager;" => Some(vec![
+            "Landroid/content/pm/PackageManager;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/content/pm/ApplicationInfo;" | "Landroid/content/pm/ComponentInfo;" => {
+            Some(vec![
+                "Landroid/content/pm/PackageItemInfo;",
+                "Ljava/lang/Object;",
+            ])
+        }
+        "Landroid/content/pm/ActivityInfo;"
+        | "Landroid/content/pm/ServiceInfo;"
+        | "Landroid/content/pm/ProviderInfo;" => Some(vec![
+            "Landroid/content/pm/ComponentInfo;",
+            "Landroid/content/pm/PackageItemInfo;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/nio/charset/Charset;" | "Ljava/util/UUID;" => Some(OBJECT.to_vec()),
+        // jio_chars
+        "Ljava/io/Writer;" | "Ljava/io/Reader;" => Some(OBJECT.to_vec()),
+        "Ljava/io/StringWriter;"
+        | "Ljava/io/OutputStreamWriter;"
+        | "Ljava/io/BufferedWriter;"
+        | "Ljava/io/PrintWriter;" => Some(vec!["Ljava/io/Writer;", "Ljava/lang/Object;"]),
+        "Ljava/io/FileWriter;" => Some(vec![
+            "Ljava/io/OutputStreamWriter;",
+            "Ljava/io/Writer;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/io/StringReader;" | "Ljava/io/InputStreamReader;" | "Ljava/io/BufferedReader;" => {
+            Some(vec!["Ljava/io/Reader;", "Ljava/lang/Object;"])
+        }
+        "Ljava/io/FileReader;" => Some(vec![
+            "Ljava/io/InputStreamReader;",
+            "Ljava/io/Reader;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/io/ByteArrayOutputStream;" => {
+            Some(vec!["Ljava/io/OutputStream;", "Ljava/lang/Object;"])
+        }
+        "Ljava/io/ByteArrayInputStream;" => {
+            Some(vec!["Ljava/io/InputStream;", "Ljava/lang/Object;"])
+        }
+        // jsqlite: programs, cursors and the cursor driver.
+        "Landroid/database/sqlite/SQLiteClosable;"
+        | "Landroid/database/sqlite/SQLiteDirectCursorDriver;"
+        | "Landroid/database/AbstractCursor;" => Some(OBJECT.to_vec()),
+        "Landroid/database/sqlite/SQLiteProgram;" => Some(vec![
+            "Landroid/database/sqlite/SQLiteClosable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/database/sqlite/SQLiteQuery;" | "Landroid/database/sqlite/SQLiteStatement;" => {
+            Some(vec![
+                "Landroid/database/sqlite/SQLiteProgram;",
+                "Landroid/database/sqlite/SQLiteClosable;",
+                "Ljava/lang/Object;",
+            ])
+        }
+        "Landroid/database/AbstractWindowedCursor;" => Some(vec![
+            "Landroid/database/AbstractCursor;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/database/sqlite/SQLiteCursor;" => Some(vec![
+            "Landroid/database/AbstractWindowedCursor;",
+            "Landroid/database/AbstractCursor;",
+            "Ljava/lang/Object;",
+        ]),
         "Landroid/content/ContentValues;" => Some(OBJECT.to_vec()),
         "Landroid/net/Uri;" => Some(OBJECT.to_vec()),
+        "Landroid/net/Uri$Builder;" => Some(OBJECT.to_vec()),
         "Landroid/app/job/JobScheduler;" => Some(OBJECT.to_vec()),
         "Landroidx/recyclerview/widget/RecyclerView;" => Some(VIEWGROUP.to_vec()),
         "Landroidx/recyclerview/widget/RecyclerView$Adapter;" => Some(OBJECT.to_vec()),
@@ -685,6 +992,11 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/util/ArrayDeque;" => {
             Some(vec!["Ljava/util/AbstractCollection;", "Ljava/lang/Object;"])
         }
+        "Ljava/util/PriorityQueue;" => Some(vec![
+            "Ljava/util/AbstractQueue;",
+            "Ljava/util/AbstractCollection;",
+            "Ljava/lang/Object;",
+        ]),
         "Ljava/util/AbstractMap;" => Some(OBJECT.to_vec()),
         "Ljava/util/HashMap;" => Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"]),
         "Ljava/util/LinkedHashMap;" => Some(vec![
@@ -696,7 +1008,9 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/util/concurrent/ConcurrentHashMap;" => {
             Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"])
         }
-        "Ljava/util/WeakHashMap;" => Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"]),
+        "Ljava/util/WeakHashMap;" | "Ljava/util/IdentityHashMap;" => {
+            Some(vec!["Ljava/util/AbstractMap;", "Ljava/lang/Object;"])
+        }
         "Ljava/util/ArrayList;" => Some(vec![
             "Ljava/util/AbstractList;",
             "Ljava/util/AbstractCollection;",
@@ -721,6 +1035,14 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/util/concurrent/CopyOnWriteArraySet;" => Some(OBJECT.to_vec()),
         "Ljava/util/concurrent/atomic/AtomicReference;" => Some(OBJECT.to_vec()),
         "Ljava/lang/Number;" => Some(OBJECT.to_vec()),
+        // primitive wrappers (boxes.rs): numeric ones extend Number
+        "Ljava/lang/Integer;"
+        | "Ljava/lang/Long;"
+        | "Ljava/lang/Short;"
+        | "Ljava/lang/Byte;"
+        | "Ljava/lang/Float;"
+        | "Ljava/lang/Double;" => Some(vec!["Ljava/lang/Number;", "Ljava/lang/Object;"]),
+        "Ljava/lang/Boolean;" | "Ljava/lang/Character;" => Some(OBJECT.to_vec()),
         "Ljava/lang/Thread;" => Some(OBJECT.to_vec()),
         "Ljava/lang/ThreadLocal;" => Some(OBJECT.to_vec()),
         "Ljava/lang/InheritableThreadLocal;" => {
@@ -731,11 +1053,25 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         // M8: ServiceLoader host é um Iterable vazio enquanto a descoberta
         // `META-INF/services` do APK permanece fora do runtime.
         "Ljava/util/ServiceLoader;" => Some(OBJECT.to_vec()),
-        "Ljava/util/concurrent/atomic/AtomicInteger;" => {
+        "Ljava/util/concurrent/atomic/AtomicInteger;"
+        | "Ljava/util/concurrent/atomic/AtomicLong;" => {
             Some(vec!["Ljava/lang/Number;", "Ljava/lang/Object;"])
         }
+        "Ljava/util/concurrent/atomic/AtomicBoolean;" => Some(OBJECT.to_vec()),
         "Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;" => Some(OBJECT.to_vec()),
         "Ljava/lang/Enum;" => Some(OBJECT.to_vec()),
+        // java.util.Random (jrandom.rs)
+        "Ljava/util/Random;" => Some(OBJECT.to_vec()),
+        "Ljava/util/concurrent/ThreadLocalRandom;" => {
+            Some(vec!["Ljava/util/Random;", "Ljava/lang/Object;"])
+        }
+        // java.math (jbigdecimal.rs)
+        "Ljava/math/BigDecimal;" | "Ljava/math/BigInteger;" => {
+            Some(vec!["Ljava/lang/Number;", "Ljava/lang/Object;"])
+        }
+        "Ljava/math/RoundingMode;" | "Ljava/text/Normalizer$Form;" => {
+            Some(vec!["Ljava/lang/Enum;", "Ljava/lang/Object;"])
+        }
         "Ljava/lang/ref/Reference;" => Some(OBJECT.to_vec()),
         "Ljava/lang/ref/WeakReference;" => {
             Some(vec!["Ljava/lang/ref/Reference;", "Ljava/lang/Object;"])
@@ -767,9 +1103,147 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
     const MAP_IFACES: &[&str] = &["Ljava/util/Map;"];
     match class {
         "Ljava/lang/String;" => Some(STRING_IFACES.to_vec()),
-        "Ljava/lang/StringBuilder;" => Some(SB_IFACES.to_vec()),
+        "Ljava/lang/StringBuilder;" | "Ljava/lang/StringBuffer;" => Some(SB_IFACES.to_vec()),
+        "Ljava/util/regex/Pattern;" => Some(vec!["Ljava/io/Serializable;"]),
+        "Ljava/util/regex/Matcher;" => Some(vec!["Ljava/util/regex/MatchResult;"]),
+        "Ljava/text/Format;"
+        | "Ljava/text/NumberFormat;"
+        | "Ljava/text/DecimalFormat;"
+        | "Ljava/text/DecimalFormatSymbols;" => {
+            Some(vec!["Ljava/lang/Cloneable;", "Ljava/io/Serializable;"])
+        }
+        "Ljava/nio/charset/Charset;" => Some(vec!["Ljava/lang/Comparable;"]),
+        "Ljava/util/UUID;" => Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
+        "Landroid/net/Uri;" => Some(vec!["Landroid/os/Parcelable;", "Ljava/lang/Comparable;"]),
+        // framework value types that apps (and Compose's SaveableStateRegistry)
+        // test with `Parcelable.class.isInstance(..)` / check-cast
+        "Landroid/os/Bundle;"
+        | "Landroid/os/PersistableBundle;"
+        | "Landroid/content/Intent;"
+        | "Landroid/graphics/Bitmap;"
+        | "Landroid/graphics/Rect;"
+        | "Landroid/graphics/RectF;"
+        | "Landroid/graphics/Point;"
+        | "Landroid/graphics/PointF;" => {
+            Some(vec!["Landroid/os/Parcelable;", "Ljava/lang/Cloneable;"])
+        }
+        "Landroid/util/SparseArray;" => Some(vec!["Ljava/lang/Cloneable;"]),
+        "Landroid/text/SpannableString;" => Some(vec![
+            "Landroid/text/Spannable;",
+            "Landroid/text/Spanned;",
+            "Ljava/lang/CharSequence;",
+            "Landroid/text/GetChars;",
+        ]),
+        "Landroid/text/SpannableStringBuilder;" => Some(vec![
+            "Landroid/text/Editable;",
+            "Landroid/text/Spannable;",
+            "Landroid/text/Spanned;",
+            "Ljava/lang/CharSequence;",
+            "Landroid/text/GetChars;",
+            "Ljava/lang/Appendable;",
+        ]),
+        "Landroid/content/ComponentName;" => Some(vec![
+            "Landroid/os/Parcelable;",
+            "Ljava/lang/Cloneable;",
+            "Ljava/lang/Comparable;",
+        ]),
+        "Ljava/io/Writer;" => Some(vec![
+            "Ljava/lang/Appendable;",
+            "Ljava/io/Closeable;",
+            "Ljava/io/Flushable;",
+            "Ljava/lang/AutoCloseable;",
+        ]),
+        "Ljava/io/Reader;" => Some(vec![
+            "Ljava/lang/Readable;",
+            "Ljava/io/Closeable;",
+            "Ljava/lang/AutoCloseable;",
+        ]),
+        // jsqlite host classes
+        "Landroid/database/sqlite/SQLiteDirectCursorDriver;" => {
+            Some(vec!["Landroid/database/sqlite/SQLiteCursorDriver;"])
+        }
+        "Landroid/database/sqlite/SQLiteClosable;"
+        | "Landroid/database/sqlite/SQLiteProgram;"
+        | "Landroid/database/sqlite/SQLiteQuery;"
+        | "Landroid/database/sqlite/SQLiteStatement;"
+        | "Landroid/database/sqlite/SQLiteDatabase;" => {
+            Some(vec!["Ljava/io/Closeable;", "Ljava/lang/AutoCloseable;"])
+        }
+        "Landroid/database/sqlite/SQLiteCursor;"
+        | "Landroid/database/AbstractWindowedCursor;"
+        | "Landroid/database/AbstractCursor;" => Some(vec![
+            "Landroid/database/CrossProcessCursor;",
+            "Landroid/database/Cursor;",
+            "Ljava/io/Closeable;",
+            "Ljava/lang/AutoCloseable;",
+        ]),
+        // java.util.concurrent.locks host classes (jlocks.rs)
+        "Ljava/util/concurrent/locks/ReentrantLock;" => Some(vec![
+            "Ljava/util/concurrent/locks/Lock;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/concurrent/locks/ReentrantReadWriteLock;" => Some(vec![
+            "Ljava/util/concurrent/locks/ReadWriteLock;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/concurrent/locks/ReentrantReadWriteLock$ReadLock;"
+        | "Ljava/util/concurrent/locks/ReentrantReadWriteLock$WriteLock;" => Some(vec![
+            "Ljava/util/concurrent/locks/Lock;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/io/File;" => Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
+        "Ljava/io/FileOutputStream;" | "Ljava/io/FileInputStream;" => {
+            Some(vec!["Ljava/io/Closeable;", "Ljava/lang/AutoCloseable;"])
+        }
+        "Ljava/nio/channels/FileLock;" => Some(vec!["Ljava/lang/AutoCloseable;"]),
+        // host XML resource parser (xml_res.rs) is a pull parser + AttributeSet
+        "Landroid/content/res/XmlResourceParser;" => Some(vec![
+            "Lorg/xmlpull/v1/XmlPullParser;",
+            "Landroid/util/AttributeSet;",
+            "Ljava/lang/AutoCloseable;",
+        ]),
         // ── M8: interfaces das classes host do compat real ──
         "Ljava/util/AbstractCollection;" => Some(COLL.to_vec()),
+        // JDK collection interfaces: super-interface closure, so a DEX class
+        // implementing Set/List/Queue/… is a Collection/Iterable (check-cast)
+        "Ljava/util/Collection;" => Some(vec!["Ljava/lang/Iterable;"]),
+        "Ljava/util/Set;" | "Ljava/util/List;" | "Ljava/util/Queue;" => Some(COLL.to_vec()),
+        "Ljava/util/Deque;" | "Ljava/util/concurrent/BlockingQueue;" => Some(vec![
+            "Ljava/util/Queue;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+        ]),
+        "Ljava/util/SortedSet;" => Some(vec![
+            "Ljava/util/Set;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+        ]),
+        "Ljava/util/NavigableSet;" => Some(vec![
+            "Ljava/util/SortedSet;",
+            "Ljava/util/Set;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+        ]),
+        "Ljava/util/SortedMap;" | "Ljava/util/concurrent/ConcurrentMap;" => {
+            Some(vec!["Ljava/util/Map;"])
+        }
+        "Ljava/util/NavigableMap;" => Some(vec!["Ljava/util/SortedMap;", "Ljava/util/Map;"]),
+        "Ljava/util/TreeSet;" => Some(vec![
+            "Ljava/util/NavigableSet;",
+            "Ljava/util/SortedSet;",
+            "Ljava/util/Set;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+            "Ljava/lang/Cloneable;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/TreeMap;" => Some(vec![
+            "Ljava/util/NavigableMap;",
+            "Ljava/util/SortedMap;",
+            "Ljava/util/Map;",
+            "Ljava/lang/Cloneable;",
+            "Ljava/io/Serializable;",
+        ]),
         "Ljava/util/AbstractList;" | "Ljava/util/AbstractSequentialList;" => {
             Some(LIST_IFACES.to_vec())
         }
@@ -780,6 +1254,7 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/io/Serializable;",
         ]),
         "Ljava/util/WeakHashMap;"
+        | "Ljava/util/IdentityHashMap;"
         | "Ljava/util/LinkedHashMap;"
         | "Ljava/util/concurrent/ConcurrentHashMap;" => Some(vec![
             "Ljava/util/Map;",
@@ -787,6 +1262,23 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",
         ]),
+        // Immutable views from java.util.Collections (intrinsics.rs markers).
+        "Ljava/util/Collections$UnmodifiableSet;" => Some(vec![
+            "Ljava/util/Set;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/Collections$SingletonList;" => Some(vec![
+            "Ljava/util/List;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+            "Ljava/util/RandomAccess;",
+            "Ljava/io/Serializable;",
+        ]),
+        "Ljava/util/Collections$UnmodifiableMap;" => {
+            Some(vec!["Ljava/util/Map;", "Ljava/io/Serializable;"])
+        }
         "Ljava/util/AbstractSet;" | "Ljava/util/HashSet;" | "Ljava/util/LinkedHashSet;" => {
             Some(vec![
                 "Ljava/util/Set;",
@@ -825,6 +1317,12 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/util/Collection;",
             "Ljava/lang/Iterable;",
         ]),
+        "Ljava/util/PriorityQueue;" => Some(vec![
+            "Ljava/util/Queue;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
+            "Ljava/io/Serializable;",
+        ]),
         "Ljava/util/ArrayDeque;" => Some(vec![
             "Ljava/util/Deque;",
             "Ljava/util/Queue;",
@@ -848,10 +1346,23 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",
         ]),
+        "Ljava/lang/Integer;"
+        | "Ljava/lang/Long;"
+        | "Ljava/lang/Short;"
+        | "Ljava/lang/Byte;"
+        | "Ljava/lang/Float;"
+        | "Ljava/lang/Double;"
+        | "Ljava/lang/Boolean;"
+        | "Ljava/lang/Character;" => Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
         "Ljava/util/concurrent/atomic/AtomicReference;"
-        | "Ljava/util/concurrent/atomic/AtomicInteger;" => Some(vec!["Ljava/io/Serializable;"]),
+        | "Ljava/util/concurrent/atomic/AtomicInteger;"
+        | "Ljava/util/concurrent/atomic/AtomicLong;"
+        | "Ljava/util/concurrent/atomic/AtomicBoolean;" => Some(vec!["Ljava/io/Serializable;"]),
         "Ljava/util/concurrent/ExecutorService;" => Some(vec!["Ljava/util/concurrent/Executor;"]),
         "Ljava/util/ServiceLoader;" => Some(vec!["Ljava/lang/Iterable;"]),
+        "Ljava/math/BigDecimal;" | "Ljava/math/BigInteger;" => {
+            Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"])
+        }
         "Ljava/lang/Enum;" => Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
         "Ljava/lang/Thread;" => Some(vec!["Ljava/lang/Runnable;"]),
         _ => None,
@@ -859,6 +1370,27 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
 }
 
 /// Erro de resolução com sugestão (Lei 1 — nunca silencioso).
+/// Whether the host runtime models `desc` (a JDK/platform type outside the
+/// app DEX).
+pub fn host_class_known(desc: &str) -> bool {
+    builtin_hierarchy(desc).is_some() || builtin_interfaces(desc).is_some()
+}
+
+/// Like [`unresolved_method`], naming the receiver's runtime class when it
+/// differs from the declaring class of the method reference.
+pub fn unresolved_method_on(class: &str, recv_class: &str, name: &str, proto: &str) -> RdError {
+    if class == recv_class {
+        return unresolved_method(class, name, proto);
+    }
+    crate::err::with_suggestion(
+        crate::err::vm_error(
+            "NOT_FOUND",
+            format!("método {class}->{name}{proto} não resolvido (receiver {recv_class})"),
+        ),
+        "a classe pode depender de plataforma fora do escopo M2",
+    )
+}
+
 pub fn unresolved_method(class: &str, name: &str, proto: &str) -> RdError {
     crate::err::with_suggestion(
         crate::err::vm_error(
@@ -867,6 +1399,19 @@ pub fn unresolved_method(class: &str, name: &str, proto: &str) -> RdError {
         ),
         "a classe pode depender de plataforma fora do escopo M2",
     )
+}
+
+/// Parent-first class loading: a *synthetic* class that the app DEX defines
+/// in a platform package is an R8/D8 API stub (its `<clinit>` typically just
+/// throws `NoClassDefFoundError`, for devices below the API level that
+/// introduced the class). On a device the boot classpath class shadows it,
+/// so here the platform (host) class wins too.
+fn is_shadowed_platform_stub(descriptor: &str, access_flags: u32) -> bool {
+    const ACC_SYNTHETIC: u32 = 0x1000;
+    access_flags & ACC_SYNTHETIC != 0
+        && ["Landroid/", "Ljava/", "Ljavax/", "Ldalvik/"]
+            .iter()
+            .any(|p| descriptor.starts_with(p))
 }
 
 #[cfg(test)]

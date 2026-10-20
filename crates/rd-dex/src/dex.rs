@@ -237,6 +237,9 @@ pub struct Dex {
     /// offsets de call_site_id_item (encoded_array_item).
     pub call_site_offsets: Vec<u32>,
     pub method_handles: Vec<MethodHandle>,
+    /// descriptor → class_defs index, built on first `find_class`
+    /// (the linear scan dominated launch time on 10k-class apps)
+    pub class_index: std::sync::OnceLock<std::collections::HashMap<String, usize>>,
 }
 
 impl Dex {
@@ -289,6 +292,7 @@ impl Dex {
             field_ids,
             method_ids,
             class_defs,
+            class_index: std::sync::OnceLock::new(),
             call_site_offsets,
             method_handles,
         })
@@ -491,11 +495,17 @@ impl Dex {
         protos::type_list(&self.data, def.interfaces_off)
     }
 
-    /// Índice de classe para descritor (`Lcom/x/Y;`) — busca linear nos class_defs.
+    /// Class for a descriptor (`Lcom/x/Y;`). O(1) via a lazily built index;
+    /// the first definition wins, matching the previous linear scan.
     pub fn find_class(&self, descriptor: &str) -> Option<&ClassDef> {
-        self.class_defs
-            .iter()
-            .find(|d| self.type_str(d.class_idx) == descriptor)
+        let idx = self.class_index.get_or_init(|| {
+            let mut m = std::collections::HashMap::with_capacity(self.class_defs.len());
+            for (i, d) in self.class_defs.iter().enumerate() {
+                m.entry(self.type_str(d.class_idx).to_string()).or_insert(i);
+            }
+            m
+        });
+        idx.get(descriptor).map(|&i| &self.class_defs[i])
     }
 }
 

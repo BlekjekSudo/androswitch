@@ -68,8 +68,8 @@ const CRATE_STATUS: &[(&str, &str, &str)] = &[
     ),
     (
         "rd-vm",
-        "M2–M3",
-        "interpretador Dalvik + golden harness vs JVM + framework host headless (Activity/View/Handler/Looper) + LayoutInflater AXML/ARSC",
+        "M2–M9",
+        "interpretador Dalvik + golden harness vs JVM + framework host headless (Activity/View/Handler/Looper) + LayoutInflater AXML/ARSC + componentes M9 (notificações/IME/widgets/a11y/atalhos) + ponte JNI (feature `native`)",
     ),
     (
         "rd-testsupport",
@@ -83,11 +83,19 @@ const CRATE_STATUS: &[(&str, &str, &str)] = &[
     ),
     (
         "rd-agent",
-        "M5–M6",
-        "MCP v1 (30 tools + batch + policy sandbox) · executor de suítes `rd test` (JSON → JUnit XML, M6)",
+        "M5–M9",
+        "MCP (41 tools + batch + policy sandbox + screen resources/live viewer; M9: widgets/IME/a11y/shortcuts/native_state) · executor de suítes `rd test` (JSON → JUnit XML, M6)",
     ),
-    ("rd-jni", "M3+", "stub NOT_IMPLEMENTED"),
-    ("rd-ndk", "M9", "stub NOT_IMPLEMENTED"),
+    (
+        "rd-jni",
+        "M9",
+        "mangling JNI (curto/sobrecarga), descritores, MUTF-8, frames de refs locais/globais",
+    ),
+    (
+        "rd-ndk",
+        "M9",
+        "parser ELF32/64 limitado (x86_64/AArch64/ARM) + runtime `native` em worker Unicorn isolado (ADR 004)",
+    ),
 ];
 
 fn compat_report(root: &Path, out: &Path) -> Result<()> {

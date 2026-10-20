@@ -348,6 +348,9 @@ pub struct AgentSession {
     logs: Arc<Mutex<Vec<u8>>>,
     devices: DeviceTable,
     behavior: SwitchTable,
+    /// Round 6: cached screen model / PNG per frame version, resource
+    /// subscriptions, pending notifications and the live viewer.
+    screen: ScreenState,
 }
 
 impl Default for AgentSession {
@@ -384,6 +387,7 @@ impl AgentSession {
             logs,
             devices: DeviceTable::embedded().expect("devices.toml embutido parseia"),
             behavior: SwitchTable::embedded().expect("behavior-switches.toml embutido parseia"),
+            screen: ScreenState::default(),
         }
     }
 
@@ -537,7 +541,7 @@ fn obj(props: serde_json::Value, required: &[&str]) -> serde_json::Value {
 /// observação, wait/wait_for, asserts, permissões, estado/saúde, lacunas de
 /// compat., batch — spec PARTE 4).
 pub fn tool_defs() -> Vec<ToolDef> {
-    vec![
+    let mut defs = vec![
         ToolDef {
             name: "install",
             description:
@@ -586,7 +590,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "type_text",
             description:
-                "Digita texto na primeira EditText visível+habilitada da activity (modelo v1 sem foco real — issue #54). `replace=true` substitui; default anexa. Devolve o texto final.",
+                "Digita texto: na EditText focada/primeira visível; sem EditText (Jetpack Compose, editores custom) usa o caminho do IME da plataforma — a view focada cria o InputConnection (onCreateInputConnection) e recebe commitText; toque no campo antes. `replace=true` substitui; default anexa. Devolve o texto final lido do editor.",
             schema: obj(
                 serde_json::json!({
                     "text": { "type": "string" },
@@ -598,7 +602,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "key",
             description:
-                "Evento de tecla: BACK (finaliza a activity corrente), DEL (apaga último caractere da EditText), ENTER (entregue, sem IME action no v1). Outras teclas: erro tipado NOT_IMPLEMENTED com a lista suportada.",
+                "Evento de tecla: BACK (finaliza a activity corrente), DEL (apaga último caractere da EditText), ENTER (no editor do IME — Compose — executa a IME action do EditorInfo via performEditorAction; senão entregue sem efeito). Outras teclas: erro tipado NOT_IMPLEMENTED com a lista suportada.",
             schema: obj(
                 serde_json::json!({ "key": { "type": "string", "enum": ["BACK", "ENTER", "DEL"] } }),
                 &["key"],
@@ -775,8 +779,8 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "runtime_health",
             description:
-                "Saúde do runtime: sessão, app em execução, activity, finished, clock virtual, heap, fuel, fila do Looper, bytes de log e tamanho do registro — sem exigir app (reporta o que existe).",
-            schema: obj(serde_json::json!({}), &[]),
+                "Saúde do runtime: sessão, app em execução, activity, finished, clock virtual, heap, fuel, fila do Looper, bytes de log e tamanho do registro — sem exigir app (reporta o que existe). Inclui `gc` (gerações minor/major, chaves fracas, pausas), heap peak e `jit` quando compilado com a feature jit. `gc=true` força coleta major. Fuel é cumulativo; cada tool inicia uma janela de execução limitada nova.",
+            schema: obj(serde_json::json!({ "gc": { "type": "boolean" } }), &[]),
         },
         ToolDef {
             name: "compat_gaps",
@@ -814,19 +818,72 @@ pub fn tool_defs() -> Vec<ToolDef> {
                 "AG-09 (metade dinâmica): cobertura de EXECUÇÃO do app em uso, nível de MÉTODO — instrumentação no interpretador registra cada corpo DEX executado. Requer app lançado (senão NOT_RUNNING); a contagem é do processo atual (reiniciar o app zera). Denominador: métodos com corpo nos DEX do app (abstract/native e classes host ficam fora).",
             schema: obj(serde_json::json!({}), &[]),
         },
+        ToolDef { name: "component_service", description: "M9: enable an APK-declared IME, accessibility, notification listener or widget provider. Runs its DEX lifecycle; returns the component object handle.", schema: obj(serde_json::json!({"class":{"type":"string"},"role":{"type":"string","enum":["ime","accessibility","notification_listener","widget"]}}), &["class","role"]) },
+        ToolDef { name: "widgets", description: "M9: list/allocate/bind/delete widgets or click a RemoteViews PendingIntent. Provider is an object handle returned by component_service.", schema: obj(serde_json::json!({"action":{"type":"string","enum":["list","allocate","bind","delete","click"]},"id":{"type":"integer"},"host":{"type":"integer"},"provider":{"type":"integer","minimum":1},"view_id":{"type":"integer"}}), &[]) },
+        ToolDef { name: "widget_screenshot", description: "M9: render the current RemoteViews widget through the normal deterministic PNG renderer.", schema: obj(serde_json::json!({"id":{"type":"integer"}}), &["id"]) },
+        ToolDef { name: "ime", description: "M9: inspect/focus the editor, select UTF-16 range, commit/compose text, delete surrounding code units or finish composition.", schema: obj(serde_json::json!({"action":{"type":"string","enum":["state","focus","select","commit","compose","delete","finish"]},"view":{"type":"integer","minimum":1},"start":{"type":"integer","minimum":0},"end":{"type":"integer","minimum":0},"text":{"type":"string"},"cursor":{"type":"integer"},"before":{"type":"integer","minimum":0},"after":{"type":"integer","minimum":0},"codepoints":{"type":"boolean"}}), &[]) },
+        ToolDef { name: "accessibility", description: "M9: inspect visible accessibility nodes/events or perform a node action by object id. Action 16 click, 1 focus, 64 accessibility focus, 2097152 set text.", schema: obj(serde_json::json!({"action":{"type":"string","enum":["tree","events","perform"]},"node":{"type":"integer","minimum":1},"action_id":{"type":"integer"},"text":{"type":"string"}}), &[]) },
+        ToolDef { name: "shortcuts", description: "M9: list current dynamic/pinned shortcuts or launch an enabled shortcut by id.", schema: obj(serde_json::json!({"action":{"type":"string","enum":["list","launch"]},"id":{"type":"string"}}), &[]) },
+        ToolDef { name: "native_state", description: "M9: native feature availability, ABI, loaded ELF libraries and guest instruction/memory accounting. Never claims a library ran merely because it was loaded.", schema: obj(serde_json::json!({}), &[]) },
         ToolDef {
             name: "notifications",
             description:
-                "Notificações do app. FORA DO ESCOPO do M5 (entram no M9 com widgets/IME) — responde erro tipado NOT_IMPLEMENTED (honesto).",
-            schema: obj(serde_json::json!({}), &[]),
+                "M9: list active notifications/channels or click/cancel a notification (tag/id and optional action index). Uses the app NotificationManager state.",
+            schema: obj(serde_json::json!({"action":{"type":"string","enum":["list","click","cancel"]},"tag":{"type":"string"},"id":{"type":"integer"},"action_index":{"type":"integer","minimum":0}}), &[]),
         },
-    ]
+        ToolDef {
+            name: "observe",
+            description:
+                "See the screen WITHOUT a screenshot: semantic model of the current frame derived from the recorded display list (works for Views, Compose and custom canvases) merged with the host view tree. Returns visible texts with bounds, probable tap targets (label + center x,y; source frame|view), images and a frame `version` that only changes when visible content changes, plus a diff (+added/-removed texts) since the previous observe. format=text (default, compact, LLM-friendly) or json (structured; boxes=true adds drawn boxes). ~10-100x cheaper than screenshot (no rasterize/PNG). Also available as subscribable MCP resources rustydroid://screen and rustydroid://screen.txt.",
+            schema: obj(
+                serde_json::json!({
+                    "format": { "type": "string", "enum": ["text", "json"], "description": "text (default) ou json" },
+                    "diff": { "type": "boolean", "description": "incluir mudanças desde o observe anterior (default true)" },
+                    "boxes": { "type": "boolean", "description": "json: incluir caixas desenhadas (default false)" },
+                }),
+                &[],
+            ),
+        },
+        ToolDef {
+            name: "tap_text",
+            description:
+                "Tap by visible label instead of coordinates: finds the tap target (or text) whose label matches `text` on the current frame (case/space-insensitive substring; exact=true for equality; nth picks among matches in reading order) and taps its center. Error VIEW_NOT_FOUND lists the visible texts. Works on Compose UIs (labels come from the drawn frame).",
+            schema: obj(
+                serde_json::json!({
+                    "text": { "type": "string", "description": "rótulo visível (ex.: \"Continuar\")" },
+                    "exact": { "type": "boolean", "description": "igualdade em vez de substring (default false)" },
+                    "nth": { "type": "integer", "minimum": 0, "description": "índice entre os candidatos (default 0)" },
+                }),
+                &["text"],
+            ),
+        },
+    ];
+    for d in defs.iter_mut() {
+        if OBSERVE_AFTER_TOOLS.contains(&d.name) {
+            if let Some(p) = d
+                .schema
+                .get_mut("properties")
+                .and_then(|p| p.as_object_mut())
+            {
+                p.insert(
+                    "observe".into(),
+                    serde_json::json!({ "type": "boolean", "description": "anexar o resumo `observe` (texto) da tela após a ação (default false)" }),
+                );
+            }
+        }
+    }
+    defs
 }
 
 impl AgentSession {
     /// Dispatch de uma tool (o envelope MCP chama isto). Erros de tool voltam
     /// como ToolResult::is_error com o contrato {code, cause, suggestion}.
     pub fn call_tool(&mut self, name: &str, args: &serde_json::Value) -> ToolResult {
+        // Fuel limits one operation, not the lifetime of a healthy MCP session.
+        // Total fuel remains observable; loops still exhaust a per-tool budget.
+        if let Some(eng) = &mut self.engine {
+            eng.reset_fuel_window();
+        }
         let args = args.as_object().cloned().unwrap_or_default();
         let res: Result<ToolResult, RdError> = match name {
             "install" => self.tool_install(args.get("apk").and_then(|v| v.as_str()).unwrap_or("")),
@@ -998,7 +1055,14 @@ impl AgentSession {
             "permissions_audit" => self.tool_permissions_audit(),
             "device_profile" => self.tool_device_profile(),
             "behavior_switches" => self.tool_behavior_switches(),
-            "runtime_health" => self.tool_runtime_health(),
+            "runtime_health" => {
+                if args.get("gc").and_then(|v| v.as_bool()) == Some(true) {
+                    if let Some(eng) = self.engine.as_mut() {
+                        eng.gc();
+                    }
+                }
+                self.tool_runtime_health()
+            }
             "compat_gaps" => self.tool_compat_gaps(),
             "batch" => self.tool_batch(
                 args.get("calls"),
@@ -1009,9 +1073,13 @@ impl AgentSession {
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as usize,
             ),
-            "notifications" => self.tool_notifications(),
+            "notifications" => self.tool_notifications(&args),
+            "component_service" | "widgets" | "widget_screenshot" | "ime" | "accessibility"
+            | "shortcuts" | "native_state" => self.tool_m9(name, &args),
             "get_api_usage" => self.tool_api_usage(args.get("package").and_then(|v| v.as_str())),
             "get_coverage" => self.tool_coverage(),
+            "observe" => self.tool_observe(&args),
+            "tap_text" => self.tool_tap_text(&args),
             other => {
                 return ToolResult::error(&agent_error(
                     "UNKNOWN_TOOL",
@@ -1020,10 +1088,31 @@ impl AgentSession {
                 ))
             }
         };
-        match res {
+        let mut out = match res {
             Ok(r) => r,
             Err(e) => ToolResult::error(&e),
+        };
+        self.screen_post_tool(name, &args, &mut out);
+        // safe point for the collector: no interpreter frame is live between
+        // tool calls (see rd-vm gc.rs); adaptive threshold, RD_GC=off disables
+        if let Some(eng) = self.engine.as_mut() {
+            if let Some(st) = eng.maybe_gc() {
+                let line = format!(
+                    "I/RdGc: freed {} objects / {} KB in {:.1} ms (live {}, heap {} -> {} KB)\n",
+                    st.last_freed_objects,
+                    st.last_freed_bytes / 1024,
+                    st.last_pause_ms,
+                    st.last_live_objects,
+                    st.last_used_before / 1024,
+                    st.last_used_after / 1024
+                );
+                self.logs
+                    .lock()
+                    .expect("logs")
+                    .extend_from_slice(line.as_bytes());
+            }
         }
+        out
     }
 
     // ── install / launch / input ────────────────────────────────────────────
@@ -1214,6 +1303,12 @@ impl AgentSession {
             eng.launch_app(&desc, &package_out, Vec::new())
         } else {
             let dexes = dexes_of_apk(&app.apk)?;
+            #[cfg(feature = "advanced-components")]
+            let notification_permission = app
+                .perms
+                .state("android.permission.POST_NOTIFICATIONS")
+                .map(|s| s.is_granted())
+                .unwrap_or(app.apk.manifest.target_sdk < 33);
             let resources = app.apk.clone();
             // M8 (38º gap): Application do manifest como no boot_app do CLI.
             let app_desc = resources.manifest.application.name.as_ref().map(|name| {
@@ -1226,9 +1321,20 @@ impl AgentSession {
             });
             let mut eng = Engine::new(dexes, VmConfig::default());
             eng.set_resources(resources);
+            #[cfg(feature = "advanced-components")]
+            eng.m9_set_notification_permission(notification_permission);
             if let Some(ad) = app_desc {
                 eng.set_application_class(ad);
             }
+            // perms.rs: checkSelfPermission/requestPermissions see the
+            // session's real grant state
+            eng.set_granted_permissions(
+                app.perms
+                    .all_states()
+                    .iter()
+                    .filter(|(_, s)| s.is_granted())
+                    .map(|(n, _)| n.clone()),
+            );
             let r = eng.launch_app(&desc, &package_out, Vec::new());
             if r.is_ok() {
                 self.engine = Some(eng);
@@ -1292,10 +1398,24 @@ impl AgentSession {
                 Some("divida em chamadas menores ou eleve RD_MCP_MAX_WAIT_MS no processo do servidor"),
             ));
         }
-        let ran = self
-            .require_engine()?
-            .advance_clock(ms)
-            .map_err(vm_exit_to_rd)?;
+        // Long waits advance in 512 ms slices (a multiple of the 16 ms vsync)
+        // with a collector safe point between slices: no interpreter frame
+        // and no host-held reference is live there, and runnables still run
+        // in deadline order. Keeps a long animation/coroutine burst from
+        // filling the heap inside one call.
+        const SLICE_MS: u64 = 512;
+        let eng = self.require_engine()?;
+        let mut ran = 0;
+        let mut left = ms;
+        loop {
+            let step = left.min(SLICE_MS);
+            ran += eng.advance_clock(step).map_err(vm_exit_to_rd)?;
+            left -= step;
+            if left == 0 {
+                break;
+            }
+            let _ = eng.maybe_gc();
+        }
         Ok(ToolResult::json(&serde_json::json!({
             "avancado_ms": ms,
             "runnables_executados": ran,
@@ -1420,6 +1540,8 @@ impl AgentSession {
     // ── observação ──────────────────────────────────────────────────────────
 
     fn tool_ui_tree(&mut self, format: &str) -> Result<ToolResult, RdError> {
+        // inspect a laid-out window (bounds are 0×0 before the first frame)
+        let _ = self.require_engine()?.ensure_laid_out();
         let tree: UiNode = self
             .require_engine()?
             .view_tree()
@@ -1443,14 +1565,18 @@ impl AgentSession {
     }
 
     fn tool_screenshot(&mut self, path: Option<&str>) -> Result<ToolResult, RdError> {
-        let tree = self.require_engine()?.view_tree().ok_or_else(|| {
-            agent_error(
+        if self.require_engine()?.view_tree().is_none() {
+            return Err(agent_error(
                 "INVALID_FORMAT",
                 "sem activity/window para screenshot",
                 None,
-            )
-        })?;
-        let png = rd_render::render_snapshot(&tree).to_png();
+            ));
+        }
+        // App-drawn content (Compose, custom views): the host draw pass is
+        // recorded once per frame version and the PNG cached until app code
+        // runs again (round 6) — repeated screenshots are free.
+        let png = self.screen_png()?;
+        let draw_warning = self.screen.draw_error.clone();
         match path {
             Some(p) if !p.is_empty() => {
                 // Controle M5: escrita de arquivo SÓ dentro do sandbox
@@ -1464,13 +1590,21 @@ impl AgentSession {
                     "size": [720, 1440],
                 })))
             }
-            _ => Ok(ToolResult {
-                content: vec![ToolContent::Image {
+            _ => {
+                let mut content = vec![ToolContent::Image {
                     data_b64: base64_encode(&png),
                     mime: "image/png",
-                }],
-                is_error: false,
-            }),
+                }];
+                if let Some(w) = draw_warning {
+                    content.push(ToolContent::Text(format!(
+                        "warning: draw pass failed — app-drawn content may be missing: {w}"
+                    )));
+                }
+                Ok(ToolResult {
+                    content,
+                    is_error: false,
+                })
+            }
         }
     }
 
@@ -1739,6 +1873,30 @@ impl AgentSession {
                 perms.revoke(permission).map_err(rd_to_rd)?
             }
         };
+        // keep the running engine's grant set in sync (perms.rs)
+        if self.engine_package == self.active {
+            let granted: Option<Vec<String>> = self.active.as_ref().and_then(|p| {
+                self.installed.iter().find(|a| &a.package == p).map(|a| {
+                    a.perms
+                        .all_states()
+                        .iter()
+                        .filter(|(_, s)| s.is_granted())
+                        .map(|(n, _)| n.clone())
+                        .collect()
+                })
+            });
+            if let (Some(e), Some(g)) = (self.engine.as_mut(), granted) {
+                e.set_granted_permissions(g);
+            }
+        }
+        #[cfg(feature = "advanced-components")]
+        if permission == "android.permission.POST_NOTIFICATIONS"
+            && self.engine_package == self.active
+        {
+            if let Some(e) = self.engine.as_mut() {
+                e.m9_set_notification_permission(st.is_granted());
+            }
+        }
         Ok(ToolResult::json(&serde_json::json!({
             "permission": permission,
             "state": grant_state_str(st),
@@ -1826,6 +1984,11 @@ impl AgentSession {
                 v["heap_peak_bytes"] = serde_json::json!(eng.heap_peak());
                 v["fuel_used"] = serde_json::json!(eng.fuel_used());
                 v["looper_pending"] = serde_json::json!(eng.looper_pending());
+                v["gc"] = serde_json::json!(eng.gc_stats());
+                #[cfg(feature = "jit")]
+                {
+                    v["jit"] = serde_json::json!(eng.jit_stats());
+                }
             }
             None => {
                 v["activity"] = serde_json::json!(Option::<String>::None);
@@ -1850,13 +2013,13 @@ impl AgentSession {
                 "java-util-collections",
                 "vm",
                 "partial",
-                "HashMap/WeakHashMap/ArrayList/LinkedList/CopyOnWriteArrayList host com métodos essenciais (put/get/add/remove/size/…); CopyOnWriteArraySet host com add que deduplica; subtipagem completa (check-cast p/ List/Set/Map/Collection/Iterable); LinkedHashMap host (≡ HashMap; estado Vec = ordem de inserção); entrySet/keySet/values (views snapshot HashSet) + Iterator host (hasNext/next; remove → UOE) + Map.Entry host (getKey/getValue/setValue); equals de usuário não consultado em chaves; Collections.synchronized* devolve a própria coleção (identidade — single-threaded); ArrayDeque host (Deque completo: addFirst/Last, push/pop, peek/poll, occurrences; null rejeitado, NSE em vazio); Collections.unmodifiableMap/unmodifiableSet/singletonList host: views de SNAPSHOT em classes-marcadoras JDK (Collections$UnmodifiableMap/$UnmodifiableSet/$SingletonList) — leituras delegam, mutações → UOE tipada, null → NPE, sem estado host → VM_TYPE_ERROR tipado; singletonList(null) aceito (JDK); empty*/outros unmodifiable* seguem fora. Set.<init>(Collection) host: snapshot dedup na ordem do iterador (NPE em null; VM_TYPE_ERROR sem estado host). Enum é host (name/ordinal/toString/compareTo — inclusive herdado por enums do app via subtipagem)",
+                "HashMap/WeakHashMap/ArrayList/LinkedList/CopyOnWriteArrayList host (WeakHashMap: chaves fracas, valores fortes, null permanente; limpeza no GC) com métodos essenciais (put/get/add/remove/size/…); CopyOnWriteArraySet host com add que deduplica; subtipagem completa (check-cast p/ List/Set/Map/Collection/Iterable); LinkedHashMap host (≡ HashMap; estado Vec = ordem de inserção); entrySet/keySet/values (views snapshot HashSet) + Iterator host (hasNext/next; remove escreve na coleção/mapa de origem com ISE antes de next e após remoção dupla; iteradores COW/imutáveis continuam UOE) + Map.Entry host (getKey/getValue/setValue); equals de usuário não consultado em chaves; Collections.synchronized* devolve a própria coleção (identidade — single-threaded); ArrayDeque host (Deque completo: addFirst/Last, push/pop, peek/poll, occurrences; null rejeitado, NSE em vazio); Collections.unmodifiableMap/unmodifiableSet/singletonList host: views de SNAPSHOT em classes-marcadoras JDK (Collections$UnmodifiableMap/$UnmodifiableSet/$SingletonList) — leituras delegam, mutações → UOE tipada, null → NPE, sem estado host → VM_TYPE_ERROR tipado; singletonList(null) aceito (JDK); empty*/outros unmodifiable* seguem fora. Set.<init>(Collection) host: snapshot dedup na ordem do iterador (NPE em null; VM_TYPE_ERROR sem estado host). Enum é host (name/ordinal/toString/compareTo — inclusive herdado por enums do app via subtipagem)",
             ),
             (
                 "java-lang-ref",
                 "vm",
                 "partial",
-                "WeakReference/SoftReference host (get/clear; referent vive até clear — sem GC na arena); ReferenceQueue permanentemente vazia (poll/remove → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). AtomicInteger é host (get/set/CAS/increment/add com overflow wrapping). Executors/ExecutorService são host com execução INLINE (single-threaded): submit devolve Future já completado; exceções do Runnable propagam na hora. Object.getClass/Class host (getName/getSimpleName/toString; identidade canônica). ConcurrentHashMap host (≡ HashMap; hierarquia JDK: AbstractMap direto + ConcurrentMap). LinkedBlockingQueue host (FIFO unbounded; take/poll bloqueante com fila vazia → IllegalStateException — fail-fast honesto anti-deadlock). ThreadLocal/InheritableThreadLocal host (get com initialValue DEX memoizado; set/remove; override vence). System.getProperty host (tabela da plataforma; desconhecida → null; (key,def) → def). Class.getClassLoader host (ClassLoader canônico por VM). System.getSecurityManager → null (Android não tem SecurityManager). ServiceLoader host com descoberta REAL: load(Class)/(Class,ClassLoader) lê META-INF/services/<binário> do APK anexado (# comenta; linhas vazias puladas); iterator() INSTANCIA os providers encontrados via DEX (clinit+<init>()V) e devolve iterador do snapshot (eager, não lazy como JDK — desvio documentado); provider ausente → ServiceConfigurationError tipado; sem APK/arquivo → loader vazio (hasNext false; next → NoSuchElementException). LinkedHashSet host preserva inserção e suporta init/add/remove/contains/size/clear/iterator. ClassLoader.getResources(String) host → Enumeration vazia (contrato JDK: nunca null; name null → NPE; cursor ≡ Iterator com hasMoreElements/nextElement e NoSuchElementException em vazio) — entries do APK não são enumerados como classpath e META-INF/services agora lido (ServiceLoader). ArrayList.<init>(Collection) host: snapshot na ordem do iterador da fonte (duplicatas preservadas; sem aliasing); fonte null → NPE; coleção do app sem estado host → VM_TYPE_ERROR tipado. Idem LinkedList/CopyOnWriteArrayList via helper compartilhado. LinkedBlockingQueue.drainTo(Collection)/(Collection,int) host: drena até max na ORDEM FIFO respeitando o add do destino (Set deduplica); retorno conta os retirados (JDK); null → NPE, drainTo(this) → IAE, max<=0 → 0, destino do app → VM_TYPE_ERROR tipado. Sequence java.util do launch real COMPLETA. Activity.getFragmentManager() host: FragmentManager legacy canônico por VM (identidade estável, lazy); estado de fragments (back stack/transações) ainda não existe. FragmentManager.findFragmentByTag(String)/findFragmentById(int) host → null enquanto não há transações committadas (contrato Android; tag null também devolve null). FragmentTransaction host: beginTransaction → tx nova; add(Fragment,String)/add(int,Fragment)/(int,Fragment,String)/replace/remove fluentes com ops pendentes; commit/commitAllowingStateLoss aplicam no registro (validação ANTES — sem aplicação parcial; Add de fragment já registrada → ISE; 2º commit/uso pós-commit → ISE; fragment null → NPE; commit devolve id opaco 0 — sem back stack/animations/lifecycle DEX). findFragmentByTag/Id consultam o registro (última registrada vence; containerId 0 nunca casa). Fragment.<init>()V host: no-op (a fragment do app chama o super via invokespecial — sem estado de ctor, como Activity/Application/Context). FragmentManager.executePendingTransactions() → false sempre (commit aplica sincronamente — nunca há fila pendente; AOSP \"nothing was executed\"). array.clone() host ([LX;/[I/...): shallow copy com mesmo descritor/ElemKind (JLS 10.7 — cobre values()/$VALUES.clone() de enums como androidx Lifecycle$Event). Enum.clone() → CloneNotSupportedException capturável (final na JDK/libcore — nunca copia). Regime pós-bootstrap: sondagem seguinte já mostra exceção Java materializada (NPE invoke receiver null) — próximas investigações pedem tracing de call site — ENTREGUE: VmConfig.exception_trace + rd app run --trace (linhas at estilo JVM no unwind, innermost-first; off por default — golden vectors intactos) e postmortem Engine::executed_labels (cobertura de entrada, AG-09) no VM_EXCEPTION com --trace — responde rodou/não-rodou após o engine morrer. Sondagem real: NPE pós-bootstrap localizado em androidx FragmentManager.dispatchCreate e o postmortem provou attachController/attachHost/FragmentActivity.init NUNCA executados (init registra OnContextAvailableListener→attachHost; o DEX de dispatchCreate chegou ao frame do NPE pelas linhas de trace) — androidx Fragments (attachController e cia.) era o suspeito — REVISADO na iteração seguinte: o problema NÃO era estado androidx ausente, e sim DOIS bugs de semântica DEX de invoke na VM: (1) invoke-super iniciava a busca em super(mref.class) em vez da super da classe definidora do frame (FragmentActivity.onCreate pulava androidx/activity/ComponentActivity.onCreate inteiro e attachHost nunca rodava), (2) as variantes /range de invoke-virtual (0x74) e invoke-direct (0x76) estavam TROCADAS (conforme spec Dalvik: 0x70/0x76=direct — ctor Kotlin de lambda FunctionReferenceImpl re-executava o próprio <init> em loop até VM_STACK_OVERFLOW/abort); + <init>()V no-op das coleções abstratas host (AbstractList e cia.) para subclasses DEX diretas. O launch real sai do NPE e do overflow e avança até Activity.getApplication() (próximo gap NOT_FOUND). empty* de Collections, Views live (não snapshot) e ctors de slices de coleções (ArrayList(Collection) etc. já cobertos; guarde Set/Map cobertos como snapshots) seguem fora. Rodada seguinte da cadeia real (todas ENTREGUES): getApplication/getApplicationContext → Application canônica do manifest; cadeia java.util do LogController (unmodifiableMap/singletonList/HashSet(Collection)/unmodifiableSet); PreferenceManager.getDefaultSharedPreferences → SharedPreferencesImpl vazio host (sem persistência; edit segue fora); ServiceLoader discovery real. Resultado: o launch executa PftpdApp.onCreate + LogController.init/readPrefs completos e morre em ClassCastException tipada (NOPLoggerFactory → LoggerContext) — o APK golden não embarca META-INF/services/strip do gradle; slf4j cai no fallback NOP e o cast incondicional do setActiveConfig é o comportamento-fiel que um dispositivo real também entregaria com este APK.",
+                "WeakReference/SoftReference host (get/clear); o GC mark-sweep limpa o referent de WeakReference/PhantomReference quando só ela o alcança (SoftReference fica forte) e, com fila registrada, a enfileira na ReferenceQueue (poll/remove não bloqueantes; vazia → null). AtomicReferenceFieldUpdater é host (newUpdater/get/set/CAS). AtomicInteger é host (get/set/CAS/increment/add com overflow wrapping). Executors/ExecutorService são host com execução INLINE (single-threaded): submit devolve Future já completado; exceções do Runnable propagam na hora. Object.getClass/Class host (getName/getSimpleName/toString; identidade canônica). ConcurrentHashMap host (≡ HashMap; hierarquia JDK: AbstractMap direto + ConcurrentMap). LinkedBlockingQueue host (FIFO unbounded; take/poll bloqueante com fila vazia → IllegalStateException — fail-fast honesto anti-deadlock). ThreadLocal/InheritableThreadLocal host (get com initialValue DEX memoizado; set/remove; override vence). System.getProperty host (tabela da plataforma; desconhecida → null; (key,def) → def). Class.getClassLoader host (ClassLoader canônico por VM). System.getSecurityManager → null (Android não tem SecurityManager). ServiceLoader host com descoberta REAL: load(Class)/(Class,ClassLoader) lê META-INF/services/<binário> do APK anexado (# comenta; linhas vazias puladas); iterator() INSTANCIA os providers encontrados via DEX (clinit+<init>()V) e devolve iterador do snapshot (eager, não lazy como JDK — desvio documentado); provider ausente → ServiceConfigurationError tipado; sem APK/arquivo → loader vazio (hasNext false; next → NoSuchElementException). LinkedHashSet host preserva inserção e suporta init/add/remove/contains/size/clear/iterator. ClassLoader.getResources(String) host → Enumeration vazia (contrato JDK: nunca null; name null → NPE; cursor ≡ Iterator com hasMoreElements/nextElement e NoSuchElementException em vazio) — entries do APK não são enumerados como classpath e META-INF/services agora lido (ServiceLoader). ArrayList.<init>(Collection) host: snapshot na ordem do iterador da fonte (duplicatas preservadas; sem aliasing); fonte null → NPE; coleção do app sem estado host → VM_TYPE_ERROR tipado. Idem LinkedList/CopyOnWriteArrayList via helper compartilhado. LinkedBlockingQueue.drainTo(Collection)/(Collection,int) host: drena até max na ORDEM FIFO respeitando o add do destino (Set deduplica); retorno conta os retirados (JDK); null → NPE, drainTo(this) → IAE, max<=0 → 0, destino do app → VM_TYPE_ERROR tipado. Sequence java.util do launch real COMPLETA. Activity.getFragmentManager() host: FragmentManager legacy canônico por VM (identidade estável, lazy); estado de fragments (back stack/transações) ainda não existe. FragmentManager.findFragmentByTag(String)/findFragmentById(int) host → null enquanto não há transações committadas (contrato Android; tag null também devolve null). FragmentTransaction host: beginTransaction → tx nova; add(Fragment,String)/add(int,Fragment)/(int,Fragment,String)/replace/remove fluentes com ops pendentes; commit/commitAllowingStateLoss aplicam no registro (validação ANTES — sem aplicação parcial; Add de fragment já registrada → ISE; 2º commit/uso pós-commit → ISE; fragment null → NPE; commit devolve id opaco 0 — sem back stack/animations/lifecycle DEX). findFragmentByTag/Id consultam o registro (última registrada vence; containerId 0 nunca casa). Fragment.<init>()V host: no-op (a fragment do app chama o super via invokespecial — sem estado de ctor, como Activity/Application/Context). FragmentManager.executePendingTransactions() → false sempre (commit aplica sincronamente — nunca há fila pendente; AOSP \"nothing was executed\"). array.clone() host ([LX;/[I/...): shallow copy com mesmo descritor/ElemKind (JLS 10.7 — cobre values()/$VALUES.clone() de enums como androidx Lifecycle$Event). Enum.clone() → CloneNotSupportedException capturável (final na JDK/libcore — nunca copia). Regime pós-bootstrap: sondagem seguinte já mostra exceção Java materializada (NPE invoke receiver null) — próximas investigações pedem tracing de call site — ENTREGUE: VmConfig.exception_trace + rd app run --trace (linhas at estilo JVM no unwind, innermost-first; off por default — golden vectors intactos) e postmortem Engine::executed_labels (cobertura de entrada, AG-09) no VM_EXCEPTION com --trace — responde rodou/não-rodou após o engine morrer. Sondagem real: NPE pós-bootstrap localizado em androidx FragmentManager.dispatchCreate e o postmortem provou attachController/attachHost/FragmentActivity.init NUNCA executados (init registra OnContextAvailableListener→attachHost; o DEX de dispatchCreate chegou ao frame do NPE pelas linhas de trace) — androidx Fragments (attachController e cia.) era o suspeito — REVISADO na iteração seguinte: o problema NÃO era estado androidx ausente, e sim DOIS bugs de semântica DEX de invoke na VM: (1) invoke-super iniciava a busca em super(mref.class) em vez da super da classe definidora do frame (FragmentActivity.onCreate pulava androidx/activity/ComponentActivity.onCreate inteiro e attachHost nunca rodava), (2) as variantes /range de invoke-virtual (0x74) e invoke-direct (0x76) estavam TROCADAS (conforme spec Dalvik: 0x70/0x76=direct — ctor Kotlin de lambda FunctionReferenceImpl re-executava o próprio <init> em loop até VM_STACK_OVERFLOW/abort); + <init>()V no-op das coleções abstratas host (AbstractList e cia.) para subclasses DEX diretas. O launch real sai do NPE e do overflow e avança até Activity.getApplication() (próximo gap NOT_FOUND). empty* de Collections, Views live (não snapshot) e ctors de slices de coleções (ArrayList(Collection) etc. já cobertos; guarde Set/Map cobertos como snapshots) seguem fora. Rodada seguinte da cadeia real (todas ENTREGUES): getApplication/getApplicationContext → Application canônica do manifest; cadeia java.util do LogController (unmodifiableMap/singletonList/HashSet(Collection)/unmodifiableSet); PreferenceManager.getDefaultSharedPreferences → SharedPreferencesImpl vazio host (sem persistência; edit segue fora); ServiceLoader discovery real. Resultado: o launch executa PftpdApp.onCreate + LogController.init/readPrefs completos e morre em ClassCastException tipada (NOPLoggerFactory → LoggerContext) — o APK golden não embarca META-INF/services/strip do gradle; slf4j cai no fallback NOP e o cast incondicional do setActiveConfig é o comportamento-fiel que um dispositivo real também entregaria com este APK.",
             ),
             (
                 "android-framework-clock",
@@ -1868,7 +2031,7 @@ impl AgentSession {
                 "notifications",
                 "ui",
                 "not-implemented",
-                "notificações entram no M9 (widgets/IME/notificações)",
+                "M9: channels, notification builders, PendingIntents, actions, listener callbacks, timeout/cancel and agent controls; platform visual notification shade not modeled",
             ),
             (
                 "invoke-string-args",
@@ -1886,7 +2049,7 @@ impl AgentSession {
                 "focus-model",
                 "input",
                 "partial",
-                "sem foco real (issue #54): type_text digita na primeira EditText visível+habilitada",
+                "M9 focused EditText with UTF-16 selection/composition; initial typing auto-focuses first visible enabled editor",
             ),
             (
                 "key-events",
@@ -1916,7 +2079,7 @@ impl AgentSession {
                 "ime-widgets",
                 "ui",
                 "not-implemented",
-                "IME e widgets entram no M9",
+                "M9 IME InputConnection and RemoteViews widget rendering; unsupported methods fail typed (docs/m9.md)",
             ),
         ];
         let gaps: Vec<serde_json::Value> = GAPS
@@ -2061,14 +2224,6 @@ impl AgentSession {
             },
             "steps": steps,
         })))
-    }
-
-    fn tool_notifications(&mut self) -> Result<ToolResult, RdError> {
-        Err(agent_error(
-            "NOT_IMPLEMENTED",
-            "notificações entram no M9 (widgets/IME/notificações) — fora do escopo do agente v1",
-            Some("acompanhe docs/ROADMAP.md (M9)"),
-        ))
     }
 
     /// AG-09 (metade estática): uso de APIs android.* referenciadas nos DEX.
@@ -2579,7 +2734,10 @@ fn handle_single(
             id,
             serde_json::json!({
                 "protocolVersion": PROTOCOL_VERSION,
-                "capabilities": { "tools": {} },
+                "capabilities": {
+                    "tools": {},
+                    "resources": { "subscribe": true, "listChanged": false },
+                },
                 "serverInfo": { "name": SERVER_NAME, "version": SERVER_VERSION },
             }),
         ))),
@@ -2600,7 +2758,9 @@ fn handle_single(
                 .to_string();
             let empty = serde_json::json!({});
             let args = msg.pointer("/params/arguments").unwrap_or(&empty);
-            let result = session.call_tool(&name, args);
+            let t0 = std::time::Instant::now();
+            let result = session.call_tool_isolated(&name, args);
+            session.screen_after_call(&name, t0.elapsed().as_secs_f64() * 1000.0);
             let content: Vec<serde_json::Value> = result
                 .content
                 .iter()
@@ -2628,6 +2788,30 @@ fn handle_single(
             Some(Ok(jsonrpc_result(id, result_json)))
         }
         "ping" => Some(Ok(jsonrpc_result(id, serde_json::json!({})))),
+        "resources/list" => Some(Ok(jsonrpc_result(id, AgentSession::resources_list()))),
+        "resources/templates/list" => Some(Ok(jsonrpc_result(
+            id,
+            serde_json::json!({ "resourceTemplates": [] }),
+        ))),
+        "resources/read" | "resources/subscribe" | "resources/unsubscribe" => {
+            let Some(uri) = msg.pointer("/params/uri").and_then(|v| v.as_str()) else {
+                return Some(Err(jsonrpc_error(
+                    id,
+                    -32602,
+                    "params.uri (string) é obrigatório",
+                )));
+            };
+            let r = match method {
+                "resources/read" => session.resource_read(uri),
+                m => session
+                    .resource_subscribe(uri, m == "resources/subscribe")
+                    .map(|()| serde_json::json!({})),
+            };
+            Some(match r {
+                Ok(v) => Ok(jsonrpc_result(id, v)),
+                Err((code, m)) => Err(jsonrpc_error(id, code, &m)),
+            })
+        }
         m if m.starts_with("notifications/") => None, // notificações conhecidas: silêncio
         other => {
             // issue #71: JSON-RPC 2.0 §4.1 — o servidor NÃO responde a
@@ -2641,7 +2825,7 @@ fn handle_single(
                 Some(Err(jsonrpc_error(
                     id,
                     -32601,
-                    &format!("método '{other}' não existe (initialize/tools/list/tools/call/ping)"),
+                    &format!("método '{other}' não existe (initialize/tools/list/tools/call/resources/list|read|subscribe|unsubscribe/ping)"),
                 )))
             }
         }
@@ -2659,10 +2843,25 @@ fn jsonrpc_error(id: Option<serde_json::Value>, code: i64, message: &str) -> ser
 /// Loop stdio: uma linha = uma mensagem (LSP-style). Termina em EOF.
 pub fn serve_stdio<R: std::io::Read, W: std::io::Write>(
     input: R,
+    output: W,
+) -> Result<(), RdError> {
+    serve_stdio_with(input, output, std::env::var("RD_MCP_LIVE").ok().as_deref())
+}
+
+/// [`serve_stdio`] with an optional live viewer address (`rd mcp --live`):
+/// a std-only HTTP server showing the current frame, visible texts and tap
+/// targets, updated after every tool call (long-poll, no polling storm).
+pub fn serve_stdio_with<R: std::io::Read, W: std::io::Write>(
+    input: R,
     mut output: W,
+    live: Option<&str>,
 ) -> Result<(), RdError> {
     let reader = std::io::BufReader::new(input);
     let mut session = AgentSession::new();
+    if let Some(addr) = live.filter(|a| !a.is_empty()) {
+        let local = session.enable_live(addr)?;
+        eprintln!("[rd mcp] live viewer: http://{local}/");
+    }
     for line in reader.lines() {
         let line = line.map_err(|e| RdError::new("IO_ERROR", format!("stdin: {e}"), MODULE_ID))?;
         if line.trim().is_empty() {
@@ -2678,9 +2877,18 @@ pub fn serve_stdio<R: std::io::Read, W: std::io::Write>(
                     .map_err(|e| RdError::new("IO_ERROR", format!("stdout: {e}"), MODULE_ID))?;
             }
         }
+        // server → client notifications (resources/updated) after the reply
+        for n in session.take_notifications() {
+            writeln!(output, "{n}")
+                .and_then(|()| output.flush())
+                .map_err(|e| RdError::new("IO_ERROR", format!("stdout: {e}"), MODULE_ID))?;
+        }
     }
     Ok(())
 }
+
+include!("m9_tools.rs");
+include!("observe.rs");
 
 #[cfg(test)]
 mod tests {
@@ -2867,6 +3075,189 @@ mod tests {
         (content, r.is_error)
     }
 
+    /// Round 6: the agent sees the screen without screenshots — `observe`
+    /// (text/json + diff), `tap_text`, cached screenshots, MCP resources with
+    /// subscriptions and `notifications/resources/updated`.
+    #[test]
+    fn observe_tap_text_and_screen_resources() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        let (v, err) = call(&mut s, "observe", serde_json::json!({}));
+        assert!(err, "observe sem app é erro tipado: {v}");
+        assert!(!call(&mut s, "install", serde_json::json!({"apk": apk_path})).1);
+        let r = s.call_tool("launch", &serde_json::json!({"observe": true}));
+        assert!(!r.is_error);
+        assert_eq!(r.content.len(), 2, "observe:true anexa o resumo");
+        match &r.content[1] {
+            ToolContent::Text(t) => assert!(t.contains("Olá do MCP"), "{t}"),
+            _ => panic!("resumo é texto"),
+        }
+        let (v, err) = call(&mut s, "observe", serde_json::json!({}));
+        assert!(!err);
+        let t = v.as_str().unwrap_or_default().to_string();
+        assert!(t.starts_with("frame v1"), "{t}");
+        assert!(t.contains("unchanged since last observe"), "{t}");
+        let (v, err) = call(&mut s, "observe", serde_json::json!({"format": "json"}));
+        assert!(!err);
+        assert_eq!(v["version"], 1);
+        assert_eq!(v["finished"], false);
+        assert!(
+            v["texts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|t| t["text"] == "Olá do MCP"),
+            "{v}"
+        );
+        let (v, err) = call(&mut s, "observe", serde_json::json!({"format": "xml"}));
+        assert!(err && v["code"] == "INVALID_FORMAT", "{v}");
+        // tap by label: a visible text resolves; a missing one lists texts
+        let (v, err) = call(
+            &mut s,
+            "tap_text",
+            serde_json::json!({"text": "olá   do mcp"}),
+        );
+        assert!(!err, "tap_text: {v}");
+        assert_eq!(v["label"], "Olá do MCP");
+        let (v, err) = call(
+            &mut s,
+            "tap_text",
+            serde_json::json!({"text": "nao existe"}),
+        );
+        assert!(err && v["code"] == "VIEW_NOT_FOUND", "{v}");
+        assert!(
+            v["suggestion"].as_str().unwrap().contains("Olá do MCP"),
+            "{v}"
+        );
+        let (v, err) = call(&mut s, "tap_text", serde_json::json!({}));
+        assert!(err && v["code"] == "INVALID_FORMAT", "{v}");
+        // screenshot twice: same frame version → identical cached PNG
+        let a = s.call_tool("screenshot", &serde_json::json!({}));
+        let b = s.call_tool("screenshot", &serde_json::json!({}));
+        match (&a.content[0], &b.content[0]) {
+            (ToolContent::Image { data_b64: x, .. }, ToolContent::Image { data_b64: y, .. }) => {
+                assert_eq!(x, y)
+            }
+            _ => panic!("screenshot devolve imagem"),
+        }
+        // resources over JSON-RPC
+        let rpc = |s: &mut AgentSession, m: &str| -> serde_json::Value {
+            match handle_message(s, m) {
+                Some(Ok(v)) | Some(Err(v)) => v,
+                None => serde_json::json!(null),
+            }
+        };
+        let init = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#,
+        );
+        assert_eq!(
+            init["result"]["capabilities"]["resources"]["subscribe"],
+            true
+        );
+        let l = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":2,"method":"resources/list"}"#,
+        );
+        let uris: Vec<&str> = l["result"]["resources"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|r| r["uri"].as_str())
+            .collect();
+        assert!(
+            uris.contains(&"rustydroid://screen") && uris.contains(&"rustydroid://screen.png"),
+            "{l}"
+        );
+        let rd = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"rustydroid://screen.txt"}}"#,
+        );
+        assert!(
+            rd["result"]["contents"][0]["text"]
+                .as_str()
+                .unwrap()
+                .contains("Olá do MCP"),
+            "{rd}"
+        );
+        let png = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":4,"method":"resources/read","params":{"uri":"rustydroid://screen.png"}}"#,
+        );
+        assert!(png["result"]["contents"][0]["blob"].as_str().unwrap().len() > 1000);
+        let bad = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":5,"method":"resources/read","params":{"uri":"rustydroid://nope"}}"#,
+        );
+        assert_eq!(bad["error"]["code"], -32002, "{bad}");
+        let bad = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":6,"method":"resources/subscribe","params":{"uri":"rustydroid://logs"}}"#,
+        );
+        assert_eq!(bad["error"]["code"], -32602, "{bad}");
+        let ok = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":7,"method":"resources/subscribe","params":{"uri":"rustydroid://screen"}}"#,
+        );
+        assert!(ok["result"].is_object(), "{ok}");
+        let _ = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"wait","arguments":{"ms":16}}}"#,
+        );
+        let n = s.take_notifications();
+        assert_eq!(
+            n.len(),
+            1,
+            "primeira versão observada após assinar → 1 aviso: {n:?}"
+        );
+        assert_eq!(n[0]["method"], "notifications/resources/updated");
+        assert_eq!(n[0]["params"]["uri"], "rustydroid://screen");
+        // same visible content → no further notification
+        let _ = rpc(
+            &mut s,
+            r#"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"wait","arguments":{"ms":16}}}"#,
+        );
+        assert!(s.take_notifications().is_empty());
+        // tools/list exposes the optional `observe` flag on action tools
+        let defs = tool_defs();
+        let tap = defs.iter().find(|d| d.name == "tap").unwrap();
+        assert!(tap.schema["properties"]["observe"].is_object());
+    }
+
+    /// Round 6: the live viewer serves the page, the state (long-poll) and
+    /// the frame PNG over plain HTTP.
+    #[test]
+    fn live_viewer_serves_page_state_and_frame() {
+        use std::io::{Read, Write};
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let mut s = AgentSession::new();
+        let addr = s.enable_live("127.0.0.1:0").expect("bind");
+        let get = |path: &str| -> String {
+            let mut c = std::net::TcpStream::connect(addr).expect("connect");
+            write!(c, "GET {path} HTTP/1.1\r\nHost: x\r\n\r\n").unwrap();
+            let mut out = Vec::new();
+            c.read_to_end(&mut out).unwrap();
+            String::from_utf8_lossy(&out).to_string()
+        };
+        assert!(get("/").contains("RustyDroid"));
+        assert!(
+            get("/frame.png").starts_with("HTTP/1.1 204"),
+            "sem frame ainda"
+        );
+        assert!(!call(&mut s, "install", serde_json::json!({"apk": apk_path})).1);
+        let msg = r#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"launch","arguments":{}}}"#;
+        assert!(handle_message(&mut s, msg).is_some());
+        let st = get("/state.json?since=0");
+        assert!(
+            st.contains("Olá do MCP") && st.contains("\"last_tool\":\"launch\""),
+            "{st}"
+        );
+        assert!(get("/frame.png").contains("image/png"));
+        assert!(get("/nope").starts_with("HTTP/1.1 404"));
+    }
+
     /// DoD M5 na unidade: instala → executa → navega → assera SÓ com as tools.
     #[test]
     fn golden_flow_install_launch_navigate_assert() {
@@ -2970,12 +3361,12 @@ mod tests {
 
     /// notifications tool: honesta NOT_IMPLEMENTED (M9).
     #[test]
-    fn notifications_is_typed_not_implemented() {
+    fn notifications_without_running_app_is_typed() {
         let _guard = SESSION_LOCK.lock().unwrap();
         let mut s = AgentSession::new();
         let (v, err) = call(&mut s, "notifications", serde_json::json!({}));
         assert!(err);
-        assert_eq!(v["code"], "NOT_IMPLEMENTED");
+        assert_eq!(v["code"], "NOT_RUNNING");
     }
 
     /// AG-09 (metade estática): get_api_usage reporta as APIs android.* que o
@@ -3092,8 +3483,8 @@ mod tests {
         let tools = r["result"]["tools"].as_array().expect("tools");
         assert_eq!(
             tools.len(),
-            32,
-            "catálogo completo: 30 do M5 + get_api_usage/get_coverage (AG-09)"
+            41,
+            "catálogo completo: M5 + AG-09 + M9 + round 6 observe/tap_text (41 tools)"
         );
         for t in tools {
             assert!(t["name"].as_str().is_some());
@@ -3196,7 +3587,7 @@ mod tests {
         assert_eq!(arr.len(), 2);
         assert_eq!(
             arr[0]["result"]["tools"].as_array().expect("tools").len(),
-            32
+            41
         );
         assert_eq!(arr[1]["result"]["serverInfo"]["name"], SERVER_NAME);
     }
@@ -4208,7 +4599,7 @@ mod tests {
         let _guard = SESSION_LOCK.lock().unwrap();
         let mut s = AgentSession::new();
         let defs = tool_defs();
-        assert_eq!(defs.len(), 32);
+        assert_eq!(defs.len(), 41);
         for t in &defs {
             // schema: objeto com properties/required consistentes
             assert!(t.schema["type"] == "object", "{}: schema object", t.name);
@@ -4745,5 +5136,107 @@ mod tests {
                 std::fs::write(&path, &generated).expect("gera docs na primeira execução");
             }
         }
+    }
+    /// M9: the agent drives the SAME component state the app APIs use —
+    /// component activation from the manifest, IME, accessibility, widgets,
+    /// notification permission sync and shortcuts.
+    #[cfg(feature = "advanced-components")]
+    #[test]
+    fn m9_agent_tools_drive_components() {
+        let _guard = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mut s = AgentSession::new();
+        let apk = fixture_apk_write(rd_testsupport::m9_app::apk());
+        install_ok(&mut s, &apk);
+        launch_ok(&mut s, serde_json::json!({}));
+        // undeclared component is refused
+        let (v, err) = call(
+            &mut s,
+            "component_service",
+            serde_json::json!({"class":"test.m9.Nope","role":"ime"}),
+        );
+        assert!(err, "{v}");
+        let (v, err) = call(
+            &mut s,
+            "component_service",
+            serde_json::json!({"class":"test.m9.Accessibility","role":"accessibility"}),
+        );
+        assert!(!err, "{v}");
+        let (tree, err) = call(
+            &mut s,
+            "accessibility",
+            serde_json::json!({"action":"tree"}),
+        );
+        assert!(!err, "{tree}");
+        let editor = tree["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|n| n["editable"] == true)
+            .expect("editable")["id"]
+            .as_u64()
+            .unwrap();
+        let (v, err) = call(
+            &mut s,
+            "ime",
+            serde_json::json!({"action":"focus","view":editor}),
+        );
+        assert!(!err, "{v}");
+        let (v, err) = call(
+            &mut s,
+            "ime",
+            serde_json::json!({"action":"commit","text":"!"}),
+        );
+        assert!(!err, "{v}");
+        assert_eq!(v["text"], "A😀B!");
+        let (v, err) = call(
+            &mut s,
+            "accessibility",
+            serde_json::json!({"action":"perform","node":editor,"action_id":2097152,"text":"set"}),
+        );
+        assert!(!err && v["performed"] == true, "{v}");
+        let (v, _) = call(
+            &mut s,
+            "accessibility",
+            serde_json::json!({"action":"events"}),
+        );
+        assert!(!v["events"].as_array().unwrap().is_empty());
+        // widgets: allocate + bind a declared provider (DEX onUpdate runs)
+        let (p, err) = call(
+            &mut s,
+            "component_service",
+            serde_json::json!({"class":"test.m9.Widget","role":"widget"}),
+        );
+        assert!(!err, "{p}");
+        let (w, err) = call(&mut s, "widgets", serde_json::json!({"action":"allocate"}));
+        assert!(!err, "{w}");
+        let (v, err) = call(
+            &mut s,
+            "widgets",
+            serde_json::json!({"action":"bind","id":w["id"],"provider":p["object"]}),
+        );
+        assert!(!err, "{v}");
+        // notification permission (targetSdk 34) syncs into the running engine
+        let (v, _) = call(&mut s, "notifications", serde_json::json!({}));
+        assert_eq!(v["permission_granted"], false, "{v}");
+        let (_, err) = call(
+            &mut s,
+            "permissions_grant",
+            serde_json::json!({"permission":"android.permission.POST_NOTIFICATIONS"}),
+        );
+        assert!(!err);
+        let (v, _) = call(&mut s, "notifications", serde_json::json!({}));
+        assert_eq!(v["permission_granted"], true, "{v}");
+        let (v, err) = call(
+            &mut s,
+            "shortcuts",
+            serde_json::json!({"action":"launch","id":"missing"}),
+        );
+        assert!(err, "{v}");
+        let (v, err) = call(
+            &mut s,
+            "ime",
+            serde_json::json!({"action":"select","start":-1,"end":0}),
+        );
+        assert!(err, "{v}");
     }
 }

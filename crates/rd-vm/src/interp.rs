@@ -27,6 +27,20 @@ const ASC: &str = "Ljava/lang/ArrayStoreException;";
 const OOME: &str = "Ljava/lang/OutOfMemoryError;";
 
 /// Executa um frame; `ins` já está em forma de registradores (wide = par).
+/// Live call stack (innermost first, capped) appended to VM_FUEL so an agent
+/// can see WHERE a guest spins instead of only that it did.
+fn fuel_stack(vm: &Engine) -> String {
+    let mut out = String::from("; pilha no esgotamento (innermost primeiro):");
+    for l in vm.frame_labels.iter().rev().take(24) {
+        out.push_str("\n  at ");
+        out.push_str(l);
+    }
+    if vm.frame_labels.len() > 24 {
+        out.push_str(&format!("\n  ... +{} frames", vm.frame_labels.len() - 24));
+    }
+    out
+}
+
 pub(crate) fn exec_frame(
     vm: &mut Engine,
     dex_idx: usize,
@@ -58,11 +72,15 @@ pub(crate) fn exec_frame(
     'main: loop {
         // fuel por instrução (contra loop infinito em código hostil)
         vm.fuel_used += 1;
-        if vm.fuel_used > vm.config.fuel {
+        if vm.fuel_used.saturating_sub(vm.fuel_window_start) > vm.config.fuel {
             return Err(err::with_suggestion(
                 err::vm_error(
                     "VM_FUEL",
-                    format!("execução excedeu {} instruções", vm.config.fuel),
+                    format!(
+                        "execução excedeu {} instruções{}",
+                        vm.config.fuel,
+                        fuel_stack(vm)
+                    ),
                 ),
                 "aumente --fuel ou revise o método executado",
             )
@@ -70,8 +88,24 @@ pub(crate) fn exec_frame(
         }
 
         let cur_pc = pc;
+        vm.last_pc = cur_pc;
         let idx = lookup(&code.instructions, cur_pc)?;
         let insn = &code.instructions[idx].1;
+        // Suspended callers must publish roots before any path that can
+        // initialize a class or invoke guest code. Current roots are also
+        // refreshed whenever allocation pressure requests collection.
+        let may_call = matches!(insn.opcode, 0x22 | 0x60..=0x78);
+        let collect = vm.gc_due();
+        if may_call || collect {
+            vm.publish_frame_roots(
+                &regs,
+                &last_result,
+                pending_exc.as_ref().and_then(|e| e.obj),
+            );
+        }
+        if collect {
+            vm.maybe_gc();
+        }
         pc += insn.size as usize;
 
         // captura exceção Java no frame atual (try/catch); sem handler → caller
@@ -288,15 +322,10 @@ pub(crate) fn exec_frame(
                     ))
                     .into());
                 }
-                let name_r = intrinsics::alloc_string(vm, desc)?;
-                // issue #49: OOM aqui é OutOfMemoryError capturável (não run-killer)
-                let r = step!(vm
-                    .heap
-                    .alloc_instance(
-                        "Ljava/lang/Class;".to_string(),
-                        vec![("name".to_string(), Value::Obj(name_r))],
-                    )
-                    .map_err(oom_exception));
+                // canonical Class object: `Foo.class == foo.getClass()` and
+                // `Foo.class == Foo.class` (identity keys in AndroidX/Compose).
+                // OOM surfaces as a catchable OutOfMemoryError (issue #49).
+                let r = step!(vm.class_object_for(&desc));
                 regs[*a as usize] = Value::Obj(r);
             }
 
@@ -785,6 +814,42 @@ pub(crate) fn exec_frame(
                     let unit = step!(vm.time_unit_obj(&fname));
                     vm.statics
                         .insert((owner.clone(), fname.clone()), Value::Obj(unit));
+                }
+                // JDK constants not backed by any DEX (Boolean.TRUE/FALSE,
+                // MAX_VALUE, NaN, ...) are materialized on first read.
+                if !vm.statics.contains_key(&(owner.clone(), fname.clone())) {
+                    if let Some(c) = step!(crate::boxes::host_static(vm, &owner, &fname)) {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
+                        step!(crate::jnormalizer::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
+                        step!(crate::jbigdecimal::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
+                        step!(crate::jtext_format::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
+                        step!(crate::android_colorspace::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
+                        step!(crate::android_build::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) = step!(crate::graphics::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
+                        step!(crate::platform_base::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) = step!(crate::jtime::host_static(vm, &owner, &fname)) {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    }
                 }
                 let v = vm
                     .statics
@@ -1401,6 +1466,20 @@ fn do_invoke(
     slots: &[Value],
 ) -> Result<Value, VmExit> {
     let mref = vm.cp.method_ref(dex_idx, method_idx)?;
+    // Host dispatch (intrinsics, m8/m9, framework, native loader) receives
+    // LOGICAL arguments: one Value per parameter. Register slots carry a
+    // WideHi placeholder after each long/double, so before this a host
+    // reading a parameter after a wide one saw WideHi. For example
+    // AtomicLongFieldUpdater.compareAndSet(o, J, J) wrote 0 on every CAS,
+    // which made kotlinx.coroutines' lock-free queue spin forever.
+    // DEX callees still get the raw register form.
+    let raw = slots;
+    let logical: Vec<Value> = slots
+        .iter()
+        .filter(|v| !matches!(v, Value::WideHi))
+        .cloned()
+        .collect();
+    let slots: &[Value] = &logical;
     // DEX opcodes (Dalvik spec): 6E virtual · 6F super · 70 direct ·
     // 71 static · 72 interface · 74 virtual/range · 75 super/range ·
     // 76 direct/range · 77 static/range · 78 interface/range.
@@ -1417,6 +1496,15 @@ fn do_invoke(
 
     // static: intrínsecos de plataforma primeiro
     if is_static {
+        if let Some(v) =
+            intrinsics::call_native_loader(vm, &mref.class, &mref.name, &mref.proto, slots)?
+        {
+            return Ok(v);
+        }
+        #[cfg(feature = "advanced-components")]
+        if let Some(v) = crate::m9::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)? {
+            return Ok(v);
+        }
         if let Some(v) =
             intrinsics::call_static_intrinsic(vm, &mref.class, &mref.name, &mref.proto, slots)?
         {
@@ -1461,7 +1549,7 @@ fn do_invoke(
             )
             .into());
         }
-        return vm.call(d2, def, &m, slots.to_vec());
+        return vm.call(d2, def, &m, raw.to_vec());
     }
 
     // não-static: receiver é o primeiro slot
@@ -1499,6 +1587,36 @@ fn do_invoke(
     )? {
         return Ok(v);
     }
+    // Covariant bridge: `Appendable.append(..)Appendable` on a host
+    // StringBuilder (or any host method whose declared return is a supertype
+    // of the receiver) matches the intrinsic declared with the receiver type.
+    if let Some((params, ret)) = mref.proto.rsplit_once(')') {
+        if ret.starts_with('L')
+            && ret != recv_class
+            && vm.cp.find_class(&recv_class).is_none()
+            && vm.cp.is_subtype(&recv_class, ret)
+        {
+            let bridged = format!("{params}){recv_class}");
+            if let Some(v) = intrinsics::call_instance_intrinsic_mref(
+                vm,
+                &recv_class,
+                &recv_class,
+                &mref.name,
+                &bridged,
+                recv,
+                &slots[1..],
+            )? {
+                return Ok(v);
+            }
+        }
+    }
+
+    #[cfg(feature = "advanced-components")]
+    if let Some(v) =
+        crate::m9::call_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+    {
+        return Ok(v);
+    }
 
     // M8: compat real — host sequestra só os métodos listados em m8.rs;
     // `None` cai para o DEX real da biblioteca (androidx/okhttp no APK).
@@ -1520,9 +1638,33 @@ fn do_invoke(
             &slots[1..],
         )? {
             Some(v) => Ok(v),
-            None => Err(
-                crate::classpath::unresolved_method(&mref.class, &mref.name, &mref.proto).into(),
-            ),
+            // last resort: general View property store (view_props.rs)
+            None => match crate::view_props::fallback(
+                vm,
+                &mref.class,
+                &mref.name,
+                &mref.proto,
+                recv,
+                &slots[1..],
+            )? {
+                Some(v) => Ok(v),
+                // No host model: virtual/interface dispatch on the receiver's
+                // own DEX class (an app class implementing a platform
+                // interface, e.g. Choreographer.FrameCallback.doFrame).
+                None => match (!is_direct && !is_super)
+                    .then(|| vm.cp.resolve_method(&recv_class, &mref.name, &mref.proto))
+                    .flatten()
+                {
+                    Some((d2, def, m)) => vm.call(d2, def, &m, raw.to_vec()),
+                    None => Err(crate::classpath::unresolved_method_on(
+                        &mref.class,
+                        &recv_class,
+                        &mref.name,
+                        &mref.proto,
+                    )
+                    .into()),
+                },
+            },
         };
     }
 
@@ -1556,7 +1698,7 @@ fn do_invoke(
             crate::classpath::unresolved_method(&start_class, &mref.name, &mref.proto).into(),
         );
     };
-    vm.call(d2, def, &m, slots.to_vec())
+    vm.call(d2, def, &m, raw.to_vec())
 }
 
 /// Renderização do resultado para humano/JSON do CLI (formato Java).

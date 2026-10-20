@@ -3894,13 +3894,25 @@ fn collection_views_and_iterators() {
         }
         other => panic!("esperava NSE, got {other:?}"),
     }
-    // remove do iterator → UnsupportedOperationException
-    match call_instance_intrinsic(&mut e, IT, "remove", "()V", it, &[]) {
-        Err(rd_vm::err::VmExit::Exception(t)) => {
-            assert_eq!(t.class, "Ljava/lang/UnsupportedOperationException;")
-        }
-        other => panic!("esperava UOE, got {other:?}"),
-    }
+    // A failed next() does not invalidate the last successful element.
+    // remove writes through to the map; then restore the fixture for views.
+    assert_eq!(
+        call_instance_intrinsic(&mut e, IT, "remove", "()V", it, &[]).unwrap(),
+        Some(Value::Null)
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut e, HM, "size", "()I", m, &[]).unwrap(),
+        Some(Value::Int(1))
+    );
+    call_instance_intrinsic(
+        &mut e,
+        HM,
+        "put",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+        m,
+        &[Value::Obj(k2), Value::Obj(v2)],
+    )
+    .unwrap();
 
     // keySet / values
     let ks = call_instance_intrinsic(&mut e, HM, "keySet", "()Ljava/util/Set;", m, &[]).unwrap();

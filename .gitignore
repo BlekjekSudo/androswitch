@@ -45,3 +45,6 @@ crates/*/fuzz/corpus
 
 # local fuzz campaign logs (scripts/fuzz-campaign.sh)
 fuzz-logs/
+
+# Native ABI fixtures are rebuilt from source
+/golden/native/artifacts/

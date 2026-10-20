@@ -130,6 +130,8 @@ pub struct M8State {
     pub cursors: HashMap<ObjRef, CursorState>,
     pub content_values: HashMap<ObjRef, Vec<(String, Value)>>,
     pub helpers_db: HashMap<ObjRef, String>,
+    /// Real-SQLite backend state (jsqlite).
+    pub sqlx: crate::jsqlite::SqlState,
     pub uris: HashMap<ObjRef, String>,
     pub intents: HashMap<ObjRef, IntentState>,
     pub started_services: Vec<String>,
@@ -188,7 +190,7 @@ fn astr(vm: &mut Engine, s: String) -> Result<Value, VmExit> {
     Ok(Value::Obj(intrinsics::alloc_string(vm, s)?))
 }
 /// Invoca método DEX (virtual, pela classe do receiver) se declarado.
-fn call_dex(
+pub(crate) fn call_dex(
     vm: &mut Engine,
     recv: ObjRef,
     name: &str,
@@ -264,6 +266,13 @@ impl Engine {
             }
         }
     }
+    /// Use the built-in SQL subset instead of the real SQLite backend
+    /// (`jsqlite`) for this engine — same as `RD_SQLITE=subset`, without
+    /// touching the process environment. Tests that inspect
+    /// [`Engine::m8_database`] need it: only the subset fills that model.
+    pub fn use_sqlite_subset(&mut self) {
+        self.fw.m8.sqlx.unavailable = true;
+    }
     pub fn m8_database(&self, name: &str) -> Option<&Database> {
         self.fw.m8.databases.get(name)
     }
@@ -286,6 +295,25 @@ pub fn call_m8_static(
     _sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_m8_static_rooted(vm, class, name, _sig, args))
+}
+
+fn call_m8_static_rooted(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    _sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if let Some(v) = crate::android_drawable::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_uri::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::jsqlite::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
     match (class, name) {
         // Android Process host (probe Breezy Weather): ids determinísticos.
         ("Landroid/os/Process;", "myPid") => Ok(Some(Value::Int(10000))),
@@ -343,7 +371,30 @@ pub fn call_m8_instance(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_m8_instance_rooted(vm, mref_class, name, sig, recv, args))
+}
+
+fn call_m8_instance_rooted(
+    vm: &mut Engine,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     let recv_class = vm.heap.class_of(recv).unwrap_or("").to_string();
+    // ── Drawable family / ColorStateList (android_drawable.rs) ──────────
+    if let Some(v) = crate::android_drawable::instance_intrinsic(
+        vm,
+        &recv_class,
+        mref_class,
+        name,
+        sig,
+        recv,
+        args,
+    )? {
+        return Ok(Some(v));
+    }
     // ── Fragments androidx ──────────────────────────────────────────────
     if mref_class == "Landroidx/fragment/app/FragmentManager;"
         || recv_class == "Landroidx/fragment/app/FragmentManager;"
@@ -420,7 +471,23 @@ pub fn call_m8_instance(
         return dialog(vm, name, sig, recv, args, true);
     }
     // ── SQLite ──────────────────────────────────────────────────────────
-    if mref_class == SQLITE_HELPER || vm.cp.is_subtype(&recv_class, SQLITE_HELPER) {
+    // Real SQLite backend first (jsqlite); the subset below is the fallback.
+    if mref_class.starts_with("Landroid/database/")
+        || recv_class.starts_with("Landroid/database/")
+        || vm.cp.is_subtype(&recv_class, SQLITE_HELPER)
+    {
+        if let Some(v) =
+            crate::jsqlite::instance_intrinsic(vm, &recv_class, mref_class, name, sig, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
+    // A DEX subclass's own methods (its constructor, overrides) run as DEX;
+    // the host model only answers calls that land on SQLiteOpenHelper.
+    if mref_class == SQLITE_HELPER
+        || (vm.cp.is_subtype(&recv_class, SQLITE_HELPER)
+            && vm.cp.resolve_method(mref_class, name, sig).is_none())
+    {
         return sqlite_helper(vm, name, sig, recv, args);
     }
     if mref_class == SQLITE_DB || recv_class == SQLITE_DB {
@@ -479,8 +546,19 @@ pub fn call_m8_instance(
         return file_host(vm, name, recv, args);
     }
     // ── Uri (instância) ─────────────────────────────────────────────────
-    if mref_class == URI || recv_class == URI {
-        return uri_instance(vm, name, recv, args);
+    if mref_class == URI
+        || recv_class == URI
+        || mref_class == "Landroid/net/Uri$Builder;"
+        || recv_class == "Landroid/net/Uri$Builder;"
+    {
+        if let Some(v) =
+            crate::android_uri::instance_intrinsic(vm, &recv_class, mref_class, name, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+        if mref_class == URI || recv_class == URI {
+            return uri_instance(vm, name, recv, args);
+        }
     }
     // ── JobScheduler ────────────────────────────────────────────────────
     if mref_class == JOB_SCHEDULER || recv_class == JOB_SCHEDULER {
@@ -491,10 +569,31 @@ pub fn call_m8_instance(
         return intent_m8(vm, name, sig, recv, args);
     }
     // ── Context.getSystemService (probe real Breezy Weather) ───────────
+    if name == "getSystemServiceName" && sig == "(Ljava/lang/Class;)Ljava/lang/String;" {
+        let cls = match args.first() {
+            Some(Value::Obj(c)) => match vm.heap.get_field(*c, "class_name") {
+                Ok(Value::Obj(s)) => vm
+                    .heap
+                    .as_str(s)
+                    .ok()
+                    .map(str::to_string)
+                    .unwrap_or_default(),
+                _ => String::new(),
+            },
+            _ => String::new(),
+        };
+        return Ok(Some(match SERVICES.iter().find(|(_, c)| *c == cls) {
+            Some((n, _)) => Value::Obj(crate::intrinsics::alloc_string(vm, n.to_string())?),
+            None => Value::Null,
+        }));
+    }
     if name == "getSystemService"
         && (mref_class == "Landroid/content/Context;"
             || mref_class == "Landroid/app/Activity;"
-            || mref_class == "Landroid/app/Application;")
+            || mref_class == "Landroid/app/Application;"
+            || mref_class == "Landroid/content/ContextWrapper;"
+            || mref_class == "Landroid/view/ContextThemeWrapper;"
+            || mref_class == "Landroid/app/Service;")
     {
         let key = if sig.contains("Ljava/lang/Class;") {
             match args.first() {
@@ -515,8 +614,25 @@ pub fn call_m8_instance(
         } else {
             sarg(vm, args, 0)?.unwrap_or_default()
         };
-        let class = system_service_class(&key);
-        let r = alloc(vm, class)?;
+        // Class-keyed lookups return exactly that class; services are
+        // per-class singletons (AOSP caches them per Context).
+        let class = if key.starts_with('L')
+            && key.ends_with(';')
+            && system_service_class(&key) == "Ljava/lang/Object;"
+        {
+            key.clone()
+        } else {
+            system_service_class(&key).to_string()
+        };
+        if class == "Ljava/lang/Object;" {
+            return Ok(Some(Value::Null)); // unknown service name → null, as AOSP
+        }
+        let k = ("Lrd/SystemServices;".to_string(), class.clone());
+        if let Some(v) = vm.statics.get(&k) {
+            return Ok(Some(v.clone()));
+        }
+        let r = alloc(vm, &class)?;
+        vm.statics.insert(k, Value::Obj(r));
         return Ok(Some(Value::Obj(r)));
     }
     // ── Context: services / broadcasts / receivers ─────────────────────
@@ -756,7 +872,82 @@ fn dialog(
     };
     map.entry(recv).or_default();
     match name {
-        "<init>" => Ok(Some(Value::Null)),
+        "<init>" => {
+            if !is_builder {
+                if let Some(ctx) = oarg(args, 0) {
+                    vm.view_props
+                        .insert((recv, "dlg:context".to_string()), Value::Obj(ctx));
+                }
+            }
+            Ok(Some(Value::Null))
+        }
+        "getContext" if !is_builder => Ok(Some(
+            vm.view_props
+                .get(&(recv, "dlg:context".to_string()))
+                .cloned()
+                .unwrap_or(Value::Null),
+        )),
+        // AOSP Dialog lifecycle hooks: the base implementations are empty
+        "onCreate" | "onStart" | "onStop" if !is_builder => Ok(Some(Value::Null)),
+        // AOSP Dialog.onTouchEvent: a DOWN outside the window cancels a
+        // cancelable dialog when canceledOnTouchOutside (dialog themes'
+        // windowCloseOnTouchOutside default) — the caller only delivers
+        // events that fell outside the dialog's window
+        "onTouchEvent" if !is_builder => {
+            let action = match oarg(args, 0) {
+                Some(ev) => vm
+                    .invoke_instance(ev, "getActionMasked", "()I", &[])?
+                    .as_int()
+                    .unwrap_or(-1),
+                None => -1,
+            };
+            let cancelable = !vm
+                .view_props
+                .contains_key(&(recv, "dlg:noCancel".to_string()));
+            let outside = !vm
+                .view_props
+                .contains_key(&(recv, "dlg:noOutside".to_string()));
+            let showing = vm.fw.m8.dialogs.get(&recv).is_some_and(|d| d.showing);
+            if action == 0 && cancelable && outside && showing {
+                dialog_set_showing(vm, recv, false)?;
+                return Ok(Some(Value::Int(1)));
+            }
+            Ok(Some(Value::Int(0)))
+        }
+        "setCanceledOnTouchOutside" if !is_builder => {
+            let k = (recv, "dlg:noOutside".to_string());
+            if iarg(args, 0) == 0 {
+                vm.view_props.insert(k, Value::Int(1));
+            } else {
+                vm.view_props.remove(&k);
+            }
+            Ok(Some(Value::Null))
+        }
+        "onSaveInstanceState" if !is_builder => {
+            const BUNDLE: &str = "Landroid/os/Bundle;";
+            let b = vm.heap.alloc_instance(BUNDLE.to_string(), Vec::new())?;
+            intrinsics::call_instance_intrinsic(vm, BUNDLE, "<init>", "()V", b, &[])?;
+            Ok(Some(Value::Obj(b)))
+        }
+        "getOnBackInvokedDispatcher" if !is_builder => crate::activity_extras::instance_intrinsic(
+            vm,
+            "Landroid/app/Activity;",
+            name,
+            _sig,
+            recv,
+            args,
+        ),
+        "onBackPressed" if !is_builder => {
+            dialog_set_showing(vm, recv, false)?;
+            Ok(Some(Value::Null))
+        }
+        "addContentView" if !is_builder => {
+            let has = vm.fw.m8.dialogs.get(&recv).and_then(|d| d.view).is_some();
+            if !has {
+                return dialog(vm, "setContentView", _sig, recv, args, false);
+            }
+            Ok(Some(Value::Null))
+        }
         "setTitle" | "setMessage" => {
             let txt = match name {
                 "setTitle" => sarg(vm, args, 0)?,
@@ -797,6 +988,14 @@ fn dialog(
         }
         "setCancelable" => {
             let v = iarg(args, 0) != 0;
+            if !is_builder {
+                let k = (recv, "dlg:noCancel".to_string());
+                if v {
+                    vm.view_props.remove(&k);
+                } else {
+                    vm.view_props.insert(k, Value::Int(1));
+                }
+            }
             let st = if is_builder {
                 vm.fw.m8.builders.get_mut(&recv).unwrap()
             } else {
@@ -852,17 +1051,13 @@ fn dialog(
                 vm.fw.m8.last_dialog = Some(d);
                 Ok(Some(Value::Obj(d)))
             } else {
-                if let Some(st) = vm.fw.m8.dialogs.get_mut(&recv) {
-                    st.showing = true;
-                }
                 vm.fw.m8.last_dialog = Some(recv);
+                dialog_set_showing(vm, recv, true)?;
                 Ok(Some(Value::Null))
             }
         }
         "dismiss" | "cancel" => {
-            if let Some(st) = vm.fw.m8.dialogs.get_mut(&recv) {
-                st.showing = false;
-            }
+            dialog_set_showing(vm, recv, false)?;
             Ok(Some(Value::Null))
         }
         "isShowing" => Ok(Some(Value::Int(
@@ -874,9 +1069,126 @@ fn dialog(
                 .unwrap_or(0),
         ))),
         "getButton" => Ok(Some(Value::Null)), // botão host não é View; clique via m8_click_dialog_button
+        // Each Dialog owns a host Window (AOSP: PhoneWindow created in the
+        // Dialog constructor); `setContentView(View)` sets its content.
+        "getWindow" if !is_builder => Ok(Some(Value::Obj(dialog_window(vm, recv)?))),
+        "setContentView" if !is_builder => {
+            if let Some(v) = oarg(args, 0) {
+                let w = dialog_window(vm, recv)?;
+                if let Some(crate::framework::HostObj::Window { content }) =
+                    vm.fw.objects.get_mut(&w)
+                {
+                    *content = Some(v);
+                }
+                if let Some(st) = vm.fw.m8.dialogs.get_mut(&recv) {
+                    st.view = Some(v);
+                }
+            }
+            Ok(Some(Value::Null))
+        }
         _ => Ok(None),
     }
 }
+/// AOSP `Dialog.show()`: the first show dispatches `onCreate(null)`, then
+/// every show `onStart()`; `dismiss()` dispatches `onStop()`. Virtual
+/// dispatch, so DEX subclasses (ComponentDialog, Compose DialogWrapper, …)
+/// run their overrides; the host base methods are no-ops.
+fn dialog_set_showing(vm: &mut Engine, dialog: ObjRef, show: bool) -> Result<(), VmExit> {
+    let was = vm
+        .fw
+        .m8
+        .dialogs
+        .get(&dialog)
+        .map(|d| d.showing)
+        .unwrap_or(false);
+    if let Some(st) = vm.fw.m8.dialogs.get_mut(&dialog) {
+        st.showing = show;
+    }
+    if show != was {
+        // WindowManager.addView/removeView → ViewRootImpl.requestLayout:
+        // the next vsync traverses the new (or uncovered) window
+        vm.fw.traversal_pending = true;
+    }
+    if show && !was {
+        let created = (dialog, "dlg:created".to_string());
+        if vm.view_props.insert(created, Value::Int(1)).is_none() {
+            vm.invoke_instance(dialog, "onCreate", "(Landroid/os/Bundle;)V", &[Value::Null])?;
+        }
+        vm.invoke_instance(dialog, "onStart", "()V", &[])?;
+        // WindowManager.addView(decor): the dialog's window tree attaches
+        if let Some(c) = dialog_content(vm, dialog) {
+            crate::view_attach::dispatch_attach(vm, c)?;
+        }
+    } else if !show && was {
+        if let Some(c) = dialog_content(vm, dialog) {
+            crate::view_attach::dispatch_detach(vm, c)?;
+        }
+        vm.invoke_instance(dialog, "onStop", "()V", &[])?;
+    }
+    Ok(())
+}
+
+pub(crate) fn dialog_window(vm: &mut Engine, dialog: ObjRef) -> Result<ObjRef, VmExit> {
+    let key = (dialog, "dlg:window".to_string());
+    if let Some(Value::Obj(w)) = vm.view_props.get(&key) {
+        return Ok(*w);
+    }
+    let w = vm
+        .heap
+        .alloc_instance("Landroid/view/Window;".to_string(), Vec::new())?;
+    vm.fw
+        .objects
+        .insert(w, crate::framework::HostObj::Window { content: None });
+    vm.view_props.insert(key, Value::Obj(w));
+    // floating (dialog) windows are WRAP_CONTENT × WRAP_CONTENT
+    let a = crate::window::window_attributes(vm, w)?;
+    for f in ["width", "height"] {
+        crate::err::put_field_result(vm.heap.put_field(a, f, Value::Int(-2)))?;
+    }
+    Ok(w)
+}
+
+/// Content root of a dialog's window, if any.
+pub(crate) fn dialog_content(vm: &Engine, dialog: ObjRef) -> Option<ObjRef> {
+    if let Some(Value::Obj(w)) = vm.view_props.get(&(dialog, "dlg:window".to_string())) {
+        if let Some(crate::framework::HostObj::Window { content: Some(c) }) = vm.fw.get(*w) {
+            return Some(*c);
+        }
+    }
+    vm.fw.m8.dialogs.get(&dialog).and_then(|d| d.view)
+}
+
+/// Showing dialogs that have a content view, as (dialog, content) in
+/// creation order: the last one is the topmost window.
+pub(crate) fn showing_dialog_roots(vm: &Engine) -> Vec<(ObjRef, ObjRef)> {
+    let mut v: Vec<(ObjRef, ObjRef)> = vm
+        .fw
+        .m8
+        .dialogs
+        .iter()
+        .filter(|(_, st)| st.showing)
+        .filter_map(|(d, _)| dialog_content(vm, *d).map(|c| (*d, c)))
+        .collect();
+    v.sort_unstable();
+    v
+}
+
+/// The dialog window's requested size (`WindowManager.LayoutParams`
+/// width/height: -1 MATCH_PARENT, -2 WRAP_CONTENT, else px).
+pub(crate) fn dialog_window_size(vm: &mut Engine, dialog: ObjRef) -> (i32, i32) {
+    let Ok(w) = dialog_window(vm, dialog) else {
+        return (-2, -2);
+    };
+    let Ok(a) = crate::window::window_attributes(vm, w) else {
+        return (-2, -2);
+    };
+    let get = |vm: &Engine, f: &str| match vm.heap.get_field(a, f) {
+        Ok(Value::Int(i)) => i,
+        _ => -2,
+    };
+    (get(vm, "width"), get(vm, "height"))
+}
+
 impl Engine {
     /// Clica um botão de dialog (which: -1 positivo, -2 negativo, -3 neutro),
     /// disparando o OnClickListener DEX registrado. Retorna false se ausente.
@@ -955,6 +1267,12 @@ fn sqlite_helper(
             Ok(Some(Value::Obj(d)))
         }
         "close" => Ok(Some(Value::Null)),
+        // journal/config knobs: the in-memory store has no journal, so they
+        // are accepted and have no effect
+        "setWriteAheadLoggingEnabled"
+        | "setLookasideConfig"
+        | "setOpenParams"
+        | "setIdleConnectionTimeout" => Ok(Some(Value::Null)),
         "getDatabaseName" => {
             let n = vm.fw.m8.helpers_db.get(&recv).cloned().unwrap_or_default();
             Ok(Some(astr(vm, n)?))
@@ -1165,6 +1483,28 @@ fn sqlite_db(
             Ok(Some(Value::Null))
         }
         "isOpen" => Ok(Some(Value::Int(1))),
+        "enableWriteAheadLogging" => Ok(Some(Value::Int(1))),
+        "disableWriteAheadLogging"
+        | "setForeignKeyConstraintsEnabled"
+        | "setMaxSqlCacheSize"
+        | "setLocale"
+        | "setPageSize" => Ok(Some(Value::Null)),
+        "isWriteAheadLoggingEnabled" | "isReadOnly" | "isDbLockedByCurrentThread" => {
+            Ok(Some(Value::Int(0)))
+        }
+        "getPath" => {
+            let n = db_name_of(vm, recv)?;
+            Ok(Some(astr(vm, format!("/data/data/app/databases/{n}"))?))
+        }
+        "getAttachedDbs" => {
+            let n = db_name_of(vm, recv)?;
+            Ok(Some(
+                crate::collections::new_list(vm, "Ljava/util/ArrayList;", vec![Value::Null; 0])
+                    .inspect(|_l| {
+                        let _ = n;
+                    })?,
+            ))
+        }
         "close" => Ok(Some(Value::Null)),
         "compileStatement" => {
             // SQLiteStatement mínimo: devolve objeto; bind/execute tratados tipados se sondados.
@@ -1845,23 +2185,74 @@ fn okhttp(
 
 // ── Services / broadcasts ───────────────────────────────────────────────
 /// Nome (Context.XXX_SERVICE) ou classe -> classe host do serviço de sistema.
+/// `Context.*_SERVICE` names → manager classes.
+const SERVICES: &[(&str, &str)] = &[
+    ("jobscheduler", "Landroid/app/job/JobScheduler;"),
+    ("activity", "Landroid/app/ActivityManager;"),
+    ("window", "Landroid/view/WindowManager;"),
+    ("layout_inflater", "Landroid/view/LayoutInflater;"),
+    ("power", "Landroid/os/PowerManager;"),
+    ("alarm", "Landroid/app/AlarmManager;"),
+    ("notification", "Landroid/app/NotificationManager;"),
+    ("connectivity", "Landroid/net/ConnectivityManager;"),
+    (
+        "input_method",
+        "Landroid/view/inputmethod/InputMethodManager;",
+    ),
+    ("location", "Landroid/location/LocationManager;"),
+    ("sensor", "Landroid/hardware/SensorManager;"),
+    (
+        "accessibility",
+        "Landroid/view/accessibility/AccessibilityManager;",
+    ),
+    ("autofill", "Landroid/view/autofill/AutofillManager;"),
+    ("clipboard", "Landroid/content/ClipboardManager;"),
+    ("vibrator", "Landroid/os/Vibrator;"),
+    ("vibrator_manager", "Landroid/os/VibratorManager;"),
+    ("audio", "Landroid/media/AudioManager;"),
+    ("camera", "Landroid/hardware/camera2/CameraManager;"),
+    ("display", "Landroid/hardware/display/DisplayManager;"),
+    ("keyguard", "Landroid/app/KeyguardManager;"),
+    ("uimode", "Landroid/app/UiModeManager;"),
+    ("download", "Landroid/app/DownloadManager;"),
+    ("storage", "Landroid/os/storage/StorageManager;"),
+    (
+        "textservices",
+        "Landroid/view/textservice/TextServicesManager;",
+    ),
+    (
+        "textclassification",
+        "Landroid/view/textclassifier/TextClassificationManager;",
+    ),
+    ("user", "Landroid/os/UserManager;"),
+    ("appops", "Landroid/app/AppOpsManager;"),
+    ("batterymanager", "Landroid/os/BatteryManager;"),
+    ("wifi", "Landroid/net/wifi/WifiManager;"),
+    ("telephony", "Landroid/telephony/TelephonyManager;"),
+    ("shortcut", "Landroid/content/pm/ShortcutManager;"),
+    ("appwidget", "Landroid/appwidget/AppWidgetManager;"),
+    ("locale", "Landroid/app/LocaleManager;"),
+    (
+        "content_capture",
+        "Landroid/view/contentcapture/ContentCaptureManager;",
+    ),
+    (
+        "translation",
+        "Landroid/view/translation/TranslationManager;",
+    ),
+    (
+        "media_session",
+        "Landroid/media/session/MediaSessionManager;",
+    ),
+    ("usagestats", "Landroid/app/usage/UsageStatsManager;"),
+];
+
 fn system_service_class(key: &str) -> &'static str {
-    match key {
-        "jobscheduler" | "Landroid/app/job/JobScheduler;" => JOB_SCHEDULER,
-        "activity" | "Landroid/app/ActivityManager;" => "Landroid/app/ActivityManager;",
-        "window" | "Landroid/view/WindowManager;" => "Landroid/view/WindowManager;",
-        "layout_inflater" | "Landroid/view/LayoutInflater;" => "Landroid/view/LayoutInflater;",
-        "power" | "Landroid/os/PowerManager;" => "Landroid/os/PowerManager;",
-        "alarm" | "Landroid/app/AlarmManager;" => "Landroid/app/AlarmManager;",
-        "notification" | "Landroid/app/NotificationManager;" => "Landroid/app/NotificationManager;",
-        "connectivity" | "Landroid/net/ConnectivityManager;" => "Landroid/net/ConnectivityManager;",
-        "input_method" | "Landroid/view/inputmethod/InputMethodManager;" => {
-            "Landroid/view/inputmethod/InputMethodManager;"
-        }
-        "location" | "Landroid/location/LocationManager;" => "Landroid/location/LocationManager;",
-        "sensor" | "Landroid/hardware/SensorManager;" => "Landroid/hardware/SensorManager;",
-        _ => "Ljava/lang/Object;",
-    }
+    SERVICES
+        .iter()
+        .find(|(n, c)| *n == key || *c == key)
+        .map(|(_, c)| *c)
+        .unwrap_or("Ljava/lang/Object;")
 }
 
 fn context_services(

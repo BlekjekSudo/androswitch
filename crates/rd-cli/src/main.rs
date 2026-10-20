@@ -117,6 +117,11 @@ enum Cmd {
         /// Escreve a documentação GERADA do catálogo no arquivo e sai
         #[arg(long)]
         gen_docs: Option<PathBuf>,
+        /// Live viewer: serve the current frame + visible texts over HTTP on
+        /// this address (e.g. 0.0.0.0:7878), updated after every tool call.
+        /// Same as env RD_MCP_LIVE.
+        #[arg(long)]
+        live: Option<String>,
     },
     /// M6: executa uma suíte JSON de cenários → resumo + JUnit XML (TST-01).
     /// Exit: 0 tudo passou · 1 houve falha · 64 suíte inválida/IO (ver docs/suite-format.md)
@@ -396,6 +401,7 @@ fn run(cli: Cli) -> i32 {
         Cmd::Mcp {
             describe_tools,
             gen_docs,
+            live,
         } => {
             // M5 (DoD): o conjunto publicado corresponde ao --describe-tools
             // e à documentação gerada — ambos saem do MESMO tool_defs().
@@ -427,7 +433,8 @@ fn run(cli: Cli) -> i32 {
             // M5: o stdout É o canal do protocolo — nada mais pode escrever
             // nele (o app roteia saída para o buffer da sessão, ADR 001).
             // O erro sai pelo caminho padrão do contrato (JSON no stderr).
-            rd_agent::mcp::serve_stdio(std::io::stdin(), std::io::stdout())
+            let live = live.clone().or_else(|| std::env::var("RD_MCP_LIVE").ok());
+            rd_agent::mcp::serve_stdio_with(std::io::stdin(), std::io::stdout(), live.as_deref())
         }
         Cmd::Perf {
             apk,
@@ -1362,6 +1369,44 @@ fn cmd_app_run(
                     println!("[tap {x},{y}] listener acionado: {hit}");
                 }
             }
+            ("swipe", rest) => {
+                // swipe X1,Y1,X2,Y2[,MS] — same gesture as the MCP `swipe` tool
+                let nums: Vec<i64> = rest
+                    .copied()
+                    .unwrap_or("")
+                    .split(',')
+                    .filter_map(|t| t.trim().parse().ok())
+                    .collect();
+                if nums.len() < 4 {
+                    return Err(RdError::new(
+                        "INVALID_FORMAT",
+                        format!("script swipe inválido: {script:?}"),
+                        "rd-cli",
+                    )
+                    .with_suggestion("use --script \"swipe X1,Y1,X2,Y2[,MS]\""));
+                }
+                let ms = nums.get(4).copied().unwrap_or(300).max(0) as u64;
+                let rep = eng
+                    .swipe_app(
+                        nums[0] as i32,
+                        nums[1] as i32,
+                        nums[2] as i32,
+                        nums[3] as i32,
+                        ms,
+                    )
+                    .map_err(vm_err_to_rd)?;
+                if !json {
+                    println!(
+                        "[swipe {},{}→{},{} {ms}ms] views atravessadas: {} clique: {}",
+                        nums[0],
+                        nums[1],
+                        nums[2],
+                        nums[3],
+                        rep.crossed.len(),
+                        rep.clicked
+                    );
+                }
+            }
             ("wait", rest) => {
                 let ms: u64 = rest.and_then(|r| r.trim().parse().ok()).ok_or_else(|| {
                     RdError::new(
@@ -1417,7 +1462,25 @@ fn cmd_app_run(
                         "rd-cli",
                     )
                 })?;
-                let png = rd_render::render_snapshot(&tree).to_png();
+                // same pipeline as the MCP screenshot: host tree + DEX draw pass
+                let mut fb = rd_render::render_snapshot(&tree);
+                match eng.draw_frame() {
+                    Ok(ops) if ops > 0 && eng.has_frame() => {
+                        let (w, h) = (fb.w, fb.h);
+                        eng.rasterize_frame(&mut fb.px, w, h);
+                        if std::env::var_os("RD_TRACE_DRAW").is_some() {
+                            eprintln!("D/RustyDroid: frame ops={ops}");
+                            if std::env::var("RD_TRACE_DRAW").as_deref() == Ok("2") {
+                                eprintln!("{}", eng.frame_summary());
+                            }
+                        }
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        eprintln!("W/RustyDroid: draw pass failed: {e}{}", eng.exit_trace(&e))
+                    }
+                }
+                let png = fb.to_png();
                 std::fs::write(file, &png).map_err(|e| {
                     RdError::new("IO_ERROR", format!("escrevendo {file}: {e}"), "rd-cli")
                 })?;

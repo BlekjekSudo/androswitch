@@ -56,9 +56,9 @@ const MATH: &str = "Ljava/lang/Math;";
 /// M8: base de enums — terceiro gap do launch real (EIIE em Enum.<init>).
 const ENUM: &str = "Ljava/lang/Enum;";
 /// M8: família java.lang.ref — quarto gap do launch real (WeakReference.
-/// <init>). Sem GC na arena ⇒ referências fracas/soft NUNCA são limpas
-/// espontaneamente; o referent vive até `clear()` — limitação documentada
-/// (mesma política do WeakHashMap host).
+/// <init>). O GC (`gc.rs`) limpa o referent de WeakReference/PhantomReference
+/// quando nada mais o alcança; SoftReference fica forte (Android só limpa sob
+/// pressão de memória). Limpas com fila registrada vão para a ReferenceQueue.
 /// M8: quinto gap do launch real — `newUpdater(Class,Class,String)` caía no
 /// NOT_IMPLEMENTED tipado do catch-all `Ljava/`. Updater host: captura o NOME
 /// do campo e opera via get_field/put_field (sem volatile/checks — VM
@@ -207,7 +207,7 @@ pub(crate) fn object_to_string(vm: &mut Engine, r: crate::heap::ObjRef) -> Resul
 
 /// Escreve no stdout/stderr do host. PrintStream Java NUNCA lança IOException
 /// (spec de java.io.PrintStream) — engolir falha de E/S é a semântica correta.
-fn host_print(fd: i32, s: &str) {
+pub(crate) fn host_print(fd: i32, s: &str) {
     use std::io::Write;
     if fd == 2 {
         let _ = std::io::stderr().write_all(s.as_bytes());
@@ -277,6 +277,125 @@ pub fn call_static_intrinsic(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_static_intrinsic_rooted(vm, class, name, sig, args))
+}
+
+fn call_static_intrinsic_rooted(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // java.lang primitive wrappers (boxes.rs): valueOf/hashCode/compare/bits
+    if let Some(v) = crate::boxes::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::xml_res::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_motion::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_colorspace::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if class == ENUM && name == "valueOf" {
+        return enum_value_of(vm, args).map(Some);
+    }
+    if let Some(v) = crate::jrandom::static_intrinsic(vm, class, name)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::jnormalizer::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if class.starts_with("Ljava/math/") {
+        if let Some(v) = crate::jbigdecimal::static_intrinsic(vm, class, name, sig, args)? {
+            return Ok(Some(v));
+        }
+    }
+    if let Some(v) = crate::jbreakiter::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_spannable::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::juuid::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::jtext_format::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::jregex::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::jfile::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    // java.time values + DateTimeFormatter (jtime.rs)
+    if let Some(v) = crate::jtime::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // java.lang.System: arraycopy/identityHashCode/virtual-clock time
+    if let Some(v) = crate::jlsystem::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::view_layout::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::platform_base::vibrator_static(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_util::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(v));
+    }
+    // android.graphics / android.text layout statics (graphics.rs)
+    if let Some(v) = crate::graphics::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // Resources/Locale/LocaleList statics (android_res.rs)
+    if let Some(v) = crate::android_res::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // java.util.Collections extras (collections.rs)
+    if let Some(v) = crate::collections::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // Settings.* / Uri statics (content.rs)
+    if let Some(v) = crate::content::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // java.util.Arrays (arrays.rs)
+    if let Some(v) = crate::arrays::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // Integer/Long/Float/Double/Character/Math statics (numerics.rs)
+    if let Some(v) = crate::numerics::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // Handler.createAsync / Message.obtain (handler_msg.rs)
+    if let Some(v) = crate::handler_msg::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // String.format/join (jlstring.rs)
+    if let Some(v) = crate::jlstring::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // green threads (threads.rs): currentThread/interrupted/LockSupport
+    if let Some(v) = crate::threads::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // android.text.TextUtils
+    if let Some(v) = crate::android_text::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // android.util.Log → app output (MCP `logs`)
+    if let Some(v) = crate::choreographer::static_intrinsic(vm, class, name, sig)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_text::log_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
     match (class, name, sig) {
         ("Ljava/util/Arrays;", "asList", "([Ljava/lang/Object;)Ljava/util/List;") => {
             let array = args.first().and_then(|v| v.as_ref().ok().flatten()).ok_or_else(|| VmExit::Exception(Throwable::new("Ljava/lang/NullPointerException;", "Arrays.asList array null")))?;
@@ -635,6 +754,53 @@ pub fn call_static_intrinsic(
                 .insert(r, crate::framework::HostObj::List { elems: vec![v] });
             Ok(Some(Value::Obj(r)))
         }
+        // Collections immutable factories: singleton/emptyX and list/collection
+        // views reuse the immutable marker classes (mutations → UOE). Views
+        // are snapshots of host state, like unmodifiableSet; a source without
+        // host state (DEX collection) is returned as-is.
+        ("Ljava/util/Collections;", "singleton", "(Ljava/lang/Object;)Ljava/util/Set;")
+        | ("Ljava/util/Collections;", "emptySet", "()Ljava/util/Set;")
+        | ("Ljava/util/Collections;", "emptyList", "()Ljava/util/List;")
+        | ("Ljava/util/Collections;", "emptyMap", "()Ljava/util/Map;")
+        | ("Ljava/util/Collections;", "emptySortedSet", "()Ljava/util/SortedSet;")
+        | ("Ljava/util/Collections;", "emptySortedMap", "()Ljava/util/SortedMap;") => {
+            let (class, state) = match name {
+                "singleton" => (
+                    UNMODIFIABLE_SET,
+                    crate::framework::HostObj::List {
+                        elems: vec![args.first().cloned().unwrap_or(Value::Null)],
+                    },
+                ),
+                "emptySet" | "emptySortedSet" => {
+                    (UNMODIFIABLE_SET, crate::framework::HostObj::List { elems: vec![] })
+                }
+                "emptyList" => (SINGLETON_LIST, crate::framework::HostObj::List { elems: vec![] }),
+                _ => (UNMODIFIABLE_MAP, crate::framework::HostObj::Map { entries: vec![] }),
+            };
+            let r = vm.heap.alloc_instance(class.to_string(), vec![])?;
+            vm.fw.objects.insert(r, state);
+            Ok(Some(Value::Obj(r)))
+        }
+        ("Ljava/util/Collections;", "unmodifiableList", "(Ljava/util/List;)Ljava/util/List;")
+        | (
+            "Ljava/util/Collections;",
+            "unmodifiableCollection",
+            "(Ljava/util/Collection;)Ljava/util/Collection;",
+        ) => {
+            let Some(Value::Obj(src)) = args.first() else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    format!("Collections.{name} com coleção null"),
+                )));
+            };
+            let elems = match vm.fw.objects.get(src) {
+                Some(crate::framework::HostObj::List { elems }) => elems.clone(),
+                _ => return Ok(Some(Value::Obj(*src))),
+            };
+            let r = vm.heap.alloc_instance(SINGLETON_LIST.to_string(), vec![])?;
+            vm.fw.objects.insert(r, crate::framework::HostObj::List { elems });
+            Ok(Some(Value::Obj(r)))
+        }
         // M8 (43º gap real): Collections.unmodifiableSet — pedido pelo
         // launch real (LogController.readPrefs): view dedup de leitura em
         // classe-marcadora (snapshot; desvio de view documentado —
@@ -817,7 +983,48 @@ fn class_supported(name: &str, sig: &str) -> bool {
                 "(Ljava/lang/String;)Ljava/lang/reflect/Field;"
             )
             | ("getDeclaredFields", "()[Ljava/lang/reflect/Field;")
+            | ("getField", "(Ljava/lang/String;)Ljava/lang/reflect/Field;")
     )
+}
+
+/// Value of a platform static constant (Build.VERSION.SDK_INT, Integer.MAX_VALUE,
+/// BigDecimal.ZERO, …) through the same host hooks `sget` uses; cached in
+/// `vm.statics`.
+fn platform_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<Value>, VmExit> {
+    let key = (owner.to_string(), field.to_string());
+    if let Some(v) = vm.statics.get(&key) {
+        return Ok(Some(v.clone()));
+    }
+    let v = match crate::android_build::host_static(vm, owner, field)? {
+        Some(v) => Some(v),
+        None => match crate::boxes::host_static(vm, owner, field)? {
+            Some(v) => Some(v),
+            None => match crate::jbigdecimal::host_static(vm, owner, field)? {
+                Some(v) => Some(v),
+                None => crate::jnormalizer::host_static(vm, owner, field)?,
+            },
+        },
+    };
+    if let Some(v) = &v {
+        vm.statics.insert(key, v.clone());
+    }
+    Ok(v)
+}
+
+/// Field descriptor for a host static value (reflection metadata).
+fn type_of_value(vm: &Engine, v: &Value) -> String {
+    match v {
+        Value::Int(_) => "I".into(),
+        Value::Long(_) => "J".into(),
+        Value::Float(_) => "F".into(),
+        Value::Double(_) => "D".into(),
+        Value::Obj(r) => vm
+            .heap
+            .class_of(*r)
+            .unwrap_or("Ljava/lang/Object;")
+            .to_string(),
+        _ => "Ljava/lang/Object;".into(),
+    }
 }
 
 /// Descritor → nome binário Java ("Lcom/x/Y;" → "com.x.Y"; arrays/primitivos
@@ -850,6 +1057,58 @@ fn class_intrinsic(
         Ok(Value::Obj(r)) => vm.heap.as_str(r)?.to_string(),
         _ => String::new(),
     };
+    if name == "getField" {
+        // public fields of the class and its superclasses (JLS getField);
+        // platform classes without DEX metadata expose their host constants
+        let field_name = string_arg(vm, &args[0])?;
+        let mut cur = Some(desc.clone());
+        let mut found = None;
+        let mut depth = 0;
+        while let Some(c) = cur {
+            if depth > 32 {
+                break;
+            }
+            depth += 1;
+            if let Some(f) = vm
+                .cp
+                .declared_fields_info(&c)
+                .into_iter()
+                .find(|(_, n, _, m, _)| n == &field_name && m & 0x0001 != 0)
+            {
+                found = Some(f);
+                break;
+            }
+            cur = vm.cp.superclass_of(&c);
+        }
+        if found.is_none() && vm.cp.find_class(&desc).is_none() {
+            if let Some(v) = platform_static(vm, &desc, &field_name)? {
+                let ty = type_of_value(vm, &v);
+                found = Some((desc.clone(), field_name.clone(), ty, 0x0019, true));
+            }
+        }
+        let Some((declaring_class, field_name, field_type, modifiers, is_static)) = found else {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/NoSuchFieldException;",
+                field_name,
+            )));
+        };
+        let field = vm
+            .heap
+            .alloc_instance(REFLECT_FIELD.to_string(), Vec::new())
+            .map_err(crate::err::oom_throwable)?;
+        vm.fw.objects.insert(
+            field,
+            crate::framework::HostObj::ReflectField {
+                declaring_class,
+                name: field_name,
+                field_type,
+                modifiers,
+                is_static,
+                accessible: false,
+            },
+        );
+        return Ok(Some(Value::Obj(field)));
+    }
     if name == "getDeclaredField" {
         let field_name = string_arg(vm, &args[0])?;
         let metadata = if desc == UNSAFE_CLASS && field_name == "theUnsafe" {
@@ -1176,12 +1435,34 @@ fn reflect_field_intrinsic(
                 return Ok(Some(Value::Obj(unsafe_singleton(vm, &declaring_class)?)));
             }
             if is_static {
-                return Ok(Some(
-                    vm.statics
-                        .get(&(declaring_class, field_name))
-                        .cloned()
-                        .unwrap_or(Value::Null),
-                ));
+                let v = match vm
+                    .statics
+                    .get(&(declaring_class.clone(), field_name.clone()))
+                {
+                    Some(v) => v.clone(),
+                    None => {
+                        platform_static(vm, &declaring_class, &field_name)?.unwrap_or(Value::Null)
+                    }
+                };
+                // Field.get returns Object: primitives come back boxed
+                let wrapper = match field_type.as_str() {
+                    "I" => Some("Ljava/lang/Integer;"),
+                    "J" => Some("Ljava/lang/Long;"),
+                    "Z" => Some("Ljava/lang/Boolean;"),
+                    "F" => Some("Ljava/lang/Float;"),
+                    "D" => Some("Ljava/lang/Double;"),
+                    "S" => Some("Ljava/lang/Short;"),
+                    "B" => Some("Ljava/lang/Byte;"),
+                    "C" => Some("Ljava/lang/Character;"),
+                    _ => None,
+                };
+                return Ok(Some(match (wrapper, &v) {
+                    (
+                        Some(w),
+                        Value::Int(_) | Value::Long(_) | Value::Float(_) | Value::Double(_),
+                    ) => Value::Obj(crate::boxes::box_value(vm, w, v)?),
+                    _ => v,
+                }));
             }
             let Some(target) = args.first().and_then(|v| v.as_ref().ok().flatten()) else {
                 return Err(VmExit::Exception(Throwable::new(
@@ -1556,39 +1837,7 @@ fn iterator_intrinsic(
     recv: crate::heap::ObjRef,
     name: &str,
 ) -> Result<Option<Value>, VmExit> {
-    use crate::framework::HostObj;
-    match name {
-        "hasNext" => {
-            let more = match vm.fw.objects.get(&recv) {
-                Some(HostObj::Iter { elems, pos }) => *pos < elems.len(),
-                _ => false,
-            };
-            Ok(Some(Value::Int(more as i32)))
-        }
-        "next" => {
-            let Some(HostObj::Iter { elems, pos }) = vm.fw.objects.get_mut(&recv) else {
-                return Err(crate::err::vm_error(
-                    "VM_TYPE_ERROR",
-                    "Iterator host sem estado (use iterator())",
-                )
-                .into());
-            };
-            if *pos >= elems.len() {
-                return Err(VmExit::Exception(Throwable::new(
-                    "Ljava/util/NoSuchElementException;",
-                    "Iterator.next sem próximo elemento",
-                )));
-            }
-            let v = elems[*pos].clone();
-            *pos += 1;
-            Ok(Some(v))
-        }
-        "remove" => Err(VmExit::Exception(Throwable::new(
-            "Ljava/lang/UnsupportedOperationException;",
-            "Iterator host: remove não suportado (snapshot)",
-        ))),
-        _ => Ok(None),
-    }
+    crate::jiterator::navigate(vm, recv, name)
 }
 
 /// (name, sig) de Map.Entry host suportados (M8).
@@ -1812,6 +2061,15 @@ fn alfu_intrinsic(
             crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Long(next)))?;
             Ok(Some(Value::Long(next)))
         }
+        "getAndIncrement" | "getAndDecrement" => {
+            let next = if name == "getAndIncrement" {
+                current.wrapping_add(1)
+            } else {
+                current.wrapping_sub(1)
+            };
+            crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Long(next)))?;
+            Ok(Some(Value::Long(current)))
+        }
         "incrementAndGet" => {
             let next = current.wrapping_add(1);
             crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Long(next)))?;
@@ -1903,6 +2161,15 @@ fn aifu_intrinsic(
             let next = current.wrapping_add(delta);
             crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Int(next)))?;
             Ok(Some(Value::Int(next)))
+        }
+        "getAndIncrement" | "getAndDecrement" => {
+            let next = if name == "getAndIncrement" {
+                current.wrapping_add(1)
+            } else {
+                current.wrapping_sub(1)
+            };
+            crate::err::put_field_result(vm.heap.put_field(target, &field, Value::Int(next)))?;
+            Ok(Some(Value::Int(current)))
         }
         "incrementAndGet" => {
             let next = current.wrapping_add(1);
@@ -1999,8 +2266,8 @@ fn arfu_intrinsic(
 }
 
 /// `<init>` de WeakReference/SoftReference (M8): referent no campo de heap
-/// "referent". A variante com ReferenceQueue IGNORA a fila — sem GC na arena
-/// nada é enfileirado (documentado).
+/// "referent" (o GC não o traça através de WeakReference — ver `gc.rs`). A
+/// variante com ReferenceQueue guarda a fila no campo `queue` (o GC enfileira).
 fn ref_init(
     vm: &mut Engine,
     recv: crate::heap::ObjRef,
@@ -2013,7 +2280,25 @@ fn ref_init(
         args[0].clone()
     };
     crate::err::put_field_result(vm.heap.put_field(recv, "referent", referent))?;
+    if let Some(q @ Value::Obj(_)) = args.get(1) {
+        crate::err::put_field_result(vm.heap.put_field(recv, "queue", q.clone()))?;
+    }
     Ok(Some(Value::Null))
+}
+
+/// ReferenceQueue.poll/remove: pop the intrusive list the GC fills
+/// (`gc.rs`). Non-blocking — `remove()` returning null when empty is the
+/// honest single-threaded answer.
+fn ref_queue_poll(vm: &mut Engine, q: crate::heap::ObjRef) -> Result<Option<Value>, VmExit> {
+    let head = vm.heap.get_field(q, "rd$head").unwrap_or(Value::Null);
+    if let Value::Obj(h) = head {
+        let next = vm.heap.get_field(h, "rd$next").unwrap_or(Value::Null);
+        crate::err::put_field_result(vm.heap.put_field(q, "rd$head", next))?;
+        crate::err::put_field_result(vm.heap.put_field(h, "rd$next", Value::Null))?;
+        crate::err::put_field_result(vm.heap.put_field(h, "rd$enq", Value::Int(0)))?;
+        crate::err::put_field_result(vm.heap.put_field(h, "queue", Value::Null))?;
+    }
+    Ok(Some(head))
 }
 
 /// get/clear de WeakReference/SoftReference (M8).
@@ -2037,6 +2322,56 @@ fn ref_get_clear(
 /// Enum host (M8): estado nos campos de heap `name`/`ordinal` (padrão
 /// StringBuilder/Throwable). `values()`/`valueOf()` são estáticos sintéticos
 /// da classe do app (DEX) — executam normal no interpretador.
+/// `Enum.valueOf(Class, String)`: the enum's constants are its static fields
+/// of its own type; match on the `name` given to `Enum.<init>` (R8 may rename
+/// the fields, never the names). Host enums resolve through host statics.
+fn enum_value_of(vm: &mut Engine, args: &[Value]) -> Result<Value, VmExit> {
+    let desc = match args.first() {
+        Some(Value::Obj(c)) => match vm
+            .heap
+            .get_field(*c, "class_name")
+            .or_else(|_| vm.heap.get_field(*c, "name"))
+        {
+            Ok(Value::Obj(r)) => vm.heap.as_str(r)?.to_string(),
+            _ => String::new(),
+        },
+        _ => String::new(),
+    };
+    let wanted = match args.get(1) {
+        Some(v @ Value::Obj(_)) => string_arg(vm, v)?,
+        _ => {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/NullPointerException;",
+                "Name is null",
+            )))
+        }
+    };
+    if vm.cp.find_class(&desc).is_some() {
+        vm.ensure_initialized(&desc)?;
+        for (decl, fname, ftype, _, is_static) in vm.cp.declared_fields_info(&desc) {
+            if !is_static || ftype != desc {
+                continue;
+            }
+            if let Some(Value::Obj(c)) = vm.statics.get(&(decl, fname)).cloned() {
+                if let Ok(Value::Obj(n)) = vm.heap.get_field(c, "name") {
+                    if vm.heap.as_str(n).ok() == Some(wanted.as_str()) {
+                        return Ok(Value::Obj(c));
+                    }
+                }
+            }
+        }
+    } else if let Some(v @ Value::Obj(_)) = platform_static(vm, &desc, &wanted)? {
+        return Ok(v);
+    }
+    Err(VmExit::Exception(Throwable::new(
+        "Ljava/lang/IllegalArgumentException;",
+        format!(
+            "No enum constant {}.{wanted}",
+            descriptor_to_class_name(&desc)
+        ),
+    )))
+}
+
 fn enum_intrinsic(
     vm: &mut Engine,
     recv: crate::heap::ObjRef,
@@ -2103,6 +2438,15 @@ fn map_supported(name: &str, sig: &str) -> bool {
                 "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"
             )
             | ("get", "(Ljava/lang/Object;)Ljava/lang/Object;")
+            | ("putAll", "(Ljava/util/Map;)V")
+            | (
+                "putIfAbsent",
+                "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"
+            )
+            | (
+                "getOrDefault",
+                "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"
+            )
             | ("remove", "(Ljava/lang/Object;)Ljava/lang/Object;")
             | ("containsKey", "(Ljava/lang/Object;)Z")
             | ("containsValue", "(Ljava/lang/Object;)Z")
@@ -2158,7 +2502,21 @@ pub fn values_equal(heap: &crate::heap::Heap, a: &Value, b: &Value) -> Result<bo
             }
             match cx {
                 STRING => Ok(heap.as_str(*x)? == heap.as_str(*y)?),
-                INTEGER | LONG | BOOLEAN => Ok(heap.get_field(*x, "value")?.as_int()?
+                // Long payloads are 64-bit (an Int payload widens)
+                LONG => {
+                    let wide = |v: Value| -> Result<i64, String> {
+                        match v {
+                            Value::Int(i) => Ok(i as i64),
+                            other => other.as_long(),
+                        }
+                    };
+                    Ok(wide(heap.get_field(*x, "value")?)? == wide(heap.get_field(*y, "value")?)?)
+                }
+                INTEGER
+                | BOOLEAN
+                | "Ljava/lang/Short;"
+                | "Ljava/lang/Byte;"
+                | "Ljava/lang/Character;" => Ok(heap.get_field(*x, "value")?.as_int()?
                     == heap.get_field(*y, "value")?.as_int()?),
                 DOUBLE => Ok(heap.get_field(*x, "value")?.as_double()?
                     == heap.get_field(*y, "value")?.as_double()?),
@@ -2808,8 +3166,7 @@ fn iobe(msg: String) -> VmExit {
     VmExit::Exception(Throwable::new("Ljava/lang/IndexOutOfBoundsException;", msg))
 }
 
-/// HashMap/WeakHashMap host (M8). Estado em `HostObj::Map`; sem GC na arena
-/// ⇒ WeakHashMap nunca limpa entradas (comportamento documentado).
+/// Host maps. GC traces WeakHashMap keys weakly and values strongly.
 fn map_intrinsic(
     vm: &mut Engine,
     recv: crate::heap::ObjRef,
@@ -2848,6 +3205,7 @@ fn map_intrinsic(
         ("entrySet", _) | ("keySet", _) | ("values", _) => {
             let snapshot = map_entries(vm, recv)?.clone();
             let mut elems = Vec::with_capacity(snapshot.len());
+            let keys: Vec<Value> = snapshot.iter().map(|(k, _)| k.clone()).collect();
             for (k, v) in snapshot {
                 let item = match name {
                     "keySet" => k,
@@ -2861,8 +3219,16 @@ fn map_intrinsic(
                 };
                 elems.push(item);
             }
-            let view = vm.heap.alloc_instance(VIEW_SET.to_string(), vec![])?;
+            let readonly = vm.heap.class_of(recv)? == UNMODIFIABLE_MAP;
+            let view = vm.heap.alloc_instance(
+                if readonly { UNMODIFIABLE_SET } else { VIEW_SET }.to_string(),
+                vec![],
+            )?;
             vm.fw.objects.insert(view, HostObj::List { elems });
+            crate::err::put_field_result(vm.heap.put_field(view, "rd$map", Value::Obj(recv)))?;
+            for (i, k) in keys.into_iter().enumerate() {
+                crate::err::put_field_result(vm.heap.put_field(view, &format!("rd$key{i}"), k))?;
+            }
             Ok(Some(Value::Obj(view)))
         }
         ("put", _) => {
@@ -2882,6 +3248,52 @@ fn map_intrinsic(
             let idx = find_key(vm, recv, &args[0])?;
             let entries = map_entries(vm, recv)?;
             Ok(Some(idx.map_or(Value::Null, |i| entries[i].1.clone())))
+        }
+        ("getOrDefault", _) => {
+            let idx = find_key(vm, recv, &args[0])?;
+            let entries = map_entries(vm, recv)?;
+            Ok(Some(idx.map_or(args[1].clone(), |i| entries[i].1.clone())))
+        }
+        ("putIfAbsent", _) => {
+            // Map.putIfAbsent: absent OR mapped to null → put; returns old
+            let idx = find_key(vm, recv, &args[0])?;
+            let entries = map_entries(vm, recv)?;
+            match idx {
+                Some(i) if !matches!(entries[i].1, Value::Null) => Ok(Some(entries[i].1.clone())),
+                Some(i) => {
+                    entries[i].1 = args[1].clone();
+                    Ok(Some(Value::Null))
+                }
+                None => {
+                    entries.push((args[0].clone(), args[1].clone()));
+                    Ok(Some(Value::Null))
+                }
+            }
+        }
+        ("putAll", _) => {
+            // source: a host map directly, or any java.util.Map (DEX/Kotlin
+            // maps) through its entrySet().iterator() contract
+            let src = match args.first() {
+                Some(Value::Obj(o)) => match vm.fw.objects.get(o) {
+                    Some(HostObj::Map { entries }) => entries.clone(),
+                    _ => map_entries_via_iteration(vm, *o)?,
+                },
+                _ => {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "Map.putAll(null)",
+                    )))
+                }
+            };
+            for (k, v) in src {
+                let idx = find_key(vm, recv, &k)?;
+                let entries = map_entries(vm, recv)?;
+                match idx {
+                    Some(i) => entries[i].1 = v,
+                    None => entries.push((k, v)),
+                }
+            }
+            Ok(Some(Value::Null))
         }
         ("remove", _) => {
             let idx = find_key(vm, recv, &args[0])?;
@@ -3037,9 +3449,14 @@ fn list_intrinsic(
 /// Igualdade de identidade de referências (o `==` do Java sobre refs) — usada
 /// pelo CAS do AtomicReference: Null == Null; Obj(i) == Obj(j) sse i == j.
 /// Valores não-ref (Int/Long/…) nunca são payload de AtomicReference via DEX.
+/// Reference identity for CAS-style comparisons. DEX materialises `null`
+/// as `const/4 vX, 0`, so a register holding `Int(0)` in an object position
+/// IS null: `CAS(expected = null)` against an unset field must succeed.
+/// Before this, every kotlinx `loopOnState`/`installParentHandle` CAS with
+/// a null expected value spun forever.
 fn ref_identity_eq(a: &Value, b: &Value) -> bool {
     match (a, b) {
-        (Value::Null, Value::Null) => true,
+        (Value::Null | Value::Int(0), Value::Null | Value::Int(0)) => true,
         (Value::Obj(x), Value::Obj(y)) => x == y,
         _ => false,
     }
@@ -3063,6 +3480,23 @@ pub fn call_instance_intrinsic(
 /// para Enum: a chamada super `Enum.<init>(String,int)` tem mref_class =
 /// `Ljava/lang/Enum;` mas receiver de classe do app — e o construtor da
 /// classe do app (DEX) NÃO pode ser sequestrado pelo intrínseco.
+pub(crate) const CONTEXT_IMPL: &str = "Landroid/app/ContextImpl;";
+
+/// The process-wide `ContextImpl` singleton (base context of activities,
+/// services and the Application).
+pub(crate) fn context_impl(vm: &mut Engine) -> Result<crate::heap::ObjRef, VmExit> {
+    let key = (CONTEXT_IMPL.to_string(), "rd_instance".to_string());
+    if let Some(Value::Obj(r)) = vm.statics.get(&key) {
+        return Ok(*r);
+    }
+    let r = vm
+        .heap
+        .alloc_instance(CONTEXT_IMPL.to_string(), Vec::new())
+        .map_err(crate::err::oom_throwable)?;
+    vm.statics.insert(key, Value::Obj(r));
+    Ok(r)
+}
+
 pub fn call_instance_intrinsic_mref(
     vm: &mut Engine,
     recv_class: &str,
@@ -3072,6 +3506,415 @@ pub fn call_instance_intrinsic_mref(
     recv: crate::heap::ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| {
+        call_instance_intrinsic_mref_rooted(vm, recv_class, mref_class, name, sig, recv, args)
+    })
+}
+
+fn call_instance_intrinsic_mref_rooted(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: crate::heap::ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // `List.subList` views: refresh from / write back to the backing list.
+    if vm.fw.sublists.contains_key(&recv) {
+        crate::jcollections::sublist_refresh(vm, recv);
+        let r = instance_intrinsic_dispatch(vm, recv_class, mref_class, name, sig, recv, args);
+        crate::jcollections::sublist_write_back(vm, recv);
+        return r;
+    }
+    // ContextImpl (base of every ContextWrapper chain): platform calls are
+    // answered by the app's live context — the current activity, else the
+    // Application.
+    if recv_class == CONTEXT_IMPL && !matches!(name, "getBaseContext" | "<init>") {
+        let target = match vm.fw.current_activity {
+            Some(a) => a,
+            None => vm.application_obj()?,
+        };
+        let tc = vm.heap.class_of(target)?.to_string();
+        return call_instance_intrinsic_mref(vm, &tc, mref_class, name, sig, target, args);
+    }
+    let r = instance_intrinsic_dispatch(vm, recv_class, mref_class, name, sig, recv, args)?;
+    if r.is_some() || name == "<init>" {
+        return Ok(r);
+    }
+    // Inherited platform method named through a DEX subclass (e.g.
+    // `invoke-virtual LApp/MyRef;->get()` on `class MyRef extends
+    // WeakReference`): when no class in the DEX chain declares it, the
+    // nearest platform ancestor's implementation answers (JVMS 5.4.3.3).
+    if vm.cp.find_class(mref_class).is_some()
+        && vm.cp.resolve_method(mref_class, name, sig).is_none()
+    {
+        let mut c = mref_class.to_string();
+        for _ in 0..64 {
+            let Some(sup) = vm.cp.superclass_of(&c) else {
+                break;
+            };
+            if sup == c {
+                break;
+            }
+            if vm.cp.find_class(&sup).is_none() {
+                if sup == OBJECT {
+                    break;
+                }
+                return instance_intrinsic_dispatch(vm, recv_class, &sup, name, sig, recv, args);
+            }
+            c = sup;
+        }
+    }
+    Ok(None)
+}
+
+fn instance_intrinsic_dispatch(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: crate::heap::ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // Virtual dispatch for Object's overridable methods: `invoke-virtual
+    // Object.equals/hashCode/toString` on a host-state receiver (a host
+    // List/Map/Set, …) must reach that receiver's own implementation, not
+    // Object's identity semantics.
+    if mref_class == OBJECT
+        && recv_class != OBJECT
+        && matches!(
+            (name, sig),
+            ("equals", "(Ljava/lang/Object;)Z")
+                | ("hashCode", "()I")
+                | ("toString", "()Ljava/lang/String;")
+        )
+        && vm.fw.objects.contains_key(&recv)
+    {
+        if let Some(v) =
+            call_instance_intrinsic_mref(vm, recv_class, recv_class, name, sig, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
+    // MotionEvent (android_motion.rs)
+    if recv_class.starts_with("Landroid/view/MotionEvent") {
+        if let Some(v) =
+            crate::android_motion::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
+    // java.util.PriorityQueue (jpriorityqueue.rs)
+    if let Some(v) =
+        crate::jpriorityqueue::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // java.util.Random / ThreadLocalRandom (jrandom.rs)
+    if let Some(v) =
+        crate::jrandom::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // java.math.BigDecimal / BigInteger (jbigdecimal.rs)
+    if recv_class == crate::jbigdecimal::BD
+        || recv_class == crate::jbigdecimal::BI
+        || vm.bignums.contains_key(&recv)
+    {
+        if let Some(v) =
+            crate::jbigdecimal::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
+    // java.text.BreakIterator (jbreakiter.rs)
+    if recv_class == crate::jbreakiter::BI || vm.break_iters.contains_key(&recv) {
+        if let Some(v) = crate::jbreakiter::instance_intrinsic(vm, name, sig, recv, args)? {
+            return Ok(Some(v));
+        }
+    }
+    // ColorSpace (android_colorspace.rs)
+    if recv_class == crate::android_colorspace::CS || recv_class == crate::android_colorspace::RGB {
+        if let Some(v) =
+            crate::android_colorspace::instance_intrinsic(vm, recv_class, name, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
+    // SpannableString / SpannableStringBuilder (android_spannable.rs)
+    if crate::android_spannable::is_spannable(recv_class) {
+        if let Some(v) =
+            crate::android_spannable::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
+    // the default Display (android_display.rs)
+    if matches!(name, "getDisplay" | "getDefaultDisplay")
+        || recv_class == crate::android_display::DISPLAY
+    {
+        if let Some(v) =
+            crate::android_display::instance_intrinsic(vm, recv_class, mref_class, name, sig, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
+    // PackageManager backed by the manifest (android_pm.rs)
+    if name == "getPackageManager"
+        || recv_class == crate::android_pm::APM
+        || recv_class == "Landroid/content/pm/PackageInfo;"
+    {
+        if let Some(v) =
+            crate::android_pm::instance_intrinsic(vm, recv_class, mref_class, name, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
+    // equals/hashCode/toString of host List/Set state (jcollections.rs)
+    if vm.fw.objects.contains_key(&recv) {
+        if let Some(v) =
+            crate::jcollections::host_object_method(vm, recv_class, recv, name, sig, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
+    // annotation instances from Class.getAnnotation (jannotations.rs)
+    if let Some(v) = crate::jannotations::instance_intrinsic(vm, recv_class, name, sig, recv)? {
+        return Ok(Some(v));
+    }
+    // StringBuilder/StringBuffer full surface (jsb.rs)
+    if let Some(v) = crate::jsb::instance_intrinsic(vm, recv_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // java.lang primitive wrappers (boxes.rs): xxxValue/equals/hashCode/…
+    if let Some(v) = crate::boxes::instance_intrinsic(vm, recv_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // green threads (threads.rs): Thread ctors/start/join/name/daemon/…
+    if let Some(v) =
+        crate::threads::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // runtime permissions (perms.rs): check*/requestPermissions
+    if let Some(v) =
+        crate::perms::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // Window decor/insets (window.rs) and View system-UI flags
+    if let Some(v) = crate::window::instance_intrinsic(vm, recv_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::window::layout_params_intrinsic(vm, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // android.graphics recording pipeline + text layouts (graphics.rs)
+    if let Some(v) =
+        crate::graphics::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // Resources/Configuration/DisplayMetrics/Theme/TypedArray/Locale + Context family (android_res.rs)
+    if let Some(v) =
+        crate::xml_res::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    if let Some(v) =
+        crate::android_res::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // ClassLoader.loadClass (jlsystem.rs)
+    if let Some(v) = crate::jlsystem::class_loader_intrinsic(
+        vm,
+        mref_class,
+        name,
+        sig,
+        &[&[Value::Obj(recv)][..], args].concat()[if matches!(
+            mref_class,
+            "Ljava/lang/Class;" | "Ljava/lang/Package;"
+        ) {
+            0
+        } else {
+            1
+        }..],
+    )? {
+        return Ok(Some(v));
+    }
+    // java.io.File + Context directory getters (jfile.rs)
+    if let Some(v) = crate::juuid::instance_intrinsic(vm, recv_class, name, recv, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) =
+        crate::jio_chars::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::jtext_format::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::jregex::instance_intrinsic(vm, recv_class, name, recv, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::jfile::instance_intrinsic(vm, recv_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    if matches!(
+        name,
+        "getFilesDir"
+            | "getCacheDir"
+            | "getCodeCacheDir"
+            | "getNoBackupFilesDir"
+            | "getDataDir"
+            | "getDatabasePath"
+            | "getDir"
+            | "getExternalFilesDir"
+            | "getExternalCacheDir"
+            | "databaseList"
+            | "fileList"
+            | "deleteDatabase"
+    ) && (mref_class.starts_with("Landroid/")
+        || vm.cp.is_subtype(recv_class, "Landroid/content/Context;"))
+    {
+        if let Some(v) = crate::jfile::context_dirs(vm, name, sig, args)? {
+            return Ok(Some(v));
+        }
+    }
+    // java.time values + DateTimeFormatter (jtime.rs)
+    if let Some(v) = crate::jtime::instance_intrinsic(vm, recv_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // java.util.concurrent.locks (jlocks.rs)
+    if let Some(v) =
+        crate::jlocks::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // TreeMap / TreeSet (jsorted.rs)
+    if let Some(v) =
+        crate::jsorted::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // collection bulk ops + AbstractList/AbstractCollection templates (jcollections.rs)
+    if let Some(v) = crate::jcollections::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // reflective member lookup: Class.getMethod / Method.invoke (reflect.rs)
+    if let Some(v) = crate::reflect::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // platform UncaughtExceptionHandler (threads.rs)
+    if let Some(v) = crate::threads::ueh_intrinsic(vm, name, recv, args)? {
+        return Ok(Some(v));
+    }
+    // Throwable cause/suppressed/stack (throwable.rs)
+    if let Some(v) = crate::throwable::instance_intrinsic(vm, recv_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // ContentResolver/ContentObserver/Uri (content.rs)
+    if let Some(v) = crate::content::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // Handler messaging / Message (handler_msg.rs)
+    if let Some(v) = crate::handler_msg::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // java.lang.Class type introspection (jlclass.rs)
+    if let Some(v) = crate::jlclass::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // java.lang.String extended surface (jlstring.rs)
+    if let Some(v) = crate::jlstring::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // Bundle/BaseBundle/PersistableBundle + Intent data (bundle.rs)
+    if let Some(v) = crate::bundle::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // Activity config/results/back dispatch (activity_extras.rs)
+    if let Some(v) =
+        crate::activity_extras::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // ActivityLifecycleCallbacks (activity_callbacks.rs)
+    if let Some(v) =
+        crate::activity_callbacks::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // Choreographer frame callbacks (choreographer.rs)
+    if let Some(v) = crate::choreographer::instance_intrinsic(vm, mref_class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // ViewTreeObserver (vto.rs)
+    if let Some(v) = crate::vto::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // attach-to-window lifecycle (view_attach.rs)
+    if let Some(v) = crate::view_attach::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // View measure/layout/location, ViewConfiguration (view_layout.rs)
+    if let Some(v) = crate::view_layout::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_region::call(vm, mref_class, name, recv, args)? {
+        return Ok(Some(v));
+    }
+    // stateless platform base classes (platform_base.rs)
+    if let Some(v) = crate::platform_base::instance_intrinsic(mref_class, name, sig) {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::platform_base::a11y_manager(vm, mref_class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::platform_base::vibrator(vm, mref_class, name, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::platform_base::value_builder(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) =
+        crate::platform_base::insets_controller(vm, recv_class, mref_class, name, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::platform_base::activity_manager(vm, mref_class, name, args)? {
+        return Ok(Some(v));
+    }
+    // android.util sparse arrays / Size / Pair / Range / Rational (android_util.rs)
+    if let Some(v) = crate::android_util::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    if mref_class.starts_with("Landroid/view/") {
+        if let Some(v) = crate::window::view_intrinsic(vm, name, sig, recv, args)? {
+            return Ok(Some(v));
+        }
+    }
+    // AtomicBoolean/AtomicLong (atomics.rs), keyed on the declaring class
+    if let Some(v) = crate::atomics::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // DEX subclasses of AtomicInteger/AtomicReference (Compose's AtomicInt,
+    // …) dispatch through the declaring class: the state field is the same
+    let recv_class = if mref_class == ATOMIC_INT || mref_class == ATOMIC_REF {
+        mref_class
+    } else {
+        recv_class
+    };
     match (recv_class, name, sig) {
         (OBJECT, "<init>", "()V") => Ok(Some(Value::Null)), // ctor de Object = no-op
 
@@ -3094,6 +3937,20 @@ pub fn call_instance_intrinsic_mref(
             let cls = vm.heap.class_of(recv)?.to_string();
             let c = vm.class_object_for(&cls)?;
             Ok(Some(Value::Obj(c)))
+        }
+        // ── Object monitor methods: final on Object, so no DEX class can
+        // declare them. The VM is single-threaded: notify/notifyAll have no
+        // waiter to wake, and wait(..) returns at once (a spurious wakeup,
+        // which the JLS allows; callers re-check their condition in a loop).
+        (_, "notify" | "notifyAll", "()V") | (_, "wait", "()V" | "(J)V" | "(JI)V") => {
+            Ok(Some(Value::Null))
+        }
+        // Context.getClassLoader: single class loader per VM (the app's)
+        (_, "getClassLoader", "()Ljava/lang/ClassLoader;")
+            if vm.cp.is_subtype(recv_class, "Landroid/content/Context;")
+                || vm.cp.is_subtype(mref_class, "Landroid/content/Context;") =>
+        {
+            Ok(Some(Value::Obj(vm.class_loader_obj()?)))
         }
         // ── Activity.getApplication (M8, 38º gap real): final na plataforma;
         // o DEX do app referencia o método pela PRÓPRIA classe do receiver
@@ -3127,6 +3984,40 @@ pub fn call_instance_intrinsic_mref(
             unsafe_intrinsic(vm, name, sig, args)
         }
         // java.lang.reflect.Field/AccessibleObject metadata captured by Class.
+        // AccessibleObject on a Method/Constructor: no runtime-visible
+        // annotations are modelled (documented deviation); access is granted
+        (_, name, sig)
+            if mref_class == "Ljava/lang/reflect/AccessibleObject;"
+                && !matches!(
+                    vm.fw.objects.get(&recv),
+                    Some(crate::framework::HostObj::ReflectField { .. })
+                ) =>
+        {
+            Ok(Some(match name {
+                "getAnnotations" | "getDeclaredAnnotations" => crate::arrays::new_array(
+                    vm,
+                    "[Ljava/lang/annotation/Annotation;",
+                    crate::heap::ElemKind::Obj,
+                    Vec::new(),
+                )?,
+                "getAnnotation" | "getDeclaredAnnotation" => Value::Null,
+                "getAnnotationsByType" | "getDeclaredAnnotationsByType" => {
+                    crate::arrays::new_array(
+                        vm,
+                        "[Ljava/lang/annotation/Annotation;",
+                        crate::heap::ElemKind::Obj,
+                        Vec::new(),
+                    )?
+                }
+                "isAnnotationPresent" => Value::Int(0),
+                "isAccessible" | "trySetAccessible" | "canAccess" => Value::Int(1),
+                "setAccessible" => Value::Null,
+                _ => {
+                    let _ = sig;
+                    return Ok(None);
+                }
+            }))
+        }
         (_, name, sig)
             if (mref_class == REFLECT_FIELD
                 || mref_class == "Ljava/lang/reflect/AccessibleObject;") =>
@@ -3285,9 +4176,32 @@ pub fn call_instance_intrinsic_mref(
         {
             ref_init(vm, recv, sig, args)
         }
+        // java.lang.ref.Reference (the abstract base) — same referent field
+        (_, name, sig)
+            if mref_class == "Ljava/lang/ref/Reference;"
+                && matches!(
+                    (name, sig),
+                    ("refersTo", "(Ljava/lang/Object;)Z")
+                        | ("enqueue", "()Z")
+                        | ("isEnqueued", "()Z")
+                ) =>
+        {
+            Ok(Some(match name {
+                "refersTo" => {
+                    let cur = vm.heap.get_field(recv, "referent").unwrap_or(Value::Null);
+                    Value::Int(values_equal(&vm.heap, &cur, &args[0])? as i32)
+                }
+                // isEnqueued: sitting on its queue (cleared by the GC, not polled)
+                _ => Value::Int(matches!(
+                    vm.heap.get_field(recv, "rd$enq").unwrap_or(Value::Null),
+                    Value::Int(1)
+                ) as i32),
+            }))
+        }
         (c, name, sig)
             if (mref_class == WEAK_REF
                 || mref_class == SOFT_REF
+                || mref_class == "Ljava/lang/ref/Reference;"
                 || c == WEAK_REF
                 || c == SOFT_REF)
                 && matches!(
@@ -3298,9 +4212,8 @@ pub fn call_instance_intrinsic_mref(
         {
             ref_get_clear(vm, recv, name)
         }
-        // ReferenceQueue: sem GC nada é enfileirado — poll/remove devolvem
-        // null para sempre (na JVM real remove() BLOQUEIA; aqui a fila está
-        // permanentemente vazia, então null é a resposta honesta).
+        // ReferenceQueue: o GC enfileira referências fracas limpas; poll/remove
+        // desempilham (não bloqueante — remove() vazio devolve null).
         (c, name, sig)
             if (mref_class == REF_QUEUE || c == REF_QUEUE)
                 && matches!(
@@ -3311,7 +4224,11 @@ pub fn call_instance_intrinsic_mref(
                         | ("remove", "(J)Ljava/lang/ref/Reference;")
                 ) =>
         {
-            Ok(Some(Value::Null))
+            if name == "<init>" {
+                Ok(Some(Value::Null))
+            } else {
+                ref_queue_poll(vm, recv)
+            }
         }
 
         // ── AtomicReferenceArray (M8) ──────────────────────────────────────
@@ -3514,7 +4431,11 @@ pub fn call_instance_intrinsic_mref(
             map_intrinsic(vm, recv, name, sig, args)
         }
         (c, name, sig)
-            if (c == HASH_MAP || c == WEAK_MAP || c == LINKED_MAP || c == CONCURRENT_MAP)
+            if (c == HASH_MAP
+                || c == WEAK_MAP
+                || c == "Ljava/util/IdentityHashMap;"
+                || c == LINKED_MAP
+                || c == CONCURRENT_MAP)
                 && map_supported(name, sig) =>
         {
             map_intrinsic(vm, recv, name, sig, args)
@@ -3611,6 +4532,7 @@ pub fn call_instance_intrinsic_mref(
                 || c == VIEW_SET
                 || c == LINKED_SET
                 || c == SINGLETON_LIST
+                || c == UNMODIFIABLE_SET
                 || c == ARRAY_DEQUE)
                 && name == "iterator"
                 && sig == "()Ljava/util/Iterator;" =>
@@ -3620,9 +4542,12 @@ pub fn call_instance_intrinsic_mref(
             vm.fw
                 .objects
                 .insert(it, crate::framework::HostObj::Iter { elems, pos: 0 });
+            if !matches!(c, COW_LIST | COW_SET | SINGLETON_LIST) {
+                crate::jiterator::bind(vm, it, recv)?;
+            }
             Ok(Some(Value::Obj(it)))
         }
-        // Iterator host (M8): hasNext/next sobre o snapshot; remove → UOE
+        // Iterator host: deterministic snapshot traversal, bound removal writes through
         (c, name, sig) if c == ITERATOR && iterator_supported(name, sig) => {
             iterator_intrinsic(vm, recv, name)
         }
@@ -4078,7 +5003,7 @@ fn default_to_string(class_desc: &str, r: crate::heap::ObjRef) -> String {
     format!("{name}@{r:x}")
 }
 
-fn is_throwable_class(vm: &Engine, class: &str) -> bool {
+pub(crate) fn is_throwable_class(vm: &Engine, class: &str) -> bool {
     vm.cp.is_subtype(class, "Ljava/lang/Throwable;")
 }
 
@@ -4253,4 +5178,80 @@ fn java_round_f64(v: f64) -> i64 {
 fn java_pow(a: f64, b: f64) -> f64 {
     // Java Math.pow casos especiais mínimos cobertos por pow do Rust
     a.powf(b)
+}
+
+/// Native loading is never silently ignored, including in minimal builds.
+pub(crate) fn call_native_loader(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_native_loader_rooted(vm, class, name, sig, args))
+}
+
+fn call_native_loader_rooted(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class != "Ljava/lang/System;"
+        || !matches!(name, "loadLibrary" | "load")
+        || sig != "(Ljava/lang/String;)V"
+    {
+        return Ok(None);
+    }
+    let name = match args.first() {
+        Some(Value::Obj(r)) => vm.heap.as_str(*r)?.to_string(),
+        _ => {
+            return Err(crate::err::Throwable::new(
+                "Ljava/lang/NullPointerException;",
+                "native library name",
+            )
+            .into())
+        }
+    };
+    #[cfg(feature = "native")]
+    {
+        crate::native::load(vm, &name)?;
+        Ok(Some(Value::Null))
+    }
+    #[cfg(not(feature = "native"))]
+    {
+        let _ = name;
+        Err(crate::err::Throwable::new(
+            "Ljava/lang/UnsatisfiedLinkError;",
+            "LANG-02 disabled: rebuild with --features native",
+        )
+        .into())
+    }
+}
+
+/// Entries of any `java.util.Map` (host or DEX) via the interface contract:
+/// `entrySet().iterator()`, then `getKey`/`getValue` on each entry, all
+/// through virtual dispatch.
+fn map_entries_via_iteration(
+    vm: &mut Engine,
+    map: crate::heap::ObjRef,
+) -> Result<Vec<(Value, Value)>, VmExit> {
+    let set = vm.invoke_instance(map, "entrySet", "()Ljava/util/Set;", &[])?;
+    let Value::Obj(set) = set else {
+        return Ok(Vec::new());
+    };
+    let it = vm.invoke_instance(set, "iterator", "()Ljava/util/Iterator;", &[])?;
+    let Value::Obj(it) = it else {
+        return Ok(Vec::new());
+    };
+    let mut out = Vec::new();
+    while vm.invoke_instance(it, "hasNext", "()Z", &[])?.as_int()? != 0 {
+        let e = vm.invoke_instance(it, "next", "()Ljava/lang/Object;", &[])?;
+        let Value::Obj(e) = e else { continue };
+        let k = vm.invoke_instance(e, "getKey", "()Ljava/lang/Object;", &[])?;
+        let v = vm.invoke_instance(e, "getValue", "()Ljava/lang/Object;", &[])?;
+        out.push((k, v));
+    }
+    Ok(out)
 }
