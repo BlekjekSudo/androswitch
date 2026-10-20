@@ -1078,7 +1078,15 @@ impl Engine {
         // themselves: deliver a real DOWN → MOVE… → UP MotionEvent stream.
         let mut dex = Vec::new();
         self.collect_dex_roots(root, &mut dex, 0);
-        if !dex.is_empty() || root != content {
+        // down+up on the same view with a host click handler stays a click
+        // (Android tap-vs-scroll semantics of the host widget model)
+        let start_t = self.hit_test(root, x1, y1);
+        let host_click = start_t.is_some()
+            && start_t == self.hit_test(root, x2, y2)
+            && start_t.is_some_and(|t| {
+                self.click_listener_of(t).is_some() || self.click_method_of(t).is_some()
+            });
+        if !host_click && (!dex.is_empty() || root != content) {
             let pts: Vec<(i32, i32)> = (0..=STEPS)
                 .map(|i| {
                     let t = i as f32 / STEPS as f32;

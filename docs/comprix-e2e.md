@@ -339,3 +339,86 @@ the following are still untested through MCP:
 - share, backup, the widget, and the camera/OCR features.
 
 The MCP scenario files for them follow the `s01-launch.json` format.
+
+## Rounds 4–5 addendum (fixes 24–76)
+
+Rounds 4–5 took Comprix from a blank frame to an end-to-end flow driven
+through `rd mcp`:
+1. onboarding (4 pages);
+2. "Minhas listas";
+3. the "Criar nova lista" bottom sheet (swipe to expand);
+4. "Criar e adicionar itens", which creates the list (Room insert) and
+   navigates to it;
+5. the new list's detail screen ("Compras de janeiro", quick add, total
+   R$ 0,00);
+6. BACK;
+7. all five tabs: Listas, Comparar, Scanner, Histórico, Ajustes.
+
+Every fix is a general RustyDroid addition; nothing is Comprix-specific.
+
+| # | Fix |
+|---|---|
+| 24–28 | Host layout respects the guest; `dispatchDraw` emulation; `RD_TRACE_DRAW` |
+| 29–37 | ColorSpace; `createBitmap`; CLEAR/tint; `Layout.draw`; `RD_TRACE_METHOD`; letterSpacing |
+| 38–44 | MotionEvent/touch; `View.post`; Matrix; drawables; vsync clock; `removeViews` |
+| 45–55 | `ensure_laid_out`; db exceptions; `RD_SQL_TRACE`; `Map.putAll`; R8 stub shadowing; `subList` views; Drawable.Callback; ContextWrapper; Dialog/Window methods and lifecycle; `onBackPressed` |
+| 56 | Dialog windows: attach, floating layout, scrim and overlay draw, topmost-window touch/BACK, cancel-on-outside, `ui_tree` |
+| 57 | `findOnBackInvokedDispatcher` |
+| 58–59 | `java.text.BreakIterator`, `java.util.PriorityQueue` |
+| 60 | Inherited platform methods called through a DEX subclass fall back to the platform ancestor |
+| 61 | `java.lang.ref.Reference` methods |
+| 62 | android.text Layout family in the class hierarchy (a missing entry caused a ClassCastException in the draw pass) |
+| 63 | Bundle/Intent extras store boxed values; typed getters unbox and widen |
+| 64 | `java.math.BigDecimal`/`BigInteger`/`RoundingMode` (i128 unscaled value + scale, JDK semantics) |
+| 65 | Generic View `clearX()`, add/remove listener no-ops, `scrollTo`/`scrollBy`, `setPadding`, haptics/sound |
+| 66 | ViewRootImpl-style traversals: `requestLayout`, window add/remove and `setContentView` schedule a layout pass on the next vsync. Plain `invalidate()` does not, which avoids per-frame relayout churn without a GC |
+| 67 | `swipe` delivers DOWN/MOVE/UP MotionEvents to the topmost window (Compose drags and sheets); host click semantics are kept |
+| 68 | `Object.notify`/`notifyAll`/`wait` (final Object methods; single-threaded VM) |
+| 69 | CLI `--script "swipe X1,Y1,X2,Y2[,MS]"` |
+| 70 | `Resources.openRawResource` returns a ByteArrayInputStream over the APK entry |
+| 71 | `Heap::alloc_array_zeroed`; Reader scratch buffers had been 0-length |
+| 72 | `java.text.Normalizer` (NFD/NFC/NFKD/NFKC, tables generated from Unicode data) |
+| 73 | `java.util.Random` (JDK LCG, bit-exact) and `ThreadLocalRandom` |
+| 74 | `Class.getField` (public, inherited, platform constants); `Field.get` boxes primitive statics |
+| 75 | Context hierarchy: Activity → ContextThemeWrapper → ContextWrapper. A `ContextImpl` base context ends unwrap loops |
+| 76 | Host map keys: Long boxes compare as 64-bit values; `Enum.valueOf(Class,String)`; `Context.getClassLoader` |
+| diag | VM errors name the faulting instruction (`[pc 0x62: Insn{..}]`) of the innermost frame |
+
+### MCP latency (round 5, release build, 720×1440)
+
+Runs `r5g` (s06, create flow) and `r5h` (s07, tabs):
+
+| Tool | Real time | Notes |
+|---|---|---|
+| install | 16–38 ms | |
+| launch | 864–924 ms | cold; Compose and Room `<clinit>` |
+| tap | 36–236 ms (the first tap: 520–550 ms) | first-tap JIT-like warm-up of the Compose input path |
+| wait 1000 ms (virtual) | 1.4–3.3 s | onboarding pager animations |
+| wait 1500 ms (virtual), idle tab | 0.3–1.4 s | |
+| wait after creating a list | 5.6–7.7 s | Room insert + navigation + first composition of the list screen |
+| swipe (800 ms gesture) | 650–890 ms | 9 MotionEvents, with vsync drains between them |
+| screenshot | 300–1576 ms | full draw pass and PNG (~3.1 MB) |
+| key BACK | 1.2–1.9 s | navigation pop + recomposition |
+| ui_tree / logs / runtime_health | 0.1–2.3 ms | |
+
+Before fix 66, the 1000 ms wait during the sheet animation took 9.8 s and
+the heap grew past 256 MB (OOM). After it, the same flow peaks at about
+54–105 MB.
+
+### Open items and what to improve next
+
+1. **Garbage collector.** RustyDroid never frees memory. A long session
+   (create a list, then all tabs, about 18 s of virtual time) reaches the
+   256 MB heap ceiling. A collector that runs at safe points between
+   looper messages (roots: statics, host objects, looper queue, frame
+   callbacks and side maps) is the top item.
+2. **`type_text` for Compose text fields.** Today it only types into host
+   EditTexts; Compose fields need the InputConnection/IME path.
+3. **Sheet animation speed.** The Material sheet settles about 3× slower in
+   virtual time than on a device (exponential approach; still under
+   investigation).
+4. **Scanner tab.** It returns to Listas (camera/ML Kit not modelled).
+5. **Screenshots.** Cache the frame until something is invalidated, and
+   use cheaper PNG encoding (deflate level, or a delta frame).
+6. **Faster cold launch.** Use a warm start or snapshot.
+7. **Make NOT_FOUND catchable,** and cache negative method resolution.

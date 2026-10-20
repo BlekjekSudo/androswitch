@@ -290,6 +290,9 @@ pub fn call_static_intrinsic(
     if let Some(v) = crate::android_colorspace::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
+    if class == ENUM && name == "valueOf" {
+        return enum_value_of(vm, args).map(Some);
+    }
     if let Some(v) = crate::jrandom::static_intrinsic(vm, class, name)? {
         return Ok(Some(v));
     }
@@ -2323,6 +2326,56 @@ fn ref_get_clear(
 /// Enum host (M8): estado nos campos de heap `name`/`ordinal` (padrão
 /// StringBuilder/Throwable). `values()`/`valueOf()` são estáticos sintéticos
 /// da classe do app (DEX) — executam normal no interpretador.
+/// `Enum.valueOf(Class, String)`: the enum's constants are its static fields
+/// of its own type; match on the `name` given to `Enum.<init>` (R8 may rename
+/// the fields, never the names). Host enums resolve through host statics.
+fn enum_value_of(vm: &mut Engine, args: &[Value]) -> Result<Value, VmExit> {
+    let desc = match args.first() {
+        Some(Value::Obj(c)) => match vm
+            .heap
+            .get_field(*c, "class_name")
+            .or_else(|_| vm.heap.get_field(*c, "name"))
+        {
+            Ok(Value::Obj(r)) => vm.heap.as_str(r)?.to_string(),
+            _ => String::new(),
+        },
+        _ => String::new(),
+    };
+    let wanted = match args.get(1) {
+        Some(v @ Value::Obj(_)) => string_arg(vm, v)?,
+        _ => {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/NullPointerException;",
+                "Name is null",
+            )))
+        }
+    };
+    if vm.cp.find_class(&desc).is_some() {
+        vm.ensure_initialized(&desc)?;
+        for (decl, fname, ftype, _, is_static) in vm.cp.declared_fields_info(&desc) {
+            if !is_static || ftype != desc {
+                continue;
+            }
+            if let Some(Value::Obj(c)) = vm.statics.get(&(decl, fname)).cloned() {
+                if let Ok(Value::Obj(n)) = vm.heap.get_field(c, "name") {
+                    if vm.heap.as_str(n).ok() == Some(wanted.as_str()) {
+                        return Ok(Value::Obj(c));
+                    }
+                }
+            }
+        }
+    } else if let Some(v @ Value::Obj(_)) = platform_static(vm, &desc, &wanted)? {
+        return Ok(v);
+    }
+    Err(VmExit::Exception(Throwable::new(
+        "Ljava/lang/IllegalArgumentException;",
+        format!(
+            "No enum constant {}.{wanted}",
+            descriptor_to_class_name(&desc)
+        ),
+    )))
+}
+
 fn enum_intrinsic(
     vm: &mut Engine,
     recv: crate::heap::ObjRef,
@@ -3870,6 +3923,13 @@ fn instance_intrinsic_dispatch(
         // which the JLS allows; callers re-check their condition in a loop).
         (_, "notify" | "notifyAll", "()V") | (_, "wait", "()V" | "(J)V" | "(JI)V") => {
             Ok(Some(Value::Null))
+        }
+        // Context.getClassLoader: single class loader per VM (the app's)
+        (_, "getClassLoader", "()Ljava/lang/ClassLoader;")
+            if vm.cp.is_subtype(recv_class, "Landroid/content/Context;")
+                || vm.cp.is_subtype(mref_class, "Landroid/content/Context;") =>
+        {
+            Ok(Some(Value::Obj(vm.class_loader_obj()?)))
         }
         // ── Activity.getApplication (M8, 38º gap real): final na plataforma;
         // o DEX do app referencia o método pela PRÓPRIA classe do receiver
