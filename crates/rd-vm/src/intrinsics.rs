@@ -290,6 +290,11 @@ pub fn call_static_intrinsic(
     if let Some(v) = crate::android_colorspace::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
+    if class.starts_with("Ljava/math/") {
+        if let Some(v) = crate::jbigdecimal::static_intrinsic(vm, class, name, sig, args)? {
+            return Ok(Some(v));
+        }
+    }
     if let Some(v) = crate::jbreakiter::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
@@ -3372,6 +3377,17 @@ fn instance_intrinsic_dispatch(
         crate::jpriorityqueue::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
     {
         return Ok(Some(v));
+    }
+    // java.math.BigDecimal / BigInteger (jbigdecimal.rs)
+    if recv_class == crate::jbigdecimal::BD
+        || recv_class == crate::jbigdecimal::BI
+        || vm.bignums.contains_key(&recv)
+    {
+        if let Some(v) =
+            crate::jbigdecimal::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
+        {
+            return Ok(Some(v));
+        }
     }
     // java.text.BreakIterator (jbreakiter.rs)
     if recv_class == crate::jbreakiter::BI || vm.break_iters.contains_key(&recv) {

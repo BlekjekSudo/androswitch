@@ -86,6 +86,8 @@ pub struct Engine {
     pub(crate) view_props: HashMap<(crate::heap::ObjRef, String), Value>,
     /// `java.text.BreakIterator` state (jbreakiter.rs)
     pub(crate) break_iters: HashMap<crate::heap::ObjRef, crate::jbreakiter::BreakState>,
+    /// BigDecimal/BigInteger values: (unscaled, scale) (jbigdecimal.rs).
+    pub(crate) bignums: HashMap<crate::heap::ObjRef, (i128, i32)>,
     /// view_attach.rs: OnAttachStateChangeListeners per view
     pub(crate) attach_listeners: HashMap<crate::heap::ObjRef, Vec<crate::heap::ObjRef>>,
     /// view_attach.rs: views currently attached to a window
@@ -164,6 +166,7 @@ impl Engine {
             system_ui_visibility: HashMap::new(),
             view_props: HashMap::new(),
             break_iters: HashMap::new(),
+            bignums: HashMap::new(),
             attach_listeners: HashMap::new(),
             attached_views: HashSet::new(),
             gfx: Default::default(),

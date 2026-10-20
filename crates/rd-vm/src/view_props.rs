@@ -209,6 +209,56 @@ pub(crate) fn fallback(
                 .unwrap_or(Value::Null),
         ));
     }
+    // clearXxx() undoes setXxx(..) (clearViewTranslationCallback,
+    // clearAnimation-style resets of stored properties)
+    if let Some(prop) = name.strip_prefix("clear") {
+        if ret == "V" && args.is_empty() && prop.starts_with(|c: char| c.is_ascii_uppercase()) {
+            vm.view_props.remove(&(recv, prop.to_string()));
+            return Ok(Some(Value::Null));
+        }
+    }
+    // add/removeXxxListener|Callback(l): registrations with no headless
+    // event source (layout-change, unhandled-key, insets-animation, …)
+    if ret == "V"
+        && args.len() == 1
+        && (name.starts_with("add") || name.starts_with("remove"))
+        && (name.ends_with("Listener") || name.ends_with("Callback"))
+    {
+        return Ok(Some(Value::Null));
+    }
+    match (name, sig) {
+        ("scrollTo", "(II)V") | ("scrollBy", "(II)V") => {
+            for (i, k) in ["ScrollX", "ScrollY"].iter().enumerate() {
+                let d = args.get(i).and_then(|v| v.as_int().ok()).unwrap_or(0);
+                let key = (recv, k.to_string());
+                let base = if name == "scrollBy" {
+                    vm.view_props
+                        .get(&key)
+                        .and_then(|v| v.as_int().ok())
+                        .unwrap_or(0)
+                } else {
+                    0
+                };
+                vm.view_props.insert(key, Value::Int(base.wrapping_add(d)));
+            }
+            return Ok(Some(Value::Null));
+        }
+        ("setPadding", "(IIII)V") | ("setPaddingRelative", "(IIII)V") => {
+            for (i, k) in ["PaddingLeft", "PaddingTop", "PaddingRight", "PaddingBottom"]
+                .iter()
+                .enumerate()
+            {
+                let v = args.get(i).and_then(|v| v.as_int().ok()).unwrap_or(0);
+                vm.view_props.insert((recv, k.to_string()), Value::Int(v));
+            }
+            return Ok(Some(Value::Null));
+        }
+        ("playSoundEffect", "(I)V") | ("drawableHotspotChanged", "(FF)V") => {
+            return Ok(Some(Value::Null))
+        }
+        ("performHapticFeedback", _) => return Ok(Some(Value::Int(0))),
+        _ => {}
+    }
     if let Some(prop) = name.strip_prefix("set") {
         if ret == "V" && args.len() == 1 && prop.starts_with(|c: char| c.is_ascii_uppercase()) {
             vm.view_props

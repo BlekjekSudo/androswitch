@@ -1047,6 +1047,11 @@ fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
         "Ljava/util/concurrent/atomic/AtomicBoolean;" => Some(OBJECT.to_vec()),
         "Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;" => Some(OBJECT.to_vec()),
         "Ljava/lang/Enum;" => Some(OBJECT.to_vec()),
+        // java.math (jbigdecimal.rs)
+        "Ljava/math/BigDecimal;" | "Ljava/math/BigInteger;" => {
+            Some(vec!["Ljava/lang/Number;", "Ljava/lang/Object;"])
+        }
+        "Ljava/math/RoundingMode;" => Some(vec!["Ljava/lang/Enum;", "Ljava/lang/Object;"]),
         "Ljava/lang/ref/Reference;" => Some(OBJECT.to_vec()),
         "Ljava/lang/ref/WeakReference;" => {
             Some(vec!["Ljava/lang/ref/Reference;", "Ljava/lang/Object;"])
@@ -1335,6 +1340,9 @@ fn builtin_interfaces(class: &str) -> Option<Vec<&'static str>> {
         | "Ljava/util/concurrent/atomic/AtomicBoolean;" => Some(vec!["Ljava/io/Serializable;"]),
         "Ljava/util/concurrent/ExecutorService;" => Some(vec!["Ljava/util/concurrent/Executor;"]),
         "Ljava/util/ServiceLoader;" => Some(vec!["Ljava/lang/Iterable;"]),
+        "Ljava/math/BigDecimal;" | "Ljava/math/BigInteger;" => {
+            Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"])
+        }
         "Ljava/lang/Enum;" => Some(vec!["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
         "Ljava/lang/Thread;" => Some(vec!["Ljava/lang/Runnable;"]),
         _ => None,

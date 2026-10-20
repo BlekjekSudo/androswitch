@@ -805,6 +805,10 @@ pub(crate) fn exec_frame(
                     if let Some(c) = step!(crate::boxes::host_static(vm, &owner, &fname)) {
                         vm.statics.insert((owner.clone(), fname.clone()), c);
                     } else if let Some(c) =
+                        step!(crate::jbigdecimal::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
                         step!(crate::jtext_format::host_static(vm, &owner, &fname))
                     {
                         vm.statics.insert((owner.clone(), fname.clone()), c);

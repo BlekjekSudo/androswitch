@@ -178,6 +178,12 @@ fn typed_access(
     };
     if is_put && params.len() == 2 {
         let v = args.get(1).cloned().unwrap_or(Value::Null);
+        // AOSP keeps boxed values in the map: `get(key)` must return an
+        // object (Integer/Long/…), and typed getters unbox it
+        let v = match wrapper_of(&params[1]) {
+            Some(w) => Value::Obj(crate::boxes::box_value(vm, w, v)?),
+            None => v,
+        };
         if is_intent {
             if let Some(HostObj::Intent { extras, .. }) = vm.fw.objects.get_mut(&list_owner) {
                 store(extras, key, v);
@@ -195,7 +201,7 @@ fn typed_access(
         name.starts_with("get")
     };
     if is_get {
-        let cur = read(vm);
+        let cur = read(vm).map(|v| coerce_stored(vm, v, &ret)).transpose()?;
         return Ok(Some(match (cur, params.len()) {
             (Some(v), _) => v,
             // getX(key, default) — but not getParcelable(key, Class) (API 33)
@@ -204,6 +210,77 @@ fn typed_access(
         }));
     }
     Ok(None)
+}
+
+/// Wrapper class for a primitive descriptor.
+fn wrapper_of(desc: &str) -> Option<&'static str> {
+    Some(match desc {
+        "I" => "Ljava/lang/Integer;",
+        "J" => "Ljava/lang/Long;",
+        "Z" => "Ljava/lang/Boolean;",
+        "F" => "Ljava/lang/Float;",
+        "D" => "Ljava/lang/Double;",
+        "S" => "Ljava/lang/Short;",
+        "B" => "Ljava/lang/Byte;",
+        "C" => "Ljava/lang/Character;",
+        _ => return None,
+    })
+}
+
+/// A stored map value as the getter's declared return type: primitive
+/// getters unbox (and widen, e.g. getLong over an int), object getters box
+/// raw primitives stored by host code.
+fn coerce_stored(vm: &mut Engine, v: Value, ret: &str) -> Result<Value, VmExit> {
+    let prim = match &v {
+        Value::Obj(o) if wrapper_of(ret).is_some() => {
+            let cls = vm.heap.class_of(*o)?.to_string();
+            if cls.starts_with("Ljava/lang/") {
+                vm.heap.get_field(*o, "value").unwrap_or(v.clone())
+            } else {
+                v.clone()
+            }
+        }
+        _ => v.clone(),
+    };
+    Ok(match ret {
+        "J" => Value::Long(match prim {
+            Value::Int(i) => i as i64,
+            other => other.as_long().unwrap_or(0),
+        }),
+        "I" | "Z" | "S" | "B" | "C" => Value::Int(prim.as_int().unwrap_or(0)),
+        "F" => Value::Float(prim.as_float().unwrap_or(0.0)),
+        "D" => Value::Double(prim.as_double().unwrap_or(0.0)),
+        "Ljava/lang/Object;"
+        | "Ljava/lang/Number;"
+        | "Ljava/io/Serializable;"
+        | "Ljava/lang/Integer;"
+        | "Ljava/lang/Long;"
+        | "Ljava/lang/Float;"
+        | "Ljava/lang/Double;" => match v {
+            Value::Int(i) => Value::Obj(crate::boxes::box_value(
+                vm,
+                "Ljava/lang/Integer;",
+                Value::Int(i),
+            )?),
+            Value::Long(l) => Value::Obj(crate::boxes::box_value(
+                vm,
+                "Ljava/lang/Long;",
+                Value::Long(l),
+            )?),
+            Value::Float(f) => Value::Obj(crate::boxes::box_value(
+                vm,
+                "Ljava/lang/Float;",
+                Value::Float(f),
+            )?),
+            Value::Double(d) => Value::Obj(crate::boxes::box_value(
+                vm,
+                "Ljava/lang/Double;",
+                Value::Double(d),
+            )?),
+            other => other,
+        },
+        _ => v,
+    })
 }
 
 fn bundle(

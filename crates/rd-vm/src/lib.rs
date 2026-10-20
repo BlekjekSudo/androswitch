@@ -36,6 +36,7 @@ pub mod inflate;
 pub mod interp;
 pub mod intrinsics;
 pub(crate) mod jannotations;
+pub(crate) mod jbigdecimal;
 pub(crate) mod jbreakiter;
 pub(crate) mod jcollections;
 pub(crate) mod jfile;
