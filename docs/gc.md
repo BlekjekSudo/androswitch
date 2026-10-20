@@ -47,8 +47,10 @@ allocations.
 
 - `WeakReference`/`PhantomReference` referents (app subclasses included) are
   cleared when nothing else reaches them; `SoftReference` stays strong
-  (Android clears softs only under memory pressure). `ReferenceQueue`
-  enqueueing and `WeakHashMap` key weakness are not modelled yet.
+  (Android clears softs only under memory pressure). A cleared reference
+  registered with a `ReferenceQueue` is enqueued (intrusive list in heap
+  fields `rd$head`/`rd$next`; `poll`/`remove` are non-blocking).
+  `WeakHashMap` key weakness is not modelled yet (it behaves as `HashMap`).
 - Conservative roots mean an integer in host state that equals a live id
   keeps that object (and what it reaches) alive — harmless over-retention.
 - No collection *inside* a single long-running Java call (no frame maps); the

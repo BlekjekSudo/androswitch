@@ -58,7 +58,7 @@ const ENUM: &str = "Ljava/lang/Enum;";
 /// M8: família java.lang.ref — quarto gap do launch real (WeakReference.
 /// <init>). O GC (`gc.rs`) limpa o referent de WeakReference/PhantomReference
 /// quando nada mais o alcança; SoftReference fica forte (Android só limpa sob
-/// pressão de memória). ReferenceQueue não recebe enfileiramento.
+/// pressão de memória). Limpas com fila registrada vão para a ReferenceQueue.
 /// M8: quinto gap do launch real — `newUpdater(Class,Class,String)` caía no
 /// NOT_IMPLEMENTED tipado do catch-all `Ljava/`. Updater host: captura o NOME
 /// do campo e opera via get_field/put_field (sem volatile/checks — VM
@@ -2289,7 +2289,7 @@ fn arfu_intrinsic(
 
 /// `<init>` de WeakReference/SoftReference (M8): referent no campo de heap
 /// "referent" (o GC não o traça através de WeakReference — ver `gc.rs`). A
-/// variante com ReferenceQueue IGNORA a fila (nada é enfileirado).
+/// variante com ReferenceQueue guarda a fila no campo `queue` (o GC enfileira).
 fn ref_init(
     vm: &mut Engine,
     recv: crate::heap::ObjRef,
@@ -2302,7 +2302,25 @@ fn ref_init(
         args[0].clone()
     };
     crate::err::put_field_result(vm.heap.put_field(recv, "referent", referent))?;
+    if let Some(q @ Value::Obj(_)) = args.get(1) {
+        crate::err::put_field_result(vm.heap.put_field(recv, "queue", q.clone()))?;
+    }
     Ok(Some(Value::Null))
+}
+
+/// ReferenceQueue.poll/remove: pop the intrusive list the GC fills
+/// (`gc.rs`). Non-blocking — `remove()` returning null when empty is the
+/// honest single-threaded answer.
+fn ref_queue_poll(vm: &mut Engine, q: crate::heap::ObjRef) -> Result<Option<Value>, VmExit> {
+    let head = vm.heap.get_field(q, "rd$head").unwrap_or(Value::Null);
+    if let Value::Obj(h) = head {
+        let next = vm.heap.get_field(h, "rd$next").unwrap_or(Value::Null);
+        crate::err::put_field_result(vm.heap.put_field(q, "rd$head", next))?;
+        crate::err::put_field_result(vm.heap.put_field(h, "rd$next", Value::Null))?;
+        crate::err::put_field_result(vm.heap.put_field(h, "rd$enq", Value::Int(0)))?;
+        crate::err::put_field_result(vm.heap.put_field(h, "queue", Value::Null))?;
+    }
+    Ok(Some(head))
 }
 
 /// get/clear de WeakReference/SoftReference (M8).
@@ -4170,8 +4188,11 @@ fn instance_intrinsic_dispatch(
                     let cur = vm.heap.get_field(recv, "referent").unwrap_or(Value::Null);
                     Value::Int(values_equal(&vm.heap, &cur, &args[0])? as i32)
                 }
-                // no GC/ReferenceQueue: never enqueued
-                _ => Value::Int(0),
+                // isEnqueued: sitting on its queue (cleared by the GC, not polled)
+                _ => Value::Int(matches!(
+                    vm.heap.get_field(recv, "rd$enq").unwrap_or(Value::Null),
+                    Value::Int(1)
+                ) as i32),
             }))
         }
         (c, name, sig)
@@ -4188,9 +4209,8 @@ fn instance_intrinsic_dispatch(
         {
             ref_get_clear(vm, recv, name)
         }
-        // ReferenceQueue: sem GC nada é enfileirado — poll/remove devolvem
-        // null para sempre (na JVM real remove() BLOQUEIA; aqui a fila está
-        // permanentemente vazia, então null é a resposta honesta).
+        // ReferenceQueue: o GC enfileira referências fracas limpas; poll/remove
+        // desempilham (não bloqueante — remove() vazio devolve null).
         (c, name, sig)
             if (mref_class == REF_QUEUE || c == REF_QUEUE)
                 && matches!(
@@ -4201,7 +4221,11 @@ fn instance_intrinsic_dispatch(
                         | ("remove", "(J)Ljava/lang/ref/Reference;")
                 ) =>
         {
-            Ok(Some(Value::Null))
+            if name == "<init>" {
+                Ok(Some(Value::Null))
+            } else {
+                ref_queue_poll(vm, recv)
+            }
         }
 
         // ── AtomicReferenceArray (M8) ──────────────────────────────────────

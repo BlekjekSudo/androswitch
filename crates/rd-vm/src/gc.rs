@@ -273,6 +273,17 @@ impl Engine {
             if !m.marked.get(referent as usize).copied().unwrap_or(true) {
                 let _ = self.heap.put_field(wr, "referent", Value::Null);
                 cleared_weak += 1;
+                // registered ReferenceQueue: enqueue on an intrusive list kept
+                // in heap fields (`rd$head` / `rd$next`), traced like any field
+                if let Value::Obj(q) = self.heap.get_field(wr, "queue").unwrap_or(Value::Null) {
+                    let enq = self.heap.get_field(wr, "rd$enq").unwrap_or(Value::Null);
+                    if !matches!(enq, Value::Int(1)) {
+                        let head = self.heap.get_field(q, "rd$head").unwrap_or(Value::Null);
+                        let _ = self.heap.put_field(wr, "rd$next", head);
+                        let _ = self.heap.put_field(wr, "rd$enq", Value::Int(1));
+                        let _ = self.heap.put_field(q, "rd$head", Value::Obj(wr));
+                    }
+                }
             }
         }
         let t_mark = t0.elapsed();
