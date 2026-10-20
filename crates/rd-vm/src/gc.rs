@@ -19,7 +19,9 @@
 //!   traced only when its key object is reachable, and purged when the key is
 //!   freed — that is where most garbage lives.
 //! - **Heap graph is precise.** Instance fields and array elements are traced
-//!   through `Value::Obj`.
+//!   through `Value::Obj`. `WeakReference`/`PhantomReference` (and app
+//!   subclasses) do not keep their `referent` alive: it is cleared to null
+//!   when nothing else reaches it. `SoftReference` stays strong.
 //! - **Non-moving, slots recycled.** A freed slot becomes a tombstone
 //!   instance of `Lrd/gc/Freed;` (contents dropped, bytes returned to the
 //!   budget) and goes on the heap free list; allocation reuses it (LIFO)
@@ -44,6 +46,8 @@ pub struct GcStats {
     pub last_used_before: usize,
     pub last_used_after: usize,
     pub last_pause_ms: f64,
+    /// WeakReference/PhantomReference referents cleared in the last cycle.
+    pub last_cleared_weak: usize,
     pub total_freed_objects: u64,
     pub total_freed_bytes: u64,
 }
@@ -149,11 +153,30 @@ impl Engine {
             m.push(r);
         }
         let mut text = String::new();
+        // weak references: (reference, referent) pairs whose referent is not
+        // traced through the reference; cleared after marking if unreached
+        let mut weak: Vec<(ObjRef, ObjRef)> = Vec::new();
+        let mut is_weak_class: std::collections::HashMap<String, bool> = Default::default();
         while let Some(r) = m.stack.pop() {
             match self.heap.get(r) {
-                Ok(HeapObj::Instance { fields, .. }) => {
-                    for (_, v) in fields {
+                Ok(HeapObj::Instance { class, fields }) => {
+                    for (name, v) in fields {
                         if let Value::Obj(x) = v {
+                            if name == "referent" {
+                                let cp = &self.cp;
+                                let weak_ref =
+                                    *is_weak_class.entry(class.clone()).or_insert_with(|| {
+                                        cp.is_subtype(class, "Ljava/lang/ref/WeakReference;")
+                                            || cp.is_subtype(
+                                                class,
+                                                "Ljava/lang/ref/PhantomReference;",
+                                            )
+                                    });
+                                if weak_ref {
+                                    weak.push((r, *x));
+                                    continue;
+                                }
+                            }
                             cand.push(*x);
                         }
                     }
@@ -188,6 +211,16 @@ impl Engine {
             }
             for x in cand.drain(..) {
                 m.push(x);
+            }
+        }
+        // clear weak references whose referent only they kept alive (ART
+        // semantics; SoftReference stays strong — cleared only under memory
+        // pressure on Android). ReferenceQueue enqueue is not modelled.
+        let mut cleared_weak = 0usize;
+        for (wr, referent) in weak {
+            if !m.marked.get(referent as usize).copied().unwrap_or(true) {
+                let _ = self.heap.put_field(wr, "referent", Value::Null);
+                cleared_weak += 1;
             }
         }
         let t_mark = t0.elapsed();
@@ -239,6 +272,7 @@ impl Engine {
             last_used_before: used_before,
             last_used_after: self.heap.used(),
             last_pause_ms: t0.elapsed().as_secs_f64() * 1000.0,
+            last_cleared_weak: cleared_weak,
             total_freed_objects: prev.total_freed_objects + freed as u64,
             total_freed_bytes: prev.total_freed_bytes + freed_bytes as u64,
         };

@@ -530,3 +530,9 @@ snapshot iterator, also present with `RD_GC=off`), which limits how far the
 end-to-end stress can push; the unit test `long_session_stays_under_budget`
 covers the long-session property directly (8 MB budget, ~25× the budget
 allocated across 200 tool calls, live set intact; the arena OOMs before call 20).
+
+**Weak references (same round).** `WeakReference`/`PhantomReference` referents
+are now cleared when nothing else reaches them (SoftReference stays strong).
+Re-running the flows: identical OK/ERR outcomes; real Compose weak references
+were cleared (42 in an `s08-observe` cycle, 13 in `s11-type`, 30 per cycle in
+`s12-gc`) and `s12-gc` ends at 6.8 MB (was 7.6 MB with strong weak refs).

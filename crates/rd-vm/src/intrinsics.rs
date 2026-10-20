@@ -56,9 +56,9 @@ const MATH: &str = "Ljava/lang/Math;";
 /// M8: base de enums — terceiro gap do launch real (EIIE em Enum.<init>).
 const ENUM: &str = "Ljava/lang/Enum;";
 /// M8: família java.lang.ref — quarto gap do launch real (WeakReference.
-/// <init>). Sem GC na arena ⇒ referências fracas/soft NUNCA são limpas
-/// espontaneamente; o referent vive até `clear()` — limitação documentada
-/// (mesma política do WeakHashMap host).
+/// <init>). O GC (`gc.rs`) limpa o referent de WeakReference/PhantomReference
+/// quando nada mais o alcança; SoftReference fica forte (Android só limpa sob
+/// pressão de memória). ReferenceQueue não recebe enfileiramento.
 /// M8: quinto gap do launch real — `newUpdater(Class,Class,String)` caía no
 /// NOT_IMPLEMENTED tipado do catch-all `Ljava/`. Updater host: captura o NOME
 /// do campo e opera via get_field/put_field (sem volatile/checks — VM
@@ -2288,8 +2288,8 @@ fn arfu_intrinsic(
 }
 
 /// `<init>` de WeakReference/SoftReference (M8): referent no campo de heap
-/// "referent". A variante com ReferenceQueue IGNORA a fila — sem GC na arena
-/// nada é enfileirado (documentado).
+/// "referent" (o GC não o traça através de WeakReference — ver `gc.rs`). A
+/// variante com ReferenceQueue IGNORA a fila (nada é enfileirado).
 fn ref_init(
     vm: &mut Engine,
     recv: crate::heap::ObjRef,

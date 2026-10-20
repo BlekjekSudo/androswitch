@@ -140,3 +140,101 @@ fn long_session_stays_under_budget() {
     // recycled slots: the slot vector stays far below total allocations
     assert!(e.heap.len() < 2_000, "slots {}", e.heap.len());
 }
+
+/// Host-backed objects: the host half (`fw.objects`, e.g. an ArrayList) is
+/// traced only while its heap object is reachable, and purged with it.
+#[test]
+fn host_object_table_is_ephemeron() {
+    use rd_vm::framework::HostObj;
+    let mut e = Engine::new(vec![], VmConfig::default());
+    let elem = e.heap.alloc_string("in list".into()).unwrap();
+    let list = e
+        .heap
+        .alloc_instance("Ljava/util/ArrayList;".into(), Vec::new())
+        .unwrap();
+    e.fw.objects.insert(
+        list,
+        HostObj::List {
+            elems: vec![Value::Obj(elem)],
+        },
+    );
+    let dead_elem = e.heap.alloc_string("in dead list".into()).unwrap();
+    let dead = e
+        .heap
+        .alloc_instance("Ljava/util/ArrayList;".into(), Vec::new())
+        .unwrap();
+    e.fw.objects.insert(
+        dead,
+        HostObj::List {
+            elems: vec![Value::Obj(dead_elem)],
+        },
+    );
+    e.statics
+        .insert(("LRoot;".into(), "l".into()), Value::Obj(list));
+    e.gc();
+    assert_eq!(
+        e.heap.as_str(elem).unwrap(),
+        "in list",
+        "element of a live host list kept"
+    );
+    assert!(e.fw.objects.contains_key(&list));
+    assert!(
+        !e.fw.objects.contains_key(&dead),
+        "host half of a dead list purged"
+    );
+    assert_eq!(class_of(&e, dead_elem), rd_vm::gc::FREED_CLASS);
+}
+
+/// WeakReference clears an otherwise-unreachable referent; SoftReference and
+/// strongly reachable referents survive.
+/// (Root key names avoid digits: the conservative root scan would read "w1"
+/// as ObjRef 1 and legitimately keep that object alive.)
+#[test]
+fn weak_references_are_cleared() {
+    let mut e = Engine::new(vec![], VmConfig::default());
+    // realistic ids: small refs collide with small constants in a fresh
+    // engine's host state, which the conservative root scan keeps alive
+    for _ in 0..20_000 {
+        let _ = e.heap.alloc_string(String::new()).unwrap();
+    }
+    let gone = e.heap.alloc_string("weak only".into()).unwrap();
+    let soft_t = e.heap.alloc_string("soft".into()).unwrap();
+    let strong = e.heap.alloc_string("strong too".into()).unwrap();
+    let w1 = e
+        .heap
+        .alloc_instance(
+            "Ljava/lang/ref/WeakReference;".into(),
+            vec![("referent".into(), Value::Obj(gone))],
+        )
+        .unwrap();
+    let w2 = e
+        .heap
+        .alloc_instance(
+            "Ljava/lang/ref/WeakReference;".into(),
+            vec![("referent".into(), Value::Obj(strong))],
+        )
+        .unwrap();
+    let s1 = e
+        .heap
+        .alloc_instance(
+            "Ljava/lang/ref/SoftReference;".into(),
+            vec![("referent".into(), Value::Obj(soft_t))],
+        )
+        .unwrap();
+    for (k, r) in [("wa", w1), ("wb", w2), ("sa", s1), ("st", strong)] {
+        e.statics.insert(("LRoot;".into(), k.into()), Value::Obj(r));
+    }
+    let st = e.gc();
+    assert_eq!(st.last_cleared_weak, 1, "{st:?}");
+    assert_eq!(e.heap.get_field(w1, "referent").unwrap(), Value::Null);
+    assert_eq!(class_of(&e, gone), rd_vm::gc::FREED_CLASS);
+    assert_eq!(
+        e.heap.get_field(w2, "referent").unwrap(),
+        Value::Obj(strong)
+    );
+    assert_eq!(
+        e.heap.get_field(s1, "referent").unwrap(),
+        Value::Obj(soft_t)
+    );
+    assert_eq!(e.heap.as_str(soft_t).unwrap(), "soft");
+}

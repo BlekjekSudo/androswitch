@@ -45,8 +45,12 @@ allocations.
 
 ## Known limits / next steps
 
-- Weak/soft references are traced strongly (never cleared) — correct but
-  conservative; clearing + `ReferenceQueue` enqueue is the next step.
+- `WeakReference`/`PhantomReference` referents (app subclasses included) are
+  cleared when nothing else reaches them; `SoftReference` stays strong
+  (Android clears softs only under memory pressure). `ReferenceQueue`
+  enqueueing and `WeakHashMap` key weakness are not modelled yet.
+- Conservative roots mean an integer in host state that equals a live id
+  keeps that object (and what it reaches) alive — harmless over-retention.
 - No collection *inside* a single long-running Java call (no frame maps); the
   slice safe points cover `wait`, other tools allocate little per call.
 - Pause is proportional to live objects + host state (~20–65 ms on Comprix,
