@@ -146,6 +146,13 @@ enum Cmd {
 
 #[derive(Subcommand)]
 enum EngineSub {
+    /// Launch an APK through an opt-in C/C++/Rust native adapter.
+    Run {
+        id: String,
+        path: PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
     /// Lista os 28 itens, módulos/features e estado real de runtime
     List {
         #[arg(long)]

@@ -2,7 +2,7 @@
 
 use crate::{DataDir, EngineSub};
 use rd_apk::{Apk, RdResult};
-use rd_engine_registry::{Artifact, DetectionState, EngineAdapter, Registry};
+use rd_engine_registry::{Artifact, DetectionState, EngineAdapter, EngineEvent, Registry};
 
 pub(super) fn load_registry(dd: &DataDir) -> RdResult<Registry> {
     dd.require("engines.toml")?;
@@ -40,9 +40,10 @@ pub(super) fn run(sub: &EngineSub, dd: &DataDir) -> RdResult<()> {
                         e.name
                     );
                     println!(
-                        "   runtime: {}; feature_enabled={}; registry_adapter=NOT_IMPLEMENTED",
+                        "   runtime: {}; feature_enabled={}; registry_adapter={}",
                         e.runtime_status.label(),
-                        info.feature_enabled
+                        info.feature_enabled,
+                        info.registry_adapter_status
                     );
                 }
                 println!("\nUse `rd engine detect <apk> --json` para evidências. Features não implementam runtimes.");
@@ -89,9 +90,74 @@ pub(super) fn run(sub: &EngineSub, dd: &DataDir) -> RdResult<()> {
             }
             Ok(())
         }
-        EngineSub::Check { id, json: _ } => registry.adapter(id)?.parse(Artifact {
-            name: id,
-            bytes: &[],
-        }),
+        EngineSub::Run { id, path, json: _ } => {
+            use std::io::Read;
+            let adapter = registry.adapter(id)?;
+            if !rd_engine_registry::native_execution_available(id) {
+                adapter.parse(Artifact {
+                    name: "unsupported",
+                    bytes: &[],
+                })?;
+            }
+            let file = std::fs::File::open(path)
+                .map_err(|e| rd_apk::RdError::io(&e, format!("open {}", path.display())))?;
+            let mut bytes = Vec::new();
+            file.take(256 * 1024 * 1024 + 1)
+                .read_to_end(&mut bytes)
+                .map_err(|e| rd_apk::RdError::io(&e, "read bounded native APK"))?;
+            if bytes.len() > 256 * 1024 * 1024 {
+                return Err(rd_apk::RdError::new(
+                    "APK_TOO_LARGE",
+                    "native APK exceeds 256 MiB",
+                    "rd-cli",
+                )
+                .with_suggestion("use an APK no larger than 256 MiB"));
+            }
+            let logs = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+            rd_vm::set_app_stdout(rd_vm::HostOut::Buffer(logs.clone()));
+            let mut process = adapter.parse(Artifact {
+                name: &path.to_string_lossy(),
+                bytes: &bytes,
+            })?;
+            adapter.event(
+                &mut process,
+                EngineEvent {
+                    name: "launch",
+                    payload: &[],
+                },
+            )?;
+            let report = process.report()?;
+            #[cfg(feature = "native-engines")]
+            let report = {
+                let mut report = report;
+                report["logs"] = serde_json::json!(String::from_utf8_lossy(
+                    &logs.lock().expect("CLI app log buffer")
+                )
+                .to_string());
+                report
+            };
+            println!("{}", crate::to_json(&report));
+            Ok(())
+        }
+        EngineSub::Check { id, json: _ } => {
+            if rd_engine_registry::native_execution_available(id) {
+                println!(
+                    "{}",
+                    crate::to_json(
+                        &serde_json::json!({"engine":id,"adapter":"AVAILABLE_BOUNDED","execution_claimed":false,"hint":"rd engine run <id> <apk> --json"})
+                    )
+                );
+                registry.get(id)?;
+                Ok(())
+            } else {
+                registry
+                    .adapter(id)?
+                    .parse(Artifact {
+                        name: id,
+                        bytes: &[],
+                    })
+                    .map(|_| ())
+            }
+        }
     }
 }

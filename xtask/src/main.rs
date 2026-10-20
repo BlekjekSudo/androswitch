@@ -685,9 +685,34 @@ mod tests {
                     ["advanced-components"],
                     "{pkg}: preserve existing defaults"
                 );
+                let expected_native: Vec<toml::Value> = if pkg == "rd-cli" {
+                    vec!["rd-vm/native", "rd-agent/native"]
+                } else {
+                    vec!["rd-vm/native"]
+                }
+                .into_iter()
+                .map(|s| toml::Value::String(s.into()))
+                .collect();
                 assert_eq!(
                     features["native"].as_array().unwrap(),
-                    &[toml::Value::String("rd-vm/native".into())]
+                    &expected_native,
+                    "native must reach the MCP native_state implementation too"
+                );
+                let native_engines: Vec<toml::Value> = if pkg == "rd-cli" {
+                    vec![
+                        "native",
+                        "rd-engine-registry/native-execution",
+                        "rd-agent/native-engines",
+                    ]
+                } else {
+                    vec!["native", "rd-engine-registry/native-execution"]
+                }
+                .into_iter()
+                .map(|s| toml::Value::String(s.into()))
+                .collect();
+                assert_eq!(
+                    features["native-engines"].as_array().unwrap(),
+                    &native_engines
                 );
                 assert_eq!(
                     features["advanced-components"].as_array().unwrap(),

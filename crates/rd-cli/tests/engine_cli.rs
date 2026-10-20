@@ -83,7 +83,14 @@ fn embedded_catalog_is_complete_even_when_run_outside_the_repository() {
     assert_eq!(v["scope"], "registry-and-detection-only");
     assert_eq!(v["execution_claimed"], false);
     for engine in v["engines"].as_array().unwrap() {
-        assert_eq!(engine["registry_adapter_status"], "NOT_IMPLEMENTED");
+        assert_eq!(
+            engine["registry_adapter_status"],
+            if rd_engine_registry::native_execution_available(engine["id"].as_str().unwrap()) {
+                "AVAILABLE_BOUNDED"
+            } else {
+                "NOT_IMPLEMENTED"
+            }
+        );
         assert!(engine["feature_enabled"].is_boolean());
     }
     let out = t.run(&["engine", "list"]);

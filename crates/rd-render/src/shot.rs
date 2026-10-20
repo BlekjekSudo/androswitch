@@ -1,9 +1,8 @@
 //! Screenshot headless (M4 DoD: "screenshot correto").
 //!
 //! Software renderer determinístico: framebuffer RGB 720×1440 (viewport do
-//! M3.2), pinta a árvore de views (retângulo por classe/estado + texto via
-//! glifos de bloco 3×7 — fonte tipográfica real é M8/M9, o Android real usa
-//! skia/FreeType), e codifica PNG com filtros de linha adaptativos
+//! M3.2), pinta a árvore de views (retângulo por classe/estado + texto legível
+//! pelo mesmo atlas tipográfico da Canvas da VM; não é pixel-perfect Android), e codifica PNG com filtros de linha adaptativos
 //! (None/Sub/Up) e deflate rápido pelo flate2 puro-Rust já usado no rd-apk
 //! (antes: blocos STORED, ~3,1 MB por tela). Mesmo input → mesmos bytes.
 
@@ -64,16 +63,10 @@ impl Framebuffer {
         self.rect(x.saturating_add(w.saturating_sub(1)), y, 1, h, c);
     }
 
-    /// Texto com glifos de bloco 3×7 (determinístico; fonte tipográfica real
-    /// é M8/M9). Caracteres fora do ASCII imprimável viram bloco sólido —
-    /// acentos do português incluídos.
+    /// Single-line snapshot text using the VM's embedded, antialiased font.
+    /// Dimensions and hostile coordinates are validated/clipped in the rasterizer.
     pub fn text(&mut self, x: i32, y: i32, s: &str, c: Rgb) {
-        let mut cx = x;
-        for ch in s.chars() {
-            draw_glyph_block(self, cx, y, ch, c);
-            // issue #62: text hostil gigante não pode overflowar o cursor
-            cx = cx.saturating_add(6); // 3 px de glifo + 3 de espaçamento
-        }
+        rd_vm::graphics::rasterize_ui_text_rgb(&mut self.px, (self.w, self.h), (x, y), s, c);
     }
 
     /// Codifica o framebuffer como PNG RGB 8-bit (zlib STORED — sem deps).
@@ -170,27 +163,6 @@ fn crc32(data: &[u8]) -> u32 {
     !crc
 }
 
-fn draw_glyph_block(fb: &mut Framebuffer, x: i32, y: i32, ch: char, c: Rgb) {
-    // bloco 3×7; ASCII imprimável desenha meia-altura com padrão alternado
-    // por char (parece texto); não-ASCII (acentos) vira bloco sólido 3×7
-    let ascii = ch.is_ascii_graphic();
-    let h = if ascii { 4 } else { 7 };
-    for dy in 0..h {
-        for dx in 0..3i32 {
-            let solid = if ascii {
-                (dx as u32 + dy as u32 + ch as u32) % 2 == 0
-            } else {
-                true
-            };
-            if solid {
-                // issue #62: cursor saturado (texto hostil gigante) não panic
-                fb.rect(x.saturating_add(dx), y.saturating_add(dy), 1, 1, c);
-            }
-        }
-    }
-}
-
-/// Renderiza a árvore num framebuffer (determinístico).
 pub fn render_snapshot(root: &UiNode) -> Framebuffer {
     let mut fb = Framebuffer::new((0xF6, 0xF6, 0xF6)); // fundo da window
     paint(root, &mut fb, 0);
@@ -221,7 +193,7 @@ fn paint(n: &UiNode, fb: &mut Framebuffer, depth: usize) {
     }
     if !n.text.is_empty() {
         // issue #62: offsets/centralização saturados (bounds hostis)
-        let ty = y.saturating_add(h.saturating_sub(8).max(0) / 2);
+        let ty = y.saturating_add(h.saturating_sub(18).max(0) / 2);
         fb.text(x.saturating_add(4), ty, &n.text, (0x1B, 0x1B, 0x1B));
     }
     for c in &n.children {
@@ -248,6 +220,42 @@ mod tests {
         }
     }
 
+    #[test]
+    fn real_letters_and_digits_have_distinct_glyphs_not_parity_placeholders() {
+        let mut a = Framebuffer::new((255, 255, 255));
+        let mut b = Framebuffer::new((255, 255, 255));
+        a.text(8, 8, "A 1", (0, 0, 0));
+        b.text(8, 8, "C 3", (0, 0, 0));
+        assert_ne!(
+            a.px, b.px,
+            "old parity checkerboard produced identical text"
+        );
+        assert!(
+            a.px.iter().any(|v| *v > 0 && *v < 255),
+            "font is antialiased"
+        );
+    }
+    #[test]
+    fn text_rejects_inconsistent_dimensions_without_writing_or_panicking() {
+        let mut pixels = vec![255; 12];
+        let before = pixels.clone();
+        assert!(!rd_vm::graphics::rasterize_ui_text_rgb(
+            &mut pixels,
+            (usize::MAX, 2),
+            (0, 0),
+            "test",
+            (0, 0, 0)
+        ));
+        assert_eq!(pixels, before);
+        assert!(rd_vm::graphics::rasterize_ui_text_rgb(
+            &mut pixels,
+            (2, 2),
+            (i32::MAX, i32::MIN),
+            "test",
+            (0, 0, 0)
+        ));
+        assert_eq!(pixels, before);
+    }
     #[test]
     fn png_is_valid_and_deterministic() {
         let mut root = node("android.widget.LinearLayout", "", (0, 0, 720, 96));

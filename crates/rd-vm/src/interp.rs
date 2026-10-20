@@ -1629,7 +1629,19 @@ fn do_invoke(
     // M3: framework host (Activity/View/TextView/Button/LinearLayout/
     // Handler/Intent/Bundle) — a classe DECLARANTE do method ref é android/*
     if mref.class.starts_with("Landroid/") {
-        return match crate::framework::call_host_instance(
+        if !is_direct && !is_super {
+            if let Some((d2, def, m)) = vm.cp.resolve_method(&recv_class, &mref.name, &mref.proto) {
+                return vm.call(d2, def, &m, raw.to_vec());
+            }
+        }
+        if let Some(value) =
+            inherited_android_host(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+        {
+            return Ok(value);
+        }
+        // Generic property storage is strictly last: it must not swallow
+        // inherited View IDs, EditText text, or Activity/Context state.
+        if let Some(value) = crate::view_props::fallback(
             vm,
             &mref.class,
             &mref.name,
@@ -1637,35 +1649,15 @@ fn do_invoke(
             recv,
             &slots[1..],
         )? {
-            Some(v) => Ok(v),
-            // last resort: general View property store (view_props.rs)
-            None => match crate::view_props::fallback(
-                vm,
-                &mref.class,
-                &mref.name,
-                &mref.proto,
-                recv,
-                &slots[1..],
-            )? {
-                Some(v) => Ok(v),
-                // No host model: virtual/interface dispatch on the receiver's
-                // own DEX class (an app class implementing a platform
-                // interface, e.g. Choreographer.FrameCallback.doFrame).
-                None => match (!is_direct && !is_super)
-                    .then(|| vm.cp.resolve_method(&recv_class, &mref.name, &mref.proto))
-                    .flatten()
-                {
-                    Some((d2, def, m)) => vm.call(d2, def, &m, raw.to_vec()),
-                    None => Err(crate::classpath::unresolved_method_on(
-                        &mref.class,
-                        &recv_class,
-                        &mref.name,
-                        &mref.proto,
-                    )
-                    .into()),
-                },
-            },
-        };
+            return Ok(value);
+        }
+        return Err(crate::classpath::unresolved_method_on(
+            &mref.class,
+            &recv_class,
+            &mref.name,
+            &mref.proto,
+        )
+        .into());
     }
 
     // classe inicial da resolução
@@ -1694,11 +1686,71 @@ fn do_invoke(
     };
 
     let Some((d2, def, m)) = vm.cp.resolve_method(&start_class, &mref.name, &mref.proto) else {
+        // D8 may use an app subclass as the inherited Android method owner.
+        // DEX overrides above always win; direct app constructors stay direct.
+        if !is_direct || is_super {
+            if let Some(value) = inherited_android_host(
+                vm,
+                &start_class,
+                &mref.name,
+                &mref.proto,
+                recv,
+                &slots[1..],
+            )? {
+                return Ok(value);
+            }
+        }
         return Err(
             crate::classpath::unresolved_method(&start_class, &mref.name, &mref.proto).into(),
         );
     };
     vm.call(d2, def, &m, raw.to_vec())
+}
+
+/// Resolve only real inherited Android hosts; never invent an app method.
+pub(crate) fn inherited_android_host(
+    vm: &mut Engine,
+    start: &str,
+    name: &str,
+    sig: &str,
+    recv: crate::heap::ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let mut ancestor = start.to_string();
+    let mut visited = std::collections::BTreeSet::new();
+    for _ in 0..16 {
+        if !visited.insert(ancestor.clone()) {
+            break;
+        }
+        if ancestor.starts_with("Landroid/") {
+            #[cfg(feature = "advanced-components")]
+            if let Some(value) = crate::m9::call_instance(vm, &ancestor, name, sig, recv, args)? {
+                return Ok(Some(value));
+            }
+            if let Some(value) = crate::m8::call_m8_instance(vm, &ancestor, name, sig, recv, args)?
+            {
+                return Ok(Some(value));
+            }
+            if let Some(value) =
+                crate::framework::call_host_instance(vm, &ancestor, name, sig, recv, args)?
+            {
+                return Ok(Some(value));
+            }
+        }
+        let next = vm.cp.superclass_of(&ancestor).or_else(|| {
+            crate::classpath::builtin_hierarchy(&ancestor).and_then(|chain| {
+                chain
+                    .into_iter()
+                    .find(|s| *s != ancestor)
+                    .map(str::to_string)
+            })
+        });
+        match next {
+            Some(next) => ancestor = next,
+            None => break,
+        }
+    }
+    Ok(None)
 }
 
 /// Renderização do resultado para humano/JSON do CLI (formato Java).

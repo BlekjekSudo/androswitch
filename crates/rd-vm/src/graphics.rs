@@ -3208,6 +3208,44 @@ fn layout_method(
 
 // ── rasterizer ─────────────────────────────────────────────────────────
 
+/// Paint one snapshot text line into a validated packed RGB framebuffer.
+/// Shares the real embedded glyph atlas and clipping rasterizer with Canvas;
+/// no checkerboard placeholder characters, host fonts or external resources.
+/// Returns false for inconsistent/overflowing dimensions and leaves pixels intact.
+pub fn rasterize_ui_text_rgb(
+    px: &mut [u8],
+    dimensions: (usize, usize),
+    origin: (i32, i32),
+    text: &str,
+    rgb: (u8, u8, u8),
+) -> bool {
+    let (w, h) = dimensions;
+    if w == 0
+        || h == 0
+        || w > i32::MAX as usize
+        || h > i32::MAX as usize
+        || w.checked_mul(h).and_then(|n| n.checked_mul(3)) != Some(px.len())
+    {
+        return false;
+    }
+    let argb = 0xff00_0000 | (u32::from(rgb.0) << 16) | (u32::from(rgb.1) << 8) | u32::from(rgb.2);
+    let mut raster = Raster {
+        px,
+        w,
+        h,
+        tint: None,
+    };
+    raster.text(
+        text,
+        &ID,
+        (origin.0 as f32, origin.1.saturating_add(17) as f32),
+        (18.0, 0.0),
+        argb,
+        [0.0, 0.0, w as f32, h as f32],
+    );
+    true
+}
+
 pub(crate) struct Raster<'a> {
     pub px: &'a mut [u8],
     pub w: usize,

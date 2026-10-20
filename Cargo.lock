@@ -515,7 +515,9 @@ name = "rd-engine-registry"
 version = "0.9.0"
 dependencies = [
  "rd-apk",
+ "rd-dex",
  "rd-testsupport",
+ "rd-vm",
  "serde",
  "serde_json",
  "toml",

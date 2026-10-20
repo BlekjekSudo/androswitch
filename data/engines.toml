@@ -157,7 +157,7 @@ modules = ["LANG-02"]
 strategy = "ELF + JNI"
 adapter_crate = "rd-ndk/rd-jni"
 runtime_status = "partial_native"
-notes = "C não pode ser atribuído a uma .so genérica; a rota ELF/JNI existente é parcial e exige feature native."
+notes = "C não pode ser atribuído a uma .so genérica. Adapter c-ndk real e limitado exige native-engines; fonte/compilador auditáveis atribuem o idioma."
 
 [[engine.rule]]
 state = "candidate"
@@ -174,7 +174,7 @@ modules = ["LANG-02"]
 strategy = "ELF + JNI + STL"
 adapter_crate = "rd-ndk/rd-jni"
 runtime_status = "partial_native"
-notes = "libc++_shared.so indica dependência STL, não a linguagem; ELF/JNI parcial não implementa toda a STL/NDK."
+notes = "Adapter cpp-ndk real e limitado exige native-engines. O APK de prova compila C++20 com std::array e sem libc++_shared; não implementa exceções nem STL/NDK completos."
 
 [[engine.rule]]
 state = "candidate"
@@ -191,7 +191,7 @@ modules = ["LANG-03"]
 strategy = "ELF + JNI"
 adapter_crate = "rd-ndk/rd-jni"
 runtime_status = "partial_native"
-notes = "Nome .so e símbolos removidos não provam Rust; a rota ELF/JNI existente é parcial e exige feature native."
+notes = "Nome .so e símbolos removidos não provam Rust. Adapter rust-ndk real com native-engines, validado por APK Android no_std source-built; não implica std/async."
 
 [[engine.rule]]
 state = "candidate"

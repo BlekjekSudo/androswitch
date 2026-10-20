@@ -22,11 +22,12 @@ impl AgentSession {
     }
     fn tool_m9(&mut self,name:&str,args:&serde_json::Map<String,serde_json::Value>)->Result<ToolResult,RdError>{
         if name=="native_state" {
+            let selected=self.native_engine.clone();
             let e=self.require_engine()?;
             #[cfg(feature="native")]
-            {return Ok(ToolResult::json(&e.native_report()));}
+            {let mut report=e.native_report();report["selected_engine"]=serde_json::json!(selected);return Ok(ToolResult::json(&report));}
             #[cfg(not(feature="native"))]
-            {let _=e;return Ok(ToolResult::json(&serde_json::json!({"enabled":false,"hint":"build rd-cli with --features native; install unicorn==2.1.4"})));}
+            {let _=(e,selected);return Ok(ToolResult::json(&serde_json::json!({"enabled":false,"hint":"build rd-cli with --features native; install unicorn==2.1.4"})));}
         }
         #[cfg(not(feature="advanced-components"))]
         {let _=(name,args);Err(agent_error("NOT_IMPLEMENTED","M9 requires advanced-components",None))}

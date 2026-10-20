@@ -2,8 +2,8 @@
 
 use rd_apk::{Apk, RdError};
 use rd_engine_registry::{
-    Artifact, DetectionReport, DetectionState, EngineAdapter, EngineEvent, EngineSyscall, Registry,
-    CANONICAL_IDS, ENGINE_COUNT, SCOPE,
+    AdapterProcess, Artifact, DetectionReport, DetectionState, EngineAdapter, EngineEvent,
+    EngineSyscall, Registry, CANONICAL_IDS, ENGINE_COUNT, SCOPE,
 };
 use rd_testsupport::apkfix::{build_manifest_axml_sdk, ZipFix};
 use serde::Deserialize;
@@ -178,7 +178,14 @@ fn features_are_opt_in_and_transitive_but_never_runtime_claims() {
     }
     for info in r.engine_infos().unwrap() {
         assert_eq!(info.feature_enabled, info.disabled_modules.is_empty());
-        assert_eq!(info.registry_adapter_status, "NOT_IMPLEMENTED");
+        assert_eq!(
+            info.registry_adapter_status,
+            if rd_engine_registry::native_execution_available(&info.engine.id) {
+                "AVAILABLE_BOUNDED"
+            } else {
+                "NOT_IMPLEMENTED"
+            }
+        );
     }
     assert_eq!(
         r.required_modules(r.get("tauri").unwrap()).unwrap(),
@@ -197,7 +204,45 @@ fn every_parse_event_and_syscall_returns_structured_not_implemented() {
     for e in r.engines() {
         let adapter = r.adapter(&e.id).unwrap();
         assert_eq!(adapter.descriptor().number, e.number);
-        let mut process = (); // placeholder for testing failures, not a real process
+        if rd_engine_registry::native_execution_available(&e.id) {
+            let bad = adapter
+                .parse(Artifact {
+                    name: "bad.apk",
+                    bytes: b"bad",
+                })
+                .unwrap_err();
+            assert_ne!(
+                bad.code, "NOT_IMPLEMENTED",
+                "real adapter must validate the APK"
+            );
+            let mut process = AdapterProcess::Unavailable;
+            typed(
+                adapter
+                    .event(
+                        &mut process,
+                        EngineEvent {
+                            name: "launch",
+                            payload: &[],
+                        },
+                    )
+                    .unwrap_err(),
+                "INVALID_PROCESS",
+            );
+            typed(
+                adapter
+                    .syscall(
+                        &mut process,
+                        EngineSyscall {
+                            name: "open",
+                            args: &[],
+                        },
+                    )
+                    .unwrap_err(),
+                "INVALID_PROCESS",
+            );
+            continue;
+        }
+        let mut process = AdapterProcess::Unavailable; // negative sentinel, never a parsed process
         for error in [
             adapter
                 .parse(Artifact {
@@ -454,8 +499,15 @@ fn existing_native_routes_are_partial_but_registry_adapters_stay_unavailable() {
         );
         assert_eq!(
             registry.info(descriptor).unwrap().registry_adapter_status,
-            "NOT_IMPLEMENTED"
+            if rd_engine_registry::native_execution_available(id) {
+                "AVAILABLE_BOUNDED"
+            } else {
+                "NOT_IMPLEMENTED"
+            }
         );
+        if rd_engine_registry::native_execution_available(id) {
+            continue;
+        }
         typed(
             registry
                 .adapter(id)

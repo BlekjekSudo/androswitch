@@ -540,7 +540,7 @@ impl Classpath {
 /// DEX (catch/instanceof/ hierarquia de exceções; M3.2: hierarquia Android do
 /// framework host — APKs REAIS não definem android.* no DEX, e o LayoutInflater
 /// precisa de is_subtype(View/Activity/…) para attach/dispatch corretos).
-fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
+pub(crate) fn builtin_hierarchy(class: &str) -> Option<Vec<&'static str>> {
     const EXC: &[&str] = &[
         "Ljava/lang/Exception;",
         "Ljava/lang/Throwable;",

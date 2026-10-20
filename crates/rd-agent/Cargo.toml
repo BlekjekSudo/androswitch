@@ -42,5 +42,6 @@ lang-12 = ["rd-engine-registry/lang-12"]
 default = ["advanced-components"]
 advanced-components = ["rd-vm/advanced-components"]
 native = ["rd-vm/native"]
+native-engines = ["native", "rd-engine-registry/native-execution"]
 
 jit = ["rd-vm/jit"]

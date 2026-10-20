@@ -235,3 +235,36 @@ jobs:
       - run: cargo test -p rd-jni --features jit
       - run: cargo test -p rd-vm --features jit --test jit
       - run: cargo clippy --workspace --all-targets --features rd-cli/jit -- -D warnings
+
+  native-languages:
+    name: C/C++/Rust signed APKs and all 41 MCP tools (three ABIs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-linux-android,aarch64-linux-android,armv7-linux-androideabi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/native-language-sdk
+          key: native-languages-sdk-r27c-platform26-r8-8.5.35-v1
+      - name: Android packaging and isolated guest execution prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y aapt apksigner zipalign unzip openjdk-17-jdk-headless
+          python -m pip install unicorn==2.1.4
+      - name: Build source APKs, adapter API tests, and positive full MCP matrices
+        run: bash golden/native-languages/gate.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-languages-apks-and-mcp-evidence
+          path: |
+            target/native-languages/apks/
+            target/native-languages/evidence/
+          retention-days: 7

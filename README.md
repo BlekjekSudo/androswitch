@@ -244,3 +244,12 @@ software e um **modo dedicado a agentes de IA (MCP)** com 31 ferramentas estrutu
 <p align="center">
   <sub>🦀 RustyDroid — Android without Android. Made with 🤖 AI assistance + ☕ human review.</sub>
 </p>
+
+## C/C++/Rust APKs and full MCP execution (opt-in)
+
+`cargo build -p rd-cli --features native-engines` enables three real, bounded
+source-language-selected native adapters. Source-built Android APKs, all 41 MCP
+tools, x86_64/ARM64/ARMv7 matrices, and limitations are documented in
+[Real native-language execution](docs/native-languages.md). These are genuine
+project-owned Android demonstration APKs with native cores and Java UI glue,
+not claims of universal NDK/Rust support or third-party APK compatibility.

@@ -189,7 +189,7 @@ impl Registry {
                 disabled_modules: info.disabled_modules,
                 feature_enabled: info.feature_enabled,
                 runtime_status: e.runtime_status,
-                registry_adapter_status: "NOT_IMPLEMENTED",
+                registry_adapter_status: info.registry_adapter_status,
                 evidence,
             });
         }

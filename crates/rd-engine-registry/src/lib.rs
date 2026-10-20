@@ -6,9 +6,20 @@
 
 mod contract;
 mod detect;
+#[cfg(feature = "native-execution")]
+mod native_execution;
 mod report;
 
-pub use contract::{Artifact, EngineAdapter, EngineEvent, EngineSyscall, UnavailableAdapter};
+pub use contract::{
+    Adapter, AdapterProcess, Artifact, EngineAdapter, EngineEvent, EngineSyscall,
+    UnavailableAdapter,
+};
+#[cfg(feature = "native-execution")]
+pub use native_execution::NativeProcess;
+
+pub fn native_execution_available(id: &str) -> bool {
+    cfg!(feature = "native-execution") && matches!(id, "c-ndk" | "cpp-ndk" | "rust-ndk")
+}
 pub use detect::{
     DetectionReport, Diagnostic, EngineFinding, Evidence, InspectionDetection, RuleEvidence,
 };
@@ -77,7 +88,7 @@ impl RuntimeStatus {
         match self {
             Self::PartialDex => "DEX parcial (rd-vm); adaptador do registro ausente",
             Self::PartialNative => {
-                "ELF/JNI parcial (feature native); adaptador do registro ausente"
+                "ELF/JNI parcial; disponibilidade do adaptador depende da engine/feature"
             }
             Self::NotImplemented => "NOT_IMPLEMENTED",
         }
@@ -351,7 +362,11 @@ impl Registry {
             feature_enabled: disabled_modules.is_empty(),
             required_modules,
             disabled_modules,
-            registry_adapter_status: "NOT_IMPLEMENTED",
+            registry_adapter_status: if native_execution_available(&e.id) {
+                "AVAILABLE_BOUNDED"
+            } else {
+                "NOT_IMPLEMENTED"
+            },
         })
     }
 

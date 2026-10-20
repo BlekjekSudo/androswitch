@@ -60,11 +60,11 @@ distribuir o binário sozinho. MCP usa o catálogo embutido.
 
 ## Features e dependências
 
-Features selecionam contratos, **não compilam/baixam engines**. Os contratos LANG são
+Features LANG selecionam contratos. `native-engines` habilita adapters reais e limitados de C/C++/Rust, sem baixar engines automaticamente. Os contratos LANG são
 opt-in; o registro não possui features default. CLI/agente preservam
 advanced-components como default e native/jit continuam opt-in. Dependências são transitivas e propagadas
 pelo `rd-cli`/`rd-agent`; o catálogo permanece completo em qualquer build.
-A seleção de runtimes no manifest/spec não mudou nesta entrega.
+O MCP aceita seleção explícita `launch.engine`; consulte [C/C++/Rust](native-languages.md).
 
 | Módulo | Cargo feature | Dependências diretas | Nota |
 |---|---|---|---|
@@ -86,12 +86,13 @@ seleciona LANG-04 → LANG-02 → LANG-01. O campo `feature_enabled` confirma
 seleção, enquanto `registry_adapter_status` continua `NOT_IMPLEMENTED`.
 LANG-08 representa a união Mono/IL2CPP; selecionar o módulo inclui LANG-07.
 A VM já renderiza um subconjunto Compose Android; a feature native executa
-ELF/JNI limitados em x86_64/ARM64/ARMv7. Isso não implementa adapters
-LANG, Compose Multiplatform, NDK/Android completo nem bridges WebView.
+ELF/JNI limitados em x86_64/ARM64/ARMv7. `native-engines` acrescenta os adapters `c-ndk`, `cpp-ndk`, `rust-ndk` sobre essa rota.
+Não implementa Compose Multiplatform, NDK/Android completo nem bridges WebView.
 Essas rotas existentes e seus limites estão nos ADRs 004, 006 e 007.
 runtime_status descreve cobertura existente, não disponibilidade neste build;
 feature_enabled informa somente os contratos LANG. native/jit são seleções
-independentes; nenhum status autoriza o adaptador a executar.
+independentes. `AVAILABLE_BOUNDED` informa existência do adapter, não execução observada.
+Metadados mantêm `execution_claimed=false`; o relatório do runtime mede instruções reais.
 
 ## Regras de detecção e rotas
 
@@ -133,22 +134,22 @@ Nenhum asset/lib é descomprimido, extraído, carregado ou executado.
 ### 5 — `c-ndk`
 
 - **Rota existente/futura:** `rd-ndk/rd-jni`
-- **Runtime:** ELF/JNI parcial (feature native); adaptador do registro ausente
-- **Limite:** C não pode ser atribuído a uma .so genérica; a rota ELF/JNI existente é parcial e exige feature native.
+- **Runtime:** ELF/JNI parcial; disponibilidade do adaptador depende da engine/feature
+- **Limite:** C não pode ser atribuído a uma .so genérica. Adapter c-ndk real e limitado exige native-engines; fonte/compilador auditáveis atribuem o idioma.
 - **candidate:** all=[`native-so`]; any=[] — ELF é compartilhado: não identifica a linguagem de origem nem valida ABI/payload.
 
 ### 6 — `cpp-ndk`
 
 - **Rota existente/futura:** `rd-ndk/rd-jni`
-- **Runtime:** ELF/JNI parcial (feature native); adaptador do registro ausente
-- **Limite:** libc++_shared.so indica dependência STL, não a linguagem; ELF/JNI parcial não implementa toda a STL/NDK.
+- **Runtime:** ELF/JNI parcial; disponibilidade do adaptador depende da engine/feature
+- **Limite:** Adapter cpp-ndk real e limitado exige native-engines. O APK de prova compila C++20 com std::array e sem libc++_shared; não implementa exceções nem STL/NDK completos.
 - **candidate:** all=[`native-so`]; any=[] — ELF é compartilhado: não identifica a linguagem de origem nem valida ABI/payload.
 
 ### 7 — `rust-ndk`
 
 - **Rota existente/futura:** `rd-ndk/rd-jni`
-- **Runtime:** ELF/JNI parcial (feature native); adaptador do registro ausente
-- **Limite:** Nome .so e símbolos removidos não provam Rust; a rota ELF/JNI existente é parcial e exige feature native.
+- **Runtime:** ELF/JNI parcial; disponibilidade do adaptador depende da engine/feature
+- **Limite:** Nome .so e símbolos removidos não provam Rust. Adapter rust-ndk real com native-engines, validado por APK Android no_std source-built; não implica std/async.
 - **candidate:** all=[`native-so`]; any=[] — ELF é compartilhado: não identifica a linguagem de origem nem valida ABI/payload.
 
 ### 8 — `go-mobile`
@@ -162,14 +163,14 @@ Nenhum asset/lib é descomprimido, extraído, carregado ou executado.
 ### 9 — `objective-c-ndk`
 
 - **Rota existente/futura:** `rd-ndk/rd-jni`
-- **Runtime:** ELF/JNI parcial (feature native); adaptador do registro ausente
+- **Runtime:** ELF/JNI parcial; disponibilidade do adaptador depende da engine/feature
 - **Limite:** Somente a rota ELF/JNI é parcial; runtime Objective-C não é implementado. Uma .so genérica só produz candidato.
 - **candidate:** all=[`native-so`]; any=[] — ELF é compartilhado: não identifica a linguagem de origem nem valida ABI/payload.
 
 ### 10 — `zig-llvm`
 
 - **Rota existente/futura:** `rd-ndk/rd-jni`
-- **Runtime:** ELF/JNI parcial (feature native); adaptador do registro ausente
+- **Runtime:** ELF/JNI parcial; disponibilidade do adaptador depende da engine/feature
 - **Limite:** ELF não preserva necessariamente a linguagem do compilador.
 - **candidate:** all=[`native-so`]; any=[] — ELF é compartilhado: não identifica a linguagem de origem nem valida ABI/payload.
 
