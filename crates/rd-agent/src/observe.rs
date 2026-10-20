@@ -435,7 +435,7 @@ impl AgentSession {
 
     fn diff_line(&self, cur: &[String]) -> String {
         match &self.screen.observed {
-            Some((pv, prev)) if *pv == self.screen.version => "-- unchanged since last observe\n".into(),
+            Some((pv, _)) if *pv == self.screen.version => "-- unchanged since last observe\n".into(),
             Some((pv, prev)) => {
                 let added: Vec<&String> = cur.iter().filter(|t| !prev.contains(t)).collect();
                 let removed: Vec<&String> = prev.iter().filter(|t| !cur.contains(t)).collect();

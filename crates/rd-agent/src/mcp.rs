@@ -3537,7 +3537,7 @@ mod tests {
         assert_eq!(arr.len(), 2);
         assert_eq!(
             arr[0]["result"]["tools"].as_array().expect("tools").len(),
-            39
+            41
         );
         assert_eq!(arr[1]["result"]["serverInfo"]["name"], SERVER_NAME);
     }

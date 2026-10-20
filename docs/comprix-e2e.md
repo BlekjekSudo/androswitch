@@ -422,3 +422,71 @@ the heap grew past 256 MB (OOM). After it, the same flow peaks at about
    use cheaper PNG encoding (deflate level, or a delta frame).
 6. **Faster cold launch.** Use a warm start or snapshot.
 7. **Make NOT_FOUND catchable,** and cache negative method resolution.
+
+## Round 6: seeing the app in real time without screenshots
+
+Question from the round: *can the agent see the full APK in real time via
+MCP without screenshots?* Before this round, **no** — `ui_tree` showed a
+single opaque `AndroidComposeView` node and the only way to see Comprix was a
+~3 MB `screenshot` (0.3–1.6 s). Now yes, see [`mcp-observe.md`](mcp-observe.md):
+
+- `observe` (text/json): visible texts with bounds, tap targets, icon centres,
+  frame `version` and diff — derived from the recorded display list, so it
+  works on Compose;
+- `tap_text`: tap by label; `observe: true` on action tools;
+- MCP resources `rustydroid://screen`, `screen.txt`, `screen.png`, `logs` with
+  `resources/subscribe` → `notifications/resources/updated` (the live demo got
+  13 notifications for 13 real screen changes, none for unchanged frames);
+- `rd mcp --live 0.0.0.0:7878`: a browser page with the RustyDroid-rendered
+  frame, screen text, tap-target overlay and last tool latency (long-poll);
+- `screenshot` cached per frame version; runtime panics isolated
+  (`INTERNAL_PANIC`, session survives).
+
+### Full Comprix flow driven only by visible labels (run `r6i`, 30/30)
+
+`launch` → `tap_text "Continuar"` ×3 → `tap_text "Começar agora"` →
+`tap_text "Nova lista"` → swipe the sheet → `tap_text "Criar e adicionar"` →
+list detail "Compras de janeiro" → BACK → `tap_text "Comparar"`,
+`"Histórico"`, `"Ajustes"`; `tap_text "nao existe"` → `VIEW_NOT_FOUND` listing
+the visible texts. No coordinates were needed except the sheet swipe, and the
+only screenshots taken were two, to measure the cache.
+`observe` also caught a scenario bug immediately: page 4 of onboarding says
+"Começar agora", not "Continuar".
+
+### MCP latency (round 6, release, 720×1440)
+
+| Call | ms | Note |
+|---|---:|---|
+| `observe` (no change since last) | 0.14–0.4 | cached model |
+| `observe` (new frame) | 45–60 | records one frame; no raster/PNG |
+| `observe` (first frame after heavy navigation) | ~1 200 | Compose composes inside the draw pass (same cost a screenshot would pay) |
+| `tap_text` | 20–155 | resolve label + tap |
+| `wait 1000` + `observe:true` (onboarding) | 1 400–1 800 | was 1.4–3.3 s without the summary |
+| `wait 3000` after Criar + `observe:true` | 6 900 | Room insert + navigation |
+| `screenshot` fresh (frame already recorded) | 115–132 | rasterize + PNG only; was 300–1 576 ms |
+| `screenshot` repeated (same version) | 22 | cached PNG |
+| `swipe 800 ms` | 600–740 | |
+| `key BACK` | 1 190–1 350 | |
+
+### Fixes found by driving through `observe` (all general)
+
+| # | Fix |
+|---|---|
+| 81 | Text glyph boxes use \|ascent\|/\|descent\| — every text has a tight clip, a wrong sign dropped them |
+| 82 | Container rule: a box with labels side by side on one row (bottom nav) is not a target — `tap_text "Comparar"` used to tap the bar centre (Scanner) |
+| 83 | Painter's-order occlusion, only by *filled* opaque shapes (the outline of an outlined button is drawn after its label) |
+| 84 | Finished activity → empty snapshot with `finished: true` (no stale frame / ghost taps) |
+| 85 | `Throwable` host arrays (`getStackTrace`/`getSuppressed`) assigned whole — indexing an empty element vector panicked and killed `rd mcp` |
+| 86 | `Intent.setExtrasClassLoader` (no-op: extras are host bundles) |
+| 87 | `panic = "unwind"` + `call_tool_isolated` → `INTERNAL_PANIC` tool error, app ended, session kept |
+
+### Focus check (project goals vs. this round)
+
+All additions are Rust-native and stay inside the project's shape: no VM,
+no emulator, no new dependencies (the HTTP viewer is `std::net`, the PNG
+encoder is the existing one), the model is computed from RustyDroid's own
+display list (tiny-skia-style raster path), and everything is exposed through
+the in-house JSON-RPC MCP (ADR 001) first. Gaps against the stated goals that
+remain the top priorities: **no GC** (the 256 MB no-GC heap is the main risk
+for the Moto E5 / 2 GB floor on long sessions), Cranelift JIT not started,
+Compose `type_text`, Compose semantics (`contentDescription`) for icon labels.

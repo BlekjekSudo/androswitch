@@ -42,6 +42,17 @@ RustyDroid is a **"Wine for Android"**: instead of emulating an entire Android O
 | AI-agent control plane | adb, screen scraping | **MCP + 41 structured tools** + subscribable screen resources + live viewer (JSON-RPC próprio — ADR 001) |
 | Perf baseline | modern desktop | **Motorola Moto E5 (2 GB RAM)** floor |
 
+### 👀 Agents see the screen without screenshots
+
+RustyDroid renders every frame itself, so it knows what is on screen *as
+data*. `observe` returns the visible texts, tap targets and icons, derived
+from the recorded display list. This works for Compose too, and costs about
+45 ms for a new frame and under 1 ms when nothing changed. `tap_text "Continuar"`
+taps by label. MCP resources `rustydroid://screen` (and `.txt`, `.png`) can
+be subscribed to and push `notifications/resources/updated` on every real
+change. For humans, `rd mcp --live 0.0.0.0:7878` serves a browser page with
+the live frame and tap-target overlay. See [docs/mcp-observe.md](docs/mcp-observe.md).
+
 ### 🤖 Built with AI — heavily
 
 > **This project is developed with heavy AI assistance** — specification, architecture,
