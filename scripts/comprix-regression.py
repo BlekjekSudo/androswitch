@@ -175,7 +175,16 @@ try:
             ("Comparar", "Comparar"),
             ("Listas", "Minhas listas"),
         ]:
-            rpc("tap_text", {"text": label, "observe": True}, expected, title=True)
+            _, observed = rpc(
+                "tap_text", {"text": label, "observe": True}, expected, title=True
+            )
+            if a.typed and label in {"Listas", "Comparar"}:
+                frame = next(t for t in observed if t.startswith("frame v")).split(
+                    "-- changed since"
+                )[0]
+                count = "1 item" if label == "Listas" else "1 itens"
+                if "Compra do Mês" not in frame or count not in frame:
+                    raise RuntimeError("typed list/item disappeared during tab cycling")
         rpc("runtime_health", {})
         summary["cycles_completed"] = cycle + 1
         summary["elapsed_seconds"] = round(time.monotonic() - start, 2)
@@ -192,6 +201,17 @@ try:
             ) >= datetime.datetime.fromisoformat(a.deadline):
                 break
     rpc("runtime_health", {"gc": True} if a.gc == "on" else {})
+    if a.typed:
+        rpc("tap_text", {"text": "Abrir", "observe": True}, "Arroz")
+        _, observed = rpc("wait", {"ms": 400, "observe": True}, "Arroz")
+        frame = next(t for t in observed if t.startswith("frame v")).split(
+            "-- changed since"
+        )[0]
+        if "2 x kg" not in frame or "1 item" not in frame:
+            raise RuntimeError("typed quantity/item changed after final collection")
+        rpc("screenshot", {"path": str(folder / "endurance-final.png")})
+        rpc("key", {"key": "BACK", "observe": True}, "Minhas listas")
+        summary["final_item_verified"] = True
     summary["success"] = True
 except Exception as e:
     summary["success"] = False
