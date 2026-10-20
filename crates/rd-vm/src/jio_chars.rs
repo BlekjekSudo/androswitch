@@ -109,8 +109,7 @@ pub(crate) fn gc_keys(out: &mut Vec<ObjRef>) {
 }
 
 /// GC ephemeron: state of a reachable object (holds heap refs).
-pub(crate) fn gc_entry(r: ObjRef, out: &mut String) {
-    use std::fmt::Write as _;
+pub(crate) fn gc_entry(r: ObjRef, out: &mut impl std::fmt::Write) {
     WRITERS_ST.with(|m| {
         if let Some(v) = m.borrow().get(&r) {
             let _ = write!(out, "|{v:?}");

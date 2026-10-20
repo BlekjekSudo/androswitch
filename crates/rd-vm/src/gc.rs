@@ -60,6 +60,7 @@ pub struct GcStats {
 }
 
 /// Pushes every integer token of `s` that is a valid `ObjRef` (1..=n).
+#[cfg(test)]
 fn scan_refs(s: &str, n: usize, out: &mut Vec<ObjRef>) {
     let b = s.as_bytes();
     let mut i = 0;
@@ -79,6 +80,56 @@ fn scan_refs(s: &str, n: usize, out: &mut Vec<ObjRef>) {
     }
 }
 
+/// Tokenizes the exact conservative Debug byte stream without buffering it.
+/// A numeric token may span any number of write_str/write_char calls. The
+/// saturating arithmetic and emitted order match the original scan_refs.
+struct RefScanner<F> {
+    limit: u64,
+    pending: u64,
+    bytes: usize,
+    emit: F,
+}
+
+impl<F: FnMut(ObjRef)> RefScanner<F> {
+    fn new(n: usize, emit: F) -> Self {
+        Self {
+            limit: n as u64,
+            pending: 0,
+            bytes: 0,
+            emit,
+        }
+    }
+
+    fn flush(&mut self) {
+        if self.pending >= 1 && self.pending <= self.limit {
+            (self.emit)(self.pending as ObjRef);
+        }
+        self.pending = 0;
+    }
+
+    fn finish(mut self) -> usize {
+        self.flush();
+        self.bytes
+    }
+}
+
+impl<F: FnMut(ObjRef)> std::fmt::Write for RefScanner<F> {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        self.bytes = self.bytes.saturating_add(s.len());
+        for b in s.bytes() {
+            if b.is_ascii_digit() {
+                self.pending = self
+                    .pending
+                    .saturating_mul(10)
+                    .saturating_add(u64::from(b - b'0'));
+            } else {
+                self.flush();
+            }
+        }
+        Ok(())
+    }
+}
+
 struct Marker {
     marked: Vec<bool>,
     stack: Vec<ObjRef>,
@@ -95,13 +146,13 @@ impl Marker {
 }
 
 impl Engine {
-    /// Conservative root text: every engine structure outside the heap,
-    /// except the weak host-object table (traced per reachable key).
-    fn gc_root_text(&mut self) -> String {
+    /// Conservative root rendering: every engine structure outside the heap,
+    /// except the weak host-object table (traced per reachable key). A generic
+    /// sink lets collection scan the identical Debug text without allocating it.
+    fn write_gc_roots(&mut self, s: &mut impl std::fmt::Write) {
         // the parsed APK (zip, arsc, layouts) holds no heap refs: skip it
         let objects = std::mem::take(&mut self.fw.objects);
         let resources = self.fw.resources.take();
-        let mut s = String::with_capacity(1 << 16);
         let _ = write!(s, "{:?}", self.fw);
         self.fw.objects = objects;
         self.fw.resources = resources;
@@ -137,7 +188,6 @@ impl Engine {
         {
             let _ = write!(s, "|{:?}", self.native);
         }
-        s
     }
 
     /// Full collection. Interpreter frames must have published roots; external
@@ -178,14 +228,13 @@ impl Engine {
             m.push(r);
         }
         let mut cand = Vec::new();
-        let roots = self.gc_root_text();
+        let root_len = {
+            let mut scanner = RefScanner::new(n, |r| m.push(r));
+            self.write_gc_roots(&mut scanner);
+            scanner.finish()
+        };
+        // Root phase now includes tokenization, rather than only formatting.
         let t_roots = t0.elapsed();
-        scan_refs(&roots, n, &mut cand);
-        let root_len = roots.len();
-        drop(roots);
-        for r in cand.drain(..) {
-            m.push(r);
-        }
         // objects with side state (host half, gfx object, module tables):
         // one bitmap built per cycle instead of ~5 hash lookups per object
         let mut side_keys: Vec<ObjRef> = Vec::new();
@@ -209,15 +258,14 @@ impl Engine {
         if minor {
             // Old side-state writes can introduce young refs without touching
             // Heap::get_mut. Scan these owners each minor; no missing barrier.
-            let mut seen = std::collections::HashSet::new();
+            // Arena indices are already unique; no auxiliary HashSet needed.
             for r in 1..=n as ObjRef {
-                if !self.heap.is_young(r) && has_side[r as usize] != 0 && seen.insert(r) {
+                if !self.heap.is_young(r) && has_side[r as usize] != 0 {
                     m.stack.push(r);
                 }
             }
         }
         let mut traced_objects = 0;
-        let mut text = String::new();
         // weak references: (reference, referent) pairs whose referent is not
         // traced through the reference; cleared after marking if unreached
         let mut weak: Vec<(ObjRef, ObjRef)> = Vec::new();
@@ -295,26 +343,24 @@ impl Engine {
                     }
                 }
                 Some(h) => {
-                    text.clear();
-                    let _ = write!(text, "{h:?}");
-                    scan_refs(&text, n, &mut cand);
+                    let mut scanner = RefScanner::new(n, |x| cand.push(x));
+                    let _ = write!(scanner, "{h:?}");
+                    scanner.finish();
                 }
                 None => {}
             }
             // module side tables keyed by object (Matcher, Spannable, Reader…)
             if side & 2 != 0 {
-                text.clear();
-                crate::jregex::gc_entry(r, &mut text);
-                crate::android_spannable::gc_entry(r, &mut text);
-                crate::jio_chars::gc_entry(r, &mut text);
-                if !text.is_empty() {
-                    scan_refs(&text, n, &mut cand);
-                }
+                let mut scanner = RefScanner::new(n, |x| cand.push(x));
+                crate::jregex::gc_entry(r, &mut scanner);
+                crate::android_spannable::gc_entry(r, &mut scanner);
+                crate::jio_chars::gc_entry(r, &mut scanner);
+                scanner.finish();
             }
             if let Some(g) = self.gfx.objs.get(&r) {
-                text.clear();
-                let _ = write!(text, "{g:?}");
-                scan_refs(&text, n, &mut cand);
+                let mut scanner = RefScanner::new(n, |x| cand.push(x));
+                let _ = write!(scanner, "{g:?}");
+                scanner.finish();
             }
             for x in cand.drain(..) {
                 m.push(x);
@@ -524,6 +570,129 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn streaming_scanner_matches_buffered_scanner_at_every_utf8_boundary() {
+        let cases = [
+            "",
+            "0",
+            "00000000001",
+            "12",
+            "1234",
+            "-1 +2 3.4 5e6 0x7f8",
+            "α12β345🌳٦٧٨9\n10\t11",
+            "\\u{0012} \\\"34\\\"",
+            "18446744073709551615 18446744073709551616 999999999999999999999999999999999999 2",
+            "[Some(1), Obj(234), Int(-56), Long(0), {name: \"789\"}]",
+        ];
+        for n in [0, 1, 9, 255, 1024, crate::heap::MAX_OBJECTS, usize::MAX] {
+            for text in cases {
+                let mut expected = Vec::new();
+                scan_refs(text, n, &mut expected);
+                for cut in (0..=text.len()).filter(|i| text.is_char_boundary(*i)) {
+                    let mut actual = Vec::new();
+                    let mut sink = RefScanner::new(n, |r| actual.push(r));
+                    sink.write_str(&text[..cut]).unwrap();
+                    sink.write_str("").unwrap();
+                    sink.write_str(&text[cut..]).unwrap();
+                    assert_eq!(sink.finish(), text.len());
+                    assert_eq!(actual, expected, "n={n} cut={cut} text={text:?}");
+                }
+                let mut actual = Vec::new();
+                let mut sink = RefScanner::new(n, |r| actual.push(r));
+                for c in text.chars() {
+                    sink.write_char(c).unwrap();
+                }
+                assert_eq!(sink.finish(), text.len());
+                assert_eq!(actual, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn streaming_scanner_differential_random_chunks_and_overflow() {
+        // Fixed seed: reproducible property-style differential coverage,
+        // independent of formatting chunk boundaries or an extra dependency.
+        let mut seed = 0x5eed_1234_2026_1020u64;
+        fn next(seed: &mut u64) -> u64 {
+            *seed ^= *seed << 13;
+            *seed ^= *seed >> 7;
+            *seed ^= *seed << 17;
+            *seed
+        }
+        let pieces = [
+            "0",
+            "1",
+            "9",
+            "00000",
+            "18446744073709551616",
+            "9876543210",
+            "|",
+            "-",
+            ".",
+            "e",
+            "α",
+            "🌳",
+            "٣",
+            "\n",
+            "\\u{12}",
+            "Obj(",
+        ];
+        for _ in 0..2048 {
+            let n = (next(&mut seed) as usize) & 0xffff;
+            let mut text = String::new();
+            for _ in 0..96 {
+                text.push_str(pieces[(next(&mut seed) as usize) % pieces.len()]);
+            }
+            let mut expected = Vec::new();
+            scan_refs(&text, n, &mut expected);
+            let mut actual = Vec::new();
+            let mut sink = RefScanner::new(n, |r| actual.push(r));
+            let mut start = 0;
+            while start < text.len() {
+                let mut end = (start + 1 + (next(&mut seed) % 23) as usize).min(text.len());
+                while !text.is_char_boundary(end) {
+                    end += 1;
+                }
+                sink.write_str(&text[start..end]).unwrap();
+                start = end;
+            }
+            assert_eq!(sink.finish(), text.len());
+            assert_eq!(actual, expected, "n={n} text={text:?}");
+        }
+    }
+
+    #[test]
+    fn streaming_engine_roots_equal_buffered_roots_and_restore_host_tables() {
+        let mut vm = Engine::new(vec![], Default::default());
+        for _ in 0..128 {
+            vm.heap.alloc_instance("LPad;".into(), vec![]).unwrap();
+        }
+        vm.statics
+            .insert(("LRoot123;".into(), "field9".into()), Value::Obj(99));
+        vm.statics.insert(
+            ("LRoot;".into(), "184467440737095516160🌳".into()),
+            Value::Long(123),
+        );
+        vm.fw.objects.insert(
+            100,
+            HostObj::Bundle {
+                map: vec![("hidden124".into(), Value::Obj(127))],
+            },
+        );
+        let before = format!("{:?}", vm.fw);
+        let mut text = String::new();
+        vm.write_gc_roots(&mut text);
+        let mut expected = Vec::new();
+        scan_refs(&text, vm.heap.len(), &mut expected);
+        let mut actual = Vec::new();
+        let mut scanner = RefScanner::new(vm.heap.len(), |r| actual.push(r));
+        vm.write_gc_roots(&mut scanner);
+        assert_eq!(scanner.finish(), text.len());
+        assert_eq!(actual, expected);
+        assert_eq!(format!("{:?}", vm.fw), before);
+        // Weak host-object contents must not accidentally become strong roots.
+        assert!(!actual.contains(&127));
+    }
 
     #[test]
     fn nested_host_scope_returns_stay_rooted_until_the_outer_callback_returns() {
