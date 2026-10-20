@@ -230,3 +230,37 @@ fn repeat_load_does_not_repeat_constructors() {
         Value::Int(30)
     );
 }
+
+#[test]
+fn native_calls_use_the_current_fuel_window_not_lifetime_total() {
+    for abi in ["x86_64", "arm64-v8a", "armeabi-v7a"] {
+        let mut e = engine(abi);
+        e.config.fuel = 1000;
+        for _ in 0..500 {
+            assert_eq!(
+                e.invoke_static(C, "twice", "(I)I", &[Value::Int(2)])
+                    .unwrap(),
+                Value::Int(4)
+            );
+        }
+        assert!(
+            matches!(e.invoke_static(C,"twice","(I)I",&[Value::Int(2)]),Err(VmExit::Error(err)) if err.code=="VM_FUEL")
+        );
+        e.reset_fuel_window();
+        assert_eq!(
+            e.invoke_static(C, "add", "(II)I", &[Value::Int(10), Value::Int(25)])
+                .unwrap(),
+            Value::Int(42),
+            "{abi}"
+        );
+        assert_eq!(
+            e.invoke_static(C, "twice", "(I)I", &[Value::Int(2)])
+                .unwrap(),
+            Value::Int(4)
+        );
+        assert!(
+            e.fuel_used() > e.config.fuel,
+            "lifetime accounting must remain observable"
+        );
+    }
+}

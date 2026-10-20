@@ -274,7 +274,7 @@ fn run(vm: &mut Engine, s: &mut NativeState, address: u64, args: &[Argument]) ->
     runtime.call(
         address,
         args,
-        vm.config.fuel.saturating_sub(vm.fuel_used).min(5_000_000),
+        vm.fuel_remaining().min(5_000_000),
         |rt, t| bridge(vm, rt, refs, registered, buffers, t),
     )
 }
