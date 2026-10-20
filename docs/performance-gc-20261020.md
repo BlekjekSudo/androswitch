@@ -12,8 +12,10 @@ or physical-Android conformance.
 The optimization-only baseline is imported delivered source
 `6fdfaaf47b60f93d2aba5f499a2b7fa1a198008c`. Measurements used the Rust source
 subsequently delivered in `f119cbd8143374f5de89053074502fbf5ba03d72`.
-PR-publication follow-up changes are CI, shell-gate coverage and documentation,
-not new Rust optimizations.
+PR-publication follow-ups extend CI and shell-gate coverage, document evidence,
+and scope CLI report serialization to its feature configuration so default and
+native builds both pass strict Clippy. The CLI JSON behavior is preserved;
+these follow-ups add no new VM/GC optimization.
 
 No quality-damaging shortcut is accepted. Heap storage/API/limits, fuel,
 safepoints, parser/ELF validation, barriers, pinning and the optimization
