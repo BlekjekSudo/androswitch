@@ -42,6 +42,9 @@ pub struct ScreenItem {
     pub argb: u32,
     /// Effective text size in pixels (0 for non-text items).
     pub size: f32,
+    /// Filled shape (boxes): only filled opaque shapes hide what is under
+    /// them — a stroked outline (outlined button) does not.
+    pub filled: bool,
 }
 
 impl ScreenItem {
@@ -200,7 +203,8 @@ impl Engine {
             let alpha = palpha * op.alpha;
             let col = mod_alpha(op.p.tint.unwrap_or(op.p.argb), alpha);
             let visible = (col >> 24) >= 0x18;
-            let push = |sw: &mut ScreenWalk, kind, text: String, r: [f32; 4], argb, size| {
+            let filled = op.p.style != 1;
+            let push = |sw: &mut ScreenWalk, kind, text: String, r: [f32; 4], argb, size, filled| {
                 let b = [
                     r[0].max(0.0).floor() as i32,
                     r[1].max(0.0).floor() as i32,
@@ -214,6 +218,7 @@ impl Engine {
                         bounds: b,
                         argb,
                         size,
+                        filled,
                     });
                 }
             };
@@ -230,7 +235,7 @@ impl Engine {
                 OpK::Rect(l, t, r, b) | OpK::RRect(l, t, r, b, _, _) | OpK::Oval(l, t, r, b) => {
                     if visible && !in_image {
                         if let Some(rb) = shape_bounds(&[(*l, *t), (*r, *t), (*r, *b), (*l, *b)]) {
-                            push(sw, ScreenKind::Box, String::new(), rb, col, 0.0);
+                            push(sw, ScreenKind::Box, String::new(), rb, col, 0.0, filled);
                         }
                     }
                 }
@@ -238,14 +243,14 @@ impl Engine {
                     if visible && !in_image {
                         let pts: Vec<(f32, f32)> = polys.iter().flatten().copied().collect();
                         if let Some(rb) = shape_bounds(&pts) {
-                            push(sw, ScreenKind::Box, String::new(), rb, col, 0.0);
+                            push(sw, ScreenKind::Box, String::new(), rb, col, 0.0, filled);
                         }
                     }
                 }
                 OpK::Color(c) => {
                     let c = mod_alpha(*c, alpha);
                     if (c >> 24) >= 0x18 && !in_image {
-                        push(sw, ScreenKind::Box, String::new(), clip, c, 0.0);
+                        push(sw, ScreenKind::Box, String::new(), clip, c, 0.0, true);
                     }
                 }
                 OpK::Line(..) => {}
@@ -266,7 +271,7 @@ impl Engine {
                         continue;
                     }
                     let text = s.replace(['\n', '\r'], " ").trim_end().to_string();
-                    push(sw, ScreenKind::Text, text, r, col, size * ms);
+                    push(sw, ScreenKind::Text, text, r, col, size * ms, false);
                 }
                 OpK::Node(n) => {
                     if let Some(G::Node(ns)) = self.gfx.objs.get(n) {
@@ -310,7 +315,7 @@ impl Engine {
                         if bclip[0] < bclip[2] && bclip[1] < bclip[3] && alpha > 0.05 {
                             if !in_image {
                                 let c = op.p.tint.map(|t| mod_alpha(t, alpha)).unwrap_or(0);
-                                push(sw, ScreenKind::Image, String::new(), bclip, c, 0.0);
+                                push(sw, ScreenKind::Image, String::new(), bclip, c, 0.0, false);
                             }
                             // text drawn into a bitmap is still text
                             self.screen_ops(sw, bops, &s, bclip, alpha, true, depth + 1);
@@ -334,7 +339,27 @@ fn build_model(walk: ScreenWalk) -> ScreenModel {
     let mut boxes: Vec<ScreenItem> = Vec::new();
     let mut images: Vec<ScreenItem> = Vec::new();
     let mut background = None;
-    for it in walk.items {
+    // painter's order: an item fully covered by an opaque box drawn LATER is
+    // not visible (sheet/dialog surfaces over the screen behind them)
+    let items = walk.items;
+    let opaque: Vec<(usize, [i32; 4])> = items
+        .iter()
+        .enumerate()
+        .filter(|(_, b)| b.kind == ScreenKind::Box && b.filled && (b.argb >> 24) >= 0xf0)
+        .map(|(i, b)| (i, b.bounds))
+        .collect();
+    let hidden = |i: usize, it: &ScreenItem| {
+        opaque
+            .iter()
+            .any(|(j, ob)| *j > i && contains_b(ob, &it.bounds) && ob != &it.bounds)
+    };
+    let visible: Vec<ScreenItem> = items
+        .iter()
+        .enumerate()
+        .filter(|(i, it)| !hidden(*i, it))
+        .map(|(_, it)| it.clone())
+        .collect();
+    for it in visible {
         match it.kind {
             ScreenKind::Text => texts.push(it),
             ScreenKind::Image => {
@@ -454,6 +479,7 @@ mod screen_model_tests {
             bounds: b,
             argb: 0xff00_0000,
             size,
+            filled: true,
         }
     }
 
@@ -497,6 +523,43 @@ mod screen_model_tests {
         });
         assert!(m.targets.is_empty(), "{:?}", m.targets);
         assert_eq!(m.texts.len(), 3);
+    }
+
+    #[test]
+    fn items_under_a_later_opaque_surface_are_hidden() {
+        let mut sheet = item(ScreenKind::Box, "", [0, 600, 720, 1440], 0.0);
+        sheet.argb = 0xffff_ffff;
+        let mut scrim = item(ScreenKind::Box, "", [0, 0, 720, 1440], 0.0);
+        scrim.argb = 0x5200_0000;
+        let m = build_model(ScreenWalk {
+            items: vec![
+                item(ScreenKind::Text, "behind sheet", [100, 700, 300, 730], 20.0),
+                item(ScreenKind::Text, "above sheet", [100, 200, 300, 230], 20.0),
+                scrim,
+                sheet,
+                item(ScreenKind::Text, "on sheet", [100, 800, 300, 830], 20.0),
+            ],
+            ops: 5,
+            w: 720.0,
+            h: 1440.0,
+        });
+        let names: Vec<&str> = m.texts.iter().map(|t| t.text.as_str()).collect();
+        assert_eq!(names, vec!["above sheet", "on sheet"], "scrim is translucent, sheet is opaque");
+    }
+
+    #[test]
+    fn stroked_outline_drawn_after_label_does_not_hide_it() {
+        let mut outline = item(ScreenKind::Box, "", [580, 78, 684, 160], 0.0);
+        outline.filled = false;
+        let m = build_model(ScreenWalk {
+            items: vec![item(ScreenKind::Text, "Pular", [606, 107, 660, 132], 21.0), outline],
+            ops: 2,
+            w: 720.0,
+            h: 1440.0,
+        });
+        assert_eq!(m.texts.len(), 1);
+        assert_eq!(m.targets.len(), 1);
+        assert_eq!(m.targets[0].label, "Pular");
     }
 
     #[test]

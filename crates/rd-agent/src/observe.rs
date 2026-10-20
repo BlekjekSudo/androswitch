@@ -159,6 +159,18 @@ impl ScreenSnap {
             let parts: Vec<String> = runs.iter().map(|r| format!("[x{}] {}", r.bounds[0], r.text)).collect();
             let _ = writeln!(out, "y{y:<5} {}", parts.join("   "));
         }
+        // icons / images (no label in the frame): centres, so icon-only
+        // buttons (search, overflow, nav icons) are still reachable by tap
+        let icons: Vec<String> = self
+            .model
+            .images
+            .iter()
+            .filter(|i| i.bounds[2] - i.bounds[0] <= 160 && i.bounds[3] - i.bounds[1] <= 160)
+            .map(|i| format!("{},{}", (i.bounds[0] + i.bounds[2]) / 2, (i.bounds[1] + i.bounds[3]) / 2))
+            .collect();
+        if !icons.is_empty() {
+            let _ = writeln!(out, "-- icons @ center: {}", icons.join("  "));
+        }
         let targets = self.targets();
         if !targets.is_empty() {
             let _ = writeln!(out, "-- targets (label @ center x,y):");
@@ -223,6 +235,7 @@ fn host_collect(n: &UiNode, texts: &mut Vec<ScreenItem>, targets: &mut Vec<HostT
                 bounds: b,
                 argb: 0xff00_0000,
                 size: 0.0,
+                filled: false,
             });
         }
         if n.clickable && n.enabled {

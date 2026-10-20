@@ -4549,7 +4549,7 @@ mod tests {
         let _guard = SESSION_LOCK.lock().unwrap();
         let mut s = AgentSession::new();
         let defs = tool_defs();
-        assert_eq!(defs.len(), 39);
+        assert_eq!(defs.len(), 41);
         for t in &defs {
             // schema: objeto com properties/required consistentes
             assert!(t.schema["type"] == "object", "{}: schema object", t.name);
