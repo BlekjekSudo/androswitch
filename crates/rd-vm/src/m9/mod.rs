@@ -172,6 +172,16 @@ pub fn call_static(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_static_rooted(vm, class, name, sig, args))
+}
+
+fn call_static_rooted(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if let Some(v) = notifications::static_call(vm, class, name, sig, args)? {
         return Ok(Some(v));
     }
@@ -181,6 +191,17 @@ pub fn call_static(
     accessibility::static_call(vm, class, name, sig, args)
 }
 pub fn call_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_instance_rooted(vm, class, name, sig, recv, args))
+}
+
+fn call_instance_rooted(
     vm: &mut Engine,
     class: &str,
     name: &str,

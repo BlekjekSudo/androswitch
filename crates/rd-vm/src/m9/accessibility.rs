@@ -213,6 +213,16 @@ pub(super) fn static_call(
     _sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if class == NODE && name == "obtain" {
+        return crate::accessibility_node::obtain(vm, args).map(Some);
+    }
+    if class.starts_with("Landroid/view/accessibility/AccessibilityNodeInfo$") && name == "obtain" {
+        let r = alloc(vm, class)?;
+        for (i, v) in args.iter().enumerate() {
+            crate::err::put_field_result(vm.heap.put_field(r, &format!("arg{i}"), v.clone()))?;
+        }
+        return Ok(Some(Value::Obj(r)));
+    }
     if class == EVENT && name == "obtain" {
         let r = alloc(vm, EVENT)?;
         vm.fw.m9.event_objects.insert(
@@ -236,6 +246,36 @@ pub(super) fn instance_call(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if class == "Landroid/view/accessibility/AccessibilityNodeInfo$AccessibilityAction;" {
+        let v = match name {
+            "<init>" => {
+                for (key, value) in ["Id", "Label"].into_iter().zip(args) {
+                    crate::err::put_field_result(vm.heap.put_field(recv, key, value.clone()))?;
+                }
+                Value::Null
+            }
+            "getId" => vm.heap.get_field(recv, "Id").unwrap_or(Value::Int(0)),
+            "getLabel" => vm.heap.get_field(recv, "Label").unwrap_or(Value::Null),
+            _ => return Ok(None),
+        };
+        return Ok(Some(v));
+    }
+    if class == NODE && !vm.fw.m9.nodes.contains_key(&recv) {
+        return crate::accessibility_node::call(vm, recv, name, _sig, args);
+    }
+    if name == "onInitializeAccessibilityNodeInfo"
+        && matches!(vm.fw.get(recv), Some(HostObj::View { .. }))
+    {
+        if let Some(Value::Obj(n)) = args.first() {
+            crate::accessibility_node::initialize_view(vm, recv, *n)?;
+        }
+        return Ok(Some(Value::Null));
+    }
+    if name == "getParentForAccessibility" {
+        if let Some(HostObj::View { parent, .. }) = vm.fw.get(recv) {
+            return Ok(Some(parent.map(Value::Obj).unwrap_or(Value::Null)));
+        }
+    }
     if name == "setContentDescription" && matches!(vm.fw.get(recv), Some(HostObj::View { .. })) {
         let s = if obj(args, 0).is_some() {
             text(vm, args, 0)?

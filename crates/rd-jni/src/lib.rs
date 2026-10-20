@@ -1,5 +1,8 @@
 //! JNI wire types, descriptors, mangling, modified UTF-8 and reference frames.
 //! No raw host pointers: native references are opaque tokens (ADR 004).
+#[cfg(feature = "jit")]
+pub mod jit;
+
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 pub const MODULE_ID: &str = "rd-jni";

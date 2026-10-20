@@ -27,7 +27,7 @@
 //!
 //! **Deviations (documented).**
 //! - `subList` returns a copy, not a live view.
-//! - Host `ListIterator`s iterate a snapshot; `add`/`set`/`remove` through
+//! - Host `ListIterator`s iterate a snapshot; `add`/`set` through
 //!   them throw `UnsupportedOperationException` rather than silently
 //!   diverging.
 
@@ -226,11 +226,17 @@ fn new_host(vm: &mut Engine, class: &str, elems: Vec<Value>) -> Result<Value, Vm
     Ok(Value::Obj(r))
 }
 
-fn new_iter(vm: &mut Engine, elems: Vec<Value>, pos: usize) -> Result<Value, VmExit> {
+fn new_iter(
+    vm: &mut Engine,
+    owner: ObjRef,
+    elems: Vec<Value>,
+    pos: usize,
+) -> Result<Value, VmExit> {
     let r = vm
         .heap
         .alloc_instance("Ljava/util/ListIterator;".to_string(), Vec::new())?;
     vm.fw.objects.insert(r, HostObj::Iter { elems, pos });
+    crate::jiterator::bind(vm, r, owner)?;
     Ok(Value::Obj(r))
 }
 
@@ -316,37 +322,9 @@ pub(crate) fn instance_intrinsic(
         mref_class,
         "Ljava/util/ListIterator;" | "Ljava/util/Iterator;"
     ) {
-        if let Some(HostObj::Iter { elems, pos }) = vm.fw.objects.get_mut(&recv) {
-            return Ok(match (name, sig) {
-                ("hasNext", "()Z") => Some(Value::Int((*pos < elems.len()) as i32)),
-                ("next", "()Ljava/lang/Object;") => {
-                    if *pos >= elems.len() {
-                        return Err(exc("Ljava/util/NoSuchElementException;", ""));
-                    }
-                    *pos += 1;
-                    Some(elems[*pos - 1].clone())
-                }
-                ("hasPrevious", "()Z") => Some(Value::Int((*pos > 0) as i32)),
-                ("previous", "()Ljava/lang/Object;") => {
-                    if *pos == 0 {
-                        return Err(exc("Ljava/util/NoSuchElementException;", ""));
-                    }
-                    *pos -= 1;
-                    Some(elems[*pos].clone())
-                }
-                ("nextIndex", "()I") => Some(Value::Int(*pos as i32)),
-                ("previousIndex", "()I") => Some(Value::Int(*pos as i32 - 1)),
-                ("add", _) | ("set", _) if mref_class == "Ljava/util/ListIterator;" => {
-                    return Err(exc(
-                        "Ljava/lang/UnsupportedOperationException;",
-                        "ListIterator.add/set on a host snapshot iterator",
-                    ))
-                }
-                _ => None,
-            });
-        }
-        return Ok(None);
+        return crate::jiterator::navigate(vm, recv, name);
     }
+
     if !COLLECTION_TYPES.contains(&mref_class) {
         return Ok(None);
     }
@@ -451,7 +429,7 @@ pub(crate) fn instance_intrinsic(
                 return Ok(Some(Value::Int(found)));
             }
             ("listIterator", "()Ljava/util/ListIterator;") => {
-                return Ok(Some(new_iter(vm, items, 0)?))
+                return Ok(Some(new_iter(vm, recv, items, 0)?))
             }
             ("listIterator", "(I)Ljava/util/ListIterator;") => {
                 let i = args[0].as_int()?;
@@ -461,7 +439,7 @@ pub(crate) fn instance_intrinsic(
                         format!("Index: {i}"),
                     ));
                 }
-                return Ok(Some(new_iter(vm, items, i as usize)?));
+                return Ok(Some(new_iter(vm, recv, items, i as usize)?));
             }
             _ => return Ok(None),
         };
@@ -509,7 +487,7 @@ pub(crate) fn instance_intrinsic(
             } else {
                 0
             };
-            new_iter(vm, items, start.min(n.max(0) as usize))?
+            new_iter(vm, recv, items, start.min(n.max(0) as usize))?
         }
         ("contains", "(Ljava/lang/Object;)Z") => {
             let items = elems_of(vm, &me)?;

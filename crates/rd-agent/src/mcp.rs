@@ -779,7 +779,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "runtime_health",
             description:
-                "Saúde do runtime: sessão, app em execução, activity, finished, clock virtual, heap, fuel, fila do Looper, bytes de log e tamanho do registro — sem exigir app (reporta o que existe). Inclui `gc` (estatísticas do coletor mark-sweep); `gc=true` força um ciclo antes de reportar.",
+                "Saúde do runtime: sessão, app em execução, activity, finished, clock virtual, heap, fuel, fila do Looper, bytes de log e tamanho do registro — sem exigir app (reporta o que existe). Inclui `gc` (gerações minor/major, chaves fracas, pausas), heap peak e `jit` quando compilado com a feature jit. `gc=true` força coleta major. Fuel é cumulativo; cada tool inicia uma janela de execução limitada nova.",
             schema: obj(serde_json::json!({ "gc": { "type": "boolean" } }), &[]),
         },
         ToolDef {
@@ -879,6 +879,11 @@ impl AgentSession {
     /// Dispatch de uma tool (o envelope MCP chama isto). Erros de tool voltam
     /// como ToolResult::is_error com o contrato {code, cause, suggestion}.
     pub fn call_tool(&mut self, name: &str, args: &serde_json::Value) -> ToolResult {
+        // Fuel limits one operation, not the lifetime of a healthy MCP session.
+        // Total fuel remains observable; loops still exhaust a per-tool budget.
+        if let Some(eng) = &mut self.engine {
+            eng.reset_fuel_window();
+        }
         let args = args.as_object().cloned().unwrap_or_default();
         let res: Result<ToolResult, RdError> = match name {
             "install" => self.tool_install(args.get("apk").and_then(|v| v.as_str()).unwrap_or("")),
@@ -1980,6 +1985,10 @@ impl AgentSession {
                 v["fuel_used"] = serde_json::json!(eng.fuel_used());
                 v["looper_pending"] = serde_json::json!(eng.looper_pending());
                 v["gc"] = serde_json::json!(eng.gc_stats());
+                #[cfg(feature = "jit")]
+                {
+                    v["jit"] = serde_json::json!(eng.jit_stats());
+                }
             }
             None => {
                 v["activity"] = serde_json::json!(Option::<String>::None);
@@ -2004,7 +2013,7 @@ impl AgentSession {
                 "java-util-collections",
                 "vm",
                 "partial",
-                "HashMap/WeakHashMap/ArrayList/LinkedList/CopyOnWriteArrayList host com métodos essenciais (put/get/add/remove/size/…); CopyOnWriteArraySet host com add que deduplica; subtipagem completa (check-cast p/ List/Set/Map/Collection/Iterable); LinkedHashMap host (≡ HashMap; estado Vec = ordem de inserção); entrySet/keySet/values (views snapshot HashSet) + Iterator host (hasNext/next; remove → UOE) + Map.Entry host (getKey/getValue/setValue); equals de usuário não consultado em chaves; Collections.synchronized* devolve a própria coleção (identidade — single-threaded); ArrayDeque host (Deque completo: addFirst/Last, push/pop, peek/poll, occurrences; null rejeitado, NSE em vazio); Collections.unmodifiableMap/unmodifiableSet/singletonList host: views de SNAPSHOT em classes-marcadoras JDK (Collections$UnmodifiableMap/$UnmodifiableSet/$SingletonList) — leituras delegam, mutações → UOE tipada, null → NPE, sem estado host → VM_TYPE_ERROR tipado; singletonList(null) aceito (JDK); empty*/outros unmodifiable* seguem fora. Set.<init>(Collection) host: snapshot dedup na ordem do iterador (NPE em null; VM_TYPE_ERROR sem estado host). Enum é host (name/ordinal/toString/compareTo — inclusive herdado por enums do app via subtipagem)",
+                "HashMap/WeakHashMap/ArrayList/LinkedList/CopyOnWriteArrayList host (WeakHashMap: chaves fracas, valores fortes, null permanente; limpeza no GC) com métodos essenciais (put/get/add/remove/size/…); CopyOnWriteArraySet host com add que deduplica; subtipagem completa (check-cast p/ List/Set/Map/Collection/Iterable); LinkedHashMap host (≡ HashMap; estado Vec = ordem de inserção); entrySet/keySet/values (views snapshot HashSet) + Iterator host (hasNext/next; remove escreve na coleção/mapa de origem com ISE antes de next e após remoção dupla; iteradores COW/imutáveis continuam UOE) + Map.Entry host (getKey/getValue/setValue); equals de usuário não consultado em chaves; Collections.synchronized* devolve a própria coleção (identidade — single-threaded); ArrayDeque host (Deque completo: addFirst/Last, push/pop, peek/poll, occurrences; null rejeitado, NSE em vazio); Collections.unmodifiableMap/unmodifiableSet/singletonList host: views de SNAPSHOT em classes-marcadoras JDK (Collections$UnmodifiableMap/$UnmodifiableSet/$SingletonList) — leituras delegam, mutações → UOE tipada, null → NPE, sem estado host → VM_TYPE_ERROR tipado; singletonList(null) aceito (JDK); empty*/outros unmodifiable* seguem fora. Set.<init>(Collection) host: snapshot dedup na ordem do iterador (NPE em null; VM_TYPE_ERROR sem estado host). Enum é host (name/ordinal/toString/compareTo — inclusive herdado por enums do app via subtipagem)",
             ),
             (
                 "java-lang-ref",

@@ -1,4 +1,4 @@
-//! `java.util.regex.Pattern` / `Matcher` on the `regex` crate.
+//! `java.util.regex.Pattern` / `Matcher` on bounded `fancy-regex`.
 //!
 //! - **Pattern** is a host object holding its source (`rd_regex`) and flags
 //!   (`rd_flags`). Supported: `compile(regex[, flags])`, `quote`,
@@ -11,9 +11,9 @@
 //!   `appendReplacement`/`appendTail` (StringBuilder/StringBuffer).
 //! - Indices are UTF-16 code units, as in Java.
 //! - Java syntax translated: `\Q…\E` quoting, `(?<name>…)`,
-//!   `\p{javaWhitespace}` and friends. Constructs the regex crate lacks
-//!   (backreferences, lookaround, possessive quantifiers) raise
-//!   `PatternSyntaxException` with an explicit message.
+//!   `\p{javaWhitespace}` and friends. Lookahead/lookbehind and
+//!   backreferences use fancy-regex with a bounded backtracking budget.
+//!   Exhaustion is a structured REGEX_RUNTIME error, never a silent miss.
 //! - Flags: CASE_INSENSITIVE (2), COMMENTS (4), MULTILINE (8), LITERAL (16),
 //!   DOTALL (32); UNICODE_CASE/UNICODE_CHARACTER_CLASS are accepted (the
 //!   regex crate is Unicode-aware by default).
@@ -44,7 +44,7 @@ struct MState {
 }
 
 thread_local! {
-    static CACHE: RefCell<HashMap<(String, i32), regex::Regex>> = RefCell::new(HashMap::new());
+    static CACHE: RefCell<HashMap<(String, i32), fancy_regex::Regex>> = RefCell::new(HashMap::new());
     static MATCHERS: RefCell<HashMap<ObjRef, MState>> = RefCell::new(HashMap::new());
 }
 
@@ -156,17 +156,33 @@ pub(crate) fn translate(src: &str, flags: i32) -> String {
     out
 }
 
-fn compile(src: &str, flags: i32) -> Result<regex::Regex, VmExit> {
+pub(crate) fn compile(src: &str, flags: i32) -> Result<fancy_regex::Regex, VmExit> {
+    if src.len() > 64 * 1024 {
+        return Err(exc(
+            "Ljava/util/regex/PatternSyntaxException;",
+            "pattern exceeds the 64 KiB host compilation limit",
+        ));
+    }
     let key = (src.to_string(), flags);
     if let Some(r) = CACHE.with(|c| c.borrow().get(&key).cloned()) {
         return Ok(r);
     }
     let t = translate(src, flags);
-    let r = regex::RegexBuilder::new(&t)
-        .case_insensitive(flags & 2 != 0)
-        .ignore_whitespace(flags & 4 != 0)
-        .multi_line(flags & 8 != 0)
-        .dot_matches_new_line(flags & 32 != 0)
+    let mut modes = String::new();
+    for (bit, mode) in [(2, 'i'), (4, 'x'), (8, 'm'), (32, 's')] {
+        if flags & bit != 0 {
+            modes.push(mode);
+        }
+    }
+    let t = if modes.is_empty() {
+        t
+    } else {
+        format!("(?{modes}){t}")
+    };
+    let r = fancy_regex::RegexBuilder::new(&t)
+        .backtrack_limit(100_000)
+        .delegate_size_limit(1 << 20)
+        .delegate_dfa_size_limit(1 << 20)
         .build()
         .map_err(|e| {
             exc(
@@ -174,8 +190,27 @@ fn compile(src: &str, flags: i32) -> Result<regex::Regex, VmExit> {
                 format!("{src}: not supported by RustyDroid's regex engine ({e})"),
             )
         })?;
-    CACHE.with(|c| c.borrow_mut().insert(key, r.clone()));
+    CACHE.with(|c| {
+        let mut c = c.borrow_mut();
+        // Bound retained native compilation state across transient Java Patterns.
+        if c.len() >= 128 {
+            c.clear();
+        }
+        c.insert(key, r.clone());
+    });
     Ok(r)
+}
+
+/// Fallible matching must never become a false match/miss on budget exhaustion.
+pub(crate) fn runtime_error(e: fancy_regex::Error) -> VmExit {
+    crate::err::with_suggestion(
+        crate::err::vm_error(
+            "REGEX_RUNTIME",
+            format!("bounded regex execution failed: {e}"),
+        ),
+        "simplify the expression/input; backtracking is capped at 100000 steps",
+    )
+    .into()
 }
 
 fn char_seq(vm: &mut Engine, v: Option<&Value>) -> Result<Option<String>, VmExit> {
@@ -255,7 +290,7 @@ fn new_matcher(vm: &mut Engine, pattern: ObjRef, input: String) -> Result<Value,
 }
 
 /// Java replacement string (`$1`, `${name}`, `\$`) expanded for a match.
-fn expand(rep: &str, caps: &regex::Captures<'_>) -> Result<String, VmExit> {
+fn expand(rep: &str, caps: &fancy_regex::Captures<'_>) -> Result<String, VmExit> {
     let mut out = String::new();
     let mut it = rep.chars().peekable();
     while let Some(c) = it.next() {
@@ -314,10 +349,16 @@ fn expand(rep: &str, caps: &regex::Captures<'_>) -> Result<String, VmExit> {
     Ok(out)
 }
 
-fn replace(re: &regex::Regex, input: &str, rep: &str, all: bool) -> Result<String, VmExit> {
+pub(crate) fn replace(
+    re: &fancy_regex::Regex,
+    input: &str,
+    rep: &str,
+    all: bool,
+) -> Result<String, VmExit> {
     let mut out = String::new();
     let mut last = 0;
     for caps in re.captures_iter(input) {
+        let caps = caps.map_err(runtime_error)?;
         let m = caps.get(0).expect("group 0");
         out.push_str(&input[last..m.start()]);
         out.push_str(&expand(rep, &caps)?);
@@ -331,13 +372,18 @@ fn replace(re: &regex::Regex, input: &str, rep: &str, all: bool) -> Result<Strin
 }
 
 /// Java `Pattern.split` semantics.
-pub(crate) fn split(re: &regex::Regex, input: &str, limit: i32) -> Vec<String> {
+pub(crate) fn split(
+    re: &fancy_regex::Regex,
+    input: &str,
+    limit: i32,
+) -> Result<Vec<String>, VmExit> {
     if input.is_empty() {
-        return vec![String::new()];
+        return Ok(vec![String::new()]);
     }
     let mut parts = Vec::new();
     let mut last = 0;
     for m in re.find_iter(input) {
+        let m = m.map_err(runtime_error)?;
         if limit > 0 && parts.len() as i32 == limit - 1 {
             break;
         }
@@ -357,10 +403,10 @@ pub(crate) fn split(re: &regex::Regex, input: &str, limit: i32) -> Vec<String> {
             parts.pop();
         }
         if parts.len() == 1 && parts[0].is_empty() {
-            return vec![String::new()];
+            return Ok(vec![String::new()]);
         }
     }
-    parts
+    Ok(parts)
 }
 
 pub fn static_intrinsic(
@@ -391,30 +437,30 @@ pub fn static_intrinsic(
             let src = char_seq(vm, args.first())?.unwrap_or_default();
             let input = char_seq(vm, args.get(1))?.unwrap_or_default();
             let re = compile(&src, 0)?;
-            Value::Int(
-                re.find(&input)
-                    .is_some_and(|m| m.start() == 0 && m.end() == input.len())
-                    as i32,
-            )
+            Value::Int(anchored_full(&re, &input, 0)?.is_some() as i32)
         }
         _ => return Ok(None),
     }))
 }
 
+type GroupSpans = Vec<Option<(usize, usize)>>;
+
 fn anchored_full(
-    re: &regex::Regex,
+    re: &fancy_regex::Regex,
     input: &str,
     from: usize,
-) -> Option<Vec<Option<(usize, usize)>>> {
+) -> Result<Option<GroupSpans>, VmExit> {
     // Java matches(): the whole region must match; try leftmost-first, then
     // an anchored rebuild so alternations like `a|ab` still match "ab".
-    let full = regex::Regex::new(&format!("^(?:{})$", re.as_str())).ok()?;
-    let caps = full.captures(&input[from..])?;
-    Some(
+    let full = compile(&format!(r"\A(?:{})\z", re.as_str()), 0)?;
+    let Some(caps) = full.captures(&input[from..]).map_err(runtime_error)? else {
+        return Ok(None);
+    };
+    Ok(Some(
         (0..caps.len())
             .map(|i| caps.get(i).map(|m| (m.start() + from, m.end() + from)))
             .collect(),
-    )
+    ))
 }
 
 pub fn instance_intrinsic(
@@ -437,7 +483,7 @@ pub fn instance_intrinsic(
                 let input = char_seq(vm, args.first())?.unwrap_or_default();
                 let limit = args.get(1).and_then(|v| v.as_int().ok()).unwrap_or(0);
                 let re = compile(&src, flags)?;
-                let parts = split(&re, &input, limit);
+                let parts = split(&re, &input, limit)?;
                 let mut vals = Vec::new();
                 for p in parts {
                     vals.push(jstr(vm, p)?);
@@ -493,7 +539,7 @@ pub fn instance_intrinsic(
             }
         }
     };
-    let set_caps = |st: &mut MState, caps: Option<regex::Captures<'_>>| match caps {
+    let set_caps = |st: &mut MState, caps: Option<fancy_regex::Captures<'_>>| match caps {
         Some(c) => {
             st.groups = (0..c.len())
                 .map(|i| c.get(i).map(|m| (m.start(), m.end())))
@@ -525,7 +571,9 @@ pub fn instance_intrinsic(
                 set_caps(&mut st, None);
             } else {
                 let input = st.input.clone();
-                let caps = re.captures_at(&input, st.next);
+                let caps = re
+                    .captures_from_pos(&input, st.next)
+                    .map_err(runtime_error)?;
                 set_caps(&mut st, caps);
             }
             Value::Int(st.matched as i32)
@@ -533,17 +581,14 @@ pub fn instance_intrinsic(
         "matches" | "lookingAt" => {
             let input = st.input.clone();
             let groups = if name == "matches" {
-                anchored_full(&re, &input, 0)
+                anchored_full(&re, &input, 0)?
             } else {
-                regex::Regex::new(&format!("^(?:{})", re.as_str()))
-                    .ok()
-                    .and_then(|r| {
-                        r.captures(&input).map(|c| {
-                            (0..c.len())
-                                .map(|i| c.get(i).map(|m| (m.start(), m.end())))
-                                .collect()
-                        })
-                    })
+                let anchored = compile(&format!(r"\A(?:{})", re.as_str()), 0)?;
+                anchored.captures(&input).map_err(runtime_error)?.map(|c| {
+                    (0..c.len())
+                        .map(|i| c.get(i).map(|m| (m.start(), m.end())))
+                        .collect()
+                })
             };
             match groups {
                 Some(g) => {
@@ -616,7 +661,10 @@ pub fn instance_intrinsic(
                 let rep = char_seq(vm, args.get(1))?.unwrap_or_default();
                 let (s, e) = st.groups[0].unwrap_or((0, 0));
                 let input = st.input.clone();
-                let caps = re.captures_at(&input, s).ok_or_else(no_match)?;
+                let caps = re
+                    .captures_from_pos(&input, s)
+                    .map_err(runtime_error)?
+                    .ok_or_else(no_match)?;
                 let t = format!("{}{}", &input[st.append..s], expand(&rep, &caps)?);
                 st.append = e;
                 t
@@ -671,10 +719,10 @@ mod tests {
     #[test]
     fn java_split_semantics() {
         let re = compile(",", 0).unwrap();
-        assert_eq!(split(&re, "a,b,,", 0), vec!["a", "b"]);
-        assert_eq!(split(&re, "a,b,,", -1), vec!["a", "b", "", ""]);
-        assert_eq!(split(&re, "a,b,c", 2), vec!["a", "b,c"]);
-        assert_eq!(split(&re, "", 0), vec![""]);
+        assert_eq!(split(&re, "a,b,,", 0).unwrap(), vec!["a", "b"]);
+        assert_eq!(split(&re, "a,b,,", -1).unwrap(), vec!["a", "b", "", ""]);
+        assert_eq!(split(&re, "a,b,c", 2).unwrap(), vec!["a", "b,c"]);
+        assert_eq!(split(&re, "", 0).unwrap(), vec![""]);
     }
     #[test]
     fn replacement_groups() {

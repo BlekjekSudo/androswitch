@@ -5,6 +5,8 @@
 //! vectors vs execução real). Heap arena com o orçamento do piso moto-e5
 //! (heap ≤ 256 MB — PRF-06/A2); OOM é erro tipado, nunca abort (Lei 1).
 
+#[cfg(feature = "advanced-components")]
+pub mod accessibility_node;
 pub(crate) mod activity_callbacks;
 pub(crate) mod activity_extras;
 pub mod android_build;
@@ -13,6 +15,7 @@ pub(crate) mod android_display;
 pub(crate) mod android_drawable;
 pub(crate) mod android_motion;
 pub(crate) mod android_pm;
+pub(crate) mod android_region;
 pub(crate) mod android_res;
 pub(crate) mod android_spannable;
 pub(crate) mod android_text;
@@ -42,6 +45,9 @@ pub(crate) mod jbreakiter;
 pub(crate) mod jcollections;
 pub(crate) mod jfile;
 pub(crate) mod jio_chars;
+#[cfg(feature = "jit")]
+pub mod jit;
+pub(crate) mod jiterator;
 pub(crate) mod jlclass;
 pub(crate) mod jlocks;
 pub(crate) mod jlstring;

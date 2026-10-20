@@ -84,6 +84,13 @@ pub struct Heap {
     objects: Vec<HeapObj>,
     /// Slots freed by the GC, reused LIFO by `alloc` (see `gc.rs`).
     free: Vec<ObjRef>,
+    young: Vec<bool>,
+    remembered: std::collections::HashSet<ObjRef>,
+    // Some = host scope (pin allocations); None = guest execution.
+    gc_scopes: Vec<Option<Vec<ObjRef>>>,
+    births: Vec<u64>,
+    allocation_clock: u64,
+    existing_cutoffs: Vec<(usize, u64)>,
 }
 
 impl Heap {
@@ -94,6 +101,70 @@ impl Heap {
             peak: 0,
             objects: Vec::new(),
             free: Vec::new(),
+            young: Vec::new(),
+            remembered: Default::default(),
+            gc_scopes: Vec::new(),
+            births: Vec::new(),
+            allocation_clock: 0,
+            existing_cutoffs: Vec::new(),
+        }
+    }
+
+    pub(crate) fn is_young(&self, r: ObjRef) -> bool {
+        self.young
+            .get(r.wrapping_sub(1) as usize)
+            .copied()
+            .unwrap_or(true)
+    }
+    pub(crate) fn remembered(&self) -> impl Iterator<Item = ObjRef> + '_ {
+        self.remembered.iter().copied()
+    }
+    pub(crate) fn promote(&mut self) {
+        self.young.fill(false);
+        // Free slots are never old; keep them unmarked in minor collections.
+        for r in &self.free {
+            self.young[(*r - 1) as usize] = true;
+        }
+        self.remembered.clear();
+    }
+    pub(crate) fn gc_scope_depth(&self) -> usize {
+        self.gc_scopes.len()
+    }
+    pub(crate) fn gc_host_enter(&mut self, existing: bool) {
+        if existing {
+            self.existing_cutoffs
+                .push((self.gc_scopes.len(), self.allocation_clock));
+        }
+        self.gc_scopes.push(Some(Vec::new()));
+    }
+    pub(crate) fn gc_guest_enter(&mut self) {
+        self.gc_scopes.push(None);
+    }
+    pub(crate) fn gc_scope_restore(&mut self, depth: usize) {
+        self.gc_scopes.truncate(depth);
+        self.existing_cutoffs.retain(|(d, _)| *d < depth);
+    }
+    pub(crate) fn gc_pinned_roots(&self) -> impl Iterator<Item = ObjRef> + '_ {
+        let cutoff = self
+            .existing_cutoffs
+            .iter()
+            .map(|(_, c)| *c)
+            .max()
+            .unwrap_or(0);
+        self.gc_scopes.iter().filter_map(Option::as_ref).flatten().copied().chain(
+            self.births.iter().enumerate().filter(move |(_, birth)| **birth <= cutoff)
+                .map(|(i, _)| (i + 1) as ObjRef).filter(|r|
+                    !matches!(self.get(*r), Ok(HeapObj::Instance { class, .. }) if class == crate::gc::FREED_CLASS)
+                )
+        )
+    }
+    pub(crate) fn gc_pin_return(&mut self, r: ObjRef) {
+        self.pin_allocation(r);
+    }
+
+    fn pin_allocation(&mut self, r: ObjRef) {
+        if let Some(Some(roots)) = self.gc_scopes.last_mut() {
+            roots.push(r);
         }
     }
 
@@ -139,10 +210,19 @@ impl Heap {
         self.peak = self.peak.max(new_used);
         if let Some(r) = self.free.pop() {
             self.objects[(r - 1) as usize] = obj;
+            self.young[(r - 1) as usize] = true;
+            self.allocation_clock += 1;
+            self.births[(r - 1) as usize] = self.allocation_clock;
+            self.pin_allocation(r);
             return Ok(r);
         }
         self.objects.push(obj);
-        Ok(self.objects.len() as ObjRef)
+        self.young.push(true);
+        self.allocation_clock += 1;
+        self.births.push(self.allocation_clock);
+        let r = self.objects.len() as ObjRef;
+        self.pin_allocation(r);
+        Ok(r)
     }
 
     pub fn alloc_string(&mut self, s: String) -> Result<ObjRef, OomError> {
@@ -295,6 +375,8 @@ impl Heap {
             fields: Vec::new(),
         };
         self.free.push(r);
+        self.young[(r - 1) as usize] = true;
+        self.remembered.remove(&r);
         let bytes = bytes.min(self.used);
         self.used -= bytes;
         Some(bytes)
@@ -310,6 +392,9 @@ impl Heap {
     pub fn get_mut(&mut self, r: ObjRef) -> Result<&mut HeapObj, String> {
         if r == 0 || r as usize > self.objects.len() {
             return Err(format!("referência inválida #{r}"));
+        }
+        if !self.young[(r - 1) as usize] {
+            self.remembered.insert(r);
         }
         Ok(&mut self.objects[(r - 1) as usize])
     }
@@ -389,6 +474,7 @@ impl Heap {
                 }));
             }
             self.used = new_used;
+            self.peak = self.peak.max(new_used);
         }
         match self.get_mut(r) {
             Ok(HeapObj::Instance { fields, .. }) => {

@@ -93,83 +93,18 @@ fn char_units(c: i32) -> Vec<u16> {
     }
 }
 
-/// Translate a Java regex to the `regex` crate dialect, or fail with a
-/// PatternSyntaxException for constructs it does not support.
-fn compile(pattern: &str) -> Result<regex::Regex, VmExit> {
-    let p = pattern.replace("\\p{javaWhitespace}", "\\s");
-    regex::Regex::new(&p).map_err(|e| {
-        exc(
-            "Ljava/util/regex/PatternSyntaxException;",
-            format!("{pattern}: not supported by RustyDroid's regex engine ({e})"),
-        )
-    })
+/// Shared Pattern/String engine: flags, lookaround, replacement and split
+/// semantics must agree between java.lang.String and java.util.regex.
+fn compile(pattern: &str) -> Result<fancy_regex::Regex, VmExit> {
+    crate::jregex::compile(pattern, 0)
 }
 
-/// Java replacement syntax (`$1`, `\$`) → regex crate (`${1}`, `$$`).
-fn java_replacement(r: &str) -> String {
-    let mut out = String::new();
-    let mut it = r.chars().peekable();
-    while let Some(c) = it.next() {
-        match c {
-            '\\' => {
-                if let Some(n) = it.next() {
-                    if n == '$' {
-                        out.push_str("$$");
-                    } else {
-                        out.push(n);
-                    }
-                }
-            }
-            '$' => {
-                let mut num = String::new();
-                while let Some(d) = it.peek().filter(|d| d.is_ascii_digit()) {
-                    num.push(*d);
-                    it.next();
-                }
-                if num.is_empty() {
-                    out.push_str("$$");
-                } else {
-                    out.push_str(&format!("${{{num}}}"));
-                }
-            }
-            c => out.push(c),
-        }
-    }
-    out
-}
-
-/// JDK `String.split(regex, limit)`.
-pub(crate) fn java_split(s: &str, re: &regex::Regex, limit: i32) -> Vec<String> {
-    if s.is_empty() {
-        return vec![String::new()];
-    }
-    let mut parts: Vec<String> = Vec::new();
-    let mut last = 0usize;
-    for m in re.find_iter(s) {
-        if limit > 0 && parts.len() as i32 == limit - 1 {
-            break;
-        }
-        // a zero-width match at the beginning never produces a leading empty
-        // string (JDK 8+)
-        if m.end() == 0 {
-            continue;
-        }
-        if m.start() == m.end() && m.start() == last && last == 0 {
-            continue;
-        }
-        parts.push(s[last..m.start()].to_string());
-        last = m.end();
-    }
-    parts.push(s[last..].to_string());
-    if limit == 0 {
-        while parts.len() > 1 && parts.last().is_some_and(|p| p.is_empty()) {
-            parts.pop();
-        }
-        if parts.len() == 1 && parts[0].is_empty() && !s.is_empty() {
-            parts.clear();
-        }
-    }
-    parts
+pub(crate) fn java_split(
+    s: &str,
+    re: &fancy_regex::Regex,
+    limit: i32,
+) -> Result<Vec<String>, VmExit> {
+    crate::jregex::split(re, s, limit)
 }
 
 fn string_array(vm: &mut Engine, items: Vec<String>) -> Result<Value, VmExit> {
@@ -455,26 +390,24 @@ pub(crate) fn instance_intrinsic(
             let pat = charseq(vm, &args[0])?;
             let limit = if args.len() > 1 { int(1) } else { 0 };
             let re = compile(&pat)?;
-            let parts = java_split(&this, &re, limit);
+            let parts = java_split(&this, &re, limit)?;
             string_array(vm, parts)?
         }
         ("replaceAll", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;") => {
             let (p, r) = (charseq(vm, &args[0])?, charseq(vm, &args[1])?);
-            let out = compile(&p)?
-                .replace_all(&this, java_replacement(&r).as_str())
-                .into_owned();
+            let out = crate::jregex::replace(&compile(&p)?, &this, &r, true)?;
             new_str(vm, out)?
         }
         ("replaceFirst", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;") => {
             let (p, r) = (charseq(vm, &args[0])?, charseq(vm, &args[1])?);
-            let out = compile(&p)?
-                .replace(&this, java_replacement(&r).as_str())
-                .into_owned();
+            let out = crate::jregex::replace(&compile(&p)?, &this, &r, false)?;
             new_str(vm, out)?
         }
         ("matches", "(Ljava/lang/String;)Z") => {
             let p = charseq(vm, &args[0])?;
-            b(compile(&format!("^(?:{p})$"))?.is_match(&this))
+            b(compile(&format!(r"\A(?:{p})\z"))?
+                .is_match(&this)
+                .map_err(crate::jregex::runtime_error)?)
         }
         ("getBytes", "()[B") => byte_array(vm, this.as_bytes())?,
         ("getBytes", "(Ljava/lang/String;)[B") | ("getBytes", "(Ljava/nio/charset/Charset;)[B") => {
@@ -1031,19 +964,29 @@ mod tests {
 
     #[test]
     fn split_follows_jdk() {
-        let re = regex::Regex::new(",").unwrap();
-        assert_eq!(java_split("a,b,,", &re, 0), vec!["a", "b"]);
-        assert_eq!(java_split("a,b,,", &re, -1), vec!["a", "b", "", ""]);
-        assert_eq!(java_split("a,b,c", &re, 2), vec!["a", "b,c"]);
-        assert_eq!(java_split("", &re, 0), vec![""]);
-        let ws = regex::Regex::new(r"\s+").unwrap();
-        assert_eq!(java_split("x  y z", &ws, 0), vec!["x", "y", "z"]);
+        let re = fancy_regex::Regex::new(",").unwrap();
+        assert_eq!(java_split("a,b,,", &re, 0).unwrap(), vec!["a", "b"]);
+        assert_eq!(
+            java_split("a,b,,", &re, -1).unwrap(),
+            vec!["a", "b", "", ""]
+        );
+        assert_eq!(java_split("a,b,c", &re, 2).unwrap(), vec!["a", "b,c"]);
+        assert_eq!(java_split("", &re, 0).unwrap(), vec![""]);
+        let ws = fancy_regex::Regex::new(r"\s+").unwrap();
+        assert_eq!(java_split("x  y z", &ws, 0).unwrap(), vec!["x", "y", "z"]);
     }
 
     #[test]
     fn replacement_syntax() {
-        assert_eq!(java_replacement("$1-$2"), "${1}-${2}");
-        assert_eq!(java_replacement("\\$"), "$$");
+        let re = compile(r"(\d+)-(\d+)").unwrap();
+        assert_eq!(
+            crate::jregex::replace(&re, "1-2", "$2:$1", true).unwrap(),
+            "2:1"
+        );
+        assert_eq!(
+            crate::jregex::replace(&re, "1-2", r"\$", true).unwrap(),
+            "$"
+        );
     }
 
     #[test]

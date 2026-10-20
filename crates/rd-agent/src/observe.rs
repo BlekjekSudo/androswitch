@@ -301,7 +301,7 @@ impl AgentSession {
         let eng = self.require_engine()?;
         let finished = eng.activity_is_finished();
         let mut draw_error = None;
-        let model = if finished {
+        let mut model = if finished {
             // no window any more: never serve the last frame as if it were live
             ScreenModel {
                 width: 720,
@@ -315,6 +315,24 @@ impl AgentSession {
             }
             eng.screen_model()
         };
+        #[cfg(feature = "advanced-components")]
+        if !finished {
+            match eng.virtual_semantics() {
+                Ok(nodes) => {
+                    for n in nodes {
+                        // Prefer explicit accessibility descriptions for icons;
+                        // a provider's text is already represented by drawing.
+                        if !n.description.is_empty() {
+                            let bounds = [n.bounds[0].max(0),n.bounds[1].max(0),n.bounds[2].min(720),n.bounds[3].min(1440)];
+                            if bounds[2] > bounds[0] && bounds[3] > bounds[1] {
+                                model.targets.push(rd_vm::graphics::ScreenTarget {label:n.description,bounds});
+                            }
+                        }
+                    }
+                }
+                Err(e) => draw_error = Some(format!("accessibility provider: {e}{}", eng.exit_trace(&e))),
+            }
+        }
         let mut host_texts = Vec::new();
         let mut host_targets = Vec::new();
         let mut dialogs = 0;
@@ -336,6 +354,7 @@ impl AgentSession {
             use std::hash::{Hash, Hasher};
             let mut hs = std::collections::hash_map::DefaultHasher::new();
             model.fingerprint.hash(&mut hs);
+            for t in &model.targets {t.label.hash(&mut hs);t.bounds.hash(&mut hs);}
             for t in &host_texts {
                 t.text.hash(&mut hs);
                 t.bounds.hash(&mut hs);

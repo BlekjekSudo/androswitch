@@ -186,6 +186,17 @@ pub fn invoke(
     is_static: bool,
     slots: &[Value],
 ) -> std::result::Result<Value, VmExit> {
+    vm.with_host_roots(|vm| invoke_rooted(vm, class, name, sig, is_static, slots))
+}
+
+fn invoke_rooted(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    is_static: bool,
+    slots: &[Value],
+) -> std::result::Result<Value, VmExit> {
     ensure(vm)?;
     let mut state = vm.native.take().unwrap();
     vm.native_active = true;

@@ -51,6 +51,8 @@ impl Default for VmConfig {
 /// Motor interpretador. O heap é coletado por mark-sweep em safe points
 /// (`Engine::gc` / `maybe_gc`, ver `gc.rs`) e descartado quando o Engine cai.
 pub struct Engine {
+    #[cfg(feature = "jit")]
+    jit: crate::jit::JitState,
     #[cfg(feature = "native")]
     pub(crate) native: Option<crate::native::NativeState>,
     #[cfg(feature = "native")]
@@ -69,6 +71,7 @@ pub struct Engine {
     pub fw: crate::framework::HostState,
     depth: usize,
     pub(crate) fuel_used: u64,
+    pub(crate) fuel_window_start: u64,
     /// AG-09: cobertura de métodos — chave `(dex_idx << 32) | method_idx`
     /// de cada corpo DEX que chegou a executar neste Engine.
     coverage: HashSet<u64>,
@@ -121,6 +124,8 @@ pub struct Engine {
     pub(crate) content: crate::content::ContentState,
     /// Mark-sweep collector statistics (`gc.rs`).
     pub(crate) gc_stats: crate::gc::GcStats,
+    pub(crate) gc_slots_after: usize,
+    pub(crate) gc_frames: Vec<Vec<crate::heap::ObjRef>>,
 }
 
 /// Cobertura por classe (AG-09, nível de método).
@@ -162,6 +167,7 @@ impl Engine {
             fw: Default::default(),
             depth: 0,
             fuel_used: 0,
+            fuel_window_start: 0,
             coverage: HashSet::new(),
             frame_labels: Vec::new(),
             threads: Default::default(),
@@ -190,7 +196,33 @@ impl Engine {
             intent_meta: HashMap::new(),
             content: Default::default(),
             gc_stats: Default::default(),
+            gc_slots_after: 0,
+            gc_frames: Vec::new(),
+            #[cfg(feature = "jit")]
+            jit: {
+                let mut j = crate::jit::JitState::default();
+                if std::env::var("RD_JIT")
+                    .map(|v| v == "on" || v == "1")
+                    .unwrap_or(false)
+                {
+                    if let Err(e) = j.enable() {
+                        j.stats.last_error = Some(e);
+                    }
+                }
+                j
+            },
         }
+    }
+
+    /// Opt in to the bounded integer leaf JIT (default remains interpreter).
+    #[cfg(feature = "jit")]
+    pub fn enable_jit(&mut self) -> Result<(), String> {
+        self.jit.enable()
+    }
+
+    #[cfg(feature = "jit")]
+    pub fn jit_stats(&self) -> &crate::jit::JitStats {
+        &self.jit.stats
     }
 
     pub fn heap_used(&self) -> usize {
@@ -208,6 +240,17 @@ impl Engine {
     /// onCreate DEX dela antes do onCreate da activity — como o Android faz.
     pub fn set_application_class(&mut self, application_desc: String) {
         self.fw.application_class = Some(application_desc);
+    }
+
+    /// Start a new bounded host/tool operation without losing lifetime counters.
+    pub fn reset_fuel_window(&mut self) {
+        self.fuel_window_start = self.fuel_used;
+    }
+
+    pub fn fuel_remaining(&self) -> u64 {
+        self.config
+            .fuel
+            .saturating_sub(self.fuel_used.saturating_sub(self.fuel_window_start))
     }
 
     pub fn fuel_used(&self) -> u64 {
@@ -423,10 +466,48 @@ impl Engine {
         // AG-09: cobertura de métodos — o corpo existe e vai executar.
         self.coverage
             .insert(((dex_idx as u64) << 32) | u64::from(m.method_idx));
+        #[cfg(feature = "jit")]
+        if m.access_flags & ACC_STATIC != 0 && self.jit.stats.enabled {
+            let key = ((dex_idx as u64) << 32) | u64::from(m.method_idx);
+            let proto = self.cp.method_ref(dex_idx, m.method_idx)?.proto;
+            if let Some(value) = self
+                .jit
+                .run(key, &code, &proto, &ins, self.fuel_remaining())
+            {
+                self.fuel_used += code.instructions.len() as u64;
+                return Ok(Value::Int(value));
+            }
+        }
         let frame_label = self.method_label(dex_idx, m);
         self.frame_labels.push(frame_label);
         self.depth += 1;
+        let scope_depth = self.heap.gc_scope_depth();
+        if self.gc_frames.is_empty() {
+            self.heap.gc_host_enter(true);
+        }
+        self.heap.gc_guest_enter();
+        self.gc_frames.push(
+            ins.iter()
+                .filter_map(|v| match v {
+                    Value::Obj(r) => Some(*r),
+                    _ => None,
+                })
+                .collect(),
+        );
         let mut ret = interp::exec_frame(self, dex_idx, frame_super.as_deref(), code.clone(), ins);
+        self.gc_frames.pop();
+        self.heap.gc_scope_restore(scope_depth);
+        // A guest allocation returned into a Rust host temporary must survive
+        // the host's next guest callback, even before it is stored in a table.
+        match &ret {
+            Ok(Value::Obj(r)) => self.heap.gc_pin_return(*r),
+            Err(VmExit::Exception(t)) => {
+                if let Some(r) = t.obj {
+                    self.heap.gc_pin_return(r);
+                }
+            }
+            _ => {}
+        }
         self.depth -= 1;
         self.frame_labels.pop();
         // Observabilidade opt-in (default off — nenhuma saída existente muda):

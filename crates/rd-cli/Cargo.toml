@@ -35,3 +35,5 @@ rd-testsupport = { path = "../rd-testsupport" }
 default = ["advanced-components"]
 advanced-components = ["rd-vm/advanced-components"]
 native = ["rd-vm/native"]
+
+jit = ["rd-vm/jit", "rd-agent/jit"]

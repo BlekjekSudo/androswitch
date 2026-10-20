@@ -295,6 +295,16 @@ pub fn call_m8_static(
     _sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_m8_static_rooted(vm, class, name, _sig, args))
+}
+
+fn call_m8_static_rooted(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    _sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     if let Some(v) = crate::android_drawable::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
@@ -354,6 +364,17 @@ pub fn call_m8_static(
 
 // ── dispatch de instância ───────────────────────────────────────────────
 pub fn call_m8_instance(
+    vm: &mut Engine,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_m8_instance_rooted(vm, mref_class, name, sig, recv, args))
+}
+
+fn call_m8_instance_rooted(
     vm: &mut Engine,
     mref_class: &str,
     name: &str,

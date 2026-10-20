@@ -178,7 +178,7 @@ Comutadores de comportamento targetSdk 26→36 ativos para o app instalado (PRF-
 
 ### `runtime_health`
 
-Saúde do runtime: sessão, app em execução, activity, finished, clock virtual, heap, fuel, fila do Looper, bytes de log e tamanho do registro — sem exigir app (reporta o que existe). Inclui `gc` (estatísticas do coletor mark-sweep); `gc=true` força um ciclo antes de reportar.
+Saúde do runtime: sessão, app em execução, activity, finished, clock virtual, heap, fuel, fila do Looper, bytes de log e tamanho do registro — sem exigir app (reporta o que existe). Inclui `gc` (gerações minor/major, chaves fracas, pausas), heap peak e `jit` quando compilado com a feature jit. `gc=true` força coleta major. Fuel é cumulativo; cada tool inicia uma janela de execução limitada nova.
 
 - Parâmetros: `gc`
 

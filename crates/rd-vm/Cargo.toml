@@ -23,6 +23,7 @@ regex = { workspace = true }
 
 rd-ndk = { path = "../rd-ndk", optional = true }
 rd-jni = { path = "../rd-jni", optional = true }
+fancy-regex = "=0.13.0"
 
 [dev-dependencies]
 rd-jni = { path = "../rd-jni" }
@@ -33,3 +34,5 @@ rd-testsupport = { path = "../rd-testsupport" }
 default = ["advanced-components"]
 advanced-components = []
 native = ["dep:rd-ndk", "dep:rd-jni", "rd-ndk/native"]
+
+jit = ["dep:rd-jni", "rd-jni/jit"]

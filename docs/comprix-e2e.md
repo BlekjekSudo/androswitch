@@ -507,6 +507,8 @@ remain the top priorities: Cranelift JIT not started (the GC landed — see
 regex look-around (above), Compose semantics (`contentDescription`) for icon
 labels. Compose `type_text` is done (fixes 89–92).
 
+> Historical round-6 blockers above are superseded by round 8 below.
+
 ## Garbage collector (round 7)
 
 The app heap used to be an arena: nothing was freed until the app exited, so a
@@ -544,3 +546,59 @@ host `List`/`Map`/`Iter` cut marking to 5–9 ms; steady-state forced cycle
 14 → 8 ms (live 38.6 k, identical live set), last automatic cycle per flow:
 `s08` 46 → 37 ms, `s11` 42 → 35 ms, `s12` 20 → 12 ms — same bytes freed to
 the byte (the collector is deterministic).
+
+
+## Runtime completion and strict regression (round 8, 2026-10-20)
+
+AI-assisted changes address the runtime blockers before integrating the feature
+branch. Historical round-6/7 numbers above remain historical, not new-device
+measurements.
+
+- Iterator.remove now writes through to mutable lists/sets/map-view backing
+  maps, with next/previous cursor adjustment and IllegalStateException rules.
+  COW/immutable iterators remain unsupported for removal. Traversal is still a
+  deterministic snapshot, not a complete fail-fast/live JDK collection model.
+- WeakHashMap keys are weak (strong values, permanent null keys). Minors retain
+  old dead keys until a major collection.
+- Non-moving generations, remembered old writes, live/suspended frame roots
+  and host-temporary scopes permit collection inside one Java invocation.
+  Adaptive object-slot pressure avoids hitting the slot cap before the byte
+  budget and backs off when pinned live objects cannot be reclaimed.
+- Pattern/Matcher/String regex entry points share fancy-regex 0.13 lookaround
+  and backreferences. Backtracking is bounded at 100,000; exhaustion reports
+  REGEX_RUNTIME, never a false match. Source length (64 KiB), delegated regex
+  size/DFA (1 MiB each) and retained cache (128 patterns) are bounded. This is
+  still a documented Java-regex subset, not a complete replacement for Java.
+- Generic saved View delegate/provider traversal supplies Compose virtual
+  node descriptions. Bounded rectilinear Region operations and wrapper-context
+  delegation support the actual provider path, without obfuscated-class hooks.
+- Optional Cranelift 0.104 integer leaf JIT is implemented and off by default.
+  Warmup threshold 32, cache 8,192 entries, native function cap 256; unsupported
+  code falls back to the interpreter. See ADR 007 for safety and architecture.
+- Fuel remains a lifetime counter, but each MCP tool starts a fresh bounded
+  execution window. This avoids exhausting a healthy session's entire fuel
+  allowance merely through a long sequence of ordinary actions.
+
+### Observed real-APK evidence
+
+Comprix 1.6.0 x86_64 release APK, release RustyDroid, desktop Linux sandbox
+(2 GiB RAM); **not a Moto E5 measurement**:
+
+1. Create a list, type `2 kg de arroz`, submit via ENTER: **Arroz / 2 x kg /
+   1 item**. This goes through the actual app's parser, Compose input and Room
+   insert, not a mocked fixture.
+2. `observe` exposes **Buscar listas**, **Minhas lojas**, **Voltar**. Tapping
+   `Minhas lojas` by name opens the correct screen. Dialog nodes use the same
+   generic path.
+3. With GC disabled, two full Listas → Ajustes → Histórico → Comparar → Listas
+   cycles complete without Iterator.remove failure (17 MCP steps including
+   install/onboarding/provider checks; 32.65 seconds).
+4. Strict populated-list stress treats provider warnings as failures. It
+   uncovered a ContextThemeWrapper inherited-query gap and then a slot-pressure
+   collection storm above 786,432 pinned objects. Both have dedicated regression
+   tests; the long campaign is rerun after these fixes. Final outcome is recorded
+   in the validation report when available; do not infer a completed soak here.
+
+No physical camera/Scanner campaign, ARMv7 native JIT, Moto E5 latency or full
+Java/Android compatibility claim is made. Human review is required before merge
+by CONTRIBUTING.md.

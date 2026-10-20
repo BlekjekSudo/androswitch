@@ -277,6 +277,16 @@ pub fn call_static_intrinsic(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_static_intrinsic_rooted(vm, class, name, sig, args))
+}
+
+fn call_static_intrinsic_rooted(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     // java.lang primitive wrappers (boxes.rs): valueOf/hashCode/compare/bits
     if let Some(v) = crate::boxes::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
@@ -1827,39 +1837,7 @@ fn iterator_intrinsic(
     recv: crate::heap::ObjRef,
     name: &str,
 ) -> Result<Option<Value>, VmExit> {
-    use crate::framework::HostObj;
-    match name {
-        "hasNext" => {
-            let more = match vm.fw.objects.get(&recv) {
-                Some(HostObj::Iter { elems, pos }) => *pos < elems.len(),
-                _ => false,
-            };
-            Ok(Some(Value::Int(more as i32)))
-        }
-        "next" => {
-            let Some(HostObj::Iter { elems, pos }) = vm.fw.objects.get_mut(&recv) else {
-                return Err(crate::err::vm_error(
-                    "VM_TYPE_ERROR",
-                    "Iterator host sem estado (use iterator())",
-                )
-                .into());
-            };
-            if *pos >= elems.len() {
-                return Err(VmExit::Exception(Throwable::new(
-                    "Ljava/util/NoSuchElementException;",
-                    "Iterator.next sem próximo elemento",
-                )));
-            }
-            let v = elems[*pos].clone();
-            *pos += 1;
-            Ok(Some(v))
-        }
-        "remove" => Err(VmExit::Exception(Throwable::new(
-            "Ljava/lang/UnsupportedOperationException;",
-            "Iterator host: remove não suportado (snapshot)",
-        ))),
-        _ => Ok(None),
-    }
+    crate::jiterator::navigate(vm, recv, name)
 }
 
 /// (name, sig) de Map.Entry host suportados (M8).
@@ -3188,8 +3166,7 @@ fn iobe(msg: String) -> VmExit {
     VmExit::Exception(Throwable::new("Ljava/lang/IndexOutOfBoundsException;", msg))
 }
 
-/// HashMap/WeakHashMap host (M8). Estado em `HostObj::Map`; sem GC na arena
-/// ⇒ WeakHashMap nunca limpa entradas (comportamento documentado).
+/// Host maps. GC traces WeakHashMap keys weakly and values strongly.
 fn map_intrinsic(
     vm: &mut Engine,
     recv: crate::heap::ObjRef,
@@ -3228,6 +3205,7 @@ fn map_intrinsic(
         ("entrySet", _) | ("keySet", _) | ("values", _) => {
             let snapshot = map_entries(vm, recv)?.clone();
             let mut elems = Vec::with_capacity(snapshot.len());
+            let keys: Vec<Value> = snapshot.iter().map(|(k, _)| k.clone()).collect();
             for (k, v) in snapshot {
                 let item = match name {
                     "keySet" => k,
@@ -3241,8 +3219,16 @@ fn map_intrinsic(
                 };
                 elems.push(item);
             }
-            let view = vm.heap.alloc_instance(VIEW_SET.to_string(), vec![])?;
+            let readonly = vm.heap.class_of(recv)? == UNMODIFIABLE_MAP;
+            let view = vm.heap.alloc_instance(
+                if readonly { UNMODIFIABLE_SET } else { VIEW_SET }.to_string(),
+                vec![],
+            )?;
             vm.fw.objects.insert(view, HostObj::List { elems });
+            crate::err::put_field_result(vm.heap.put_field(view, "rd$map", Value::Obj(recv)))?;
+            for (i, k) in keys.into_iter().enumerate() {
+                crate::err::put_field_result(vm.heap.put_field(view, &format!("rd$key{i}"), k))?;
+            }
             Ok(Some(Value::Obj(view)))
         }
         ("put", _) => {
@@ -3512,6 +3498,20 @@ pub(crate) fn context_impl(vm: &mut Engine) -> Result<crate::heap::ObjRef, VmExi
 }
 
 pub fn call_instance_intrinsic_mref(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: crate::heap::ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| {
+        call_instance_intrinsic_mref_rooted(vm, recv_class, mref_class, name, sig, recv, args)
+    })
+}
+
+fn call_instance_intrinsic_mref_rooted(
     vm: &mut Engine,
     recv_class: &str,
     mref_class: &str,
@@ -3868,6 +3868,9 @@ fn instance_intrinsic_dispatch(
     // View measure/layout/location, ViewConfiguration (view_layout.rs)
     if let Some(v) = crate::view_layout::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
     {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_region::call(vm, mref_class, name, recv, args)? {
         return Ok(Some(v));
     }
     // stateless platform base classes (platform_base.rs)
@@ -4529,6 +4532,7 @@ fn instance_intrinsic_dispatch(
                 || c == VIEW_SET
                 || c == LINKED_SET
                 || c == SINGLETON_LIST
+                || c == UNMODIFIABLE_SET
                 || c == ARRAY_DEQUE)
                 && name == "iterator"
                 && sig == "()Ljava/util/Iterator;" =>
@@ -4538,9 +4542,12 @@ fn instance_intrinsic_dispatch(
             vm.fw
                 .objects
                 .insert(it, crate::framework::HostObj::Iter { elems, pos: 0 });
+            if !matches!(c, COW_LIST | COW_SET | SINGLETON_LIST) {
+                crate::jiterator::bind(vm, it, recv)?;
+            }
             Ok(Some(Value::Obj(it)))
         }
-        // Iterator host (M8): hasNext/next sobre o snapshot; remove → UOE
+        // Iterator host: deterministic snapshot traversal, bound removal writes through
         (c, name, sig) if c == ITERATOR && iterator_supported(name, sig) => {
             iterator_intrinsic(vm, recv, name)
         }
@@ -5175,6 +5182,16 @@ fn java_pow(a: f64, b: f64) -> f64 {
 
 /// Native loading is never silently ignored, including in minimal builds.
 pub(crate) fn call_native_loader(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_native_loader_rooted(vm, class, name, sig, args))
+}
+
+fn call_native_loader_rooted(
     vm: &mut Engine,
     class: &str,
     name: &str,

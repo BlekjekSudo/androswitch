@@ -81,11 +81,31 @@ y1377  [x200] Comparar estabelecimentos
 -- changed since v6: +["Adição rápida", …] -["Minhas listas", …]
 ```
 
+## Accessibility labels (round 8)
+
+With `advanced-components` (enabled by default), the refresh path also calls
+saved standard View accessibility delegates/providers. It executes the app's
+real DEX `createAccessibilityNodeInfo` and traverses virtual child IDs; no
+Comprix class names or icon positions are hardcoded. Mutable node text,
+`contentDescription`, screen bounds, child IDs and actions support Compose's
+provider. Described nodes with bounds augment the frame targets. For example,
+Comprix exposes **Buscar listas**, **Minhas lojas**, and **Voltar**; tapping
+`Minhas lojas` by name opens that screen.
+
+Traversal is bounded at 2,048 nodes. It executes guest code and can be much
+more expensive than the historical round-6 draw-only timings above; heavy
+navigation can take seconds. Provider errors are surfaced in the screen's
+error/warning field (currently labelled `draw_error`), not silently ignored.
+Dialogs use the same provider path, including ContextThemeWrapper base-context
+delegation and bounded rectilinear Region clipping.
+
 ## Limits (honest)
 
-- Labels come from drawn text: icon-only buttons appear as icon centres
-  (`-- icons @ center`) without a name — Compose `contentDescription` lives in
-  the semantics tree, which is not modelled yet.
+- Images with no drawn text or accessibility description still appear only
+  as icon centres (`-- icons @ center`). This is not OCR or icon recognition.
+- This is provider-node traversal, not a complete Android accessibility
+  service framework or complete Region API. Boolean Region operations have
+  rectangle/work limits and return structured errors on exhaustion.
 - The virtual clock only advances inside tools (`wait`, actions): the live
   viewer shows the latest frame between calls; it does not animate on its own
   (determinism is a feature for agents).

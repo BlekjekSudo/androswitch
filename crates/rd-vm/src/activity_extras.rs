@@ -68,6 +68,55 @@ pub(crate) fn instance_intrinsic(
             _ => {}
         }
     }
+    // Inherited Context queries must delegate to a wrapper's *actual* base,
+    // not assume every receiver is an Activity. Compose Dialog accessibility
+    // requests getPackageName through ContextThemeWrapper.
+    if vm.cp.is_subtype(mref_class, "Landroid/content/Context;")
+        && matches!(
+            (name, sig),
+            ("getPackageName", "()Ljava/lang/String;")
+                | ("getApplicationContext", "()Landroid/content/Context;")
+                | (
+                    "getSharedPreferences",
+                    "(Ljava/lang/String;I)Landroid/content/SharedPreferences;"
+                )
+        )
+    {
+        if let Some(Value::Obj(mut base)) =
+            vm.view_props.get(&(recv, "ctx:mBase".to_string())).cloned()
+        {
+            let mut seen = vec![recv];
+            loop {
+                if seen.len() >= 64 || seen.contains(&base) {
+                    return Err(crate::err::vm_error(
+                        "VM_STACK_OVERFLOW",
+                        "cyclic or over-deep ContextWrapper base chain",
+                    )
+                    .into());
+                }
+                seen.push(base);
+                let class = vm.heap.class_of(base)?.to_string();
+                // Honor application/library DEX overrides before unwrapping.
+                if vm.cp.resolve_method(&class, name, sig).is_some() {
+                    return vm.invoke_instance(base, name, sig, args).map(Some);
+                }
+                if let Some(Value::Obj(next)) =
+                    vm.view_props.get(&(base, "ctx:mBase".to_string())).cloned()
+                {
+                    base = next;
+                    continue;
+                }
+                return crate::framework::call_host_instance(
+                    vm,
+                    "Landroid/content/Context;",
+                    name,
+                    sig,
+                    base,
+                    args,
+                );
+            }
+        }
+    }
     let app_or_ctx = matches!(
         mref_class,
         "Landroid/app/Application;"
@@ -186,4 +235,96 @@ pub(crate) fn back_invoked_top(vm: &Engine, activity: ObjRef) -> Option<ObjRef> 
         .enumerate()
         .max_by_key(|(i, (p, _))| (*p, *i))
         .map(|(_, (_, c))| *c)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rd_testsupport::vm::*;
+    #[test]
+    fn context_wrapper_delegates_package_query_to_real_base_dex_override() {
+        let mut b = DexBuilder::new();
+        let cls = b.class("LMyContext;", "Landroid/content/Context;");
+        let text = b.intern("custom.base.package") as u16;
+        let mut code = op21c(0x1a, 0, text);
+        code.extend(op11x(0x11, 0));
+        b.r#virtual(
+            cls,
+            "getPackageName",
+            "Ljava/lang/String;",
+            vec![],
+            ACC_PUBLIC,
+            Some(b.code(2, 1, 0, code)),
+        );
+        let dex = rd_dex::Dex::parse(b.finish()).unwrap();
+        let mut e = Engine::new(vec![dex], Default::default());
+        let base = e.heap.alloc_instance("LMyContext;".into(), vec![]).unwrap();
+        let wrapper = e
+            .heap
+            .alloc_instance("Landroid/view/ContextThemeWrapper;".into(), vec![])
+            .unwrap();
+        instance_intrinsic(
+            &mut e,
+            "Landroid/view/ContextThemeWrapper;",
+            "<init>",
+            "(Landroid/content/Context;I)V",
+            wrapper,
+            &[Value::Obj(base), Value::Int(0)],
+        )
+        .unwrap();
+        let got = instance_intrinsic(
+            &mut e,
+            "Landroid/content/Context;",
+            "getPackageName",
+            "()Ljava/lang/String;",
+            wrapper,
+            &[],
+        )
+        .unwrap()
+        .unwrap();
+        let Value::Obj(got) = got else { panic!() };
+        assert_eq!(e.heap.as_str(got).unwrap(), "custom.base.package");
+    }
+    #[test]
+    fn wrapper_delegates_inherited_platform_method_and_rejects_cycles() {
+        let mut b = DexBuilder::new();
+        b.class("LMyActivity;", "Landroid/app/Activity;");
+        let dex = rd_dex::Dex::parse(b.finish()).unwrap();
+        let mut e = Engine::new(vec![dex], Default::default());
+        e.fw.package_name = "app.package".into();
+        let activity = e
+            .heap
+            .alloc_instance("LMyActivity;".into(), vec![])
+            .unwrap();
+        let wrapper = e
+            .heap
+            .alloc_instance("Landroid/view/ContextThemeWrapper;".into(), vec![])
+            .unwrap();
+        e.view_props
+            .insert((wrapper, "ctx:mBase".into()), Value::Obj(activity));
+        let got = instance_intrinsic(
+            &mut e,
+            "Landroid/content/Context;",
+            "getPackageName",
+            "()Ljava/lang/String;",
+            wrapper,
+            &[],
+        )
+        .unwrap()
+        .unwrap();
+        let Value::Obj(got) = got else { panic!() };
+        assert_eq!(e.heap.as_str(got).unwrap(), "app.package");
+        e.view_props
+            .insert((wrapper, "ctx:mBase".into()), Value::Obj(wrapper));
+        let err = instance_intrinsic(
+            &mut e,
+            "Landroid/content/Context;",
+            "getPackageName",
+            "()Ljava/lang/String;",
+            wrapper,
+            &[],
+        )
+        .unwrap_err();
+        assert!(matches!(err,VmExit::Error(e) if e.code=="VM_STACK_OVERFLOW"));
+    }
 }

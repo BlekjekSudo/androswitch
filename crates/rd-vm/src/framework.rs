@@ -159,9 +159,8 @@ pub enum HostObj {
     /// M8: coleções java.util host — Map (HashMap/WeakHashMap) e List
     /// (ArrayList/LinkedList). Estado linear (volumes pequenos); igualdade
     /// de chave/elemento via `intrinsics::values_equal` (String/boxes por
-    /// valor, senão identidade). VM de arena não tem GC ⇒ WeakHashMap se
-    /// comporta como HashMap (entradas nunca são limpas) — limitação
-    /// documentada em compat_gaps.
+    /// valor, senão identidade). WeakHashMap keys are weak during GC;
+    /// values remain strong and null-key entries are never GC-removed.
     Map {
         entries: Vec<(Value, Value)>,
     },
@@ -169,7 +168,8 @@ pub enum HostObj {
         elems: Vec<Value>,
     },
     /// M8: iterador host — snapshot de elementos + cursor (determinístico;
-    /// `remove` não suportado, como em views imutáveis).
+    /// removal writes through when rd$owner is set; immutable snapshots
+    /// still reject remove).
     Iter {
         elems: Vec<Value>,
         pos: usize,
@@ -1993,6 +1993,16 @@ pub fn call_host_static(
     _sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_host_static_rooted(vm, class, name, _sig, args))
+}
+
+fn call_host_static_rooted(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    _sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
     match (class, name) {
         (LOOPER, "getMainLooper") | (LOOPER, "myLooper") => {
             Ok(Some(Value::Obj(vm.main_looper_obj()?)))
@@ -2178,6 +2188,17 @@ fn fragment_tx_intrinsic(
 }
 
 pub fn call_host_instance(
+    vm: &mut Engine,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    vm.with_host_roots(|vm| call_host_instance_rooted(vm, mref_class, name, sig, recv, args))
+}
+
+fn call_host_instance_rooted(
     vm: &mut Engine,
     mref_class: &str,
     name: &str,

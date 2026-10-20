@@ -46,8 +46,10 @@ RustyDroid is a **"Wine for Android"**: instead of emulating an entire Android O
 
 RustyDroid renders every frame itself, so it knows what is on screen *as
 data*. `observe` returns the visible texts, tap targets and icons, derived
-from the recorded display list. This works for Compose too, and costs about
-45 ms for a new frame and under 1 ms when nothing changed. `tap_text "Continuar"`
+from the recorded display list and standard accessibility providers. Compose
+`contentDescription` labels name icon-only targets too. Cached observations
+cost under 1 ms in desktop runs; a fresh frame executes app drawing and
+semantics and can take seconds during navigation. `tap_text "Continuar"`
 taps by label. MCP resources `rustydroid://screen` (and `.txt`, `.png`) can
 be subscribed to and push `notifications/resources/updated` on every real
 change. For humans, `rd mcp --live 0.0.0.0:7878` serves a browser page with
@@ -55,11 +57,20 @@ the live frame and tap-target overlay. See [docs/mcp-observe.md](docs/mcp-observ
 
 ### ♻️ Garbage-collected app heap
 
-The app heap (256 MB budget, the Moto E5 floor) is collected by a safe-point
-mark-sweep GC: between MCP tool calls and inside long waits, with precise
-heap tracing, conservative roots over the host state and recycled slots. On
-Comprix it keeps the heap around 7–18 MB instead of 34–45 MB, with 8–37 ms
-pauses; `runtime_health` reports its stats. See [docs/gc.md](docs/gc.md).
+The app heap (default 256 MB budget) uses non-moving generational mark/sweep:
+between MCP tools, in long waits, and **inside long Java calls**. Live-frame
+roots, host-temporary protection and remembered old writes keep collection
+safe; WeakHashMap keys are weak. `runtime_health` reports minor/major cycles,
+weak-key clearing, heap peaks and pauses. Device budgets still need Moto E5
+validation. See [docs/gc.md](docs/gc.md).
+
+### ⚙️ Experimental integer leaf JIT
+
+Cranelift is optional and **off by default**: build `rd-cli` with `--features
+jit`, then set `RD_JIT=on`. Only hot static straight-line integer leaf methods
+compile; everything else stays interpreted, with fuel enforcement unchanged.
+This first backend is tested on x86_64, not an ARMv7/Moto E5 JIT claim.
+See [ADR 007](docs/adr/007-cranelift-leaf-jit.md).
 
 ### 🤖 Built with AI — heavily
 

@@ -72,7 +72,7 @@ pub(crate) fn exec_frame(
     'main: loop {
         // fuel por instrução (contra loop infinito em código hostil)
         vm.fuel_used += 1;
-        if vm.fuel_used > vm.config.fuel {
+        if vm.fuel_used.saturating_sub(vm.fuel_window_start) > vm.config.fuel {
             return Err(err::with_suggestion(
                 err::vm_error(
                     "VM_FUEL",
@@ -91,6 +91,21 @@ pub(crate) fn exec_frame(
         vm.last_pc = cur_pc;
         let idx = lookup(&code.instructions, cur_pc)?;
         let insn = &code.instructions[idx].1;
+        // Suspended callers must publish roots before any path that can
+        // initialize a class or invoke guest code. Current roots are also
+        // refreshed whenever allocation pressure requests collection.
+        let may_call = matches!(insn.opcode, 0x22 | 0x60..=0x78);
+        let collect = vm.gc_due();
+        if may_call || collect {
+            vm.publish_frame_roots(
+                &regs,
+                &last_result,
+                pending_exc.as_ref().and_then(|e| e.obj),
+            );
+        }
+        if collect {
+            vm.maybe_gc();
+        }
         pc += insn.size as usize;
 
         // captura exceção Java no frame atual (try/catch); sem handler → caller

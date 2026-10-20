@@ -4,9 +4,9 @@
 //! session hit the 256 MB budget (the main risk for the Moto E5 / 2 GB floor).
 //!
 //! Design (safe-point, non-moving, precise heap graph + conservative roots):
-//! - **Safe point.** `Engine::gc` must run when no interpreter frame is live
-//!   (between MCP tool calls / host entry points). The Dalvik registers live
-//!   on the Rust stack, so they are not a root set we have to enumerate.
+//! - **Safe points.** Interpreter frames publish ObjRef roots before calls
+//!   and collection; host dispatch pins Rust temporaries across callbacks.
+//!   Tool boundaries remain full safe points. See ADR 006 for generations.
 //! - **Roots.** Every engine structure outside the heap (statics, the host
 //!   framework state, looper queues, threads, choreographer, callbacks,
 //!   native/JNI state, module side tables) is scanned *conservatively*: its
@@ -41,6 +41,10 @@ pub const FREED_CLASS: &str = "Lrd/gc/Freed;";
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct GcStats {
     pub collections: u64,
+    pub minor_collections: u64,
+    pub major_collections: u64,
+    pub last_kind: &'static str,
+    pub last_traced_objects: usize,
     pub last_live_objects: usize,
     pub last_freed_objects: usize,
     pub last_freed_bytes: usize,
@@ -49,6 +53,8 @@ pub struct GcStats {
     pub last_pause_ms: f64,
     /// WeakReference/PhantomReference referents cleared in the last cycle.
     pub last_cleared_weak: usize,
+    /// WeakHashMap entries removed because their keys became unreachable.
+    pub last_cleared_weak_keys: usize,
     pub total_freed_objects: u64,
     pub total_freed_bytes: u64,
 }
@@ -134,9 +140,19 @@ impl Engine {
         s
     }
 
-    /// Collects unreachable heap objects. Call only at a safe point (no
-    /// interpreter frame live). Returns this cycle's statistics.
+    /// Full collection. Interpreter frames must have published roots; external
+    /// Rust callers must store local references in engine state before calling.
     pub fn gc(&mut self) -> GcStats {
+        self.collect_generation(false)
+    }
+
+    /// Young-only collection. Old heap writes are remembered; old host
+    /// side states are scanned conservatively because they lack barriers.
+    pub fn gc_minor(&mut self) -> GcStats {
+        self.collect_generation(true)
+    }
+
+    fn collect_generation(&mut self, minor: bool) -> GcStats {
         let t0 = std::time::Instant::now();
         let n = self.heap.len();
         let used_before = self.heap.used();
@@ -144,6 +160,23 @@ impl Engine {
             marked: vec![false; n + 1],
             stack: Vec::new(),
         };
+        if minor {
+            for r in 1..=n as ObjRef {
+                if !self.heap.is_young(r) {
+                    m.marked[r as usize] = true;
+                }
+            }
+            m.stack.extend(self.heap.remembered());
+        }
+        for r in self
+            .gc_frames
+            .iter()
+            .flatten()
+            .copied()
+            .chain(self.heap.gc_pinned_roots())
+        {
+            m.push(r);
+        }
         let mut cand = Vec::new();
         let roots = self.gc_root_text();
         let t_roots = t0.elapsed();
@@ -173,12 +206,24 @@ impl Engine {
                 *b |= 2;
             }
         }
+        if minor {
+            // Old side-state writes can introduce young refs without touching
+            // Heap::get_mut. Scan these owners each minor; no missing barrier.
+            let mut seen = std::collections::HashSet::new();
+            for r in 1..=n as ObjRef {
+                if !self.heap.is_young(r) && has_side[r as usize] != 0 && seen.insert(r) {
+                    m.stack.push(r);
+                }
+            }
+        }
+        let mut traced_objects = 0;
         let mut text = String::new();
         // weak references: (reference, referent) pairs whose referent is not
         // traced through the reference; cleared after marking if unreached
         let mut weak: Vec<(ObjRef, ObjRef)> = Vec::new();
         let mut is_weak_class: std::collections::HashMap<String, bool> = Default::default();
         while let Some(r) = m.stack.pop() {
+            traced_objects += 1;
             match self.heap.get(r) {
                 Ok(HeapObj::Instance { class, fields }) => {
                     for (name, v) in fields {
@@ -230,9 +275,19 @@ impl Engine {
                     }
                 }
                 Some(HostObj::Map { entries }) => {
+                    // java.util.WeakHashMap holds values strongly (a value
+                    // pointing back to its key keeps the entry alive), but
+                    // keys weakly. Null keys are permanent, just like Java.
+                    let weak_keys = self
+                        .heap
+                        .class_of(r)
+                        .map(|c| self.cp.is_subtype(c, "Ljava/util/WeakHashMap;"))
+                        .unwrap_or(false);
                     for (k, v) in entries {
-                        if let Value::Obj(x) = k {
-                            cand.push(*x);
+                        if !weak_keys {
+                            if let Value::Obj(x) = k {
+                                cand.push(*x);
+                            }
                         }
                         if let Value::Obj(x) = v {
                             cand.push(*x);
@@ -286,6 +341,25 @@ impl Engine {
                 }
             }
         }
+        let mut cleared_weak_keys = 0;
+        for (r, host) in &mut self.fw.objects {
+            if m.marked.get(*r as usize).copied().unwrap_or(false)
+                && self
+                    .heap
+                    .class_of(*r)
+                    .map(|c| self.cp.is_subtype(c, "Ljava/util/WeakHashMap;"))
+                    .unwrap_or(false)
+            {
+                if let HostObj::Map { entries } = host {
+                    let before = entries.len();
+                    entries.retain(|(key, _)| match key {
+                        Value::Obj(k) => m.marked.get(*k as usize).copied().unwrap_or(false),
+                        _ => true,
+                    });
+                    cleared_weak_keys += before - entries.len();
+                }
+            }
+        }
         let t_mark = t0.elapsed();
         // sweep
         let mut freed = 0usize;
@@ -326,9 +400,15 @@ impl Engine {
                 t0.elapsed()
             );
         }
+        self.heap.promote();
+        self.gc_slots_after = self.heap.len() - self.heap.free_slots();
         let prev = self.gc_stats.clone();
         let stats = GcStats {
             collections: prev.collections + 1,
+            minor_collections: prev.minor_collections + u64::from(minor),
+            major_collections: prev.major_collections + u64::from(!minor),
+            last_kind: if minor { "minor" } else { "major" },
+            last_traced_objects: traced_objects,
             last_live_objects: live,
             last_freed_objects: freed,
             last_freed_bytes: freed_bytes,
@@ -336,6 +416,7 @@ impl Engine {
             last_used_after: self.heap.used(),
             last_pause_ms: t0.elapsed().as_secs_f64() * 1000.0,
             last_cleared_weak: cleared_weak,
+            last_cleared_weak_keys: cleared_weak_keys,
             total_freed_objects: prev.total_freed_objects + freed as u64,
             total_freed_bytes: prev.total_freed_bytes + freed_bytes as u64,
         };
@@ -354,12 +435,84 @@ impl Engine {
         {
             return None;
         }
-        let used = self.heap.used();
+        if !self.gc_due() {
+            return None;
+        }
+        let minor = self.gc_stats.collections % 8 != 7
+            && self.heap.used() < self.heap.budget().saturating_mul(3) / 4
+            && self.heap.len() - self.heap.free_slots() < crate::heap::MAX_OBJECTS * 3 / 4;
+        let mut stats = self.collect_generation(minor);
+        // A minor cannot reclaim old garbage. Escalate rather than repeatedly
+        // returning a full heap to a caller that is about to allocate again.
+        if minor && self.heap.used() >= self.heap.budget() / 2 {
+            stats = self.gc();
+        }
+        Some(stats)
+    }
+
+    pub(crate) fn gc_due(&self) -> bool {
+        let slots = self.heap.len() - self.heap.free_slots();
+        // A live/pinned heap may remain above a pressure watermark. Never
+        // collect every interpreter instruction when the previous GC could
+        // not reclaim it: require growth and use remaining-slot headroom.
+        if !self.gc_frames.is_empty()
+            && self.heap.used() <= self.gc_stats.last_used_after
+            && slots <= self.gc_slots_after
+        {
+            return false;
+        }
+        let slot_limit = if self.gc_frames.is_empty() {
+            crate::heap::MAX_OBJECTS * 3 / 4
+        } else {
+            (crate::heap::MAX_OBJECTS * 3 / 4).max(
+                self.gc_slots_after
+                    .saturating_add(((crate::heap::MAX_OBJECTS - self.gc_slots_after) / 2).max(1)),
+            )
+        };
         let base = self.gc_stats.last_used_after;
-        let threshold = (base.saturating_mul(2))
-            .max(base + (16 << 20))
-            .min(self.heap.budget() / 2);
-        (used >= threshold).then(|| self.gc())
+        let cap = if base < self.heap.budget() / 2 {
+            self.heap.budget() / 2
+        } else {
+            base.saturating_add((self.heap.budget() - base) / 2)
+        };
+        let threshold = base
+            .saturating_mul(2)
+            .max(base.saturating_add(16 << 20))
+            .min(cap);
+        (self.heap.used() >= threshold || slots >= slot_limit)
+            && !std::env::var("RD_GC")
+                .map(|v| v == "off" || v == "0")
+                .unwrap_or(false)
+    }
+
+    /// Protect allocations made by a Rust host dispatch while permitting a
+    /// guest callback to collect its own allocations.
+    pub(crate) fn with_host_roots<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let depth = self.heap.gc_scope_depth();
+        self.heap.gc_host_enter(false);
+        let out = f(self);
+        self.heap.gc_scope_restore(depth);
+        out
+    }
+
+    pub(crate) fn publish_frame_roots(
+        &mut self,
+        regs: &[Value],
+        result: &Value,
+        exception: Option<ObjRef>,
+    ) {
+        if let Some(roots) = self.gc_frames.last_mut() {
+            roots.clear();
+            roots.extend(
+                regs.iter()
+                    .chain(std::iter::once(result))
+                    .filter_map(|v| match v {
+                        Value::Obj(r) => Some(*r),
+                        _ => None,
+                    }),
+            );
+            roots.extend(exception);
+        }
     }
 
     /// Statistics of the collector so far.
@@ -371,6 +524,89 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn slot_pressure_does_not_recollect_unchanged_pinned_heap_each_instruction() {
+        let mut vm = Engine::new(vec![], Default::default());
+        for _ in 0..crate::heap::MAX_OBJECTS * 3 / 4 + 8 {
+            vm.heap.alloc_instance("LExisting;".into(), vec![]).unwrap();
+        }
+        let scope = vm.heap.gc_scope_depth();
+        vm.heap.gc_host_enter(true);
+        vm.gc_frames.push(vec![]);
+        assert!(vm.gc_due());
+        vm.maybe_gc().unwrap();
+        assert!(!vm.gc_due());
+        assert!(vm.maybe_gc().is_none());
+        vm.heap.alloc_instance("LNew;".into(), vec![]).unwrap();
+        assert!(!vm.gc_due(), "growth must reach the backed-off watermark");
+        vm.gc_frames.pop();
+        vm.heap.gc_scope_restore(scope);
+        assert!(
+            vm.gc_due(),
+            "tool boundary can collect after host pins are released"
+        );
+        vm.gc();
+        assert!(
+            vm.heap.len() - vm.heap.free_slots() <= 16,
+            "only conservative scalar roots may remain"
+        );
+    }
+
+    #[test]
+    fn host_temporary_from_guest_return_survives_another_guest_callback() {
+        use rd_testsupport::vm::*;
+        let mut b = DexBuilder::new();
+        let c = b.class("LCaso;", "Ljava/lang/Object;");
+        let ty = b.type_idx("[B");
+        let mut make = op11n(0x12, 0, 1);
+        make.extend(op22c(0x23, 1, 0, ty));
+        make.extend(op11x(0x11, 1));
+        b.direct(
+            c,
+            "make",
+            "[B",
+            vec![],
+            ACC_PUBLIC | ACC_STATIC,
+            Some(b.code(2, 0, 0, make)),
+        );
+        let mut code = op11n(0x12, 0, 0);
+        code.extend(op21s(0x13, 1, 100));
+        code.extend(op21s(0x13, 2, 32767));
+        let start = code.len();
+        code.extend(op22c(0x23, 3, 2, ty));
+        code.extend(op22b(0xd8, 0, 0, 1));
+        let at = code.len();
+        code.extend(op22t(0x34, 0, 1, start as i16 - at as i16));
+        code.extend(op11x(0x0f, 0));
+        b.direct(
+            c,
+            "run",
+            "I",
+            vec![],
+            ACC_PUBLIC | ACC_STATIC,
+            Some(b.code(4, 0, 0, code)),
+        );
+        let dex = rd_dex::Dex::parse(b.finish()).unwrap();
+        let mut vm = Engine::new(
+            vec![dex],
+            crate::VmConfig {
+                heap_budget: 4 << 20,
+                ..Default::default()
+            },
+        );
+        // Simulate a suspended Java caller around an inline host callback.
+        vm.gc_frames.push(vec![]);
+        vm.with_host_roots(|vm| {
+            let Value::Obj(r) = vm.invoke_static("LCaso;", "make", "()[B", &[]).unwrap() else {
+                panic!()
+            };
+            vm.invoke_static("LCaso;", "run", "()I", &[]).unwrap();
+            assert_eq!(vm.heap.as_array_elems(r).unwrap().0.len(), 1);
+            assert!(vm.gc_stats.collections > 10);
+        });
+        vm.gc_frames.pop();
+    }
 
     #[test]
     fn scan_finds_only_valid_refs() {
