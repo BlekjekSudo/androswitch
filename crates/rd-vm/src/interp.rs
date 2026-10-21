@@ -762,10 +762,11 @@ pub(crate) fn exec_frame(
                 });
                 // issue #49: OOM de campo novo no iput é OutOfMemoryError
                 // CAPTURÁVEL (antes: VM_TYPE_ERROR mentiroso e run-killer)
+                let field_value = regs[*a as usize].clone();
                 step!(crate::err::put_field_result(vm.heap.put_field(
                     r,
                     &fname,
-                    regs[*a as usize].clone()
+                    field_value
                 )));
             }
 
@@ -821,6 +822,9 @@ pub(crate) fn exec_frame(
                 }
                 // JDK constants not backed by any DEX (Boolean.TRUE/FALSE,
                 // MAX_VALUE, NaN, ...) are materialized on first read.
+                // Host-static resolution needs `&mut Engine`; keeping a map Entry
+                // live across those calls would conflict with the mutable borrow.
+                #[allow(clippy::map_entry)]
                 if !vm.statics.contains_key(&(owner.clone(), fname.clone())) {
                     if let Some(c) = step!(crate::boxes::host_static(vm, &owner, &fname)) {
                         vm.statics.insert((owner.clone(), fname.clone()), c);
@@ -841,6 +845,10 @@ pub(crate) fn exec_frame(
                     {
                         vm.statics.insert((owner.clone(), fname.clone()), c);
                     } else if let Some(c) =
+                        step!(crate::android_env::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
                         step!(crate::android_build::host_static(vm, &owner, &fname))
                     {
                         vm.statics.insert((owner.clone(), fname.clone()), c);
@@ -849,6 +857,10 @@ pub(crate) fn exec_frame(
                         vm.statics.insert((owner.clone(), fname.clone()), c);
                     } else if let Some(c) =
                         step!(crate::platform_base::host_static(vm, &owner, &fname))
+                    {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) =
+                        step!(crate::collections::host_static(vm, &owner, &fname))
                     {
                         vm.statics.insert((owner.clone(), fname.clone()), c);
                     } else if let Some(c) = step!(crate::jtime::host_static(vm, &owner, &fname)) {
@@ -1585,13 +1597,29 @@ fn do_invoke(
     }
     let recv = match first.as_ref() {
         Ok(None) | Err(_) => {
-            return Err(VmExit::Exception(
-                vm.vm_exception(NPE, "invoke em receiver null")?,
-            ));
+            return Err(VmExit::Exception(vm.vm_exception(
+                NPE,
+                &format!(
+                    "invoke em receiver null: {}->{}{} (opcode 0x{invoke_op:02x})",
+                    mref.class, mref.name, mref.proto
+                ),
+            )?));
         }
         Ok(Some(r)) => r,
     };
     let recv_class = vm.heap.class_of(recv)?.to_string();
+
+    // `invoke-super Object.equals` from an AndroidX base implementation
+    // (Fragment.equals is a final identity wrapper) must execute Object's
+    // identity semantics, not resolve the same DEX override recursively.
+    if is_super
+        && mref.class == "Ljava/lang/Object;"
+        && mref.name == "equals"
+        && mref.proto == "(Ljava/lang/Object;)Z"
+    {
+        let other = slots.get(1).and_then(|slot| slot.as_ref().ok()).flatten();
+        return Ok(Value::Int((other == Some(recv)) as i32));
+    }
 
     // intrínseco de instância (String/StringBuilder/Throwable/Object)
     if let Some(v) = intrinsics::call_instance_intrinsic_mref(
@@ -1735,12 +1763,14 @@ pub(crate) fn inherited_android_host(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     let mut ancestor = start.to_string();
+    let mut property_fallback_class = None;
     let mut visited = std::collections::BTreeSet::new();
     for _ in 0..16 {
         if !visited.insert(ancestor.clone()) {
             break;
         }
         if ancestor.starts_with("Landroid/") {
+            property_fallback_class.get_or_insert_with(|| ancestor.clone());
             #[cfg(feature = "advanced-components")]
             if let Some(value) = crate::m9::call_instance(vm, &ancestor, name, sig, recv, args)? {
                 return Ok(Some(value));
@@ -1752,6 +1782,14 @@ pub(crate) fn inherited_android_host(
             if let Some(value) =
                 crate::framework::call_host_instance(vm, &ancestor, name, sig, recv, args)?
             {
+                return Ok(Some(value));
+            }
+            if let Some(value) =
+                crate::view_attach::instance_intrinsic(vm, &ancestor, name, sig, recv, args)?
+            {
+                return Ok(Some(value));
+            }
+            if let Some(value) = crate::platform_base::instance_intrinsic(&ancestor, name, sig) {
                 return Ok(Some(value));
             }
         }
@@ -1767,6 +1805,14 @@ pub(crate) fn inherited_android_host(
         match next {
             Some(next) => ancestor = next,
             None => break,
+        }
+    }
+    if let Some(class) = property_fallback_class {
+        // Try generic properties only after every concrete Android host has had
+        // a chance to handle the call (e.g. View.setId must not be shadowed by
+        // a generic setId property on an intermediate EditText ancestor).
+        if let Some(value) = crate::view_props::fallback(vm, &class, name, sig, recv, args)? {
+            return Ok(Some(value));
         }
     }
     Ok(None)

@@ -128,27 +128,30 @@ fn idx_of(strs: &mut Vec<String>, s: &str) -> u32 {
 }
 
 fn collect_strings(node: &AxNode, strs: &mut Vec<String>) {
-    idx_of(strs, &node.name);
-    for at in &node.attrs {
-        if at.android {
-            // uri + prefix (a URI fica no slot 0 — os attrs android apontam p/ ela)
-            if !strs.contains(&NS_ANDROID.to_string()) {
-                strs.insert(0, NS_ANDROID.to_string());
-                strs.insert(1, "android".to_string());
+    // Fixture trees may intentionally exceed the LayoutInflater cap. Keep the
+    // test builder iterative so it can construct the hostile input safely.
+    let mut pending = vec![node];
+    while let Some(node) = pending.pop() {
+        idx_of(strs, &node.name);
+        for at in &node.attrs {
+            if at.android {
+                // uri + prefix (a URI fica no slot 0 — os attrs android apontam p/ ela)
+                if !strs.contains(&NS_ANDROID.to_string()) {
+                    strs.insert(0, NS_ANDROID.to_string());
+                    strs.insert(1, "android".to_string());
+                }
+            }
+            idx_of(strs, &at.name);
+            if let AxVal::Str(s) = &at.val {
+                idx_of(strs, s);
             }
         }
-        idx_of(strs, &at.name);
-        if let AxVal::Str(s) = &at.val {
-            idx_of(strs, s);
-        }
-    }
-    for c in &node.children {
-        collect_strings(c, strs);
+        pending.extend(node.children.iter().rev());
     }
 }
 
-fn emit_node(node: &AxNode, strs: &[String], out: &mut Vec<u8>) {
-    // todas as strings já foram internadas por collect_strings
+fn emit_start_element(node: &AxNode, strs: &[String], out: &mut Vec<u8>) {
+    // Todas as strings já foram internadas por collect_strings.
     let ix =
         |s: &str| -> u32 { strs.iter().position(|x| x == s).expect("string internada") as u32 };
     let ns_idx = |android: bool| -> u32 {
@@ -218,11 +221,11 @@ fn emit_node(node: &AxNode, strs: &[String], out: &mut Vec<u8>) {
     let el_size = el.len() as u32;
     el[4..8].copy_from_slice(&el_size.to_le_bytes());
     out.extend(&el);
+}
 
-    for c in &node.children {
-        emit_node(c, strs, out);
-    }
-
+fn emit_end_element(node: &AxNode, strs: &[String], out: &mut Vec<u8>) {
+    let ix =
+        |s: &str| -> u32 { strs.iter().position(|x| x == s).expect("string internada") as u32 };
     let mut end = Vec::new();
     end.extend(0x0103u16.to_le_bytes()); // RES_XML_END_ELEMENT_TYPE
     end.extend(16u16.to_le_bytes());
@@ -232,6 +235,24 @@ fn emit_node(node: &AxNode, strs: &[String], out: &mut Vec<u8>) {
     end.extend(NO_INDEX.to_le_bytes()); // ns
     end.extend(ix(&node.name).to_le_bytes());
     out.extend(&end);
+}
+
+fn emit_node(root: &AxNode, strs: &[String], out: &mut Vec<u8>) {
+    enum Event<'a> {
+        Open(&'a AxNode),
+        Close(&'a AxNode),
+    }
+    let mut pending = vec![Event::Open(root)];
+    while let Some(event) = pending.pop() {
+        match event {
+            Event::Open(node) => {
+                emit_start_element(node, strs, out);
+                pending.push(Event::Close(node));
+                pending.extend(node.children.iter().rev().map(Event::Open));
+            }
+            Event::Close(node) => emit_end_element(node, strs, out),
+        }
+    }
 }
 
 /// Monta um documento AXML binário completo (doc header + pool + chunks de
@@ -295,13 +316,14 @@ pub fn build_axml(root: &AxNode) -> Vec<u8> {
 }
 
 fn collect_android_attr_names(node: &AxNode, out: &mut Vec<String>) {
-    for at in &node.attrs {
-        if at.android && !out.contains(&at.name.to_string()) {
-            out.push(at.name.to_string());
+    let mut pending = vec![node];
+    while let Some(node) = pending.pop() {
+        for at in &node.attrs {
+            if at.android && !out.contains(&at.name.to_string()) {
+                out.push(at.name.to_string());
+            }
         }
-    }
-    for c in &node.children {
-        collect_android_attr_names(c, out);
+        pending.extend(node.children.iter().rev());
     }
 }
 

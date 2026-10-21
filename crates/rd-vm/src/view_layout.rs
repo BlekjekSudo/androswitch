@@ -14,16 +14,17 @@
 //!
 //! **Draw pass** (`Engine::draw_frame`). The host lays out its own views; for
 //! each top-most DEX view in the content tree it runs `measure`/`layout` with
-//! EXACTLY specs from the host bounds. It then records a frame: host view
-//! backgrounds, and each DEX view's `draw(Canvas)` (or `onDraw` +
-//! `dispatchDraw`) on a canvas translated to the view's window origin. The
-//! frame display list is rasterized by `Engine::rasterize_frame` (graphics.rs).
+//! EXACTLY specs from the host bounds. It then records a transparent overlay
+//! of each DEX view's `draw(Canvas)` (or `onDraw` + `dispatchDraw`) on a canvas
+//! translated to the view's window origin. Host-only backgrounds/widgets stay
+//! in the shared `rd-render::render_snapshot` base. The frame display list is
+//! rasterized by `Engine::rasterize_frame` (graphics.rs).
 //!
 //! **ViewConfiguration** uses AOSP's dp constants scaled by the device density
 //! (`android_res`). The timeouts are AOSP 14 values.
 
 use crate::engine::Engine;
-use crate::err::VmExit;
+use crate::err::{Throwable, VmExit};
 use crate::framework::HostObj;
 use crate::heap::ObjRef;
 use crate::value::Value;
@@ -32,6 +33,16 @@ const EXACTLY: i32 = 0x4000_0000;
 /// MeasureSpec.AT_MOST (`2 << 30`).
 const AT_MOST: i32 = i32::MIN;
 const VIEW_CONFIG: &str = "Landroid/view/ViewConfiguration;";
+const LAYOUT_INFLATER: &str = "Landroid/view/LayoutInflater;";
+const WINDOW_INSETS: &str = "Landroid/view/WindowInsets;";
+const SCROLLER: &str = "Landroid/widget/Scroller;";
+const OVER_SCROLLER: &str = "Landroid/widget/OverScroller;";
+const EDGE_EFFECT: &str = "Landroid/widget/EdgeEffect;";
+const LINEAR_INTERPOLATOR: &str = "Landroid/view/animation/LinearInterpolator;";
+const DECELERATE_INTERPOLATOR: &str = "Landroid/view/animation/DecelerateInterpolator;";
+const ACCELERATE_INTERPOLATOR: &str = "Landroid/view/animation/AccelerateInterpolator;";
+const ACCELERATE_DECELERATE_INTERPOLATOR: &str =
+    "Landroid/view/animation/AccelerateDecelerateInterpolator;";
 
 fn density() -> f32 {
     std::env::var("RD_DENSITY_DPI")
@@ -71,17 +82,12 @@ fn set_prop(vm: &mut Engine, v: ObjRef, k: &str, x: i32) {
 pub(crate) fn measure(vm: &mut Engine, v: ObjRef, ws: i32, hs: i32) -> Result<(), VmExit> {
     set_prop(vm, v, "rd_wspec", ws);
     set_prop(vm, v, "rd_hspec", hs);
-    if crate::jcollections::guest_call(
-        vm,
-        v,
-        "onMeasure",
-        "(II)V",
-        &[Value::Int(ws), Value::Int(hs)],
-    )?
-    .is_none()
-    {
-        set_prop(vm, v, "MeasuredWidth", ws & 0x3fff_ffff);
-        set_prop(vm, v, "MeasuredHeight", hs & 0x3fff_ffff);
+    let measure_args = [Value::Int(ws), Value::Int(hs)];
+    if crate::jcollections::guest_call(vm, v, "onMeasure", "(II)V", &measure_args)?.is_none() {
+        // Platform containers such as FrameLayout and LinearLayout implement
+        // onMeasure outside the APK DEX. Dispatch through the host framework
+        // before falling back to View's getDefaultSize behavior.
+        vm.invoke_instance(v, "onMeasure", "(II)V", &measure_args)?;
     }
     vm.view_props
         .remove(&(v, "rd_layout_requested".to_string()));
@@ -135,20 +141,36 @@ pub(crate) fn layout(
             ],
         )?;
     }
-    crate::jcollections::guest_call(
-        vm,
-        v,
-        "onLayout",
-        "(ZIIII)V",
-        &[
-            Value::Int(changed as i32),
-            Value::Int(l),
-            Value::Int(t),
-            Value::Int(r),
-            Value::Int(b),
-        ],
-    )?;
+    let layout_args = [
+        Value::Int(changed as i32),
+        Value::Int(l),
+        Value::Int(t),
+        Value::Int(r),
+        Value::Int(b),
+    ];
+    if crate::jcollections::guest_call(vm, v, "onLayout", "(ZIIII)V", &layout_args)?.is_none() {
+        // Platform containers lay out their children in native onLayout
+        // methods that are not present in an APK's DEX files.
+        vm.invoke_instance(v, "onLayout", "(ZIIII)V", &layout_args)?;
+    }
     Ok(())
+}
+
+fn absolute_gravity(mut gravity: i32, layout_direction: i32) -> i32 {
+    const RELATIVE_LAYOUT_DIRECTION: i32 = 0x0080_0000;
+    const START: i32 = RELATIVE_LAYOUT_DIRECTION | 0x3;
+    const END: i32 = RELATIVE_LAYOUT_DIRECTION | 0x5;
+    const LEFT: i32 = 0x3;
+    const RIGHT: i32 = 0x5;
+    if gravity & RELATIVE_LAYOUT_DIRECTION != 0 {
+        if gravity & START == START {
+            gravity = (gravity & !START) | if layout_direction == 1 { RIGHT } else { LEFT };
+        } else if gravity & END == END {
+            gravity = (gravity & !END) | if layout_direction == 1 { LEFT } else { RIGHT };
+        }
+        gravity &= !RELATIVE_LAYOUT_DIRECTION;
+    }
+    gravity
 }
 
 pub(crate) fn static_intrinsic(
@@ -157,7 +179,138 @@ pub(crate) fn static_intrinsic(
     name: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if class == "Landroid/view/Gravity;" && name == "getAbsoluteGravity" && args.len() == 2 {
+        return Ok(Some(Value::Int(absolute_gravity(
+            args[0].as_int()?,
+            args[1].as_int()?,
+        ))));
+    }
+    if class == "Landroid/view/Gravity;" && name == "apply" && args.len() == 6 {
+        let gravity = absolute_gravity(args[0].as_int()?, args[5].as_int()?);
+        let (width, height) = (args[1].as_int()?, args[2].as_int()?);
+        let rect_obj = |value: &Value, label: &str| -> Result<ObjRef, VmExit> {
+            value.as_ref()?.ok_or_else(|| {
+                VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    format!("Gravity.apply {label} Rect == null"),
+                ))
+            })
+        };
+        let container = rect_obj(&args[3], "container")?;
+        let out = rect_obj(&args[4], "outRect")?;
+        let rect = |r: ObjRef, field: &str| {
+            vm.heap
+                .get_field(r, field)
+                .ok()
+                .and_then(|value| value.as_int().ok())
+                .unwrap_or(0)
+        };
+        let (container_left, container_top, container_right, container_bottom) = (
+            rect(container, "left"),
+            rect(container, "top"),
+            rect(container, "right"),
+            rect(container, "bottom"),
+        );
+        let (left, right) = match gravity & 0x7 {
+            0x7 => (container_left, container_right),
+            0x1 => {
+                let left = container_left.saturating_add(
+                    container_right
+                        .saturating_sub(container_left)
+                        .saturating_sub(width)
+                        / 2,
+                );
+                (left, left.saturating_add(width))
+            }
+            0x5 => (container_right.saturating_sub(width), container_right),
+            _ => (container_left, container_left.saturating_add(width)),
+        };
+        let (top, bottom) = match gravity & 0x70 {
+            0x70 => (container_top, container_bottom),
+            0x10 => {
+                let top = container_top.saturating_add(
+                    container_bottom
+                        .saturating_sub(container_top)
+                        .saturating_sub(height)
+                        / 2,
+                );
+                (top, top.saturating_add(height))
+            }
+            0x50 => (container_bottom.saturating_sub(height), container_bottom),
+            _ => (container_top, container_top.saturating_add(height)),
+        };
+        for (field, value) in [
+            ("left", left),
+            ("top", top),
+            ("right", right),
+            ("bottom", bottom),
+        ] {
+            crate::err::put_field_result(vm.heap.put_field(out, field, Value::Int(value)))?;
+        }
+        return Ok(Some(Value::Null));
+    }
+    // D8 may keep the concrete ViewGroup subclass as the method-ref owner
+    // for this inherited protected static helper (for example Toolbar).
+    if name == "getChildMeasureSpec"
+        && vm.cp.is_subtype(class, "Landroid/view/ViewGroup;")
+        && args.len() == 3
+    {
+        let (spec, padding, child_dimension) =
+            (args[0].as_int()?, args[1].as_int()?, args[2].as_int()?);
+        return Ok(Some(Value::Int(crate::framework::child_measure_spec(
+            spec,
+            padding,
+            child_dimension,
+        ))));
+    }
+    if class == LAYOUT_INFLATER && name == "from" {
+        let context = args
+            .first()
+            .ok_or_else(|| {
+                VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "LayoutInflater.from(context): null context",
+                ))
+            })?
+            .as_ref()?
+            .ok_or_else(|| {
+                VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "LayoutInflater.from(context): null context",
+                ))
+            })?;
+        let service_name = crate::intrinsics::alloc_string(vm, "layout_inflater".to_string())?;
+        let inflater = crate::m8::call_m8_instance(
+            vm,
+            "Landroid/content/Context;",
+            "getSystemService",
+            "(Ljava/lang/String;)Ljava/lang/Object;",
+            context,
+            &[Value::Obj(service_name)],
+        )?
+        .ok_or_else(|| {
+            crate::err::vm_error(
+                "VM_TYPE_ERROR",
+                "LayoutInflater.from: Context service shim returned no result",
+            )
+        })?;
+        let Value::Obj(inflater) = inflater else {
+            return Err(crate::err::vm_error(
+                "VM_TYPE_ERROR",
+                "LayoutInflater.from: layout_inflater service is not an object",
+            )
+            .into());
+        };
+        for field in ["mFactory", "mFactory2"] {
+            if vm.heap.get_field(inflater, field).is_err() {
+                crate::err::put_field_result(vm.heap.put_field(inflater, field, Value::Null))?;
+            }
+        }
+        crate::err::put_field_result(vm.heap.put_field(inflater, "mContext", Value::Obj(context)))?;
+        return Ok(Some(Value::Obj(inflater)));
+    }
     let a = |i: usize| int(args.get(i));
+    let is_view_class = vm.cp.is_subtype(class, "Landroid/view/View;");
     Ok(Some(match (class, name) {
         // WindowInsets.Type masks (AOSP constants, API 30+)
         ("Landroid/view/WindowInsets$Type;", t) => Value::Int(match t {
@@ -180,7 +333,7 @@ pub(crate) fn static_intrinsic(
             Value::Int(a(0) & (0xC000_0000u32 as i32))
         }
         ("Landroid/view/View$MeasureSpec;", "getSize") => Value::Int(a(0) & 0x3fff_ffff),
-        ("Landroid/view/View;", "resolveSize" | "resolveSizeAndState") => {
+        (_, "resolveSize" | "resolveSizeAndState") if is_view_class => {
             let (size, spec) = (a(0), a(1));
             let (mode, ss) = (spec & (0xC000_0000u32 as i32), spec & 0x3fff_ffff);
             Value::Int(match mode {
@@ -189,15 +342,15 @@ pub(crate) fn static_intrinsic(
                 _ => size,
             })
         }
-        ("Landroid/view/View;", "getDefaultSize") => {
+        (_, "getDefaultSize") if is_view_class => {
             Value::Int(if a(1) & (0xC000_0000u32 as i32) == 0 {
                 a(0)
             } else {
                 a(1) & 0x3fff_ffff
             })
         }
-        ("Landroid/view/View;", "combineMeasuredStates") => Value::Int(a(0) | a(1)),
-        ("Landroid/view/View;", "generateViewId") => {
+        (_, "combineMeasuredStates") if is_view_class => Value::Int(a(0) | a(1)),
+        (_, "generateViewId") if is_view_class => {
             let k = ("Lrd/View;".to_string(), "next_id".to_string());
             let n = match vm.statics.get(&k) {
                 Some(Value::Int(i)) => *i,
@@ -300,6 +453,294 @@ fn move_focus(vm: &mut Engine, to: Option<ObjRef>, dir: i32) -> Result<(), VmExi
     Ok(())
 }
 
+fn scroller_value(vm: &Engine, recv: ObjRef, field: &str, default: i32) -> i32 {
+    match vm.view_props.get(&(recv, format!("rd_scroller_{field}"))) {
+        Some(Value::Int(value)) => *value,
+        _ => default,
+    }
+}
+
+fn set_scroller_value(vm: &mut Engine, recv: ObjRef, field: &str, value: i32) {
+    vm.view_props
+        .insert((recv, format!("rd_scroller_{field}")), Value::Int(value));
+}
+
+fn scroller_intrinsic(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let arg = |i: usize| int(args.get(i));
+    let get = |field: &str| scroller_value(vm, recv, field, 0);
+    let set_position = |vm: &mut Engine, x: i32, y: i32| {
+        set_scroller_value(vm, recv, "curr_x", x);
+        set_scroller_value(vm, recv, "curr_y", y);
+    };
+    let value = match (name, sig) {
+        ("<init>", _) => {
+            for field in [
+                "start_x", "start_y", "curr_x", "curr_y", "final_x", "final_y",
+            ] {
+                set_scroller_value(vm, recv, field, 0);
+            }
+            set_scroller_value(vm, recv, "finished", 1);
+            Value::Null
+        }
+        ("isFinished", "()Z") => Value::Int(i32::from(get("finished") != 0)),
+        ("isOverScrolled", "()Z") => Value::Int(0),
+        ("getStartX", "()I") => Value::Int(get("start_x")),
+        ("getStartY", "()I") => Value::Int(get("start_y")),
+        ("getCurrX", "()I") => Value::Int(get("curr_x")),
+        ("getCurrY", "()I") => Value::Int(get("curr_y")),
+        ("getFinalX", "()I") => Value::Int(get("final_x")),
+        ("getFinalY", "()I") => Value::Int(get("final_y")),
+        ("getCurrVelocity", "()F") => Value::Float(0.0),
+        ("getDuration" | "timePassed", "()I") => Value::Int(0),
+        ("computeScrollOffset", "()Z") => {
+            if get("finished") != 0 {
+                Value::Int(0)
+            } else {
+                set_position(vm, get("final_x"), get("final_y"));
+                set_scroller_value(vm, recv, "finished", 1);
+                Value::Int(1)
+            }
+        }
+        ("abortAnimation", "()V") => {
+            set_position(vm, get("final_x"), get("final_y"));
+            set_scroller_value(vm, recv, "finished", 1);
+            Value::Null
+        }
+        ("forceFinished", "(Z)V") => {
+            set_scroller_value(vm, recv, "finished", i32::from(arg(0) != 0));
+            Value::Null
+        }
+        ("startScroll", _) if args.len() >= 4 => {
+            let (x, y) = (arg(0), arg(1));
+            set_scroller_value(vm, recv, "start_x", x);
+            set_scroller_value(vm, recv, "start_y", y);
+            set_position(vm, x, y);
+            set_scroller_value(vm, recv, "final_x", x.saturating_add(arg(2)));
+            set_scroller_value(vm, recv, "final_y", y.saturating_add(arg(3)));
+            set_scroller_value(vm, recv, "finished", 0);
+            Value::Null
+        }
+        ("fling", _) if args.len() >= 8 => {
+            let (x, y) = (arg(0), arg(1));
+            let min_x = arg(4);
+            let max_x = arg(5);
+            let min_y = arg(6);
+            let max_y = arg(7);
+            let final_x = x.saturating_add(arg(2) / 4).clamp(min_x, max_x);
+            let final_y = y.saturating_add(arg(3) / 4).clamp(min_y, max_y);
+            set_scroller_value(vm, recv, "start_x", x);
+            set_scroller_value(vm, recv, "start_y", y);
+            set_position(vm, x, y);
+            set_scroller_value(vm, recv, "final_x", final_x);
+            set_scroller_value(vm, recv, "final_y", final_y);
+            set_scroller_value(
+                vm,
+                recv,
+                "finished",
+                i32::from(x == final_x && y == final_y),
+            );
+            Value::Null
+        }
+        ("springBack", _) if args.len() >= 6 => {
+            let (x, y) = (arg(0), arg(1));
+            let final_x = x.clamp(arg(2), arg(3));
+            let final_y = y.clamp(arg(4), arg(5));
+            set_scroller_value(vm, recv, "start_x", x);
+            set_scroller_value(vm, recv, "start_y", y);
+            set_position(vm, x, y);
+            set_scroller_value(vm, recv, "final_x", final_x);
+            set_scroller_value(vm, recv, "final_y", final_y);
+            let changed = x != final_x || y != final_y;
+            set_scroller_value(vm, recv, "finished", i32::from(!changed));
+            Value::Int(i32::from(changed))
+        }
+        ("setFinalX", "(I)V") => {
+            set_scroller_value(vm, recv, "final_x", arg(0));
+            set_scroller_value(vm, recv, "finished", 0);
+            Value::Null
+        }
+        ("setFinalY", "(I)V") => {
+            set_scroller_value(vm, recv, "final_y", arg(0));
+            set_scroller_value(vm, recv, "finished", 0);
+            Value::Null
+        }
+        ("extendDuration" | "setFriction", _) => Value::Null,
+        ("notifyHorizontalEdgeReached" | "notifyVerticalEdgeReached", _) => Value::Null,
+        ("isScrollingInDirection", "(FF)Z") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn interpolator_intrinsic(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let recognized = matches!(
+        class,
+        LINEAR_INTERPOLATOR
+            | DECELERATE_INTERPOLATOR
+            | ACCELERATE_INTERPOLATOR
+            | ACCELERATE_DECELERATE_INTERPOLATOR
+    );
+    if !recognized {
+        return Ok(None);
+    }
+    let factor_key = (recv, "rd_interpolator_factor".to_string());
+    let factor = match vm.view_props.get(&factor_key) {
+        Some(Value::Float(value)) => *value,
+        _ => 1.0,
+    };
+    let arg_float = |index: usize| {
+        args.get(index)
+            .and_then(|value| value.as_float().ok())
+            .unwrap_or(0.0)
+    };
+    match (name, sig) {
+        ("<init>", _) => {
+            if matches!(class, DECELERATE_INTERPOLATOR | ACCELERATE_INTERPOLATOR) {
+                let value = if args.is_empty() { 1.0 } else { arg_float(0) };
+                vm.view_props.insert(factor_key, Value::Float(value));
+            }
+            Ok(Some(Value::Null))
+        }
+        ("getInterpolation", "(F)F") => {
+            let input = arg_float(0);
+            let value = match class {
+                LINEAR_INTERPOLATOR => input,
+                DECELERATE_INTERPOLATOR => {
+                    let inverse = 1.0 - input;
+                    1.0 - if factor == 1.0 {
+                        inverse * inverse
+                    } else {
+                        inverse.powf(2.0 * factor)
+                    }
+                }
+                ACCELERATE_INTERPOLATOR => {
+                    if factor == 1.0 {
+                        input * input
+                    } else {
+                        input.powf(2.0 * factor)
+                    }
+                }
+                _ => ((input + 1.0) * std::f32::consts::PI).cos() / 2.0 + 0.5,
+            };
+            Ok(Some(Value::Float(value)))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn edge_float(vm: &Engine, recv: ObjRef, field: &str, default: f32) -> f32 {
+    match vm.view_props.get(&(recv, format!("rd_edge_{field}"))) {
+        Some(Value::Float(value)) => *value,
+        Some(Value::Int(value)) => *value as f32,
+        _ => default,
+    }
+}
+
+fn set_edge_float(vm: &mut Engine, recv: ObjRef, field: &str, value: f32) {
+    vm.view_props
+        .insert((recv, format!("rd_edge_{field}")), Value::Float(value));
+}
+
+fn edge_effect_intrinsic(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let distance = edge_float(vm, recv, "distance", 0.0);
+    let f = |index: usize| {
+        args.get(index)
+            .and_then(|value| value.as_float().ok())
+            .unwrap_or(0.0)
+    };
+    let i = |index: usize| int(args.get(index));
+    let result = match (name, sig) {
+        ("<init>", _) => {
+            set_edge_float(vm, recv, "distance", 0.0);
+            vm.view_props
+                .insert((recv, "rd_edge_finished".to_string()), Value::Int(1));
+            Value::Null
+        }
+        ("isFinished", "()Z") => Value::Int(i32::from(distance <= 0.0)),
+        ("getDistance", "()F") => Value::Float(distance),
+        ("onPull", "(F)V") | ("onPull", "(FF)V") => {
+            let next = (distance + f(0).max(0.0)).clamp(0.0, 1.0);
+            set_edge_float(vm, recv, "distance", next);
+            vm.view_props.insert(
+                (recv, "rd_edge_finished".to_string()),
+                Value::Int(i32::from(next <= 0.0)),
+            );
+            Value::Null
+        }
+        ("onPullDistance", "(FF)F") => {
+            let next = (distance + f(0)).clamp(0.0, 1.0);
+            set_edge_float(vm, recv, "distance", next);
+            vm.view_props.insert(
+                (recv, "rd_edge_finished".to_string()),
+                Value::Int(i32::from(next <= 0.0)),
+            );
+            Value::Float(next - distance)
+        }
+        ("onRelease" | "finish", "()V") => {
+            set_edge_float(vm, recv, "distance", 0.0);
+            vm.view_props
+                .insert((recv, "rd_edge_finished".to_string()), Value::Int(1));
+            Value::Null
+        }
+        ("onAbsorb", "(I)V") => {
+            let next = if i(0) == 0 { 0.0 } else { 1.0 };
+            set_edge_float(vm, recv, "distance", next);
+            vm.view_props.insert(
+                (recv, "rd_edge_finished".to_string()),
+                Value::Int(i32::from(next <= 0.0)),
+            );
+            Value::Null
+        }
+        ("draw", "(Landroid/graphics/Canvas;)Z") => Value::Int(0),
+        ("setSize", "(II)V") => {
+            vm.view_props
+                .insert((recv, "rd_edge_width".to_string()), Value::Int(i(0)));
+            vm.view_props
+                .insert((recv, "rd_edge_height".to_string()), Value::Int(i(1)));
+            Value::Null
+        }
+        ("getMaxHeight", "()I") | ("getTargetHeight", "()I") => Value::Int(
+            match vm.view_props.get(&(recv, "rd_edge_height".to_string())) {
+                Some(Value::Int(value)) => *value,
+                _ => 0,
+            },
+        ),
+        ("setColor", "(I)V") => {
+            vm.view_props
+                .insert((recv, "rd_edge_color".to_string()), Value::Int(i(0)));
+            Value::Null
+        }
+        ("getColor", "()I") => Value::Int(
+            match vm.view_props.get(&(recv, "rd_edge_color".to_string())) {
+                Some(Value::Int(value)) => *value,
+                _ => 0,
+            },
+        ),
+        ("setBlendMode", "(Landroid/graphics/BlendMode;)V") => Value::Null,
+        _ => return Ok(None),
+    };
+    Ok(Some(result))
+}
+
 pub(crate) fn instance_intrinsic(
     vm: &mut Engine,
     mref_class: &str,
@@ -308,6 +749,154 @@ pub(crate) fn instance_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if mref_class == SCROLLER || mref_class == OVER_SCROLLER {
+        return scroller_intrinsic(vm, name, sig, recv, args);
+    }
+    if matches!(
+        mref_class,
+        LINEAR_INTERPOLATOR
+            | DECELERATE_INTERPOLATOR
+            | ACCELERATE_INTERPOLATOR
+            | ACCELERATE_DECELERATE_INTERPOLATOR
+    ) {
+        return interpolator_intrinsic(vm, mref_class, name, sig, recv, args);
+    }
+    if mref_class == EDGE_EFFECT {
+        return edge_effect_intrinsic(vm, name, sig, recv, args);
+    }
+    if mref_class == WINDOW_INSETS {
+        let value = match (name, sig) {
+            ("<init>", _) => Value::Null,
+            ("consumeDisplayCutout", "()Landroid/view/WindowInsets;")
+            | ("consumeStableInsets", "()Landroid/view/WindowInsets;")
+            | ("consumeSystemWindowInsets", "()Landroid/view/WindowInsets;") => Value::Obj(recv),
+            ("getDisplayCutout", "()Landroid/view/DisplayCutout;") => Value::Null,
+            ("getSystemGestureInsets", "()Landroid/graphics/Insets;")
+            | ("getMandatorySystemGestureInsets", "()Landroid/graphics/Insets;")
+            | ("getTappableElementInsets", "()Landroid/graphics/Insets;") => {
+                Value::Obj(crate::graphics::new_platform_insets(vm, [0; 4])?)
+            }
+            ("getInsets", "(I)Landroid/graphics/Insets;")
+            | ("getInsetsIgnoringVisibility", "(I)Landroid/graphics/Insets;") => {
+                Value::Obj(crate::graphics::new_platform_insets(vm, [0; 4])?)
+            }
+            ("isVisible", "(I)Z") => Value::Int(0),
+            ("getSystemWindowInsetLeft", "()I")
+            | ("getSystemWindowInsetTop", "()I")
+            | ("getSystemWindowInsetRight", "()I")
+            | ("getSystemWindowInsetBottom", "()I")
+            | ("getStableInsetLeft", "()I")
+            | ("getStableInsetTop", "()I")
+            | ("getStableInsetRight", "()I")
+            | ("getStableInsetBottom", "()I") => Value::Int(0),
+            ("hasSystemWindowInsets", "()Z")
+            | ("hasStableInsets", "()Z")
+            | ("isConsumed", "()Z")
+            | ("isRound", "()Z") => Value::Int(0),
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+    if mref_class == LAYOUT_INFLATER {
+        return match (name, sig) {
+            ("getFactory", "()Landroid/view/LayoutInflater$Factory;") => Ok(Some(
+                vm.heap.get_field(recv, "mFactory").unwrap_or(Value::Null),
+            )),
+            ("getFactory2", "()Landroid/view/LayoutInflater$Factory2;") => Ok(Some(
+                vm.heap.get_field(recv, "mFactory2").unwrap_or(Value::Null),
+            )),
+            ("setFactory", "(Landroid/view/LayoutInflater$Factory;)V") => {
+                let factory = match args.first() {
+                    Some(Value::Null | Value::Int(0)) | None => Value::Null,
+                    Some(value) => value.clone(),
+                };
+                crate::err::put_field_result(vm.heap.put_field(recv, "mFactory", factory))?;
+                Ok(Some(Value::Null))
+            }
+            ("setFactory2", "(Landroid/view/LayoutInflater$Factory2;)V") => {
+                let factory = match args.first() {
+                    Some(Value::Null | Value::Int(0)) | None => Value::Null,
+                    Some(value) => value.clone(),
+                };
+                crate::err::put_field_result(vm.heap.put_field(recv, "mFactory", factory.clone()))?;
+                crate::err::put_field_result(vm.heap.put_field(recv, "mFactory2", factory))?;
+                Ok(Some(Value::Null))
+            }
+            ("getContext", "()Landroid/content/Context;") => Ok(Some(
+                vm.heap.get_field(recv, "mContext").unwrap_or(Value::Null),
+            )),
+            ("cloneInContext", "(Landroid/content/Context;)Landroid/view/LayoutInflater;") => {
+                let context = args
+                    .first()
+                    .ok_or_else(|| {
+                        crate::err::vm_error("VM_TYPE_ERROR", "cloneInContext sem Context")
+                    })?
+                    .as_ref()
+                    .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))?
+                    .ok_or_else(|| {
+                        VmExit::Exception(Throwable::new(
+                            "Ljava/lang/NullPointerException;",
+                            "LayoutInflater.cloneInContext(context): null context",
+                        ))
+                    })?;
+                let clone = vm
+                    .heap
+                    .alloc_instance(LAYOUT_INFLATER.to_string(), Vec::new())
+                    .map_err(crate::err::oom_throwable)?;
+                for (field, value) in [
+                    (
+                        "mFactory",
+                        vm.heap.get_field(recv, "mFactory").unwrap_or(Value::Null),
+                    ),
+                    (
+                        "mFactory2",
+                        vm.heap.get_field(recv, "mFactory2").unwrap_or(Value::Null),
+                    ),
+                    ("mContext", Value::Obj(context)),
+                ] {
+                    crate::err::put_field_result(vm.heap.put_field(clone, field, value))?;
+                }
+                Ok(Some(Value::Obj(clone)))
+            }
+            ("inflate", "(ILandroid/view/ViewGroup;)Landroid/view/View;")
+            | ("inflate", "(ILandroid/view/ViewGroup;Z)Landroid/view/View;") => {
+                let resid = args
+                    .first()
+                    .ok_or_else(|| crate::err::vm_error("VM_TYPE_ERROR", "inflate sem resource"))?
+                    .as_int()
+                    .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))?
+                    as u32;
+                let root = args
+                    .get(1)
+                    .ok_or_else(|| crate::err::vm_error("VM_TYPE_ERROR", "inflate sem root"))?
+                    .as_ref()
+                    .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))?;
+                let explicit_attach = sig == "(ILandroid/view/ViewGroup;Z)Landroid/view/View;";
+                let attach = if explicit_attach {
+                    args.get(2)
+                        .ok_or_else(|| {
+                            crate::err::vm_error("VM_TYPE_ERROR", "inflate sem attachToRoot")
+                        })?
+                        .as_int()
+                        .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))?
+                        != 0
+                } else {
+                    root.is_some()
+                };
+                let context = vm
+                    .heap
+                    .get_field(recv, "mContext")
+                    .ok()
+                    .and_then(|value| value.as_ref().ok().flatten())
+                    .or(vm.fw.current_activity);
+                let view = crate::inflate::inflate_resource_into_with_context(
+                    vm, resid, root, attach, context,
+                )?;
+                Ok(Some(Value::Obj(view)))
+            }
+            _ => Ok(None),
+        };
+    }
     if mref_class == VIEW_CONFIG {
         return Ok(Some(match name {
             "getScaledTouchSlop" => Value::Int(dp(8.0)),
@@ -380,6 +969,167 @@ pub(crate) fn instance_intrinsic(
             Value::Int(prop(vm, recv, "MeasuredHeight").unwrap_or(h))
         }
         ("getMeasuredState", "()I") => Value::Int(0),
+        ("getRootWindowInsets", "()Landroid/view/WindowInsets;") => {
+            if !vm.attached_views.contains(&recv) {
+                Value::Null
+            } else {
+                let key = (
+                    "Landroid/view/View;".to_string(),
+                    "rd_empty_root_window_insets".to_string(),
+                );
+                let insets = match vm.statics.get(&key) {
+                    Some(Value::Obj(insets)) => *insets,
+                    _ => {
+                        let insets = vm
+                            .heap
+                            .alloc_instance(WINDOW_INSETS.to_string(), Vec::new())?;
+                        vm.statics.insert(key, Value::Obj(insets));
+                        insets
+                    }
+                };
+                Value::Obj(insets)
+            }
+        }
+        (
+            "dispatchApplyWindowInsets",
+            "(Landroid/view/WindowInsets;)Landroid/view/WindowInsets;",
+        ) => match args.first().cloned() {
+            Some(Value::Obj(insets)) => vm.invoke_instance(
+                recv,
+                "onApplyWindowInsets",
+                "(Landroid/view/WindowInsets;)Landroid/view/WindowInsets;",
+                &[Value::Obj(insets)],
+            )?,
+            Some(Value::Null | Value::Int(0)) | None => Value::Null,
+            Some(value) => value,
+        },
+        ("onApplyWindowInsets", "(Landroid/view/WindowInsets;)Landroid/view/WindowInsets;") => {
+            args.first().cloned().unwrap_or(Value::Null)
+        }
+        (
+            "computeSystemWindowInsets",
+            "(Landroid/view/WindowInsets;Landroid/graphics/Rect;)Landroid/view/WindowInsets;",
+        ) => {
+            // The headless window currently supplies zero system insets. The
+            // AOSP default reports those as local insets and consumes them;
+            // WindowInsets.consumeSystemWindowInsets is modeled as identity.
+            if let Some(Value::Obj(local)) = args.get(1) {
+                for field in ["left", "top", "right", "bottom"] {
+                    crate::err::put_field_result(vm.heap.put_field(*local, field, Value::Int(0)))?;
+                }
+            }
+            match args.first() {
+                Some(Value::Obj(insets)) => vm.invoke_instance(
+                    *insets,
+                    "consumeSystemWindowInsets",
+                    "()Landroid/view/WindowInsets;",
+                    &[],
+                )?,
+                Some(Value::Null | Value::Int(0)) | None => Value::Null,
+                _ => Value::Null,
+            }
+        }
+        ("setPaddingRelative", "(IIII)V") => {
+            for (field, value) in [
+                ("paddingStart", a(0)),
+                ("paddingTop", a(1)),
+                ("paddingEnd", a(2)),
+                ("paddingBottom", a(3)),
+                ("paddingLeft", a(0)), // headless device is LTR
+                ("paddingRight", a(2)),
+                ("paddingRelative", 1),
+            ] {
+                set_prop(vm, recv, field, value);
+            }
+            Value::Null
+        }
+        ("setPadding", "(IIII)V") => {
+            for (field, value) in [
+                ("paddingLeft", a(0)),
+                ("paddingTop", a(1)),
+                ("paddingRight", a(2)),
+                ("paddingBottom", a(3)),
+                ("paddingStart", a(0)),
+                ("paddingEnd", a(2)),
+                ("paddingRelative", 0),
+            ] {
+                set_prop(vm, recv, field, value);
+            }
+            Value::Null
+        }
+        ("getPaddingLeft", "()I") => Value::Int(prop(vm, recv, "paddingLeft").unwrap_or(0)),
+        ("getPaddingTop", "()I") => Value::Int(prop(vm, recv, "paddingTop").unwrap_or(0)),
+        ("getPaddingRight", "()I") => Value::Int(prop(vm, recv, "paddingRight").unwrap_or(0)),
+        ("getPaddingBottom", "()I") => Value::Int(prop(vm, recv, "paddingBottom").unwrap_or(0)),
+        ("getPaddingStart", "()I") => Value::Int(prop(vm, recv, "paddingStart").unwrap_or(0)),
+        ("getPaddingEnd", "()I") => Value::Int(prop(vm, recv, "paddingEnd").unwrap_or(0)),
+        ("isPaddingRelative", "()Z") => Value::Int(prop(vm, recv, "paddingRelative").unwrap_or(0)),
+        ("setHorizontalScrollBarEnabled", "(Z)V") => {
+            set_prop(vm, recv, "horizontalScrollBarEnabled", a(0));
+            Value::Null
+        }
+        ("isHorizontalScrollBarEnabled", "()Z") => Value::Int(i32::from(
+            prop(vm, recv, "horizontalScrollBarEnabled").unwrap_or(1) != 0,
+        )),
+        ("setVerticalScrollBarEnabled", "(Z)V") => {
+            set_prop(vm, recv, "verticalScrollBarEnabled", a(0));
+            Value::Null
+        }
+        ("isVerticalScrollBarEnabled", "()Z") => Value::Int(i32::from(
+            prop(vm, recv, "verticalScrollBarEnabled").unwrap_or(1) != 0,
+        )),
+        ("setScrollbarFadingEnabled", "(Z)V") => {
+            set_prop(vm, recv, "scrollbarFadingEnabled", a(0));
+            Value::Null
+        }
+        ("isScrollbarFadingEnabled", "()Z") => Value::Int(i32::from(
+            prop(vm, recv, "scrollbarFadingEnabled").unwrap_or(1) != 0,
+        )),
+        ("setScrollBarStyle", "(I)V") => {
+            set_prop(vm, recv, "scrollBarStyle", a(0));
+            Value::Null
+        }
+        ("getScrollBarStyle", "()I") => Value::Int(prop(vm, recv, "scrollBarStyle").unwrap_or(0)),
+        ("getImportantForAccessibility", "()I") => {
+            Value::Int(prop(vm, recv, "importantForAccessibility").unwrap_or(0))
+        }
+        ("getOutlineProvider", "()Landroid/view/ViewOutlineProvider;") => vm
+            .view_props
+            .get(&(recv, "outlineProvider".to_string()))
+            .cloned()
+            .unwrap_or(Value::Null),
+        ("setOutlineProvider", "(Landroid/view/ViewOutlineProvider;)V") => {
+            vm.view_props.insert(
+                (recv, "outlineProvider".to_string()),
+                args.first().cloned().unwrap_or(Value::Null),
+            );
+            Value::Null
+        }
+        ("getClipToOutline", "()Z") => {
+            Value::Int(i32::from(prop(vm, recv, "clipToOutline").unwrap_or(0) != 0))
+        }
+        ("setClipToOutline", "(Z)V") => {
+            set_prop(vm, recv, "clipToOutline", a(0));
+            Value::Null
+        }
+        ("setImportantForAccessibility", "(I)V") => {
+            set_prop(vm, recv, "importantForAccessibility", a(0));
+            Value::Null
+        }
+        ("isLaidOut", "()Z") => {
+            Value::Int(i32::from(prop(vm, recv, "rd_laid_out").unwrap_or(0) != 0))
+        }
+        ("requestLayout" | "forceLayout", "()V") => {
+            set_prop(vm, recv, "rd_layout_requested", 1);
+            vm.fw.traversal_pending = true;
+            Value::Null
+        }
+        ("invalidate" | "postInvalidate" | "postInvalidateOnAnimation", _)
+            if sig.ends_with(")V") =>
+        {
+            vm.fw.traversal_pending = true;
+            Value::Null
+        }
         // AOSP ViewGroup.drawChild: draw `child` on the parent's canvas,
         // translated to the child's parent-relative frame.
         ("drawChild", "(Landroid/graphics/Canvas;Landroid/view/View;J)Z") => {
@@ -608,6 +1358,27 @@ pub(crate) fn instance_intrinsic(
             Value::Int(prop(vm, recv, "rd_layout_requested").is_some() as i32)
         }
         ("isInTouchMode", "()Z") => Value::Int(1),
+        ("setFocusable", "(Z)V") => {
+            set_prop(vm, recv, "focusable", a(0));
+            Value::Null
+        }
+        ("isFocusable", "()Z") => {
+            Value::Int(i32::from(prop(vm, recv, "focusable").unwrap_or(0) != 0))
+        }
+        ("setFocusableInTouchMode", "(Z)V") => {
+            set_prop(vm, recv, "focusableInTouchMode", a(0));
+            Value::Null
+        }
+        ("isFocusableInTouchMode", "()Z") => Value::Int(i32::from(
+            prop(vm, recv, "focusableInTouchMode").unwrap_or(0) != 0,
+        )),
+        ("setDescendantFocusability", "(I)V") => {
+            set_prop(vm, recv, "descendantFocusability", a(0));
+            Value::Null
+        }
+        ("getDescendantFocusability", "()I") => {
+            Value::Int(prop(vm, recv, "descendantFocusability").unwrap_or(0x0002_0000))
+        }
         ("hasWindowFocus", "()Z") => Value::Int(vm.attached_views.contains(&recv) as i32),
         // single-focus model of the window (AOSP ViewRootImpl.mFocusedView):
         // requestFocus moves focus and notifies onFocusChanged (virtual —
@@ -693,7 +1464,6 @@ pub(crate) fn instance_intrinsic(
         ) => Value::Null,
         ("setOnDragListener", _)
         | ("requestDisallowInterceptTouchEvent", _)
-        | ("setFocusableInTouchMode", _)
         | ("setOnHierarchyChangeListener", _) => Value::Null,
         (
             "dispatchKeyEventPreIme"
@@ -800,7 +1570,6 @@ impl Engine {
         let _ = self.advance_clock(16);
         // 3. record the frame
         let canvas = self.begin_frame_canvas(fw_, fh_)?;
-        self.frame_fill(canvas, 0.0, 0.0, fw_ as f32, fh_ as f32, 0xFFFF_FFFF);
         self.record_view(canvas, content, 0)?;
         for (_, root) in &dialogs {
             // FLAG_DIM_BEHIND (Material dialog backgroundDimAmount 0.32)
@@ -1077,6 +1846,22 @@ pub(crate) fn host_dispatch_touch(vm: &mut Engine, v: ObjRef, ev: ObjRef) -> Res
             if dispatch_touch(vm, *c, e2)? {
                 return Ok(true);
             }
+        }
+    }
+    // AOSP View.dispatchTouchEvent calls OnTouchListener before onTouchEvent.
+    if let Some(Value::Obj(listener)) = vm
+        .view_props
+        .get(&(v, crate::framework::VIEW_ON_TOUCH_LISTENER.to_string()))
+        .cloned()
+    {
+        let handled = vm.invoke_instance(
+            listener,
+            "onTouch",
+            "(Landroid/view/View;Landroid/view/MotionEvent;)Z",
+            &[Value::Obj(v), Value::Obj(ev)],
+        )?;
+        if truthy(Some(handled)) {
+            return Ok(true);
         }
     }
     Ok(truthy(crate::jcollections::guest_call(

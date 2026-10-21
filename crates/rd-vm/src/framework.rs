@@ -47,6 +47,7 @@ pub const CONTEXT: &str = "Landroid/content/Context;";
 pub const INTENT: &str = "Landroid/content/Intent;";
 pub const BUNDLE: &str = "Landroid/os/Bundle;";
 pub const VIEW: &str = "Landroid/view/View;";
+pub(crate) const VIEW_ON_TOUCH_LISTENER: &str = "view:on_touch_listener";
 pub const VIEWGROUP: &str = "Landroid/view/ViewGroup;";
 pub const TEXTVIEW: &str = "Landroid/widget/TextView;";
 pub const BUTTON: &str = "Landroid/widget/Button;";
@@ -56,6 +57,8 @@ pub const HANDLER: &str = "Landroid/os/Handler;";
 pub const LOOPER: &str = "Landroid/os/Looper;";
 /// M8: relógio host (relógio virtual determinístico — ver `call_host_static`).
 pub const SYSTEM_CLOCK: &str = "Landroid/os/SystemClock;";
+/// Android Environment over the per-VM emulated shared-storage root.
+pub const ENVIRONMENT: &str = "Landroid/os/Environment;";
 /// M8: Thread host — a VM é single-threaded: existe UMA thread sintética
 /// "main" (id 1, não-daemon), devolvida por `Looper.getThread`/
 /// `Thread.currentThread`.
@@ -80,6 +83,691 @@ const MAX_VIEW_DEPTH: usize = 512;
 const VSYNC_MS: u64 = 16;
 /// Cap on vsync-stepped ticks per `advance_clock` (about 64 s of animation).
 const MAX_VSYNC_TICKS: usize = 4000;
+
+const MEASURE_SPEC_SIZE_MASK: i32 = 0x3fff_ffff;
+const MEASURE_SPEC_MODE_MASK: i32 = 0xc000_0000u32 as i32;
+const MEASURE_SPEC_EXACTLY: i32 = 0x4000_0000;
+const MEASURE_SPEC_AT_MOST: i32 = 0x8000_0000u32 as i32;
+
+/// Android ViewGroup.getChildMeasureSpec semantics for a single dimension.
+pub(crate) fn child_measure_spec(parent_spec: i32, padding: i32, child_dimension: i32) -> i32 {
+    let size = (parent_spec & MEASURE_SPEC_SIZE_MASK)
+        .saturating_sub(padding)
+        .clamp(0, MEASURE_SPEC_SIZE_MASK);
+    if child_dimension >= 0 {
+        return MEASURE_SPEC_EXACTLY | child_dimension.min(MEASURE_SPEC_SIZE_MASK);
+    }
+    match parent_spec & MEASURE_SPEC_MODE_MASK {
+        MEASURE_SPEC_EXACTLY if child_dimension == -1 => MEASURE_SPEC_EXACTLY | size,
+        MEASURE_SPEC_EXACTLY => MEASURE_SPEC_AT_MOST | size,
+        MEASURE_SPEC_AT_MOST => MEASURE_SPEC_AT_MOST | size,
+        _ => 0, // UNSPECIFIED parent + MATCH_PARENT/WRAP_CONTENT
+    }
+}
+
+/// AOSP ViewGroup.measureChildWithMargins: account for parent padding, child
+/// margins and dimensions, then dispatch the derived specs to View.measure.
+fn measure_child_with_margins(
+    vm: &mut Engine,
+    parent: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    measure_child_with_margins_override(vm, parent, args, None, None)
+}
+
+fn measure_child_with_margins_override(
+    vm: &mut Engine,
+    parent: ObjRef,
+    args: &[Value],
+    width_override: Option<i32>,
+    height_override: Option<i32>,
+) -> Result<Option<Value>, VmExit> {
+    let Some(Value::Obj(child)) = args.first() else {
+        return Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/NullPointerException;",
+            "ViewGroup.measureChildWithMargins child == null",
+        )));
+    };
+    if args.len() != 5 {
+        return Err(crate::err::vm_error(
+            "INVALID_ARG",
+            "ViewGroup.measureChildWithMargins expects 5 arguments",
+        )
+        .into());
+    }
+    let Some(Value::Obj(params)) = vm.heap.get_field(*child, "mLayoutParams").ok() else {
+        return Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/NullPointerException;",
+            "ViewGroup.measureChildWithMargins child has no LayoutParams",
+        )));
+    };
+    let width = width_override.unwrap_or_else(|| {
+        vm.heap
+            .get_field(params, "width")
+            .ok()
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(-2)
+    });
+    let height = height_override.unwrap_or_else(|| {
+        vm.heap
+            .get_field(params, "height")
+            .ok()
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(-2)
+    });
+    let margin = |field: &str| {
+        vm.heap
+            .get_field(params, field)
+            .ok()
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0)
+    };
+    let (left, top, right, bottom) = (
+        margin("leftMargin"),
+        margin("topMargin"),
+        margin("rightMargin"),
+        margin("bottomMargin"),
+    );
+    let padding = |field: &str| {
+        vm.view_props
+            .get(&(parent, field.to_string()))
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0)
+    };
+    let horizontal_padding = padding("paddingLeft")
+        .saturating_add(padding("paddingRight"))
+        .saturating_add(left)
+        .saturating_add(right)
+        .saturating_add(args[2].as_int()?);
+    let vertical_padding = padding("paddingTop")
+        .saturating_add(padding("paddingBottom"))
+        .saturating_add(top)
+        .saturating_add(bottom)
+        .saturating_add(args[4].as_int()?);
+    let width_spec = child_measure_spec(args[1].as_int()?, horizontal_padding, width);
+    let height_spec = child_measure_spec(args[3].as_int()?, vertical_padding, height);
+    vm.invoke_instance(
+        *child,
+        "measure",
+        "(II)V",
+        &[Value::Int(width_spec), Value::Int(height_spec)],
+    )?;
+    Ok(Some(Value::Null))
+}
+
+fn suggested_minimum(
+    vm: &mut Engine,
+    view: ObjRef,
+    minimum_field: &str,
+    drawable_method: &str,
+) -> Result<i32, VmExit> {
+    let min = vm
+        .heap
+        .get_field(view, minimum_field)
+        .ok()
+        .and_then(|value| value.as_int().ok())
+        .unwrap_or(0);
+    let background = vm
+        .view_props
+        .get(&(view, "view:background".to_string()))
+        .cloned()
+        .unwrap_or(Value::Null);
+    let background_min = if let Value::Obj(background) = background {
+        vm.invoke_instance(background, drawable_method, "()I", &[])?
+            .as_int()
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    Ok(min.max(background_min))
+}
+
+fn property_int(vm: &Engine, view: ObjRef, field: &str, default: i32) -> i32 {
+    vm.view_props
+        .get(&(view, field.to_string()))
+        .and_then(|value| value.as_int().ok())
+        .unwrap_or(default)
+}
+
+fn layout_param_int(vm: &Engine, child: ObjRef, field: &str, default: i32) -> i32 {
+    let Ok(Value::Obj(params)) = vm.heap.get_field(child, "mLayoutParams") else {
+        return default;
+    };
+    vm.heap
+        .get_field(params, field)
+        .ok()
+        .and_then(|value| value.as_int().ok())
+        .unwrap_or(default)
+}
+
+fn layout_param_weight(vm: &Engine, child: ObjRef) -> f32 {
+    let Ok(Value::Obj(params)) = vm.heap.get_field(child, "mLayoutParams") else {
+        return 0.0;
+    };
+    vm.heap
+        .get_field(params, "weight")
+        .ok()
+        .and_then(|value| match value {
+            Value::Float(weight) => Some(weight),
+            Value::Int(weight) => Some(weight as f32),
+            _ => None,
+        })
+        .filter(|weight| weight.is_finite() && *weight > 0.0)
+        .unwrap_or(0.0)
+}
+
+fn measured_dimension(vm: &Engine, view: ObjRef, field: &str) -> i32 {
+    property_int(vm, view, field, 0)
+}
+
+fn view_children(vm: &Engine, parent: ObjRef) -> Vec<ObjRef> {
+    match vm.fw.get(parent) {
+        Some(HostObj::View { children, .. }) => children.clone(),
+        _ => Vec::new(),
+    }
+}
+
+fn is_gone(vm: &Engine, view: ObjRef) -> bool {
+    matches!(vm.fw.get(view), Some(HostObj::View { vis: Vis::Gone, .. }))
+}
+
+fn resolve_measure_size(desired: i32, spec: i32) -> i32 {
+    let size = (spec & MEASURE_SPEC_SIZE_MASK).max(0);
+    match spec & MEASURE_SPEC_MODE_MASK {
+        MEASURE_SPEC_EXACTLY => size,
+        MEASURE_SPEC_AT_MOST => desired.max(0).min(size),
+        _ => desired.max(0),
+    }
+}
+
+/// Native FrameLayout measurement: measure visible children with their
+/// LayoutParams/margins, then resolve the parent against its MeasureSpecs.
+fn frame_layout_on_measure(
+    vm: &mut Engine,
+    parent: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let width_spec = args
+        .first()
+        .and_then(|value| value.as_int().ok())
+        .unwrap_or(0);
+    let height_spec = args
+        .get(1)
+        .and_then(|value| value.as_int().ok())
+        .unwrap_or(0);
+    let (padding_left, padding_top, padding_right, padding_bottom) = (
+        property_int(vm, parent, "paddingLeft", 0),
+        property_int(vm, parent, "paddingTop", 0),
+        property_int(vm, parent, "paddingRight", 0),
+        property_int(vm, parent, "paddingBottom", 0),
+    );
+    let parent_class = vm.heap.class_of(parent)?;
+    let vertical_scroll = vm
+        .cp
+        .is_subtype(parent_class, "Landroid/widget/ScrollView;");
+    let horizontal_scroll = vm
+        .cp
+        .is_subtype(parent_class, "Landroid/widget/HorizontalScrollView;");
+    let child_width_spec = if horizontal_scroll { 0 } else { width_spec };
+    let child_height_spec = if vertical_scroll { 0 } else { height_spec };
+    let mut max_width = 0i32;
+    let mut max_height = 0i32;
+    for child in view_children(vm, parent) {
+        if is_gone(vm, child) {
+            continue;
+        }
+        let child_args = [
+            Value::Obj(child),
+            Value::Int(child_width_spec),
+            Value::Int(0),
+            Value::Int(child_height_spec),
+            Value::Int(0),
+        ];
+        measure_child_with_margins(vm, parent, &child_args)?;
+        let horizontal_margins = layout_param_int(vm, child, "leftMargin", 0)
+            .saturating_add(layout_param_int(vm, child, "rightMargin", 0));
+        let vertical_margins = layout_param_int(vm, child, "topMargin", 0)
+            .saturating_add(layout_param_int(vm, child, "bottomMargin", 0));
+        max_width = max_width
+            .max(measured_dimension(vm, child, "MeasuredWidth").saturating_add(horizontal_margins));
+        max_height = max_height
+            .max(measured_dimension(vm, child, "MeasuredHeight").saturating_add(vertical_margins));
+    }
+    let desired_width = max_width
+        .saturating_add(padding_left)
+        .saturating_add(padding_right)
+        .max(suggested_minimum(
+            vm,
+            parent,
+            "mMinWidth",
+            "getMinimumWidth",
+        )?);
+    let desired_height = max_height
+        .saturating_add(padding_top)
+        .saturating_add(padding_bottom)
+        .max(suggested_minimum(
+            vm,
+            parent,
+            "mMinHeight",
+            "getMinimumHeight",
+        )?);
+    vm.view_props.insert(
+        (parent, "MeasuredWidth".to_string()),
+        Value::Int(resolve_measure_size(desired_width, width_spec)),
+    );
+    vm.view_props.insert(
+        (parent, "MeasuredHeight".to_string()),
+        Value::Int(resolve_measure_size(desired_height, height_spec)),
+    );
+    Ok(Some(Value::Null))
+}
+
+/// Native LinearLayout measurement for the horizontal/vertical paths used by
+/// classic Android View trees, including zero-size weighted children.
+fn linear_layout_on_measure(
+    vm: &mut Engine,
+    parent: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let width_spec = args
+        .first()
+        .and_then(|value| value.as_int().ok())
+        .unwrap_or(0);
+    let height_spec = args
+        .get(1)
+        .and_then(|value| value.as_int().ok())
+        .unwrap_or(0);
+    let vertical = matches!(
+        vm.fw.get(parent),
+        Some(HostObj::View { orientation: 1, .. })
+    );
+    let (padding_left, padding_top, padding_right, padding_bottom) = (
+        property_int(vm, parent, "paddingLeft", 0),
+        property_int(vm, parent, "paddingTop", 0),
+        property_int(vm, parent, "paddingRight", 0),
+        property_int(vm, parent, "paddingBottom", 0),
+    );
+    let children: Vec<_> = view_children(vm, parent)
+        .into_iter()
+        .filter(|child| !is_gone(vm, *child))
+        .collect();
+    let main_spec = if vertical { height_spec } else { width_spec };
+    let main_mode = main_spec & MEASURE_SPEC_MODE_MASK;
+    let total_weight: f64 = children
+        .iter()
+        .map(|child| f64::from(layout_param_weight(vm, *child)))
+        .sum();
+
+    if total_weight > 0.0 && main_mode == MEASURE_SPEC_EXACTLY {
+        let mut used_main = 0i32;
+        let mut skipped_weight_margins = 0i32;
+        let mut weighted = Vec::new();
+        for child in &children {
+            let weight = layout_param_weight(vm, *child);
+            let main_dimension =
+                layout_param_int(vm, *child, if vertical { "height" } else { "width" }, -2);
+            let child_args = [
+                Value::Obj(*child),
+                Value::Int(width_spec),
+                Value::Int(if vertical { 0 } else { used_main }),
+                Value::Int(height_spec),
+                Value::Int(if vertical { used_main } else { 0 }),
+            ];
+            if weight > 0.0 {
+                let main_margins =
+                    if vertical {
+                        layout_param_int(vm, *child, "topMargin", 0)
+                            .saturating_add(layout_param_int(vm, *child, "bottomMargin", 0))
+                    } else {
+                        layout_param_int(vm, *child, "leftMargin", 0)
+                            .saturating_add(layout_param_int(vm, *child, "rightMargin", 0))
+                    };
+                let base_size = if main_dimension == 0 {
+                    skipped_weight_margins = skipped_weight_margins.saturating_add(main_margins);
+                    0
+                } else {
+                    measure_child_with_margins(vm, parent, &child_args)?;
+                    let measured = measured_dimension(
+                        vm,
+                        *child,
+                        if vertical {
+                            "MeasuredHeight"
+                        } else {
+                            "MeasuredWidth"
+                        },
+                    );
+                    used_main = used_main
+                        .saturating_add(measured)
+                        .saturating_add(main_margins);
+                    measured
+                };
+                weighted.push((*child, weight, base_size));
+            } else {
+                measure_child_with_margins(vm, parent, &child_args)?;
+                let measured = measured_dimension(
+                    vm,
+                    *child,
+                    if vertical {
+                        "MeasuredHeight"
+                    } else {
+                        "MeasuredWidth"
+                    },
+                );
+                let main_margins =
+                    if vertical {
+                        layout_param_int(vm, *child, "topMargin", 0)
+                            .saturating_add(layout_param_int(vm, *child, "bottomMargin", 0))
+                    } else {
+                        layout_param_int(vm, *child, "leftMargin", 0)
+                            .saturating_add(layout_param_int(vm, *child, "rightMargin", 0))
+                    };
+                used_main = used_main
+                    .saturating_add(measured)
+                    .saturating_add(main_margins);
+            }
+        }
+
+        let main_padding = if vertical {
+            padding_top.saturating_add(padding_bottom)
+        } else {
+            padding_left.saturating_add(padding_right)
+        };
+        let remaining_pixels = (main_spec & MEASURE_SPEC_SIZE_MASK)
+            .saturating_sub(main_padding)
+            .saturating_sub(used_main)
+            .saturating_sub(skipped_weight_margins)
+            .max(0);
+        let mut pixels_left = remaining_pixels;
+        let mut weight_left = total_weight;
+        for (child, weight, base_size) in weighted {
+            let share = if f64::from(weight) >= weight_left {
+                pixels_left
+            } else if weight_left > 0.0 {
+                ((f64::from(pixels_left) * f64::from(weight)) / weight_left)
+                    .floor()
+                    .clamp(0.0, f64::from(pixels_left)) as i32
+            } else {
+                0
+            };
+            pixels_left = pixels_left.saturating_sub(share);
+            weight_left = (weight_left - f64::from(weight)).max(0.0);
+            let assigned_size = base_size.saturating_add(share);
+            let child_args = [
+                Value::Obj(child),
+                Value::Int(width_spec),
+                Value::Int(if vertical { 0 } else { used_main }),
+                Value::Int(height_spec),
+                Value::Int(if vertical { used_main } else { 0 }),
+            ];
+            measure_child_with_margins_override(
+                vm,
+                parent,
+                &child_args,
+                (!vertical).then_some(assigned_size),
+                vertical.then_some(assigned_size),
+            )?;
+        }
+    } else {
+        let mut used_main = 0i32;
+        for child in &children {
+            let weight = layout_param_weight(vm, *child);
+            let main_dimension =
+                layout_param_int(vm, *child, if vertical { "height" } else { "width" }, -2);
+            let child_args = [
+                Value::Obj(*child),
+                Value::Int(width_spec),
+                Value::Int(if vertical { 0 } else { used_main }),
+                Value::Int(height_spec),
+                Value::Int(if vertical { used_main } else { 0 }),
+            ];
+            let wrap_weighted_zero = weight > 0.0 && main_dimension == 0;
+            measure_child_with_margins_override(
+                vm,
+                parent,
+                &child_args,
+                (!vertical && wrap_weighted_zero).then_some(-2),
+                (vertical && wrap_weighted_zero).then_some(-2),
+            )?;
+            let measured = measured_dimension(
+                vm,
+                *child,
+                if vertical {
+                    "MeasuredHeight"
+                } else {
+                    "MeasuredWidth"
+                },
+            );
+            let main_margins = if vertical {
+                layout_param_int(vm, *child, "topMargin", 0).saturating_add(layout_param_int(
+                    vm,
+                    *child,
+                    "bottomMargin",
+                    0,
+                ))
+            } else {
+                layout_param_int(vm, *child, "leftMargin", 0).saturating_add(layout_param_int(
+                    vm,
+                    *child,
+                    "rightMargin",
+                    0,
+                ))
+            };
+            used_main = used_main
+                .saturating_add(measured)
+                .saturating_add(main_margins);
+        }
+    }
+
+    let mut main_length = 0i32;
+    let mut max_cross = 0i32;
+    for child in children {
+        let width = measured_dimension(vm, child, "MeasuredWidth");
+        let height = measured_dimension(vm, child, "MeasuredHeight");
+        let horizontal_margins = layout_param_int(vm, child, "leftMargin", 0)
+            .saturating_add(layout_param_int(vm, child, "rightMargin", 0));
+        let vertical_margins = layout_param_int(vm, child, "topMargin", 0)
+            .saturating_add(layout_param_int(vm, child, "bottomMargin", 0));
+        if vertical {
+            main_length = main_length
+                .saturating_add(height)
+                .saturating_add(vertical_margins);
+            max_cross = max_cross.max(width.saturating_add(horizontal_margins));
+        } else {
+            main_length = main_length
+                .saturating_add(width)
+                .saturating_add(horizontal_margins);
+            max_cross = max_cross.max(height.saturating_add(vertical_margins));
+        }
+    }
+    let (desired_width, desired_height) = if vertical {
+        (
+            max_cross
+                .saturating_add(padding_left)
+                .saturating_add(padding_right),
+            main_length
+                .saturating_add(padding_top)
+                .saturating_add(padding_bottom),
+        )
+    } else {
+        (
+            main_length
+                .saturating_add(padding_left)
+                .saturating_add(padding_right),
+            max_cross
+                .saturating_add(padding_top)
+                .saturating_add(padding_bottom),
+        )
+    };
+    let desired_width = desired_width.max(suggested_minimum(
+        vm,
+        parent,
+        "mMinWidth",
+        "getMinimumWidth",
+    )?);
+    let desired_height = desired_height.max(suggested_minimum(
+        vm,
+        parent,
+        "mMinHeight",
+        "getMinimumHeight",
+    )?);
+    vm.view_props.insert(
+        (parent, "MeasuredWidth".to_string()),
+        Value::Int(resolve_measure_size(desired_width, width_spec)),
+    );
+    vm.view_props.insert(
+        (parent, "MeasuredHeight".to_string()),
+        Value::Int(resolve_measure_size(desired_height, height_spec)),
+    );
+    Ok(Some(Value::Null))
+}
+
+fn frame_layout_on_layout(
+    vm: &mut Engine,
+    parent: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if args.len() != 5 {
+        return Err(crate::err::vm_error(
+            "INVALID_ARG",
+            "FrameLayout.onLayout expects 5 arguments",
+        )
+        .into());
+    }
+    let (parent_width, parent_height) = (
+        args[3].as_int()?.saturating_sub(args[1].as_int()?),
+        args[4].as_int()?.saturating_sub(args[2].as_int()?),
+    );
+    let (padding_left, padding_top, padding_right, padding_bottom) = (
+        property_int(vm, parent, "paddingLeft", 0),
+        property_int(vm, parent, "paddingTop", 0),
+        property_int(vm, parent, "paddingRight", 0),
+        property_int(vm, parent, "paddingBottom", 0),
+    );
+    for child in view_children(vm, parent) {
+        if is_gone(vm, child) {
+            continue;
+        }
+        let (width, height) = (
+            measured_dimension(vm, child, "MeasuredWidth"),
+            measured_dimension(vm, child, "MeasuredHeight"),
+        );
+        let (left_margin, top_margin, right_margin, bottom_margin) = (
+            layout_param_int(vm, child, "leftMargin", 0),
+            layout_param_int(vm, child, "topMargin", 0),
+            layout_param_int(vm, child, "rightMargin", 0),
+            layout_param_int(vm, child, "bottomMargin", 0),
+        );
+        let gravity = layout_param_int(vm, child, "gravity", -1);
+        let horizontal = if gravity < 0 { 3 } else { gravity & 0x7 };
+        let vertical = if gravity < 0 { 0x30 } else { gravity & 0x70 };
+        let content_left = padding_left.saturating_add(left_margin);
+        let content_right = parent_width
+            .saturating_sub(padding_right)
+            .saturating_sub(right_margin);
+        let content_top = padding_top.saturating_add(top_margin);
+        let content_bottom = parent_height
+            .saturating_sub(padding_bottom)
+            .saturating_sub(bottom_margin);
+        let left = match horizontal {
+            1 => {
+                content_left
+                    .saturating_add(content_right)
+                    .saturating_sub(width)
+                    / 2
+            }
+            5 => content_right.saturating_sub(width),
+            _ => content_left,
+        };
+        let top = match vertical {
+            0x10 => {
+                content_top
+                    .saturating_add(content_bottom)
+                    .saturating_sub(height)
+                    / 2
+            }
+            0x50 => content_bottom.saturating_sub(height),
+            _ => content_top,
+        };
+        vm.invoke_instance(
+            child,
+            "layout",
+            "(IIII)V",
+            &[
+                Value::Int(left),
+                Value::Int(top),
+                Value::Int(left.saturating_add(width)),
+                Value::Int(top.saturating_add(height)),
+            ],
+        )?;
+    }
+    Ok(Some(Value::Null))
+}
+
+fn linear_layout_on_layout(
+    vm: &mut Engine,
+    parent: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if args.len() != 5 {
+        return Err(crate::err::vm_error(
+            "INVALID_ARG",
+            "LinearLayout.onLayout expects 5 arguments",
+        )
+        .into());
+    }
+    let vertical = matches!(
+        vm.fw.get(parent),
+        Some(HostObj::View { orientation: 1, .. })
+    );
+    let (padding_left, padding_top) = (
+        property_int(vm, parent, "paddingLeft", 0),
+        property_int(vm, parent, "paddingTop", 0),
+    );
+    let mut main_cursor = if vertical { padding_top } else { padding_left };
+    for child in view_children(vm, parent) {
+        if is_gone(vm, child) {
+            continue;
+        }
+        let (width, height) = (
+            measured_dimension(vm, child, "MeasuredWidth"),
+            measured_dimension(vm, child, "MeasuredHeight"),
+        );
+        let (left_margin, top_margin, right_margin, bottom_margin) = (
+            layout_param_int(vm, child, "leftMargin", 0),
+            layout_param_int(vm, child, "topMargin", 0),
+            layout_param_int(vm, child, "rightMargin", 0),
+            layout_param_int(vm, child, "bottomMargin", 0),
+        );
+        let (left, top) = if vertical {
+            (
+                padding_left.saturating_add(left_margin),
+                main_cursor.saturating_add(top_margin),
+            )
+        } else {
+            (
+                main_cursor.saturating_add(left_margin),
+                padding_top.saturating_add(top_margin),
+            )
+        };
+        vm.invoke_instance(
+            child,
+            "layout",
+            "(IIII)V",
+            &[
+                Value::Int(left),
+                Value::Int(top),
+                Value::Int(left.saturating_add(width)),
+                Value::Int(top.saturating_add(height)),
+            ],
+        )?;
+        main_cursor = if vertical {
+            top.saturating_add(height).saturating_add(bottom_margin)
+        } else {
+            left.saturating_add(width).saturating_add(right_margin)
+        };
+    }
+    Ok(Some(Value::Null))
+}
 
 /// Estado host de um objeto. O heap guarda apenas a classe; o estado Java
 /// real fica aqui. Um ObjRef = um HostObj.
@@ -131,6 +819,8 @@ pub enum HostObj {
         h: i32,
         vis: Vis,
         enabled: bool,
+        clickable: bool,
+        selected: bool,
         click_listener: Option<ObjRef>,
         /// android:onClick="metodo" (XML) — resolve no contexto da ACTIVITY
         click_method: Option<String>,
@@ -173,6 +863,13 @@ pub enum HostObj {
     Iter {
         elems: Vec<Value>,
         pos: usize,
+    },
+    /// `java.util.StringTokenizer` source, UTF-16 delimiter set and cursor.
+    StringTokenizer {
+        source: Vec<u16>,
+        delimiters: Vec<u16>,
+        return_delimiters: bool,
+        cursor: usize,
     },
     /// M8 (45º gap real — slf4j 2.x do primftpd): ServiceLoader host com os
     /// providers descobertos em `META-INF/services/<nome binário da
@@ -434,6 +1131,8 @@ fn new_view() -> HostObj {
         h: 0,
         vis: Vis::Visible,
         enabled: true,
+        clickable: false,
+        selected: false,
         click_listener: None,
         click_method: None,
         parent: None,
@@ -1055,6 +1754,16 @@ impl Engine {
                     if point_in_view_bounds(x, y, (*rx, *ry, *w, *h)));
             if inside {
                 if let Some(t) = self.hit_test(root, x, y) {
+                    if self.touch_listener_of(t).is_some() {
+                        let consumed = self.touch_sequence(root, &[(x, y)])?;
+                        if !consumed
+                            && (self.click_listener_of(t).is_some()
+                                || self.click_method_of(t).is_some())
+                        {
+                            return self.dispatch_click(t);
+                        }
+                        return Ok(consumed);
+                    }
                     if self.click_listener_of(t).is_some() || self.click_method_of(t).is_some() {
                         return self.dispatch_click(t);
                     }
@@ -1107,6 +1816,16 @@ impl Engine {
             }
             return Ok(false);
         };
+        if self.touch_listener_of(target).is_some() {
+            let consumed = self.touch_sequence(content, &[(x, y)])?;
+            if !consumed
+                && (self.click_listener_of(target).is_some()
+                    || self.click_method_of(target).is_some())
+            {
+                return self.dispatch_click(target);
+            }
+            return Ok(consumed);
+        }
         if self.click_listener_of(target).is_some() || self.click_method_of(target).is_some() {
             return self.dispatch_click(target);
         }
@@ -1884,6 +2603,16 @@ impl Engine {
         }
     }
 
+    fn touch_listener_of(&self, v: ObjRef) -> Option<ObjRef> {
+        match self
+            .view_props
+            .get(&(v, VIEW_ON_TOUCH_LISTENER.to_string()))
+        {
+            Some(Value::Obj(listener)) => Some(*listener),
+            _ => None,
+        }
+    }
+
     /// android:onClick="metodo" capturado pelo LayoutInflater (M3.2).
     fn click_method_of(&self, v: ObjRef) -> Option<String> {
         match self.fw.get(v)? {
@@ -2191,6 +2920,66 @@ fn call_host_static_rooted(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     match (class, name) {
+        ("Landroid/view/PointerIcon;", "getSystemIcon")
+            if _sig == "(Landroid/content/Context;I)Landroid/view/PointerIcon;" =>
+        {
+            let icon = vm
+                .heap
+                .alloc_instance("Landroid/view/PointerIcon;".to_string(), Vec::new())?;
+            Ok(Some(Value::Obj(icon)))
+        }
+        (ENVIRONMENT, "getExternalStorageState")
+            if matches!(
+                _sig,
+                "()Ljava/lang/String;" | "(Ljava/io/File;)Ljava/lang/String;"
+            ) =>
+        {
+            Ok(Some(Value::Obj(intrinsics::alloc_string(
+                vm,
+                "mounted".into(),
+            )?)))
+        }
+        (ENVIRONMENT, "getExternalStorageDirectory") if _sig == "()Ljava/io/File;" => {
+            crate::jfile::external_storage_path(vm, "/storage/emulated/0").map(Some)
+        }
+        (ENVIRONMENT, "getExternalStoragePublicDirectory")
+            if _sig == "(Ljava/lang/String;)Ljava/io/File;" =>
+        {
+            let kind = match args.first() {
+                Some(Value::Obj(value)) => vm.heap.as_str(*value)?.to_string(),
+                _ => {
+                    return Err(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "Environment directory type == null",
+                    )
+                    .into())
+                }
+            };
+            let path = if kind.is_empty() {
+                "/storage/emulated/0".to_string()
+            } else {
+                format!("/storage/emulated/0/{kind}")
+            };
+            crate::jfile::external_storage_path(vm, &path).map(Some)
+        }
+        (ENVIRONMENT, "isExternalStorageEmulated")
+            if matches!(_sig, "()Z" | "(Ljava/io/File;)Z") =>
+        {
+            Ok(Some(Value::Int(1)))
+        }
+        (ENVIRONMENT, "isExternalStorageRemovable")
+            if matches!(_sig, "()Z" | "(Ljava/io/File;)Z") =>
+        {
+            Ok(Some(Value::Int(0)))
+        }
+        (ENVIRONMENT, "isExternalStorageLegacy") if _sig == "()Z" => Ok(Some(Value::Int(1))),
+        (ENVIRONMENT, "isExternalStorageManager")
+            if matches!(_sig, "()Z" | "(Ljava/io/File;)Z") =>
+        {
+            // The virtual device exposes emulated external storage but does
+            // not grant Android 11+ all-files access to the app by default.
+            Ok(Some(Value::Int(0)))
+        }
         (LOOPER, "getMainLooper") | (LOOPER, "myLooper") => {
             Ok(Some(Value::Obj(vm.main_looper_obj()?)))
         }
@@ -2424,6 +3213,16 @@ fn call_host_instance_rooted(
         // ctor do super via invokespecial; o host não tem estado de ctor, que
         // vira no-op (mesmo padrão de Activity/Application/Context).
         (FRAGMENT_CLS, "<init>") if sig == "()V" => Ok(Some(Value::Null)),
+        (ACTIVITY, "getLayoutInflater")
+            if sig == "()Landroid/view/LayoutInflater;" && is_activity(vm) =>
+        {
+            crate::view_layout::static_intrinsic(
+                vm,
+                "Landroid/view/LayoutInflater;",
+                "from",
+                &[Value::Obj(recv)],
+            )
+        }
         (ACTIVITY, "getIntent") | (CONTEXT, "getIntent") => {
             let intent = match vm.fw.get(recv) {
                 Some(HostObj::Activity { intent, .. }) => *intent,
@@ -2488,21 +3287,49 @@ fn call_host_instance_rooted(
                 Ok(Some(Value::Obj(recv)))
             }
             "commit" => {
-                apply_prefs_editor(vm, recv);
+                apply_prefs_editor(vm, recv)?;
                 Ok(Some(Value::Int(1)))
             }
             "apply" => {
-                apply_prefs_editor(vm, recv);
+                apply_prefs_editor(vm, recv)?;
                 Ok(Some(Value::Null))
             }
             _ => Ok(None),
         },
         _ if recv_class == SHARED_PREFS_IMPL && mref_class == SHARED_PREFS => match (name, sig) {
+            (
+                "registerOnSharedPreferenceChangeListener",
+                "(Landroid/content/SharedPreferences$OnSharedPreferenceChangeListener;)V",
+            ) => {
+                if let Some(Value::Obj(listener)) = args.first() {
+                    let listeners = vm.fw.m8.prefs_listeners.entry(recv).or_default();
+                    if !listeners.contains(listener) {
+                        listeners.push(*listener);
+                    }
+                }
+                Ok(Some(Value::Null))
+            }
+            (
+                "unregisterOnSharedPreferenceChangeListener",
+                "(Landroid/content/SharedPreferences$OnSharedPreferenceChangeListener;)V",
+            ) => {
+                if let Some(Value::Obj(listener)) = args.first() {
+                    if let Some(listeners) = vm.fw.m8.prefs_listeners.get_mut(&recv) {
+                        listeners.retain(|registered| registered != listener);
+                    }
+                }
+                Ok(Some(Value::Null))
+            }
             ("edit", "()Landroid/content/SharedPreferences$Editor;") => {
                 let e = vm.heap.alloc_instance(
                     "Landroid/content/SharedPreferences$Editor;".to_string(),
                     Vec::new(),
                 )?;
+                crate::err::put_field_result(vm.heap.put_field(
+                    e,
+                    "mSharedPreferences",
+                    Value::Obj(recv),
+                ))?;
                 Ok(Some(Value::Obj(e)))
             }
             ("getAll", "()Ljava/util/Map;") => Ok(Some(Value::Obj(m8_prefs_get_all(vm)?))),
@@ -2619,6 +3446,50 @@ fn call_host_instance_rooted(
         (ACTIVITY, "getPackageName") | (CONTEXT, "getPackageName") if is_activity(vm) => {
             let s = vm.fw.package_name.clone();
             Ok(Some(Value::Obj(intrinsics::alloc_string(vm, s)?)))
+        }
+        (ACTIVITY, "getTitle") if is_activity(vm) => {
+            let key = (recv, "activity:title".to_string());
+            if let Some(title) = vm.view_props.get(&key).cloned() {
+                return Ok(Some(title));
+            }
+            let title = vm
+                .resources()
+                .ok()
+                .and_then(|apk| apk.manifest.application.label.clone())
+                .unwrap_or_else(|| vm.fw.package_name.clone());
+            Ok(Some(Value::Obj(intrinsics::alloc_string(vm, title)?)))
+        }
+        (ACTIVITY, "setTitle") if is_activity(vm) && sig == "(Ljava/lang/CharSequence;)V" => {
+            let title = args.first().cloned().unwrap_or(Value::Null);
+            vm.view_props
+                .insert((recv, "activity:title".to_string()), title);
+            Ok(Some(Value::Null))
+        }
+        (ACTIVITY, "setTitle") if is_activity(vm) && sig == "(I)V" => {
+            let resid = args.first().and_then(|v| v.as_int().ok()).unwrap_or(0) as u32;
+            let title = Value::Obj(intrinsics::alloc_string(vm, vm.resolve_string(resid)?)?);
+            vm.view_props
+                .insert((recv, "activity:title".to_string()), title);
+            Ok(Some(Value::Null))
+        }
+        (ACTIVITY, "getComponentName") if is_activity(vm) => {
+            let package = vm.fw.package_name.clone();
+            let class = recv_class
+                .trim_start_matches('L')
+                .trim_end_matches(';')
+                .replace('/', ".");
+            let component = vm
+                .heap
+                .alloc_instance("Landroid/content/ComponentName;".to_string(), Vec::new())?;
+            let package = intrinsics::alloc_string(vm, package)?;
+            let class = intrinsics::alloc_string(vm, class)?;
+            vm.invoke_instance(
+                component,
+                "<init>",
+                "(Ljava/lang/String;Ljava/lang/String;)V",
+                &[Value::Obj(package), Value::Obj(class)],
+            )?;
+            Ok(Some(Value::Obj(component)))
         }
         (ACTIVITY, "setContentView") | (ACTIVITY, "addContentView")
             if sig == "(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V" =>
@@ -2745,12 +3616,58 @@ fn call_host_instance_rooted(
         | (APPLICATION, "onCreate") => Ok(Some(Value::Null)),
 
         // ── View ────────────────────────────────────────────────────────────
+        ("Landroid/widget/OverScroller;", "<init>") => Ok(Some(Value::Null)),
         (VIEW, "<init>")
         | (VIEWGROUP, "<init>")
         | (LINEARLAYOUT, "<init>")
         | (FRAMELAYOUT, "<init>")
             if is_view(vm) =>
         {
+            Ok(Some(Value::Null))
+        }
+        _ if name == "<init>"
+            && is_view(vm)
+            && (mref_class.starts_with("Landroid/view/")
+                || mref_class.starts_with("Landroid/widget/")) =>
+        {
+            // Platform View subclasses are represented by the common host
+            // View state; constructor-specific rendering parameters are
+            // intentionally not modeled here.
+            Ok(Some(Value::Null))
+        }
+        ("Landroid/widget/ImageView;", "getDrawable") if is_view(vm) => {
+            // The headless view model does not decode Android Drawable
+            // resources; an unassigned image therefore starts as null.
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "saveAttributeDataForStyleable") if is_view(vm) => {
+            // API 29+: retained only for inspection/autofill diagnostics on
+            // Android; no-op in the headless host (the style values have
+            // already been consumed by the inflater/TypedArray model).
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "setWillNotDraw") if is_view(vm) => {
+            let value = args.first().cloned().unwrap_or(Value::Int(1));
+            vm.view_props
+                .insert((recv, "WillNotDraw".to_string()), value);
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "setBackground") | (VIEW, "setBackgroundDrawable") if is_view(vm) => {
+            let background = args.first().cloned().unwrap_or(Value::Null);
+            vm.view_props
+                .insert((recv, "view:background".to_string()), background);
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "getBackground") if is_view(vm) => Ok(Some(
+            vm.view_props
+                .get(&(recv, "view:background".to_string()))
+                .cloned()
+                .unwrap_or(Value::Null),
+        )),
+        (VIEW, "setBackgroundColor") if is_view(vm) => {
+            let color = args.first().cloned().unwrap_or(Value::Int(0));
+            vm.view_props
+                .insert((recv, "view:backgroundColor".to_string()), color);
             Ok(Some(Value::Null))
         }
         (VIEW, "setId") if is_view(vm) => {
@@ -2786,6 +3703,77 @@ fn call_host_instance_rooted(
             };
             Ok(Some(Value::Int(en as i32)))
         }
+        (VIEW, "setClickable") if is_view(vm) => {
+            let clickable = args
+                .first()
+                .ok_or_else(|| {
+                    crate::err::vm_error("INVALID_ARG", "setClickable requires a boolean")
+                })?
+                .as_int()?
+                != 0;
+            if let Some(HostObj::View {
+                clickable: state, ..
+            }) = vm.fw.objects.get_mut(&recv)
+            {
+                *state = clickable;
+            }
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "isClickable") if is_view(vm) => {
+            let clickable = match vm.fw.get(recv) {
+                Some(HostObj::View { clickable, .. }) => *clickable,
+                _ => false,
+            };
+            Ok(Some(Value::Int(clickable as i32)))
+        }
+        (VIEW, "setSelected") if is_view(vm) => {
+            let selected = args
+                .first()
+                .ok_or_else(|| {
+                    crate::err::vm_error("INVALID_ARG", "setSelected requires a boolean")
+                })?
+                .as_int()?
+                != 0;
+            if let Some(HostObj::View {
+                selected: state, ..
+            }) = vm.fw.objects.get_mut(&recv)
+            {
+                *state = selected;
+            }
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "isSelected") if is_view(vm) => {
+            let selected = match vm.fw.get(recv) {
+                Some(HostObj::View { selected, .. }) => *selected,
+                _ => false,
+            };
+            Ok(Some(Value::Int(selected as i32)))
+        }
+        (VIEW, "setActivated") if is_view(vm) => {
+            let activated = args
+                .first()
+                .ok_or_else(|| {
+                    crate::err::vm_error("INVALID_ARG", "setActivated requires a boolean")
+                })?
+                .as_int()?
+                != 0;
+            crate::err::put_field_result(vm.heap.put_field(
+                recv,
+                "mActivated",
+                Value::Int(i32::from(activated)),
+            ))?;
+            vm.fw.traversal_pending = true;
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "isActivated") if is_view(vm) => {
+            let activated = vm
+                .heap
+                .get_field(recv, "mActivated")
+                .unwrap_or(Value::Int(0))
+                .as_int()?
+                != 0;
+            Ok(Some(Value::Int(i32::from(activated))))
+        }
         (VIEW, "setVisibility") if is_view(vm) => {
             let v = args[0].as_int()?;
             if let Some(HostObj::View { vis, .. }) = vm.fw.objects.get_mut(&recv) {
@@ -2800,6 +3788,30 @@ fn call_host_instance_rooted(
             };
             Ok(Some(Value::Int(vis.to_java())))
         }
+        (VIEW, "setOnTouchListener")
+            if is_view(vm) && sig == "(Landroid/view/View$OnTouchListener;)V" =>
+        {
+            match args.first() {
+                Some(Value::Obj(listener)) => {
+                    vm.view_props.insert(
+                        (recv, VIEW_ON_TOUCH_LISTENER.to_string()),
+                        Value::Obj(*listener),
+                    );
+                }
+                Some(Value::Null | Value::Int(0)) | None => {
+                    vm.view_props
+                        .remove(&(recv, VIEW_ON_TOUCH_LISTENER.to_string()));
+                }
+                _ => {
+                    return Err(crate::err::vm_error(
+                        "INVALID_FORMAT",
+                        "setOnTouchListener: argumento não é objeto",
+                    )
+                    .into())
+                }
+            }
+            Ok(Some(Value::Null))
+        }
         (VIEW, "setOnClickListener") if is_view(vm) => {
             let listener = match args.first() {
                 Some(Value::Obj(l)) => Some(*l),
@@ -2812,8 +3824,16 @@ fn call_host_instance_rooted(
                     .into())
                 }
             };
-            if let Some(HostObj::View { click_listener, .. }) = vm.fw.objects.get_mut(&recv) {
+            if let Some(HostObj::View {
+                click_listener,
+                clickable,
+                ..
+            }) = vm.fw.objects.get_mut(&recv)
+            {
                 *click_listener = listener;
+                if listener.is_some() {
+                    *clickable = true;
+                }
             }
             Ok(Some(Value::Null))
         }
@@ -2842,35 +3862,351 @@ fn call_host_instance_rooted(
             };
             Ok(Some(Value::Int(h)))
         }
+        (VIEW, "getLayoutDirection" | "getResolvedLayoutDirection") if is_view(vm) => Ok(Some(
+            vm.heap
+                .get_field(recv, "mLayoutDirection")
+                .unwrap_or(Value::Int(0)),
+        )),
+        (VIEW, "setLayoutDirection") if is_view(vm) => {
+            let direction = args
+                .first()
+                .ok_or_else(|| {
+                    crate::err::vm_error("INVALID_ARG", "setLayoutDirection requires an int")
+                })?
+                .as_int()?;
+            crate::err::put_field_result(vm.heap.put_field(
+                recv,
+                "mLayoutDirection",
+                Value::Int(direction),
+            ))?;
+            vm.fw.traversal_pending = true;
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "getScrollX") if is_view(vm) => Ok(Some(Value::Int(
+            match vm.view_props.get(&(recv, "ScrollX".to_string())) {
+                Some(Value::Int(scroll_x)) => *scroll_x,
+                _ => 0,
+            },
+        ))),
+        (VIEW, "getScrollY") if is_view(vm) => Ok(Some(Value::Int(
+            match vm.view_props.get(&(recv, "ScrollY".to_string())) {
+                Some(Value::Int(scroll_y)) => *scroll_y,
+                _ => 0,
+            },
+        ))),
+        (VIEW, "scrollTo") if is_view(vm) && sig == "(II)V" => {
+            let x = args
+                .first()
+                .ok_or_else(|| crate::err::vm_error("INVALID_ARG", "scrollTo requires x"))?
+                .as_int()?;
+            let y = args
+                .get(1)
+                .ok_or_else(|| crate::err::vm_error("INVALID_ARG", "scrollTo requires y"))?
+                .as_int()?;
+            vm.view_props
+                .insert((recv, "ScrollX".to_string()), Value::Int(x));
+            vm.view_props
+                .insert((recv, "ScrollY".to_string()), Value::Int(y));
+            vm.fw.traversal_pending = true;
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "scrollBy") if is_view(vm) && sig == "(II)V" => {
+            for (index, property) in ["ScrollX", "ScrollY"].iter().enumerate() {
+                let delta = args
+                    .get(index)
+                    .ok_or_else(|| {
+                        crate::err::vm_error("INVALID_ARG", "scrollBy requires x and y")
+                    })?
+                    .as_int()?;
+                let key = (recv, (*property).to_string());
+                let current = match vm.view_props.get(&key) {
+                    Some(Value::Int(value)) => *value,
+                    _ => 0,
+                };
+                vm.view_props
+                    .insert(key, Value::Int(current.wrapping_add(delta)));
+            }
+            vm.fw.traversal_pending = true;
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "getOverScrollMode") if is_view(vm) => Ok(Some(
+            vm.view_props
+                .get(&(recv, "OverScrollMode".to_string()))
+                .cloned()
+                .unwrap_or(Value::Int(1)),
+        )),
+        (VIEW, "setOverScrollMode") if is_view(vm) => {
+            let mode = args
+                .first()
+                .ok_or_else(|| {
+                    crate::err::vm_error("INVALID_ARG", "setOverScrollMode requires a mode")
+                })?
+                .as_int()?;
+            if !(0..=2).contains(&mode) {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/IllegalArgumentException;",
+                    format!("Invalid overscroll mode: {mode}"),
+                )));
+            }
+            vm.view_props
+                .insert((recv, "OverScrollMode".to_string()), Value::Int(mode));
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "getMinimumWidth") if is_view(vm) => Ok(Some(
+            vm.heap
+                .get_field(recv, "mMinWidth")
+                .unwrap_or(Value::Int(0)),
+        )),
+        (VIEW, "setMinimumWidth") if is_view(vm) => {
+            let width = match args.first() {
+                Some(Value::Int(width)) => *width,
+                _ => 0,
+            };
+            crate::err::put_field_result(vm.heap.put_field(recv, "mMinWidth", Value::Int(width)))?;
+            vm.fw.traversal_pending = true;
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "getMinimumHeight") if is_view(vm) => Ok(Some(
+            vm.heap
+                .get_field(recv, "mMinHeight")
+                .unwrap_or(Value::Int(0)),
+        )),
+        (VIEW, "getSuggestedMinimumWidth") if is_view(vm) => Ok(Some(Value::Int(
+            suggested_minimum(vm, recv, "mMinWidth", "getMinimumWidth")?,
+        ))),
+        (VIEW, "getSuggestedMinimumHeight") if is_view(vm) => Ok(Some(Value::Int(
+            suggested_minimum(vm, recv, "mMinHeight", "getMinimumHeight")?,
+        ))),
+        (VIEW, "setMinimumHeight") if is_view(vm) => {
+            let height = match args.first() {
+                Some(Value::Int(height)) => *height,
+                _ => 0,
+            };
+            crate::err::put_field_result(vm.heap.put_field(
+                recv,
+                "mMinHeight",
+                Value::Int(height),
+            ))?;
+            vm.fw.traversal_pending = true;
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "getLayoutParams") if is_view(vm) => Ok(Some(
+            vm.heap
+                .get_field(recv, "mLayoutParams")
+                .unwrap_or(Value::Null),
+        )),
+        (VIEW, "setLayoutParams") if is_view(vm) => {
+            let params = match args.first() {
+                Some(Value::Null | Value::Int(0)) | None => Value::Null,
+                Some(value) => value.clone(),
+            };
+            crate::err::put_field_result(vm.heap.put_field(recv, "mLayoutParams", params))?;
+            vm.fw.traversal_pending = true;
+            Ok(Some(Value::Null))
+        }
 
         // ── TextView/Button ─────────────────────────────────────────────────
         (TEXTVIEW, "<init>") | (BUTTON, "<init>") if is_view(vm) => Ok(Some(Value::Null)),
         (TEXTVIEW, "setText") | (BUTTON, "setText") if is_view(vm) => {
-            let s = match args.first() {
-                Some(Value::Obj(sr)) => vm.heap.as_str(*sr)?.to_string(),
-                // M3.2: setText(int resId) resolve no resources.arsc
-                Some(Value::Int(resid)) => vm.resolve_string(*resid as u32)?,
-                _ => {
-                    return Err(crate::err::vm_error(
-                        "INVALID_FORMAT",
-                        "setText: argumento não é String nem resid",
-                    )
-                    .into())
+            let text = match sig {
+                "(I)V" | "(ILandroid/widget/TextView$BufferType;)V" => {
+                    // M3.2: setText(int resId) resolves only the resource-ID
+                    // overload; ID zero remains a genuine missing-resource error.
+                    let Some(Value::Int(resid)) = args.first() else {
+                        return Err(crate::err::vm_error(
+                            "INVALID_FORMAT",
+                            "setText(int): argument is not an int resource ID",
+                        )
+                        .into());
+                    };
+                    vm.resolve_string(*resid as u32)?
                 }
+                "(Ljava/lang/CharSequence;)V"
+                | "(Ljava/lang/CharSequence;Landroid/widget/TextView$BufferType;)V" => {
+                    match args.first() {
+                        Some(Value::Obj(value)) => match vm.heap.as_str(*value) {
+                            Ok(text) => text.to_string(),
+                            Err(_) => intrinsics::object_to_string(vm, *value)?,
+                        },
+                        // DEX commonly represents null object arguments as
+                        // Int(0); this is not the setText(int) resource overload.
+                        Some(Value::Null | Value::Int(0)) | None => String::new(),
+                        _ => {
+                            return Err(crate::err::vm_error(
+                                "INVALID_FORMAT",
+                                "setText(CharSequence): argument is not a reference",
+                            )
+                            .into())
+                        }
+                    }
+                }
+                _ => return Ok(None),
             };
-            vm.set_view_text(recv, s)?;
+            vm.set_view_text(recv, text)?;
             Ok(Some(Value::Null))
         }
         (TEXTVIEW, "getText") | (BUTTON, "getText") if is_view(vm) => {
             let s = vm.view_text(recv)?;
             Ok(Some(Value::Obj(intrinsics::alloc_string(vm, s)?)))
         }
+        (TEXTVIEW, "setMovementMethod")
+            if sig == "(Landroid/text/method/MovementMethod;)V" && is_view(vm) =>
+        {
+            let method = match args.first() {
+                Some(Value::Null | Value::Int(0)) | None => Value::Null,
+                Some(value) => value.clone(),
+            };
+            crate::err::put_field_result(vm.heap.put_field(recv, "movementMethod", method))?;
+            Ok(Some(Value::Null))
+        }
+        (TEXTVIEW, "getMovementMethod")
+            if sig == "()Landroid/text/method/MovementMethod;" && is_view(vm) =>
+        {
+            Ok(Some(
+                vm.heap
+                    .get_field(recv, "movementMethod")
+                    .unwrap_or(Value::Null),
+            ))
+        }
 
+        // ── View/ViewGroup measurement and layout ─────────────────────────
+        (VIEW, "getFitsSystemWindows") if sig == "()Z" && is_view(vm) => {
+            let fits = vm
+                .view_props
+                .get(&(recv, "fitsSystemWindows".to_string()))
+                .and_then(|value| value.as_int().ok())
+                .unwrap_or(0);
+            Ok(Some(Value::Int(i32::from(fits != 0))))
+        }
+        (VIEW, "setFitsSystemWindows") if sig == "(Z)V" && is_view(vm) => {
+            let fits = args
+                .first()
+                .and_then(|value| value.as_int().ok())
+                .unwrap_or(0);
+            vm.view_props.insert(
+                (recv, "fitsSystemWindows".to_string()),
+                Value::Int(i32::from(fits != 0)),
+            );
+            vm.fw.traversal_pending = true;
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "onMeasure") if sig == "(II)V" && is_view(vm) => {
+            let width_spec = args
+                .first()
+                .and_then(|value| value.as_int().ok())
+                .unwrap_or(0);
+            let height_spec = args
+                .get(1)
+                .and_then(|value| value.as_int().ok())
+                .unwrap_or(0);
+            let width_min = suggested_minimum(vm, recv, "mMinWidth", "getMinimumWidth")?;
+            let height_min = suggested_minimum(vm, recv, "mMinHeight", "getMinimumHeight")?;
+            let default_size = |spec: i32, minimum: i32| {
+                if spec & MEASURE_SPEC_MODE_MASK == 0 {
+                    minimum.max(0)
+                } else {
+                    spec & MEASURE_SPEC_SIZE_MASK
+                }
+            };
+            let (measured_width, measured_height) = if vm.cp.is_subtype(&recv_class, TEXTVIEW) {
+                // Unlike View's getDefaultSize, TextView measures its
+                // content under AT_MOST specs. Returning the entire bound
+                // here makes the first wrap-content child consume a
+                // ScrollView's viewport and pushes every later row off
+                // screen (seen in Primftpd's storage/access settings).
+                let text = vm.view_text(recv)?;
+                let (padding_left, padding_top, padding_right, padding_bottom) = (
+                    property_int(vm, recv, "paddingLeft", 0),
+                    property_int(vm, recv, "paddingTop", 0),
+                    property_int(vm, recv, "paddingRight", 0),
+                    property_int(vm, recv, "paddingBottom", 0),
+                );
+                let horizontal_padding = padding_left.saturating_add(padding_right);
+                let vertical_padding = padding_top.saturating_add(padding_bottom);
+                let max_chars =
+                    ((width_spec & MEASURE_SPEC_SIZE_MASK).saturating_sub(horizontal_padding) / 16)
+                        .max(1) as usize;
+                let mut lines = 0usize;
+                let mut widest_line = 0usize;
+                for line in text.split('\n') {
+                    let chars = line.chars().count();
+                    widest_line = widest_line.max(chars.min(max_chars));
+                    lines = lines.saturating_add(chars.max(1).div_ceil(max_chars));
+                }
+                let text_width = (widest_line as i32)
+                    .saturating_mul(16)
+                    .saturating_add(horizontal_padding)
+                    .max(width_min);
+                let text_height = (lines.max(1) as i32)
+                    .saturating_mul(ROW_H)
+                    .saturating_add(vertical_padding)
+                    .max(height_min);
+                (
+                    resolve_measure_size(text_width, width_spec),
+                    resolve_measure_size(text_height, height_spec),
+                )
+            } else if vm
+                .cp
+                .is_subtype(&recv_class, "Landroid/widget/ProgressBar;")
+            {
+                // Platform ProgressBar has its own intrinsic drawable size.
+                // The generic View default would otherwise expand a
+                // wrap-content spinner to the entire AT_MOST viewport.
+                let intrinsic = ROW_H;
+                (
+                    resolve_measure_size(intrinsic.max(width_min), width_spec),
+                    resolve_measure_size(intrinsic.max(height_min), height_spec),
+                )
+            } else {
+                (
+                    default_size(width_spec, width_min),
+                    default_size(height_spec, height_min),
+                )
+            };
+            vm.view_props.insert(
+                (recv, "MeasuredWidth".to_string()),
+                Value::Int(measured_width),
+            );
+            vm.view_props.insert(
+                (recv, "MeasuredHeight".to_string()),
+                Value::Int(measured_height),
+            );
+            Ok(Some(Value::Null))
+        }
+        (VIEW, "onLayout") if sig == "(ZIIII)V" && is_view(vm) => Ok(Some(Value::Null)),
         // ── ViewGroup/LinearLayout/FrameLayout ─────────────────────────────
+        (
+            FRAMELAYOUT | "Landroid/widget/HorizontalScrollView;" | "Landroid/widget/ScrollView;",
+            "onMeasure",
+        ) if sig == "(II)V" && is_view(vm) => frame_layout_on_measure(vm, recv, args),
+        (LINEARLAYOUT, "onMeasure") if sig == "(II)V" && is_view(vm) => {
+            linear_layout_on_measure(vm, recv, args)
+        }
+        (
+            FRAMELAYOUT | "Landroid/widget/HorizontalScrollView;" | "Landroid/widget/ScrollView;",
+            "onLayout",
+        ) if sig == "(ZIIII)V" && is_view(vm) => frame_layout_on_layout(vm, recv, args),
+        (LINEARLAYOUT, "onLayout") if sig == "(ZIIII)V" && is_view(vm) => {
+            linear_layout_on_layout(vm, recv, args)
+        }
+        (VIEWGROUP, "measureChildWithMargins") if sig == "(Landroid/view/View;IIII)V" => {
+            measure_child_with_margins(vm, recv, args)
+        }
+        (VIEWGROUP, "checkLayoutParams") if sig == "(Landroid/view/ViewGroup$LayoutParams;)Z" => {
+            // ViewGroup's AOSP default accepts any non-null LayoutParams;
+            // subclasses such as Toolbar may override with a stricter check.
+            let valid = args
+                .first()
+                .is_some_and(|value| !matches!(value, Value::Null | Value::Int(0)));
+            Ok(Some(Value::Int(valid as i32)))
+        }
         (VIEWGROUP, "addView") | (LINEARLAYOUT, "addView") | (FRAMELAYOUT, "addView") => {
             let Some(Value::Obj(child)) = args.first() else {
                 return Err(crate::err::vm_error("INVALID_FORMAT", "addView sem view").into());
             };
+            if let Some(params) = explicit_layout_params(vm, args) {
+                crate::err::put_field_result(vm.heap.put_field(*child, "mLayoutParams", params))?;
+            }
             add_child(vm, recv, *child)?;
             Ok(Some(Value::Null))
         }
@@ -2961,6 +4297,17 @@ fn call_host_instance_rooted(
             }
             Ok(Some(Value::Null))
         }
+        (LINEARLAYOUT, "setGravity") if is_view(vm) && sig == "(I)V" => {
+            vm.view_props
+                .insert((recv, "linearLayout:gravity".to_string()), args[0].clone());
+            Ok(Some(Value::Null))
+        }
+        (LINEARLAYOUT, "getGravity") if is_view(vm) && sig == "()I" => Ok(Some(
+            vm.view_props
+                .get(&(recv, "linearLayout:gravity".to_string()))
+                .cloned()
+                .unwrap_or(Value::Int(0x0080_0033)),
+        )),
 
         // ── Handler ────────────────────────────────────────────────────────
         (HANDLER, "<init>") => {
@@ -3123,23 +4470,75 @@ fn call_host_instance_rooted(
 
 // ── helpers da dispatch ──────────────────────────────────────────────────────
 
-/// M8 full: aplica um Editor de SharedPreferences (commit/apply síncronos).
-fn apply_prefs_editor(vm: &mut Engine, editor: ObjRef) {
+/// M8 full: applies an Editor synchronously, then notifies each registered
+/// SharedPreferences listener once per key whose final value actually changed.
+fn apply_prefs_editor(vm: &mut Engine, editor: ObjRef) -> Result<(), VmExit> {
+    let mut changed_keys = Vec::new();
     if vm.fw.m8.prefs_clear.remove(&editor).unwrap_or(false) {
-        vm.fw.m8.prefs.clear();
+        let mut removed: Vec<String> = vm.fw.m8.prefs.keys().cloned().collect();
+        removed.sort(); // deterministic callback order for clear()
+        for key in removed {
+            vm.fw.m8.prefs.remove(&key);
+            changed_keys.push(key);
+        }
     }
     if let Some(edits) = vm.fw.m8.prefs_editors.remove(&editor) {
-        for (k, v) in edits {
-            match v {
-                Some(val) => {
-                    vm.fw.m8.prefs.insert(k, val);
+        // Editor.putX/remove are last-write-wins per key before commit/apply.
+        let mut final_edits: Vec<(String, Option<Value>)> = Vec::new();
+        for (key, value) in edits {
+            if let Some((_, previous)) = final_edits.iter_mut().find(|(k, _)| *k == key) {
+                *previous = value;
+            } else {
+                final_edits.push((key, value));
+            }
+        }
+        for (key, value) in final_edits {
+            let changed = match value.as_ref() {
+                Some(next) => match vm.fw.m8.prefs.get(&key) {
+                    Some(current) => !crate::intrinsics::values_equal(&vm.heap, current, next)?,
+                    None => true,
+                },
+                None => vm.fw.m8.prefs.contains_key(&key),
+            };
+            if changed {
+                match value {
+                    Some(value) => {
+                        vm.fw.m8.prefs.insert(key.clone(), value);
+                    }
+                    None => {
+                        vm.fw.m8.prefs.remove(&key);
+                    }
                 }
-                None => {
-                    vm.fw.m8.prefs.remove(&k);
+                if !changed_keys.contains(&key) {
+                    changed_keys.push(key);
                 }
             }
         }
     }
+
+    let prefs = match vm.heap.get_field(editor, "mSharedPreferences") {
+        Ok(Value::Obj(prefs)) => prefs,
+        _ => vm.shared_prefs_obj()?,
+    };
+    let listeners = vm
+        .fw
+        .m8
+        .prefs_listeners
+        .get(&prefs)
+        .cloned()
+        .unwrap_or_default();
+    for key in changed_keys {
+        let key_ref = intrinsics::alloc_string(vm, key)?;
+        for listener in &listeners {
+            vm.invoke_instance(
+                *listener,
+                "onSharedPreferenceChanged",
+                "(Landroid/content/SharedPreferences;Ljava/lang/String;)V",
+                &[Value::Obj(prefs), Value::Obj(key_ref)],
+            )?;
+        }
+    }
+    Ok(())
 }
 
 /// M8 full: `getAll()` — HashMap host com chaves String reais alocadas.
@@ -3189,6 +4588,9 @@ pub(crate) fn ensure_window(vm: &mut Engine, activity: ObjRef) -> Result<ObjRef,
         .heap
         .alloc_instance("Landroid/view/Window;".to_string(), Vec::new())?;
     vm.fw.objects.insert(w, HostObj::Window { content: None });
+    // PhoneWindow starts with its owning Activity as the Window.Callback.
+    vm.view_props
+        .insert((w, "win:callback".to_string()), Value::Obj(activity));
     if let Some(HostObj::Activity { window, .. }) = vm.fw.objects.get_mut(&activity) {
         *window = Some(w);
     }
@@ -3235,7 +4637,44 @@ pub(crate) fn attach_child(vm: &mut Engine, parent: ObjRef, child: ObjRef) -> Re
     crate::view_attach::on_child_added(vm, parent, child)
 }
 
+fn ensure_child_layout_params(
+    vm: &mut Engine,
+    parent: ObjRef,
+    child: ObjRef,
+) -> Result<(), VmExit> {
+    if matches!(vm.heap.get_field(child, "mLayoutParams"), Ok(Value::Obj(_))) {
+        return Ok(());
+    }
+    let params = vm.invoke_instance(
+        parent,
+        "generateDefaultLayoutParams",
+        "()Landroid/view/ViewGroup$LayoutParams;",
+        &[],
+    )?;
+    if matches!(params, Value::Null | Value::Int(0)) {
+        return Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/IllegalArgumentException;",
+            "ViewGroup.generateDefaultLayoutParams() returned null",
+        )));
+    }
+    crate::err::put_field_result(vm.heap.put_field(child, "mLayoutParams", params))?;
+    Ok(())
+}
+
+fn explicit_layout_params(vm: &Engine, args: &[Value]) -> Option<Value> {
+    args.iter().skip(1).find_map(|value| {
+        let Value::Obj(params) = value else {
+            return None;
+        };
+        let class = vm.heap.class_of(*params).ok()?;
+        vm.cp
+            .is_subtype(class, "Landroid/view/ViewGroup$LayoutParams;")
+            .then(|| value.clone())
+    })
+}
+
 pub(crate) fn add_child(vm: &mut Engine, parent: ObjRef, child: ObjRef) -> Result<(), VmExit> {
+    ensure_child_layout_params(vm, parent, child)?;
     attach_child(vm, parent, child)?;
     // re-layout do container na sua posição corrente — addView PROGRAMÁTICO
     // (pós-setContentView): O(N) por chamada, não cumulativo (issue #45)
@@ -3501,6 +4940,7 @@ impl Engine {
                     h,
                     vis,
                     enabled,
+                    clickable,
                     text,
                     click_listener,
                     click_method,
@@ -3527,7 +4967,7 @@ impl Engine {
                         (*x, *y, *w, *h),
                         *vis,
                         *enabled,
-                        click_listener.is_some() || click_method.is_some(),
+                        *clickable || click_listener.is_some() || click_method.is_some(),
                     )
                 }
                 _ => (

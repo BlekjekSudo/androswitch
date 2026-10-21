@@ -241,6 +241,8 @@ fn md5(input: &[u8]) -> [u8; 16] {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write as _;
+
     use super::*;
     #[test]
     fn roundtrip_and_md5() {
@@ -248,9 +250,10 @@ mod tests {
         let (m, l) = parse_uuid(s).unwrap();
         assert_eq!(format_uuid(m, l), s);
         let h = md5(b"");
-        assert_eq!(
-            h.iter().map(|b| format!("{b:02x}")).collect::<String>(),
-            "d41d8cd98f00b204e9800998ecf8427e"
-        );
+        let mut hex = String::with_capacity(h.len() * 2);
+        for byte in h {
+            write!(&mut hex, "{byte:02x}").expect("writing to String cannot fail");
+        }
+        assert_eq!(hex, "d41d8cd98f00b204e9800998ecf8427e");
     }
 }

@@ -38,6 +38,39 @@ pub(crate) fn new_list(vm: &mut Engine, class: &str, elems: Vec<Value>) -> Resul
     Ok(Value::Obj(r))
 }
 
+/// Materialize JDK `Collections.EMPTY_*` fields on first `sget-object`.
+/// AndroidX FragmentStore uses EMPTY_LIST as the no-fragments result; a null
+/// fallback is not equivalent because callers immediately iterate it.
+pub(crate) fn host_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+) -> Result<Option<Value>, VmExit> {
+    if class != "Ljava/util/Collections;" {
+        return Ok(None);
+    }
+    let (class, state) = match name {
+        "EMPTY_LIST" => (
+            "Ljava/util/Collections$SingletonList;",
+            HostObj::List { elems: Vec::new() },
+        ),
+        "EMPTY_SET" | "EMPTY_SORTED_SET" => (
+            "Ljava/util/Collections$UnmodifiableSet;",
+            HostObj::List { elems: Vec::new() },
+        ),
+        "EMPTY_MAP" | "EMPTY_SORTED_MAP" => (
+            "Ljava/util/Collections$UnmodifiableMap;",
+            HostObj::Map {
+                entries: Vec::new(),
+            },
+        ),
+        _ => return Ok(None),
+    };
+    let r = vm.heap.alloc_instance(class.to_string(), Vec::new())?;
+    vm.fw.objects.insert(r, state);
+    Ok(Some(Value::Obj(r)))
+}
+
 pub(crate) fn static_intrinsic(
     vm: &mut Engine,
     class: &str,

@@ -266,6 +266,16 @@ pub(crate) fn fallback(
         ("performHapticFeedback", _) => return Ok(Some(Value::Int(0))),
         _ => {}
     }
+    if name == "willNotDraw" && sig == "()Z" && args.is_empty() {
+        if let Some(value) = vm.view_props.get(&(recv, "WillNotDraw".to_string())) {
+            return Ok(Some(value.clone()));
+        }
+        // Android ViewGroup defaults to skipping its own onDraw; plain View
+        // does not. An explicit setWillNotDraw call is stored above/below.
+        return Ok(Some(Value::Int(
+            vm.cp.is_subtype(mref_class, "Landroid/view/ViewGroup;") as i32,
+        )));
+    }
     if let Some(prop) = name.strip_prefix("set") {
         if ret == "V" && args.len() == 1 && prop.starts_with(|c: char| c.is_ascii_uppercase()) {
             vm.view_props

@@ -584,13 +584,69 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroid/view/View;",
         "Ljava/lang/Object;",
     ];
+    const VIEWGROUP_LAYOUT_PARAMS: &[&str] = &[
+        "Landroid/view/ViewGroup$LayoutParams;",
+        "Ljava/lang/Object;",
+    ];
+    const MARGIN_LAYOUT_PARAMS: &[&str] = &[
+        "Landroid/view/ViewGroup$MarginLayoutParams;",
+        "Landroid/view/ViewGroup$LayoutParams;",
+        "Ljava/lang/Object;",
+    ];
+    const LINEAR_LAYOUT_PARAMS: &[&str] = &[
+        "Landroid/widget/LinearLayout$LayoutParams;",
+        "Landroid/view/ViewGroup$MarginLayoutParams;",
+        "Landroid/view/ViewGroup$LayoutParams;",
+        "Ljava/lang/Object;",
+    ];
+    const FRAME_LAYOUT_PARAMS: &[&str] = &[
+        "Landroid/widget/FrameLayout$LayoutParams;",
+        "Landroid/view/ViewGroup$MarginLayoutParams;",
+        "Landroid/view/ViewGroup$LayoutParams;",
+        "Ljava/lang/Object;",
+    ];
+    const RELATIVE_LAYOUT_PARAMS: &[&str] = &[
+        "Landroid/widget/RelativeLayout$LayoutParams;",
+        "Landroid/view/ViewGroup$MarginLayoutParams;",
+        "Landroid/view/ViewGroup$LayoutParams;",
+        "Ljava/lang/Object;",
+    ];
     const TEXTVIEW: &[&str] = &[
         "Landroid/widget/TextView;",
         "Landroid/view/View;",
         "Ljava/lang/Object;",
     ];
+    const IMAGEVIEW: &[&str] = &[
+        "Landroid/widget/ImageView;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const IMAGEBUTTON: &[&str] = &[
+        "Landroid/widget/ImageButton;",
+        "Landroid/widget/ImageView;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const PROGRESSBAR: &[&str] = &[
+        "Landroid/widget/ProgressBar;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
     const BUTTON: &[&str] = &[
         "Landroid/widget/Button;",
+        "Landroid/widget/TextView;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const COMPOUND_BUTTON: &[&str] = &[
+        "Landroid/widget/CompoundButton;",
+        "Landroid/widget/TextView;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const RADIO_BUTTON: &[&str] = &[
+        "Landroid/widget/RadioButton;",
+        "Landroid/widget/CompoundButton;",
         "Landroid/widget/TextView;",
         "Landroid/view/View;",
         "Ljava/lang/Object;",
@@ -601,8 +657,106 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroid/view/View;",
         "Ljava/lang/Object;",
     ];
+    const RADIO_GROUP: &[&str] = &[
+        "Landroid/widget/RadioGroup;",
+        "Landroid/widget/LinearLayout;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
     const FRAMELAYOUT: &[&str] = &[
         "Landroid/widget/FrameLayout;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const SCROLL_VIEW: &[&str] = &[
+        "Landroid/widget/ScrollView;",
+        "Landroid/widget/FrameLayout;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const HORIZONTAL_SCROLL_VIEW: &[&str] = &[
+        "Landroid/widget/HorizontalScrollView;",
+        "Landroid/widget/FrameLayout;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const RELATIVE_LAYOUT: &[&str] = &[
+        "Landroid/widget/RelativeLayout;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const TABLE_LAYOUT: &[&str] = &[
+        "Landroid/widget/TableLayout;",
+        "Landroid/widget/LinearLayout;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const TABLE_ROW: &[&str] = &[
+        "Landroid/widget/TableRow;",
+        "Landroid/widget/LinearLayout;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const ADAPTER_VIEW: &[&str] = &[
+        "Landroid/widget/AdapterView;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const ABS_LIST_VIEW: &[&str] = &[
+        "Landroid/widget/AbsListView;",
+        "Landroid/widget/AdapterView;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const LIST_VIEW: &[&str] = &[
+        "Landroid/widget/ListView;",
+        "Landroid/widget/AbsListView;",
+        "Landroid/widget/AdapterView;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const GRID_VIEW: &[&str] = &[
+        "Landroid/widget/GridView;",
+        "Landroid/widget/AbsListView;",
+        "Landroid/widget/AdapterView;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const SPINNER: &[&str] = &[
+        "Landroid/widget/Spinner;",
+        "Landroid/widget/AbsSpinner;",
+        "Landroid/widget/AdapterView;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const ABS_SPINNER: &[&str] = &[
+        "Landroid/widget/AbsSpinner;",
+        "Landroid/widget/AdapterView;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const WEB_VIEW: &[&str] = &[
+        "Landroid/webkit/WebView;",
+        "Landroid/widget/AbsoluteLayout;",
+        "Landroid/view/ViewGroup;",
+        "Landroid/view/View;",
+        "Ljava/lang/Object;",
+    ];
+    const ABSOLUTE_LAYOUT: &[&str] = &[
+        "Landroid/widget/AbsoluteLayout;",
         "Landroid/view/ViewGroup;",
         "Landroid/view/View;",
         "Ljava/lang/Object;",
@@ -818,6 +972,10 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         // M8: Fragment legacy (32º gap real) — super das fragments do app.
         "Landroid/app/Fragment;" => Some(OBJECT),
         "Landroid/content/Intent;" => Some(OBJECT),
+        // java.util time types used by Logback's rolling-file initialization.
+        "Ljava/util/Calendar;" => Some(OBJECT),
+        "Ljava/util/GregorianCalendar;" => Some(&["Ljava/util/Calendar;", "Ljava/lang/Object;"]),
+        "Ljava/util/TimeZone;" => Some(OBJECT),
         // ── M8 full scope ─────────────────────────────────────────────
         "Landroid/app/Dialog;" => Some(OBJECT),
         "Landroid/app/AlertDialog;" => Some(&["Landroid/app/Dialog;", "Ljava/lang/Object;"]),
@@ -825,7 +983,9 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroid/database/sqlite/SQLiteDatabase;" => Some(OBJECT),
         "Landroid/database/sqlite/SQLiteOpenHelper;" => Some(OBJECT),
         // jtext_format
-        "Ljava/text/Format;" | "Ljava/text/DecimalFormatSymbols;" => Some(OBJECT),
+        "Ljava/text/Format;"
+        | "Ljava/text/DecimalFormatSymbols;"
+        | "Ljava/text/DateFormatSymbols;" => Some(OBJECT),
         "Ljava/text/NumberFormat;" => Some(&["Ljava/text/Format;", "Ljava/lang/Object;"]),
         "Ljava/text/DecimalFormat;" => Some(&[
             "Ljava/text/NumberFormat;",
@@ -856,6 +1016,18 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             Some(&["Landroid/graphics/ColorSpace;", "Ljava/lang/Object;"])
         }
         "Landroid/text/SpannableString;" | "Landroid/text/SpannableStringBuilder;" => Some(OBJECT),
+        "Landroid/text/style/CharacterStyle;" => Some(OBJECT),
+        "Landroid/text/style/MetricAffectingSpan;" => {
+            Some(&["Landroid/text/style/CharacterStyle;", "Ljava/lang/Object;"])
+        }
+        "Landroid/text/style/ReplacementSpan;" => Some(&[
+            "Landroid/text/style/MetricAffectingSpan;",
+            "Landroid/text/style/CharacterStyle;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/text/style/ClickableSpan;" | "Landroid/text/style/UnderlineSpan;" => {
+            Some(&["Landroid/text/style/CharacterStyle;", "Ljava/lang/Object;"])
+        }
         "Landroid/content/pm/PackageManager;"
         | "Landroid/view/Display;"
         | "Landroid/content/pm/PackageInfo;"
@@ -875,7 +1047,27 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         ]),
         "Ljava/nio/charset/Charset;" | "Ljava/util/UUID;" => Some(OBJECT),
         // jio_chars
-        "Ljava/io/Writer;" | "Ljava/io/Reader;" => Some(OBJECT),
+        "Ljava/io/Writer;"
+        | "Ljava/io/Reader;"
+        | "Ljava/io/OutputStream;"
+        | "Ljava/io/InputStream;" => Some(OBJECT),
+        "Ljava/io/FilterOutputStream;" => Some(&["Ljava/io/OutputStream;", "Ljava/lang/Object;"]),
+        "Ljava/io/BufferedOutputStream;" => Some(&[
+            "Ljava/io/FilterOutputStream;",
+            "Ljava/io/OutputStream;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/io/BufferedInputStream;" => Some(&[
+            "Ljava/io/FilterInputStream;",
+            "Ljava/io/InputStream;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/io/FilterInputStream;" => Some(&["Ljava/io/InputStream;", "Ljava/lang/Object;"]),
+        "Ljava/io/PrintStream;" => Some(&[
+            "Ljava/io/FilterOutputStream;",
+            "Ljava/io/OutputStream;",
+            "Ljava/lang/Object;",
+        ]),
         "Ljava/io/StringWriter;"
         | "Ljava/io/OutputStreamWriter;"
         | "Ljava/io/BufferedWriter;"
@@ -955,12 +1147,37 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroid/os/Handler;" => Some(OBJECT),
         "Landroid/os/Looper;" => Some(OBJECT),
         "Landroid/view/Window;" => Some(OBJECT),
+        "Landroid/view/ViewGroup$LayoutParams;" => Some(VIEWGROUP_LAYOUT_PARAMS),
+        "Landroid/view/ViewGroup$MarginLayoutParams;" => Some(MARGIN_LAYOUT_PARAMS),
+        "Landroid/widget/LinearLayout$LayoutParams;" => Some(LINEAR_LAYOUT_PARAMS),
+        "Landroid/widget/FrameLayout$LayoutParams;" => Some(FRAME_LAYOUT_PARAMS),
+        "Landroid/widget/RelativeLayout$LayoutParams;" => Some(RELATIVE_LAYOUT_PARAMS),
         "Landroid/view/View;" => Some(VIEW),
         "Landroid/view/ViewGroup;" => Some(VIEWGROUP),
         "Landroid/widget/TextView;" => Some(TEXTVIEW),
+        "Landroid/widget/ImageView;" => Some(IMAGEVIEW),
+        "Landroid/widget/ImageButton;" => Some(IMAGEBUTTON),
+        "Landroid/widget/ProgressBar;" => Some(PROGRESSBAR),
+        "Landroid/widget/CompoundButton;" => Some(COMPOUND_BUTTON),
+        "Landroid/widget/RadioButton;" => Some(RADIO_BUTTON),
         "Landroid/widget/Button;" => Some(BUTTON),
         "Landroid/widget/LinearLayout;" => Some(LINEARLAYOUT),
+        "Landroid/widget/RadioGroup;" => Some(RADIO_GROUP),
         "Landroid/widget/FrameLayout;" => Some(FRAMELAYOUT),
+        "Landroid/widget/ScrollView;" => Some(SCROLL_VIEW),
+        "Landroid/widget/HorizontalScrollView;" => Some(HORIZONTAL_SCROLL_VIEW),
+        "Landroid/widget/RelativeLayout;" => Some(RELATIVE_LAYOUT),
+        "Landroid/widget/TableLayout;" => Some(TABLE_LAYOUT),
+        "Landroid/widget/TableRow;" => Some(TABLE_ROW),
+        "Landroid/widget/AdapterView;" => Some(ADAPTER_VIEW),
+        "Landroid/widget/AbsListView;" => Some(ABS_LIST_VIEW),
+        "Landroid/widget/ListView;" | "Landroid/widget/ExpandableListView;" => Some(LIST_VIEW),
+        "Landroid/widget/GridView;" => Some(GRID_VIEW),
+        "Landroid/widget/AbsSpinner;" => Some(ABS_SPINNER),
+        "Landroid/widget/Spinner;" => Some(SPINNER),
+        "Landroid/widget/AbsoluteLayout;" => Some(ABSOLUTE_LAYOUT),
+        "Landroid/webkit/WebView;" => Some(WEB_VIEW),
+        "Landroid/view/ViewStub;" => Some(VIEW),
         // ── M8: classes host do compat real (cadeia completa de ancestrais) ──
         "Ljava/util/AbstractCollection;" => Some(OBJECT),
         "Ljava/util/AbstractList;" => {
@@ -1012,6 +1229,19 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/util/AbstractCollection;",
             "Ljava/lang/Object;",
         ]),
+        // Vector/Stack share list storage intrinsics but retain their JDK
+        // inheritance chain for guest check-cast and instanceof operations.
+        "Ljava/util/Vector;" => Some(&[
+            "Ljava/util/AbstractList;",
+            "Ljava/util/AbstractCollection;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/util/Stack;" => Some(&[
+            "Ljava/util/Vector;",
+            "Ljava/util/AbstractList;",
+            "Ljava/util/AbstractCollection;",
+            "Ljava/lang/Object;",
+        ]),
         "Ljava/util/LinkedList;" => Some(&[
             "Ljava/util/AbstractSequentialList;",
             "Ljava/util/AbstractList;",
@@ -1039,6 +1269,16 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         | "Ljava/lang/Float;"
         | "Ljava/lang/Double;" => Some(&["Ljava/lang/Number;", "Ljava/lang/Object;"]),
         "Ljava/lang/Boolean;" | "Ljava/lang/Character;" => Some(OBJECT),
+        "Ljava/util/concurrent/AbstractExecutorService;" => Some(OBJECT),
+        "Ljava/util/concurrent/ForkJoinPool;" => Some(&[
+            "Ljava/util/concurrent/AbstractExecutorService;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/text/method/BaseMovementMethod;" => Some(OBJECT),
+        "Landroid/text/method/LinkMovementMethod;" => Some(&[
+            "Landroid/text/method/BaseMovementMethod;",
+            "Ljava/lang/Object;",
+        ]),
         "Ljava/lang/Thread;" => Some(OBJECT),
         "Ljava/lang/ThreadLocal;" => Some(OBJECT),
         "Ljava/lang/InheritableThreadLocal;" => {
@@ -1096,6 +1336,20 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         "Ljava/util/Collection;",
         "Ljava/lang/Iterable;",
     ];
+    const VECTOR_IFACES: &[&str] = &[
+        "Ljava/util/List;",
+        "Ljava/util/Collection;",
+        "Ljava/lang/Iterable;",
+        "Ljava/util/RandomAccess;",
+        "Ljava/lang/Cloneable;",
+        "Ljava/io/Serializable;",
+    ];
+    const TIMEZONE_IFACES: &[&str] = &["Ljava/lang/Cloneable;", "Ljava/io/Serializable;"];
+    const CALENDAR_IFACES: &[&str] = &[
+        "Ljava/lang/Cloneable;",
+        "Ljava/io/Serializable;",
+        "Ljava/lang/Comparable;",
+    ];
     const MAP_IFACES: &[&str] = &["Ljava/util/Map;"];
     match class {
         "Ljava/lang/String;" => Some(STRING_IFACES),
@@ -1105,7 +1359,8 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         "Ljava/text/Format;"
         | "Ljava/text/NumberFormat;"
         | "Ljava/text/DecimalFormat;"
-        | "Ljava/text/DecimalFormatSymbols;" => {
+        | "Ljava/text/DecimalFormatSymbols;"
+        | "Ljava/text/DateFormatSymbols;" => {
             Some(&["Ljava/lang/Cloneable;", "Ljava/io/Serializable;"])
         }
         "Ljava/nio/charset/Charset;" => Some(&["Ljava/lang/Comparable;"]),
@@ -1138,6 +1393,9 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Landroid/text/GetChars;",
             "Ljava/lang/Appendable;",
         ]),
+        "Landroid/text/method/BaseMovementMethod;" | "Landroid/text/method/LinkMovementMethod;" => {
+            Some(&["Landroid/text/method/MovementMethod;"])
+        }
         "Landroid/content/ComponentName;" => Some(&[
             "Landroid/os/Parcelable;",
             "Ljava/lang/Cloneable;",
@@ -1191,6 +1449,16 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         "Ljava/io/FileOutputStream;" | "Ljava/io/FileInputStream;" => {
             Some(&["Ljava/io/Closeable;", "Ljava/lang/AutoCloseable;"])
         }
+        "Ljava/io/BufferedOutputStream;"
+        | "Ljava/io/BufferedInputStream;"
+        | "Ljava/io/FilterOutputStream;"
+        | "Ljava/io/FilterInputStream;"
+        | "Ljava/io/OutputStream;"
+        | "Ljava/io/InputStream;" => Some(&[
+            "Ljava/io/Closeable;",
+            "Ljava/io/Flushable;",
+            "Ljava/lang/AutoCloseable;",
+        ]),
         "Ljava/nio/channels/FileLock;" => Some(&["Ljava/lang/AutoCloseable;"]),
         // host XML resource parser (xml_res.rs) is a pull parser + AttributeSet
         "Landroid/content/res/XmlResourceParser;" => Some(&[
@@ -1198,11 +1466,17 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Landroid/util/AttributeSet;",
             "Ljava/lang/AutoCloseable;",
         ]),
+        // java.util time classes inherit these standard JDK interfaces.
+        "Ljava/util/Calendar;" | "Ljava/util/GregorianCalendar;" => Some(CALENDAR_IFACES),
+        "Ljava/util/TimeZone;" => Some(TIMEZONE_IFACES),
         // ── M8: interfaces das classes host do compat real ──
         "Ljava/util/AbstractCollection;" => Some(COLL),
         // JDK collection interfaces: super-interface closure, so a DEX class
         // implementing Set/List/Queue/… is a Collection/Iterable (check-cast)
         "Ljava/util/Collection;" => Some(&["Ljava/lang/Iterable;"]),
+        // AOSP/JDK: ListIterator extends Iterator; Kotlin's EmptyIterator
+        // implements ListIterator and is returned as java.util.Iterator.
+        "Ljava/util/ListIterator;" => Some(&["Ljava/util/Iterator;"]),
         "Ljava/util/Set;" | "Ljava/util/List;" | "Ljava/util/Queue;" => Some(COLL),
         "Ljava/util/Deque;" | "Ljava/util/concurrent/BlockingQueue;" => Some(&[
             "Ljava/util/Queue;",
@@ -1288,6 +1562,7 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",
         ]),
+        "Ljava/util/Vector;" | "Ljava/util/Stack;" => Some(VECTOR_IFACES),
         "Ljava/util/LinkedList;" => Some(&[
             "Ljava/util/List;",
             "Ljava/util/Collection;",
@@ -1350,6 +1625,11 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         | "Ljava/util/concurrent/atomic/AtomicInteger;"
         | "Ljava/util/concurrent/atomic/AtomicLong;"
         | "Ljava/util/concurrent/atomic/AtomicBoolean;" => Some(&["Ljava/io/Serializable;"]),
+        "Ljava/util/concurrent/AbstractExecutorService;"
+        | "Ljava/util/concurrent/ForkJoinPool;" => Some(&[
+            "Ljava/util/concurrent/ExecutorService;",
+            "Ljava/util/concurrent/Executor;",
+        ]),
         "Ljava/util/concurrent/ExecutorService;" => Some(&["Ljava/util/concurrent/Executor;"]),
         "Ljava/util/ServiceLoader;" => Some(&["Ljava/lang/Iterable;"]),
         "Ljava/math/BigDecimal;" | "Ljava/math/BigInteger;" => {
@@ -1672,6 +1952,8 @@ mod tests {
     #[test]
     fn host_collections_subtype_their_interfaces() {
         let cp = Classpath::new(Vec::new());
+        // Kotlin EmptyIterator implements ListIterator and is cast to Iterator.
+        assert!(cp.is_subtype("Ljava/util/ListIterator;", "Ljava/util/Iterator;"));
         // Set concorrente <: Set <: Collection <: Iterable <: Object
         assert!(cp.is_subtype(
             "Ljava/util/concurrent/CopyOnWriteArraySet;",
@@ -1689,6 +1971,12 @@ mod tests {
             "Ljava/util/concurrent/CopyOnWriteArrayList;",
             "Ljava/util/List;"
         ));
+        // Logback's Joran interpreter stores nested configuration actions in
+        // Vector; it must satisfy the List check-cast used by its DEX code.
+        assert!(cp.is_subtype("Ljava/util/Vector;", "Ljava/util/List;"));
+        assert!(cp.is_subtype("Ljava/util/Vector;", "Ljava/util/RandomAccess;"));
+        assert!(cp.is_subtype("Ljava/util/Stack;", "Ljava/util/Vector;"));
+        assert!(cp.is_subtype("Ljava/util/Stack;", "Ljava/util/List;"));
         // cadeias de classe
         assert!(cp.is_subtype("Ljava/util/HashMap;", "Ljava/util/AbstractMap;"));
         assert!(cp.is_subtype("Ljava/util/LinkedList;", "Ljava/util/AbstractList;"));
@@ -1706,6 +1994,15 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn jutil_calendar_and_timezone_have_jdk_type_relations() {
+        let cp = Classpath::new(Vec::new());
+        assert!(cp.is_subtype("Ljava/util/GregorianCalendar;", "Ljava/util/Calendar;"));
+        assert!(cp.is_subtype("Ljava/util/GregorianCalendar;", "Ljava/io/Serializable;"));
+        assert!(cp.is_subtype("Ljava/util/TimeZone;", "Ljava/lang/Cloneable;"));
+        assert!(cp.is_subtype("Ljava/util/TimeZone;", "Ljava/io/Serializable;"));
+    }
+
     /// M8 (bug real do app org.primftpd): a cadeia builtin de Activity apontava
     /// para "Ljava/content/Context;" (typo) — check-cast Activity→Context falhava.
     #[test]
@@ -1714,6 +2011,28 @@ mod tests {
         assert!(cp.is_subtype("Landroid/app/Activity;", "Landroid/content/Context;"));
         assert!(cp.is_subtype("Landroid/app/Application;", "Landroid/content/Context;"));
         assert!(!cp.is_subtype("Landroid/app/Activity;", "Ljava/content/Context;"));
+    }
+
+    #[test]
+    fn android_scroll_and_container_widgets_are_views() {
+        let cp = Classpath::new(Vec::new());
+        for class in [
+            "Landroid/widget/HorizontalScrollView;",
+            "Landroid/widget/ScrollView;",
+            "Landroid/widget/RelativeLayout;",
+            "Landroid/widget/TableLayout;",
+            "Landroid/widget/ListView;",
+            "Landroid/widget/GridView;",
+            "Landroid/widget/Spinner;",
+            "Landroid/webkit/WebView;",
+        ] {
+            assert!(cp.is_subtype(class, "Landroid/view/View;"), "{class}");
+            assert!(cp.is_subtype(class, "Landroid/view/ViewGroup;"), "{class}");
+        }
+        assert!(cp.is_subtype(
+            "Landroid/widget/HorizontalScrollView;",
+            "Landroid/widget/FrameLayout;"
+        ));
     }
 
     /// issue #42: covariância de arrays no is_subtype (JLS 4.10.2/4.10.3).

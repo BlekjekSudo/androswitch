@@ -258,7 +258,7 @@ pub(crate) fn format_number(f: &Fmt, x: f64) -> String {
     if x.is_nan() {
         return "NaN".into();
     }
-    let neg = x < 0.0 || (x == 0.0 && x.is_sign_negative() && false);
+    let neg = x < 0.0;
     let v = x.abs() * f.pat.multiplier as f64;
     if v.is_infinite() {
         return format!("{}∞{}", if neg { "-" } else { "" }, "");

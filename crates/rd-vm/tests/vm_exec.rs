@@ -3139,7 +3139,7 @@ fn cow_collections_host_intrinsics() {
     );
     assert_eq!(call_s(&mut e, "size", "()I", vec![]), Some(Value::Int(0)));
 
-    // ── CopyOnWriteArrayList ≡ ArrayList ──
+    // ── CopyOnWriteArrayList ≡ ArrayList plus the legacy addIfAbsent API ──
     let lt = e.heap.alloc_instance(CL.to_string(), vec![]).unwrap();
     let call_l = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
         call_instance_intrinsic(e, CL, name, sig, lt, &args).expect("intrínseco")
@@ -3168,6 +3168,26 @@ fn cow_collections_host_intrinsics() {
         ),
         Some(Value::Int(0))
     );
+    assert_eq!(
+        call_l(
+            &mut e,
+            "addIfAbsent",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(7)]
+        ),
+        Some(Value::Int(0)),
+        "addIfAbsent keeps the existing equal element"
+    );
+    assert_eq!(
+        call_l(
+            &mut e,
+            "addIfAbsent",
+            "(Ljava/lang/Object;)Z",
+            vec![Value::Int(8)]
+        ),
+        Some(Value::Int(1))
+    );
+    assert_eq!(call_l(&mut e, "size", "()I", vec![]), Some(Value::Int(3)));
     call_l(&mut e, "clear", "()V", vec![]);
     assert_eq!(
         call_l(&mut e, "isEmpty", "()Z", vec![]),
@@ -3175,9 +3195,9 @@ fn cow_collections_host_intrinsics() {
     );
 }
 
-/// M8 (compat real): LinkedHashMap host — sétimo gap do launch do
-/// org.primftpd (`LinkedHashMap.<init>()V`). Métodos essenciais ≡ HashMap
-/// (ordem de iteração não garantida — documentado); subtipo de HashMap/Map.
+/// M8 (compat real): LinkedHashMap host — gap do launch do org.primftpd.
+/// Os métodos essenciais acompanham HashMap e as views preservam ordem de
+/// inserção; o construtor access-order tem regressão semântica separada.
 #[test]
 fn linked_hash_map_host_intrinsics() {
     use rd_vm::intrinsics::call_instance_intrinsic;
@@ -3240,6 +3260,66 @@ fn linked_hash_map_host_intrinsics() {
         Some(Value::Obj(v))
     );
     assert_eq!(call(&mut e, "size", "()I", vec![]), Some(Value::Int(0)));
+}
+
+#[test]
+fn linked_hash_map_access_order_constructor_and_validation() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const LHM: &str = "Ljava/util/LinkedHashMap;";
+    const INIT_ACCESS: &str = "(IFZ)V";
+    const PUT: &str = "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
+    const GET: &str = "(Ljava/lang/Object;)Ljava/lang/Object;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let m = e.heap.alloc_instance(LHM.to_string(), vec![]).unwrap();
+    let call = |e: &mut Engine, name: &str, sig: &str, args: Vec<Value>| {
+        call_instance_intrinsic(e, LHM, name, sig, m, &args)
+    };
+    call(
+        &mut e,
+        "<init>",
+        INIT_ACCESS,
+        vec![Value::Int(8), Value::Float(0.75), Value::Int(1)],
+    )
+    .unwrap();
+    let k1 = e.heap.alloc_string("first".into()).unwrap();
+    let k2 = e.heap.alloc_string("second".into()).unwrap();
+    call(&mut e, "put", PUT, vec![Value::Obj(k1), Value::Int(1)]).unwrap();
+    call(&mut e, "put", PUT, vec![Value::Obj(k2), Value::Int(2)]).unwrap();
+    assert_eq!(
+        call(&mut e, "get", GET, vec![Value::Obj(k1)]).unwrap(),
+        Some(Value::Int(1))
+    );
+    let keys = call(&mut e, "keySet", "()Ljava/util/Set;", vec![])
+        .unwrap()
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        e.heap.get_field(keys, "rd$key0").unwrap(),
+        Value::Obj(k2),
+        "get(first) moves first to the tail in access-order mode"
+    );
+    assert_eq!(e.heap.get_field(keys, "rd$key1").unwrap(), Value::Obj(k1));
+
+    let invalid = e.heap.alloc_instance(LHM.to_string(), vec![]).unwrap();
+    let result = call_instance_intrinsic(
+        &mut e,
+        LHM,
+        "<init>",
+        INIT_ACCESS,
+        invalid,
+        &[Value::Int(-1), Value::Float(0.75), Value::Int(0)],
+    );
+    match result {
+        Err(VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/IllegalArgumentException;");
+        }
+        other => panic!("negative initial capacity must throw IllegalArgumentException: {other:?}"),
+    }
 }
 
 /// M8 (compat real): LinkedHashSet host — 25º gap do launch de org.primftpd.
@@ -3533,6 +3613,10 @@ fn executors_host_inline_execution() {
         .heap
         .alloc_instance("LTickX;".to_string(), vec![])
         .unwrap();
+    let time_unit = e
+        .heap
+        .alloc_instance("Ljava/util/concurrent/TimeUnit;".to_string(), vec![])
+        .unwrap();
 
     // newFixedThreadPool(I, ThreadFactory) → executor host
     let ex = call_static_intrinsic(
@@ -3550,6 +3634,19 @@ fn executors_host_inline_execution() {
     assert_eq!(
         call_instance_intrinsic(&mut e, SVC, "isShutdown", "()Z", ex, &[]).unwrap(),
         Some(Value::Int(0))
+    );
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            SVC,
+            "awaitTermination",
+            "(JLjava/util/concurrent/TimeUnit;)Z",
+            ex,
+            &[Value::Long(0), Value::Obj(time_unit)],
+        )
+        .unwrap(),
+        Some(Value::Int(0)),
+        "an open executor has not terminated"
     );
 
     // execute roda INLINE (síncrono — t já vale 1 na volta)
@@ -3654,6 +3751,19 @@ fn executors_host_inline_execution() {
     assert_eq!(
         call_instance_intrinsic(&mut e, SVC, "isTerminated", "()Z", ex, &[]).unwrap(),
         Some(Value::Int(1))
+    );
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            SVC,
+            "awaitTermination",
+            "(JLjava/util/concurrent/TimeUnit;)Z",
+            ex,
+            &[Value::Long(0), Value::Obj(time_unit)],
+        )
+        .unwrap(),
+        Some(Value::Int(1)),
+        "all inline work has finished when the executor is shut down"
     );
     let pending =
         call_instance_intrinsic(&mut e, SVC, "shutdownNow", "()Ljava/util/List;", ex, &[]).unwrap();
@@ -5035,7 +5145,7 @@ fn service_loader_host_is_empty_and_iterable() {
 }
 
 #[test]
-fn class_loader_get_resources_returns_empty_enumeration() {
+fn class_loader_get_resources_without_attached_apk_returns_empty_enumeration() {
     use rd_vm::intrinsics::call_instance_intrinsic;
     use rd_vm::value::Value;
     const CLS: &str = "Ljava/lang/Class;";
@@ -5079,9 +5189,8 @@ fn class_loader_get_resources_returns_empty_enumeration() {
     };
     assert_eq!(e.heap.class_of(loader).unwrap(), LOADER);
 
-    // getResources(nome) nunca devolve null (contrato JDK): Enumeration host
-    // vazia enquanto o runtime não enumera recursos do APK. Cada chamada
-    // devolve um cursor novo e independente.
+    // Sem APK anexado, getResources(nome) devolve Enumeration vazia, nunca
+    // null. Cada chamada devolve um cursor novo e independente.
     let name = Value::Obj(
         e.heap
             .alloc_string("META-INF/services/com.exemplo.Res".into())
@@ -5137,6 +5246,551 @@ fn class_loader_get_resources_returns_empty_enumeration() {
         Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/lang/NullPointerException;"),
         other => panic!("esperava NPE, got {other:?}"),
     }
+}
+
+#[test]
+fn class_loader_reads_resource_entries_from_attached_apk() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+
+    const CLASS: &str = "Ljava/lang/Class;";
+    const CLASS_LOADER: &str = "Ljava/lang/ClassLoader;";
+    const URL: &str = "Ljava/net/URL;";
+    const ENUMERATION: &str = "Ljava/util/Enumeration;";
+    const RESOURCE: &str = "assets/logback.xml";
+
+    let apk_bytes = common::apkfix::build_apk(
+        "com.test.resources",
+        "LMain;",
+        common::apkfix::ArscFix::new().build(),
+        vec![
+            (RESOURCE, b"<configuration/>".to_vec()),
+            (
+                "META-INF/services/demo.Service",
+                b"demo.Provider\n".to_vec(),
+            ),
+        ],
+    );
+    let apk = rd_apk::Apk::from_bytes(apk_bytes).expect("APK de recursos parseia");
+
+    // O método DEX segue o caminho real invoke-virtual: ClassLoader.getResource
+    // → URL.openConnection → URLConnection.getInputStream → InputStream.read.
+    let mut b = DexBuilder::new();
+    b.class("LMarker;", "Ljava/lang/Object;");
+    let resource_name = b.intern(RESOURCE) as u16;
+    let p_get_resource = b.proto_idx(URL, vec!["Ljava/lang/String;".into()]);
+    let p_open_connection = b.proto_idx("Ljava/net/URLConnection;", vec![]);
+    let p_set_use_caches = b.proto_idx("V", vec!["Z".into()]);
+    let p_get_input_stream = b.proto_idx("Ljava/io/InputStream;", vec![]);
+    let p_read = b.proto_idx("I", vec![]);
+    let get_resource = b.method_idx(CLASS_LOADER, p_get_resource, "getResource");
+    let open_connection = b.method_idx(URL, p_open_connection, "openConnection");
+    let set_use_caches = b.method_idx("Ljava/net/URLConnection;", p_set_use_caches, "setUseCaches");
+    let get_input_stream = b.method_idx(
+        "Ljava/net/URLConnection;",
+        p_get_input_stream,
+        "getInputStream",
+    );
+    let read = b.method_idx("Ljava/io/InputStream;", p_read, "read");
+    let caller = b.class("LCaso;", "Ljava/lang/Object;");
+    b.direct(
+        caller,
+        "readFirst",
+        "I",
+        vec![CLASS_LOADER],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(5, 1, 2, {
+            let mut u = op21c(0x1A, 0, resource_name); // const-string v0, asset path
+            u.extend(op35c(0x6E, 2, get_resource, [4, 0, 0, 0, 0])); // loader.getResource
+            u.extend(op11x(0x0C, 1)); // move-result-object URL v1
+            u.extend(op35c(0x6E, 1, open_connection, [1, 0, 0, 0, 0]));
+            u.extend(op11x(0x0C, 1)); // move-result-object URLConnection v1
+            u.extend(op11n(0x12, 0, 0)); // setUseCaches(false)
+            u.extend(op35c(0x6E, 2, set_use_caches, [1, 0, 0, 0, 0]));
+            u.extend(op35c(0x6E, 1, get_input_stream, [1, 0, 0, 0, 0]));
+            u.extend(op11x(0x0C, 2)); // move-result-object InputStream v2
+            u.extend(op35c(0x6E, 1, read, [2, 0, 0, 0, 0]));
+            u.extend(op11x(0x0A, 0)); // move-result v0
+            u.extend(op11x(0x0F, 0)); // return first byte
+            u
+        })),
+    );
+
+    let dex = rd_dex::Dex::parse(b.finish()).expect("DEX de ClassLoader parseia");
+    let mut vm = Engine::new(vec![dex], VmConfig::default());
+    vm.set_resources(apk);
+    let marker = vm
+        .heap
+        .alloc_instance("LMarker;".to_string(), Vec::new())
+        .unwrap();
+    let class = match call_instance_intrinsic(
+        &mut vm,
+        "LMarker;",
+        "getClass",
+        "()Ljava/lang/Class;",
+        marker,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getClass: {other:?}"),
+    };
+    let loader = match call_instance_intrinsic(
+        &mut vm,
+        CLASS,
+        "getClassLoader",
+        "()Ljava/lang/ClassLoader;",
+        class,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getClassLoader: {other:?}"),
+    };
+
+    assert_eq!(
+        invoke(
+            &mut vm,
+            "readFirst",
+            "(Ljava/lang/ClassLoader;)I",
+            &[Value::Obj(loader)],
+        )
+        .unwrap()
+        .as_int()
+        .unwrap(),
+        b'<' as i32
+    );
+
+    let resource = Value::Obj(vm.heap.alloc_string(RESOURCE.into()).unwrap());
+    let url = match call_instance_intrinsic(
+        &mut vm,
+        CLASS_LOADER,
+        "getResource",
+        "(Ljava/lang/String;)Ljava/net/URL;",
+        loader,
+        std::slice::from_ref(&resource),
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getResource: {other:?}"),
+    };
+    assert_eq!(vm.heap.class_of(url).unwrap(), URL);
+    let url_string = match call_instance_intrinsic(
+        &mut vm,
+        URL,
+        "toExternalForm",
+        "()Ljava/lang/String;",
+        url,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("URL.toExternalForm: {other:?}"),
+    };
+    assert_eq!(
+        vm.heap.as_str(url_string).unwrap(),
+        "apk:/assets/logback.xml"
+    );
+
+    let enumeration = match call_instance_intrinsic(
+        &mut vm,
+        CLASS_LOADER,
+        "getResources",
+        "(Ljava/lang/String;)Ljava/util/Enumeration;",
+        loader,
+        &[resource],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getResources: {other:?}"),
+    };
+    assert_eq!(vm.heap.class_of(enumeration).unwrap(), ENUMERATION);
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut vm,
+            ENUMERATION,
+            "hasMoreElements",
+            "()Z",
+            enumeration,
+            &[],
+        )
+        .unwrap(),
+        Some(Value::Int(1))
+    );
+    let enumerated_url = match call_instance_intrinsic(
+        &mut vm,
+        ENUMERATION,
+        "nextElement",
+        "()Ljava/lang/Object;",
+        enumeration,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("Enumeration.nextElement: {other:?}"),
+    };
+    assert_eq!(vm.heap.class_of(enumerated_url).unwrap(), URL);
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut vm,
+            ENUMERATION,
+            "hasMoreElements",
+            "()Z",
+            enumeration,
+            &[],
+        )
+        .unwrap(),
+        Some(Value::Int(0))
+    );
+
+    let stream_name = Value::Obj(vm.heap.alloc_string(RESOURCE.into()).unwrap());
+    let resource_stream = match call_instance_intrinsic(
+        &mut vm,
+        CLASS_LOADER,
+        "getResourceAsStream",
+        "(Ljava/lang/String;)Ljava/io/InputStream;",
+        loader,
+        &[stream_name],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getResourceAsStream: {other:?}"),
+    };
+    let url_stream = match call_instance_intrinsic(
+        &mut vm,
+        URL,
+        "openStream",
+        "()Ljava/io/InputStream;",
+        url,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("URL.openStream: {other:?}"),
+    };
+    for (method, stream) in [
+        ("getResourceAsStream", resource_stream),
+        ("URL.openStream", url_stream),
+    ] {
+        assert_eq!(
+            call_instance_intrinsic(
+                &mut vm,
+                "Ljava/io/ByteArrayInputStream;",
+                "read",
+                "()I",
+                stream,
+                &[],
+            )
+            .unwrap(),
+            Some(Value::Int(b'<' as i32)),
+            "{method} returns APK bytes"
+        );
+    }
+
+    let missing_name = Value::Obj(vm.heap.alloc_string("assets/missing".into()).unwrap());
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut vm,
+            CLASS_LOADER,
+            "getResource",
+            "(Ljava/lang/String;)Ljava/net/URL;",
+            loader,
+            &[missing_name],
+        )
+        .unwrap(),
+        Some(Value::Null)
+    );
+}
+
+#[test]
+fn android_environment_exposes_deterministic_virtual_external_storage() {
+    use rd_vm::framework::call_host_static;
+    use rd_vm::intrinsics::call_instance_intrinsic;
+
+    let mut vm = Engine::new(vec![], VmConfig::default());
+    let state = call_host_static(
+        &mut vm,
+        "Landroid/os/Environment;",
+        "getExternalStorageState",
+        "()Ljava/lang/String;",
+        &[],
+    )
+    .unwrap()
+    .unwrap();
+    let Value::Obj(state) = state else {
+        panic!("Environment.getExternalStorageState did not return a String");
+    };
+    assert_eq!(vm.heap.as_str(state).unwrap(), "mounted");
+
+    let storage = call_host_static(
+        &mut vm,
+        "Landroid/os/Environment;",
+        "getExternalStorageDirectory",
+        "()Ljava/io/File;",
+        &[],
+    )
+    .unwrap()
+    .unwrap();
+    let Value::Obj(storage) = storage else {
+        panic!("Environment.getExternalStorageDirectory did not return a File");
+    };
+    let path = call_instance_intrinsic(
+        &mut vm,
+        "Ljava/io/File;",
+        "getAbsolutePath",
+        "()Ljava/lang/String;",
+        storage,
+        &[],
+    )
+    .unwrap()
+    .unwrap();
+    let Value::Obj(path) = path else {
+        panic!("File.getAbsolutePath did not return a String");
+    };
+    assert_eq!(vm.heap.as_str(path).unwrap(), "/storage/emulated/0");
+    assert_eq!(
+        call_instance_intrinsic(&mut vm, "Ljava/io/File;", "exists", "()Z", storage, &[]).unwrap(),
+        Some(Value::Int(1))
+    );
+    assert_eq!(
+        call_host_static(
+            &mut vm,
+            "Landroid/os/Environment;",
+            "isExternalStorageManager",
+            "()Z",
+            &[],
+        )
+        .unwrap(),
+        Some(Value::Int(0)),
+        "the default virtual device does not grant all-files access"
+    );
+}
+
+#[test]
+fn vector_and_stack_host_intrinsics_cover_legacy_collection_apis() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+
+    const VECTOR: &str = "Ljava/util/Vector;";
+    const STACK: &str = "Ljava/util/Stack;";
+    const ENUMERATION: &str = "Ljava/util/Enumeration;";
+
+    let mut b = DexBuilder::new();
+    b.class("LMarker;", "Ljava/lang/Object;");
+    let mut vm = engine_of(&b);
+
+    let vector = vm
+        .heap
+        .alloc_instance(VECTOR.to_string(), Vec::new())
+        .unwrap();
+    call_instance_intrinsic(&mut vm, VECTOR, "<init>", "(I)V", vector, &[Value::Int(0)]).unwrap();
+    let first = Value::Obj(vm.heap.alloc_string("first".into()).unwrap());
+    call_instance_intrinsic(
+        &mut vm,
+        VECTOR,
+        "addElement",
+        "(Ljava/lang/Object;)V",
+        vector,
+        std::slice::from_ref(&first),
+    )
+    .unwrap();
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut vm,
+            VECTOR,
+            "elementAt",
+            "(I)Ljava/lang/Object;",
+            vector,
+            &[Value::Int(0)],
+        )
+        .unwrap(),
+        Some(first.clone())
+    );
+    let enumeration = match call_instance_intrinsic(
+        &mut vm,
+        VECTOR,
+        "elements",
+        "()Ljava/util/Enumeration;",
+        vector,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("Vector.elements: {other:?}"),
+    };
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut vm,
+            ENUMERATION,
+            "nextElement",
+            "()Ljava/lang/Object;",
+            enumeration,
+            &[],
+        )
+        .unwrap(),
+        Some(first.clone())
+    );
+
+    let stack = vm
+        .heap
+        .alloc_instance(STACK.to_string(), Vec::new())
+        .unwrap();
+    call_instance_intrinsic(&mut vm, STACK, "<init>", "()V", stack, &[]).unwrap();
+    let second = Value::Obj(vm.heap.alloc_string("second".into()).unwrap());
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut vm,
+            STACK,
+            "push",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            stack,
+            std::slice::from_ref(&first),
+        )
+        .unwrap(),
+        Some(first.clone())
+    );
+    call_instance_intrinsic(
+        &mut vm,
+        STACK,
+        "push",
+        "(Ljava/lang/Object;)Ljava/lang/Object;",
+        stack,
+        std::slice::from_ref(&second),
+    )
+    .unwrap();
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut vm,
+            STACK,
+            "search",
+            "(Ljava/lang/Object;)I",
+            stack,
+            std::slice::from_ref(&first)
+        )
+        .unwrap(),
+        Some(Value::Int(2))
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut vm, STACK, "pop", "()Ljava/lang/Object;", stack, &[]).unwrap(),
+        Some(second)
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut vm, STACK, "pop", "()Ljava/lang/Object;", stack, &[]).unwrap(),
+        Some(first)
+    );
+    assert_eq!(
+        call_instance_intrinsic(&mut vm, STACK, "empty", "()Z", stack, &[]).unwrap(),
+        Some(Value::Int(1))
+    );
+    match call_instance_intrinsic(&mut vm, STACK, "pop", "()Ljava/lang/Object;", stack, &[]) {
+        Err(VmExit::Exception(throwable)) => {
+            assert_eq!(throwable.class, "Ljava/util/EmptyStackException;");
+        }
+        other => panic!("empty Stack.pop should throw, got {other:?}"),
+    }
+}
+
+#[test]
+fn sax_input_source_retains_input_stream_and_system_id() {
+    use rd_vm::intrinsics::{call_instance_intrinsic, call_instance_intrinsic_mref};
+
+    const INPUT_SOURCE: &str = "Lorg/xml/sax/InputSource;";
+    const INPUT_STREAM: &str = "Ljava/io/InputStream;";
+    const DEFAULT_HANDLER: &str = "Lorg/xml/sax/helpers/DefaultHandler;";
+
+    let mut b = DexBuilder::new();
+    b.class("LMarker;", "Ljava/lang/Object;");
+    b.class("LTestHandler;", DEFAULT_HANDLER);
+    let mut vm = engine_of(&b);
+    let source = vm
+        .heap
+        .alloc_instance(INPUT_SOURCE.to_string(), Vec::new())
+        .unwrap();
+    let stream = vm
+        .heap
+        .alloc_instance(INPUT_STREAM.to_string(), Vec::new())
+        .unwrap();
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut vm,
+            INPUT_SOURCE,
+            "<init>",
+            "(Ljava/io/InputStream;)V",
+            source,
+            &[Value::Obj(stream)],
+        )
+        .unwrap(),
+        Some(Value::Null)
+    );
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut vm,
+            INPUT_SOURCE,
+            "getByteStream",
+            "()Ljava/io/InputStream;",
+            source,
+            &[],
+        )
+        .unwrap(),
+        Some(Value::Obj(stream))
+    );
+
+    let system_id = Value::Obj(
+        vm.heap
+            .alloc_string("apk:/assets/logback.xml".into())
+            .unwrap(),
+    );
+    call_instance_intrinsic(
+        &mut vm,
+        INPUT_SOURCE,
+        "setSystemId",
+        "(Ljava/lang/String;)V",
+        source,
+        &[system_id],
+    )
+    .unwrap();
+    let returned_system_id = match call_instance_intrinsic(
+        &mut vm,
+        INPUT_SOURCE,
+        "getSystemId",
+        "()Ljava/lang/String;",
+        source,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("InputSource.getSystemId: {other:?}"),
+    };
+    assert_eq!(
+        vm.heap.as_str(returned_system_id).unwrap(),
+        "apk:/assets/logback.xml"
+    );
+
+    let handler = vm
+        .heap
+        .alloc_instance("LTestHandler;".to_string(), Vec::new())
+        .unwrap();
+    assert_eq!(
+        call_instance_intrinsic_mref(
+            &mut vm,
+            "LTestHandler;",
+            DEFAULT_HANDLER,
+            "<init>",
+            "()V",
+            handler,
+            &[],
+        )
+        .unwrap(),
+        Some(Value::Null)
+    );
 }
 
 #[test]
@@ -6184,6 +6838,56 @@ fn invoke_super_comeca_na_super_da_classe_definidora() {
 }
 
 #[test]
+fn invoke_super_object_equals_uses_reference_identity() {
+    let mut b = DexBuilder::new();
+    let base = b.class("LIdentityEqualsBase;", "Ljava/lang/Object;");
+    let equals_proto = b.proto_idx("Z", vec!["Ljava/lang/Object;".into()]);
+    let object_equals = b.method_idx("Ljava/lang/Object;", equals_proto, "equals");
+    b.r#virtual(
+        base,
+        "equals",
+        "Z",
+        vec!["Ljava/lang/Object;"],
+        ACC_PUBLIC,
+        Some(b.code(2, 2, 2, {
+            let mut code = op35c(0x6F, 2, object_equals, [0, 1, 0, 0, 0]);
+            code.extend(op11x(0x0A, 0)); // move-result v0
+            code.extend(op11x(0x0F, 0)); // return v0
+            code
+        })),
+    );
+    let mut e = engine_of(&b);
+    let first = e
+        .heap
+        .alloc_instance("LIdentityEqualsBase;".into(), vec![])
+        .unwrap();
+    let second = e
+        .heap
+        .alloc_instance("LIdentityEqualsBase;".into(), vec![])
+        .unwrap();
+    assert_eq!(
+        e.invoke_instance(
+            first,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(first)],
+        )
+        .unwrap(),
+        Value::Int(1)
+    );
+    assert_eq!(
+        e.invoke_instance(
+            first,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(second)],
+        )
+        .unwrap(),
+        Value::Int(0)
+    );
+}
+
+#[test]
 fn subclasse_dex_de_abstractlist_chama_super_init_noop() {
     // M8 (37º gap, real no launch do primftpd pós-fix do invoke-super):
     // classe DEX estendendo DIRETAMENTE java.util.AbstractList chama
@@ -6235,6 +6939,182 @@ fn subclasse_dex_de_abstractlist_chama_super_init_noop() {
         v, 1,
         "subclasse DEX de AbstractList instanciou via super() no-op"
     );
+}
+
+#[test]
+fn dex_subclass_of_copy_on_write_list_gets_host_constructor_and_methods() {
+    // Regressão do launch do org.primftpd 8.2: logback TurboFilterList é
+    // subclasse DEX de CopyOnWriteArrayList. O invokespecial do construtor
+    // host precisa ligar HostObj::List ao receiver DEX; chamadas List.add/size
+    // herdadas devem usar esse estado, sem ocultar overrides DEX.
+    const COW: &str = "Ljava/util/concurrent/CopyOnWriteArrayList;";
+    const SUB: &str = "Lch/qos/logback/classic/spi/TurboFilterList;";
+
+    let mut b = DexBuilder::new();
+    let p_void = b.proto_idx("V", vec![]);
+    let p_add = b.proto_idx("Z", vec!["Ljava/lang/Object;".into()]);
+    let p_size = b.proto_idx("I", vec![]);
+    let sub = b.class(SUB, COW);
+    let init_cow = b.method_idx(COW, p_void, "<init>");
+    b.direct(
+        sub,
+        "<init>",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(1, 1, 1, {
+            let mut u = op35c(0x70, 1, init_cow, [0, 0, 0, 0, 0]);
+            u.extend(op11x(0x0E, 0)); // return-void
+            u
+        })),
+    );
+
+    let sub_type = b.type_idx(SUB);
+    let init_sub = b.method_idx(SUB, p_void, "<init>");
+    let add_list = b.method_idx("Ljava/util/List;", p_add, "add");
+    let size_list = b.method_idx("Ljava/util/List;", p_size, "size");
+    let item = b.intern("host-list-item") as u16;
+    let caller = b.class("LCaso;", "Ljava/lang/Object;");
+    b.direct(
+        caller,
+        "exercise",
+        "I",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(4, 0, 2, {
+            let mut u = op21c(0x22, 0, sub_type); // new-instance TurboFilterList
+            u.extend(op35c(0x70, 1, init_sub, [0, 0, 0, 0, 0])); // subclass ctor
+            u.extend(op21c(0x1A, 1, item)); // const-string v1, "host-list-item"
+            u.extend(op35c(0x72, 2, add_list, [0, 1, 0, 0, 0])); // List.add(receiver,item)
+            u.extend(op11x(0x0A, 2)); // move-result v2 (boolean)
+            u.extend(op35c(0x72, 1, size_list, [0, 0, 0, 0, 0])); // List.size(receiver)
+            u.extend(op11x(0x0A, 3)); // move-result v3
+            u.extend(op11x(0x0F, 3)); // return v3
+            u
+        })),
+    );
+
+    let dex = rd_dex::Dex::parse(b.finish()).expect("DEX sintético parseia");
+    let mut e = Engine::new(vec![dex], VmConfig::default());
+    assert_eq!(
+        invoke(&mut e, "exercise", "()I", &[])
+            .expect("super COW constructor + métodos List herdados")
+            .as_int()
+            .unwrap(),
+        1
+    );
+}
+
+#[test]
+fn access_controller_runs_dex_privileged_actions_inline() {
+    const ACTION: &str = "Ltest/PropertyAction;";
+    const ACCESS_CONTROLLER: &str = "Ljava/security/AccessController;";
+
+    let mut b = DexBuilder::new();
+    let action = b.class(ACTION, "Ljava/lang/Object;");
+    let result = b.intern("privileged-result") as u16;
+    b.r#virtual(
+        action,
+        "run",
+        "Ljava/lang/Object;",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(2, 1, 0, {
+            let mut u = op21c(0x1A, 0, result); // const-string v0, result
+            u.extend(op11x(0x11, 0)); // return-object v0
+            u
+        })),
+    );
+
+    let dex = rd_dex::Dex::parse(b.finish()).expect("DEX de action parseia");
+    let mut vm = Engine::new(vec![dex], VmConfig::default());
+    let action_ref = vm
+        .heap
+        .alloc_instance(ACTION.to_string(), Vec::new())
+        .expect("aloca PrivilegedAction DEX");
+
+    // Os três overloads usuais de cada interface ignoram o contexto de
+    // segurança, ausente neste modelo, mas preservam o callback e o retorno.
+    let signatures = [
+        "(Ljava/security/PrivilegedAction;)Ljava/lang/Object;",
+        "(Ljava/security/PrivilegedAction;Ljava/security/AccessControlContext;)Ljava/lang/Object;",
+        "(Ljava/security/PrivilegedAction;Ljava/security/AccessControlContext;[Ljava/security/Permission;)Ljava/lang/Object;",
+        "(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;",
+        "(Ljava/security/PrivilegedExceptionAction;Ljava/security/AccessControlContext;)Ljava/lang/Object;",
+        "(Ljava/security/PrivilegedExceptionAction;Ljava/security/AccessControlContext;[Ljava/security/Permission;)Ljava/lang/Object;",
+    ];
+    for sig in signatures {
+        let mut args = vec![Value::Obj(action_ref)];
+        if sig.contains("AccessControlContext") {
+            args.push(Value::Null);
+        }
+        if sig.contains("[Ljava/security/Permission;") {
+            args.push(Value::Null);
+        }
+        let value = vm
+            .invoke_static(ACCESS_CONTROLLER, "doPrivileged", sig, &args)
+            .expect("doPrivileged executa run() e devolve seu resultado");
+        let Value::Obj(string) = value else {
+            panic!("resultado não é String: {value:?}");
+        };
+        assert_eq!(vm.heap.as_str(string).unwrap(), "privileged-result");
+    }
+
+    match vm.invoke_static(
+        ACCESS_CONTROLLER,
+        "doPrivileged",
+        "(Ljava/security/PrivilegedAction;)Ljava/lang/Object;",
+        &[Value::Null],
+    ) {
+        Err(VmExit::Exception(t)) => assert_eq!(t.class, "Ljava/lang/NullPointerException;"),
+        other => panic!("action nula deveria lançar NullPointerException, got {other:?}"),
+    }
+}
+
+#[test]
+fn runtime_permission_constructor_and_access_controller_check_permission_work() {
+    const RUNTIME_PERMISSION: &str = "Ljava/lang/RuntimePermission;";
+
+    let mut b = DexBuilder::new();
+    let runtime_permission = b.type_idx(RUNTIME_PERMISSION);
+    let name = b.intern("getClassLoader") as u16;
+    let p_string = b.proto_idx("V", vec!["Ljava/lang/String;".into()]);
+    let init = b.method_idx(RUNTIME_PERMISSION, p_string, "<init>");
+    let p_get_name = b.proto_idx("Ljava/lang/String;", vec![]);
+    let get_name = b.method_idx("Ljava/security/Permission;", p_get_name, "getName");
+    let p_check = b.proto_idx("V", vec!["Ljava/security/Permission;".into()]);
+    let check = b.method_idx(
+        "Ljava/security/AccessController;",
+        p_check,
+        "checkPermission",
+    );
+    let caller = b.class("LCaso;", "Ljava/lang/Object;");
+    b.direct(
+        caller,
+        "permissionName",
+        "Ljava/lang/String;",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(3, 0, 2, {
+            let mut u = op21c(0x22, 0, runtime_permission);
+            u.extend(op21c(0x1A, 1, name)); // const-string v1, "getClassLoader"
+            u.extend(op35c(0x70, 2, init, [0, 1, 0, 0, 0])); // RuntimePermission.<init>
+            u.extend(op35c(0x6E, 1, get_name, [0, 0, 0, 0, 0])); // Permission.getName
+            u.extend(op11x(0x0A, 1)); // move-result-object v1
+            u.extend(op35c(0x71, 1, check, [0, 0, 0, 0, 0])); // checkPermission
+            u.extend(op11x(0x11, 1)); // return-object v1
+            u
+        })),
+    );
+
+    let dex = rd_dex::Dex::parse(b.finish()).expect("DEX de Permission parseia");
+    let mut vm = Engine::new(vec![dex], VmConfig::default());
+    let value = invoke(&mut vm, "permissionName", "()Ljava/lang/String;", &[])
+        .expect("RuntimePermission é construído e checkPermission é no-op");
+    let Value::Obj(string) = value else {
+        panic!("Permission.getName não devolveu String: {value:?}");
+    };
+    assert_eq!(vm.heap.as_str(string).unwrap(), "getClassLoader");
 }
 
 #[test]
@@ -7005,6 +7885,449 @@ fn preference_manager_prefs_padrao_comecam_vazias_devolvem_default() {
         matches!(npe, Err(rd_vm::VmExit::Exception(ref t)) if t.class == "Ljava/lang/NullPointerException;"),
         "key null → NPE"
     );
+}
+
+#[test]
+fn activity_component_name_uses_package_and_runtime_class() {
+    use rd_vm::value::Value;
+    let mut b = DexBuilder::new();
+    let activity_class = b.class("Ltest/MainActivity;", "Landroid/app/Activity;");
+    let _ = activity_class;
+    let mut e = engine_of(&b);
+    e.fw.package_name = "org.test".to_string();
+    let activity = e
+        .heap
+        .alloc_instance("Ltest/MainActivity;".to_string(), vec![])
+        .unwrap();
+    let component = match e
+        .invoke_instance(
+            activity,
+            "getComponentName",
+            "()Landroid/content/ComponentName;",
+            &[],
+        )
+        .unwrap()
+    {
+        Value::Obj(component) => component,
+        other => panic!("Activity.getComponentName should return ComponentName: {other:?}"),
+    };
+    let package = e
+        .invoke_instance(component, "getPackageName", "()Ljava/lang/String;", &[])
+        .unwrap();
+    let Value::Obj(package) = package else {
+        panic!("ComponentName.getPackageName should return String")
+    };
+    assert_eq!(e.heap.as_str(package).unwrap(), "org.test");
+
+    let class = e
+        .invoke_instance(component, "getClassName", "()Ljava/lang/String;", &[])
+        .unwrap();
+    let Value::Obj(class) = class else {
+        panic!("ComponentName.getClassName should return String")
+    };
+    assert_eq!(e.heap.as_str(class).unwrap(), "test.MainActivity");
+
+    let title = e
+        .invoke_instance(activity, "getTitle", "()Ljava/lang/CharSequence;", &[])
+        .unwrap();
+    let Value::Obj(title) = title else {
+        panic!("Activity.getTitle should return its application title")
+    };
+    assert_eq!(e.heap.as_str(title).unwrap(), "org.test");
+    e.invoke_instance(
+        activity,
+        "setTitle",
+        "(Ljava/lang/CharSequence;)V",
+        &[Value::StrPlaceholder("Custom title".to_string())],
+    )
+    .unwrap();
+    let Value::Obj(title) = e
+        .invoke_instance(activity, "getTitle", "()Ljava/lang/CharSequence;", &[])
+        .unwrap()
+    else {
+        panic!("Activity.getTitle should return a set title")
+    };
+    assert_eq!(e.heap.as_str(title).unwrap(), "Custom title");
+}
+
+#[test]
+fn window_callback_defaults_to_activity_and_can_be_replaced() {
+    use rd_vm::value::Value;
+    const ACTIVITY: &str = "Landroid/app/Activity;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let activity = e.heap.alloc_instance(ACTIVITY.to_string(), vec![]).unwrap();
+    let window = match e
+        .invoke_instance(activity, "getWindow", "()Landroid/view/Window;", &[])
+        .unwrap()
+    {
+        Value::Obj(window) => window,
+        other => panic!("Activity.getWindow should return Window: {other:?}"),
+    };
+    assert_eq!(
+        e.invoke_instance(
+            window,
+            "getCallback",
+            "()Landroid/view/Window$Callback;",
+            &[],
+        )
+        .unwrap(),
+        Value::Obj(activity),
+        "the Activity owns the default PhoneWindow callback"
+    );
+
+    let replacement = e
+        .heap
+        .alloc_instance("Ltest/WindowCallback;".to_string(), vec![])
+        .unwrap();
+    e.invoke_instance(
+        window,
+        "setCallback",
+        "(Landroid/view/Window$Callback;)V",
+        &[Value::Obj(replacement)],
+    )
+    .unwrap();
+    assert_eq!(
+        e.invoke_instance(
+            window,
+            "getCallback",
+            "()Landroid/view/Window$Callback;",
+            &[],
+        )
+        .unwrap(),
+        Value::Obj(replacement)
+    );
+
+    let content = e
+        .heap
+        .alloc_instance("Landroid/widget/FrameLayout;".to_string(), vec![])
+        .unwrap();
+    e.attach_host_state("Landroid/widget/FrameLayout;", content)
+        .unwrap();
+    e.invoke_instance(
+        window,
+        "setContentView",
+        "(Landroid/view/View;)V",
+        &[Value::Obj(content)],
+    )
+    .unwrap();
+    assert!(matches!(
+        e.fw.get(window),
+        Some(rd_vm::framework::HostObj::Window { content: Some(c) }) if *c == content
+    ));
+    let decor = match e
+        .invoke_instance(window, "getDecorView", "()Landroid/view/View;", &[])
+        .unwrap()
+    {
+        Value::Obj(decor) => decor,
+        other => panic!("Window.getDecorView should return View: {other:?}"),
+    };
+    let frame = match e.fw.get(decor).unwrap() {
+        rd_vm::framework::HostObj::View { children, .. } => children[0],
+        _ => panic!("expected decor ViewGroup"),
+    };
+    assert!(matches!(
+        e.fw.get(frame),
+        Some(rd_vm::framework::HostObj::View { children, .. }) if children == &vec![content]
+    ));
+}
+
+#[test]
+fn fork_join_common_pool_is_canonical_and_executes_inline() {
+    const FORK_JOIN_POOL: &str = "Ljava/util/concurrent/ForkJoinPool;";
+
+    let mut b = DexBuilder::new();
+    let runnable = b.class("LTestForkJoinTask;", "Ljava/lang/Object;");
+    b.r#virtual(
+        runnable,
+        "run",
+        "V",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(1, 1, 0, op10x(0x0E))),
+    );
+    let mut e = engine_of(&b);
+    let pool = match e
+        .invoke_static(
+            FORK_JOIN_POOL,
+            "commonPool",
+            "()Ljava/util/concurrent/ForkJoinPool;",
+            &[],
+        )
+        .unwrap()
+    {
+        Value::Obj(pool) => pool,
+        other => panic!("commonPool should return ForkJoinPool: {other:?}"),
+    };
+    assert_eq!(e.heap.class_of(pool).unwrap(), FORK_JOIN_POOL);
+    assert_eq!(
+        e.invoke_static(
+            FORK_JOIN_POOL,
+            "commonPool",
+            "()Ljava/util/concurrent/ForkJoinPool;",
+            &[],
+        )
+        .unwrap(),
+        Value::Obj(pool),
+        "commonPool must return a stable singleton"
+    );
+
+    let task = e
+        .heap
+        .alloc_instance("LTestForkJoinTask;".into(), Vec::new())
+        .unwrap();
+    e.invoke_instance(
+        pool,
+        "execute",
+        "(Ljava/lang/Runnable;)V",
+        &[Value::Obj(task)],
+    )
+    .unwrap();
+}
+
+#[test]
+fn context_open_file_streams_use_the_app_private_vfs() {
+    use rd_vm::intrinsics::{alloc_string, call_instance_intrinsic};
+
+    let mut e = engine_of(&DexBuilder::new());
+    e.fw.package_name = "com.example.contextfiles".into();
+    let context = e
+        .heap
+        .alloc_instance("Landroid/content/Context;".to_string(), Vec::new())
+        .unwrap();
+    let file_name = Value::Obj(alloc_string(&mut e, "state.bin".to_string()).unwrap());
+
+    let missing = call_instance_intrinsic(
+        &mut e,
+        "Landroid/content/Context;",
+        "openFileInput",
+        "(Ljava/lang/String;)Ljava/io/FileInputStream;",
+        context,
+        std::slice::from_ref(&file_name),
+    );
+    assert!(matches!(
+        missing,
+        Err(VmExit::Exception(ref t)) if t.class == "Ljava/io/FileNotFoundException;"
+    ));
+
+    let output = call_instance_intrinsic(
+        &mut e,
+        "Landroid/content/Context;",
+        "openFileOutput",
+        "(Ljava/lang/String;I)Ljava/io/FileOutputStream;",
+        context,
+        &[file_name.clone(), Value::Int(0)],
+    )
+    .unwrap()
+    .expect("openFileOutput should return a stream");
+    let Value::Obj(output) = output else {
+        panic!("openFileOutput must return FileOutputStream")
+    };
+    call_instance_intrinsic(
+        &mut e,
+        "Ljava/io/FileOutputStream;",
+        "write",
+        "(I)V",
+        output,
+        &[Value::Int(0x5A)],
+    )
+    .unwrap();
+    call_instance_intrinsic(
+        &mut e,
+        "Ljava/io/FileOutputStream;",
+        "close",
+        "()V",
+        output,
+        &[],
+    )
+    .unwrap();
+
+    let input = call_instance_intrinsic(
+        &mut e,
+        "Landroid/content/Context;",
+        "openFileInput",
+        "(Ljava/lang/String;)Ljava/io/FileInputStream;",
+        context,
+        std::slice::from_ref(&file_name),
+    )
+    .unwrap()
+    .expect("the file should now exist");
+    let Value::Obj(input) = input else {
+        panic!("openFileInput must return FileInputStream")
+    };
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            "Ljava/io/FileInputStream;",
+            "read",
+            "()I",
+            input,
+            &[],
+        )
+        .unwrap(),
+        Some(Value::Int(0x5A))
+    );
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            "Ljava/io/FileInputStream;",
+            "read",
+            "()I",
+            input,
+            &[],
+        )
+        .unwrap(),
+        Some(Value::Int(-1))
+    );
+
+    let unsafe_name = Value::Obj(alloc_string(&mut e, "../outside.bin".to_string()).unwrap());
+    assert!(matches!(
+        call_instance_intrinsic(
+            &mut e,
+            "Landroid/content/Context;",
+            "openFileOutput",
+            "(Ljava/lang/String;I)Ljava/io/FileOutputStream;",
+            context,
+            &[unsafe_name, Value::Int(0)],
+        ),
+        Err(VmExit::Exception(ref t)) if t.class == "Ljava/lang/IllegalArgumentException;"
+    ));
+}
+
+#[test]
+fn print_stream_println_writes_to_its_output_stream() {
+    let mut e = engine_of(&DexBuilder::new());
+    let output = e
+        .heap
+        .alloc_instance("Ljava/io/ByteArrayOutputStream;".into(), vec![])
+        .unwrap();
+    e.invoke_instance(output, "<init>", "()V", &[]).unwrap();
+
+    let stream = e
+        .heap
+        .alloc_instance("Ljava/io/PrintStream;".into(), vec![])
+        .unwrap();
+    e.invoke_instance(
+        stream,
+        "<init>",
+        "(Ljava/io/OutputStream;)V",
+        &[Value::Obj(output)],
+    )
+    .unwrap();
+    let text = Value::Obj(
+        e.heap
+            .alloc_string("sample authorized keys".into())
+            .unwrap(),
+    );
+    e.invoke_instance(stream, "println", "(Ljava/lang/String;)V", &[text])
+        .unwrap();
+
+    let output_text = e
+        .invoke_instance(output, "toString", "()Ljava/lang/String;", &[])
+        .unwrap();
+    let Value::Obj(output_text) = output_text else {
+        panic!("ByteArrayOutputStream.toString must return String")
+    };
+    assert_eq!(
+        e.heap.as_str(output_text).unwrap(),
+        "sample authorized keys\n"
+    );
+}
+
+#[test]
+fn layout_inflater_from_returns_context_service_and_tracks_factory() {
+    use rd_vm::intrinsics::{call_instance_intrinsic, call_static_intrinsic};
+    use rd_vm::value::Value;
+    const LI: &str = "Landroid/view/LayoutInflater;";
+    const FACTORY2: &str = "(Landroid/view/LayoutInflater$Factory2;)V";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let context = e
+        .heap
+        .alloc_instance("Landroid/content/Context;".to_string(), vec![])
+        .unwrap();
+    let from = |e: &mut Engine, context| {
+        call_static_intrinsic(
+            e,
+            LI,
+            "from",
+            "(Landroid/content/Context;)Landroid/view/LayoutInflater;",
+            &[Value::Obj(context)],
+        )
+    };
+    let inflater = match from(&mut e, context).unwrap() {
+        Some(Value::Obj(inflater)) => inflater,
+        other => panic!("LayoutInflater.from(context) should return the service: {other:?}"),
+    };
+    assert_eq!(
+        from(&mut e, context).unwrap(),
+        Some(Value::Obj(inflater)),
+        "the Context service is stable across from() calls"
+    );
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            LI,
+            "getFactory",
+            "()Landroid/view/LayoutInflater$Factory;",
+            inflater,
+            &[],
+        )
+        .unwrap(),
+        Some(Value::Null)
+    );
+
+    let factory = e
+        .heap
+        .alloc_instance("Ltest/InflaterFactory;".to_string(), vec![])
+        .unwrap();
+    call_instance_intrinsic(
+        &mut e,
+        LI,
+        "setFactory2",
+        FACTORY2,
+        inflater,
+        &[Value::Obj(factory)],
+    )
+    .unwrap();
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            LI,
+            "getFactory",
+            "()Landroid/view/LayoutInflater$Factory;",
+            inflater,
+            &[],
+        )
+        .unwrap(),
+        Some(Value::Obj(factory))
+    );
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            LI,
+            "getFactory2",
+            "()Landroid/view/LayoutInflater$Factory2;",
+            inflater,
+            &[],
+        )
+        .unwrap(),
+        Some(Value::Obj(factory))
+    );
+
+    let null_context = call_static_intrinsic(
+        &mut e,
+        LI,
+        "from",
+        "(Landroid/content/Context;)Landroid/view/LayoutInflater;",
+        &[Value::Null],
+    );
+    assert!(matches!(
+        null_context,
+        Err(VmExit::Exception(ref t)) if t.class == "Ljava/lang/NullPointerException;"
+    ));
 }
 
 #[test]

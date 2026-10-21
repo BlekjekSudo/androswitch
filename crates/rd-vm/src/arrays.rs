@@ -465,13 +465,13 @@ pub(crate) fn static_intrinsic(
             while lo <= hi {
                 let mid = ((lo + hi) as u32 >> 1) as i32;
                 let c = compare(vm, None, &items[mid as usize], &key)?;
-                if c < 0 {
-                    lo = mid + 1;
-                } else if c > 0 {
-                    hi = mid - 1;
-                } else {
-                    found = Some(mid);
-                    break;
+                match c.cmp(&0) {
+                    std::cmp::Ordering::Less => lo = mid + 1,
+                    std::cmp::Ordering::Greater => hi = mid - 1,
+                    std::cmp::Ordering::Equal => {
+                        found = Some(mid);
+                        break;
+                    }
                 }
             }
             Value::Int(found.unwrap_or(-(lo + 1)))

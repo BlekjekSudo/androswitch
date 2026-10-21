@@ -110,6 +110,13 @@ pub(crate) fn new_file(vm: &mut Engine, path: &str) -> Result<Value, VmExit> {
     Ok(Value::Obj(r))
 }
 
+/// Android's deterministic emulated shared-storage root, held only in the
+/// VM's virtual filesystem (never mapped to host disk).
+pub(crate) fn external_storage_path(vm: &mut Engine, path: &str) -> Result<Value, VmExit> {
+    mkdirs("/storage/emulated/0");
+    new_file(vm, path)
+}
+
 fn path_of(vm: &Engine, r: ObjRef) -> String {
     match vm.heap.get_field(r, "rd_path") {
         Ok(Value::Obj(s)) => vm.heap.as_str(s).map(str::to_string).unwrap_or_default(),
@@ -144,6 +151,28 @@ fn app_dir(vm: &mut Engine, sub: &str) -> Result<Value, VmExit> {
     new_file(vm, &p)
 }
 
+fn app_file_path(vm: &mut Engine, args: &[Value]) -> Result<String, VmExit> {
+    let name = match args.first() {
+        Some(Value::Obj(r)) => vm.heap.as_str(*r)?.to_string(),
+        _ => {
+            return Err(
+                crate::err::Throwable::new("Ljava/lang/NullPointerException;", "name").into(),
+            )
+        }
+    };
+    if name.contains('/') || name.contains('\\') || matches!(name.as_str(), "." | "..") {
+        return Err(crate::err::Throwable::new(
+            "Ljava/lang/IllegalArgumentException;",
+            format!("File {name} contains a path separator"),
+        )
+        .into());
+    }
+    let Value::Obj(dir) = app_dir(vm, "files")? else {
+        return Err(crate::err::vm_error("VM_TYPE_ERROR", "files dir is not a File").into());
+    };
+    Ok(format!("{}/{name}", path_of(vm, dir)))
+}
+
 /// Context directory getters. `None` when `name` is not one of them.
 pub fn context_dirs(
     vm: &mut Engine,
@@ -170,6 +199,61 @@ pub fn context_dirs(
         ("getDir", "(Ljava/lang/String;I)Ljava/io/File;") => {
             let n = str_arg(vm, args.first()).unwrap_or_default();
             app_dir(vm, &format!("app_{n}"))?
+        }
+        ("openFileInput", "(Ljava/lang/String;)Ljava/io/FileInputStream;") => {
+            let path = app_file_path(vm, args)?;
+            let stream = vm
+                .heap
+                .alloc_instance(FIS.to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            let path_ref = crate::intrinsics::alloc_string(vm, path)?;
+            if stream_intrinsic(
+                vm,
+                FIS,
+                "<init>",
+                "(Ljava/lang/String;)V",
+                stream,
+                &[Value::Obj(path_ref)],
+            )?
+            .is_none()
+            {
+                return Err(crate::err::vm_error(
+                    "VM_TYPE_ERROR",
+                    "FileInputStream constructor was not handled",
+                )
+                .into());
+            }
+            Value::Obj(stream)
+        }
+        ("openFileOutput", "(Ljava/lang/String;I)Ljava/io/FileOutputStream;") => {
+            let path = app_file_path(vm, args)?;
+            let mode = args
+                .get(1)
+                .and_then(|value| value.as_int().ok())
+                .unwrap_or(0);
+            let append = Value::Int(i32::from(mode & 0x8000 != 0));
+            let stream = vm
+                .heap
+                .alloc_instance(FOS.to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            let path_ref = crate::intrinsics::alloc_string(vm, path)?;
+            if stream_intrinsic(
+                vm,
+                FOS,
+                "<init>",
+                "(Ljava/lang/String;Z)V",
+                stream,
+                &[Value::Obj(path_ref), append],
+            )?
+            .is_none()
+            {
+                return Err(crate::err::vm_error(
+                    "VM_TYPE_ERROR",
+                    "FileOutputStream constructor was not handled",
+                )
+                .into());
+            }
+            Value::Obj(stream)
         }
         ("getExternalFilesDir", _) | ("getExternalCacheDir", _) => {
             let pkg = vm.fw.package_name.clone();

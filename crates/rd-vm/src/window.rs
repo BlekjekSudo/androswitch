@@ -101,8 +101,45 @@ pub(crate) fn instance_intrinsic(
         return Ok(None);
     }
     let v = match (name, sig) {
+        ("getCallback", "()Landroid/view/Window$Callback;") => vm
+            .view_props
+            .get(&(recv, "win:callback".to_string()))
+            .cloned()
+            .unwrap_or(Value::Null),
+        ("setCallback", "(Landroid/view/Window$Callback;)V") => {
+            let callback = match args.first() {
+                Some(Value::Null | Value::Int(0)) | None => Value::Null,
+                Some(value) => value.clone(),
+            };
+            vm.view_props
+                .insert((recv, "win:callback".to_string()), callback);
+            Value::Null
+        }
         ("getDecorView", "()Landroid/view/View;") | ("peekDecorView", "()Landroid/view/View;") => {
             Value::Obj(decor_of(vm, recv)?.0)
+        }
+        ("setContentView", "(Landroid/view/View;)V") => {
+            let content = args
+                .first()
+                .ok_or_else(|| {
+                    crate::err::vm_error("VM_TYPE_ERROR", "Window.setContentView sem View")
+                })?
+                .as_ref()
+                .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))?
+                .ok_or_else(|| {
+                    crate::err::Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "Window.setContentView(view): null view",
+                    )
+                })?;
+            let Some(HostObj::Window { content: slot }) = vm.fw.objects.get_mut(&recv) else {
+                return Err(crate::err::vm_error("VM_TYPE_ERROR", "Window sem estado host").into());
+            };
+            *slot = Some(content);
+            let (_, frame) = decor_of(vm, recv)?;
+            attach_content(vm, frame, content)?;
+            vm.fw.traversal_pending = true;
+            Value::Null
         }
         ("findViewById", "(I)Landroid/view/View;") => {
             let (decor, _) = decor_of(vm, recv)?;

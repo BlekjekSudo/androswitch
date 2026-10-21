@@ -114,6 +114,10 @@ pub(crate) fn instance_intrinsic(
             Some(c) => Value::Obj(vm.class_object_for(c)?),
             None => Value::Null,
         },
+        ("getModifiers", "()I") => {
+            const CLASS_MODIFIER_MASK: u32 = 0x0000_761f;
+            Value::Int((access_flags(vm, &d).unwrap_or(0) & CLASS_MODIFIER_MASK) as i32)
+        }
         ("isInterface", "()Z") => b(access_flags(vm, &d).is_some_and(|f| f & ACC_INTERFACE != 0)
             || (crate::classpath::host_class_known(&d)
                 && vm.cp.superclass_of(&d).is_none()
@@ -248,6 +252,20 @@ pub(crate) fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn get_modifiers_returns_class_flags_without_acc_super() {
+        let mut builder = rd_testsupport::vm::DexBuilder::new();
+        builder.class("Lexample/PublicFragment;", "Ljava/lang/Object;");
+        let dex = rd_dex::Dex::parse(builder.finish()).unwrap();
+        let mut vm = crate::engine::Engine::new(vec![dex], crate::engine::VmConfig::default());
+        let class = vm.class_object_for("Lexample/PublicFragment;").unwrap();
+        assert_eq!(
+            vm.invoke_instance(class, "getModifiers", "()I", &[])
+                .unwrap(),
+            Value::Int(0x1)
+        );
+    }
 
     #[test]
     fn name_shapes() {

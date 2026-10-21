@@ -159,11 +159,11 @@ impl Insn {
             }
             Kind::RegRegReg(a, b, c) => {
                 units.push(op | ((*a as u16) << 8));
-                units.push((*c as u16) << 8 | *b as u16);
+                units.push(((*c as u16) << 8) | *b as u16);
             }
             Kind::RegRegLit8(a, b, lit) => {
                 units.push(op | ((*a as u16) << 8));
-                units.push(((*lit as u8) as u16) << 8 | (*b as u16));
+                units.push((((*lit as u8) as u16) << 8) | (*b as u16));
             }
             Kind::RegRegBranch16(a, b, off) => {
                 units.push(op | byte1(*a as u16, *b as u16));
@@ -201,7 +201,9 @@ impl Insn {
             Kind::Invoke35c { count, idx, regs } => {
                 units.push(op | ((*count as u16 & 0xF) << 12) | (n4(regs[4]) << 8));
                 units.push(*idx);
-                units.push(n4(regs[3]) << 12 | n4(regs[2]) << 8 | n4(regs[1]) << 4 | n4(regs[0]));
+                units.push(
+                    (n4(regs[3]) << 12) | (n4(regs[2]) << 8) | (n4(regs[1]) << 4) | n4(regs[0]),
+                );
             }
             Kind::InvokeRange3rc { count, idx, start } => {
                 units.push(op | ((*count as u16) << 8));
@@ -216,7 +218,9 @@ impl Insn {
             } => {
                 units.push(op | ((*count as u16 & 0xF) << 12) | (n4(regs[4]) << 8));
                 units.push(*idx);
-                units.push(n4(regs[3]) << 12 | n4(regs[2]) << 8 | n4(regs[1]) << 4 | n4(regs[0]));
+                units.push(
+                    (n4(regs[3]) << 12) | (n4(regs[2]) << 8) | (n4(regs[1]) << 4) | n4(regs[0]),
+                );
                 units.push(*proto);
             }
             Kind::InvokeRange4rcc {
@@ -583,13 +587,13 @@ pub fn decode_at(insns: &[u16], addr: usize) -> RdResult<(Insn, u16)> {
         Format::F30t => {
             let lo = unit(1)?;
             let hi = unit(2)?;
-            let off = ((hi as u32) << 16 | lo as u32) as i32;
+            let off = (((hi as u32) << 16) | lo as u32) as i32;
             Ok((mk(3, Kind::Branch32(off)), 3))
         }
         Format::F31i | Format::F31t | Format::F31c => {
             let lo = unit(1)?;
             let hi = unit(2)?;
-            let raw = (hi as u32) << 16 | lo as u32;
+            let raw = ((hi as u32) << 16) | lo as u32;
             let kind = match o.format {
                 Format::F31i => Kind::RegLit32(b1 as u8, raw as i32),
                 Format::F31t => Kind::RegBranch32(b1 as u8, raw as i32),

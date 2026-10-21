@@ -1463,6 +1463,7 @@ fn cmd_app_run(
                 }
             }
             ("dump", _) => {
+                eng.ensure_laid_out().map_err(vm_err_to_rd)?;
                 let d = eng.dump_ui();
                 dumps.push(d);
                 if !json {
@@ -1471,7 +1472,8 @@ fn cmd_app_run(
                 }
             }
             ("xml", _) => {
-                // M4: dump uiautomator (get_ui_tree)
+                // M4: dump uiautomator (get_ui_tree) after the first host traversal.
+                eng.ensure_laid_out().map_err(vm_err_to_rd)?;
                 let tree = eng.view_tree().ok_or_else(|| {
                     RdError::new("INVALID_FORMAT", "sem activity/window para dump", "rd-cli")
                 })?;
@@ -1496,6 +1498,9 @@ fn cmd_app_run(
                         .with_suggestion("use --script \"shot tela.png\"")
                     })?;
                 let file = file.strip_prefix("--out ").map(str::trim).unwrap_or(file);
+                // Run measure/layout before snapshotting host views; otherwise
+                // the first screenshot can capture zero-sized decor children.
+                let draw_result = eng.draw_frame();
                 let tree = eng.view_tree().ok_or_else(|| {
                     RdError::new(
                         "INVALID_FORMAT",
@@ -1503,9 +1508,9 @@ fn cmd_app_run(
                         "rd-cli",
                     )
                 })?;
-                // same pipeline as the MCP screenshot: host tree + DEX draw pass
+                // same pipeline as the MCP screenshot: laid-out host tree + DEX draw pass
                 let mut fb = rd_render::render_snapshot(&tree);
-                match eng.draw_frame() {
+                match draw_result {
                     Ok(ops) if ops > 0 && eng.has_frame() => {
                         let (w, h) = (fb.w, fb.h);
                         eng.rasterize_frame(&mut fb.px, w, h);
@@ -1541,6 +1546,7 @@ fn cmd_app_run(
         }
     }
     if dumps.is_empty() {
+        eng.ensure_laid_out().map_err(vm_err_to_rd)?;
         dumps.push(eng.dump_ui());
     }
     if json {
@@ -1593,7 +1599,8 @@ fn cmd_app_dump(
     text: bool,
     json: bool,
 ) -> Result<(), RdError> {
-    let (eng, activity_desc, package) = boot_app(path, activity, false, None)?;
+    let (mut eng, activity_desc, package) = boot_app(path, activity, false, None)?;
+    eng.ensure_laid_out().map_err(vm_err_to_rd)?;
     if text {
         let d = eng.dump_ui();
         if json {
@@ -1632,7 +1639,8 @@ fn cmd_app_dump(
 /// M4 DoD "screenshot correto": PNG headless 720×1440 da tela corrente —
 /// software renderer determinístico do rd-render.
 fn cmd_app_shot(path: &Path, activity: Option<&str>, out: &Path) -> Result<(), RdError> {
-    let (eng, _activity, _package) = boot_app(path, activity, false, None)?;
+    let (mut eng, _activity, _package) = boot_app(path, activity, false, None)?;
+    let draw_result = eng.draw_frame();
     let tree = eng.view_tree().ok_or_else(|| {
         RdError::new(
             "INVALID_FORMAT",
@@ -1640,7 +1648,19 @@ fn cmd_app_shot(path: &Path, activity: Option<&str>, out: &Path) -> Result<(), R
             "rd-cli",
         )
     })?;
-    let png = rd_render::render_snapshot(&tree).to_png();
+    let mut fb = rd_render::render_snapshot(&tree);
+    match draw_result {
+        Ok(ops) if ops > 0 && eng.has_frame() => {
+            let (w, h) = (fb.w, fb.h);
+            eng.rasterize_frame(&mut fb.px, w, h);
+        }
+        Ok(_) => {}
+        Err(error) => eprintln!(
+            "W/RustyDroid: draw pass failed: {error}{}",
+            eng.exit_trace(&error)
+        ),
+    }
+    let png = fb.to_png();
     std::fs::write(out, &png).map_err(|e| {
         RdError::new(
             "IO_ERROR",

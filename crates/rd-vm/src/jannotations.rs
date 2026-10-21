@@ -16,8 +16,9 @@
 //! - `annotationType()`, `toString()`, `hashCode()` and `equals()` are
 //!   provided.
 //!
-//! **Deviation.** Method, field and parameter annotations are still
-//! reported absent.
+//! **Deviation.** Runtime-visible method/constructor annotations are queried
+//! by `AnnotatedElement`; repeatable-container expansion, field annotations,
+//! and parameter annotations are not implemented.
 
 use rd_dex::annotations::{
     parse_annotation_item, parse_annotation_set_item, parse_annotations_directory,
@@ -28,7 +29,7 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 
 use crate::engine::Engine;
-use crate::err::VmExit;
+use crate::err::{Throwable, VmExit};
 use crate::heap::{ElemKind, ObjRef};
 use crate::value::Value;
 
@@ -73,6 +74,48 @@ fn desc_of_class_obj(vm: &Engine, c: ObjRef) -> Option<String> {
         Ok(Value::Obj(s)) => vm.heap.as_str(s).ok().map(str::to_string),
         _ => None,
     }
+}
+
+/// Runtime-visible annotations attached to one declared DEX method.
+fn method_annotations(
+    vm: &Engine,
+    class: &str,
+    name: &str,
+    proto: &str,
+) -> Vec<(usize, EncodedAnnotation)> {
+    let Some((di, def)) = vm.cp.find_class(class) else {
+        return Vec::new();
+    };
+    if def.annotations_off == 0 {
+        return Vec::new();
+    }
+    let dex = &vm.cp.dexes[di];
+    let Some(method_idx) = (0..dex.method_ids.len()).find(|&idx| {
+        vm.cp
+            .method_ref(di, idx as u32)
+            .map(|m| m.class == class && m.name == name && m.proto == proto)
+            .unwrap_or(false)
+    }) else {
+        return Vec::new();
+    };
+    let Ok(dir) = parse_annotations_directory(&dex.data, def.annotations_off) else {
+        return Vec::new();
+    };
+    let Some((_, set_off)) = dir
+        .method_annotations
+        .iter()
+        .find(|(idx, _)| *idx as usize == method_idx)
+    else {
+        return Vec::new();
+    };
+    let Ok(offs) = parse_annotation_set_item(&dex.data, *set_off) else {
+        return Vec::new();
+    };
+    offs.into_iter()
+        .filter_map(|off| parse_annotation_item(&dex.data, off).ok())
+        .filter(|item| item.visibility == Visibility::Runtime)
+        .map(|item| (di, item.annotation))
+        .collect()
 }
 
 fn to_value(vm: &mut Engine, di: usize, v: &EncodedValue) -> Result<Value, VmExit> {
@@ -236,6 +279,89 @@ pub fn class_intrinsic(
                 .array_elems_mut(arr)
                 .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))? = vals;
             Value::Obj(arr)
+        }
+    }))
+}
+
+/// Method/`Executable` reflection over runtime-visible DEX annotations.
+pub(crate) fn method_intrinsic(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let query = match (name, sig) {
+        ("getAnnotation", "(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;")
+        | ("getDeclaredAnnotation", "(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;")
+        | ("isAnnotationPresent", "(Ljava/lang/Class;)Z")
+        | ("getAnnotationsByType", "(Ljava/lang/Class;)[Ljava/lang/annotation/Annotation;")
+        | (
+            "getDeclaredAnnotationsByType",
+            "(Ljava/lang/Class;)[Ljava/lang/annotation/Annotation;",
+        ) => true,
+        ("getAnnotations", "()[Ljava/lang/annotation/Annotation;")
+        | ("getDeclaredAnnotations", "()[Ljava/lang/annotation/Annotation;") => false,
+        _ => return Ok(None),
+    };
+    let (Some(Value::Obj(class_name)), Some(Value::Obj(method_name)), Some(Value::Obj(proto))) = (
+        vm.heap.get_field(recv, "rd_decl").ok(),
+        vm.heap.get_field(recv, "rd_name").ok(),
+        vm.heap.get_field(recv, "rd_sig").ok(),
+    ) else {
+        return Ok(None);
+    };
+    let decl = vm.heap.as_str(class_name)?.to_string();
+    let method = vm.heap.as_str(method_name)?.to_string();
+    let proto = vm.heap.as_str(proto)?.to_string();
+    let want = if query {
+        let Some(Value::Obj(class_obj)) = args.first() else {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/NullPointerException;",
+                "annotation type == null",
+            )));
+        };
+        Some(desc_of_class_obj(vm, *class_obj).ok_or_else(|| {
+            VmExit::Exception(Throwable::new(
+                "Ljava/lang/NullPointerException;",
+                "annotation type has no class descriptor",
+            ))
+        })?)
+    } else {
+        None
+    };
+    let annotations = method_annotations(vm, &decl, &method, &proto);
+    let matching: Vec<(usize, EncodedAnnotation)> = annotations
+        .into_iter()
+        .filter(|(di, annotation)| {
+            want.as_deref()
+                .map(|wanted| wanted == vm.cp.dexes[*di].type_str(annotation.type_idx))
+                .unwrap_or(true)
+        })
+        .collect();
+    Ok(Some(match name {
+        "isAnnotationPresent" => Value::Int(!matching.is_empty() as i32),
+        "getAnnotation" | "getDeclaredAnnotation" => match matching.first() {
+            Some((di, annotation)) => Value::Obj(instance(vm, *di, annotation)?),
+            None => Value::Null,
+        },
+        _ => {
+            let mut values = Vec::with_capacity(matching.len());
+            for (di, annotation) in &matching {
+                values.push(Value::Obj(instance(vm, *di, annotation)?));
+            }
+            let array = vm
+                .heap
+                .alloc_array(
+                    ElemKind::Obj,
+                    values.len(),
+                    "[Ljava/lang/annotation/Annotation;",
+                )
+                .map_err(crate::err::oom_throwable)?;
+            *vm.heap
+                .array_elems_mut(array)
+                .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))? = values;
+            Value::Obj(array)
         }
     }))
 }

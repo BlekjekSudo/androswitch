@@ -16,7 +16,7 @@
 | M6 | Executor de testes | suíte JSON → JUnit XML; compat-matrix automatizada | ✅ **implementado (2026-10)** |
 | M7 | Performance + gate piso E5 | startup < 2 s app trivial; suíte golden passa nos budgets moto-e5 | 🟡 **parcial (2026-10)** — `rd perf` + gate de CI no app trivial (estimativa); golden pendente |
 | M8 | Compat real | app OSS médio navega funcional; v0.9 | ✅ **implementado (2026-10)** |
-| M9 | Componentes avançados + NDK | 5 APKs com .so rodando; widgets/IME/notificações ok | ✅ **implementado (2026-10)** — 5 APKs reais × 3 ABIs com chamadas JNI verificadas; revisão humana pendente |
+| M9 | Componentes avançados + NDK | 5 APKs com .so rodando; widgets/IME/notificações ok | ✅ **implementado e revisado (2026-10)** — 5 APKs reais × 3 ABIs com chamadas JNI verificadas; aprovação humana registrada em 2026-10-21 |
 | M10 | Dispositivos virtuais | câmera/GPS/biometria programáveis pelo agente | ⬜ |
 | M11 | Engines | Flutter → RN → Mono → wasm: 1 app de cada em golden flow | ⬜ |
 | M12 | Ecossistema GH | docs site, compat-matrix viva, releases; v1.0 | ⬜ |

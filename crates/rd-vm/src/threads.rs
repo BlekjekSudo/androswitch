@@ -81,23 +81,20 @@ pub struct Threads {
 
 impl Threads {
     fn entry(&mut self, t: ObjRef) -> &mut GreenThread {
-        if !self.table.contains_key(&t) {
+        if let std::collections::hash_map::Entry::Vacant(entry) = self.table.entry(t) {
             self.next_id += 1;
             let id = self.next_id + 1; // 1 is "main"
-            self.table.insert(
-                t,
-                GreenThread {
-                    id,
-                    name: format!("Thread-{}", id - 2),
-                    target: None,
-                    daemon: false,
-                    state: ThreadState::New,
-                    permit: false,
-                    interrupted: false,
-                    wake_at_ms: None,
-                    runs: 0,
-                },
-            );
+            entry.insert(GreenThread {
+                id,
+                name: format!("Thread-{}", id - 2),
+                target: None,
+                daemon: false,
+                state: ThreadState::New,
+                permit: false,
+                interrupted: false,
+                wake_at_ms: None,
+                runs: 0,
+            });
         }
         self.table.get_mut(&t).expect("inserted")
     }

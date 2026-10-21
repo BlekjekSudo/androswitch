@@ -31,19 +31,15 @@ const ITERATOR: &str = "Ljava/util/Iterator;";
 const EXECUTORS: &str = "Ljava/util/concurrent/Executors;";
 const EXECUTOR: &str = "Ljava/util/concurrent/Executor;";
 const EXECUTOR_SVC: &str = "Ljava/util/concurrent/ExecutorService;";
+const FORK_JOIN_POOL: &str = "Ljava/util/concurrent/ForkJoinPool;";
 const FUTURE: &str = "Ljava/util/concurrent/Future;";
 /// M8: 24º gap do launch real (`ServiceLoader.load`). Sem leitura de
 /// `META-INF/services` no APK, o loader é deliberadamente vazio; isso mantém
 /// o caminho de inicialização vivo sem inventar providers que não existem.
 const SERVICE_LOADER: &str = "Ljava/util/ServiceLoader;";
-/// M8: 26º gap do launch real (`ClassLoader.getResources`). Enumeration é o
-/// cursor legado da JDK 1.0 — semanticamente o mesmo cursor do Iterator host,
-/// então reutiliza o estado `HostObj::Iter`. O runtime ainda não enumera
-/// entries do APK como recursos de classpath: a Enumeration host é vazia.
+/// Enumeration é o cursor legado da JDK 1.0 — semanticamente o mesmo cursor
+/// do Iterator host (`HostObj::Iter`), agora também usado para recursos APK.
 const ENUMERATION: &str = "Ljava/util/Enumeration;";
-/// M8: ClassLoader canônico da VM (identidade por VM — ver
-/// `framework::class_loader_obj`). `getResources(String)` é o 26º gap real.
-const CLASS_LOADER: &str = "Ljava/lang/ClassLoader;";
 const REFLECT_FIELD: &str = "Ljava/lang/reflect/Field;";
 const UNSAFE_CLASS: &str = "Lsun/misc/Unsafe;";
 const TIME_UNIT: &str = "Ljava/util/concurrent/TimeUnit;";
@@ -81,9 +77,8 @@ const WEAK_MAP: &str = "Ljava/util/WeakHashMap;";
 /// M8: 25º gap do launch real (`LinkedHashSet.<init>`). Reusa o estado List
 /// dos demais Sets: deduplicação por igualdade Java e ordem de inserção.
 const LINKED_SET: &str = "Ljava/util/LinkedHashSet;";
-/// M8: sétimo gap do launch real (`LinkedHashMap.<init>`). Estado Map é
-/// `Vec<(chave, valor)>` ⇒ ordem de INSERÇÃO (como LinkedHashMap real); para
-/// os métodos essenciais o comportamento é o do HashMap.
+/// M8: host LinkedHashMap uses Map's ordered Vec state; the `(IFZ)V` form
+/// records access-order mode and moves accessed entries to the tail.
 const LINKED_MAP: &str = "Ljava/util/LinkedHashMap;";
 /// M8: 17º gap do launch real (`ConcurrentHashMap.<init>`). VM
 /// single-threaded ⇒ sem segmentação/concorrência: mesmo estado e métodos do
@@ -117,6 +112,8 @@ const ABSTRACT_COLLECTION_CTORS: [&str; 6] = [
 
 const ARRAY_LIST: &str = "Ljava/util/ArrayList;";
 const LINKED_LIST: &str = "Ljava/util/LinkedList;";
+const VECTOR: &str = "Ljava/util/Vector;";
+const STACK: &str = "Ljava/util/Stack;";
 /// M8: coleções concorrentes — sexto gap do launch real
 /// (`CopyOnWriteArraySet.<init>`). VM single-threaded ⇒ cópia-em-escrita é
 /// irrelevante: ArraySet vira Set host (add deduplica) e ArrayList segue o
@@ -287,6 +284,72 @@ fn call_static_intrinsic_rooted(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if class == "Ljava/util/Objects;" && name == "requireNonNull" {
+        let value = args.first().cloned().unwrap_or(Value::Null);
+        if !matches!(value, Value::Null | Value::Int(0)) {
+            return Ok(Some(value));
+        }
+        let message = match sig {
+            "(Ljava/lang/Object;)Ljava/lang/Object;" => None,
+            "(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;" => match args.get(1) {
+                Some(Value::Obj(message)) => vm.heap.as_str(*message).ok().map(str::to_string),
+                _ => None,
+            },
+            "(Ljava/lang/Object;Ljava/util/function/Supplier;)Ljava/lang/Object;" => {
+                let supplied = match args.get(1) {
+                    Some(Value::Obj(supplier)) => {
+                        vm.invoke_instance(*supplier, "get", "()Ljava/lang/Object;", &[])?
+                    }
+                    _ => Value::Null,
+                };
+                match supplied {
+                    Value::Obj(message) => vm.heap.as_str(message).ok().map(str::to_string),
+                    _ => None,
+                }
+            }
+            _ => return Ok(None),
+        };
+        return Err(VmExit::Exception(Throwable {
+            class: "Ljava/lang/NullPointerException;".to_string(),
+            message,
+            obj: None,
+        }));
+    }
+    if class == "Ljava/util/Objects;"
+        && name == "equals"
+        && sig == "(Ljava/lang/Object;Ljava/lang/Object;)Z"
+    {
+        let left = args.first().cloned().unwrap_or(Value::Null);
+        let right = args.get(1).cloned().unwrap_or(Value::Null);
+        let is_null = |value: &Value| matches!(value, Value::Null | Value::Int(0));
+        if is_null(&left) || is_null(&right) {
+            return Ok(Some(Value::Int((is_null(&left) && is_null(&right)) as i32)));
+        }
+        if let (Value::Obj(left_ref), Value::Obj(right_ref)) = (&left, &right) {
+            if left_ref == right_ref {
+                return Ok(Some(Value::Int(1)));
+            }
+        }
+        if let Value::Obj(left_ref) = left {
+            return vm
+                .invoke_instance(left_ref, "equals", "(Ljava/lang/Object;)Z", &[right])
+                .map(Some);
+        }
+        return Ok(Some(Value::Int(0)));
+    }
+    if class == "Landroid/text/method/LinkMovementMethod;"
+        && name == "getInstance"
+        && sig == "()Landroid/text/method/MovementMethod;"
+    {
+        let key = (class.to_string(), "INSTANCE".to_string());
+        if let Some(value) = vm.statics.get(&key) {
+            return Ok(Some(value.clone()));
+        }
+        let instance = vm.heap.alloc_instance(class.to_string(), Vec::new())?;
+        let value = Value::Obj(instance);
+        vm.statics.insert(key, value.clone());
+        return Ok(Some(value));
+    }
     // java.lang primitive wrappers (boxes.rs): valueOf/hashCode/compare/bits
     if let Some(v) = crate::boxes::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
@@ -338,6 +401,10 @@ fn call_static_intrinsic_rooted(
     }
     // java.lang.System: arraycopy/identityHashCode/virtual-clock time
     if let Some(v) = crate::jlsystem::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    // java.security.AccessController: run PrivilegedAction callbacks inline.
+    if let Some(v) = crate::jsecurity::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
     }
     if let Some(v) = crate::view_layout::static_intrinsic(vm, class, name, args)? {
@@ -396,6 +463,53 @@ fn call_static_intrinsic_rooted(
     if let Some(v) = crate::android_text::log_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
     }
+    if class == "Ljava/lang/reflect/Modifier;" {
+        if sig == "(I)Z" {
+            let mask = match name {
+                "isPublic" => Some(0x0001),
+                "isPrivate" => Some(0x0002),
+                "isProtected" => Some(0x0004),
+                "isStatic" => Some(0x0008),
+                "isFinal" => Some(0x0010),
+                "isSynchronized" => Some(0x0020),
+                "isVolatile" => Some(0x0040),
+                "isTransient" => Some(0x0080),
+                "isNative" => Some(0x0100),
+                "isInterface" => Some(0x0200),
+                "isAbstract" => Some(0x0400),
+                "isStrict" => Some(0x0800),
+                "isSynthetic" => Some(0x1000),
+                "isAnnotation" => Some(0x2000),
+                "isEnum" => Some(0x4000),
+                "isMandated" => Some(0x8000),
+                _ => None,
+            };
+            if let Some(mask) = mask {
+                return Ok(Some(Value::Int((args[0].as_int()? & mask != 0) as i32)));
+            }
+        } else if name == "toString" && sig == "(I)Ljava/lang/String;" {
+            let modifiers = args[0].as_int()?;
+            let words = [
+                (0x0001, "public"),
+                (0x0004, "protected"),
+                (0x0002, "private"),
+                (0x0400, "abstract"),
+                (0x0008, "static"),
+                (0x0010, "final"),
+                (0x0080, "transient"),
+                (0x0040, "volatile"),
+                (0x0020, "synchronized"),
+                (0x0100, "native"),
+                (0x0800, "strictfp"),
+            ];
+            let text = words
+                .iter()
+                .filter_map(|(mask, word)| (modifiers & mask != 0).then_some(*word))
+                .collect::<Vec<_>>()
+                .join(" ");
+            return Ok(Some(Value::Obj(alloc_string(vm, text)?)));
+        }
+    }
     match (class, name, sig) {
         ("Ljava/util/Arrays;", "asList", "([Ljava/lang/Object;)Ljava/util/List;") => {
             let array = args.first().and_then(|v| v.as_ref().ok().flatten()).ok_or_else(|| VmExit::Exception(Throwable::new("Ljava/lang/NullPointerException;", "Arrays.asList array null")))?;
@@ -406,12 +520,6 @@ fn call_static_intrinsic_rooted(
         }
         ("Ljava/lang/Runtime;", "getRuntime", "()Ljava/lang/Runtime;") => {
             Ok(Some(Value::Obj(vm.runtime_obj()?)))
-        }
-        ("Ljava/lang/reflect/Modifier;", "isStatic", "(I)Z") => {
-            Ok(Some(Value::Int((args[0].as_int()? & 0x0008 != 0) as i32)))
-        }
-        ("Ljava/lang/reflect/Modifier;", "isFinal", "(I)Z") => {
-            Ok(Some(Value::Int((args[0].as_int()? & 0x0010 != 0) as i32)))
         }
         (MATH, "abs", "(I)I") => Ok(Some(Value::Int(args[0].as_int()?.wrapping_abs()))),
         (MATH, "abs", "(J)J") => Ok(Some(Value::Long(args[0].as_long()?.wrapping_abs()))),
@@ -881,6 +989,15 @@ fn call_static_intrinsic_rooted(
             let r = vm.heap.alloc_instance(EXECUTOR_SVC.to_string(), vec![])?;
             Ok(Some(Value::Obj(r)))
         }
+        (FORK_JOIN_POOL, "commonPool", "()Ljava/util/concurrent/ForkJoinPool;") => {
+            let key = (FORK_JOIN_POOL.to_string(), "commonPool".to_string());
+            if let Some(pool) = vm.statics.get(&key) {
+                return Ok(Some(pool.clone()));
+            }
+            let pool = Value::Obj(vm.heap.alloc_instance(FORK_JOIN_POOL.to_string(), vec![])?);
+            vm.statics.insert(key, pool.clone());
+            Ok(Some(pool))
+        }
         _ => {
             if class.starts_with("Ljava/") || class.starts_with("Ljavax/") {
                 return Err(not_implemented(format!("intrínseco {class}->{name}{sig}")).into());
@@ -997,11 +1114,14 @@ fn platform_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<V
     }
     let v = match crate::android_build::host_static(vm, owner, field)? {
         Some(v) => Some(v),
-        None => match crate::boxes::host_static(vm, owner, field)? {
+        None => match crate::android_env::host_static(vm, owner, field)? {
             Some(v) => Some(v),
-            None => match crate::jbigdecimal::host_static(vm, owner, field)? {
+            None => match crate::boxes::host_static(vm, owner, field)? {
                 Some(v) => Some(v),
-                None => crate::jnormalizer::host_static(vm, owner, field)?,
+                None => match crate::jbigdecimal::host_static(vm, owner, field)? {
+                    Some(v) => Some(v),
+                    None => crate::jnormalizer::host_static(vm, owner, field)?,
+                },
             },
         },
     };
@@ -1548,6 +1668,7 @@ fn exec_supported(name: &str, sig: &str) -> bool {
             )
             | ("shutdown", "()V")
             | ("shutdownNow", "()Ljava/util/List;")
+            | ("awaitTermination", "(JLjava/util/concurrent/TimeUnit;)Z")
             | ("isShutdown", "()Z")
             | ("isTerminated", "()Z")
     )
@@ -1651,6 +1772,14 @@ fn exec_intrinsic(
             let l = vm.heap.alloc_instance(ARRAY_LIST.to_string(), vec![])?;
             vm.fw.objects.insert(l, HostObj::List { elems: Vec::new() });
             Ok(Some(Value::Obj(l)))
+        }
+        ("awaitTermination", "(JLjava/util/concurrent/TimeUnit;)Z") => {
+            if matches!(args.get(1), None | Some(Value::Null) | Some(Value::Int(0))) {
+                return Err(exec_npe("unit"));
+            }
+            let down =
+                matches!(vm.heap.get_field(recv, "exec_shutdown"), Ok(Value::Int(v)) if v != 0);
+            Ok(Some(Value::Int(down as i32)))
         }
         ("isShutdown", _) | ("isTerminated", _) => {
             let down =
@@ -1759,20 +1888,6 @@ fn service_loader_intrinsic(
     Ok(Some(Value::Obj(it)))
 }
 
-/// Aloca uma Enumeration host vazia (M8): cursor sobre zero elementos sobre o
-/// mesmo estado `HostObj::Iter` do Iterator host.
-fn alloc_empty_enumeration(vm: &mut Engine) -> Result<Value, VmExit> {
-    let e = vm.heap.alloc_instance(ENUMERATION.to_string(), vec![])?;
-    vm.fw.objects.insert(
-        e,
-        crate::framework::HostObj::Iter {
-            elems: Vec::new(),
-            pos: 0,
-        },
-    );
-    Ok(Value::Obj(e))
-}
-
 /// (name, sig) de Enumeration host suportados (M8).
 fn enumeration_supported(name: &str, sig: &str) -> bool {
     matches!(
@@ -1794,32 +1909,6 @@ fn enumeration_intrinsic(
         _ => "next",
     };
     iterator_intrinsic(vm, recv, cursor_name)
-}
-
-/// (name, sig) de ClassLoader host suportados (M8).
-fn class_loader_supported(name: &str, sig: &str) -> bool {
-    matches!(
-        (name, sig),
-        (
-            "getResources",
-            "(Ljava/lang/String;)Ljava/util/Enumeration;"
-        )
-    )
-}
-
-/// `ClassLoader.getResources(String)` (M8, 26º gap do launch real): a VM não
-/// expõe entries do APK/DEX como recursos de classpath, então a Enumeration é
-/// deliberadamente vazia — nunca null (contrato JDK), sem inventar recursos
-/// inexistentes e sem varrer `META-INF/services` (descoberta SPI real segue
-/// fora do escopo). `name` null materializa NPE (`Objects.requireNonNull`).
-fn class_loader_get_resources(vm: &mut Engine, args: &[Value]) -> Result<Option<Value>, VmExit> {
-    if args[0].as_ref()?.is_none() {
-        return Err(VmExit::Exception(Throwable::new(
-            "Ljava/lang/NullPointerException;",
-            "ClassLoader.getResources com name null",
-        )));
-    }
-    alloc_empty_enumeration(vm).map(Some)
 }
 
 /// (name, sig) de Iterator host suportados (M8).
@@ -2432,6 +2521,7 @@ fn map_supported(name: &str, sig: &str) -> bool {
         ("<init>", "()V")
             | ("<init>", "(I)V")
             | ("<init>", "(IF)V")
+            | ("<init>", "(IFZ)V")
             | ("<init>", "(Ljava/util/Map;)V")
             | (
                 "put",
@@ -2478,6 +2568,165 @@ fn list_supported(name: &str, sig: &str) -> bool {
             | ("isEmpty", "()Z")
             | ("clear", "()V")
     )
+}
+
+/// Operações herdadas/sincronizadas de Vector que não fazem parte de List.
+fn vector_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("addElement", "(Ljava/lang/Object;)V")
+            | ("elementAt", "(I)Ljava/lang/Object;")
+            | ("firstElement", "()Ljava/lang/Object;")
+            | ("lastElement", "()Ljava/lang/Object;")
+            | ("removeElement", "(Ljava/lang/Object;)Z")
+            | ("removeElementAt", "(I)V")
+            | ("insertElementAt", "(Ljava/lang/Object;I)V")
+            | ("elements", "()Ljava/util/Enumeration;")
+            | ("capacity", "()I")
+            | ("ensureCapacity", "(I)V")
+            | ("trimToSize", "()V")
+            | ("setSize", "(I)V")
+            | ("copyInto", "([Ljava/lang/Object;)V")
+    )
+}
+
+fn vector_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    use crate::framework::HostObj;
+    match (name, sig) {
+        ("addElement", _) => {
+            list_elems(vm, recv)?.push(args[0].clone());
+            Ok(Some(Value::Null))
+        }
+        ("elementAt", _) => list_intrinsic(vm, recv, "get", "(I)Ljava/lang/Object;", args),
+        ("firstElement", _) | ("lastElement", _) => {
+            let elems = list_elems(vm, recv)?;
+            let value = if name == "firstElement" {
+                elems.first()
+            } else {
+                elems.last()
+            };
+            value.cloned().map(Some).ok_or_else(|| {
+                VmExit::Exception(Throwable::new(
+                    "Ljava/util/NoSuchElementException;",
+                    "Vector is empty",
+                ))
+            })
+        }
+        ("removeElement", _) => list_intrinsic(vm, recv, "remove", "(Ljava/lang/Object;)Z", args),
+        ("removeElementAt", _) => {
+            list_intrinsic(vm, recv, "remove", "(I)Ljava/lang/Object;", args)?;
+            Ok(Some(Value::Null))
+        }
+        ("insertElementAt", _) => list_intrinsic(
+            vm,
+            recv,
+            "add",
+            "(ILjava/lang/Object;)V",
+            &[args[1].clone(), args[0].clone()],
+        ),
+        ("elements", _) => {
+            let elems = list_elems(vm, recv)?.clone();
+            let enumeration = vm
+                .heap
+                .alloc_instance(ENUMERATION.to_string(), Vec::new())?;
+            vm.fw
+                .objects
+                .insert(enumeration, HostObj::Iter { elems, pos: 0 });
+            Ok(Some(Value::Obj(enumeration)))
+        }
+        ("capacity", _) => Ok(Some(Value::Int(list_elems(vm, recv)?.len() as i32))),
+        ("ensureCapacity", _) | ("trimToSize", _) => Ok(Some(Value::Null)),
+        ("setSize", _) => {
+            let requested = args[0].as_int()?;
+            if requested < 0 {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/ArrayIndexOutOfBoundsException;",
+                    format!("negative Vector size {requested}"),
+                )));
+            }
+            let elems = list_elems(vm, recv)?;
+            elems.resize(requested as usize, Value::Null);
+            Ok(Some(Value::Null))
+        }
+        ("copyInto", _) => {
+            let Some(Value::Obj(array)) = args.first() else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "Vector.copyInto array == null",
+                )));
+            };
+            let source = list_elems(vm, recv)?.clone();
+            let target = vm
+                .heap
+                .array_elems_mut(*array)
+                .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))?;
+            if target.len() < source.len() {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/ArrayIndexOutOfBoundsException;",
+                    "destination array is shorter than Vector",
+                )));
+            }
+            target[..source.len()].clone_from_slice(&source);
+            Ok(Some(Value::Null))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn stack_supported(name: &str, sig: &str) -> bool {
+    matches!(
+        (name, sig),
+        ("push", "(Ljava/lang/Object;)Ljava/lang/Object;")
+            | ("pop", "()Ljava/lang/Object;")
+            | ("peek", "()Ljava/lang/Object;")
+            | ("empty", "()Z")
+            | ("search", "(Ljava/lang/Object;)I")
+    )
+}
+
+fn stack_intrinsic(
+    vm: &mut Engine,
+    recv: crate::heap::ObjRef,
+    name: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match name {
+        "push" => {
+            let value = args.first().cloned().unwrap_or(Value::Null);
+            list_elems(vm, recv)?.push(value.clone());
+            Ok(Some(value))
+        }
+        "peek" | "pop" => {
+            let elems = list_elems(vm, recv)?;
+            let Some(value) = elems.last().cloned() else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/util/EmptyStackException;",
+                    "Stack is empty",
+                )));
+            };
+            if name == "pop" {
+                elems.pop();
+            }
+            Ok(Some(value))
+        }
+        "empty" => Ok(Some(Value::Int(list_elems(vm, recv)?.is_empty() as i32))),
+        "search" => {
+            let found = find_elem(vm, recv, args.first().unwrap_or(&Value::Null))?;
+            let depth = found.map_or(-1, |index| {
+                list_elems(vm, recv)
+                    .map(|elems| (elems.len() - index) as i32)
+                    .unwrap_or(-1)
+            });
+            Ok(Some(Value::Int(depth)))
+        }
+        _ => Ok(None),
+    }
 }
 
 /// Igualdade JAVA para chaves/elementos de coleções (M8): Null==Null;
@@ -2549,6 +2798,22 @@ fn list_elems(vm: &mut Engine, recv: crate::heap::ObjRef) -> Result<&mut Vec<Val
                 .into(),
         ),
     }
+}
+
+fn map_touch_entry(vm: &mut Engine, recv: crate::heap::ObjRef, index: usize) -> Result<(), VmExit> {
+    let access_order = matches!(
+        vm.heap.get_field(recv, "rd$linked_map_access_order"),
+        Ok(Value::Int(value)) if value != 0
+    );
+    if !access_order {
+        return Ok(());
+    }
+    let entries = map_entries(vm, recv)?;
+    if index < entries.len() && index + 1 < entries.len() {
+        let entry = entries.remove(index);
+        entries.push(entry);
+    }
+    Ok(())
 }
 
 fn find_key(vm: &Engine, recv: crate::heap::ObjRef, key: &Value) -> Result<Option<usize>, VmExit> {
@@ -3176,6 +3441,19 @@ fn map_intrinsic(
 ) -> Result<Option<Value>, VmExit> {
     use crate::framework::HostObj;
     if name == "<init>" {
+        let access_order = if sig == "(IFZ)V" {
+            let initial_capacity = args[0].as_int()?;
+            let load_factor = args[1].as_float()?;
+            if initial_capacity < 0 || load_factor <= 0.0 || load_factor.is_nan() {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/IllegalArgumentException;",
+                    "Illegal initial capacity or load factor",
+                )));
+            }
+            Some(args[2].as_int()? != 0)
+        } else {
+            None
+        };
         let entries = if sig == "(Ljava/util/Map;)V" {
             match args.first() {
                 Some(Value::Obj(other)) => match vm.fw.objects.get(other) {
@@ -3188,6 +3466,13 @@ fn map_intrinsic(
             Vec::new() // capacidade inicial/fator de carga: só performance
         };
         vm.fw.objects.insert(recv, HostObj::Map { entries });
+        if let Some(access_order) = access_order {
+            crate::err::put_field_result(vm.heap.put_field(
+                recv,
+                "rd$linked_map_access_order",
+                Value::Int(access_order as i32),
+            ))?;
+        }
         return Ok(Some(Value::Null));
     }
     if !matches!(vm.fw.objects.get(&recv), Some(HostObj::Map { .. })) {
@@ -3235,40 +3520,65 @@ fn map_intrinsic(
             let k = args[0].clone();
             let v = args[1].clone();
             let idx = find_key(vm, recv, &k)?;
-            let entries = map_entries(vm, recv)?;
+            let old = {
+                let entries = map_entries(vm, recv)?;
+                if let Some(i) = idx {
+                    Some(std::mem::replace(&mut entries[i].1, v))
+                } else {
+                    entries.push((k, v));
+                    None
+                }
+            };
             if let Some(i) = idx {
-                let old = std::mem::replace(&mut entries[i].1, v);
-                Ok(Some(old))
-            } else {
-                entries.push((k, v));
-                Ok(Some(Value::Null))
+                map_touch_entry(vm, recv, i)?;
             }
+            Ok(Some(old.unwrap_or(Value::Null)))
         }
         ("get", _) => {
             let idx = find_key(vm, recv, &args[0])?;
-            let entries = map_entries(vm, recv)?;
-            Ok(Some(idx.map_or(Value::Null, |i| entries[i].1.clone())))
+            let value = {
+                let entries = map_entries(vm, recv)?;
+                idx.map_or(Value::Null, |i| entries[i].1.clone())
+            };
+            if let Some(i) = idx {
+                map_touch_entry(vm, recv, i)?;
+            }
+            Ok(Some(value))
         }
         ("getOrDefault", _) => {
             let idx = find_key(vm, recv, &args[0])?;
-            let entries = map_entries(vm, recv)?;
-            Ok(Some(idx.map_or(args[1].clone(), |i| entries[i].1.clone())))
+            let value = {
+                let entries = map_entries(vm, recv)?;
+                idx.map_or(args[1].clone(), |i| entries[i].1.clone())
+            };
+            if let Some(i) = idx {
+                map_touch_entry(vm, recv, i)?;
+            }
+            Ok(Some(value))
         }
         ("putIfAbsent", _) => {
             // Map.putIfAbsent: absent OR mapped to null → put; returns old
             let idx = find_key(vm, recv, &args[0])?;
-            let entries = map_entries(vm, recv)?;
-            match idx {
-                Some(i) if !matches!(entries[i].1, Value::Null) => Ok(Some(entries[i].1.clone())),
-                Some(i) => {
-                    entries[i].1 = args[1].clone();
-                    Ok(Some(Value::Null))
+            let (result, touched) = {
+                let entries = map_entries(vm, recv)?;
+                match idx {
+                    Some(i) if !matches!(entries[i].1, Value::Null) => {
+                        (entries[i].1.clone(), Some(i))
+                    }
+                    Some(i) => {
+                        entries[i].1 = args[1].clone();
+                        (Value::Null, Some(i))
+                    }
+                    None => {
+                        entries.push((args[0].clone(), args[1].clone()));
+                        (Value::Null, None)
+                    }
                 }
-                None => {
-                    entries.push((args[0].clone(), args[1].clone()));
-                    Ok(Some(Value::Null))
-                }
+            };
+            if let Some(i) = touched {
+                map_touch_entry(vm, recv, i)?;
             }
+            Ok(Some(result))
         }
         ("putAll", _) => {
             // source: a host map directly, or any java.util.Map (DEX/Kotlin
@@ -3287,10 +3597,15 @@ fn map_intrinsic(
             };
             for (k, v) in src {
                 let idx = find_key(vm, recv, &k)?;
-                let entries = map_entries(vm, recv)?;
-                match idx {
-                    Some(i) => entries[i].1 = v,
-                    None => entries.push((k, v)),
+                {
+                    let entries = map_entries(vm, recv)?;
+                    match idx {
+                        Some(i) => entries[i].1 = v,
+                        None => entries.push((k, v)),
+                    }
+                }
+                if let Some(i) = idx {
+                    map_touch_entry(vm, recv, i)?;
                 }
             }
             Ok(Some(Value::Null))
@@ -3598,6 +3913,24 @@ fn instance_intrinsic_dispatch(
             return Ok(Some(v));
         }
     }
+    // java.security.Permission / java.lang.RuntimePermission.
+    if let Some(v) =
+        crate::jsecurity::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // ClassLoader resources and APK-backed URL streams (jresources.rs).
+    if let Some(v) =
+        crate::jresources::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // org.xml.sax.InputSource stores streams and source identifiers.
+    if let Some(v) =
+        crate::jxml::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
     // MotionEvent (android_motion.rs)
     if recv_class.starts_with("Landroid/view/MotionEvent") {
         if let Some(v) =
@@ -3774,6 +4107,8 @@ fn instance_intrinsic_dispatch(
             | "getDataDir"
             | "getDatabasePath"
             | "getDir"
+            | "openFileInput"
+            | "openFileOutput"
             | "getExternalFilesDir"
             | "getExternalCacheDir"
             | "databaseList"
@@ -3799,6 +4134,12 @@ fn instance_intrinsic_dispatch(
     // TreeMap / TreeSet (jsorted.rs)
     if let Some(v) =
         crate::jsorted::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
+    // java.util.StringTokenizer (jstring_tokenizer.rs)
+    if let Some(v) =
+        crate::jstring_tokenizer::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
     {
         return Ok(Some(v));
     }
@@ -3873,9 +4214,20 @@ fn instance_intrinsic_dispatch(
     if let Some(v) = crate::android_region::call(vm, mref_class, name, recv, args)? {
         return Ok(Some(v));
     }
-    // stateless platform base classes (platform_base.rs)
-    if let Some(v) = crate::platform_base::instance_intrinsic(mref_class, name, sig) {
+    // DataSetObservable / Observable callbacks used by PagerAdapter and ViewPager.
+    if let Some(v) =
+        crate::android_observable::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
+    {
         return Ok(Some(v));
+    }
+    // Stateless platform base defaults are only reached when no DEX override
+    // exists. Otherwise an invoke-virtual whose symbolic owner is the base
+    // class (e.g. DataSetObserver.onChanged) must dispatch to the guest method.
+    let dex_virtual_override = vm.cp.resolve_method(recv_class, name, sig).is_some();
+    if !dex_virtual_override {
+        if let Some(v) = crate::platform_base::instance_intrinsic(mref_class, name, sig) {
+            return Ok(Some(v));
+        }
     }
     if let Some(v) = crate::platform_base::a11y_manager(vm, mref_class, name, sig, args)? {
         return Ok(Some(v));
@@ -4389,7 +4741,9 @@ fn instance_intrinsic_dispatch(
         // imediatamente (em Java seriam capturadas no Future) — desvio
         // documentado em compat_gaps.
         (c, name, sig)
-            if (c == EXECUTOR_SVC || mref_class == EXECUTOR_SVC || mref_class == EXECUTOR)
+            if (vm.cp.is_subtype(c, EXECUTOR_SVC)
+                || vm.cp.is_subtype(mref_class, EXECUTOR_SVC)
+                || mref_class == EXECUTOR)
                 && exec_supported(name, sig) =>
         {
             exec_intrinsic(vm, recv, name, sig, args)
@@ -4452,8 +4806,57 @@ fn instance_intrinsic_dispatch(
             list_intrinsic(vm, recv, name, sig, args)
         }
         (c, name, sig)
-            if (c == ARRAY_LIST || c == LINKED_LIST || c == COW_LIST)
+            if (c == ARRAY_LIST
+                || c == LINKED_LIST
+                || c == COW_LIST
+                || c == VECTOR
+                || c == STACK)
                 && list_supported(name, sig) =>
+        {
+            list_intrinsic(vm, recv, name, sig, args)
+        }
+        // `Vector` and `Stack` host state shares the List representation while
+        // retaining their legacy enumeration and stack-specific operations.
+        (c, name, sig) if c == STACK && stack_supported(name, sig) => {
+            stack_intrinsic(vm, recv, name, args)
+        }
+        (c, name, sig) if matches!(c, VECTOR | STACK) && vector_supported(name, sig) => {
+            vector_intrinsic(vm, recv, name, sig, args)
+        }
+        // Concrete host lists may have DEX subclasses (e.g. logback's
+        // TurboFilterList extends CopyOnWriteArrayList). The direct super
+        // constructor must initialize HostObj::List on the subclass receiver;
+        // later inherited calls must reach the same host state, but only when
+        // the subclass has no DEX override (virtual dispatch remains DEX-first).
+        (_, "<init>", sig)
+            if matches!(
+                mref_class,
+                ARRAY_LIST | LINKED_LIST | COW_LIST | VECTOR | STACK
+            ) && list_supported("<init>", sig)
+                && vm.cp.is_subtype(recv_class, mref_class) =>
+        {
+            list_intrinsic(vm, recv, "<init>", sig, args)
+        }
+        (_, name, sig)
+            if matches!(
+                mref_class,
+                ARRAY_LIST
+                    | LINKED_LIST
+                    | COW_LIST
+                    | VECTOR
+                    | STACK
+                    | "Ljava/util/List;"
+                    | "Ljava/util/Collection;"
+                    | "Ljava/util/AbstractList;"
+                    | "Ljava/util/AbstractCollection;"
+                    | "Ljava/util/AbstractSequentialList;"
+            ) && list_supported(name, sig)
+                && vm.cp.is_subtype(recv_class, mref_class)
+                && matches!(
+                    vm.fw.objects.get(&recv),
+                    Some(crate::framework::HostObj::List { .. })
+                )
+                && vm.cp.resolve_method(recv_class, name, sig).is_none() =>
         {
             list_intrinsic(vm, recv, name, sig, args)
         }
@@ -4514,11 +4917,6 @@ fn instance_intrinsic_dispatch(
         (c, name, sig) if c == SERVICE_LOADER && service_loader_supported(name, sig) => {
             service_loader_intrinsic(vm, recv)
         }
-        // ClassLoader (M8): getResources(String) → Enumeration host vazia —
-        // recursos de classpath do APK ainda não são enumerados (26º gap real).
-        (c, name, sig) if c == CLASS_LOADER && class_loader_supported(name, sig) => {
-            class_loader_get_resources(vm, args)
-        }
         // Enumeration host (M8): cursor legado ≡ Iterator (nomes JDK 1.0).
         (c, name, sig) if c == ENUMERATION && enumeration_supported(name, sig) => {
             enumeration_intrinsic(vm, recv, name)
@@ -4528,6 +4926,8 @@ fn instance_intrinsic_dispatch(
             if (c == ARRAY_LIST
                 || c == LINKED_LIST
                 || c == COW_LIST
+                || c == VECTOR
+                || c == STACK
                 || c == COW_SET
                 || c == VIEW_SET
                 || c == LINKED_SET

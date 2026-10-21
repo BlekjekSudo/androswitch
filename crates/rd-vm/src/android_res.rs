@@ -356,12 +356,13 @@ fn identifier(vm: &Engine, name: &str, def_type: Option<&str>, def_pkg: Option<&
 fn fill_typed_value(vm: &mut Engine, tv: ObjRef, id: i32, v: &ResolvedValue) -> Result<(), VmExit> {
     // TypedValue.TYPE_*: STRING 3, FLOAT 4, DIMENSION 5, INT_DEC 16, BOOLEAN 18, INT_COLOR_ARGB8 28
     let (ty, data, string) = match v {
+        ResolvedValue::Reference(id) => (1, *id as i32, None),
+        ResolvedValue::Attribute(id) => (2, *id as i32, None),
         ResolvedValue::Str(t) => (3, 0, Some(t.clone())),
         ResolvedValue::Float(f) => (4, f.to_bits() as i32, None),
         ResolvedValue::Dimension { .. } => (5, dimension_px(vm, v, id)?.round() as i32, None),
         ResolvedValue::Integer(i) => (16, *i, None),
         ResolvedValue::Boolean(b) => (18, *b as i32, None),
-        _ => (0, 0, None),
     };
     put(vm, tv, "type", Value::Int(ty))?;
     put(vm, tv, "data", Value::Int(data))?;
@@ -390,6 +391,60 @@ fn typed_array(vm: &mut Engine, attrs: Option<&Value>) -> Result<Value, VmExit> 
     Ok(Value::Obj(r))
 }
 
+fn parse_theme_id(raw: &str) -> Option<u32> {
+    let raw = raw.strip_prefix('@').unwrap_or(raw);
+    if let Some(hex) = raw.strip_prefix("0x").or_else(|| raw.strip_prefix("0X")) {
+        u32::from_str_radix(hex, 16).ok()
+    } else {
+        raw.parse().ok()
+    }
+}
+
+fn theme_id_for_context(vm: &Engine, context: ObjRef) -> Option<u32> {
+    if let Some(Value::Int(id)) = vm
+        .view_props
+        .get(&(context, "rd_theme_override".to_string()))
+    {
+        return (*id != 0).then_some(*id as u32);
+    }
+    let apk = vm.fw.resources.as_ref()?;
+    let class = vm.heap.class_of(context).ok()?;
+    if vm.cp.is_subtype(class, "Landroid/app/Activity;") {
+        let name = class
+            .trim_start_matches('L')
+            .trim_end_matches(';')
+            .replace('/', ".");
+        if let Some(id) = apk
+            .manifest
+            .application
+            .components
+            .iter()
+            .find(|component| component.class_name == name)
+            .and_then(|component| component.theme.as_deref())
+            .and_then(parse_theme_id)
+        {
+            return Some(id);
+        }
+    }
+    apk.manifest.application.theme_res
+}
+
+fn theme_style_id(vm: &Engine, theme: ObjRef) -> Option<u32> {
+    match vm.heap.get_field(theme, "rd_theme_id") {
+        Ok(Value::Int(id)) if id != 0 => Some(id as u32),
+        _ => None,
+    }
+}
+
+fn style_attribute(vm: &Engine, style_id: u32, attr_id: u32) -> Option<ResolvedValue> {
+    vm.fw
+        .resources
+        .as_ref()?
+        .arsc
+        .as_ref()?
+        .resolve_style_attribute(style_id, attr_id)
+}
+
 fn format_string(vm: &mut Engine, fmt: String, arr: &Value) -> Result<Value, VmExit> {
     let f = s(vm, fmt)?;
     vm.invoke_static(
@@ -408,6 +463,37 @@ pub(crate) fn static_intrinsic(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     Ok(Some(match (class, name, sig) {
+        (TYPED_VALUE, "applyDimension", "(IFLandroid/util/DisplayMetrics;)F") => {
+            let unit = args
+                .first()
+                .and_then(|value| value.as_int().ok())
+                .unwrap_or(0);
+            let value = args
+                .get(1)
+                .and_then(|value| value.as_float().ok())
+                .unwrap_or(0.0);
+            let metrics_ref = args.get(2).and_then(|value| value.as_ref().ok().flatten());
+            let metric = |field: &str| {
+                metrics_ref
+                    .and_then(|metrics| vm.heap.get_field(metrics, field).ok())
+                    .and_then(|value| match value {
+                        Value::Float(number) => Some(number),
+                        Value::Double(number) => Some(number as f32),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| device().dpi as f32 / 160.0)
+            };
+            let pixels = match unit {
+                0 => value,                     // COMPLEX_UNIT_PX
+                1 => value * metric("density"), // COMPLEX_UNIT_DIP
+                2 => value * metric("scaledDensity"),
+                3 => value * metric("xdpi") / 72.0,
+                4 => value * metric("xdpi"),
+                5 => value * metric("xdpi") / 25.4,
+                _ => 0.0,
+            };
+            Value::Float(pixels)
+        }
         (RESOURCES, "getSystem", _) => Value::Obj(resources(vm)?),
         (LOCALE, "getDefault", "()Ljava/util/Locale;") => Value::Obj(default_locale(vm)?),
         (LOCALE, "setDefault", "(Ljava/util/Locale;)V") => {
@@ -562,7 +648,29 @@ pub(crate) fn instance_intrinsic(
         }
         THEME => {
             return Ok(Some(match name {
-                "resolveAttribute" => Value::Int(0),
+                "resolveAttribute" => {
+                    let style_id = theme_style_id(vm, recv);
+                    let attr_id = args.first().and_then(|v| v.as_int().ok()).unwrap_or(0) as u32;
+                    let value = style_id.and_then(|style| style_attribute(vm, style, attr_id));
+                    let Some(mut value) = value else {
+                        return Ok(Some(Value::Int(0)));
+                    };
+                    let Some(Value::Obj(out)) = args.get(1) else {
+                        return Err(exc(
+                            "Ljava/lang/NullPointerException;",
+                            "Theme.resolveAttribute outValue == null",
+                        ));
+                    };
+                    let resolve_refs = args.get(2).and_then(|v| v.as_int().ok()).unwrap_or(0) != 0;
+                    if resolve_refs {
+                        if let ResolvedValue::Reference(id) = &value {
+                            value =
+                                value_of(vm, *id as i32).unwrap_or(ResolvedValue::Reference(*id));
+                        }
+                    }
+                    fill_typed_value(vm, *out, attr_id as i32, &value)?;
+                    Value::Int(1)
+                }
                 "obtainStyledAttributes" => {
                     let attrs = args
                         .iter()
@@ -570,11 +678,29 @@ pub(crate) fn instance_intrinsic(
                         .cloned();
                     let ta = typed_array(vm, attrs.as_ref())?;
                     if let Value::Obj(t) = ta {
+                        if let Some(style) = theme_style_id(vm, recv) {
+                            crate::xml_res::fill_theme_typed_array(vm, t, attrs.as_ref(), style);
+                        }
                         crate::xml_res::fill_typed_array(vm, t, args.first(), attrs.as_ref());
                     }
                     ta
                 }
-                "applyStyle" | "setTo" | "rebase" => Value::Null,
+                "applyStyle" => {
+                    let style = args.first().and_then(|v| v.as_int().ok()).unwrap_or(0);
+                    let force = args.get(1).and_then(|v| v.as_int().ok()).unwrap_or(0) != 0;
+                    if style != 0 && (force || theme_style_id(vm, recv).is_none()) {
+                        put(vm, recv, "rd_theme_id", Value::Int(style))?;
+                    }
+                    Value::Null
+                }
+                "setTo" => {
+                    if let Some(Value::Obj(source)) = args.first() {
+                        let style = get(vm, *source, "rd_theme_id");
+                        put(vm, recv, "rd_theme_id", style)?;
+                    }
+                    Value::Null
+                }
+                "rebase" => Value::Null,
                 "getResources" => Value::Obj(resources(vm)?),
                 "getChangingConfigurations" => Value::Int(0),
                 _ => return Ok(None),
@@ -912,16 +1038,28 @@ pub(crate) fn instance_intrinsic(
     Ok(Some(match (name, sig) {
         ("getTheme", _) => {
             let k = ("Lrd/Resources;".to_string(), "theme".to_string());
-            match vm.statics.get(&k) {
-                Some(Value::Obj(t)) => Value::Obj(*t),
+            let theme = match vm.statics.get(&k) {
+                Some(Value::Obj(t)) => *t,
                 _ => {
                     let t = vm.heap.alloc_instance(THEME.to_string(), Vec::new())?;
                     vm.statics.insert(k, Value::Obj(t));
-                    Value::Obj(t)
+                    t
                 }
-            }
+            };
+            let style = theme_id_for_context(vm, recv).unwrap_or(0);
+            put(vm, theme, "rd_theme_id", Value::Int(style as i32))?;
+            Value::Obj(theme)
         }
-        ("setTheme", _) => Value::Null,
+        ("setTheme", _) => {
+            let style = args.first().and_then(|v| v.as_int().ok()).unwrap_or(0);
+            vm.view_props
+                .insert((recv, "rd_theme_override".to_string()), Value::Int(style));
+            let k = ("Lrd/Resources;".to_string(), "theme".to_string());
+            if let Some(Value::Obj(theme)) = vm.statics.get(&k).cloned() {
+                put(vm, theme, "rd_theme_id", Value::Int(style))?;
+            }
+            Value::Null
+        }
         ("obtainStyledAttributes", _) => {
             let attrs = args
                 .iter()
@@ -929,6 +1067,9 @@ pub(crate) fn instance_intrinsic(
                 .cloned();
             let ta = typed_array(vm, attrs.as_ref())?;
             if let Value::Obj(t) = ta {
+                if let Some(style) = theme_id_for_context(vm, recv) {
+                    crate::xml_res::fill_theme_typed_array(vm, t, attrs.as_ref(), style);
+                }
                 crate::xml_res::fill_typed_array(vm, t, args.first(), attrs.as_ref());
             }
             ta

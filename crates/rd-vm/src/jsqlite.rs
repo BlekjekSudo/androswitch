@@ -232,12 +232,12 @@ const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012
 fn b64(data: &[u8]) -> String {
     let mut out = String::new();
     for c in data.chunks(3) {
-        let n = (c[0] as u32) << 16
-            | (*c.get(1).unwrap_or(&0) as u32) << 8
+        let n = ((c[0] as u32) << 16)
+            | ((*c.get(1).unwrap_or(&0) as u32) << 8)
             | *c.get(2).unwrap_or(&0) as u32;
         for i in 0..4 {
             if i <= c.len() {
-                out.push(B64[(n >> (18 - 6 * i) & 63) as usize] as char);
+                out.push(B64[((n >> (18 - 6 * i)) & 63) as usize] as char);
             } else {
                 out.push('=');
             }
@@ -253,7 +253,7 @@ fn unb64(s: &str) -> Vec<u8> {
         let Some(v) = B64.iter().position(|&b| b == ch) else {
             continue;
         };
-        buf = buf << 6 | v as u32;
+        buf = (buf << 6) | v as u32;
         bits += 6;
         if bits >= 8 {
             bits -= 8;

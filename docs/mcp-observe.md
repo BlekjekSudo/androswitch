@@ -1,31 +1,19 @@
-# Optional, on-demand screen observation (headless by default)
+# Seeing the screen without screenshots (`observe`, resources, live viewer)
 
-The standard `rd mcp` session is headless: no desktop window, live HTTP viewer,
-or continuous render loop starts by default. The software screen model is
-recorded only when a screen-facing operation requests a frame; ordinary MCP
-actions mark the cached view dirty but do not continuously render or poll.
+RustyDroid renders every frame itself (tiny-skia-style software raster of the
+display list the app records through `android.graphics.Canvas` /
+`RenderNode`). That means the runtime already knows **what is on screen as
+data**, before any pixel exists. Round 6 exposes that knowledge to agents and
+humans:
 
-Explicit requests such as `observe`, `tap_text`, `screenshot`, a screen-resource
-read, or `observe: true` on an action trigger a refresh when needed. MCP screen
-subscriptions (`resources/subscribe`) and the `rd mcp --live` viewer are
-separate opt-ins; while enabled, they check for screen changes after app calls
-and publish updates only when visible content changes. An unchanged frame is
-reused from cache.
-
-A requested frame records the app's software display list (`android.graphics.Canvas`
-/ `RenderNode`) and, when enabled, accessibility-provider semantics. This gives
-agents structured screen data without requiring a desktop display or a PNG.
-
-| Surface | For | What it gives (when requested) | Cost when requested (Comprix, release, 720×1440) |
+| Surface | For | What it gives | Cost (Comprix, release, 720×1440) |
 |---|---|---|---|
-| `observe` tool | agents | explicit query for visible texts, tap targets, icons, frame `version`, and diffs; refreshes only if dirty | 45 ms for a new frame · **0.1–0.4 ms** unchanged-cache read |
-| `tap_text` tool | agents | explicit tap by visible label (`"Continuar"`, `"Ajustes"`) instead of coordinates | 25–180 ms (tap + app work) |
-| `observe: true` on `launch/tap/tap_text/swipe/type_text/key/wait/wait_for` | agents | opt-in summary appended to that action result | +45 ms |
-| MCP resources `rustydroid://screen` (JSON), `rustydroid://screen.txt`, `rustydroid://screen.png`, `rustydroid://logs` | MCP clients | explicit `resources/read`; optional `resources/subscribe` pushes only after app calls when visible content changes | — |
-| `rd mcp --live 0.0.0.0:7878` (or `RD_MCP_LIVE`) | humans | opt-in browser page with the frame, screen text, tap-target overlay, last tool + latency; long-poll push | PNG encoded only when the version changes |
-| `screenshot` | both | explicit PNG request, cached per frame version and deflate-compressed (about 190 KB vs 3.1 MB) | ~75 ms fresh · 1.4 ms repeated |
-
-These are measured costs for explicit requests in that test setup, not continuous background rendering. Provider semantics can add substantial latency; see [Accessibility labels](#accessibility-labels-round-8).
+| `observe` tool | agents | visible texts with bounds, tap targets (label + centre), icons, frame `version`, diff since last observe | 45 ms when a new frame must be recorded · **0.1–0.4 ms** when nothing changed |
+| `tap_text` tool | agents | tap by visible label (`"Continuar"`, `"Ajustes"`) instead of coordinates | 25–180 ms (tap + app work) |
+| `observe: true` on `launch/tap/tap_text/swipe/type_text/key/wait/wait_for` | agents | the action result carries the new screen summary → 1 round-trip per step | +45 ms |
+| MCP resources `rustydroid://screen` (JSON), `rustydroid://screen.txt`, `rustydroid://screen.png`, `rustydroid://logs` | MCP clients | `resources/read` + `resources/subscribe` → `notifications/resources/updated` whenever visible content changes | — |
+| `rd mcp --live 0.0.0.0:7878` (or `RD_MCP_LIVE`) | humans | browser page with the RustyDroid-rendered frame, the screen text, tap-target overlay, last tool + latency; long-poll push | PNG encoded only when the version changes |
+| `screenshot` | both | PNG, now **cached per frame version** and **deflate-compressed** (adaptive row filters; ~190 KB instead of ~3.1 MB) | ~75 ms fresh · 1.4 ms repeated |
 
 Before round 6, the only way to see a Compose app was `screenshot`
 (0.3–1.6 s, ~3 MB base64 per call) — `ui_tree` shows one opaque
@@ -61,15 +49,10 @@ the app *drew*, not an accessibility tree the app may not populate.
 
 ### Caching and invalidation
 
-Tools that can run app code mark the screen dirty. Read-only queries do not;
-an explicit screen request may still refresh a dirty frame. Dirty is only cache
-invalidation; it does not start a render. A fresh frame is recorded
-lazily by an explicit `observe`, `tap_text`, `screenshot`, screen-resource read,
-action with `observe: true`, or an active subscription/live viewer after an app
-call. Without one of those requests/watchers, default `rd mcp` does not refresh
-or poll the screen in the background. The PNG is cached per frame version. A
-finished activity reports `finished: true` and an empty screen — never a stale
-frame.
+Any tool that can run app code (everything except `observe`, `ui_tree`,
+`screenshot`, `logs`, asserts, info tools) marks the screen dirty. The next
+observer records one frame; the PNG is cached per version. A finished activity
+reports `finished: true` and an empty screen — never a stale frame.
 
 ## Robustness
 
@@ -100,25 +83,21 @@ y1377  [x200] Comparar estabelecimentos
 
 ## Accessibility labels (round 8)
 
-`advanced-components` is enabled by default, so provider traversal support is
-included in standard builds. The traversal itself runs only during a requested
-fresh screen observation (or an opted-in subscription/live refresh after an
-app call); it is not a continuous background cost. It calls saved standard
-View accessibility delegates/providers, executes the app's real DEX
-`createAccessibilityNodeInfo`, and traverses virtual child IDs; no Comprix
-class names or icon positions are hardcoded. Mutable node text,
+With `advanced-components` (enabled by default), the refresh path also calls
+saved standard View accessibility delegates/providers. It executes the app's
+real DEX `createAccessibilityNodeInfo` and traverses virtual child IDs; no
+Comprix class names or icon positions are hardcoded. Mutable node text,
 `contentDescription`, screen bounds, child IDs and actions support Compose's
 provider. Described nodes with bounds augment the frame targets. For example,
 Comprix exposes **Buscar listas**, **Minhas lojas**, and **Voltar**; tapping
 `Minhas lojas` by name opens that screen.
 
-Traversal is bounded at 2,048 nodes. Because it executes guest code, it can be
-much more expensive than the historical round-6 draw-only timings above; heavy
-navigation can take seconds when a fresh observation is requested. Provider
-errors are surfaced in the screen's error/warning field (currently labelled
-`draw_error`), not silently ignored. Dialogs use the same provider path,
-including ContextThemeWrapper base-context delegation and bounded rectilinear
-Region clipping.
+Traversal is bounded at 2,048 nodes. It executes guest code and can be much
+more expensive than the historical round-6 draw-only timings above; heavy
+navigation can take seconds. Provider errors are surfaced in the screen's
+error/warning field (currently labelled `draw_error`), not silently ignored.
+Dialogs use the same provider path, including ContextThemeWrapper base-context
+delegation and bounded rectilinear Region clipping.
 
 ## Limits (honest)
 
