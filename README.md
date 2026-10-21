@@ -42,18 +42,25 @@ RustyDroid is a **"Wine for Android"**: instead of emulating an entire Android O
 | AI-agent control plane | adb, screen scraping | **MCP + 47 structured tools** + subscribable screen resources + live viewer (JSON-RPC próprio — ADR 001) |
 | Perf baseline | modern desktop | **Motorola Moto E5 (2 GB RAM)** floor |
 
-### 👀 Agents see the screen without screenshots
+### 👀 Optional, on-demand screen observation (headless by default)
 
-RustyDroid renders every frame itself, so it knows what is on screen *as
-data*. `observe` returns the visible texts, tap targets and icons, derived
-from the recorded display list and standard accessibility providers. Compose
+The standard `rd mcp` session is headless: no desktop window, live HTTP viewer,
+or continuous render loop starts automatically. Screen observation is on demand.
+`observe` and `tap_text` use cached state and re-record only when it is dirty;
+explicit `screenshot` and screen-resource reads refresh when needed; action tools
+append a summary only when passed `observe: true`. Screen subscriptions and `rd mcp --live ...` are opt-in. A
+subscribed/live session checks for changes after app calls; without an observer
+request or active watcher, ordinary MCP calls do not refresh the screen. Dirty
+frames are refreshed lazily and cached.
+
+When requested, `observe` returns visible texts, tap targets and icons from the
+recorded display list and standard accessibility providers. Compose
 `contentDescription` labels name icon-only targets too. Cached observations
-cost under 1 ms in desktop runs; a fresh frame executes app drawing and
-semantics and can take seconds during navigation. `tap_text "Continuar"`
-taps by label. MCP resources `rustydroid://screen` (and `.txt`, `.png`) can
-be subscribed to and push `notifications/resources/updated` on every real
-change. For humans, `rd mcp --live 0.0.0.0:7878` serves a browser page with
-the live frame and tap-target overlay. See [docs/mcp-observe.md](docs/mcp-observe.md).
+cost under 1 ms in tested desktop runs. A requested fresh frame runs app drawing
+and (with `advanced-components`) accessibility semantics; heavy navigation can
+take seconds. `tap_text "Continuar"` taps by label. For humans,
+`rd mcp --live 0.0.0.0:7878` explicitly starts a browser page with the live
+frame and tap-target overlay. See [docs/mcp-observe.md](docs/mcp-observe.md).
 
 ### ♻️ Garbage-collected app heap
 
