@@ -72,6 +72,20 @@ compile; everything else stays interpreted, with fuel enforcement unchanged.
 This first backend is tested on x86_64, not an ARMv7/Moto E5 JIT claim.
 See [ADR 007](docs/adr/007-cranelift-leaf-jit.md).
 
+## C/C++/Rust APKs and full MCP execution (opt-in)
+
+`cargo build -p rd-cli --features native-engines` enables three real, bounded
+source-language-selected native adapters. Source-built Android APKs, all 47 MCP
+tools, x86_64/ARM64/ARMv7 matrices, and limitations are documented in
+[Real native-language execution](docs/native-languages.md). These are genuine
+project-owned Android demonstration APKs with native cores and Java UI glue,
+not claims of universal NDK/Rust support or third-party APK compatibility.
+
+## Reliable MCP automation and diagnostics
+
+See [the automation guide](docs/mcp-automation.md) for structured host-view selectors, guarded taps, presence/absence waits, session diagnostics, incremental byte-exact log reads and typed error snapshots. The original tool definitions remain intact; the live catalog now has 47 tools.
+
+
 ### 🤖 Built with AI — heavily
 
 > **This project is developed with heavy AI assistance** — specification, architecture,
@@ -244,16 +258,3 @@ software e um **modo dedicado a agentes de IA (MCP)** com 31 ferramentas estrutu
 <p align="center">
   <sub>🦀 RustyDroid — Android without Android. Made with 🤖 AI assistance + ☕ human review.</sub>
 </p>
-
-## C/C++/Rust APKs and full MCP execution (opt-in)
-
-`cargo build -p rd-cli --features native-engines` enables three real, bounded
-source-language-selected native adapters. Source-built Android APKs, all 47 MCP
-tools, x86_64/ARM64/ARMv7 matrices, and limitations are documented in
-[Real native-language execution](docs/native-languages.md). These are genuine
-project-owned Android demonstration APKs with native cores and Java UI glue,
-not claims of universal NDK/Rust support or third-party APK compatibility.
-
-## Reliable MCP automation and diagnostics
-
-See [the automation guide](docs/mcp-automation.md) for structured host-view selectors, guarded taps, presence/absence waits, session diagnostics, incremental byte-exact log reads and typed error snapshots. The original tool definitions remain intact; the live catalog now has 47 tools.
