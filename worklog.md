@@ -3427,3 +3427,4 @@ Task: Non-phone pendency update — Primftpd M7 continuation (2026-10-21)
 - Gates: cargo fmt clean; clippy --workspace --all-targets -D warnings clean (incl. 5+8 lints fixed in framework/inflate/jxml/tests found by clippy 1.99); cargo test --workspace PASS (48 binaries); --all-features PASS after building golden/native fixtures (cross-gcc) + unicorn==2.1.4; golden VM gate 150/150 PASS (JDK 21).
 - Perf (moto-e5 estimate, 3 runs): cold emulated p50 2313ms / max 2317ms (was 2505/2781), warm p50 596ms, RSS 99.8MB PASS, heap 3.7MB PASS. Cold estimate for this heavy 11MB app remains above the 2000ms trivial-app DoD; not claimed as a pass. Profiling attempt (gprofng + symbols build) OOM-killed and was timeboxed.
 - No credential is recorded in this file. PR prepared from this tree.
+- PR #164 opened from this tree (branch m7-primftpd-launch-20261021, rebased onto main 5ba1f3e): all 10/10 GitHub CI checks pass. Perf note above stands; PR not merged.
