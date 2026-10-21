@@ -324,7 +324,7 @@ pub struct InstalledApp {
     pub package: String,
     pub version_name: Option<String>,
     pub version_code: Option<u64>,
-    pub apk: Apk,
+    pub apk: std::sync::Arc<Apk>,
     pub perms: PermissionEngine,
 }
 
@@ -1248,7 +1248,7 @@ impl AgentSession {
             package: package.clone(),
             version_name: manifest.version_name.clone(),
             version_code: manifest.version_code,
-            apk,
+            apk: std::sync::Arc::new(apk),
             perms,
         };
         match self.installed.iter().position(|a| a.package == package) {
@@ -1400,7 +1400,8 @@ impl AgentSession {
             let mut eng = if let Some(id) = selected_engine.as_deref() {
                 #[cfg(feature = "native-engines")]
                 {
-                    rd_engine_registry::NativeProcess::from_apk(id, resources)?.into_engine()
+                    rd_engine_registry::NativeProcess::from_apk(id, (*resources).clone())?
+                        .into_engine()
                 }
                 #[cfg(not(feature = "native-engines"))]
                 {
@@ -1413,7 +1414,7 @@ impl AgentSession {
                 }
             } else {
                 let mut e = Engine::new(dexes_of_apk(&app.apk)?, VmConfig::default());
-                e.set_resources(resources);
+                e.set_resources_arc(resources);
                 e
             };
             #[cfg(feature = "advanced-components")]

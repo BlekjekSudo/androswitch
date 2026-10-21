@@ -7,6 +7,7 @@ pub mod arsc;
 pub mod axml;
 pub mod error;
 pub mod manifest;
+pub mod paged;
 pub mod pool;
 pub mod signing;
 pub mod zip;
