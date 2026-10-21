@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuild genuine Android APKs, then require positive 41-tool MCP coverage x 18.
+# Rebuild genuine Android APKs, then require positive 47-tool MCP coverage x 18.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"

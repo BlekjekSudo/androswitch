@@ -352,6 +352,10 @@ pub struct AgentSession {
     /// Round 6: cached screen model / PNG per frame version, resource
     /// subscriptions, pending notifications and the live viewer.
     screen: ScreenState,
+    ui_epoch: u64,
+    log_generation: u64,
+    tool_error_count: u64,
+    last_tool_error: Option<LastToolError>,
 }
 
 impl Default for AgentSession {
@@ -390,6 +394,10 @@ impl AgentSession {
             devices: DeviceTable::embedded().expect("devices.toml embutido parseia"),
             behavior: SwitchTable::embedded().expect("behavior-switches.toml embutido parseia"),
             screen: ScreenState::default(),
+            ui_epoch: 0,
+            log_generation: 0,
+            tool_error_count: 0,
+            last_tool_error: None,
         }
     }
 
@@ -865,6 +873,8 @@ pub fn tool_defs() -> Vec<ToolDef> {
             ),
         },
     ];
+    defs.extend(ui_tool_defs());
+    defs.extend(runtime_tool_defs());
     for d in defs.iter_mut() {
         if OBSERVE_AFTER_TOOLS.contains(&d.name) {
             if let Some(p) = d
@@ -886,12 +896,26 @@ impl AgentSession {
     /// Dispatch de uma tool (o envelope MCP chama isto). Erros de tool voltam
     /// como ToolResult::is_error com o contrato {code, cause, suggestion}.
     pub fn call_tool(&mut self, name: &str, args: &serde_json::Value) -> ToolResult {
+        let diagnostic = matches!(name, "session_info" | "logs_tail" | "last_error");
+        if diagnostic && !args.is_object() {
+            return self.tool_error_result(
+                name,
+                &agent_error(
+                    "INVALID_FORMAT",
+                    "diagnostic arguments must be an object",
+                    None,
+                ),
+            );
+        }
         // Fuel limits one operation, not the lifetime of a healthy MCP session.
         // Total fuel remains observable; loops still exhaust a per-tool budget.
-        if let Some(eng) = &mut self.engine {
+        if let Some(eng) = self.engine.as_mut().filter(|_| !diagnostic) {
             eng.reset_fuel_window();
         }
         let args = args.as_object().cloned().unwrap_or_default();
+        if let Err(e) = validate_legacy_tool_arguments(name, &args) {
+            return self.tool_error_result(name, &e);
+        }
         let res: Result<ToolResult, RdError> = match name {
             "install" => self.tool_install(args.get("apk").and_then(|v| v.as_str()).unwrap_or("")),
             "launch" => {
@@ -899,11 +923,10 @@ impl AgentSession {
                     None => None,
                     Some(serde_json::Value::String(id)) => Some(id.as_str()),
                     _ => {
-                        return ToolResult::error(&agent_error(
-                            "INVALID_FORMAT",
-                            "launch engine must be a string",
-                            None,
-                        ))
+                        return self.tool_error_result(
+                            name,
+                            &agent_error("INVALID_FORMAT", "launch engine must be a string", None),
+                        )
                     }
                 };
                 self.tool_launch(
@@ -917,17 +940,20 @@ impl AgentSession {
                     args.get("x").and_then(|v| v.as_i64()),
                     args.get("y").and_then(|v| v.as_i64()),
                 ) else {
-                    return ToolResult::error(&agent_error(
-                        "INVALID_FORMAT",
-                        "tap exige x,y inteiros",
-                        Some("use {\"x\": <int>, \"y\": <int>} (px do viewport 720×1440)"),
-                    ));
+                    return self.tool_error_result(
+                        name,
+                        &agent_error(
+                            "INVALID_FORMAT",
+                            "tap exige x,y inteiros",
+                            Some("use {\"x\": <int>, \"y\": <int>} (px do viewport 720×1440)"),
+                        ),
+                    );
                 };
                 // issue #85: `as i32` truncava em silêncio (4294967396 virava
                 // 100) e a resposta ecoava o valor truncado — o agente não
                 // percebia que o toque não era o pedido.
                 let (Ok(x), Ok(y)) = (i32::try_from(x), i32::try_from(y)) else {
-                    return ToolResult::error(&agent_error(
+                    return self.tool_error_result(name, &agent_error(
                         "INVALID_FORMAT",
                         format!("tap: x/y fora da faixa de i32 (x={x}, y={y})"),
                         Some(
@@ -944,7 +970,7 @@ impl AgentSession {
                     args.get("x2").and_then(|v| v.as_i64()),
                     args.get("y2").and_then(|v| v.as_i64()),
                 ) else {
-                    return ToolResult::error(&agent_error(
+                    return self.tool_error_result(name, &agent_error(
                         "INVALID_FORMAT",
                         "swipe exige x1,y1,x2,y2 inteiros",
                         Some("use {\"x1\":…,\"y1\":…,\"x2\":…,\"y2\":…,\"ms\":…} (px do viewport)"),
@@ -958,7 +984,7 @@ impl AgentSession {
                     i32::try_from(x2),
                     i32::try_from(y2),
                 ) else {
-                    return ToolResult::error(&agent_error(
+                    return self.tool_error_result(name, &agent_error(
                         "INVALID_FORMAT",
                         format!("swipe: coordenada fora da faixa de i32 ({x1},{y1} → {x2},{y2})"),
                         Some(
@@ -970,11 +996,14 @@ impl AgentSession {
             }
             "type_text" => {
                 let Some(text) = args.get("text").and_then(|v| v.as_str()) else {
-                    return ToolResult::error(&agent_error(
-                        "INVALID_FORMAT",
-                        "type_text exige text (string)",
-                        Some("use {\"text\": \"…\", \"replace\": false}"),
-                    ));
+                    return self.tool_error_result(
+                        name,
+                        &agent_error(
+                            "INVALID_FORMAT",
+                            "type_text exige text (string)",
+                            Some("use {\"text\": \"…\", \"replace\": false}"),
+                        ),
+                    );
                 };
                 self.tool_type_text(
                     text,
@@ -985,21 +1014,23 @@ impl AgentSession {
             }
             "key" => {
                 let Some(key) = args.get("key").and_then(|v| v.as_str()) else {
-                    return ToolResult::error(&agent_error(
-                        "INVALID_FORMAT",
-                        "key exige key (BACK|ENTER|DEL)",
-                        None,
-                    ));
+                    return self.tool_error_result(
+                        name,
+                        &agent_error("INVALID_FORMAT", "key exige key (BACK|ENTER|DEL)", None),
+                    );
                 };
                 self.tool_key(key)
             }
             "wait" => {
                 let Some(ms) = args.get("ms").and_then(|v| v.as_u64()) else {
-                    return ToolResult::error(&agent_error(
-                        "INVALID_FORMAT",
-                        "wait exige ms inteiro ≥ 0",
-                        Some("use {\"ms\": 250}"),
-                    ));
+                    return self.tool_error_result(
+                        name,
+                        &agent_error(
+                            "INVALID_FORMAT",
+                            "wait exige ms inteiro ≥ 0",
+                            Some("use {\"ms\": 250}"),
+                        ),
+                    );
                 };
                 self.tool_wait(ms)
             }
@@ -1028,18 +1059,16 @@ impl AgentSession {
             ),
             "assert_text" => {
                 let Some(rid) = args.get("resource_id").and_then(|v| v.as_str()) else {
-                    return ToolResult::error(&agent_error(
-                        "INVALID_FORMAT",
-                        "assert_text exige resource_id",
-                        None,
-                    ));
+                    return self.tool_error_result(
+                        name,
+                        &agent_error("INVALID_FORMAT", "assert_text exige resource_id", None),
+                    );
                 };
                 let Some(expected) = args.get("expected").and_then(|v| v.as_str()) else {
-                    return ToolResult::error(&agent_error(
-                        "INVALID_FORMAT",
-                        "assert_text exige expected",
-                        None,
-                    ));
+                    return self.tool_error_result(
+                        name,
+                        &agent_error("INVALID_FORMAT", "assert_text exige expected", None),
+                    );
                 };
                 self.tool_assert_text(
                     rid,
@@ -1101,19 +1130,32 @@ impl AgentSession {
             "get_coverage" => self.tool_coverage(),
             "observe" => self.tool_observe(&args),
             "tap_text" => self.tool_tap_text(&args),
+            "find_views" => self.tool_find_views(&args),
+            "tap_view" => self.tool_tap_view(&args),
+            "wait_for_view" => self.tool_wait_for_view(&args),
+            "session_info" => self.tool_session_info(&args),
+            "logs_tail" => self.tool_logs_tail(&args),
+            "last_error" => self.tool_last_error(&args),
             other => {
-                return ToolResult::error(&agent_error(
-                    "UNKNOWN_TOOL",
-                    format!("tool '{other}' não existe neste servidor"),
-                    Some("veja tools/list para o catálogo"),
-                ))
+                return self.tool_error_result(
+                    name,
+                    &agent_error(
+                        "UNKNOWN_TOOL",
+                        format!("tool '{other}' não existe neste servidor"),
+                        Some("veja tools/list para o catálogo"),
+                    ),
+                )
             }
         };
         let mut out = match res {
             Ok(r) => r,
-            Err(e) => ToolResult::error(&e),
+            Err(e) => self.tool_error_result(name, &e),
         };
         self.screen_post_tool(name, &args, &mut out);
+        // Pure diagnostics must not reset VM budgets or trigger automatic GC.
+        if diagnostic {
+            return out;
+        }
         // safe point for the collector: no interpreter frame is live between
         // tool calls (see rd-vm gc.rs); adaptive threshold, RD_GC=off disables
         if let Some(eng) = self.engine.as_mut() {
@@ -1668,6 +1710,7 @@ impl AgentSession {
         let text = String::from_utf8_lossy(&buf).to_string();
         if clear {
             buf.clear();
+            self.log_generation = self.log_generation.saturating_add(1);
         }
         Ok(ToolResult::json(&serde_json::json!({
             "logs": text,
@@ -2950,6 +2993,8 @@ pub fn serve_stdio_with<R: std::io::Read, W: std::io::Write>(
 
 include!("m9_tools.rs");
 include!("observe.rs");
+include!("ui_tools.rs");
+include!("runtime_tools.rs");
 
 #[cfg(test)]
 mod tests {
@@ -3468,7 +3513,7 @@ mod tests {
         );
         assert_eq!(
             tool_defs().len(),
-            41,
+            47,
             "preserve the existing MCP tool contract"
         );
         let _ = std::fs::remove_file(apk_path);
@@ -3641,8 +3686,8 @@ mod tests {
         let tools = r["result"]["tools"].as_array().expect("tools");
         assert_eq!(
             tools.len(),
-            41,
-            "catálogo completo: M5 + AG-09 + M9 + round 6 observe/tap_text (41 tools)"
+            47,
+            "catálogo completo: M5 + AG-09 + M9 + round 6 observe/tap_text (47 tools)"
         );
         for t in tools {
             assert!(t["name"].as_str().is_some());
@@ -3745,7 +3790,7 @@ mod tests {
         assert_eq!(arr.len(), 2);
         assert_eq!(
             arr[0]["result"]["tools"].as_array().expect("tools").len(),
-            41
+            47
         );
         assert_eq!(arr[1]["result"]["serverInfo"]["name"], SERVER_NAME);
     }
@@ -4757,7 +4802,7 @@ mod tests {
         let _guard = SESSION_LOCK.lock().unwrap();
         let mut s = AgentSession::new();
         let defs = tool_defs();
-        assert_eq!(defs.len(), 41);
+        assert_eq!(defs.len(), 47);
         for t in &defs {
             // schema: objeto com properties/required consistentes
             assert!(t.schema["type"] == "object", "{}: schema object", t.name);
@@ -5399,4 +5444,6 @@ mod tests {
         );
         assert!(err, "{v}");
     }
+    include!("ui_tools_tests.rs");
+    include!("runtime_tools_tests.rs");
 }
