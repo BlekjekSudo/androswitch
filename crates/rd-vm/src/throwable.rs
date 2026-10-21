@@ -20,6 +20,8 @@
 //! - `printStackTrace` writes `toString()` plus the `Caused by:` chain to the
 //!   log as `W/System.err`.
 
+use std::fmt::Write as _;
+
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::{ElemKind, ObjRef};
@@ -66,13 +68,10 @@ pub(crate) fn instance_intrinsic(
     // records the guest call stack at construction, innermost first, in
     // `rd_trace`. Uncaught-exception logging prints it.
     if name == "<init>" && vm.config.exception_trace {
-        let trace: String = vm
-            .frame_labels
-            .iter()
-            .rev()
-            .take(16)
-            .map(|l| format!("\n  at {l}"))
-            .collect();
+        let mut trace = String::new();
+        for label in vm.frame_labels.iter().rev().take(16) {
+            let _ = write!(&mut trace, "\n  at {label}");
+        }
         let t = crate::intrinsics::alloc_string(vm, trace)?;
         put(vm, recv, "rd_trace", Value::Obj(t))?;
     }

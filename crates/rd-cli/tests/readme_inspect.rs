@@ -1,5 +1,5 @@
 //! issue #75: o bloco de exemplo do `rd inspect` no README precisa ser igual
-//! à saída REAL do binário para o APK de referência (F-Droid 2.0.1).
+//! à saída REAL do binário para o APK de referência (F-Droid 2.0.2).
 //!
 //! O APK golden não é versionado (política GH-05: nenhum binário no repo) e
 //! não é baixado pelo CI — então o teste roda quando o APK está presente

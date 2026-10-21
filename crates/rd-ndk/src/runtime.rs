@@ -249,7 +249,7 @@ impl Runtime {
         let b = self.read(address, self.abi.pointer_size())?;
         Ok(b.iter()
             .enumerate()
-            .fold(0, |v, (i, b)| v | u64::from(*b) << (i * 8)))
+            .fold(0, |v, (i, b)| v | (u64::from(*b) << (i * 8))))
     }
     pub fn write_word(&mut self, address: u64, value: u64) -> Result<()> {
         self.write(address, &value.to_le_bytes()[..self.abi.pointer_size()])
@@ -549,7 +549,7 @@ impl Runtime {
                     } else {
                         let lo = t.args.get(2 * i).copied().unwrap_or(0) & 0xffff_ffff;
                         let hi = t.args.get(2 * i + 1).copied().unwrap_or(0) & 0xffff_ffff;
-                        f64::from_bits(hi << 32 | lo)
+                        f64::from_bits((hi << 32) | lo)
                     }
                 }
                 _ => {

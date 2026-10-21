@@ -390,6 +390,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(None);
     };
     let ret = msig.rsplit_once(')').map_or("V", |(_, r)| r).to_string();
+    if let Some(value) = crate::jannotations::method_intrinsic(vm, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
     Ok(Some(match (name, sig) {
         ("setAccessible", "(Z)V") => Value::Null,
         ("isAccessible", "()Z") => Value::Int(1),

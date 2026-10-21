@@ -785,7 +785,7 @@ fn arm_wide(rt: &mut Runtime, t: &Trap, i: &mut usize) -> Result<u64> {
     let lo = rt.raw_argument(t, *i)? & 0xffff_ffff;
     let hi = rt.raw_argument(t, *i + 1)? & 0xffff_ffff;
     *i += 2;
-    Ok(lo | hi << 32)
+    Ok(lo | (hi << 32))
 }
 fn primitive(i: usize) -> char {
     ['Z', 'B', 'C', 'S', 'I', 'J', 'F', 'D'][i]
@@ -836,7 +836,7 @@ fn write_array(vm: &mut Engine, r: ObjRef, k: char, start: usize, b: &[u8]) -> R
         let raw = b
             .iter()
             .enumerate()
-            .fold(0u64, |v, (i, c)| v | u64::from(*c) << (i * 8));
+            .fold(0u64, |v, (i, c)| v | (u64::from(*c) << (i * 8)));
         *v = match k {
             'J' => Value::Long(raw as i64),
             'F' => Value::Float(f32::from_bits(raw as u32)),

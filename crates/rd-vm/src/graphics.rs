@@ -697,6 +697,15 @@ pub(crate) fn host_static(
     owner: &str,
     field: &str,
 ) -> Result<Option<Value>, VmExit> {
+    if owner == PLATFORM_INSETS && field == "NONE" {
+        let key = (owner.to_string(), field.to_string());
+        if let Some(value) = vm.statics.get(&key) {
+            return Ok(Some(value.clone()));
+        }
+        let value = Value::Obj(alloc_platform_insets(vm, [0; 4])?);
+        vm.statics.insert(key, value.clone());
+        return Ok(Some(value));
+    }
     if let Some((_, names)) = ENUMS.iter().find(|(c, _)| *c == owner) {
         if let Some(i) = names.iter().position(|n| *n == field) {
             return enum_const(vm, owner, i);
@@ -982,6 +991,103 @@ fn write_floats(vm: &mut Engine, v: Option<&Value>, xs: &[f32], at: usize) {
 }
 
 const GFX_PREFIXES: [&str; 2] = ["Landroid/graphics/", "Landroid/text/"];
+const PLATFORM_INSETS: &str = "Landroid/graphics/Insets;";
+
+fn insets_values(vm: &Engine, recv: ObjRef) -> [i32; 4] {
+    ["left", "top", "right", "bottom"].map(|field| match vm.heap.get_field(recv, field) {
+        Ok(Value::Int(value)) => value,
+        _ => 0,
+    })
+}
+
+fn alloc_platform_insets(vm: &mut Engine, values: [i32; 4]) -> Result<ObjRef, VmExit> {
+    let recv = vm
+        .heap
+        .alloc_instance(PLATFORM_INSETS.to_string(), Vec::new())
+        .map_err(crate::err::oom_throwable)?;
+    for (field, value) in ["left", "top", "right", "bottom"].into_iter().zip(values) {
+        put(vm, recv, field, Value::Int(value))?;
+    }
+    Ok(recv)
+}
+
+/// Platform Insets value object shared with AndroidX's Insets adapter.
+pub(crate) fn new_platform_insets(vm: &mut Engine, values: [i32; 4]) -> Result<ObjRef, VmExit> {
+    alloc_platform_insets(vm, values)
+}
+
+fn platform_insets_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let values = match (name, sig) {
+        ("of", "(IIII)Landroid/graphics/Insets;") => Some([
+            it(args.first()),
+            it(args.get(1)),
+            it(args.get(2)),
+            it(args.get(3)),
+        ]),
+        ("of", "(Landroid/graphics/Rect;)Landroid/graphics/Insets;") => {
+            let Some(rect) = obj(args.first()) else {
+                return Err(exc(
+                    "Ljava/lang/NullPointerException;",
+                    "Insets.of(rect): null rect",
+                ));
+            };
+            Some(["left", "top", "right", "bottom"].map(
+                |field| match vm.heap.get_field(rect, field) {
+                    Ok(Value::Int(value)) => value,
+                    _ => 0,
+                },
+            ))
+        }
+        (
+            "max",
+            "(Landroid/graphics/Insets;Landroid/graphics/Insets;)Landroid/graphics/Insets;",
+        )
+        | (
+            "min",
+            "(Landroid/graphics/Insets;Landroid/graphics/Insets;)Landroid/graphics/Insets;",
+        )
+        | (
+            "add",
+            "(Landroid/graphics/Insets;Landroid/graphics/Insets;)Landroid/graphics/Insets;",
+        ) => {
+            let (Some(left), Some(right)) = (obj(args.first()), obj(args.get(1))) else {
+                return Err(exc(
+                    "Ljava/lang/NullPointerException;",
+                    format!("Insets.{name}(insets): null argument"),
+                ));
+            };
+            let (a, b) = (insets_values(vm, left), insets_values(vm, right));
+            Some(std::array::from_fn(|i| match name {
+                "max" => a[i].max(b[i]),
+                "min" => a[i].min(b[i]),
+                _ => a[i].saturating_add(b[i]),
+            }))
+        }
+        (
+            "subtract",
+            "(Landroid/graphics/Insets;Landroid/graphics/Insets;)Landroid/graphics/Insets;",
+        ) => {
+            let (Some(left), Some(right)) = (obj(args.first()), obj(args.get(1))) else {
+                return Err(exc(
+                    "Ljava/lang/NullPointerException;",
+                    "Insets.subtract(insets): null argument",
+                ));
+            };
+            let (a, b) = (insets_values(vm, left), insets_values(vm, right));
+            Some(std::array::from_fn(|i| a[i].saturating_sub(b[i])))
+        }
+        _ => return Ok(None),
+    };
+    let Some(values) = values else {
+        return Ok(None);
+    };
+    Ok(Some(Value::Obj(alloc_platform_insets(vm, values)?)))
+}
 
 pub(crate) fn static_intrinsic(
     vm: &mut Engine,
@@ -992,6 +1098,9 @@ pub(crate) fn static_intrinsic(
 ) -> Result<Option<Value>, VmExit> {
     if !GFX_PREFIXES.iter().any(|p| class.starts_with(p)) {
         return Ok(None);
+    }
+    if class == PLATFORM_INSETS {
+        return platform_insets_static(vm, name, sig, args);
     }
     if let Some((_, names)) = ENUMS.iter().find(|(c, _)| *c == class) {
         return match name {
@@ -1045,20 +1154,20 @@ pub(crate) fn static_intrinsic(
                 ("green", "(I)I") => Value::Int(((c >> 8) & 0xFF) as i32),
                 ("blue", "(I)I") => Value::Int((c & 0xFF) as i32),
                 ("argb", "(IIII)I") => Value::Int(
-                    ((it(a(0)) as u32 & 0xFF) << 24
-                        | (it(a(1)) as u32 & 0xFF) << 16
-                        | (it(a(2)) as u32 & 0xFF) << 8
+                    (((it(a(0)) as u32 & 0xFF) << 24)
+                        | ((it(a(1)) as u32 & 0xFF) << 16)
+                        | ((it(a(2)) as u32 & 0xFF) << 8)
                         | (it(a(3)) as u32 & 0xFF)) as i32,
                 ),
                 ("rgb", "(III)I") => Value::Int(
                     (0xFF00_0000u32
-                        | (it(a(0)) as u32 & 0xFF) << 16
-                        | (it(a(1)) as u32 & 0xFF) << 8
+                        | ((it(a(0)) as u32 & 0xFF) << 16)
+                        | ((it(a(1)) as u32 & 0xFF) << 8)
                         | (it(a(2)) as u32 & 0xFF)) as i32,
                 ),
                 ("argb", "(FFFF)I") => {
                     let q = |i: usize| (fl(a(i)).clamp(0.0, 1.0) * 255.0 + 0.5) as u32;
-                    Value::Int((q(0) << 24 | q(1) << 16 | q(2) << 8 | q(3)) as i32)
+                    Value::Int(((q(0) << 24) | (q(1) << 16) | (q(2) << 8) | q(3)) as i32)
                 }
                 ("parseColor", _) => {
                     let s = cs_text(vm, a(0).unwrap_or(&Value::Null))?;
@@ -1218,11 +1327,51 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(v));
     }
     let host_ref = GFX_PREFIXES.iter().any(|p| mref_class.starts_with(p));
-    if !host_ref && !vm.gfx.objs.contains_key(&recv) {
+    let insets_ref = recv_class == PLATFORM_INSETS || mref_class == PLATFORM_INSETS;
+    if !host_ref && !insets_ref && !vm.gfx.objs.contains_key(&recv) {
         return Ok(None);
     }
-    let class = if host_ref { mref_class } else { recv_class };
+    let class = if insets_ref {
+        PLATFORM_INSETS
+    } else if host_ref {
+        mref_class
+    } else {
+        recv_class
+    };
     let a = |i: usize| args.get(i);
+    if class == PLATFORM_INSETS {
+        let fields = insets_values(vm, recv);
+        return Ok(Some(match name {
+            "<init>" => {
+                if args.len() == 4 {
+                    for (field, value) in ["left", "top", "right", "bottom"].into_iter().zip([
+                        it(a(0)),
+                        it(a(1)),
+                        it(a(2)),
+                        it(a(3)),
+                    ]) {
+                        put(vm, recv, field, Value::Int(value))?;
+                    }
+                }
+                Value::Null
+            }
+            "equals" => match obj(a(0)) {
+                Some(other) => b(insets_values(vm, other) == fields),
+                None => b(false),
+            },
+            "hashCode" => Value::Int(fields.into_iter().fold(1i32, |hash, value| {
+                hash.wrapping_mul(31).wrapping_add(value)
+            })),
+            "toString" => Value::Obj(crate::intrinsics::alloc_string(
+                vm,
+                format!(
+                    "Insets{{left={}, top={}, right={}, bottom={}}}",
+                    fields[0], fields[1], fields[2], fields[3]
+                ),
+            )?),
+            _ => return Ok(None),
+        }));
+    }
     // enums
     if ENUMS.iter().any(|(c, _)| *c == class || *c == recv_class) {
         return Ok(Some(match name {
@@ -1747,9 +1896,9 @@ fn paint_method(
         }
         "getAlpha" => Value::Int((p.argb >> 24) as i32),
         "setARGB" => {
-            p.argb = (it(a(0)) as u32 & 0xFF) << 24
-                | (it(a(1)) as u32 & 0xFF) << 16
-                | (it(a(2)) as u32 & 0xFF) << 8
+            p.argb = ((it(a(0)) as u32 & 0xFF) << 24)
+                | ((it(a(1)) as u32 & 0xFF) << 16)
+                | ((it(a(2)) as u32 & 0xFF) << 8)
                 | (it(a(3)) as u32 & 0xFF);
             Value::Null
         }
@@ -2748,15 +2897,15 @@ fn canvas_method(
         "drawColor" | "drawARGB" | "drawRGB" | "drawPaint" => {
             let c = match name {
                 "drawARGB" => {
-                    (it(a(0)) as u32 & 0xFF) << 24
-                        | (it(a(1)) as u32 & 0xFF) << 16
-                        | (it(a(2)) as u32 & 0xFF) << 8
+                    ((it(a(0)) as u32 & 0xFF) << 24)
+                        | ((it(a(1)) as u32 & 0xFF) << 16)
+                        | ((it(a(2)) as u32 & 0xFF) << 8)
                         | (it(a(3)) as u32 & 0xFF)
                 }
                 "drawRGB" => {
                     0xFF00_0000
-                        | (it(a(0)) as u32 & 0xFF) << 16
-                        | (it(a(1)) as u32 & 0xFF) << 8
+                        | ((it(a(0)) as u32 & 0xFF) << 16)
+                        | ((it(a(1)) as u32 & 0xFF) << 8)
                         | (it(a(2)) as u32 & 0xFF)
                 }
                 "drawPaint" => paint_of(vm, a(0)).argb,

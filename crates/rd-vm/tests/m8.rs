@@ -728,6 +728,135 @@ fn m8_shared_preferences_stateful() {
     );
 }
 
+#[test]
+fn m8_shared_preferences_change_listener_notifies_only_changed_keys() {
+    let mut b = DexBuilder::new();
+    let listener_class = b.class("LPrefsListener;", "Ljava/lang/Object;");
+    b.instance_field(listener_class, "changeCount", "I");
+    b.instance_field(listener_class, "lastKey", "Ljava/lang/String;");
+    let count_field = b.field_idx("LPrefsListener;", "I", "changeCount");
+    let key_field = b.field_idx("LPrefsListener;", "Ljava/lang/String;", "lastKey");
+    b.r#virtual(
+        listener_class,
+        "onSharedPreferenceChanged",
+        "V",
+        vec!["Landroid/content/SharedPreferences;", "Ljava/lang/String;"],
+        ACC_PUBLIC,
+        Some(b.code(5, 3, 0, {
+            // regs v0-v1 are temporaries; incoming p0=this, p1=prefs, p2=key
+            let mut code = op22c(0x52, 0, 2, count_field); // iget v0, v2, count
+            code.extend(op11n(0x12, 1, 1)); // const/4 v1, 1
+            code.extend(op12x(0xb0, 0, 1)); // add-int/2addr v0, v1
+            code.extend(op22c(0x59, 0, 2, count_field)); // iput v0, v2, count
+            code.extend(op22c(0x5b, 4, 2, key_field)); // iput-object v4, v2, lastKey
+            code.extend(op10x(0x0e));
+            code
+        })),
+    );
+
+    let mut e = engine_of(&b);
+    let context = obj(&mut e, "Landroid/app/Activity;");
+    let pref_name = s(&mut e, "listener-test");
+    let prefs = match rd_vm::framework::call_host_instance(
+        &mut e,
+        "Landroid/content/Context;",
+        "getSharedPreferences",
+        "(Ljava/lang/String;I)Landroid/content/SharedPreferences;",
+        context,
+        &[pref_name, Value::Int(0)],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(prefs)) => prefs,
+        other => panic!("getSharedPreferences: {other:?}"),
+    };
+    let listener = e.new_dex_instance_pub("LPrefsListener;").unwrap();
+    const LISTENER_SIG: &str =
+        "(Landroid/content/SharedPreferences$OnSharedPreferenceChangeListener;)V";
+    for _ in 0..2 {
+        rd_vm::framework::call_host_instance(
+            &mut e,
+            "Landroid/content/SharedPreferences;",
+            "registerOnSharedPreferenceChangeListener",
+            LISTENER_SIG,
+            prefs,
+            &[Value::Obj(listener)],
+        )
+        .unwrap();
+    }
+
+    let commit_string = |e: &mut Engine, value: &str| {
+        let editor = match rd_vm::framework::call_host_instance(
+            e,
+            "Landroid/content/SharedPreferences;",
+            "edit",
+            "()Landroid/content/SharedPreferences$Editor;",
+            prefs,
+            &[],
+        )
+        .unwrap()
+        {
+            Some(Value::Obj(editor)) => editor,
+            other => panic!("edit: {other:?}"),
+        };
+        let key = s(e, "mode");
+        let value = s(e, value);
+        rd_vm::framework::call_host_instance(
+            e,
+            "Landroid/content/SharedPreferences$Editor;",
+            "putString",
+            "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;",
+            editor,
+            &[key, value],
+        )
+        .unwrap();
+        rd_vm::framework::call_host_instance(
+            e,
+            "Landroid/content/SharedPreferences$Editor;",
+            "commit",
+            "()Z",
+            editor,
+            &[],
+        )
+        .unwrap();
+    };
+
+    commit_string(&mut e, "dark");
+    assert_eq!(
+        e.heap.get_field(listener, "changeCount").unwrap(),
+        Value::Int(1)
+    );
+    commit_string(&mut e, "dark"); // equal String content is not a change
+    assert_eq!(
+        e.heap.get_field(listener, "changeCount").unwrap(),
+        Value::Int(1)
+    );
+    commit_string(&mut e, "light");
+    assert_eq!(
+        e.heap.get_field(listener, "changeCount").unwrap(),
+        Value::Int(2)
+    );
+    let Value::Obj(last_key) = e.heap.get_field(listener, "lastKey").unwrap() else {
+        panic!("listener should receive a String key");
+    };
+    assert_eq!(e.heap.as_str(last_key).unwrap(), "mode");
+
+    rd_vm::framework::call_host_instance(
+        &mut e,
+        "Landroid/content/SharedPreferences;",
+        "unregisterOnSharedPreferenceChangeListener",
+        LISTENER_SIG,
+        prefs,
+        &[Value::Obj(listener)],
+    )
+    .unwrap();
+    commit_string(&mut e, "bright");
+    assert_eq!(
+        e.heap.get_field(listener, "changeCount").unwrap(),
+        Value::Int(2)
+    );
+}
+
 // ── Room builder over SQLite host ────────────────────────────────────────
 #[test]
 fn m8_room_builder_builds_database() {

@@ -149,6 +149,8 @@ pub struct M8State {
     pub prefs: HashMap<String, Value>,
     pub prefs_editors: HashMap<ObjRef, Vec<(String, Option<Value>)>>, // None = remove
     pub prefs_clear: HashMap<ObjRef, bool>,
+    /// Per-SharedPreferences listener identities; GC roots are traced from M8State.
+    pub prefs_listeners: HashMap<ObjRef, Vec<ObjRef>>,
     pub room_builders: HashMap<ObjRef, (String, String)>, // obj -> (db class desc, name)
     pub ax_fragments: Vec<(ObjRef, i32, Option<String>)>,
     pub ax_frag_txs: HashMap<ObjRef, Vec<(ObjRef, i32, Option<String>)>>,
@@ -396,30 +398,44 @@ fn call_m8_instance_rooted(
         return Ok(Some(v));
     }
     // ── Fragments androidx ──────────────────────────────────────────────
-    if mref_class == "Landroidx/fragment/app/FragmentManager;"
-        || recv_class == "Landroidx/fragment/app/FragmentManager;"
+    if (mref_class == "Landroidx/fragment/app/FragmentManager;"
+        || recv_class == "Landroidx/fragment/app/FragmentManager;")
+        && vm.cp.resolve_method(mref_class, name, sig).is_none()
     {
+        // Prefer the real AndroidX implementation when the APK supplies it;
+        // retain the compact host transaction model for synthetic fixtures.
         return ax_fragment_manager(vm, name, recv, args);
     }
-    if mref_class == "Landroidx/fragment/app/FragmentTransaction;"
-        || recv_class == "Landroidx/fragment/app/FragmentTransaction;"
+    if (mref_class == "Landroidx/fragment/app/FragmentTransaction;"
+        || recv_class == "Landroidx/fragment/app/FragmentTransaction;")
+        && vm.cp.resolve_method(mref_class, name, sig).is_none()
     {
         return ax_fragment_tx(vm, name, recv, args);
     }
     if (mref_class == "Landroidx/fragment/app/Fragment;" || mref_class == "Landroid/app/Fragment;")
         && name == "<init>"
     {
+        // AndroidX Fragment is shipped in the APK. Its constructor initializes
+        // identity, request-code and listener state required by
+        // registerForActivityResult; only the platform legacy Fragment lacks
+        // a DEX body here and should use the host no-op.
+        if vm.cp.resolve_method(mref_class, name, sig).is_some() {
+            return Ok(None);
+        }
         return Ok(Some(Value::Null));
     }
-    if name == "getSupportFragmentManager" {
-        if let Some(f) = vm.fw.m8.ax_fragment_manager {
-            return Ok(Some(Value::Obj(f)));
+    if name == "getSupportFragmentManager"
+        || (name == "getFragmentManager" && mref_class.contains("androidx"))
+    {
+        // Let the real library getter execute when present. In particular,
+        // FragmentHostCallback.getFragmentManager() returns the
+        // FragmentManagerImpl created by its constructor; manufacturing a
+        // blank FragmentManager here skips its constructor and leaves fields
+        // such as mOnAttachListeners null. Keep the synthetic fallback only
+        // for reduced DEX fixtures without the getter implementation.
+        if vm.cp.resolve_method(mref_class, name, sig).is_some() {
+            return Ok(None);
         }
-        let r = alloc(vm, "Landroidx/fragment/app/FragmentManager;")?;
-        vm.fw.m8.ax_fragment_manager = Some(r);
-        return Ok(Some(Value::Obj(r)));
-    }
-    if name == "getFragmentManager" && mref_class.contains("androidx") {
         if let Some(f) = vm.fw.m8.ax_fragment_manager {
             return Ok(Some(Value::Obj(f)));
         }

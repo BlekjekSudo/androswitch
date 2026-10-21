@@ -294,6 +294,7 @@ fn to_string(vm: &mut Engine, me: ObjRef, items: &[Value]) -> Result<String, VmE
 }
 
 const COLLECTION_TYPES: &[&str] = &[
+    "Ljava/lang/Iterable;",
     "Ljava/util/Collection;",
     "Ljava/util/List;",
     "Ljava/util/Set;",
@@ -356,6 +357,26 @@ pub(crate) fn instance_intrinsic(
                 }
                 vm.fw.objects.insert(recv, HostObj::List { elems: out });
                 return Ok(Some(Value::Null));
+            }
+            ("addIfAbsent", "(Ljava/lang/Object;)Z") => {
+                let value = args.first().cloned().unwrap_or(Value::Null);
+                if contains(vm, &items, &value)? {
+                    Value::Int(0)
+                } else {
+                    items.push(value);
+                    Value::Int(1)
+                }
+            }
+            ("addAllAbsent", "(Ljava/util/Collection;)I") => {
+                let source = elems_of(vm, args.first().unwrap_or(&Value::Null))?;
+                let mut added = 0;
+                for value in source {
+                    if !contains(vm, &items, &value)? {
+                        items.push(value);
+                        added += 1;
+                    }
+                }
+                Value::Int(added)
             }
             ("addAll", "(Ljava/util/Collection;)Z") | ("addAll", "(ILjava/util/Collection;)Z") => {
                 let (at, src_v) = if sig.starts_with("(I") {

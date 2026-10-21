@@ -118,7 +118,7 @@ pub(crate) fn instance_intrinsic(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     let ours = recv_class == RANDOM || recv_class == TLR;
-    if !ours && !(mref_class == RANDOM && name == "<init>") {
+    if !(ours || (mref_class == RANDOM && name == "<init>")) {
         return Ok(None);
     }
     Ok(Some(match (name, sig) {

@@ -32,6 +32,7 @@ const BASES: &[&str] = &[
     "Landroid/text/style/MetricAffectingSpan;",
     "Landroid/text/style/ReplacementSpan;",
     "Landroid/text/style/ClickableSpan;",
+    "Landroid/text/style/UnderlineSpan;",
     "Landroid/text/method/BaseMovementMethod;",
     "Landroid/graphics/drawable/Animatable2$AnimationCallback;",
     "Landroid/animation/AnimatorListenerAdapter;",
@@ -61,6 +62,16 @@ pub(crate) fn host_static(
     owner: &str,
     field: &str,
 ) -> Result<Option<Value>, VmExit> {
+    if owner == "Landroid/view/WindowInsets;" && field == "CONSUMED" {
+        let key = (owner.to_string(), field.to_string());
+        if let Some(value) = vm.statics.get(&key) {
+            return Ok(Some(value.clone()));
+        }
+        let consumed = vm.heap.alloc_instance(owner.to_string(), Vec::new())?;
+        let value = Value::Obj(consumed);
+        vm.statics.insert(key, value.clone());
+        return Ok(Some(value));
+    }
     if owner == "Landroid/view/ViewOutlineProvider;"
         && matches!(field, "BACKGROUND" | "BOUNDS" | "PADDED_BOUNDS")
     {
@@ -71,6 +82,11 @@ pub(crate) fn host_static(
 }
 
 pub(crate) fn instance_intrinsic(mref_class: &str, name: &str, sig: &str) -> Option<Value> {
+    // BroadcastReceiver is an abstract callback base, not a stateless default
+    // base; only its protected no-arg constructor has host no-op semantics.
+    if mref_class == "Landroid/content/BroadcastReceiver;" {
+        return (name == "<init>" && sig == "()V").then_some(Value::Null);
+    }
     if !BASES.contains(&mref_class) {
         return None;
     }

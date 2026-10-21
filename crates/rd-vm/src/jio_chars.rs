@@ -42,15 +42,20 @@ const SW: &str = "Ljava/io/StringWriter;";
 const OSW: &str = "Ljava/io/OutputStreamWriter;";
 const BW: &str = "Ljava/io/BufferedWriter;";
 const PW: &str = "Ljava/io/PrintWriter;";
+const PS: &str = "Ljava/io/PrintStream;";
 const FW: &str = "Ljava/io/FileWriter;";
 const SR: &str = "Ljava/io/StringReader;";
 const ISR: &str = "Ljava/io/InputStreamReader;";
 const BR: &str = "Ljava/io/BufferedReader;";
 const FR: &str = "Ljava/io/FileReader;";
 const BAOS: &str = "Ljava/io/ByteArrayOutputStream;";
+const OUTPUT_STREAM: &str = "Ljava/io/OutputStream;";
+const INPUT_STREAM: &str = "Ljava/io/InputStream;";
+const FILTER_OS: &str = "Ljava/io/FilterOutputStream;";
+const BOS: &str = "Ljava/io/BufferedOutputStream;";
 const BAIS: &str = "Ljava/io/ByteArrayInputStream;";
 
-const WRITERS: [&str; 5] = [SW, OSW, BW, PW, FW];
+const WRITERS: [&str; 6] = [SW, OSW, BW, PW, PS, FW];
 const READERS: [&str; 4] = [SR, ISR, BR, FR];
 
 #[derive(Debug, Clone)]
@@ -348,8 +353,9 @@ fn writer(
 ) -> Result<Option<Value>, VmExit> {
     if name == "<init>" {
         let sink = sink_for(vm, class, args, sig)?;
-        let autoflush =
-            class == PW && sig.contains("Z)V") && args.iter().any(|a| matches!(a, Value::Int(1)));
+        let autoflush = matches!(class, PW | PS)
+            && sig.contains("Z)V")
+            && args.iter().any(|a| matches!(a, Value::Int(1)));
         wput(
             recv,
             WState {
@@ -367,6 +373,7 @@ fn writer(
     }
     let ret_self = sig.ends_with(")Ljava/io/Writer;")
         || sig.ends_with(")Ljava/io/PrintWriter;")
+        || sig.ends_with(")Ljava/io/PrintStream;")
         || sig.ends_with(")Ljava/io/StringWriter;")
         || sig.ends_with(")Ljava/lang/Appendable;");
     let out = match name {
@@ -414,9 +421,6 @@ fn writer(
                 s.push('\n');
             }
             write_text(recv, &s)?;
-            if name == "println" && wget(recv).is_some_and(|w| w.autoflush) {
-                flush_writer(vm, recv, false)?;
-            }
             Value::Null
         }
         "printf" | "format" => {
@@ -467,6 +471,16 @@ fn writer(
         },
         _ => return Ok(None),
     };
+    let stream_write = class == PS
+        && matches!(
+            name,
+            "write" | "append" | "print" | "println" | "printf" | "format" | "newLine"
+        );
+    let printwriter_autoflush =
+        class == PW && name == "println" && wget(recv).is_some_and(|w| w.autoflush);
+    if stream_write || printwriter_autoflush {
+        flush_writer(vm, recv, false)?;
+    }
     Ok(Some(if ret_self && matches!(out, Value::Null) {
         Value::Obj(recv)
     } else {
@@ -916,7 +930,13 @@ fn dex_base(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     match (mref_class, name, sig) {
-        (WRITER | READER, "<init>", _) => Ok(Some(Value::Null)),
+        (WRITER | READER | OUTPUT_STREAM | INPUT_STREAM, "<init>", _) => Ok(Some(Value::Null)),
+        (FILTER_OS, "<init>", "(Ljava/io/OutputStream;)V") => {
+            if let Some(out) = args.first() {
+                let _ = vm.heap.put_field(recv, "out", out.clone());
+            }
+            Ok(Some(Value::Null))
+        }
         (WRITER, "write", "(Ljava/lang/String;)V")
         | (WRITER, "write", "(I)V")
         | (WRITER, "append", _) => {
@@ -995,6 +1015,92 @@ fn dex_base(
     }
 }
 
+fn buffered_output_stream(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if name == "<init>" {
+        let Some(out) = obj(args, 0) else {
+            return Err(exc("Ljava/lang/NullPointerException;", "out"));
+        };
+        let _ = vm.heap.put_field(recv, "out", Value::Obj(out));
+        let size = if args.len() > 1 { int(args, 1) } else { 8192 };
+        if size <= 0 {
+            return Err(exc(
+                "Ljava/lang/IllegalArgumentException;",
+                "Buffer size <= 0",
+            ));
+        }
+        let _ = vm.heap.put_field(recv, "rd_buf_size", Value::Int(size));
+        BYTES_ST.with(|m| m.borrow_mut().insert(recv, BState::default()));
+        return Ok(Some(Value::Null));
+    }
+    let wrapped = match vm.heap.get_field(recv, "out") {
+        Ok(Value::Obj(o)) => Some(o),
+        _ => None,
+    };
+    let flush_buffer = |vm: &mut Engine| -> Result<(), VmExit> {
+        let pending = BYTES_ST.with(|m| {
+            let mut map = m.borrow_mut();
+            let st = map.entry(recv).or_default();
+            std::mem::take(&mut st.bytes)
+        });
+        if !pending.is_empty() {
+            if let Some(out) = wrapped {
+                let b = crate::jlstring::byte_array(vm, &pending)?;
+                vm.invoke_instance(out, "write", "([B)V", &[b])?;
+            }
+        }
+        Ok(())
+    };
+    match name {
+        "write" => {
+            let data = match sig {
+                "(I)V" => vec![int(args, 0) as u8],
+                "([B)V" => bytes_of(vm, args.first()),
+                _ => {
+                    let all = bytes_of(vm, args.first());
+                    slice(&all, int(args, 1), int(args, 2))?
+                }
+            };
+            BYTES_ST.with(|m| m.borrow_mut().entry(recv).or_default().bytes.extend(data));
+            let cap = match vm.heap.get_field(recv, "rd_buf_size") {
+                Ok(Value::Int(v)) => v.max(1) as usize,
+                _ => 8192,
+            };
+            let over = BYTES_ST.with(|m| {
+                m.borrow()
+                    .get(&recv)
+                    .map(|st| st.bytes.len() >= cap)
+                    .unwrap_or(false)
+            });
+            if over {
+                flush_buffer(vm)?;
+            }
+            Ok(Some(Value::Null))
+        }
+        "flush" => {
+            flush_buffer(vm)?;
+            if let Some(out) = wrapped {
+                vm.invoke_instance(out, "flush", "()V", &[])?;
+            }
+            Ok(Some(Value::Null))
+        }
+        "close" => {
+            let r = flush_buffer(vm);
+            if let Some(out) = wrapped {
+                let _ = vm.invoke_instance(out, "close", "()V", &[]);
+            }
+            r?;
+            Ok(Some(Value::Null))
+        }
+        _ => Ok(None),
+    }
+}
+
 pub fn instance_intrinsic(
     vm: &mut Engine,
     recv_class: &str,
@@ -1013,9 +1119,14 @@ pub fn instance_intrinsic(
     if recv_class == BAOS || recv_class == BAIS {
         return bytes_stream(vm, recv_class, name, sig, recv, args);
     }
+    if recv_class == BOS {
+        return buffered_output_stream(vm, name, sig, recv, args);
+    }
     // Base-class templates apply when the DEX receiver does not override.
-    if (mref_class == WRITER || mref_class == READER)
-        && vm.cp.resolve_method(recv_class, name, sig).is_none()
+    if matches!(
+        mref_class,
+        WRITER | READER | OUTPUT_STREAM | INPUT_STREAM | FILTER_OS
+    ) && (name == "<init>" || vm.cp.resolve_method(recv_class, name, sig).is_none())
     {
         return dex_base(vm, mref_class, name, sig, recv, args);
     }

@@ -1351,6 +1351,2080 @@ Local gates: 548 all-feature / 537 default tests passed; Clippy, fmt, minimal VM
 
 AI assistance disclosed; updated-source remote CI and human review still required before merge. Source/cache recovery and command/tool ledger are preserved separately in the accompanying workspace worklog; no credential is committed.
 
+---
+Task: Resolve outstanding non-physical-phone pendencies (continuation)
+Agent: Arena Agent Mode
+Date: 2026-10-21
+
+Work Log:
+- Scope reaffirmed from the user: continue resolving all actionable pendencies except genuine physical-phone tests; provide progress updates; do not call unresolved items complete. M10–M12 remain future roadmap phases, not overdue current implementation.
+- Latest golden APK remains `org.primftpd_71.apk` (SHA-256 `d36566e774e2d0446dcbb41438d22e62d198688aac2711ba7afaa6ea2fdd577d`).
+- Added host collection state/dispatch for `Vector` and `Stack` in `crates/rd-vm/src/intrinsics.rs`, including legacy Vector element/enumeration operations and Stack push/pop/peek/search/empty. Added `vector_and_stack_host_intrinsics_cover_legacy_collection_apis`; focused test passes.
+- Extended runtime-visible method/constructor annotation lookup in `crates/rd-vm/src/jannotations.rs` and reflective `AnnotatedElement` dispatch in `crates/rd-vm/src/reflect.rs`. This allowed Logback configuration to get past `Method.getAnnotation(DefaultClass.class)`.
+- Added Java Unicode-category support for `Character.isJavaIdentifierStart/Part` and `isIdentifierIgnorable`; the dedicated `numerics::tests::java_identifier_start_and_part_follow_java_categories` passes. Added deterministic Android Environment external-storage state and a VM-virtual `/storage/emulated/0` path; its integration regression passes. Implemented `DateTimeFormatter.withZone/getZone`, preserving locale and zone in immutable copies; all 3 `jtime::tests` pass.
+- Traced the FragmentManager NPE to the M8 getter shortcut: it returned a blank manager instead of allowing the DEX `FragmentHostCallback` getter to return its initialized `FragmentManagerImpl`. Changed `crates/rd-vm/src/m8.rs` to fall through to the real DEX getter when available; field tracing confirmed the actual manager and initialized listeners are used, and the old NPE disappeared. Temporary `RD_TRACE_HOST_FIELDS` diagnostics have since been removed from `interp.rs`.
+- Added `LinkedHashMap(int,float,boolean)` with validation and access-order movement on map access/update operations; `linked_hash_map_access_order_constructor_and_validation` passes. APK advanced past this and exposed `LayoutInflater.from(Context)`; implemented the Context system-service-backed inflater and factory getters/setters, with a focused regression passing.
+- Added `Window.getCallback/setCallback` state with the owning Activity as the initial callback; its focused regression passes. Implemented `Activity.getComponentName()` via the manifest package and runtime class; the ComponentName regression passes.
+- Implemented theme resource resolution: ARSC complex bags now retain map entries and parents; `Arsc::resolve_style_attribute` follows parent styles and `?attr` aliases. Context/Theme lookups populate TypedArray values from the manifest-selected style. `style_attributes_follow_parent_and_theme_attribute_aliases` passes, and the unreachable-pattern warning in `fill_typed_value` was removed.
+- Rebuilt the debug CLI and reran `org.primftpd_71.apk`; AppCompat `createSubDecor` now passes its `Theme.AppCompat` validation. The APK still exits 1 at the next blocker, unresolved `Landroid/view/LayoutInflater;->inflate(ILandroid/view/ViewGroup;)Landroid/view/View;` in `AppCompatDelegateImpl.createSubDecor`. Earlier Logback `LoggerContext` ClassCastException is still printed, but execution continues. Latest trace log: `/home/user/recovery/primftpd-after-theme-debug-stderr.log`.
+- Focused passes now include ARSC theme parent/alias (1), access-order LinkedHashMap (1), LayoutInflater service/factory (1), Window callback (1), Activity ComponentName (1), Vector/Stack (1), Java identifier (1), Environment (1), and `jtime::tests` (3). These are focused checks only, not the complete gate.
+- No release build after theme work; full workspace tests/clippy/MSRV/release gates remain outstanding. No commit, push, PR, or remote CI assertion made. Preserve pre-existing uncommitted edits and never expose/reuse credentials disclosed earlier.
+
+Current status / next steps:
+- Immediate work: implement `LayoutInflater.inflate(int, ViewGroup[, attachToRoot])` using the APK-backed inflater, then rerun the golden app. Inspect whether the AppCompat shell layout uses unsupported AndroidX view classes and extend the host inflater only where a real app path requires it; do not claim full inflation from the current service/factory regression alone.
+- Continue through newly exposed non-phone blockers, then rerun the golden app, full VM/workspace tests, clippy/MSRV and release build. Prepare a valid M7 golden/performance report from the verified run; do not call it complete before the gate passes.
+- M1's prescribed 24-hour fuzz campaign and M9 human signoff remain open. The previous 600-second capped fuzz attempt was invalid/OOM-prone; do not repeat unchanged. Estimated ~1–3 hours active work for the current golden-app path and local validation, with unknown additional debugging time; overall closure has a minimum 24-hour wall-clock fuzz gate once an adequate runner is available, plus unbounded human-review scheduling. Physical-phone tests remain excluded by the user; M10–M12 remain future phases.
+
+
 ## 2026-10-20 — canonical MCP documentation follow-up
 
 The full rerun caught the generator EOF invariant after advisory Markdown cleanup. Fixed the generator itself (one final newline), retained exact generated-file equality, and added a no-blank-EOF assertion. Latest rebuilt native/JIT CLI completed both typed20-cycle Comprix campaigns again with strict title/item audits, forced-major item persistence, JVM150/150 and all15native APK/ABI combinations passing. Nightly fuzz targets build; pinned Markdown has29files/0issues. No remote write, new-head GitHub CI result or human review is fabricated.
+
+## 2026-10-21 — non-phone pendency resolution (continuation checkpoint)
+
+### User update / ETA
+- User asked for a progress update, an estimated time to finish, a refreshed `worklog.md`, and immediate continuation.
+- Current forecast: **a few more active hours** for the golden-app path and local code verification, with high uncertainty because each resolved platform call exposes more of the app’s initialization. The full non-phone checklist has a hard lower bound of **24 hours of wall time** for the prescribed M1 fuzz campaign, after an adequate runner is available. M9 human signoff still requires a reviewer; M10–M12 remain future roadmap phases, not current blockers. Do not represent any of those as done.
+
+### Changes since the preceding checkpoint
+- `crates/rd-vm/src/graphics.rs`: added heap-backed `android.graphics.Insets` creation for `of(int,int,int,int)` and `of(Rect)`, pairwise `max/min/add/subtract`, `NONE`, equality/hash/string operations; exposed a constructor helper for WindowInsets inset getters.
+- `crates/rd-vm/src/view_layout.rs`: expanded zero-inset WindowInsets getters; added View `isLaidOut`, `requestLayout/forceLayout`, focus/accessibility/outline/clip state; implemented stateful simplified `Scroller`/`OverScroller`, `EdgeEffect`, and linear/decelerate/accelerate/accelerate-decelerate interpolators.
+- `crates/rd-vm/src/framework.rs`: added `View.setWillNotDraw`, background setters/getter, and an `OverScroller` constructor fallback.
+- `crates/rd-vm/src/classpath.rs`: added platform hierarchy for scroll/container/list widgets (including `HorizontalScrollView <: FrameLayout <: ViewGroup <: View`) so DEX-defined AndroidX/Material views that extend these classes can receive generic host View state. Added hierarchy regression coverage.
+- `crates/rd-vm/src/inflate.rs`: made the non-View failure message describe the DEX/platform hierarchy check rather than the obsolete M3 hard-coded class list.
+- `crates/rd-vm/tests/android_inherited_dispatch.rs`: added focused regressions for Insets, scrollers, EdgeEffect, interpolators, View properties, and a DEX custom view extending HorizontalScrollView.
+
+### Verification and golden progress
+- `cargo fmt --all` and `cargo build --locked -p rd-cli` passed after these changes.
+- Focused regressions passed for platform Insets factory/value operations, Scroller start/finish, EdgeEffect pull/release, linear/decelerate interpolators, inherited View host behavior, platform scroll-widget hierarchy, and custom DEX subclass host attachment.
+- Golden `org.primftpd_71.apk` advanced past the former `Insets.of(IIII)` initialization failure, WindowInsets initialization, AppCompat shell construction, ViewPager’s Scroller/EdgeEffect, and Material interpolator initialization.
+- The first custom-view rejection for `com.google.android.material.tabs.TabLayout` was corrected by filling in the HorizontalScrollView platform ancestry; the APK now reaches its DEX constructor.
+- Latest golden run still exits 1 on **unresolved `Lcom/google/android/material/tabs/TabLayout;->setHorizontalScrollBarEnabled(Z)V`**. Diagnostics: `/home/user/recovery/primftpd-after-view-hierarchy-debug-stderr.log` and `/home/user/recovery/primftpd-after-view-hierarchy-debug-stdout.json`. This is the active blocker; no implementation has yet been made for it.
+- Disassembled `TabLayout.<init>(Context, AttributeSet, int)` to map the following constructor path; it disables horizontal scrollbars, builds a `SlidingTabIndicator`, attaches it with `HorizontalScrollView.addView`, then reads the Material/AppCompat styleables and background. The next fix should model the inherited scroll-bar property and rerun to identify the next concrete failure.
+
+### Remaining / not yet verified
+- No full workspace test run, clippy, MSRV, release build, M7 report, or fuzz campaign has been completed in this continuation. No commit/push/PR has been made.
+- M1 24-hour fuzz gate still needs a properly resourced runner; do not repeat the prior memory-capped OOM attempt unchanged. M9 human signoff is a separate external review dependency. Physical-device tests remain excluded; M10–M12 remain future phases.
+
+### Immediate next steps
+1. Implement and test `View.setHorizontalScrollBarEnabled/isHorizontalScrollBarEnabled` (and vertical counterpart if natural from the same host property), then rebuild and rerun the golden APK.
+2. Continue the Material `TabLayout` constructor path, fixing only observed blockers; keep `worklog.md` current and send progress updates.
+3. After the golden path stabilizes, run diff hygiene, full workspace tests, clippy, MSRV and release checks; then address M7 evidence and arrange the available non-phone gates without claiming external review/fuzz completion prematurely.
+
+## 2026-10-21 — detailed continuation ledger: Material ViewPager/DataSetObservable
+
+### Messages and decisions (in order)
+- Assistant progress message: “Checkpoint: the golden APK now gets past `Insets`, AppCompat view setup, ViewPager’s `Scroller`/`EdgeEffect`, and Material interpolators. I also expanded the platform view hierarchy so DEX-defined widgets such as `TabLayout` can be hosted instead of rejected during inflation. The latest run reaches `TabLayout` construction and stops at `setHorizontalScrollBarEnabled`.
+
+  **ETA:** I can’t give a reliable finish time until the golden path stops exposing new blockers. For the golden launch and local verification, budget roughly **a few more hours**, with significant uncertainty. The full non-phone checklist also includes a **24-hour fuzz campaign**, so completion of every non-phone gate cannot honestly be estimated at less than about a day, even if the code work finishes sooner. I’m recording that distinction in the worklog and continuing with the current blocker.”
+- User instruction (verbatim): “ignore **24-hour fuzz campaign or make a CI that make 24-hour fuzz campaign only and let it run on the github and tomorow i check it anjd you MUST**
+
+  create a ++**[worklog.md](http://worklog.md)**++ file in the workspace to log everything: my messages, your messages (including each tool call, search, read, fetch, etc.). Please separate the work log into sections so you can choose to read only the parts that matter. i have not seen you update the worklog wich is crucial.”
+- Decision: take the user-authorized “ignore the 24-hour fuzz campaign” option for this closure pass. Fuzz remains **deferred/not passed**, not a blocker and not represented as complete. No GitHub workflow was created or triggered. Do not reuse credentials disclosed earlier.
+- Assistant progress message after that instruction: “Understood. I’ll take the option to **keep the 24-hour fuzz campaign out of the blocking path**; it will remain marked deferred, not passed. The repository worklog already exists at `/home/user/recovery/optional-observe-docs/worklog.md`; I’m adding a detailed message/tool ledger now so you can see the update. The golden run has moved through `TabLayout` and now stops at `DataSetObservable.registerObserver(Object)`. I’ve added support for that erased Java signature, but have not yet validated it. My “few active hours” estimate still applies to the golden path and local checks, excluding the deferred fuzz wait; there’s uncertainty from whatever blockers appear next.”
+
+### Tool-call ledger since the previous checkpoint
+1. `functions.read_file` — read `worklog.md` from line 1 (first 260 lines returned; file then had 1,382 lines). Outcome: confirmed a long existing project log and an old pending-task entry.
+2. `functions.read_file` — read `worklog.md` from line 1,080 (tail section). Outcome: found the previous pendency status and stale “setHorizontalScrollBarEnabled” next step.
+3. `functions.bash` — appended the “2026-10-21 — non-phone pendency resolution (continuation checkpoint)” section to this file. Outcome: ETA, current golden state, tests, and pending gates recorded.
+4. `functions.bash` — searched `framework.rs`/`view_layout.rs` for scroll bar and padding methods. Outcome: neither had `setHorizontalScrollBarEnabled` nor `setPadding` support.
+5. `functions.edit_file` — added horizontal/vertical scrollbar getters/setters, fading, and style state to `view_layout.rs`.
+6. `functions.edit_file` — added horizontal/vertical scrollbar regression assertions to `android_inherited_dispatch.rs`.
+7. `functions.bash` — `cargo fmt --all`, focused inherited-View test, CLI build, then golden APK run. Outcome: formatting/test/build passed; golden advanced to `TabLayout$SlidingTabIndicator.postInvalidateOnAnimation()`.
+8. `functions.bash` — searched `view_layout.rs`, `framework.rs`, and `choreographer.rs` for invalidation support. Outcome: only drawable callbacks were no-op; no View invalidate/postInvalidate entry existed.
+9. `functions.bash` — read `view_layout.rs` Drawable callback section and `framework.rs` traversal state locations.
+10. `functions.edit_file` — made request/force-layout mark traversal pending and added `invalidate`/`postInvalidate`/`postInvalidateOnAnimation` dispatch.
+11. `functions.edit_file` — first added a test reading private `HostState.traversal_pending`. Outcome: edit succeeded, but the next test compile showed integration tests cannot access that private field.
+12. `functions.edit_file` — removed the private-field access; retained return-value regression for `postInvalidateOnAnimation`.
+13. `functions.bash` — format, focused test, CLI build, golden run. Outcome: focused test/build passed; golden advanced to `TabLayout$SlidingTabIndicator.setPaddingRelative(IIII)V`.
+14. `functions.edit_file` — added `setPadding`, `setPaddingRelative`, left/top/right/bottom/start/end getters, and `isPaddingRelative` to `view_layout.rs` (LTR headless mapping documented in code).
+15. `functions.bash` — located the relevant inherited View test insertion point.
+16. `functions.edit_file` — added padding-relative assertions to that regression.
+17. `functions.bash` — format, focused test, build, golden run. Outcome: test/build passed; golden advanced to `TabLayout$SlidingTabIndicator.setGravity(I)V`.
+18. `functions.edit_file` — added LinearLayout `setGravity/getGravity` property storage in `framework.rs`.
+19. `functions.edit_file` — added a focused DEX LinearLayout-subclass gravity regression.
+20. `functions.bash` — format, focused test, build, golden run. Outcome: test/build passed; golden advanced to `Landroid/database/DataSetObservable;-><init>()V` from `PagerAdapter.<init>`.
+21. `functions.bash` — read `android_util.rs` to compare existing stateful Android host modules. Outcome: found no Observable implementation.
+22. `functions.bash` — inspected `Engine` host-state fields and `jcollections` host-list representation/dispatch.
+23. `functions.bash` — inspected `jcollections` constructor behavior, framework host attachment, and host list allocation. Outcome: identified `HostObj::List` as usable observer storage.
+24. `functions.bash` — read `DexBuilder` APIs in `rd-testsupport` to build DEX observer regression coverage.
+25. `functions.bash` — checked `Engine::executed_labels()` signature for proving DEX callbacks fired.
+26. `functions.write_file` — created `crates/rd-vm/src/android_observable.rs`. Initial implementation: host observer list, registration/unregistration, `hasObservers`, and reverse-order DEX `onChanged`/`onInvalidated` callbacks.
+27. `functions.edit_file` — registered `android_observable` in `crates/rd-vm/src/lib.rs`.
+28. `functions.bash` — inspected the `intrinsics.rs` dispatch insertion point.
+29. `functions.edit_file` — wired `android_observable::instance_intrinsic` into the host instance dispatch.
+30. `functions.edit_file` — replaced an unused observer descriptor constant with the generic observer signature constant.
+31. `functions.edit_file` — switched `registerObserver` to use that signature constant.
+32. `functions.edit_file` — switched `unregisterObserver` to use that signature constant.
+33. `functions.edit_file` — corrected `hasObservers` boolean conversion and removed its dead helper.
+34. `functions.edit_file` — added `data_set_observable_calls_dex_observers_and_unregisters_them` regression.
+35. `functions.bash` — formatted, ran the focused test, built CLI, and ran the golden APK. Outcome: regression/build passed; golden failed at `DataSetObservable.registerObserver(Ljava/lang/Object;)V`, revealing Java generic erasure.
+36. `functions.edit_file` — added the erased observer method signature constant.
+37. `functions.edit_file` — updated `registerObserver` to accept either typed or erased signature.
+38. `functions.edit_file` — updated `unregisterObserver` to accept either typed or erased signature.
+39. User interrupted before the erased-signature fix was revalidated; therefore the current source edit is **unverified** at this checkpoint.
+- No web search/fetch, GitHub API call, commit, push, or CI trigger occurred in this continuation.
+
+### Current state / immediate next action
+- Latest observed golden diagnostic is still the run before the erased-signature edits: unresolved `DataSetObservable.registerObserver(Object)`; diagnostics `/home/user/recovery/primftpd-after-datasetobservable-debug-stderr.log` and `/home/user/recovery/primftpd-after-datasetobservable-debug-stdout.json`.
+- The typed/erased registration and unregistration support is now in the source but **not yet formatted, compiled, tested, or golden-rerun**. First run `cargo fmt --all`, the focused Observable regression, then `cargo build --locked -p rd-cli` and the golden APK.
+- The full worklog is this file at `/home/user/recovery/optional-observe-docs/worklog.md`; keep subsequent messages and every tool/read/search/fetch/edit/run in an itemized ledger as they happen. The fuzz campaign remains explicitly deferred, never passed. No commit or remote GitHub action has been made.
+
+## 2026-10-21 — detailed continuation ledger: generic observer fix validated
+
+### Message
+- Assistant progress update: “Worklog updated and opened for you. The erased-signature `DataSetObservable` fix passed its focused regression, and `rd-cli` built successfully. The golden APK has now passed observer registration and advanced to a new blocker: `java.lang.reflect.Modifier.isPublic(I)Z` in `JvmViewModelProviders.createViewModel`. I’m continuing with that static reflection API; the fuzz campaign stays deferred, not falsely marked complete.”
+
+### Tool-call ledger
+1. `functions.bash` — appended the preceding detailed continuation ledger to this file. Outcome: added the user's exact fuzz/worklog instruction, the assistant progress messages, and a numbered list of preceding reads, edits, tests, and diagnostics.
+2. `functions.present_file` — opened `/home/user/recovery/optional-observe-docs/worklog.md` in the user viewer. Outcome: success; the updated log was surfaced.
+3. `functions.bash` — ran `cargo fmt --all`; focused test `cargo test --locked -p rd-vm --test android_inherited_dispatch data_set_observable_calls_dex_observers_and_unregisters_them -- --nocapture`; `cargo build --locked -p rd-cli`; then `./target/debug/rd app run golden-apks/cache/org.primftpd_71.apk --trace --json`, writing diagnostics to `/home/user/recovery/primftpd-after-datasetobservable-erasure-debug-stdout.json` and `...-stderr.log`. Outcomes: formatting passed, focused Observable callback/registration test passed, CLI build passed, golden run exited 2 on `NOT_IMPLEMENTED Ljava/lang/reflect/Modifier;->isPublic(I)Z` in `Landroidx/lifecycle/viewmodel/internal/JvmViewModelProviders;->createViewModel(...)`. This confirms the erased `registerObserver(Object)` support works far enough for ViewPager/TabLayout to continue.
+4. `functions.bash` — appended this status section and tool-call ledger. Outcome: new active blocker and test results recorded.
+
+### Current active blocker / next action
+- Implement Java `Modifier` static bit-query helpers used by AndroidX reflection, beginning with `isPublic(I)Z`; add focused tests for access-flag bitmasks; format, test, build and rerun the golden APK.
+- The 24-hour fuzz campaign is explicitly deferred/not passed per the user's allowed choice. No GitHub CI workflow/run, remote write, commit or push was made.
+- Golden-path estimate remains a few active hours with uncertainty; this excludes the deferred fuzz wait and any external human review.
+
+## 2026-10-21 — detailed continuation ledger: Java Modifier/reflection
+
+### Message
+- Assistant progress update: “The `Modifier` predicates and `toString` now pass a focused test, and the golden run advanced through ViewModel creation. Its current failure is an `ExceptionInInitializerError` from `Defaults.<clinit>`: `Environment directory type == null`. I’m tracing the exact call and resource value before changing behavior. The worklog remains the running ledger; the 24-hour fuzz item is deferred, not passed.”
+
+### Tool-call ledger
+1. `functions.bash` — appended the validated DataSetObservable generic-erasure status and ledger above.
+2. `functions.bash` — searched `intrinsics.rs`, `reflect.rs`, and VM tests for `Modifier` and `isPublic`. Outcome: found existing `Modifier.isStatic/isFinal` only.
+3. `functions.bash` — inspected static intrinsic dispatch around `Modifier` and searched existing test coverage. Outcome: located the direct match to extend.
+4. `functions.edit_file` — added Java modifier-bit predicates (public/private/protected/static/final/synchronized/volatile/transient/native/interface/abstract/strict/synthetic/annotation/enum/mandated) and `Modifier.toString(int)` to `intrinsics.rs`.
+5. `functions.edit_file` — removed now-duplicated `isStatic/isFinal` arms.
+6. `functions.edit_file` — added focused tests covering each bit predicate and string formatting.
+7. `functions.bash` — formatted, ran `reflect_modifier_predicates_and_string_use_java_flag_bits`, built `rd-cli`, and ran the golden APK with `--trace --json`. Outcomes: test passed; build passed; golden exited 1 with `ExceptionInInitializerError` caused by `NullPointerException: Environment directory type == null` at `Lorg/primftpd/util/Defaults;-><clinit>()V`. Diagnostics: `/home/user/recovery/primftpd-after-modifier-debug-stderr.log` and `/home/user/recovery/primftpd-after-modifier-debug-stdout.json`.
+8. `functions.bash` — appended this status and ledger to `worklog.md`.
+- No web search/fetch, GitHub API call, commit, push, or CI trigger occurred in this interval.
+
+### Active investigation
+- Inspect `Defaults.<clinit>` and `LoadPrefsUtil.startDir` DEX to identify which Environment constant/method yields the null directory type; inspect ARSC/resource values only as needed. Do not hard-code a fabricated directory value without matching the app’s branch/contract.
+- Most recent runtime verification: focused Modifier test + CLI build passed; golden is **not yet passing** and now fails in app preference defaults during Environment path setup.
+- Fuzz remains deferred/not passed; golden/local estimate remains a few active hours with high uncertainty, excluding fuzz wait and external review.
+
+## 2026-10-21 — detailed continuation ledger: Environment constants
+
+### Message
+- Assistant progress update: “Environment directory constants are now modeled; the focused test passes, and `Defaults.<clinit>` advances. The golden APK now stops in FTP passive-port parsing on a missing `StringTokenizer(String, String, boolean)` constructor. I’ll inspect the parser’s exact token operations and implement the needed tokenizer semantics rather than masking the error.”
+
+### Tool-call ledger
+1. `functions.bash` — disassembled `Defaults.<clinit>` and `LoadPrefsUtil.startDir` from the golden APK and searched Rust sources for Environment methods/constants. Outcome: `<clinit>` reads `Environment.DIRECTORY_DOWNLOADS`, whose absent static field was passed as null to the already-implemented public-directory method.
+2. `functions.bash` — inspected `framework.rs` Environment host dispatch. Outcome: confirmed the NPE accurately exposed a missing host static constant rather than a wrong path method.
+3. `functions.bash` — inspected `interp.rs` static-field host-hook chain, `intrinsics.rs::platform_static`, `android_build.rs`, and Engine construction patterns. Outcome: identified both direct `sget` and reflective platform-static paths to wire.
+4. `functions.write_file` — created `crates/rd-vm/src/android_env.rs` with Android shared-storage directory String constants, including `DIRECTORY_DOWNLOADS = "Download"`, and tests.
+5. `functions.edit_file` — registered `android_env` in `lib.rs`.
+6. `functions.edit_file` — added `android_env::host_static` to the interpreter's `sget` host-hook chain.
+7. `functions.edit_file` — added Environment constants to `intrinsics.rs::platform_static` for reflection/static lookups.
+8. `functions.bash` — formatted, ran the Environment constant unit test (passed), built `rd-cli` (passed), then reran the golden APK. Outcome: golden exited 1 at `NOT_FOUND` for `Ljava/util/StringTokenizer;-><init>(Ljava/lang/String;Ljava/lang/String;Z)V`, reached from `Lorg/apache/ftpserver/impl/PassivePorts;->parse(Ljava/lang/String;)Ljava/util/Set;`. Diagnostics: `/home/user/recovery/primftpd-after-env-directories-debug-stderr.log` and `...-stdout.json`. The Environment null-dereference is cleared.
+9. `functions.bash` — appended this Environment/Parser status section to the worklog.
+- No web or GitHub calls, commit, push, or CI run occurred in this interval.
+
+### Active blocker / next action
+- Disassemble `PassivePorts.parse` to establish exact `StringTokenizer` constructor and iteration method use; implement Java-compatible delimiters/include-delimiters behavior and focused tests, then format/test/build/rerun golden.
+- Current facts: Modifier regression passed; Environment constant regression passed; latest CLI build passed. Golden remains incomplete. Fuzz remains deferred/not passed; do not start the 24-hour campaign.
+
+## 2026-10-21 — detailed continuation ledger: StringTokenizer
+
+### Message
+- Assistant progress update: “`StringTokenizer` now passes its focused delimiter/enumeration regression, and the golden APK advances beyond passive-port parsing. The next blocker is the inherited `BroadcastReceiver.<init>()V` call in `PftpdFragment` setup. I’m checking the platform-base constructor routing and will add the smallest tested host implementation.”
+
+### Tool-call ledger
+1. `functions.bash` — disassembled `PassivePorts.parse` and searched for existing `StringTokenizer` support. Outcome: parser constructs `StringTokenizer(input, ",;-", true)`, uses `hasMoreTokens()` and `nextToken()`; no tokenizer implementation existed.
+2. `functions.bash` — inspected `HostObj`, `jcollections.rs`, `jlstring.rs`, instance intrinsic dispatch, Engine object allocation, and `attach_host_state`. Outcome: host-state constructor interception is supported through the normal intrinsic chain; a UTF-16-backed host state is appropriate.
+3. `functions.bash` — inspected tests/helpers and existing iterator navigation. Outcome: `Engine::invoke_instance` accepts `Value::StrPlaceholder`, enabling direct host regression coverage.
+4. `functions.write_file` — created `crates/rd-vm/src/jstring_tokenizer.rs` with StringTokenizer one-/two-/three-argument constructors, default delimiter set, delimiter-set tokenization, optional delimiter tokens, enumeration aliases, `nextToken(newDelimiters)`, and `countTokens`.
+5. `functions.edit_file` — added UTF-16/cursor tokenizer state to `framework::HostObj`.
+6. `functions.edit_file` — registered `jstring_tokenizer` in `lib.rs`. An initial edit attempt had stale context; the file was read to find the current module order, and the corrected edit succeeded.
+7. `functions.edit_file` — wired tokenizer instance dispatch before collection dispatch in `intrinsics.rs`.
+8. `functions.edit_file` — added focused regression coverage for returned delimiters, Enumeration aliases, counts, and dynamic delimiters.
+9. `functions.bash` — ran `cargo fmt --all`, the focused StringTokenizer test, `cargo build --locked -p rd-cli`, and the golden APK. Outcomes: test and build passed; golden exited 1 at unresolved `Landroid/content/BroadcastReceiver;-><init>()V`, with receiver `Lorg/primftpd/ui/PftpdFragment$1;`. Diagnostics: `/home/user/recovery/primftpd-after-stringtokenizer-debug-stderr.log` and `...-stdout.json`. This confirms Environment constants and FTP passive-port tokenization now get past their previous failures.
+10. `functions.bash` — appended this status and tool-call ledger to `worklog.md`.
+- No external web/GitHub action, commit, push, or CI run occurred in this interval.
+
+### Active blocker / next action
+- Inspect platform constructor routing (`platform_base.rs`, inherited dispatch and classpath hierarchy) for `BroadcastReceiver.<init>()V`; add an Android no-op base constructor only if host semantics warrant it, with a focused inherited-constructor test. Then format/test/build/rerun golden.
+- Current verification: focused StringTokenizer test passed; CLI build passed; full golden still incomplete. 24-hour fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: BroadcastReceiver constructor
+
+### Message
+- Assistant progress update: “The `BroadcastReceiver` super-constructor regression passed, and the golden run cleared that blocker. It now reaches AndroidX Fragment pre-attach and throws a null-receiver exception from `Fragment.generateActivityResultKey()` during `registerForActivityResult`. I’m tracing the Fragment lifecycle and method registers to identify which host state is missing; the worklog will record this new blocker.”
+
+### Tool-call ledger
+1. `functions.bash` — inspected `platform_base.rs`, classpath's BroadcastReceiver hierarchy, and Android constructor dispatch. Outcome: stateless platform base list already provides no-op constructors but BroadcastReceiver is intentionally abstract and was not listed.
+2. `functions.bash` — inspected `platform_base::instance_intrinsic` dispatch and existing DEX subclass-constructor test patterns.
+3. `functions.edit_file` — added a narrow host no-op only for `BroadcastReceiver.<init>()V` (did not add the abstract class to the blanket default-method list).
+4. `functions.edit_file` — added `broadcast_receiver_subclass_calls_platform_super_constructor`, exercising an app DEX subclass's `invoke-direct` to the platform constructor.
+5. `functions.bash` — ran `cargo fmt --all`, the focused constructor test (passed), built `rd-cli` (passed), and ran the golden APK. Outcome: the BroadcastReceiver blocker cleared; golden exited 1 with `VM_EXCEPTION` from `Fragment.generateActivityResultKey()` reached via `Fragment$9.onPreAttached()` / `registerForActivityResult`, reported as a null receiver. Diagnostics: `/home/user/recovery/primftpd-after-broadcastreceiver-debug-stderr.log` and `...-stdout.json`.
+6. `functions.bash` — appended this checkpoint and call ledger to the worklog.
+- No web/GitHub request, commit, push, or CI action occurred in this interval.
+
+### Active investigation
+- Inspect the full Fragment exception trace and DEX for `Fragment.generateActivityResultKey`, `Fragment$9.onPreAttached`, Fragment constructors, and the app fragment's `registerForActivityResult` call site. Determine whether the failing null receiver is a missing base Fragment identity/host field or an incorrect `new-instance`/constructor sequence; do not silence the NPE with a blanket default.
+- Latest local test/build passed; golden remains blocked in app startup. The 24-hour fuzz run remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: AndroidX Fragment constructor interception
+
+### Message
+- Assistant progress update: “I found why the Fragment state was null: the M8 host hook was swallowing AndroidX `Fragment.<init>()V`, skipping its DEX field initialization. I’ve changed it to execute the APK constructor when present. The new regression itself first failed because I encoded `42` with DEX `const/4` (a signed 4-bit immediate), producing `-6`; that value indicates the DEX constructor did run. I’ll correct the fixture encoding, rerun the test, then retry the golden APK.”
+
+### Tool-call ledger
+1. `functions.bash` — parsed the complete golden error and disassembled AndroidX `Fragment.generateActivityResultKey`, `registerForActivityResult`, `Fragment$9.onPreAttached`, and the PftpdFragment constructor. Outcome: `Fragment$9.this$0` is null at the call; PftpdFragment calls `Fragment.<init>()V` and later calls `registerForActivityResult` from its constructor.
+2. `functions.bash` — disassembled `Fragment$9.<init>`, `Fragment.prepareCallInternal`, and `registerOnPreAttachListener`. Outcome: the synthetic listener constructor stores the Fragment parameter correctly; the underlying Fragment constructor's fields must be initialized.
+3. `functions.bash` — searched Fragment interception in `m8.rs` and host code, and inspected AtomicInteger support. Outcome: found an M8 unconditional no-op for AndroidX `Fragment.<init>()V`, which skipped DEX initialization of `mWho`, `mNextLocalRequestCode`, listeners and other fields.
+4. `functions.edit_file` — changed M8 Fragment constructor handling to defer to a DEX constructor when `Classpath::resolve_method` finds it, retaining the no-op only for platform legacy Fragment without a DEX body.
+5. `functions.bash` — inspected test fixture builders and field opcodes.
+6. `functions.edit_file` — added a regression fixture whose AndroidX Fragment DEX constructor writes a marker field and whose subclass invokes it.
+7. `functions.bash` — ran `cargo fmt --all` and the focused regression. Outcome: test failed because the fixture used `const/4` with immediate 42, which sign-extends/truncates to -6; observed field was `Int(-6)` instead of `Int(42)`. This is consistent with the DEX constructor executing, but the regression needs a valid `const/16` or small `const/4` marker. Because the command used `set -e`, the CLI build and golden rerun did not execute. No product-code defect is inferred from this failed assertion.
+8. `functions.bash` — appended this investigation and test-fixture correction note to the worklog.
+
+### Immediate next steps
+- Fix the test to use a representable `const/4` marker (e.g. 7) or DEX `const/16`; rerun the focused regression, then build `rd-cli` and rerun the golden APK. Record the next actual app failure.
+- Current golden state is still the prior `Fragment.generateActivityResultKey` NPE; no post-fix golden run has yet completed.
+- Fuzz remains deferred/not passed; no CI, commit or push.
+
+## 2026-10-21 — detailed continuation ledger: Fragment DEX constructor fix validated
+
+### Message
+- Assistant progress update: “The corrected Fragment-constructor regression now passes, and the golden APK has moved past Fragment pre-attach/`registerForActivityResult`. The current blocker is `NOT_FOUND` for `TabLayout$TabView.setClickable(Z)V` while constructing tabs. I’ll add it at the Android `View` behavior layer, verify state through a focused test, then resume the golden run.”
+
+### Tool-call ledger
+1. `functions.bash` — appended the preceding note about the initial invalid `const/4 42` fixture encoding.
+2. `functions.edit_file` — changed the test initializer from immediate 42 to representable `const/4` value 7.
+3. `functions.edit_file` — updated the expected marker to 7.
+4. `functions.bash` — ran `cargo fmt --all`, the focused AndroidX Fragment constructor regression, built `rd-cli`, and reran the golden APK. Outcomes: regression passed; CLI build passed; the `Fragment.generateActivityResultKey` null receiver is cleared, and execution advances to `NOT_FOUND Lcom/google/android/material/tabs/TabLayout$TabView;->setClickable(Z)V` in `TabView.<init>`. Diagnostics: `/home/user/recovery/primftpd-after-fragment-constructor-debug-stderr.log` and `...-stdout.json`.
+5. `functions.bash` — appended this progress section and ledger to the worklog.
+- No GitHub/web calls, commit, push, or CI action occurred in this interval.
+
+### Active blocker / next action
+- Inspect current View clickability state/dispatch and add `setClickable(Z)V` / `isClickable()Z` as appropriate, with regression coverage for DEX TabView subclasses; format/test/build/rerun golden.
+- Current state: Fragment constructor regression passes; full golden still fails on View clickability. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: View clickability
+
+### Message
+- Assistant progress update: “The View clickability state now round-trips in a focused regression, and the golden APK has cleared `TabView.setClickable`. It now stops at Android’s `PointerIcon.getSystemIcon(Context, int)` factory during TabView construction. I’m adding a headless, non-null PointerIcon result and will continue through the next startup call.”
+
+### Tool-call ledger
+1. `functions.bash` — inspected current View host state/dispatch and found no `setClickable` implementation; accessibility's `UiNode` inferred clickability only from listeners/XML handlers.
+2. `functions.bash` — inspected `HostObj::View`, `new_view`, View enabled/listener handling, `UiNode` creation, and click dispatch.
+3. `functions.edit_file` — added independent `clickable: bool` state to `HostObj::View`.
+4. `functions.bash` — inspected View initialization and `setEnabled`/`setOnClickListener`/UI-node code before making the remaining edits.
+5. `functions.edit_file` — initialized new Views as non-clickable.
+6. `functions.edit_file` — added `View.setClickable(Z)` and `View.isClickable()` in framework host dispatch.
+7. `functions.edit_file` — made a non-null `setOnClickListener` imply clickable state, matching Android.
+8. `functions.edit_file` — included explicit clickability when building accessibility/UI nodes.
+9. `functions.bash` — verified the `UiNode` destructuring and field references after the edit.
+10. `functions.edit_file` — combined explicit clickability with listener and XML-handler state in `UiNode.clickable`.
+11. `functions.bash` — inspected click dispatch and host instance routing to ensure View methods reach the inherited Android host.
+12. `functions.bash` — inspected `inherited_android_host` superclass walk.
+13. `functions.edit_file` — added focused View clickability round-trip coverage for a DEX subclass.
+14. `functions.bash` — ran `cargo fmt --all`, the focused clickability test (passed), built `rd-cli` (passed), and reran the golden APK. Outcome: clickability blocker cleared; golden exited 1 on unresolved `Landroid/view/PointerIcon;->getSystemIcon(Landroid/content/Context;I)Landroid/view/PointerIcon;` from AndroidX `PointerIconCompat` in `TabLayout$TabView.<init>`. Diagnostics: `/home/user/recovery/primftpd-after-clickable-debug-stderr.log` and `...-stdout.json`.
+15. `functions.bash` — appended this progress and tool ledger.
+- No GitHub, web, commit, push, or CI action occurred in this interval.
+
+### Active blocker / next action
+- Inspect Android static host dispatch and PointerIconCompat usage; model PointerIcon's system factory with an opaque host object and add a focused factory regression. Then format/test/build/rerun the golden APK.
+- Latest verification: clickability test and CLI build passed; golden is now blocked on PointerIcon factory. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: PointerIcon factory
+
+### Message
+- Assistant progress update: “The PointerIcon host-factory regression passes, and the golden APK clears `getSystemIcon`. It now fails while inflating an `<ImageView>` in `TabLayout`’s default-tab-icon path; the inflater currently reports that tag as unmapped. I’m inspecting the resource-inflater mapping and call site so the fix supports the real widget construction path.”
+
+### Tool-call ledger
+1. `functions.bash` — searched for PointerIcon implementations and inspected Android static host dispatch. Outcome: no existing factory; interpreter routes `Landroid/*` static calls to `framework::call_host_static`.
+2. `functions.edit_file` — added `PointerIcon.getSystemIcon(Context,int)` support returning a non-null opaque `Landroid/view/PointerIcon;` instance.
+3. `functions.edit_file` — initially wrote a regression using `Engine::invoke_static`. The subsequent focused test showed this direct API does not dispatch Android static host methods and returned NOT_FOUND; the golden interpreter path does dispatch them. This was a test-harness mismatch, not a golden blocker.
+4. `functions.edit_file` — changed the regression to call the public `framework::call_host_static` dispatch hook directly.
+5. `functions.bash` — formatted, ran the focused PointerIcon test (passed), built `rd-cli` (passed), and reran the golden APK. Outcome: PointerIcon blocker cleared; golden exits 1 with `INFLATE` for unmapped `<ImageView>` at `TabLayout$TabView.inflateAndAddDefaultIconView()V` → `updateTab()V`. Diagnostics: `/home/user/recovery/primftpd-after-pointericon-debug-stderr.log` and `...-stdout.json`.
+6. `functions.bash` — appended this status and the test-harness note to the worklog.
+- No web/GitHub activity, commit, push, or CI action occurred in this interval.
+
+### Active blocker / next action
+- Inspect the inflater's tag-to-widget map, `ImageView`/AppCompat image widget constructors and the TabLayout icon layout resource. Add the minimal correct host mapping/constructor path and regression; format/test/build/rerun golden.
+- Latest verification: PointerIcon test and CLI build passed; full golden now fails on `<ImageView>` inflation. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: ImageView inflation
+
+### Message
+- Assistant progress update: “The inflater now maps the short `<ImageView>` tag to the built-in ImageView host, and focused tests confirm it inflates while an unsupported `<SurfaceView>` still returns a typed error. The golden APK advances to the next View API gap: `TabLayout$TabView.isSelected()Z`. I’m adding independent selected state and the matching View setter/getter.”
+
+### Tool-call ledger
+1. `functions.bash` — inspected `inflate.rs::view_desc_of`, ImageView classpath hierarchy, ImageView host dispatch, and disassembled `TabLayout$TabView.inflateAndAddDefaultIconView`. Outcome: Material inflates the layout resource with a short `<ImageView>` tag; the host already recognizes ImageView hierarchy/constructor/getDrawable but omitted the short-tag mapping.
+2. `functions.bash` — inspected AXML construction and existing app-XML integration tests, including the test that expected ImageView to be unsupported.
+3. `functions.bash` — inspected `inflate_element_depth` and Classpath subtype behavior. Outcome: mapped platform ImageView will receive common View host state and no custom DEX constructor is needed.
+4. `functions.bash` — checked unsupported-widget candidates; `SurfaceView` is not in the built-in classpath list and remains a proper unsupported tag.
+5. `functions.edit_file` — mapped shorthand `ImageView` to `Landroid/widget/ImageView;` in `inflate.rs`.
+6. `functions.edit_file` — added an app-XML integration test for a short `<ImageView>` layout, asserting the runtime class and common View host state.
+7. `functions.edit_file` — changed the existing unsupported-view test fixture to `<SurfaceView>`.
+8. `functions.bash` — inspected the updated XML test and found its error expectation still named ImageView.
+9. `functions.edit_file` — corrected the typed-error expectation to SurfaceView.
+10. `functions.bash` — formatted; ran both ImageView inflation and unsupported-widget tests (both passed); built `rd-cli` (passed); reran golden. Outcome: ImageView inflation blocker cleared; golden now exits 1 on `NOT_FOUND Lcom/google/android/material/tabs/TabLayout$TabView;->isSelected()Z` in `TabView.updateTab()V`. Diagnostics: `/home/user/recovery/primftpd-after-imageview-debug-stderr.log` and `...-stdout.json`.
+11. `functions.bash` — appended this checkpoint and tool ledger.
+- No web/GitHub action, commit, push or CI run occurred.
+
+### Active blocker / next action
+- Add `View.setSelected(Z)`/`isSelected()Z` with a dedicated host-state property, preserving independence from `enabled`/`clickable`; add focused DEX-subclass coverage, format/test/build/rerun the golden APK.
+- Current verification: ImageView and unsupported widget tests passed; CLI build passed; golden now stops at selected-state access. 24-hour fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: View selected state
+
+### Message
+- Assistant progress update: “The independent selected-state regression passed, and the golden APK now clears `isSelected()`. It next fails with `RESOURCE_NOT_FOUND` for resource ID `0` inside `TabLayout$TabView.updateTextAndIcon(TextView, ImageView, boolean)`. I’m disassembling that exact call site to distinguish an intentional ‘no resource’ sentinel from a genuine missing resource.”
+
+### Tool-call ledger
+1. `functions.bash` — searched View selected-state support. Outcome: no existing `setSelected`/`isSelected` host state existed.
+2. `functions.edit_file` — added independent `selected: bool` to `HostObj::View`.
+3. `functions.edit_file` — initialized new Views with `selected=false`.
+4. `functions.edit_file` — implemented `View.setSelected(Z)` and `View.isSelected()Z` through the inherited View host path.
+5. `functions.edit_file` — added a View-subclass regression proving selected state round-trips and does not overwrite enabled state.
+6. `functions.bash` — formatted, ran the focused selected-state test (passed), built `rd-cli` (passed), and reran golden. Outcome: `isSelected` blocker cleared; golden exits 1 with `RESOURCE_NOT_FOUND` for `0x00000000` in `TabLayout$TabView.updateTextAndIcon(TextView,ImageView,boolean)`. Diagnostics: `/home/user/recovery/primftpd-after-selected-debug-stderr.log` and `...-stdout.json`.
+7. `functions.bash` — appended this checkpoint and ledger to worklog.
+- No web/GitHub action, commit, push, or CI run occurred.
+
+### Active investigation
+- Disassemble `TabView.updateTextAndIcon` around PC `0x6a`, identify the exact receiver/method and resource API, then determine whether zero is a legal no-resource/no-style sentinel. Preserve real `RESOURCE_NOT_FOUND` errors for nonzero unknown IDs.
+- Latest verification: selected-state test and CLI build passed; golden remains blocked on the zero-ID resource path. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: resource ID zero diagnosis
+
+### Message
+- Assistant progress update: “The disassembly confirms the issue: TabLayout calls `TextView.setText(CharSequence)` with a DEX null represented as `Int(0)`. The host currently ignores the overload signature and treats any `Int` as a string resource ID, causing the false `RESOURCE_NOT_FOUND`. I’ll make `setText(CharSequence)` null-safe while keeping `setText(int)` strict about real resource IDs.”
+
+### Tool-call ledger
+1. `functions.bash` — disassembled `TabLayout$TabView.updateTextAndIcon` and searched resource resolver error sites. Outcome: the method passes a `CharSequence` value to `TextView.setText(CharSequence)`; its control flow includes null text/icon paths.
+2. `functions.bash` — inspected `framework.rs::resolve_string` source and verified `RESOURCE_NOT_FOUND` is produced only by resource resolution in the relevant host path.
+3. `functions.bash` — searched TextView `setText` handling and inspected CLI disassembly options. Outcome: framework host matches `setText` by name only and treats any `Value::Int` as a resource ID, regardless of method descriptor.
+4. `functions.bash` — inspected the exact `TextView.setText` implementation. Root cause confirmed: overload signature is ignored, so `Int(0)` used as the DEX null representation for `CharSequence` is incorrectly resolved as a resource ID.
+5. `functions.bash` — appended this diagnosis and next action to worklog.
+- No external web/GitHub calls, commit, push, or CI run occurred.
+
+### Next action
+- Make TextView/Button `setText` dispatch signature-aware: `setText(CharSequence)` treats null/zero as empty text and stringifies supported CharSequence objects; `setText(int)` continues resolving resource IDs, including rejecting unknown zero. Add both positive and negative regression coverage, then format/test/build/rerun golden.
+- Current latest runtime state: `View.isSelected` regression passed; golden now reaches a host overload-dispatch bug at resource ID zero. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: signature-aware TextView.setText
+
+### Message
+- Assistant progress update: “The signature-aware `setText` implementation is in place, and the CharSequence-null path reaches the expected empty text. The regression’s negative assertion expected `RESOURCE_NOT_FOUND`, but its bare Engine has no APK resources, so the correct result is `RESOURCES_MISSING`. I’m correcting that test expectation; the build and golden rerun have not yet run because the focused test stopped first.”
+
+### Tool-call ledger
+1. `functions.edit_file` — made TextView/Button `setText` dispatch signature-aware: integer overload resolves a resource, CharSequence overload treats DEX `Int(0)`/null as empty text and stringifies non-String objects.
+2. `functions.edit_file` — added regression for CharSequence null versus integer resource overload.
+3. `functions.bash` — ran formatting and the focused test. Outcome: CharSequence-null handling and empty `getText()` assertions passed; the final negative assertion failed only because the bare test Engine has no APK/resources and returns `RESOURCES_MISSING` before it can produce `RESOURCE_NOT_FOUND`. `set -e` stopped the sequence, so the existing app XML resource-ID test, CLI build and golden APK were not run.
+4. `functions.bash` — appended this test-harness correction and status to the worklog.
+
+### Immediate next action
+- Correct the negative assertion to expect `RESOURCES_MISSING` in the no-resources fixture (or provide a fixture APK); rerun the focused TextView and existing app XML setText(resource) regressions, then build and rerun golden. Do not weaken production resource-ID checks.
+
+## 2026-10-21 — detailed continuation ledger: TextView overload fix
+
+### Message
+- Assistant progress update: “The TextView overload fix passed both the null-CharSequence test and the existing resource-ID test; integer resource lookup remains strict. The golden run now clears the false zero-ID error and fails later because the inflated ImageView has null layout parameters when TabLayout reads `bottomMargin`. I’m checking the `inflate(resource, parent, false)` path and ViewGroup layout-parameter creation.”
+
+### Tool-call ledger
+1. `functions.bash` — appended the Resource ID zero diagnosis and next steps.
+2. `functions.edit_file` — updated the no-resources test expectation from `RESOURCE_NOT_FOUND` to `RESOURCES_MISSING`; the host correctly reaches resource resolution but that fixture has no APK.
+3. `functions.bash` — ran `cargo fmt --all`; focused TextView overload test (passed); existing `app_xml::find_by_id_set_text_resid_and_get_string` (passed); `cargo build --locked -p rd-cli` (passed); then golden. Outcome: resource ID zero false failure cleared; golden exits 1 with NPE `iget 'bottomMargin' em null` in `TabLayout$TabView.updateTextAndIcon`, indicating the inflated ImageView lacks `ViewGroup.LayoutParams`. Diagnostics: `/home/user/recovery/primftpd-after-textview-overloads-debug-stderr.log` and `...-stdout.json`.
+4. `functions.bash` — appended this current blocker and ledger to worklog.
+- No web/GitHub requests, commit, push or CI run occurred.
+
+### Active blocker / next action
+- Inspect `LayoutInflater.inflate(resource, root, attachToRoot=false)` semantics and the current host `getLayoutParams` / `setLayoutParams` / `generateLayoutParams` support. Android assigns a root's params from the supplied parent even when it does not attach; add a minimal real params object/state, with an XML/host regression, rather than silently returning a fake margin.
+- Current verification: TextView null and resource-ID tests passed; CLI build passed; golden is still failing in TabView layout-param access. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: LayoutParams path investigation
+
+### Tool-call ledger
+1. `functions.bash` — searched `inflate.rs`, `framework.rs`, `view_layout.rs`, and `window.rs` for layout-parameter support. Outcome: host code had `LayoutParams` constructors/margin methods, but no View get/set params state.
+2. `functions.bash` — inspected `inflate_resource_into_with_context`, `inflate_element_depth`, `window::layout_params_intrinsic`, and `view_layout`'s `generateDefaultLayoutParams`. Outcome: inflater with a non-null root did not generate/assign root params, regardless of attach flag.
+3. `functions.bash` — inspected the LayoutInflater intrinsic. Outcome: it passes root and `attachToRoot` into `inflate_resource_into_with_context`; false attachment currently returns a view without parent-derived LayoutParams.
+4. `functions.bash` — inspected width/height and dimension-reference helpers, the built-in Android class hierarchy, and View host dispatch. Outcome: XML attributes can supply dimensions/margins; parent-specific layout-param class hierarchy needs either modeling or a compatible MarginLayoutParams class.
+5. `functions.bash` — inspected ViewGroup.addView overload handling and `window::layout_params_intrinsic`. Outcome: existing addView only attaches/layouts children and does not generate default params; constructor intrinsic initializes width/height and margin fields.
+6. `functions.bash` — located `framework::attach_child` and checked heap dynamic-field storage. Outcome: inflater attachment is a simple tree link, so LayoutParams must be explicitly generated before attach; storing the object in heap field `mLayoutParams` will keep it GC-reachable.
+7. `functions.bash` — an attempted append used a malformed workspace path (`.../workspace/../optional-observe-docs/worklog.md`) and failed with “No such file or directory”; no file was changed.
+8. `functions.bash` — retried using the correct absolute path `/home/user/recovery/optional-observe-docs/worklog.md`. Outcome: this investigation record was appended successfully.
+- No external searches, GitHub calls, commit, push, or CI action occurred.
+
+### Implementation plan
+- Add View host `getLayoutParams`/`setLayoutParams` backed by heap field `mLayoutParams`.
+- In the inflater, generate parent-compatible `ViewGroup.MarginLayoutParams` (and subclass hierarchy where needed) from root/child width, height and margins. Crucially assign params whenever `root != null`, including `attachToRoot=false`, matching Android's LayoutInflater contract; also assign for normal nested XML children.
+- Add an integration test asserting a detached inflated ImageView has non-null params, initialized margins, and is not attached; then format/test/build/rerun golden.
+
+## 2026-10-21 — detailed continuation ledger: LayoutParams implementation validated
+
+### Message
+- Assistant progress update: “The new inflater test passes: `inflate(resource, parent, false)` now assigns a parent-compatible `FrameLayout.LayoutParams`, initializes `bottomMargin`, and leaves the view unattached. The existing attach-semantics test also passes. The golden run clears the null-LayoutParams crash and advances to `TabLayout$TabView.setMinimumWidth(I)V`; I’m adding the corresponding View size state next.”
+
+### Tool-call ledger
+1. `functions.bash` — appended the LayoutParams investigation and implementation plan; one malformed-path append attempt failed and was followed by a successful append at the correct path.
+2. `functions.edit_file` — added built-in class hierarchies for ViewGroup/LayoutParams, MarginLayoutParams, LinearLayout.LayoutParams, FrameLayout.LayoutParams, and RelativeLayout.LayoutParams.
+3. `functions.edit_file` — added View `getLayoutParams()`/`setLayoutParams()` host methods backed by the heap's `mLayoutParams` field.
+4. `functions.edit_file` — added inflater helpers to resolve width/height and margin attributes, instantiate parent-compatible parameter objects, initialize margins, and keep params GC-reachable on the View heap object.
+5. `functions.bash` — inspected the root inflate path after helper insertion.
+6. `functions.bash` — inspected `inflate_children` include/child branches.
+7. `functions.bash` — inspected the exact `inflate_children` implementation before wiring generation.
+8. `functions.edit_file` — assigned params to root views whenever `root != null`, including `attachToRoot=false`.
+9. `functions.edit_file` — assigned params to normal children and included roots before attaching them.
+10. `functions.edit_file` — updated the ImageView XML integration test to pass a FrameLayout parent with `attachToRoot=false`.
+11. `functions.edit_file` — an assertion patch attempt used stale context and failed; no file change.
+12. `functions.bash` — read the formatted ImageView test context to target the corrected patch.
+13. `functions.edit_file` — added assertions that params are `FrameLayout.LayoutParams`, are a subtype of `MarginLayoutParams`, have `bottomMargin=0`, and the view remains unattached.
+14. `functions.bash` — ran formatting, the ImageView LayoutParams regression (passed), the existing LayoutInflater attach-semantics test (passed), built `rd-cli` (passed), and reran golden. Outcome: LayoutParams NPE cleared; golden exits 1 on `NOT_FOUND Lcom/google/android/material/tabs/TabLayout$TabView;->setMinimumWidth(I)V` from `TabLayout.createTabView`. Diagnostics: `/home/user/recovery/primftpd-after-layoutparams-debug-stderr.log` and `...-stdout.json`.
+15. `functions.bash` — appended this status and tool-call ledger to worklog.
+- No GitHub/web action, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Inspect existing View min-size property support and add `setMinimumWidth(I)V` (and likely `setMinimumHeight(I)V`/getters consistently) with independent host state; add focused View-subclass coverage; format/test/build/rerun golden.
+- Latest verification: XML params regression, attach-semantics regression and CLI build passed; golden now fails on `View.setMinimumWidth`. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: View minimum dimensions
+
+### Message
+- Assistant progress update: “View minimum width and height now round-trip through independent host fields; their focused regression and the LayoutParams regression both pass, and `rd-cli` builds. Golden now clears `setMinimumWidth` and stops at the next Android View gap, `setActivated(Z)V` in `TabLayout.addTabView`; I’m adding that state without conflating it with `selected` or `enabled`.”
+
+### Tool-call ledger
+1. `functions.bash` — searched View for minimum-size support; found no View methods (only Drawable's fixed zero getters) and located `view_layout`'s generic property store.
+2. `functions.bash` — read `view_layout` property helpers and measure/layout APIs.
+3. `functions.bash` — read the host View dispatch for padding, scrollbars, outlines, and related properties.
+4. `functions.bash` — read the rest of `view_layout` View dispatch and checked `Engine.view_props` storage.
+5. `functions.bash` — inspected `Engine::invoke_instance` host fallback order and `view_layout` integration.
+6. `functions.bash` — searched inherited Android host dispatch and existing View setters.
+7. `functions.bash` — inspected `view_layout::instance_intrinsic` and its registration from `intrinsics.rs`.
+8. `functions.bash` — inspected `interp::inherited_android_host`'s ancestor traversal and dispatch sequence.
+9. `functions.bash` — read `framework::call_host_instance` around View dimension/params dispatch and located existing inherited-dispatch regressions.
+10. `functions.bash` — read clickable/selected regression helpers to mirror their test setup.
+11. `functions.edit_file` — added `View.getMinimumWidth/Height` and setters backed by `mMinWidth`/`mMinHeight`, marking traversal pending on setters.
+12. `functions.edit_file` — added a regression proving min dimensions round-trip independently of measured host bounds.
+13. `functions.bash` — formatted; minimum-dimension and detached-root LayoutParams tests passed; `rd-cli` build passed. Golden exits 1 on `NOT_FOUND TabLayout$TabView.setActivated(Z)V` in `TabLayout.addTabView`. Diagnostics: `/home/user/recovery/primftpd-after-minimum-dimensions-debug-stderr.log` and `...-stdout.json`.
+14. `functions.bash` — appended this progress record and ledger.
+- No external searches, GitHub calls, commit, push, or CI action occurred.
+
+### Active blocker / next action
+- Add independent Android View activated state and `setActivated(Z)V`/`isActivated()Z`, with regression proving it does not overwrite selected/enabled. Then format/test/build/rerun golden.
+- Most recent checks: min-size and LayoutParams regressions passed; CLI build passed; golden advanced to activated state. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: View activated state
+
+### Message
+- Assistant progress update: “Activated state now round-trips independently from selected/enabled, with its regression passing; minimum-size coverage still passes, and the CLI builds. Golden clears `setActivated` and reaches `TabLayout.getScrollX()I`, the next missing View API. I’ll check existing scroll-state support before adding a targeted implementation.”
+
+### Tool-call ledger
+1. `functions.bash` — inspected current enabled/clickable/selected View dispatch and the selected-state test context.
+2. `functions.bash` — searched View patterns/constructors; decided to store activation in a distinct heap field rather than mutate the shared View struct, preserving strict state independence with minimal unrelated changes.
+3. `functions.bash` — inspected the `HostObj::View` fields, `new_view`, and host-state initialization.
+4. `functions.edit_file` — added `setActivated(Z)V`/`isActivated()Z` backed by `mActivated`, with layout traversal invalidation.
+5. `functions.edit_file` — added an inherited-dispatch regression proving activation does not overwrite selected or enabled state.
+6. `functions.bash` — formatted; activated-state and min-dimension regressions passed; `rd-cli` build passed. Golden exits 1 on `NOT_FOUND TabLayout.getScrollX()I` in `TabLayout.setScrollPosition`. Diagnostics: `/home/user/recovery/primftpd-after-activated-debug-stderr.log` and `...-stdout.json`.
+7. `functions.bash` — appended this progress/ledger.
+- No external searches, GitHub calls, commit, push, or CI action occurred.
+
+### Active blocker / next action
+- Inspect `getScrollX`/`getScrollY`/`scrollTo`/`scrollBy` implementations and the View host state. Implement coherent per-view scroll offsets (not a constant-only workaround), with a round-trip regression. Then format/test/build/rerun golden.
+- Current verification: activated-state and min-size regressions pass; CLI build passes; golden advances to scroll offset access. The 24-hour fuzz campaign remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: View scroll offsets
+
+### Message
+- Assistant progress update: “Per-view scroll offsets now have coherent `scrollTo`, `scrollBy`, and getter behavior; the round-trip regression passes and the CLI builds. Golden clears `getScrollX` and now stops at `TabLayout.getLayoutDirection()I`. I’ll model the View’s layout-direction state and default LTR behavior next.”
+
+### Tool-call ledger
+1. `functions.bash` — searched View framework/layout/property modules for scroll state. Found `view_props` already records `scrollTo`/`scrollBy` offsets but lacks explicit getters, and the inherited host route needed coverage for DEX references whose owner is an app subclass.
+2. `functions.bash` — read `view_props` fallback, nullable/default behavior, and existing scroll mutation.
+3. `functions.bash` — inspected `view_props` Android-only receiver gate and generic property getter semantics.
+4. `functions.bash` — checked public `intrinsics::call_instance_intrinsic_mref` for possible focused test routing.
+5. `functions.bash` — read the host intrinsic registration and verified the direct Engine fallback order.
+6. `functions.bash` — traced DEX virtual dispatch through `interp::invoke`, confirming app-subclass method-reference owners traverse `inherited_android_host`.
+7. `functions.bash` — verified `view_props::fallback` is only used at Android method-owner boundaries; no duplicate scroll getter exists.
+8. `functions.bash` — reviewed the remaining `interp` fallback and `instance_intrinsic_dispatch` path.
+9. `functions.edit_file` — implemented View `getScrollX/Y`, `scrollTo(II)V`, and `scrollBy(II)V` in the inherited framework host; offsets use per-view `view_props` and request traversal on mutation.
+10. `functions.bash` — read the existing min-size test insertion point.
+11. `functions.edit_file` — added a regression: zero defaults, `scrollTo(20,30)`, `scrollBy(-5,2)` yields `(15,32)`.
+12. `functions.bash` — formatted; scroll-offset regression passed; `rd-cli` build passed. Golden exits 1 on `NOT_FOUND TabLayout.getLayoutDirection()I` during tab selection. Diagnostics: `/home/user/recovery/primftpd-after-scroll-offsets-debug-stderr.log` and `...-stdout.json`.
+13. `functions.bash` — appended this progress record and ledger.
+- No external searches, GitHub calls, commit, push, or CI action occurred.
+
+### Active blocker / next action
+- Implement View layout-direction getter/setter with LTR default and independent per-view storage, plus focused coverage. Then format/test/build/rerun golden.
+- Latest checks: scroll-state regression and CLI build passed; golden advanced to View layout-direction lookup. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: View layout direction
+
+### Message
+- Assistant progress update: “Layout direction now defaults to LTR and round-trips; its test and the scroll-offset test pass, and the CLI builds. Golden clears `getLayoutDirection` and proceeds into EventBus initialization, where it now fails on `Looper.getMainLooper()`. I’ll add the main-looper accessor so initialization can continue normally.”
+
+### Tool-call ledger
+1. `functions.edit_file` — added View `getLayoutDirection`/`getResolvedLayoutDirection` and `setLayoutDirection`, with a default LTR heap field.
+2. `functions.edit_file` — added a View subclass regression for default LTR and setting RTL.
+3. `functions.bash` — formatted; layout-direction and scroll-offset regressions passed; `rd-cli` build passed. Golden clears layout-direction lookup and advances to `NOT_FOUND Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;` during EventBus initialization. Diagnostics: `/home/user/recovery/primftpd-after-layout-direction-debug-stderr.log` and `...-stdout.json`.
+4. `functions.bash` — appended this progress record and ledger.
+- No web/GitHub activity, commit, push, or CI action occurred.
+
+### Active blocker / next action
+- Inspect existing Looper object/state and static host dispatch. Implement `Looper.getMainLooper()` returning the Engine's canonical main Looper object, with identity regression; then format/test/build/rerun golden.
+- Current verification: layout-direction and scroll regressions passed; CLI build passed; golden has entered EventBus initialization and now needs the canonical main Looper accessor. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: Looper dispatch investigation
+
+### Message / correction
+- Assistant update: “Correction from the code inspection: `Looper.getMainLooper()` is already implemented and returns the VM’s canonical main Looper, so I won’t duplicate it. The trace reports opcode `110` (`0x6e`, invoke-virtual) for this zero-argument API, so the remaining issue is in call decoding/dispatch or the DEX call site. I’m tracing that mismatch before changing behavior.”
+
+### Tool-call ledger
+1. `functions.bash` — searched framework, intrinsics, handlers and classpath for Looper support. Outcome: a canonical `main_looper_obj()` already exists, and framework static dispatch already includes `Looper.getMainLooper()`/`myLooper()`.
+2. `functions.bash` — inspected `framework::call_host_static`; confirmed the Looper accessor branch returns `vm.main_looper_obj()`.
+3. `functions.bash` — inspected DEX static-invocation handling in `interp.rs`; verified the framework host dispatcher is called for `invoke-static` on `android/*` method refs.
+4. `functions.bash` — checked other `getMainLooper` sites and Context-family host handling.
+5. `functions.bash` — checked for `baksmali`, `dexdump`, `apktool`, and existing local disassemblies; none of those executables are on PATH. Existing TabLayout disassemblies remain under `/home/user/recovery/`.
+6. `functions.bash` — inspected static dispatch and confirmed opcode `110` is reported in the failed instruction, not the expected invoke-static opcode.
+7. `functions.bash` — inspected `android_res` Context `getMainLooper` path and verified it is unrelated to the static Looper API.
+8. `functions.bash` — appended this correction and investigation ledger.
+- No web/GitHub activity, commit, push, CI action, or source edit occurred during this investigation.
+
+### Active blocker / next action
+- Trace the exact `AndroidDependenciesDetector.isAndroidSDKAvailable()` DEX instruction and why `Looper.getMainLooper()` is reached with opcode `0x6e`; inspect the DEX decoder/invoke dispatch and fix the actual cause. Avoid duplicating the already-present static Looper host method.
+- Most recent test/build/golden results remain: View layout-direction and scroll tests passed; CLI build passed; golden exits at EventBus static initialization with the Looper method unresolved. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: reflection root cause identified
+
+### Message / correction
+- Assistant update: “I found the mismatch: EventBus does **not** directly call `Looper.getMainLooper()` in DEX. It uses reflection—`Class.getDeclaredMethod("getMainLooper", …)` followed by `Method.invoke(...)`. The reported `0x6e` is the reflective `Method.invoke` call, whose target is the Looper getter. So the static host method is already correct; the missing piece is reflective invocation of a platform static method.”
+
+### Tool-call ledger
+1. `functions.bash` — searched DEX decoder/interpreter for Invoke35c and opcode tables; confirmed `0x6e` is invoke-virtual and `0x71` is invoke-static.
+2. `functions.bash` — read DEX F35c parsing and interpreter invocation decoding; raw opcode is preserved through `do_invoke`.
+3. `functions.bash` — inspected rd-dex crate/public disassembler APIs and APK container APIs to obtain the exact method bytecode.
+4. `functions.bash` — inspected `rd-vm` package dependencies, DEX class/method parser types, and class-data accessor.
+5. `functions.bash` — checked `rd dex` CLI help; found direct APK/class/method disassembly is supported.
+6. `functions.bash` — ran `rd dex disasm` on the golden APK for `AndroidDependenciesDetector.isAndroidSDKAvailable`; output saved to `/home/user/recovery/primftpd-eventbus-android-detector.smali`. The bytecode proves the sequence is `Class.forName("android.os.Looper")`, `Class.getDeclaredMethod("getMainLooper", null)`, then `Method.invoke(null, null)`.
+7. `functions.bash` — appended this correction, artifact path, and source-ledger entries.
+- No web/GitHub action, commit, push, or CI action occurred.
+
+### Root cause / next action
+- Golden failure is **not** a missing Looper accessor or decoder opcode bug. EventBus uses reflection, and the host `Method.invoke` path cannot dispatch the resulting Android static method reference `Looper.getMainLooper()`.
+- Inspect `reflect.rs` Method object representation and invocation; add host-static target dispatch using the stored declaring class/name/prototype when target is static, and add a focused reflection regression. Then format/test/build/rerun golden.
+
+## 2026-10-21 — detailed continuation ledger: reflective static dispatch
+
+### Message
+- Assistant progress update: “Reflective invocation now reaches Android static hosts through `Engine::invoke_static`; the regression exercises `Class.forName → getDeclaredMethod → Method.invoke` and confirms the returned Looper is canonical. The test passes and the CLI builds. Golden gets past EventBus and now stops at `SharedPreferencesImpl.registerOnSharedPreferenceChangeListener`; I’ll implement the observer behavior rather than stub the call.”
+
+### Tool-call ledger
+1. `functions.bash` — inspected `reflect.rs` method lookup/invocation, plus existing reflection regression locations.
+2. `functions.bash` — read `Method.invoke` dispatch; confirmed it calls `Engine::invoke_static` for null-receiver static methods.
+3. `functions.bash` — inspected `Engine::invoke_static`; found it omitted `m8::call_m8_static` and `framework::call_host_static` even though DEX `invoke-static` dispatch includes them.
+4. `functions.bash` — inspected DexBuilder method-reference and Class-object APIs to design an end-to-end reflection test.
+5. `functions.bash` — read test builder conventions and verified method refs can exist without defining a platform class.
+6. `functions.edit_file` — extended `Engine::invoke_static` to call m8 static hosts and Android framework static hosts after intrinsics, matching interpreter dispatch.
+7. `functions.edit_file` — added an end-to-end reflection regression: Class.forName → getDeclaredMethod → Method.invoke on Looper.getMainLooper; asserts result type and canonical identity.
+8. `functions.bash` — formatted and ran the reflective static regression; passed.
+9. `functions.bash` — built `rd-cli` (passed) and reran golden. Outcome: reflected Looper static call cleared; golden exits `NOT_FOUND` on `SharedPreferencesImpl.registerOnSharedPreferenceChangeListener(Landroid/content/SharedPreferences$OnSharedPreferenceChangeListener;)V`. Diagnostics: `/home/user/recovery/primftpd-after-reflective-static-debug-stderr.log` and `...-stdout.json`.
+10. `functions.bash` — appended this progress record and ledger.
+- No external searches, GitHub calls, commit, push, or CI action occurred.
+
+### Active blocker / next action
+- Inspect SharedPreferences/Editor host representation and existing observer APIs; implement listener registration/unregistration and notification after committed key changes. Add regression, then format/test/build/rerun golden.
+- Current verification: reflection regression passed; `rd-cli` build passed; golden now reaches SharedPreferences change-listener registration. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: SharedPreferences change listeners
+
+### Message
+- Assistant progress update: “SharedPreferences listeners are now registered per preference object. Commits/apply notify once for keys whose final values actually changed; duplicate registration is deduplicated, and unregister stops callbacks. The new listener test, existing preference-state test, reflection test, and CLI build pass. Golden now gets past EventBus and preference initialization, then throws an NPE in `FragmentManager.noteStateNotSaved()` during `FragmentActivity.onStart`; I’ll inspect the FragmentManager path next.”
+
+### Tool-call ledger
+1. `functions.bash` — searched M8/framework/tests for SharedPreferences state. Found one canonical SharedPreferencesImpl object, value/editor state, no listeners, and a stateful edit/commit regression.
+2. `functions.bash` — inspected HostState shared-preferences identity, Editor dispatch/commit logic, and existing m8 test.
+3. `functions.bash` — inspected `M8State` fields and current prefs editor storage.
+4. `functions.bash` — checked GC root scanning; M8State is traced via HostState Debug, so listener references stored there remain GC roots.
+5. `functions.bash` — located Java-value equality helper for detecting no-op commits.
+6. `functions.bash` — inspected equality semantics (strings/boxed primitives by value; other objects by identity).
+7. `functions.bash` — verified `framework::call_host_instance` wraps callbacks in host roots and inspected GC rooted-call support.
+8. `functions.bash` — inspected m8 integration-test builder imports and existing DEX callback pattern.
+9. `functions.bash` — inspected DexBuilder `op12x`/field helpers and callback test insertion point.
+10. `functions.edit_file` — added per-SharedPreferences listener lists to `M8State`.
+11. `functions.edit_file` — added listener register/unregister dispatch and attached each Editor to its owning prefs object.
+12. `functions.edit_file` — changed editor application to last-write-wins per key, compare values, gather deterministic changed keys, and invoke DEX listeners after state mutation.
+13. `functions.bash` — located Editor commit/apply call sites and verified bytecode helpers; first attempted patch context did not match.
+14. `functions.edit_file` — first commit/apply propagation patch failed because the source arm had different formatting; no source change.
+15. `functions.bash` — read exact Editor commit/apply source context.
+16. `functions.edit_file` — propagated callback errors from commit/apply via `?`.
+17. `functions.edit_file` — added DEX callback coverage for registration deduplication, changed-value notification, unchanged String-value suppression, key delivery, and unregister.
+18. `functions.bash` — formatted and ran the new listener test; first run failed only because the fixture used a plain Context, while modeled `getSharedPreferences` requires Activity/Application. No production change based on this test failure.
+19. `functions.bash` — inspected the `getSharedPreferences` host guard and existing test's Activity receiver.
+20. `functions.edit_file` — changed the fixture receiver from Context to Activity.
+21. `functions.bash` — formatted and reran listener test; passed.
+22. `functions.bash` — ran existing SharedPreferences stateful test (passed), reflective main-Looper regression (passed), built `rd-cli` (passed), and reran golden. Outcome: EventBus reflection and listener registration clear; golden exits with `VM_EXCEPTION` NPE “invoke em receiver null” in `FragmentManager.noteStateNotSaved`, via `FragmentController.noteStateNotSaved` and `FragmentActivity.onStart`. Diagnostics: `/home/user/recovery/primftpd-after-shared-prefs-listeners-debug-stderr.log` and `...-stdout.json`.
+23. `functions.bash` — appended this progress record and ledger.
+- No external searches, GitHub calls, commit, push, or CI action occurred.
+
+### Active blocker / next action
+- Inspect FragmentManager `noteStateNotSaved` call chain, host object/state and constructor/dispatch path to identify the exact null receiver; fix the true missing invariant and add a regression. Then format/test/build/rerun golden.
+- Most recent checks: SharedPreferences listener test, existing prefs stateful test, and reflection regression passed; CLI build passed; golden now reaches FragmentActivity start lifecycle and fails in FragmentManager. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: FragmentManager NPE diagnosis
+
+### User message
+- User asked: “Update me in the progress update the [[worklog.md](http://worklog.md)] and go back to work.”
+
+### Assistant progress update
+- “On it—I’ll keep `worklog.md` current and continue. The disassembly shows `FragmentManager.noteStateNotSaved()` passes its `mHost` guard, then dereferences `mNonConfig` and `mFragmentStore`; I’m tracing their initialization to identify which field is null before making a fix.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — disassembled `FragmentManager.noteStateNotSaved`, `FragmentController.noteStateNotSaved`, and `FragmentActivity.onStart` from the golden APK. Files: `/home/user/recovery/primftpd-fragmentmanager-note-state-not-saved.smali`, `/home/user/recovery/primftpd-fragmentcontroller-note-state-not-saved.smali`, `/home/user/recovery/primftpd-fragmentactivity-onstart.smali`. Outcome: FragmentManager checks `mHost`, then invokes `mNonConfig.setIsStateSaved(false)` and `mFragmentStore.getFragments()`; FragmentController calls `mHost.getFragmentManager()` and then delegates.
+2. `functions.bash` — searched M8/framework for FragmentController/FragmentManager support and grepped the latest golden trace. The command included a nonexistent `crates/rd-vm/src/m8` path (harmless grep warning) and the long trace grep produced truncated output. Outcome: found a `getSupportFragmentManager` branch in `m8.rs` and canonical `framework::fragment_manager_obj`; no source changes.
+3. `functions.bash` — appended the user's request, the assistant update, and this tool record to `worklog.md`.
+- No web/GitHub activity, source edits, commit, push, or CI action occurred in this interval.
+
+### Active blocker / next action
+- Inspect `m8.rs` `getSupportFragmentManager` and FragmentActivity / FragmentController construction to find why the real FragmentManager has null `mNonConfig` or `mFragmentStore` after the host returns it. Add the minimal semantically correct initialization and a regression, then format/test/build/rerun golden.
+- Current latest verification remains: prefs listener, prefs stateful, reflective Looper regression, and CLI build passed; golden fails in FragmentManager.noteStateNotSaved during onStart. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: Collections.EMPTY_LIST null root cause
+
+### Assistant progress update
+- “The null target was `List.iterator()`, not the FragmentManager model. `FragmentStore.getFragments()` returns `Collections.EMPTY_LIST` when empty, but that external static field was falling back to null. I’ve added host materialization for the empty collections and a DEX-level regression confirming `EMPTY_LIST` is non-null and iterable; it passes. I’m rebuilding and rerunning golden now.”
+
+### Tool-call ledger since the previous worklog update
+1. `functions.bash` — inspected `m8.rs` AndroidX FragmentManager dispatch and `framework::fragment_manager_obj`; confirmed the real DEX getter should run when present, and the synthetic fallback is limited to missing getters.
+2. `functions.bash` — attempted to disassemble FragmentManager/FragmentHostCallback constructors, but the `target/debug/rd` binary was absent after the inter-turn snapshot; command stopped before disassembly.
+3. `functions.bash` — rebuilt `rd-cli`, then disassembled FragmentManager constructor/attachController, FragmentHostCallback constructor/getter, and FragmentController constructor/createController. Results saved under `/home/user/recovery/primftpd-fragmentmanager-*`, `...fragmenthostcallback-*`, and `...fragmentcontroller-*`. The combined terminal output was truncated, but files were written.
+4. `functions.bash` — inspected `FragmentManager.attachController`: it sets `mNonConfig` through `FragmentManagerViewModel.getInstance` for a ViewModelStoreOwner and links it to `mFragmentStore`; disassembled FragmentController.attachHost and FragmentActivity.onCreate.
+5. `functions.bash` — disassembled FragmentManagerViewModel.getInstance, FragmentActivity$HostCallbacks.getViewModelStore/constructor, and FragmentActivity constructor. Output saved under `/home/user/recovery/primftpd-fragmentmanager-viewmodel-*` and `/home/user/recovery/primftpd-fragmentactivity-*`.
+6. `functions.bash` — searched for ViewModel support and disassembled FragmentActivity.init; found no dedicated ViewModelProvider host implementation.
+7. `functions.bash` — inspected `do_invoke` null-receiver error site and confirmed no existing tests require the exact generic error string.
+8. `functions.edit_file` — enriched null-receiver diagnostics with the target method and invoke opcode, to identify the exact dereference site.
+9. `functions.bash` — formatted, rebuilt CLI, reran golden. Exact null target: `Ljava/util/List;->iterator()Ljava/util/Iterator; (opcode 0x72)`, called from `FragmentManager.noteStateNotSaved`. Diagnostics: `/home/user/recovery/primftpd-after-fragment-null-target-debug-stderr.log` and `...-stdout.json`.
+10. `functions.bash` — disassembled FragmentStore constructor/getFragments/setNonConfig. Files: `/home/user/recovery/primftpd-fragmentstore-constructors.smali`, `...-get-fragments.smali`, `...-set-non-config.smali`. Root cause: empty `getFragments()` returns `Collections.EMPTY_LIST`; `sget-object` currently yields null for that external static field.
+11. `functions.bash` — searched existing Collections factory/static support; found `emptyList()` support but no static-field materialization.
+12. `functions.bash` — inspected interpreter `sget-object` host-static materialization chain and Collections list/set/map host representations.
+13. `functions.bash` — inspected test imports and DEX builder helpers for a real `sget-object` regression.
+14. `functions.edit_file` — added Collections `EMPTY_LIST`, `EMPTY_SET`/`EMPTY_SORTED_SET`, and `EMPTY_MAP`/`EMPTY_SORTED_MAP` host field materialization.
+15. `functions.bash` — inspected the exact interpreter `sget-object` host-static chain.
+16. `functions.edit_file` — wired `collections::host_static` into external static-field resolution.
+17. `functions.bash` — read `android_inherited_dispatch` imports and DexBuilder direct-method signature.
+18. `functions.edit_file` — added a DEX-level regression that reads `Collections.EMPTY_LIST`, checks `isEmpty`, calls `iterator`, and verifies `hasNext=false`.
+19. `functions.bash` — formatted and ran the new regression; passed.
+20. `functions.bash` — appended this detailed status and ledger.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rebuild `rd-cli` and rerun golden to confirm the `FragmentStore.getFragments()` NPE is cleared; continue resolving subsequent non-phone blockers.
+- Latest result: `Collections.EMPTY_LIST` DEX-level regression passes. Fuzz campaign remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: FragmentStore NPE cleared
+
+### Assistant progress update
+- “Golden now clears the FragmentManager NPE, confirming the `Collections.EMPTY_LIST` fix. It advances into `OnBackPressedDispatcher.updateEnabledCallbacks()` and stops on `kotlin.collections.ArrayDeque.iterator()`. I’m checking whether that class/method is present in the APK DEX or needs host collection dispatch.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — rebuilt `rd-cli` (passed) and reran golden. Outcome: `FragmentStore.getFragments()` NPE is cleared; next `NOT_FOUND Lkotlin/collections/ArrayDeque;->iterator()Ljava/util/Iterator;` at `OnBackPressedDispatcher.updateEnabledCallbacks`. Diagnostics: `/home/user/recovery/primftpd-after-empty-collections-debug-stderr.log` and `...-stdout.json`.
+2. `functions.bash` — appended this verification and next-step record to `worklog.md`.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Determine whether Kotlin `ArrayDeque` is defined in the golden APK DEX and whether its `iterator()` should execute DEX or route to collection host state; add the minimal correct support and a regression, then format/test/build/rerun golden.
+- Current verification: `Collections.EMPTY_LIST` field/iterator regression passed; golden cleared FragmentManager null List and now fails on Kotlin ArrayDeque iterator. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: Kotlin ArrayDeque inherited iterator
+
+### Assistant progress update
+- “The APK contains `ArrayDeque`, but its `iterator()` is inherited through `kotlin.collections.AbstractMutableList` from the host `java.util.AbstractList`. D8 calls it through `java.lang.Iterable`; our existing abstract-list template handler only accepts `java.util.*` method owners, so it misses this case. I’m extending that dispatch to `Iterable` and adding an interface-invocation regression.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — requested direct `ArrayDeque.iterator()` and constructor disassemblies; first method lookup returned `MISSING_ENTRY`, confirming `iterator()` is not declared on `ArrayDeque`.
+2. `functions.bash` — disassembled full Kotlin ArrayDeque and `OnBackPressedDispatcher.updateEnabledCallbacks`. Files: `/home/user/recovery/primftpd-kotlin-arraydeque-class.smali` and `/home/user/recovery/primftpd-onbackpressed-update-enabled.smali`; class extends Kotlin AbstractMutableList, caller invokes `java.lang.Iterable.iterator()`.
+3. `functions.bash` — disassembled Kotlin AbstractMutableList/AbstractList/AbstractCollection. `AbstractMutableList` extends `java.util.AbstractList`; `kotlin.collections.AbstractList` separately declares its iterator. Files: `/home/user/recovery/primftpd-kotlin-{abstractmutablelist,abstractlist,abstractcollection}.smali`.
+4. `functions.bash` — inspected `resolve_method`, Collections host state, interpreter dispatch, and searched collection routes. `rg` was absent (`command not found`); subsequent searches use `grep`.
+5. `functions.bash` — traced interpreter/intrinsics: `jcollections::instance_intrinsic` handles inherited AbstractList templates only when the referenced owner is in `COLLECTION_TYPES`, which omitted `java.lang.Iterable`.
+6. `functions.bash` — confirmed `jlclass::assignable` delegates to `ClassPath::is_subtype`; reviewed AbstractList regression scaffolding and the new Collections test.
+7. `functions.bash` — appended this investigation/result and next action to `worklog.md`.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Add `java.lang.Iterable` to the template dispatch eligibility and regression-test an app/DEX AbstractList subclass reached through an `invoke-interface Iterable.iterator`; format, run tests, rebuild and rerun golden.
+- Current evidence: prior Collections empty-list regression passes; latest golden advances past FragmentManager and fails only on Kotlin ArrayDeque iterator. Fuzz is deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: Iterable abstract-list dispatch
+
+### Assistant progress update
+- “The `Iterable` dispatch fix is in place, and the new DEX regression passes: an `AbstractList` subclass invoked through `Iterable.iterator()` now yields a working iterator. I’m rebuilding and rerunning the golden APK to find the next non-phone blocker.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.edit_file` — added `Ljava/lang/Iterable;` to `jcollections::COLLECTION_TYPES` so DEX AbstractList subclasses can use inherited `iterator()` when D8 invokes through the Iterable interface.
+2. `functions.edit_file` — added `dex_abstract_list_iterator_dispatches_through_iterable_interface` to `android_inherited_dispatch.rs`. It creates a DEX AbstractList with `size/get`, invokes `Iterable.iterator`, then checks `hasNext`, `next`, and exhaustion.
+3. `functions.edit_file` — removed an unused local proto from the regression fixture.
+4. `functions.edit_file` — removed a second unused proto from the regression fixture.
+5. `functions.bash` — ran `cargo fmt --all` and the focused regression; formatting and test passed.
+6. `functions.bash` — appended this ledger/progress record.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rebuild `rd-cli` and rerun golden after the Iterable change; fix the next non-phone blocker and preserve exact diagnostics.
+- Verified in this segment: DEX AbstractList inherited iterator through `Iterable` regression passes. Collections empty-list regression also passed earlier. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: CoordinatorLayout LayoutParams mismatch
+
+### Assistant progress update
+- “The golden run clears the Kotlin iterator blocker and reaches view attachment. It now fails in `CoordinatorLayout.resetTouchBehaviors()`: a child has `ViewGroup.MarginLayoutParams` where `CoordinatorLayout.LayoutParams` is required. I’m tracing inflation and add-view parameter conversion to locate the source.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — rebuilt `rd-cli` (passed) and reran golden. Outcome: prior FragmentManager and Kotlin ArrayDeque iterator failures cleared; new `VM_EXCEPTION` is `ClassCastException: ViewGroup$MarginLayoutParams cannot be cast to CoordinatorLayout$LayoutParams` at `CoordinatorLayout.resetTouchBehaviors()` during `onAttachedToWindow`. Diagnostics: `/home/user/recovery/primftpd-after-iterable-iterator-debug-stderr.log` and `...-stdout.json`.
+2. `functions.bash` — appended this failure and investigation direction to `worklog.md`.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Disassemble CoordinatorLayout touch-reset/attachment and layout-param factory paths; inspect the ViewGroup/Inflater host path; ensure the child parameter instance is converted to the coordinator-specific subtype and add a DEX regression. Then format/test/build/rerun golden.
+- Current verification: Iterable AbstractList iterator regression passes; golden has reached UI attachment and now fails on coordinator-specific LayoutParams. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: CoordinatorLayout child params
+
+### Assistant progress update
+- “I traced the mismatch to XML inflation: parents outside the three built-in widget groups were assigned generic `MarginLayoutParams`. Inflation now selects `CoordinatorLayout.LayoutParams` for CoordinatorLayout children, and a focused inflater regression passes. I’m rerunning the golden APK to check for further blockers.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — disassembled `CoordinatorLayout.resetTouchBehaviors`, `onAttachedToWindow`, `generateLayoutParams`, `checkLayoutParams`, and `CoordinatorLayout$LayoutParams`; confirmed `resetTouchBehaviors` casts each child's params and XML inflater was assigning generic margins. Disassembly outputs under `/home/user/recovery/primftpd-coordinator-*.smali`.
+2. `functions.bash` — inspected `inflate.rs::layout_params_class/assign_layout_params`, `framework.rs` addView/getLayoutParams, and `view_attach.rs`; found inflater maps only LinearLayout, FrameLayout, RelativeLayout, defaulting to MarginLayoutParams.
+3. `functions.bash` — inspected `app_xml.rs` fixture and inflater regressions, custom FQCN View support, and ZIP contents; golden APK has five DEX files and `resources.arsc`.
+4. `functions.bash` — inspected `inflate_resource` context selection and View attach callback behavior; custom DEX view constructors use `current_activity` context, and detached inflate avoids attach lifecycle.
+5. `functions.bash` — inspected test access to `Engine.fw.current_activity` and existing LayoutInflater test patterns.
+6. `functions.edit_file` — added a specific CoordinatorLayout parent branch to `inflate.rs::layout_params_class`, returning `CoordinatorLayout$LayoutParams`.
+7. `functions.edit_file` — added an `app_xml` regression: inflate a FQCN DEX CoordinatorLayout with a TextView child and verify its params are the CoordinatorLayout subtype of MarginLayoutParams.
+8. `functions.bash` — ran `cargo fmt --all` and focused inflater regression; both passed.
+9. `functions.bash` — appended this ledger/status to `worklog.md`.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rebuild `rd-cli` and rerun golden after the CoordinatorLayout LayoutParams correction; continue resolving all non-phone blockers.
+- Verified this segment: `coordinator_layout_children_receive_coordinator_layout_params` passes. Earlier empty-list and Iterable iterator regressions pass. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: Window.Callback panel callback
+
+### Assistant progress update
+- “The CoordinatorLayout cast is cleared. Golden now reaches AppCompat’s panel-menu invalidation and stops because the host does not resolve `Window.Callback.onCreatePanelView(int)` on the Activity. I’m inspecting the wrapper and framework dispatch so the platform-default callback can be modeled narrowly and tested.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — rebuilt CLI (passed) and reran golden. Outcome: CoordinatorLayout LayoutParams cast is cleared; new `NOT_FOUND` is `Landroid/view/Window$Callback;->onCreatePanelView(I)Landroid/view/View;` on `MainTabsActivity`, called from AppCompatWindowCallback/preparePanel. Diagnostics: `/home/user/recovery/primftpd-after-coordinator-layoutparams-debug-stderr.log` and `...-stdout.json`.
+2. `functions.bash` — appended this new blocker/status and next step to `worklog.md`.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Inspect WindowCallbackWrapper/AppCompatDelegate caller and framework callback dispatch; add default Activity/Window.Callback handling for this callback and a focused regression, then format/test/build/rerun golden.
+- Verified so far: CoordinatorLayout-specific child params regression passes; golden advances past the ClassCastException and now fails at Window.Callback.onCreatePanelView. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: Window.Callback default panel view
+
+### Assistant progress update
+- “The Activity-backed `Window.Callback` default is now modeled: `onCreatePanelView(int)` returns null, and existing no-menu defaults remain shared. A focused DEX `invoke-interface` regression passes. I’m rerunning golden; additional panel callbacks may still reveal gaps.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — disassembled `WindowCallbackWrapper.onCreatePanelView`, AppCompatWindowCallback, `preparePanel`, `doInvalidatePanelMenu`, and posted runnable; found wrapper delegates panel-view/menu/preparation callbacks through `Window.Callback`. Files `/home/user/recovery/primftpd-appcompat-*.smali`.
+2. `functions.bash` — inspected `activity_extras.rs`, `framework.rs` host routing, and `window.rs`; Activity extras already provides false/no-op panel defaults but only when the method-ref owner is Activity.
+3. `functions.bash` — inspected complete activity-extras and intrinsic dispatch; confirmed interface-owner calls reach `activity_extras` but previously returned `None` because owner was `Window$Callback`.
+4. `functions.edit_file` — extended `activity_extras::instance_intrinsic` to accept `Window.Callback` calls only when the receiver is an Activity subtype.
+5. `functions.edit_file` — added the Activity default `onCreatePanelView(I)View` → null to the existing callback defaults.
+6. `functions.edit_file` — added `activity_window_callback_returns_default_null_panel_view`, which exercises the real DEX `invoke-interface Window$Callback.onCreatePanelView` path on an Activity receiver.
+7. `functions.bash` — ran `cargo fmt --all` and focused regression; both passed.
+8. `functions.bash` — appended this update/ledger to `worklog.md`.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rebuild CLI and rerun golden after Window.Callback default handling; resolve any subsequent panel/window callbacks, preserving diagnostics.
+- Verified this segment: interface callback regression passes. Prior CoordinatorLayout LayoutParams, Iterable iterator, and Collections empty-list regressions pass. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: ViewGroup.checkLayoutParams
+
+### Assistant progress update
+- “The `Window.Callback` default clears the panel-view lookup. Golden now stops earlier in Toolbar setup because `ViewGroup.checkLayoutParams(LayoutParams)` is unresolved on the AppCompat Toolbar. The Android base implementation accepts non-null params, so I’m adding that host fallback with a DEX regression.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — rebuilt CLI (passed) and reran golden. Outcome: Window.Callback panel-view blocker cleared; next `NOT_FOUND` is `ViewGroup.checkLayoutParams(LayoutParams)Z` on AppCompat Toolbar during `Toolbar.addSystemView`. Diagnostics: `/home/user/recovery/primftpd-after-window-callback-debug-stderr.log` and `...-stdout.json`.
+2. `functions.bash` — disassembled WindowCallbackWrapper/AppCompatWindowCallback panel view, AppCompatDelegate preparePanel/invalidate flow. Files `/home/user/recovery/primftpd-appcompat-*.smali`; confirmed callback delegates to original Activity and menu code then configures the toolbar.
+3. `functions.bash` — inspected Activity extras, Window storage, and host dispatch; panel view was absent while existing Activity panel defaults returned false/no-op.
+4. `functions.bash` — verified `activity_extras` is called for method-reference owner and saw the Activity-only guard that caused interface-owner fallback to miss.
+5. `functions.edit_file` — broadened Activity extras dispatch to Activity receivers invoked via `Window.Callback`, added null `onCreatePanelView` default.
+6. `functions.edit_file` — added DEX interface regression for Activity `Window.Callback.onCreatePanelView`; formatting/test passed (see previous ledger).
+7. `functions.bash` — appended this new blocker/next-step record.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Implement `ViewGroup.checkLayoutParams(LayoutParams)Z` (false for null, true for non-null, per Android base behavior), exercise it through a DEX virtual call on a ViewGroup subclass, then format/test/build/rerun golden.
+- Verified: Window.Callback regression passes; golden has moved to Toolbar's inherited ViewGroup method. Earlier three regressions pass. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: ViewGroup.checkLayoutParams
+
+### Assistant progress update
+- “`ViewGroup.checkLayoutParams` is now handled with Android’s default non-null check, and a DEX virtual-call regression passes for both non-null and null params. I’m rebuilding and rerunning golden.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — rebuilt CLI and reran golden. Outcome: Window.Callback panel-view issue cleared; new `NOT_FOUND` is `ViewGroup.checkLayoutParams(LayoutParams)Z` on Toolbar in `addSystemView`. Diagnostics: `/home/user/recovery/primftpd-after-window-callback-debug-stderr.log` and `...-stdout.json`.
+2. `functions.bash` — inspected Toolbar wrapper/delegate callers and Window.Callback defaults; confirmed host callback support is reached through `activity_extras`.
+3. `functions.edit_file` — added ViewGroup default `checkLayoutParams(LayoutParams)Z`, returning false for null and true for non-null.
+4. `functions.edit_file` — added DEX virtual-call regression for a ViewGroup subclass and both non-null/null params.
+5. `functions.edit_file` — removed an unused builder class-index binding from the fixture.
+6. `functions.bash` — ran `cargo fmt --all` and focused test; both passed.
+7. `functions.bash` — appended this ledger/progress record.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rebuild `rd-cli` and rerun golden after ViewGroup.checkLayoutParams; continue resolving the next non-phone blocker.
+- Verified this segment: DEX checkLayoutParams regression passes for non-null and null. Window.Callback and CoordinatorLayout regressions pass. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: View.setOnTouchListener
+
+### Assistant progress update
+- “`checkLayoutParams` clears the Toolbar failure. Golden advances to creation of AppCompat’s overflow button and stops at missing `View.setOnTouchListener`. I’m checking the existing View listener state and touch path before adding support, so registration behaves consistently with click listeners.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — rebuilt CLI (passed) and reran golden. Outcome: ViewGroup.checkLayoutParams blocker cleared; new `NOT_FOUND` is `View.setOnTouchListener(View$OnTouchListener)V` on AppCompat OverflowMenuButton constructor. Diagnostics: `/home/user/recovery/primftpd-after-check-layoutparams-debug-stderr.log` and `...-stdout.json`.
+2. `functions.bash` — appended this blocker and source-inspection direction to `worklog.md`.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Inspect click-listener state and touch event dispatch; add View.OnTouchListener registration/state (and dispatch if the current input model supports it), a regression, then format/test/build/rerun golden.
+- Verified: ViewGroup.checkLayoutParams regression passes and golden progressed to overflow-button listener setup. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: View.OnTouchListener support
+
+### Assistant progress update
+- “`setOnTouchListener` is now stored in the GC-rooted view-property table, and touch dispatch invokes `OnTouchListener` before `onTouchEvent`; the tap path also preserves click fallback when the touch listener declines. A DEX regression passes for register, dispatch, and unregister. I’m rerunning golden.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — searched existing View click-listener and touch-dispatch code; found only click listener state, but MotionEvent creation/dispatch already exists.
+2. `functions.bash` — inspected `touch_app`, `touch_sequence`, HostObj::View, `setOnClickListener`, `view_layout::dispatch_touch`, and GC roots; `view_props` is already traced by GC, so touch listener can be stored there without adding a HostObj field.
+3. `functions.edit_file` — added shared `VIEW_ON_TOUCH_LISTENER` property key.
+4. `functions.edit_file` — added `View.setOnTouchListener` registration/unregister handling and argument validation.
+5. `functions.edit_file` — first attempt to insert helper had stale context and failed; no file change from that call.
+6. `functions.bash` — read the exact `click_listener_of`/`click_method_of` context.
+7. `functions.edit_file` — added `touch_listener_of` helper.
+8. `functions.edit_file` — made dialog tap path deliver touch events when the target has an OnTouchListener, retaining click fallback when not consumed.
+9. `functions.edit_file` — made normal app tap path honor OnTouchListener before click fallback.
+10. `functions.edit_file` — invoked registered `OnTouchListener.onTouch(View, MotionEvent)` before host `onTouchEvent`.
+11. `functions.edit_file` — added DEX regression registering a listener returning true, dispatching touch, unregistering with null, and confirming no further consumption.
+12. `functions.bash` — ran `cargo fmt --all` and focused touch-listener test; both passed.
+13. `functions.bash` — appended this ledger/progress record.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rebuild `rd-cli` and rerun golden after View.OnTouchListener support; resolve the next non-phone blocker.
+- Verified this segment: set/register/dispatch/unregister DEX regression passes. ViewGroup.checkLayoutParams and Window.Callback regressions pass. Fuzz remains deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: golden app startup exits successfully
+
+### Assistant progress update
+- “Golden now exits 0 and emits a UI tree for `MainTabsActivity`, including the tab layout, CoordinatorLayout, and toolbar; no VM exception is reported. Many container bounds are still zero-height, so this is a startup pass—not yet an M7 verified report. I’m checking the run diagnostics and continuing the remaining validation and pendency work.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — rebuilt `rd-cli` and reran the SHA-pinned primftpd golden APK after View.OnTouchListener support. CLI build passed; `rd app run ... --trace --json` exited 0. Stdout JSON saved to `/home/user/recovery/primftpd-after-touch-listener-debug-stdout.json`; stderr to `/home/user/recovery/primftpd-after-touch-listener-debug-stderr.log`.
+2. `functions.read_file` — inspected successful JSON summary: package `org.primftpd`, activity `MainTabsActivity`, `finished=false`, tabs/CoordinatorLayout/Toolbar present; many outer container bounds remain zero-height, so not sufficient to claim verified M7.
+3. `functions.bash` — appended successful-startup result, caveat, and next action to this worklog.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Inspect successful-run stderr and UI-state cause; rerun relevant regressions and full repository gates (workspace tests, clippy, MSRV, release build, diff-check). Prepare/verify M7 evidence and address remaining non-phone roadmap items. M9 human review is not self-certified; record/route it accurately.
+- Golden startup is now green; do not equate this with M7 completion. Fuzz remains deferred/not passed. Physical-device measurement remains excluded.
+
+## 2026-10-21 — detailed continuation ledger: golden diagnostics and worktree snapshot
+
+### Assistant progress update
+- “The successful golden run has one stderr warning (`W/System.err: java.lang.ClassCastException@370b`) but exits 0; its JSON has 36 UI-tree lines, 11 zero-height containers. The worktree currently contains 44 modified and 6 new source/doc files from this broader continuation, with no commit made. I’m moving on to the full workspace test suite; M7 evidence remains pending.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — parsed successful golden stderr/JSON, counted UI lines/zero-height bounds, inspected `git status --short`, `git diff --stat`, and local roadmap filenames. Observed process exit 0; stderr has one `W/System.err: java.lang.ClassCastException@370b`; worktree has 44 modified files and 6 new Rust modules; `docs/ROADMAP.md` and `docs/m9.md` exist. No commit/push.
+2. `functions.bash` — appended this diagnostics/worktree snapshot and next validation step.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Run `cargo test --locked --workspace`; fix any failures before clippy/MSRV/release gates. Review local roadmap details and prepare M7 evidence after technical tests.
+- Golden startup exits 0 but is not M7 verified: structured tree contains 11 zero-height containers and a logged ClassCastException warning. Fuzz remains deferred/not passed; phone-only measurement excluded.
+
+## 2026-10-21 — detailed continuation ledger: workspace test failure
+
+### Assistant progress update
+- “The workspace test run is not fully green: all earlier test binaries passed, but `rd-cli`’s `readme_inspect_example_matches_binary_output` failed. I’m comparing the documented example with the CLI’s actual output and will fix the mismatch before rerunning the suite.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — ran `cargo test --locked --workspace`, capturing full output at `/home/user/recovery/optional-observe-workspace-test.log`. Exit 101: prior test binaries passed (including `rd-vm` suites), but `rd-cli --test readme_inspect` failed at `readme_inspect_example_matches_binary_output`.
+2. `functions.bash` — appended test result, next investigation, and pending status.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Extract the exact `readme_inspect` assertion diff and reconcile the README example with current CLI output; rerun that test, then the full workspace suite.
+- Current: workspace tests are failing, not complete. Golden startup is green but not an M7 verified report; fuzz remains deferred/not passed; phone-only measurement excluded.
+
+## 2026-10-21 — detailed continuation ledger: stale README golden version
+
+### Assistant progress update
+- “The failure was a stale fixture note: README and its test comment expected F-Droid 2.0.1 / code 2000051, while the checked APK is 2.0.2 / 2000052. I updated both, and the focused README-output test now passes. I’m rerunning the full workspace suite.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — extracted exact workspace failure from `/home/user/recovery/optional-observe-workspace-test.log`: README expected `org.fdroid.fdroid v2.0.1 (2000051)`, actual inspect output for the local APK was v2.0.2 (2000052).
+2. `functions.bash` — inspected `crates/rd-cli/tests/readme_inspect.rs`, README console block, and local APK hash/size; confirmed only the version marker/comment was stale.
+3. `functions.edit_file` — updated README example to F-Droid v2.0.2 (2000052).
+4. `functions.edit_file` — updated readme_inspect test comment to identify F-Droid 2.0.2.
+5. `functions.bash` — ran focused `cargo test --locked -p rd-cli --test readme_inspect ...`; passed.
+6. `functions.bash` — appended this fix and verification to `worklog.md`.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rerun `cargo test --locked --workspace`; if green, proceed to clippy, MSRV, release build, and `git diff --check`.
+- Workspace suite was red only on stale README artifact metadata; focused regression is now green. Golden startup remains green, but M7 evidence still pending; fuzz deferred/not passed; phone-only work excluded.
+
+## 2026-10-21 — detailed continuation ledger: deep-AXML stack overflow
+
+### Assistant progress update
+- “The README test is fixed and the rerun passes it and all test binaries before `app_xml`. The workspace run now aborts on `hostile_deep_axml_is_typed_error_not_abort` with a test-thread stack overflow, rather than an assertion failure. I’m isolating whether the overflow is in fixture generation, AXML parsing, or inflation, then I’ll fix it.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — reran `cargo test --locked --workspace`, capturing `/home/user/recovery/optional-observe-workspace-test-rerun.log`. README test and prior binaries passed; `rd-vm/tests/app_xml.rs` process aborted at `hostile_deep_axml_is_typed_error_not_abort` with stack overflow (SIGABRT). Focused regression counts in preceding suites included 30/30 Android inherited-dispatch tests; no test suite completion overall.
+2. `functions.bash` — appended the failure and isolation plan.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Run the deep-AXML test in isolation and inspect the fixture builder, AXML parser, and inflater depth guard to locate the recursion; fix the stack-overflow path and rerun focused/full tests.
+- Workspace tests remain red due process abort. Golden exits 0 but is not M7 verified; fuzz deferred/not passed; physical-phone-only gates excluded.
+
+## 2026-10-21 — detailed continuation ledger: isolate deep-XML fixture recursion
+
+### Assistant progress update
+- “The inflate depth guard itself works: the isolated test passes with an 8 MiB test stack. The overflow is in the test APK builder, which recursively walks the 600-level `AxNode` before inflation. I’ll make the fixture’s collection/emission walks iterative, keeping the 512-level production limit and the test unchanged in intent.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — inspected deep-XML test, APK fixture builder, parser, and inflater depth guard. Production AXML parser is iterative and `XmlElement` has an iterative Drop; `apkfix::collect_strings`, `emit_node`, and `collect_android_attr_names` are recursive.
+2. `functions.bash` — read `apkfix.rs` full AXML builder and confirmed default `AxNode` drop is already overridden iteratively near the file end.
+3. `functions.bash` — ran isolated deep-AXML test with `RUST_MIN_STACK=8388608`; passed, confirming stack-size-sensitive recursion rather than a production depth-guard failure.
+4. `functions.bash` — searched all `AxNode` usage and ownership patterns; no destructive field moves that block an iterative builder change; custom AxNode Drop exists.
+5. `functions.bash` — appended this isolation result and implementation plan.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rewrite test-support AXML fixture traversal/emission to use explicit stacks; run the deep test with the default test stack, then the entire `app_xml` target and full workspace suite.
+- Workspace tests remain red only at deep-fixture stack overflow after all earlier suites passed; M7 verified report remains pending, fuzz deferred/not passed, phone-only work excluded.
+
+## 2026-10-21 — detailed continuation ledger: iterative fixture builder, remaining overflow
+
+### Assistant progress update
+- “I made the test fixture’s tree walks iterative, but the default-stack test still overflows; with an 8 MiB stack it passes. That narrows the remaining recursion to the inflation/launch path near the 512-level cap. I’m marking the exact failing stage before changing runtime behavior.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.edit_file` — rewrote `apkfix::collect_strings` as an explicit-stack traversal.
+2. `functions.edit_file` — replaced recursive AXML node emission with explicit Open/Close events and start/end emitters.
+3. `functions.edit_file` — rewrote `collect_android_attr_names` iteratively.
+4. `functions.bash` — formatted and reran the isolated deep-AXML test with default stack; it still aborted with stack overflow. The same test passed earlier with 8 MiB.
+5. `functions.bash` — appended the remaining failure and instrumentation plan.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Instrument deep test phases (`build_fixture`, resource injection, `launch_app`) to confirm whether overflow is in `inflate_element_depth` or subsequent tree/lifecycle work; then fix the actual recursion/stack requirement and rerun at default stack.
+- Workspace suite still red on deep-XML stack overflow. Earlier app/golden and focused regressions remain verified; M7 report, clippy/MSRV/release/diff-check pending; fuzz deferred/not passed.
+
+## 2026-10-21 — detailed continuation ledger: pinpoint inflater stack cap
+
+### Assistant progress update
+- “The instrumentation confirms the overflow occurs during `inflate_element_depth`, around depth 256—well before the configured 512 cap. The fixture builder is no longer the cause. I’ll set a conservative host-side cap of 128, return the existing typed `INFLATE` error, and update the comments; this trades extreme nesting support for reliable stack headroom in debug and small-thread-stack runs.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.edit_file` — temporarily added fixture-build stage markers to the deep-AXML test.
+2. `functions.edit_file` — temporarily added resource/launch stage marker.
+3. `functions.bash` — isolated test showed fixture build and resource injection complete, then stack overflow during `launch_app`.
+4. `functions.edit_file` — temporarily added inflater depth checkpoints every 64 levels.
+5. `functions.bash` — isolated default-stack test reached inflater depth 256 before SIGABRT; confirms recursive inflate path, not fixture serialization/drop, exceeds test-thread stack before the 512 cap.
+6. `functions.bash` — appended this diagnosis and bounded-cap remediation.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Lower host `MAX_INFLATE_DEPTH` from 512 to 128 with rationale; remove temporary debug prints; correct stale test comments; rerun hostile test at default stack and the `app_xml` target.
+- Workspace remains red until this is fixed. M7 verified report, clippy/MSRV/release/diff-check pending; fuzz deferred/not passed; phone-only work excluded.
+
+## 2026-10-21 — detailed continuation ledger: conservative host inflater depth cap
+
+### Assistant progress update
+- “The stack diagnosis is resolved: the recursive host inflater exhausted a 2 MiB test stack around depth 256, before its old cap of 512. I lowered the host cap to 128, preserved the 600-level hostile-input test, removed the temporary probes, and the test now returns the expected typed `INFLATE` error on the default stack. Next I’m running all `app_xml` tests, then the workspace suite.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — read exact inflater cap and deep-test comments before the runtime adjustment.
+2. `functions.edit_file` — lowered host `MAX_INFLATE_DEPTH` from 512 to 128 and documented Rust debug/2 MiB worker-stack rationale.
+3. `functions.edit_file` — removed temporary inflater-depth logging.
+4. `functions.edit_file` — corrected deep-XML test comment to the actual 600 levels and host cap 128.
+5. `functions.edit_file` — removed temporary fixture-build markers.
+6. `functions.edit_file` — removed temporary launch marker.
+7. `functions.bash` — ran `cargo fmt --all` and default-stack focused hostile XML test; both passed; test returns typed `INFLATE`, no process abort.
+8. `functions.bash` — appended cap rationale, result, and next validation.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Run the full `app_xml` integration target, then full workspace tests. If green, continue clippy, MSRV, release build, diff-check, and M7 evidence.
+- The previous stack-overflow test failure is resolved at default test stack. M7 remains pending; fuzz deferred/not passed; phone-only measurement excluded.
+
+## 2026-10-21 — detailed continuation ledger: app_xml suite green
+
+### Assistant progress update
+- “All 21 `app_xml` tests now pass, including the deep-AXML safety test at the default stack size and the new CoordinatorLayout LayoutParams regression. I’m rerunning the full workspace suite.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — ran `cargo test --locked -p rd-vm --test app_xml -- --nocapture`; 21 passed, 0 failed, including `hostile_deep_axml_is_typed_error_not_abort` and CoordinatorLayout params.
+2. `functions.bash` — appended this target-level verification to the worklog.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rerun full `cargo test --locked --workspace`; address any remaining failures before clippy/MSRV/release gates.
+- App XML target green. Golden startup remains green; M7 verified report pending; fuzz remains deferred/not passed; physical-device work excluded.
+
+## 2026-10-21 — detailed continuation ledger: full workspace tests green
+
+### Assistant progress update
+- “The full workspace suite is green: 641 passed, 0 failed, 1 ignored across 48 test-result records. The deep-XML case now completes on the default stack. I’m moving to Clippy, the documented MSRV check, and a release build, then I’ll run diff checks and update the M7 evidence.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — reran `cargo test --locked --workspace`; exit 0. Captured full log at `/home/user/recovery/optional-observe-workspace-test-final.log`; all workspace and doc-test result records successful.
+2. `functions.bash` — summed result lines: 48 result records, 641 passed, 0 failed, 1 ignored; no `error:` lines.
+3. `functions.bash` — appended this verification and next gates to `worklog.md`.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Run workspace clippy with warnings denied per project policy; inspect local MSRV instructions and run the appropriate locked check; run release build; then `git diff --check` and M7 evidence/report review.
+- Workspace tests green. M7 report still pending; fuzz remains deferred/not passed; physical phone tests excluded. M9 human review must remain accurately marked until a real reviewer signs off.
+
+## 2026-10-21 — detailed continuation ledger: validation toolchain availability
+
+### Assistant progress update
+- “Workspace tests are green. The CI-required Clippy command cannot start because this environment has no `cargo clippy`; `rustup` is also absent. I’m checking the installed compiler and whether Rust 1.76 can be exercised here. If those tools are unavailable, I’ll record the gates as unverified—not passed.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — full workspace tests exited 0; log `/home/user/recovery/optional-observe-workspace-test-final.log`.
+2. `functions.bash` — counted 641 passed, 0 failed, 1 ignored across 48 result records.
+3. `functions.bash` — inspected CONTRIBUTING/CI/workspace files: strict Clippy is `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; declared MSRV is 1.76; `rustup` command is absent.
+4. `functions.bash` — attempted strict all-feature Clippy; command unavailable (`cargo: no such command: clippy`). No lint result exists.
+5. `functions.bash` — recorded these results and next environment check.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Inspect `cargo`/`rustc` paths and versions; attempt documented `cargo +1.76.0 check --workspace --all-features --locked`; run format-check and release build if supported. Clippy and MSRV gates must remain unverified if the required toolchains cannot be installed.
+- Workspace tests green. M7 evidence/report and M9 human review remain outstanding; 24-hour fuzz deferred/not passed; phone-only measurement excluded.
+
+## 2026-10-21 — detailed continuation ledger: temporary Rust toolchains
+
+### Assistant progress update
+- “This environment uses Debian’s `/usr/bin/cargo` 1.85.1, so `cargo +1.76.0` is unsupported. I found the matching Clippy package, but its launcher is a rustup proxy and needs an active toolchain. I’m installing temporary Rust 1.76 and 1.85 toolchains under `/tmp` so I can run MSRV and strict Clippy without changing the repository or system packages.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — confirmed `/usr/bin/cargo` and `/usr/bin/rustc` are 1.85.1; `cargo +1.76.0` cannot run because cargo is not a rustup proxy; `cargo fmt --all -- --check` passed.
+2. `functions.bash` — confirmed no system `clippy-driver`/rustup initially; Debian metadata offers rust-clippy 1.85.1 and rustup 1.27.1.
+3. `functions.bash` — downloaded and extracted rust-clippy and rustup packages under `/tmp/rd-validation-tools` (no repo/system installation).
+4. `functions.bash` — attempted extracted `cargo clippy`; its rustup proxy failed because no toolchain/default was configured.
+5. `functions.bash` — inspected the extracted cargo-clippy/clippy-driver symlinks and local rustup version; both are rustup proxies.
+6. `functions.bash` — recorded toolchain/install plan and exact constraints.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Install temporary Rust 1.76.0 and 1.85.1 toolchains with Clippy into `/tmp`; run strict all-feature Clippy and the documented MSRV check.
+- Workspace tests and format-check green. M7 evidence/report and M9 review remain open; fuzz deferred/not passed; physical-phone gates excluded.
+
+## 2026-10-21 — detailed continuation ledger: Rust 1.76 installed, disk-limited second toolchain
+
+### Assistant progress update
+- “Rust 1.76.0 installed with Clippy in the temporary toolchain, but installing a second 1.85 toolchain ran out of sandbox disk space. That’s an environment limit, not a project failure. I’ll run MSRV and strict Clippy with 1.76 first, then check whether there’s enough headroom to test Clippy on the system-version compiler.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — installed temporary Rust 1.76.0 plus Clippy under `/tmp/rd-validation-tools`; rustc 1.76.0 installed successfully.
+2. `functions.bash` — attempted a second temporary 1.85.1+Clippy toolchain; rustup rolled back the install after `No space left on device`. Repository files unchanged by tool installation.
+3. `functions.bash` — recorded environment constraint and next tests.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Check free disk and temporary toolchain state. Run 1.76.0 all-features MSRV `cargo check` and strict all-feature Clippy; then run release build / diff-check. Do not call the failed 1.85 install a project failure.
+- Workspace tests and format check green; M7 evidence/report and M9 review open; fuzz deferred/not passed; phone-only work excluded.
+
+## 2026-10-21 — detailed continuation ledger: toolchain storage diagnosis
+
+### Assistant progress update
+- “The install failed because `/tmp` is a 992 MB filesystem with only 262 MB free; the main workspace filesystem has 15 GB free. I can move the temporary toolchain cache into the excluded home cache, run MSRV/Clippy there, and keep generated toolchains out of the project.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — checked filesystem and toolchain footprint: `/tmp` tmpfs is 992 MiB with 262 MiB free; `/home/user` filesystem has 15 GiB free; Rust 1.76 toolchain uses 493 MiB; workspace `target` is 4.5 GiB.
+2. `functions.bash` — recorded storage diagnosis and relocation plan.
+- No repository files changed during toolchain installation; no external searches or CI actions.
+
+### Active blocker / next action
+- Relocate temporary Rustup home to `/home/user/.cache` (excluded from snapshots) and use available root-filesystem space; run MSRV/Clippy. Keep downloaded tooling outside the repository.
+
+## 2026-10-21 — detailed continuation ledger: temporary toolchains available
+
+### Assistant progress update
+- “Both Rust 1.76.0 and 1.85.1 are now installed under the excluded home cache, with Clippy components. No system package or repository toolchain files were changed. I’m running the documented all-features MSRV check first, followed by strict Clippy on 1.85.1.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — moved temporary Rustup/cache files from 992 MiB `/tmp` to `/home/user/.cache/rd-validation-tools`; 1.76 toolchain remains registered; `/tmp` space recovered.
+2. `functions.bash` — installed Rust 1.85.1 with Clippy in the relocated home cache; Rustup lists 1.76.0 and 1.85.1; root filesystem has 14 GiB free.
+3. `functions.bash` — recorded toolchain availability and planned validation.
+- All toolchain/cache files remain outside the repository in an excluded cache path.
+
+### Active blocker / next action
+- Run `cargo check --workspace --all-features --locked` with 1.76.0; run strict all-target/all-feature Clippy with 1.85.1. Then release build and `git diff --check`.
+
+## 2026-10-21 — detailed continuation ledger: MSRV passed, Clippy launcher diagnosis
+
+### Assistant progress update
+- “The Rust 1.76 all-features check passed. My first Rust 1.85 Clippy attempt still used system Cargo’s subcommand lookup, so it missed the installed component; inspection confirms the toolchain’s `cargo-clippy` is present. I’ll rerun with that toolchain’s Cargo and bin directory explicitly first in `PATH`.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — ran `rustup run 1.76.0 cargo check --workspace --all-features --locked`; exit 0, `Finished dev` in 45.31s. Full log: `/home/user/recovery/optional-observe-msrv-1.76.log`.
+2. `functions.bash` — attempted `rustup run 1.85.1 cargo clippy ...`; command lookup failed (`no such command: clippy`), not a lint result.
+3. `functions.bash` — confirmed Clippy component is installed in Rust 1.85.1 toolchain (`cargo-clippy`, `clippy-driver` binaries); `rustup run` did not prepend that bin dir for Cargo subcommand discovery.
+4. `functions.bash` — recorded the launcher issue and explicit PATH workaround.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rerun strict Clippy using the explicit Rust 1.85.1 toolchain `bin` directory; then release build and diff-check.
+- MSRV 1.76 all-features check passed. Workspace tests/format-check green; M7 evidence and M9 human review remain open; fuzz deferred/not passed; physical-device work excluded.
+
+## 2026-10-21 — detailed continuation ledger: first strict Clippy findings
+
+### Assistant progress update
+- “The first Clippy warnings in `rd-ndk` are fixed; the rerun progressed and exposed eight more precedence warnings in `rd-dex` bit packing and offset decoding. These are explicit-grouping fixes with no intended behavior change. I’m addressing them before another strict pass.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — ran Rust 1.76 all-feature MSRV check; exit 0.
+2. `functions.bash` — attempted Clippy using rustup invocation; subcommand lookup issue diagnosed, no lint outcome.
+3. `functions.bash` — inspected Rust 1.85.1 toolchain component; confirmed `cargo-clippy` and `clippy-driver` binaries.
+4. `functions.bash` — appended MSRV success and launcher diagnosis.
+5. `functions.bash` — reran strict Clippy using toolchain-specific Cargo and PATH; found two precedence lints in `crates/rd-ndk/src/runtime.rs`.
+6. `functions.read_file` (parallel) — inspected both NDK expressions.
+7. `functions.edit_file` (2 calls) — parenthesized the byte-shift OR and high/low bit assembly in `rd-ndk/src/runtime.rs`.
+8. `functions.bash` — formatted, format-checked, and reran strict Clippy; NDK lints cleared, eight precedence lints found in `crates/rd-dex/src/code.rs`.
+9. `functions.bash` — recorded findings and next action.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Inspect and parenthesize all eight DEX expressions reported by Clippy; rerun strict all-target/all-feature Clippy on 1.85.1, then run full tests, release build, and diff-check after fixes.
+- MSRV check passed. Workspace tests were green before these precedence-only clarity changes. M7 report/M9 review open; fuzz deferred/not passed; phone-only tests excluded.
+
+## 2026-10-21 — detailed continuation ledger: broader Clippy findings and MSRV recheck
+
+### Assistant progress update
+- “Clippy now reports 25 strict-lint errors across the workspace, mostly bitwise-precedence clarity plus a few logic/style issues. It also flags `Option::is_none_or` as newer than the declared MSRV 1.76. That makes me want to verify the earlier MSRV check with both Cargo and rustc pinned explicitly; I won’t count it as passed until that confirmation.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — strict Rust 1.85.1 all-target/all-feature Clippy after DEX/NDK precedence cleanup; remaining errors were emitted and captured at `/home/user/recovery/optional-observe-clippy-1.85.log`.
+2. `functions.bash` — indexed all diagnostics and confirmed actual Rust 1.76.0/1.85.1 compiler binaries are available.
+3. `functions.read_file` — read full Clippy diagnostics: 17 remaining precedence warnings (graphics, jsqlite, native), comparison-chain, two map-entry, nonminimal bool, two overly-complex bool subdiagnostics, MSRV incompatibility (`Option::is_none_or`), and format-collect.
+4. `functions.bash` — appended correction and plan.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blockers / next action
+- Re-run MSRV check using explicit `1.76.0/bin/cargo`, `1.76.0/bin/rustc`, and PATH to the same toolchain; correct any incompatible APIs, including `is_none_or` if confirmed.
+- Resolve remaining strict Clippy errors with behavior-preserving explicit parentheses and targeted style/logic adjustments; rerun Clippy and tests.
+- Previous “MSRV passed” wording is superseded pending explicit compiler verification; Clippy is not green yet. M7 report/M9 review remain open; fuzz deferred/not passed; phone-only tests excluded.
+
+## 2026-10-21 — detailed continuation ledger: explicit MSRV check confirms API failure
+
+### Assistant progress update
+- “Confirmed: the explicitly pinned Rust 1.76.0 build fails on `Option::is_none_or` in `jxml.rs`, so the earlier unpinned check was not valid MSRV evidence. I’ll replace that post-1.76 API with a compatible equivalent, then address the remaining Clippy findings and rerun the gates with explicit compiler paths.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — explicitly invoked Rust 1.76.0 Cargo and rustc (`PATH` and `RUSTC` pinned); all-feature locked workspace check failed only on `Option::is_none_or` in `crates/rd-vm/src/jxml.rs:527`. Full log: `/home/user/recovery/optional-observe-msrv-1.76-pinned.log`.
+2. `functions.bash` — appended confirmed MSRV failure and remediation.
+- Previous unpinned MSRV “pass” is withdrawn; Clippy remains red until all diagnostics are resolved.
+
+## 2026-10-21 — detailed continuation ledger: MSRV and Clippy remediation
+
+### Assistant progress update
+- “The pinned Rust 1.76 check confirmed the `is_none_or` incompatibility; I replaced it with an MSRV-compatible `map_or`. I also addressed the reported bitwise precedence, binary-search comparison, thread-map entry, dead boolean term, and trace-string allocation warnings. The interpreter’s map check stays intentionally separated because its resolver calls need `&mut Engine`. I’m formatting and rerunning strict Clippy now.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — reran all-feature MSRV with both Cargo and rustc explicitly pinned to Rust 1.76.0; failed only at `jxml.rs:527` because `Option::is_none_or` is unavailable. Log: `/home/user/recovery/optional-observe-msrv-1.76-pinned.log`.
+2. `multi_tool_use.parallel` — `functions.read_file` inspected 12 regions: `graphics.rs` (ARGB/RGB/paint color packing), `jsqlite.rs` (base64 bit packing), `native.rs` (wide value/byte packing), `arrays.rs` (binary search), `interp.rs` (host static cache), `jrandom.rs` (guard), `jtext_format.rs` (negative flag), `jxml.rs` (attribute URI), `threads.rs` (thread cache), `throwable.rs` (trace builder).
+3. `functions.read_file` — read `throwable.rs` module imports before adding formatting trait.
+4. `functions.read_file` — read `throwable.rs` imports and helper context.
+5. `functions.edit_file` — parenthesized ARGB color packing in `graphics.rs`.
+6. `functions.edit_file` — parenthesized RGB color packing in `graphics.rs`.
+7. `functions.edit_file` — parenthesized float-channel ARGB packing in `graphics.rs`.
+8. `functions.edit_file` — parenthesized `Paint.setARGB` packing in `graphics.rs`.
+9. `functions.edit_file` — parenthesized Canvas `drawARGB`/`drawRGB` packing in `graphics.rs`.
+10. `functions.edit_file` — parenthesized base64 assembly in `jsqlite.rs`.
+11. `functions.edit_file` — parenthesized base64 bit-index expression in `jsqlite.rs`.
+12. `functions.edit_file` — parenthesized base64 decoder shift/OR in `jsqlite.rs`.
+13. `functions.edit_file` — parenthesized ARM wide word assembly in `native.rs`.
+14. `functions.edit_file` — parenthesized primitive-byte fold in `native.rs`.
+15. `functions.edit_file` — rewrote binary-search comparison as `match c.cmp(&0)` in `arrays.rs`.
+16. `functions.edit_file` — added a narrow, documented `clippy::map_entry` allowance to the `interp.rs` host-static cache because callbacks need mutable `Engine` access while the map entry must not remain borrowed.
+17. `functions.edit_file` — simplified the `jrandom.rs` guard via De Morgan’s law.
+18. `functions.edit_file` — removed the constant-false negative-zero clause from `jtext_format.rs`.
+19. `functions.edit_file` — replaced `Option::is_none_or` with MSRV-compatible `map_or` in `jxml.rs`.
+20. `functions.edit_file` — changed `threads.rs` insertion to `HashMap::Entry::Vacant`.
+21. `functions.edit_file` — imported `std::fmt::Write` in `throwable.rs`.
+22. `functions.edit_file` — replaced `format!`+collect with incremental `write!` trace construction in `throwable.rs`.
+23. `functions.bash` — appended this remediation record.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Run `cargo fmt --all -- --check`, then strict Clippy on the explicit Rust 1.85.1 toolchain. Fix any remaining lint/compiler diagnostics, rerun pinned Rust 1.76 check, then full tests/release/diff-check.
+
+## 2026-10-21 — detailed continuation ledger: Clippy reduced to test-support precedence
+
+### Assistant progress update
+- “The strict Clippy rerun cleared the earlier DEX, NDK, VM, and MSRV diagnostics; it now stops on two remaining precedence warnings in `rd-testsupport/src/vm.rs`. I’ll parenthesize that register-packing expression and rerun the full strict pass.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — formatted and format-checked; strict explicit Rust 1.85.1 all-target/all-feature Clippy cleared prior diagnostics and reported only two `clippy::precedence` warnings at `crates/rd-testsupport/src/vm.rs:81`.
+2. `functions.bash` — appended this remaining issue and next action.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+## 2026-10-21 — detailed continuation ledger: single UUID format-collect lint
+
+### Assistant progress update
+- “The test-support precedence warnings are fixed. The next strict pass got through the workspace and found one remaining `format_collect` in the UUID helper (`juuid.rs`). I’ll switch it to direct string writes and rerun Clippy.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.read_file` — inspected `rd-testsupport/src/vm.rs` 35c register packing.
+2. `functions.edit_file` — parenthesized each shifted register nibble in the test helper.
+3. `functions.bash` — formatted and format-checked; strict Rust 1.85.1 Clippy cleared prior lints and reported one `clippy::format_collect` at `rd-vm/src/juuid.rs:252`.
+4. `functions.bash` — appended this remaining lint and next action.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+## 2026-10-21 — detailed continuation ledger: strict Clippy green
+
+### Assistant progress update
+- “Strict all-target/all-feature Clippy now passes on Rust 1.85.1, and `cargo fmt --check` passes. I’ve also corrected the MSRV-incompatible API; next I’m rerunning the all-features check with both Cargo and rustc explicitly pinned to 1.76.0, then I’ll rerun workspace tests and the release build.”
+
+### Tool-call ledger since the preceding worklog update
+1. `multi_tool_use.parallel` — read `juuid.rs` module imports and MD5 round-trip test before replacing `format_collect`.
+2. `functions.edit_file` — rewrote the MD5 hex assertion using incremental `write!` into a preallocated `String`.
+3. `functions.bash` — ran `cargo fmt --all`, `cargo fmt --all -- --check`, and Rust 1.85.1 explicit-toolchain strict Clippy (`--workspace --all-targets --all-features --locked -- -D warnings`); all passed, Clippy finished in 16.82s. Log: `/home/user/recovery/optional-observe-clippy-1.85.log`.
+4. `functions.bash` — appended the green Clippy result and next validation sequence.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Run all-feature MSRV check with Rust 1.76.0 Cargo and rustc explicitly selected; then full workspace tests, release build, and `git diff --check`.
+- Strict Clippy and format-check green. Physical phone work excluded; fuzz remains deferred/not passed; M7 evidence and M9 human review remain outstanding.
+
+## 2026-10-21 — detailed continuation ledger: pinned MSRV green
+
+### Assistant progress update
+- “The explicit Rust 1.76.0 all-features check now passes with both compiler and Cargo pinned, so MSRV is verified. Together with the green strict Clippy and format check, the code-quality gates are clear. I’m rerunning the full test suite against the final edits, then release build and diff-check.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — ran locked all-features workspace check using explicit Rust 1.76.0 Cargo, rustc, and PATH; exit 0, finished in 7.28s. Full log: `/home/user/recovery/optional-observe-msrv-1.76-pinned.log`.
+2. `functions.bash` — appended pinned MSRV verification and final validation plan.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rerun full locked workspace tests after Clippy/MSRV fixes, then build release workspace and run `git diff --check`; inspect diff and M7 evidence/remaining non-phone pendencies.
+- Clippy, formatting, and pinned MSRV all green. M7 report/M9 human review open; 24h fuzz campaign deferred/not passed; phone-only testing excluded.
+
+## 2026-10-21 — detailed continuation ledger: CI gate inventory
+
+### Assistant progress update
+- “The repository CI also has a no-app contract test, an unsafe-code scan, registry feature-isolation checks, and a release CLI smoke test. I’ll run those host-side gates where the sandbox supports them, alongside the final workspace suite; the 24-hour fuzz campaign remains deliberately deferred per your instruction.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — explicit Rust 1.76.0 all-features locked check, with Cargo and rustc pinned; passed.
+2. `functions.read_file` — inspected `.github/workflows/ci.yml` Rust job, engine registry matrix, VM golden, native/M9 and MSRV jobs. Identified local gates: fmt, Clippy, workspace tests, contract-no-app, unsafe scan, release smoke, registry feature isolation/docs, and M9 native tests.
+3. `functions.bash` — appended CI inventory and deferred-fuzz decision.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rerun `cargo test --locked --workspace` after final lint/MSRV changes. Then execute the feasible CI contract, unsafe, registry, release, and golden gates; continue M7 layout diagnostics without claiming completion on zero-height bounds/warnings.
+- Strict Clippy, formatting, and pinned MSRV are green. M7 evidence/M9 human review open; 24h fuzz deferred/not passed; physical-phone-only tests excluded.
+
+## 2026-10-21 — detailed continuation ledger: final workspace tests green
+
+### Assistant progress update
+- “The final-edit workspace test rerun is green: 641 passed, 0 failed, and 1 ignored across 48 result records. I’m moving through the remaining non-phone CI checks: contract suite and unsafe scan, registry feature isolation, then release build/CLI smoke.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — reran full locked workspace tests using explicit Rust 1.85.1 Cargo/rustc; exit 0, 641 passed, 0 failed, 1 ignored, 48 result lines. Log: `/home/user/recovery/optional-observe-workspace-test-final-clippy.log`.
+2. `functions.bash` — appended result and next CI checks; test totals were parsed in the same command.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+## 2026-10-21 — detailed continuation ledger: contract suite green
+
+### Assistant progress update
+- “The no-app contract suite passes all 8 scenarios, including no-app launch/tap, runtime health, and teardown behavior. I’m running the CI unsafe-code scan next, then the engine-registry feature matrix.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.edit_file` — corrected the prior worklog segment’s tool-call ledger to match the actual call sequence.
+2. `functions.bash` — built `rd-cli` locked on explicit Rust 1.85.1 and ran `rd test tests/suites/contract-no-app.json --junit target/junit-contract-no-app.xml`; 8 passed, 0 failed. Output: “Resultado: 8 passou, 0 falhou — 28 ms”.
+3. `functions.bash` — appended contract result and next CI gates.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+## 2026-10-21 — detailed continuation ledger: unsafe and registry CI gates green
+
+### Assistant progress update
+- “The unsafe-code scan passes. The engine-registry matrix also passes: no-default, all 12 isolated language features, and all-features tests; both CLI feature checks pass, and generated registry/spec docs match the checked-in files. Next I’m doing the release CLI build and smoke tests.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — ran CI-equivalent unsafe scan; pass, no `unsafe` outside `rd-ndk`/`rd-jni`.
+2. `functions.bash` — ran engine-registry tests (no default features, each `lang-01`…`lang-12`, all features), CLI no-default/all-feature checks, and `cargo xtask engine-report` / `engine-spec` plus exact `diff -u`; all passed. Log: `/home/user/recovery/optional-observe-registry-gates.log`.
+3. `functions.bash` — appended these results and next release gate.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+## 2026-10-21 — detailed continuation ledger: release CLI smoke green
+
+### Assistant progress update
+- “The release build succeeded, and the release CLI passes `--help` and `device list` smoke tests. I’m now rerunning the Primftpd APK through the release binary and will inspect its view bounds and stderr warning before deciding whether it qualifies as M7 evidence.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — ran CI registry matrix: no-default, `lang-01`…`lang-12`, all-features, CLI no-default/all-feature checks, and generated docs diffs; all passed.
+2. `functions.bash` — built `rd-cli` locked in release with explicit Rust 1.85.1; ran release `rd --help` and `rd device list`; exit 0. Full log: `/home/user/recovery/optional-observe-release-smoke.log`.
+3. `functions.bash` — appended release result and M7 golden inspection plan.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+## 2026-10-21 — detailed continuation ledger: release golden still not M7 evidence
+
+### Assistant progress update
+- “The release Primftpd run still exits 0, but it reproduces the 11 zero-height containers and `ClassCastException@370b`. That is not M7 evidence. I’m inspecting the full stderr and decoded view tree now to locate whether the exception or layout-measure path is suppressing the root content.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — ran release `rd app run` on `golden-apks/cache/org.primftpd_71.apk` with `--trace --json`; process exit 0; stderr includes `Reported exception: W/System.err: java.lang.ClassCastException@370b`; JSON tree still has zero-height containers. APK SHA-256 confirmed `d36566e774e2d0446dcbb41438d22e62d198688aac2711ba7afaa6ea2fdd577d`. Logs: `/home/user/recovery/primftpd-after-final-lints-release-{stdout.json,stderr.log}` and `/home/user/recovery/primftpd-final-apk.sha256`.
+2. `functions.bash` — appended that this is not M7 evidence and next diagnostic action.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Decode/list every view bound and read complete stderr; locate `ClassCastException` source in trace/guest methods and identify why root height is zero. Do not mark M7 verified until golden output meets layout/error criteria.
+
+## 2026-10-21 — detailed continuation ledger: golden error and layout diagnostics
+
+### Assistant progress update
+- “The decoded output confirms 36 tree entries with 11 zero-height views. Full stderr adds two clues: Logback `LoggerContext` instantiation failed, and AppCompat reports its widgets lack a `Theme.AppCompat` theme. I’ll trace theme/resource application and decor measurement separately; the current golden still does not qualify as M7 evidence.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — decoded full release golden stderr and parsed JSON bounds; 36 tree lines, 11 height-0 nodes. Stderr includes `Failed to instantiate [ch.qos.logback.classic.LoggerContext]`, `W/System.err: java.lang.ClassCastException@370b`, repeated FragmentManager diagnostics, and AppCompat theme errors for AppCompatImageButton/OverflowMenuButton.
+2. `functions.bash` — appended exact diagnostic summary and separate theme/layout investigation plan.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Inspect app theme resources, manifest theme assignment, AppCompat theme detection, logger instantiation, and decor/root measurement. Keep M7 incomplete until warning and invalid layout are resolved or appropriately dispositioned with evidence.
+
+## 2026-10-21 — detailed continuation ledger: distinguish pre-frame dump from rendered layout
+
+### Assistant progress update
+- “One important correction: `app run` without a script only dumps `dump_ui()`; it doesn’t trigger the first draw/layout traversal, so those zero-height bounds may be pre-frame rather than a render defect. The roadmap also documents this `ClassCastException` as faithful to Primftpd 8.2, whose packaging omits `META-INF/services`. I’ll rerun with a screenshot script to evaluate the actual first frame; M7 stays pending meanwhile.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — searched theme/layout source, app command help, and inspected APK metadata; manifest lists launcher theme `@0x7f120171`, app-level theme absent.
+2. `functions.bash` — parsed saved `rd inspect --json`; confirmed Primftpd 8.2/code 71 and component themes.
+3. `multi_tool_use.parallel` — read `android_res.rs` theme lookup/resolution, `android_pm.rs` info defaults, and inflater/view methods; confirmed theme selection parses manifest component style and ARSC follows parent styles.
+4. `functions.read_file` — an attempted read targeted `crates/rd-apk/src` as a directory and failed (no code changed).
+5. `multi_tool_use.parallel` — read ARSC style resolution, `xml_res::fill_theme_typed_array`, `draw_frame/layout_roots`, and Activity attachment/traversal code.
+6. `functions.bash` — searched CLI app command, M7/M9 docs, AndroidX/ARSC style resolution; observed `cmd_app_run` defaults to `eng.dump_ui()` without drawing, and ARSC implements parent-style lookup.
+7. `multi_tool_use.parallel` — read `cmd_app_run` script handling, `ensure_laid_out`, ARSC resolver, and M7/Primftpd roadmap sections; confirmed `shot` invokes `draw_frame`, M7 still lists golden/phone/release workflow pending, and roadmap records the ClassCastException as faithful with missing `META-INF/services`.
+8. `functions.bash` — appended diagnostic distinction and screenshot-plan.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Run the release binary with `--script "shot …"`, inspect the post-layout tree and screenshot, and separate expected Primftpd ClassCastException from AppCompat theme warnings. M7 remains unverified pending golden gate/release workflow and real-device measurement (phone excluded).
+
+## 2026-10-21 — detailed continuation ledger: first-frame failure localized
+
+### Assistant progress update
+- “The screenshot confirms this is a real first-frame failure, not just a stale dump: only the tab strip renders. The draw trace pinpoints it—`ActionBarOverlayLayout.onMeasure` calls inherited `ViewGroup.measureChildWithMargins`, which is unresolved, so the draw pass fails and leaves the root at zero height. I’ll add that host default with a DEX regression, then reassess the theme messages.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — ran release `rd app run` with `--script "shot …"`; PNG 720×1440 generated; draw failed with `NOT_FOUND` for `ViewGroup.measureChildWithMargins(View,IIII)V` from `ActionBarOverlayLayout.onMeasure`; post-frame tree still had 11 zero-height views. Full stderr/JSON: `/home/user/recovery/primftpd-after-layout-release-{stderr.log,stdout.json}`; PNG `/home/user/recovery/primftpd-after-layout-final.png`.
+2. `functions.read_file` — visually inspected the PNG; only the tab strip rendered over a blank frame.
+3. `functions.bash` — appended exact failure source and implementation plan.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Implement inherited `ViewGroup.measureChildWithMargins` behavior (including child LayoutParams/margins/specs) and add a DEX regression; rebuild/run screenshot, then investigate remaining AppCompat theme warnings. M7 remains incomplete until the frame is valid and gates are evidenced.
+
+## 2026-10-21 — detailed continuation ledger: ViewGroup measurement implementation plan
+
+### Assistant progress update
+- “The dispatch path already walks an AppCompat subclass’s Android ancestors and reaches the `ViewGroup` host, so the missing piece is the base method itself. I’ll implement `measureChildWithMargins` using the child’s LayoutParams, parent padding/margins, and MeasureSpec modes, with a DEX-level regression that checks the derived child specs.”
+
+### Tool-call ledger since the preceding worklog update
+1. `functions.bash` — located ViewGroup host methods, HostObj::View fields, MarginLayoutParams constructors, and existing inherited-dispatch regression.
+2. `multi_tool_use.parallel` — read HostObj::View, `framework::call_host_instance` ViewGroup dispatch, `interp.rs` regression context, `classpath.rs` ViewGroup inheritance, and inflater LayoutParams construction.
+3. `functions.bash` — inspected framework host dispatch order, ViewGroup match arms, and fields used for margins/padding.
+4. `functions.bash` — listed framework dispatch entry points and inspected Engine `invoke_instance` fallback.
+5. `multi_tool_use.parallel` — read call_host_instance, inherited Android host ancestor traversal, Engine invocation fallback, and builtin hierarchy.
+6. `functions.bash` — inspected padding storage, LayoutParams constructors, and measurement-related storage in `view_props.rs`, `view_layout.rs`, and `window.rs`.
+7. `multi_tool_use.parallel` — read interpreter Android-call path, ancestor dispatch loop, LayoutParams intrinsic, and View measurement/padding fallback.
+8. `functions.bash` — appended the method design and DEX regression plan.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Add `ViewGroup.measureChildWithMargins(View,IIII)` to `framework.rs` with AOSP child MeasureSpec derivation and execute child `measure`; add a DEX dispatch test with fixed/match/wrap dimensions and margins/padding; run focused tests, then rebuild/re-run Primftpd screenshot.
+
+## 2026-10-21 — user requested progress update and ETA
+
+### User message
+- “Update me in the progress and how much time is estimated to end, update the worklog.md and go back to work.”
+
+### Assistant progress update
+- Validation completed so far: full workspace tests (641 passed, 0 failed, 1 ignored), strict all-target/all-feature Clippy, format check, explicit Rust 1.76 all-features check, contract suite (8/8), unsafe scan, registry feature-isolation matrix/docs comparisons, release CLI smoke.
+- Current blocker: Primftpd 8.2 release screenshot fails during `ActionBarOverlayLayout.onMeasure`; inherited `ViewGroup.measureChildWithMargins(View,IIII)V` is unresolved. Only the tab strip renders; M7 is not verified.
+- ETA: approximately 1–3 hours for remaining headless fixes and validation, contingent on no further framework gaps emerging from the screenshot. This estimate excludes the physical Moto E5 measurement and the explicitly deferred 24-hour fuzz campaign. M9 human sign-off still requires a human reviewer.
+
+### Tool-call ledger
+1. `functions.bash` — appended this user request, progress summary, ETA, scope exclusions, and current blocker.
+
+### Active next action
+- Implement `ViewGroup.measureChildWithMargins` with AOSP child MeasureSpec calculations from LayoutParams, padding, margins, and used space; add a DEX regression and rerun the Primftpd screenshot.
+
+## 2026-10-21 — ViewGroup child-measure implementation drafted
+
+### Assistant progress update
+- Added the host-side Android child MeasureSpec derivation and inherited `ViewGroup.measureChildWithMargins(View,IIII)V` dispatch. Added a DEX regression that sets parent padding, LayoutParams width/height and margins, supplies used space, and asserts measured dimensions. These edits are **not yet validated**; the Primftpd golden and M7 remain unresolved.
+
+### Tool-call ledger since the previous worklog update
+1. `functions.read_file` — checked imports and fixture conventions in `android_inherited_dispatch.rs`.
+2. `functions.edit_file` — added MeasureSpec constants, `child_measure_spec`, and the host implementation to `framework.rs`.
+3. `functions.read_file` — inspected an unrelated View dispatch range; no changes.
+4. `functions.bash` — located `checkLayoutParams` and ViewGroup host-dispatch arms.
+5. `functions.read_file` — inspected the precise ViewGroup dispatch match.
+6. `functions.edit_file` — registered inherited `measureChildWithMargins(View,IIII)V` dispatch.
+7. `functions.bash` — located existing ViewGroup inherited-dispatch tests.
+8. `functions.read_file` — inspected the nearby checkLayoutParams and touch-listener DEX test patterns.
+9. `functions.bash` — checked integration-test access to `view_props` and its Engine visibility; direct test access is unavailable.
+10. `functions.bash` — located `setPadding` handling.
+11. `functions.read_file` — confirmed padding is set through View host behavior.
+12. `functions.bash` — checked padding key spellings and LayoutParams margin/width field storage.
+13. `functions.read_file` — verified `View.measure`, measured-dimension, and padding host behavior.
+14. `functions.bash` — checked LayoutParams constructor/inflater field names.
+15. `functions.bash` — searched for the shared test-support shim (no `common.rs` file at the queried path).
+16. `functions.bash` — located `tests/common/mod.rs`.
+17. `functions.read_file` — confirmed the shim re-exports `rd_testsupport::vm::*`.
+18. `functions.bash` — located `DexBuilder` helper definitions.
+19. `functions.read_file` — confirmed `direct` takes `Vec<&str>`, `proto_idx` takes `Vec<String>`, and `code` takes `Vec<u16>`.
+20. `functions.edit_file` — added the DEX regression test for derived child specs.
+21. `functions.edit_file` — cast the method index to `u16` for the raw `invoke-virtual/range` encoding.
+22. `functions.read_file` — checked the end of `worklog.md` before appending this ledger.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Run formatting and the focused inherited-dispatch regression; correct any compile/runtime issues. Then rebuild and rerun the screenshot-triggered Primftpd release golden, inspect its tree/frame/stderr, and continue with theme and remaining non-phone M7 gates. M7 is still not verified.
+
+## 2026-10-21 — measurement path advanced; AppCompat LayoutParams cast surfaced
+
+### Assistant progress update
+- “The new `ViewGroup.measureChildWithMargins` DEX regression passes, and the release build succeeds. The screenshot now advances past the missing method but exposes the next blocker: AppCompat casts a child’s generic `MarginLayoutParams` to `ActionBarOverlayLayout.LayoutParams`. I’m tracing inflater/constructor handling now; the screen is still not valid, so M7 remains open.”
+
+### Tool-call ledger since the previous worklog update
+1. `functions.bash` — `cargo fmt --all -- --check` found formatting changes in the new code/test; no tests ran in that command.
+2. `functions.bash` — ran `cargo fmt --all`; formatting applied.
+3. `functions.bash` — attempted focused test with the prior temporary toolchain path; failed because that path is absent in this restored environment.
+4. `functions.bash` — searched `/home/user/.cache/rd-validation-tools`; the excluded temporary toolchain cache is not present.
+5. `functions.bash` — identified system Cargo/Rust 1.85.1; `rustup` is not installed.
+6. `functions.bash` — ran `cargo test -p rd-vm --test android_inherited_dispatch --locked`; **31 passed, 0 failed**, including the new derived-measure-spec regression.
+7. `functions.bash` — ran format check and Clippy gate; format check passed, but `cargo-clippy` is not installed in this environment.
+8. `functions.bash` — built release `rd-cli` successfully with `cargo build --release -p rd-cli --locked`.
+9. `functions.bash` — reran the Primftpd screenshot-triggered release golden; exit 0, prior missing-method failure is gone, but stderr now reports `MarginLayoutParams` cannot be cast to `ActionBarOverlayLayout$LayoutParams` in `ActionBarOverlayLayout.onMeasure`. AppCompat theme and documented LoggerContext/ClassCastException diagnostics remain. Output: `/home/user/recovery/primftpd-after-measure-release-{stdout.json,stderr.log}`; PNG `/home/user/recovery/primftpd-after-measure.png`.
+10. Assistant progress update — reported the regression/build success and newly surfaced cast failure; M7 explicitly left open.
+11. `functions.read_file` — visually inspected the new PNG; it still shows only the tab strip on a blank frame, with some unsupported/malformed glyphs.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Trace how the inflated `ActionBarOverlayLayout` children get `mLayoutParams`; AppCompat requires its nested `ActionBarOverlayLayout$LayoutParams`, not the current generic `MarginLayoutParams`. Inspect inflater/ViewGroup constructor dispatch and DEX method bytecode, add a regression for subclass-specific LayoutParams, then rerun the release golden. Theme diagnostics and the non-phone M7 gates remain.
+
+## 2026-10-21 — inflater now selects DEX ViewGroup LayoutParams subclasses
+
+### Progress note
+- Diagnosed the next first-frame failure as inflated children receiving generic `ViewGroup$MarginLayoutParams`; AppCompat's `ActionBarOverlayLayout.onMeasure` requires its DEX nested `ActionBarOverlayLayout$LayoutParams`. Changed inflater selection to prefer an available nested `$LayoutParams` DEX class that is a `ViewGroup.LayoutParams` subtype, retaining platform defaults. Added an AppCompat-specific inflation regression. The code now passes both relevant test targets; the release golden has not yet been rerun after this change.
+
+### Tool-call ledger since the previous worklog update
+1. `functions.bash` — searched `framework.rs`, inflater, window, and layout sources for margin params/generation paths; one query named a nonexistent `classloader.rs` path (no changes).
+2. `multi_tool_use.parallel` — read inflater's current LayoutParams chooser/assignment, native LayoutParams constructor support, `generateDefaultLayoutParams`, and `Activity.setContentView` dispatch.
+3. `functions.bash` — located LayoutParams-related inflater regressions.
+4. `functions.read_file` — inspected the existing CoordinatorLayout/LayoutParams DEX fixture pattern in `app_xml.rs`.
+5. `functions.bash` — checked ClassPath lookup APIs and inflater constructor entry points.
+6. `functions.read_file` — confirmed `ClassPath::find_class` and subtype API behavior.
+7. `functions.edit_file` — changed inflater to prefer an APK-defined nested `$LayoutParams` class when it is a `ViewGroup.LayoutParams` subtype, before using native widget defaults.
+8. `functions.edit_file` — passed the resolved owned class descriptor directly into heap allocation.
+9. `functions.read_file` — checked `app_xml.rs` imports and fixture builder conventions.
+10. `functions.read_file` — verified inflater constructor selection for DEX custom Views.
+11. `functions.bash` — located the synthetic APK fixture builder.
+12. `functions.edit_file` — added an AppCompat `ActionBarOverlayLayout$LayoutParams` inflation regression.
+13. `functions.bash` — formatted the workspace.
+14. `functions.bash` — ran `cargo test -p rd-vm --test app_xml --test android_inherited_dispatch --locked`; **53 passed, 0 failed** (31 inherited-dispatch, 22 app-XML tests), including both new regressions.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rebuild release `rd-cli` and rerun the Primftpd screenshot golden. The visible frame was still blank at the prior run; M7 remains unverified. If layout advances, record each subsequent independent AppCompat/theme issue and continue until a valid non-phone golden is established or a concrete remaining gap is documented.
+
+## 2026-10-21 — follow-on ViewInsets host dispatch identified
+
+### Progress note
+- Release golden confirms the DEX-specific LayoutParams fix worked: the cast is gone. The next draw failure is `NOT_FOUND` for inherited `View.computeSystemWindowInsets(WindowInsets, Rect)` from `ActionBarOverlayLayout.decorFitsSystemWindows`; the root still has zero height, so no valid golden yet. Added a headless default for zero system insets and a regression; focused tests pass. Need rebuild/re-run before judging progress.
+
+### Tool-call ledger since the previous worklog update
+1. `functions.bash` — rebuilt release `rd-cli` successfully after the inflater change.
+2. `functions.bash` — reran Primftpd screenshot golden; `ActionBarOverlayLayout$LayoutParams` cast is resolved; next trace points to missing `View.computeSystemWindowInsets`; AppCompat theme warnings and the documented logger cast remain. Tree still zero-height; output `/home/user/recovery/primftpd-after-layoutparams-release-{stdout.json,stderr.log}` and PNG `/home/user/recovery/primftpd-after-layoutparams.png`.
+3. `functions.bash` — located existing WindowInsets host behavior.
+4. `functions.read_file` — inspected modeled WindowInsets methods (zero insets; consume methods currently identity).
+5. `functions.read_file` — inspected the View-host dispatch boundary in `view_layout.rs`.
+6. `functions.web_search` — official Android View docs describe `computeSystemWindowInsets` as splitting local/propagated insets; official AOSP source result shows the default copies system insets into `outLocalInsets` and returns consumed insets unless optional-fit/system-UI conditions apply.
+7. `functions.web_search` — searched AOSP `View.java` implementation and corroborated the default branch.
+8. `functions.bash` — located graphics Rect support and WindowInsets references.
+9. `functions.read_file` — inspected graphics Rect intrinsic dispatch.
+10. `functions.bash` — located `rect_method`.
+11. `functions.read_file` — inspected Rect field storage and mutation behavior.
+12. `functions.edit_file` — added inherited `View.computeSystemWindowInsets` handling to the View layout host; fills local Rect with current modeled zero insets and calls the modeled `WindowInsets.consumeSystemWindowInsets`.
+13. `functions.edit_file` — added a regression asserting return value and all four local inset fields.
+14. `functions.bash` — formatted and ran `cargo test -p rd-vm --test android_inherited_dispatch --test app_xml --locked`; **54 passed, 0 failed** (32 inherited-dispatch, 22 app-XML), including all three recent regressions.
+- No GitHub actions, commit, push, or CI run occurred.
+
+### External sources consulted
+- `https://developer.android.com/reference/android/view/View#computeSystemWindowInsets(android.view.WindowInsets,android.graphics.Rect)` — official API description of local versus propagated insets.
+- `https://android.googlesource.com/platform/frameworks/base/+/8ff5bb09c783b14cff187a4549734ec8e75983ba%5E2..8ff5bb09c783b14cff187a4549734ec8e75983ba/` — AOSP default implementation behavior (copy system insets into the out Rect, consume/return the WindowInsets by default).
+- `https://android.googlesource.com/platform/frameworks/base/+/master/core/java/android/view/WindowInsets.java` — current WindowInsets implementation reference.
+
+### Active blocker / next action
+- Rebuild release `rd-cli` and rerun the Primftpd screenshot golden to identify the next blocker. The currently modeled WindowInsets are zero, so nonzero real-window inset behavior remains outside this regression; M7 still requires a valid first frame and non-phone gates.
+
+## 2026-10-21 — root WindowInsets dispatch added after AppCompat DEX trace
+
+### Assistant progress update
+- “The inflater now chooses AppCompat’s real nested `ActionBarOverlayLayout.LayoutParams`; its regression and the earlier measurement regression pass. The golden run then reached a different unresolved inherited call, `View.computeSystemWindowInsets`, from AppCompat’s decor-fit logic. I’ve added a default for the VM’s current zero-inset model and a test; both focused suites are green (54/54). I’m rebuilding and rerunning the screenshot now. The actual frame and M7 are still not verified.”
+
+### Tool-call ledger since the previous worklog update
+1. `functions.bash` — rebuilt release `rd-cli` after the computeSystemWindowInsets change.
+2. `functions.bash` — reran Primftpd screenshot golden; computeSystemWindowInsets now dispatches, next missing method is `View.getRootWindowInsets()` from `WindowInsetsCompat.toWindowInsetsCompat`. Root remains zero-height; AppCompat theme and LoggerContext/ClassCastException diagnostics remain. Output `/home/user/recovery/primftpd-after-insets-release-{stdout.json,stderr.log}` and PNG `/home/user/recovery/primftpd-after-insets.png`.
+3. `functions.bash` — checked `rd dex disasm` usage.
+4. `functions.bash` — disassembled `ViewCompat$Api21Impl.computeSystemWindowInsets` and `ActionBarOverlayLayout.decorFitsSystemWindows`; confirmed the DEX method converts platform insets and invokes View.computeSystemWindowInsets.
+5. `functions.bash` — disassembled `WindowInsetsCompat` and located its `(WindowInsets, View)` conversion calling `ViewCompat.getRootWindowInsets`.
+6. `functions.read_file` — inspected that smali path; it checks `isAttachedToWindow`, then fetches root insets and root view bounds.
+7. `functions.bash` — disassembled `ViewCompat.getRootWindowInsets`.
+8. `functions.bash` — disassembled `ViewCompat$Api23Impl.getRootWindowInsets`; it calls `View.getRootWindowInsets` and wraps non-null results.
+9. `functions.read_file` — inspected attach-state model (`attached_views`, root-view traversal, and isAttachedToWindow).
+10. `functions.edit_file` — added `View.getRootWindowInsets`: null when detached, stable empty host `WindowInsets` while attached.
+11. `functions.edit_file` — added a detached-root-insets assertion to the ViewInsets regression.
+12. `functions.bash` — checked activity content attachment flow and `ensure_window` path.
+13. `functions.read_file` — inspected `set_content_view`/window setup behavior.
+14. `functions.bash` — ran format and focused tests; **54 passed, 0 failed** across `android_inherited_dispatch` and `app_xml`.
+- No GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rebuild release `rd-cli` and rerun the screenshot golden after adding `getRootWindowInsets`. Confirm whether AppCompat advances to measurement/layout or reports another method gap. Theme warnings remain separate; M7 is still unverified.
+
+## 2026-10-21 — Java Objects.equals follow-up in AppCompat onMeasure
+
+### Progress note
+- The release rerun passed the two newly added View insets calls and exposed `NOT_IMPLEMENTED` for `java.util.Objects.equals(Object,Object)` from `ActionBarOverlayLayout.onMeasure`. Added standard null/identity handling and dynamic guest `equals` dispatch, plus a regression using a DEX `equals` override. Focused tests now pass 55/55; this change has not yet been included in a fresh release golden.
+
+### Tool-call ledger since the previous worklog update
+1. `functions.bash` — rebuilt release `rd-cli` with `getRootWindowInsets` support.
+2. `functions.bash` — reran screenshot golden; `getRootWindowInsets` resolves and the next blocker is `NOT_IMPLEMENTED` `java.util.Objects.equals(Object,Object)Z` from `ActionBarOverlayLayout.onMeasure`. AppCompat theme warnings and separate LoggerContext/ClassCastException persist; tree has 22 zero-sized entries. Output `/home/user/recovery/primftpd-after-root-insets-release-{stdout.json,stderr.log}` and PNG `/home/user/recovery/primftpd-after-root-insets.png`.
+3. `functions.bash` — searched Java collection/object equality handlers; no `java.util.Objects` static implementation existed.
+4. `functions.bash` — located static intrinsic dispatcher and existing equality helpers.
+5. `functions.read_file` — inspected `Collections` static intrinsics (not an appropriate owner for Objects.equals).
+6. `functions.bash` — located `intrinsics::values_equal` and instance equals handlers.
+7. `functions.read_file` — inspected equality helper semantics; it does not dynamically dispatch guest overrides.
+8. `functions.edit_file` — implemented `Objects.equals` null/identity behavior plus guest virtual `equals` dispatch in the central static intrinsic path.
+9. `functions.bash` — located the adjacent inherited-dispatch test insertion point.
+10. `functions.edit_file` — added a DEX regression covering guest `equals`, null/null, and null/object.
+11. `functions.bash` — formatted and ran `cargo test -p rd-vm --test android_inherited_dispatch --test app_xml --locked`; **55 passed, 0 failed** (33 inherited-dispatch, 22 app-XML).
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rebuild release `rd-cli` and rerun the Primftpd screenshot to see whether AppCompat completes `onMeasure` and the screen receives nonzero bounds. Theme warnings are still separate; M7 is not verified.
+
+## 2026-10-21 — child WindowInsets dispatch added
+
+### Assistant progress update
+- “The inset calls now pass; the latest release trace moved again, this time to an unimplemented `java.util.Objects.equals` inside AppCompat’s `onMeasure`. I added the standard null/identity rules plus dynamic dispatch to a guest `equals` override, with a DEX regression; the two focused suites pass 55/55. I’ll rebuild and rerun the golden before treating that blocker as cleared. The frame is still invalid, and I’m keeping M7 open.”
+
+### Tool-call ledger since the previous worklog update
+1. `functions.bash` — rebuilt release `rd-cli` after adding Objects.equals.
+2. `functions.bash` — reran Primftpd screenshot golden; Objects.equals now dispatches; next failure is missing `View.dispatchApplyWindowInsets(WindowInsets)`, called on AppCompat `ContentFrameLayout` from `ActionBarOverlayLayout.onMeasure`. Root/tree remains zero-height; AppCompat theme warnings and LoggerContext/ClassCastException remain. Output `/home/user/recovery/primftpd-after-objects-equals-release-{stdout.json,stderr.log}` and PNG `/home/user/recovery/primftpd-after-objects-equals.png`.
+3. `functions.bash` — searched ViewInsets dispatch implementations and disassembled ContentFrameLayout and ActionBarOverlayLayout; ContentFrameLayout does not declare the missing method and ActionBar calls through ViewCompat.
+4. `functions.read_file` — inspected `view_props::NOOP_ACTIONS`; dispatchApplyWindowInsets is listed, but the no-op does not provide the required WindowInsets return.
+5. `functions.bash` — located static/instance intrinsic dispatch and equality paths.
+6. `functions.read_file` — inspected the intrinsic entry and inherited platform fallback.
+7. `functions.read_file` — checked the later dispatch order; View layout intrinsic runs before generic view-property fallback.
+8. `functions.edit_file` — added `View.dispatchApplyWindowInsets` → virtual `onApplyWindowInsets` behavior and identity default for `onApplyWindowInsets`.
+9. `functions.read_file` — inspected the ViewInsets regression insertion point.
+10. `functions.edit_file` — extended the ViewInsets regression to verify `dispatchApplyWindowInsets` returns the input insets.
+11. `functions.bash` — formatted and ran `cargo test -p rd-vm --test android_inherited_dispatch --test app_xml --locked`; **55 passed, 0 failed** (33 inherited-dispatch, 22 app-XML).
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rebuild release `rd-cli` and rerun the screenshot golden. The missing `dispatchApplyWindowInsets` method is now covered by a host default and regression but not yet confirmed in the release run. M7 remains unverified.
+
+## 2026-10-21 — suggested View minimum dimensions support
+
+### Assistant progress update
+- “`Objects.equals` is now clear in the release trace. AppCompat next calls `View.dispatchApplyWindowInsets` on its content frame; I’ve added a return-preserving dispatch to `onApplyWindowInsets` and a focused regression (55/55 tests green). I’ll confirm this through a fresh release screenshot; the root is still zero-height, and I have not marked the golden or M7 complete.”
+
+### Tool-call ledger since the previous worklog update
+1. `functions.bash` — rebuilt release `rd-cli` with dispatchApplyWindowInsets support.
+2. `functions.bash` — reran Primftpd screenshot; dispatchApplyWindowInsets resolves; next missing method is `ActionBarOverlayLayout.getSuggestedMinimumHeight()I` in `onMeasure`. Tree remains zero-height; theme and logger diagnostics persist. Output `/home/user/recovery/primftpd-after-dispatch-insets-release-{stdout.json,stderr.log}` and PNG `/home/user/recovery/primftpd-after-dispatch-insets.png`.
+3. `functions.bash` — searched existing suggested-minimum and background handling; no View suggested-minimum method existed.
+4. `functions.read_file` — inspected `View.getBackground`/`setBackground` host storage (`view:background`).
+5. `functions.read_file` — inspected current minimum-dimensions regression.
+6. `functions.bash` — located the minimum-dimensions test.
+7. `functions.read_file` — reviewed the assertions to extend.
+8. `functions.edit_file` — added a helper computing suggested minimum as max(view minimum, drawable minimum).
+9. `functions.edit_file` — registered View `getSuggestedMinimumWidth/Height` host methods.
+10. `functions.edit_file` — extended the test for zero defaults and explicit minimum dimensions.
+11. `functions.edit_file` — extended the test to assert suggested dimensions reflect explicit minima.
+12. `functions.bash` — formatted and ran `cargo test -p rd-vm --test android_inherited_dispatch --test app_xml --locked`; **55 passed, 0 failed**.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rebuild release `rd-cli` and rerun Primftpd screenshot golden. Confirm suggested-minimum handling, then continue through any remaining measurement/layout gaps. M7 remains unverified.
+
+## 2026-10-21 — ViewGroup.addView now supplies LayoutParams when omitted
+
+### Progress note
+- The release run passed suggested-minimum measurement and established the root height at `720x1440`, but `ActionBarOverlayLayout.onLayout` then threw while reading `leftMargin` from a null LayoutParams. APK disassembly shows its constructor calls `addView(NoSystemUiLayoutFlagView)` without params and its DEX override of `generateDefaultLayoutParams()` returns `ActionBarOverlayLayout$LayoutParams`. Added default-param generation in `add_child`, explicit-param preservation in addView dispatch, and a DEX regression. Focused tests pass 56/56; screenshot not rerun yet.
+
+### Tool-call ledger since the previous worklog update
+1. `functions.bash` — rebuilt release `rd-cli` after suggested-minimum support.
+2. `functions.bash` — reran the Primftpd screenshot; `getSuggestedMinimumHeight` resolved and the decor root now measures `720x1440`. `onLayout` fails with NPE reading `leftMargin` from null; 22 tree entries remain zero-sized. AppCompat theme warnings and LoggerContext/ClassCastException persist. Output `/home/user/recovery/primftpd-after-suggested-min-release-{stdout.json,stderr.log}` and PNG `/home/user/recovery/primftpd-after-suggested-min.png`.
+3. `functions.bash` — disassembled `ActionBarOverlayLayout.onLayout`, bridge and concrete `generateDefaultLayoutParams`, constructor, and related layout-param references; confirmed constructor's `addView(child)` path and DEX factory returning nested params.
+4. `functions.bash` — located addView dispatch and `add_child` implementation.
+5. `functions.read_file` — inspected the ViewGroup addView match.
+6. `functions.read_file` — inspected `attach_child` and `add_child` behavior; no default params were generated.
+7. `functions.edit_file` — added default LayoutParams generation before child attachment and a helper to recognize explicit LayoutParams arguments.
+8. `functions.edit_file` — updated addView host dispatch to store explicit params before attachment.
+9. `functions.edit_file` — added a DEX regression covering omitted and explicit params.
+10. `functions.bash` — formatted and ran `cargo test -p rd-vm --test android_inherited_dispatch --test app_xml --locked`; **56 passed, 0 failed** (34 inherited-dispatch, 22 app-XML).
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rebuild release `rd-cli` and rerun the screenshot. Verify ActionBarOverlayLayout's constructor-created child receives its DEX-generated params and proceeds through `onLayout`; M7 remains unverified until the frame is valid and remaining non-phone gates are evidenced.
+
+## 2026-10-21 — ViewPager overscroll API blocker
+
+### Assistant progress update
+- “The latest release pass now gets the decor root to the full 720×1440 size; measurement is no longer the blocker. Layout then failed because AppCompat’s constructor adds its special view without explicit params, and our `addView` host path had not called the parent’s `generateDefaultLayoutParams`. I’ve added that default/explicit-param handling, confirmed by 56/56 focused tests, and am rerunning the release screenshot. The screen is not yet validated; M7 stays open.”
+
+### Tool-call ledger since the previous worklog update
+1. `functions.bash` — rebuilt release `rd-cli` after adding default/explicit LayoutParams handling.
+2. `functions.bash` — reran Primftpd screenshot; the onLayout null-params failure is gone. New failure is inherited `ViewPager.getOverScrollMode()I` during `ViewPager.draw`; `ActionBarOverlayLayout` and `ContentFrameLayout` are full `720x1440`, while the inner CoordinatorLayout/ViewPager/AppBar/TabLayout bounds remain zero. AppCompat theme and LoggerContext/ClassCastException diagnostics remain. Output `/home/user/recovery/primftpd-after-default-layoutparams-release-{stdout.json,stderr.log}` and PNG `/home/user/recovery/primftpd-after-default-layoutparams.png`.
+3. `functions.bash` — checked overscroll methods/defaults and captured the draw stack; no View overscroll host implementation existed.
+4. `functions.read_file` — visually inspected the PNG; it still shows the tab row and a blank body (unsupported glyphs remain).
+5. `functions.edit_file` — added View over-scroll mode getter/setter with Android default `OVER_SCROLL_IF_CONTENT_SCROLLS` (1) and range validation.
+6. `functions.edit_file` — added a round-trip/default regression.
+7. `functions.bash` — first format/test attempt stopped on a malformed delimiter in the new match arm; no tests ran.
+8. `functions.read_file` — inspected and located the stray brace in `framework.rs`.
+9. `functions.edit_file` — corrected the delimiter.
+10. `functions.bash` — reran format and focused test targets; **57 passed, 0 failed** (35 inherited-dispatch, 22 app-XML).
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Rebuild release `rd-cli` and rerun the screenshot to verify `getOverScrollMode`; investigate subsequent draw/layout gaps, including why inner content remains zero-sized. M7 remains unverified.
+
+## 2026-10-21 — no exception, but nested containers still measure to zero
+
+### Progress note
+- The release run now has no draw-pass exception after the overscroll fix, but the screenshot is blank white and the UI tree still has zero-sized CoordinatorLayout/ViewPager/AppBar/TabLayout nodes. DEX inspection shows `ContentFrameLayout.onMeasure` delegates to native `FrameLayout.onMeasure`, `AppBarLayout.onMeasure` delegates to native `LinearLayout.onMeasure`, and `TabLayout.onMeasure` delegates to native `HorizontalScrollView.onMeasure`. The current host fallback only sets default View dimensions and does not measure/layout container children. This is the likely nested-layout gap; confirm via implementation/tests and another release golden.
+
+### Tool-call ledger since the previous worklog update
+1. `functions.bash` — rebuilt release `rd-cli` after the overscroll implementation.
+2. `functions.bash` — reran Primftpd screenshot; no draw-pass error remains, but inner content stays zero-sized. Theme warnings and logger diagnostics remain. Output `/home/user/recovery/primftpd-after-overscroll-release-{stdout.json,stderr.log}` and PNG `/home/user/recovery/primftpd-after-overscroll.png`.
+3. `functions.read_file` — inspected the PNG; it is a blank white frame.
+4. `functions.bash` — disassembled onMeasure for ContentFrameLayout, CoordinatorLayout, ViewPager, AppBarLayout, TabLayout, and ActionBarContainer; observed FrameLayout/LinearLayout/HorizontalScrollView superclass measurement paths.
+5. `functions.bash` — saved each measurement method's smali under `/home/user/recovery/*-onMeasure.smali` and located child-measure/setMeasuredDimension calls.
+6. `multi_tool_use.parallel` — attempted to read saved smali using incorrect generated paths; all four reads failed (no code change).
+7. `functions.bash` — listed the correct saved-smali filenames.
+8. `multi_tool_use.parallel` — read CoordinatorLayout, ViewPager, AppBarLayout, and ContentFrameLayout onMeasure bytecode; confirmed CoordinatorLayout resolves size from child measurements and that platform container super methods are required.
+9. `functions.bash` — checked current `onMeasure` host fallback and ViewPager getDefaultSize implementation.
+10. `functions.read_file` — inspected generic `view_props` onMeasure fallback (it only sets dimensions; it does not measure children).
+11. `functions.read_file` — inspected `view_layout::layout`; it invokes DEX onLayout but has no platform container fallback when no DEX override exists.
+12. `functions.read_file` — inspected the legacy host `layout_depth`; it intentionally does not override DEX-managed subtree frames.
+- No external searches, GitHub actions, commit, push, or CI run occurred.
+
+### Active blocker / next action
+- Implement native FrameLayout measurement/layout and LinearLayout measurement/layout (plus the needed scroll-container measurement fallback) so AppCompat/Material superclass calls propagate dimensions and positions. Add focused regressions, rerun focused tests, rebuild release, and inspect the screenshot/tree again. M7 remains unverified.
+
+## 2026-10-21 — native container layout advanced; release trace still finds AndroidX gaps
+
+### Progress and ETA update
+- Implemented host fallbacks for native `FrameLayout`/`LinearLayout` measurement and child layout, FrameLayout-like `HorizontalScrollView`/`ScrollView` paths, and inherited `View.onMeasure`/`onLayout` defaults. Added tests for FrameLayout margins/padding, vertical LinearLayout stacking, inherited `ViewGroup.getChildMeasureSpec`, `Gravity.getAbsoluteGravity`, and `TypedValue.applyDimension`.
+- The focused suites currently pass **62/62** (40 inherited-dispatch + 22 app-XML); `cargo build --release -p rd-cli --locked` succeeds.
+- Primftpd golden tracing has advanced through three consecutive platform helpers (`getChildMeasureSpec`, `Gravity.getAbsoluteGravity`, `TypedValue.applyDimension`). The latest release run exits 0 but its draw pass fails at `AppBarLayout.getFitsSystemWindows()Z`; the tree still has 11 zero-sized entries. Latest artifacts: `/home/user/recovery/primftpd-after-typed-value.png` and `/home/user/recovery/primftpd-after-typed-value-release-{stdout.json,stderr.log}`. This is not a valid golden; M7 remains open.
+- ETA is necessarily uncertain while each release run exposes the next missing platform behavior: roughly **30–90 minutes** for the current golden/debug cycle and **1–3 hours** for a broader non-phone technical pass, assuming no major new subsystem gap. M9 human sign-off is not under this implementation ETA; M1's 24-hour fuzz campaign remains deferred/not passed as agreed. Phone testing is excluded; M10–M12 remain future roadmap phases.
+
+### Tool-call ledger since the previous worklog update
+1. `functions.read_file` — inspected HostObj::View visibility/orientation fields needed by the container fallback.
+2. `functions.edit_file` — added FrameLayout/LinearLayout child measurement and layout helpers, measured-dimension resolution, margins/padding, visibility handling, and simple gravity placement.
+3. `functions.read_file` — inspected existing framework ViewGroup dispatch before adding the host callbacks.
+4. `functions.bash` — located current onMeasure/onLayout dispatch sites and framework class constants.
+5. `functions.edit_file` — registered FrameLayout, LinearLayout, HorizontalScrollView, and ScrollView host onMeasure/onLayout paths.
+6. `functions.read_file` — first inspected an unrelated scroller region while locating view layout dispatch (no change).
+7. `functions.bash` — found `view_layout::layout` and `onLayout` call-site lines.
+8. `functions.read_file` — confirmed the guest onLayout signature is `(ZIIII)V` and child frames are parent-relative.
+9. `functions.read_file` — inspected `view_layout::measure`; its missing-DEX fallback had directly copied MeasureSpec sizes.
+10. `functions.edit_file` — changed missing-DEX onMeasure dispatch to call the host implementation before default View behavior.
+11. `functions.edit_file` — changed missing-DEX onLayout dispatch to call native host container behavior.
+12. `functions.read_file` — checked the existing `measure_child_with_margins` signature and LayoutParams requirements.
+13. `functions.bash` — inspected classpath subtype/ancestor lookup while diagnosing the first test failure.
+14. `functions.read_file` — inspected `Engine::invoke_instance` host fallback.
+15. `functions.bash` — confirmed inherited Android host traversal through custom subclasses.
+16. `functions.read_file` — inspected `interp::inherited_android_host` and its platform-ancestor order.
+17. `functions.edit_file` — an insertion attempt for generic View callbacks missed the formatted match context; no change.
+18. `functions.read_file` — inspected the exact formatted framework dispatch context.
+19. `functions.edit_file` — added platform `View.onMeasure` default-size handling and no-op `View.onLayout` for subclasses without DEX overrides.
+20. `functions.bash` — formatted and ran focused tests; first attempt had 1 failure because a custom AppCompat button's inherited onLayout did not resolve.
+21. `functions.read_file` — one mistaken path read (`crates/rd-vm/crates/notexist`) failed; then inspected `view_props::fallback` to understand why custom runtime names bypassed that default.
+22. `functions.edit_file` — added FrameLayout-with-margins/padding and vertical LinearLayout measurement/layout regressions.
+23. `functions.bash` — ran the two new container tests individually; both passed.
+24. `functions.bash` — ran focused suites; **59/59 passed**.
+25. `functions.read_file` — reviewed the worklog tail for current release command/history.
+26. `functions.bash` — inspected prior Primftpd JSON/stderr and CLI help; reconstructed the release `rd app run --script "shot …"` invocation.
+27. `functions.bash` — inspected the golden VM helper script (not the Primftpd runner; no change).
+28. `functions.bash` — built release `rd-cli` and ran Primftpd after container changes; exit 0, draw now reaches missing static `Toolbar.getChildMeasureSpec(III)I`; 11 zero-sized entries remain. Artifacts `/home/user/recovery/primftpd-after-containers-{stdout.json,stderr.log}` and PNG.
+29. `functions.bash` — located static dispatch, current child-measure logic, and `ClassPath::is_subtype`.
+30. `functions.edit_file` — made the shared Android child MeasureSpec helper crate-visible.
+31. `functions.edit_file` — added inherited static `ViewGroup.getChildMeasureSpec` handling for DEX method-ref owners such as Toolbar.
+32. `functions.edit_file` — added fixed/match/wrap/unspecified MeasureSpec regression cases.
+33. `functions.bash` — formatted and ran the new static helper test; passed.
+34. `functions.bash` — ran focused suites (**60/60**) and rebuilt release `rd-cli`; both passed.
+35. `functions.bash` — reran Primftpd; `getChildMeasureSpec` resolves, next draw-pass failure is static `Gravity.getAbsoluteGravity(II)I`; zero-sized entries remain. Artifacts `/home/user/recovery/primftpd-after-containers-2-release-{stdout.json,stderr.log}` and PNG.
+36. Assistant progress update — reported 60/60 tests, the new Gravity blocker, and that M7 remains open.
+37. `functions.edit_file` — implemented START/END-to-LEFT/RIGHT resolution in `Gravity.getAbsoluteGravity` for LTR/RTL.
+38. `functions.bash` — searched for existing Gravity helper tests; none found.
+39. `functions.edit_file` — added LTR/RTL Gravity regression cases.
+40. `functions.bash` — formatted, ran Gravity regression, and reran focused suites; **61/61 passed**.
+41. `functions.bash` — rebuilt release and reran Primftpd; Gravity resolves; next draw-pass failure is `TypedValue.applyDimension(IFLDisplayMetrics;)F`. Tree remains invalid. Artifacts `/home/user/recovery/primftpd-after-gravity-release-{stdout.json,stderr.log}` and PNG.
+42. `functions.bash` — searched for DisplayMetrics/TypedValue implementation and use sites.
+43. `functions.read_file` — inspected the device profile and metrics (280 dpi, density/scaledDensity, xdpi).
+44. `functions.read_file` — inspected DisplayMetrics initialization and current Android resource static dispatch.
+45. `functions.bash` — confirmed `Value::as_float` is available for the helper.
+46. `functions.edit_file` — implemented `TypedValue.applyDimension` for px/dp/sp/pt/in/mm using DisplayMetrics.
+47. `functions.edit_file` — added conversion regressions for all units and an unknown unit.
+48. `functions.bash` — formatted and ran the targeted dimension-conversion test; passed.
+49. `functions.bash` — ran focused suites (**62/62 passed**) and rebuilt release `rd-cli`; both passed.
+50. `functions.bash` — reran Primftpd; `applyDimension` resolves; latest draw-pass error is inherited `AppBarLayout.getFitsSystemWindows()Z`. Process exit 0 is not a valid-golden signal; tree still has 11 zero-sized entries. Artifacts `/home/user/recovery/primftpd-after-typed-value-release-{stdout.json,stderr.log}` and PNG `/home/user/recovery/primftpd-after-typed-value.png`.
+51. User message — requested a progress update, time estimate, worklog update, and continuation.
+52. Assistant progress update — reported 62/62 focused tests, release-build success, latest `getFitsSystemWindows` blocker, and an uncertain 30–90 minute golden / 1–3 hour broader technical ETA.
+- No web search/fetch, GitHub action, commit, push, or CI run occurred in this interval.
+
+### Active blocker / next action
+- Implement/test `View.getFitsSystemWindows()` (and its setter if the DEX trace requires it), rebuild, rerun the release golden, then inspect the actual image and complete post-frame tree. Continue through newly surfaced non-phone gaps. M7 is still unverified.
+
+---
+Task: Continue non-phone pendency resolution — Primftpd golden draw pass (2026-10-21)
+
+Work Log:
+- User continuation asked for a classpath regression covering the new built-in `ListIterator <: Iterator` interface edge; added it to `host_collections_subtype_their_interfaces`.
+- Formatted and validated the hierarchy assertion (1/1 targeted unit test), reran the inherited-dispatch and app-XML suites (**43/43 + 22/22**), and rebuilt release `rd-cli` successfully.
+- Release Primftpd run cleared the Kotlin `EmptyIterator` cast and advanced measurement: decor/content/coordinator are 720×1440; AppBarLayout and TabLayout are 720×84. Draw then failed on inherited `Gravity.apply(IIILRect;LRect;I)V`; screenshot/tree remain diagnostic, not a valid M7 golden.
+- Added an Android-compatible `Gravity.apply` host intrinsic (relative START/END resolution, fill/center/edge placement) and LTR/RTL/fill regressions. Targeted test passed; full focused suites then passed **44/44 + 22/22**, and release build succeeded.
+- Next Primftpd release run cleared `Gravity.apply`; it now fails on inherited `AppBarLayout.getForeground()Drawable`. Latest tree has six zero-sized entries. Assistant progress update reported **66/66** tests at that checkpoint, release build success, the current getter gap, and an approximate 20–60 minute technical golden ETA.
+- Traced the getter gap: `getForeground` was already a nullable default in `view_props`, but inherited dispatch for DEX-owned AndroidX method refs did not reach that generic Android View fallback. Added the fallback at Android ancestors in `inherited_android_host` and a custom DEX subclass regression. The new targeted regression passes (1/1). This latest interpreter edit has **not** yet had a full focused-suite run, release rebuild, or Primftpd rerun.
+- No phone testing, M1 24-hour fuzz run, M9 human review, or M10–M12 roadmap work was attempted. M7 remains open until a valid frame is captured and checked; fuzz stays deferred/not passed.
+
+Tool-call ledger since the previous worklog update:
+1. `functions.edit_file` — added the `ListIterator`-to-`Iterator` subtype assertion.
+2. `functions.bash` — formatted and ran the subtype regression plus inherited-dispatch/app-XML suites; targeted hierarchy test and 43/43 + 22/22 passed.
+3. `functions.bash` — built release `rd-cli`; passed.
+4. `functions.bash` — reran release Primftpd with callback tracing; hierarchy/callbacks resolved, next failure was `Gravity.apply`; wrote diagnostic JSON/log/PNG under `/home/user/recovery/`.
+5. `functions.edit_file` — extracted Gravity relative-direction resolution helper.
+6. `functions.read_file` — inspected the static intrinsic dispatch region.
+7. `functions.edit_file` — implemented the six-argument `Gravity.apply` intrinsic.
+8. `functions.read_file` — checked `view_layout.rs` imports (`ObjRef`/`VmExit` already available).
+9. `functions.bash` — located the Gravity regression insertion point.
+10. `functions.read_file` — inspected neighboring Gravity test code.
+11. `functions.edit_file` — added LTR, RTL, and FILL `Gravity.apply` regression cases.
+12. `functions.bash` — formatted and ran the new Gravity test; passed.
+13. `functions.bash` — reran focused suites (**44/44 + 22/22**) and rebuilt release CLI; both passed.
+14. `functions.bash` — reran Primftpd; Gravity resolved, draw now fails on inherited `getForeground`; six zero-sized entries remain. Wrote `primftpd-after-gravity-apply` diagnostics under `/home/user/recovery/`.
+15. Assistant progress update — reported the improved measured tree, current `getForeground` blocker, no valid golden, and ETA.
+16. `functions.bash` — searched for foreground handling in `rd-vm`.
+17. `functions.read_file` — inspected `view_props.rs`; confirmed `getForeground` is in its nullable-default list.
+18. `functions.bash` — located both interpreter/engine generic property fallback call sites.
+19. `functions.read_file` — inspected the DEX `invoke` fallback path.
+20. `functions.read_file` — inspected `Engine::invoke_instance` host fallback.
+21. `functions.read_file` — inspected the remainder of `inherited_android_host` superclass traversal.
+22. `functions.bash` — confirmed foreground getters are absent from `platform_base`/framework handlers.
+23. `functions.edit_file` — routed generic View property fallback through Android ancestors in `inherited_android_host`.
+24. `functions.edit_file` — added a regression for nullable `getForeground()` on a custom DEX EditText subclass.
+25. `functions.bash` — formatted and ran that targeted regression; passed (1/1).
+26. `functions.read_file` — inspected the worklog before appending this entry.
+27. `functions.read_file` — inspected the prior worklog tail and active blocker.
+- No web search/fetch, GitHub action, commit, push, or CI run occurred in this interval.
+
+### Active blocker / next action
+- Run format/focused tests after the inherited property-fallback change, rebuild release `rd-cli`, then rerun Primftpd and inspect whether a screenshot is actually rendered and the remaining views have meaningful bounds. Continue fixing newly exposed non-phone gaps. Do not mark M7 or all non-phone pendencies complete until evidence supports it.
+
+---
+Task: Non-phone pendency pass — M7 golden and user-approved M9 review (2026-10-21)
+
+Status update / user messages:
+- User reviewed the full M9 package and explicitly approved it; M9 human review is removed from the active pendency list as of this message. Older worklog notes that M9 review was outstanding are historical and superseded by this approval.
+- Assistant progress update: M7's Primftpd golden remains open. Before the latest fragment-transaction dispatch change, the focused suites passed 47/47 inherited-dispatch and 22/22 app-XML tests (69/69); the M8 fallback regression passed 1/1. Letting APK-supplied AndroidX transaction methods run now reaches `FragmentTransaction.doAddOp`, which fails on unresolved `java.lang.Class.getModifiers()`. Added a candidate intrinsic and unit regression; these latest edits are **not yet formatted/tested/rebuilt**.
+- Current ETA: about 30–90 minutes for the next technical golden/debug cycle, 1–3 hours for the broader non-phone M7 gate; uncertain because real fragment lifecycle/view creation can expose more missing behavior. No valid golden has been captured. Physical-phone testing remains excluded; M1's 24-hour fuzz campaign remains deferred/not passed; M10–M12 remain future roadmap phases.
+
+Work Log:
+- Corrected inherited Android dispatch ordering: deferred generic View-property fallback until concrete Android host handlers had all run. The first focused run caught regressions in `setId`/DEX override behavior; after deferring the fallback, the full focused suites passed.
+- Implemented `View.willNotDraw()` with ViewGroup-vs-View defaults and stored `setWillNotDraw` state. Android documentation search confirmed the public default distinction. Primftpd's draw pass then completed, but the screenshot was uniformly white.
+- Inspected the CLI/agent screenshot pipeline and reproduced that `draw_frame()` filled an opaque white framebuffer over the host-rendered snapshot. Removed the full-screen fill, documented the VM frame as a transparent overlay, and extended the M4 screenshot regression to run the draw pass before checking host pixels. The regression failed before the fix (Button pixel became white) and passed after it.
+- Primftpd screenshot now shows the tab strip, with real host text rasterized (unavailable emoji render as replacement glyphs); content area was still empty. Trace showed `ViewPager.populate()` is gated by inherited `getWindowToken()` and that AndroidX-owned method references did not reach `view_attach` host behavior. Added inherited attach-state dispatch plus an attached custom DEX View regression; it passes. Primftpd now calls `FragmentPagerAdapter.instantiateItem()` and `MainAdapter.getItem()` for `PftpdFragment` and `QrFragment`.
+- Found that the M8 AndroidX transaction shim stores fragment references but does not execute real FragmentManager lifecycle/view creation. Changed the shim to defer to APK DEX implementations when the requested FragmentManager/FragmentTransaction method exists, while preserving the host fallback for synthetic fixtures. The existing `m8_androidx_fragments` regression passes (1/1).
+- Release Primftpd then advanced into the real `BackStackRecord.doAddOp` and failed at `Class.getModifiers()`. Added `Class.getModifiers()` from DEX class access flags (masking `ACC_SUPER`) and a focused class-introspection regression. **Next actions:** format/run the new regression and full focused suites, rebuild release, rerun Primftpd, then continue through any newly surfaced fragment lifecycle/view gaps and inspect the resulting screenshot.
+- No commit, push, CI run, physical-phone test, or 24-hour fuzz campaign occurred in this interval.
+
+Tool-call ledger since the previous worklog update (including inspection/search calls):
+1. `functions.bash` — ran fmt/focused suites after the inherited property fallback; 2 tests failed because generic fallback intercepted concrete `setId`/DEX override handling.
+2. `functions.edit_file` — began deferring the generic fallback and recorded the nearest Android ancestor.
+3. `functions.edit_file` — a replacement missed the formatted context; no change.
+4. `functions.read_file` — inspected the exact `inherited_android_host` block.
+5. `functions.edit_file` — removed per-ancestor generic fallback while preserving concrete M8/framework/platform dispatch.
+6. `functions.edit_file` — ran generic View fallback only after the full Android ancestor traversal.
+7. `functions.bash` — formatted and ran `android_inherited_dispatch`; 45/45 passed.
+8. `functions.bash` — reran focused suites (45/45 + 22/22) and built release CLI; passed.
+9. `functions.bash` — ran Primftpd; draw stopped at `AppBarLayout.willNotDraw()`, and the written screenshot was still diagnostically white.
+10. `functions.read_file` — inspected `view_props.rs` NULLABLE/default/property logic.
+11. `functions.web_search` — checked Android `View.willNotDraw` / `setWillNotDraw` defaults; Android API documentation distinguishes View from some ViewGroup subclasses.
+12. `functions.edit_file` — added `willNotDraw()` default handling to `view_props`.
+13. `functions.edit_file` — added ViewGroup/View default and setter regression.
+14. `functions.bash` — targeted willNotDraw regression failed because the existing framework setter was a no-op.
+15. `functions.bash` — searched `willNotDraw`/setter handlers.
+16. `functions.read_file` — inspected the framework `setWillNotDraw` branch.
+17. `functions.edit_file` — stored the setter value in `view_props` from the concrete framework handler.
+18. `functions.bash` — reran targeted willNotDraw regression; passed.
+19. `functions.bash` — reran focused suites (46/46 + 22/22) and rebuilt release; passed.
+20. `functions.bash` — reran Primftpd; no draw-pass error, root/ViewPager measured, but frame was white; wrote screenshot/log/JSON under `/home/user/recovery/`.
+21. `functions.read_file` — viewed the uniformly white Primftpd screenshot.
+22. `functions.bash` — inspected JSON tree, image dimensions, and pixel colors; confirmed one RGB color and visible TabLayout text in the tree.
+23. `functions.bash` — located draw-frame/rasterizer/screenshot pipeline call sites.
+24. `functions.read_file` — inspected `draw_frame()` and its full-screen white fill.
+25. `functions.bash` — located `record_view` and display-list helpers.
+26. `functions.read_file` — inspected `record_view()` recursion and DEX draw behavior.
+27. `functions.read_file` — inspected `rasterize_frame()` and its overlay behavior.
+28. `functions.read_file` — inspected CLI screenshot composition: render host snapshot, then rasterize VM frame over it.
+29. `functions.bash` — searched frame/rasterizer tests and `render_snapshot` call sites.
+30. `functions.read_file` — inspected the agent screenshot pipeline, which also composes host snapshot + VM overlay.
+31. `functions.read_file` — inspected the existing M4 screenshot regression.
+32. `functions.bash` — located `launch_app`/`set_content_view` integration-test examples.
+33. `functions.read_file` — inspected the minimal synthetic app test pattern.
+34. `functions.edit_file` — extended the M4 screenshot test to run and composite the VM draw pass.
+35. `functions.bash` — ran the regression before the fix; it failed as expected because the Button pixel turned white.
+36. Assistant progress update — reported the white-overlay diagnosis, pending rerun, empty ViewPager, and revised ETA.
+37. `functions.bash` — reran focused suites (46/46 + 22/22) and rebuilt release CLI; passed.
+38. `functions.bash` — reran Primftpd after transparent-overlay change; screenshot had 176 colors and visible tabs but no fragment page content; wrote diagnostic artifacts.
+39. `functions.read_file` — viewed the screenshot with tab strip and blank pager content.
+40. `functions.bash` — located the `RD_TRACE_METHOD` implementation.
+41. `functions.read_file` — inspected the method-trace pattern helper.
+42. `functions.bash` — ran Primftpd with `RD_TRACE_METHOD=Fragment` and a dump script; saved fragment trace.
+43. `functions.bash` — filtered the fragment trace for pager/fragment creation and errors.
+44. `functions.bash` — ran Primftpd with `RD_TRACE_METHOD=ViewPager`; saw `onMeasure`/`populate`/`addNewItem` calls and no page children in the tree.
+45. `functions.bash` — disassembled `ViewPager.populate`, `FragmentPagerAdapter.instantiateItem`, and related classes for gate/dispatch analysis.
+46. `functions.bash` — inspected the exact `populate(I)V` and `instantiateItem` smali blocks.
+47. `functions.bash` — searched `getWindowToken` in Primftpd DEX and host source.
+48. `functions.bash` — located `view_attach::instance_intrinsic` and its call site.
+49. `functions.read_file` — inspected view attach/token behavior and attached-view state.
+50. `functions.bash` — searched intrinsic-dispatch locations for `view_attach`.
+51. `functions.read_file` — inspected intrinsic dispatch order.
+52. `functions.read_file` — inspected interpreter invoke path and AndroidX inherited-host traversal.
+53. `functions.bash` — searched exact `getWindowToken` call/reference sites.
+54. `functions.bash` — inspected `call_instance_intrinsic_mref` declaration and View dispatch conditions.
+55. `functions.read_file` — inspected `call_instance_intrinsic_mref` parameters.
+56. `functions.bash` — located classpath `resolve_method`.
+57. `functions.read_file` — inspected DEX-only method resolution.
+58. `functions.bash` — located `view_layout::instance_intrinsic` and its View guards.
+59. `functions.read_file` — inspected `view_layout` instance intrinsic dispatch.
+60. `functions.edit_file` — added a regression to attach a custom DEX View subclass from `onCreate` and query inherited attach/token state.
+61. `functions.edit_file` — routed `view_attach` through Android ancestor fallback for DEX-owned subclass method references.
+62. `functions.bash` — targeted attach test failed because the first test tried setting content after the window had attached.
+63. `functions.read_file` — inspected `launch_app` lifecycle/attach order.
+64. `functions.read_file` — inspected `set_content_view` and child attach behavior.
+65. `functions.edit_file` — rewrote the test to set content during `onCreate` and retrieve the view afterward.
+66. `functions.bash` — targeted attach-state/token regression passed.
+67. `functions.bash` — reran focused suites (47/47 + 22/22) and release build; passed.
+68. `functions.bash` — reran Primftpd with `RD_TRACE_METHOD=ViewPager`; pager measured, but its child list remained empty.
+69. `functions.bash` — ran Primftpd with an `instantiateItem` trace pattern and `dump`; dump does not trigger the layout/populate pass.
+70. `functions.bash` — reran Primftpd with `RD_TRACE_METHOD=Fragment` plus screenshot; observed `FragmentPagerAdapter.instantiateItem()` and app `getItem()` for Pftpd/Qr; views still absent.
+71. `functions.bash` — searched the fragment trace for transaction/state-manager/view creation calls.
+72. `functions.bash` — located M8 AndroidX transaction interception and fallback functions.
+73. `functions.read_file` — inspected the M8 fragment manager/transaction interception block.
+74. `functions.bash` — located `ax_fragment_manager` and `ax_fragment_tx` implementations.
+75. `functions.read_file` — inspected the host transaction shim; it records fragment operations but does not execute real FragmentManager view lifecycle.
+76. `functions.bash` — located AndroidX fragment regression coverage.
+77. `functions.read_file` — inspected `m8_androidx_fragments` host-fallback regression.
+78. Assistant progress update — reported M9 approval was not yet known at that checkpoint, attached pager progress, current fake-fragment-transaction gap, and 69/69 focused suite status.
+79. `functions.edit_file` — changed M8 AndroidX manager/transaction shims to fall back only when the APK has no DEX method implementation.
+80. `functions.bash` — formatted and ran `m8_androidx_fragments`; passed (1/1).
+81. `functions.bash` — rebuilt release CLI after the transaction-dispatch change; passed.
+82. `functions.bash` — ran Primftpd with real DEX fragment transactions; reached `BackStackRecord.doAddOp`, then failed at `Class.getModifiers()`; no valid golden.
+83. `functions.bash` — searched for existing `Class.getModifiers` handling.
+84. `functions.read_file` — inspected `jlclass.rs` type-introspection logic.
+85. `functions.read_file` — inspected the remainder of `jlclass.rs` and existing test module.
+86. `functions.bash` — inspected FragmentTransaction `doAddOp` smali around its `Class.getModifiers()` use.
+87. `functions.edit_file` — added `Class.getModifiers()` from DEX class access flags, masking class-only flags.
+88. `functions.edit_file` — added a `getModifiers` unit regression; unverified as of this worklog update.
+89. User message — stated M9 was fully reviewed and approved, requested it be removed from the task list, and asked for progress/ETA, worklog update, and continuation.
+90. Assistant progress update — removed M9 human review from active pendencies; reported `Class.getModifiers` as current blocker, 69/69 previous focused tests, 30–90-minute debug ETA / 1–3-hour broader M7 ETA, and continued work plan.
+91. `functions.bash` — inspected the current worklog tail before appending this update.
+- No additional web fetch/search beyond the Android `willNotDraw` API search; no GitHub/commit/push/CI activity.
+
+### Active blocker / next action
+- Format and test the new `Class.getModifiers()` regression, rerun all focused suites and M8 fragment fallback tests, rebuild release, and rerun Primftpd. Inspect real fragment lifecycle, content attachment, tab widths, and screenshot after the next gap is cleared. M9 review is approved/closed; M7 remains open. Do not claim non-phone pendencies complete without a valid golden and gates.
+
+---
+Task: Non-phone pendency update — M7 Primftpd fragment/view inflation (2026-10-21)
+
+Status update:
+- M9 review is approved and closed. Updated `docs/ROADMAP.md` to remove “human review pending” and `docs/m9.md` to record the user’s approval (2026-10-21). Appendix G’s separate integration-review requirement remains unchanged; it was not part of the M9 approval.
+- M7 still has no valid golden. Fixed and verified `Class.getModifiers()` (105 rd-vm library tests passed) and inherited `Activity.getLayoutInflater()` (new regression passed; broader suites passed). Primftpd now enters real AndroidX `FragmentStateManager.createView()` and `PftpdFragment.onCreateView()`.
+- Successive non-phone runs exposed more Android XML tags used by the app: `<ScrollView>` and `<ProgressBar>` were mapped to host Views; the current run (with ProgressBar support) stops on `<RadioGroup>`. RadioGroup/RadioButton hierarchy, shorthand mappings, and a synthetic AXML regression are now added and their targeted tests pass. These newest RadioGroup changes have **not yet had a full focused-suite run, release build, or Primftpd rerun**.
+- Current ETA remains roughly 30–90 minutes for the next debug/golden cycle and 1–3 hours for the remaining non-phone M7 gate, subject to new framework gaps. Physical-phone testing excluded; 24-hour fuzz deferred/not passed; M10–M12 future. No valid M7 golden yet.
+
+Work Log:
+- The first `Class.getModifiers` unit-test attempt incorrectly used `rd_testsupport::engine_of`, creating an Engine/Value type from an external `rd-vm` crate instance and making `class_object_for` inaccessible. Reworked it to parse the synthetic DEX and construct the in-crate Engine; regression passed.
+- After `Class.getModifiers`, the real transaction committed, AndroidX attached/created `PftpdFragment`, and rendering next failed because `MainTabsActivity.getLayoutInflater()` had no host implementation. Routed Activity’s getter through the existing `LayoutInflater.from(context)` service path and added an inherited Activity regression. Focused suites and release build passed.
+- The next Primftpd run advanced through `Fragment.performCreateView` / `PftpdFragment.onCreateView` and stopped at `<ScrollView>` unmapped in `inflate::view_desc_of`. Added its shorthand mapping and a full synthetic resource-inflation regression. App-XML suite passed 23/23 and release build succeeded.
+- Next Primftpd run stopped at `<ProgressBar>`. Added a minimal platform class hierarchy and shorthand tag mapping for ProgressBar, plus AXML coverage. App-XML suite passed 23/23 and release build succeeded.
+- Next Primftpd run stopped at `<RadioGroup>`. Added platform hierarchy for RadioGroup (LinearLayout) and RadioButton (CompoundButton/TextView), plus their shorthand mappings; expanded the AXML regression to cover ScrollView + ProgressBar + RadioGroup + RadioButton. Targeted AXML and classpath regressions pass. Full suite/build/retry remain next.
+- The repeated CLI runs return exit code 0 while the diagnostic draw pass logs an error; these are not valid goldens. AppCompat theme warnings and a `ClassCastException@370b` still appear in logs; reassess their relevance once XML inflation completes.
+- Attempts to use `rd apk` failed because the CLI has no `apk` subcommand. Primftpd’s resource ZIP paths are obfuscated (flat `res/<id>.xml` entries rather than `res/layout/*.xml`), and a simple byte-regex scan did not decode the binary XML string pool. These exploratory calls changed no files. `rd dex disasm` remains the available DEX inspection command.
+- No GitHub/commit/push/CI/phone test/fuzz campaign occurred.
+
+Tool-call ledger since the prior worklog update:
+1. `functions.bash` — searched ROADMAP/M9/Appendix G for stale human-review status; found ROADMAP row and `docs/m9.md` pending text, plus a separate Appendix G review requirement.
+2. `multi_tool_use.parallel` — read M9 status header, ROADMAP status table, and M9 completion section.
+3. `functions.edit_file` — updated ROADMAP M9 row to mark review approved (2026-10-21).
+4. `functions.edit_file` — updated `docs/m9.md` to record user approval.
+5. `functions.bash` — formatted/tested new `Class.getModifiers` unit regression; compile failed due external `rd-vm` Engine/Value types from the testsupport helper.
+6. `functions.bash` — inspected Engine constructor and test-support DEX helper.
+7. `functions.bash` — confirmed `DexBuilder::finish()` is public.
+8. `functions.edit_file` — changed unit fixture to parse DEX bytes and construct the in-crate Engine.
+9. `functions.bash` — formatted and ran the `getModifiers` unit regression; passed 1/1.
+10. `functions.bash` — rd-vm library tests 105/105, inherited-dispatch 47/47, app-XML 22/22, M8 11/11; release CLI build passed.
+11. `functions.bash` — Primftpd after `getModifiers`; real state manager reached `Fragment.performCreateView` and failed on inherited `Activity.getLayoutInflater`; no golden.
+12. `functions.bash` — searched VM source for Activity/LayoutInflater handlers and checked prior fragment disassembly.
+13. `functions.read_file` — inspected `LayoutInflater.from` host service logic.
+14. `functions.bash` — inspected interpreter Android dispatch and located framework/M8/context Activity paths.
+15. `functions.read_file` — inspected interpreter inherited-Android fallback and method resolution.
+16. `multi_tool_use.parallel` — read framework host dispatch, M8 Context system-service handler, and Activity extra/query dispatch.
+17. `functions.bash` — inspected LayoutInflater static dispatch, platform constants and system-service class mapping.
+18. `functions.bash` — checked existing inherited-dispatch fixtures and located LayoutInflater integration coverage.
+19. `functions.read_file` — inspected the existing `LayoutInflater.from` test pattern.
+20. `functions.bash` — checked Activity/Context constants and view-layout dispatch entry points.
+21. `functions.edit_file` — implemented inherited `Activity.getLayoutInflater()` using the existing `LayoutInflater.from(context)` path.
+22. `functions.read_file` — inspected the inherited-dispatch test file for insertion point.
+23. `functions.edit_file` — added an Activity-subclass regression asserting a contextual LayoutInflater result.
+24. `functions.bash` — targeted inherited Activity LayoutInflater regression passed 1/1.
+25. `functions.bash` — reran rd-vm suites (105 + 48 + 22 + 11, all passed) and rebuilt release CLI successfully.
+26. `functions.bash` — Primftpd then failed on unmapped `<ScrollView>`; lifecycle/view creation now reaches `PftpdFragment.onCreateView`.
+27. `functions.bash` — searched ScrollView hierarchy and view-inflation mapping.
+28. `functions.read_file` — inspected AXML element-to-host-class map.
+29. `functions.bash` — checked inflation dispatch and host-state creation for ScrollView support.
+30. `functions.read_file` — inspected app-XML fixture helpers and main layout pattern.
+31. `functions.bash` — inspected built-in ScrollView hierarchy.
+32. `functions.bash` — checked inflation unit-test/public-function locations.
+33. `functions.read_file` — inspected public `inflate_resource` entry point.
+34. `functions.bash` — checked heap class introspection and public inflation module.
+35. `functions.edit_file` — mapped shorthand `<ScrollView>`.
+36. `functions.edit_file` — added synthetic ScrollView AXML inflation regression.
+37. `functions.bash` — targeted ScrollView test passed 1/1.
+38. `functions.bash` — app-XML suite passed 23/23; release build passed.
+39. `functions.bash` — Primftpd then stopped at `<ProgressBar>`; no valid golden.
+40. `functions.bash` — searched for ProgressBar hierarchy/host implementation.
+41. `functions.bash` — attempted `rd apk --help`; CLI rejected nonexistent `apk` subcommand.
+42. `functions.bash` — inspected `rd --help` and golden APK file listing.
+43. `functions.bash` — attempted to list `res/layout/*.xml`; no entries (APK resource names are flattened/obfuscated).
+44. `functions.bash` — listed flat `res/` ZIP entries; output was long/truncated and revealed obfuscated resource filenames.
+45. `functions.bash` — inspected built-in hierarchy and View/FrameLayout host coverage.
+46. `functions.read_file` — inspected classpath hierarchy constants and mappings.
+47. `functions.read_file` — inspected existing Android container hierarchy regression.
+48. `functions.edit_file` — added ProgressBar’s View hierarchy.
+49. `functions.edit_file` — registered ProgressBar built-in hierarchy.
+50. `functions.edit_file` — mapped shorthand `<ProgressBar>`.
+51. `functions.edit_file` — expanded AXML regression to include ProgressBar.
+52. `functions.edit_file` — asserted ProgressBar’s host class.
+53. `functions.bash` — targeted ScrollView/ProgressBar inflation regression passed 1/1.
+54. `functions.bash` — app-XML suite passed 23/23; release build passed.
+55. `functions.bash` — Primftpd then stopped at `<RadioGroup>`; host screenshot remained a failed-draw diagnostic.
+56. `functions.bash` — searched for RadioGroup/RadioButton and widget class hierarchies.
+57. `functions.bash` — checked the CLI for a resource-inspection subcommand; none exists.
+58. `functions.bash` — inspected available CLI commands and golden APK files.
+59. `functions.bash` — attempted conventional `res/layout` listing; none found.
+60. `functions.bash` — inspected flattened APK `res/` file names; no modifications.
+61. `functions.bash` — inspected built-in class hierarchy definitions and mappings for View subclasses.
+62. `functions.read_file` — inspected classpath View/container regression.
+63. `functions.edit_file` — added `CompoundButton` and `RadioButton` hierarchy.
+64. `functions.edit_file` — added `RadioGroup <: LinearLayout` hierarchy.
+65. `functions.edit_file` — registered `CompoundButton`, `RadioButton`, and `RadioGroup` built-in hierarchies.
+66. `functions.edit_file` — mapped `<RadioButton>` and `<RadioGroup>` shorthand tags.
+67. `functions.read_file` — inspected the AXML regression body.
+68. `functions.read_file` — read the relevant AXML test insertion context.
+69. `functions.edit_file` — expanded the synthetic layout with a RadioGroup containing a RadioButton.
+70. `functions.edit_file` — asserted nested host classes and parent/child shape.
+71. `functions.bash` — targeted AXML regression passed 1/1; classpath container regression passed 1/1.
+- The newest RadioGroup/RadioButton changes are only targeted-tested so far; no full-suite run or release rebuild after them.
+
+### Active blocker / next action
+- Format/run full rd-vm library + `android_inherited_dispatch` + `app_xml` + M8 suites, rebuild release, and rerun Primftpd. Current release binary includes ProgressBar but not the latest RadioGroup/RadioButton changes. Continue tracing real fragment inflation/lifecycle and do not treat zero exit status or diagnostic screenshots as golden completion. M9 review is closed; M7 remains open.
+
+---
+Task: Non-phone pendency update — Primftpd M7 continuation (2026-10-21)
+
+### Status update
+- M9 has full user approval and is removed from active pendencies. M7 remains open. Physical-phone testing is excluded; the 24-hour fuzz campaign remains deferred/not passed; M10–M12 remain future roadmap phases.
+- Since the prior worklog entry, successive release Primftpd runs advanced from `ExecutorService.awaitTermination` through `LinkMovementMethod.getInstance`, `PrintStream(OutputStream)`, `Object.equals` via `invoke-super`, `Environment.isExternalStorageManager`, and `UnderlineSpan.<init>`. Each gap received a narrow implementation and regression.
+- Most recent complete focused gate, run after the UnderlineSpan change but **before** the new TextView measurement patch: `rd-vm --lib` 105/105; `android_inherited_dispatch` 51/51; `app_xml` 24/24; `m8` 11/11; `vm_exec` 103/103; `cargo build --release -p rd-cli --locked` passed.
+- Latest release diagnostic (`/home/user/recovery/primftpd-after-underline-span-release-*`) exited 0 and logged no `draw pass failed`; clock advanced to 16 ms and ViewPager measured 720×1440. This is **not a valid golden**: the UI tree shows `quickShareInfo` at 720×1408 and following content rows at zero height/offscreen, and the PNG (`/home/user/recovery/primftpd-after-underline-span.png`) is tabs over a blank body. The tree has 87 lines. The zero exit is not acceptance evidence.
+- Root cause identified: `View.onMeasure` returns the AT_MOST bound for TextViews as if it were an intrinsic size. In a vertical layout, the first wrap-content TextView consumes nearly the whole screen. A new deterministic TextView intrinsic-size/line-count implementation and regression were added in `framework.rs` and `android_inherited_dispatch.rs`; the regression was initially written against private `Engine.view_props`, then changed to assert through public `getMeasuredHeight()`. That final version is **not yet formatted or tested**.
+- The last test attempt after that change could not start because `cargo` is no longer in the current shell PATH. `rustfmt` was also absent; searches under the usual cargo/rustup/toolchain locations found no executable. Do not treat the newest TextView change as verified. Previous focused tests and release build listed above did pass.
+- Current UI blocker: verify the TextView measurement regression, rerun focused suites and release build, rerun Primftpd, and inspect both screenshot pixels and tree bounds. Reassess the still-reported AppCompat ThemeUtils warnings, `ClassCastException@370b`, logback/LoggerContext messages, and FragmentManager StrictMode logs. Do not claim completion without valid output and all required gates.
+
+### Implementations and diagnostics since prior entry
+- `intrinsics.rs`: added `ExecutorService.awaitTermination(J,TimeUnit)Z` handling for the single-thread deterministic inline executor. A non-null TimeUnit is required; all inline work is complete after shutdown. Added open/shutdown assertions to `executors_host_inline_execution`.
+- Primftpd after that change advanced to `LinkMovementMethod.getInstance`; its ViewPager was still 0×0. Added the canonical LinkMovementMethod singleton, platform type hierarchy, and TextView movement-method storage/getter. Regression passed.
+- Next release run failed in `SampleAuthKeysFileCreator` at `PrintStream.<init>(OutputStream)`. Disassembled `createSampleAuthorizedKeysFiles` using `rd dex disasm`; added PrintStream writer/stream integration through the existing virtual filesystem/output-stream model and a ByteArrayOutputStream regression. Regression passed.
+- Next release run measured the Pftpd page at 720×1392 but failed on `Object.equals` from AndroidX `Fragment.equals` invoking `invoke-super Object.equals`. Added identity semantics for that explicit invoke-super case and a synthetic DEX regression; passed.
+- Next release run advanced to `Environment.isExternalStorageManager()Z`. Added deterministic `false` for the virtual device (all-files permission not granted by default) plus a regression; passed.
+- Next release run advanced to `UnderlineSpan.<init>()V` in `PftpdFragment.buildPermissionRequestLink`. Added platform constructor defaults and class hierarchy; targeted regression passed. The full focused gates and release build then passed.
+- Final release diagnostic completed the lifecycle without a draw-pass exception, but the screenshot/tree exposed the incorrect TextView AT_MOST measurement described above. The current measurement patch computes wrap-content width/height from text lines and padding, with a synthetic two-line regression awaiting execution.
+- Diagnostic artifacts are under `/home/user/recovery/primftpd-after-awaittermination-release-*`, `primftpd-after-linkmovement-release-*`, `primftpd-after-printstream-release-*`, `primftpd-after-object-equals-release-*`, `primftpd-after-externalstorage-release-*`, and `primftpd-after-underline-span-release-*`. APK: `golden-apks/cache/org.primftpd_71.apk`, SHA-256 `d36566e774e2d0446dcbb41438d22e62d198688aac2711ba7afaa6ea2fdd577`.
+
+### User messages and PR/credential handling
+- User asked for a PR of the current state and pasted a PAT. The credential value was not used, copied to files, or repeated here; assistant advised immediate revocation. Treat it as compromised.
+- GitHub connector lookup returned `unsupported`; `gh` is not installed; this checkout has no Git remote configured (branch `docs/headless-observe-on-demand`). `Cargo.toml` identifies the public repository, and read-only `git ls-remote` returned its HEAD, but no authenticated push/create-PR path was available. No PR, commit, push, CI run, or 24-hour fuzz run occurred. User then explicitly narrowed the request to “just use remaining credits to update the worklog with everything.”
+
+### Tool-call ledger since the previous worklog update
+1. `functions.bash` — inspected the executor regression and `awaitTermination` caller context.
+2. `functions.edit_file` ×3 — registered/implemented `awaitTermination` and extended executor regression for open vs shutdown states.
+3. `functions.bash` — formatting and focused executor regression passed; full focused suites and release build passed (105/49/24/11/101 and release CLI).
+4. `functions.bash` — Primftpd after awaitTermination failed next at `LinkMovementMethod.getInstance`; ViewPager remained 0×0.
+5. `functions.bash` / `functions.read_file` — traced calls and inspected classpath, TextView host dispatch, and platform base support.
+6. `functions.edit_file` ×4 — added LinkMovementMethod hierarchy/singleton and TextView movement-method storage/getter, plus regression.
+7. `functions.bash` — LinkMovementMethod regression passed; release build passed.
+8. `functions.bash` — Primftpd failed next at `PrintStream(OutputStream)`; caller traced to `SampleAuthKeysFileCreator.createSampleAuthorizedKeysFiles`.
+9. `functions.bash` — `rd dex disasm` saved `/home/user/recovery/primftpd-sampleauthkeys-create.smali` and identified PrintStream write/println usage.
+10. `functions.edit_file` ×6 — added PrintStream hierarchy/writer behavior and a regression that writes `println` through a ByteArrayOutputStream.
+11. `functions.bash` — targeted PrintStream test passed; full focused gates passed (105/50/24/11/102); release build passed.
+12. `functions.bash` — Primftpd advanced to `Object.equals` via Fragment invoke-super; ViewPager and content measured, but draw failed.
+13. `functions.edit_file` / `functions.bash` — implemented explicit `invoke-super Object.equals` identity behavior and synthetic DEX regression; targeted test passed.
+14. `functions.bash` — full focused gates passed (105/50/24/11/103); release build passed.
+15. `functions.bash` — Primftpd advanced to `Environment.isExternalStorageManager()Z`; UI tree showed ViewPager 720×1392 before failure.
+16. `functions.edit_file` / `functions.bash` — added deterministic no-all-files-access result and regression; targeted environment test passed.
+17. `functions.bash` — full focused gates passed (105/50/24/11/103); release build passed.
+18. `functions.bash` / `functions.read_file` — Primftpd advanced to `UnderlineSpan.<init>()V`; inspected `buildPermissionRequestLink` DEX and diagnosed the constructor/type gap.
+19. `functions.edit_file` ×3 / `functions.bash` — added UnderlineSpan platform base and hierarchy plus regression; formatting and targeted test passed.
+20. `functions.bash` — full focused suites passed (105/51/24/11/103); release CLI build passed; final Primftpd run exited 0 with no draw-pass error but the screen content was badly measured.
+21. `functions.read_file` — visually inspected the PNG; tabs visible, body blank.
+22. `functions.bash` ×2 / `functions.read_file` ×2 — printed full tree and inspected measure code; identified first TextView measuring to 1408 px under AT_MOST and following rows as zero height.
+23. `functions.edit_file` ×2 — added TextView intrinsic AT_MOST measurement and a two-line `getMeasuredHeight()` regression; first test version used a private field and failed compilation, then was corrected.
+24. `functions.bash` — latest format/test attempt failed before building because `cargo` was not found in PATH; toolchain search found no cargo/rustfmt executable.
+25. `functions.list_connector_tools` — GitHub connector returned `unsupported`.
+26. `functions.bash` ×2 — inspected branch/worktree/remotes/CLI; confirmed no remote and no `gh`; `git ls-remote` could read the public repository HEAD. `git diff --stat` before this appended worklog update showed 62 files changed (11,398 insertions, 565 deletions).
+27. Assistant progress update — declined to use/repeat the pasted PAT, advised revocation, and reported the missing connector/remote/auth path.
+28. User message — narrowed the remaining request to updating the worklog with everything.
+29. `functions.read_file` ×2 — inspected the worklog’s actual tail before appending this continuation.
+30. `functions.edit_file` — appended this detailed status, user-message record, and tool ledger.
+- No credential value is recorded. No GitHub PR or repository write action occurred.
+
+### Active blocker / next action
+- Current release Primftpd is still **not a valid golden**: app’s content rows are collapsed/offscreen because TextView AT_MOST measurement is wrong. The attempted correction and its test are unverified because cargo/rustfmt are unavailable in the current shell. Restore the Rust toolchain, run `cargo fmt --all`, verify the new regression and focused suites, rebuild release, rerun Primftpd, and validate visible content in both screenshot and UI tree. M7 remains open; no completion claim. M9 is approved/closed; physical phone remains excluded; 24-hour fuzz is deferred/not passed; M10–M12 remain future.
+
+---
+
+## Session 2026-10-21 (restored workspace, M7 Primftpd launch unblocked)
+- Restored from Filebin archive; working tree (63 files, incl. 6 new modules) is ahead of main and was preserved intact. Toolchain: stable Rust 1.99.1 installed via rustup.
+- Live-confirmed blockers fixed, in order: (1) java.text.DateFormatSymbols.getInstance/getters (en-US deterministic arrays, jtime.rs + classpath Cloneable/Serializable); (2) java.io OutputStream/InputStream/FilterOutputStream super-constructors for DEX subclasses (jio_chars dex_base; <init> bypasses the resolve guard since super-calls are direct); (3) java.io.BufferedOutputStream host model (buffered write/flush/close delegating to the wrapped stream; classpath for Buffered/Filter streams).
+- Result: `rd app run org.primftpd_71.apk` exits 0 with the full Pftpd settings tree (720x2064); `rd app dump` returns the 103-line UIAutomator XML; `rd app shot` renders the populated body (verified visually).
+- Gates: cargo fmt clean; clippy --workspace --all-targets -D warnings clean (incl. 5+8 lints fixed in framework/inflate/jxml/tests found by clippy 1.99); cargo test --workspace PASS (48 binaries); --all-features PASS after building golden/native fixtures (cross-gcc) + unicorn==2.1.4; golden VM gate 150/150 PASS (JDK 21).
+- Perf (moto-e5 estimate, 3 runs): cold emulated p50 2313ms / max 2317ms (was 2505/2781), warm p50 596ms, RSS 99.8MB PASS, heap 3.7MB PASS. Cold estimate for this heavy 11MB app remains above the 2000ms trivial-app DoD; not claimed as a pass. Profiling attempt (gprofng + symbols build) OOM-killed and was timeboxed.
+- No credential is recorded in this file. PR prepared from this tree.
+- PR #164 opened from this tree (branch m7-primftpd-launch-20261021, rebased onto main 5ba1f3e): all 10/10 GitHub CI checks pass. Perf note above stands; PR not merged.

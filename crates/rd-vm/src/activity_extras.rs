@@ -134,7 +134,10 @@ pub(crate) fn instance_intrinsic(
             _ => None,
         });
     }
-    if mref_class != "Landroid/app/Activity;" {
+    let receiver_class = vm.heap.class_of(recv)?.to_string();
+    let activity_window_callback = mref_class == "Landroid/view/Window$Callback;"
+        && vm.cp.is_subtype(&receiver_class, "Landroid/app/Activity;");
+    if mref_class != "Landroid/app/Activity;" && !activity_window_callback {
         return Ok(None);
     }
     Ok(Some(match (name, sig) {
@@ -180,6 +183,7 @@ pub(crate) fn instance_intrinsic(
         | ("onWindowFocusChanged", "(Z)V")
         | ("onAttachedToWindow" | "onDetachedFromWindow" | "onContentChanged", "()V")
         | ("onPanelClosed", "(ILandroid/view/Menu;)V")
+        | ("onCreatePanelView", "(I)Landroid/view/View;")
         | ("onMultiWindowModeChanged", _)
         | ("onPictureInPictureModeChanged", _) => Value::Null,
         // no options menu/panels headless

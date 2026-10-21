@@ -133,7 +133,7 @@ The foundation is **real, tested code** — verified end-to-end against the F-Dr
 
 ```console
 $ rd inspect golden-apks/org.fdroid.fdroid.apk
-package            org.fdroid.fdroid  v2.0.1 (2000051)
+package            org.fdroid.fdroid  v2.0.2 (2000052)
 label              F-Droid (resolved @0x7f110045)
 SDK                min 24 · target 37 · compile 37
 api floor          ⚠ BELOW_FLOOR(minSdk=24, floor=26) — inspect ok; execução responde erro estruturado

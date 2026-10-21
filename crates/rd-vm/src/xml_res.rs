@@ -212,7 +212,67 @@ pub(crate) fn fill_typed_array(
                 .cloned()
         })
         .collect();
-    ARRAYS.with(|m| m.borrow_mut().insert(ta, vals));
+    ARRAYS.with(|m| {
+        let mut arrays = m.borrow_mut();
+        if let Some(existing) = arrays.get(&ta) {
+            let mut merged = existing.clone();
+            merged.resize(vals.len(), None);
+            for (i, value) in vals.into_iter().enumerate() {
+                if value.is_some() {
+                    merged[i] = value;
+                }
+            }
+            arrays.insert(ta, merged);
+        } else {
+            arrays.insert(ta, vals);
+        }
+    });
+}
+
+/// Fill a TypedArray from a resolved style bag. Missing attributes remain
+/// `None`, allowing the normal TypedArray default-value path to apply.
+pub(crate) fn fill_theme_typed_array(
+    vm: &Engine,
+    ta: ObjRef,
+    attrs: Option<&Value>,
+    style_id: u32,
+) {
+    let Some(Value::Obj(a)) = attrs else { return };
+    let Ok((ids, _)) = vm.heap.as_array_elems(*a) else {
+        return;
+    };
+    let Some(arsc) = vm.fw.resources.as_ref().and_then(|apk| apk.arsc.as_ref()) else {
+        return;
+    };
+    let values = ids
+        .iter()
+        .map(|id| {
+            let Value::Int(attr_id) = id else {
+                return None;
+            };
+            let attr_id = *attr_id as u32;
+            let value = arsc.resolve_style_attribute(style_id, attr_id)?;
+            let value = match value {
+                rd_apk::arsc::ResolvedValue::Str(s) => AttrValue::String(s),
+                rd_apk::arsc::ResolvedValue::Boolean(b) => AttrValue::Bool(b),
+                rd_apk::arsc::ResolvedValue::Integer(i) => AttrValue::Int(i),
+                rd_apk::arsc::ResolvedValue::Float(f) => AttrValue::Float(f),
+                rd_apk::arsc::ResolvedValue::Dimension { value, unit } => {
+                    AttrValue::Dimension(value, unit)
+                }
+                rd_apk::arsc::ResolvedValue::Reference(r) => AttrValue::Reference(r),
+                rd_apk::arsc::ResolvedValue::Attribute(a) => AttrValue::Attribute(a),
+            };
+            Some(XmlAttribute {
+                ns: None,
+                name: arsc.resolve_name(attr_id).unwrap_or_default(),
+                raw: None,
+                value,
+                res_id: Some(attr_id),
+            })
+        })
+        .collect();
+    ARRAYS.with(|m| m.borrow_mut().insert(ta, values));
 }
 
 fn str_val(vm: &mut Engine, s: String) -> Result<Value, VmExit> {
@@ -276,7 +336,7 @@ fn as_f32(vm: &Engine, v: &AttrValue) -> Option<f32> {
         R::Dimension { value, unit } => to_px(value, unit),
         R::Str(s) => s.parse().ok()?,
         R::Boolean(b) => b as i32 as f32,
-        R::Reference(_) => return None,
+        R::Reference(_) | R::Attribute(_) => return None,
     })
 }
 
@@ -296,7 +356,7 @@ fn as_i32(vm: &Engine, v: &AttrValue) -> Option<i32> {
                 t.parse().ok()?
             }
         }
-        R::Reference(_) => return None,
+        R::Reference(_) | R::Attribute(_) => return None,
     })
 }
 

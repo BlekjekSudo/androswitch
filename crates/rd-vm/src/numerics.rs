@@ -170,6 +170,40 @@ fn java_whitespace(c: char) -> bool {
     ) || (c.is_whitespace() && !matches!(c, '\u{A0}' | '\u{2007}' | '\u{202F}') && c != '\u{85}')
 }
 
+fn java_identifier_start(c: char) -> bool {
+    use std::sync::OnceLock;
+    static CATEGORIES: OnceLock<regex::Regex> = OnceLock::new();
+    CATEGORIES
+        .get_or_init(|| {
+            regex::Regex::new(r"\A[\p{L}\p{Nl}\p{Sc}\p{Pc}]\z")
+                .expect("valid Java identifier-start Unicode categories")
+        })
+        .is_match(&c.to_string())
+}
+
+fn java_identifier_ignorable(c: char) -> bool {
+    use std::sync::OnceLock;
+    static FORMAT: OnceLock<regex::Regex> = OnceLock::new();
+    let code = c as u32;
+    matches!(code, 0x0000..=0x0008 | 0x000E..=0x001B | 0x007F..=0x009F)
+        || FORMAT
+            .get_or_init(|| regex::Regex::new(r"\A\p{Cf}\z").expect("valid Unicode Cf category"))
+            .is_match(&c.to_string())
+}
+
+fn java_identifier_part(c: char) -> bool {
+    use std::sync::OnceLock;
+    static CATEGORIES: OnceLock<regex::Regex> = OnceLock::new();
+    java_identifier_start(c)
+        || java_identifier_ignorable(c)
+        || CATEGORIES
+            .get_or_init(|| {
+                regex::Regex::new(r"\A[\p{Mn}\p{Mc}\p{Nd}]\z")
+                    .expect("valid Java identifier-part Unicode categories")
+            })
+            .is_match(&c.to_string())
+}
+
 pub(crate) fn static_intrinsic(
     vm: &mut Engine,
     class: &str,
@@ -386,6 +420,15 @@ pub(crate) fn static_intrinsic(
         ("Boolean", "toString", "(Z)Ljava/lang/String;") => s(vm, (i(0) != 0).to_string())?,
         // ── Character ──
         ("Character", "charCount", "(I)I") => Value::Int(if i(0) >= 0x10000 { 2 } else { 1 }),
+        ("Character", "isJavaIdentifierStart", "(C)Z" | "(I)Z") => {
+            b(ch(0).is_some_and(java_identifier_start))
+        }
+        ("Character", "isJavaIdentifierPart", "(C)Z" | "(I)Z") => {
+            b(ch(0).is_some_and(java_identifier_part))
+        }
+        ("Character", "isIdentifierIgnorable", "(C)Z" | "(I)Z") => {
+            b(ch(0).is_some_and(java_identifier_ignorable))
+        }
         ("Character", "isDigit", _) => b(ch(0).is_some_and(|c| {
             c.is_numeric() && c.is_ascii_digit() || ('\u{660}'..='\u{669}').contains(&c)
         })),
@@ -650,5 +693,52 @@ mod tests {
         assert_eq!(cmp_f64(-0.0, 0.0), -1);
         assert_eq!(cmp_f64(f64::NAN, f64::INFINITY), 1);
         assert_eq!(cmp_f64(f64::NAN, f64::NAN), 0);
+    }
+
+    #[test]
+    fn java_identifier_start_and_part_follow_java_categories() {
+        fn call(name: &str, sig: &str, code_point: char) -> Value {
+            let mut vm = Engine::new(vec![], crate::engine::VmConfig::default());
+            static_intrinsic(
+                &mut vm,
+                "Ljava/lang/Character;",
+                name,
+                sig,
+                &[Value::Int(code_point as i32)],
+            )
+            .unwrap()
+            .expect("Character intrinsic")
+        }
+
+        for c in ['A', 'π', 'Ⅰ', '$', '_', '€'] {
+            assert_eq!(
+                call("isJavaIdentifierStart", "(C)Z", c),
+                Value::Int(1),
+                "{c}"
+            );
+        }
+        for c in ['1', '-', '\u{0301}', '\n'] {
+            assert_eq!(
+                call("isJavaIdentifierStart", "(C)Z", c),
+                Value::Int(0),
+                "{c}"
+            );
+        }
+        for c in ['A', '7', '\u{0301}', '\u{200C}', '\u{0001}', '$'] {
+            assert_eq!(
+                call("isJavaIdentifierPart", "(I)Z", c),
+                Value::Int(1),
+                "{c}"
+            );
+        }
+        assert_eq!(call("isJavaIdentifierPart", "(I)Z", '\n'), Value::Int(0));
+        assert_eq!(
+            call("isIdentifierIgnorable", "(C)Z", '\u{200C}'),
+            Value::Int(1)
+        );
+        assert_eq!(
+            call("isIdentifierIgnorable", "(C)Z", '\u{0301}'),
+            Value::Int(0)
+        );
     }
 }

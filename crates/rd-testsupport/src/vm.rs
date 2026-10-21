@@ -78,7 +78,10 @@ pub fn op35c(op: u8, count: u8, idx: u16, regs: [u8; 5]) -> Vec<u16> {
     vec![
         (op as u16) | ((count as u16) << 12) | ((regs[4] as u16) << 8),
         idx,
-        (regs[3] as u16) << 12 | (regs[2] as u16) << 8 | (regs[1] as u16) << 4 | regs[0] as u16,
+        ((regs[3] as u16) << 12)
+            | ((regs[2] as u16) << 8)
+            | ((regs[1] as u16) << 4)
+            | regs[0] as u16,
     ]
 }
 pub fn packed_payload(first_key: i32, targets: &[i32]) -> Vec<u16> {

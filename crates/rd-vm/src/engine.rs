@@ -301,6 +301,14 @@ impl Engine {
         if let Some(v) = intrinsics::call_static_intrinsic(self, class, method, sig, &args)? {
             return Ok(v);
         }
+        if let Some(v) = crate::m8::call_m8_static(self, class, method, sig, &args)? {
+            return Ok(v);
+        }
+        if class.starts_with("Landroid/") {
+            if let Some(v) = crate::framework::call_host_static(self, class, method, sig, &args)? {
+                return Ok(v);
+            }
+        }
         let Some((dex_idx, def, m)) = self.cp.resolve_method(class, method, sig) else {
             return Err(crate::classpath::unresolved_method(class, method, sig).into());
         };

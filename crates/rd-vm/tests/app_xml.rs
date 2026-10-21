@@ -232,6 +232,386 @@ fn layout_xml_inflates_and_touch_fires_onclick() {
     );
 }
 
+#[test]
+fn inflation_supports_custom_layout_params_with_noarg_constructor() {
+    let layout = AxNode::new(
+        "TextView",
+        vec![
+            a(true, "layout_width", AxVal::Int(-1)),
+            a(true, "layout_height", AxVal::Int(-2)),
+        ],
+        vec![],
+    );
+    let apk_bytes = build_fixture(vec![("custom_params", layout)]);
+    let mut b = DexBuilder::new();
+    b.class(
+        "Landroidx/viewpager/widget/ViewPager;",
+        "Landroid/view/ViewGroup;",
+    );
+    let params = b.class(
+        "Landroidx/viewpager/widget/ViewPager$LayoutParams;",
+        "Landroid/view/ViewGroup$LayoutParams;",
+    );
+    let p_size = b.proto_idx("V", vec!["I".into(), "I".into()]);
+    let size_ctor = b.method_idx("Landroid/view/ViewGroup$LayoutParams;", p_size, "<init>");
+    let mut code = op11n(0x12, 0, -1);
+    code.extend(op11n(0x12, 1, -1));
+    code.extend(op35c(0x70, 3, size_ctor, [2, 0, 1, 0, 0]));
+    code.extend(op10x(0x0E));
+    b.direct(
+        params,
+        "<init>",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(3, 1, 3, code)),
+    );
+    let mut e = engine_of(&b);
+    e.set_resources(rd_apk::Apk::from_bytes(apk_bytes).expect("APK sintético parseia"));
+    let parent = e
+        .heap
+        .alloc_instance("Landroidx/viewpager/widget/ViewPager;".into(), vec![])
+        .unwrap();
+    e.attach_host_state("Landroidx/viewpager/widget/ViewPager;", parent)
+        .unwrap();
+
+    let child =
+        rd_vm::inflate::inflate_resource_into(&mut e, LAYOUT_MAIN as u32, Some(parent), false)
+            .expect("layout params custom deve inflar");
+    let Value::Obj(params) = e.heap.get_field(child, "mLayoutParams").unwrap() else {
+        panic!("child must have custom LayoutParams")
+    };
+    assert_eq!(
+        e.heap.class_of(params).unwrap(),
+        "Landroidx/viewpager/widget/ViewPager$LayoutParams;"
+    );
+    assert_eq!(e.heap.get_field(params, "width").unwrap(), Value::Int(-1));
+    assert_eq!(e.heap.get_field(params, "height").unwrap(), Value::Int(-2));
+}
+
+#[test]
+fn scroll_progress_and_radio_shorthands_inflate_as_host_views() {
+    let radio_group = AxNode::new(
+        "RadioGroup",
+        vec![],
+        vec![AxNode::new("RadioButton", vec![], vec![])],
+    );
+    let layout = AxNode::new(
+        "ScrollView",
+        vec![
+            a(true, "layout_width", AxVal::Int(-1)),
+            a(true, "layout_height", AxVal::Int(-1)),
+        ],
+        vec![
+            AxNode::new("TextView", vec![], vec![]),
+            AxNode::new("ProgressBar", vec![], vec![]),
+            radio_group,
+        ],
+    );
+    let apk_bytes = build_fixture(vec![("scroll", layout)]);
+    let mut e = engine_of(&DexBuilder::new());
+    e.set_resources(rd_apk::Apk::from_bytes(apk_bytes).expect("APK sintético parseia"));
+
+    let root = rd_vm::inflate::inflate_resource(&mut e, LAYOUT_MAIN as u32)
+        .expect("<ScrollView> deve inflar");
+    assert_eq!(
+        e.heap.class_of(root).unwrap(),
+        "Landroid/widget/ScrollView;"
+    );
+    let children = match e.fw.get(root) {
+        Some(HostObj::View { children, .. }) => children,
+        other => panic!("ScrollView deve usar o modelo host ViewGroup: {other:?}"),
+    };
+    assert_eq!(children.len(), 3);
+    assert_eq!(
+        e.heap.class_of(children[0]).unwrap(),
+        "Landroid/widget/TextView;"
+    );
+    assert_eq!(
+        e.heap.class_of(children[1]).unwrap(),
+        "Landroid/widget/ProgressBar;"
+    );
+    let radio_group = children[2];
+    assert_eq!(
+        e.heap.class_of(radio_group).unwrap(),
+        "Landroid/widget/RadioGroup;"
+    );
+    let radio_buttons = match e.fw.get(radio_group) {
+        Some(HostObj::View { children, .. }) => children,
+        other => panic!("RadioGroup deve usar o modelo host LinearLayout: {other:?}"),
+    };
+    assert_eq!(radio_buttons.len(), 1);
+    assert_eq!(
+        e.heap.class_of(radio_buttons[0]).unwrap(),
+        "Landroid/widget/RadioButton;"
+    );
+}
+
+#[test]
+fn inflater_preserves_linear_layout_child_weights() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+
+    const LI: &str = "Landroid/view/LayoutInflater;";
+    let layout = AxNode::new(
+        "LinearLayout",
+        vec![
+            a(true, "orientation", AxVal::Int(0)),
+            a(true, "layout_width", AxVal::Int(-1)),
+            a(true, "layout_height", AxVal::Int(-2)),
+        ],
+        [1, 2]
+            .into_iter()
+            .map(|weight| {
+                AxNode::new(
+                    "TextView",
+                    vec![
+                        a(true, "layout_width", AxVal::Int(0)),
+                        a(true, "layout_height", AxVal::Int(-1)),
+                        a(true, "layout_weight", AxVal::Int(weight)),
+                    ],
+                    vec![],
+                )
+            })
+            .collect(),
+    );
+    let apk_bytes = build_fixture(vec![("activity_main", layout)]);
+    let mut b = DexBuilder::new();
+    register_platform_classes(&mut b);
+    let mut e = engine_of(&b);
+    e.set_resources(rd_apk::Apk::from_bytes(apk_bytes).expect("APK"));
+    let inflater = e.heap.alloc_instance(LI.to_string(), vec![]).unwrap();
+    let root = call_instance_intrinsic(
+        &mut e,
+        LI,
+        "inflate",
+        "(ILandroid/view/ViewGroup;)Landroid/view/View;",
+        inflater,
+        &[Value::Int(LAYOUT_MAIN), Value::Null],
+    )
+    .unwrap()
+    .unwrap()
+    .as_ref()
+    .unwrap()
+    .unwrap();
+    let children = match e.fw.get(root).unwrap() {
+        HostObj::View { children, .. } => children,
+        other => panic!("expected LinearLayout host view, got {other:?}"),
+    };
+    let weights: Vec<_> = children
+        .iter()
+        .map(|child| {
+            let Value::Obj(params) = e.heap.get_field(*child, "mLayoutParams").unwrap() else {
+                panic!("inflated child must retain layout params")
+            };
+            match e.heap.get_field(params, "weight").unwrap() {
+                Value::Float(weight) => weight,
+                other => panic!("weight must be stored as float, got {other:?}"),
+            }
+        })
+        .collect();
+    assert_eq!(weights, vec![1.0, 2.0]);
+}
+
+/// LayoutInflater.inflate(resource, root) infla o layout do APK, mantém a
+/// árvore host e respeita a semântica do overload explícito attachToRoot.
+#[test]
+fn layout_inflater_inflate_resource_attaches_only_when_requested() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+
+    const LI: &str = "Landroid/view/LayoutInflater;";
+    const INFLATE_ROOT: &str = "(ILandroid/view/ViewGroup;)Landroid/view/View;";
+    const INFLATE_ATTACH: &str = "(ILandroid/view/ViewGroup;Z)Landroid/view/View;";
+
+    let apk_bytes = build_fixture(vec![("activity_main", main_layout())]);
+    let mut b = DexBuilder::new();
+    register_platform_classes(&mut b);
+    let mut e = engine_of(&b);
+    e.set_resources(rd_apk::Apk::from_bytes(apk_bytes).expect("APK"));
+
+    let inflater = e.heap.alloc_instance(LI.to_string(), vec![]).unwrap();
+    let detached = call_instance_intrinsic(
+        &mut e,
+        LI,
+        "inflate",
+        INFLATE_ROOT,
+        inflater,
+        &[Value::Int(LAYOUT_MAIN), Value::Null],
+    )
+    .unwrap()
+    .unwrap()
+    .as_ref()
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        e.heap.class_of(detached).unwrap(),
+        "Landroid/widget/LinearLayout;"
+    );
+    assert!(
+        matches!(e.fw.get(detached), Some(HostObj::View { children, .. }) if children.len() == 2)
+    );
+
+    let parent = e
+        .heap
+        .alloc_instance("Landroid/widget/FrameLayout;".to_string(), vec![])
+        .unwrap();
+    e.attach_host_state("Landroid/widget/FrameLayout;", parent)
+        .unwrap();
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            LI,
+            "inflate",
+            INFLATE_ROOT,
+            inflater,
+            &[Value::Int(LAYOUT_MAIN), Value::Obj(parent)],
+        )
+        .unwrap(),
+        Some(Value::Obj(parent)),
+        "two-argument overload attaches and returns the supplied root"
+    );
+    let first_inflated = match e.fw.get(parent).unwrap() {
+        HostObj::View { children, .. } => children[0],
+        _ => panic!("expected host ViewGroup"),
+    };
+    assert!(
+        matches!(e.fw.get(first_inflated), Some(HostObj::View { children, .. }) if children.len() == 2)
+    );
+
+    let returned = call_instance_intrinsic(
+        &mut e,
+        LI,
+        "inflate",
+        INFLATE_ATTACH,
+        inflater,
+        &[Value::Int(LAYOUT_MAIN), Value::Obj(parent), Value::Int(0)],
+    )
+    .unwrap()
+    .unwrap()
+    .as_ref()
+    .unwrap()
+    .unwrap();
+    assert_ne!(returned, parent, "attachToRoot=false returns the new tree");
+    assert!(
+        matches!(e.fw.get(parent), Some(HostObj::View { children, .. }) if children.len() == 1)
+    );
+
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            LI,
+            "inflate",
+            INFLATE_ATTACH,
+            inflater,
+            &[Value::Int(LAYOUT_MAIN), Value::Obj(parent), Value::Int(1)],
+        )
+        .unwrap(),
+        Some(Value::Obj(parent)),
+        "attachToRoot=true attaches and returns the supplied root"
+    );
+    assert!(
+        matches!(e.fw.get(parent), Some(HostObj::View { children, .. }) if children.len() == 2)
+    );
+}
+
+/// `<include>` é expandido; roots `<merge>` são anexados diretamente ao
+/// ViewGroup, sem criar uma view artificial para a tag de inclusão.
+#[test]
+fn layout_inflater_expands_include_and_merge_roots() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+
+    const LI: &str = "Landroid/view/LayoutInflater;";
+    const INFLATE_ROOT: &str = "(ILandroid/view/ViewGroup;)Landroid/view/View;";
+    const INFLATE_ATTACH: &str = "(ILandroid/view/ViewGroup;Z)Landroid/view/View;";
+    const LAYOUT_INCLUDED: i32 = 0x7F01_0001;
+    const LAYOUT_ROOT_MERGE: i32 = 0x7F01_0002;
+
+    let include = AxNode::new(
+        "include",
+        vec![a(false, "layout", AxVal::Ref(LAYOUT_INCLUDED as u32))],
+        vec![],
+    );
+    let host_layout = AxNode::new("FrameLayout", vec![], vec![include]);
+    let included_merge = AxNode::new(
+        "merge",
+        vec![],
+        vec![
+            AxNode::new("TextView", vec![], vec![]),
+            AxNode::new("Button", vec![], vec![]),
+        ],
+    );
+    let root_merge = AxNode::new(
+        "merge",
+        vec![],
+        vec![
+            AxNode::new("TextView", vec![], vec![]),
+            AxNode::new("Button", vec![], vec![]),
+        ],
+    );
+    let apk_bytes = build_fixture(vec![
+        ("activity_main", host_layout),
+        ("included", included_merge),
+        ("root_merge", root_merge),
+    ]);
+    let mut b = DexBuilder::new();
+    register_platform_classes(&mut b);
+    let mut e = engine_of(&b);
+    e.set_resources(rd_apk::Apk::from_bytes(apk_bytes).expect("APK"));
+    let inflater = e.heap.alloc_instance(LI.to_string(), vec![]).unwrap();
+
+    let inflated = call_instance_intrinsic(
+        &mut e,
+        LI,
+        "inflate",
+        INFLATE_ROOT,
+        inflater,
+        &[Value::Int(LAYOUT_MAIN), Value::Null],
+    )
+    .unwrap()
+    .unwrap()
+    .as_ref()
+    .unwrap()
+    .unwrap();
+    let included_children = match e.fw.get(inflated).unwrap() {
+        HostObj::View { children, .. } => children.clone(),
+        _ => panic!("expected included host ViewGroup"),
+    };
+    assert_eq!(included_children.len(), 2);
+    assert_eq!(
+        e.heap.class_of(included_children[0]).unwrap(),
+        "Landroid/widget/TextView;"
+    );
+    assert_eq!(
+        e.heap.class_of(included_children[1]).unwrap(),
+        "Landroid/widget/Button;"
+    );
+
+    let parent = e
+        .heap
+        .alloc_instance("Landroid/widget/FrameLayout;".to_string(), vec![])
+        .unwrap();
+    e.attach_host_state("Landroid/widget/FrameLayout;", parent)
+        .unwrap();
+    assert_eq!(
+        call_instance_intrinsic(
+            &mut e,
+            LI,
+            "inflate",
+            INFLATE_ATTACH,
+            inflater,
+            &[
+                Value::Int(LAYOUT_ROOT_MERGE),
+                Value::Obj(parent),
+                Value::Int(1),
+            ],
+        )
+        .unwrap(),
+        Some(Value::Obj(parent))
+    );
+    assert!(
+        matches!(e.fw.get(parent), Some(HostObj::View { children, .. }) if children.len() == 2)
+    );
+}
+
 /// Sem Resources injetadas (Engine::new direto), setContentView(I) responde
 /// RESOURCES_MISSING tipado — nunca silencioso, nunca pânico.
 #[test]
@@ -330,15 +710,273 @@ fn find_by_id_set_text_resid_and_get_string() {
     }
 }
 
-/// Tag de view sem implementação host (ImageView) falha TIPADA (INFLATE) —
-/// nunca silenciosa (Lei 1).
+#[test]
+fn coordinator_layout_children_receive_coordinator_layout_params() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+
+    const LI: &str = "Landroid/view/LayoutInflater;";
+    const INFLATE_ROOT: &str = "(ILandroid/view/ViewGroup;)Landroid/view/View;";
+    const COORDINATOR: &str = "Landroidx/coordinatorlayout/widget/CoordinatorLayout;";
+    const COORDINATOR_PARAMS: &str =
+        "Landroidx/coordinatorlayout/widget/CoordinatorLayout$LayoutParams;";
+
+    let layout = AxNode::new(
+        "androidx.coordinatorlayout.widget.CoordinatorLayout",
+        vec![
+            a(true, "layout_width", AxVal::Int(-1)),
+            a(true, "layout_height", AxVal::Int(-1)),
+        ],
+        vec![AxNode::new(
+            "TextView",
+            vec![
+                a(true, "id", AxVal::Ref(ID_TV as u32)),
+                a(true, "layout_width", AxVal::Int(-1)),
+                a(true, "layout_height", AxVal::Int(-2)),
+            ],
+            vec![],
+        )],
+    );
+    let apk_bytes = build_fixture(vec![("activity_main", layout)]);
+    let mut b = DexBuilder::new();
+    register_platform_classes(&mut b);
+    let coordinator = b.class(COORDINATOR, "Landroid/view/ViewGroup;");
+    let params = b.class(
+        COORDINATOR_PARAMS,
+        "Landroid/view/ViewGroup$MarginLayoutParams;",
+    );
+    b.direct(
+        coordinator,
+        "<init>",
+        "V",
+        vec!["Landroid/content/Context;"],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(2, 2, 0, op10x(0x0e))),
+    );
+    b.direct(
+        params,
+        "<init>",
+        "V",
+        vec!["I", "I"],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(3, 3, 0, op10x(0x0e))),
+    );
+
+    let mut e = engine_of(&b);
+    e.set_resources(rd_apk::Apk::from_bytes(apk_bytes).expect("APK"));
+    let context = e
+        .heap
+        .alloc_instance("Landroid/content/Context;".into(), vec![])
+        .unwrap();
+    e.fw.current_activity = Some(context);
+    let inflater = e.heap.alloc_instance(LI.to_string(), vec![]).unwrap();
+    let Value::Obj(root) = call_instance_intrinsic(
+        &mut e,
+        LI,
+        "inflate",
+        INFLATE_ROOT,
+        inflater,
+        &[Value::Int(LAYOUT_MAIN), Value::Null],
+    )
+    .unwrap()
+    .expect("inflate returns the CoordinatorLayout") else {
+        panic!("inflate should return a View");
+    };
+    assert_eq!(e.heap.class_of(root).unwrap(), COORDINATOR);
+
+    let child = match e.fw.get(root) {
+        Some(HostObj::View { children, .. }) if children.len() == 1 => children[0],
+        _ => panic!("CoordinatorLayout should have one inflated child"),
+    };
+    let Value::Obj(params) = e
+        .invoke_instance(
+            child,
+            "getLayoutParams",
+            "()Landroid/view/ViewGroup$LayoutParams;",
+            &[],
+        )
+        .unwrap()
+    else {
+        panic!("CoordinatorLayout child should have LayoutParams");
+    };
+    assert_eq!(e.heap.class_of(params).unwrap(), COORDINATOR_PARAMS);
+    assert!(e.cp.is_subtype(
+        COORDINATOR_PARAMS,
+        "Landroid/view/ViewGroup$MarginLayoutParams;"
+    ));
+}
+
+#[test]
+fn appcompat_viewgroup_children_receive_their_dex_layout_params_subclass() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+
+    const LI: &str = "Landroid/view/LayoutInflater;";
+    const INFLATE_ROOT: &str = "(ILandroid/view/ViewGroup;)Landroid/view/View;";
+    const ACTION_BAR: &str = "Landroidx/appcompat/widget/ActionBarOverlayLayout;";
+    const ACTION_BAR_PARAMS: &str =
+        "Landroidx/appcompat/widget/ActionBarOverlayLayout$LayoutParams;";
+
+    let layout = AxNode::new(
+        "androidx.appcompat.widget.ActionBarOverlayLayout",
+        vec![
+            a(true, "layout_width", AxVal::Int(-1)),
+            a(true, "layout_height", AxVal::Int(-1)),
+        ],
+        vec![AxNode::new(
+            "TextView",
+            vec![
+                a(true, "layout_width", AxVal::Int(-1)),
+                a(true, "layout_height", AxVal::Int(-2)),
+            ],
+            vec![],
+        )],
+    );
+    let apk_bytes = build_fixture(vec![("activity_main", layout)]);
+    let mut b = DexBuilder::new();
+    register_platform_classes(&mut b);
+    let action_bar = b.class(ACTION_BAR, "Landroid/view/ViewGroup;");
+    let params = b.class(
+        ACTION_BAR_PARAMS,
+        "Landroid/view/ViewGroup$MarginLayoutParams;",
+    );
+    b.direct(
+        action_bar,
+        "<init>",
+        "V",
+        vec!["Landroid/content/Context;"],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(2, 2, 0, op10x(0x0e))),
+    );
+    b.direct(
+        params,
+        "<init>",
+        "V",
+        vec!["I", "I"],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(3, 3, 0, op10x(0x0e))),
+    );
+
+    let mut e = engine_of(&b);
+    e.set_resources(rd_apk::Apk::from_bytes(apk_bytes).expect("APK"));
+    let context = e
+        .heap
+        .alloc_instance("Landroid/content/Context;".into(), vec![])
+        .unwrap();
+    e.fw.current_activity = Some(context);
+    let inflater = e.heap.alloc_instance(LI.to_string(), vec![]).unwrap();
+    let Value::Obj(root) = call_instance_intrinsic(
+        &mut e,
+        LI,
+        "inflate",
+        INFLATE_ROOT,
+        inflater,
+        &[Value::Int(LAYOUT_MAIN), Value::Null],
+    )
+    .unwrap()
+    .expect("inflate returns the ActionBarOverlayLayout") else {
+        panic!("inflate should return a View");
+    };
+    let child = match e.fw.get(root) {
+        Some(HostObj::View { children, .. }) if children.len() == 1 => children[0],
+        _ => panic!("ActionBarOverlayLayout should have one inflated child"),
+    };
+    let Value::Obj(params) = e
+        .invoke_instance(
+            child,
+            "getLayoutParams",
+            "()Landroid/view/ViewGroup$LayoutParams;",
+            &[],
+        )
+        .unwrap()
+    else {
+        panic!("ActionBarOverlayLayout child should have LayoutParams");
+    };
+    assert_eq!(e.heap.class_of(params).unwrap(), ACTION_BAR_PARAMS);
+    assert!(e.cp.is_subtype(
+        ACTION_BAR_PARAMS,
+        "Landroid/view/ViewGroup$MarginLayoutParams;"
+    ));
+}
+
+/// The short Android ImageView tag resolves to the built-in platform class and
+/// receives the same common View host state as fully-qualified ImageView.
+#[test]
+fn image_view_short_tag_inflates_as_platform_view() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+
+    const LI: &str = "Landroid/view/LayoutInflater;";
+    const INFLATE: &str = "(ILandroid/view/ViewGroup;Z)Landroid/view/View;";
+    let layout = AxNode::new(
+        "ImageView",
+        vec![a(true, "layout_width", AxVal::Int(-1))],
+        vec![],
+    );
+    let apk_bytes = build_fixture(vec![("activity_main", layout)]);
+    let mut b = DexBuilder::new();
+    register_platform_classes(&mut b);
+    let mut e = engine_of(&b);
+    e.set_resources(rd_apk::Apk::from_bytes(apk_bytes).expect("APK"));
+    let inflater = e.heap.alloc_instance(LI.to_string(), vec![]).unwrap();
+    let parent = e
+        .heap
+        .alloc_instance("Landroid/widget/FrameLayout;".into(), Vec::new())
+        .unwrap();
+    e.attach_host_state("Landroid/widget/FrameLayout;", parent)
+        .unwrap();
+    let image = call_instance_intrinsic(
+        &mut e,
+        LI,
+        "inflate",
+        INFLATE,
+        inflater,
+        &[Value::Int(LAYOUT_MAIN), Value::Obj(parent), Value::Int(0)],
+    )
+    .unwrap()
+    .unwrap()
+    .as_ref()
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        e.heap.class_of(image).unwrap(),
+        "Landroid/widget/ImageView;"
+    );
+    assert!(matches!(e.fw.get(image), Some(HostObj::View { .. })));
+    let Value::Obj(params) = e
+        .invoke_instance(
+            image,
+            "getLayoutParams",
+            "()Landroid/view/ViewGroup$LayoutParams;",
+            &[],
+        )
+        .unwrap()
+    else {
+        panic!("inflate(resource, parent, false) must assign LayoutParams");
+    };
+    assert_eq!(
+        e.heap.class_of(params).unwrap(),
+        "Landroid/widget/FrameLayout$LayoutParams;"
+    );
+    assert!(e.cp.is_subtype(
+        "Landroid/widget/FrameLayout$LayoutParams;",
+        "Landroid/view/ViewGroup$MarginLayoutParams;"
+    ));
+    assert_eq!(
+        e.heap.get_field(params, "bottomMargin").unwrap(),
+        Value::Int(0)
+    );
+    assert!(matches!(
+        e.fw.get(parent),
+        Some(HostObj::View { children, .. }) if children.is_empty()
+    ));
+}
+
+/// A shorthand widget outside the modeled set still fails with a typed error.
 #[test]
 fn unsupported_view_class_is_typed_error() {
     let bad = AxNode::new(
         "LinearLayout",
         vec![a(true, "orientation", AxVal::Int(1))],
         vec![AxNode::new(
-            "ImageView",
+            "SurfaceView",
             vec![a(true, "layout_width", AxVal::Int(-1))],
             vec![],
         )],
@@ -366,11 +1004,11 @@ fn unsupported_view_class_is_typed_error() {
     e.set_resources(rd_apk::Apk::from_bytes(apk_bytes).expect("apk"));
     let err = e
         .launch_app("LMain;", "com.test.xml", Vec::new())
-        .expect_err("ImageView fora do escopo M3 deve falhar tipado");
+        .expect_err("SurfaceView fora do escopo M3 deve falhar tipado");
     match err {
         VmExit::Error(rde) => {
             assert_eq!(rde.code, "INFLATE", "{rde}");
-            assert!(rde.cause.contains("ImageView"), "{rde}");
+            assert!(rde.cause.contains("SurfaceView"), "{rde}");
         }
         other => panic!("esperava VmExit::Error, veio {other:?}"),
     }
@@ -516,12 +1154,11 @@ fn inflate_builds_host_tree_shape() {
 
 // ── issue #40: cap de profundidade do LayoutInflater (AXML hostil)
 
-/// AXML aninhado além do cap (600 níveis no fixture; cap real = 512) falha
-/// TIPADO (INFLATE) — antes:
-/// estourava a stack Rust e ABORTAVA o processo (Lei 1 violada).
+/// AXML aninhado além do cap (600 níveis no fixture; cap host = 128) falha
+/// TIPADO (INFLATE) — antes, a recursão da stack Rust podia abortar o processo.
 #[test]
 fn hostile_deep_axml_is_typed_error_not_abort() {
-    // cadeia de 2.000 LinearLayouts com Button na ponta
+    // cadeia de 600 LinearLayouts com Button na ponta
     let mut cur = AxNode::new("Button", vec![], vec![]);
     for _ in 0..600 {
         cur = AxNode::new(
@@ -857,7 +1494,14 @@ fn m4_screenshot_renders_real_tree() {
     assert!(xml.contains("resource-id=\"com.test:id/tv\""), "{xml}");
     assert!(xml.contains("resource-id=\"com.test:id/btn\""), "{xml}");
 
-    let fb = rd_render::render_snapshot(&tree);
+    let mut fb = rd_render::render_snapshot(&tree);
+    // The VM draw-list is transparent over the host-rendered tree; it must not
+    // replace the host snapshot with a white full-screen canvas.
+    let ops = e.draw_frame().expect("DEX overlay draw pass");
+    if ops > 0 && e.has_frame() {
+        let (w, h) = (fb.w, fb.h);
+        e.rasterize_frame(&mut fb.px, w, h);
+    }
     let px = |x: i32, y: i32| {
         let i = ((y as usize) * fb.w + x as usize) * 3;
         (fb.px[i], fb.px[i + 1], fb.px[i + 2])

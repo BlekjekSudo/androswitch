@@ -57,6 +57,17 @@ impl ResConfigInfo {
     }
 }
 
+/// Uma entrada de um bag/mapa de recurso (por exemplo, um atributo de style).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResMapEntry {
+    /// Nome/resource id do atributo dentro do bag.
+    pub name: u32,
+    pub data_type: u8,
+    pub data: u32,
+    /// Pré-resolvida quando `data_type == 3` (STRING → pool global).
+    pub string: Option<String>,
+}
+
 /// Uma entrada de recurso resolvida para uma config.
 #[derive(Debug, Clone)]
 pub struct ResEntry {
@@ -66,6 +77,10 @@ pub struct ResEntry {
     /// Pré-resolvida quando `data_type == 3` (STRING → pool global).
     pub string: Option<String>,
     pub complex: bool,
+    /// Parent style resource id, when this entry is a complex bag.
+    pub parent: Option<u32>,
+    /// Resource map values when this entry is a complex bag (style/array/etc.).
+    pub bag: Option<Vec<ResMapEntry>>,
     /// Índice no key string pool (para `resolve_name`).
     pub key_idx: u32,
 }
@@ -113,6 +128,8 @@ pub enum ResolvedValue {
     },
     /// Referência a outro recurso (resid) — o caller decide se segue a cadeia.
     Reference(u32),
+    /// Referência a um atributo de tema (`?attr/...`) inside a style bag.
+    Attribute(u32),
 }
 
 /// complexToFloat (TypedValue) — mesma matemática do axml (mantissa bits
@@ -245,6 +262,7 @@ impl Arsc {
         match best.data_type {
             0x03 => best.string.clone().map(ResolvedValue::Str),
             0x01 => Some(ResolvedValue::Reference(best.data)),
+            0x02 => Some(ResolvedValue::Attribute(best.data)),
             // INT_DEC (u32 com semântica i32 — TypedValue.data é cru)
             0x10 => Some(ResolvedValue::Integer(best.data as i32)),
             0x11 => Some(ResolvedValue::Integer(best.data as i32)),
@@ -258,6 +276,56 @@ impl Arsc {
             }),
             _ => None,
         }
+    }
+
+    /// Resolve one attribute from a style, including its parent style and
+    /// `?attr/…` aliases. Resource references remain explicit so the VM can
+    /// dereference them using the APK's normal resource policy.
+    pub fn resolve_style_attribute(&self, style_id: u32, attr_id: u32) -> Option<ResolvedValue> {
+        self.resolve_style_attribute_inner(style_id, attr_id, 0)
+    }
+
+    fn resolve_style_attribute_inner(
+        &self,
+        style_id: u32,
+        attr_id: u32,
+        depth: usize,
+    ) -> Option<ResolvedValue> {
+        if depth >= 64 {
+            return None;
+        }
+        let pkg = self.package_for(style_id)?;
+        let entries = pkg.entries.get(&style_id)?;
+        let style = entries
+            .iter()
+            .min_by_key(|e| (e.config.specificity(), !e.config.is_default()))?;
+        if let Some(value) = style
+            .bag
+            .as_ref()
+            .and_then(|bag| bag.iter().find(|value| value.name == attr_id))
+        {
+            let resolved = match value.data_type {
+                0x01 => ResolvedValue::Reference(value.data),
+                0x02 => ResolvedValue::Attribute(value.data),
+                0x03 => ResolvedValue::Str(value.string.clone()?),
+                0x04 => ResolvedValue::Float(f32::from_bits(value.data)),
+                0x05 => ResolvedValue::Dimension {
+                    value: complex_to_float(value.data),
+                    unit: complex_unit_of(value.data),
+                },
+                0x10 | 0x11 | 0x1c..=0x1f => ResolvedValue::Integer(value.data as i32),
+                0x12 => ResolvedValue::Boolean(value.data != 0),
+                _ => return None,
+            };
+            return match resolved {
+                ResolvedValue::Attribute(next) => {
+                    self.resolve_style_attribute_inner(style_id, next, depth + 1)
+                }
+                other => Some(other),
+            };
+        }
+        let parent = style.parent?;
+        self.resolve_style_attribute_inner(parent, attr_id, depth + 1)
     }
 
     pub fn package_for(&self, res_id: u32) -> Option<&Package> {
@@ -337,17 +405,58 @@ fn parse_package(
                 let e_size = u16_at(data, eoff)? as usize;
                 let e_flags = u16_at(data, eoff + 2)?;
                 let key_idx = u32_at(data, eoff + 4)?;
-                let (data_type, ddata, complex) = if e_flags & ENTRY_FLAG_COMPLEX != 0 {
-                    (0u8, 0u32, true)
+                let (data_type, ddata, complex, parent, bag) = if e_flags & ENTRY_FLAG_COMPLEX != 0
+                {
+                    let parent = if e_size >= 16 && eoff + 16 <= p + csize {
+                        let parent = u32_at(data, eoff + 8)?;
+                        (parent != 0).then_some(parent)
+                    } else {
+                        None
+                    };
+                    let map_count = if e_size >= 16 && eoff + 16 <= p + csize {
+                        u32_at(data, eoff + 12)? as usize
+                    } else {
+                        usize::MAX
+                    };
+                    let maps_start = eoff.saturating_add(e_size);
+                    let available = (p + csize).saturating_sub(maps_start) / 12;
+                    let bag = if map_count <= 65_536 && map_count <= available {
+                        let mut bag = Vec::with_capacity(map_count);
+                        for i in 0..map_count {
+                            let m = maps_start + i * 12;
+                            let value_size = u16_at(data, m + 4)?;
+                            if value_size < 8 {
+                                bag.clear();
+                                break;
+                            }
+                            let name = u32_at(data, m)?;
+                            let dtype = *data.get(m + 7).unwrap_or(&0);
+                            let value = u32_at(data, m + 8)?;
+                            bag.push(ResMapEntry {
+                                name,
+                                data_type: dtype,
+                                data: value,
+                                string: (dtype == 3)
+                                    .then(|| global.get(value).map(str::to_owned))
+                                    .flatten(),
+                            });
+                        }
+                        (bag.len() == map_count).then_some(bag)
+                    } else {
+                        None
+                    };
+                    (0u8, 0u32, true, parent, bag)
                 } else {
                     // Res_value após ResTable_entry (e_size bytes)
-                    let v = eoff + e_size;
-                    if v + 8 > data.len() {
+                    let Some(v) = eoff.checked_add(e_size) else {
+                        return Ok(());
+                    };
+                    if v + 8 > p + csize || v + 8 > data.len() {
                         return Ok(());
                     }
                     let dtype = *data.get(v + 3).unwrap_or(&0);
                     let d = u32_at(data, v + 4)?;
-                    (dtype, d, false)
+                    (dtype, d, false, None, None)
                 };
                 let string = if data_type == 3 && !complex {
                     global.get(ddata).map(str::to_owned)
@@ -362,6 +471,8 @@ fn parse_package(
                     data: ddata,
                     string,
                     complex,
+                    parent,
+                    bag,
                     key_idx,
                 });
                 Ok(())
@@ -536,5 +647,96 @@ mod tests {
         assert_eq!(info.density, Some(256));
         assert_eq!(info.language.as_deref(), Some("en"));
         assert_eq!(info.country.as_deref(), Some("US"));
+    }
+
+    #[test]
+    fn style_attributes_follow_parent_and_theme_attribute_aliases() {
+        let parent = 0x7f12_0001;
+        let child = 0x7f12_0002;
+        let primary = 0x7f04_0001;
+        let alias = 0x7f04_0002;
+        let inherited = 0x7f04_0003;
+        let absent = 0x7f04_0004;
+        let entry = |parent, bag| ResEntry {
+            config: ResConfigInfo::default(),
+            data_type: 0,
+            data: 0,
+            string: None,
+            complex: true,
+            parent,
+            bag: Some(bag),
+            key_idx: 0,
+        };
+        let mut entries = BTreeMap::new();
+        entries.insert(
+            parent,
+            vec![entry(
+                None,
+                vec![
+                    ResMapEntry {
+                        name: primary,
+                        data_type: 0x12,
+                        data: 1,
+                        string: None,
+                    },
+                    ResMapEntry {
+                        name: inherited,
+                        data_type: 0x12,
+                        data: 1,
+                        string: None,
+                    },
+                ],
+            )],
+        );
+        entries.insert(
+            child,
+            vec![entry(
+                Some(parent),
+                vec![
+                    ResMapEntry {
+                        name: primary,
+                        data_type: 0x12,
+                        data: 0,
+                        string: None,
+                    },
+                    ResMapEntry {
+                        name: alias,
+                        data_type: 0x02,
+                        data: primary,
+                        string: None,
+                    },
+                ],
+            )],
+        );
+        let arsc = Arsc {
+            global_strings: StringPool::default(),
+            packages: vec![Package {
+                id: 0x7f,
+                name: "test".into(),
+                type_strings: StringPool::default(),
+                key_strings: StringPool::default(),
+                entries,
+            }],
+        };
+        assert_eq!(
+            arsc.resolve_style_attribute(child, primary),
+            Some(ResolvedValue::Boolean(false)),
+            "the child style overrides its parent"
+        );
+        assert_eq!(
+            arsc.resolve_style_attribute(child, alias),
+            Some(ResolvedValue::Boolean(false)),
+            "?attr alias resolves through the child's effective theme"
+        );
+        assert_eq!(
+            arsc.resolve_style_attribute(child, inherited),
+            Some(ResolvedValue::Boolean(true)),
+            "a missing child attribute is inherited from the parent"
+        );
+        assert_eq!(
+            arsc.resolve_style_attribute(child, absent),
+            None,
+            "absent attributes stay absent"
+        );
     }
 }
