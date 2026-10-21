@@ -70,3 +70,15 @@ panic = "unwind"
 
 [profile.release.package."*"]
 opt-level = 3
+
+# ADR 008: low-memory profiling profile — symbols without the release
+# LTO/codegen-units=1 memory blow-up. Build with:
+#   CARGO_BUILD_JOBS=1 cargo build --profile profiling -p rd-cli
+# (optionally RUSTFLAGS="-C link-arg=-Wl,--no-keep-memory"). Keeps the 2 GB
+# sandbox build under ~1.5 GB while retaining line tables for profilers.
+[profile.profiling]
+inherits = "release"
+lto = false
+codegen-units = 16
+debug = 1
+strip = "none"

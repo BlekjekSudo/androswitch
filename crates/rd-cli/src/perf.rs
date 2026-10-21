@@ -49,6 +49,18 @@ pub struct Run {
     /// Marca d'água do heap do app (bytes) após o primeiro frame, lida do
     /// `runtime_health` FORA do cronômetro. `None` se não reportado.
     pub heap_peak_bytes: Option<u64>,
+    /// ADR 008 phase telemetry: `install` time (cold runs only; install is
+    /// outside the launch timer by design, but reported for diagnosis).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub install_ms: Option<f64>,
+    /// ADR 008 phase telemetry: host ms inside the `launch` tool call.
+    pub launch_ms: f64,
+    /// ADR 008 phase telemetry: host ms inside the first `screenshot` call
+    /// (raster + PNG encode as seen by the session).
+    pub screenshot_ms: f64,
+    /// ADR 008: VmHWM (MB) sampled right after this run, when available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rss_after_mb: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -183,8 +195,12 @@ fn call_json(
 fn timed_launch_frame(s: &mut AgentSession, device_factor: f64) -> Result<Run, RdError> {
     let cpu0 = process_cpu_ns();
     let t0 = Instant::now();
+    let t_launch = Instant::now();
     call_ok(s, "launch", &serde_json::json!({}))?;
+    let launch_ms = t_launch.elapsed().as_secs_f64() * 1000.0;
+    let t_shot = Instant::now();
     call_ok(s, "screenshot", &serde_json::json!({}))?;
+    let screenshot_ms = t_shot.elapsed().as_secs_f64() * 1000.0;
     let host_ms = t0.elapsed().as_secs_f64() * 1000.0;
     let cpu1 = process_cpu_ns();
     let cpu_ms = match (cpu0, cpu1) {
@@ -199,6 +215,10 @@ fn timed_launch_frame(s: &mut AgentSession, device_factor: f64) -> Result<Run, R
         emulated_ms: emulated_ms(host_ms, device_factor),
         cpu_ms,
         heap_peak_bytes,
+        install_ms: None,
+        launch_ms: round1(launch_ms),
+        screenshot_ms: round1(screenshot_ms),
+        rss_after_mb: peak_rss_mb().map(round1),
     })
 }
 
@@ -223,8 +243,12 @@ pub fn measure(apk: &Path, device: &DeviceProfile, runs: u32) -> Result<PerfRepo
     for i in 0..runs {
         // cold: sessão nova; o APK é registrado fora do cronômetro.
         let mut s = AgentSession::new();
+        let t_install = Instant::now();
         call_ok(&mut s, "install", &install_args)?;
-        cold.push(timed_launch_frame(&mut s, factor)?);
+        let install_ms = t_install.elapsed().as_secs_f64() * 1000.0;
+        let mut run = timed_launch_frame(&mut s, factor)?;
+        run.install_ms = Some(round1(install_ms));
+        cold.push(run);
         // warm: na primeira sessão, relança `runs` vezes com o APK já registrado.
         if i == 0 {
             for _ in 0..runs {
@@ -423,6 +447,10 @@ mod tests {
             emulated_ms: 1.0,
             cpu_ms: None,
             heap_peak_bytes: b,
+            install_ms: None,
+            launch_ms: 0.0,
+            screenshot_ms: 0.0,
+            rss_after_mb: None,
         };
         // nada medido → None (orçamento falha fechado)
         assert_eq!(heap_peak_mb_max(&[], &[]), None);

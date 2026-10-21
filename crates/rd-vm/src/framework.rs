@@ -980,7 +980,7 @@ pub struct HostState {
     pub shared_prefs_impl: Option<ObjRef>,
     /// M3.2: APK aberto (Resources) — layouts AXML + resources.arsc para o
     /// LayoutInflater. Injetado via `Engine::set_resources` (CLI `rd app run`).
-    pub resources: Option<rd_apk::Apk>,
+    pub resources: Option<std::sync::Arc<rd_apk::Apk>>,
     /// M8 full scope: estado dos subsistemas de compat real (RecyclerView,
     /// Dialogs, OkHttp, SQLite/Room, Services/Broadcasts/DeepLinks,
     /// WorkManager, SharedPreferences stateful) — ver `crate::m8`.
@@ -1066,6 +1066,11 @@ impl Engine {
     /// M3.2: injeta o APK aberto como fonte de Resources (layouts AXML +
     /// resources.arsc). O CLI `rd app run` chama isto UMA vez por execução.
     pub fn set_resources(&mut self, apk: rd_apk::Apk) {
+        self.set_resources_arc(std::sync::Arc::new(apk));
+    }
+
+    /// ADR 008 Stage 1: O(1) launch injection — no deep `Apk` clone.
+    pub fn set_resources_arc(&mut self, apk: std::sync::Arc<rd_apk::Apk>) {
         #[cfg(feature = "advanced-components")]
         {
             self.fw.m9.target_sdk = apk.manifest.target_sdk;
@@ -1076,7 +1081,7 @@ impl Engine {
 
     /// Resources injetados — erro tipado se ausentes (nunca silencioso).
     pub fn resources(&self) -> Result<&rd_apk::Apk, VmExit> {
-        self.fw.resources.as_ref().ok_or_else(|| {
+        self.fw.resources.as_deref().ok_or_else(|| {
             crate::err::with_suggestion(
                 crate::err::vm_error(
                     "RESOURCES_MISSING",

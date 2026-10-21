@@ -117,6 +117,17 @@ fn filtered_scanlines(px: &[u8], w: usize, h: usize) -> Vec<u8> {
         } else {
             None
         };
+        // ADR 008 fast path: a row identical to the one above filters to an
+        // all-zero Up row — the adaptive heuristic below would pick exactly
+        // that (score 0), so emitting it directly is byte-identical output
+        // in O(stride) memcmp instead of 3 candidate builds + scoring.
+        if let Some(prev) = up {
+            if prev == row {
+                raw.push(2); // Up
+                raw.resize(raw.len() + stride, 0);
+                continue;
+            }
+        }
         for i in 0..stride {
             let a = if i >= 3 { row[i - 3] } else { 0 };
             let b = up.map(|u| u[i]).unwrap_or(0);
