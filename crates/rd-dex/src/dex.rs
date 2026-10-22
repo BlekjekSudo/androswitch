@@ -46,7 +46,7 @@ pub struct Header {
     pub magic: [u8; 8],
     pub version: DexVersion,
     pub checksum: u32,
-    /// checksum adler32 verificado (ver `checksum_ok`).
+    /// checksum adler32 armazenado no header.
     pub signature: [u8; 20],
     pub file_size: u32,
     pub header_size: u32,
@@ -68,7 +68,10 @@ pub struct Header {
     pub class_defs_off: u32,
     pub data_size: u32,
     pub data_off: u32,
-    /// adler32 recalculado confere? (informacional; parse não falha)
+    /// adler32 recalculado confere? (informacional; parse não falha).
+    /// `false` também quando a verificação foi explicitamente deferida
+    /// (ADR 009: `Dex::parse_unverified`) — use `Dex::verify_checksum()`
+    /// para o valor autoritativo.
     pub checksum_ok: bool,
 }
 
@@ -249,9 +252,24 @@ impl Dex {
         data.len() >= 8 && data[0..4] == DEX_MAGIC
     }
 
-    /// Parseia um DEX completo de memória.
+    /// Parseia um DEX completo de memória (verifica o adler32 do header).
     pub fn parse(data: Vec<u8>) -> RdResult<Dex> {
-        let header = Self::parse_header(&data)?;
+        Self::parse_inner(data, true)
+    }
+
+    /// ADR 009: como `parse`, mas DEFERE a verificação do adler32 do
+    /// header (a varredura O(file_size) custava ~metade do mount num DEX
+    /// de 9 MB e é redundante no caminho de execução: a entrada ZIP já
+    /// teve o CRC32 conferido na extração, e o conteúdo é validado
+    /// estruturalmente por todas as tabelas). `header.checksum_ok` fica
+    /// `false` = "não verificado"; `verify_checksum()` recalcula sob
+    /// demanda. `rd dex`/inspect continuam usando `parse` (verificado).
+    pub fn parse_unverified(data: Vec<u8>) -> RdResult<Dex> {
+        Self::parse_inner(data, false)
+    }
+
+    fn parse_inner(data: Vec<u8>, verify_checksum: bool) -> RdResult<Dex> {
+        let header = Self::parse_header_with(&data, verify_checksum)?;
         let map_list = Self::parse_map_list(&data, header.map_off)?;
         let strings = Strings::parse(&data, header.string_ids_size, header.string_ids_off)?;
         let type_ids =
@@ -299,8 +317,19 @@ impl Dex {
         })
     }
 
+    /// Recalcula o adler32 sobre os bytes e compara com o header
+    /// (autoritativo; independente de como o DEX foi parseado).
+    pub fn verify_checksum(&self) -> bool {
+        let fs = self.header.file_size as usize;
+        fs >= 12 && fs <= self.data.len() && adler32(&self.data[12..fs]) == self.header.checksum
+    }
+
     /// Parse do header com validações fuzz-safe.
     pub fn parse_header(data: &[u8]) -> RdResult<Header> {
+        Self::parse_header_with(data, true)
+    }
+
+    fn parse_header_with(data: &[u8], verify_checksum: bool) -> RdResult<Header> {
         if data.len() < 112 {
             return Err(RdError::parse(format!(
                 "dex: arquivo de {} bytes < header mínimo (112)",
@@ -350,7 +379,9 @@ impl Dex {
                 data.len()
             )));
         }
-        let checksum_ok = file_size >= 12 && adler32(&data[12..file_size as usize]) == checksum;
+        let checksum_ok = verify_checksum
+            && file_size >= 12
+            && adler32(&data[12..file_size as usize]) == checksum;
 
         Ok(Header {
             magic: data[0..8].try_into().unwrap_or([0u8; 8]),

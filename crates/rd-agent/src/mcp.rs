@@ -341,8 +341,51 @@ pub struct InstalledApp {
     pub package: String,
     pub version_name: Option<String>,
     pub version_code: Option<u64>,
-    pub apk: std::sync::Arc<Apk>,
+    /// Manifest parsed at install (cached: the majority of tools only
+    /// need this, never the whole container).
+    pub manifest: rd_apk::Manifest,
+    /// The fully opened APK. `None` only after an ADR 009 snapshot fast
+    /// install; loaded on first real use via [`InstalledApp::apk`].
+    pub apk: Option<std::sync::Arc<Apk>>,
+    /// Where the APK was installed from (lazy load / re-fingerprint).
+    pub source_path: Option<PathBuf>,
+    /// ADR 009 content fingerprint, once known.
+    pub snapshot_key: Option<String>,
     pub perms: PermissionEngine,
+}
+
+impl InstalledApp {
+    /// The fully opened APK, loading it from `source_path` on first use
+    /// (ADR 009 lazy materialization of a snapshot fast install).
+    pub fn apk(&mut self) -> Result<std::sync::Arc<Apk>, RdError> {
+        if let Some(a) = &self.apk {
+            return Ok(a.clone());
+        }
+        let path = self.source_path.clone().ok_or_else(|| {
+            agent_error(
+                "NO_APP",
+                format!(
+                    "APK de {} sem caminho de origem para materializar",
+                    self.package
+                ),
+                Some("reinstale o APK (tool `install`)"),
+            )
+        })?;
+        let t0 = std::time::Instant::now();
+        let bytes = std::fs::read(&path).map_err(|e| {
+            RdError::new(
+                "IO_ERROR",
+                format!("lendo {}: {e}", path.display()),
+                MODULE_ID,
+            )
+        })?;
+        let apk =
+            Apk::from_bytes(bytes).map_err(|e| RdError::new(&e.code, &e.cause, &e.module_id))?;
+        phase("lazy_apk_load", t0);
+        let arc = std::sync::Arc::new(apk);
+        self.apk = Some(arc.clone());
+        Ok(arc)
+    }
 }
 
 /// Estado do "dispositivo" headless: registro de apps instalados, app
@@ -364,6 +407,8 @@ pub struct AgentSession {
     activity: Option<String>,
     /// System.out do app (issue #55: buffer da sessão, tool `logs` lê).
     logs: Arc<Mutex<Vec<u8>>>,
+    /// ADR 009: snapshot frame presented but engine not yet materialized.
+    pending_snapshot: Option<PendingSnapshot>,
     devices: DeviceTable,
     behavior: SwitchTable,
     /// Round 6: cached screen model / PNG per frame version, resource
@@ -408,6 +453,7 @@ impl AgentSession {
             native_engine: None,
             activity: None,
             logs,
+            pending_snapshot: None,
             devices: DeviceTable::embedded().expect("devices.toml embutido parseia"),
             behavior: SwitchTable::embedded().expect("behavior-switches.toml embutido parseia"),
             screen: ScreenState::default(),
@@ -449,6 +495,12 @@ impl AgentSession {
     }
 
     fn require_engine(&mut self) -> Result<&mut Engine, RdError> {
+        // ADR 009: first engine-requiring tool after a snapshot launch
+        // runs the real cold launch now (disclosed via launch result
+        // `materialized: false`).
+        if self.engine.is_none() && self.pending_snapshot.is_some() {
+            self.materialize_snapshot()?;
+        }
         let running = self.engine.is_some();
         if running {
             Ok(self.engine.as_mut().expect("engine"))
@@ -474,6 +526,7 @@ impl AgentSession {
     fn kill_engine_if_running(&mut self, package: &str) -> bool {
         if self.engine_package.as_deref() == Some(package) {
             self.engine = None;
+            self.pending_snapshot = None;
             self.engine_package = None;
             self.native_engine = None;
             self.activity = None;
@@ -511,8 +564,10 @@ fn dexes_of_apk(apk: &Apk) -> Result<Vec<rd_dex::Dex>, RdError> {
             .map_err(|e| RdError::new(&e.code, &e.cause, &e.module_id))?;
         phase(&format!("dex_read_entry:{name}"), t_entry);
         let t_parse = std::time::Instant::now();
-        let d =
-            rd_dex::Dex::parse(bytes).map_err(|e| RdError::new(&e.code, &e.cause, &e.module_id))?;
+        // ADR 009: mount defere o adler32 do DEX (o CRC32 da entrada ZIP já
+        // foi conferido em read_entry; `Dex::verify_checksum` fica sob demanda).
+        let d = rd_dex::Dex::parse_unverified(bytes)
+            .map_err(|e| RdError::new(&e.code, &e.cause, &e.module_id))?;
         phase(&format!("dex_parse:{name}"), t_parse);
         Ok(d)
     };
@@ -1263,6 +1318,13 @@ impl AgentSession {
                 Some("use um APK menor ou eleve RD_MCP_MAX_APK_MB no processo do servidor"),
             ));
         }
+        // ADR 009 (opt-in RD_SNAPSHOT=on): paged fast install when a
+        // content-keyed snapshot exists — no whole-file read at all.
+        if snapshot_enabled() {
+            if let Some(res) = self.try_install_snapshot(&apk_file)? {
+                return Ok(res);
+            }
+        }
         let t_read = std::time::Instant::now();
         let bytes = std::fs::read(&apk_file).map_err(|e| {
             RdError::new(
@@ -1305,7 +1367,10 @@ impl AgentSession {
             package: package.clone(),
             version_name: manifest.version_name.clone(),
             version_code: manifest.version_code,
-            apk: std::sync::Arc::new(apk),
+            manifest: manifest.clone(),
+            apk: Some(std::sync::Arc::new(apk)),
+            source_path: Some(apk_file.clone()),
+            snapshot_key: None,
             perms,
         };
         match self.installed.iter().position(|a| a.package == package) {
@@ -1324,6 +1389,107 @@ impl AgentSession {
             "runtime_pending": self.find_installed(&package).map(|a| a.perms.pending_runtime().len()).unwrap_or(0),
             "runtime_special": self.find_installed(&package).map(|a| a.perms.pending_special().len()).unwrap_or(0),
         })))
+    }
+
+    /// Real cold launch (new Engine + DEX mount + `launch_app`).
+    /// Outer `Err` = host/setup failures; inner `Err` = guest `VmExit`,
+    /// preserved so callers keep the existing exit mapping (issue #109).
+    fn cold_launch(
+        &mut self,
+        package_out: &str,
+        desc: &str,
+        selected_engine: Option<&str>,
+    ) -> Result<Result<u32, VmExit>, RdError> {
+        #[cfg(feature = "advanced-components")]
+        let (resources, granted, notification_permission) = {
+            let app = self.find_installed_mut(package_out).ok_or_else(|| {
+                agent_error(
+                    "PACKAGE_NOT_INSTALLED",
+                    format!("package {package_out:?} não está no registro desta sessão"),
+                    Some("veja package_list — instale com `install` antes de lançar"),
+                )
+            })?;
+            let notification_permission = app
+                .perms
+                .state("android.permission.POST_NOTIFICATIONS")
+                .map(|s| s.is_granted())
+                .unwrap_or(app.manifest.target_sdk < 33);
+            let granted: Vec<String> = app
+                .perms
+                .all_states()
+                .iter()
+                .filter(|(_, s)| s.is_granted())
+                .map(|(n, _)| n.clone())
+                .collect();
+            (app.apk()?, granted, notification_permission)
+        };
+        #[cfg(not(feature = "advanced-components"))]
+        let (resources, granted) = {
+            let app = self.find_installed_mut(package_out).ok_or_else(|| {
+                agent_error(
+                    "PACKAGE_NOT_INSTALLED",
+                    format!("package {package_out:?} não está no registro desta sessão"),
+                    Some("veja package_list — instale com `install` antes de lançar"),
+                )
+            })?;
+            let granted: Vec<String> = app
+                .perms
+                .all_states()
+                .iter()
+                .filter(|(_, s)| s.is_granted())
+                .map(|(n, _)| n.clone())
+                .collect();
+            (app.apk()?, granted)
+        };
+        // M8 (38º gap): Application do manifest como no boot_app do CLI.
+        let app_desc = resources.manifest.application.name.as_ref().map(|name| {
+            let abs = if let Some(rel) = name.strip_prefix('.') {
+                format!("{}{}", resources.manifest.package, rel)
+            } else {
+                name.clone()
+            };
+            format!("L{};", abs.replace('.', "/"))
+        });
+        let mut eng = if let Some(id) = selected_engine {
+            #[cfg(feature = "native-engines")]
+            {
+                rd_engine_registry::NativeProcess::from_apk(id, (*resources).clone())?.into_engine()
+            }
+            #[cfg(not(feature = "native-engines"))]
+            {
+                let _ = id;
+                return Err(agent_error(
+                    "NOT_IMPLEMENTED",
+                    "MCP native selection requires native-engines",
+                    None,
+                ));
+            }
+        } else {
+            let t_mount = std::time::Instant::now();
+            let dexes = dexes_of_apk(&resources)?;
+            phase("dex_mount_total", t_mount);
+            let t_new = std::time::Instant::now();
+            let mut e = Engine::new(dexes, VmConfig::default());
+            phase("engine_new", t_new);
+            e.set_resources_arc(resources);
+            e
+        };
+        #[cfg(feature = "advanced-components")]
+        eng.m9_set_notification_permission(notification_permission);
+        if let Some(ad) = app_desc {
+            eng.set_application_class(ad);
+        }
+        // perms.rs: checkSelfPermission/requestPermissions see the
+        // session's real grant state
+        eng.set_granted_permissions(granted.into_iter());
+        let t_launch = std::time::Instant::now();
+        let r = eng.launch_app(desc, package_out, Vec::new());
+        phase("launch_app_cold", t_launch);
+        if r.is_ok() {
+            self.pending_snapshot = None;
+            self.engine = Some(eng);
+        }
+        Ok(r)
     }
 
     fn tool_launch(
@@ -1369,7 +1535,6 @@ impl AgentSession {
                 // ActivityNotFoundException. O caminho sem `activity` já
                 // consultava o manifest (LAUNCHER): os dois agora concordam.
                 let comp = app
-                    .apk
                     .manifest
                     .application
                     .components
@@ -1385,7 +1550,7 @@ impl AgentSession {
                             "MISSING_ENTRY",
                             format!(
                                 "activity {a} não está declarada como <activity>/<activity-alias> no AndroidManifest.xml (pacote {})",
-                                app.apk.manifest.package
+                                app.manifest.package
                             ),
                             Some(
                                 "o Android recusa iniciar classe não declarada; use `inspect`/`package_list` para listar as activities do manifest, ou lance sem `activity` para usar a LAUNCHER",
@@ -1393,13 +1558,12 @@ impl AgentSession {
                         )
                     })?;
                 let (desc, alias_of) = launch_desc_of_component(comp)?;
-                (desc, app.apk.manifest.package.clone(), alias_of)
+                (desc, app.manifest.package.clone(), alias_of)
             }
             None => {
                 // issue #109: a entrada MAIN/LAUNCHER pode estar declarada num
                 // `<activity-alias>`, não só numa `<activity>`.
                 let launcher = app
-                    .apk
                     .manifest
                     .application
                     .components
@@ -1418,9 +1582,13 @@ impl AgentSession {
                         )
                     })?;
                 let (desc, alias_of) = launch_desc_of_component(launcher)?;
-                (desc, app.apk.manifest.package.clone(), alias_of)
+                (desc, app.manifest.package.clone(), alias_of)
             }
         };
+        // ADR 009: owned hints so the `app` borrow ends before branches
+        // that need `&mut self`.
+        let snap_key = app.snapshot_key.clone();
+        let snap_source = app.source_path.clone();
         // M7 (regime warm): se o package ainda está em execução na sessão, o
         // relançamento REUTILIZA o processo (o Engine existente) — o Android
         // não re-parseia o DEX num warm start; a activity é recriada no mesmo
@@ -1431,75 +1599,38 @@ impl AgentSession {
         let warm = self.engine.is_some()
             && self.engine_package.as_deref() == Some(package_out.as_str())
             && self.native_engine == selected_engine;
+        // ADR 009 (opt-in): present a stored first frame immediately; the
+        // engine materializes lazily on the first engine-requiring tool.
+        // Only when no other engine is live (a cold launch would replace
+        // it) and no native engine was selected.
+        let snapshot_present: Option<Result<u32, VmExit>> =
+            if !warm && self.engine.is_none() && selected_engine.is_none() && snapshot_enabled() {
+                match self.snapshot_for_launch(
+                    &package_out,
+                    &desc,
+                    snap_key.as_deref(),
+                    snap_source.as_deref(),
+                ) {
+                    Some(pending) => {
+                        self.present_snapshot(pending);
+                        Some(Ok(0))
+                    }
+                    None => None,
+                }
+            } else {
+                None
+            };
+        let used_snapshot = snapshot_present.is_some();
         let launch_result = if warm {
             let eng = self
                 .engine
                 .as_mut()
                 .expect("engine presente: warm verificado acima");
             eng.launch_app(&desc, &package_out, Vec::new())
+        } else if let Some(snap_result) = snapshot_present {
+            snap_result
         } else {
-            #[cfg(feature = "advanced-components")]
-            let notification_permission = app
-                .perms
-                .state("android.permission.POST_NOTIFICATIONS")
-                .map(|s| s.is_granted())
-                .unwrap_or(app.apk.manifest.target_sdk < 33);
-            let resources = app.apk.clone();
-            // M8 (38º gap): Application do manifest como no boot_app do CLI.
-            let app_desc = resources.manifest.application.name.as_ref().map(|name| {
-                let abs = if let Some(rel) = name.strip_prefix('.') {
-                    format!("{}{}", resources.manifest.package, rel)
-                } else {
-                    name.clone()
-                };
-                format!("L{};", abs.replace('.', "/"))
-            });
-            let mut eng = if let Some(id) = selected_engine.as_deref() {
-                #[cfg(feature = "native-engines")]
-                {
-                    rd_engine_registry::NativeProcess::from_apk(id, (*resources).clone())?
-                        .into_engine()
-                }
-                #[cfg(not(feature = "native-engines"))]
-                {
-                    let _ = id;
-                    return Err(agent_error(
-                        "NOT_IMPLEMENTED",
-                        "MCP native selection requires native-engines",
-                        None,
-                    ));
-                }
-            } else {
-                let t_mount = std::time::Instant::now();
-                let dexes = dexes_of_apk(&app.apk)?;
-                phase("dex_mount_total", t_mount);
-                let t_new = std::time::Instant::now();
-                let mut e = Engine::new(dexes, VmConfig::default());
-                phase("engine_new", t_new);
-                e.set_resources_arc(resources);
-                e
-            };
-            #[cfg(feature = "advanced-components")]
-            eng.m9_set_notification_permission(notification_permission);
-            if let Some(ad) = app_desc {
-                eng.set_application_class(ad);
-            }
-            // perms.rs: checkSelfPermission/requestPermissions see the
-            // session's real grant state
-            eng.set_granted_permissions(
-                app.perms
-                    .all_states()
-                    .iter()
-                    .filter(|(_, s)| s.is_granted())
-                    .map(|(n, _)| n.clone()),
-            );
-            let t_launch = std::time::Instant::now();
-            let r = eng.launch_app(&desc, &package_out, Vec::new());
-            phase("launch_app_cold", t_launch);
-            if r.is_ok() {
-                self.engine = Some(eng);
-            }
-            r
+            self.cold_launch(&package_out, &desc, selected_engine.as_deref())?
         };
         launch_result.map_err(|e| {
             let rd = vm_exit_to_rd(e);
@@ -1520,9 +1651,18 @@ impl AgentSession {
             }
         })?;
         self.engine_package = Some(package_out.clone());
-        self.native_engine = selected_engine;
+        self.native_engine = selected_engine.clone();
         self.activity = Some(desc.clone());
         self.active = Some(package_out.clone());
+        // ADR 009: a REAL cold launch captures the snapshot for future
+        // processes (install-time precomputation). Failure is disclosed
+        // in the result, never fatal to the launch.
+        let mut snapshot_error: Option<String> = None;
+        if !warm && !used_snapshot && selected_engine.is_none() && snapshot_enabled() {
+            if let Err(e) = self.capture_snapshot(&package_out, &desc) {
+                snapshot_error = Some(e.cause);
+            }
+        }
         let mut out = serde_json::json!({
             "launched": true,
             "native_engine": self.native_engine,
@@ -1532,6 +1672,13 @@ impl AgentSession {
             // M7: true = warm start (processo reutilizado, sem re-parse do DEX)
             "warm": warm,
         });
+        if used_snapshot {
+            out["snapshot"] = serde_json::json!(true);
+            out["materialized"] = serde_json::json!(false);
+        }
+        if let Some(e) = snapshot_error {
+            out["snapshot_error"] = serde_json::json!(e);
+        }
         if let Some((alias, _)) = &alias_of {
             // issue #109: o que foi pedido/declarado é o alias — o resultado
             // registra qual alias resolveu o launch (a `activity` é o alvo).
@@ -1727,6 +1874,33 @@ impl AgentSession {
     }
 
     fn tool_screenshot(&mut self, path: Option<&str>) -> Result<ToolResult, RdError> {
+        // ADR 009: a presented-but-unmaterialized snapshot serves its
+        // stored frame directly (byte-identical to the live frame under
+        // Law 4 determinism) instead of forcing materialization.
+        if self.engine.is_none() {
+            if let Some(pending) = &self.pending_snapshot {
+                let png = pending.loaded.png.clone();
+                return match path {
+                    Some(p) if !p.is_empty() => {
+                        let out = self.policy.check_write_path(p, &self.roots)?;
+                        write_no_follow(&out, &png)?;
+                        Ok(ToolResult::json(&serde_json::json!({
+                            "path": out.display().to_string(),
+                            "bytes": png.len(),
+                            "size": [720, 1440],
+                            "snapshot": true,
+                        })))
+                    }
+                    _ => Ok(ToolResult {
+                        content: vec![ToolContent::Image {
+                            data_b64: base64_encode(&png),
+                            mime: "image/png",
+                        }],
+                        is_error: false,
+                    }),
+                };
+            }
+        }
         if self.require_engine()?.view_tree().is_none() {
             return Err(agent_error(
                 "INVALID_FORMAT",
@@ -1886,9 +2060,13 @@ impl AgentSession {
     // ── permissões / device / behavior ──────────────────────────────────────
 
     fn tool_app_info(&mut self) -> Result<ToolResult, RdError> {
-        let app = self.require_apk()?;
-        let engines = rd_engine_registry::Registry::embedded()?.detect_for_inspection(&app.apk)?;
-        let m = &app.apk.manifest;
+        let pkg = self.require_apk()?.package.clone();
+        let apk = self
+            .find_installed_mut(&pkg)
+            .ok_or_else(|| agent_error("NO_APP", "app ativo sumiu do registro", None))?
+            .apk()?;
+        let engines = rd_engine_registry::Registry::embedded()?.detect_for_inspection(&apk)?;
+        let m = &apk.manifest;
         Ok(ToolResult::json(&serde_json::json!({
             "package": m.package,
             "version_name": m.version_name,
@@ -1896,7 +2074,7 @@ impl AgentSession {
             "engines": engines,
             "min_sdk": m.min_sdk,
             "target_sdk": m.target_sdk,
-            "floor": serde_json::json!(match app.apk.floor_status() {
+            "floor": serde_json::json!(match apk.floor_status() {
                 rd_apk::FloorStatus::Ok => serde_json::json!({"ok": true, "floor": 26}),
                 rd_apk::FloorStatus::BelowFloor { min_sdk, floor } =>
                     serde_json::json!({"ok": false, "min_sdk": min_sdk, "floor": floor}),
@@ -1979,7 +2157,7 @@ impl AgentSession {
                     Some("veja package_list"),
                 )
             })?;
-            app.apk.manifest.clone()
+            app.manifest.clone()
         };
         // Android clear data: app em execução é morto e as permissões
         // runtime voltam ao estado de instalação.
@@ -2072,7 +2250,7 @@ impl AgentSession {
         let app = self.require_apk()?;
         let findings: Vec<serde_json::Value> = app
             .perms
-            .audit(&app.apk.manifest)
+            .audit(&app.manifest)
             .iter()
             .map(|f| {
                 serde_json::json!({
@@ -2114,7 +2292,7 @@ impl AgentSession {
     fn tool_behavior_switches(&mut self) -> Result<ToolResult, RdError> {
         let target = self
             .require_apk()
-            .map(|a| a.apk.manifest.target_sdk)
+            .map(|a| a.manifest.target_sdk)
             .unwrap_or(26);
         let active: Vec<serde_json::Value> = self
             .behavior
@@ -2405,8 +2583,13 @@ impl AgentSession {
                 Some("veja package_list — instale com `install` antes de analisar"),
             )
         })?;
-        let dexes = dexes_of_apk(&app.apk)?;
-        let usage = crate::api_usage::scan(&app.apk.manifest.package, &dexes);
+        let _ = app;
+        let apk = self
+            .find_installed_mut(&pkg)
+            .ok_or_else(|| agent_error("NO_APP", "app sumiu do registro", None))?
+            .apk()?;
+        let dexes = dexes_of_apk(&apk)?;
+        let usage = crate::api_usage::scan(&apk.manifest.package, &dexes);
         let v = serde_json::to_value(usage).map_err(|e| {
             agent_error(
                 "INTERNAL",
@@ -3058,6 +3241,7 @@ pub fn serve_stdio_with<R: std::io::Read, W: std::io::Write>(
 
 include!("m9_tools.rs");
 include!("observe.rs");
+include!("snapshot.rs");
 include!("ui_tools.rs");
 include!("runtime_tools.rs");
 
