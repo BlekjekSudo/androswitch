@@ -5044,6 +5044,88 @@ mod tests {
         v
     }
 
+    /// ADR 009: capture -> paged fast install -> present (no engine) ->
+    /// screenshot from snapshot -> lazy materialization on require_engine.
+    /// Calls the internal entry points directly: the RD_SNAPSHOT=on gate
+    /// lives in the callers and its OnceLock is process-global.
+    #[test]
+    fn snapshot_capture_present_materialize() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_apk_path();
+        let snap_root = std::env::temp_dir().join(format!(
+            "rd-snap-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::env::set_var("RD_SNAPSHOT_DIR", &snap_root);
+
+        // capture from a REAL launch in session 1
+        let mut s1 = AgentSession::new();
+        install_ok(&mut s1, &apk_path);
+        let lv = launch_ok(&mut s1, serde_json::json!({}));
+        let activity = lv["activity"].as_str().expect("activity desc").to_string();
+        let live_png = s1.screen_png().expect("live png");
+        s1.capture_snapshot("com.test.mcp", &activity)
+            .expect("capture");
+        let key = s1
+            .find_installed("com.test.mcp")
+            .and_then(|a| a.snapshot_key.clone())
+            .expect("snapshot key recorded");
+        let loaded = load_snapshot(&key).expect("snapshot loads");
+        assert_eq!(loaded.package, "com.test.mcp");
+        assert_eq!(loaded.activity, activity);
+        assert_eq!(&*loaded.png, &*live_png, "stored frame == live frame bytes");
+
+        // fingerprint is stable across opens (process-independent key)
+        let pz = rd_apk::paged::PagedZip::open(std::path::Path::new(&apk_path)).expect("paged");
+        let mb = pz.read("AndroidManifest.xml").expect("manifest");
+        assert_eq!(apk_fingerprint(&pz, &mb), key);
+
+        // session 2: fast install (no whole Apk), present, screenshot,
+        // then materialize on first engine-requiring access
+        let mut s2 = AgentSession::new();
+        let res = s2
+            .try_install_snapshot(std::path::Path::new(&apk_path))
+            .expect("fast install runs")
+            .expect("snapshot hit");
+        match &res.content[0] {
+            ToolContent::Text(txt) => {
+                let v: serde_json::Value = serde_json::from_str(txt).expect("json");
+                assert_eq!(v["snapshot_cached"], true);
+                assert_eq!(v["package"], "com.test.mcp");
+            }
+            _ => panic!("install result is text"),
+        }
+        assert!(s2
+            .find_installed("com.test.mcp")
+            .map(|a| a.apk.is_none())
+            .unwrap_or(false));
+        let pending = s2
+            .snapshot_for_launch("com.test.mcp", &activity, Some(&key), None)
+            .expect("presentable snapshot");
+        s2.present_snapshot(pending);
+        assert!(s2.engine.is_none(), "present must not materialize");
+        let shot = s2.call_tool("screenshot", &serde_json::json!({}));
+        assert!(!shot.is_error);
+        match &shot.content[0] {
+            ToolContent::Image { mime, .. } => assert_eq!(*mime, "image/png"),
+            _ => panic!("screenshot from snapshot is an image"),
+        }
+        assert!(s2.engine.is_none(), "screenshot must not materialize");
+        {
+            let _eng = s2.require_engine().expect("materialize on demand");
+        }
+        assert!(s2.pending_snapshot.is_none());
+        assert!(s2.engine.is_some());
+        let (v, err) = call(&mut s2, "tap", serde_json::json!({"x": 10, "y": 10}));
+        assert!(!err, "tap after materialization: {v}");
+        std::env::remove_var("RD_SNAPSHOT_DIR");
+        let _ = std::fs::remove_dir_all(&snap_root);
+    }
+
     /// DoD (schemas): toda tool do catálogo despacha (nada de UNKNOWN_TOOL)
     /// e tem schema com required ⊆ properties.
     #[test]

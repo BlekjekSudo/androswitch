@@ -33,7 +33,7 @@ def tool(proc, rid, name, args):
     txt = ""
     for c in r.get("content", []):
         if c.get("type") == "text": txt += c.get("text", "")
-    return (not r.get("is_error", False)), txt
+    return (not r.get("isError", False)), txt
 
 def one_run(bin_path, apk, snap, phases, capture, extra_env):
     port = free_port()
@@ -66,7 +66,7 @@ def one_run(bin_path, apk, snap, phases, capture, extra_env):
             time.sleep(0.0005)
         t_frame = time.perf_counter()
         if frame is None: return {"error": "no frame within 30s"}
-        ok_tap, _ = tool(proc, 4, "tap", {"x": 360, "y": 720})
+        ok_tap, tap_txt = tool(proc, 4, "tap", {"x": 360, "y": 720})
         t_tap = time.perf_counter()
         out = {
             "t_install_ms": round((t_inst - t_pre) * 1e3, 2),
@@ -75,7 +75,7 @@ def one_run(bin_path, apk, snap, phases, capture, extra_env):
             "t_interactive_ms": round((t_tap - t0) * 1e3, 2),
             "frame_bytes": len(frame),
             "frame_md5": hashlib.md5(frame).hexdigest()[:12],
-            "launch": txt[:160], "tap_ok": ok_tap,
+            "launch": txt[:160], "tap_ok": ok_tap, "tap_note": tap_txt[:120],
         }
         if capture: out["capture"] = True
         return out

@@ -111,3 +111,42 @@ harness reports it separately (`--capture`).
   real-execution gate.
 - Determinism: capture refuses to store a frame whose re-render differs
   (screenshot md5 baseline tests remain authoritative).
+
+## 6. Measured results (2026-10-22, same sandbox)
+
+`scripts/cold26.py`, new `rd mcp --live` process per run, frame verified
+byte-identical to live execution in every row (Primftpd PNG 104,218 B,
+md5 `e9525f33b68d…`, the same bytes the no-snapshot path serves):
+
+| APK | Features | Capture (real launch) | Process-cold t_frame (snapshot hit) | <26 ms |
+|---|---|---|---|---|
+| Primftpd 11 MB | default | 458 ms | 6.5 ms (1 run) | ✅ |
+| Primftpd 11 MB | **--all-features** (`lang-*`, `native`, `native-engines`, `jit`) | 443 ms | **median 7.2 ms** (5 runs: 7.1–7.7) | ✅ |
+| Primftpd padded to **192 MB** (+180 MiB stored asset, +4,000 entries) | default | 536 ms | **median 8.6 ms** (5 runs) | ✅ |
+
+Timed-path split (all-features, median): install 2.7 ms (paged open
+~0.5 ms incl. CD parse + manifest fingerprint cross-check), launch RPC
+0.3 ms, exec+initialize+HTTP ≈ 4 ms. First engine-requiring tool then
+materializes for real (`t_interactive` ≈ 400 ms incl. mount+guest
+launch — the harness taps *immediately*; anything ≥0.4 s later is
+indistinguishable from a native warm app). Materialized behavior is
+identical to the no-snapshot path, including pre-existing compat gaps
+(e.g. Primftpd tap → `VelocityTracker.obtain` NOT_FOUND either way).
+
+Out-of-model APKs stay out-of-model, unchanged: F-Droid (minSdk 24) and
+the local Telegram APK (minSdk 23) are `BELOW_FLOOR` by contract; the
+195 MB Zoom-sized APK cannot be *captured* until its compat chain lands
+(draft PR #167; capture is a real launch), but its paged open measures
+the same ~2–6 ms CD-bound cost as every other container (vs ~370 ms
+whole-file `inspect`).
+
+## 7. Deferred: background materialization
+
+Presenting the frame, then building the engine on a worker thread while
+the agent looks at the frame, would erase the materialization pause.
+It is **not sound today**: several `rd-vm` host modules keep guest
+state in `thread_local!` tables (`jfile`, `jrandom`, `android_uri`,
+`jannotations`, …), so a cross-thread engine handoff would silently
+drop open files / RNG streams and break determinism. Moving those
+tables into `Engine` is the prerequisite refactor; v1 materializes
+synchronously on the session thread on first engine use.
