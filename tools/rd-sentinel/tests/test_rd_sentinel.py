@@ -658,6 +658,73 @@ test vm::stable ... ok
         self.assertTrue(result["truncated"])
         self.assertEqual("GHSA-example", result["results"][0]["vulnerability_ids"][0])
 
+    def test_efficiency_summary_accepts_legacy_sentinel_six_and_rejects_mismatch(self):
+        script = ROOT.parents[1] / "scripts" / "summarize-efficiency-benchmarks.py"
+        six = ["roots", "host", "sweep", "minor", "resolve", "interp"]
+        nine = [*six, "strings", "subtype", "jit"]
+        rows = []
+        for workload in six:
+            for label, elapsed in (("baseline", 10.0), ("candidate", 9.8)):
+                for repetition in range(3):
+                    rows.append(
+                        {
+                            "workload": workload,
+                            "label": label,
+                            "repetition": repetition,
+                            "checksum": 123,
+                            "iterations": 100,
+                            "rss_source": "gnu-time-child",
+                            "elapsed_ms": elapsed + repetition * 0.01,
+                            "max_rss_kib": 6000,
+                        }
+                    )
+        with tempfile.TemporaryDirectory() as raw:
+            evidence = Path(raw)
+            bench = evidence / "benchmarks.json"
+            bench.write_text(json.dumps(rows), encoding="utf-8")
+            legacy = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--evidence",
+                    str(evidence),
+                    "--input",
+                    str(bench),
+                    "--resamples",
+                    "1000",
+                ],
+                text=True,
+                capture_output=True,
+                timeout=30,
+            )
+            self.assertEqual(0, legacy.returncode, legacy.stderr)
+            summary = json.loads((evidence / "final-benchmark-summary.json").read_text())
+            self.assertEqual(set(six), {row["workload"] for row in summary})
+            mismatch = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--evidence",
+                    str(evidence),
+                    "--input",
+                    str(bench),
+                    "--expected-workloads",
+                    *nine,
+                    "--resamples",
+                    "1000",
+                ],
+                text=True,
+                capture_output=True,
+                timeout=30,
+            )
+            self.assertNotEqual(0, mismatch.returncode)
+            self.assertIn("workload set mismatch", mismatch.stderr)
+        campaign_source = (ROOT / "sentinel" / "campaigns.py").read_text(encoding="utf-8")
+        self.assertIn('"--expected-workloads"', campaign_source)
+        self.assertIn('"--features"', campaign_source)
+        for workload in nine:
+            self.assertIn(f'"{workload}"', campaign_source)
+
 
 class GenericMcpEnduranceTests(unittest.TestCase):
     def test_fake_stdio_server_completes_cycles(self):

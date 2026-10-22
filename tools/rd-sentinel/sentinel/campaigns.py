@@ -1895,8 +1895,37 @@ class CampaignRunner:
                 self._add_finding(Finding("binary-size-ab-regression", "P1", "performance", "Release binary grew beyond A/B budget", f"base={base_size}, candidate={candidate_size}, ratio={ratio:.3f}", remediation="Use cargo tree/bloat analysis; feature-gate or remove the new code/dependency."))
 
             bench_binaries: dict[str, Path] = {}
+            efficiency_workloads = [
+                "roots",
+                "host",
+                "sweep",
+                "minor",
+                "resolve",
+                "interp",
+                "strings",
+                "subtype",
+                "jit",
+            ]
             for label, source_repo in (("base", base_repo), ("candidate", self.repo)):
-                raw_bench = self._run_check(["cargo", "build", "--release", "-p", "rd-vm", "--example", "efficiency_bench", "--locked"], check_id=f"compare-bench-build-{label}", title=f"Build efficiency bench ({label})", component="compare", cwd=source_repo, timeout=3600)
+                raw_bench = self._run_check(
+                    [
+                        "cargo",
+                        "build",
+                        "--release",
+                        "-p",
+                        "rd-vm",
+                        "--example",
+                        "efficiency_bench",
+                        "--features",
+                        "jit",
+                        "--locked",
+                    ],
+                    check_id=f"compare-bench-build-{label}",
+                    title=f"Build efficiency bench ({label})",
+                    component="compare",
+                    cwd=source_repo,
+                    timeout=3600,
+                )
                 bench = source_repo / "target/release/examples/efficiency_bench"
                 if raw_bench.exit_code == 0 and bench.is_file():
                     dest = self.output_dir / "bin" / f"efficiency-{label}"
@@ -1906,9 +1935,43 @@ class CampaignRunner:
                 evidence = self.output_dir / "efficiency"
                 evidence.mkdir(parents=True, exist_ok=True)
                 bench_out = evidence / "benchmarks.json"
-                self._run_check([sys.executable, "scripts/efficiency-benchmark.py", "--baseline", str(bench_binaries["base"]), "--candidate", str(bench_binaries["candidate"]), "--out", str(bench_out), "--repetitions", "5"], check_id="compare-efficiency-benchmark", title="Paired semantic efficiency benchmarks", component="compare", timeout=3600)
+                self._run_check(
+                    [
+                        sys.executable,
+                        "scripts/efficiency-benchmark.py",
+                        "--baseline",
+                        str(bench_binaries["base"]),
+                        "--candidate",
+                        str(bench_binaries["candidate"]),
+                        "--out",
+                        str(bench_out),
+                        "--repetitions",
+                        "5",
+                        "--workloads",
+                        *efficiency_workloads,
+                    ],
+                    check_id="compare-efficiency-benchmark",
+                    title="Paired semantic efficiency benchmarks",
+                    component="compare",
+                    timeout=3600,
+                )
                 if bench_out.is_file():
-                    self._run_check([sys.executable, "scripts/summarize-efficiency-benchmarks.py", "--evidence", str(evidence), "--input", str(bench_out)], check_id="compare-efficiency-summary", title="Paired efficiency summary", component="compare", timeout=600)
+                    self._run_check(
+                        [
+                            sys.executable,
+                            "scripts/summarize-efficiency-benchmarks.py",
+                            "--evidence",
+                            str(evidence),
+                            "--input",
+                            str(bench_out),
+                            "--expected-workloads",
+                            *efficiency_workloads,
+                        ],
+                        check_id="compare-efficiency-summary",
+                        title="Paired efficiency summary",
+                        component="compare",
+                        timeout=600,
+                    )
                     summary_file = evidence / "final-benchmark-summary.json"
                     if summary_file.is_file():
                         summary_data = extract_json(summary_file.read_text(encoding="utf-8", errors="ignore"))
