@@ -90,12 +90,25 @@ fn method_annotations(
         return Vec::new();
     }
     let dex = &vm.cp.dexes[di];
-    let Some(method_idx) = (0..dex.method_ids.len()).find(|&idx| {
-        vm.cp
-            .method_ref(di, idx as u32)
-            .map(|m| m.class == class && m.name == name && m.proto == proto)
-            .unwrap_or(false)
-    }) else {
+    // Search only this class's declared methods (ADR 008 Stage 1b): the
+    // previous scan walked every method_id in the DEX (50k+) per call,
+    // which reflection-heavy frameworks hit repeatedly during launch.
+    let declared = dex.class_data(def).ok().flatten();
+    let Some(method_idx) = declared
+        .iter()
+        .flat_map(|data| {
+            data.direct_methods
+                .iter()
+                .chain(data.virtual_methods.iter())
+        })
+        .map(|m| m.method_idx)
+        .find(|&idx| {
+            vm.cp
+                .method_ref(di, idx)
+                .map(|m| m.class == class && m.name == name && m.proto == proto)
+                .unwrap_or(false)
+        })
+    else {
         return Vec::new();
     };
     let Ok(dir) = parse_annotations_directory(&dex.data, def.annotations_off) else {
@@ -104,7 +117,7 @@ fn method_annotations(
     let Some((_, set_off)) = dir
         .method_annotations
         .iter()
-        .find(|(idx, _)| *idx as usize == method_idx)
+        .find(|(idx, _)| *idx == method_idx)
     else {
         return Vec::new();
     };

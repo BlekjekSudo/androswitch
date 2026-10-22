@@ -102,9 +102,42 @@ const fn make_crc_table() -> [u32; 256] {
 
 static CRC_TABLE: [u32; 256] = make_crc_table();
 
+const fn make_crc_tables8() -> [[u32; 256]; 8] {
+    let mut tables = [[0u32; 256]; 8];
+    tables[0] = make_crc_table();
+    let mut k = 1;
+    while k < 8 {
+        let mut i = 0;
+        while i < 256 {
+            let prev = tables[k - 1][i];
+            tables[k][i] = tables[0][(prev & 0xFF) as usize] ^ (prev >> 8);
+            i += 1;
+        }
+        k += 1;
+    }
+    tables
+}
+
+static CRC_TABLES8: [[u32; 256]; 8] = make_crc_tables8();
+
 pub fn crc32(data: &[u8]) -> u32 {
+    // Slicing-by-8 (ADR 008 Stage 1b): 8 table lookups per 8 input bytes;
+    // bit-identical results to the byte-at-a-time form above.
     let mut c: u32 = 0xFFFF_FFFF;
-    for &b in data {
+    let mut chunks = data.chunks_exact(8);
+    for ch in &mut chunks {
+        let one = u32::from_le_bytes([ch[0], ch[1], ch[2], ch[3]]) ^ c;
+        let two = u32::from_le_bytes([ch[4], ch[5], ch[6], ch[7]]);
+        c = CRC_TABLES8[7][(one & 0xFF) as usize]
+            ^ CRC_TABLES8[6][((one >> 8) & 0xFF) as usize]
+            ^ CRC_TABLES8[5][((one >> 16) & 0xFF) as usize]
+            ^ CRC_TABLES8[4][(one >> 24) as usize]
+            ^ CRC_TABLES8[3][(two & 0xFF) as usize]
+            ^ CRC_TABLES8[2][((two >> 8) & 0xFF) as usize]
+            ^ CRC_TABLES8[1][((two >> 16) & 0xFF) as usize]
+            ^ CRC_TABLES8[0][(two >> 24) as usize];
+    }
+    for &b in chunks.remainder() {
         c = CRC_TABLE[((c ^ b as u32) & 0xFF) as usize] ^ (c >> 8);
     }
     c ^ 0xFFFF_FFFF

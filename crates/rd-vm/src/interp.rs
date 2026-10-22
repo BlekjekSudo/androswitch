@@ -1504,12 +1504,19 @@ fn do_invoke(
     // which made kotlinx.coroutines' lock-free queue spin forever.
     // DEX callees still get the raw register form.
     let raw = slots;
-    let logical: Vec<Value> = slots
-        .iter()
-        .filter(|v| !matches!(v, Value::WideHi))
-        .cloned()
-        .collect();
-    let slots: &[Value] = &logical;
+    // Fast path (ADR 008 Stage 1b): most invokes carry no wide values, so
+    // the register slots are already the logical arguments — no allocation.
+    let logical: Vec<Value>;
+    let slots: &[Value] = if slots.iter().any(|v| matches!(v, Value::WideHi)) {
+        logical = slots
+            .iter()
+            .filter(|v| !matches!(v, Value::WideHi))
+            .cloned()
+            .collect();
+        &logical
+    } else {
+        slots
+    };
     // DEX opcodes (Dalvik spec): 6E virtual · 6F super · 70 direct ·
     // 71 static · 72 interface · 74 virtual/range · 75 super/range ·
     // 76 direct/range · 77 static/range · 78 interface/range.

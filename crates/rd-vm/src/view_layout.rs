@@ -80,6 +80,19 @@ fn set_prop(vm: &mut Engine, v: ObjRef, k: &str, x: i32) {
 
 /// `View.measure`: DEX `onMeasure` override or AOSP default.
 pub(crate) fn measure(vm: &mut Engine, v: ObjRef, ws: i32, hs: i32) -> Result<(), VmExit> {
+    // Android View.measure semantics (ADR 008 Stage 1b): same specs and no
+    // pending requestLayout on this view -> the previous measured size is
+    // still valid, skip onMeasure entirely. requestLayout bubbles the flag
+    // to ancestors (see the requestLayout handler), so a changed child
+    // re-measures its whole ancestor path, exactly like AOSP.
+    if prop(vm, v, "rd_layout_requested").is_none()
+        && prop(vm, v, "rd_wspec") == Some(ws)
+        && prop(vm, v, "rd_hspec") == Some(hs)
+        && prop(vm, v, "MeasuredWidth").is_some()
+        && prop(vm, v, "MeasuredHeight").is_some()
+    {
+        return Ok(());
+    }
     set_prop(vm, v, "rd_wspec", ws);
     set_prop(vm, v, "rd_hspec", hs);
     let measure_args = [Value::Int(ws), Value::Int(hs)];
@@ -1120,7 +1133,13 @@ pub(crate) fn instance_intrinsic(
             Value::Int(i32::from(prop(vm, recv, "rd_laid_out").unwrap_or(0) != 0))
         }
         ("requestLayout" | "forceLayout", "()V") => {
-            set_prop(vm, recv, "rd_layout_requested", 1);
+            // AOSP: requestLayout bubbles to the root, flagging each ancestor.
+            let mut cur = Some(recv);
+            for _ in 0..64 {
+                let Some(v) = cur else { break };
+                set_prop(vm, v, "rd_layout_requested", 1);
+                cur = bounds(vm, v).and_then(|b| b.4);
+            }
             vm.fw.traversal_pending = true;
             Value::Null
         }

@@ -31,7 +31,11 @@ use rd_framework::DeviceProfile;
 use serde::Serialize;
 
 /// Orçamento de startup (ROADMAP M7 DoD: "startup < 2 s no trivial app").
-pub const STARTUP_BUDGET_EMULATED_MS: f64 = 2000.0;
+/// ADR 008 Stage 5: lowered from 2000 ms to 1500 ms after the Stage 1b
+/// hot-path work (parallel DEX mount, slicing-by-8 CRC32, classpath
+/// resolution caches, measure short-circuit, declared-methods-only
+/// annotation lookup) brought the M7 gate APK to ~1330 ms emulated p50.
+pub const STARTUP_BUDGET_EMULATED_MS: f64 = 1500.0;
 
 /// Mínimo de execuções aceito por `--runs`.
 pub const MIN_RUNS: u32 = 1;
@@ -413,8 +417,9 @@ mod tests {
 
     #[test]
     fn startup_budget_is_strict() {
-        assert!(startup_within_budget(1999.9));
-        assert!(!startup_within_budget(2000.0));
+        // ADR 008 Stage 5: budget lowered 2000 -> 1500 ms.
+        assert!(startup_within_budget(1499.9));
+        assert!(!startup_within_budget(1500.0));
         assert!(!startup_within_budget(2500.0));
     }
 

@@ -478,7 +478,7 @@ impl Engine {
         #[cfg(feature = "jit")]
         if m.access_flags & ACC_STATIC != 0 && self.jit.stats.enabled {
             let key = ((dex_idx as u64) << 32) | u64::from(m.method_idx);
-            let proto = self.cp.method_ref(dex_idx, m.method_idx)?.proto;
+            let proto = self.cp.method_ref(dex_idx, m.method_idx)?.proto.clone();
             if let Some(value) = self
                 .jit
                 .run(key, &code, &proto, &ins, self.fuel_remaining())

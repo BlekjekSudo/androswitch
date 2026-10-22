@@ -34,6 +34,14 @@ pub struct MethodRef {
     pub return_type: String,
 }
 
+/// method_id (dex, idx) -> resolved method reference (ADR 008 Stage 1b).
+type MethodRefCache = std::cell::RefCell<HashMap<(usize, u32), Arc<MethodRef>>>;
+/// field_id (dex, idx) -> (class, name, type) reference.
+type FieldRefCache = std::cell::RefCell<HashMap<(usize, u32), Arc<(String, String, String)>>>;
+/// (class, name, proto) -> virtual resolution result.
+type ResolveCache =
+    HashMap<(String, String, String), Option<(usize, ClassDef, rd_dex::methods::EncodedMethod)>>;
+
 #[derive(Debug, Default)]
 pub struct Classpath {
     pub dexes: Vec<Dex>,
@@ -41,6 +49,20 @@ pub struct Classpath {
     code_cache: HashMap<(usize, usize), Arc<CodeItem>>,
     /// (índice do dex, class_idx) → class_data em cache
     class_data_cache: HashMap<(usize, u32), Option<Arc<ClassData>>>,
+    /// ADR 008 Stage 4 (hot-path subset): method_id → resolved ref cache.
+    /// `method_ref` used to rebuild the proto descriptor + parameter type
+    /// strings on *every* invoke; the cache makes repeat invokes O(1).
+    method_ref_cache: MethodRefCache,
+    field_ref_cache: FieldRefCache,
+    /// (class, name, proto) → virtual resolution result (dexes are immutable
+    /// for the lifetime of an Engine, so this can never go stale).
+    resolve_cache: ResolveCache,
+    /// descriptor -> (dex, class_def position) memo for `find_class`
+    /// (ADR 008 Stage 1b). NOTE: unlike subtype results (which a test
+    /// deliberately mutates DEX metadata to re-check), class *identity*
+    /// lookup is only memoized as an index pair and re-borrowed from the
+    /// live DEX each call, so in-place def edits stay visible.
+    find_class_cache: std::cell::RefCell<HashMap<String, Option<(usize, usize)>>>,
 }
 
 impl Classpath {
@@ -49,11 +71,18 @@ impl Classpath {
             dexes,
             code_cache: HashMap::new(),
             class_data_cache: HashMap::new(),
+            method_ref_cache: std::cell::RefCell::new(HashMap::new()),
+            field_ref_cache: std::cell::RefCell::new(HashMap::new()),
+            resolve_cache: HashMap::new(),
+            find_class_cache: std::cell::RefCell::new(HashMap::new()),
         }
     }
 
-    /// method_id cru (class/name/idx).
-    pub fn method_ref(&self, dex_idx: usize, idx: u32) -> RdResult<MethodRef> {
+    /// method_id cru (class/name/idx) — cached (ADR 008 Stage 4 subset).
+    pub fn method_ref(&self, dex_idx: usize, idx: u32) -> RdResult<Arc<MethodRef>> {
+        if let Some(cached) = self.method_ref_cache.borrow().get(&(dex_idx, idx)) {
+            return Ok(cached.clone());
+        }
         let dex = &self.dexes[dex_idx];
         let m = dex.method(idx)?;
         let proto = proto_descriptor(dex, m.proto_idx)?;
@@ -65,24 +94,35 @@ impl Classpath {
         let ret = dex
             .type_str(dex.proto(m.proto_idx)?.return_type_idx)
             .to_string();
-        Ok(MethodRef {
+        let out = Arc::new(MethodRef {
             class: dex.type_str(m.class_idx as u32).to_string(),
             name: dex.string(m.name_idx).to_string(),
             proto,
             param_types,
             return_type: ret,
-        })
+        });
+        self.method_ref_cache
+            .borrow_mut()
+            .insert((dex_idx, idx), out.clone());
+        Ok(out)
     }
 
     /// field_id cru → (classe, nome, tipo).
     pub fn field_ref(&self, dex_idx: usize, idx: u32) -> RdResult<(String, String, String)> {
+        if let Some(cached) = self.field_ref_cache.borrow().get(&(dex_idx, idx)) {
+            return Ok((**cached).clone());
+        }
         let dex = &self.dexes[dex_idx];
         let f = dex.field(idx)?;
-        Ok((
+        let out = (
             dex.type_str(f.class_idx as u32).to_string(),
             dex.string(f.name_idx).to_string(),
             dex.type_str(f.type_idx as u32).to_string(),
-        ))
+        );
+        self.field_ref_cache
+            .borrow_mut()
+            .insert((dex_idx, idx), Arc::new(out.clone()));
+        Ok(out)
     }
 
     /// string id (com fallback vazio tolerante — Lei 1).
@@ -96,15 +136,33 @@ impl Classpath {
 
     /// Procura a classe por descritor em todos os dex → (dex_idx, def).
     pub fn find_class(&self, descriptor: &str) -> Option<(usize, &ClassDef)> {
+        if let Some(hit) = self.find_class_cache.borrow().get(descriptor) {
+            return hit.map(|(di, ci)| (di, &self.dexes[di].class_defs[ci]));
+        }
+        let mut found = None;
         for (i, dex) in self.dexes.iter().enumerate() {
             if let Some(def) = dex.find_class(descriptor) {
                 if is_shadowed_platform_stub(descriptor, def.access_flags) {
-                    return None;
+                    found = None;
+                    break;
                 }
-                return Some((i, def));
+                let ci = dex
+                    .class_defs
+                    .iter()
+                    .position(|d| std::ptr::eq(d, def))
+                    .unwrap_or(usize::MAX);
+                found = if ci == usize::MAX {
+                    return Some((i, def));
+                } else {
+                    Some((i, ci))
+                };
+                break;
             }
         }
-        None
+        self.find_class_cache
+            .borrow_mut()
+            .insert(descriptor.to_string(), found);
+        found.map(|(di, ci)| (di, &self.dexes[di].class_defs[ci]))
     }
 
     /// class_data em cache.
@@ -197,6 +255,21 @@ impl Classpath {
     /// (métodos default — Java 8+/Kotlin massivo); retorna
     /// (dex_idx, class_def_idx, método, classe_que_declara).
     pub fn resolve_method(
+        &mut self,
+        class_desc: &str,
+        name: &str,
+        proto: &str,
+    ) -> Option<(usize, ClassDef, rd_dex::methods::EncodedMethod)> {
+        let key = (class_desc.to_string(), name.to_string(), proto.to_string());
+        if let Some(cached) = self.resolve_cache.get(&key) {
+            return cached.clone();
+        }
+        let out = self.resolve_method_uncached(class_desc, name, proto);
+        self.resolve_cache.insert(key, out.clone());
+        out
+    }
+
+    fn resolve_method_uncached(
         &mut self,
         class_desc: &str,
         name: &str,

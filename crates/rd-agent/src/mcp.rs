@@ -478,8 +478,11 @@ fn agent_error(code: &str, cause: impl Into<String>, suggestion: Option<&str>) -
 
 /// Extrai os DEXs de um APK (mesma política do CLI `boot_app`).
 fn dexes_of_apk(apk: &Apk) -> Result<Vec<rd_dex::Dex>, RdError> {
-    let mut out = Vec::new();
-    for name in &apk.dex_files {
+    // ADR 008 Stage 1b: mount DEX files in parallel (scoped threads, joins
+    // in declaration order -> deterministic Vec<Dex>). Each file's inflate +
+    // CRC + parse is independent; on multi-core hosts this turns the sum of
+    // per-DEX costs into roughly the largest single DEX cost.
+    let parse_one = |name: &String| -> Result<rd_dex::Dex, RdError> {
         let entry = apk
             .zip
             .find(name)
@@ -490,8 +493,37 @@ fn dexes_of_apk(apk: &Apk) -> Result<Vec<rd_dex::Dex>, RdError> {
             .map_err(|e| RdError::new(&e.code, &e.cause, &e.module_id))?;
         let d =
             rd_dex::Dex::parse(bytes).map_err(|e| RdError::new(&e.code, &e.cause, &e.module_id))?;
-        out.push(d);
-    }
+        Ok(d)
+    };
+    let out: Vec<rd_dex::Dex> = if apk.dex_files.len() > 1 {
+        std::thread::scope(|scope| {
+            let handles: Vec<_> = apk
+                .dex_files
+                .iter()
+                .map(|name| scope.spawn(|| parse_one(name)))
+                .collect();
+            let mut out = Vec::with_capacity(handles.len());
+            for h in handles {
+                match h.join() {
+                    Ok(r) => out.push(r?),
+                    Err(_) => {
+                        return Err(RdError::new(
+                            "INTERNAL",
+                            "dex mount worker panicked",
+                            "rd-agent",
+                        ));
+                    }
+                }
+            }
+            Ok(out)
+        })?
+    } else {
+        let mut out = Vec::new();
+        for name in &apk.dex_files {
+            out.push(parse_one(name)?);
+        }
+        out
+    };
     if out.is_empty() {
         return Err(RdError::missing_entry("classes*.dex no APK")
             .with_suggestion("confirme com `rd inspect` — o campo content lista os dex"));
@@ -1413,7 +1445,8 @@ impl AgentSession {
                     ));
                 }
             } else {
-                let mut e = Engine::new(dexes_of_apk(&app.apk)?, VmConfig::default());
+                let dexes = dexes_of_apk(&app.apk)?;
+                let mut e = Engine::new(dexes, VmConfig::default());
                 e.set_resources_arc(resources);
                 e
             };
