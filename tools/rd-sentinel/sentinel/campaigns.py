@@ -22,10 +22,16 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, MutableMapping, Sequence
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 
 from .audit import compare_cargo_locks, license_expression_allowed
 from .mcp_endurance import run_generic_apk_endurance
 from .model import CheckResult, Finding, canonical_json, redact, sha256_file, sha256_text
+
+PACKAGE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+FEATURE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+OSV_QUERYBATCH_URL = "https://api.osv.dev/v1/querybatch"
 
 
 @dataclass(slots=True)
@@ -39,6 +45,7 @@ class CampaignOptions:
     repeat: int | None = None
     perf_runs: int | None = None
     cold_runs: int | None = None
+    mutation_minutes: int | None = None
     allow_network: bool = False
     output_dir: Path = Path("target/rd-sentinel")
 
@@ -66,6 +73,41 @@ def _percentile(values: Sequence[float], p: float) -> float:
     ordered = sorted(values)
     rank = max(0, min(len(ordered) - 1, math.ceil(p / 100.0 * len(ordered)) - 1))
     return float(ordered[rank])
+
+
+def _median(values: Sequence[float]) -> float:
+    return float(statistics.median(values)) if values else math.nan
+
+
+def _mad(values: Sequence[float]) -> float:
+    """Median absolute deviation, a robust spread estimate for small samples."""
+
+    if not values:
+        return math.nan
+    center = statistics.median(values)
+    return float(statistics.median([abs(v - center) for v in values]))
+
+
+def _distribution(prefix: str, values: Sequence[float]) -> dict[str, float]:
+    if not values:
+        return {f"{prefix}_samples": 0}
+    return {
+        f"{prefix}_samples": len(values),
+        f"{prefix}_median_ms": round(_median(values), 3),
+        f"{prefix}_mean_ms": round(statistics.fmean(values), 3),
+        f"{prefix}_mad_ms": round(_mad(values), 3),
+        f"{prefix}_p95_ms": round(_percentile(values, 95), 3),
+        f"{prefix}_min_ms": round(min(values), 3),
+        f"{prefix}_max_ms": round(max(values), 3),
+    }
+
+
+def _noise_floor_ms(base_values: Sequence[float], head_values: Sequence[float]) -> float:
+    """Three robust-sigma equivalents from the noisier side of an A/B pair."""
+
+    if not base_values or not head_values:
+        return 0.0
+    return 3.0 * 1.4826 * max(_mad(base_values), _mad(head_values))
 
 
 def parse_cold26_output(text: str) -> dict[str, Any]:
@@ -126,6 +168,10 @@ def parse_cold26_output(text: str) -> dict[str, Any]:
         "interactive_median_ms": statistics.median(interactive_times) if interactive_times else None,
         "interactive_p95_ms": _percentile(interactive_times, 95) if interactive_times else None,
         "interactive_max_ms": max(interactive_times) if interactive_times else None,
+        "sample_count": len(frame_times),
+        "mad_ms": _mad(frame_times) if frame_times else None,
+        "interactive_sample_count": len(interactive_times),
+        "interactive_mad_ms": _mad(interactive_times) if interactive_times else None,
         "tap_successes": sum(1 for r in hits if r.get("tap_ok") is True),
         "tap_failures": sum(1 for r in hits if r.get("tap_ok") is False),
         "frame_hashes": frame_hashes,
@@ -162,6 +208,156 @@ def _version_tuple(value: str | None) -> tuple[int, ...] | None:
     while len(parts) < 3:
         parts.append(0)
     return tuple(parts)
+
+
+_TEST_OUTCOME_RE = re.compile(
+    r"^test\s+([A-Za-z0-9_:.\/-]+)\s+\.\.\.\s+(ok|FAILED|ignored)\s*$", re.MULTILINE
+)
+
+
+def parse_test_outcomes(text: str) -> dict[str, set[str]]:
+    """Extract libtest outcomes from one or more cargo-test output blocks."""
+
+    outcomes: dict[str, set[str]] = {}
+    for name, raw_status in _TEST_OUTCOME_RE.findall(text):
+        status = {"ok": "pass", "FAILED": "fail", "ignored": "ignored"}[raw_status]
+        outcomes.setdefault(name, set()).add(status)
+    return outcomes
+
+
+def summarize_repeated_test_outcomes(
+    outputs: Sequence[str],
+) -> dict[str, list[str]]:
+    merged: dict[str, set[str]] = {}
+    for output in outputs:
+        for name, statuses in parse_test_outcomes(output).items():
+            merged.setdefault(name, set()).update(statuses)
+    flaky = sorted(
+        name for name, statuses in merged.items() if {"pass", "fail"} <= statuses
+    )
+    consistent_failures = sorted(
+        name for name, statuses in merged.items() if statuses == {"fail"}
+    )
+    return {
+        "tests_seen": sorted(merged),
+        "flaky_tests": flaky,
+        "consistent_failures": consistent_failures,
+    }
+
+
+_MUTANT_SUMMARY_RE = re.compile(
+    r"(?P<count>\d+)\s+(?:mutants?\s+)?(?P<outcome>caught|missed|unviable|timed?\s*out|timeouts?)",
+    re.IGNORECASE,
+)
+
+
+def parse_mutants_output(text: str) -> dict[str, Any]:
+    """Parse cargo-mutants human output.
+
+    Current cargo-mutants writes the final line as, for example,
+    ``5 mutants tested in 1s: 3 missed, 2 caught``. Older/other summaries use
+    ``12 mutants caught``. Accept both, while preferring the structured
+    ``outcomes.json`` parser below whenever that file is available.
+    """
+
+    counts = {"caught": 0, "missed": 0, "unviable": 0, "timeout": 0}
+    for count, raw_outcome in _MUTANT_SUMMARY_RE.findall(text):
+        lowered = raw_outcome.lower()
+        outcome = "timeout" if lowered.startswith("time") else lowered
+        counts[outcome] += int(count)
+    missed_lines = [
+        line.strip()
+        for line in text.splitlines()
+        if "MISSED" in line or line.strip().lower().endswith("... missed")
+    ]
+    if not any(counts.values()) and missed_lines:
+        counts["missed"] = len(missed_lines)
+    viable = counts["caught"] + counts["missed"] + counts["timeout"]
+    return {
+        **counts,
+        "viable": viable,
+        "kill_rate": (counts["caught"] / viable) if viable else None,
+        "missed_mutants": missed_lines[:100],
+        "outcome_source": "text",
+    }
+
+
+def parse_mutants_outcomes(data: Any) -> dict[str, Any] | None:
+    """Normalize cargo-mutants ``mutants.out/outcomes.json``.
+
+    The top-level counters are the stable part used here. Missed mutant names
+    are recovered from the current nested scenario representation when present,
+    but a future rename there must not discard the authoritative counters.
+    """
+
+    if not isinstance(data, Mapping):
+        return None
+    counts: dict[str, int] = {}
+    for source_key, target_key in (
+        ("caught", "caught"),
+        ("missed", "missed"),
+        ("unviable", "unviable"),
+        ("timeout", "timeout"),
+    ):
+        value = data.get(source_key, 0)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            return None
+        counts[target_key] = value
+
+    missed_mutants: list[str] = []
+    outcomes = data.get("outcomes", [])
+    if isinstance(outcomes, list):
+        for outcome in outcomes:
+            if not isinstance(outcome, Mapping) or outcome.get("summary") != "MissedMutant":
+                continue
+            scenario = outcome.get("scenario")
+            if isinstance(scenario, Mapping):
+                mutant = scenario.get("Mutant")
+                if isinstance(mutant, Mapping) and mutant.get("name"):
+                    missed_mutants.append(str(mutant["name"]))
+
+    viable = counts["caught"] + counts["missed"] + counts["timeout"]
+    total = data.get("total_mutants")
+    return {
+        **counts,
+        "viable": viable,
+        "total": total if isinstance(total, int) and total >= 0 else viable + counts["unviable"],
+        "kill_rate": (counts["caught"] / viable) if viable else None,
+        "missed_mutants": missed_mutants[:100],
+        "outcome_source": "outcomes.json",
+        "cargo_mutants_version": data.get("cargo_mutants_version"),
+    }
+
+
+def mutation_check_status(
+    *,
+    exit_code: int,
+    missed: int,
+    timeouts: int,
+    blocking_context: bool,
+    max_missed: int = 0,
+    missing: bool = False,
+    timed_out: bool = False,
+) -> str:
+    """Map cargo-mutants' process result to Sentinel's verdict semantics.
+
+    cargo-mutants uses a non-zero exit for ordinary missed/timeout outcomes.
+    Those outcomes are blocking only in an explicit mutants/deep context (and,
+    for survivors, only above the policy limit); in a trend campaign they are
+    visible warnings with P2 findings rather than accidental hard failures.
+    Baseline/usage failures have no usable mutant outcome and stay failures.
+    """
+
+    if missing or timed_out:
+        return "error"
+    if exit_code == 0:
+        return "pass"
+    over_limit = missed > max(0, int(max_missed))
+    if blocking_context and (over_limit or timeouts > 0):
+        return "fail"
+    if missed > 0 or timeouts > 0:
+        return "warn"
+    return "fail"
 
 
 class CampaignRunner:
@@ -466,6 +662,7 @@ class CampaignRunner:
             "core": self._component_core,
             "features": self._component_features,
             "determinism": self._component_determinism,
+            "mutation": self._component_mutation,
             "deps": self._component_deps,
             "future": self._component_future,
             "perf": self._component_perf,
@@ -602,7 +799,63 @@ class CampaignRunner:
             )
 
     # --------------------------------------------------------------- features
+    @staticmethod
+    def _feature_sets_from_names(
+        feature_names: Sequence[str], full: bool
+    ) -> list[tuple[str, ...]]:
+        names = sorted(
+            {
+                str(name)
+                for name in feature_names
+                if FEATURE_NAME_RE.fullmatch(str(name)) and str(name) != "default"
+            }
+        )
+        sets: list[tuple[str, ...]] = []
+
+        def add(values: Iterable[str]) -> None:
+            item = tuple(dict.fromkeys(str(v) for v in values if str(v) in names))
+            if item not in sets:
+                sets.append(item)
+
+        add(())
+        if not names:
+            return sets
+        for name in names:
+            add((name,))
+        if full and len(names) <= 5:
+            for size in range(2, len(names) + 1):
+                for combo in itertools.combinations(names, size):
+                    add(combo)
+        else:
+            for combo in itertools.combinations(names, 2):
+                add(combo)
+            add(tuple(names))
+        # Deep profiles keep the matrix bounded even if a crate gains many
+        # fan-in feature names; singleton/pair coverage catches most cfgs.
+        return sets[:96]
+
+    def _manifest_feature_names(self, package: str) -> list[str] | None:
+        manifest_path = self.repo / "crates" / package / "Cargo.toml"
+        if not manifest_path.is_file():
+            return None
+        try:
+            import tomllib
+
+            parsed = tomllib.loads(manifest_path.read_text(encoding="utf-8", errors="ignore"))
+        except Exception:
+            return None
+        features = parsed.get("features", {}) if isinstance(parsed, Mapping) else {}
+        if not isinstance(features, Mapping):
+            return []
+        return sorted(str(name) for name in features)
+
     def _feature_sets(self, package: str, full: bool) -> list[tuple[str, ...]]:
+        dynamic = self._manifest_feature_names(package)
+        if dynamic is not None:
+            return self._feature_sets_from_names(dynamic, full)
+
+        # Fallback for an unreadable manifest: preserve the v1.0 known matrix
+        # rather than silently shrinking feature coverage.
         sets: list[tuple[str, ...]] = []
 
         def add(values: Iterable[str]) -> None:
@@ -713,22 +966,30 @@ class CampaignRunner:
         for _ in range(repetitions):
             results.append(self._run_raw(argv, timeout=timeout))
         passes = sum(1 for r in results if r.exit_code == 0)
-        if passes == repetitions:
+        outcome_summary = summarize_repeated_test_outcomes(
+            [f"{r.stdout}\n{r.stderr}" for r in results]
+        )
+        flaky_tests = outcome_summary["flaky_tests"]
+        consistent_failures = outcome_summary["consistent_failures"]
+        if passes == repetitions and not flaky_tests:
             status = "pass"
             summary = f"{passes}/{repetitions} repetitions passed"
-        elif passes == 0:
+        elif passes == 0 and not flaky_tests:
             status = "fail"
             summary = f"0/{repetitions} repetitions passed"
+            if consistent_failures:
+                summary += f"; consistent failures: {', '.join(consistent_failures[:10])}"
         else:
             status = "fail"
             summary = f"FLAKY: {passes}/{repetitions} repetitions passed"
+            named_flaky = ", ".join(flaky_tests[:10]) if flaky_tests else "no individual libtest names parsed"
             self._add_finding(
                 Finding(
                     id="flaky-repeated-command",
                     severity="P0",
                     area="tests",
                     title="Repeated command alternated between pass and fail",
-                    evidence=f"{title}: {passes}/{repetitions} passed",
+                    evidence=f"{title}: {passes}/{repetitions} passed; flaky tests: {named_flaky}",
                     remediation="Quarantine is not a fix: capture the failing seed/order/state, remove shared global state, and add a deterministic regression.",
                 )
             )
@@ -740,8 +1001,17 @@ class CampaignRunner:
             component=component,
             status=status,
             summary=summary,
-            metrics={"repetitions": repetitions, "passes": passes, "exit_codes": [r.exit_code for r in results]},
+            metrics={
+                "repetitions": repetitions,
+                "passes": passes,
+                "exit_codes": [r.exit_code for r in results],
+                "tests_seen": outcome_summary["tests_seen"][:200],
+                "flaky_tests": flaky_tests,
+                "consistent_failures": consistent_failures,
+            },
         )
+        if flaky_tests:
+            self._metric("flaky_tests", flaky_tests)
 
     def _debug_rd(self) -> Path | None:
         if self._debug_binary and self._debug_binary.is_file():
@@ -835,6 +1105,198 @@ class CampaignRunner:
                 )
 
     # ------------------------------------------------------------------- deps
+    @staticmethod
+    def _cargo_purl(name: str, version: str) -> str:
+        encoded_name = re.sub(r"[^A-Za-z0-9._-]", "-", name)
+        encoded_version = re.sub(r"[^A-Za-z0-9.+_-]", "-", version)
+        return f"pkg:cargo/{encoded_name}@{encoded_version}"
+
+    @staticmethod
+    def _dependency_blast_radius(
+        metadata: Mapping[str, Any],
+    ) -> dict[tuple[str, str], dict[str, Any]]:
+        packages = metadata.get("packages", []) if isinstance(metadata.get("packages"), list) else []
+        by_id: dict[str, Mapping[str, Any]] = {}
+        for package in packages:
+            if isinstance(package, Mapping) and package.get("id"):
+                by_id[str(package["id"])] = package
+        workspace_ids = {
+            str(x) for x in metadata.get("workspace_members", []) if isinstance(x, str)
+        }
+        resolve = metadata.get("resolve", {}) if isinstance(metadata.get("resolve"), Mapping) else {}
+        nodes = resolve.get("nodes", []) if isinstance(resolve.get("nodes"), list) else []
+
+        direct_workspace_consumers: dict[str, set[str]] = {pid: set() for pid in by_id}
+        reverse_edges: dict[str, set[str]] = {pid: set() for pid in by_id}
+        kinds: dict[str, set[str]] = {pid: set() for pid in by_id}
+        for node in nodes:
+            if not isinstance(node, Mapping):
+                continue
+            consumer_id = str(node.get("id") or "")
+            if consumer_id not in by_id:
+                continue
+            deps = node.get("deps", []) if isinstance(node.get("deps"), list) else []
+            for dep in deps:
+                if not isinstance(dep, Mapping):
+                    continue
+                dep_id = str(dep.get("pkg") or "")
+                if dep_id not in by_id:
+                    continue
+                reverse_edges.setdefault(dep_id, set()).add(consumer_id)
+                consumer = by_id[consumer_id]
+                consumer_name = str(consumer.get("name") or consumer_id)
+                if consumer_id in workspace_ids:
+                    direct_workspace_consumers.setdefault(dep_id, set()).add(consumer_name)
+                dep_kinds = dep.get("dep_kinds", [])
+                if isinstance(dep_kinds, list):
+                    for kind_info in dep_kinds:
+                        kind = "normal"
+                        if isinstance(kind_info, Mapping) and kind_info.get("kind"):
+                            kind = str(kind_info["kind"])
+                        kinds.setdefault(dep_id, set()).add(kind)
+
+        def reachable_workspace_consumers(start: str) -> set[str]:
+            seen: set[str] = set()
+            frontier = [start]
+            consumers: set[str] = set()
+            while frontier:
+                current = frontier.pop()
+                for consumer_id in reverse_edges.get(current, ()):
+                    if consumer_id in seen:
+                        continue
+                    seen.add(consumer_id)
+                    consumer = by_id.get(consumer_id, {})
+                    if consumer_id in workspace_ids:
+                        consumers.add(str(consumer.get("name") or consumer_id))
+                    frontier.append(consumer_id)
+            return consumers
+
+        out: dict[tuple[str, str], dict[str, Any]] = {}
+        for package_id, package in by_id.items():
+            name = str(package.get("name") or "")
+            version = str(package.get("version") or "")
+            if not name or not version:
+                continue
+            targets = package.get("targets", []) if isinstance(package.get("targets"), list) else []
+            target_kinds: set[str] = set()
+            for target in targets:
+                if isinstance(target, Mapping):
+                    target_kinds.update(str(x) for x in target.get("kind", []) if isinstance(x, str))
+                    target_kinds.update(str(x) for x in target.get("crate_types", []) if isinstance(x, str))
+            out[(name, version)] = {
+                "direct_workspace_consumers": sorted(
+                    direct_workspace_consumers.get(package_id, ())
+                ),
+                "reachable_workspace_consumers": sorted(
+                    reachable_workspace_consumers(package_id)
+                ),
+                "dependency_kinds": sorted(kinds.get(package_id, ())),
+                "build_dependency": "build" in kinds.get(package_id, set()),
+                "proc_macro": "proc-macro" in target_kinds,
+                "has_build_script": "custom-build" in target_kinds,
+                "links": package.get("links"),
+                "source": package.get("source"),
+                "license": package.get("license"),
+            }
+        return out
+
+    def _write_cyclonedx_sbom(
+        self, metadata: Mapping[str, Any]
+    ) -> tuple[Path, int] | None:
+        packages = metadata.get("packages", []) if isinstance(metadata.get("packages"), list) else []
+        components: list[dict[str, Any]] = []
+        for package in sorted(
+            (p for p in packages if isinstance(p, Mapping)),
+            key=lambda p: (str(p.get("name")), str(p.get("version")), str(p.get("source"))),
+        ):
+            name = str(package.get("name") or "")
+            version = str(package.get("version") or "")
+            if not name or not version:
+                continue
+            component: dict[str, Any] = {
+                "type": "library",
+                "bom-ref": self._cargo_purl(name, version),
+                "name": name,
+                "version": version,
+                "purl": self._cargo_purl(name, version),
+                "properties": [
+                    {"name": "rd-sentinel:source", "value": str(package.get("source") or "workspace/path")},
+                    {"name": "rd-sentinel:rust-version", "value": str(package.get("rust_version") or "")},
+                ],
+            }
+            license_text = package.get("license")
+            if license_text:
+                component["licenses"] = [{"expression": str(license_text)}]
+            components.append(component)
+
+        serial = sha256_text(canonical_json(components))[:32]
+        document = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.5",
+            "serialNumber": f"urn:uuid:{serial[:8]}-{serial[8:12]}-{serial[12:16]}-{serial[16:20]}-{serial[20:32]}",
+            "version": 1,
+            "metadata": {
+                "tools": [
+                    {
+                        "vendor": "RustyDroid",
+                        "name": "RD Sentinel",
+                        "version": str(self.report.get("bot_version") or ""),
+                    }
+                ],
+                "properties": [
+                    {"name": "rd-sentinel:head-sha", "value": str(self.report.get("head_sha") or "")},
+                    {"name": "rd-sentinel:profile", "value": self._profile()},
+                ],
+            },
+            "components": components,
+        }
+        target = self.output_dir / "sbom.cyclonedx.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(canonical_json(document) + "\n", encoding="utf-8")
+        return target, len(components)
+
+    @staticmethod
+    def _query_osv(
+        packages: Sequence[tuple[str, str]], *, timeout: float = 30.0
+    ) -> dict[str, Any]:
+        if not packages:
+            return {"results": [], "queries": 0, "truncated": False}
+        unique = sorted(set(packages))
+        payload = {
+            "queries": [
+                {"package": {"purl": CampaignRunner._cargo_purl(name, version)}}
+                for name, version in unique
+            ]
+        }
+        request = urllib_request.Request(
+            OSV_QUERYBATCH_URL,
+            data=json.dumps(payload, separators=(",", ":")).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "RD-Sentinel",
+            },
+            method="POST",
+        )
+        with urllib_request.urlopen(request, timeout=timeout) as response:
+            document = json.loads(response.read().decode("utf-8"))
+        raw_results = document.get("results", []) if isinstance(document, Mapping) else []
+        results: list[dict[str, Any]] = []
+        truncated = False
+        for (name, version), result in zip(unique, raw_results):
+            vulns = result.get("vulns", []) if isinstance(result, Mapping) else []
+            ids = [
+                str(v.get("id"))
+                for v in vulns
+                if isinstance(v, Mapping) and v.get("id")
+            ]
+            if isinstance(result, Mapping) and result.get("next_page_token"):
+                truncated = True
+            if ids:
+                results.append(
+                    {"package": name, "version": version, "vulnerability_ids": ids}
+                )
+        return {"results": results, "queries": len(unique), "truncated": truncated}
+
     def _component_deps(self) -> None:
         raw = self._run_raw(["cargo", "metadata", "--locked", "--format-version", "1"], timeout=600)
         metadata = extract_json(raw.stdout)
@@ -871,15 +1333,67 @@ class CampaignRunner:
                 if rust_version and msrv and rust_version > msrv:
                     msrv_failures.append(f"{name} {version}: rust {package.get('rust_version')} > MSRV {'.'.join(map(str, msrv))}")
             duplicate_names = {k: sorted(v) for k, v in duplicates.items() if len(v) > 1}
+            blast_radius = self._dependency_blast_radius(metadata)
+            changed_dependencies: list[dict[str, Any]] = []
+            raw_changes = self.report.get("dependency_changes", [])
+            if isinstance(raw_changes, list):
+                for change in raw_changes:
+                    if not isinstance(change, Mapping):
+                        continue
+                    name = str(change.get("name") or "")
+                    version = str(change.get("new") or "")
+                    detail = blast_radius.get((name, version), {})
+                    changed_dependencies.append(
+                        {
+                            "name": name,
+                            "old": change.get("old"),
+                            "new": change.get("new"),
+                            "kind": change.get("kind"),
+                            **detail,
+                        }
+                    )
+            high_blast = [
+                item
+                for item in changed_dependencies
+                if len(item.get("reachable_workspace_consumers", [])) >= 3
+                or item.get("build_dependency")
+                or item.get("proc_macro")
+                or item.get("has_build_script")
+                or item.get("links")
+            ]
+            for item in high_blast[:20]:
+                self._add_finding(
+                    Finding(
+                        "dependency-high-blast-radius",
+                        "P2",
+                        "dependencies-build",
+                        f"Changed dependency has a wide blast radius: {item.get('name')}",
+                        canonical_json(item)[:1000],
+                        "Cargo.lock",
+                        remediation="Exercise every reachable workspace consumer plus feature/A-B evidence; build/proc-macro/native-link crates execute at build time or change linking.",
+                    )
+                )
+            sbom_result = self._write_cyclonedx_sbom(metadata)
             metrics = {
                 "resolved_packages": len(packages),
                 "duplicate_package_names": duplicate_names,
                 "license_failures": license_failures,
                 "source_failures": source_failures,
                 "msrv_failures": msrv_failures,
+                "changed_dependency_blast_radius": changed_dependencies,
+                "high_blast_radius_changes": high_blast,
+                "sbom_path": (
+                    str(sbom_result[0].relative_to(self.repo))
+                    if sbom_result and sbom_result[0].is_relative_to(self.repo)
+                    else (str(sbom_result[0]) if sbom_result else None)
+                ),
+                "sbom_packages": sbom_result[1] if sbom_result else 0,
             }
             self._metric("resolved_packages", len(packages))
             self._metric("duplicate_dependency_names", len(duplicate_names))
+            self._metric("sbom_packages", sbom_result[1] if sbom_result else 0)
+            if sbom_result:
+                self._metric("sbom_sha256", sha256_file(sbom_result[0]))
             if license_failures:
                 status = "fail"
                 self._add_finding(Finding("dependency-license-not-allowed", "P1", "dependencies-build", "Dependency license is outside the approved set", "; ".join(license_failures[:20]), "Cargo.lock", remediation="Replace the dependency or approve its license deliberately in policy/ADR."))
@@ -910,6 +1424,133 @@ class CampaignRunner:
             self._skip("deps-cargo-audit", "cargo audit advisory scan", "deps", "cargo-audit is not installed on this runner.", required=required)
             if required:
                 self._add_finding(Finding("cargo-audit-missing", "P2", "dependencies-build", "cargo-audit missing from deep runner", "cargo-audit executable not found", remediation="Install cargo-audit in the deep workflow or on the self-hosted runner."))
+
+        deny_bin = shutil.which("cargo-deny")
+        deny_cfg = self.repo / "deny.toml"
+        supply_profile = self._profile() in {"nightly", "weekly", "deps", "deep", "auto", "static", "plan"} or "deps" in self.report.get("executed_components", [])
+        if deny_bin and deny_cfg.is_file():
+            deny_argv = ["cargo", "deny", "--locked"]
+            if not self.options.allow_network:
+                # Still consult an already-fetched RustSec DB; maximum-db-
+                # staleness in deny.toml prevents silently ancient evidence.
+                deny_argv.append("--offline")
+            # `cargo deny check` performs all checks unless targets are named.
+            deny_argv.append("check")
+            self._run_check(
+                deny_argv,
+                check_id="deps-cargo-deny",
+                title="cargo-deny advisories/licenses/bans/sources policy",
+                component="deps",
+                timeout=1800,
+                required=True,
+            )
+        else:
+            self._skip(
+                "deps-cargo-deny",
+                "cargo-deny advisories/licenses/bans/sources policy",
+                "deps",
+                "cargo-deny or deny.toml is not present on this runner.",
+                required=bool(supply_profile),
+            )
+
+        machete_bin = shutil.which("cargo-machete")
+        if machete_bin:
+            # Do not use --with-metadata here: upstream documents that it may
+            # modify Cargo.lock, and an evidence campaign must not mutate the
+            # candidate tree it is judging.
+            self._run_check(
+                ["cargo", "machete"],
+                check_id="deps-cargo-machete",
+                title="cargo-machete unused-dependency scan",
+                component="deps",
+                timeout=900,
+                required=False,
+            )
+        else:
+            self._skip(
+                "deps-cargo-machete",
+                "cargo-machete unused-dependency scan",
+                "deps",
+                "cargo-machete is not installed; unused-dependency detection is advisory trend evidence.",
+                required=False,
+            )
+
+        if isinstance(metadata, Mapping):
+            osv_packages: list[tuple[str, str]] = []
+            for package in metadata.get("packages", []) if isinstance(metadata.get("packages"), list) else []:
+                if not isinstance(package, Mapping) or not package.get("source"):
+                    continue
+                name = str(package.get("name") or "")
+                version = str(package.get("version") or "")
+                if name and version:
+                    osv_packages.append((name, version))
+            if self.options.allow_network:
+                try:
+                    try:
+                        osv_timeout = max(
+                            1.0,
+                            min(300.0, float(self._cfg("osv_timeout_seconds", 30))),
+                        )
+                    except (TypeError, ValueError):
+                        osv_timeout = 30.0
+                    osv = self._query_osv(osv_packages, timeout=osv_timeout)
+                    vuln_total = sum(
+                        len(item.get("vulnerability_ids", []))
+                        for item in osv.get("results", [])
+                        if isinstance(item, Mapping)
+                    )
+                    self._metric("osv_vulnerability_count", vuln_total)
+                    self._metric("osv_packages_queried", osv.get("queries"))
+                    if vuln_total:
+                        self._add_finding(
+                            Finding(
+                                "osv-vulnerability",
+                                "P1",
+                                "dependencies-build",
+                                "OSV reports vulnerabilities in the resolved graph",
+                                canonical_json(osv.get("results", []))[:1500],
+                                "Cargo.lock",
+                                remediation="Update or replace affected crates; use RustSec/cargo-audit detail for exploitability and do not hide this in an undated ignore.",
+                            )
+                        )
+                    self._add_check(
+                        CheckResult(
+                            id="deps-osv-querybatch",
+                            title="OSV vulnerability batch query",
+                            status="fail" if vuln_total else "pass",
+                            required=True,
+                            component="deps",
+                            summary=(
+                                f"queried {osv.get('queries')} crates, {vuln_total} vulnerability IDs"
+                                + ("; first page only (pagination token returned)" if osv.get("truncated") else "")
+                            ),
+                            metrics={
+                                "packages_queried": osv.get("queries"),
+                                "vulnerabilities": vuln_total,
+                                "affected": osv.get("results", []),
+                                "truncated": osv.get("truncated"),
+                            },
+                        )
+                    )
+                except (OSError, ValueError, urllib_error.URLError) as exc:
+                    self._add_check(
+                        CheckResult(
+                            id="deps-osv-querybatch",
+                            title="OSV vulnerability batch query",
+                            status="error",
+                            required=True,
+                            component="deps",
+                            summary=f"OSV query failed: {redact(str(exc), repo=self.repo, limit=300)}",
+                        )
+                    )
+            else:
+                self._skip(
+                    "deps-osv-querybatch",
+                    "OSV vulnerability batch query",
+                    "deps",
+                    "Network not allowed for this campaign; OSV results are not claimed.",
+                    required=False,
+                )
 
         if self._profile() in {"nightly", "weekly", "deps"}:
             if self.options.allow_network:
@@ -1024,6 +1665,12 @@ class CampaignRunner:
             "frame_hashes": parsed["frame_hashes"],
             "hits": len(parsed["hits"]),
             "captures": len(parsed["captures"]),
+            "frame_samples": parsed.get("sample_count"),
+            "frame_mad_ms": parsed.get("mad_ms"),
+            "interactive_samples": parsed.get("interactive_sample_count"),
+            "interactive_mad_ms": parsed.get("interactive_mad_ms"),
+            **_distribution("frame", parsed.get("frame_times_ms", [])),
+            **_distribution("interactive", parsed.get("interactive_times_ms", [])),
         }
         status = "pass" if raw.exit_code == 0 and metrics["median_ms"] is not None else "fail"
         self._record_raw(raw, check_id=f"cold26-{label}-{apk.stem}", title=f"Process-cold snapshot campaign ({label}, {apk.name})", component="perf", status=status, metrics=metrics)
@@ -1065,6 +1712,10 @@ class CampaignRunner:
                 self._metric("cold_first_interactive_p95_ms", cold.get("interactive_p95_ms"))
                 self._metric("cold_tap_successes", cold.get("tap_successes"))
                 self._metric("cold_tap_failures", cold.get("tap_failures"))
+                self._metric("cold_snapshot_samples", cold.get("sample_count"))
+                self._metric("cold_snapshot_mad_ms", cold.get("mad_ms"))
+                self._metric("cold_first_interactive_samples", cold.get("interactive_sample_count"))
+                self._metric("cold_first_interactive_mad_ms", cold.get("interactive_mad_ms"))
             if median is None or median >= self._threshold("cold_snapshot_median_ms", 26.0):
                 self._add_finding(Finding("cold26-median-regression", "P0", "performance", "Process-cold snapshot median is not below 26 ms", f"apk={apk.name}, median={median}", remediation="Profile exec/paged install/snapshot presentation with RD_PHASES=1; do not snapshot-time the real rd perf gate."))
             if p95 is not None and p95 >= self._threshold("cold_snapshot_p95_ms", 26.0):
@@ -1304,16 +1955,38 @@ class CampaignRunner:
                 c_med = candidate_cold.get("median_ms")
                 if isinstance(b_med, (int, float)) and isinstance(c_med, (int, float)) and b_med > 0:
                     cold_ratio = c_med / b_med
+                    cold_delta = c_med - b_med
+                    cold_absolute_floor = self._threshold("cold_ab_median_absolute_ms", 2.0)
+                    cold_noise_floor = _noise_floor_ms(
+                        [float(v) for v in base_cold.get("frame_times_ms", []) if isinstance(v, (int, float))],
+                        [float(v) for v in candidate_cold.get("frame_times_ms", []) if isinstance(v, (int, float))],
+                    )
+                    cold_threshold_ms = max(cold_absolute_floor, cold_noise_floor)
                     self._metric("cold_ab_median_ratio", cold_ratio)
-                    if cold_ratio > self._threshold("cold_ab_median_ratio", 1.25) and (c_med - b_med) > self._threshold("cold_ab_median_absolute_ms", 2.0):
-                        self._add_finding(Finding("cold-ab-median-regression", "P1", "performance", "Process-cold snapshot median regressed versus base", f"apk={apk.name}, base={b_med}, candidate={c_med}, ratio={cold_ratio:.3f}", remediation="Profile process start, paged install fingerprinting, and snapshot publication."))
+                    self._metric("cold_ab_median_delta_ms", cold_delta)
+                    self._metric("cold_ab_noise_floor_ms", round(cold_noise_floor, 3))
+                    self._metric("cold_ab_median_threshold_ms", round(cold_threshold_ms, 3))
+                    self._metric("cold_ab_base_mad_ms", base_cold.get("mad_ms"))
+                    self._metric("cold_ab_candidate_mad_ms", candidate_cold.get("mad_ms"))
+                    if cold_ratio > self._threshold("cold_ab_median_ratio", 1.25) and cold_delta > cold_threshold_ms:
+                        self._add_finding(Finding("cold-ab-median-regression", "P1", "performance", "Process-cold snapshot median regressed versus base", f"apk={apk.name}, base={b_med}, candidate={c_med}, ratio={cold_ratio:.3f}, delta={cold_delta:.3f}ms, noise-aware threshold={cold_threshold_ms:.3f}ms", remediation="Profile process start, paged install fingerprinting, and snapshot publication."))
                 b_interactive = base_cold.get("interactive_median_ms")
                 c_interactive = candidate_cold.get("interactive_median_ms")
                 if isinstance(b_interactive, (int, float)) and isinstance(c_interactive, (int, float)) and b_interactive > 0:
                     interactive_ratio = c_interactive / b_interactive
+                    interactive_delta = c_interactive - b_interactive
+                    interactive_absolute_floor = self._threshold("cold_ab_interactive_absolute_ms", 50.0)
+                    interactive_noise_floor = _noise_floor_ms(
+                        [float(v) for v in base_cold.get("interactive_times_ms", []) if isinstance(v, (int, float))],
+                        [float(v) for v in candidate_cold.get("interactive_times_ms", []) if isinstance(v, (int, float))],
+                    )
+                    interactive_threshold_ms = max(interactive_absolute_floor, interactive_noise_floor)
                     self._metric("cold_ab_interactive_median_ratio", interactive_ratio)
-                    if interactive_ratio > self._threshold("cold_ab_interactive_ratio", 1.25) and (c_interactive - b_interactive) > self._threshold("cold_ab_interactive_absolute_ms", 50.0):
-                        self._add_finding(Finding("cold-ab-interactive-regression", "P1", "performance", "Process-cold first-interaction median regressed versus base", f"apk={apk.name}, base={b_interactive}, candidate={c_interactive}, ratio={interactive_ratio:.3f}", remediation="Profile snapshot materialization separately from first-frame presentation; do not hide a slower interactive path behind a fast stored frame."))
+                    self._metric("cold_ab_interactive_delta_ms", interactive_delta)
+                    self._metric("cold_ab_interactive_noise_floor_ms", round(interactive_noise_floor, 3))
+                    self._metric("cold_ab_interactive_threshold_ms", round(interactive_threshold_ms, 3))
+                    if interactive_ratio > self._threshold("cold_ab_interactive_ratio", 1.25) and interactive_delta > interactive_threshold_ms:
+                        self._add_finding(Finding("cold-ab-interactive-regression", "P1", "performance", "Process-cold first-interaction median regressed versus base", f"apk={apk.name}, base={b_interactive}, candidate={c_interactive}, ratio={interactive_ratio:.3f}, delta={interactive_delta:.3f}ms, noise-aware threshold={interactive_threshold_ms:.3f}ms", remediation="Profile snapshot materialization separately from first-frame presentation; do not hide a slower interactive path behind a fast stored frame."))
                 if int(base_cold.get("tap_successes") or 0) > 0 and int(candidate_cold.get("tap_successes") or 0) == 0:
                     self._add_finding(Finding("cold-ab-tap-regression", "P1", "agent-protocol", "First tap after a snapshot hit stopped succeeding", f"apk={apk.name}, base_tap_successes={base_cold.get('tap_successes')}, candidate_tap_successes={candidate_cold.get('tap_successes')}", remediation="Reproduce the first materializing tap and add an Engine-handoff regression test."))
                 bf = base_cold.get("frame_hashes") or []
@@ -1325,6 +1998,200 @@ class CampaignRunner:
             if base_repo.exists():
                 subprocess.run(["git", "-C", str(self.repo), "worktree", "remove", "--force", str(base_repo)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             shutil.rmtree(temp_root, ignore_errors=True)
+
+    # ---------------------------------------------------------------- mutation
+    def _component_mutation(self) -> None:
+        base_sha = str(self.report.get("base_sha") or "")
+        head_sha = str(self.report.get("head_sha") or "")
+        if (
+            not re.fullmatch(r"[0-9a-fA-F]{40}", base_sha)
+            or not re.fullmatch(r"[0-9a-fA-F]{40}", head_sha)
+            or base_sha == head_sha
+            or self.report.get("head_is_worktree") is True
+            or self.report.get("worktree_dirty") is True
+        ):
+            self._skip(
+                "mutation-in-diff",
+                "Changed-code mutation testing",
+                "mutation",
+                "A clean committed base/head pair is required; cargo-mutants must start from a trustworthy diff.",
+                required=True,
+            )
+            return
+
+        changed_rs = [
+            path
+            for path in self._changed_paths()
+            if path.endswith(".rs") and not path.startswith("tools/rd-sentinel/")
+        ]
+        rust_sources = [path for path in changed_rs if "/src/" in path and not path.endswith("_test.rs")]
+        if not rust_sources:
+            self._skip(
+                "mutation-in-diff",
+                "Changed-code mutation testing",
+                "mutation",
+                "No changed production Rust source can generate mutants.",
+                required=False,
+            )
+            return
+
+        mutants_bin = shutil.which("cargo-mutants")
+        if not mutants_bin:
+            self._skip(
+                "mutation-in-diff",
+                "Changed-code mutation testing",
+                "mutation",
+                "cargo-mutants is not installed on this runner.",
+                required=True,
+            )
+            return
+
+        diff_raw = self._run_raw(
+            ["git", "diff", "--unified=0", f"{base_sha}...{head_sha}", "--", "*.rs"],
+            cwd=self.repo,
+            timeout=600,
+        )
+        self._record_raw(
+            diff_raw,
+            check_id="mutation-diff",
+            title="Export changed Rust diff for cargo-mutants",
+            component="mutation",
+        )
+        if diff_raw.exit_code != 0 or not diff_raw.stdout.strip():
+            if diff_raw.exit_code == 0:
+                self._skip(
+                    "mutation-in-diff",
+                    "Changed-code mutation testing",
+                    "mutation",
+                    "Git produced no Rust diff for the committed range.",
+                    required=False,
+                )
+            return
+
+        mutation_dir = self.output_dir / "mutation"
+        mutation_dir.mkdir(parents=True, exist_ok=True)
+        diff_path = mutation_dir / "changed.rs.diff"
+        diff_path.write_text(diff_raw.stdout, encoding="utf-8")
+
+        minutes = int(self.options.mutation_minutes or self._cfg("mutation_minutes", 45))
+        minutes = max(1, min(240, minutes))
+        try:
+            test_timeout_seconds = max(
+                30,
+                min(3600, int(self._cfg("mutation_test_timeout_seconds", 600))),
+            )
+        except (TypeError, ValueError):
+            test_timeout_seconds = 600
+        argv = [
+            "cargo",
+            "mutants",
+            "--cargo-arg=--locked",
+            "--in-diff",
+            str(diff_path),
+            "--timeout",
+            str(test_timeout_seconds),
+            "--output",
+            str(mutation_dir),
+        ]
+        targeted = [
+            package
+            for package in self._targeted_packages()
+            if PACKAGE_RE.fullmatch(package)
+        ]
+        if 0 < len(targeted) <= 4:
+            for package in targeted:
+                argv.extend(["--package", package])
+
+        raw = self._run_raw(argv, timeout=minutes * 60 + 600)
+        parsed = parse_mutants_output(f"{raw.stdout}\n{raw.stderr}")
+        outcomes_path = mutation_dir / "mutants.out" / "outcomes.json"
+        if outcomes_path.is_file():
+            try:
+                structured = parse_mutants_outcomes(
+                    json.loads(outcomes_path.read_text(encoding="utf-8"))
+                )
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                structured = None
+            if structured is not None:
+                # Structured counters are authoritative; retain readable MISSED
+                # lines only if the JSON representation provides no names.
+                if not structured.get("missed_mutants"):
+                    structured["missed_mutants"] = parsed.get("missed_mutants", [])
+                parsed = structured
+        missed = int(parsed.get("missed") or 0)
+        timeout_count = int(parsed.get("timeout") or 0)
+        caught = int(parsed.get("caught") or 0)
+        try:
+            max_missed = max(0, int(self._cfg("mutation_max_missed", 0)))
+        except (TypeError, ValueError):
+            max_missed = 0
+        self._metric("mutation_caught", caught)
+        self._metric("mutation_missed", missed)
+        self._metric("mutation_max_missed", max_missed)
+        self._metric("mutation_unviable", parsed.get("unviable"))
+        self._metric("mutation_timeouts", timeout_count)
+        self._metric("mutation_kill_rate", parsed.get("kill_rate"))
+
+        profile = self._profile()
+        explicit_or_deep = profile in {"mutants", "deep"} or "sentinel:mutants" in [
+            str(x) for x in self.report.get("labels", [])
+        ]
+        over_limit = missed > max_missed
+        if missed:
+            self._add_finding(
+                Finding(
+                    "mutation-survivor",
+                    "P1" if explicit_or_deep and over_limit else "P2",
+                    "tests",
+                    "Changed-code mutants survived the test suite",
+                    (
+                        f"missed={missed}, max_missed={max_missed}, caught={caught}, "
+                        f"timeouts={timeout_count}; "
+                        + "; ".join(parsed.get("missed_mutants", [])[:10])
+                    )[:1500],
+                    remediation="Add tests for the public behavior the surviving mutant changes, or document a genuinely equivalent mutant with a dated evidence exception.",
+                )
+            )
+        if timeout_count:
+            self._add_finding(
+                Finding(
+                    "mutation-timeout",
+                    "P2",
+                    "tests",
+                    "Mutation campaign produced timed-out mutants",
+                    f"timeouts={timeout_count}",
+                    remediation="Find the slow/pathological test path; a timeout is not evidence that a mutant was caught.",
+                )
+            )
+        status = mutation_check_status(
+            exit_code=raw.exit_code,
+            missed=missed,
+            timeouts=timeout_count,
+            blocking_context=explicit_or_deep,
+            max_missed=max_missed,
+            missing=raw.missing,
+            timed_out=raw.timed_out,
+        )
+        self._record_raw(
+            raw,
+            check_id="mutation-in-diff",
+            title="Changed-code mutation testing (cargo-mutants --in-diff)",
+            component="mutation",
+            status=status,
+            summary=(
+                f"caught={caught}, missed={missed}, max_missed={max_missed}, "
+                f"unviable={parsed.get('unviable')}, timeouts={timeout_count}, "
+                f"packages={targeted or ['workspace-diff']}"
+            ),
+            metrics={
+                **parsed,
+                "minutes_budget": minutes,
+                "test_timeout_seconds": test_timeout_seconds,
+                "max_missed": max_missed,
+                "blocking_context": explicit_or_deep,
+                "packages": targeted,
+            },
+        )
 
     # ------------------------------------------------------------------- fuzz
     def _component_fuzz(self) -> None:

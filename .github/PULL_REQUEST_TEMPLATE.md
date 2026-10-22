@@ -36,5 +36,10 @@
       `cold26`, paired benchmark, or Sentinel A/B artifact as applicable)
 - [ ] No test/golden/fuzz/MCP evidence was removed or a budget relaxed without
       equivalent replacement evidence and maintainer baseline approval
-- [ ] Dependency changes disclose license, source, MSRV, and major-version
-      impact; bot policy files were not weakened to make this PR pass
+- [ ] Dependency changes disclose license, source, MSRV, major-version, and
+      downstream/blast-radius impact; bot policy files were not weakened to
+      make this PR pass
+- [ ] Workflow changes keep actions SHA-pinned, permissions explicit, and
+      user-controlled text out of shell `run:` interpolation
+- [ ] If `sentinel:test-gap` or a surviving mutant is reported, the PR adds a
+      behavior test or records a dated, narrow equivalent-mutant exception

@@ -2,7 +2,7 @@
   "schema": 1,
   "bot": {
     "name": "RD Sentinel",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "report_marker": "<!-- rd-sentinel-report -->",
     "commit_status_context": "rd-sentinel/gate"
   },
@@ -24,6 +24,8 @@
     ".github/workflows/rd-sentinel-deep.yml",
     ".github/workflows/rd-sentinel-publish.yml",
     ".github/workflows/rd-sentinel-command.yml",
+    ".github/CODEOWNERS",
+    "deny.toml",
     "tools/rd-sentinel/**",
     "docs/adr/010-rd-sentinel-anti-regression-bot.md"
   ],
@@ -34,6 +36,7 @@
     "perf_risk": {"name": "sentinel:perf-risk", "color": "fbca04", "description": "Performance or resource regression risk"},
     "security_risk": {"name": "sentinel:security-risk", "color": "d93f0b", "description": "Security or unsafe-boundary regression risk"},
     "dependency_risk": {"name": "sentinel:dependency-risk", "color": "5319e7", "description": "Dependency update needs deep Sentinel vetting"},
+    "test_gap": {"name": "sentinel:test-gap", "color": "d93f0b", "description": "Tests are flaky, missing, shrinking, or leave changed-code mutants alive"},
     "deep_required": {"name": "sentinel:deep-required", "color": "fef2c0", "description": "A deeper RD Sentinel campaign is required"},
     "risk_high": {"name": "sentinel:risk-high", "color": "fbca04", "description": "RD Sentinel diff risk is high"},
     "risk_critical": {"name": "sentinel:risk-critical", "color": "b60205", "description": "RD Sentinel diff risk is critical"}
@@ -97,6 +100,10 @@
     "fuzz_seconds_nightly": 900,
     "fuzz_seconds_weekly": 7200,
     "fuzz_workers": 1,
+    "mutation_minutes": 45,
+    "mutation_test_timeout_seconds": 600,
+    "mutation_max_missed": 0,
+    "osv_timeout_seconds": 30,
     "command_timeout_seconds": 7200,
     "short_command_timeout_seconds": 1800
   },
@@ -116,6 +123,7 @@
     "efficiency_paired_speedup_floor": 0.9
   },
   "dependencies": {
+    "mass_update_change_threshold": 20,
     "allowed_registry_source_prefix": "registry+https://github.com/rust-lang/crates.io-index",
     "allowed_license_tokens": [
       "0BSD",

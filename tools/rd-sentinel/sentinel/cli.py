@@ -15,10 +15,12 @@ from .campaigns import CampaignOptions, CampaignRunner
 from .github_api import GitHubClient, command_authorized, execute_comment_command, parse_command, publish_report
 from .model import (
     CHECK_RANK,
+    CheckResult,
     SEVERITY_RANK,
     finalize_report,
     load_json,
     render_markdown,
+    render_sarif,
     sha256_file,
     validate_report,
 )
@@ -112,16 +114,22 @@ def _dedupe_findings(report: MutableMapping[str, Any]) -> None:
     report["findings"] = list(by_key.values())
 
 
-def _write_report(args: argparse.Namespace, report: Mapping[str, Any], repo: Path) -> tuple[Path, Path]:
+def _write_report(args: argparse.Namespace, report: Mapping[str, Any], repo: Path) -> tuple[Path, Path, Path]:
     output_dir = _resolve_under_repo(repo, getattr(args, "output_dir", None), "target/rd-sentinel")
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = _resolve_under_repo(repo, getattr(args, "json_out", None), str(output_dir / "rd-sentinel-report.json"))
     markdown_path = _resolve_under_repo(repo, getattr(args, "markdown_out", None), str(output_dir / "rd-sentinel-report.md"))
+    sarif_path = _resolve_under_repo(repo, getattr(args, "sarif_out", None), str(output_dir / "rd-sentinel-report.sarif"))
     json_path.parent.mkdir(parents=True, exist_ok=True)
     markdown_path.parent.mkdir(parents=True, exist_ok=True)
+    sarif_path.parent.mkdir(parents=True, exist_ok=True)
     rendered = render_markdown(report)
     json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
     markdown_path.write_text(rendered, encoding="utf-8")
+    sarif_path.write_text(
+        json.dumps(render_sarif(report), indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     summary_path = getattr(args, "summary_out", None) or os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_path:
         with Path(summary_path).open("a", encoding="utf-8") as fh:
@@ -133,7 +141,8 @@ def _write_report(args: argparse.Namespace, report: Mapping[str, Any], repo: Pat
             fh.write(f"fingerprint={report.get('fingerprint')}\n")
             fh.write(f"report_json={json_path}\n")
             fh.write(f"report_markdown={markdown_path}\n")
-    return json_path, markdown_path
+            fh.write(f"report_sarif={sarif_path}\n")
+    return json_path, markdown_path, sarif_path
 
 
 def _exit_for_verdict(verdict: str) -> int:
@@ -166,6 +175,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
         repeat=args.repeat,
         perf_runs=args.perf_runs,
         cold_runs=args.cold_runs,
+        mutation_minutes=args.mutation_minutes,
         allow_network=bool(args.allow_network),
         output_dir=output_dir,
     )
@@ -198,10 +208,11 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
     _dedupe_findings(report)
     finalize_report(report, policy)
-    json_path, markdown_path = _write_report(args, report, repo)
+    json_path, markdown_path, sarif_path = _write_report(args, report, repo)
     print(f"RD Sentinel verdict={report['verdict']} fingerprint={report['fingerprint']}")
     print(f"JSON: {json_path}")
     print(f"Markdown: {markdown_path}")
+    print(f"SARIF: {sarif_path}")
     return _exit_for_verdict(str(report["verdict"]))
 
 
@@ -215,6 +226,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
         "head_sha": report.get("head_sha"),
         "areas": report.get("areas"),
         "risk_score": report.get("risk_score"),
+        "risk_factors": report.get("risk_factors"),
         "plan": report.get("plan"),
         "findings": report.get("findings"),
         "metrics": report.get("metrics"),
@@ -235,6 +247,20 @@ def cmd_render(args: argparse.Namespace) -> int:
         print("invalid report: " + "; ".join(errors), file=sys.stderr)
         return 2
     text = render_markdown(report)
+    if args.out:
+        Path(args.out).write_text(text, encoding="utf-8")
+    else:
+        print(text, end="")
+    return 0
+
+
+def cmd_sarif(args: argparse.Namespace) -> int:
+    report = load_json(Path(args.report))
+    errors = validate_report(report, require_fingerprint=not args.allow_unverified)
+    if errors:
+        print("invalid report: " + "; ".join(errors), file=sys.stderr)
+        return 2
+    text = json.dumps(render_sarif(report), indent=2, ensure_ascii=False, sort_keys=True) + "\n"
     if args.out:
         Path(args.out).write_text(text, encoding="utf-8")
     else:
@@ -335,6 +361,27 @@ def cmd_merge(args: argparse.Namespace) -> int:
         executed.update(str(x) for x in report.get("executed_components", []) if x)
         components.update(str(x) for x in report.get("requested_components", []) if x)
 
+    covered_components = set(executed)
+    covered_components.update(
+        str(check.get("component"))
+        for check in checks.values()
+        if check.get("component") and check.get("status") != "planned"
+    )
+    for component, plan in sorted(plans.items()):
+        if plan.get("required", True) and component not in covered_components:
+            planned_id = f"planned-{component}"
+            checks.setdefault(
+                planned_id,
+                CheckResult(
+                    id=planned_id,
+                    title=f"Planned campaign: {component}",
+                    status="planned",
+                    required=True,
+                    component=component,
+                    summary="No partial report executed this planned required component; merged evidence is incomplete.",
+                ).to_dict(),
+            )
+
     merged["checks"] = list(checks.values())
     merged["findings"] = list(findings.values())
     merged["metrics"] = metrics
@@ -343,6 +390,10 @@ def cmd_merge(args: argparse.Namespace) -> int:
     merged["executed_components"] = sorted(executed)
     merged["requested_components"] = sorted(components)
     merged["risk_score"] = max(int(r.get("risk_score") or 0) for r in reports)
+    merged["risk_factors"] = max(
+        reports,
+        key=lambda r: int(r.get("risk_score") or 0),
+    ).get("risk_factors", [])
     merged["strict_skips"] = any(bool(r.get("strict_skips")) for r in reports)
     merged["merged_report_fingerprints"] = [r.get("fingerprint") for r in reports]
     finalize_report(merged, policy)
@@ -351,6 +402,12 @@ def cmd_merge(args: argparse.Namespace) -> int:
     out.write_text(json.dumps(merged, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
     md_out = Path(args.markdown_out) if args.markdown_out else out.with_suffix(".md")
     md_out.write_text(render_markdown(merged), encoding="utf-8")
+    sarif_value = getattr(args, "sarif_out", None)
+    sarif_out = Path(sarif_value) if sarif_value else out.with_suffix(".sarif")
+    sarif_out.write_text(
+        json.dumps(render_sarif(merged), indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     print(f"merged RD Sentinel verdict={merged['verdict']} fingerprint={merged['fingerprint']} -> {out}")
     return _exit_for_verdict(str(merged["verdict"]))
 
@@ -436,7 +493,7 @@ def _add_audit_args(parser: argparse.ArgumentParser) -> None:
     _add_common(parser)
     parser.add_argument("--base", default=None, help="Trusted base ref/SHA (default: event base or origin/main)")
     parser.add_argument("--head", default=None, help="Head ref/SHA, or WORKTREE for a dirty local tree")
-    parser.add_argument("--profile", default="auto", choices=["auto", "plan", "static", "deep", "nightly", "weekly", "perf", "fuzz", "deps", "determinism", "soak"])
+    parser.add_argument("--profile", default="auto", choices=["auto", "plan", "static", "deep", "nightly", "weekly", "perf", "fuzz", "deps", "determinism", "mutants", "soak"])
     parser.add_argument("--campaign", default=None)
     parser.add_argument("--event", default=None, help="GitHub event JSON path")
     parser.add_argument("--event-name", default=None)
@@ -456,11 +513,13 @@ def _add_audit_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--repeat", type=_positive_int, default=None)
     parser.add_argument("--perf-runs", type=_positive_int, default=None)
     parser.add_argument("--cold-runs", type=_positive_int, default=None)
+    parser.add_argument("--mutation-minutes", type=_positive_int, default=None)
     parser.add_argument("--allow-network", action="store_true")
     parser.add_argument("--baseline-proposal", action="store_true")
     parser.add_argument("--output-dir", default="target/rd-sentinel")
     parser.add_argument("--json-out", default=None)
     parser.add_argument("--markdown-out", default=None)
+    parser.add_argument("--sarif-out", default=None)
     parser.add_argument("--summary-out", default=None)
     parser.add_argument("--github-output", default=None)
 
@@ -488,6 +547,12 @@ def build_parser() -> argparse.ArgumentParser:
     render.add_argument("--allow-unverified", action="store_true")
     render.set_defaults(func=cmd_render)
 
+    sarif = sub.add_parser("sarif", help="Render a JSON report as SARIF 2.1.0")
+    sarif.add_argument("--report", required=True)
+    sarif.add_argument("--out", default=None)
+    sarif.add_argument("--allow-unverified", action="store_true")
+    sarif.set_defaults(func=cmd_sarif)
+
     validate = sub.add_parser("validate", help="Validate report schema/fingerprint")
     validate.add_argument("--report", required=True)
     validate.add_argument("--require-pass", action="store_true")
@@ -498,6 +563,7 @@ def build_parser() -> argparse.ArgumentParser:
     merge.add_argument("reports", nargs="+")
     merge.add_argument("--out", required=True)
     merge.add_argument("--markdown-out", default=None)
+    merge.add_argument("--sarif-out", default=None)
     merge.set_defaults(func=cmd_merge)
 
     publish = sub.add_parser("publish", help="Publish a report through the trusted GitHub publisher")

@@ -18,7 +18,7 @@ on:
         required: true
         default: auto
         type: choice
-        options: [auto, deep, nightly, weekly, perf, fuzz, deps, determinism, soak]
+        options: [auto, deep, nightly, weekly, perf, fuzz, deps, determinism, mutants, soak]
       campaign:
         description: Campaign name recorded in the report
         required: false
@@ -26,6 +26,10 @@ on:
         type: string
       Fuzz_SECONDS:
         description: Optional fuzz seconds per target
+        required: false
+        type: string
+      mutation_minutes:
+        description: Optional changed-code mutation budget in minutes (1-240)
         required: false
         type: string
       baseline_proposal:
@@ -60,6 +64,7 @@ jobs:
           INPUT_PROFILE: ${{ inputs.profile || 'auto' }}
           INPUT_CAMPAIGN: ${{ inputs.campaign || 'manual' }}
           INPUT_FUZZ_SECONDS: ${{ inputs.Fuzz_SECONDS || '' }}
+          INPUT_MUTATION_MINUTES: ${{ inputs.mutation_minutes || '' }}
           INPUT_BASELINE_PROPOSAL: ${{ inputs.baseline_proposal || 'false' }}
         run: |
           python3 - <<'PY'
@@ -130,6 +135,10 @@ jobs:
           out["campaign"] = os.environ.get("INPUT_CAMPAIGN") or os.environ.get("GITHUB_EVENT_NAME") or "manual"
           out["actor"] = actor
           out["Fuzz_SECONDS"] = os.environ.get("INPUT_FUZZ_SECONDS", "")
+          mutation_minutes = os.environ.get("INPUT_MUTATION_MINUTES", "").strip()
+          if mutation_minutes and (not mutation_minutes.isdigit() or not (1 <= int(mutation_minutes) <= 240)):
+              mutation_minutes = ""
+          out["mutation_minutes"] = mutation_minutes
           out["baseline_proposal"] = os.environ.get("INPUT_BASELINE_PROPOSAL", "false")
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
               for key, value in out.items():
@@ -138,7 +147,7 @@ jobs:
           PY
 
       - name: Checkout candidate (untrusted, read-only token)
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: ${{ steps.ctx.outputs.head_repo }}
           ref: ${{ steps.ctx.outputs.head_sha }}
@@ -147,7 +156,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout trusted base policy and bot
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: ${{ steps.ctx.outputs.base_repo }}
           ref: ${{ steps.ctx.outputs.base_sha }}
@@ -159,21 +168,38 @@ jobs:
 
       - name: Select trusted Sentinel home and fetch base into candidate history
         id: bot
+        env:
+          BASE_SHA: ${{ steps.ctx.outputs.base_sha }}
+          REQUESTED_PROFILE: ${{ steps.ctx.outputs.profile }}
         run: |
           set -euo pipefail
           if [ -f trusted/tools/rd-sentinel/rd_sentinel.py ]; then
-            echo "home=$GITHUB_WORKSPACE/trusted" >> "$GITHUB_OUTPUT"
-            echo "Using Sentinel and policy from trusted base ${{ steps.ctx.outputs.base_sha }}"
+            sentinel_home="$GITHUB_WORKSPACE/trusted"
+            echo "Using Sentinel and policy from trusted base $BASE_SHA"
           else
-            echo "home=$GITHUB_WORKSPACE/candidate" >> "$GITHUB_OUTPUT"
+            sentinel_home="$GITHUB_WORKSPACE/candidate"
             echo "::warning::Base has no RD Sentinel yet; bootstrap mode uses candidate bot, and protected-path approval remains mandatory."
           fi
-          if ! git -C candidate cat-file -e "${{ steps.ctx.outputs.base_sha }}^{commit}" 2>/dev/null; then
-            git -C candidate fetch --no-tags "$GITHUB_WORKSPACE/trusted/.git" "${{ steps.ctx.outputs.base_sha }}"
+          echo "home=$sentinel_home" >> "$GITHUB_OUTPUT"
+          supports_v11=false
+          if grep -q 'BOT_VERSION = "1.1' "$sentinel_home/tools/rd-sentinel/sentinel/model.py" 2>/dev/null; then
+            supports_v11=true
+          fi
+          echo "supports_v11=$supports_v11" >> "$GITHUB_OUTPUT"
+          effective_profile="$REQUESTED_PROFILE"
+          if [ "$effective_profile" = "mutants" ] && [ "$supports_v11" != "true" ]; then
+            # The trusted base bot predates the mutants profile. Fail safe to
+            # the older deep campaign rather than crashing before a report.
+            effective_profile="deep"
+            echo "::warning::Trusted base RD Sentinel predates v1.1; mutants profile downgraded to deep for this bootstrap run."
+          fi
+          echo "effective_profile=$effective_profile" >> "$GITHUB_OUTPUT"
+          if ! git -C candidate cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            git -C candidate fetch --no-tags "$GITHUB_WORKSPACE/trusted/.git" "$BASE_SHA"
           fi
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
 
@@ -195,7 +221,7 @@ jobs:
             --baseline "$SENTINEL_HOME/.github/rd-sentinel/baseline.json"
             --base "${{ steps.ctx.outputs.base_sha }}"
             --head "${{ steps.ctx.outputs.head_sha }}"
-            --profile "${{ steps.ctx.outputs.profile }}"
+            --profile "${{ steps.bot.outputs.effective_profile }}"
             --campaign "${{ steps.ctx.outputs.campaign }}"
             --event "$GITHUB_EVENT_PATH"
             --event-name "$GITHUB_EVENT_NAME"
@@ -222,6 +248,7 @@ jobs:
               fh.write(f"needs_fuzz={'true' if 'fuzz' in components else 'false'}\n")
               fh.write(f"needs_apk={'true' if components & {'perf', 'compare', 'real-apk', 'determinism'} else 'false'}\n")
               fh.write(f"needs_deps={'true' if 'deps' in components or 'dep-trial' in components else 'false'}\n")
+              fh.write(f"needs_mutation={'true' if 'mutation' in components else 'false'}\n")
               fh.write(f"needs_future={'true' if 'future' in components else 'false'}\n")
               fh.write(f"needs_golden={'true' if 'golden' in components else 'false'}\n")
               fh.write(f"needs_soak={'true' if 'soak' in components else 'false'}\n")
@@ -235,9 +262,16 @@ jobs:
           rustup default stable
           cargo install cargo-fuzz@0.13.2 --locked
 
-      - name: Install cargo-audit
+      - name: Install dependency-vetting tools
         if: steps.plan.outputs.needs_deps == 'true'
-        run: cargo install cargo-audit --locked
+        run: |
+          cargo install cargo-audit@0.22.2 --locked
+          cargo install cargo-deny@0.20.2 --locked
+          cargo install cargo-machete@0.9.2 --locked
+
+      - name: Install cargo-mutants
+        if: steps.plan.outputs.needs_mutation == 'true'
+        run: cargo install cargo-mutants@27.1.0 --locked
 
       - name: Install beta and MSRV Rust for future trial
         if: steps.plan.outputs.needs_future == 'true'
@@ -252,14 +286,14 @@ jobs:
 
       - name: Set up Java for golden/soak harnesses
         if: steps.plan.outputs.needs_golden == 'true' || steps.plan.outputs.needs_soak == 'true'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: '21'
 
       - name: Cache pinned native-language SDK inputs
         if: steps.plan.outputs.needs_soak == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/native-language-sdk
           key: native-languages-sdk-r27c-platform26-r8-8.5.35-v1
@@ -306,7 +340,7 @@ jobs:
             --baseline "$SENTINEL_HOME/.github/rd-sentinel/baseline.json"
             --base "${{ steps.ctx.outputs.base_sha }}"
             --head "${{ steps.ctx.outputs.head_sha }}"
-            --profile "${{ steps.ctx.outputs.profile }}"
+            --profile "${{ steps.bot.outputs.effective_profile }}"
             --campaign "${{ steps.ctx.outputs.campaign }}"
             --event "$GITHUB_EVENT_PATH"
             --event-name "$GITHUB_EVENT_NAME"
@@ -326,6 +360,12 @@ jobs:
           fi
           if [ -n "${{ steps.ctx.outputs.Fuzz_SECONDS }}" ]; then
             args+=(--Fuzz_SECONDS "${{ steps.ctx.outputs.Fuzz_SECONDS }}")
+          fi
+          if [ "${{ steps.bot.outputs.supports_v11 }}" = "true" ]; then
+            args+=(--sarif-out "$RD_SENTINEL_OUT/rd-sentinel-report.sarif")
+            if [ -n "${{ steps.ctx.outputs.mutation_minutes }}" ]; then
+              args+=(--mutation-minutes "${{ steps.ctx.outputs.mutation_minutes }}")
+            fi
           fi
           if [ "${{ steps.ctx.outputs.baseline_proposal }}" = "true" ]; then
             args+=(--baseline-proposal)
@@ -353,12 +393,14 @@ jobs:
 
       - name: Upload fingerprinted Sentinel report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: rd-sentinel-report
           path: |
             rd-sentinel-out/rd-sentinel-report.json
             rd-sentinel-out/rd-sentinel-report.md
+            rd-sentinel-out/rd-sentinel-report.sarif
+            rd-sentinel-out/sbom.cyclonedx.json
             rd-sentinel-out/plan.json
             candidate/crates/*/fuzz/artifacts/**
             candidate/fuzz-logs/**

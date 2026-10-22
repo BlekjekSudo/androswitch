@@ -1,0 +1,29 @@
+# Route review to the repository owner until subsystem teams exist.
+# GitHub uses the last matching pattern. Do not enable "Require review from
+# Code Owners" while this maps everything to the sole maintainer: the PR
+# author cannot approve their own PR, so that setting would deadlock merges.
+
+* @nadabgfccvd
+
+# RD Sentinel's own gate, policy, and evidence must never drift unnoticed.
+.github/dependabot.yml @nadabgfccvd
+.github/rd-sentinel/ @nadabgfccvd
+.github/workflows/rd-sentinel.yml @nadabgfccvd
+.github/workflows/rd-sentinel-deep.yml @nadabgfccvd
+.github/workflows/rd-sentinel-publish.yml @nadabgfccvd
+.github/workflows/rd-sentinel-command.yml @nadabgfccvd
+.github/CODEOWNERS @nadabgfccvd
+deny.toml @nadabgfccvd
+tools/rd-sentinel/ @nadabgfccvd
+
+# Supply-chain and build contracts.
+Cargo.toml @nadabgfccvd
+Cargo.lock @nadabgfccvd
+crates/*/Cargo.toml @nadabgfccvd
+
+# Native/unsafe boundaries and cold-start evidence.
+crates/rd-jni/ @nadabgfccvd
+crates/rd-ndk/ @nadabgfccvd
+scripts/cold26.py @nadabgfccvd
+scripts/efficiency-benchmark.py @nadabgfccvd
+scripts/summarize-efficiency-benchmarks.py @nadabgfccvd

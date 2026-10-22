@@ -7,10 +7,12 @@ Operational guidance lives in [`docs/rd-sentinel.md`](../../docs/rd-sentinel.md)
 ## Layout
 
 - `rd_sentinel.py` — executable wrapper
-- `sentinel/model.py` — report schema, fingerprints, verdicts, Markdown
-- `sentinel/audit.py` — trusted diff/contract/dependency static audit
+- `sentinel/model.py` — report schema, fingerprints, verdicts, policy/baseline
+  validation, secret redaction, Markdown, and SARIF
+- `sentinel/audit.py` — trusted diff/contract/dependency/workflow static audit
+  with downstream workspace-package selection
 - `sentinel/campaigns.py` — tests, feature, determinism, perf, A/B, fuzz,
-  soak, future-toolchain, and dependency campaigns
+  mutation, soak, future-toolchain, SBOM, OSV, and dependency campaigns
 - `sentinel/mcp_endurance.py` — application-neutral persistent MCP session
   endurance for pinned launchable APKs
 - `sentinel/github_api.py` — trusted publisher and maintainer commands
