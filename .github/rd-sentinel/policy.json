@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "bot": {
+    "name": "RD Sentinel",
+    "version": "1.0.0",
+    "report_marker": "<!-- rd-sentinel-report -->",
+    "commit_status_context": "rd-sentinel/gate"
+  },
+  "severity": {
+    "blocking": ["P0", "P1"],
+    "max_nonblocking_findings_before_block": 25
+  },
+  "approvals": {
+    "policy_label": "sentinel:policy-approved",
+    "dependency_major_label": "sentinel:dependency-major-approved",
+    "baseline_label": "sentinel:baseline-approved",
+    "deep_label": "sentinel:deep",
+    "authorized_comment_associations": ["OWNER", "MEMBER", "COLLABORATOR"]
+  },
+  "protected_paths": [
+    ".github/dependabot.yml",
+    ".github/rd-sentinel/**",
+    ".github/workflows/rd-sentinel.yml",
+    ".github/workflows/rd-sentinel-deep.yml",
+    ".github/workflows/rd-sentinel-publish.yml",
+    ".github/workflows/rd-sentinel-command.yml",
+    "tools/rd-sentinel/**",
+    "docs/adr/010-rd-sentinel-anti-regression-bot.md"
+  ],
+  "labels": {
+    "pass": {"name": "sentinel:pass", "color": "0e8a16", "description": "RD Sentinel anti-regression gate passed"},
+    "blocked": {"name": "sentinel:blocked", "color": "b60205", "description": "RD Sentinel found a blocking regression risk"},
+    "p0": {"name": "sentinel:P0", "color": "7f0c13", "description": "Critical RD Sentinel finding"},
+    "perf_risk": {"name": "sentinel:perf-risk", "color": "fbca04", "description": "Performance or resource regression risk"},
+    "security_risk": {"name": "sentinel:security-risk", "color": "d93f0b", "description": "Security or unsafe-boundary regression risk"},
+    "dependency_risk": {"name": "sentinel:dependency-risk", "color": "5319e7", "description": "Dependency update needs deep Sentinel vetting"},
+    "deep_required": {"name": "sentinel:deep-required", "color": "fef2c0", "description": "A deeper RD Sentinel campaign is required"},
+    "risk_high": {"name": "sentinel:risk-high", "color": "fbca04", "description": "RD Sentinel diff risk is high"},
+    "risk_critical": {"name": "sentinel:risk-critical", "color": "b60205", "description": "RD Sentinel diff risk is critical"}
+  },
+  "diff": {
+    "large_file_bytes": 5242880,
+    "very_large_diff_files": 120,
+    "very_large_diff_lines": 12000,
+    "binary_extensions_blocking": [".apk", ".aab", ".so", ".dll", ".dylib", ".exe", ".class", ".dex", ".o", ".a"],
+    "unsafe_allowed_path_globs": ["crates/rd-jni/**", "crates/rd-ndk/**"],
+    "test_path_globs": [
+      "**/tests/**",
+      "**/*_test.rs",
+      "**/*_tests.rs",
+      "golden/**",
+      "golden-apks/**",
+      "tests/**",
+      "crates/*/fuzz/**",
+      "tools/rd-sentinel/tests/**"
+    ],
+    "adr_path_globs": ["docs/adr/**"],
+    "compat_evidence_globs": [
+      "docs/compat-matrix.md",
+      "docs/api-coverage.toml",
+      "docs/m8-*.md",
+      "docs/m9-*.md",
+      "spec.md",
+      "tests/**",
+      "golden/**"
+    ],
+    "evidence_harness_globs": [
+      "scripts/check_md_links.py",
+      "scripts/cold26.py",
+      "scripts/comprix-regression.py",
+      "scripts/efficiency-benchmark.py",
+      "scripts/summarize-efficiency-benchmarks.py",
+      "scripts/fuzz-campaign.sh",
+      "scripts/mcp-session-soak.py",
+      "golden/vm/build.sh",
+      "golden/vm/fetch-tools.sh",
+      "golden/vm/run-golden.sh",
+      "golden/vm/test-gate.sh",
+      "golden/vm/gate.py",
+      "golden-apks/fetch.sh",
+      "golden-apks/native-gate.sh",
+      "golden/native-languages/build.py"
+    ]
+  },
+  "campaigns": {
+    "cargo_jobs": 2,
+    "repeat_targeted_tests": 3,
+    "flaky_hunt_repetitions": 5,
+    "perf_runs": 3,
+    "cold_runs": 5,
+    "real_apk_cycles_pr": 10,
+    "real_apk_cycles_weekly": 100,
+    "comprix_cycles_pr": 3,
+    "comprix_cycles_weekly": 20,
+    "mcp_soak_seconds_weekly": 1800,
+    "fuzz_seconds_pr_parser": 120,
+    "fuzz_seconds_nightly": 900,
+    "fuzz_seconds_weekly": 7200,
+    "fuzz_workers": 1,
+    "command_timeout_seconds": 7200,
+    "short_command_timeout_seconds": 1800
+  },
+  "thresholds": {
+    "cold_snapshot_median_ms": 26.0,
+    "cold_snapshot_p95_ms": 26.0,
+    "cold_snapshot_max_warn_ms": 50.0,
+    "cold_ab_median_ratio": 1.25,
+    "cold_ab_median_absolute_ms": 2.0,
+    "cold_ab_interactive_ratio": 1.25,
+    "cold_ab_interactive_absolute_ms": 50.0,
+    "perf_ab_p50_ratio": 1.1,
+    "perf_ab_p50_absolute_ms": 25.0,
+    "perf_ab_max_ratio": 1.15,
+    "binary_size_ratio": 1.05,
+    "binary_size_absolute_bytes": 262144,
+    "efficiency_paired_speedup_floor": 0.9
+  },
+  "dependencies": {
+    "allowed_registry_source_prefix": "registry+https://github.com/rust-lang/crates.io-index",
+    "allowed_license_tokens": [
+      "0BSD",
+      "Apache-2.0",
+      "BSD-2-Clause",
+      "BSD-3-Clause",
+      "ISC",
+      "MIT",
+      "Unicode-3.0",
+      "Unlicense",
+      "Zlib"
+    ],
+    "deep_package_name_patterns": [
+      "cranelift.*",
+      "flate2",
+      "miniz_oxide",
+      "png",
+      "serde.*",
+      "sha.*",
+      "toml.*",
+      "unicorn.*",
+      "wasmparser",
+      "wasmtime.*",
+      "zip.*"
+    ]
+  },
+  "exceptions": [
+    {
+      "id": "EX-2026-001-pure-regex-cache",
+      "finding_id": "new-thread-local-state",
+      "path_glob": "crates/rd-vm/src/jregex.rs",
+      "owner": "rd-vm maintainers",
+      "reason": "The remaining cache stores immutable compiled regex patterns only; it carries no guest-visible state and is covered by the Engine handoff audit.",
+      "expires": "2027-10-22"
+    }
+  ]
+}
