@@ -60,6 +60,19 @@ fn real_dex_header_and_map_coverage() {
         dex.header.version_str()
     );
     assert!(dex.header.checksum_ok, "adler32 deve conferir num dex real");
+    assert!(
+        dex.verify_checksum(),
+        "verify_checksum autoritativo confere"
+    );
+    // ADR 009: parse_unverified defere o adler (checksum_ok=false =
+    // "não verificado") mas produz o mesmo Dex; verify_checksum confere.
+    let duv = Dex::parse_unverified(data.clone()).expect("parse_unverified");
+    assert!(
+        !duv.header.checksum_ok,
+        "unverified marca checksum_ok=false"
+    );
+    assert!(duv.verify_checksum(), "adler sob demanda confere");
+    assert_eq!(duv.strings.len(), dex.strings.len());
     assert_eq!(
         dex.header.file_size as usize,
         data.len(),
