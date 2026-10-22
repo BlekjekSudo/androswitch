@@ -237,8 +237,9 @@ pub struct Dex {
     /// offsets de call_site_id_item (encoded_array_item).
     pub call_site_offsets: Vec<u32>,
     pub method_handles: Vec<MethodHandle>,
-    /// descriptor → class_defs index, built on first `find_class`
-    /// (the linear scan dominated launch time on 10k-class apps)
+    /// descriptor -> class_defs position, built lazily on first
+    /// `find_class` (the linear scan dominated launch time on
+    /// 10k-class apps).
     pub class_index: std::sync::OnceLock<std::collections::HashMap<String, usize>>,
 }
 
@@ -497,6 +498,11 @@ impl Dex {
 
     /// Class for a descriptor (`Lcom/x/Y;`). O(1) via a lazily built index;
     /// the first definition wins, matching the previous linear scan.
+    /// (ADR 008 Stage 1b note: binary search over `type_ids` +
+    /// sorted-`class_idx` index was tried and reverted — at real call
+    /// volumes the per-call string compares lost to one hash lookup, and
+    /// cross-DEX misses made fallback scans catastrophic. The lazy
+    /// HashMap build measured faster end-to-end on the M7 gate APK.)
     pub fn find_class(&self, descriptor: &str) -> Option<&ClassDef> {
         let idx = self.class_index.get_or_init(|| {
             let mut m = std::collections::HashMap::with_capacity(self.class_defs.len());

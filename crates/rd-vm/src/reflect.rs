@@ -89,7 +89,7 @@ fn find_sig(vm: &Engine, class: &str, name: &str, params: &str) -> Option<String
             }
             if let Ok(mr) = vm.cp.method_ref(d, idx as u32) {
                 if mr.proto.starts_with(params) {
-                    return Some(mr.proto);
+                    return Some(mr.proto.clone());
                 }
             }
         }

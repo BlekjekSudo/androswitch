@@ -175,6 +175,55 @@ Invariants: every fixed-stride read is bounds-checked with `base + idx*stride` o
 
 **Honest status vs the ≤1,500 ms bar: NOT yet met (2,143 ms emulated).** This PR lands the architecture, the RSS-critical clone removal, the paged-I/O proof, the telemetry that names the remaining bottleneck (eager DEX inside `launch ≈ 405 ms`), and the profiling profile. Stage 1b (`LazyDex` + install index) is the designed, budgeted path from 405 ms → ≤25 ms mount + reduced parse, which is what closes ≤1,500 ms; claiming the goal now would be false. 15 GB *opening/lookup* is proven at prototype level (600 MiB sparse, ≤256 KiB pinned; design cap 16 MiB at any size); full 15 GB *launch* lands with Stages 2–3/5.
 
+### 9.1 Stage 5 completion addendum (same PR, follow-up commits)
+
+The ≤1,500 ms gate on the M7 APK is now **MET**, via the Stage 1b hot-path
+subset (measured on the final binary, Primftpd 11 MB, `--runs 3`):
+
+| Metric | Before (this PR, §9) | Final | Δ |
+|---|---|---|---|
+| Cold host runs | 536 ms p50 | **310–356 ms** (3 runs) | — |
+| Cold emulated p50 / max | 2,143 / 2,228 ms | **1,271–1,286 / 1,326–1,425 ms** | **−41%** |
+| Warm emulated p50 | 545 ms | **404–418 ms** | −25% |
+| Peak RSS (VmHWM) | 83.3 MB | **96–108 MB** | ≤512 MB budget kept |
+| App heap peak | 3.7 MB | 2.4 MB | = |
+
+`STARTUP_BUDGET_EMULATED_MS` lowered 2000 → 1500 in `rd-cli/src/perf.rs`
+(with `startup_budget_is_strict` updated); `rd perf` reports `pass=true`
+against the tightened budget. Screenshot PNG is byte-identical to the
+pre-optimization baseline (md5 `2d9d1d07…`), so Law 4 determinism held
+throughout. Workspace gates: fmt clean, clippy `-D warnings` clean,
+680/680 tests (default), 696/696 (all-features), markdown links OK.
+
+What actually closed the gap (profile-driven, in order of impact):
+
+1. `jannotations::method_annotations` scanned **all** method_ids (50k+)
+   per call to find one declared method; it now searches only the
+   declaring class's `ClassData` (the single largest win, ≈50 ms).
+2. Parallel DEX mount in `dexes_of_apk` (scoped threads, declaration
+   order preserved, deterministic `Vec<Dex>`) + slicing-by-8 CRC32
+   (bit-identical). Note this partially revises §10: parallel *mount* of
+   the few DEX files proved deterministic and within the 1-core quota;
+   eager *parse* remains the Stage 1b target.
+3. Classpath caches: `method_ref` / `field_ref` / `resolve_method`
+   memoization (DEX sets are immutable per Engine) + a `find_class`
+   index memo re-borrowed from the live DEX per call.
+4. Android-style `measure()` short-circuit (same specs + no bubbled
+   `requestLayout` ⇒ skip `onMeasure`) and a zero-allocation fast path
+   in `do_invoke` when no wide register is present.
+
+Two documented dead ends, kept here so they are not retried: (a) binary
+-search `find_class` (`type_ids` + sorted-`class_idx` index) was
+*slower* end-to-end (cross-DEX misses and per-call string compares) and
+was reverted to the lazy `HashMap` build; (b) memoizing `is_subtype`
+results is unsound — a differential test deliberately mutates DEX
+metadata in place and asserts subtype answers stay live.
+
+Still outstanding (unchanged from §8): full `LazyDex` mount, the
+`ZipSource`/`CompactCdIndex` swap (Stage 2), `LazyArsc` (Stage 3),
+Stage 4 VM internals, and the 15 GB sparse *launch* fixture — the
+≤1,500 ms bar above is met on the M7 gate APK, not yet on a 15 GB APK.
+
 ## 10. Alternatives considered
 
 - **mmap (even windowed):** rejected as default (§3, RSS trap + unsafe ban); may return via dedicated ADR with hard eviction accounting.
