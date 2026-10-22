@@ -400,7 +400,9 @@ impl AgentSession {
 
     /// PNG of the current frame, cached per frame version.
     fn screen_png(&mut self) -> Result<Arc<Vec<u8>>, RdError> {
+        let t_refresh = std::time::Instant::now();
         self.screen_refresh()?;
+        phase("screen_refresh", t_refresh);
         let v = self.screen.version;
         if let Some((pv, png)) = &self.screen.png {
             if *pv == v {
@@ -411,12 +413,18 @@ impl AgentSession {
         let tree = eng
             .view_tree()
             .ok_or_else(|| agent_error("INVALID_FORMAT", "sem activity/window para screenshot", None))?;
+        let t_render = std::time::Instant::now();
         let mut fb = rd_render::render_snapshot(&tree);
+        phase("render_snapshot", t_render);
         if eng.has_frame() {
+            let t_rast = std::time::Instant::now();
             let (w, h) = (fb.w, fb.h);
             eng.rasterize_frame(&mut fb.px, w, h);
+            phase("rasterize_frame", t_rast);
         }
+        let t_png = std::time::Instant::now();
         let png = Arc::new(fb.to_png());
+        phase("png_encode", t_png);
         self.screen.png = Some((v, png.clone()));
         Ok(png)
     }

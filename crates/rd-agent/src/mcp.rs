@@ -30,6 +30,23 @@ use rd_vm::framework::UiNode;
 use rd_vm::{Engine, HostOut, Value, VmConfig, VmExit};
 
 pub const MODULE_ID: &str = "rd-agent";
+/// ADR 009 cold-start phase telemetry: `RD_PHASES=1` prints
+/// `phase <name> <ms>` lines to stderr. Zero work when off beyond one
+/// `Instant::now()` per phase boundary.
+pub fn phases_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| {
+        std::env::var("RD_PHASES")
+            .map(|v| v == "1" || v == "on")
+            .unwrap_or(false)
+    })
+}
+
+pub fn phase(name: &str, t0: std::time::Instant) {
+    if phases_on() {
+        eprintln!("phase {name} {:.3}", t0.elapsed().as_secs_f64() * 1000.0);
+    }
+}
 
 /// Versão do protocolo MCP anunciada no initialize (shape 2024-11-05).
 pub const PROTOCOL_VERSION: &str = "2024-11-05";
@@ -487,12 +504,16 @@ fn dexes_of_apk(apk: &Apk) -> Result<Vec<rd_dex::Dex>, RdError> {
             .zip
             .find(name)
             .ok_or_else(|| RdError::missing_entry(format!("entrada zip {name:?}")))?;
+        let t_entry = std::time::Instant::now();
         let bytes = apk
             .zip
             .read_entry(entry)
             .map_err(|e| RdError::new(&e.code, &e.cause, &e.module_id))?;
+        phase(&format!("dex_read_entry:{name}"), t_entry);
+        let t_parse = std::time::Instant::now();
         let d =
             rd_dex::Dex::parse(bytes).map_err(|e| RdError::new(&e.code, &e.cause, &e.module_id))?;
+        phase(&format!("dex_parse:{name}"), t_parse);
         Ok(d)
     };
     let out: Vec<rd_dex::Dex> = if apk.dex_files.len() > 1 {
@@ -1242,6 +1263,7 @@ impl AgentSession {
                 Some("use um APK menor ou eleve RD_MCP_MAX_APK_MB no processo do servidor"),
             ));
         }
+        let t_read = std::time::Instant::now();
         let bytes = std::fs::read(&apk_file).map_err(|e| {
             RdError::new(
                 "IO_ERROR",
@@ -1250,8 +1272,11 @@ impl AgentSession {
             )
             .with_suggestion("confira o caminho absoluto do APK")
         })?;
+        phase("install_fs_read", t_read);
+        let t_open = std::time::Instant::now();
         let apk =
             Apk::from_bytes(bytes).map_err(|e| RdError::new(&e.code, &e.cause, &e.module_id))?;
+        phase("install_apk_from_bytes", t_open);
         // piso API 26 é contrato: instalação recusa com erro tipado
         if let rd_apk::FloorStatus::BelowFloor { min_sdk, floor } = apk.floor_status() {
             return Err(agent_error(
@@ -1445,8 +1470,12 @@ impl AgentSession {
                     ));
                 }
             } else {
+                let t_mount = std::time::Instant::now();
                 let dexes = dexes_of_apk(&app.apk)?;
+                phase("dex_mount_total", t_mount);
+                let t_new = std::time::Instant::now();
                 let mut e = Engine::new(dexes, VmConfig::default());
+                phase("engine_new", t_new);
                 e.set_resources_arc(resources);
                 e
             };
@@ -1464,7 +1493,9 @@ impl AgentSession {
                     .filter(|(_, s)| s.is_granted())
                     .map(|(n, _)| n.clone()),
             );
+            let t_launch = std::time::Instant::now();
             let r = eng.launch_app(&desc, &package_out, Vec::new());
+            phase("launch_app_cold", t_launch);
             if r.is_ok() {
                 self.engine = Some(eng);
             }
