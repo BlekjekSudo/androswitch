@@ -24,3 +24,17 @@
 - [ ] Fits the `moto-e5` performance budgets *(para features de runtime)*
 - [ ] Docs updated (`compat-matrix.md` / `api-coverage.toml` se aplicável)
 - [ ] AI usage disclosed / uso de IA declarado
+
+## RD Sentinel anti-regression evidence
+
+- [ ] I read the Sentinel risk areas/findings; no required campaign is being
+      treated as a pass while skipped, planned, or incomplete
+- [ ] High-risk runtime/parser/native/protocol changes include a regression
+      test that would catch the old behavior (or the PR explains why an
+      existing golden/contract/real-APK test already does)
+- [ ] Performance-sensitive changes include before/after evidence (`rd perf`,
+      `cold26`, paired benchmark, or Sentinel A/B artifact as applicable)
+- [ ] No test/golden/fuzz/MCP evidence was removed or a budget relaxed without
+      equivalent replacement evidence and maintainer baseline approval
+- [ ] Dependency changes disclose license, source, MSRV, and major-version
+      impact; bot policy files were not weakened to make this PR pass
