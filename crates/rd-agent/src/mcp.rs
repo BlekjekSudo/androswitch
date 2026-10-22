@@ -1481,7 +1481,7 @@ impl AgentSession {
         }
         // perms.rs: checkSelfPermission/requestPermissions see the
         // session's real grant state
-        eng.set_granted_permissions(granted.into_iter());
+        eng.set_granted_permissions(granted);
         let t_launch = std::time::Instant::now();
         let r = eng.launch_app(desc, package_out, Vec::new());
         phase("launch_app_cold", t_launch);
