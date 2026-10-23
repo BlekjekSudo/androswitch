@@ -761,10 +761,13 @@ fn base64_input_stream(
 /// `android.util.Base64` compile-time flag constants for `sget` and
 /// reflection paths that do not inline them.
 pub(crate) fn host_static(
-    _vm: &mut Engine,
+    vm: &mut Engine,
     class: &str,
     name: &str,
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(value) = crate::android_json::host_static(vm, class, name)? {
+        return Ok(Some(value));
+    }
     if class != BASE64 {
         return Ok(None);
     }
@@ -1137,6 +1140,9 @@ pub(crate) fn static_intrinsic(
     name: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(value) = crate::android_json::static_intrinsic(vm, class, name, args)? {
+        return Ok(Some(value));
+    }
     if class == BASE64 {
         return base64_static(vm, name, args);
     }
@@ -1164,6 +1170,22 @@ pub(crate) fn instance_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    let json_recv_class = vm
+        .heap
+        .class_of(recv)
+        .map(str::to_string)
+        .unwrap_or_default();
+    if let Some(value) = crate::android_json::instance_intrinsic(
+        vm,
+        mref_class,
+        &json_recv_class,
+        name,
+        sig,
+        recv,
+        args,
+    )? {
+        return Ok(Some(value));
+    }
     // LruCache's state operations are final, so a DEX subclass reference
     // can safely use the same host implementation while its create/sizeOf/
     // entryRemoved overrides remain guest methods.

@@ -900,7 +900,9 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Throwable;",
             "Ljava/lang/Object;",
         ]),
-        "Ljava/io/FileNotFoundException;" | "Ljava/io/EOFException;" => Some(&[
+        "Ljava/io/FileNotFoundException;"
+        | "Ljava/io/EOFException;"
+        | "Landroid/util/MalformedJsonException;" => Some(&[
             "Ljava/io/IOException;",
             "Ljava/lang/Exception;",
             "Ljava/lang/Throwable;",
@@ -1379,6 +1381,8 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Ljava/util/concurrent/atomic/AtomicBoolean;" => Some(OBJECT),
         "Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;" => Some(OBJECT),
         "Ljava/lang/Enum;" => Some(OBJECT),
+        "Landroid/util/JsonReader;" | "Landroid/util/JsonWriter;" => Some(OBJECT),
+        "Landroid/util/JsonToken;" => Some(&["Ljava/lang/Enum;", "Ljava/lang/Object;"]),
         // java.util.Random (jrandom.rs)
         "Ljava/util/Random;" => Some(OBJECT),
         "Ljava/util/concurrent/ThreadLocalRandom;" => {
@@ -1533,6 +1537,12 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         "Ljava/io/FileOutputStream;" | "Ljava/io/FileInputStream;" => {
             Some(&["Ljava/io/Closeable;", "Ljava/lang/AutoCloseable;"])
         }
+        "Landroid/util/JsonReader;" => Some(&["Ljava/io/Closeable;", "Ljava/lang/AutoCloseable;"]),
+        "Landroid/util/JsonWriter;" => Some(&[
+            "Ljava/io/Closeable;",
+            "Ljava/io/Flushable;",
+            "Ljava/lang/AutoCloseable;",
+        ]),
         "Ljava/io/BufferedOutputStream;"
         | "Ljava/io/BufferedInputStream;"
         | "Ljava/io/FilterOutputStream;"

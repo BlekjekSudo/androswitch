@@ -230,6 +230,32 @@ that exact prefix:
   public catalogue, including JSON/XML helpers and event/log types,
   remains incomplete.
 
+## Round 10 — `android.util` JSON streaming
+
+- `JsonReader` now implements the AOSP streaming scope machine for
+  objects, arrays, names, strings, numbers, booleans and null, including
+  `begin*`/`end*`, `hasNext`, `peek`, typed scalar readers, `skipValue`,
+  `getPath`, strict number/string validation, BOM handling and typed
+  `MalformedJsonException`/`IllegalStateException` failures. Lenient mode
+  additionally accepts comments, single-quoted and unquoted literals,
+  alternative separators and `NaN`/infinities.
+- `JsonToken` is a real host enum surface: its ten constants are cached
+  singletons with Java `name`/`ordinal`, and `values()`/`valueOf(String)`
+  return those same constants.
+- `JsonWriter` maintains the document/object/array scope stack while it
+  emits to a guest or host `Writer`. It covers deferred names, compact
+  and indented output, string escaping, HTML-safe replacements,
+  `serializeNulls`, fluent primitive values, boxed `Boolean`/`Number`,
+  finite-number checks, flush and incomplete-document failure on close.
+- Proof: `json_reader_strict_streaming_tokens_paths_and_skip_value`,
+  `json_reader_lenient_mode_and_typed_errors`,
+  `json_writer_pretty_prints_html_safe_output_and_skips_null_names` and
+  `json_writer_boxed_values_and_json_token_enum_statics` exercise the
+  classes through guest-visible `StringReader`/`StringWriter` objects.
+- Status after Round 10: `android.util` remains **partial**. The rest of
+  its public catalogue, including XML helpers and event/log types,
+  remains incomplete.
+
 ## Remaining literal blockers by partial surface
 
 | Domain | Surface | Main literal blockers |

@@ -14,6 +14,7 @@ pub(crate) mod android_colorspace;
 pub(crate) mod android_display;
 pub(crate) mod android_drawable;
 pub(crate) mod android_env;
+pub(crate) mod android_json;
 pub(crate) mod android_motion;
 pub(crate) mod android_observable;
 pub(crate) mod android_pm;
