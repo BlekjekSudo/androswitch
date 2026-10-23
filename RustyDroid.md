@@ -255,9 +255,9 @@ rustydroid/
 │   ├── rd-jni/        # JNI bridge (LANG-02/03/09): ABI estável, exceções, strings
 │   ├── rd-ndk/        # ELF loader x86_64 + interpretador ARM64/32 (feature-gated)
 │   ├── rd-engine-*/   # pontes por linguagem (flutter/rn/mono/wasm...) feature-gated
-│   ├── rd-framework/  # android.* nativo por domínio (ver Apêndice C):
-│   │                  #   fd-ui, fd-content, fd-os, fd-net, fd-media, fd-hardware,
-│   │                  #   fd-system-services, fd-permissions (motor completo)
+│   ├── rd-framework/  # dados/motores transversais + fd-api-coverage
+│   │                  #   (Apêndice C); domínios fd-* mapeiam hoje para o
+│   │                  #   host android.* em rd-vm até extração futura
 │   ├── rd-render/     # headless/winit/web renderers + uiautomator dump + a11y tree
 │   └── rd-agent/      # MCP (rmcp) + JSON-RPC + scenario DSL + coverage + batch
 ├── data/
@@ -450,25 +450,31 @@ LOCATION_HARDWARE · CONTROL_LOCATION_UPDATES · DEVICE_POWER · REBOOT · FACTO
 
 ## Apêndice C — Superfície android.* por domínio (api-coverage.toml)
 
-| Domínio | Pacotes principais |
-|---|---|
-| App/lifecycle | android.app (+activity, service, job, admin, widget, backup, slice, search), android.content (pm, res, intent, broadcast, atom) |
-| View/UI | android.view (accessibility, inputmethod, animation, textservice, translation, display, surface), android.widget, android.webkit |
-| Graphics | android.graphics (drawable, text, pdf, shapes), android.opengl, android.renderscript(legado) |
-| Text | android.text (format, method, style, util) |
-| OS/IPC | android.os (binder→local, parcel, power, strictmode, vibrator, build), android.util |
-| Database | android.database (sqlite, content), android.provider (contacts, media, settings, calendar, calllog, telephony, downloads, documents) |
-| Net | android.net (http, wifi, nsd, sip, vpn, conn), android.net.ipsec.ike |
-| Media | android.media (session, browse, projection, tv, audiofx, midi, ringtone), android.exif |
-| Camera | android.hardware.camera2 (+params, extras), legacy android.hardware.camera |
-| Hardware | android.hardware (sensor, location→android.location, usb, fingerprint/biometrics, hdmi, display, input, serial, geofence, soundtrigger) |
-| Telephony | android.telephony (+gsm, mbms, euicc, cellbroadcast), android.telecom |
-| Connectivity | android.bluetooth (+le), android.nfc (+cardemulation, tech), android.companion |
-| Security | android.security (+keystore, identity), android.se.omapi, android.service.credentials |
-| Speech/ML | android.speech (tts, recognition), android.service.voice, android.view.textclassifier |
-| Services ext | android.service.* (autofill, quicksettings, wallpaper, dream, notification, media, textservice, chooser, carrier, credentials) |
-| System UI | android.app.usage, android.appwidget, android.print, android.inputmethodservice, android.accessibilityservice |
-| Misc | android.gesture, android.accounts, android.preference(legado), android.animation, android.transition, android.content.res, android.icu, android.location, android.mtp, android.system |
+A fonte executável deste apêndice é `data/api-coverage.toml`, validada por `rd-framework::fd_api_coverage` e consumida por `rd api-coverage`, pelo MCP (`get_api_usage`/`compat_gaps`) e pelos relatórios gerados. A tabela abaixo é **gerada** por `cargo xtask api-coverage-spec`; o relatório completo sai em `docs/api-coverage.md` (`cargo xtask api-coverage-report`). Status é conservador: `supported` cobre só o subconjunto documentado da superfície, nunca um pacote AOSP inteiro; `partial` executa subconjunto real; `stub` é hierarquia/fallback; `not_implemented` continua `NOT_IMPLEMENTED(module_id)`.
+
+<!-- BEGIN API COVERAGE -->
+| Domínio | Superfícies/pacotes principais | Status das superfícies | Módulos |
+|---|---|---|---|
+| App/lifecycle | `android.app`, `android.app.admin`, `android.app.backup`, `android.app.job`, `android.app.slice`, `android.content`, `android.content.pm`, `android.content.res` | partial 5 · not_implemented 3 | `none`, `rd-vm/android-pm`, `rd-vm/android-res`, `rd-vm/framework`, `rd-vm/m8` |
+| View/UI | `android.view`, `android.view.accessibility`, `android.view.animation`, `android.view.inputmethod`, `android.view.textservice`, `android.view.translation`, `android.webkit`, `android.widget` | partial 4 · stub 2 · not_implemented 2 | `none`, `rd-vm/classpath`, `rd-vm/framework`, `rd-vm/m9`, `rd-vm/view-layout` |
+| Graphics | `android.graphics`, `android.graphics.drawable`, `android.graphics.pdf`, `android.opengl`, `android.renderscript` | partial 2 · not_implemented 3 | `none`, `rd-vm/graphics` |
+| Text | `android.text`, `android.text.format`, `android.text.method`, `android.text.style`, `android.text.util` | partial 3 · stub 2 | `rd-vm/android-text`, `rd-vm/graphics`, `rd-vm/jtext-format` |
+| OS/IPC | `android.os`, `android.os.Binder`, `android.os.Build`, `android.os.Bundle`, `android.os.Parcel`, `android.os.Parcelable`, `android.util` | supported 2 · partial 2 · stub 3 | `rd-vm/android-build`, `rd-vm/android-util`, `rd-vm/bundle`, `rd-vm/classpath`, `rd-vm/framework` |
+| Database | `android.database`, `android.database.sqlite`, `android.provider`, `android.provider.Settings` | supported 1 · partial 2 · stub 1 | `rd-vm/content`, `rd-vm/jsqlite` |
+| Net | `android.net`, `android.net.Uri`, `android.net.http`, `android.net.ipsec.ike`, `android.net.nsd`, `android.net.sip`, `android.net.wifi` | supported 1 · partial 1 · not_implemented 5 | `none`, `rd-vm/android-uri`, `rd-vm/framework` |
+| Media | `android.media`, `android.media.audiofx`, `android.media.browse`, `android.media.midi`, `android.media.projection`, `android.media.session`, `android.media.tv` | not_implemented 7 | `none` |
+| Camera | `android.hardware.Camera`, `android.hardware.camera2`, `android.hardware.camera2.params` | stub 2 · not_implemented 1 | `none`, `rd-vm/android-util`, `rd-vm/classpath` |
+| Hardware | `android.hardware`, `android.hardware.biometrics`, `android.hardware.display`, `android.hardware.fingerprint`, `android.hardware.hdmi`, `android.hardware.input`, `android.hardware.soundtrigger`, `android.hardware.usb`, `android.location` | partial 1 · stub 1 · not_implemented 7 | `none`, `rd-vm/android-display`, `rd-vm/classpath` |
+| Telephony | `android.telecom`, `android.telephony`, `android.telephony.cellbroadcast`, `android.telephony.euicc`, `android.telephony.gsm`, `android.telephony.mbms` | not_implemented 6 | `none` |
+| Connectivity | `android.bluetooth`, `android.bluetooth.le`, `android.companion`, `android.nfc`, `android.nfc.cardemulation`, `android.nfc.tech` | not_implemented 6 | `none` |
+| Security | `android.se.omapi`, `android.security`, `android.security.identity`, `android.security.keystore`, `android.service.credentials` | stub 1 · not_implemented 4 | `none`, `rd-vm/jsecurity` |
+| Speech/ML | `android.service.voice`, `android.speech`, `android.speech.tts`, `android.view.textclassifier` | stub 1 · not_implemented 3 | `none`, `rd-vm/classpath` |
+| Services ext | `android.service.autofill`, `android.service.carrier`, `android.service.chooser`, `android.service.dreams`, `android.service.media`, `android.service.notification`, `android.service.quicksettings`, `android.service.textservice`, `android.service.wallpaper` | partial 1 · stub 1 · not_implemented 7 | `none`, `rd-vm/classpath`, `rd-vm/m9` |
+| System UI | `android.accessibilityservice`, `android.app.usage`, `android.appwidget`, `android.inputmethodservice`, `android.print` | partial 3 · not_implemented 2 | `none`, `rd-vm/m9` |
+| Misc | `android.accounts`, `android.animation`, `android.gesture`, `android.icu`, `android.mtp`, `android.preference`, `android.system`, `android.transition` | partial 2 · stub 3 · not_implemented 3 | `none`, `rd-vm/classpath`, `rd-vm/framework`, `rd-vm/intrinsics` |
+<!-- END API COVERAGE -->
+
+Normalização dos atalhos históricos da spec no registro: conceitos que não são pacotes (`intent`, `broadcast`, `service`, `display`, `surface`) viram APIs-chave dentro do pacote/classe real; cada prefixo tem um único domínio dono (`android.content.res` → App/lifecycle, `android.location` → Hardware, `android.service.credentials` → Security); `android.service.dream` é grafado como o pacote AOSP `android.service.dreams`; `android.exif` é a classe `android.media.ExifInterface`, sob `android.media`. Toda mudança de API Android deve atualizar `data/api-coverage.toml` no mesmo PR e regenerar spec/relatórios; tipo `android.*` sem linha no registro é gap explícito, nunca suporte implícito.
 
 ## Apêndice D — AndroidX/Jetpack (shims por módulo)
 
