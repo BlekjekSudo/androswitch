@@ -29,6 +29,8 @@ const BINDER: &str = "Landroid/os/Binder;";
 const IBINDER: &str = "Landroid/os/IBinder;";
 const BUNDLE: &str = "Landroid/os/Bundle;";
 const PERSISTABLE_BUNDLE: &str = "Landroid/os/PersistableBundle;";
+const SPARSE_ARRAY: &str = "Landroid/util/SparseArray;";
+const SPARSE_BOOLEAN_ARRAY: &str = "Landroid/util/SparseBooleanArray;";
 const ON_TRANSACT_SIG: &str = "(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z";
 
 const INTERFACE_TRANSACTION: i32 = 0x5f4e_5446; // '_NTF'
@@ -49,6 +51,7 @@ const VAL_DOUBLE: i32 = 8;
 const VAL_BOOLEAN: i32 = 9;
 const VAL_CHARSEQUENCE: i32 = 10;
 const VAL_LIST: i32 = 11;
+const VAL_SPARSEARRAY: i32 = 12;
 const VAL_BYTEARRAY: i32 = 13;
 const VAL_STRINGARRAY: i32 = 14;
 const VAL_IBINDER: i32 = 15;
@@ -56,6 +59,7 @@ const VAL_OBJECTARRAY: i32 = 16;
 const VAL_INTARRAY: i32 = 17;
 const VAL_LONGARRAY: i32 = 18;
 const VAL_BYTE: i32 = 19;
+const VAL_SPARSEBOOLEANARRAY: i32 = 22;
 const VAL_BOOLEANARRAY: i32 = 23;
 const VAL_CHARARRAY: i32 = 24;
 const VAL_DOUBLEARRAY: i32 = 25;
@@ -674,6 +678,135 @@ fn read_nullable_bundle(vm: &mut Engine, parcel: ObjRef, class: &str) -> Result<
     }
 }
 
+fn sparse_entries(vm: &mut Engine, sparse: ObjRef) -> Result<Vec<(i32, Value)>, VmExit> {
+    if let Some(entries) = vm.sparse.get(&sparse) {
+        return entries
+            .iter()
+            .map(|(key, value)| {
+                i32::try_from(*key)
+                    .map(|key| (key, value.clone()))
+                    .map_err(|_| {
+                        bad(format!(
+                            "Parcel: SparseArray key {key} is outside int range"
+                        ))
+                    })
+            })
+            .collect();
+    }
+    // A DEX SparseArray subclass can carry its contents in guest methods
+    // rather than the host map. Parcel's own algorithm reads it through
+    // size()/keyAt()/valueAt(), so do the same before giving up.
+    let n = match vm.invoke_instance(sparse, "size", "()I", &[])? {
+        Value::Int(n) if n >= 0 => n as usize,
+        _ => return Err(bad("Parcel: SparseArray.size() did not return a count")),
+    };
+    let mut entries = Vec::with_capacity(n.min(1_000_000));
+    for i in 0..n {
+        let index = Value::Int(i as i32);
+        let key = vm
+            .invoke_instance(sparse, "keyAt", "(I)I", std::slice::from_ref(&index))?
+            .as_int()?;
+        let value = vm.invoke_instance(
+            sparse,
+            "valueAt",
+            "(I)Ljava/lang/Object;",
+            std::slice::from_ref(&index),
+        )?;
+        entries.push((key, value));
+    }
+    Ok(entries)
+}
+
+fn new_sparse(vm: &mut Engine, class: &str, entries: Vec<(i32, Value)>) -> Result<Value, VmExit> {
+    let r = vm
+        .heap
+        .alloc_instance(class.to_string(), Vec::new())
+        .map_err(crate::err::oom_throwable)?;
+    vm.sparse.insert(
+        r,
+        entries
+            .into_iter()
+            .map(|(key, value)| (i64::from(key), value))
+            .collect(),
+    );
+    Ok(Value::Obj(r))
+}
+
+fn write_sparse_array(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    sparse: Option<ObjRef>,
+) -> Result<(), VmExit> {
+    let Some(sparse) = sparse else {
+        let mut st = load(vm, parcel);
+        st.write_i32(-1);
+        store(vm, parcel, st);
+        return Ok(());
+    };
+    let entries = sparse_entries(vm, sparse)?;
+    let mut st = load(vm, parcel);
+    st.write_i32(entries.len() as i32);
+    store(vm, parcel, st);
+    for (key, value) in entries {
+        let mut st = load(vm, parcel);
+        st.write_i32(key);
+        store(vm, parcel, st);
+        write_value(vm, parcel, &value)?;
+    }
+    Ok(())
+}
+
+fn read_sparse_array(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
+    let Some(n) = read_typed_len(vm, parcel, "SparseArray")? else {
+        return Ok(Value::Null);
+    };
+    let mut entries = Vec::with_capacity(n.min(1_000_000));
+    for _ in 0..n {
+        let key = read_i32_from(vm, parcel)?;
+        entries.push((key, read_value(vm, parcel)?));
+    }
+    new_sparse(vm, SPARSE_ARRAY, entries)
+}
+
+fn write_sparse_boolean_array(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    sparse: Option<ObjRef>,
+) -> Result<(), VmExit> {
+    let Some(sparse) = sparse else {
+        let mut st = load(vm, parcel);
+        st.write_i32(-1);
+        store(vm, parcel, st);
+        return Ok(());
+    };
+    let entries = sparse_entries(vm, sparse)?;
+    let mut st = load(vm, parcel);
+    st.write_i32(entries.len() as i32);
+    for (key, value) in entries {
+        st.write_i32(key);
+        // AOSP writes each boolean with writeByte, whose native aligned
+        // representation is one 4-byte word in the Parcel stream.
+        st.write_i32((value.as_int().unwrap_or(0) != 0) as i32);
+    }
+    store(vm, parcel, st);
+    Ok(())
+}
+
+fn read_sparse_boolean_array(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
+    let Some(n) = read_typed_len(vm, parcel, "SparseBooleanArray")? else {
+        return Ok(Value::Null);
+    };
+    let mut st = load(vm, parcel);
+    let mut entries = Vec::with_capacity(n.min(1_000_000));
+    for _ in 0..n {
+        let key = st.read_i32()?;
+        let value = st.read_i32()?;
+        entries.push((key, Value::Int((value != 0) as i32)));
+    }
+    store(vm, parcel, st);
+    new_sparse(vm, SPARSE_BOOLEAN_ARRAY, entries)
+}
+
 fn new_bundle(vm: &mut Engine, class: &str, map: Vec<(String, Value)>) -> Result<Value, VmExit> {
     let r = vm
         .heap
@@ -818,6 +951,18 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
         st.write_i32(VAL_BUNDLE);
         store(vm, parcel, st);
         return write_bundle_map(vm, parcel, r);
+    }
+    if class == SPARSE_BOOLEAN_ARRAY {
+        let mut st = load(vm, parcel);
+        st.write_i32(VAL_SPARSEBOOLEANARRAY);
+        store(vm, parcel, st);
+        return write_sparse_boolean_array(vm, parcel, Some(r));
+    }
+    if class == SPARSE_ARRAY || vm.cp.is_subtype(&class, SPARSE_ARRAY) {
+        let mut st = load(vm, parcel);
+        st.write_i32(VAL_SPARSEARRAY);
+        store(vm, parcel, st);
+        return write_sparse_array(vm, parcel, Some(r));
     }
     if class.starts_with('[') {
         let elems = vm.heap.as_array_elems(r)?.0.to_vec();
@@ -1152,6 +1297,8 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             let map = read_bundle_map(vm, parcel)?;
             new_bundle(vm, BUNDLE, map)?
         }
+        VAL_SPARSEARRAY => read_sparse_array(vm, parcel)?,
+        VAL_SPARSEBOOLEANARRAY => read_sparse_boolean_array(vm, parcel)?,
         VAL_IBINDER => {
             let mut st = load(vm, parcel);
             let h = st.read_i32()?;
@@ -1627,6 +1774,25 @@ fn parcel_instance(
         ("readBundle", "()Landroid/os/Bundle;")
         | ("readBundle", "(Ljava/lang/ClassLoader;)Landroid/os/Bundle;") => {
             return some(read_nullable_bundle(vm, recv, BUNDLE)?);
+        }
+        ("writeSparseArray", "(Landroid/util/SparseArray;)V") => {
+            write_sparse_array(vm, recv, obj_arg(args, 0))?;
+            return some(Value::Null);
+        }
+        ("readSparseArray", "(Ljava/lang/ClassLoader;)Landroid/util/SparseArray;")
+        | ("readSparseArray", "(Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/Object;") => {
+            return some(read_sparse_array(vm, recv)?);
+        }
+        ("writeSparseBooleanArray", "(Landroid/util/SparseBooleanArray;)V") => {
+            write_sparse_boolean_array(vm, recv, obj_arg(args, 0))?;
+            return some(Value::Null);
+        }
+        ("readSparseBooleanArray", "()Landroid/util/SparseBooleanArray;")
+        | (
+            "readSparseBooleanArray",
+            "(Ljava/lang/ClassLoader;)Landroid/util/SparseBooleanArray;",
+        ) => {
+            return some(read_sparse_boolean_array(vm, recv)?);
         }
         ("writePersistableBundle", "(Landroid/os/PersistableBundle;)V") => {
             write_nullable_bundle(vm, recv, obj_arg(args, 0))?;
@@ -2699,6 +2865,121 @@ mod tests {
         assert_eq!(vm.heap.get_field(first, "value").unwrap(), Value::Int(4242));
         let second = obj(items[1].clone());
         assert_eq!(vm.heap.as_str(second).unwrap(), "inside-list");
+    }
+
+    #[test]
+    fn sparse_arrays_roundtrip_through_value_and_direct_methods() {
+        let mut vm = engine();
+
+        let sparse = vm
+            .heap
+            .alloc_instance(SPARSE_ARRAY.to_string(), Vec::new())
+            .unwrap();
+        let number = Value::Obj(
+            crate::boxes::box_value(&mut vm, "Ljava/lang/Integer;", Value::Int(77)).unwrap(),
+        );
+        let label = s(&mut vm, "sparse-label");
+        vm.sparse.insert(
+            sparse,
+            std::collections::BTreeMap::from([
+                (-3_i64, Value::Null),
+                (2_i64, label),
+                (10_i64, number),
+            ]),
+        );
+        let p = obj(new_parcel(&mut vm).unwrap());
+        callp(
+            &mut vm,
+            p,
+            "writeValue",
+            "(Ljava/lang/Object;)V",
+            &[Value::Obj(sparse)],
+        );
+        let p2 = obj(new_parcel(&mut vm).unwrap());
+        let size = callp(&mut vm, p, "dataSize", "()I", &[]);
+        let bytes = callp(&mut vm, p, "marshall", "()[B", &[]);
+        callp(
+            &mut vm,
+            p2,
+            "unmarshall",
+            "([BII)V",
+            &[bytes, Value::Int(0), size],
+        );
+        let got_sparse = obj(callp(
+            &mut vm,
+            p2,
+            "readValue",
+            "(Ljava/lang/ClassLoader;)Ljava/lang/Object;",
+            &[Value::Null],
+        ));
+        let entries = vm.sparse.get(&got_sparse).unwrap();
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[&-3], Value::Null);
+        let got_label = obj(entries[&2].clone());
+        assert_eq!(vm.heap.as_str(got_label).unwrap(), "sparse-label");
+        let got_number = obj(entries[&10].clone());
+        assert_eq!(
+            vm.heap.get_field(got_number, "value").unwrap(),
+            Value::Int(77)
+        );
+
+        let booleans = vm
+            .heap
+            .alloc_instance(SPARSE_BOOLEAN_ARRAY.to_string(), Vec::new())
+            .unwrap();
+        vm.sparse.insert(
+            booleans,
+            std::collections::BTreeMap::from([
+                (-1_i64, Value::Int(0)),
+                (5_i64, Value::Int(1)),
+                (9_i64, Value::Int(1)),
+            ]),
+        );
+        let p3 = obj(new_parcel(&mut vm).unwrap());
+        callp(
+            &mut vm,
+            p3,
+            "writeSparseBooleanArray",
+            "(Landroid/util/SparseBooleanArray;)V",
+            &[Value::Obj(booleans)],
+        );
+        callp(&mut vm, p3, "setDataPosition", "(I)V", &[Value::Int(0)]);
+        let got_booleans = obj(callp(
+            &mut vm,
+            p3,
+            "readSparseBooleanArray",
+            "()Landroid/util/SparseBooleanArray;",
+            &[],
+        ));
+        assert_eq!(
+            vm.sparse.get(&got_booleans).unwrap(),
+            &std::collections::BTreeMap::from([
+                (-1_i64, Value::Int(0)),
+                (5_i64, Value::Int(1)),
+                (9_i64, Value::Int(1)),
+            ])
+        );
+
+        let p4 = obj(new_parcel(&mut vm).unwrap());
+        callp(
+            &mut vm,
+            p4,
+            "writeSparseArray",
+            "(Landroid/util/SparseArray;)V",
+            &[Value::Null],
+        );
+        assert_eq!(load(&vm, p4).data, vec![0xff, 0xff, 0xff, 0xff]);
+        callp(&mut vm, p4, "setDataPosition", "(I)V", &[Value::Int(0)]);
+        assert_eq!(
+            callp(
+                &mut vm,
+                p4,
+                "readSparseArray",
+                "(Ljava/lang/ClassLoader;)Landroid/util/SparseArray;",
+                &[Value::Null],
+            ),
+            Value::Null
+        );
     }
 
     #[test]

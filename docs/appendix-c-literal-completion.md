@@ -121,6 +121,25 @@ that exact prefix:
   file descriptors, Serializable/SparseArray forms and byte layouts for
   every framework-owned Parcelable remain blockers.
 
+## Round 5 — SparseArray Parcel values
+
+- `Parcel.writeValue`/`readValue` now support the AOSP
+  `VAL_SPARSEARRAY` and `VAL_SPARSEBOOLEANARRAY` tags, preserving sorted
+  integer keys and typed values through marshalled bytes.
+- The direct `writeSparseArray`/`readSparseArray` and
+  `writeSparseBooleanArray`/`readSparseBooleanArray` Parcel methods use
+  the same size/key/value streams, including the `-1` null marker.
+- Host `SparseArray` state is read from the existing sorted Engine map;
+  DEX subclasses fall back to their guest `size()`, `keyAt()` and
+  `valueAt()` methods.
+- Proof: `sparse_arrays_roundtrip_through_value_and_direct_methods`
+  round-trips null, String and boxed values at negative/positive keys,
+  SparseBooleanArray entries, and a null SparseArray marker.
+- Status after Round 5: `android.os`, `android.os.Parcel`,
+  `android.os.Parcelable` and `android.util` remain **partial**.
+  Serializable values, file descriptors, cross-process Binder and every
+  framework Parcelable layout remain blockers.
+
 ## Remaining literal blockers by partial surface
 
 | Domain | Surface | Main literal blockers |
@@ -139,7 +158,7 @@ that exact prefix:
 | Text | `android.text` | Unicode shaping, bidi, line breaking/hyphenation, fonts/fallback, spans/editable operations and layout pixel fidelity. |
 | Text | `android.text.method` | Complete movement/key/transformation method catalogue and editor interaction edge cases. |
 | Text | `android.text.style` | Exact span precedence/rendering for character, paragraph, suggestion, locale and metric-affecting spans. |
-| OS/IPC | `android.os` | Remaining after Rounds 2/4: cross-process/kernel Binder and servicemanager, death recipients/oneway scheduling, file-descriptor Parcels, Serializable/SparseArray forms, exact wire layouts for every framework-owned Parcelable, process/power/vibration/strict-mode/users and all manager semantics. |
+| OS/IPC | `android.os` | Remaining after Rounds 2/4/5: cross-process/kernel Binder and servicemanager, death recipients/oneway scheduling, file-descriptor Parcels, Serializable forms, exact wire layouts for every framework-owned Parcelable, process/power/vibration/strict-mode/users and all manager semantics. |
 | OS/IPC | `android.util` | Remaining public helper/value catalogue (IO, JSON/XML, event log, printers, state sets, time/date helpers and deprecated classes). |
 | Database | `android.database` | ContentProvider query/insert/update/delete/call transport, bulk operations, cursor windows/extras/notifications across apps. |
 | Database | `android.database.sqlite` | See Round 1 remaining blockers above. |
