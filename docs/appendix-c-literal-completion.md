@@ -11,6 +11,238 @@ it explains what still blocks each promotion and in which order the blockers
 are being removed. No status in `data/api-coverage.toml` may be flipped to
 `supported` merely because this page lists a plan.
 
+## What “literal completion program” means
+
+Read the phrase in its ordinary, strict sense:
+
+- **Literal** modifies the definition of _complete_. “Complete” means the
+  whole registered scope is accounted for; it does not mean “good enough”,
+  “the common cases work”, “the app starts”, or “the subset needed today
+  works”.
+- **Completion** is the final state being pursued, not the amount of effort
+  already spent and not the fact that a commit, PR, checkpoint or round was
+  finished.
+- **Program** means a coordinated, multi-step body of work with an explicit
+  ledger of remaining blockers. It is not an executable program, and the
+  existence of this document is not itself evidence that anything is complete.
+
+In short:
+
+> A registered Appendix C scope is literally complete **only if every
+> in-scope public API and Android-visible behaviour is implemented, tested
+> and truthfully recorded**. Anything less is progress, not completion.
+
+### Binding rule for future agents
+
+Before writing or saying that a package, class or registered surface is
+“done”, “complete” or `supported`, a future agent must:
+
+1. identify the exact registered prefix and scope in
+   `data/api-coverage.toml`, using the API 26–36 public Android surface;
+2. inventory every in-scope class/interface/enum, constructor, method and
+   field, instead of starting from only the calls used by one app or test;
+3. account for every inventoried item as either implemented and tested, or
+   as an explicit remaining blocker — an unaudited item counts as a blocker;
+4. implement Android-visible semantics, not merely signatures: state
+   transitions, return values, callback order, exceptions, permissions,
+   lifecycle/threading rules, process boundaries and persistence where the
+   platform exposes them;
+5. test success, error, boundary and lifecycle paths, with real-APK evidence
+   for hot paths where the completion gate below requires it; and
+6. update the registry and generated reports so they agree with the code and
+   tests in the same change.
+
+If any in-scope item is still missing, unknown, stubbed, defaulted,
+unimplemented or untested, the surface is **not literally complete**. Leave
+it at `not_implemented`, `stub` or `partial`, as appropriate, and name the
+remaining blockers. When in doubt, choose the lower, more honest status.
+
+The following are useful progress signals, but **none of them is literal
+completion**:
+
+- the code compiles;
+- a selected unit/integration test subset passes;
+- one app reaches a screen or one golden path works;
+- most or all commonly used methods work;
+- class hierarchies, constants or method signatures exist;
+- methods exist but return a plausible default or silently do nothing;
+- a percentage estimate sounds high;
+- a long-running task, checkpoint, commit or PR has finished.
+
+### Incremental work is allowed; false completion is not
+
+This program expects incremental rounds. An agent may correctly finish a
+requested checkpoint without literally completing the whole Android surface,
+but must report those as two different facts, for example:
+
+> “This checkpoint implemented subset Y and its tests. Surface X remains
+> `partial`; blockers A, B and C remain.”
+
+It must not shorten that to “X is done” or promote X to `supported`. If a
+task explicitly asks for literal completion of a scope, the agent must work
+from the full inventory and either close every blocker or stop with the
+remaining blockers stated explicitly. It must not silently redefine the
+requested scope to whatever subset happened to be implemented.
+
+For example, correctly implementing `put`, `get`, `size` and `clear` for a
+collection class is real progress, but the class or package remains
+`partial` if its views, iterators, bulk operations, equality/ordering
+semantics, serialization forms, edge cases or any other in-scope members are
+still missing or unaudited. Only the exact registered scope that passes the
+full gate below may be called complete.
+
+## When a surface is `not_implemented` or `stub`
+
+Classify the **registered surface** (the exact package or class prefix in
+`data/api-coverage.toml`), not the outcome of one call. A single unsupported
+overload may return a typed `NOT_IMPLEMENTED(...)` error inside a `partial`
+surface; that does not make the whole surface `not_implemented`. Conversely,
+one hierarchy entry or constant does not make a package `partial`.
+
+Use the narrowest honest prefix. Registry lookup uses the longest matching
+prefix, so a real class can be `partial` or `supported` while its surrounding
+package remains `stub` or `not_implemented`. Do not let a broad package entry
+claim credit for one unrelated class.
+
+### Decision rule
+
+Ask these questions in order:
+
+1. **Is there production host code that intentionally owns this prefix?**
+   - No → `not_implemented`.
+   - Yes → continue.
+2. **Does that code perform any Android-visible behaviour?** Examples are
+   retaining state, computing a result from inputs, changing lifecycle,
+   invoking callbacks in the platform order, enforcing a permission, or
+   raising the Android exception required by the operation.
+   - No; it only supplies type shape, constants or a harmless fallback →
+     `stub`.
+   - Yes, for a real subset → `partial`.
+3. **Does the whole registered scope pass the literal completion gate
+   below?**
+   - Yes → `supported`.
+   - No → keep `partial` and name the remaining blockers, or narrow the
+     registered prefix to the scope that is actually complete.
+
+| Question | `not_implemented` | `stub` | `partial` |
+|---|---|---|---|
+| Registered production owner/module? | No | Yes | Yes |
+| Class/interface hierarchy or constants may resolve? | Not claimed | Yes | Usually |
+| Android-visible state transition or computed result? | No | No | Yes, for a subset |
+| Counts as API behaviour/support? | No | No | Only for the documented subset |
+| Normal result when real semantics are requested | Structured `NOT_IMPLEMENTED(...)`, unresolved host feature, or another explicit failure | Explicit failure, or a documented no-op/default only where no semantics are being claimed | Real behaviour for implemented calls; explicit failure for the rest |
+
+### Use `not_implemented` when there is no host model
+
+A surface is `not_implemented` when RustyDroid has **no registered host
+model or dispatch for that prefix**. The following do **not** count as an
+implementation and do not, by themselves, move a surface out of
+`not_implemented`:
+
+- the API name appears in an APK/DEX, a test fixture, documentation, an
+  issue, a TODO or an AOSP reference copy;
+- a descriptor or package string appears in unrelated code;
+- AndroidX or app code contains its own class with a similar role;
+- a generic VM path can allocate an otherwise empty object shell but no code
+  owns the Android semantics of the surface;
+- a plan exists to implement it later.
+
+Runtime behaviour must not fake success. When guest code needs the missing
+host behaviour, it should receive the structured `NOT_IMPLEMENTED(module)`
+contract (or an equally explicit unresolved-feature failure), not a
+plausible null, zero, empty collection, successful return code, invented
+sensor/media/location data or silent no-op.
+
+Registry requirements for `not_implemented`:
+
+- `module = "none"`;
+- `code = []`;
+- a non-empty `gap_id`;
+- `notes` names the missing model rather than saying only “TODO”;
+- `key_apis` may identify representative missing APIs, but they are an
+  inventory of the gap, not evidence of support.
+
+If intentional production code is added for the prefix, the entry can no
+longer remain `not_implemented`: reclassify it as `stub` or `partial` in the
+same change and record the real module/code paths.
+
+### Use `stub` when only the shape or a fallback exists
+
+A surface is `stub` when RustyDroid intentionally recognizes it well enough
+for loading, linking or harmless placeholder interaction, but does not yet
+model its Android-visible semantics. Typical stub-only material includes:
+
+- built-in superclass/interface hierarchy entries so `instanceof`, casts or
+  method resolution can proceed;
+- public constants, enum shells or field defaults;
+- an allocatable manager/view/value shell with no service, rendering,
+  transport or state machine behind it;
+- methods that always return the same null/zero/false/empty result or do
+  nothing regardless of their inputs;
+- a compatibility fallback that lets startup continue while the requested
+  operation is explicitly unsupported.
+
+A stub is **not support**. It must not be described as “works”, “complete”,
+“compatible” or as execution coverage. In particular, a stub must not invent
+data whose presence would make an app believe a device, renderer, network,
+media pipeline, provider or system service actually operated.
+
+A documented no-op can be real behaviour only when the Android contract for
+that exact operation is itself a no-op in the relevant environment. If the
+operation normally has an observable effect and RustyDroid merely ignores
+it, the surface remains a stub (or `partial` if other operations are real),
+and the deviation stays in the gap notes.
+
+Registry requirements for `stub`:
+
+- a concrete implementing `module` (never `"none"`);
+- at least one real `code` path containing the hierarchy/constants/fallback;
+- a non-empty `gap_id`;
+- `notes` separates what shape exists from what semantics are absent;
+- evidence proves only the placeholder/loadability claim; it must not be
+  presented as behavioural coverage.
+
+### Boundary examples
+
+- **Only a `classpath.rs` hierarchy entry and constants exist:** `stub`.
+- **No owner code exists; only an app DEX references the package:**
+  `not_implemented`.
+- **A manager object can be obtained but every operation is a fixed default
+  and registrations/callbacks are discarded:** `stub`.
+- **A manager records registrations and dispatches a tested subset of
+  callbacks, while other operations fail explicitly:** `partial`.
+- **A value class stores constructor inputs and correctly implements a
+  tested subset of accessors, equality, parsing or serialization:**
+  `partial`; `supported` only if the registered scope is complete.
+- **One unsupported overload in an otherwise real implementation returns
+  typed `NOT_IMPLEMENTED(...)`:** the surface remains `partial`; record the
+  overload as a blocker instead of downgrading the whole prefix.
+- **One class in a package is real, but the rest of the package has no
+  model:** register or retain the narrow class prefix for the real class and
+  keep the broader package at its own honest status.
+
+### Promotion and demotion rules
+
+- `not_implemented` → `stub`: only when intentional hierarchy, constants
+  or fallback code lands with an owner module and gap record. A plan, issue
+  or unmerged experiment is not enough.
+- `stub` → `partial`: only when the first real Android-visible behaviour
+  lands and is exercised by tests. More constants or more elaborate
+  fallbacks do not cross this boundary.
+- `partial` → `supported`: only when every item in the completion gate
+  below is true for the exact registered prefix. A complete hot path is
+  still `partial` under the literal program.
+- Demote a surface when an audit shows that its claimed behaviour is only
+  hierarchy/default fallback, that the named code no longer owns the prefix,
+  or that tests do not exercise the claimed semantics. Honest demotion is
+  progress; preserving an inflated count is not.
+
+As of 2026-10-23 the registry contains 106 surfaces: 4 `supported`, 29
+`partial`, 14 `stub` and 59 `not_implemented`. The generated inventory in
+`docs/api-coverage.md` and the records in `data/api-coverage.toml` are the
+current lists; this section defines how those records must be classified
+when they change.
+
 ## Completion gate for every package
 
 A `partial` surface may be promoted only when all items below are true for
