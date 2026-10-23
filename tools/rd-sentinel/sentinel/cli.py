@@ -79,9 +79,16 @@ def _context_from_args(args: argparse.Namespace, repo: Path) -> tuple[AuditConte
         or str(merge_group.get("head_sha") or "")
         or "HEAD"
     )
-    event_name = getattr(args, "event_name", None) or os.environ.get("GITHUB_EVENT_NAME", "local")
-    if merge_group and event_name == "local":
+    explicit_event_name = getattr(args, "event_name", None)
+    if explicit_event_name:
+        event_name = explicit_event_name
+    elif merge_group:
+        # An explicit merge_group payload is stronger evidence than ambient
+        # GITHUB_EVENT_NAME: the same code is unit-tested/reproduced while an
+        # outer pull_request workflow is running.
         event_name = "merge_group"
+    else:
+        event_name = os.environ.get("GITHUB_EVENT_NAME", "local")
     if not base_ref:
         if event_name == "schedule":
             parent = resolve_rev(repo, "HEAD^")
