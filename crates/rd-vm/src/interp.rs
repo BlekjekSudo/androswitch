@@ -855,6 +855,8 @@ pub(crate) fn exec_frame(
                     } else if let Some(c) = step!(crate::graphics::host_static(vm, &owner, &fname))
                     {
                         vm.statics.insert((owner.clone(), fname.clone()), c);
+                    } else if let Some(c) = step!(crate::parcel::host_static(vm, &owner, &fname)) {
+                        vm.statics.insert((owner.clone(), fname.clone()), c);
                     } else if let Some(c) =
                         step!(crate::platform_base::host_static(vm, &owner, &fname))
                     {

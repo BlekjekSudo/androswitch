@@ -74,8 +74,10 @@ pub mod m9;
 #[cfg(feature = "native")]
 pub mod native;
 pub(crate) mod numerics;
+pub(crate) mod parcel;
 pub mod perms;
 pub(crate) mod platform_base;
+pub(crate) mod prefs;
 pub(crate) mod reflect;
 pub mod repr;
 pub mod threads;

@@ -194,7 +194,9 @@ the same registry (`api_coverage` in the result); `compat_gaps` includes its
 domain/status summary, while `get_coverage` remains the dynamic execution
 counter. Regenerate the human report and spec table with
 `cargo xtask api-coverage-report`, `cargo xtask api-coverage-spec` and
-`cargo xtask compat-report`; see the [generated API coverage report](docs/api-coverage.md).
+`cargo xtask compat-report`; see the [generated API coverage report](docs/api-coverage.md)
+and the [literal completion ledger](docs/appendix-c-literal-completion.md) for
+what still blocks promoting any `partial` package.
 
 ## 🧩 Appendix G — engine registry (detection only)
 

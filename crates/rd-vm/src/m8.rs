@@ -7,14 +7,14 @@
 //!
 //! Princípios (Leis do projeto):
 //! - Estado REAL e consultável: RecyclerView pergunta `getItemCount()` ao
-//!   adapter DEX e cria/vincula ViewHolders via DEX; SQLite guarda tabelas
-//!   e linhas em memória e responde queries; prefs persistem na VM;
+//!   adapter DEX e cria/vincula ViewHolders via DEX; SQLite executa queries;
+//!   SharedPreferences nomeadas persistem como XML no VFS app-private;
 //!   OkHttp devolve a resposta determinística registrada (ou 200 vazio);
 //!   services/broadcasts/work ficam registrados e expostos ao Engine
 //!   (`Engine::m8_*`) para o agente/testes asserirem — nada é "no-op mudo".
 //! - Desvios documentados, nunca silenciosos: tudo é single-thread
-//!   determinístico (enqueue/execute são síncronos), SQLite é em memória
-//!   (sem arquivo, sem SQL completo — subconjunto DDL/DML abaixo), OkHttp
+//!   determinístico (enqueue/execute são síncronos), SQLite named databases
+//!   persistem no VFS mas o fallback subset continua documentalmente limitado, OkHttp
 //!   NÃO faz rede (shim offline; rede real é M9+ via socket do host),
 //!   WorkManager executa o nome do pedido no registro mas não roda o
 //!   `Worker.doWork()` em background (sem threads) — o trabalho fica
@@ -23,13 +23,14 @@
 //!   interpretador segue para o DEX real da biblioteca (androidx/okhttp
 //!   viajam no APK). Host só sequestra o que implementa de verdade.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::framework::HostObj;
 use crate::heap::ObjRef;
 use crate::intrinsics;
+use crate::prefs::{PrefStore, PrefValue};
 use crate::value::Value;
 
 // ── classes ─────────────────────────────────────────────────────────────
@@ -146,8 +147,13 @@ pub struct M8State {
     pub work: Vec<WorkRecord>,
     pub work_manager: Option<ObjRef>,
     pub scheduled_jobs: Vec<i32>,
-    pub prefs: HashMap<String, Value>,
-    pub prefs_editors: HashMap<ObjRef, Vec<(String, Option<Value>)>>, // None = remove
+    /// Named `SharedPreferences` stores, keyed by the guest-visible file
+    /// name (without `.xml`). Stores load lazily from the app-private VFS.
+    pub prefs_stores: HashMap<String, PrefStore>,
+    pub prefs_loaded: HashSet<String>,
+    pub prefs_objs: HashMap<String, ObjRef>,
+    pub prefs_name_by_obj: HashMap<ObjRef, String>,
+    pub prefs_editors: HashMap<ObjRef, Vec<(String, Option<PrefValue>)>>, // None = remove
     pub prefs_clear: HashMap<ObjRef, bool>,
     /// Per-SharedPreferences listener identities; GC roots are traced from M8State.
     pub prefs_listeners: HashMap<ObjRef, Vec<ObjRef>>,
