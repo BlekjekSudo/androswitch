@@ -295,7 +295,11 @@ pub fn context_dirs(
             let n = str_arg(vm, args.first()).unwrap_or_default();
             let pkg = vm.fw.package_name.clone();
             let p = format!("/data/user/0/{pkg}/databases/{n}");
-            Value::Int(VFS.with(|v| v.borrow_mut().files.remove(&p).is_some()) as i32)
+            // Close/forget any open SQLite handle first; otherwise its next
+            // committed mutation would rewrite (resurrect) the deleted image.
+            let was_open = crate::jsqlite::forget_database(vm, &p);
+            let deleted = VFS.with(|v| v.borrow_mut().files.remove(&p).is_some());
+            Value::Int((was_open || deleted) as i32)
         }
         _ => return Ok(None),
     }))
@@ -748,6 +752,31 @@ pub(crate) fn touch(p: &str) {
     VFS.with(|v| {
         v.borrow_mut().files.entry(p).or_default();
     });
+}
+
+/// Reads a virtual file's bytes for another host module (e.g. SQLite loads
+/// its serialized database image from the app-private VFS path).
+pub(crate) fn read_bytes(p: &str) -> Option<Vec<u8>> {
+    let p = absolute(p);
+    VFS.with(|v| v.borrow().files.get(&p).cloned())
+}
+
+/// Replaces a virtual file's bytes, creating parent directories as Android
+/// does for app-private storage paths.
+pub(crate) fn write_bytes(p: &str, bytes: Vec<u8>) {
+    let p = absolute(p);
+    if let Some(parent) = parent_of(&p) {
+        mkdirs(&parent);
+    }
+    VFS.with(|v| {
+        v.borrow_mut().files.insert(p, bytes);
+    });
+}
+
+/// Deletes a virtual file. Returns whether a file existed.
+pub(crate) fn delete_file(p: &str) -> bool {
+    let p = absolute(p);
+    VFS.with(|v| v.borrow_mut().files.remove(&p).is_some())
 }
 
 #[cfg(test)]

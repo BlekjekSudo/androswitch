@@ -738,7 +738,7 @@ mod tests {
         assert_eq!(c.status, "partial");
         assert_eq!(
             c.gap_id.as_deref(),
-            Some("gap-android-database-sqlite-persistence")
+            Some("gap-android-database-sqlite-literal")
         );
     }
 
