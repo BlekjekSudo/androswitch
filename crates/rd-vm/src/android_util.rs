@@ -179,42 +179,55 @@ fn base64_bad() -> VmExit {
     ))
 }
 
-fn base64_encode(input: &[u8], flags: i32) -> Vec<u8> {
+fn base64_alphabet(flags: i32) -> &'static [u8; 64] {
     const STANDARD: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     const WEB_SAFE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-    let alphabet = if flags & BASE64_URL_SAFE != 0 {
+    if flags & BASE64_URL_SAFE != 0 {
         WEB_SAFE
     } else {
         STANDARD
-    };
+    }
+}
+
+fn base64_newline(flags: i32) -> &'static [u8] {
+    if flags & BASE64_CRLF != 0 {
+        b"\r\n"
+    } else {
+        b"\n"
+    }
+}
+
+fn base64_push_group(output: &mut Vec<u8>, chunk: &[u8], flags: i32) {
+    debug_assert!(!chunk.is_empty() && chunk.len() <= 3);
+    let alphabet = base64_alphabet(flags);
     let padding = flags & BASE64_NO_PADDING == 0;
+    let b0 = u32::from(chunk[0]);
+    let b1 = u32::from(*chunk.get(1).unwrap_or(&0));
+    let b2 = u32::from(*chunk.get(2).unwrap_or(&0));
+    let triple = (b0 << 16) | (b1 << 8) | b2;
+    output.push(alphabet[(triple >> 18) as usize & 63]);
+    output.push(alphabet[(triple >> 12) as usize & 63]);
+    if chunk.len() > 1 {
+        output.push(alphabet[(triple >> 6) as usize & 63]);
+    } else if padding {
+        output.push(b'=');
+    }
+    if chunk.len() > 2 {
+        output.push(alphabet[triple as usize & 63]);
+    } else if padding {
+        output.push(b'=');
+    }
+}
+
+fn base64_encode(input: &[u8], flags: i32) -> Vec<u8> {
     let mut raw = Vec::with_capacity(input.len().div_ceil(3) * 4);
     for chunk in input.chunks(3) {
-        let b0 = u32::from(chunk[0]);
-        let b1 = u32::from(*chunk.get(1).unwrap_or(&0));
-        let b2 = u32::from(*chunk.get(2).unwrap_or(&0));
-        let triple = (b0 << 16) | (b1 << 8) | b2;
-        raw.push(alphabet[(triple >> 18) as usize & 63]);
-        raw.push(alphabet[(triple >> 12) as usize & 63]);
-        if chunk.len() > 1 {
-            raw.push(alphabet[(triple >> 6) as usize & 63]);
-        } else if padding {
-            raw.push(b'=');
-        }
-        if chunk.len() > 2 {
-            raw.push(alphabet[triple as usize & 63]);
-        } else if padding {
-            raw.push(b'=');
-        }
+        base64_push_group(&mut raw, chunk, flags);
     }
     if flags & BASE64_NO_WRAP != 0 || raw.is_empty() {
         return raw;
     }
-    let newline: &[u8] = if flags & BASE64_CRLF != 0 {
-        b"\r\n"
-    } else {
-        b"\n"
-    };
+    let newline = base64_newline(flags);
     let mut wrapped = Vec::with_capacity(raw.len() + (raw.len() / 76 + 1) * newline.len());
     for line in raw.chunks(76) {
         wrapped.extend_from_slice(line);
@@ -357,6 +370,392 @@ fn base64_static(vm: &mut Engine, name: &str, args: &[Value]) -> Result<Option<V
         }
         _ => return Ok(None),
     }))
+}
+
+const BASE64_INPUT_STREAM: &str = "Landroid/util/Base64InputStream;";
+const BASE64_OUTPUT_STREAM: &str = "Landroid/util/Base64OutputStream;";
+const B64_STREAM_FLAGS: &str = "rd_b64_flags";
+const B64_STREAM_CLOSED: &str = "rd_b64_closed";
+const B64_STREAM_PENDING_LEN: &str = "rd_b64_pending_len";
+const B64_STREAM_PENDING_0: &str = "rd_b64_pending_0";
+const B64_STREAM_PENDING_1: &str = "rd_b64_pending_1";
+const B64_STREAM_COLUMN: &str = "rd_b64_column";
+const B64_STREAM_DECODED: &str = "rd_b64_decoded";
+const B64_STREAM_POS: &str = "rd_b64_pos";
+
+fn b64_stream_throw(class: &str, message: impl Into<String>) -> VmExit {
+    VmExit::Exception(Throwable::new(class, message.into()))
+}
+
+fn b64_stream_int(vm: &Engine, recv: ObjRef, field: &str) -> i32 {
+    match get(vm, recv, field) {
+        Value::Int(value) => value,
+        _ => 0,
+    }
+}
+
+fn b64_stream_set_int(
+    vm: &mut Engine,
+    recv: ObjRef,
+    field: &str,
+    value: i32,
+) -> Result<(), VmExit> {
+    put(vm, recv, field, Value::Int(value))
+}
+
+fn b64_stream_wrapped(vm: &Engine, recv: ObjRef, field: &str) -> Result<ObjRef, VmExit> {
+    match get(vm, recv, field) {
+        Value::Obj(wrapped) => Ok(wrapped),
+        _ => Err(b64_stream_throw(
+            "Ljava/io/IOException;",
+            "stream has no wrapped stream",
+        )),
+    }
+}
+
+fn b64_stream_array_bytes(vm: &Engine, value: Option<&Value>) -> Result<Vec<u8>, VmExit> {
+    let Some(Value::Obj(array)) = value else {
+        return Err(b64_stream_throw(
+            "Ljava/lang/NullPointerException;",
+            "buffer == null",
+        ));
+    };
+    Ok(vm
+        .heap
+        .as_array_elems(*array)?
+        .0
+        .iter()
+        .map(|value| value.as_int().unwrap_or(0) as u8)
+        .collect())
+}
+
+fn b64_stream_write_data(vm: &Engine, sig: &str, args: &[Value]) -> Result<Vec<u8>, VmExit> {
+    match sig {
+        "(I)V" => Ok(vec![args
+            .first()
+            .and_then(|value| value.as_int().ok())
+            .unwrap_or(0) as u8]),
+        "([B)V" => b64_stream_array_bytes(vm, args.first()),
+        "([BII)V" => {
+            let all = b64_stream_array_bytes(vm, args.first())?;
+            let offset = args
+                .get(1)
+                .and_then(|value| value.as_int().ok())
+                .unwrap_or(0);
+            let len = args
+                .get(2)
+                .and_then(|value| value.as_int().ok())
+                .unwrap_or(0);
+            let offset = usize::try_from(offset).ok();
+            let len = usize::try_from(len).ok();
+            let Some((offset, len)) = offset.zip(len) else {
+                return Err(b64_stream_throw(
+                    "Ljava/lang/IndexOutOfBoundsException;",
+                    "negative offset or length",
+                ));
+            };
+            let Some(end) = offset.checked_add(len).filter(|end| *end <= all.len()) else {
+                return Err(b64_stream_throw(
+                    "Ljava/lang/IndexOutOfBoundsException;",
+                    format!("offset={offset}, len={len}, array length={}", all.len()),
+                ));
+            };
+            Ok(all[offset..end].to_vec())
+        }
+        _ => Ok(Vec::new()),
+    }
+}
+
+fn b64_stream_save_pending(
+    vm: &mut Engine,
+    recv: ObjRef,
+    pending: &[u8],
+    column: i32,
+) -> Result<(), VmExit> {
+    b64_stream_set_int(vm, recv, B64_STREAM_PENDING_LEN, pending.len() as i32)?;
+    b64_stream_set_int(
+        vm,
+        recv,
+        B64_STREAM_PENDING_0,
+        i32::from(*pending.first().unwrap_or(&0)),
+    )?;
+    b64_stream_set_int(
+        vm,
+        recv,
+        B64_STREAM_PENDING_1,
+        i32::from(*pending.get(1).unwrap_or(&0)),
+    )?;
+    b64_stream_set_int(vm, recv, B64_STREAM_COLUMN, column)
+}
+
+fn b64_stream_pending(vm: &Engine, recv: ObjRef) -> Vec<u8> {
+    match b64_stream_int(vm, recv, B64_STREAM_PENDING_LEN) {
+        1 => vec![b64_stream_int(vm, recv, B64_STREAM_PENDING_0) as u8],
+        2.. => vec![
+            b64_stream_int(vm, recv, B64_STREAM_PENDING_0) as u8,
+            b64_stream_int(vm, recv, B64_STREAM_PENDING_1) as u8,
+        ],
+        _ => Vec::new(),
+    }
+}
+
+fn b64_stream_write_encoded(vm: &mut Engine, recv: ObjRef, encoded: &[u8]) -> Result<(), VmExit> {
+    if encoded.is_empty() {
+        return Ok(());
+    }
+    let out = b64_stream_wrapped(vm, recv, "out")?;
+    let bytes = crate::jlstring::byte_array(vm, encoded)?;
+    vm.invoke_instance(out, "write", "([B)V", &[bytes])?;
+    Ok(())
+}
+
+fn base64_output_stream(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match (name, sig) {
+        ("<init>", "(Ljava/io/OutputStream;I)V") => {
+            let Some(out @ Value::Obj(_)) = args.first() else {
+                return Err(b64_stream_throw(
+                    "Ljava/lang/NullPointerException;",
+                    "out == null",
+                ));
+            };
+            put(vm, recv, "out", out.clone())?;
+            b64_stream_set_int(vm, recv, B64_STREAM_FLAGS, base64_flags(args))?;
+            b64_stream_set_int(vm, recv, B64_STREAM_CLOSED, 0)?;
+            b64_stream_save_pending(vm, recv, &[], 0)?;
+        }
+        ("write", "(I)V" | "([B)V" | "([BII)V") => {
+            if b64_stream_int(vm, recv, B64_STREAM_CLOSED) != 0 {
+                return Err(b64_stream_throw("Ljava/io/IOException;", "Stream closed"));
+            }
+            let flags = b64_stream_int(vm, recv, B64_STREAM_FLAGS);
+            let mut pending = b64_stream_pending(vm, recv);
+            let mut column = b64_stream_int(vm, recv, B64_STREAM_COLUMN);
+            let mut encoded = Vec::new();
+            for byte in b64_stream_write_data(vm, sig, args)? {
+                pending.push(byte);
+                if pending.len() == 3 {
+                    base64_push_group(&mut encoded, &pending, flags);
+                    column += 4;
+                    if flags & BASE64_NO_WRAP == 0 && column == 76 {
+                        encoded.extend_from_slice(base64_newline(flags));
+                        column = 0;
+                    }
+                    pending.clear();
+                }
+            }
+            b64_stream_save_pending(vm, recv, &pending, column)?;
+            b64_stream_write_encoded(vm, recv, &encoded)?;
+        }
+        ("flush", "()V") => {
+            if b64_stream_int(vm, recv, B64_STREAM_CLOSED) != 0 {
+                return Err(b64_stream_throw("Ljava/io/IOException;", "Stream closed"));
+            }
+            let out = b64_stream_wrapped(vm, recv, "out")?;
+            vm.invoke_instance(out, "flush", "()V", &[])?;
+        }
+        ("close", "()V") => {
+            if b64_stream_int(vm, recv, B64_STREAM_CLOSED) != 0 {
+                return Ok(Some(Value::Null));
+            }
+            let flags = b64_stream_int(vm, recv, B64_STREAM_FLAGS);
+            let pending = b64_stream_pending(vm, recv);
+            let mut column = b64_stream_int(vm, recv, B64_STREAM_COLUMN);
+            let mut encoded = Vec::new();
+            if !pending.is_empty() {
+                let start = encoded.len();
+                base64_push_group(&mut encoded, &pending, flags);
+                column += (encoded.len() - start) as i32;
+            }
+            if flags & BASE64_NO_WRAP == 0 && column > 0 {
+                encoded.extend_from_slice(base64_newline(flags));
+            }
+            b64_stream_save_pending(vm, recv, &[], 0)?;
+            b64_stream_set_int(vm, recv, B64_STREAM_CLOSED, 1)?;
+            b64_stream_write_encoded(vm, recv, &encoded)?;
+            let out = b64_stream_wrapped(vm, recv, "out")?;
+            if flags & BASE64_NO_CLOSE == 0 {
+                vm.invoke_instance(out, "close", "()V", &[])?;
+            } else {
+                vm.invoke_instance(out, "flush", "()V", &[])?;
+            }
+        }
+        _ => return Ok(None),
+    }
+    Ok(Some(Value::Null))
+}
+
+fn base64_input_load(vm: &mut Engine, recv: ObjRef) -> Result<Vec<u8>, VmExit> {
+    if let Value::Obj(decoded) = get(vm, recv, B64_STREAM_DECODED) {
+        return b64_stream_array_bytes(vm, Some(&Value::Obj(decoded)));
+    }
+    let input = b64_stream_wrapped(vm, recv, "in")?;
+    let scratch = crate::jlstring::byte_array(vm, &[0; 8192])?;
+    let Value::Obj(scratch_ref) = scratch else {
+        return Err(b64_stream_throw("Ljava/io/IOException;", "scratch buffer"));
+    };
+    let mut encoded = Vec::new();
+    let mut zero_reads = 0usize;
+    loop {
+        let n = vm
+            .invoke_instance(
+                input,
+                "read",
+                "([BII)I",
+                &[scratch.clone(), Value::Int(0), Value::Int(8192)],
+            )?
+            .as_int()
+            .unwrap_or(-1);
+        if n < 0 {
+            break;
+        }
+        if n == 0 {
+            zero_reads += 1;
+            if zero_reads > 100 {
+                break;
+            }
+            continue;
+        }
+        zero_reads = 0;
+        let bytes = vm.heap.as_array_elems(scratch_ref)?.0;
+        let take = (n as usize).min(bytes.len());
+        encoded.extend(
+            bytes[..take]
+                .iter()
+                .map(|value| value.as_int().unwrap_or(0) as u8),
+        );
+    }
+    let decoded = base64_decode(&encoded, b64_stream_int(vm, recv, B64_STREAM_FLAGS))?;
+    let decoded_value = crate::jlstring::byte_array(vm, &decoded)?;
+    put(vm, recv, B64_STREAM_DECODED, decoded_value)?;
+    Ok(decoded)
+}
+
+fn base64_input_stream(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match (name, sig) {
+        ("<init>", "(Ljava/io/InputStream;I)V") => {
+            let Some(input @ Value::Obj(_)) = args.first() else {
+                return Err(b64_stream_throw(
+                    "Ljava/lang/NullPointerException;",
+                    "in == null",
+                ));
+            };
+            put(vm, recv, "in", input.clone())?;
+            b64_stream_set_int(vm, recv, B64_STREAM_FLAGS, base64_flags(args))?;
+            b64_stream_set_int(vm, recv, B64_STREAM_CLOSED, 0)?;
+            b64_stream_set_int(vm, recv, B64_STREAM_POS, 0)?;
+            put(vm, recv, B64_STREAM_DECODED, Value::Null)?;
+            Ok(Some(Value::Null))
+        }
+        ("read", "()I") => {
+            if b64_stream_int(vm, recv, B64_STREAM_CLOSED) != 0 {
+                return Ok(Some(Value::Int(-1)));
+            }
+            let decoded = base64_input_load(vm, recv)?;
+            let pos = b64_stream_int(vm, recv, B64_STREAM_POS).max(0) as usize;
+            let Some(byte) = decoded.get(pos) else {
+                return Ok(Some(Value::Int(-1)));
+            };
+            b64_stream_set_int(vm, recv, B64_STREAM_POS, (pos + 1) as i32)?;
+            Ok(Some(Value::Int(i32::from(*byte))))
+        }
+        ("read", "([B)I" | "([BII)I") => {
+            let Some(Value::Obj(array)) = args.first() else {
+                return Err(b64_stream_throw(
+                    "Ljava/lang/NullPointerException;",
+                    "buffer == null",
+                ));
+            };
+            let array_len = vm.heap.as_array_elems(*array)?.0.len();
+            let (offset, len) = if sig == "([B)I" {
+                (0, array_len as i32)
+            } else {
+                (
+                    args.get(1)
+                        .and_then(|value| value.as_int().ok())
+                        .unwrap_or(0),
+                    args.get(2)
+                        .and_then(|value| value.as_int().ok())
+                        .unwrap_or(0),
+                )
+            };
+            let offset = usize::try_from(offset).ok();
+            let len = usize::try_from(len).ok();
+            let Some((offset, len)) = offset.zip(len) else {
+                return Err(b64_stream_throw(
+                    "Ljava/lang/IndexOutOfBoundsException;",
+                    "negative offset or length",
+                ));
+            };
+            if offset
+                .checked_add(len)
+                .filter(|end| *end <= array_len)
+                .is_none()
+            {
+                return Err(b64_stream_throw(
+                    "Ljava/lang/IndexOutOfBoundsException;",
+                    format!("offset={offset}, len={len}, array length={array_len}"),
+                ));
+            }
+            if len == 0 {
+                return Ok(Some(Value::Int(0)));
+            }
+            if b64_stream_int(vm, recv, B64_STREAM_CLOSED) != 0 {
+                return Ok(Some(Value::Int(-1)));
+            }
+            let decoded = base64_input_load(vm, recv)?;
+            let pos = b64_stream_int(vm, recv, B64_STREAM_POS).max(0) as usize;
+            if pos >= decoded.len() {
+                return Ok(Some(Value::Int(-1)));
+            }
+            let count = len.min(decoded.len() - pos);
+            {
+                let elems = vm.heap.array_elems_mut(*array)?;
+                for (index, byte) in decoded[pos..pos + count].iter().enumerate() {
+                    elems[offset + index] = Value::Int(i32::from(*byte as i8));
+                }
+            }
+            b64_stream_set_int(vm, recv, B64_STREAM_POS, (pos + count) as i32)?;
+            Ok(Some(Value::Int(count as i32)))
+        }
+        ("available", "()I") => {
+            if let Value::Obj(decoded_ref) = get(vm, recv, B64_STREAM_DECODED) {
+                let decoded = b64_stream_array_bytes(vm, Some(&Value::Obj(decoded_ref)))?;
+                let pos = b64_stream_int(vm, recv, B64_STREAM_POS).max(0) as usize;
+                return Ok(Some(Value::Int(decoded.len().saturating_sub(pos) as i32)));
+            }
+            let input = b64_stream_wrapped(vm, recv, "in")?;
+            let encoded_available = vm
+                .invoke_instance(input, "available", "()I", &[])?
+                .as_int()
+                .unwrap_or(0)
+                .max(0);
+            Ok(Some(Value::Int((encoded_available * 3) / 4)))
+        }
+        ("close", "()V") => {
+            if b64_stream_int(vm, recv, B64_STREAM_CLOSED) != 0 {
+                return Ok(Some(Value::Null));
+            }
+            b64_stream_set_int(vm, recv, B64_STREAM_CLOSED, 1)?;
+            if b64_stream_int(vm, recv, B64_STREAM_FLAGS) & BASE64_NO_CLOSE == 0 {
+                let input = b64_stream_wrapped(vm, recv, "in")?;
+                vm.invoke_instance(input, "close", "()V", &[])?;
+            }
+            Ok(Some(Value::Null))
+        }
+        _ => Ok(None),
+    }
 }
 
 /// `android.util.Base64` compile-time flag constants for `sget` and
@@ -794,6 +1193,18 @@ pub(crate) fn instance_intrinsic(
                 .is_ok_and(|class| vm.cp.is_subtype(class, LRU_CACHE)))
     {
         return lru_cache(vm, name, sig, recv, args);
+    }
+    let recv_class = vm.heap.class_of(recv).unwrap_or("");
+    let stream_override = vm.cp.resolve_method(recv_class, name, sig).is_some();
+    if mref_class == BASE64_INPUT_STREAM
+        || (!stream_override && vm.cp.is_subtype(recv_class, BASE64_INPUT_STREAM))
+    {
+        return base64_input_stream(vm, name, sig, recv, args);
+    }
+    if mref_class == BASE64_OUTPUT_STREAM
+        || (!stream_override && vm.cp.is_subtype(recv_class, BASE64_OUTPUT_STREAM))
+    {
+        return base64_output_stream(vm, name, sig, recv, args);
     }
     if !mref_class.starts_with("Landroid/util/") {
         return Ok(None);

@@ -1136,6 +1136,16 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Object;",
         ]),
         "Ljava/io/FilterInputStream;" => Some(&["Ljava/io/InputStream;", "Ljava/lang/Object;"]),
+        "Landroid/util/Base64OutputStream;" => Some(&[
+            "Ljava/io/FilterOutputStream;",
+            "Ljava/io/OutputStream;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/util/Base64InputStream;" => Some(&[
+            "Ljava/io/FilterInputStream;",
+            "Ljava/io/InputStream;",
+            "Ljava/lang/Object;",
+        ]),
         "Ljava/io/PrintStream;" => Some(&[
             "Ljava/io/FilterOutputStream;",
             "Ljava/io/OutputStream;",

@@ -178,6 +178,33 @@ that exact prefix:
   its public catalogue, including IO/JSON/XML helpers and event/log
   types, remains incomplete.
 
+## Round 8 — `android.util.Base64` stream classes
+
+- `Base64OutputStream` now wraps a guest or host `OutputStream`, accepts
+  single-byte and byte-array slice writes, emits only complete encoded
+  triplets while the stream is open, carries a one- or two-byte remainder
+  across writes, preserves the selected alphabet/padding/wrapping flags,
+  flushes the wrapped stream without finishing the code stream, and on
+  close emits the final padded group and line break before honouring
+  `NO_CLOSE`.
+- `Base64InputStream` now wraps a guest or host `InputStream`, decodes its
+  encoded bytes with the Round 6 AOSP decoder state machine, and serves
+  `read()`, `read(byte[])`, sliced `read(byte[], int, int)`, `available()`
+  after decoding has begun, EOF and close/`NO_CLOSE` behaviour.
+- Both stream classes are registered in the built-in class hierarchy as
+  filter streams and dispatch when referenced polymorphically through
+  `java.io.InputStream`/`java.io.OutputStream`, without shadowing a DEX
+  subclass override.
+- Proof: `base64_output_stream_incrementally_encodes_and_finishes_on_close`
+  writes `hello` one byte at a time, observes only `aGVs` after `flush()`,
+  and observes `aGVsbG8=\n` after `close()`;
+  `base64_input_stream_decodes_wrapped_bytes_with_offsets` decodes wrapped
+  input, writes into a non-zero destination offset, and checks
+  `available()`/EOF.
+- Status after Round 8: `android.util` remains **partial**. The rest of its
+  public catalogue, including IO/JSON/XML helpers and event/log types,
+  remains incomplete.
+
 ## Remaining literal blockers by partial surface
 
 | Domain | Surface | Main literal blockers |
