@@ -33,6 +33,8 @@ const ON_TRANSACT_SIG: &str = "(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z";
 
 const INTERFACE_TRANSACTION: i32 = 0x5f4e_5446; // '_NTF'
 const DUMP_TRANSACTION: i32 = 0x5f44_4d50; // '_DMP'
+/// `BaseBundle.BUNDLE_MAGIC`; as little-endian bytes this is `BNDL`.
+const BUNDLE_MAGIC: i32 = 0x4c44_4e42;
 
 const VAL_NULL: i32 = -1;
 const VAL_STRING: i32 = 0;
@@ -113,6 +115,11 @@ impl PState {
     fn write_i64(&mut self, v: i64) {
         self.align_write();
         self.write_raw(&v.to_le_bytes());
+    }
+    fn patch_i32(&mut self, offset: usize, v: i32) {
+        if let Some(bytes) = self.data.get_mut(offset..offset + 4) {
+            bytes.copy_from_slice(&v.to_le_bytes());
+        }
     }
     fn write_string(&mut self, s: Option<&str>) {
         match s {
@@ -513,8 +520,8 @@ fn invoke_write_to_parcel(
 ) -> Result<(), VmExit> {
     let class = vm.heap.class_of(obj)?.to_string();
     if class == BUNDLE || class == PERSISTABLE_BUNDLE {
-        // Bundle is a host value, not DEX: its parcel form is the same
-        // length/key/value stream readBundle consumes below.
+        // Bundle is a host value, not DEX: write its AOSP
+        // length/magic/ArrayMap frame directly.
         return write_bundle_map(vm, parcel, obj);
     }
     vm.invoke_instance(
@@ -533,12 +540,11 @@ fn bundle_map(vm: &Engine, r: ObjRef) -> Vec<(String, Value)> {
     }
 }
 
-pub(crate) fn write_bundle_map(
+fn write_bundle_entries(
     vm: &mut Engine,
     parcel: ObjRef,
-    bundle: ObjRef,
+    entries: Vec<(String, Value)>,
 ) -> Result<(), VmExit> {
-    let entries = bundle_map(vm, bundle);
     let mut st = load(vm, parcel);
     st.write_i32(entries.len() as i32);
     store(vm, parcel, st);
@@ -549,10 +555,7 @@ pub(crate) fn write_bundle_map(
     Ok(())
 }
 
-pub(crate) fn read_bundle_map(
-    vm: &mut Engine,
-    parcel: ObjRef,
-) -> Result<Vec<(String, Value)>, VmExit> {
+fn read_bundle_entries(vm: &mut Engine, parcel: ObjRef) -> Result<Vec<(String, Value)>, VmExit> {
     let mut st = load(vm, parcel);
     let n = st.read_i32()?;
     store(vm, parcel, st);
@@ -568,6 +571,107 @@ pub(crate) fn read_bundle_map(
         out.push((k, v));
     }
     Ok(out)
+}
+
+/// Write a Bundle in AOSP `BaseBundle.writeToParcelInner` framing:
+/// `length | BUNDLE_MAGIC | ArrayMap`. Despite the historical function
+/// name, this is now the complete Bundle parcel representation used by
+/// `Bundle.writeToParcel`, `Parcel.writeBundle`, `writeValue` and
+/// `writeParcelable`; there is no longer a second internal-only format.
+pub(crate) fn write_bundle_map(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    bundle: ObjRef,
+) -> Result<(), VmExit> {
+    let entries = bundle_map(vm, bundle);
+    let (length_pos, start_pos) = {
+        let mut st = load(vm, parcel);
+        st.pos = align4(st.pos);
+        let length_pos = st.pos;
+        st.write_i32(0); // Backpatched after the map is written.
+        st.write_i32(BUNDLE_MAGIC);
+        let start_pos = st.pos;
+        store(vm, parcel, st);
+        (length_pos, start_pos)
+    };
+    write_bundle_entries(vm, parcel, entries)?;
+    let mut st = load(vm, parcel);
+    let end_pos = st.pos;
+    let length = i32::try_from(end_pos - start_pos)
+        .map_err(|_| bad("Parcel: Bundle exceeds the maximum parcelable size"))?;
+    st.patch_i32(length_pos, length);
+    st.pos = end_pos;
+    store(vm, parcel, st);
+    Ok(())
+}
+
+/// Read one AOSP-framed Bundle. The declared length bounds the map and is
+/// honored even if a forward-compatible producer leaves unread bytes inside
+/// the Bundle frame.
+pub(crate) fn read_bundle_map(
+    vm: &mut Engine,
+    parcel: ObjRef,
+) -> Result<Vec<(String, Value)>, VmExit> {
+    let end_pos = {
+        let mut st = load(vm, parcel);
+        let length = st.read_i32()?;
+        if length < 0 {
+            return Err(bad(format!("Parcel: negative Bundle length {length}")));
+        }
+        let magic = st.read_i32()?;
+        if magic != BUNDLE_MAGIC {
+            return Err(bad(format!(
+                "Parcel: Bundle magic mismatch: expected {BUNDLE_MAGIC:#010x}, got {magic:#010x}"
+            )));
+        }
+        let end_pos = st
+            .pos
+            .checked_add(length as usize)
+            .filter(|end| *end <= st.data.len())
+            .ok_or_else(|| bad("Parcel under-run reading Bundle: length exceeds parcel size"))?;
+        store(vm, parcel, st);
+        end_pos
+    };
+    let entries = read_bundle_entries(vm, parcel)?;
+    let mut st = load(vm, parcel);
+    if st.pos > end_pos {
+        return Err(bad(
+            "Parcel: Bundle entries exceed the declared Bundle length",
+        ));
+    }
+    st.pos = end_pos;
+    store(vm, parcel, st);
+    Ok(entries)
+}
+
+fn write_nullable_bundle(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    bundle: Option<ObjRef>,
+) -> Result<(), VmExit> {
+    let mut st = load(vm, parcel);
+    st.write_i32(bundle.is_some() as i32);
+    store(vm, parcel, st);
+    if let Some(bundle) = bundle {
+        write_bundle_map(vm, parcel, bundle)?;
+    }
+    Ok(())
+}
+
+fn read_nullable_bundle(vm: &mut Engine, parcel: ObjRef, class: &str) -> Result<Value, VmExit> {
+    let mut st = load(vm, parcel);
+    let present = st.read_i32()?;
+    store(vm, parcel, st);
+    match present {
+        0 => Ok(Value::Null),
+        1 => {
+            let entries = read_bundle_map(vm, parcel)?;
+            new_bundle(vm, class, entries)
+        }
+        other => Err(bad(format!(
+            "Parcel: invalid nullable Bundle marker {other}"
+        ))),
+    }
 }
 
 fn new_bundle(vm: &mut Engine, class: &str, map: Vec<(String, Value)>) -> Result<Value, VmExit> {
@@ -1517,55 +1621,20 @@ fn parcel_instance(
             return some(read_parcelable(vm, recv)?);
         }
         ("writeBundle", "(Landroid/os/Bundle;)V") => {
-            match obj_arg(args, 0) {
-                Some(b) => write_bundle_map(vm, recv, b)?,
-                None => {
-                    let mut st = load(vm, recv);
-                    st.write_i32(-1);
-                    store(vm, recv, st);
-                }
-            }
+            write_nullable_bundle(vm, recv, obj_arg(args, 0))?;
             return some(Value::Null);
         }
         ("readBundle", "()Landroid/os/Bundle;")
         | ("readBundle", "(Ljava/lang/ClassLoader;)Landroid/os/Bundle;") => {
-            // Peek for the null-bundle marker written above (-1 length).
-            let mut st = load(vm, recv);
-            let save = st.pos;
-            let first = st.read_i32()?;
-            if first == -1 {
-                store(vm, recv, st);
-                return some(Value::Null);
-            }
-            st.pos = save;
-            store(vm, recv, st);
-            let map = read_bundle_map(vm, recv)?;
-            return some(new_bundle(vm, BUNDLE, map)?);
+            return some(read_nullable_bundle(vm, recv, BUNDLE)?);
         }
         ("writePersistableBundle", "(Landroid/os/PersistableBundle;)V") => {
-            match obj_arg(args, 0) {
-                Some(b) => write_bundle_map(vm, recv, b)?,
-                None => {
-                    let mut st = load(vm, recv);
-                    st.write_i32(-1);
-                    store(vm, recv, st);
-                }
-            }
+            write_nullable_bundle(vm, recv, obj_arg(args, 0))?;
             return some(Value::Null);
         }
         ("readPersistableBundle", "()Landroid/os/PersistableBundle;")
         | ("readPersistableBundle", "(Ljava/lang/ClassLoader;)Landroid/os/PersistableBundle;") => {
-            let mut st = load(vm, recv);
-            let save = st.pos;
-            let first = st.read_i32()?;
-            if first == -1 {
-                store(vm, recv, st);
-                return some(Value::Null);
-            }
-            st.pos = save;
-            store(vm, recv, st);
-            let map = read_bundle_map(vm, recv)?;
-            return some(new_bundle(vm, PERSISTABLE_BUNDLE, map)?);
+            return some(read_nullable_bundle(vm, recv, PERSISTABLE_BUNDLE)?);
         }
         ("writeList", "(Ljava/util/List;)V") | ("writeArrayList", "(Ljava/util/ArrayList;)V") => {
             let v = args.first().cloned().unwrap_or(Value::Null);
@@ -2633,6 +2702,113 @@ mod tests {
     }
 
     #[test]
+    fn bundle_parcel_uses_aosp_length_magic_and_nullable_marker() {
+        let mut vm = engine();
+        let empty = vm
+            .heap
+            .alloc_instance(BUNDLE.to_string(), Vec::new())
+            .unwrap();
+        vm.fw
+            .objects
+            .insert(empty, HostObj::Bundle { map: Vec::new() });
+        let p = obj(new_parcel(&mut vm).unwrap());
+        write_bundle_map(&mut vm, p, empty).unwrap();
+        let st = load(&vm, p);
+        assert_eq!(st.data.len(), 12);
+        assert_eq!(
+            i32::from_le_bytes(st.data[0..4].try_into().unwrap()),
+            4,
+            "length covers only the ArrayMap after the magic"
+        );
+        assert_eq!(&st.data[4..8], b"BNDL");
+        assert_eq!(i32::from_le_bytes(st.data[8..12].try_into().unwrap()), 0);
+
+        let mut st = load(&vm, p);
+        st.pos = 0;
+        store(&mut vm, p, st);
+        assert!(read_bundle_map(&mut vm, p).unwrap().is_empty());
+        assert_eq!(load(&vm, p).pos, 12);
+
+        let mut st = load(&vm, p);
+        st.pos = 0;
+        st.data[4] = b'X';
+        store(&mut vm, p, st);
+        assert!(read_bundle_map(&mut vm, p).is_err());
+
+        let p2 = obj(new_parcel(&mut vm).unwrap());
+        callp(
+            &mut vm,
+            p2,
+            "writeBundle",
+            "(Landroid/os/Bundle;)V",
+            &[Value::Null],
+        );
+        assert_eq!(load(&vm, p2).data, vec![0, 0, 0, 0]);
+        callp(&mut vm, p2, "setDataPosition", "(I)V", &[Value::Int(0)]);
+        assert_eq!(
+            callp(
+                &mut vm,
+                p2,
+                "readBundle",
+                "(Ljava/lang/ClassLoader;)Landroid/os/Bundle;",
+                &[Value::Null],
+            ),
+            Value::Null
+        );
+
+        // The guest-visible Bundle methods use the same frame, not a
+        // shortcut stream private to Bundle.writeToParcel.
+        let source = vm
+            .heap
+            .alloc_instance(BUNDLE.to_string(), Vec::new())
+            .unwrap();
+        let number = Value::Obj(
+            crate::boxes::box_value(&mut vm, "Ljava/lang/Integer;", Value::Int(12)).unwrap(),
+        );
+        vm.fw.objects.insert(
+            source,
+            HostObj::Bundle {
+                map: vec![("answer".into(), number)],
+            },
+        );
+        let p3 = obj(new_parcel(&mut vm).unwrap());
+        vm.invoke_instance(
+            source,
+            "writeToParcel",
+            "(Landroid/os/Parcel;I)V",
+            &[Value::Obj(p3), Value::Int(0)],
+        )
+        .unwrap();
+        let framed = load(&vm, p3);
+        assert_eq!(
+            i32::from_le_bytes(framed.data[0..4].try_into().unwrap()) as usize,
+            framed.data.len() - 8
+        );
+        assert_eq!(&framed.data[4..8], b"BNDL");
+        callp(&mut vm, p3, "setDataPosition", "(I)V", &[Value::Int(0)]);
+
+        let target = vm
+            .heap
+            .alloc_instance(BUNDLE.to_string(), Vec::new())
+            .unwrap();
+        vm.fw
+            .objects
+            .insert(target, HostObj::Bundle { map: Vec::new() });
+        vm.invoke_instance(
+            target,
+            "readFromParcel",
+            "(Landroid/os/Parcel;)V",
+            &[Value::Obj(p3)],
+        )
+        .unwrap();
+        let map = bundle_map(&vm, target);
+        assert_eq!(map.len(), 1);
+        assert_eq!(map[0].0, "answer");
+        let got = obj(map[0].1.clone());
+        assert_eq!(vm.heap.get_field(got, "value").unwrap(), Value::Int(12));
+    }
+
+    #[test]
     fn bundle_and_binder_handles_survive_parcel_bytes() {
         let mut vm = engine();
         let p = obj(new_parcel(&mut vm).unwrap());
@@ -2658,6 +2834,13 @@ mod tests {
             "(Landroid/os/Bundle;)V",
             &[Value::Obj(bundle)],
         );
+        let framed = load(&vm, p);
+        assert_eq!(i32::from_le_bytes(framed.data[0..4].try_into().unwrap()), 1);
+        assert_eq!(
+            i32::from_le_bytes(framed.data[4..8].try_into().unwrap()) as usize,
+            framed.data.len() - 12
+        );
+        assert_eq!(&framed.data[8..12], b"BNDL");
 
         let binder = vm
             .heap
