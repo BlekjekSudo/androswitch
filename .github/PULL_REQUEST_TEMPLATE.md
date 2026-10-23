@@ -22,7 +22,7 @@
 - [ ] `cargo fmt` + `clippy -D warnings` clean *(quando houver código)*
 - [ ] No silent failures — missing APIs respond `NOT_IMPLEMENTED(module_id)`
 - [ ] Fits the `moto-e5` performance budgets *(para features de runtime)*
-- [ ] Docs updated (`compat-matrix.md` / `api-coverage.toml` se aplicável)
+- [ ] Docs updated (`compat-matrix.md`; Android API changes also update `data/api-coverage.toml` and regenerate Appendix C reports)
 - [ ] AI usage disclosed / uso de IA declarado
 
 ## RD Sentinel anti-regression evidence

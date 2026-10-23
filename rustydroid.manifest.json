@@ -26,6 +26,13 @@
   "unselected_policy": "NOT_IMPLEMENTED(module_id)",
   "spec_version": "2.1",
   "registries": {
+    "appendix_c": {
+      "catalog": "data/api-coverage.toml",
+      "domains": 17,
+      "surfaces": 106,
+      "scope": "registry-and-classification-only",
+      "execution_claimed": false
+    },
     "appendix_g": {
       "catalog": "data/engines.toml",
       "engines": 28,

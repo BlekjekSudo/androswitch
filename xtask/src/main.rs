@@ -5,6 +5,7 @@
 //! do projeto é gerado.
 
 use anyhow::{bail, Context, Result};
+use rd_framework::fd_api_coverage::ApiCoverageTable;
 use std::path::{Path, PathBuf};
 
 fn main() {
@@ -48,6 +49,24 @@ fn run() -> Result<()> {
                 .unwrap_or_else(|| root.join("RustyDroid.md"));
             engine_spec(&root, &out)
         }
+        Some("api-coverage-report") => {
+            let out = args
+                .next()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| root.join("docs").join("api-coverage.md"));
+            let table = api_coverage_table(&root)?;
+            std::fs::write(&out, table.markdown_report())
+                .with_context(|| format!("writing {}", out.display()))?;
+            println!("api coverage report: {}", out.display());
+            Ok(())
+        }
+        Some("api-coverage-spec") => {
+            let out = args
+                .next()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| root.join("RustyDroid.md"));
+            api_coverage_spec(&root, &out)
+        }
         Some("--help") | Some("help") | None => {
             println!("xtask — RustyDroid build tasks");
             println!();
@@ -57,6 +76,10 @@ fn run() -> Result<()> {
             println!("  compat-report [out.md]  gera docs/compat-matrix.md (placar oficial)");
             println!("  engine-report [out.md]  gera docs/engine-registry.md (Apêndice G)");
             println!("  engine-spec [out.md]    regenera apenas a tabela marcada em RustyDroid.md");
+            println!("  api-coverage-report [out.md] gera docs/api-coverage.md (Apêndice C)");
+            println!(
+                "  api-coverage-spec [out.md]   regenera a tabela Apêndice C em RustyDroid.md"
+            );
             Ok(())
         }
         Some(other) => bail!("unknown task {other:?} — try `cargo xtask --help`"),
@@ -74,12 +97,12 @@ const CRATE_STATUS: &[(&str, &str, &str)] = &[
     (
         "rd-framework",
         "M0",
-        "fd-permissions (motor completo + gating maxSdk/since_api) · fd-devices · fd-behavior",
+        "fd-permissions (motor completo + gating maxSdk/since_api) · fd-devices · fd-behavior · fd-api-coverage (registro executável do Apêndice C)",
     ),
     (
         "rd-cli",
         "M0–M6",
-        "inspect · perm · device · behavior · dex disasm · vm exec · app run · mcp · test (suítes JUnit, M6)",
+        "inspect · perm · device · behavior · api-coverage · dex disasm · vm exec · app run · mcp · test (suítes JUnit, M6)",
     ),
     (
         "rd-dex",
@@ -104,7 +127,7 @@ const CRATE_STATUS: &[(&str, &str, &str)] = &[
     (
         "rd-agent",
         "M5–M9",
-        "MCP (47 tools + batch + policy sandbox + screen resources/live viewer; M9: widgets/IME/a11y/shortcuts/native_state) · executor de suítes `rd test` (JSON → JUnit XML, M6)",
+        "MCP (47 tools + batch + policy sandbox + screen resources/live viewer; AG-09 estático classificado pelo Apêndice C; M9: widgets/IME/a11y/shortcuts/native_state) · executor de suítes `rd test` (JSON → JUnit XML, M6)",
     ),
     (
         "rd-jni",
@@ -207,6 +230,21 @@ fn compat_report(root: &Path, out: &Path) -> Result<()> {
     md.push_str(&registry.appendix_table());
     md.push_str("\nRegras, dependências e limites em [engine-registry.md](engine-registry.md); fonte: `data/engines.toml`.\n");
 
+    let api_table = api_coverage_table(root)?;
+    let api_counts = api_table.status_counts();
+    let api_count = |k: &str| api_counts.get(k).copied().unwrap_or(0);
+    md.push_str("\n## Superfície android.* (Apêndice C — registro, não execução)\n\n");
+    md.push_str(&format!(
+        "**{} superfícies em {} domínios** (supported {}, partial {}, stub {}, not_implemented {}). Fonte executável: `data/api-coverage.toml`; relatório completo em [api-coverage.md](api-coverage.md), consulta via `rd api-coverage` e classificação estática no MCP `get_api_usage`. `supported` é apenas o subconjunto documentado de cada superfície — nunca o pacote AOSP inteiro; cobertura de execução continua sendo `get_coverage`.\n\n",
+        api_table.surface.len(),
+        api_table.domain.len(),
+        api_count("supported"),
+        api_count("partial"),
+        api_count("stub"),
+        api_count("not_implemented")
+    ));
+    md.push_str(&api_table.appendix_c_markdown_table());
+
     md.push_str("\n## Dados versionados (M0)\n\n");
     md.push_str(&format!(
         "- permissions.toml: **{perm_count}** permissões + {role_count} roles (Apêndice B)\n"
@@ -216,6 +254,11 @@ fn compat_report(root: &Path, out: &Path) -> Result<()> {
     ));
     md.push_str(&format!(
         "- behavior-switches.toml: **{switch_count}** comutadores targetSdk 26→36 (PRF-07)\n"
+    ));
+    md.push_str(&format!(
+        "- api-coverage.toml: **{}** superfícies android.* em {} domínios (Apêndice C)\n",
+        api_table.surface.len(),
+        api_table.domain.len()
     ));
     md.push_str("\n## Compatibilidade por módulo (checklist PARTE 0)\n\n");
     md.push_str(
@@ -245,6 +288,34 @@ fn engine_spec(root: &Path, out: &Path) -> Result<()> {
     let generated = format!("{before}{start}\n{}{end}{after}", registry.appendix_table());
     std::fs::write(out, generated).with_context(|| format!("writing {}", out.display()))?;
     println!("Appendix G table: {}", out.display());
+    Ok(())
+}
+
+fn api_coverage_table(root: &Path) -> Result<ApiCoverageTable> {
+    let text = std::fs::read_to_string(root.join("data/api-coverage.toml"))
+        .context("data/api-coverage.toml ausente")?;
+    ApiCoverageTable::from_toml(&text).context("validating data/api-coverage.toml")
+}
+
+/// Preserve the rest of the master spec byte-for-byte; only the marked
+/// Appendix C table changes.
+fn api_coverage_spec(root: &Path, out: &Path) -> Result<()> {
+    let spec = std::fs::read_to_string(root.join("RustyDroid.md"))?;
+    let table = api_coverage_table(root)?;
+    let start = "<!-- BEGIN API COVERAGE -->";
+    let end = "<!-- END API COVERAGE -->";
+    let (before, rest) = spec
+        .split_once(start)
+        .context("api coverage table start marker missing")?;
+    let (_, after) = rest
+        .split_once(end)
+        .context("api coverage table end marker missing")?;
+    let generated = format!(
+        "{before}{start}\n{}{end}{after}",
+        table.appendix_c_markdown_table()
+    );
+    std::fs::write(out, generated).with_context(|| format!("writing {}", out.display()))?;
+    println!("Appendix C table: {}", out.display());
     Ok(())
 }
 
@@ -660,6 +731,27 @@ mod tests {
     }
 
     #[test]
+    fn api_coverage_report_and_appendix_table_match_the_versioned_registry() {
+        let root = repo_root();
+        let table = api_coverage_table(&root).unwrap();
+        assert_eq!(table.domain.len(), 17);
+        assert!(table.surface.len() >= 100);
+        assert_eq!(
+            std::fs::read_to_string(root.join("docs/api-coverage.md")).unwrap(),
+            table.markdown_report(),
+            "run cargo xtask api-coverage-report"
+        );
+        let spec = std::fs::read_to_string(root.join("RustyDroid.md")).unwrap();
+        let (_, table_md) = spec.split_once("<!-- BEGIN API COVERAGE -->\n").unwrap();
+        let (table_md, _) = table_md.split_once("<!-- END API COVERAGE -->").unwrap();
+        assert_eq!(
+            table_md,
+            table.appendix_c_markdown_table(),
+            "run cargo xtask api-coverage-spec"
+        );
+    }
+
+    #[test]
     fn language_features_match_catalog_dependencies_and_forwarding() {
         let root = repo_root();
         let registry = rd_engine_registry::Registry::load(&root.join("data/engines.toml")).unwrap();
@@ -768,6 +860,21 @@ mod tests {
             &std::fs::read_to_string(root.join("rustydroid.manifest.json")).unwrap(),
         )
         .unwrap();
+        let api_table = api_coverage_table(&root).unwrap();
+        assert_eq!(
+            manifest["registries"]["appendix_c"]["catalog"],
+            "data/api-coverage.toml"
+        );
+        assert_eq!(manifest["registries"]["appendix_c"]["domains"], 17);
+        assert_eq!(
+            manifest["registries"]["appendix_c"]["surfaces"].as_u64(),
+            Some(api_table.surface.len() as u64)
+        );
+        assert_eq!(
+            manifest["registries"]["appendix_c"]["scope"],
+            "registry-and-classification-only"
+        );
+        assert_eq!(manifest["registries"]["appendix_c"]["execution_claimed"], false);
         assert_eq!(manifest["registries"]["appendix_g"]["engines"], 28);
         assert_eq!(
             manifest["registries"]["appendix_g"]["scope"],

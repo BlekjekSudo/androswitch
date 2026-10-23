@@ -908,7 +908,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "compat_gaps",
             description:
-                "Catálogo HONESTO das lacunas de compatibilidade do runtime v1 (notificações M9, args String/array na sonda, foco, teclas, gestures, intent implícito, transporte HTTP) — o agente consulta antes de planejar.",
+                "Catálogo HONESTO das lacunas de compatibilidade do runtime v1 (notificações M9, args String/array na sonda, foco, teclas, gestures, intent implícito, transporte HTTP) + sumário executável do Apêndice C (data/api-coverage.toml: domínios/status das superfícies android.*) — o agente consulta antes de planejar.",
             schema: obj(serde_json::json!({}), &[]),
         },
         ToolDef {
@@ -927,7 +927,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "get_api_usage",
             description:
-                "AG-09 (metade estática): quais APIs android.* o app instalado REFERENCIA nos DEX — tipos (method_ids/field_ids/superclass/interfaces), métodos por classe e contagem por domínio (android.app, android.view…). É análise ESTÁTICA do DEX; para coverage de EXECUÇÃO use get_coverage. Com `package` consulta outro app instalado; sem, o app ativo.",
+                "AG-09 (metade estática): quais APIs android.* o app instalado REFERENCIA nos DEX — tipos (method_ids/field_ids/superclass/interfaces), métodos por classe, contagem por pacote e classificação Apêndice C (`api_coverage`: domínio funcional/status/gaps via data/api-coverage.toml). É análise ESTÁTICA do DEX; para coverage de EXECUÇÃO use get_coverage. Com `package` consulta outro app instalado; sem, o app ativo.",
             schema: obj(
                 serde_json::json!({
                     "package": { "type": "string", "description": "package instalado a analisar. Default: o app ativo" },
@@ -2437,8 +2437,23 @@ impl AgentSession {
                 })
             })
             .collect();
+        // Apêndice C executável: mesmo registro que `rd api-coverage` e o
+        // relatório gerado consomem. Isto não substitui os gaps narrativos
+        // acima; dá ao agente a contagem auditável por domínio/status.
+        let api_table = rd_framework::fd_api_coverage::ApiCoverageTable::embedded()?;
         Ok(ToolResult::json(&serde_json::json!({
             "gaps": gaps,
+            "api_coverage": {
+                "source": api_table.source,
+                "data": "data/api-coverage.toml",
+                "api_floor": api_table.api_floor,
+                "api_ceiling": api_table.api_ceiling,
+                "domains": api_table.domain.len(),
+                "surfaces": api_table.surface.len(),
+                "by_status": api_table.status_counts(),
+                "by_domain": api_table.domain_summaries(),
+                "hint": "get_api_usage classifica as referências DEX de um app contra este registro; get_coverage continua sendo a cobertura de execução",
+            },
             "hint": "behavior_switches lista os comutadores targetSdk ativos (PRF-07)",
         })))
     }
@@ -3821,6 +3836,24 @@ mod tests {
         assert_eq!(v["code"], "NOT_RUNNING");
     }
 
+    /// Apêndice C: compat_gaps expõe o sumário executável do registro
+    /// android.* junto dos gaps narrativos históricos.
+    #[test]
+    fn compat_gaps_includes_appendix_c_summary() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let mut s = AgentSession::new();
+        let (v, err) = call(&mut s, "compat_gaps", serde_json::json!({}));
+        assert!(!err, "{v}");
+        assert_eq!(v["api_coverage"]["data"], "data/api-coverage.toml");
+        assert_eq!(v["api_coverage"]["domains"], 17);
+        assert!(v["api_coverage"]["surfaces"].as_u64() >= Some(100), "{v}");
+        assert!(
+            v["api_coverage"]["by_status"]["not_implemented"].as_u64()
+                > v["api_coverage"]["by_status"]["supported"].as_u64(),
+            "registro não pode fingir Android completo: {v}"
+        );
+    }
+
     /// AG-09 (metade estática): get_api_usage reporta as APIs android.* que o
     /// app referencia nos DEX (análise estática) e exige app instalado.
     #[test]
@@ -3852,6 +3885,17 @@ mod tests {
         assert!(
             v["types_by_domain"]["android.app"].as_u64() >= Some(1),
             "domínios: {v}"
+        );
+        // Apêndice C: a mesma referência estática é classificada por domínio
+        // funcional/status, sem virar cobertura de execução.
+        assert_eq!(v["coverage_source"], "data/api-coverage.toml (Appendix C)");
+        assert!(
+            v["api_coverage"]["by_domain"]["app-lifecycle"]["total"].as_u64() >= Some(1),
+            "classificação Apêndice C: {v}"
+        );
+        assert!(
+            v["api_coverage"]["by_status"]["partial"].as_u64() >= Some(1),
+            "android.app é parcial, não pacote completo: {v}"
         );
 
         // package não instalado → tipado

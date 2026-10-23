@@ -26,13 +26,13 @@
 | Crate | Fase | Escopo |
 |---|---|---|
 | `rd-apk` | M0 | ZIP + AXML + arsc + assinaturas + manifest model completo |
-| `rd-framework` | M0 | fd-permissions (motor completo + gating maxSdk/since_api) · fd-devices · fd-behavior |
-| `rd-cli` | M0–M6 | inspect · perm · device · behavior · dex disasm · vm exec · app run · mcp · test (suítes JUnit, M6) |
+| `rd-framework` | M0 | fd-permissions (motor completo + gating maxSdk/since_api) · fd-devices · fd-behavior · fd-api-coverage (registro executável do Apêndice C) |
+| `rd-cli` | M0–M6 | inspect · perm · device · behavior · api-coverage · dex disasm · vm exec · app run · mcp · test (suítes JUnit, M6) |
 | `rd-dex` | M1 | parser DEX completo + disassembler smali validado vs baksmali + fuzz targets |
 | `rd-vm` | M2–M9 | interpretador Dalvik + golden harness vs JVM + framework host headless (Activity/View/Handler/Looper) + LayoutInflater AXML/ARSC + componentes M9 (notificações/IME/widgets/a11y/atalhos) + ponte JNI (feature `native`) |
 | `rd-testsupport` | M0–M6 | fixtures de teste (APK/DEX/AXML/ARSC sintéticos; dev-only, fora do binário) |
 | `rd-render` | M4 | UI dump uiautomator + screenshot headless (software renderer determinístico + PNG sem deps); winit/web são stub → M11 |
-| `rd-agent` | M5–M9 | MCP (47 tools + batch + policy sandbox + screen resources/live viewer; M9: widgets/IME/a11y/shortcuts/native_state) · executor de suítes `rd test` (JSON → JUnit XML, M6) |
+| `rd-agent` | M5–M9 | MCP (47 tools + batch + policy sandbox + screen resources/live viewer; AG-09 estático classificado pelo Apêndice C; M9: widgets/IME/a11y/shortcuts/native_state) · executor de suítes `rd test` (JSON → JUnit XML, M6) |
 | `rd-jni` | M9 | mangling JNI (curto/sobrecarga), descritores, MUTF-8, frames de refs locais/globais |
 | `rd-ndk` | M9 | parser ELF32/64 limitado (x86_64/AArch64/ARM) + runtime `native` em worker Unicorn isolado (ADR 004) |
 | `rd-engine-registry` | Apêndice G | registro/detecção dos 28 itens; features/contratos; NÃO executa engines |
@@ -83,11 +83,36 @@ Executar: `rd test tests/suites/<arquivo>.json --junit <saida>.xml` (formato em 
 
 Regras, dependências e limites em [engine-registry.md](engine-registry.md); fonte: `data/engines.toml`.
 
+## Superfície android.* (Apêndice C — registro, não execução)
+
+**106 superfícies em 17 domínios** (supported 4, partial 26, stub 17, not_implemented 59). Fonte executável: `data/api-coverage.toml`; relatório completo em [api-coverage.md](api-coverage.md), consulta via `rd api-coverage` e classificação estática no MCP `get_api_usage`. `supported` é apenas o subconjunto documentado de cada superfície — nunca o pacote AOSP inteiro; cobertura de execução continua sendo `get_coverage`.
+
+| Domínio | Superfícies/pacotes principais | Status das superfícies | Módulos |
+|---|---|---|---|
+| App/lifecycle | `android.app`, `android.app.admin`, `android.app.backup`, `android.app.job`, `android.app.slice`, `android.content`, `android.content.pm`, `android.content.res` | partial 5 · not_implemented 3 | `none`, `rd-vm/android-pm`, `rd-vm/android-res`, `rd-vm/framework`, `rd-vm/m8` |
+| View/UI | `android.view`, `android.view.accessibility`, `android.view.animation`, `android.view.inputmethod`, `android.view.textservice`, `android.view.translation`, `android.webkit`, `android.widget` | partial 4 · stub 2 · not_implemented 2 | `none`, `rd-vm/classpath`, `rd-vm/framework`, `rd-vm/m9`, `rd-vm/view-layout` |
+| Graphics | `android.graphics`, `android.graphics.drawable`, `android.graphics.pdf`, `android.opengl`, `android.renderscript` | partial 2 · not_implemented 3 | `none`, `rd-vm/graphics` |
+| Text | `android.text`, `android.text.format`, `android.text.method`, `android.text.style`, `android.text.util` | partial 3 · stub 2 | `rd-vm/android-text`, `rd-vm/graphics`, `rd-vm/jtext-format` |
+| OS/IPC | `android.os`, `android.os.Binder`, `android.os.Build`, `android.os.Bundle`, `android.os.Parcel`, `android.os.Parcelable`, `android.util` | supported 2 · partial 2 · stub 3 | `rd-vm/android-build`, `rd-vm/android-util`, `rd-vm/bundle`, `rd-vm/classpath`, `rd-vm/framework` |
+| Database | `android.database`, `android.database.sqlite`, `android.provider`, `android.provider.Settings` | supported 1 · partial 2 · stub 1 | `rd-vm/content`, `rd-vm/jsqlite` |
+| Net | `android.net`, `android.net.Uri`, `android.net.http`, `android.net.ipsec.ike`, `android.net.nsd`, `android.net.sip`, `android.net.wifi` | supported 1 · partial 1 · not_implemented 5 | `none`, `rd-vm/android-uri`, `rd-vm/framework` |
+| Media | `android.media`, `android.media.audiofx`, `android.media.browse`, `android.media.midi`, `android.media.projection`, `android.media.session`, `android.media.tv` | not_implemented 7 | `none` |
+| Camera | `android.hardware.Camera`, `android.hardware.camera2`, `android.hardware.camera2.params` | stub 2 · not_implemented 1 | `none`, `rd-vm/android-util`, `rd-vm/classpath` |
+| Hardware | `android.hardware`, `android.hardware.biometrics`, `android.hardware.display`, `android.hardware.fingerprint`, `android.hardware.hdmi`, `android.hardware.input`, `android.hardware.soundtrigger`, `android.hardware.usb`, `android.location` | partial 1 · stub 1 · not_implemented 7 | `none`, `rd-vm/android-display`, `rd-vm/classpath` |
+| Telephony | `android.telecom`, `android.telephony`, `android.telephony.cellbroadcast`, `android.telephony.euicc`, `android.telephony.gsm`, `android.telephony.mbms` | not_implemented 6 | `none` |
+| Connectivity | `android.bluetooth`, `android.bluetooth.le`, `android.companion`, `android.nfc`, `android.nfc.cardemulation`, `android.nfc.tech` | not_implemented 6 | `none` |
+| Security | `android.se.omapi`, `android.security`, `android.security.identity`, `android.security.keystore`, `android.service.credentials` | stub 1 · not_implemented 4 | `none`, `rd-vm/jsecurity` |
+| Speech/ML | `android.service.voice`, `android.speech`, `android.speech.tts`, `android.view.textclassifier` | stub 1 · not_implemented 3 | `none`, `rd-vm/classpath` |
+| Services ext | `android.service.autofill`, `android.service.carrier`, `android.service.chooser`, `android.service.dreams`, `android.service.media`, `android.service.notification`, `android.service.quicksettings`, `android.service.textservice`, `android.service.wallpaper` | partial 1 · stub 1 · not_implemented 7 | `none`, `rd-vm/classpath`, `rd-vm/m9` |
+| System UI | `android.accessibilityservice`, `android.app.usage`, `android.appwidget`, `android.inputmethodservice`, `android.print` | partial 3 · not_implemented 2 | `none`, `rd-vm/m9` |
+| Misc | `android.accounts`, `android.animation`, `android.gesture`, `android.icu`, `android.mtp`, `android.preference`, `android.system`, `android.transition` | partial 2 · stub 3 · not_implemented 3 | `none`, `rd-vm/classpath`, `rd-vm/framework`, `rd-vm/intrinsics` |
+
 ## Dados versionados (M0)
 
 - permissions.toml: **175** permissões + 13 roles (Apêndice B)
 - devices.toml: **6** perfis (piso: `moto-e5`)
 - behavior-switches.toml: **25** comutadores targetSdk 26→36 (PRF-07)
+- api-coverage.toml: **106** superfícies android.* em 17 domínios (Apêndice C)
 
 ## Compatibilidade por módulo (checklist PARTE 0)
 
