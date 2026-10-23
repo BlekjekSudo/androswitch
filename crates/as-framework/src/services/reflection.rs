@@ -171,10 +171,30 @@ pub(super) fn call(
             } else {
                 0
             }),
-            ("getSuperclass", "()Ljava/lang/Class;") => match vm.cp.superclass_of(&d) {
-                Some(s) => Value::Obj(vm.device_class_object(&s)?),
-                None => Value::Null,
-            },
+            ("getSuperclass", "()Ljava/lang/Class;") => {
+                let parent = if d.starts_with('[') {
+                    Some("Ljava/lang/Object;".into())
+                } else if d.len() == 1
+                    || d == "Ljava/lang/Object;"
+                    || vm
+                        .cp
+                        .find_class(&d)
+                        .is_some_and(|(_, def)| def.access_flags & 0x200 != 0)
+                {
+                    None
+                } else {
+                    Some(vm.cp.superclass_of(&d).ok_or_else(|| {
+                        error(
+                            "API_UNAVAILABLE",
+                            format!("Class.getSuperclass platform metadata: {d}"),
+                        )
+                    })?)
+                };
+                match parent {
+                    Some(s) => Value::Obj(vm.device_class_object(&s)?),
+                    None => Value::Null,
+                }
+            }
             (
                 "getDeclaredMethod" | "getMethod",
                 "(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;",

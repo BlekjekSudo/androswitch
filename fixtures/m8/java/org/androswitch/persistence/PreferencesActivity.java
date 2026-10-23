@@ -15,6 +15,9 @@ public class PreferencesActivity extends Activity implements SharedPreferences.O
     }
     protected void onCreate(Bundle bundle) {
         super.onCreate(bundle);
+        SharedPreferences local=getPreferences(MODE_PRIVATE);
+        if(local!=getSharedPreferences(getClass().getName(),MODE_PRIVATE)) throw new IllegalStateException("activity preference name outside package prefix");
+        local.edit().putInt("local-value",123).commit();
         SharedPreferences clearing = getSharedPreferences("clear-order", MODE_PRIVATE);
         clearing.edit().clear().putInt("old", 1).commit();
         clearing.edit().putInt("new", 2).clear().commit();

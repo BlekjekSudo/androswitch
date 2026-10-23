@@ -61,6 +61,7 @@ fn dex_preferences_collections_gc_restart_and_renamed_package_share_contracts() 
         )
         .unwrap();
         assert!(xml.contains("&amp;") && xml.contains("&lt;"));
+        assert!(root.join(format!("userdata/{package}/shared_prefs/org.androswitch.persistence.PreferencesActivity.xml")).is_file());
     }
 }
 #[test]

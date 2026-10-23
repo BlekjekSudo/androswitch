@@ -160,12 +160,14 @@ impl PreferenceService {
             if int(args, 0)? != 0 {
                 return Err(error("API_UNAVAILABLE", "Activity preferences mode"));
             }
-            let class = vm.heap.class_of(r)?.to_string();
-            let name = class
+            let class = vm
+                .heap
+                .class_of(r)?
+                .trim_start_matches('L')
                 .trim_end_matches(';')
-                .rsplit('/')
-                .next()
-                .unwrap_or(&class);
+                .replace('/', ".");
+            let prefix = format!("{}.", services.package);
+            let name = class.strip_prefix(&prefix).unwrap_or(&class);
             return self.get(vm, name).map(Some);
         }
         let pref_name = self.state.borrow().names.get(&r).cloned();

@@ -31,6 +31,7 @@ public final class Contracts {
     public static int fails() { int zero = 0; return 1 / zero; }
     public static String reflection() throws Exception {
         Class<?> type = Class.forName("org.androswitch.persistence.Contracts");
+        if (!"java.lang.Object".equals(type.getSuperclass().getName()) || Integer.TYPE.getSuperclass()!=null) throw new IllegalStateException("class hierarchy metadata");
         java.lang.reflect.Method method = type.getDeclaredMethod("twice", new Class<?>[] { Integer.TYPE });
         Object result = method.invoke(null, new Object[] { Integer.valueOf(9) });
         int catches = 0;
