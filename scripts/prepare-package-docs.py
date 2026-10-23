@@ -20,6 +20,9 @@ for path in package.rglob("*.md"):
         if urlsplit(target).scheme or target.startswith(("#","//")):
             return match.group(0)
         file,separator,fragment=target.partition("#")
+        direct=(path.parent / unquote(file)).resolve()
+        if direct.is_relative_to(package) and direct.exists():
+            return match.group(0)
         source=(origin.parent / unquote(file)).resolve()
         try:
             relative_source=source.relative_to(root).as_posix()
