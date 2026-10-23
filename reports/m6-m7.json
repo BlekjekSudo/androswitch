@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "implementation_commit": null,
+  "implementation_commit": "1ee616ba593f90d95238be65148017c587363e19",
   "stage": "M7 development alpha; supported proof corpus, not universal APK compatibility",
   "product_nro_sha256": "3d84164e6ba3227d6916e26bafff91f7485a817925f5450b85f5811c3738236b",
   "verification": {
