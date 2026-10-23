@@ -4260,7 +4260,8 @@ fn instance_intrinsic_dispatch(
         return Ok(Some(v));
     }
     // android.util sparse arrays / Size / Pair / Range / Rational (android_util.rs)
-    if let Some(v) = crate::android_util::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
+    if let Some(v) =
+        crate::android_util::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
     {
         return Ok(Some(v));
     }

@@ -1169,27 +1169,30 @@ pub(crate) fn static_intrinsic(
 
 pub(crate) fn instance_intrinsic(
     vm: &mut Engine,
+    recv_class: &str,
     mref_class: &str,
     name: &str,
     sig: &str,
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    let json_recv_class = vm
-        .heap
-        .class_of(recv)
-        .map(str::to_string)
-        .unwrap_or_default();
-    if let Some(value) = crate::android_json::instance_intrinsic(
-        vm,
+    // This dispatcher is consulted for host calls on *every* receiver class
+    // (including hot java.lang.String operations). Keep the non-Android path
+    // free of receiver-class allocation, method resolution, and subtype
+    // walks: only do that work after an exact Android class/method gate says
+    // this module could actually handle the call.
+    if matches!(
         mref_class,
-        &json_recv_class,
-        name,
-        sig,
-        recv,
-        args,
-    )? {
-        return Ok(Some(value));
+        "Landroid/util/JsonReader;" | "Landroid/util/JsonWriter;"
+    ) || matches!(
+        recv_class,
+        "Landroid/util/JsonReader;" | "Landroid/util/JsonWriter;"
+    ) {
+        if let Some(value) = crate::android_json::instance_intrinsic(
+            vm, mref_class, recv_class, name, sig, recv, args,
+        )? {
+            return Ok(Some(value));
+        }
     }
     // LruCache's state operations are final, so a DEX subclass reference
     // can safely use the same host implementation while its create/sizeOf/
@@ -1212,26 +1215,46 @@ pub(crate) fn instance_intrinsic(
             | "evictionCount"
             | "snapshot"
     );
-    if mref_class == LRU_CACHE
-        || (lru_final_method
-            && vm
-                .heap
-                .class_of(recv)
-                .is_ok_and(|class| vm.cp.is_subtype(class, LRU_CACHE)))
-    {
+    if mref_class == LRU_CACHE || (lru_final_method && vm.cp.is_subtype(recv_class, LRU_CACHE)) {
         return lru_cache(vm, name, sig, recv, args);
     }
-    let recv_class = vm.heap.class_of(recv).unwrap_or("");
-    let stream_override = vm.cp.resolve_method(recv_class, name, sig).is_some();
-    if mref_class == BASE64_INPUT_STREAM
-        || (!stream_override && vm.cp.is_subtype(recv_class, BASE64_INPUT_STREAM))
-    {
-        return base64_input_stream(vm, name, sig, recv, args);
+    // Base64 streams: first require one of the exact operations implemented
+    // below. A platform receiver that is not the stream class itself cannot
+    // be an unloaded subtype; only a DEX-defined receiver can need the
+    // subtype + guest-override checks.
+    let base64_input_method = matches!(
+        (name, sig),
+        ("<init>", "(Ljava/io/InputStream;I)V")
+            | ("read", "()I" | "([B)I" | "([BII)I")
+            | ("available", "()I")
+            | ("close", "()V")
+    );
+    if base64_input_method {
+        let exact_stream = mref_class == BASE64_INPUT_STREAM || recv_class == BASE64_INPUT_STREAM;
+        let dex_subclass = !exact_stream
+            && vm.cp.find_class(recv_class).is_some()
+            && vm.cp.is_subtype(recv_class, BASE64_INPUT_STREAM)
+            && vm.cp.resolve_method(recv_class, name, sig).is_none();
+        if exact_stream || dex_subclass {
+            return base64_input_stream(vm, name, sig, recv, args);
+        }
     }
-    if mref_class == BASE64_OUTPUT_STREAM
-        || (!stream_override && vm.cp.is_subtype(recv_class, BASE64_OUTPUT_STREAM))
-    {
-        return base64_output_stream(vm, name, sig, recv, args);
+    let base64_output_method = matches!(
+        (name, sig),
+        ("<init>", "(Ljava/io/OutputStream;I)V")
+            | ("write", "(I)V" | "([B)V" | "([BII)V")
+            | ("flush", "()V")
+            | ("close", "()V")
+    );
+    if base64_output_method {
+        let exact_stream = mref_class == BASE64_OUTPUT_STREAM || recv_class == BASE64_OUTPUT_STREAM;
+        let dex_subclass = !exact_stream
+            && vm.cp.find_class(recv_class).is_some()
+            && vm.cp.is_subtype(recv_class, BASE64_OUTPUT_STREAM)
+            && vm.cp.resolve_method(recv_class, name, sig).is_none();
+        if exact_stream || dex_subclass {
+            return base64_output_stream(vm, name, sig, recv, args);
+        }
     }
     if !mref_class.starts_with("Landroid/util/") {
         return Ok(None);
@@ -1453,7 +1476,7 @@ mod tests {
             .alloc_instance(LRU_CACHE.to_string(), Vec::new())
             .unwrap();
         let call = |vm: &mut Engine, name: &str, sig: &str, args: &[Value]| {
-            instance_intrinsic(vm, LRU_CACHE, name, sig, cache, args)
+            instance_intrinsic(vm, LRU_CACHE, LRU_CACHE, name, sig, cache, args)
                 .unwrap()
                 .unwrap()
         };
@@ -1536,6 +1559,7 @@ mod tests {
         assert_eq!(call(&mut vm, "size", "()I", &[]), Value::Int(1));
         assert!(instance_intrinsic(
             &mut vm,
+            LRU_CACHE,
             LRU_CACHE,
             "put",
             "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",

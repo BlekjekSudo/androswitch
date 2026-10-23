@@ -2660,6 +2660,13 @@ pub(crate) fn instance_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    // Parcel/Binder dispatch is consulted before the core java.lang handler;
+    // avoid a host-object map lookup for ordinary non-Android receivers.
+    // Host Parcels are always allocated with the Parcel descriptor, and
+    // Binder calls name Binder/IBinder (or the Binder receiver class).
+    if !mref_class.starts_with("Landroid/os/") && !recv_class.starts_with("Landroid/os/") {
+        return Ok(None);
+    }
     if mref_class == PARCEL
         || recv_class == PARCEL
         || matches!(vm.fw.get(recv), Some(HostObj::Parcel { .. }))

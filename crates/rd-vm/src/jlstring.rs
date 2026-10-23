@@ -202,6 +202,40 @@ pub(crate) fn instance_intrinsic(
     if name == "<init>" {
         return string_ctor(vm, sig, recv, args);
     }
+    // Do not clone the receiver for core String methods handled later in
+    // intrinsics.rs (charAt/length/hashCode/substring/...). This gate is
+    // deliberately name-only and over-inclusive for overloads shared with
+    // the core dispatcher; keep it in sync with the match below.
+    if !matches!(
+        name,
+        "codePointAt"
+            | "compareTo"
+            | "compareToIgnoreCase"
+            | "contains"
+            | "contentEquals"
+            | "equalsIgnoreCase"
+            | "indexOf"
+            | "lastIndexOf"
+            | "startsWith"
+            | "regionMatches"
+            | "subSequence"
+            | "toLowerCase"
+            | "toUpperCase"
+            | "trim"
+            | "strip"
+            | "stripLeading"
+            | "stripTrailing"
+            | "isBlank"
+            | "repeat"
+            | "replace"
+            | "split"
+            | "replaceAll"
+            | "replaceFirst"
+            | "matches"
+            | "getBytes"
+    ) {
+        return Ok(None);
+    }
     let Ok(this) = vm.heap.as_str(recv).map(str::to_string) else {
         return Ok(None);
     };
