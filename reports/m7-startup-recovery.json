@@ -1,0 +1,539 @@
+{
+  "schema_version": 1,
+  "recorded_utc": "2026-10-23T19:47:05.711068+00:00",
+  "stage": "M7 alpha owned startup-failure recovery; Mekorama remains unsupported",
+  "implementation_commit": "538e3c3873ab18e8b6a8ab6490e296d580b11b04",
+  "product_nro_sha256": "30ccaa96a276a94d3d93c4ee1d400866a7bef617472eba06450e659e175509be",
+  "verification": {
+    "host": "11 focused tests passed; two unchanged oracle tests ignored; three clippy commands passed",
+    "ryujinx": "passed four startup errors including unmodified Mekorama, Java/native/Java recovery, full console workflow validated from saved SD, and failed-onload live-worker exit/reboot boundary; see normal_boundary for separate status",
+    "physical_device": "startup recovery pending retest; prior display fix confirmed by user for bundled native sample",
+    "android_reference_device": "not_run"
+  },
+  "runs": {
+    "startup-failure": {
+      "schema_version": 1,
+      "physical_device": "not_run",
+      "sd_result": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-e2e-result-fdf11062a3e44adca5a4083e85fbdcf5",
+      "scenario": "startup-failure",
+      "status": "passed",
+      "emulator": {
+        "version": "1.3.3+e2143d4",
+        "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0"
+      },
+      "session_id": "fdf11062a3e44adca5a4083e85fbdcf5",
+      "backend": "ryujinx",
+      "expected_startup_errors": 4,
+      "completed_sessions": 3,
+      "external_apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+      "nro_sha256": "30ccaa96a276a94d3d93c4ee1d400866a7bef617472eba06450e659e175509be",
+      "pid": 185412
+    },
+    "startup-quiescence": {
+      "pid": 18124,
+      "nro_sha256": "30ccaa96a276a94d3d93c4ee1d400866a7bef617472eba06450e659e175509be",
+      "scenario": "startup-quiescence",
+      "backend": "ryujinx",
+      "session_id": "af410a47320540229adaf7a28342c493",
+      "next_boot_recovery": "passed",
+      "status": "passed",
+      "schema_version": 1,
+      "physical_device": "not_run",
+      "sd_result": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-e2e-result-af410a47320540229adaf7a28342c493",
+      "boundary": "process_exit_required"
+    },
+    "workflow": {
+      "nro_sha256": "30ccaa96a276a94d3d93c4ee1d400866a7bef617472eba06450e659e175509be",
+      "guest_report_status": "passed_execution",
+      "sd_result": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-e2e-result-9f6be525dd8f41d69bd640cf574dd7c0",
+      "physical_device": "not_run",
+      "session_id": "9f6be525dd8f41d69bd640cf574dd7c0",
+      "status": "passed",
+      "backend": "ryujinx",
+      "validation": "completed",
+      "scenario": "workflow",
+      "schema_version": 1,
+      "commands": 67,
+      "completed_sessions": 10,
+      "expected_api_errors": 1,
+      "emulator": {
+        "version": "1.3.3+e2143d4",
+        "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0"
+      },
+      "verification_method": "shared_validator_on_saved_SD_after_desktop_test_interruption",
+      "emulator_relaunched_for_validation": false
+    }
+  },
+  "normal_boundary": {
+    "status": "not_run_on_current_nro",
+    "reason": "Desktop testing stopped after user reported browser/Codex windows disappearing; no further emulator launch performed. Failed-onload worker boundary passed on this NRO; normal worker boundary retains separate prior-build evidence.",
+    "prior_evidence": "reports/m7-display-handoff.json; different NRO hash, not a current-build pass"
+  },
+  "desktop_incident": {
+    "evidence_type": "user_report",
+    "affected_apps": "browser and Codex",
+    "symptom": "windows disappeared while emulator testing; processes initially remained",
+    "user_action": "user later closed the affected processes; reopening declined",
+    "cause": "undetermined; no claim that Hidden, fullscreen, GPU or memory is the established cause",
+    "response": "emulator stopped, original SD folder restored, saved workflow validated without app launch; desktop E2E now requires explicit opt-in"
+  },
+  "startup_failures": [
+    {
+      "session_id": "fdf11062a3e44adca5a4083e85fbdcf5-1",
+      "package": "org.fixture.startupjava",
+      "error": "exception java.lang.ExceptionInInitializerError: dependency: libload-failure.so: dependency requires libunavailable-contract.so [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 1, regs: [0, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/startup/MainActivity;-><clinit>()V",
+      "teardown": [
+        {
+          "phase": "stop_requested",
+          "tick": 172713137
+        },
+        {
+          "phase": "native_activity_stop",
+          "tick": 173384918
+        },
+        {
+          "phase": "java_startup_abort",
+          "tick": 173440327
+        },
+        {
+          "phase": "media_thread_quiesce",
+          "tick": 173629764
+        },
+        {
+          "phase": "guest_thread_quiesce",
+          "tick": 173704613
+        },
+        {
+          "phase": "media_reset",
+          "tick": 173843043
+        },
+        {
+          "phase": "media_released",
+          "tick": 173901002
+        },
+        {
+          "phase": "activity_dispose",
+          "tick": 173943409
+        },
+        {
+          "phase": "runtime_drop",
+          "tick": 173990311
+        },
+        {
+          "phase": "native_resource_reset",
+          "tick": 175269290
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 175386047
+        },
+        {
+          "phase": "native_tls_reset",
+          "tick": 175592543
+        },
+        {
+          "phase": "native_resources_released",
+          "tick": 175622027
+        },
+        {
+          "phase": "runtime_closed",
+          "tick": 175767181
+        }
+      ]
+    },
+    {
+      "session_id": "fdf11062a3e44adca5a4083e85fbdcf5-2",
+      "package": "org.fixture.startupnative",
+      "error": "LIBRARY_NOT_FOUND [rd-vm]: dependency: libload-failure.so: dependency requires libunavailable-contract.so",
+      "teardown": [
+        {
+          "phase": "stop_requested",
+          "tick": 210183997
+        },
+        {
+          "phase": "native_activity_stop",
+          "tick": 210230615
+        },
+        {
+          "phase": "java_startup_abort",
+          "tick": 210254835
+        },
+        {
+          "phase": "media_thread_quiesce",
+          "tick": 210290369
+        },
+        {
+          "phase": "guest_thread_quiesce",
+          "tick": 210323946
+        },
+        {
+          "phase": "media_reset",
+          "tick": 210352753
+        },
+        {
+          "phase": "media_released",
+          "tick": 210378019
+        },
+        {
+          "phase": "activity_dispose",
+          "tick": 210403537
+        },
+        {
+          "phase": "runtime_drop",
+          "tick": 210431798
+        },
+        {
+          "phase": "native_resource_reset",
+          "tick": 210465185
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 210495375
+        },
+        {
+          "phase": "native_tls_reset",
+          "tick": 210601852
+        },
+        {
+          "phase": "native_resources_released",
+          "tick": 210640295
+        },
+        {
+          "phase": "runtime_closed",
+          "tick": 210679958
+        }
+      ]
+    },
+    {
+      "session_id": "fdf11062a3e44adca5a4083e85fbdcf5-3",
+      "package": "org.example.renamedstartup",
+      "error": "exception java.lang.ExceptionInInitializerError: dependency: libload-failure.so: dependency requires libunavailable-contract.so [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 1, regs: [0, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/startup/MainActivity;-><clinit>()V",
+      "teardown": [
+        {
+          "phase": "stop_requested",
+          "tick": 241371732
+        },
+        {
+          "phase": "native_activity_stop",
+          "tick": 241406257
+        },
+        {
+          "phase": "java_startup_abort",
+          "tick": 241422061
+        },
+        {
+          "phase": "media_thread_quiesce",
+          "tick": 241441466
+        },
+        {
+          "phase": "guest_thread_quiesce",
+          "tick": 241512570
+        },
+        {
+          "phase": "media_reset",
+          "tick": 241534688
+        },
+        {
+          "phase": "media_released",
+          "tick": 241554426
+        },
+        {
+          "phase": "activity_dispose",
+          "tick": 241573063
+        },
+        {
+          "phase": "runtime_drop",
+          "tick": 241597591
+        },
+        {
+          "phase": "native_resource_reset",
+          "tick": 241624024
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 241654406
+        },
+        {
+          "phase": "native_tls_reset",
+          "tick": 241727569
+        },
+        {
+          "phase": "native_resources_released",
+          "tick": 241748526
+        },
+        {
+          "phase": "runtime_closed",
+          "tick": 241779233
+        }
+      ]
+    },
+    {
+      "session_id": "fdf11062a3e44adca5a4083e85fbdcf5-4",
+      "package": "com.martinmagni.mekorama",
+      "error": "exception java.lang.ExceptionInInitializerError: dependency: libBarcodeScannerLib.so: dependency requires libstdc++.so [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 26419, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/martinmagni/mekorama/Mekorama;-><clinit>()V",
+      "teardown": [
+        {
+          "phase": "stop_requested",
+          "tick": 367462414
+        },
+        {
+          "phase": "native_activity_stop",
+          "tick": 367506666
+        },
+        {
+          "phase": "java_startup_abort",
+          "tick": 367524804
+        },
+        {
+          "phase": "media_thread_quiesce",
+          "tick": 367550027
+        },
+        {
+          "phase": "guest_thread_quiesce",
+          "tick": 367577616
+        },
+        {
+          "phase": "media_reset",
+          "tick": 367592302
+        },
+        {
+          "phase": "media_released",
+          "tick": 367611573
+        },
+        {
+          "phase": "activity_dispose",
+          "tick": 367628505
+        },
+        {
+          "phase": "runtime_drop",
+          "tick": 367647536
+        },
+        {
+          "phase": "native_resource_reset",
+          "tick": 369031599
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 369062248
+        },
+        {
+          "phase": "native_tls_reset",
+          "tick": 369116730
+        },
+        {
+          "phase": "native_resources_released",
+          "tick": 369141678
+        },
+        {
+          "phase": "runtime_closed",
+          "tick": 369179498
+        }
+      ]
+    }
+  ],
+  "following_sessions": [
+    {
+      "session_id": "fdf11062a3e44adca5a4083e85fbdcf5-5",
+      "package": "org.fixture.uiproof",
+      "status": "passed_execution",
+      "native_frames": 0,
+      "audio_frames": 0
+    },
+    {
+      "session_id": "fdf11062a3e44adca5a4083e85fbdcf5-6",
+      "package": "org.fixture.nativemedia",
+      "status": "passed_execution",
+      "native_frames": 449,
+      "audio_frames": 12000
+    },
+    {
+      "session_id": "fdf11062a3e44adca5a4083e85fbdcf5-7",
+      "package": "org.fixture.uiproof",
+      "status": "passed_execution",
+      "native_frames": 0,
+      "audio_frames": 0
+    }
+  ],
+  "failed_onload_live_worker": {
+    "error": "exception java.lang.ExceptionInInitializerError: JNI_OnLoad returned 0x0 [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 1, regs: [0, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/startup/MainActivity;-><clinit>()V; cleanup: NATIVE_NOT_QUIESCENT: -116; reopen homebrew",
+    "package": "org.fixture.startupworker",
+    "revision": 1,
+    "schema_version": 1,
+    "session_id": "af410a47320540229adaf7a28342c493-1",
+    "status": "failed"
+  },
+  "host": {
+    "framework": {
+      "passed": 4,
+      "ignored": 0,
+      "log_sha256": "646b5faaa01f8119b3f86fb218b19aa776d5cd87ccb1630e1d2583c1546f1d5c"
+    },
+    "core": {
+      "passed": 6,
+      "ignored": 2,
+      "log_sha256": "cd50a3991bdbd661714ef79e351705674750c78917eb97b2ae5d06e628c7d2ce"
+    },
+    "launcher": {
+      "passed": 1,
+      "ignored": 0,
+      "log_sha256": "5e81f37094d3f4cba7b7aee84cec52f944075bf2dd6a2420f94373d7bcd52b52"
+    }
+  },
+  "clippy_log_sha256": "21e655265b732e1a1c4aed4a082d0cf085c6b8d4cdad2e2b4d5538f101f837bd",
+  "device_build_log_sha256": "0bda39ca22ca29b2a3652171415c6ebce6143e8b493a534bad5b911bac94a2a6",
+  "device_clippy": "not_run: nightly cargo-clippy component unavailable; device release build passed",
+  "fixture_build": {
+    "api": 26,
+    "ndk": "28.2.13676358",
+    "apks": [
+      {
+        "file": "java.apk",
+        "sha256": "6602a2892777b986fbcc1e8c0f93d97cc2ed4f59bb837cb57ece142d65db8549"
+      },
+      {
+        "file": "native.apk",
+        "sha256": "dd1c72b1598644ec2b7ee2bd076a9c8e11e751bdd99defc8486cff3f8fcb859e"
+      },
+      {
+        "file": "renamed.apk",
+        "sha256": "1191de9798081734c9125741d974f1aa95d9fb2cfed8d658db14e6a3a6daacc5"
+      },
+      {
+        "file": "worker.apk",
+        "sha256": "83a9ac6fc356db9e2d28cbf47fe9f806092a9808abef5313e6ea6d8ed4c505e2"
+      }
+    ],
+    "build_tools": "35.0.0",
+    "schema_version": 1,
+    "sources": [
+      {
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\startup-failure\\dependency.c",
+        "sha256": "bea7bf68ee1a3bfebf94a26ca6599a6240726bdcf8ccf71651c34ccf32678acd"
+      },
+      {
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\startup-failure\\MainActivity.java",
+        "sha256": "042334a5fee193baa48568761e7505b1550adb4151d5986a763411ed0aec78bd"
+      },
+      {
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\startup-failure\\missing.c",
+        "sha256": "f65f1d95e5cfe622c78682e362880e220b0d252b0dfbdbf7e6ebf7897ada6ce4"
+      },
+      {
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\startup-failure\\worker.c",
+        "sha256": "a6fbfa804339eb33171d968f231b01d2ac7ba52ff9b7a5d5c575f1ff85179cb3"
+      },
+      {
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\scripts\\build-startup-failure-fixtures.ps1",
+        "sha256": "f9c3a557ce6575c0526df3d89d19775d05f4d8dd6a52318f735e6e9efdb8e461"
+      }
+    ]
+  },
+  "samples": [
+    {
+      "path": "local-artifacts/m5/fixture/java-ui.apk",
+      "sha256": "39c568280be3248058da636a80fad2378bca6e6a1496950bdcd273e36bba2d76"
+    },
+    {
+      "path": "local-artifacts/m5/fixture/kotlin-ui.apk",
+      "sha256": "34c9e552a70f48a629ad95399cf6b4c6a686139d7a1a0ef7557b60185514ae3b"
+    },
+    {
+      "path": "local-artifacts/m6/fixture/mixed-media.apk",
+      "sha256": "2ba8d1a3b7ca60f68cdc1fdc6347f62370ac0231a775956eea04b28afb53f27c"
+    },
+    {
+      "path": "local-artifacts/m6/fixture/native-media.apk",
+      "sha256": "540da2796c0e0bf941ba4ee22fa82a87f71fcdd75595007ce385bfa2795e877b"
+    }
+  ],
+  "sources": [
+    {
+      "path": "crates/as-framework/src/android.rs",
+      "sha256": "3fa6ec1af287e70017f3f898ad7db270cc00374eb28c4236ad81e90c76ad3756"
+    },
+    {
+      "path": "crates/as-framework/tests/lifecycle.rs",
+      "sha256": "d5fa9cea6732f745693079bec647d43ad65f432750076dc3d38c2287208bfb18"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/application.rs",
+      "sha256": "2b24f59b2459166d77d8a1ed657680ee3ef679bd9c07da86c2d13f5caf78ab6f"
+    },
+    {
+      "path": "platform/androswitch/main.c",
+      "sha256": "9d0136bb93ad7b31911dbc656b0a55b952395f1c07baa2d38dc21ae8264794a8"
+    },
+    {
+      "path": "scripts/test-ryujinx-launcher.ps1",
+      "sha256": "8192dee812612cc85d32e7fd131aae751d43e3aee8efb05ae0114953dd3bba15"
+    },
+    {
+      "path": "scripts/build-startup-failure-fixtures.ps1",
+      "sha256": "f9c3a557ce6575c0526df3d89d19775d05f4d8dd6a52318f735e6e9efdb8e461"
+    },
+    {
+      "path": "scripts/record-startup-recovery-evidence.py",
+      "sha256": "411a1a7c50eb9afdd9a1622e370c21948b68332d5f0c90cb6d794f99c761f150"
+    },
+    {
+      "path": "scripts/validate-launcher-report.ps1",
+      "sha256": "08104daa50c9edd25795800d25cf54948cd0edb0fa74980410e8c0cfb166641c"
+    },
+    {
+      "path": "scripts/verify-saved-launcher-run.ps1",
+      "sha256": "20b3fc1890eec337a8a6166e75e136cd0fad3c95b0dac054924fdd53f32c4652"
+    },
+    {
+      "path": "scripts/package-androswitch.ps1",
+      "sha256": "2fe440a83ac193325eb373a17b276aed01afd9c3761ecfc25b41bfa909134aaf"
+    },
+    {
+      "path": "fixtures/startup-failure/dependency.c",
+      "sha256": "bea7bf68ee1a3bfebf94a26ca6599a6240726bdcf8ccf71651c34ccf32678acd"
+    },
+    {
+      "path": "fixtures/startup-failure/MainActivity.java",
+      "sha256": "042334a5fee193baa48568761e7505b1550adb4151d5986a763411ed0aec78bd"
+    },
+    {
+      "path": "fixtures/startup-failure/missing.c",
+      "sha256": "f65f1d95e5cfe622c78682e362880e220b0d252b0dfbdbf7e6ebf7897ada6ce4"
+    },
+    {
+      "path": "fixtures/startup-failure/worker.c",
+      "sha256": "a6fbfa804339eb33171d968f231b01d2ac7ba52ff9b7a5d5c575f1ff85179cb3"
+    }
+  ],
+  "supplied_hardware_and_static_evidence": {
+    "path": "reports/mekorama-startup-20261024.json",
+    "sha256": "b7b50ef6c095c9a38835e6312dc8341338f278f67e379b3a62345993e4c99c03"
+  },
+  "reproduction_commands": [
+    "scripts/build-startup-failure-fixtures.ps1",
+    "scripts/build-androswitch.ps1",
+    "scripts/test-ryujinx-launcher.ps1 -AllowDesktopEmulator -Scenario startup-failure -ExternalApk D:/Download/mekorama-1-7-2.apk",
+    "scripts/test-ryujinx-launcher.ps1 -AllowDesktopEmulator -Scenario startup-quiescence",
+    "scripts/test-ryujinx-launcher.ps1 -AllowDesktopEmulator",
+    "scripts/test-ryujinx-launcher.ps1 -AllowDesktopEmulator -Scenario quiescence",
+    "scripts/verify-saved-launcher-run.ps1 -RunId 9f6be525dd8f41d69bd640cf574dd7c0",
+    "cargo test -p as-framework --features host --test lifecycle --locked -- --include-ignored",
+    "cargo test -p as-package -p as-native --locked",
+    "cargo test -p as-launcher --features host --test workflow --locked -- --include-ignored",
+    "cargo clippy -p as-framework --features host --all-targets --locked -- -D warnings",
+    "cargo clippy -p as-launcher -p as-package --features as-launcher/host --all-targets --locked -- -D warnings",
+    "cargo clippy -p as-switch-smoke --features host-cli --all-targets --locked -- -D warnings",
+    "cargo fmt --all -- --check",
+    "python scripts/check_md_links.py",
+    "git diff --check"
+  ],
+  "limitations": [
+    "Mekorama stops before graphics; no gameplay compatibility is claimed",
+    "The 64 MiB APK budget is unchanged; no large-APK memory validation is claimed",
+    "Host lifecycle tests cover cancellation; native ownership/thread boundaries require the NRO scenarios",
+    "No proprietary APK or extracted libraries are distributed",
+    "Synthetic Plus dispatch and PCM counters are emulator evidence, not physical controls/acoustic measurement",
+    "Full upstream VM/JVM regression corpus was not rerun; prior milestone reports retain that evidence",
+    "Supplied teardown/display traces lack session identity and are treated as earlier sample traces",
+    "Desktop window loss was reported during emulator testing; cause remains undetermined; no further emulator run was started"
+  ]
+}
