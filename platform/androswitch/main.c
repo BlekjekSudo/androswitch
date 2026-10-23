@@ -4,8 +4,43 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <switch.h>
 size_t __nx_heap_size = 256 * 1024 * 1024;
+static int tracing_teardown;
+static Mutex trace_mutex;
+static const char *last_phase;
+/* Each phase is closed/flushed independently, before executing the operation.
+ * This survives faults that never reach the Rust session report. */
+void as_teardown_phase(const char *phase) {
+  if (!__atomic_load_n(&tracing_teardown, __ATOMIC_ACQUIRE))
+    return;
+  mutexLock(&trace_mutex);
+  if (last_phase && !strcmp(last_phase, phase)) {
+    mutexUnlock(&trace_mutex);
+    return;
+  }
+  last_phase = phase;
+  FILE *file = fopen("sdmc:/switch/androswitch/logs/teardown.log", "ab");
+  if (file) {
+    fprintf(file, "{\"phase\":\"%s\",\"tick\":%" PRIu64 "}\n", phase,
+            armGetSystemTick());
+    fclose(file);
+  }
+  mutexUnlock(&trace_mutex);
+}
+static void begin_teardown(void) {
+  FILE *file = fopen("sdmc:/switch/androswitch/logs/teardown.log", "wb");
+  if (file)
+    fclose(file);
+  last_phase = NULL;
+  __atomic_store_n(&tracing_teardown, 1, __ATOMIC_RELEASE);
+  as_teardown_phase("stop_requested");
+}
+static void end_teardown(const char *phase) {
+  as_teardown_phase(phase);
+  __atomic_store_n(&tracing_teardown, 0, __ATOMIC_RELEASE);
+}
 void *as_host_alloc(size_t alignment, size_t size) {
   if (alignment < sizeof(void *))
     alignment = sizeof(void *);
@@ -84,7 +119,8 @@ static int open_framebuffer(Framebuffer *fb) {
 }
 static void teardown_timeout(void *argument) {
   UEvent *done = argument;
-  if (R_FAILED(waitSingle(waiterForUEvent(done), 4000000000))) {
+  /* Includes GPU retirement, two bounded joins and SD diagnostic writes. */
+  if (R_FAILED(waitSingle(waiterForUEvent(done), 10000000000))) {
     FILE *f =
         fopen("sdmc:/switch/androswitch/logs/teardown-failure.json", "wb");
     if (f) {
@@ -97,6 +133,7 @@ static void teardown_timeout(void *argument) {
   }
 }
 static int close_application(uint64_t app) {
+  begin_teardown();
   UEvent done;
   ueventCreate(&done, true);
   Thread watchdog;
@@ -112,6 +149,7 @@ static int close_application(uint64_t app) {
   ueventSignal(&done);
   threadWaitForExit(&watchdog);
   threadClose(&watchdog);
+  as_teardown_phase(result ? "stop_failed" : "runtime_closed");
   return result;
 }
 int main(int argc, char **argv) {
@@ -182,6 +220,9 @@ int main(int argc, char **argv) {
     int state = app ? as_runtime_step(app) : 0;
     padUpdate(&pad);
     u64 down = padGetButtonsDown(&pad);
+    /* Scripted E2E return requests exercise the same Plus dispatch as HID. */
+    if (state == 3)
+      down |= HidNpadButton_Plus;
     bool stop = app && (state < 0 || state == 1 || (!direct && state == 2) ||
                         (down & HidNpadButton_Plus));
     if (stop) {
@@ -195,7 +236,9 @@ int main(int argc, char **argv) {
       native = NULL;
       if (direct)
         break;
+      as_teardown_phase("launcher_refresh");
       as_shell_returned(shell, 1);
+      as_teardown_phase("launcher_framebuffer_open");
       if (open_framebuffer(&fb))
         break;
       framebuffer_open = true;
@@ -251,8 +294,11 @@ int main(int argc, char **argv) {
                   app ? as_runtime_capture(app) : as_shell_capture(shell));
     if (app)
       as_runtime_presented(app, checksum);
-    else
+    else {
       as_shell_presented(shell, checksum);
+      if (__atomic_load_n(&tracing_teardown, __ATOMIC_ACQUIRE))
+        end_teardown("launcher_ready");
+    }
   }
   if (framebuffer_open)
     framebufferClose(&fb);

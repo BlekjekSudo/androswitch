@@ -11,8 +11,8 @@ Implementation and verification are independent. `pending` is not a pass.
 | M3 | ARM64 ELF dependencies/relocations/TLS/constructors/Bionic, including stripped objects | supported subset implemented | passed native oracle/core tests | passed native execution in Ryujinx | not run |
 | M4 | DEX ↔ JNI ↔ native; references/strings/arrays/exceptions/callbacks/thread attach; Java/Kotlin mixed APK proof | implemented for proof gate | passed JVM JNI oracle | passed Java/C/Rust and Kotlin/C++ in Ryujinx | not run |
 | M5 | Activity/resources/layout/views/Canvas/Looper; interactive Java/Kotlin lifecycle | supported subset implemented | passed | passed, 14 UI snapshots | not run |
-| M6 | NativeActivity/assets/window/input/threading/EGL/GLES2/PCM audio | supported proof subset implemented | passed shared contracts; Android reference pending | passed native/mixed media corpus | not run |
-| M7 | Console launcher/verified session teardown; scan/install/launch/return/update/uninstall; one copy-ready folder | implemented for the alpha corpus | passed package workflow | passed 52-command workflow / ten completed sessions; boundary evidence in report | not run |
+| M6 | NativeActivity/assets/window/input/threading/EGL/GLES2/PCM audio | supported proof subset implemented | passed shared contracts; Android reference pending | passed native/mixed media corpus | user reports native triangle animation and beeps; see hardware feedback |
+| M7 | Console launcher/verified session teardown; scan/install/launch/return/update/uninstall; one copy-ready folder | implemented for the alpha corpus; hardware shutdown under investigation | passed package workflow | console workflow / ten completed sessions; boundary evidence in report | user reports install/open works, Plus crashes in native sample; fix retest pending |
 | M8 | SharedPreferences/native SQLite/reflection/collections/permissions; independent APK integration | planned | pending | pending | pending |
 | M9 | Offline v0.1 corpus/lifecycle stress/benchmarks/copy-ready package/evidence matrix | planned | pending | pending | pending |
 | M10 | DNS/socket/TLS/HTTP(S), Java/native networking and split APKs | planned | pending | pending | pending |
@@ -51,7 +51,8 @@ Java/native storage. M3 executes real ARM64 objects on Horizon and compares
 the supported native suite against Unicorn. M4 executes JNI in both directions,
 including Java/Kotlin, C/C++/Rust, exceptions, GC references and pthread callbacks.
 See [M2–M4 evidence and exact subset limits](M2_M4_E2E.md);
-physical-device testing remains pending at the user's request.
+physical-device proof of all M2–M4 scenarios remains pending. Later sample-level
+observations are tracked in [hardware feedback](HARDWARE_FEEDBACK.md).
 
 M5 now executes Java/Kotlin Activities and visible software UI in Ryujinx;
 see [M5 evidence](M5_UI_E2E.md). M6/M7 now integrate the supported native media

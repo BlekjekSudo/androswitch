@@ -5,6 +5,9 @@ the real upstream parsers/interpreter/heap with the portable adapters described
 in [M5](M5_UI_E2E.md) and [ADR 015](adr/015-portable-framework-and-session-boundary.md).
 Compact source-pinned results live in `reports/m6-m7.json`; generated full
 reports, captures and stdout remain under ignored `local-artifacts/`.
+Follow-up hardware observations and shutdown/install changes are tracked in
+[hardware feedback](HARDWARE_FEEDBACK.md); their regression evidence is separate
+from the original source-pinned `reports/m6-m7.json` baseline.
 
 ## What the product implements
 
@@ -68,7 +71,8 @@ The build is serialized with one Cargo job; generated APKs are not source files.
 ./scripts/test-ryujinx-media.ps1
 ./scripts/test-ryujinx-launcher.ps1
 ./scripts/test-ryujinx-launcher.ps1 -Scenario quiescence
-./scripts/package-androswitch.ps1
+python scripts/record-hardware-feedback-evidence.py --implementation-commit (git rev-parse HEAD)
+./scripts/package-androswitch.ps1 -EvidencePath reports/m7-hardware-feedback.json
 ```
 
 The launcher test temporarily moves an existing `sdcard/switch/androswitch`
@@ -77,7 +81,7 @@ folder to a checked sibling backup, uses a fresh folder, then restores it in
 PID. Retained test SD output is named `androswitch-e2e-result-<session>`.
 Tests never reset unrelated emulator data or the user's package saves.
 
-The 52-command console workflow checks installation, a corrupt APK failure,
+The console workflow (52 commands in the original baseline) checks installation, a corrupt APK failure,
 ten completed app sessions, a named missing-service failure, repeated native
 media teardown/reopen, restart/save retention, update, uninstall/reinstall,
 cancelled deletion and explicit data clearing. It compares hashes after actual
@@ -118,8 +122,10 @@ the compact report record exact commands and artifacts.
   input. This is not physical Joy-Con/touchscreen verification.
 - **Android reference device/emulator:** not run for these framework/media APKs.
   JVM comparisons cover the stated VM/JNI semantics, not Android framework APIs.
-- **Physical Switch:** not run, at the user's request; packaged samples provide
-  a starting point. Suspend/resume/docked/audio/memory validation remains M12.
+- **Physical Switch:** the user reports all four samples install/open and native
+  graphics/beeps work; Plus crashes in the native sample. The candidate fix is
+  pending hardware retest. See the dated hardware feedback; the original baseline
+  did not include device runs. Suspend/resume/docked/memory validation remains M12.
 - **Corpus:** original SDK/NDK fixtures; frozen external NDK samples and Vector
   Pinball remain independent pending targets. NativeActivity FD watchers/full
   native_app_glue, arbitrary apps, modern engines, Compose and WebView are not

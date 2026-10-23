@@ -31,7 +31,7 @@ fn console_install_launch_update_failure_remove_and_clear_data() {
     assert_eq!(shell.snapshot().tab, Tab::Apks);
     shell.key(Key::Accept);
     assert_eq!(shell.snapshot().installed.len(), 1);
-    shell.key(Key::Left);
+    assert_eq!(shell.snapshot().tab, Tab::Installed);
     let first = shell.key(Key::Accept).unwrap();
     assert_eq!(first.package, "org.fixture.uiproof");
     fs::write_all(
@@ -43,8 +43,11 @@ fn console_install_launch_update_failure_remove_and_clear_data() {
     shell.key(Key::Right);
     shell.key(Key::Accept);
     let revision = shell.snapshot().installed[0].revision;
-    assert!(revision > first.revision);
+    assert_eq!(revision, first.revision);
+    assert!(shell.snapshot().message.contains("Already installed"));
+    assert_eq!(shell.key(Key::Accept).unwrap().revision, revision);
     fs::write_all(fs.as_ref(), "apks/a.apk", b"broken").unwrap();
+    shell.key(Key::Right);
     shell.key(Key::Accept);
     assert_eq!(shell.snapshot().installed[0].revision, revision);
     assert!(shell.snapshot().message.contains("INVALID_APK"));
@@ -62,7 +65,6 @@ fn console_install_launch_update_failure_remove_and_clear_data() {
     fs::write_all(fs.as_ref(), "apks/a.apk", &bytes).unwrap();
     shell.key(Key::Right);
     shell.key(Key::Accept);
-    shell.key(Key::Left);
     shell.key(Key::ClearData);
     shell.key(Key::Accept);
     assert!(fs

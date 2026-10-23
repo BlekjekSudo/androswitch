@@ -136,6 +136,45 @@ fn failed_updates_preserve_previous_committed_apk_and_data() {
     assert!(successes > 0);
 }
 #[test]
+fn identical_updates_reuse_verified_installation_without_writes() {
+    let fs = FaultFs {
+        fs: HostFileSystem::new(root("identical")).unwrap(),
+        fail: Rc::new(Cell::new(None)),
+        count: Rc::new(Cell::new(0)),
+    };
+    let pm = PackageManager::new(fs.clone());
+    let bytes = apk("org.fixture.one", 1);
+    let first = pm.install(bytes.clone(), false, None).unwrap();
+    fs.count.set(0);
+    fs.fail.set(Some(0));
+    assert_eq!(pm.install(bytes.clone(), true, None).unwrap(), first);
+    assert_eq!(
+        fs.count.get(),
+        0,
+        "identical update must not write SD storage"
+    );
+    assert_eq!(
+        pm.install(bytes.clone(), false, None).unwrap_err().code,
+        "ALREADY_INSTALLED"
+    );
+    fs.fail.set(None);
+    let path = format!(
+        "installed/{}/{:020}/package.apk",
+        first.package, first.revision
+    );
+    fs::write_all(&fs, &path, b"damaged").unwrap();
+    assert_eq!(
+        pm.install(bytes.clone(), true, None).unwrap_err().code,
+        "INSTALLATION_CORRUPT"
+    );
+    assert_eq!(pm.latest(&first.package).unwrap().unwrap(), first);
+    fs::write_all(&fs, &path, &bytes).unwrap();
+    pm.uninstall(&first.package).unwrap();
+    let reinstalled = pm.install(bytes, true, None).unwrap();
+    assert!(reinstalled.revision > first.revision);
+    assert_eq!(pm.load(&first.package, None).unwrap().0, reinstalled);
+}
+#[test]
 fn copied_apks_restart_isolation_aliases_and_uninstall_retention() {
     let path = root("persist");
     let fs = HostFileSystem::new(&path).unwrap();

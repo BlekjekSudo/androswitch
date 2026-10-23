@@ -245,12 +245,26 @@ impl Shell {
                             &format!("apks/{file}"),
                             APK_MEMORY_LIMIT,
                         )?;
+                        let before = self.installed.clone();
                         let record =
                             PackageManager::new(self.fs.clone()).install(bytes, true, None)?;
                         self.refresh()?;
+                        self.tab = Tab::Installed;
+                        self.selected = self
+                            .installed
+                            .iter()
+                            .position(|r| r.package == record.package)
+                            .unwrap_or(0);
+                        self.details = false;
+                        let unchanged = before.iter().any(|r| r == &record);
                         self.message = format!(
-                            "Installed {} / revision {}",
-                            record.package, record.revision
+                            "{} / rev {}. A: open",
+                            if unchanged {
+                                "Already installed"
+                            } else {
+                                "Installed"
+                            },
+                            record.revision
                         );
                     }
                 }

@@ -28,6 +28,7 @@ extern "C" {
     fn as_media_audio_frames() -> u64;
     fn as_native_quiesce(timeout: u64) -> i32;
     fn as_native_reset() -> i32;
+    fn as_teardown_phase(phase: *const core::ffi::c_char);
     fn as_audio_open(rate: i32, channels: i32, format: i32) -> i64;
     fn as_audio_start(id: u64) -> i32;
     fn as_audio_write(id: u64, data: *const u8, frames: usize, timeout: i64) -> i64;
@@ -113,6 +114,7 @@ pub(crate) enum Event {
     Key { code: i32 },
     Gc,
     Frame,
+    ReturnToLauncher,
 }
 struct Running {
     app: App,
@@ -139,6 +141,13 @@ fn save_error(message: &str) {
         )
         .unwrap_or_default();
         let _ = fs::write_all(&fs, "logs/session-report.json", &data);
+    }
+}
+fn phase(name: &core::ffi::CStr) {
+    // SAFETY: static NUL-terminated phase strings are copied synchronously by C.
+    #[allow(unsafe_code)]
+    unsafe {
+        as_teardown_phase(name.as_ptr());
     }
 }
 fn open() -> Result<Running, String> {
@@ -276,7 +285,7 @@ impl Running {
                 self.app.vm.gc();
                 Ok(())
             }
-            Event::Frame | Event::Wait { .. } => Ok(()),
+            Event::Frame | Event::Wait { .. } | Event::ReturnToLauncher => Ok(()),
         };
         result.map_err(|e| e.to_string())?;
         self.app.draw().map_err(|e| e.to_string())
@@ -301,7 +310,11 @@ impl Running {
                         .map_err(|e| e.to_string())?;
                     self.reported = true;
                 }
-                return Ok(2);
+                return Ok(if matches!(events.last(), Some(Event::ReturnToLauncher)) {
+                    3
+                } else {
+                    2
+                });
             }
             let event = events[self.cursor].clone();
             if let Event::Wait { ms } = event {
@@ -427,6 +440,7 @@ pub unsafe extern "C" fn as_runtime_input(token: u64, kind: i32, a: f32, b: f32)
 #[no_mangle]
 pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
     let mut running = unsafe { Box::from_raw(token as *mut Running) };
+    phase(c"native_activity_stop");
     if running.native_activity != 0 {
         let rc = unsafe { as_activity_stop(running.native_activity) };
         if rc != 0 {
@@ -437,18 +451,21 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
     }
     // Java lifecycle may invoke native code or create threads too. Deliver it
     // before the final quiescence check, then release the VM lease while joining.
+    phase(c"java_activity_stop");
     device_jni::lock();
     let stopped = running.app.android.stop(&mut running.app.vm);
     device_jni::unlock();
     if let Err(error) = stopped {
         save_error(&alloc::format!("ACTIVITY_STOP_ERROR: {error}"));
     }
+    phase(c"media_thread_quiesce");
     let media_threads = unsafe { as_media_quiesce() };
     if media_threads != 0 {
         save_error("MEDIA_CALLBACK_NOT_QUIESCENT: reopen homebrew");
         core::mem::forget(running);
         return -1;
     }
+    phase(c"guest_thread_quiesce");
     let rc = unsafe { as_native_quiesce(2_000_000_000) };
     if rc != 0 {
         save_error(&alloc::format!(
@@ -465,11 +482,31 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
         core::mem::forget(running);
         return -1;
     }
+    phase(c"activity_dispose");
     unsafe { as_activity_dispose(running.native_activity) };
     if let Some(native) = &running.native {
         native.close_vm();
         native.release_root();
     }
+    // Ordinary interactive sessions also need a report; otherwise the shell
+    // can display a stale result from a previous APK. Preserve any named error.
+    let fs = running.fs.clone();
+    let final_report = if running.request.events.is_none() {
+        fs::read_all(fs.as_ref(), "logs/session-report.json", 1 << 20)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+            .filter(|report| report["status"] == "running")
+            .and_then(|mut report| {
+                report["status"] = "stopping".into();
+                let bytes = serde_json::to_vec(&report).ok()?;
+                let _ = fs::write_all(fs.as_ref(), "logs/session-report.json", &bytes);
+                report["status"] = "stopped".into();
+                serde_json::to_vec(&report).ok()
+            })
+    } else {
+        None
+    };
+    phase(c"runtime_drop");
     drop(running);
     device_jni::unlock();
     let rc = unsafe { as_native_reset() };
@@ -477,6 +514,8 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
         save_error(&alloc::format!(
             "NATIVE_RESOURCE_RESET_FAILED: {rc}; reopen homebrew"
         ));
+    } else if let Some(bytes) = final_report {
+        let _ = fs::write_all(fs.as_ref(), "logs/session-report.json", &bytes);
     }
     rc
 }

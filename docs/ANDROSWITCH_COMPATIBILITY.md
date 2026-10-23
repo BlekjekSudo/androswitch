@@ -39,8 +39,10 @@ NDK services need additional implementation. See [M2–M4 coverage and
 reproduction](M2_M4_E2E.md). Native session roots remain alive until M7 proves
 thread/media quiescence, then are released with JNI tables, TLS and mappings.
 `asctl` execution flags describe its inspection/package host facade; product-NRO
-evidence is listed separately. Physical
-Switch verification remains pending. See [M0 baseline](M0_BASELINE.md) for the
+evidence is listed separately. The user reports bundled sample execution and
+native animation/beeps on a real Switch, but native Plus crashes; full scenario
+verification and the candidate fix's hardware retest remain pending. See
+[hardware feedback](HARDWARE_FEEDBACK.md) and [M0 baseline](M0_BASELINE.md) for the
 passing AndroSwitch checks and failing immutable-upstream reference tests.
 
 M6/M7's exact subset and negative boundary tests are in [M6/M7](M6_M7_E2E.md).

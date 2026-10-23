@@ -381,6 +381,13 @@ static EGLContext guest_context(EGLDisplay d, EGLConfig config,
 }
 static EGLBoolean guest_make_current(EGLDisplay d, EGLSurface draw,
                                      EGLSurface read, EGLContext c) {
+  if (bound_context && c == EGL_NO_CONTEXT) {
+    /* An EGL swap submits asynchronously. Finish on the owning thread before
+     * its context/surface and Nouveau channel can be destroyed. */
+    as_teardown_phase("egl_wait_gpu");
+    glFinish();
+    as_teardown_phase("egl_unbind");
+  }
   EGLBoolean ok = eglMakeCurrent(d, draw, read, c);
   if (ok) {
     mutexLock(&graphics_mutex);
@@ -394,6 +401,7 @@ static EGLBoolean guest_make_current(EGLDisplay d, EGLSurface draw,
   return ok;
 }
 static EGLBoolean guest_destroy_surface(EGLDisplay d, EGLSurface s) {
+  as_teardown_phase("egl_destroy_surface");
   EGLBoolean ok = eglDestroySurface(d, s);
   if (ok)
     for (unsigned i = 0; i < 16; i++)
@@ -402,6 +410,7 @@ static EGLBoolean guest_destroy_surface(EGLDisplay d, EGLSurface s) {
   return ok;
 }
 static EGLBoolean guest_destroy_context(EGLDisplay d, EGLContext c) {
+  as_teardown_phase("egl_destroy_context");
   EGLBoolean ok = eglDestroyContext(d, c);
   if (ok)
     for (unsigned i = 0; i < 16; i++)
@@ -465,9 +474,11 @@ static EGLBoolean guest_swap(EGLDisplay d, EGLSurface s) {
 static EGLBoolean guest_terminate(EGLDisplay d) {
   if (current_bindings)
     return EGL_FALSE;
+  as_teardown_phase("egl_terminate");
   EGLBoolean ok = eglTerminate(d);
   if (ok)
     display = 0;
+  as_teardown_phase("egl_terminated");
   return ok;
 }
 static uint64_t media_lookup(const char *name);
@@ -749,12 +760,22 @@ int as_activity_start(AsActivity *a) {
   return 0;
 }
 int as_activity_stop(AsActivity *a) {
-  int rc;
-  if ((rc = activity_callback(a, 6, 0)) || (rc = activity_callback(a, 3, 0)) ||
-      (rc = activity_callback(a, 10, (uint64_t)&window_token)) ||
-      (rc = activity_callback(a, 12, (uint64_t)&queue_token)) ||
-      (rc = activity_callback(a, 4, 0)) || (rc = activity_callback(a, 5, 0)))
-    return failure(rc);
+  const struct {
+    unsigned slot;
+    uint64_t argument;
+    const char *phase;
+  } callbacks[] = {{6, 0, "activity_focus_lost"},
+                   {3, 0, "activity_pause"},
+                   {10, (uint64_t)&window_token, "activity_window_destroy"},
+                   {12, (uint64_t)&queue_token, "activity_input_destroy"},
+                   {4, 0, "activity_stop"},
+                   {5, 0, "activity_destroy"}};
+  for (unsigned i = 0; i < sizeof(callbacks) / sizeof(callbacks[0]); i++) {
+    as_teardown_phase(callbacks[i].phase);
+    int rc = activity_callback(a, callbacks[i].slot, callbacks[i].argument);
+    if (rc)
+      return failure(rc);
+  }
   return 0;
 }
 void as_activity_dispose(AsActivity *a) {
@@ -801,6 +822,7 @@ static int guest_usleep(unsigned micros) {
   return 0;
 }
 int as_media_reset(void) {
+  as_teardown_phase("media_reset");
   extern void as_sl_reset(void);
   as_sl_reset();
   if (current_bindings || window_refs || looper_refs > 1)
@@ -838,6 +860,7 @@ int as_media_reset(void) {
   owner = NULL;
   media_failure = finish_requested = 0;
   submitted_frames = played_frames = 0;
+  as_teardown_phase("media_released");
   return 0;
 }
 int as_media_library(const char *name) {

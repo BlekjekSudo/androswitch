@@ -102,6 +102,13 @@ impl Launcher {
             .map_err(|e| e.to_string())?;
         fs::write_all(self.fs.as_ref(), "logs/pending-session.json", &bytes)
             .map_err(|e| e.to_string())?;
+        let report = serde_json::json!({"schema_version":1,"status":"running","session_id":session,"package":selection.package,"revision":selection.revision});
+        fs::write_all(
+            self.fs.as_ref(),
+            "logs/session-report.json",
+            &serde_json::to_vec(&report).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
         self.launch = Some(selection);
         Ok(())
     }
@@ -240,7 +247,14 @@ pub unsafe extern "C" fn as_shell_returned(token: u64, success: i32) {
     let l = unsafe { &mut *(token as *mut Launcher) };
     l.launch = None;
     if let Ok(bytes) = fs::read_all(l.fs.as_ref(), "logs/session-report.json", 1 << 20) {
-        if let Ok(report) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+        if let Ok(mut report) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+            if let Ok(trace) = fs::read_all(l.fs.as_ref(), "logs/teardown.log", 64 << 10) {
+                let phases: Vec<serde_json::Value> = trace
+                    .split(|b| *b == b'\n')
+                    .filter_map(|line| serde_json::from_slice(line).ok())
+                    .collect();
+                report["teardown"] = phases.into();
+            }
             if report["status"] == "failed" {
                 l.shell
                     .message(format!("Launch failed: {}", report["error"]));

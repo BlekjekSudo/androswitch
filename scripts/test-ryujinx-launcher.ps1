@@ -1,8 +1,28 @@
 param([string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',[string]$RyujinxProfile="$env:APPDATA/Ryujinx",[int]$TimeoutSeconds=300,[ValidateSet('workflow','quiescence')][string]$Scenario='workflow')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path -Parent $PSScriptRoot
+$runStarted=[DateTime]::UtcNow
+function Stop-TestProcess([Diagnostics.Process]$OwnedProcess){
+  if(-not $OwnedProcess){return}
+  # Ryujinx can restart itself in a child with the same NRO. Track ancestry,
+  # creation time and executable/request identity; never stop unrelated sessions.
+  $ownedIds=[Collections.Generic.HashSet[int]]::new();$null=$ownedIds.Add($OwnedProcess.Id)
+  for($attempt=0;$attempt -lt 3;$attempt++){
+    $candidates=@(Get-CimInstance Win32_Process -Filter "Name='Ryujinx.exe'" | Where-Object {Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue})
+    do{
+      $added=$false
+      foreach($candidate in $candidates){
+        if($ownedIds.Contains([int]$candidate.ParentProcessId) -and -not $ownedIds.Contains([int]$candidate.ProcessId) -and $candidate.CreationDate.ToUniversalTime() -ge $runStarted -and $candidate.ExecutablePath -eq [IO.Path]::GetFullPath($Ryujinx) -and $candidate.CommandLine.Replace('/','\').Contains($nro.Replace('/','\'))){$null=$ownedIds.Add([int]$candidate.ProcessId);$added=$true}
+      }
+    }while($added)
+    foreach($candidate in $candidates){if($candidate.ProcessId -ne $OwnedProcess.Id -and $ownedIds.Contains([int]$candidate.ProcessId)){Stop-Process -Id $candidate.ProcessId -ErrorAction SilentlyContinue}}
+    if(-not $OwnedProcess.HasExited){$OwnedProcess.Kill();$null=$OwnedProcess.WaitForExit(15000)}
+    Start-Sleep -Milliseconds 100
+  }
+}
 $preflightDeadline=[DateTime]::UtcNow.AddSeconds(3)
-do{$existing=@(Get-CimInstance Win32_Process -Filter "Name='Ryujinx.exe'");if(-not $existing.Count){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $preflightDeadline)
+# CIM can retain a terminated updater child after the PID has disappeared.
+do{$existing=@(Get-CimInstance Win32_Process -Filter "Name='Ryujinx.exe'" | Where-Object {Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue});if(-not $existing.Count){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $preflightDeadline)
 if($existing.Count){throw 'Close the existing Ryujinx session before this isolated E2E run.'}
 $id=[guid]::NewGuid().ToString('N');$run=Join-Path $projectRoot "local-artifacts/m7/runs/$id"
 $switchRoot=[IO.Path]::GetFullPath((Join-Path $RyujinxProfile 'sdcard/switch'))
@@ -20,12 +40,12 @@ try{
   $commands=[Collections.Generic.List[object]]::new()
   function Key([string]$Value){$commands.Add(@{kind='key';key=$Value})}
   function OpenApp([object[]]$Events){$commands.Add(@{kind='open';events=$Events})}
-  $commands.Add(@{kind='frame'});Key right
-  for($i=0;$i -lt 6;$i++){Key accept;if($i -lt 5){Key down}}
+  $commands.Add(@{kind='frame'})
+  for($i=0;$i -lt 6;$i++){Key right;for($row=0;$row -lt $i;$row++){Key down};Key accept}
   Key left
   $java=(Get-Content "$projectRoot/local-artifacts/m5/fixture/java-request.json" -Raw | ConvertFrom-Json).events
   $kotlin=(Get-Content "$projectRoot/local-artifacts/m5/fixture/kotlin-request.json" -Raw | ConvertFrom-Json).events
-  $native=@(@{kind='wait';ms=10000},@{kind='touch';action=0;x=100;y=100},@{kind='touch';action=1;x=100;y=100},@{kind='wait';ms=4000})
+  $native=@(@{kind='wait';ms=10000},@{kind='touch';action=0;x=100;y=100},@{kind='touch';action=1;x=100;y=100},@{kind='wait';ms=4000},@{kind='return_to_launcher'})
   OpenApp $java
   OpenApp @(@{kind='wait';ms=1500})
   Key down;OpenApp $kotlin
@@ -36,14 +56,14 @@ try{
   Key down;OpenApp @(@{kind='frame'})
   for($i=0;$i -lt 4;$i++){Key up}
   Key remove;Key back;Key remove;Key accept
-  Key right;Key accept;Key left;OpenApp @(@{kind='wait';ms=1500})
-  Key right;Key accept;Key left;OpenApp @(@{kind='wait';ms=1500})
+  Key right;Key accept;OpenApp @(@{kind='wait';ms=1500})
+  Key right;Key accept;OpenApp @(@{kind='wait';ms=1500})
   Key clear_data;Key accept;OpenApp @(@{kind='wait';ms=1500})
   Key details;Key back;$commands.Add(@{kind='frame'})
   if($Scenario -eq 'quiescence'){
     foreach($file in Get-ChildItem "$root/apks" -File){Remove-Item -LiteralPath $file.FullName}
     Copy-Item "$projectRoot/local-artifacts/m6/fixture/nonquiescent.apk" "$root/apks/01-nonquiescent.apk"
-    $commands.Clear();Key right;Key accept;Key left;OpenApp @(@{kind='wait';ms=50})
+    $commands.Clear();Key right;Key accept;OpenApp @(@{kind='wait';ms=50})
   }
   @{schema_version=1;session_id=$id;commands=@($commands.ToArray())} | ConvertTo-Json -Depth 20 | Set-Content "$root/runtime/launcher-test.json" -Encoding utf8NoBOM
   Copy-Item "$root/runtime/launcher-test.json" "$run/launcher-test.json"
@@ -63,9 +83,7 @@ try{
     if(Test-Path "$root/logs/launcher-report.json"){throw 'Unsafe worker returned to a completed launcher workflow'}
     if(Test-Path "$root/runtime/launch.json"){throw 'Launch request was not consumed; crash recovery would relaunch the same APK'}
     Copy-Item "$root/logs/session-report.json" "$run/expected-stop-failure.json"
-    # Use the exact process object returned by this run's Start-Process. This
-    # retains ownership even when Windows reports a different resolved path.
-    if(-not $process.HasExited){$process.Kill();$null=$process.WaitForExit(15000)}
+    Stop-TestProcess $process
     @{schema_version=1;session_id="$id-recovery";commands=@(@{kind='frame'})} | ConvertTo-Json -Depth 8 | Set-Content "$root/runtime/launcher-test.json" -Encoding utf8NoBOM
     $process=Start-Process -FilePath $Ryujinx -ArgumentList @($nro) -WorkingDirectory (Split-Path -Parent $Ryujinx) -WindowStyle Hidden -RedirectStandardOutput "$run/recovery.stdout.log" -RedirectStandardError "$run/recovery.stderr.log" -PassThru
     $deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds);$recovery=$null
@@ -90,19 +108,27 @@ try{
   $javaRuns=@($successful | Where-Object package -eq 'org.fixture.uiproof')
   $lastTexts=@($javaRuns | ForEach-Object {($_.snapshots[-1].views | Where-Object text | ForEach-Object text) -join ' | '})
   if($javaRuns.Count -ne 5 -or $lastTexts[1] -notmatch 'Ready 1 / app 1' -or $lastTexts[2] -notmatch 'Ready 1 / app 1' -or $lastTexts[3] -notmatch 'Ready 1 / app 1' -or $lastTexts[4] -notmatch 'Ready 0 / app 1'){throw "Save/update/uninstall/restart mismatch: $lastTexts"}
+  if($javaRuns[2].revision -ne $javaRuns[3].revision){throw 'Identical APK reinstall created a new revision'}
+  if(-not ($result.snapshots | Where-Object {$_.shell.tab -eq 'installed' -and $_.shell.message -match 'Already installed'})){throw 'Identical install did not immediately select the installed app'}
   $mixed=@($successful | Where-Object package -eq 'org.fixture.mixedmedia')[0]
   if(-not ($mixed.snapshots[-1].views | Where-Object text -eq 'Mixed assets 150000 / Java PCM 4800 / native 2400 / SL 4800')){throw 'Mixed Java/JNI asset/audio mismatch'}
   if($mixed.snapshots[-1].audio_frames -ne 9600){throw 'Shared PCM backend frame count mismatch'}
-  foreach($nativeRun in @($successful | Where-Object package -eq 'org.fixture.nativemedia')){if($nativeRun.snapshots[-1].native_frames -lt 31 -or $nativeRun.snapshots[-1].audio_frames -ne 12000){throw 'Repeated native session/reset mismatch'}}
+  foreach($nativeRun in @($successful | Where-Object package -eq 'org.fixture.nativemedia')){
+    if($nativeRun.snapshots[-1].native_frames -lt 31 -or $nativeRun.snapshots[-1].audio_frames -ne 12000){throw 'Repeated native session/reset mismatch'}
+    foreach($phase in @('egl_wait_gpu','egl_terminated','guest_thread_joined','native_resources_released','runtime_closed')){if($phase -notin $nativeRun.teardown.phase){throw "Native Plus shutdown did not complete $phase"}}
+  }
   $media=Get-Content "$root/userdata/org.fixture.nativemedia/files/media.json" -Raw | ConvertFrom-Json
   if($media.gl_ok -ne 1 -or $media.readback_ok -ne 1 -or $media.asset_ok -ne 1 -or $media.tls -ne 73 -or $media.input -lt 2 -or $media.audio_frames -ne 12000){throw 'Guest rendering/full-frame readback/asset/thread/input proof mismatch'}
   Copy-Item "$root/userdata/org.fixture.nativemedia/files/media.json" "$run/guest-media.json"
   if(Test-Path "$root/logs/pending-session.json"){throw 'Clean workflow left an interrupted-session marker'}
+  $trace=Get-Content "$root/logs/teardown.log" | ForEach-Object {$_ | ConvertFrom-Json}
+  if($trace[-1].phase -ne 'launcher_ready'){throw 'Teardown did not reach a presented launcher framebuffer'}
+  Copy-Item "$root/logs/teardown.log" "$run/teardown.log"
   Copy-Item "$root/logs/launcher-report.json" "$run/emulator.json";Copy-Item "$root/logs/last-frame.ppm" "$run/launcher.ppm"
   $receipt.status='passed';$receipt.commands=$commands.Count;$receipt.completed_sessions=$successful.Count;$receipt.expected_api_errors=$failed.Count;$receipt.nro_sha256=(Get-FileHash $nro).Hash.ToLowerInvariant();$receipt.emulator=@{version=(Get-Item $Ryujinx).VersionInfo.ProductVersion;sha256=(Get-FileHash $Ryujinx).Hash.ToLowerInvariant()}
   Write-Output "M7 one-NRO launcher E2E passed: $run/verification.json"
 }catch{$receipt.status='failed';$receipt.error=$_.Exception.Message;throw}finally{
-  if($process -and -not $process.HasExited){$process.Kill();$null=$process.WaitForExit(15000)}
+  Stop-TestProcess $process
   if(Test-Path $root){Move-Item -LiteralPath $root -Destination $resultRoot}
   if($moved -and (Test-Path $backup)){Move-Item -LiteralPath $backup -Destination $root}
   $receipt | ConvertTo-Json -Depth 12 | Set-Content "$run/verification.json" -Encoding utf8NoBOM

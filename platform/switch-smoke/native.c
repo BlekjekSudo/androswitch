@@ -24,6 +24,7 @@ typedef struct Mapping {
 static Handle own_process;
 static Mapping *mappings;
 static Mutex resource_mutex;
+__attribute__((weak)) void as_teardown_phase(const char *phase) { (void)phase; }
 typedef struct GuestAllocation {
   void *pointer;
   size_t size;
@@ -244,6 +245,7 @@ void as_native_release(uint64_t token) {
   Mapping *m = (void *)token;
   if (!m)
     return;
+  as_teardown_phase("native_mapping_release");
   if (m->mapped && m->executable) {
     size_t pages = m->size / 4096, at = 0;
     while (at < pages) {
@@ -428,6 +430,7 @@ static int guest_pthread_join(uint64_t handle, void **result) {
   }
   found->joining = 1;
   mutexUnlock(&resource_mutex);
+  as_teardown_phase("guest_thread_join");
   Result rc = threadWaitForExit(&thread->thread);
   if (R_FAILED(rc))
     return EINVAL;
@@ -442,6 +445,7 @@ static int guest_pthread_join(uint64_t handle, void **result) {
     *link = thread->next;
   mutexUnlock(&resource_mutex);
   free(thread);
+  as_teardown_phase("guest_thread_joined");
   return 0;
 }
 static uint64_t guest_pthread_self(void) {
@@ -583,6 +587,7 @@ int as_native_quiesce(uint64_t timeout_ns) {
   }
 }
 int as_native_reset(void) {
+  as_teardown_phase("native_resource_reset");
   if (guest_threads)
     return -EBUSY;
   extern int as_bionic_sync_reset(void);
@@ -600,6 +605,7 @@ int as_native_reset(void) {
     guest_free(guest_allocations->pointer);
   extern void as_bionic_io_reset(void);
   as_bionic_io_reset();
+  as_teardown_phase("native_tls_reset");
   while (context.emulated) {
     EmulatedTls *e = context.emulated;
     context.emulated = e->next;
@@ -615,6 +621,7 @@ int as_native_reset(void) {
     svcCloseHandle(own_process);
     own_process = 0;
   }
+  as_teardown_phase("native_resources_released");
   return 0;
 }
 uint64_t as_native_import(const char *name) {

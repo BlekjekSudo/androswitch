@@ -15,3 +15,5 @@ void as_native_fail(int code);
 void as_native_trap(int code);
 void as_jni_vm_lock(void);
 void as_jni_vm_unlock(void);
+/* Product overrides the no-op implementation to persist shutdown phases. */
+void as_teardown_phase(const char *phase);

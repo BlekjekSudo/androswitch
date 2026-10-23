@@ -17,12 +17,14 @@ See [credits and provenance](CREDITS.md) and [NOTICE](NOTICE.md).
 installs, updates and launches supported APKs using the shared RustyDroid
 interpreter and native ARM64 backend. Java/Kotlin UI, NativeActivity GLES2,
 assets, PCM audio and repeated application switching have Ryujinx evidence.
-Physical Switch testing is pending. This is not the v0.1 compatibility release.
+The user reports that the four bundled APKs open on a physical Switch, including
+native animation/beeps, but Plus crashes in the native sample. The shutdown
+changes await a hardware retest; see [hardware feedback](docs/HARDWARE_FEEDBACK.md).
+This is not the v0.1 compatibility release.
 
 ![AndroSwitch console after the verified Ryujinx workflow](docs/images/androswitch-m7.png)
 
-Actual submitted console framebuffer from the M7 test; physical-device status
-remains unverified.
+Actual submitted console framebuffer from the M7 Ryujinx test.
 
 | Area | Verified status |
 | --- | --- |
@@ -36,7 +38,7 @@ remains unverified.
 | Android lifecycle/UI | Supported M5 subset; 14 Java/Kotlin UI snapshots pass in Ryujinx |
 | Native graphics/audio | NativeActivity, incremental assets, input queue, EGL/GLES2; Java AudioTrack, AAudio writes and OpenSL ES PCM queue callbacks |
 | Console launcher | Scan/install/update/launch/return/uninstall; persistent saves, named failures and one NRO |
-| Physical Switch | Not tested yet |
+| Physical Switch | User reports sample install/open, native animation/beeps; native Plus crash remains pending retest |
 
 The launcher is usable for the supported test corpus. Arbitrary apps can still
 require missing Android APIs. This alpha accepts single APKs up to **64 MiB**

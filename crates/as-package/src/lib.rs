@@ -283,6 +283,18 @@ impl<F: FileSystem> PackageManager<F> {
                 "entry is not an enabled MAIN/LAUNCHER component",
             ));
         }
+        let entry_activity = entry
+            .map(str::to_string)
+            .or_else(|| activities.first().cloned());
+        let apk_sha256 = digest(apk.zip.raw_bytes());
+        if let Some(old) = previous.filter(|r| r.installed) {
+            if old.apk_sha256 == apk_sha256 && old.entry_activity == entry_activity {
+                // Verify the installed copy before accepting a no-op. A damaged
+                // or missing copy must not be reported as a healthy install.
+                self.load(&old.package, Some(old.revision))?;
+                return Ok(old);
+            }
+        }
         self.initialize()?;
         let revision = self.reserve(&apk.manifest.package)?;
         let record = Record {
@@ -293,12 +305,10 @@ impl<F: FileSystem> PackageManager<F> {
             version_code: apk.manifest.version_code,
             version_name: apk.manifest.version_name.clone(),
             label: apk.manifest.application.label.clone(),
-            entry_activity: entry
-                .map(str::to_string)
-                .or_else(|| activities.first().cloned()),
+            entry_activity,
             activities,
             apk_bytes: apk.file_size_bytes,
-            apk_sha256: digest(apk.zip.raw_bytes()),
+            apk_sha256,
             signature_verified: false,
         };
         let output = format!("{}/package.apk", revision_dir(&record.package, revision));

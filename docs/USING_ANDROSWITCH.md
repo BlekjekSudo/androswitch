@@ -2,6 +2,10 @@
 
 This is the first one-NRO package, not the offline v0.1 compatibility release.
 Host and Ryujinx evidence do not establish physical Switch compatibility.
+The user reported that the four bundled samples install/open on a real Switch
+and the native triangle animation and beeps work, but Plus crashes there.
+This build's shutdown changes await hardware retesting; see the
+[hardware feedback record](HARDWARE_FEEDBACK.md).
 The runtime builds on **RustyDroid by nadabgfccvd and contributors**; retain
 the packaged credits, license notices and source link when redistributing it.
 
@@ -11,8 +15,9 @@ the packaged credits, license notices and source link when redistributing it.
    `Android/`, `installed/` and `logs/` directory when updating the runtime.
 2. Start `switch/androswitch/androswitch.nro` with application/title override.
    This build uses a 256 MiB homebrew heap; applet mode is not the tested target.
-3. Press R for APKs, select a sample and press A to install. Press L for
-   Installed, then A to launch it. Plus returns to the console.
+3. Press R for APKs, select a sample and press A to install. The console selects
+   that app in Installed immediately; press A again to launch it.
+   Plus requests a return to the console.
 
 There is one product NRO. No Android partition, Python installation, Unicorn
 worker or Linux guest kernel is required on the SD card.
@@ -27,9 +32,9 @@ worker or Linux guest kernel is required on the SD card.
 | App external data | `Android/data/<package>/` |
 | OBB files | `Android/obb/<package>/`; opaque files, no automatic extraction |
 | Shared pictures/downloads | `DCIM/`, `Download/`; aliases `/sdcard` and `/storage/emulated/0` |
-| Runtime reports | `logs/session-report.json`, `last-interrupted.json`, `teardown-failure.json` |
+| Runtime reports | `logs/session-report.json`, `teardown.log`, `last-interrupted.json`, `teardown-failure.json` |
 | Lists | L/R, Up/Down; touch selects, a second tap opens |
-| Install/update/launch | A; updates preserve data |
+| Install/update/launch | A; identical APK updates reuse the verified revision; changed APKs get a new revision and retain data |
 | Details/back | X/B |
 | Uninstall | Y, then A to confirm; saves are retained |
 | Clear internal data | ZR, then A to confirm; separate from uninstall |
@@ -80,3 +85,10 @@ code mappings. A stuck thread or unsafe teardown causes a process exit.
 Reopen homebrew; the one-shot launch request is consumed and the console
 records the interrupted package/session. Seamless recovery from a native crash
 within the same process is not promised. Do not delete the logs before reporting it.
+
+Interactive launches write a `running` session report before executing the APK.
+Shutdown flushes each phase to `logs/teardown.log` before that operation, including
+GPU completion on the EGL owner thread, callbacks, joins, mapping release and
+launcher framebuffer reopening. `launcher_ready` means a console frame was
+actually submitted after cleanup. A missing final report cannot by itself locate
+a crash; keep the phase trace and the Atmosphère error report as well.
