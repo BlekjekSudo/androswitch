@@ -1,0 +1,595 @@
+{
+  "schema_version": 1,
+  "implementation_commit": "7e9ffcf4a7143cdf3f0bd3ea30d8f66c63eb06ab",
+  "stage": "M7 display-handoff candidate after supplied hardware crash logs",
+  "product_nro_sha256": "449917f0f53a88d6c66ecf09aa5b820e3612e7ec9bd2192aa839f3c59da4ad32",
+  "verification": {
+    "host": "passed four independent framebuffer address/guard cases and clippy",
+    "ryujinx": "passed console workflow, two 60-frame launcher waits after native Plus, eight-frame queue monitoring per return, negative teardown/recovery",
+    "physical_device": "pending_retest",
+    "android_reference_device": "not_run"
+  },
+  "original_hardware_feedback": {
+    "date": "2026-10-24",
+    "evidence_type": "user_report",
+    "original_nro_sha256": "3d84164e6ba3227d6916e26bafff91f7485a817925f5450b85f5811c3738236b",
+    "sample_install_open": "reported working for four bundled APKs",
+    "native_animation_beeps": "reported working",
+    "native_plus_return": "reported Switch crash; session-report.json absent",
+    "crash_dump": "not_available",
+    "new_build_hardware": "pending_retest"
+  },
+  "console": {
+    "scenario": "workflow",
+    "physical_device": "not_run",
+    "session_id": "53cebf87b38c428d801d17c9b8ab3735",
+    "completed_sessions": 10,
+    "nro_sha256": "449917f0f53a88d6c66ecf09aa5b820e3612e7ec9bd2192aa839f3c59da4ad32",
+    "status": "passed",
+    "commands": 67,
+    "schema_version": 1,
+    "expected_api_errors": 1,
+    "emulator": {
+      "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0",
+      "version": "1.3.3+e2143d4"
+    },
+    "backend": "ryujinx",
+    "artifact_root": "local-artifacts/m7/runs/53cebf87b38c428d801d17c9b8ab3735",
+    "receipt_sha256": "ea96eea8a6d7bb1bb346646fcf8d4e24b9395af4e0ee2be28c1a7cb42a3ba3c9"
+  },
+  "boundary": {
+    "scenario": "quiescence",
+    "physical_device": "not_run",
+    "boundary": "process_exit_required",
+    "session_id": "563ef07861e448778cf92df1e3800890",
+    "nro_sha256": "449917f0f53a88d6c66ecf09aa5b820e3612e7ec9bd2192aa839f3c59da4ad32",
+    "next_boot_recovery": "passed",
+    "status": "passed",
+    "schema_version": 1,
+    "backend": "ryujinx",
+    "artifact_root": "local-artifacts/m7/runs/563ef07861e448778cf92df1e3800890",
+    "receipt_sha256": "2e655739b80dadc8a6887113131960bc07c430c6d929991b39892ad26f30d7b6"
+  },
+  "native_plus_sessions": [
+    {
+      "session_id": "53cebf87b38c428d801d17c9b8ab3735-5",
+      "revision": 1,
+      "native_frames": 441,
+      "audio_frames": 12000,
+      "teardown": [
+        {
+          "phase": "stop_requested",
+          "tick": 679982945
+        },
+        {
+          "phase": "native_activity_stop",
+          "tick": 680038723
+        },
+        {
+          "phase": "activity_focus_lost",
+          "tick": 680106455
+        },
+        {
+          "phase": "activity_pause",
+          "tick": 680130224
+        },
+        {
+          "phase": "activity_window_destroy",
+          "tick": 680149712
+        },
+        {
+          "phase": "guest_thread_join",
+          "tick": 680214071
+        },
+        {
+          "phase": "egl_wait_gpu",
+          "tick": 680689436
+        },
+        {
+          "phase": "egl_unbind",
+          "tick": 680751043
+        },
+        {
+          "phase": "egl_destroy_context",
+          "tick": 680824154
+        },
+        {
+          "phase": "egl_destroy_surface",
+          "tick": 683106768
+        },
+        {
+          "phase": "egl_terminate",
+          "tick": 683305276
+        },
+        {
+          "phase": "egl_terminated",
+          "tick": 690883430
+        },
+        {
+          "phase": "guest_thread_joined",
+          "tick": 690948449
+        },
+        {
+          "phase": "activity_input_destroy",
+          "tick": 690995554
+        },
+        {
+          "phase": "activity_stop",
+          "tick": 691014814
+        },
+        {
+          "phase": "activity_destroy",
+          "tick": 691031608
+        },
+        {
+          "phase": "java_activity_stop",
+          "tick": 691133001
+        },
+        {
+          "phase": "media_thread_quiesce",
+          "tick": 691154712
+        },
+        {
+          "phase": "guest_thread_quiesce",
+          "tick": 691185889
+        },
+        {
+          "phase": "media_reset",
+          "tick": 691227319
+        },
+        {
+          "phase": "media_released",
+          "tick": 691265702
+        },
+        {
+          "phase": "activity_dispose",
+          "tick": 691293225
+        },
+        {
+          "phase": "runtime_drop",
+          "tick": 691320420
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 691344357
+        },
+        {
+          "phase": "native_resource_reset",
+          "tick": 691530854
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 691577063
+        },
+        {
+          "phase": "native_tls_reset",
+          "tick": 691650735
+        },
+        {
+          "phase": "native_resources_released",
+          "tick": 691676244
+        },
+        {
+          "phase": "runtime_closed",
+          "tick": 691706755
+        },
+        {
+          "phase": "launcher_refresh",
+          "tick": 691762542
+        }
+      ]
+    },
+    {
+      "session_id": "53cebf87b38c428d801d17c9b8ab3735-7",
+      "revision": 1,
+      "native_frames": 702,
+      "audio_frames": 12000,
+      "teardown": [
+        {
+          "phase": "stop_requested",
+          "tick": 1009036730
+        },
+        {
+          "phase": "native_activity_stop",
+          "tick": 1009080910
+        },
+        {
+          "phase": "activity_focus_lost",
+          "tick": 1009106223
+        },
+        {
+          "phase": "activity_pause",
+          "tick": 1009133865
+        },
+        {
+          "phase": "activity_window_destroy",
+          "tick": 1009160392
+        },
+        {
+          "phase": "guest_thread_join",
+          "tick": 1009202269
+        },
+        {
+          "phase": "egl_wait_gpu",
+          "tick": 1009605676
+        },
+        {
+          "phase": "egl_unbind",
+          "tick": 1009635749
+        },
+        {
+          "phase": "egl_destroy_context",
+          "tick": 1009682117
+        },
+        {
+          "phase": "egl_destroy_surface",
+          "tick": 1010104460
+        },
+        {
+          "phase": "egl_terminate",
+          "tick": 1010148890
+        },
+        {
+          "phase": "egl_terminated",
+          "tick": 1010203543
+        },
+        {
+          "phase": "guest_thread_joined",
+          "tick": 1010251898
+        },
+        {
+          "phase": "activity_input_destroy",
+          "tick": 1010296483
+        },
+        {
+          "phase": "activity_stop",
+          "tick": 1010329032
+        },
+        {
+          "phase": "activity_destroy",
+          "tick": 1010357126
+        },
+        {
+          "phase": "java_activity_stop",
+          "tick": 1010590533
+        },
+        {
+          "phase": "media_thread_quiesce",
+          "tick": 1010662273
+        },
+        {
+          "phase": "guest_thread_quiesce",
+          "tick": 1010682412
+        },
+        {
+          "phase": "media_reset",
+          "tick": 1010702628
+        },
+        {
+          "phase": "media_released",
+          "tick": 1010723473
+        },
+        {
+          "phase": "activity_dispose",
+          "tick": 1010748817
+        },
+        {
+          "phase": "runtime_drop",
+          "tick": 1010766032
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 1010789039
+        },
+        {
+          "phase": "native_resource_reset",
+          "tick": 1010812682
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 1010826794
+        },
+        {
+          "phase": "native_tls_reset",
+          "tick": 1010891291
+        },
+        {
+          "phase": "native_resources_released",
+          "tick": 1010913308
+        },
+        {
+          "phase": "runtime_closed",
+          "tick": 1010936415
+        },
+        {
+          "phase": "launcher_refresh",
+          "tick": 1010956296
+        }
+      ]
+    }
+  ],
+  "native_media": {
+    "frames": 704,
+    "input": 2,
+    "asset_ok": 1,
+    "audio_frames": 12000,
+    "gl_ok": 1,
+    "readback_ok": 1,
+    "tls": 73,
+    "renderer": "NV120"
+  },
+  "clippy_log_sha256": "d5ffa8284d49b18dd942a9bbffa048b0e5eb412d21a25bafe762993e174ced4d",
+  "sources": [
+    {
+      "path": "crates/as-package/src/lib.rs",
+      "sha256": "78429c8d665d331fa26ba727352933d263034418f4c5c8e39657b322d728579e"
+    },
+    {
+      "path": "crates/as-package/tests/persistence.rs",
+      "sha256": "c041a5c95fca730eb1f0e84bc8ea48ccea0d67cc9ac11642f14c92dc5c5c9bd4"
+    },
+    {
+      "path": "crates/as-launcher/src/lib.rs",
+      "sha256": "8822d1fa65be743ba74bb6d0ecda1d1566a2ab1d4658f6acfd23c933f5b1e198"
+    },
+    {
+      "path": "crates/as-launcher/tests/workflow.rs",
+      "sha256": "9db18b7a90e87ea52bbcf0caf736b4d8166a0e051d98f3d83d3757644ef8a68a"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/application.rs",
+      "sha256": "3498afd1d96d70f6d9e2eee8fcabfee4f4b19efbb236bb137929fa74118618ca"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/launcher.rs",
+      "sha256": "234afb5a887faa6b018a7987a19c7b0103c0588484c64701794d2e3d5842bf11"
+    },
+    {
+      "path": "platform/androswitch/main.c",
+      "sha256": "cf64efe3f4d02cac71fa34fe901b6afc5497060c2c9545cef33770142d0bf136"
+    },
+    {
+      "path": "platform/androswitch/media.c",
+      "sha256": "ad03659002fb350fce794043851260ddd9dbe40cffe65ba93e58987477d0d0b3"
+    },
+    {
+      "path": "platform/switch-smoke/native.c",
+      "sha256": "b8394b2bd35069c062d9783ec9e2da337c5fee9e70ed55b5b6e7a99ce19ac8e7"
+    },
+    {
+      "path": "platform/switch-smoke/native.h",
+      "sha256": "e4cc4b945568b4e9f31c31bdfd487ef71e599fc003ec3f94861188ddb33e1c45"
+    },
+    {
+      "path": "scripts/test-ryujinx-launcher.ps1",
+      "sha256": "bf19c5e2b5f03871d450c164f2bd1fe4daac746f9d58a3300453105bc7142053"
+    },
+    {
+      "path": "scripts/package-androswitch.ps1",
+      "sha256": "8f76225cc9707bdc26ad5c46829025a12878067673ce0f32aa60bbd46dc44737"
+    },
+    {
+      "path": "scripts/record-hardware-feedback-evidence.py",
+      "sha256": "74e8d85b2fd18138c77bb91934408f96d19a6f654ea495ad501f13ae9c199e40"
+    },
+    {
+      "path": "platform/androswitch/framebuffer_copy.h",
+      "sha256": "886ba44f63572ef616b139c17b394a8bd218124011c7cd59f23992018d0a8ac7"
+    },
+    {
+      "path": "platform/androswitch/tests/framebuffer_copy.c",
+      "sha256": "913a4435ce84dc202a3f8e453ac6f47e11bb4dff20f2b33aca958b2af3c26381"
+    },
+    {
+      "path": "platform/androswitch/Makefile",
+      "sha256": "ff0cc459f49755fa506969e547cd0bd4c2ca72ab59b988febdf545bf16e05e33"
+    },
+    {
+      "path": "platform/androswitch/media.h",
+      "sha256": "498a9ce71c5f18e2076a93df354d4d7d27abcca10e36effdaf5b371289f46d34"
+    }
+  ],
+  "samples": [
+    {
+      "path": "local-artifacts/m5/fixture/java-ui.apk",
+      "sha256": "39c568280be3248058da636a80fad2378bca6e6a1496950bdcd273e36bba2d76"
+    },
+    {
+      "path": "local-artifacts/m5/fixture/kotlin-ui.apk",
+      "sha256": "34c9e552a70f48a629ad95399cf6b4c6a686139d7a1a0ef7557b60185514ae3b"
+    },
+    {
+      "path": "local-artifacts/m6/fixture/mixed-media.apk",
+      "sha256": "2ba8d1a3b7ca60f68cdc1fdc6347f62370ac0231a775956eea04b28afb53f27c"
+    },
+    {
+      "path": "local-artifacts/m6/fixture/native-media.apk",
+      "sha256": "540da2796c0e0bf941ba4ee22fa82a87f71fcdd75595007ce385bfa2795e877b"
+    }
+  ],
+  "commands": [
+    "cargo clippy -p as-launcher -p as-package --features as-launcher/host --all-targets --locked -- -D warnings",
+    "cargo clippy -p as-switch-smoke --features host-cli --all-targets --locked -- -D warnings",
+    "scripts/build-androswitch.ps1",
+    "scripts/test-ryujinx-launcher.ps1",
+    "scripts/test-ryujinx-launcher.ps1 -Scenario quiescence",
+    "cargo fmt --all -- --check",
+    "python scripts/check_md_links.py",
+    "git diff --check",
+    "gcc -std=c11 -O2 -Wall -Wextra -Werror platform/androswitch/tests/framebuffer_copy.c -o <local output>; run output"
+  ],
+  "limitations": [
+    "Physical crash occurred after launcher_ready on the preceding candidate; display-service/queue changes await hardware retest",
+    "Synthetic return_to_launcher dispatches Plus in the C main loop; no physical HID event is claimed",
+    "Original JVM/VM regression evidence remains in reports/m6-m7.json; those suites were not rerun for this fix",
+    "Firmware, hardware model, launch mode and Atmosphere result code were not supplied"
+  ],
+  "prior_package_launcher_host_tests": [
+    {
+      "file": "target/evidence/hardware-fix-package.log",
+      "sha256": "7839929ef0c36b5df8208cbc895ce2390885892ed86824e7a261be8ea053cc32",
+      "passed_tests": 4
+    },
+    {
+      "file": "target/evidence/hardware-fix-shell.log",
+      "sha256": "faf2854d74a1f05bff451edb8fc38b5e5fc8b4efe93f1469c67fa25bd4f32c48",
+      "passed_tests": 1
+    }
+  ],
+  "host": {
+    "passed_layout_cases": 4,
+    "log_sha256": "21c7968f2f4450f469f04e5e039d5f5a7f28049278fc2f41c20750ee3674aa89",
+    "note": "Package/launcher tests above are retained prior evidence; their code is unchanged"
+  },
+  "hardware_feedback": {
+    "path": "reports/hardware-native-plus-20261024.json",
+    "sha256": "f9245706ad9b9e2bea5b13464ebc922d7cbb085f1cf415b39f8ec766c5af1fd2"
+  },
+  "display_handoffs": [
+    {
+      "generation": 1,
+      "frame": 1,
+      "slot": 0,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 2,
+      "slot": 1,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 3,
+      "slot": 2,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 4,
+      "slot": 0,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 5,
+      "slot": 1,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 6,
+      "slot": 2,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 7,
+      "slot": 0,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 8,
+      "slot": 1,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 2,
+      "frame": 1,
+      "slot": 0,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 2,
+      "frame": 2,
+      "slot": 1,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 2,
+      "frame": 3,
+      "slot": 2,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 2,
+      "frame": 4,
+      "slot": 0,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 2,
+      "frame": 5,
+      "slot": 1,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 2,
+      "frame": 6,
+      "slot": 2,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 2,
+      "frame": 7,
+      "slot": 0,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 2,
+      "frame": 8,
+      "slot": 1,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    }
+  ],
+  "display_handoff_receipt_sha256": "3d67c9a905c435ae99f8eda129b453eb1ca387d36515d46df50b08cde8f8287a"
+}
