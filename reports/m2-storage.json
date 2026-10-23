@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "host_tests": {
+    "command": "cargo test -p as-package --locked",
+    "tests": 3,
+    "injected_mutation_boundaries": 40
+  },
+  "scope": "Immutable copied-APK revisions, update/restart, private data isolation, OBB streaming, Java/native VFS",
+  "run": {
+    "schema_version": 1,
+    "session_id": "ecd807c9df804e369680b51698e9d8ef",
+    "milestone": "M2",
+    "status": "passed",
+    "physical_device": "not_run",
+    "steps": [
+      {
+        "id": "install-a",
+        "status": "passed",
+        "value": "136393766",
+        "revision": 1
+      },
+      {
+        "id": "install-b",
+        "status": "passed",
+        "value": "340884566",
+        "revision": 1
+      },
+      {
+        "id": "restart-a",
+        "status": "passed",
+        "value": "136393766",
+        "revision": 1
+      },
+      {
+        "id": "restart-b",
+        "status": "passed",
+        "value": "340884566",
+        "revision": 1
+      },
+      {
+        "id": "update-a",
+        "status": "passed",
+        "value": "136393766",
+        "revision": 2
+      },
+      {
+        "id": "obb-stream",
+        "status": "passed",
+        "value": "4890",
+        "revision": 2
+      },
+      {
+        "id": "mkdir-contract",
+        "status": "passed",
+        "value": "1",
+        "revision": 2
+      }
+    ],
+    "started_at": "2026-10-23T14:31:07.8102249Z",
+    "nro_sha256": "c12f93c7bfa9a4cf2565528446756157402e06f44ac2d19c99dae16133f97cea",
+    "fixture_build": {
+      "schema_version": 1,
+      "source_sha256": "9f42ee7de95343de0dfc4804591ee89b09362fe2b5d32d9f478ee0552d506fcc",
+      "java": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\r\nOpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)\r\nOpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+      "build_tools": "35.0.0",
+      "apks": [
+        {
+          "package": "org.fixture.alpha",
+          "version_code": 1,
+          "apk": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m2\\fixture\\org.fixture.alpha-1.apk",
+          "sha256": "ff2600f544873770e26d1d2c9243ebef2ebbea7d7ec625a305b57d0c3ef5d140"
+        },
+        {
+          "package": "org.fixture.alpha",
+          "version_code": 2,
+          "apk": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m2\\fixture\\org.fixture.alpha-2.apk",
+          "sha256": "11816fc7f7afec916a4129f8bf6d4da7c7b7c09582e1751df664637bf83abddb"
+        },
+        {
+          "package": "org.fixture.beta",
+          "version_code": 1,
+          "apk": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m2\\fixture\\org.fixture.beta-1.apk",
+          "sha256": "4512b417a683ec3c09f4129d8873d740a13fc59d7a48a205a691fb2c0110ffc0"
+        }
+      ]
+    },
+    "finished_at": "2026-10-23T14:34:43.4173156Z"
+  },
+  "limits": [
+    "APK signatures not cryptographically verified",
+    "Abrupt power loss and physical SD failures not tested",
+    "Java/native shared-file JNI proof is in M4"
+  ],
+  "implementation_commit": "pending_commit",
+  "milestone": "M2",
+  "verification": {
+    "physical_device": "not_run",
+    "host": "passed",
+    "horizon_emulator": "passed"
+  },
+  "artifact_root": "local-artifacts/m2/runs/ecd807c9df804e369680b51698e9d8ef"
+}

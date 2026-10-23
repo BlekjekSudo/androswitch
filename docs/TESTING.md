@@ -2,7 +2,7 @@
 
 Test the affected API/ABI contract and record the backend that actually ran
 it. Host execution, a Horizon emulator run and a physical Switch run are
-different evidence. The current M1 physical-device status is **not run**.
+different evidence. The current M1–M4 physical-device status is **not run**.
 
 ## Host checks
 
@@ -11,6 +11,10 @@ From the repository root in PowerShell 7:
 ```powershell
 ./scripts/check-m0.ps1
 ./scripts/check-m1.ps1
+cargo test -p as-package -p as-native --locked
+cargo test -p as-native --test loader --locked -- --include-ignored
+cargo test -p rd-jni --locked
+cargo test -p rd-ndk --features native --test native --locked
 python -X utf8 scripts/check_md_links.py
 git diff --check
 ```
@@ -27,6 +31,14 @@ from [building](BUILDING.md). After a custom SDK fixture build, use
 `check-m1.ps1 -SkipFixtureBuild`. Logs and command receipts are generated under
 `target/evidence/`; the original published evidence remains in
 [reports](../reports/m1-core.json).
+
+The ignored native-loader tests additionally require
+`scripts/build-m3-fixture.ps1`. The `rd-ndk/native` integration test requires
+`scripts/build-native-oracle-fixtures.ps1` (Windows NDK), or the original
+`golden/native/build.sh` (GCC plus Linux ARM64/ARM cross compilers), and the
+optional host Python/Unicorn installation. Its x86/ARM32 fixtures test the
+inherited host oracle; device support remains ARM64 only. Device builds
+exclude Python and Unicorn.
 
 ### Cargo feature isolation
 
@@ -73,6 +85,13 @@ old-report archiving and an exclusive SD lock prevent stale results from
 being accepted. See [M1 E2E](M1_E2E.md) for all steps and budget limits.
 
 ## CI and the upstream baseline
+
+M2–M4 tests add failure-injected package updates, persistent VFS/restart/OBB
+checks, stripped ELF/dependency/TLS/constructor execution, native oracle
+comparison and JVM-backed Java/Kotlin JNI cases. See [M2–M4](M2_M4_E2E.md).
+Use `CARGO_BUILD_JOBS=1` on memory-constrained hosts and run the host and
+device builds sequentially. An out-of-memory/compiler failure is a failed
+attempt; only a subsequent complete run can provide a passing receipt.
 
 [The AndroSwitch workflow](../.github/workflows/androswitch.yml) runs host
 inspection/parser/portable checks on Linux and Windows. It does not run

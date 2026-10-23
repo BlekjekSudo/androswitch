@@ -15,9 +15,10 @@ authors.workspace = true
 unsafe_code = "deny"
 
 [dependencies]
-serde.workspace = true
-serde_json.workspace = true
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+serde_json = { workspace = true, optional = true }
 
 [features]
-default = []
-native = []
+default = ["std"]
+std = ["serde/std", "dep:serde_json"]
+native = ["std"]

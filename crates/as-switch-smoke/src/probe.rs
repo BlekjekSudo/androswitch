@@ -1,9 +1,11 @@
 //! Generic, bounded method-probe protocol, shared by the host and Horizon.
+use alloc::{boxed::Box, rc::Rc};
 use alloc::{
     format,
     string::{String, ToString},
     vec::Vec,
 };
+use as_platform::fs::FileSystem;
 use rd_vm::{Engine, VmConfig, VmExit};
 use serde::{Deserialize, Serialize};
 
@@ -13,6 +15,24 @@ pub struct Request {
     pub schema_version: u32,
     pub session_id: String,
     pub calls: Vec<Invocation>,
+    #[serde(default)]
+    pub storage: Option<StoreRequest>,
+    #[serde(default)]
+    pub native: Vec<crate::native_probe::NativeRequest>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StoreRequest {
+    pub operation: StoreOperation,
+    pub package: Option<String>,
+    pub revision: Option<u64>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StoreOperation {
+    Install,
+    Update,
+    Launch,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -74,9 +94,25 @@ pub struct Report {
     pub application_lifecycle: bool,
     pub jni: bool,
     pub calls: Vec<CallResult>,
+    pub installation: Option<as_package::Record>,
+    pub native: Vec<crate::native_probe::NativeResult>,
+    pub jni_statistics: Option<JniStatistics>,
+}
+#[derive(Serialize)]
+pub struct JniStatistics {
+    pub libraries_loaded: u64,
+    pub native_calls: u64,
+    pub dex_callbacks: u64,
 }
 
 pub fn run(apk: Vec<u8>, request: Request) -> Result<Report, Failure> {
+    run_with_fs(apk, request, None)
+}
+pub fn run_with_fs(
+    mut apk: Vec<u8>,
+    request: Request,
+    filesystem: Option<Rc<dyn FileSystem>>,
+) -> Result<Report, Failure> {
     if request.schema_version != 1
         || request.session_id.is_empty()
         || request.session_id.len() > 128
@@ -86,6 +122,47 @@ pub fn run(apk: Vec<u8>, request: Request) -> Result<Report, Failure> {
             "INVALID_REQUEST",
             "schema_version=1, nonempty session <=128 bytes and <=128 calls required",
         ));
+    }
+    let mut installation = None;
+    if let Some(store) = &request.storage {
+        let manager = as_package::PackageManager::new(
+            filesystem
+                .clone()
+                .ok_or_else(|| failure("STORAGE_UNAVAILABLE", "no filesystem adapter"))?,
+        );
+        let platform = |e: as_platform::PlatformError| Failure {
+            code: e.code.into(),
+            module_id: "as-package".into(),
+            cause: e.to_string(),
+        };
+        let record = match store.operation {
+            StoreOperation::Install | StoreOperation::Update => manager
+                .install(apk, matches!(store.operation, StoreOperation::Update), None)
+                .map_err(platform)?,
+            StoreOperation::Launch => {
+                manager
+                    .load(
+                        store
+                            .package
+                            .as_deref()
+                            .ok_or_else(|| failure("INVALID_REQUEST", "launch requires package"))?,
+                        store.revision,
+                    )
+                    .map_err(platform)?
+                    .0
+            }
+        };
+        if store.package.as_ref().is_some_and(|p| p != &record.package) {
+            return Err(failure(
+                "PACKAGE_MISMATCH",
+                "request package differs from installed APK",
+            ));
+        }
+        apk = manager
+            .load(&record.package, Some(record.revision))
+            .map_err(platform)?
+            .1;
+        installation = Some(record);
     }
     let apk = rd_apk::Apk::from_bytes(apk)?;
     if apk.manifest.min_sdk > 26 {
@@ -105,7 +182,7 @@ pub fn run(apk: Vec<u8>, request: Request) -> Result<Report, Failure> {
     if dexes.is_empty() {
         return Err(failure("MISSING_DEX", "no DEX entries in APK"));
     }
-    let mut vm = Engine::new(
+    let mut vm = Box::new(Engine::new(
         dexes,
         VmConfig {
             fuel: 1_000_000,
@@ -113,7 +190,27 @@ pub fn run(apk: Vec<u8>, request: Request) -> Result<Report, Failure> {
             heap_budget: 32 << 20,
             exception_trace: true,
         },
-    );
+    ));
+    if let Some(fs) = filesystem {
+        vm.bind_storage(
+            &apk.manifest.package,
+            Box::new(
+                as_platform::vfs::Vfs::new(fs, &apk.manifest.package)
+                    .map_err(|e| failure(e.code, e.to_string()))?,
+            ),
+        )
+        .map_err(|e| failure("STORAGE_UNAVAILABLE", e.to_string()))?;
+    }
+    #[cfg(target_os = "horizon")]
+    let native_session = if !apk.native_libs.is_empty() && request.native.is_empty() {
+        let session = crate::device_jni::Session::new(&apk)
+            .map_err(|e| failure("JNI_INITIALIZATION", e.to_string()))?;
+        session.bind_vm(&mut vm);
+        vm.bind_native(session.clone());
+        Some(session)
+    } else {
+        None
+    };
     let mut report = Report {
         schema_version: 1,
         kind: "apk_dex_method_probe",
@@ -124,13 +221,22 @@ pub fn run(apk: Vec<u8>, request: Request) -> Result<Report, Failure> {
         dex_files: apk.dex_files.len(),
         portable_vm: rd_vm::PORTABLE_CORE,
         application_lifecycle: false,
-        jni: false,
+        jni: cfg!(target_os = "horizon")
+            && !apk.native_libs.is_empty()
+            && request.native.is_empty(),
         calls: Vec::new(),
+        installation,
+        native: crate::native_probe::run(&apk, &request.native),
+        jni_statistics: None,
     };
     for call in request.calls {
+        #[cfg(target_os = "horizon")]
+        crate::device_jni::lock();
         vm.reset_fuel_window();
         let before = vm.fuel_used();
         let result = invoke(&mut vm, &call);
+        #[cfg(target_os = "horizon")]
+        crate::device_jni::unlock();
         let (value, error) = match result {
             Ok(value) => (Some(value), None),
             Err(error) => (None, Some(error)),
@@ -141,6 +247,19 @@ pub fn run(apk: Vec<u8>, request: Request) -> Result<Report, Failure> {
             error,
             instructions: vm.fuel_used() - before,
         });
+    }
+    #[cfg(target_os = "horizon")]
+    if let Some(session) = native_session {
+        crate::device_jni::lock();
+        session.close_vm();
+        let (libraries_loaded, native_calls, dex_callbacks) = session.statistics();
+        report.jni_statistics = Some(JniStatistics {
+            libraries_loaded,
+            native_calls,
+            dex_callbacks,
+        });
+        report.jni = native_calls != 0;
+        crate::device_jni::unlock();
     }
     Ok(report)
 }
@@ -174,9 +293,12 @@ fn invoke(vm: &mut Engine, call: &Invocation) -> Result<String, Failure> {
     Ok(rd_vm::interp::render_result(&value, return_type))
 }
 pub fn run_json(apk: Vec<u8>, input: &[u8]) -> Vec<u8> {
+    run_json_with_fs(apk, input, None)
+}
+pub fn run_json_with_fs(apk: Vec<u8>, input: &[u8], fs: Option<Rc<dyn FileSystem>>) -> Vec<u8> {
     let result = serde_json::from_slice::<Request>(input)
         .map_err(|e| failure("INVALID_REQUEST", e.to_string()))
-        .and_then(|request| run(apk, request));
+        .and_then(|request| run_with_fs(apk, request, fs));
     match result {
         Ok(report) => serde_json::to_vec(&report).expect("report serialization"),
         Err(error) => serde_json::to_vec(&error).expect("error serialization"),

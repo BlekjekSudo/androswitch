@@ -1,9 +1,14 @@
 # AndroSwitch documentation
 
+- [M2–M4 persistent storage and native JNI proof](M2_M4_E2E.md)
+- [Immutable package revisions ADR](adr/013-persistent-package-revisions.md)
+- [Horizon native/JNI boundary ADR](adr/014-native-horizon-jni.md)
+
 AndroSwitch adapts [RustyDroid](https://github.com/nadabgfccvd/RustyDroid) for
 HorizonOS. Start with the [project README](../README.md) and
-[credits/provenance](../CREDITS.md). M0/M1 host and Ryujinx gates are complete;
-installation, JNI and Android lifecycle remain later milestones.
+[credits/provenance](../CREDITS.md). M0–M4 developer proof gates have host and
+Ryujinx evidence. Android UI/lifecycle and the consumer launcher remain later
+milestones; physical Switch validation is pending.
 
 ## Use and reproduce the current work
 
@@ -20,7 +25,7 @@ installation, JNI and Android lifecycle remain later milestones.
 | Document | Contents |
 | --- | --- |
 | [Roadmap](ANDROSWITCH_ROADMAP.md) | M0–M12, exit gates and backend-specific status |
-| [Architecture](ARCHITECTURE.md) | Shared core, platform boundary, planned VFS and launcher/runner |
+| [Architecture](ARCHITECTURE.md) | Shared core, platform boundary, persistent VFS and planned launcher/runner |
 | [Compatibility inventory](ANDROSWITCH_COMPATIBILITY.md) | Verified functionality and unavailable APIs/backends |
 | [ADR 010](adr/010-androswitch-platform-boundary.md) | AndroSwitch's platform and verification contract |
 | [ADR 011](adr/011-portable-dex-smoke.md) | Portable DEX parser and bounded C ABI |

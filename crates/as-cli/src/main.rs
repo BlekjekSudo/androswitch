@@ -6,7 +6,7 @@ use std::{path::PathBuf, process::ExitCode};
 #[command(
     name = "asctl",
     version,
-    about = "AndroSwitch Android runtime tools (inspection milestone)"
+    about = "AndroSwitch APK inspection and persistent package management"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -15,6 +15,41 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Copy and atomically publish an APK installation (preserves user data).
+    Install {
+        apk: PathBuf,
+        #[arg(long)]
+        root: PathBuf,
+        #[arg(long)]
+        update: bool,
+        #[arg(long)]
+        activity: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// List installed package revisions.
+    List {
+        #[arg(long)]
+        root: PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Remove a package; retain private/OBB data by default.
+    Uninstall {
+        package: String,
+        #[arg(long)]
+        root: PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Explicitly clear package-private data (separate from uninstall).
+    ClearData {
+        package: String,
+        #[arg(long)]
+        root: PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
     /// Inspect an APK without executing its code or claiming compatibility.
     Inspect {
         apk: PathBuf,
@@ -38,6 +73,39 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     let runtime = Runtime::default();
     match cli.command {
+        Commands::Install {
+            apk,
+            root,
+            update,
+            activity,
+            json,
+        } => package_command(&runtime, root, json, |pm| {
+            use as_platform::Storage;
+            let path = apk.to_str().ok_or_else(|| {
+                as_platform::fs::error("INVALID_PATH", "install", "APK path is not Unicode")
+            })?;
+            let bytes = as_platform::host::HostPlatform::default().read_bounded(path, 512 << 20)?;
+            pm.install(bytes, update, activity.as_deref())
+                .map(|r| serde_json::json!({"schema_version":1,"status":"ok","package":r}))
+        }),
+        Commands::List { root, json } => package_command(&runtime, root, json, |pm| {
+            pm.list().map(|packages|serde_json::json!({"schema_version":1,"status":"ok","packages":packages}))
+        }),
+        Commands::Uninstall {
+            package,
+            root,
+            json,
+        } => package_command(&runtime, root, json, |pm| {
+            pm.uninstall(&package)
+                .map(|r| serde_json::json!({"schema_version":1,"status":"ok","uninstall":r}))
+        }),
+        Commands::ClearData {
+            package,
+            root,
+            json,
+        } => package_command(&runtime, root, json, |pm| {
+            pm.clear_data(&package).map(|()|serde_json::json!({"schema_version":1,"status":"ok","package":package,"private_data_cleared":true}))
+        }),
         Commands::DexSummary { dex, json } => {
             let result = dex
                 .to_str()
@@ -123,10 +191,51 @@ fn main() -> ExitCode {
                     "Device target: API {}, ARM64, offline",
                     capabilities.runtime_api
                 );
-                println!("Install / DEX / native execution: not implemented in AndroSwitch yet");
-                println!("Horizon emulator / physical device: not verified");
+                println!("Package install / update / list / uninstall: implemented");
+                println!("Application lifecycle launch / stop: not implemented yet");
+                println!("DEX/native method-probe emulator evidence: docs/M2_M4_E2E.md");
+                println!("Physical device: not verified");
             }
             ExitCode::SUCCESS
+        }
+    }
+}
+
+fn package_command(
+    runtime: &Runtime,
+    root: PathBuf,
+    json: bool,
+    call: impl FnOnce(
+        &as_runtime::PackageManager<as_platform::host_fs::HostFileSystem>,
+    ) -> Result<serde_json::Value, as_platform::PlatformError>,
+) -> ExitCode {
+    let result = runtime.packages(root).and_then(|pm| {
+        call(&pm).map_err(|e| as_runtime::RuntimeError {
+            code: e.code.into(),
+            operation: e.operation.into(),
+            module_id: "as-package".into(),
+            cause: e.cause,
+        })
+    });
+    match result {
+        Ok(report) => {
+            if json {
+                println!("{}", serde_json::to_string(&report).expect("report"));
+            } else {
+                println!("{}", serde_json::to_string_pretty(&report).expect("report"));
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({"schema_version":1,"status":"error","error":error})
+                );
+            } else {
+                eprintln!("{error}");
+            }
+            ExitCode::from(1)
         }
     }
 }

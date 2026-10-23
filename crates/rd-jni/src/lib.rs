@@ -1,10 +1,18 @@
 //! JNI wire types, descriptors, mangling, modified UTF-8 and reference frames.
 //! No raw host pointers: native references are opaque tokens (ADR 004).
+#![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
+use alloc::{
+    collections::{BTreeMap, BTreeSet},
+    format,
+    string::String,
+    vec,
+    vec::Vec,
+};
 #[cfg(feature = "jit")]
 pub mod jit;
 
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
 pub const MODULE_ID: &str = "rd-jni";
 pub const MILESTONE: &str = "M9";
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,13 +35,14 @@ impl RdError {
         Self::new("NOT_IMPLEMENTED", "JNI operation not supported")
     }
 }
-impl std::fmt::Display for RdError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for RdError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{} [{}]: {}", self.code, self.module_id, self.cause)
     }
 }
+#[cfg(feature = "std")]
 impl std::error::Error for RdError {}
-pub type Result<T> = std::result::Result<T, RdError>;
+pub type Result<T> = core::result::Result<T, RdError>;
 pub fn not_implemented<T>() -> Result<T> {
     Err(RdError::not_implemented())
 }
@@ -74,6 +83,15 @@ impl Default for References {
     }
 }
 impl References {
+    pub fn object_roots(&self) -> impl Iterator<Item = u32> + '_ {
+        self.values.values().filter_map(|v| {
+            if let Handle::Object(r) = v {
+                Some(*r)
+            } else {
+                None
+            }
+        })
+    }
     pub const MAX: usize = 65536;
     pub fn insert(&mut self, v: Handle) -> Result<u64> {
         if self.values.len() >= Self::MAX {

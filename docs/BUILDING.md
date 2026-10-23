@@ -1,5 +1,11 @@
 # Building AndroSwitch
 
+M2–M4 native/JNI fixture builds additionally require Android NDK
+`28.2.13676358`, Kotlin compiler dependencies in the Gradle cache and a native
+Windows GCC/G++ toolchain for the JVM JNI oracle. See the explicit parameters
+in `scripts/build-m4-fixture.ps1` and [M2–M4 instructions](M2_M4_E2E.md).
+Keep `CARGO_BUILD_JOBS=1` on low-memory machines; serialize verification builds.
+
 The host CLI and device proof are different build paths. The current
 automated NRO workflow uses Windows Rust and the WSL Ubuntu devkitPro linker.
 No full Android OS, Python runtime or Unicorn backend is included in the NRO.

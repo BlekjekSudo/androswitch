@@ -13,30 +13,34 @@ See [credits and provenance](CREDITS.md) and [NOTICE](NOTICE.md).
 
 ## Current status
 
-**M0 and M1 have passed their host and emulator gates.** The M1 NRO reads an
-APK and executes a bounded method suite using the shared upstream interpreter
-built with `no_std + alloc`.
+**Development has reached the M4 execution proof.** The `no_std + alloc` NRO
+loads APK DEX, calls real ARM64 libraries through JNI and receives callbacks
+into the shared RustyDroid interpreter. Java/C/Rust and Kotlin/C++ APK fixtures
+use the same runtime. Physical Switch testing remains pending.
 
 | Area | Verified status |
 | --- | --- |
 | Host APK inspection | Manifest, resources, DEX/native inventory and SDK/ABI/split preflight |
 | Portable APK/DEX core | Shared parsers and interpreter build for the freestanding ARM64 Switch target |
-| Ryujinx E2E | 18 cases pass: 12 results match a real JVM; six unsupported/error cases match the portable host |
+| Persistent packages/storage | Copied APKs, immutable update revisions, isolated saves, uninstall retention and OBB streaming |
+| Native ARM64 | Program-header ELF loader, dependencies, constructors, supported relocations/TLS and real libnx execution |
+| JNI | Native registration, callbacks/reentry, strings, primitive arrays, exception/reference/GC and pthread callback proof |
+| Ryujinx E2E | DEX semantics, persistent storage, native CPU oracle and mixed Java/Kotlin JNI fixtures; see milestone evidence |
 | Upstream VM regression subset | 227 tests pass; separate from the recorded full-upstream baseline |
-| Installation, Android lifecycle, JNI and native ELF loading | Planned; not available in the application runtime yet |
+| Android lifecycle, UI/media and consumer launcher | M5–M7; not implemented yet |
 | Physical Switch | Not tested yet |
 
 This is a development project, not a general-purpose APK launcher release.
 The method probe does not launch an Activity or prove that an entire app works.
 Inherited RustyDroid capabilities are not automatically Switch capabilities.
 Read the [compatibility inventory](docs/ANDROSWITCH_COMPATIBILITY.md) and
-[M1 evidence](reports/m1-core.json) for the exact scope.
+[M2–M4 implementation and evidence guide](docs/M2_M4_E2E.md) for the exact scope.
 
 ## Project direction
 
 - One common Android environment: improve shared API/ABI contracts instead of
   adding package-name branches, game profiles or title-specific hooks.
-- DEX interpretation and, in later milestones, native ARM64 libraries connected
+- DEX interpretation and native ARM64 libraries connected
   through real JNI objects, methods and references.
 - A portable `no_std + alloc` core with explicit libnx platform adapters.
 - Offline, one-app-at-a-time operation for the first release; no Python,
@@ -68,9 +72,16 @@ cargo run -p as-cli --locked -- inspect fixtures/cache/org.fdroid.fdroid_2000052
 ./scripts/check-m0.ps1
 ```
 
-`asctl` currently provides inspection. The M1 method execution probe is a
-separate development harness; application execution flags in `asctl` remain
-false until installation/lifecycle integration is implemented. See the
+`asctl` provides inspection and persistent package management:
+
+```powershell
+cargo run -p as-cli --locked -- install "path/to/app.apk" --root "local-artifacts/storage" --json
+cargo run -p as-cli --locked -- list --root "local-artifacts/storage" --json
+```
+
+The DEX/JNI execution probe is a separate development harness; application
+lifecycle execution flags in `asctl` remain false until that integration exists.
+See the
 [CLI reference](docs/CLI.md) and [getting started guide](docs/GETTING_STARTED.md).
 
 ## Build and test the Switch proof
@@ -95,7 +106,8 @@ See [testing](docs/TESTING.md) and the [M1 E2E procedure](docs/M1_E2E.md).
 ## Planned SD layout
 
 The launcher/install layout below is the product target for later milestones.
-The current M1 proof uses `switch/androswitch-smoke/` instead.
+The M1–M4 developer runner uses `switch/androswitch-smoke/` for its inputs;
+M2–M4 persistent installations and saves already use `switch/androswitch/`.
 
 ```text
 switch/androswitch/
@@ -113,9 +125,10 @@ switch/androswitch/
 └── logs/
 ```
 
-Users will import APKs through `apks/`. Java and native APIs will share the
-same filesystem mappings; OBBs will remain ordinary app-readable files.
-Installation and persistent storage are **M2**, with the launcher in **M7**.
+Users will import APKs through `apks/` when the M7 launcher is available.
+Java and native file APIs already share the same filesystem mappings;
+OBBs remain ordinary app-readable files. Persistent installation is available
+through the host CLI and the device developer runner.
 
 ## Documentation and development
 

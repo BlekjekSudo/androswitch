@@ -25,6 +25,12 @@ binary, assets, title-specific hooks, response payloads or source code were
 imported in M0/M1. Any later component import must record its exact source,
 revision and applicable attribution.
 
+M3's generic code-memory mapping adapts the technique in `so_util.c`,
+Copyright (C) 2021 Andy Nguyen, fgsfds, licensed under MIT. The original
+license is preserved in `third_party/so_util.LICENSE`. The pinned AOSP JNI
+header retains Copyright (C) 2006 The Android Open Source Project and its
+Apache-2.0 notice. See [third-party provenance](third_party/README.md).
+
 Rust, libnx, devkitPro, Android build tools, emulator tools, Cargo dependencies
 and external fixtures retain their respective licenses and credits. The
 project's license choice does not replace those terms. External APKs, generated

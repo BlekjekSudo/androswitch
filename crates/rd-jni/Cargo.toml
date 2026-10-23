@@ -19,9 +19,12 @@ cranelift-codegen = { version = "=0.104.3", optional = true }
 cranelift-frontend = { version = "=0.104.3", optional = true }
 cranelift-jit = { version = "=0.104.3", optional = true }
 cranelift-module = { version = "=0.104.3", optional = true }
-serde.workspace = true
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+
+[dev-dependencies]
 serde_json.workspace = true
 
 [features]
-default = []
-jit = ["dep:cranelift-codegen", "dep:cranelift-frontend", "dep:cranelift-module", "dep:cranelift-jit"]
+default = ["std"]
+std = ["serde/std"]
+jit = ["std", "dep:cranelift-codegen", "dep:cranelift-frontend", "dep:cranelift-module", "dep:cranelift-jit"]

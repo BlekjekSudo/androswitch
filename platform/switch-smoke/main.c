@@ -41,7 +41,7 @@ static int apk_probe(const char *base) {
     uint8_t *apk = read_bounded(path, 64 * 1024 * 1024, &apk_size);
     snprintf(path, sizeof(path), "%s/request.json", base);
     uint8_t *request = read_bounded(path, 64 * 1024, &request_size);
-    if (!apk || !request) { free(apk); free(request); return 0; }
+    if (!request) { free(apk); return 0; }
     uint8_t *output = malloc(64 * 1024);
     size_t length = output ? as_smoke_run_apk(apk, apk_size, request, request_size, output, 64 * 1024) : 0;
     free(apk); free(request);
@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
         "\"apk_execution\":false}\n",
         allocation, result, summary.version, summary.file_size, summary.classes,
         summary.methods, summary.strings, summary.checksum_ok, elapsed);
-    printf("AndroSwitch M1 portable DEX parser smoke\n%s\nPress + to exit.\n", report);
+    printf("AndroSwitch portable parser/runtime proof\n%s\nPress + to exit.\n", report);
     FILE *receipt = fopen(output, "wb");
     if (receipt) { fputs(report, receipt); fclose(receipt); }
     const int probe_written = apk_probe(base);

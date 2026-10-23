@@ -18,9 +18,13 @@ rd-vm = { path = "../rd-vm", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 as-platform = { path = "../as-platform", default-features = false }
+as-package = { path = "../as-package" }
+as-native = { path = "../as-native" }
+rd-jni = { path = "../rd-jni", default-features = false }
 
 [features]
-host-cli = []
+host-cli = ["as-platform/std"]
+host-native = ["host-cli","as-native/oracle"]
 portable-tests = []
 
 [[bin]]

@@ -74,7 +74,11 @@ worker stack, and the bounded probe caps guest depth at 16. The final Ryujinx
 run reports `VM_STACK_OVERFLOW` rather than crashing. Device heap: 256 MiB;
 probe guest heap accounting: 32 MiB; fuel: one million instructions per call.
 
-## Scope after M1
+## Historical scope after M1
+
+This section records the M1 boundary. Persistent storage and native/JNI
+execution have since been implemented and verified separately in
+[the M2–M4 evidence](M2_M4_E2E.md).
 
 This is a method execution proof, not an Android Activity launcher. JNI,
 native loading, threads/monitors, Android framework/UI/media and persistent

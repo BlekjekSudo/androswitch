@@ -11,8 +11,9 @@ minSdk above the reference environment is. Required splits wait for M10.
 ## Components
 
 `as-runtime` is the facade consumed by the host CLI and eventually launcher and
-runner. At M0 only inspection is implemented. `as-platform` defines portable
-storage, clock and logging contracts, with a real host adapter. Further services
+runner. Inspection and persistent package management are implemented; lifecycle
+launch/stop follows M5–M7. `as-platform` defines portable
+storage, clock and logging contracts, with host and libnx filesystem adapters. Further services
 are added with their implementation milestones. The inherited `rd-*` crates
 retain their upstream behavior and tests.
 
@@ -26,8 +27,11 @@ DEFLATE inflation on both host and device. Filesystem opening stays in adapters.
 
 `as-switch-smoke` is the libnx proof bridge; `as-probe` is its host test CLI.
 They consume the same descriptor-based request, without package-specific
-runtime branches. M1's verified method suite is separate from the future
-`as-runtime` application lifecycle facade, installation and JNI backend.
+runtime branches. It now binds persistent packages, the shared native loader
+and real JNI to the Engine. This remains separate from the future
+`as-runtime` application lifecycle facade. See [M2–M4](M2_M4_E2E.md),
+[ADR 013](adr/013-persistent-package-revisions.md) and
+[ADR 014](adr/014-native-horizon-jni.md).
 
 The device path uses `no_std + alloc` and C ABI adapters for libnx. OS access,
 environment configuration, thread-local VM state and subprocesses must leave

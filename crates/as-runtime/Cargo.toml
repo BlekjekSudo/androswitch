@@ -10,6 +10,7 @@ workspace = true
 
 [dependencies]
 as-platform = { path = "../as-platform" }
+as-package = { path = "../as-package" }
 rd-apk.workspace = true
 rd-dex.workspace = true
 serde.workspace = true

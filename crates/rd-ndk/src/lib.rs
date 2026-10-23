@@ -1,5 +1,8 @@
 //! Bounded ELF parsing and optional isolated CPU execution (ADR 004).
 //! Guest code is never passed to host dlopen or executed in the Rust process.
+#![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
+use alloc::string::String;
 pub mod elf;
 #[cfg(feature = "native")]
 pub mod runtime;
@@ -29,13 +32,14 @@ impl RdError {
         )
     }
 }
-impl std::fmt::Display for RdError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for RdError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{} [{}]: {}", self.code, self.module_id, self.cause)
     }
 }
+#[cfg(feature = "std")]
 impl std::error::Error for RdError {}
-pub type Result<T> = std::result::Result<T, RdError>;
+pub type Result<T> = core::result::Result<T, RdError>;
 pub fn not_implemented<T>() -> Result<T> {
     Err(RdError::not_implemented())
 }

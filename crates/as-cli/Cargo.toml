@@ -14,6 +14,7 @@ workspace = true
 
 [dependencies]
 as-runtime = { path = "../as-runtime" }
+as-platform = { path = "../as-platform" }
 clap.workspace = true
 serde_json.workspace = true
 

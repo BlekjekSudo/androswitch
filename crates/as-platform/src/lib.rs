@@ -6,8 +6,12 @@ extern crate alloc;
 use alloc::{string::String, vec::Vec};
 use core::fmt;
 
+pub mod fs;
 #[cfg(feature = "std")]
 pub mod host;
+#[cfg(feature = "std")]
+pub mod host_fs;
+pub mod vfs;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlatformError {

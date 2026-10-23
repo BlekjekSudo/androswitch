@@ -1,7 +1,7 @@
 //! Little-endian ET_DYN ELF32/ELF64, including stripped dynamic metadata.
 use crate::{RdError, Result};
+use alloc::{collections::BTreeMap, format, string::String, vec::Vec};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 const MAX_IMAGE: u64 = 128 * 1024 * 1024;
 const MAX_ENTRIES: usize = 1_000_000;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -51,7 +51,14 @@ pub struct Relocation {
     pub addend: Option<i64>,
 }
 #[derive(Debug, Clone)]
+pub struct Tls {
+    pub bytes: Vec<u8>,
+    pub memory_size: u64,
+    pub alignment: u64,
+}
+#[derive(Debug, Clone)]
 pub struct Elf {
+    pub tls: Option<Tls>,
     pub abi: Abi,
     pub segments: Vec<Segment>,
     pub symbols: Vec<Symbol>,
@@ -131,6 +138,7 @@ impl Elf {
         )?;
         let mut segments = Vec::new();
         let mut dynamic = None;
+        let mut tls = None;
         let mut end = 0;
         for i in 0..phcount {
             let p = phoff + i * phsize;
@@ -171,6 +179,20 @@ impl Elf {
                 });
             } else if ty == 2 {
                 dynamic = Some((off, filesz));
+            } else if ty == 7 {
+                let alignment = num(d, p + if wide { 48 } else { 28 }, word)?.max(1);
+                if filesz > memsz
+                    || memsz > MAX_IMAGE
+                    || !alignment.is_power_of_two()
+                    || alignment > 1 << 20
+                {
+                    return Err(bad("invalid PT_TLS"));
+                }
+                tls = Some(Tls {
+                    bytes: bytes(d, off, filesz)?.to_vec(),
+                    memory_size: memsz,
+                    alignment,
+                });
             }
         }
         if segments.is_empty() {
@@ -449,6 +471,7 @@ impl Elf {
             None
         };
         Ok(Self {
+            tls,
             abi,
             segments,
             symbols,

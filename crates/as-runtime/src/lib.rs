@@ -1,7 +1,27 @@
 //! AndroSwitch inspection facade. Inspection never claims application execution.
+pub use as_package::{PackageManager, Record as InstalledPackage};
 use as_platform::{host::HostPlatform, Storage};
 use rd_apk::{axml::XmlElement, Apk};
 use serde::Serialize;
+
+impl Runtime<HostPlatform> {
+    pub fn packages(
+        &self,
+        root: impl AsRef<std::path::Path>,
+    ) -> Result<PackageManager<as_platform::host_fs::HostFileSystem>, RuntimeError> {
+        Ok(PackageManager::new(
+            as_platform::host_fs::HostFileSystem::new(root).map_err(platform_error)?,
+        ))
+    }
+}
+fn platform_error(error: as_platform::PlatformError) -> RuntimeError {
+    RuntimeError {
+        code: error.code.into(),
+        operation: error.operation.into(),
+        module_id: "as-platform".into(),
+        cause: error.cause,
+    }
+}
 
 pub const UPSTREAM_REVISION: &str = "6388281f66d254c8e01a0fdc7a5a9a30239bc762";
 pub const RUNTIME_API: u32 = 26;
@@ -280,7 +300,7 @@ impl<P: Storage> Runtime<P> {
                 single_apk,
                 static_requirements_met: blockers.is_empty(),
                 blockers,
-                install_implemented: false,
+                install_implemented: true,
                 execution_implemented: false,
                 host_execution_verified: false,
                 horizon_emulator_verified: false,
@@ -299,7 +319,7 @@ impl<P: Storage> Runtime<P> {
             native_abis: ["arm64-v8a"],
             offline: true,
             apk_inspection: true,
-            install: false,
+            install: true,
             dex_execution: false,
             native_execution: false,
             horizon_emulator_verified: false,

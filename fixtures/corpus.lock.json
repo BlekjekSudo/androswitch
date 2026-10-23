@@ -50,9 +50,9 @@
     },
     {
       "id": "androswitch-java-kotlin",
-      "state": "planned_no_fixture_yet",
+      "state": "source_and_apks_frozen_jvm_and_ryujinx_verified",
       "milestone": "M4",
-      "note": "Record sources, compiler inputs and generated APK hashes when these fixtures are authored."
+      "note": "Original Java/Kotlin/C/C++/Rust fixture sources in fixtures/m4; pinned compiler/source/native/APK hashes and JVM/Ryujinx executions in reports/m4-jni.json. External NDK/Vector samples retain separate pending status."
     },
     {
       "id": "androswitch-vm-java",

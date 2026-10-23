@@ -5,6 +5,13 @@
 
 extern crate alloc;
 
+#[cfg(target_os = "horizon")]
+pub mod device_fs;
+#[cfg(target_os = "horizon")]
+pub mod device_jni;
+#[cfg(target_os = "horizon")]
+pub mod device_native;
+pub mod native_probe;
 pub mod probe;
 
 use alloc::vec::Vec;
@@ -89,7 +96,7 @@ pub unsafe extern "C" fn as_smoke_run_apk(
     output: *mut u8,
     capacity: usize,
 ) -> usize {
-    if apk.is_null()
+    if (apk.is_null() && apk_len != 0)
         || request.is_null()
         || output.is_null()
         || apk_len > 64 << 20
@@ -99,9 +106,24 @@ pub unsafe extern "C" fn as_smoke_run_apk(
         return 0;
     }
     // SAFETY: caller's documented input buffer contract; APK is owned by Rust.
-    let apk = unsafe { core::slice::from_raw_parts(apk, apk_len) }.to_vec();
+    let apk = if apk_len == 0 {
+        Vec::new()
+    } else {
+        unsafe { core::slice::from_raw_parts(apk, apk_len) }.to_vec()
+    };
     let request = unsafe { core::slice::from_raw_parts(request, request_len) };
+    #[cfg(not(target_os = "horizon"))]
     let report = probe::run_json(apk, request);
+    #[cfg(target_os = "horizon")]
+    let report = match device_fs::LibnxFileSystem::new("sdmc:/switch/androswitch") {
+        Ok(fs) => probe::run_json_with_fs(apk, request, Some(alloc::rc::Rc::new(fs))),
+        Err(error) => serde_json::to_vec(&probe::Failure {
+            code: error.code.into(),
+            module_id: "as-platform".into(),
+            cause: alloc::string::ToString::to_string(&error),
+        })
+        .unwrap_or_default(),
+    };
     if report.len() > capacity {
         return 0;
     }

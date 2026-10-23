@@ -14,6 +14,8 @@ use alloc::{
 };
 
 #[cfg(not(feature = "std"))]
+pub mod native_host;
+#[cfg(not(feature = "std"))]
 mod portable;
 #[cfg(feature = "std")]
 pub(crate) mod maps {

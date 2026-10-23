@@ -64,9 +64,27 @@ The recorded fixture is DEX 037 with 11,168 classes, 65,003 methods and
 62,734 strings, and a valid checksum. `bytecode_executed` is false for this
 command. See [the fixture lock](../fixtures/corpus.lock.json).
 
-## as-probe — the M1 method harness
+## Persistent package commands
 
-This developer binary takes an APK and a request JSON, executes selected
+```powershell
+asctl install app.apk --root path/to/androswitch --json
+asctl install update.apk --root path/to/androswitch --update --json
+asctl list --root path/to/androswitch --json
+asctl uninstall org.example.app --root path/to/androswitch --json
+asctl clear-data org.example.app --root path/to/androswitch --json
+```
+
+`install` copies the source APK into a committed revision. `--activity` selects
+an enabled MAIN/LAUNCHER activity; otherwise the first enabled launcher is
+recorded. A resource/library-only APK can be installed without an activity.
+Updates retain private/shared files; an older versionCode is rejected.
+Uninstall retains data. `clear-data` clears private data explicitly; shared
+Android data/OBB is retained. JSON failures include subsystem and operation.
+These commands manage packages; they do not launch an Activity.
+
+## as-probe — the DEX/native/JNI method harness
+
+This developer binary takes an APK, a request JSON and optional storage root, executes selected
 static DEX methods through the shared interpreter and emits a report:
 
 ```powershell
@@ -78,10 +96,19 @@ carry a schema version, session ID and calls containing a class descriptor,
 method, signature and argument literals. Fixture-specific selections are in
 the harness; they do not alter runtime behavior by package name.
 
-Reports include `portable_vm`, per-call values/errors and instruction counts.
+The optional request `storage` selects install/update/installed launch, with a
+package and optional expected revision. `APK=-` loads the installed copy without
+requiring a source APK. Java and native see the same package VFS. Optional
+`native` calls select a library, exported symbol and scalar descriptor; host
+execution requires `--features host-native` and Unicorn 2.1.4.
+
+Reports include `portable_vm`, per-call values/errors and instruction counts,
+installation metadata and actual JNI load/call/callback counters.
 Use `scripts/test-ryujinx-m1.ps1` for assertions and a pass/fail receipt; raw
 probe JSON must be inspected for individual errors. This harness is not a
 user APK launcher or lifecycle API.
+
+See [M2–M4](M2_M4_E2E.md) for build/run commands and the supported JNI subset.
 
 ## Retained rd tools
 

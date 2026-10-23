@@ -1,0 +1,244 @@
+{
+  "fixture_build": {
+    "schema_version": 1,
+    "ndk": "28.2.13676358",
+    "api": 26,
+    "section_headers": false,
+    "files": [
+      {
+        "sha256": "75496a32436a27349ccc29b6be15bf0287488b93da27e314d701ca53802e6feb",
+        "name": "libarithmetic.so"
+      },
+      {
+        "sha256": "0a8da74ef79350d8bece2d432dfe7a6f50be91ade726457ccfc99908ef4f1e30",
+        "name": "libcalculation.so"
+      },
+      {
+        "sha256": "17caba297a027e7186936e11301ae5688bbb94dbcf761f52f35f36778e7ff384",
+        "name": "libmissing.so"
+      },
+      {
+        "sha256": "d7553a63685de5a6bcdd72626298a287e7c7d280690bbb97bc5385a19265b217",
+        "name": "libsyscall.so"
+      },
+      {
+        "sha256": "c71005beecd4979e3541a155078582005a11c2145ee209350113f7b3cce21624",
+        "name": "libthreadstate.so"
+      }
+    ],
+    "clang": "Android (13624864, based on r530567e) clang version 19.0.1 (https://android.googlesource.com/toolchain/llvm-project 97a699bf4812a18fb657c2779f5296a4ab2694d2)\r\nTarget: aarch64-unknown-linux-android26\r\nThread model: posix\r\nInstalledDir: C:/Users/Administrator/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin"
+  },
+  "host_execution": {
+    "schema_version": 1,
+    "kind": "apk_dex_method_probe",
+    "session_id": "7e4847947de747a9a20066f6185c6b77",
+    "package": "org.androswitch.fixture",
+    "min_sdk": 24,
+    "target_sdk": 35,
+    "dex_files": 1,
+    "portable_vm": true,
+    "application_lifecycle": false,
+    "jni": false,
+    "calls": [],
+    "installation": null,
+    "native": [
+      {
+        "library": "libarithmetic.so",
+        "symbol": "mixed_integer",
+        "value": "69135802549",
+        "error": null
+      },
+      {
+        "library": "libarithmetic.so",
+        "symbol": "mixed_float",
+        "value": "10.625",
+        "error": null
+      },
+      {
+        "library": "libarithmetic.so",
+        "symbol": "allocation",
+        "value": "257",
+        "error": null
+      },
+      {
+        "library": "libthreadstate.so",
+        "symbol": "tls_next",
+        "value": "44",
+        "error": null
+      },
+      {
+        "library": "libthreadstate.so",
+        "symbol": "tls_next",
+        "value": "37",
+        "error": null
+      },
+      {
+        "library": "libmissing.so",
+        "symbol": "missing_import",
+        "value": null,
+        "error": {
+          "code": "NOT_IMPLEMENTED",
+          "operation": "oracle",
+          "library": "unicorn",
+          "required": "native import android_api_intentionally_missing",
+          "cause": "unicorn: oracle requires native import android_api_intentionally_missing"
+        }
+      },
+      {
+        "library": "libsyscall.so",
+        "symbol": "direct_linux_syscall",
+        "value": null,
+        "error": {
+          "code": "LINUX_SYSCALL_UNSUPPORTED",
+          "operation": "validate_code",
+          "library": "libsyscall.so",
+          "required": "svc instruction at 0x124c",
+          "cause": "libsyscall.so: validate_code requires svc instruction at 0x124c"
+        }
+      }
+    ],
+    "jni_statistics": null
+  },
+  "typed_missing_import_and_syscall_cases": 2,
+  "positive_native_comparisons": 5,
+  "notes": [
+    "Missing import diagnostics differ between backends; five positive values are compared directly",
+    "Code-memory release produced no InvalidCurrentMemory warning in the final run",
+    "Supported relocation/Bionic/TLS subset; see docs/M2_M4_E2E.md"
+  ],
+  "execution": {
+    "schema_version": 1,
+    "kind": "apk_dex_method_probe",
+    "session_id": "7e4847947de747a9a20066f6185c6b77",
+    "package": "org.androswitch.fixture",
+    "min_sdk": 24,
+    "target_sdk": 35,
+    "dex_files": 1,
+    "portable_vm": true,
+    "application_lifecycle": false,
+    "jni": false,
+    "calls": [],
+    "installation": null,
+    "native": [
+      {
+        "library": "libarithmetic.so",
+        "symbol": "mixed_integer",
+        "value": "69135802549",
+        "error": null
+      },
+      {
+        "library": "libarithmetic.so",
+        "symbol": "mixed_float",
+        "value": "10.625",
+        "error": null
+      },
+      {
+        "library": "libarithmetic.so",
+        "symbol": "allocation",
+        "value": "257",
+        "error": null
+      },
+      {
+        "library": "libthreadstate.so",
+        "symbol": "tls_next",
+        "value": "44",
+        "error": null
+      },
+      {
+        "library": "libthreadstate.so",
+        "symbol": "tls_next",
+        "value": "37",
+        "error": null
+      },
+      {
+        "library": "libmissing.so",
+        "symbol": "missing_import",
+        "value": null,
+        "error": {
+          "code": "SYMBOL_NOT_FOUND",
+          "operation": "resolve",
+          "library": "libmissing.so",
+          "required": "android_api_intentionally_missing",
+          "cause": "libmissing.so: resolve requires android_api_intentionally_missing"
+        }
+      },
+      {
+        "library": "libsyscall.so",
+        "symbol": "direct_linux_syscall",
+        "value": null,
+        "error": {
+          "code": "LINUX_SYSCALL_UNSUPPORTED",
+          "operation": "validate_code",
+          "library": "libsyscall.so",
+          "required": "svc instruction at 0x124c",
+          "cause": "libsyscall.so: validate_code requires svc instruction at 0x124c"
+        }
+      }
+    ],
+    "jni_statistics": null
+  },
+  "run": {
+    "schema_version": 1,
+    "session_id": "7e4847947de747a9a20066f6185c6b77",
+    "milestone": "M3",
+    "status": "passed",
+    "physical_device": "not_run",
+    "started_at": "2026-10-23T14:39:02.2253183Z",
+    "native_calls": 7,
+    "dex_calls": 0,
+    "inputs": [
+      {
+        "sha256": "e74f2caaa1120be62607fe91277a9bb7350f837c8699ec9b180f7efb740aad75",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m3\\fixture\\native-loader.apk"
+      },
+      {
+        "sha256": "459e8d96963c7c867461041958252cdee9161b84513d74948c312e9810bea11b",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m3\\fixture\\request.json"
+      },
+      {
+        "sha256": "ed8744d4fbd0ee31c35947cdc5d598ee7a394e5954ac5795922d5137e2c4eb2e",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m3\\fixture\\expected.json"
+      },
+      {
+        "sha256": "2467561cf7361ed269dee2456e4ba9f335a14fc692a719157a95bf3fd4aeab1f",
+        "file": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-smoke\\androswitch-smoke.nro"
+      }
+    ],
+    "emulator": {
+      "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0",
+      "version": "1.3.3+e2143d4"
+    },
+    "finished_at": "2026-10-23T14:39:50.51543Z"
+  },
+  "verification": {
+    "horizon_emulator": "passed",
+    "physical_device": "not_run",
+    "host_unicorn": "passed_positive_values"
+  },
+  "schema_version": 1,
+  "milestone": "M3",
+  "artifact_root": "local-artifacts/m3/runs/7e4847947de747a9a20066f6185c6b77",
+  "implementation_commit": "pending_commit",
+  "sources": [
+    {
+      "file": "fixtures/m3/native/dependency.c",
+      "sha256": "6e9ce56f6734c4415df7c513b159db5a76b97e79f4f4ce8ef73c5c5208e88574"
+    },
+    {
+      "file": "fixtures/m3/native/missing.c",
+      "sha256": "423d71c622666e39b9832c149499557435f9a32869418b3a195a78da26ffff82"
+    },
+    {
+      "file": "fixtures/m3/native/probe.c",
+      "sha256": "95a208a988c050836fc34033260538b78a23a2cc06cedc93ebf4b7e7ac46d219"
+    },
+    {
+      "file": "fixtures/m3/native/syscall.S",
+      "sha256": "69d4ba2a6686afa2b96a5571c3b36eb3584f9ba2787d887cdbe296043c92b052"
+    },
+    {
+      "file": "fixtures/m3/native/tls.c",
+      "sha256": "c92f33aa3c3a75323ce817161096ab3d50efc7f2a94b016bf46d5bdea08f60e5"
+    }
+  ]
+}

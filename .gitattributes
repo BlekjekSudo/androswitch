@@ -10,6 +10,9 @@
 *.json text eol=lf
 *.sh text eol=lf
 
+# Preserve the pinned AOSP header byte-for-byte, including its final blank line.
+third_party/android/jni.h whitespace=-blank-at-eof
+
 # Binaries
 *.png binary
 *.jpg binary

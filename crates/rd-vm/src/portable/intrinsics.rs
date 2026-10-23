@@ -2,7 +2,7 @@
 //! resolve the actual DEX method or report its exact unresolved descriptor.
 //! This is not a successful implementation of any Android service.
 use crate::{Engine, ObjRef, Value, VmExit};
-use alloc::string::String;
+use alloc::string::{String, ToString};
 
 pub fn alloc_string(vm: &mut Engine, text: String) -> Result<ObjRef, VmExit> {
     if let Some(object) = vm.portable.strings.get(&text) {
@@ -14,32 +14,63 @@ pub fn alloc_string(vm: &mut Engine, text: String) -> Result<ObjRef, VmExit> {
 }
 
 pub fn call_native_loader(
-    _vm: &mut Engine,
-    _class: &str,
-    _name: &str,
-    _sig: &str,
-    _args: &[Value],
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if class == "Ljava/lang/System;"
+        && matches!(name, "loadLibrary" | "load")
+        && sig == "(Ljava/lang/String;)V"
+    {
+        let text = vm
+            .heap
+            .as_str(args[0].as_ref()?.ok_or_else(|| {
+                crate::Throwable::new("Ljava/lang/NullPointerException;", "library name")
+            })?)?
+            .to_string();
+        let backend = vm.native_host().ok_or_else(|| {
+            crate::err::vm_error(
+                "NATIVE_BACKEND_UNAVAILABLE",
+                "System.loadLibrary requires native backend",
+            )
+        })?;
+        backend.load(vm, &text, name == "load")?;
+        return Ok(Some(Value::Null));
+    }
     Ok(None)
 }
 pub fn call_static_intrinsic(
-    _vm: &mut Engine,
-    _class: &str,
-    _name: &str,
-    _sig: &str,
-    _args: &[Value],
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if class == "Ljava/lang/System;" && name == "gc" && sig == "()V" {
+        vm.gc();
+        return Ok(Some(Value::Null));
+    }
+    if let Some(value) = crate::portable::file::call_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     Ok(None)
 }
 #[allow(clippy::too_many_arguments)]
 pub fn call_instance_intrinsic_mref(
-    _vm: &mut Engine,
+    vm: &mut Engine,
     _receiver_class: &str,
-    _declaring_class: &str,
-    _name: &str,
-    _sig: &str,
-    _receiver: ObjRef,
-    _args: &[Value],
+    declaring_class: &str,
+    name: &str,
+    sig: &str,
+    receiver: ObjRef,
+    args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(value) =
+        crate::portable::file::call(vm, declaring_class, name, sig, receiver, args)?
+    {
+        return Ok(Some(value));
+    }
     Ok(None)
 }

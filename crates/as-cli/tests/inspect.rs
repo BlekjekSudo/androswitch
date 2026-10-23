@@ -2,7 +2,10 @@ use as_testsupport::apkfix::{build_apk_sdk, ArscFix};
 use std::{
     path::PathBuf,
     process::{Command, Output},
+    sync::atomic::{AtomicU64, Ordering},
 };
+
+static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
 struct Fixture {
     dir: PathBuf,
@@ -10,12 +13,13 @@ struct Fixture {
 impl Fixture {
     fn new() -> Self {
         let dir = std::env::temp_dir().join(format!(
-            "AndroSwitch CLI test {} {}",
+            "AndroSwitch CLI test {} {} {}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .as_nanos()
+                .as_nanos(),
+            NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed)
         ));
         std::fs::create_dir_all(&dir).unwrap();
         Self { dir }
@@ -92,8 +96,8 @@ fn capabilities_do_not_turn_upstream_features_into_switch_claims() {
     assert!(output.status.success());
     let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(report["apk_inspection"], true);
+    assert_eq!(report["install"], true);
     for field in [
-        "install",
         "dex_execution",
         "native_execution",
         "device_verified",
@@ -101,4 +105,57 @@ fn capabilities_do_not_turn_upstream_features_into_switch_claims() {
     ] {
         assert_eq!(report[field], false, "{field}");
     }
+}
+
+#[test]
+fn package_commands_persist_without_source_apk_and_uninstall_keeps_saves() {
+    let fixture = Fixture::new();
+    let apk = fixture.apk();
+    let root = fixture.dir.join("runtime storage");
+    let json = |args: &[&std::ffi::OsStr]| {
+        let output = run(args);
+        assert!(
+            output.status.success(),
+            "stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()
+    };
+    let installed = json(&[
+        "install".as_ref(),
+        apk.as_os_str(),
+        "--root".as_ref(),
+        root.as_os_str(),
+        "--json".as_ref(),
+    ]);
+    assert_eq!(installed["package"]["package"], "org.example.cli");
+    assert_eq!(installed["package"]["signature_verified"], false);
+    std::fs::remove_file(apk).unwrap();
+    let listed = json(&[
+        "list".as_ref(),
+        "--root".as_ref(),
+        root.as_os_str(),
+        "--json".as_ref(),
+    ]);
+    assert_eq!(listed["packages"][0], installed["package"]);
+    let save = root.join("userdata/org.example.cli/files/save");
+    std::fs::write(&save, b"retained").unwrap();
+    json(&[
+        "uninstall".as_ref(),
+        "org.example.cli".as_ref(),
+        "--root".as_ref(),
+        root.as_os_str(),
+        "--json".as_ref(),
+    ]);
+    let listed = json(&[
+        "list".as_ref(),
+        "--root".as_ref(),
+        root.as_os_str(),
+        "--json".as_ref(),
+    ]);
+    assert_eq!(listed["packages"], serde_json::json!([]));
+    assert_eq!(std::fs::read(save).unwrap(), b"retained");
+    // This unique temporary directory was created by this fixture only.
+    std::fs::remove_dir_all(root).unwrap();
 }

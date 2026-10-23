@@ -39,7 +39,7 @@ fn legacy_min_sdk_and_higher_target_are_allowed_without_claiming_execution() {
         assert!(report.preflight.static_requirements_met);
         assert_eq!(report.preflight.runtime_api, RUNTIME_API);
         assert!(!report.preflight.execution_implemented);
-        assert!(!report.preflight.install_implemented);
+        assert!(report.preflight.install_implemented);
         assert!(!report.preflight.device_verified);
     }
 }

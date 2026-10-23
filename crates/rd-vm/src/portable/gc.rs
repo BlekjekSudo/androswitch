@@ -21,6 +21,9 @@ impl Engine {
         roots.extend(self.heap.gc_pinned_roots());
         roots.extend(self.portable.strings.values().copied());
         roots.extend(self.portable.classes.values().copied());
+        if let Some(native) = self.native_host() {
+            roots.extend(native.roots());
+        }
         while let Some(object) = roots.pop() {
             if object == 0 || object as usize > n || marked[object as usize] {
                 continue;
@@ -43,6 +46,9 @@ impl Engine {
             }
         }
         self.heap.promote();
+        self.portable
+            .files
+            .retain(|object, _| marked.get(*object as usize).copied().unwrap_or(false));
         self.gc_stats.collections += 1;
         self.gc_stats.last_freed_objects = freed;
         self.gc_stats.last_used_after = self.heap.used();

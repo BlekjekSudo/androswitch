@@ -1,0 +1,17 @@
+[package]
+name = "as-native"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Portable program-header ARM64 loader and native call descriptors"
+
+[lints]
+workspace = true
+
+[dependencies]
+rd-ndk = { path = "../rd-ndk", default-features = false }
+rd-jni = { path = "../rd-jni", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+
+[features]
+oracle = ["rd-ndk/native"]

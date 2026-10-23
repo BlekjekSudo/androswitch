@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-23",
+  "implementation_commit": "pending_commit",
+  "status": "passed",
+  "physical_device": "not_run",
+  "checks": [
+    {
+      "command": "cargo test -p as-platform -p as-runtime -p as-cli -p as-switch-smoke --locked",
+      "log": "target/evidence/androswitch-tests.log",
+      "sha256": "c19b59b3cde3812ff49d2e6356af823681a29d1ece7ce75b690145c526f6be53",
+      "exit_code": 0,
+      "passed_tests": 15
+    },
+    {
+      "command": "cargo test -p as-runtime --test inspection --locked -- --ignored",
+      "log": "target/evidence/real-apk-test.log",
+      "sha256": "daf338a4e4a43c943aae8979314258fe2790cae301329cdc44ad39d522775a52",
+      "exit_code": 0,
+      "passed_tests": 1
+    },
+    {
+      "command": "cargo test -p rd-apk -p rd-dex --lib --locked -- --test-threads=1 --skip paged_open_handles_sparse_multigigabyte_container",
+      "log": "target/evidence/parser-regressions.log",
+      "sha256": "05f6a803d086fe619b26a86cbf00912004906bce531f1c6c2bfb07a04fe07c30",
+      "exit_code": 0,
+      "passed_tests": 127
+    },
+    {
+      "command": "cargo test -p rd-dex --test portable_index --locked -- --ignored",
+      "log": "target/evidence/dex-real-std.log",
+      "sha256": "1b5b354b38180b485cc5aa8c26550e92ab4d759284e8e6a53753eeef5d934df4",
+      "exit_code": 0,
+      "passed_tests": 1
+    },
+    {
+      "command": "cargo test -p rd-dex --no-default-features --test portable_index --locked -- --ignored",
+      "log": "target/evidence/dex-real-no-std.log",
+      "sha256": "0fc3039820edd5dd260e20c880fd14858dc699254f8c84ffbfeedecadc0473a7",
+      "exit_code": 0,
+      "passed_tests": 1
+    },
+    {
+      "command": "cargo check -p as-platform --no-default-features --locked",
+      "log": "target/evidence/platform-no-std.log",
+      "sha256": "9645c5edb80fef8436886aff68051ddf53f572d1afd9c92bcfcc82a8c3f96c35",
+      "exit_code": 0,
+      "passed_tests": 0
+    },
+    {
+      "command": "cargo clippy -p rd-dex --no-default-features --lib --locked -- -D warnings",
+      "log": "target/evidence/dex-no-std.log",
+      "sha256": "c0cb23685d0f4538baee55f516346c9c710c1b234dd577adca090d4327dc9ab1",
+      "exit_code": 0,
+      "passed_tests": 0
+    },
+    {
+      "command": "cargo clippy -p as-platform -p as-runtime -p as-cli -p as-switch-smoke --all-targets --locked -- -D warnings",
+      "log": "target/evidence/clippy.log",
+      "sha256": "464a462c5653a3064cdeea61dd16debb8dd1dd4213954a62430abeb81976c842",
+      "exit_code": 0,
+      "passed_tests": 0
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "log": "target/evidence/format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_code": 0,
+      "passed_tests": 0
+    },
+    {
+      "command": "cargo test -p as-switch-smoke --features portable-tests --test portable_core --locked -- --include-ignored",
+      "log": "target/evidence/m1-portable-tests.log",
+      "sha256": "7544903a5458b1ac3080880884f50ec3c887d540e01da42a2b7c88b867c148b2",
+      "exit_code": 0,
+      "passed_tests": 5
+    },
+    {
+      "command": "cargo clippy -p rd-apk -p rd-vm --no-default-features --lib --locked -- -D warnings",
+      "log": "target/evidence/m1-core-clippy.log",
+      "sha256": "e32700ea1d04280ffa255398026b591fe192e92c05cef8e935c96d37b5264c2a",
+      "exit_code": 0,
+      "passed_tests": 0
+    },
+    {
+      "command": "cargo clippy -p as-switch-smoke --features host-cli,portable-tests --all-targets --locked -- -D warnings",
+      "log": "target/evidence/m1-smoke-clippy.log",
+      "sha256": "bdb29dcb441b9c60bb370a6673ddd19128be3a0522d0c11c42fb3cdda2ac8b85",
+      "exit_code": 0,
+      "passed_tests": 0
+    },
+    {
+      "command": "cargo test -p as-cli --test inspect --locked",
+      "log": "target/evidence/m2-cli-final.log",
+      "sha256": "2e605655be43a4f4d10c19c5e7f3f02dfc7d10c345cce7ef3fb5dbac615d58a0",
+      "exit_code": 0,
+      "passed_tests": 4
+    },
+    {
+      "command": "cargo test -p as-package -p as-native --locked -- --include-ignored",
+      "log": "target/evidence/m2-m3-final-host.log",
+      "sha256": "8539060f5ec396626c09f802afb34f700f37a06de530985a2becd030c7cb56d8",
+      "exit_code": 0,
+      "passed_tests": 7
+    },
+    {
+      "command": "cargo test -p rd-jni --locked",
+      "log": "target/evidence/m4-final-rd-jni.log",
+      "sha256": "21833cf6a86143ec73739947d2b9023f66917227b8c23819a2c07bd5d1f01789",
+      "exit_code": 0,
+      "passed_tests": 5
+    },
+    {
+      "command": "cargo test -p rd-ndk --features native --locked --test native",
+      "log": "target/evidence/m4-final-rd-ndk.log",
+      "sha256": "3ed229a17e14008fa1855a1ff78213c9bc1f636653aa052ee870c66ac6c6bd1a",
+      "exit_code": 0,
+      "passed_tests": 3
+    },
+    {
+      "command": "cargo clippy -p as-native -p as-package -p as-switch-smoke --features as-switch-smoke/host-native,as-switch-smoke/portable-tests --all-targets --locked -- -D warnings",
+      "log": "target/evidence/m4-final-clippy.log",
+      "sha256": "12a4d8e4353a0af59f59f1a130d2e7310c4277d349d7188639ba9f45d799a2b5",
+      "exit_code": 0,
+      "passed_tests": 0
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_TEST_DEBUG=0 cargo test -p rd-vm --lib --test vm_exec --test gc --test gc_generations --test collections_gc --locked",
+      "log": "target/evidence/m4-final-vm-regressions.log",
+      "sha256": "cfbe196f9234971de4b022a7e4ef84f1e7decbe6615098f0843ad99d22bc5e39",
+      "exit_code": 0,
+      "passed_tests": 227
+    }
+  ],
+  "upstream_full_baseline": "Unchanged: five known MCP failures; not rerun as part of this milestone",
+  "resolved_attempts": [
+    "Parallel builds exhausted Windows memory; final checks run serially with CARGO_BUILD_JOBS=1.",
+    "Legacy CLI capability test still expected install=false; updated for implemented package management.",
+    "Parallel CLI fixtures could share a timestamp directory; added a process-local atomic sequence and reran the full gate.",
+    "Upstream native integration fixtures were absent; WSL lacked the ARM32 GCC compiler. Rebuilt unchanged fixture source for all three oracle ABIs with the pinned Windows NDK."
+  ],
+  "device_rust_clippy": "not_run: nightly clippy component unavailable; freestanding release build passed; host clippy and C -Wall -Wextra -Werror passed",
+  "native_oracle_fixture_build": {
+    "api": 26,
+    "ndk": "28.2.13676358",
+    "source_sha256": "dceb6a9434097e764d05caa706ac2442e7ce46645e5e27277939f3ddab55264d",
+    "role": "Host-only upstream native CPU oracle; not device ABI support",
+    "source": "golden/native/fixture.c",
+    "flags": [
+      "-shared",
+      "-fPIC",
+      "-O1",
+      "-nostdlib",
+      "-fno-stack-protector",
+      "-Wl,--hash-style=both",
+      "-Wl,--build-id=none",
+      "-Wl,--pack-dyn-relocs=none"
+    ],
+    "files": [
+      {
+        "file": "golden/native/artifacts/x86_64.so",
+        "sha256": "efa7276da6a7b9e67eb1a2c1d4d8c5106bbc39bd0a856c7d093ba58b1980f91e",
+        "abi": "x86_64"
+      },
+      {
+        "file": "golden/native/artifacts/arm64-v8a.so",
+        "sha256": "df9eb4c3f674d7a48b9f7958cc148acbd4deac47e6694971fa18fe3c5ec5f5c2",
+        "abi": "arm64-v8a"
+      },
+      {
+        "file": "golden/native/artifacts/armeabi-v7a.so",
+        "sha256": "8772272ff3f787c3f670eb55ea56ea94cea77abafff1286811303569d1b3dd36",
+        "abi": "armeabi-v7a"
+      }
+    ],
+    "schema_version": 1
+  }
+}

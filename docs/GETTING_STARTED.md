@@ -47,7 +47,7 @@ The fetch script validates size and SHA-256 against
 
 `capabilities --json` describes the current `as-runtime` facade. Its execution
 and device-verification flags remain false until application lifecycle
-integration exists. M1's separate `as-probe`/NRO harness has its own evidence.
+integration exists. The separate `as-probe`/NRO DEX/JNI harness has its own evidence.
 See [the CLI reference](CLI.md) for this distinction.
 
 ## Move to the device proof
@@ -58,8 +58,9 @@ Do not treat its output package as the future consumer launcher.
 
 The current test SD folder is `switch/androswitch-smoke/`. The intended app
 storage layout under `switch/androswitch/`, including `apks/`, `Android/data/`
-and `Android/obb/`, is planned in [architecture](ARCHITECTURE.md). Creating
-those folders does not enable installation in the current build.
+and `Android/obb/`, is created by the M2 package manager. Use `asctl install`
+and `list` with an explicit `--root`, as described in [CLI](CLI.md).
+For native/JNI proofs and hardware test inputs, follow [M2–M4](M2_M4_E2E.md).
 
 For development, continue with [testing](TESTING.md),
 [contributing](../CONTRIBUTING.md) and [credits](../CREDITS.md).

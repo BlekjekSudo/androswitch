@@ -44,7 +44,7 @@ ROOT_FILES = (
     "CREDITS.md", "NOTICE.md", "README.rustydroid.md",
     "CONTRIBUTING.rustydroid.md", "SECURITY.rustydroid.md",
 )
-SCAN_DIRS = ("docs", ".github")
+SCAN_DIRS = ("docs", ".github", "third_party")
 
 LINK_RE = re.compile(r"\]\(([^)]*)\)")
 FENCE_RE = re.compile(r"^\s{0,3}(?:```+|~~~+)")

@@ -522,6 +522,18 @@ impl Engine {
                         &ins,
                     );
                 }
+                #[cfg(not(feature = "std"))]
+                if let Some(backend) = self.native_host() {
+                    let r = self.cp.method_ref(dex_idx, m.method_idx)?;
+                    return backend.invoke(
+                        self,
+                        &r.class,
+                        &r.name,
+                        &r.proto,
+                        m.access_flags & ACC_STATIC != 0,
+                        &ins,
+                    );
+                }
                 #[cfg(not(feature = "native"))]
                 return Err(crate::err::not_implemented(format!(
                     "método nativo {}",

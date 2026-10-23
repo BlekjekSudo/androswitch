@@ -47,6 +47,9 @@ the Horizon port and its own evidence. Current additions include:
 - Per-Engine portable state and a collector for that state graph.
 - Host inspection tools, the bounded method-probe protocol and the Ryujinx
   harness with JVM comparisons and recorded failures.
+- Persistent package revisions and one Java/native filesystem adapter.
+- A shared ARM64 loader and libnx backend, with real VM-backed JNI and
+  Java/Kotlin/C/C++/Rust execution fixtures.
 - The Switch roadmap, compatibility inventory and source/fixture receipts.
 
 Individual contributions are attributed through Git history. AndroSwitch
@@ -64,6 +67,8 @@ Linux documentation.
 | [Android Open Source Project](https://source.android.com/) and [R8/D8](https://r8.googlesource.com/r8/) contributors | Android build tooling and DEX fixture compilation |
 | OpenJDK and JDK distribution contributors | Java compilation and the JVM reference execution |
 | Ryujinx contributors | Emulator used for the recorded Horizon tests; tested binary hash/version are recorded separately |
+| [Unicorn](https://github.com/unicorn-engine/unicorn) contributors | Optional host-only CPU oracle retained through RustyDroid's worker; absent from device builds |
+| JetBrains / Kotlin contributors | Kotlin compiler, standard library and compiler dependency tooling for the independent JNI fixture |
 | [F-Droid](https://f-droid.org/) contributors | Checksum-pinned real APK/DEX inspection fixture, downloaded separately |
 | [Android NDK samples](https://github.com/android/ndk-samples) contributors | Frozen sources for later JNI/NDK milestones |
 | [Vector Pinball](https://github.com/dozingcat/Vector-Pinball) / dozingcat contributors | Frozen independent integration target for later milestones |
@@ -73,11 +78,15 @@ These acknowledgements do not change the components' individual licenses.
 Tools, external APKs and proprietary game assets are not bundled in the
 source repository. [The fixture lock](fixtures/corpus.lock.json) records the
 actual revisions, hashes, source status and planned use of corpus entries.
-The Java M1 fixture is included as AndroSwitch test source.
+The Java M1, storage M2, ELF M3 and Java/Kotlin/C/C++/Rust M4 fixtures are
+included as AndroSwitch test source. The upstream parser/interpreter/JNI
+descriptor work remains attributed to RustyDroid.
 
-PES21 NX was a platform reference only in M0/M1; no PES-specific source,
-offsets, game payloads or assets were imported. Future code imports must
-record source, revision and license alongside the change.
+M3's generic Horizon code-memory mapping adapts the technique by **Andy Nguyen
+and fgsfds** from `so_util.c`; its MIT license is retained. The JNI ABI header
+is from AOSP under Apache-2.0. Exact source revisions and hashes are recorded
+in [third-party notices](third_party/README.md). No PES-specific source,
+offsets, game payloads or assets were imported.
 
 See [NOTICE](NOTICE.md) for the retained attribution statement and
 [the documentation index](docs/README.md) for current project behavior.

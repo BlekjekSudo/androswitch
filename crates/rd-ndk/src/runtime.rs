@@ -45,6 +45,7 @@ struct Library {
     elf: Elf,
 }
 pub struct Runtime {
+    worker_path: std::path::PathBuf,
     child: Child,
     input: ChildStdin,
     output: Receiver<std::result::Result<Value, String>>,
@@ -77,6 +78,7 @@ impl Drop for Runtime {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+        let _ = std::fs::remove_file(&self.worker_path);
     }
 }
 fn ioerr(e: impl std::fmt::Display) -> RdError {
@@ -111,11 +113,37 @@ fn unhex(s: &str) -> Result<Vec<u8>> {
 }
 impl Runtime {
     pub fn new(abi: Abi) -> Result<Self> {
-        let python = std::env::var_os("RD_NATIVE_PYTHON").unwrap_or_else(|| "python3".into());
+        let python = std::env::var_os("RD_NATIVE_PYTHON").unwrap_or_else(|| {
+            if cfg!(windows) {
+                "python".into()
+            } else {
+                "python3".into()
+            }
+        });
+        // A Windows command line is limited to 32767 UTF-16 units. Keep the
+        // unchanged embedded worker in a private, uniquely created file rather
+        // than truncating it through Python's -c argument.
+        use std::io::Write as _;
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let worker_path = std::env::temp_dir().join(format!(
+            "androswitch-native-{}-{}-{}.py",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(ioerr)?
+                .as_nanos(),
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        let mut worker = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&worker_path)
+            .map_err(ioerr)?;
+        worker.write_all(WORKER.as_bytes()).map_err(ioerr)?;
+        drop(worker);
         let mut child = Command::new(python)
             .arg("-u")
-            .arg("-c")
-            .arg(WORKER)
+            .arg(&worker_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
@@ -161,6 +189,7 @@ impl Runtime {
             }
         });
         let mut r = Self {
+            worker_path,
             child,
             input,
             output: rx,
@@ -200,6 +229,7 @@ impl Runtime {
         Ok(r)
     }
     fn request(&mut self, q: Value) -> Result<Value> {
+        let startup = q["op"] == "init";
         let mut b = serde_json::to_vec(&q).map_err(ioerr)?;
         if b.len() > 64 * 1024 * 1024 {
             return Err(ioerr("request exceeds IPC limit"));
@@ -209,7 +239,7 @@ impl Runtime {
         self.input.flush().map_err(ioerr)?;
         let v = self
             .output
-            .recv_timeout(Duration::from_secs(7))
+            .recv_timeout(Duration::from_secs(if startup { 30 } else { 7 }))
             .map_err(|e| {
                 let _ = self.child.kill();
                 ioerr(format!("worker response watchdog: {e}"))
@@ -464,6 +494,11 @@ impl Runtime {
         self.imports.insert(name.into(), i);
         self.import_names.insert(i, name.into());
         Ok(TRAPS + (i * 16) as u64)
+    }
+    /// Host oracle adapter for the portable AndroSwitch loader. Imports still
+    /// execute through this runtime's existing checked libc trap dispatcher.
+    pub fn bind_import(&mut self, name: &str) -> Result<u64> {
+        self.import(name)
     }
     pub fn call<F>(
         &mut self,

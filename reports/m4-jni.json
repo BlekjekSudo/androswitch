@@ -1,0 +1,521 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-23",
+  "milestone": "M4",
+  "implementation_status": "complete_for_method_probe_gate",
+  "implementation_commit": "pending_commit",
+  "upstream_revision": "6388281f66d254c8e01a0fdc7a5a9a30239bc762",
+  "verification": {
+    "horizon_emulator": "passed",
+    "physical_device": "not_run",
+    "host_jvm": "passed"
+  },
+  "scope": "Actual DEX/JNI ARM64 method execution; no Activity lifecycle/consumer launcher",
+  "jni_cases": 29,
+  "positive_jvm_comparisons": 27,
+  "named_missing_api_cases": 2,
+  "nro_sha256": "2467561cf7361ed269dee2456e4ba9f335a14fc692a719157a95bf3fd4aeab1f",
+  "fixture_build": {
+    "schema_version": 1,
+    "ndk": "28.2.13676358",
+    "api": 26,
+    "kotlin": "2.2.20",
+    "jvm_results": {
+      "numeric": "1.234567890111625E12",
+      "registration": "128",
+      "reentry": "14",
+      "strings": "5",
+      "arrays": "33014",
+      "references": "195441",
+      "exception": "73",
+      "callback-exception": "89",
+      "thread": "106",
+      "storage": "9514",
+      "many": "536.25",
+      "float-callback": "12329.625",
+      "rust": "1234567890224",
+      "kotlin": "61"
+    },
+    "files": [
+      {
+        "name": "libbridge.so",
+        "sha256": "f6d3b088829fbb2e3cec197b4b2ff473ac881bd0d480bf0d1f62b3c302619bf1"
+      },
+      {
+        "name": "libkotlinbridge.so",
+        "sha256": "965c3e7d5cd47c4be20c9a8a0afce792e64f76aea3a0ce37e943623549452e42"
+      },
+      {
+        "name": "librustbridge.so",
+        "sha256": "f69ddb07e33d96e96b33f31477694638062ec63e6620dbcbb7dc7a60e7ff9400"
+      }
+    ],
+    "sources": [
+      {
+        "sha256": "ca9c693be1d8a40d28de66dad510d4c7549b273d194d166f311fb524618632f8",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m4\\java\\org\\androswitch\\fixture\\Bridge.java"
+      },
+      {
+        "sha256": "fc0b79a64324cbef9966ad7eeeaf04d590e7edb452c13d86a60a16863a0592c0",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m4\\java\\org\\androswitch\\fixture\\RustBridge.java"
+      },
+      {
+        "sha256": "4560677a3b425f9faac96f745abcb97e0a8fbc3cdf5343be25e257d23858cbf6",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m4\\kotlin\\org\\androswitch\\fixture\\KotlinBridge.kt"
+      },
+      {
+        "sha256": "929e776e2aed45ca569871adaa48f9c825ab046b146ee0d16fae81b6b3cc265a",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m4\\native\\bridge.c"
+      },
+      {
+        "sha256": "d6daf61987b2895bd9027fe650005e7059493ffccdb814008ee787de09b4145e",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m4\\native\\kotlin_bridge.cpp"
+      },
+      {
+        "sha256": "860464f5b9864d9d49a389d61e5005033891b7344ee658cbb59aa915503ab260",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m4\\rust\\src\\lib.rs"
+      }
+    ],
+    "toolchains": {
+      "rust_android": "rustc 1.100.0-nightly (787af2b8c 2026-08-25)",
+      "java": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\r\nOpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)\r\nOpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+      "android_tools": [
+        {
+          "file": "C:\\Users\\Administrator\\AppData\\Local/Android/Sdk/build-tools/35.0.0/lib/d8.jar",
+          "sha256": "305622ad00535684534eb8f742cbf5e628a9abc09d8ea4d39d1babb95bf0cee5"
+        },
+        {
+          "file": "C:\\Users\\Administrator\\AppData\\Local/Android/Sdk/build-tools/35.0.0/aapt2.exe",
+          "sha256": "cbfe5deda5f7074ce47b6f33818b456ee8046a076a11af13e29c837d3c80c564"
+        }
+      ],
+      "rust_host": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+      "host_gcc": "gcc.exe (GCC) 16.2.0",
+      "recorded_after_execution": "2026-10-23T14:30:11.0772856Z",
+      "kotlin_language": "2.0"
+    }
+  },
+  "runs": [
+    {
+      "execution": {
+        "schema_version": 1,
+        "kind": "apk_dex_method_probe",
+        "session_id": "b6c9525172b942b4b4739e0c78735f44",
+        "package": "org.fixture.jnibridge",
+        "min_sdk": 24,
+        "target_sdk": 35,
+        "dex_files": 1,
+        "portable_vm": true,
+        "application_lifecycle": false,
+        "jni": true,
+        "calls": [
+          {
+            "id": "numeric",
+            "value": "1.234567890111625E12",
+            "error": null,
+            "instructions": 10
+          },
+          {
+            "id": "registration",
+            "value": "128",
+            "error": null,
+            "instructions": 4
+          },
+          {
+            "id": "reentry",
+            "value": "14",
+            "error": null,
+            "instructions": 32
+          },
+          {
+            "id": "strings",
+            "value": "5",
+            "error": null,
+            "instructions": 10
+          },
+          {
+            "id": "arrays",
+            "value": "33014",
+            "error": null,
+            "instructions": 3
+          },
+          {
+            "id": "references",
+            "value": "195441",
+            "error": null,
+            "instructions": 7
+          },
+          {
+            "id": "exception",
+            "value": "73",
+            "error": null,
+            "instructions": 4
+          },
+          {
+            "id": "callback-exception",
+            "value": "89",
+            "error": null,
+            "instructions": 5
+          },
+          {
+            "id": "thread",
+            "value": "106",
+            "error": null,
+            "instructions": 7
+          },
+          {
+            "id": "storage",
+            "value": "9514",
+            "error": null,
+            "instructions": 23
+          },
+          {
+            "id": "many",
+            "value": "536.25",
+            "error": null,
+            "instructions": 21
+          },
+          {
+            "id": "float-callback",
+            "value": "12329.625",
+            "error": null,
+            "instructions": 10
+          },
+          {
+            "id": "rust",
+            "value": "1234567890224",
+            "error": null,
+            "instructions": 9
+          },
+          {
+            "id": "unsupported",
+            "value": null,
+            "error": {
+              "code": "JNI_API_UNAVAILABLE",
+              "module_id": "rd-vm",
+              "cause": "JNI slot 217: MonitorEnter [pc 0x0: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 0, idx: 54, regs: [0, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/fixture/Bridge;->missingApiTest()I"
+            },
+            "instructions": 1
+          }
+        ],
+        "installation": {
+          "schema_version": 1,
+          "package": "org.fixture.jnibridge",
+          "revision": 4,
+          "installed": true,
+          "version_code": 1,
+          "version_name": null,
+          "label": "JNI fixture",
+          "entry_activity": null,
+          "activities": [],
+          "apk_bytes": 7969,
+          "apk_sha256": "8ac42272ac5f56346dd08b042e3fef5ce2d7e4b0e2a79a64fb156a51dd475a53",
+          "signature_verified": false
+        },
+        "native": [],
+        "jni_statistics": {
+          "libraries_loaded": 2,
+          "native_calls": 18,
+          "dex_callbacks": 10
+        }
+      },
+      "execution_sha256": "7ea8ceb973cf95f65fa369549faac1c02070bf0e07ccdadee27647e059cbe8b3",
+      "artifact_root": "local-artifacts/m4/runs/b6c9525172b942b4b4739e0c78735f44",
+      "receipt_sha256": "bdca2d0d43900cf3659c642c044c944117aa8c0f28e220a063cef49612186477",
+      "verification": {
+        "schema_version": 1,
+        "session_id": "b6c9525172b942b4b4739e0c78735f44",
+        "milestone": "M4",
+        "status": "passed",
+        "physical_device": "not_run",
+        "started_at": "2026-10-23T14:39:50.6435712Z",
+        "native_calls": 0,
+        "dex_calls": 14,
+        "inputs": [
+          {
+            "sha256": "8ac42272ac5f56346dd08b042e3fef5ce2d7e4b0e2a79a64fb156a51dd475a53",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m4\\fixture\\java-jni.apk"
+          },
+          {
+            "sha256": "d96d783875c068f8fb4a354f31a230969981991a02bd6e4f5dfc701296152de0",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m4\\fixture\\java-request.json"
+          },
+          {
+            "sha256": "c4323073fb514e1fea6eda8fad12164ad01bcaa5fbe41faea7d41febd9de4e10",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m4\\fixture\\java-expected.json"
+          },
+          {
+            "sha256": "2467561cf7361ed269dee2456e4ba9f335a14fc692a719157a95bf3fd4aeab1f",
+            "file": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-smoke\\androswitch-smoke.nro"
+          }
+        ],
+        "emulator": {
+          "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0",
+          "version": "1.3.3+e2143d4"
+        },
+        "finished_at": "2026-10-23T14:40:06.6067478Z"
+      }
+    },
+    {
+      "execution": {
+        "schema_version": 1,
+        "kind": "apk_dex_method_probe",
+        "session_id": "fc5ff38ecb79446bab30377d475b5e89",
+        "package": "org.fixture.kotlinbridge",
+        "min_sdk": 24,
+        "target_sdk": 35,
+        "dex_files": 1,
+        "portable_vm": true,
+        "application_lifecycle": false,
+        "jni": true,
+        "calls": [
+          {
+            "id": "kotlin",
+            "value": "61",
+            "error": null,
+            "instructions": 13
+          }
+        ],
+        "installation": null,
+        "native": [],
+        "jni_statistics": {
+          "libraries_loaded": 1,
+          "native_calls": 1,
+          "dex_callbacks": 1
+        }
+      },
+      "execution_sha256": "2848f3369e266f2bccd74493e75e24d046840ef09d277a17d7fc67cf3d9afd94",
+      "artifact_root": "local-artifacts/m4/runs/fc5ff38ecb79446bab30377d475b5e89",
+      "receipt_sha256": "eddb910a88ba4d49f1b6f64271b311b2a87495020883e56979517cf0d4d2e0af",
+      "verification": {
+        "schema_version": 1,
+        "session_id": "fc5ff38ecb79446bab30377d475b5e89",
+        "milestone": "M4",
+        "status": "passed",
+        "physical_device": "not_run",
+        "started_at": "2026-10-23T14:40:06.6162195Z",
+        "native_calls": 0,
+        "dex_calls": 1,
+        "inputs": [
+          {
+            "sha256": "c58445d46ed678c8071d2a7425965fd4c1bf8fef47b5bc0f62ce24e8c2108399",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m4\\fixture\\kotlin-jni.apk"
+          },
+          {
+            "sha256": "0d2b588d367751b1e3e1ae8704c6fd70ed45b802e5a7db565c555bbc70446adf",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m4\\fixture\\kotlin-request.json"
+          },
+          {
+            "sha256": "b7670794b4faf8bfe407a0c82126bfedd818f53889323c7bf91254002508913d",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m4\\fixture\\kotlin-expected.json"
+          },
+          {
+            "sha256": "2467561cf7361ed269dee2456e4ba9f335a14fc692a719157a95bf3fd4aeab1f",
+            "file": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-smoke\\androswitch-smoke.nro"
+          }
+        ],
+        "emulator": {
+          "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0",
+          "version": "1.3.3+e2143d4"
+        },
+        "finished_at": "2026-10-23T14:40:19.8300534Z"
+      }
+    },
+    {
+      "execution": {
+        "schema_version": 1,
+        "kind": "apk_dex_method_probe",
+        "session_id": "807ce9e82cae40ef9605afd8d8cc3e52",
+        "package": "org.fixture.jniemutls",
+        "min_sdk": 24,
+        "target_sdk": 35,
+        "dex_files": 1,
+        "portable_vm": true,
+        "application_lifecycle": false,
+        "jni": true,
+        "calls": [
+          {
+            "id": "numeric",
+            "value": "1.234567890111625E12",
+            "error": null,
+            "instructions": 10
+          },
+          {
+            "id": "registration",
+            "value": "128",
+            "error": null,
+            "instructions": 4
+          },
+          {
+            "id": "reentry",
+            "value": "14",
+            "error": null,
+            "instructions": 32
+          },
+          {
+            "id": "strings",
+            "value": "5",
+            "error": null,
+            "instructions": 10
+          },
+          {
+            "id": "arrays",
+            "value": "33014",
+            "error": null,
+            "instructions": 3
+          },
+          {
+            "id": "references",
+            "value": "195441",
+            "error": null,
+            "instructions": 7
+          },
+          {
+            "id": "exception",
+            "value": "73",
+            "error": null,
+            "instructions": 4
+          },
+          {
+            "id": "callback-exception",
+            "value": "89",
+            "error": null,
+            "instructions": 5
+          },
+          {
+            "id": "thread",
+            "value": "106",
+            "error": null,
+            "instructions": 7
+          },
+          {
+            "id": "storage",
+            "value": "9514",
+            "error": null,
+            "instructions": 23
+          },
+          {
+            "id": "many",
+            "value": "536.25",
+            "error": null,
+            "instructions": 21
+          },
+          {
+            "id": "float-callback",
+            "value": "12329.625",
+            "error": null,
+            "instructions": 10
+          },
+          {
+            "id": "rust",
+            "value": "1234567890224",
+            "error": null,
+            "instructions": 9
+          },
+          {
+            "id": "unsupported",
+            "value": null,
+            "error": {
+              "code": "JNI_API_UNAVAILABLE",
+              "module_id": "rd-vm",
+              "cause": "JNI slot 217: MonitorEnter [pc 0x0: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 0, idx: 54, regs: [0, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/fixture/Bridge;->missingApiTest()I"
+            },
+            "instructions": 1
+          }
+        ],
+        "installation": {
+          "schema_version": 1,
+          "package": "org.fixture.jniemutls",
+          "revision": 2,
+          "installed": true,
+          "version_code": 1,
+          "version_name": null,
+          "label": "JNI fixture",
+          "entry_activity": null,
+          "activities": [],
+          "apk_bytes": 7982,
+          "apk_sha256": "bec7f27aee080e56334a78adc5d394e5027a8813a44e69323fa5b1cac5371f37",
+          "signature_verified": false
+        },
+        "native": [],
+        "jni_statistics": {
+          "libraries_loaded": 2,
+          "native_calls": 18,
+          "dex_callbacks": 10
+        }
+      },
+      "execution_sha256": "42ea16ff599f707fb98352818a0ab144904de60f289ddecab8012ba89d916880",
+      "artifact_root": "local-artifacts/m4/runs/807ce9e82cae40ef9605afd8d8cc3e52",
+      "receipt_sha256": "6cc5883d28b19a07c6431dbc6748a1a01cbb702b18c9d8b9ba15e143344f47ce",
+      "verification": {
+        "schema_version": 1,
+        "session_id": "807ce9e82cae40ef9605afd8d8cc3e52",
+        "milestone": "M4",
+        "status": "passed",
+        "physical_device": "not_run",
+        "started_at": "2026-10-23T14:40:20.0357796Z",
+        "native_calls": 0,
+        "dex_calls": 14,
+        "inputs": [
+          {
+            "sha256": "bec7f27aee080e56334a78adc5d394e5027a8813a44e69323fa5b1cac5371f37",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m4\\fixture\\java-jni-emutls.apk"
+          },
+          {
+            "sha256": "2329692991c4494c84b08b6f5b509f75ac6b1d2c356bbb38b3e3f531e80587ea",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m4\\fixture\\emutls-request.json"
+          },
+          {
+            "sha256": "c4323073fb514e1fea6eda8fad12164ad01bcaa5fbe41faea7d41febd9de4e10",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m4\\fixture\\java-expected.json"
+          },
+          {
+            "sha256": "2467561cf7361ed269dee2456e4ba9f335a14fc692a719157a95bf3fd4aeab1f",
+            "file": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-smoke\\androswitch-smoke.nro"
+          }
+        ],
+        "emulator": {
+          "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0",
+          "version": "1.3.3+e2143d4"
+        },
+        "finished_at": "2026-10-23T14:40:34.4164917Z"
+      }
+    }
+  ],
+  "limitations": [
+    "M5 Android UI/lifecycle not implemented",
+    "M7 consumer launcher not implemented",
+    "JNI/Bionic supported subset only",
+    "Physical Switch not run"
+  ],
+  "hardware_packages": {
+    "packages": [
+      {
+        "physical_device": "not_run",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m4\\hardware\\64d8a57a39cb4e57adad5011b883a527\\androswitch-m4-java-proof.zip",
+        "name": "java",
+        "nro_sha256": "2467561cf7361ed269dee2456e4ba9f335a14fc692a719157a95bf3fd4aeab1f",
+        "session_id": "hardware-java-64d8a57a39cb4e57adad5011b883a527",
+        "sha256": "0894eff95e7e4a815eb3bfce62d026b14b3715838ab674e193692f27a684209e"
+      },
+      {
+        "physical_device": "not_run",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m4\\hardware\\64d8a57a39cb4e57adad5011b883a527\\androswitch-m4-kotlin-proof.zip",
+        "name": "kotlin",
+        "nro_sha256": "2467561cf7361ed269dee2456e4ba9f335a14fc692a719157a95bf3fd4aeab1f",
+        "session_id": "hardware-kotlin-64d8a57a39cb4e57adad5011b883a527",
+        "sha256": "1753044dc61aba3e4d743ecfd942a6576a2c3adc9d0b7d26ab6fc168d982c5a6"
+      },
+      {
+        "physical_device": "not_run",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m4\\hardware\\64d8a57a39cb4e57adad5011b883a527\\androswitch-m4-emutls-proof.zip",
+        "name": "emutls",
+        "nro_sha256": "2467561cf7361ed269dee2456e4ba9f335a14fc692a719157a95bf3fd4aeab1f",
+        "session_id": "hardware-emutls-64d8a57a39cb4e57adad5011b883a527",
+        "sha256": "ff0be6f6504b99b37f849a9a977361eaf4ecee8d01f43b54a56047673226d58e"
+      }
+    ],
+    "schema_version": 1,
+    "created_at": "2026-10-23T14:42:13.6283599Z"
+  }
+}

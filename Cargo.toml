@@ -2,6 +2,8 @@
 resolver = "2"
 members = [
     "crates/as-platform",
+    "crates/as-package",
+    "crates/as-native",
     "crates/as-runtime",
     "crates/as-cli",
     "crates/as-switch-smoke",
