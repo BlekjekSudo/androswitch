@@ -1,0 +1,6 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#101419">
+    <TextView android:id="@+id/counter" android:layout_width="match_parent" android:layout_height="40dp" android:text="@string/title" android:textSize="20sp" android:textColor="#eff5fa" />
+    <Button android:id="@+id/add" android:layout_width="match_parent" android:layout_height="48dp" android:text="@string/add" />
+    <Button android:id="@+id/next" android:layout_width="match_parent" android:layout_height="48dp" android:text="@string/next" />
+    <org.androswitch.ui.SquareView android:id="@+id/canvas" android:layout_width="match_parent" android:layout_height="170dp" />
+</LinearLayout>

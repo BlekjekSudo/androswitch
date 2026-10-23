@@ -13,10 +13,10 @@ See [credits and provenance](CREDITS.md) and [NOTICE](NOTICE.md).
 
 ## Current status
 
-**Development has reached the M4 execution proof.** The `no_std + alloc` NRO
-loads APK DEX, calls real ARM64 libraries through JNI and receives callbacks
-into the shared RustyDroid interpreter. Java/C/Rust and Kotlin/C++ APK fixtures
-use the same runtime. Physical Switch testing remains pending.
+**Development has reached the M5 UI proof; M6–M7 are in progress.** The
+`no_std + alloc` NRO runs real Java/Kotlin Activity bodies, XML/widgets/Canvas,
+input and lifecycle callbacks on the shared RustyDroid interpreter. M4's
+ARM64/JNI proof remains separate evidence. Physical Switch testing is pending.
 
 | Area | Verified status |
 | --- | --- |
@@ -27,11 +27,13 @@ use the same runtime. Physical Switch testing remains pending.
 | JNI | Native registration, callbacks/reentry, strings, primitive arrays, exception/reference/GC and pthread callback proof |
 | Ryujinx E2E | DEX semantics, persistent storage, native CPU oracle and mixed Java/Kotlin JNI fixtures; see milestone evidence |
 | Upstream VM regression subset | 227 tests pass; separate from the recorded full-upstream baseline |
-| Android lifecycle, UI/media and consumer launcher | M5–M7; not implemented yet |
+| Android lifecycle/UI | Supported M5 subset; 14 Java/Kotlin UI snapshots pass in Ryujinx |
+| Native graphics/audio and consumer launcher | M6–M7 in progress |
 | Physical Switch | Not tested yet |
 
 This is a development project, not a general-purpose APK launcher release.
-The method probe does not launch an Activity or prove that an entire app works.
+The M5 runner launches supported Activities; individual proofs do not establish
+that an entire arbitrary app works.
 Inherited RustyDroid capabilities are not automatically Switch capabilities.
 Read the [compatibility inventory](docs/ANDROSWITCH_COMPATIBILITY.md) and
 [M2–M4 implementation and evidence guide](docs/M2_M4_E2E.md) for the exact scope.

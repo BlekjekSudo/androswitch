@@ -1717,6 +1717,29 @@ fn do_invoke(
         return Ok(v);
     }
 
+    #[cfg(not(feature = "std"))]
+    if let Some(host) = vm.framework_host() {
+        // Preserve virtual overrides and direct/super constructor dispatch.
+        let start = if is_super {
+            frame_super.unwrap_or(&mref.class)
+        } else if is_direct {
+            &mref.class
+        } else {
+            &recv_class
+        };
+        let has_dex = vm
+            .cp
+            .resolve_method(start, &mref.name, &mref.proto)
+            .is_some();
+        if !has_dex {
+            if let Some(value) =
+                host.call(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+            {
+                return Ok(value);
+            }
+        }
+    }
+
     // M3: framework host (Activity/View/TextView/Button/LinearLayout/
     // Handler/Intent/Bundle) — a classe DECLARANTE do method ref é android/*
     #[cfg(feature = "std")]

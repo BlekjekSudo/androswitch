@@ -13,6 +13,7 @@ use alloc::{
     string::{String, ToString},
 };
 
+pub mod framework_host;
 #[cfg(not(feature = "std"))]
 pub mod native_host;
 #[cfg(not(feature = "std"))]

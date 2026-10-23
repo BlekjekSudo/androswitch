@@ -6,6 +6,8 @@
 extern crate alloc;
 
 #[cfg(target_os = "horizon")]
+mod application;
+#[cfg(target_os = "horizon")]
 pub mod device_fs;
 #[cfg(target_os = "horizon")]
 pub mod device_jni;

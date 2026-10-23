@@ -55,6 +55,9 @@ pub fn call_static_intrinsic(
     if let Some(value) = crate::portable::file::call_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(host) = vm.framework_host() {
+        return host.call_static(vm, class, name, sig, args);
+    }
     Ok(None)
 }
 #[allow(clippy::too_many_arguments)]

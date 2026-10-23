@@ -20,6 +20,7 @@ serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 as-platform = { path = "../as-platform", default-features = false }
 as-package = { path = "../as-package" }
 as-native = { path = "../as-native" }
+as-framework = { path = "../as-framework" }
 rd-jni = { path = "../rd-jni", default-features = false }
 
 [features]

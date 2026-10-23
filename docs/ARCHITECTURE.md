@@ -11,8 +11,8 @@ minSdk above the reference environment is. Required splits wait for M10.
 ## Components
 
 `as-runtime` is the facade consumed by the host CLI and eventually launcher and
-runner. Inspection and persistent package management are implemented; lifecycle
-launch/stop follows M5–M7. `as-platform` defines portable
+runner. Inspection and package management are implemented; the M5 Activity
+adapter is implemented separately, with launcher integration in M7. `as-platform` defines portable
 storage, clock and logging contracts, with host and libnx filesystem adapters. Further services
 are added with their implementation milestones. The inherited `rd-*` crates
 retain their upstream behavior and tests.
@@ -70,10 +70,13 @@ runtime reader.
 
 ## Lifecycle (M7)
 
-`androswitch.nro` presents apps/imports. `runtime/runner.nro` executes one app in
-a fresh process using a versioned internal request carrying package, install
-revision and run ID. Normal exit chains back to the launcher. Diagnose a native
-crash on next launch; seamless recovery from arbitrary crashes is not promised.
+`androswitch.nro` will present apps/imports and execute one guest at a time,
+using a versioned request carrying package, install revision and session ID.
+NRO chainloading uses the same Horizon process. M7 must verify guest threads,
+media and mappings are quiescent before returning to the launcher; otherwise
+exit the Horizon application and report the reason on next launch. See
+[ADR 015](adr/015-portable-framework-and-session-boundary.md). Seamless recovery
+from arbitrary native crashes is not promised.
 
 ## Verification
 

@@ -21,6 +21,9 @@ impl Engine {
         roots.extend(self.heap.gc_pinned_roots());
         roots.extend(self.portable.strings.values().copied());
         roots.extend(self.portable.classes.values().copied());
+        if let Some(framework) = self.framework_host() {
+            roots.extend(framework.roots());
+        }
         if let Some(native) = self.native_host() {
             roots.extend(native.roots());
         }
@@ -29,6 +32,9 @@ impl Engine {
                 continue;
             }
             marked[object as usize] = true;
+            if let Some(framework) = self.framework_host() {
+                roots.extend(framework.references(object));
+            }
             match self.heap.get(object) {
                 Ok(HeapObj::Instance { fields, .. }) => {
                     roots.extend(fields.iter().filter_map(|(_, value)| reference(value)))
@@ -40,6 +46,9 @@ impl Engine {
             }
         }
         let mut freed = 0;
+        if let Some(framework) = self.framework_host() {
+            framework.collect(&marked);
+        }
         for (object, live) in marked.iter().enumerate().skip(1) {
             if !live && self.heap.free_slot(object as ObjRef).is_some() {
                 freed += 1;

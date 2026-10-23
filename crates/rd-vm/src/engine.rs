@@ -56,6 +56,7 @@ impl Default for VmConfig {
 /// Motor interpretador. O heap é coletado por mark-sweep em safe points
 /// (`Engine::gc` / `maybe_gc`, ver `gc.rs`) e descartado quando o Engine cai.
 pub struct Engine {
+    pub(crate) framework_backend: Option<alloc::rc::Rc<dyn crate::framework_host::FrameworkHost>>,
     #[cfg(feature = "jit")]
     jit: crate::jit::JitState,
     #[cfg(feature = "native")]
@@ -189,6 +190,7 @@ impl Engine {
             native: None,
             #[cfg(feature = "native")]
             native_active: false,
+            framework_backend: None,
             cp: Classpath::new(dexes),
             heap: Heap::new(budget),
             config,
@@ -437,6 +439,12 @@ impl Engine {
                 self, &class, &class, method, sig, recv, &args,
             )? {
                 return Ok(v);
+            }
+            #[cfg(not(feature = "std"))]
+            if let Some(host) = self.framework_host() {
+                if let Some(value) = host.call(self, &class, method, sig, recv, &args)? {
+                    return Ok(value);
+                }
             }
             #[cfg(feature = "std")]
             if let Some(v) = crate::m8::call_m8_instance(self, &class, method, sig, recv, &args)? {

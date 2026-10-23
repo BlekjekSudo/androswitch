@@ -22,3 +22,12 @@ Open Source Project**, licensed under Apache-2.0. Its notice is retained in the
 file; the [Apache-2.0 license](../LICENSE-APACHE) is included at repository root.
 SHA-256: `5df9074457c041b372f2c68ff646d6e8600cd673a223885e8df21c44c94ec667`.
 This defines the JNI ABI; it does not supply a JVM implementation.
+
+## Inherited glyph atlas
+
+The UI rasterizer reuses RustyDroid's `crates/rd-vm/assets/glyphs.bin` and the
+atlas format documented by its generator. It contains DejaVu Sans glyphs,
+based on Bitstream Vera; DejaVu changes are public domain, and some imported
+glyphs have Arev notices. The complete [font license](fonts/DejaVu.LICENSE)
+is retained from the [DejaVu project](https://github.com/dejavu-fonts/dejavu-fonts).
+This does not identify a new font build or replace the inherited atlas.

@@ -12,6 +12,7 @@
 
 # Preserve the pinned AOSP header byte-for-byte, including its final blank line.
 third_party/android/jni.h whitespace=-blank-at-eof
+third_party/fonts/DejaVu.LICENSE whitespace=-blank-at-eol
 
 # Binaries
 *.png binary

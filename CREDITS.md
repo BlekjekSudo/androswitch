@@ -73,6 +73,7 @@ Linux documentation.
 | [Android NDK samples](https://github.com/android/ndk-samples) contributors | Frozen sources for later JNI/NDK milestones |
 | [Vector Pinball](https://github.com/dozingcat/Vector-Pinball) / dozingcat contributors | Frozen independent integration target for later milestones |
 | Cargo dependency authors | Parser, compression, serialization and other library dependencies recorded in `Cargo.lock` |
+| DejaVu / Bitstream / Arev contributors | Glyphs in RustyDroid's retained text atlas; full notices in `third_party/fonts/DejaVu.LICENSE` |
 
 These acknowledgements do not change the components' individual licenses.
 Tools, external APKs and proprietary game assets are not bundled in the

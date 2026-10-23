@@ -2,6 +2,11 @@
 
 Status: implemented for the M3/M4 proof; hardware validation pending.
 
+The later session-isolation assumption is superseded by
+[ADR 015](015-portable-framework-and-session-boundary.md): standard NRO
+chainloading does not create a new Horizon process. M4's process-owned code
+must gain verified quiescent teardown before M7 can switch guests safely.
+
 Keep ELF parsing in RustyDroid's portable `rd-ndk` parser. Add `as-native` for
 dependency/relocation planning and `NativeBackend` for mapping and imports.
 The optional host backend retains the upstream isolated Unicorn worker; Horizon

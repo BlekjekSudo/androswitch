@@ -1,0 +1,1625 @@
+//! A portable adaptation of RustyDroid's Activity/View/Looper model.
+//! The shared APK/AXML/ARSC parsers and real DEX methods remain authoritative.
+use crate::Frame;
+use alloc::{
+    collections::{BTreeMap, VecDeque},
+    format,
+    rc::Rc,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
+use as_platform::Clock;
+use core::cell::RefCell;
+use rd_apk::{
+    arsc::ResolvedValue,
+    axml::{AttrValue, ComplexUnit, XmlElement},
+    Apk,
+};
+use rd_vm::{framework_host::FrameworkHost, Engine, ObjRef, Throwable, Value, VmExit};
+use serde::Serialize;
+type Result<T> = core::result::Result<T, VmExit>;
+fn error(code: &str, cause: impl Into<String>) -> VmExit {
+    rd_vm::err::vm_error(code, cause).into()
+}
+fn write(vm: &mut Engine, r: ObjRef, name: &str, value: Value) -> Result<()> {
+    vm.heap.put_field(r, name, value).map_err(|e| match e {
+        rd_vm::heap::FieldWriteErr::Oom(e) => e.into(),
+        rd_vm::heap::FieldWriteErr::NotInstance => error("INVALID_OBJECT", "field receiver"),
+    })
+}
+fn obj(v: &Value) -> Result<ObjRef> {
+    v.as_ref()?.ok_or_else(|| {
+        Throwable::new("Ljava/lang/NullPointerException;", "framework argument").into()
+    })
+}
+fn int(a: &[Value], i: usize) -> Result<i32> {
+    Ok(a.get(i)
+        .ok_or_else(|| error("INVALID_ARGUMENT", "missing integer"))?
+        .as_int()?)
+}
+fn text(vm: &Engine, v: &Value) -> Result<String> {
+    Ok(vm.heap.as_str(obj(v)?)?.to_string())
+}
+fn string(vm: &mut Engine, s: impl Into<String>) -> Result<Value> {
+    Ok(Value::Obj(vm.heap.alloc_string(s.into())?))
+}
+fn shell(vm: &mut Engine, class: &str) -> Result<ObjRef> {
+    vm.ensure_initialized(class)?;
+    let r = vm.heap.alloc_instance(class.into(), vec![])?;
+    vm.attach_host_state(class, r)?;
+    Ok(r)
+}
+fn descriptor(name: &str) -> String {
+    if name.starts_with('L') && name.ends_with(';') {
+        name.into()
+    } else {
+        format!("L{};", name.replace('.', "/"))
+    }
+}
+#[derive(Clone, Serialize)]
+pub struct View {
+    pub object: ObjRef,
+    pub class: String,
+    pub id: i32,
+    pub text: String,
+    pub bounds: [i32; 4],
+    pub children: Vec<ObjRef>,
+    pub visible: bool,
+    pub enabled: bool,
+    pub clickable: bool,
+    pub color: u32,
+    pub text_color: u32,
+    pub text_size: f32,
+    pub width: i32,
+    pub height: i32,
+    pub orientation: i32,
+    pub listener: Option<ObjRef>,
+    pub click_method: Option<String>,
+}
+impl View {
+    fn new(object: ObjRef, class: &str) -> Self {
+        Self {
+            object,
+            class: class.into(),
+            id: -1,
+            text: String::new(),
+            bounds: [0; 4],
+            children: vec![],
+            visible: true,
+            enabled: true,
+            clickable: class == "Landroid/widget/Button;",
+            color: if class == "Landroid/widget/Button;" {
+                0xff305c89
+            } else {
+                0
+            },
+            text_color: 0xffeff5fa,
+            text_size: 18.,
+            width: -2,
+            height: -2,
+            orientation: 0,
+            listener: None,
+            click_method: None,
+        }
+    }
+}
+#[derive(Clone, Serialize)]
+pub struct Lifecycle {
+    pub activity: String,
+    pub event: String,
+    pub time_ms: u64,
+}
+#[derive(Clone)]
+struct Activity {
+    object: ObjRef,
+    class: String,
+    root: Option<ObjRef>,
+    intent: Option<ObjRef>,
+}
+#[derive(Clone)]
+enum Action {
+    Start(String, ObjRef),
+    Finish(ObjRef),
+}
+#[derive(Clone)]
+struct Task {
+    due: u64,
+    order: u64,
+    handler: ObjRef,
+    runnable: ObjRef,
+}
+#[derive(Clone)]
+enum Draw {
+    Color(u32),
+    Rect([f32; 4], u32),
+    Circle(f32, f32, f32, u32),
+    Text(String, f32, f32, f32, u32),
+}
+#[derive(Default)]
+struct State {
+    views: BTreeMap<ObjRef, View>,
+    activities: Vec<Activity>,
+    application: Option<ObjRef>,
+    actions: VecDeque<Action>,
+    tasks: Vec<Task>,
+    serial: u64,
+    roots: Vec<ObjRef>,
+    intents: BTreeMap<ObjRef, String>,
+    bundles: BTreeMap<ObjRef, BTreeMap<String, Value>>,
+    builders: BTreeMap<ObjRef, String>,
+    paints: BTreeMap<ObjRef, (u32, f32)>,
+    canvases: BTreeMap<ObjRef, Vec<Draw>>,
+    motion: BTreeMap<ObjRef, (i32, f32, f32)>,
+    lifecycle: Vec<Lifecycle>,
+    focus: usize,
+    pressed: Option<ObjRef>,
+    finished: bool,
+    resources: Option<ObjRef>,
+    looper: Option<ObjRef>,
+    title: String,
+}
+pub struct Android {
+    pub apk: Apk,
+    pub width: i32,
+    pub height: i32,
+    clock: Rc<dyn Clock>,
+    state: RefCell<State>,
+}
+impl Android {
+    pub fn new(apk: Apk, clock: Rc<dyn Clock>, width: i32, height: i32) -> Rc<Self> {
+        Rc::new(Self {
+            apk,
+            clock,
+            width,
+            height,
+            state: RefCell::new(State::default()),
+        })
+    }
+    pub fn now(&self) -> u64 {
+        self.clock.monotonic_micros() / 1000
+    }
+    pub fn finished(&self) -> bool {
+        self.state.borrow().finished
+    }
+    pub fn title(&self) -> String {
+        self.state.borrow().title.clone()
+    }
+    pub fn views(&self) -> Vec<View> {
+        let mut out = Vec::new();
+        let mut pending = self.active_root().into_iter().collect::<Vec<_>>();
+        let state = self.state.borrow();
+        while let Some(r) = pending.pop() {
+            if let Some(v) = state.views.get(&r) {
+                out.push(v.clone());
+                pending.extend(v.children.iter().rev().copied());
+            }
+        }
+        out
+    }
+    pub fn lifecycle(&self) -> Vec<Lifecycle> {
+        self.state.borrow().lifecycle.clone()
+    }
+    fn record(&self, class: &str, event: &str) {
+        self.state.borrow_mut().lifecycle.push(Lifecycle {
+            activity: class.into(),
+            event: event.into(),
+            time_ms: self.now(),
+        });
+    }
+    fn callback(
+        &self,
+        vm: &mut Engine,
+        r: ObjRef,
+        name: &str,
+        sig: &str,
+        args: &[Value],
+    ) -> Result<()> {
+        vm.reset_fuel_window();
+        vm.invoke_instance(r, name, sig, args)?;
+        Ok(())
+    }
+    pub fn launch(&self, vm: &mut Engine, entry: &str) -> Result<()> {
+        let app_class = self
+            .apk
+            .manifest
+            .application
+            .name
+            .as_deref()
+            .map(descriptor)
+            .unwrap_or_else(|| "Landroid/app/Application;".into());
+        let app = shell(vm, &app_class)?;
+        self.state.borrow_mut().application = Some(app);
+        self.callback(vm, app, "<init>", "()V", &[])?;
+        let base = shell(vm, "Landroid/content/Context;")?;
+        self.state.borrow_mut().roots.push(base);
+        self.callback(
+            vm,
+            app,
+            "attachBaseContext",
+            "(Landroid/content/Context;)V",
+            &[Value::Obj(base)],
+        )?;
+        self.state.borrow_mut().roots.retain(|r| *r != base);
+        self.callback(vm, app, "onCreate", "()V", &[])?;
+        self.start(vm, &descriptor(entry), None)?;
+        self.tick(vm)
+    }
+    fn start(&self, vm: &mut Engine, class: &str, intent: Option<ObjRef>) -> Result<()> {
+        if !self
+            .apk
+            .manifest
+            .application
+            .components
+            .iter()
+            .any(|c| descriptor(&c.class_name) == class && c.enabled != Some(false))
+        {
+            return Err(error("ACTIVITY_NOT_FOUND", class));
+        }
+        let previous = self.state.borrow().activities.last().cloned();
+        if let Some(old) = &previous {
+            self.callback(vm, old.object, "onPause", "()V", &[])?;
+            self.record(&old.class, "onPause");
+        }
+        let r = shell(vm, class)?;
+        self.state.borrow_mut().activities.push(Activity {
+            object: r,
+            class: class.into(),
+            root: None,
+            intent,
+        });
+        self.callback(vm, r, "<init>", "()V", &[])?;
+        let base = self.state.borrow().application.unwrap();
+        self.callback(
+            vm,
+            r,
+            "attachBaseContext",
+            "(Landroid/content/Context;)V",
+            &[Value::Obj(base)],
+        )?;
+        for (method, sig, args) in [
+            ("onCreate", "(Landroid/os/Bundle;)V", vec![Value::Null]),
+            ("onStart", "()V", vec![]),
+            ("onResume", "()V", vec![]),
+        ] {
+            self.callback(vm, r, method, sig, &args)?;
+            self.record(class, method);
+        }
+        if let Some(old) = previous {
+            self.callback(vm, old.object, "onStop", "()V", &[])?;
+            self.record(&old.class, "onStop");
+        }
+        self.state.borrow_mut().focus = 0;
+        self.layout();
+        Ok(())
+    }
+    pub fn tick(&self, vm: &mut Engine) -> Result<()> {
+        for _ in 0..256 {
+            let action = self.state.borrow_mut().actions.pop_front();
+            if let Some(action) = action {
+                match action {
+                    Action::Start(class, intent) => self.start(vm, &class, Some(intent))?,
+                    Action::Finish(r) => self.finish(vm, r)?,
+                }
+                continue;
+            }
+            let next = {
+                let mut s = self.state.borrow_mut();
+                s.tasks.sort_by_key(|t| (t.due, t.order));
+                if s.tasks.first().is_some_and(|t| t.due <= self.now()) {
+                    Some(s.tasks.remove(0))
+                } else {
+                    None
+                }
+            };
+            if let Some(task) = next {
+                self.callback(vm, task.runnable, "run", "()V", &[])?;
+                continue;
+            }
+            self.layout();
+            return Ok(());
+        }
+        Err(error(
+            "LOOPER_FUEL",
+            "more than 256 immediate events in one pump",
+        ))
+    }
+    fn finish(&self, vm: &mut Engine, r: ObjRef) -> Result<()> {
+        let active = self
+            .state
+            .borrow()
+            .activities
+            .last()
+            .cloned()
+            .ok_or_else(|| error("ACTIVITY_STATE", "no foreground activity"))?;
+        if active.object != r {
+            return Err(error("API_UNAVAILABLE", "finish background activity"));
+        }
+        self.callback(vm, r, "onPause", "()V", &[])?;
+        self.record(&active.class, "onPause");
+        let previous = {
+            let s = self.state.borrow();
+            s.activities
+                .len()
+                .checked_sub(2)
+                .and_then(|i| s.activities.get(i))
+                .cloned()
+        };
+        if let Some(previous) = &previous {
+            for method in ["onRestart", "onStart", "onResume"] {
+                self.callback(vm, previous.object, method, "()V", &[])?;
+                self.record(&previous.class, method);
+            }
+        }
+        for method in ["onStop", "onDestroy"] {
+            self.callback(vm, r, method, "()V", &[])?;
+            self.record(&active.class, method);
+        }
+        self.state.borrow_mut().activities.pop();
+        if previous.is_none() {
+            self.state.borrow_mut().finished = true;
+        }
+        Ok(())
+    }
+    pub fn back(&self, vm: &mut Engine) -> Result<()> {
+        let r = self.state.borrow().activities.last().map(|a| a.object);
+        if let Some(r) = r {
+            self.callback(vm, r, "onBackPressed", "()V", &[])?;
+        }
+        self.tick(vm)
+    }
+    fn find(&self, root: ObjRef, id: i32) -> Option<ObjRef> {
+        let s = self.state.borrow();
+        let mut pending = vec![root];
+        while let Some(r) = pending.pop() {
+            if let Some(v) = s.views.get(&r) {
+                if v.id == id {
+                    return Some(r);
+                }
+                pending.extend(v.children.iter().copied());
+            }
+        }
+        None
+    }
+    fn active_root(&self) -> Option<ObjRef> {
+        self.state.borrow().activities.last().and_then(|a| a.root)
+    }
+    pub fn click(&self, vm: &mut Engine, r: ObjRef) -> Result<bool> {
+        let view = self
+            .state
+            .borrow()
+            .views
+            .get(&r)
+            .cloned()
+            .ok_or_else(|| error("INVALID_VIEW", "click"))?;
+        if !view.enabled || !view.visible {
+            return Ok(false);
+        }
+        if let Some(listener) = view.listener {
+            self.callback(
+                vm,
+                listener,
+                "onClick",
+                "(Landroid/view/View;)V",
+                &[Value::Obj(r)],
+            )?;
+        } else if let Some(method) = view.click_method {
+            let activity = self.state.borrow().activities.last().unwrap().object;
+            self.callback(
+                vm,
+                activity,
+                &method,
+                "(Landroid/view/View;)V",
+                &[Value::Obj(r)],
+            )?;
+        } else {
+            return Ok(false);
+        }
+        self.tick(vm)?;
+        Ok(true)
+    }
+    pub fn touch(&self, vm: &mut Engine, action: i32, x: f32, y: f32) -> Result<()> {
+        self.layout();
+        let root = self.active_root();
+        let hit = root.and_then(|r| self.hit(r, x as i32, y as i32));
+        if action == 0 {
+            self.state.borrow_mut().pressed = hit;
+        }
+        if let Some(r) = hit {
+            let custom = vm
+                .cp
+                .resolve_method(
+                    vm.heap.class_of(r)?,
+                    "onTouchEvent",
+                    "(Landroid/view/MotionEvent;)Z",
+                )
+                .is_some();
+            if custom {
+                let bounds = self.state.borrow().views[&r].bounds;
+                let event = shell(vm, "Landroid/view/MotionEvent;")?;
+                self.state
+                    .borrow_mut()
+                    .motion
+                    .insert(event, (action, x - bounds[0] as f32, y - bounds[1] as f32));
+                self.state.borrow_mut().roots.push(event);
+                let result = self.callback(
+                    vm,
+                    r,
+                    "onTouchEvent",
+                    "(Landroid/view/MotionEvent;)Z",
+                    &[Value::Obj(event)],
+                );
+                self.state.borrow_mut().roots.retain(|v| *v != event);
+                self.state.borrow_mut().motion.remove(&event);
+                result?;
+            } else if action == 1 && self.state.borrow().pressed == hit {
+                self.click(vm, r)?;
+            }
+        }
+        if action == 1 || action == 3 {
+            self.state.borrow_mut().pressed = None;
+        }
+        self.tick(vm)
+    }
+    fn hit(&self, r: ObjRef, x: i32, y: i32) -> Option<ObjRef> {
+        let view = self.state.borrow().views.get(&r)?.clone();
+        let [vx, vy, w, h] = view.bounds;
+        if !view.visible || !view.enabled || x < vx || y < vy || x >= vx + w || y >= vy + h {
+            return None;
+        }
+        for child in view.children.iter().rev() {
+            if let Some(hit) = self.hit(*child, x, y) {
+                return Some(hit);
+            }
+        }
+        Some(r)
+    }
+    pub fn key(&self, vm: &mut Engine, key: i32) -> Result<()> {
+        if key == 4 {
+            return self.back(vm);
+        }
+        let Some(root) = self.active_root() else {
+            return Ok(());
+        };
+        let mut all = vec![];
+        self.clickables(root, &mut all);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let mut s = self.state.borrow_mut();
+        if key == 20 || key == 22 {
+            s.focus = (s.focus + 1) % all.len();
+        } else if key == 19 || key == 21 {
+            s.focus = (s.focus + all.len() - 1) % all.len();
+        }
+        let focus = all[s.focus % all.len()];
+        drop(s);
+        if key == 23 || key == 66 {
+            self.click(vm, focus)?;
+        }
+        Ok(())
+    }
+    fn clickables(&self, r: ObjRef, out: &mut Vec<ObjRef>) {
+        if let Some(v) = self.state.borrow().views.get(&r).cloned() {
+            if v.visible && v.enabled && v.clickable {
+                out.push(r)
+            }
+            for c in v.children {
+                self.clickables(c, out)
+            }
+        }
+    }
+    fn layout(&self) {
+        if let Some(root) = self.active_root() {
+            self.layout_node(root, 0, 0, self.width, self.height, 0);
+        }
+    }
+    fn preferred(&self, r: ObjRef, vertical: bool, depth: usize) -> i32 {
+        if depth > 64 {
+            return 0;
+        }
+        let Some(v) = self.state.borrow().views.get(&r).cloned() else {
+            return 0;
+        };
+        let explicit = if vertical { v.height } else { v.width };
+        if explicit >= 0 {
+            return explicit;
+        }
+        if v.children.is_empty() {
+            if vertical {
+                if v.class == "Landroid/widget/TextView;" {
+                    36
+                } else {
+                    48
+                }
+            } else {
+                (v.text.chars().count() as i32 * 10 + 32).max(64)
+            }
+        } else {
+            let sizes = v
+                .children
+                .iter()
+                .map(|r| self.preferred(*r, vertical, depth + 1));
+            if (v.orientation == 1) == vertical {
+                sizes.sum()
+            } else {
+                sizes.max().unwrap_or(0)
+            }
+        }
+    }
+    fn layout_node(&self, r: ObjRef, x: i32, y: i32, w: i32, h: i32, depth: usize) {
+        if depth > 64 {
+            return;
+        }
+        let Some(v) = self.state.borrow().views.get(&r).cloned() else {
+            return;
+        };
+        self.state.borrow_mut().views.get_mut(&r).unwrap().bounds = [x, y, w.max(0), h.max(0)];
+        let mut at = 0;
+        for child in &v.children {
+            let Some(c) = self.state.borrow().views.get(child).cloned() else {
+                continue;
+            };
+            if !c.visible {
+                continue;
+            }
+            let vertical = v.orientation == 1;
+            let main = if vertical { c.height } else { c.width };
+            let amount = if main == -1 {
+                (if vertical { h } else { w }) - at
+            } else {
+                self.preferred(*child, vertical, depth + 1)
+            }
+            .max(0);
+            let cross = if vertical { c.width } else { c.height };
+            let cross_size = if cross == -1 {
+                if vertical {
+                    w
+                } else {
+                    h
+                }
+            } else if cross >= 0 {
+                cross
+            } else {
+                self.preferred(*child, !vertical, depth + 1)
+            };
+            if v.class == "Landroid/widget/FrameLayout;" {
+                self.layout_node(
+                    *child,
+                    x,
+                    y,
+                    if c.width < 0 { w } else { c.width },
+                    if c.height < 0 { h } else { c.height },
+                    depth + 1,
+                )
+            } else if vertical {
+                self.layout_node(
+                    *child,
+                    x,
+                    y + at,
+                    cross_size.min(w),
+                    amount.min((h - at).max(0)),
+                    depth + 1,
+                )
+            } else {
+                self.layout_node(
+                    *child,
+                    x + at,
+                    y,
+                    amount.min((w - at).max(0)),
+                    cross_size.min(h),
+                    depth + 1,
+                )
+            }
+            at += amount;
+        }
+    }
+    pub fn render(&self, vm: &mut Engine, frame: &mut Frame) -> Result<()> {
+        self.layout();
+        frame.clear(0xff101419);
+        if let Some(root) = self.active_root() {
+            self.draw_view(vm, frame, root, 0)?;
+        }
+        Ok(())
+    }
+    fn draw_view(&self, vm: &mut Engine, frame: &mut Frame, r: ObjRef, depth: usize) -> Result<()> {
+        if depth > 64 {
+            return Err(error("VIEW_DEPTH", "draw tree >64"));
+        }
+        let v = self.state.borrow().views[&r].clone();
+        if !v.visible {
+            return Ok(());
+        }
+        let [x, y, w, h] = v.bounds;
+        frame.rect(x, y, w, h, v.color);
+        if !v.text.is_empty() {
+            frame.text(&v.text, x + 12, y + 26, v.text_size, v.text_color);
+        }
+        let class = vm.heap.class_of(r)?.to_string();
+        if vm
+            .cp
+            .resolve_method(&class, "onDraw", "(Landroid/graphics/Canvas;)V")
+            .is_some()
+        {
+            let canvas = shell(vm, "Landroid/graphics/Canvas;")?;
+            self.state.borrow_mut().canvases.insert(canvas, vec![]);
+            self.state.borrow_mut().roots.push(canvas);
+            let draw = self.callback(
+                vm,
+                r,
+                "onDraw",
+                "(Landroid/graphics/Canvas;)V",
+                &[Value::Obj(canvas)],
+            );
+            let commands = self
+                .state
+                .borrow_mut()
+                .canvases
+                .remove(&canvas)
+                .unwrap_or_default();
+            self.state.borrow_mut().roots.retain(|o| *o != canvas);
+            draw?;
+            for cmd in commands {
+                match cmd {
+                    Draw::Color(c) => frame.rect(x, y, w, h, c),
+                    Draw::Rect(b, c) => frame.rect(
+                        x + b[0] as i32,
+                        y + b[1] as i32,
+                        (b[2] - b[0]) as i32,
+                        (b[3] - b[1]) as i32,
+                        c,
+                    ),
+                    Draw::Circle(cx, cy, r, c) => {
+                        frame.circle(x + cx as i32, y + cy as i32, r as i32, c)
+                    }
+                    Draw::Text(t, tx, ty, size, c) => {
+                        frame.text(&t, x + tx as i32, y + ty as i32, size, c)
+                    }
+                }
+            }
+        }
+        for child in v.children {
+            self.draw_view(vm, frame, child, depth + 1)?;
+        }
+        Ok(())
+    }
+    fn resource(&self, id: u32, depth: usize) -> Result<ResolvedValue> {
+        if depth > 8 {
+            return Err(error("RESOURCE_CYCLE", format!("{id:#x}")));
+        }
+        match self
+            .apk
+            .arsc
+            .as_ref()
+            .and_then(|a| a.resolve_value(id))
+            .ok_or_else(|| error("RESOURCE_NOT_FOUND", format!("{id:#x}")))?
+        {
+            ResolvedValue::Reference(id) => self.resource(id, depth + 1),
+            v => Ok(v),
+        }
+    }
+    fn resource_string(&self, id: u32) -> Result<String> {
+        match self.resource(id, 0)? {
+            ResolvedValue::Str(s) => Ok(s),
+            _ => Err(error("RESOURCE_TYPE", format!("{id:#x} is not a string"))),
+        }
+    }
+    fn inflate(&self, vm: &mut Engine, id: u32, context: ObjRef) -> Result<ObjRef> {
+        let path = self.resource_string(id)?;
+        let bytes = self
+            .apk
+            .zip
+            .read(&path)
+            .map_err(|e| error(&e.code, e.cause))?;
+        let xml = rd_apk::axml::parse(&bytes).map_err(|e| error(&e.code, e.cause))?;
+        self.inflate_node(vm, &xml.root, context, 0)
+    }
+    fn inflate_node(
+        &self,
+        vm: &mut Engine,
+        node: &XmlElement,
+        context: ObjRef,
+        depth: usize,
+    ) -> Result<ObjRef> {
+        if depth > 64 {
+            return Err(error("VIEW_DEPTH", "XML nesting >64"));
+        }
+        let class = if node.name.contains('.') {
+            descriptor(&node.name)
+        } else {
+            match node.name.as_str() {
+                "View" => "Landroid/view/View;".into(),
+                "LinearLayout" | "FrameLayout" | "TextView" | "Button" => {
+                    format!("Landroid/widget/{};", node.name)
+                }
+                _ => {
+                    return Err(error(
+                        "API_UNAVAILABLE",
+                        format!("LayoutInflater tag {}", node.name),
+                    ))
+                }
+            }
+        };
+        let r = shell(vm, &class)?;
+        self.state.borrow_mut().roots.push(r);
+        self.callback(
+            vm,
+            r,
+            "<init>",
+            "(Landroid/content/Context;)V",
+            &[Value::Obj(context)],
+        )?;
+        for attribute in &node.attrs {
+            let value = attribute.value.clone();
+            let name = attribute.name.as_str();
+            match name {
+                "id" => {
+                    self.state.borrow_mut().views.get_mut(&r).unwrap().id =
+                        attribute.as_u32().unwrap_or(0) as i32
+                }
+                "text" => {
+                    let s = match value {
+                        AttrValue::Reference(id) => self.resource_string(id)?,
+                        AttrValue::String(s) => s,
+                        _ => return Err(error("RESOURCE_TYPE", "XML text")),
+                    };
+                    self.state.borrow_mut().views.get_mut(&r).unwrap().text = s;
+                }
+                "layout_width" | "layout_height" => {
+                    let dimension = match value {
+                        AttrValue::Dimension(
+                            n,
+                            ComplexUnit::Dip | ComplexUnit::Px | ComplexUnit::Sp,
+                        ) => n as i32,
+                        AttrValue::Int(n) => n,
+                        _ => {
+                            return Err(error(
+                                "API_UNAVAILABLE",
+                                format!("layout dimension {value:?}"),
+                            ))
+                        }
+                    };
+                    let mut s = self.state.borrow_mut();
+                    let view = s.views.get_mut(&r).unwrap();
+                    if name == "layout_width" {
+                        view.width = dimension
+                    } else {
+                        view.height = dimension
+                    }
+                }
+                "orientation" => {
+                    self.state
+                        .borrow_mut()
+                        .views
+                        .get_mut(&r)
+                        .unwrap()
+                        .orientation = attribute.as_i32().unwrap_or(0)
+                }
+                "background" | "textColor" => {
+                    let color = match value {
+                        AttrValue::Reference(id) => match self.resource(id, 0)? {
+                            ResolvedValue::Integer(c) => c as u32,
+                            _ => return Err(error("API_UNAVAILABLE", "drawable backgrounds")),
+                        },
+                        AttrValue::Int(c) => c as u32,
+                        AttrValue::Raw { data, .. } => data,
+                        _ => return Err(error("RESOURCE_TYPE", "color")),
+                    };
+                    let mut s = self.state.borrow_mut();
+                    let view = s.views.get_mut(&r).unwrap();
+                    if name == "background" {
+                        view.color = color
+                    } else {
+                        view.text_color = color
+                    }
+                }
+                "textSize" => {
+                    let n = match value {
+                        AttrValue::Dimension(
+                            n,
+                            ComplexUnit::Sp | ComplexUnit::Dip | ComplexUnit::Px,
+                        ) => n,
+                        _ => return Err(error("RESOURCE_TYPE", "text size")),
+                    };
+                    self.state.borrow_mut().views.get_mut(&r).unwrap().text_size = n
+                }
+                "onClick" => {
+                    let mut s = self.state.borrow_mut();
+                    let v = s.views.get_mut(&r).unwrap();
+                    v.click_method = Some(attribute.text());
+                    v.clickable = true;
+                }
+                "enabled" | "clickable" => {
+                    let b = attribute.as_bool().unwrap_or(false);
+                    let mut s = self.state.borrow_mut();
+                    let v = s.views.get_mut(&r).unwrap();
+                    if name == "enabled" {
+                        v.enabled = b
+                    } else {
+                        v.clickable = b
+                    }
+                }
+                _ => {
+                    return Err(error(
+                        "API_UNAVAILABLE",
+                        format!("LayoutInflater attribute {}", attribute.name),
+                    ))
+                }
+            }
+        }
+        for child in &node.children {
+            let c = self.inflate_node(vm, child, context, depth + 1)?;
+            self.state
+                .borrow_mut()
+                .views
+                .get_mut(&r)
+                .unwrap()
+                .children
+                .push(c);
+        }
+        self.state.borrow_mut().roots.retain(|o| *o != r);
+        Ok(r)
+    }
+    fn platform_class(&self, vm: &Engine, class: &str) -> Option<String> {
+        let mut c = class.to_string();
+        for _ in 0..64 {
+            if matches!(
+                c.as_str(),
+                "Landroid/app/Activity;"
+                    | "Landroid/app/Application;"
+                    | "Landroid/content/Context;"
+                    | "Landroid/content/ContextWrapper;"
+                    | "Landroid/view/View;"
+                    | "Landroid/view/ViewGroup;"
+                    | "Landroid/widget/TextView;"
+                    | "Landroid/widget/Button;"
+                    | "Landroid/widget/LinearLayout;"
+                    | "Landroid/widget/FrameLayout;"
+                    | "Landroid/os/Bundle;"
+                    | "Landroid/content/Intent;"
+                    | "Landroid/os/Handler;"
+                    | "Landroid/os/Looper;"
+                    | "Landroid/graphics/Paint;"
+                    | "Landroid/graphics/Canvas;"
+                    | "Landroid/view/MotionEvent;"
+                    | "Landroid/content/res/Resources;"
+                    | "Landroid/view/LayoutInflater;"
+                    | "Ljava/lang/StringBuilder;"
+                    | "Ljava/lang/StringBuffer;"
+                    | "Landroid/view/ViewGroup$LayoutParams;"
+                    | "Landroid/widget/LinearLayout$LayoutParams;"
+            ) {
+                return Some(c);
+            }
+            c = vm.cp.superclass_of(&c)?;
+        }
+        None
+    }
+    fn is_view(vm: &Engine, class: &str) -> bool {
+        vm.cp.is_subtype(class, "Landroid/view/View;")
+    }
+    fn content_activity(&self, context: ObjRef) -> Result<usize> {
+        self.state
+            .borrow()
+            .activities
+            .iter()
+            .position(|a| a.object == context)
+            .ok_or_else(|| error("ACTIVITY_STATE", "receiver is not a live Activity"))
+    }
+}
+
+impl FrameworkHost for Android {
+    fn references(&self, r: ObjRef) -> Vec<ObjRef> {
+        let s = self.state.borrow();
+        let mut refs = vec![];
+        if let Some(v) = s.views.get(&r) {
+            refs.extend(v.children.iter().copied());
+            refs.extend(v.listener);
+        }
+        if let Some(bundle) = s.bundles.get(&r) {
+            refs.extend(bundle.values().filter_map(|v| v.as_ref().ok().flatten()));
+        }
+        refs
+    }
+    fn collect(&self, marked: &[bool]) {
+        let live = |r: &ObjRef| marked.get(*r as usize).copied().unwrap_or(false);
+        let mut s = self.state.borrow_mut();
+        s.views.retain(|r, _| live(r));
+        s.bundles.retain(|r, _| live(r));
+        s.builders.retain(|r, _| live(r));
+        s.paints.retain(|r, _| live(r));
+        s.intents.retain(|r, _| live(r));
+        s.motion.retain(|r, _| live(r));
+        s.canvases.retain(|r, _| live(r));
+    }
+    fn attach(&self, vm: &mut Engine, class: &str, r: ObjRef) -> Result<bool> {
+        let Some(platform) = self.platform_class(vm, class) else {
+            return Ok(false);
+        };
+        let mut s = self.state.borrow_mut();
+        if Self::is_view(vm, &platform) {
+            s.views.insert(r, View::new(r, &platform));
+        }
+        match platform.as_str() {
+            "Landroid/content/Intent;" => {
+                s.intents.insert(r, String::new());
+            }
+            "Landroid/os/Bundle;" => {
+                s.bundles.insert(r, BTreeMap::new());
+            }
+            "Ljava/lang/StringBuilder;" | "Ljava/lang/StringBuffer;" => {
+                s.builders.insert(r, String::new());
+            }
+            "Landroid/graphics/Paint;" => {
+                s.paints.insert(r, (0xff000000, 16.));
+            }
+            _ => {}
+        }
+        Ok(true)
+    }
+    fn call_static(
+        &self,
+        vm: &mut Engine,
+        class: &str,
+        name: &str,
+        sig: &str,
+        args: &[Value],
+    ) -> Result<Option<Value>> {
+        let value = match (class, name, sig) {
+            ("Landroid/os/SystemClock;", "uptimeMillis" | "elapsedRealtime", "()J") => {
+                Value::Long(self.now() as i64)
+            }
+            ("Ljava/lang/System;", "nanoTime", "()J") => {
+                Value::Long(self.clock.monotonic_micros().saturating_mul(1000) as i64)
+            }
+            ("Ljava/lang/Integer;", "toString", "(I)Ljava/lang/String;") => {
+                string(vm, int(args, 0)?.to_string())?
+            }
+            ("Ljava/lang/Integer;", "parseInt", "(Ljava/lang/String;)I") => Value::Int(
+                text(vm, &args[0])?
+                    .parse()
+                    .map_err(|_| Throwable::new("Ljava/lang/NumberFormatException;", "integer"))?,
+            ),
+            ("Ljava/lang/String;", "valueOf", _) if sig.ends_with("Ljava/lang/String;") => {
+                string(vm, display(vm, &args[0])?)?
+            }
+            (
+                "Lkotlin/jvm/internal/Intrinsics;",
+                "checkNotNullParameter" | "checkNotNullExpressionValue",
+                "(Ljava/lang/Object;Ljava/lang/String;)V",
+            ) => {
+                obj(&args[0])?;
+                Value::Null
+            }
+            ("Landroid/os/Looper;", "getMainLooper" | "myLooper", "()Landroid/os/Looper;") => {
+                let existing = self.state.borrow().looper;
+                Value::Obj(if let Some(r) = existing {
+                    r
+                } else {
+                    let r = shell(vm, class)?;
+                    self.state.borrow_mut().looper = Some(r);
+                    r
+                })
+            }
+            (
+                "Landroid/view/LayoutInflater;",
+                "from",
+                "(Landroid/content/Context;)Landroid/view/LayoutInflater;",
+            ) => {
+                let r = shell(vm, class)?;
+                write(vm, r, "context", args[0].clone())?;
+                Value::Obj(r)
+            }
+            ("Landroid/graphics/Color;", "rgb", "(III)I") => Value::Int(
+                (0xff000000
+                    | ((int(args, 0)? as u32 & 255) << 16)
+                    | ((int(args, 1)? as u32 & 255) << 8)
+                    | (int(args, 2)? as u32 & 255)) as i32,
+            ),
+            _ => return Ok(None),
+        };
+        Ok(Some(value))
+    }
+    fn call(
+        &self,
+        vm: &mut Engine,
+        class: &str,
+        name: &str,
+        sig: &str,
+        r: ObjRef,
+        args: &[Value],
+    ) -> Result<Option<Value>> {
+        if vm.heap.class_of(r)? == "Ljava/lang/String;" {
+            let s = vm.heap.as_str(r)?.to_string();
+            let v = match (name, sig) {
+                ("length", "()I") => Value::Int(s.encode_utf16().count() as i32),
+                ("toString", "()Ljava/lang/String;") => Value::Obj(r),
+                ("equals", "(Ljava/lang/Object;)Z") => Value::Int(
+                    args[0]
+                        .as_ref()?
+                        .and_then(|r| vm.heap.as_str(r).ok())
+                        .is_some_and(|other| s == other) as i32,
+                ),
+                ("concat", "(Ljava/lang/String;)Ljava/lang/String;") => {
+                    string(vm, format!("{s}{}", text(vm, &args[0])?))?
+                }
+                ("charAt", "(I)C") => Value::Int(
+                    s.encode_utf16()
+                        .nth(int(args, 0)? as usize)
+                        .ok_or_else(|| {
+                            Throwable::new("Ljava/lang/StringIndexOutOfBoundsException;", "charAt")
+                        })? as i32,
+                ),
+                _ => return Ok(None),
+            };
+            return Ok(Some(v));
+        }
+        if class == "Ljava/lang/Object;" && name == "getClass" && sig == "()Ljava/lang/Class;" {
+            let value = vm.heap.alloc_string(vm.heap.class_of(r)?.to_string())?;
+            let c = vm.heap.alloc_instance(
+                "Ljava/lang/Class;".into(),
+                vec![("class_name".into(), Value::Obj(value))],
+            )?;
+            return Ok(Some(Value::Obj(c)));
+        }
+        let actual = vm.heap.class_of(r)?.to_string();
+        let Some(platform) = self
+            .platform_class(vm, class)
+            .or_else(|| self.platform_class(vm, &actual))
+        else {
+            return Ok(None);
+        };
+        let value = match (name, sig) {
+            (
+                "<init>",
+                "()V"
+                | "(Landroid/content/Context;)V"
+                | "(Landroid/content/Context;Landroid/util/AttributeSet;)V"
+                | "(I)V",
+            ) if !platform.contains("Intent") => Value::Null,
+            ("onCreate", "(Landroid/os/Bundle;)V") if platform == "Landroid/app/Activity;" => {
+                Value::Null
+            }
+            (
+                "onCreate" | "onStart" | "onRestart" | "onResume" | "onPause" | "onStop"
+                | "onDestroy",
+                "()V",
+            ) if platform == "Landroid/app/Activity;"
+                || platform == "Landroid/app/Application;" =>
+            {
+                Value::Null
+            }
+            ("getPackageName", "()Ljava/lang/String;") => {
+                string(vm, self.apk.manifest.package.clone())?
+            }
+            ("getApplicationContext", "()Landroid/content/Context;")
+            | ("getApplication", "()Landroid/app/Application;") => Value::Obj(
+                self.state
+                    .borrow()
+                    .application
+                    .ok_or_else(|| error("APPLICATION_STATE", "not created"))?,
+            ),
+            ("getResources", "()Landroid/content/res/Resources;") => {
+                let old = self.state.borrow().resources;
+                Value::Obj(if let Some(r) = old {
+                    r
+                } else {
+                    let r = shell(vm, "Landroid/content/res/Resources;")?;
+                    self.state.borrow_mut().resources = Some(r);
+                    r
+                })
+            }
+            ("getString", "(I)Ljava/lang/String;") | ("getText", "(I)Ljava/lang/CharSequence;") => {
+                string(vm, self.resource_string(int(args, 0)? as u32)?)?
+            }
+            ("getFilesDir", "()Ljava/io/File;") => {
+                let file = shell(vm, "Ljava/io/File;")?;
+                vm.invoke_instance(
+                    file,
+                    "<init>",
+                    "(Ljava/lang/String;)V",
+                    &[Value::StrPlaceholder(format!(
+                        "/data/user/0/{}/files",
+                        self.apk.manifest.package
+                    ))],
+                )?;
+                Value::Obj(file)
+            }
+            ("attachBaseContext", "(Landroid/content/Context;)V") => {
+                obj(&args[0])?;
+                write(vm, r, "base_context", args[0].clone())?;
+                Value::Null
+            }
+            ("getBaseContext", "()Landroid/content/Context;") => {
+                vm.heap.get_field(r, "base_context")?
+            }
+            ("setTitle", "(Ljava/lang/CharSequence;)V") => {
+                self.state.borrow_mut().title = text(vm, &args[0])?;
+                Value::Null
+            }
+            ("setContentView", "(I)V") => {
+                let root = self.inflate(vm, int(args, 0)? as u32, r)?;
+                let index = self.content_activity(r)?;
+                self.state.borrow_mut().activities[index].root = Some(root);
+                Value::Null
+            }
+            ("setContentView", "(Landroid/view/View;)V") => {
+                let root = obj(&args[0])?;
+                if !self.state.borrow().views.contains_key(&root) {
+                    return Err(error("INVALID_VIEW", "setContentView"));
+                }
+                let index = self.content_activity(r)?;
+                self.state.borrow_mut().activities[index].root = Some(root);
+                Value::Null
+            }
+            ("findViewById", "(I)Landroid/view/View;") => {
+                let root = if self.state.borrow().views.contains_key(&r) {
+                    Some(r)
+                } else {
+                    let index = self.content_activity(r)?;
+                    self.state.borrow().activities[index].root
+                };
+                root.and_then(|r| self.find(r, int(args, 0).unwrap_or(-1)))
+                    .map(Value::Obj)
+                    .unwrap_or(Value::Null)
+            }
+            ("getIntent", "()Landroid/content/Intent;") => self.state.borrow().activities
+                [self.content_activity(r)?]
+            .intent
+            .map(Value::Obj)
+            .unwrap_or(Value::Null),
+            ("finish" | "onBackPressed", "()V") => {
+                self.state.borrow_mut().actions.push_back(Action::Finish(r));
+                Value::Null
+            }
+            ("startActivity", "(Landroid/content/Intent;)V") => {
+                let intent = obj(&args[0])?;
+                let class = self
+                    .state
+                    .borrow()
+                    .intents
+                    .get(&intent)
+                    .cloned()
+                    .ok_or_else(|| error("INVALID_INTENT", "startActivity"))?;
+                if class.is_empty() {
+                    return Err(error("API_UNAVAILABLE", "implicit intent resolution"));
+                }
+                self.state
+                    .borrow_mut()
+                    .actions
+                    .push_back(Action::Start(class, intent));
+                Value::Null
+            }
+            ("<init>", "(Landroid/content/Context;Ljava/lang/Class;)V")
+                if platform == "Landroid/content/Intent;" =>
+            {
+                let class = obj(&args[1])?;
+                let value = vm.heap.get_field(class, "class_name")?;
+                self.state.borrow_mut().intents.insert(r, text(vm, &value)?);
+                Value::Null
+            }
+            ("<init>", "()V") if platform == "Landroid/content/Intent;" => Value::Null,
+            ("post", "(Ljava/lang/Runnable;)Z") | ("postDelayed", "(Ljava/lang/Runnable;J)Z") => {
+                let runnable = obj(&args[0])?;
+                let delay = if args.len() > 1 {
+                    args[1].as_long()?.max(0) as u64
+                } else {
+                    0
+                };
+                let mut s = self.state.borrow_mut();
+                if s.tasks.len() >= 4096 {
+                    return Err(error("LOOPER_LIMIT", "4096 queued callbacks"));
+                }
+                s.serial += 1;
+                let order = s.serial;
+                s.tasks.push(Task {
+                    due: self.now().saturating_add(delay),
+                    order,
+                    handler: r,
+                    runnable,
+                });
+                Value::Int(1)
+            }
+            ("removeCallbacks", "(Ljava/lang/Runnable;)V") => {
+                let runnable = obj(&args[0])?;
+                self.state
+                    .borrow_mut()
+                    .tasks
+                    .retain(|t| t.handler != r || t.runnable != runnable);
+                Value::Null
+            }
+            ("<init>", "(Landroid/os/Looper;)V") if platform == "Landroid/os/Handler;" => {
+                obj(&args[0])?;
+                Value::Null
+            }
+            ("inflate", "(ILandroid/view/ViewGroup;)Landroid/view/View;") => {
+                let context = obj(&vm.heap.get_field(r, "context")?)?;
+                let root = self.inflate(vm, int(args, 0)? as u32, context)?;
+                if let Some(parent) = args[1].as_ref()? {
+                    self.add_child(parent, root)?;
+                    Value::Obj(parent)
+                } else {
+                    Value::Obj(root)
+                }
+            }
+            _ => return self.call_object(vm, &platform, name, sig, r, args),
+        };
+        Ok(Some(value))
+    }
+    fn roots(&self) -> Vec<ObjRef> {
+        let s = self.state.borrow();
+        let mut roots = s.roots.clone();
+        roots.extend(s.application);
+        roots.extend(s.resources);
+        roots.extend(s.looper);
+        for a in &s.activities {
+            roots.push(a.object);
+            roots.extend(a.intent);
+            if let Some(r) = a.root {
+                let mut nodes = vec![r];
+                while let Some(r) = nodes.pop() {
+                    roots.push(r);
+                    if let Some(v) = s.views.get(&r) {
+                        roots.extend(v.listener);
+                        nodes.extend(v.children.iter().copied())
+                    }
+                }
+            }
+        }
+        roots.extend(s.tasks.iter().flat_map(|t| [t.handler, t.runnable]));
+        for action in &s.actions {
+            match action {
+                Action::Start(_, r) | Action::Finish(r) => roots.push(*r),
+            }
+        }
+        roots
+    }
+}
+fn display(vm: &Engine, value: &Value) -> Result<String> {
+    Ok(match value {
+        Value::Obj(r) => vm.heap.as_str(*r)?.to_string(),
+        Value::Null => "null".into(),
+        Value::Int(n) => n.to_string(),
+        Value::Long(n) => n.to_string(),
+        Value::Float(n) => n.to_string(),
+        Value::Double(n) => n.to_string(),
+        _ => return Err(error("INVALID_ARGUMENT", "display value")),
+    })
+}
+impl Android {
+    fn add_child(&self, parent: ObjRef, child: ObjRef) -> Result<()> {
+        let mut s = self.state.borrow_mut();
+        if parent == child || !s.views.contains_key(&child) {
+            return Err(error("INVALID_VIEW", "addView child"));
+        }
+        let mut pending = vec![child];
+        while let Some(r) = pending.pop() {
+            if r == parent {
+                return Err(error("VIEW_CYCLE", "addView ancestor"));
+            }
+            if let Some(v) = s.views.get(&r) {
+                pending.extend(v.children.iter().copied());
+            }
+        }
+        if s.views.values().any(|v| v.children.contains(&child)) {
+            return Err(Throwable::new(
+                "Ljava/lang/IllegalStateException;",
+                "child already has a parent",
+            )
+            .into());
+        }
+        s.views
+            .get_mut(&parent)
+            .ok_or_else(|| error("INVALID_VIEW", "addView parent"))?
+            .children
+            .push(child);
+        Ok(())
+    }
+    fn call_object(
+        &self,
+        vm: &mut Engine,
+        platform: &str,
+        name: &str,
+        sig: &str,
+        r: ObjRef,
+        args: &[Value],
+    ) -> Result<Option<Value>> {
+        if self.state.borrow().builders.contains_key(&r) {
+            let v = match name {
+                "<init>" if sig == "()V" || sig == "(I)V" => Value::Null,
+                "<init>" if sig == "(Ljava/lang/String;)V" => {
+                    self.state
+                        .borrow_mut()
+                        .builders
+                        .insert(r, text(vm, &args[0])?);
+                    Value::Null
+                }
+                "append" if args.len() == 1 => {
+                    let s = display(vm, &args[0])?;
+                    self.state
+                        .borrow_mut()
+                        .builders
+                        .get_mut(&r)
+                        .unwrap()
+                        .push_str(&s);
+                    Value::Obj(r)
+                }
+                "toString" if sig == "()Ljava/lang/String;" => {
+                    string(vm, self.state.borrow().builders[&r].clone())?
+                }
+                _ => return Ok(None),
+            };
+            return Ok(Some(v));
+        }
+        if platform.ends_with("LayoutParams;") {
+            return match (name, sig) {
+                ("<init>", "(II)V") => {
+                    write(vm, r, "width", Value::Int(int(args, 0)?))?;
+                    write(vm, r, "height", Value::Int(int(args, 1)?))?;
+                    Ok(Some(Value::Null))
+                }
+                _ => Ok(None),
+            };
+        }
+        if platform == "Landroid/view/MotionEvent;" {
+            let (action, x, y) = self
+                .state
+                .borrow()
+                .motion
+                .get(&r)
+                .copied()
+                .ok_or_else(|| error("INPUT_EVENT_EXPIRED", "MotionEvent"))?;
+            return Ok(match (name, sig) {
+                ("getAction" | "getActionMasked", "()I") => Some(Value::Int(action)),
+                ("getX", "()F") => Some(Value::Float(x)),
+                ("getY", "()F") => Some(Value::Float(y)),
+                _ => None,
+            });
+        }
+        if platform == "Landroid/graphics/Paint;" {
+            let mut s = self.state.borrow_mut();
+            let p = s
+                .paints
+                .get_mut(&r)
+                .ok_or_else(|| error("INVALID_PAINT", "Paint"))?;
+            let v = match (name, sig) {
+                ("setColor", "(I)V") => {
+                    p.0 = int(args, 0)? as u32;
+                    Value::Null
+                }
+                ("getColor", "()I") => Value::Int(p.0 as i32),
+                ("setTextSize", "(F)V") => {
+                    p.1 = args[0].as_float()?.clamp(1., 256.);
+                    Value::Null
+                }
+                ("getTextSize", "()F") => Value::Float(p.1),
+                _ => return Ok(None),
+            };
+            return Ok(Some(v));
+        }
+        if platform == "Landroid/graphics/Canvas;" {
+            let paint_index = match (name, sig) {
+                ("drawRect", "(FFFFLandroid/graphics/Paint;)V") => Some(4),
+                ("drawCircle", "(FFFLandroid/graphics/Paint;)V") => Some(3),
+                ("drawText", "(Ljava/lang/String;FFLandroid/graphics/Paint;)V") => Some(3),
+                _ => None,
+            };
+            let paint = if let Some(index) = paint_index {
+                self.state
+                    .borrow()
+                    .paints
+                    .get(&obj(&args[index])?)
+                    .copied()
+                    .ok_or_else(|| error("INVALID_PAINT", "Canvas paint"))?
+            } else {
+                (0, 0.)
+            };
+            let command = match (name, sig) {
+                ("drawColor", "(I)V") => Draw::Color(int(args, 0)? as u32),
+                ("drawRect", "(FFFFLandroid/graphics/Paint;)V") => Draw::Rect(
+                    [
+                        args[0].as_float()?,
+                        args[1].as_float()?,
+                        args[2].as_float()?,
+                        args[3].as_float()?,
+                    ],
+                    paint.0,
+                ),
+                ("drawCircle", "(FFFLandroid/graphics/Paint;)V") => Draw::Circle(
+                    args[0].as_float()?,
+                    args[1].as_float()?,
+                    args[2].as_float()?,
+                    paint.0,
+                ),
+                ("drawText", "(Ljava/lang/String;FFLandroid/graphics/Paint;)V") => Draw::Text(
+                    text(vm, &args[0])?,
+                    args[1].as_float()?,
+                    args[2].as_float()?,
+                    paint.1,
+                    paint.0,
+                ),
+                _ => return Ok(None),
+            };
+            self.state
+                .borrow_mut()
+                .canvases
+                .get_mut(&r)
+                .ok_or_else(|| error("CANVAS_EXPIRED", "draw outside onDraw"))?
+                .push(command);
+            return Ok(Some(Value::Null));
+        }
+        if platform == "Landroid/os/Bundle;" || platform == "Landroid/content/Intent;" {
+            let is_intent = platform == "Landroid/content/Intent;";
+            let result = match (name, sig) {
+                ("putInt", "(Ljava/lang/String;I)V")
+                | ("putString", "(Ljava/lang/String;Ljava/lang/String;)V")
+                | ("putExtra", "(Ljava/lang/String;I)Landroid/content/Intent;")
+                | ("putExtra", "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;") => {
+                    let key = text(vm, &args[0])?;
+                    self.state
+                        .borrow_mut()
+                        .bundles
+                        .entry(r)
+                        .or_default()
+                        .insert(key, args[1].clone());
+                    if is_intent {
+                        Value::Obj(r)
+                    } else {
+                        Value::Null
+                    }
+                }
+                ("getInt", "(Ljava/lang/String;)I")
+                | ("getInt", "(Ljava/lang/String;I)I")
+                | ("getIntExtra", "(Ljava/lang/String;I)I") => {
+                    let key = text(vm, &args[0])?;
+                    self.state
+                        .borrow()
+                        .bundles
+                        .get(&r)
+                        .and_then(|b| b.get(&key))
+                        .cloned()
+                        .unwrap_or_else(|| args.get(1).cloned().unwrap_or(Value::Int(0)))
+                }
+                ("getString", "(Ljava/lang/String;)Ljava/lang/String;")
+                | ("getStringExtra", "(Ljava/lang/String;)Ljava/lang/String;") => {
+                    let key = text(vm, &args[0])?;
+                    self.state
+                        .borrow()
+                        .bundles
+                        .get(&r)
+                        .and_then(|b| b.get(&key))
+                        .cloned()
+                        .unwrap_or(Value::Null)
+                }
+                _ => return Ok(None),
+            };
+            return Ok(Some(result));
+        }
+        if !self.state.borrow().views.contains_key(&r) {
+            return Ok(None);
+        }
+        let value = match (name, sig) {
+            ("setId", "(I)V") => {
+                self.state.borrow_mut().views.get_mut(&r).unwrap().id = int(args, 0)?;
+                Value::Null
+            }
+            ("getId", "()I") => Value::Int(self.state.borrow().views[&r].id),
+            ("setText", "(Ljava/lang/CharSequence;)V") => {
+                let s = if args[0].as_ref()?.is_none() {
+                    String::new()
+                } else {
+                    text(vm, &args[0])?
+                };
+                self.state.borrow_mut().views.get_mut(&r).unwrap().text = s;
+                Value::Null
+            }
+            ("setText", "(I)V") => {
+                let s = self.resource_string(int(args, 0)? as u32)?;
+                self.state.borrow_mut().views.get_mut(&r).unwrap().text = s;
+                Value::Null
+            }
+            ("getText", "()Ljava/lang/CharSequence;") => {
+                string(vm, self.state.borrow().views[&r].text.clone())?
+            }
+            ("setTextSize", "(F)V") => {
+                self.state.borrow_mut().views.get_mut(&r).unwrap().text_size =
+                    args[0].as_float()?.clamp(1., 256.);
+                Value::Null
+            }
+            ("setTextColor", "(I)V") => {
+                self.state
+                    .borrow_mut()
+                    .views
+                    .get_mut(&r)
+                    .unwrap()
+                    .text_color = int(args, 0)? as u32;
+                Value::Null
+            }
+            ("setBackgroundColor", "(I)V") => {
+                self.state.borrow_mut().views.get_mut(&r).unwrap().color = int(args, 0)? as u32;
+                Value::Null
+            }
+            ("setOrientation", "(I)V") => {
+                self.state
+                    .borrow_mut()
+                    .views
+                    .get_mut(&r)
+                    .unwrap()
+                    .orientation = int(args, 0)?;
+                Value::Null
+            }
+            ("setOnClickListener", "(Landroid/view/View$OnClickListener;)V") => {
+                let listener = args[0].as_ref()?;
+                let mut s = self.state.borrow_mut();
+                let v = s.views.get_mut(&r).unwrap();
+                v.listener = listener;
+                v.clickable = listener.is_some();
+                Value::Null
+            }
+            ("setClickable" | "setEnabled", "(Z)V") => {
+                let b = int(args, 0)? != 0;
+                let mut s = self.state.borrow_mut();
+                let v = s.views.get_mut(&r).unwrap();
+                if name == "setClickable" {
+                    v.clickable = b
+                } else {
+                    v.enabled = b
+                }
+                Value::Null
+            }
+            ("isEnabled", "()Z") => Value::Int(self.state.borrow().views[&r].enabled as i32),
+            ("performClick", "()Z") => Value::Int(self.click(vm, r)? as i32),
+            ("setVisibility", "(I)V") => {
+                self.state.borrow_mut().views.get_mut(&r).unwrap().visible = int(args, 0)? == 0;
+                Value::Null
+            }
+            ("getWidth" | "getHeight", "()I") => Value::Int(
+                self.state.borrow().views[&r].bounds[if name == "getWidth" { 2 } else { 3 }],
+            ),
+            ("setLayoutParams", "(Landroid/view/ViewGroup$LayoutParams;)V") => {
+                let p = obj(&args[0])?;
+                let w = vm.heap.get_field(p, "width")?.as_int()?;
+                let h = vm.heap.get_field(p, "height")?.as_int()?;
+                let mut s = self.state.borrow_mut();
+                let v = s.views.get_mut(&r).unwrap();
+                v.width = w;
+                v.height = h;
+                Value::Null
+            }
+            ("addView", "(Landroid/view/View;)V") | ("addView", "(Landroid/view/View;II)V") => {
+                let child = obj(&args[0])?;
+                if args.len() == 3 {
+                    let mut s = self.state.borrow_mut();
+                    let v = s
+                        .views
+                        .get_mut(&child)
+                        .ok_or_else(|| error("INVALID_VIEW", "addView"))?;
+                    v.width = int(args, 1)?;
+                    v.height = int(args, 2)?;
+                }
+                self.add_child(r, child)?;
+                Value::Null
+            }
+            ("removeAllViews", "()V") => {
+                self.state
+                    .borrow_mut()
+                    .views
+                    .get_mut(&r)
+                    .unwrap()
+                    .children
+                    .clear();
+                Value::Null
+            }
+            ("invalidate" | "requestLayout", "()V") => Value::Null, // draw/layout is scheduled every platform frame
+            ("onDraw", "(Landroid/graphics/Canvas;)V") if class_is_base_view(platform) => {
+                Value::Null
+            }
+            ("onTouchEvent", "(Landroid/view/MotionEvent;)Z") => Value::Int(0),
+            _ => return Ok(None),
+        };
+        Ok(Some(value))
+    }
+}
+fn class_is_base_view(class: &str) -> bool {
+    class == "Landroid/view/View;"
+}
