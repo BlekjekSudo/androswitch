@@ -22,6 +22,7 @@ use crate::heap::{ElemKind, ObjRef};
 use crate::value::Value;
 
 const FILE: &str = "Ljava/io/File;";
+const ATOMIC_FILE: &str = "Landroid/util/AtomicFile;";
 
 #[derive(Default)]
 struct Vfs {
@@ -332,6 +333,201 @@ pub fn static_intrinsic(
     }))
 }
 
+fn atomic_throw(class: &str, message: impl Into<String>) -> VmExit {
+    crate::err::Throwable::new(class, message.into()).into()
+}
+
+fn atomic_file_ref(vm: &Engine, recv: ObjRef, field: &str) -> Result<ObjRef, VmExit> {
+    match vm.heap.get_field(recv, field) {
+        Ok(Value::Obj(file)) => Ok(file),
+        _ => Err(atomic_throw(
+            "Ljava/lang/NullPointerException;",
+            format!("{field} == null"),
+        )),
+    }
+}
+
+fn atomic_paths(vm: &Engine, recv: ObjRef) -> Result<(String, String), VmExit> {
+    let base = atomic_file_ref(vm, recv, "mBaseFile")?;
+    let backup = atomic_file_ref(vm, recv, "mBackupFile")?;
+    Ok((absolute(&path_of(vm, base)), absolute(&path_of(vm, backup))))
+}
+
+fn atomic_rename(from: &str, to: &str) -> bool {
+    VFS.with(|v| {
+        let mut v = v.borrow_mut();
+        let Some(bytes) = v.files.remove(from) else {
+            return false;
+        };
+        v.files.insert(to.to_string(), bytes);
+        true
+    })
+}
+
+fn atomic_create_stream(vm: &mut Engine, class: &str, path: &str) -> Result<Value, VmExit> {
+    let stream = vm
+        .heap
+        .alloc_instance(class.to_string(), Vec::new())
+        .map_err(crate::err::oom_throwable)?;
+    let path_ref = crate::intrinsics::alloc_string(vm, path.to_string())?;
+    if stream_intrinsic(
+        vm,
+        class,
+        "<init>",
+        "(Ljava/lang/String;)V",
+        stream,
+        &[Value::Obj(path_ref)],
+    )?
+    .is_none()
+    {
+        return Err(crate::err::vm_error(
+            "VM_TYPE_ERROR",
+            format!("{class} constructor was not handled"),
+        )
+        .into());
+    }
+    Ok(Value::Obj(stream))
+}
+
+fn atomic_close_stream(vm: &mut Engine, args: &[Value]) {
+    if let Some(Value::Obj(stream)) = args.first() {
+        // FileOutputStream.close() also makes the host VFS state final; the
+        // AOSP implementation ignores IOException from this cleanup path.
+        let _ = vm.invoke_instance(*stream, "close", "()V", &[]);
+    }
+}
+
+fn atomic_restore_backup(base: &str, backup: &str) {
+    if is_file(backup) {
+        delete_file(base);
+        atomic_rename(backup, base);
+    }
+}
+
+fn atomic_open_read(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
+    let (base, backup) = atomic_paths(vm, recv)?;
+    atomic_restore_backup(&base, &backup);
+    atomic_create_stream(vm, FIS, &base)
+}
+
+fn atomic_file_intrinsic(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match (name, sig) {
+        ("<init>", "(Ljava/io/File;)V") => {
+            let Some(base @ Value::Obj(base_ref)) = args.first() else {
+                return Err(atomic_throw(
+                    "Ljava/lang/NullPointerException;",
+                    "baseFile == null",
+                ));
+            };
+            let base_path = path_of(vm, *base_ref);
+            let backup = new_file(vm, &format!("{base_path}.bak"))?;
+            crate::err::put_field_result(vm.heap.put_field(recv, "mBaseFile", base.clone()))?;
+            crate::err::put_field_result(vm.heap.put_field(recv, "mBackupFile", backup))?;
+            Ok(Some(Value::Null))
+        }
+        ("getBaseFile", "()Ljava/io/File;") => {
+            Ok(Some(Value::Obj(atomic_file_ref(vm, recv, "mBaseFile")?)))
+        }
+        ("startWrite", "()Ljava/io/FileOutputStream;") => {
+            let (base, backup) = atomic_paths(vm, recv)?;
+            if is_file(&base) || is_dir(&base) {
+                if !is_file(&backup) && !is_dir(&backup) {
+                    if !is_file(&base) || !atomic_rename(&base, &backup) {
+                        return Err(atomic_throw(
+                            "Ljava/io/IOException;",
+                            format!("Couldn't rename file {base} to backup file {backup}"),
+                        ));
+                    }
+                } else {
+                    // A pre-existing backup is the older committed state;
+                    // the current base is an interrupted replacement.
+                    delete_file(&base);
+                }
+            }
+            match atomic_create_stream(vm, FOS, &base) {
+                Ok(stream) => Ok(Some(stream)),
+                Err(error) => {
+                    let Some(parent) = parent_of(&base) else {
+                        return Err(error);
+                    };
+                    mkdirs(&parent);
+                    if !is_dir(&parent) {
+                        return Err(error);
+                    }
+                    Ok(Some(atomic_create_stream(vm, FOS, &base)?))
+                }
+            }
+        }
+        ("finishWrite", "(Ljava/io/FileOutputStream;)V") => {
+            atomic_close_stream(vm, args);
+            let (_, backup) = atomic_paths(vm, recv)?;
+            delete_file(&backup);
+            Ok(Some(Value::Null))
+        }
+        ("failWrite", "(Ljava/io/FileOutputStream;)V") => {
+            atomic_close_stream(vm, args);
+            let (base, backup) = atomic_paths(vm, recv)?;
+            delete_file(&base);
+            if is_file(&backup) {
+                atomic_rename(&backup, &base);
+            }
+            Ok(Some(Value::Null))
+        }
+        ("openRead", "()Ljava/io/FileInputStream;") => Ok(Some(atomic_open_read(vm, recv)?)),
+        ("readFully", "()[B") => {
+            let Value::Obj(stream) = atomic_open_read(vm, recv)? else {
+                return Err(atomic_throw(
+                    "Ljava/io/IOException;",
+                    "openRead returned null",
+                ));
+            };
+            let scratch = crate::jlstring::byte_array(vm, &[0; 8192])?;
+            let Value::Obj(scratch_ref) = scratch else {
+                return Err(atomic_throw("Ljava/io/IOException;", "scratch buffer"));
+            };
+            let mut contents = Vec::new();
+            loop {
+                let count = vm
+                    .invoke_instance(
+                        stream,
+                        "read",
+                        "([BII)I",
+                        &[scratch.clone(), Value::Int(0), Value::Int(8192)],
+                    )?
+                    .as_int()
+                    .unwrap_or(-1);
+                if count < 0 {
+                    break;
+                }
+                if count == 0 {
+                    continue;
+                }
+                let bytes = vm.heap.as_array_elems(scratch_ref)?.0;
+                contents.extend(
+                    bytes[..(count as usize).min(bytes.len())]
+                        .iter()
+                        .map(|value| value.as_int().unwrap_or(0) as u8),
+                );
+            }
+            let _ = vm.invoke_instance(stream, "close", "()V", &[]);
+            Ok(Some(crate::jlstring::byte_array(vm, &contents)?))
+        }
+        ("delete", "()V") => {
+            let (base, backup) = atomic_paths(vm, recv)?;
+            delete_file(&base);
+            delete_file(&backup);
+            Ok(Some(Value::Null))
+        }
+        _ => Ok(None),
+    }
+}
+
 pub fn instance_intrinsic(
     vm: &mut Engine,
     recv_class: &str,
@@ -342,6 +538,9 @@ pub fn instance_intrinsic(
 ) -> Result<Option<Value>, VmExit> {
     if STREAMS.contains(&recv_class) {
         return stream_intrinsic(vm, recv_class, name, sig, recv, args);
+    }
+    if recv_class == ATOMIC_FILE {
+        return atomic_file_intrinsic(vm, name, sig, recv, args);
     }
     if recv_class != FILE {
         return Ok(None);

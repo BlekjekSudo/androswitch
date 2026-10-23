@@ -205,6 +205,31 @@ that exact prefix:
   public catalogue, including IO/JSON/XML helpers and event/log types,
   remains incomplete.
 
+## Round 9 — `android.util.AtomicFile`
+
+- `AtomicFile(File)` retains the exact base `File`, derives the AOSP
+  `<base>.bak` backup file, and implements `getBaseFile`, `startWrite`,
+  `finishWrite`, `failWrite`, `openRead`, `readFully` and `delete` over
+  the VM filesystem.
+- `startWrite` follows the platform backup protocol: an existing base is
+  renamed to `.bak`; if a backup already exists, that older committed
+  backup is retained and the interrupted base replacement is discarded.
+  A failed first stream open creates missing parent directories and
+  retries, matching AOSP.
+- `finishWrite` closes the replacement stream and deletes the backup;
+  `failWrite` closes it, deletes the replacement and restores the backup;
+  `openRead` first restores an orphaned backup left by an interrupted
+  write. Missing base files surface `FileNotFoundException` from the real
+  `FileInputStream` constructor path.
+- Proof:
+  `atomic_file_finish_fail_and_interrupted_writes_follow_aosp_backup_protocol`
+  covers initial parent creation, commit, explicit rollback, a second
+  `startWrite` while a backup exists, rollback on read after an
+  interrupted write, recommit, delete and the missing-file error.
+- Status after Round 9: `android.util` remains **partial**. The rest of its
+  public catalogue, including JSON/XML helpers and event/log types,
+  remains incomplete.
+
 ## Remaining literal blockers by partial surface
 
 | Domain | Surface | Main literal blockers |
