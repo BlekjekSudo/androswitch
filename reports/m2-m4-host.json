@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-10-23",
-  "implementation_commit": "pending_commit",
+  "implementation_commit": "13fbcd00d1421a1ea75f41ed7fcc5c9231cc3428",
   "status": "passed",
   "physical_device": "not_run",
   "checks": [
@@ -174,5 +174,6 @@
       }
     ],
     "schema_version": 1
-  }
+  },
+  "native_fixture_warning": "Unchanged upstream ARM32 source redeclares snprintf with unsigned long instead of the Android size_t typedef; compiler diagnostic retained in target/evidence/m4-native-fixture-build-ndk.log. The three recorded native tests pass."
 }

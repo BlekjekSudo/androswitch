@@ -91,7 +91,7 @@
     "Abrupt power loss and physical SD failures not tested",
     "Java/native shared-file JNI proof is in M4"
   ],
-  "implementation_commit": "pending_commit",
+  "implementation_commit": "13fbcd00d1421a1ea75f41ed7fcc5c9231cc3428",
   "milestone": "M2",
   "verification": {
     "physical_device": "not_run",

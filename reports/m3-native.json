@@ -218,7 +218,7 @@
   "schema_version": 1,
   "milestone": "M3",
   "artifact_root": "local-artifacts/m3/runs/7e4847947de747a9a20066f6185c6b77",
-  "implementation_commit": "pending_commit",
+  "implementation_commit": "13fbcd00d1421a1ea75f41ed7fcc5c9231cc3428",
   "sources": [
     {
       "file": "fixtures/m3/native/dependency.c",
