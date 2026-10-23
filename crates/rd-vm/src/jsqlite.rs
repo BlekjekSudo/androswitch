@@ -29,14 +29,21 @@
 //! - `Cursor`: the full row-cursor surface with AOSP CursorWindow
 //!   conversions (`getString` on an int, `getLong` on text, …).
 //!
+//! **Persistence:** named databases are serialized to their app-private
+//! VFS path (`jfile`) after committed mutations and deserialized on the next
+//! Engine launch that opens the same path. `:memory:`/`createInMemory`
+//! databases intentionally remain memory-only. The VFS image is a real
+//! SQLite file image when Python's `sqlite3` serialize/deserialize API is
+//! available; older interpreters fall back to a SQL dump image.
+//!
 //! **Deviations:**
-//! - Databases live in memory for the Engine's lifetime. Their file path
-//!   exists in the virtual filesystem (`jfile`), but nothing is persisted
-//!   across app launches.
 //! - SQL errors map to `SQLiteException` subclasses by SQLite error class,
 //!   not exact result code.
+//! - This is still not literal AOSP completeness: WAL/checkpointing, locale
+//!   collation, custom functions/extensions, multi-process locking and every
+//!   overload/result-code nuance remain Appendix C gaps.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
@@ -59,6 +66,7 @@ const DRIVER: &str = "Landroid/database/sqlite/SQLiteDirectCursorDriver;";
 const PY: &str = r#"
 import sys, json, sqlite3, base64
 dbs = {}
+DUMP_PREFIX = b"-- RustyDroid SQLite dump\n"
 def enc(v):
     if isinstance(v, (bytes, bytearray, memoryview)):
         return {"b": base64.b64encode(bytes(v)).decode()}
@@ -67,6 +75,19 @@ def dec(v):
     if isinstance(v, dict):
         return base64.b64decode(v["b"])
     return v
+def load_db(db, data):
+    if not data:
+        return
+    if data.startswith(DUMP_PREFIX):
+        db.executescript(data[len(DUMP_PREFIX):].decode())
+    elif hasattr(db, "deserialize"):
+        db.deserialize(data)
+    else:
+        raise sqlite3.DatabaseError("sqlite3.deserialize is unavailable")
+def dump_db(db):
+    if hasattr(db, "serialize"):
+        return db.serialize()
+    return DUMP_PREFIX + ("\n".join(db.iterdump())).encode()
 for line in sys.stdin:
     r = json.loads(line)
     try:
@@ -78,6 +99,10 @@ for line in sys.stdin:
         op = r["op"]
         if op == "close":
             db.close(); del dbs[name]; out = {}
+        elif op == "load":
+            load_db(db, base64.b64decode(r.get("data", ""))); out = {}
+        elif op == "dump":
+            out = {"data": base64.b64encode(dump_db(db)).decode()}
         else:
             cur = db.execute(r["sql"], [dec(a) for a in r.get("args", [])])
             cols = [d[0] for d in cur.description] if cur.description else []
@@ -137,6 +162,10 @@ pub struct SqlState {
     /// The backend failed to start: use the m8 subset.
     pub(crate) unavailable: bool,
     dbs: HashMap<ObjRef, String>,
+    /// Persistent DB paths already deserialized into this Engine's backend
+    /// process. A new Engine has an empty set, so reopening a named DB loads
+    /// the VFS image again (the cross-launch persistence boundary).
+    loaded: HashSet<String>,
     txns: HashMap<String, Txn>,
     programs: HashMap<ObjRef, (String, String, Vec<Sv>)>, // obj -> (db, sql, binds)
     cursors: HashMap<ObjRef, Cursor>,
@@ -294,8 +323,7 @@ fn sql_trace() -> bool {
     *ON.get_or_init(|| std::env::var("RD_SQL_TRACE").is_ok_and(|v| v != "0"))
 }
 
-fn run(vm: &mut Engine, db: &str, sql: &str, args: &[Sv]) -> Result<Res, VmExit> {
-    let req = json!({"op": "exec", "db": db, "sql": sql, "args": args.iter().map(sv_json).collect::<Vec<_>>()});
+fn send(vm: &mut Engine, req: &J) -> Result<J, VmExit> {
     let line = {
         let p =
             vm.fw.m8.sqlx.proc.as_mut().ok_or_else(|| {
@@ -313,8 +341,124 @@ fn run(vm: &mut Engine, db: &str, sql: &str, args: &[Sv]) -> Result<Res, VmExit>
         p.stdout.read_line(&mut line).map_err(io)?;
         line
     };
-    let r: J = serde_json::from_str(&line)
-        .map_err(|e| crate::err::vm_error("VM_ERROR", format!("SQLite backend reply: {e}")))?;
+    serde_json::from_str(&line)
+        .map_err(|e| crate::err::vm_error("VM_ERROR", format!("SQLite backend reply: {e}")).into())
+}
+
+fn persistent_db(db: &str) -> bool {
+    !db.is_empty() && db != ":memory:" && !db.starts_with(":memory:")
+}
+
+fn first_keyword(sql: &str) -> String {
+    sql.trim_start()
+        .chars()
+        .take_while(|c| c.is_ascii_alphabetic())
+        .collect::<String>()
+        .to_ascii_uppercase()
+}
+
+fn in_transaction(vm: &Engine, db: &str) -> bool {
+    vm.fw
+        .m8
+        .sqlx
+        .txns
+        .get(db)
+        .map(|t| !t.levels.is_empty())
+        .unwrap_or(false)
+}
+
+fn ensure_loaded(vm: &mut Engine, db: &str) -> Result<(), VmExit> {
+    if !persistent_db(db) || vm.fw.m8.sqlx.loaded.contains(db) {
+        return Ok(());
+    }
+    // Mark first: loading is a backend-process boundary, and a failed load is
+    // a typed corruption error rather than a reason to retry on every SQL op.
+    vm.fw.m8.sqlx.loaded.insert(db.to_string());
+    let Some(bytes) = crate::jfile::read_bytes(db).filter(|b| !b.is_empty()) else {
+        return Ok(());
+    };
+    let r = send(vm, &json!({"op": "load", "db": db, "data": b64(&bytes)}))?;
+    if let Some(e) = r.get("err").and_then(J::as_str) {
+        return Err(Throwable::new(
+            "Landroid/database/sqlite/SQLiteDatabaseCorruptException;",
+            format!("loading persistent database {db}: {e}"),
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn persist_db(vm: &mut Engine, db: &str) -> Result<(), VmExit> {
+    if !persistent_db(db) {
+        return Ok(());
+    }
+    ensure_loaded(vm, db)?;
+    let r = send(vm, &json!({"op": "dump", "db": db}))?;
+    if let Some(e) = r.get("err").and_then(J::as_str) {
+        return Err(sql_exc(
+            r.get("kind").and_then(J::as_str).unwrap_or(""),
+            e,
+            "<serialize database>",
+        ));
+    }
+    let data = r
+        .get("data")
+        .and_then(J::as_str)
+        .map(unb64)
+        .unwrap_or_default();
+    if !data.is_empty() {
+        crate::jfile::write_bytes(db, data);
+    }
+    Ok(())
+}
+
+fn backend_close(vm: &mut Engine, db: &str) {
+    let _ = send(vm, &json!({"op": "close", "db": db}));
+    vm.fw.m8.sqlx.loaded.remove(db);
+    vm.fw.m8.sqlx.txns.remove(db);
+    vm.fw.m8.sqlx.programs.retain(|_, (pdb, _, _)| pdb != db);
+    vm.fw.m8.sqlx.dbs.retain(|_, pdb| pdb != db);
+}
+
+/// Forgets every in-Engine handle for a database path before its file is
+/// deleted (e.g. `Context.deleteDatabase`), so a later mutation through a
+/// stale handle cannot resurrect the deleted image. The legacy subset is
+/// keyed by helper name, so its basename entry is removed too.
+pub(crate) fn forget_database(vm: &mut Engine, path: &str) -> bool {
+    let was_open =
+        vm.fw.m8.sqlx.dbs.values().any(|db| db == path) || vm.fw.m8.sqlx.loaded.contains(path);
+    if was_open {
+        backend_close(vm, path);
+    }
+    let base = path.rsplit('/').next().unwrap_or(path);
+    let subset = vm.fw.m8.databases.remove(base).is_some();
+    vm.fw.m8.db_by_obj.retain(|_, name| name != base);
+    was_open || subset
+}
+
+fn should_persist_after(sql: &str) -> bool {
+    let kw = first_keyword(sql);
+    matches!(
+        kw.as_str(),
+        "INSERT"
+            | "UPDATE"
+            | "DELETE"
+            | "REPLACE"
+            | "CREATE"
+            | "DROP"
+            | "ALTER"
+            | "VACUUM"
+            | "REINDEX"
+            | "ANALYZE"
+            | "COMMIT"
+            | "END"
+    ) || (kw == "PRAGMA" && sql.contains('='))
+}
+
+fn run(vm: &mut Engine, db: &str, sql: &str, args: &[Sv]) -> Result<Res, VmExit> {
+    ensure_loaded(vm, db)?;
+    let req = json!({"op": "exec", "db": db, "sql": sql, "args": args.iter().map(sv_json).collect::<Vec<_>>()});
+    let r = send(vm, &req)?;
     if sql_trace() {
         eprintln!(
             "S/RustyDroid: sql {sql} args={} err={}",
@@ -349,12 +493,25 @@ fn run(vm: &mut Engine, db: &str, sql: &str, args: &[Sv]) -> Result<Res, VmExit>
                 .collect()
         })
         .unwrap_or_default();
-    Ok(Res {
+    let res = Res {
         cols,
         rows,
         changes: r["changes"].as_i64().unwrap_or(0),
         last: r["last"].as_i64().unwrap_or(0),
-    })
+    };
+    // Durability boundary: flush committed work to the VFS image. Work inside
+    // an explicit transaction is not flushed until COMMIT/END runs, matching
+    // the commit boundary instead of leaking uncommitted rows across launches.
+    let kw = first_keyword(sql);
+    // `changes > 0` also catches mutating CTEs (`WITH ... DELETE ...`),
+    // whose first keyword is not itself a mutation verb.
+    if persistent_db(db)
+        && (should_persist_after(sql) || res.changes > 0)
+        && (!in_transaction(vm, db) || matches!(kw.as_str(), "COMMIT" | "END"))
+    {
+        persist_db(vm, db)?;
+    }
+    Ok(res)
 }
 
 // ── Java <-> SQL values ─────────────────────────────────────────────────
@@ -875,20 +1032,12 @@ fn db_intrinsic(
             end(vm, db)?;
             Value::Null
         }
-        "inTransaction" | "isDbLockedByCurrentThread" => Value::Int(
-            vm.fw
-                .m8
-                .sqlx
-                .txns
-                .get(db)
-                .map(|t| !t.levels.is_empty())
-                .unwrap_or(false) as i32,
-        ),
+        "inTransaction" | "isDbLockedByCurrentThread" => Value::Int(in_transaction(vm, db) as i32),
+        "isInMemoryDatabase" => Value::Int((!persistent_db(db)) as i32),
         "yieldIfContendedSafely"
         | "yieldIfContended"
         | "isDbLockedByOtherThreads"
-        | "isReadOnly"
-        | "isInMemoryDatabase" => Value::Int(0),
+        | "isReadOnly" => Value::Int(0),
         "getVersion" => Value::Int(version(vm, db)? as i32),
         "setVersion" => {
             let v = args.first().and_then(|v| v.as_int().ok()).unwrap_or(0);
@@ -912,6 +1061,10 @@ fn db_intrinsic(
         "getPath" => jstring(vm, db.to_string())?,
         "isOpen" => Value::Int(1),
         "close" | "releaseReference" | "acquireReference" | "releaseReferenceFromContainer" => {
+            // Reference-count/close calls are a safe durability point; the
+            // object model stays usable (existing RustyDroid deviation), but
+            // committed named-database state is flushed to the VFS image.
+            persist_db(vm, db)?;
             Value::Null
         }
         "enableWriteAheadLogging" => Value::Int(1),
@@ -1464,20 +1617,12 @@ pub fn static_intrinsic(
         other => jstr(vm, other).unwrap_or_default(),
     };
     if name == "deleteDatabase" {
-        let existed = vm.fw.m8.sqlx.dbs.values().any(|d| *d == path);
-        if existed {
-            let p = vm.fw.m8.sqlx.proc.as_mut().map(|p| {
-                writeln!(p.stdin, "{}", json!({"op":"close","db":path}))
-                    .and_then(|_| p.stdin.flush())
-                    .map(|_| {
-                        let mut l = String::new();
-                        let _ = p.stdout.read_line(&mut l);
-                    })
-            });
-            let _ = p;
-            vm.fw.m8.sqlx.dbs.retain(|_, d| *d != path);
+        let was_open = vm.fw.m8.sqlx.dbs.values().any(|d| *d == path);
+        if was_open || vm.fw.m8.sqlx.loaded.contains(&path) {
+            backend_close(vm, &path);
         }
-        return Ok(Some(Value::Int(existed as i32)));
+        let deleted_file = persistent_db(&path) && crate::jfile::delete_file(&path);
+        return Ok(Some(Value::Int((was_open || deleted_file) as i32)));
     }
     let path =
         if matches!(name, "create" | "createInMemory") || path.is_empty() || path == ":memory:" {
@@ -1497,6 +1642,17 @@ mod tests {
         for s in [&b""[..], b"a", b"ab", b"abc", b"\x00\xff\x10hello"] {
             assert_eq!(unb64(&b64(s)), s);
         }
+    }
+    #[test]
+    fn persistence_classification() {
+        assert!(persistent_db("/data/user/0/app/databases/app.db"));
+        assert!(!persistent_db(":memory:"));
+        assert!(!persistent_db(":memory:3"));
+        assert!(should_persist_after("CREATE TABLE t (x INTEGER)"));
+        assert!(should_persist_after(" insert into t values (1)"));
+        assert!(should_persist_after("PRAGMA user_version = 2"));
+        assert!(!should_persist_after("PRAGMA user_version"));
+        assert!(!should_persist_after("SELECT * FROM t"));
     }
     #[test]
     fn select_builder() {

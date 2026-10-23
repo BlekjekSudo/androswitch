@@ -354,6 +354,10 @@ fn call_static_intrinsic_rooted(
     if let Some(v) = crate::boxes::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
     }
+    // Parcel.obtain / Binder identity statics (parcel.rs)
+    if let Some(v) = crate::parcel::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
     if let Some(v) = crate::xml_res::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
@@ -1120,7 +1124,10 @@ fn platform_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<V
                 Some(v) => Some(v),
                 None => match crate::jbigdecimal::host_static(vm, owner, field)? {
                     Some(v) => Some(v),
-                    None => crate::jnormalizer::host_static(vm, owner, field)?,
+                    None => match crate::jnormalizer::host_static(vm, owner, field)? {
+                        Some(v) => Some(v),
+                        None => crate::android_util::host_static(vm, owner, field)?,
+                    },
                 },
             },
         },
@@ -4177,6 +4184,12 @@ fn instance_intrinsic_dispatch(
     if let Some(v) = crate::jlstring::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
         return Ok(Some(v));
     }
+    // Parcel/Parcelable/Binder local transport (parcel.rs)
+    if let Some(v) =
+        crate::parcel::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
     // Bundle/BaseBundle/PersistableBundle + Intent data (bundle.rs)
     if let Some(v) = crate::bundle::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
         return Ok(Some(v));
@@ -4247,7 +4260,8 @@ fn instance_intrinsic_dispatch(
         return Ok(Some(v));
     }
     // android.util sparse arrays / Size / Pair / Range / Rational (android_util.rs)
-    if let Some(v) = crate::android_util::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
+    if let Some(v) =
+        crate::android_util::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
     {
         return Ok(Some(v));
     }

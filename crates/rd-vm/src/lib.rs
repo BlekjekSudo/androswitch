@@ -14,6 +14,7 @@ pub(crate) mod android_colorspace;
 pub(crate) mod android_display;
 pub(crate) mod android_drawable;
 pub(crate) mod android_env;
+pub(crate) mod android_json;
 pub(crate) mod android_motion;
 pub(crate) mod android_observable;
 pub(crate) mod android_pm;
@@ -74,8 +75,10 @@ pub mod m9;
 #[cfg(feature = "native")]
 pub mod native;
 pub(crate) mod numerics;
+pub(crate) mod parcel;
 pub mod perms;
 pub(crate) mod platform_base;
+pub(crate) mod prefs;
 pub(crate) mod reflect;
 pub mod repr;
 pub mod threads;
