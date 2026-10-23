@@ -1,0 +1,83 @@
+# Credits and source provenance
+
+## RustyDroid — the foundation
+
+**AndroSwitch is built on RustyDroid, not a runtime written from scratch.**
+The primary upstream credit belongs to
+[nadabgfccvd](https://github.com/nadabgfccvd) and the
+[RustyDroid contributors](https://github.com/nadabgfccvd/RustyDroid/graphs/contributors).
+
+| Item | Provenance |
+| --- | --- |
+| Original repository | [nadabgfccvd/RustyDroid](https://github.com/nadabgfccvd/RustyDroid) |
+| Fork base | [`6388281f66d254c8e01a0fdc7a5a9a30239bc762`](https://github.com/nadabgfccvd/RustyDroid/commit/6388281f66d254c8e01a0fdc7a5a9a30239bc762) |
+| Base commit date | 22 October 2026 |
+| Original copyright | Copyright (c) 2026 RustyDroid contributors |
+| License | [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE) |
+| History | Original commits and authors retained as ancestors of this fork |
+
+The inherited work includes APK ZIP/AXML/ARSC/manifest parsing, DEX parsing
+and decoding, the Dalvik interpreter, Engine, classpath, heap, exception/value
+models, host framework implementations, native/JNI research backends, tools,
+tests and design documents. The `rd-*` names and upstream authorship remain.
+
+M1 specifically ports and shares the existing interpreter and heap. It does
+not substitute a second demonstration interpreter and present it as the
+original runtime. The Switch-specific feature boundaries and adapters are
+AndroSwitch changes on top of that foundation.
+
+The original documents are preserved from the fork base:
+
+- [RustyDroid README](README.rustydroid.md).
+- [RustyDroid contributing guide](CONTRIBUTING.rustydroid.md).
+- [RustyDroid security policy](SECURITY.rustydroid.md).
+- [RustyDroid specification](RustyDroid.md) and
+  [upstream roadmap](docs/ROADMAP.md).
+
+The original logo is retained with the upstream material; it is not presented
+as AndroSwitch branding. The original license files are unchanged. Keep these
+notices and source attribution when redistributing or extending the project.
+
+## AndroSwitch additions
+
+[BlekjekSudo/androswitch](https://github.com/BlekjekSudo/androswitch) maintains
+the Horizon port and its own evidence. Current additions include:
+
+- Portable `no_std + alloc` paths and a libnx C ABI boundary.
+- Per-Engine portable state and a collector for that state graph.
+- Host inspection tools, the bounded method-probe protocol and the Ryujinx
+  harness with JVM comparisons and recorded failures.
+- The Switch roadmap, compatibility inventory and source/fixture receipts.
+
+Individual contributions are attributed through Git history. AndroSwitch
+additions use the same **MIT OR Apache-2.0** license choice. Current Switch
+compatibility claims belong to this fork's reports, rather than the upstream
+Linux documentation.
+
+## Platform, tooling and test sources
+
+| Project / contributors | Use in AndroSwitch |
+| --- | --- |
+| [Rust](https://github.com/rust-lang/rust) and its contributors | Language, compiler, `core` and `alloc` |
+| [libnx](https://github.com/switchbrew/libnx) / switchbrew contributors | Horizon services and the homebrew C platform boundary |
+| [devkitPro](https://devkitpro.org/) / devkitA64 contributors | ARM64 C toolchain and Switch packaging tools |
+| [Android Open Source Project](https://source.android.com/) and [R8/D8](https://r8.googlesource.com/r8/) contributors | Android build tooling and DEX fixture compilation |
+| OpenJDK and JDK distribution contributors | Java compilation and the JVM reference execution |
+| Ryujinx contributors | Emulator used for the recorded Horizon tests; tested binary hash/version are recorded separately |
+| [F-Droid](https://f-droid.org/) contributors | Checksum-pinned real APK/DEX inspection fixture, downloaded separately |
+| [Android NDK samples](https://github.com/android/ndk-samples) contributors | Frozen sources for later JNI/NDK milestones |
+| [Vector Pinball](https://github.com/dozingcat/Vector-Pinball) / dozingcat contributors | Frozen independent integration target for later milestones |
+| Cargo dependency authors | Parser, compression, serialization and other library dependencies recorded in `Cargo.lock` |
+
+These acknowledgements do not change the components' individual licenses.
+Tools, external APKs and proprietary game assets are not bundled in the
+source repository. [The fixture lock](fixtures/corpus.lock.json) records the
+actual revisions, hashes, source status and planned use of corpus entries.
+The Java M1 fixture is included as AndroSwitch test source.
+
+PES21 NX was a platform reference only in M0/M1; no PES-specific source,
+offsets, game payloads or assets were imported. Future code imports must
+record source, revision and license alongside the change.
+
+See [NOTICE](NOTICE.md) for the retained attribution statement and
+[the documentation index](docs/README.md) for current project behavior.

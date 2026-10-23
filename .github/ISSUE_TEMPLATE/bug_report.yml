@@ -1,36 +1,52 @@
-name: 🐛 Bug report
-description: Something crashes, hangs or returns wrong results / Algo quebra, trava ou retorna resultado errado
+name: Bug report
+description: A reproducible AndroSwitch crash, hang or incorrect result
 labels: ["bug", "triage"]
 body:
   - type: textarea
     id: what-happened
     attributes:
-      label: What happened? / O que aconteceu?
+      label: What happened and what did you expect?
     validations:
       required: true
   - type: textarea
     id: reproduce
     attributes:
-      label: Steps to reproduce / Passos para reproduzir
+      label: Exact steps and commands to reproduce
       placeholder: |
-        1. rustydroid …
-        2. …
+        1. Runtime commit and fixture source/hash
+        2. Command used (asctl, as-probe or the Ryujinx E2E script)
+        3. Actual result
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: RustyDroid version / commit
+      label: AndroSwitch commit
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
       label: Logs / structured error JSON
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Backend that actually reproduced the issue
+      options:
+        - Host
+        - Ryujinx (Horizon emulator)
+        - Physical Switch
+        - Build only / no execution
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: OS, Rust/toolchain and emulator or hardware details
   - type: checkboxes
     id: checks
     attributes:
       label: Checklist
       options:
-        - label: I searched existing issues / Procurei em issues existentes
+        - label: I searched existing issues and checked the AndroSwitch compatibility inventory
           required: true

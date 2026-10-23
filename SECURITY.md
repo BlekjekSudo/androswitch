@@ -1,41 +1,31 @@
-# Security Policy
+# Security policy — AndroSwitch
 
-> 🇧🇷 [Política de segurança em português abaixo](#política-de-segurança-pt-br)
+This policy covers the AndroSwitch fork. The original RustyDroid policy is
+preserved in [SECURITY.rustydroid.md](SECURITY.rustydroid.md).
 
-## Supported versions
+## Project status
 
-RustyDroid is pre-1.0 (spec phase → M0+). Security fixes target the **latest commit on `main`**.
+AndroSwitch is an experimental runtime. The M1 runner is a development
+method probe; it does not implement Android's process/permission isolation.
+Parser bounds and guest instruction/heap budgets are tested, but they are
+not evidence of a complete Android security boundary.
 
-## Reporting a vulnerability
+Security fixes target the current development code in this repository.
+There is no supported stable release or published response-time guarantee yet.
 
-**Please do NOT open a public issue for security reports.**
+## Reporting
 
-Use GitHub's private vulnerability reporting:
-**[Security → Report a vulnerability](https://github.com/nadabgfccvd/RustyDroid/security/advisories/new)**
+Send security-sensitive reports privately to the repository maintainers.
+If GitHub private reporting is enabled, use **Security → Report a vulnerability**
+on [BlekjekSudo/androswitch](https://github.com/BlekjekSudo/androswitch/security).
+If that option is unavailable, establish a private channel with the owner
+before sending the payload. Do not include credentials or exploit files in
+a public issue.
 
-- Include: affected component (`rd-apk`, `rd-dex`, `rd-vm`, `rd-agent`…), reproduction
-  steps or a malicious-input sample (e.g., a crafted DEX/AXML/ARSC/APK that triggers
-  the issue), and impact assessment
-- Response target: **72 hours** for triage, fix timeline agreed privately
+Include the affected commit/component, host or device backend, input type,
+reproduction commands and observed impact. For a crafted APK/DEX/ZIP/ELF,
+provide the smallest reproducer and its hash through the private channel.
 
-## Security-relevant design notes
-
-- RustyDroid **executes untrusted bytecode** (APKs) — the runtime is the security
-  boundary. Parser bugs (DEX/AXML/ARSC/ZIP/ELF) are treated as security-critical:
-  they are fuzz targets in CI (nightly `cargo-fuzz`)
-- The **agent control plane (MCP/JSON-RPC)** can drive apps: snapshots, input
-  injection, file access. If you embed RustyDroid as a service, put your own
-  authentication/authorization in front — the MVP ships no auth layer by design
-- Native code loading (planned `rd-ndk`/`rd-jni`) is the highest-risk area and is
-  strictly feature-gated + audited (`unsafe` is forbidden everywhere else)
-
-## 🇧🇷 Política de segurança (PT-BR)
-
-**Não abra issue pública para relatos de segurança.**
-
-Use o canal privado: **[Security → Report a vulnerability](https://github.com/nadabgfccvd/RustyDroid/security/advisories/new)**
-
-O RustyDroid executa bytecode não confiável (APKs) — bugs de parser são críticos e
-são alvo de fuzzing noturno no CI. O plano de controle do agente (MCP) permite
-injetar input e acessar arquivos: se você expor o RustyDroid como serviço, adicione
-sua própria camada de autenticação/autorização.
+Retained RustyDroid files still point to upstream's reporting process. Reports
+about this port should first reach this repository's maintainers; shared
+upstream issues can then be coordinated with RustyDroid.

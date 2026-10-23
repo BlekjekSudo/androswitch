@@ -1,26 +1,30 @@
-<!--
-  🤖 AI-assisted contributions are welcome! Note in the description how AI was used.
-  Contribuições assistidas por IA são bem-vindas! Indique na descrição como a IA foi usada.
--->
+## Problem and resulting behavior
 
-## What / O quê
+<!-- Explain the trigger, previous behavior and result for a reviewer new to the change. -->
 
-<!-- Descrição curta da mudança / Short description -->
+## Scope and provenance
 
-## Why / Por quê
+<!-- Identify the AndroSwitch milestone and shared Android API/ABI contract.
+     For imported code/fixtures, include source, revision, license and attribution.
+     Preserve RustyDroid credit and notices; do not add package-specific runtime hooks. -->
 
-<!-- Problema ou issue relacionada (ex.: Fixes #12, compat-gap #7) -->
+## Validation
 
-## How / Como
+<!-- List commands, fixture hashes and actual outcomes. Mark unrun checks explicitly. -->
 
-<!-- Abordagem técnica; ADR link se decisão de arquitetura -->
+| Backend | Result / evidence |
+| --- | --- |
+| Host | |
+| Horizon emulator | |
+| Physical Switch | |
 
-## Checklist
+## Review notes
 
-- [ ] Conventional Commits (`feat:`, `fix:`, `docs:`…)
-- [ ] Tests added/updated (unit + integration with real fixtures)
-- [ ] `cargo fmt` + `clippy -D warnings` clean *(quando houver código)*
-- [ ] No silent failures — missing APIs respond `NOT_IMPLEMENTED(module_id)`
-- [ ] Fits the `moto-e5` performance budgets *(para features de runtime)*
-- [ ] Docs updated (`compat-matrix.md` / `api-coverage.toml` se aplicável)
-- [ ] AI usage disclosed / uso de IA declarado
+- [ ] Missing APIs/symbols return structured errors rather than fabricated success
+- [ ] Device changes preserve the `no_std + alloc` platform boundary
+- [ ] Relevant tests, format, clippy and documentation checks pass
+- [ ] Compatibility inventory/roadmap updated if behavior changed
+- [ ] RustyDroid and other applicable source credits/licenses retained
+- [ ] AI assistance, if used, described along with how the result was verified
+
+<!-- Add an ADR for significant platform/VM/JNI/storage/lifecycle decisions. -->

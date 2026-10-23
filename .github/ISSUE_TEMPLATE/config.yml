@@ -1,8 +1,11 @@
 blank_issues_enabled: true
 contact_links:
-  - name: 📄 Full specification
-    url: https://github.com/nadabgfccvd/RustyDroid/blob/main/RustyDroid.md
-    about: Read the master spec (modules, permissions matrix, roadmap) before opening issues
-  - name: 🧭 Roadmap & status
-    url: https://github.com/nadabgfccvd/RustyDroid/blob/main/docs/ROADMAP.md
-    about: Check which milestone (M0–M12) covers your topic before opening an issue
+  - name: AndroSwitch documentation
+    url: https://github.com/BlekjekSudo/androswitch/blob/main/docs/README.md
+    about: Setup, builds, CLI, testing and current Horizon limitations
+  - name: Roadmap and verified status
+    url: https://github.com/BlekjekSudo/androswitch/blob/main/docs/ANDROSWITCH_ROADMAP.md
+    about: Check the milestone and separate host, emulator and physical-device results
+  - name: RustyDroid credits and provenance
+    url: https://github.com/BlekjekSudo/androswitch/blob/main/CREDITS.md
+    about: Original runtime, contributors, fork base and retained licenses

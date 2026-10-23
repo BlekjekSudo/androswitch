@@ -1,5 +1,5 @@
-name: 🔌 Compat gap (API not implemented)
-description: Report an Android API/behavior that an APK needs and RustyDroid doesn't cover yet / API Android que o RustyDroid ainda não cobre
+name: Compatibility gap
+description: Report a missing shared Android API/ABI contract in AndroSwitch
 labels: ["compat-gap", "triage"]
 body:
   - type: input
@@ -12,36 +12,33 @@ body:
   - type: dropdown
     id: module
     attributes:
-      label: Spec module (if known) / Módulo da spec (se souber)
+      label: AndroSwitch subsystem
       options:
-        - unknown / desconhecido
-        - CORE-* (apk/dex/vm)
-        - LANG-01 (Java/Kotlin DEX)
-        - LANG-02/03/09 (native .so / NDK / others)
-        - LANG-04..08 (Flutter/RN/C#/Unity)
-        - UI-* (views/render)
-        - ST-* (storage/data)
-        - NET-* (network)
-        - MEDIA-* (audio/video/camera/sensors)
-        - SYS-* (system services)
-        - AG-* (agent tools)
+        - Unknown
+        - APK / resources / SDK policy
+        - DEX / classpath / heap / exceptions
+        - JNI / ELF / Bionic / TLS
+        - Android framework / lifecycle
+        - Graphics / audio / input
+        - Package manager / shared storage
+        - Network / split APKs (later milestones)
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: Expected behavior on real Android / Comportamento esperado no Android real
+      label: Expected Android behavior and reference evidence
     validations:
       required: true
   - type: textarea
     id: observed
     attributes:
-      label: What RustyDroid returned / O que o RustyDroid respondeu
-      placeholder: 'NOT_IMPLEMENTED(module_id="…", api="…")'
+      label: What AndroSwitch returned, including backend and runtime commit
+      placeholder: 'Include the exact API descriptor or symbol and structured error JSON.'
   - type: input
     id: apk
     attributes:
-      label: APK that triggered it (name + version, optional) / APK que acionou (opcional)
+      label: APK name/version, source URL or revision, and SHA-256 if available
   - type: textarea
     id: logs
     attributes:

@@ -2,7 +2,8 @@
 """CI gate: every internal markdown link must resolve (issue #6).
 
 Scanned files:
-  * README.md, CONTRIBUTING.md, SECURITY.md, RustyDroid.md (repo root)
+  * Current README/contribution/security files, CREDITS.md, NOTICE.md,
+    RustyDroid.md and preserved *.rustydroid.md documents (repo root)
   * every *.md under docs/ and .github/ (recursive)
 
 Checked links:
@@ -38,7 +39,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-ROOT_FILES = ("README.md", "CONTRIBUTING.md", "SECURITY.md", "RustyDroid.md")
+ROOT_FILES = (
+    "README.md", "CONTRIBUTING.md", "SECURITY.md", "RustyDroid.md",
+    "CREDITS.md", "NOTICE.md", "README.rustydroid.md",
+    "CONTRIBUTING.rustydroid.md", "SECURITY.rustydroid.md",
+)
 SCAN_DIRS = ("docs", ".github")
 
 LINK_RE = re.compile(r"\]\(([^)]*)\)")

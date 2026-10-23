@@ -1,88 +1,76 @@
-# Contributing to RustyDroid
+# Contributing to AndroSwitch
 
-> 🇧🇷 [Versão em português abaixo](#contribuindo-com-o-rustydroid-pt-br)
+AndroSwitch is a Horizon adaptation of
+[RustyDroid](https://github.com/nadabgfccvd/RustyDroid). Preserve the original
+authors' credit, history and licenses. The unmodified upstream contribution
+guide is retained in [CONTRIBUTING.rustydroid.md](CONTRIBUTING.rustydroid.md);
+this file describes contributions to this fork.
 
-First off, thank you! RustyDroid is an ambitious project and every contribution counts.
+## Before changing code
 
-## 🤖 Our AI-assisted development policy
+Read the [roadmap](docs/ANDROSWITCH_ROADMAP.md),
+[architecture](docs/ARCHITECTURE.md), [compatibility inventory](docs/ANDROSWITCH_COMPATIBILITY.md)
+and [workspace guide](AGENTS.md). Work follows M0 → M1 → M2 → M3 → M4 before
+launcher work. An upstream feature is not a verified Horizon feature.
 
-This project is **developed with heavy AI assistance** (specification → architecture →
-code → CI). That's a feature, not a bug — and it applies to contributions too:
+Fix shared Android API/ABI behavior. Do not add package-name checks, game
+profiles, fixed title offsets, hard-coded game libraries or fabricated success
+responses. Unsupported behavior must identify the failing operation/API and
+subsystem. Test call descriptors belong in fixtures, outside runtime behavior.
 
-- ✅ AI-generated contributions are **allowed and expected**
-- ✅ Every contribution (AI or human) passes the same review gates: CI, tests, lint
-- ✅ Be transparent: note in the PR description whether/how AI was used
-- ❌ **Human review is mandatory** — AI output is never merged blindly
+The device core uses `no_std + alloc`. Route OS behavior through platform
+adapters and keep Python, Unicorn, subprocesses and desktop globals out of
+the device dependency graph. Host tools may use std and reference backends.
+Keep unsafe code confined to documented FFI boundaries under local lint
+allowances; do not weaken the workspace-wide safe-code rule.
 
-## 🧭 The golden rules (from the spec — see [RustyDroid.md](./RustyDroid.md))
+Significant changes to the platform boundary, native loader, VM/JNI reference
+model, storage or lifecycle should include an [architecture decision](docs/adr/).
 
-1. **No silent failures** — a missing API must return a structured
-   `NOT_IMPLEMENTED(module_id)` error and be registered in `docs/compat-matrix.md`
-2. **Compatibility beats elegance** — when in doubt, choose what keeps a real APK running
-3. **Zero copied code** from ATL/Robolectric (conceptual inspiration only)
-4. **Moto E5 floor is a contract** — any feature must fit the `moto-e5` performance
-   budgets; blowing a budget is a release-blocking bug
-5. **Feature-gated everything** — each checklist module is a Cargo feature; the minimal
-   build must compile without any optional module
+## Validate the change
 
-## 📋 How to contribute
+Use focused checks appropriate to the affected code, then the relevant gates:
 
-### Report bugs / request features
-- Found something an APK needs that we don't implement? Open a **`compat-gap` issue**
-  (template provided) — it is designed to feed the compatibility scoreboard
-  (`docs/compat-matrix.md`, generated today by `cargo xtask compat-report`; automatic
-  issue→scoreboard ingestion is planned for M6)
-- UI bugs: include the `get_ui_tree` JSON and a screenshot if possible
+```powershell
+./scripts/check-m0.ps1
+./scripts/check-m1.ps1
+python -X utf8 scripts/check_md_links.py
+git diff --check
+```
 
-### Submit code
-1. Fork + branch (`feat/my-feature`, `fix/my-fix`, `docs/my-docs`)
-2. Follow **Conventional Commits** (`feat:`, `fix:`, `docs:`, `ci:`, `chore:`…)
-3. Rust code: `cargo fmt` + `cargo clippy -- -D warnings` clean
-4. Every new module: unit tests + integration tests with real fixtures
-5. No `unsafe` outside `rd-ndk`/`rd-jni` (and those need an ADR note)
-6. PR template filled — done!
+M1 checks need a JDK/Android SDK fixture build; see [building](docs/BUILDING.md).
+Changes to the device parser/interpreter or libnx bridge also need the
+[Ryujinx E2E gate](docs/M1_E2E.md). Keep host, emulator and physical-device
+results separate. A compile is not execution evidence; an emulator pass is
+not physical Switch verification.
 
-### Architecture decisions
-Big changes (new engine, IPC model, GC strategy…) require an **ADR**
-(Architecture Decision Record) at `docs/adr/NNN-title.md` *before* the code PR.
+The [testing guide](docs/TESTING.md) explains Cargo feature isolation, the
+known immutable-upstream baseline failures and which checks are unavailable
+on some hosts. Record commands and unrun checks honestly.
 
-## 📮 Review process
+## Fixtures, evidence and attribution
 
-- Maintainers aim to review PRs within **48–72h**
-- CI must be green (docs integrity, lint, future: tests/fuzz/bench)
-- `compat-gap`-fixing PRs get priority — they grow the compatibility scoreboard
-  (`docs/compat-matrix.md`, generated by `cargo xtask compat-report`; automatic
-  issue→scoreboard ingestion is planned for M6)
+- Keep APKs, generated libraries, NROs, toolchains and verbose run output in
+  ignored cache/artifact directories. Commit fixture source and compact evidence.
+- Record external URLs/revisions/hashes in [the fixture lock](fixtures/corpus.lock.json).
+  Do not modify an APK to make it pass and report it as unmodified compatibility.
+- New platform side tables holding VM objects must participate in GC rooting
+  before callbacks, threading or JNI references use them.
+- Updates must preserve the [credits](CREDITS.md), [notices](NOTICE.md) and
+  original license files. Source imports need origin, revision and license.
 
----
+## Pull requests and issue reports
 
-# Contribuindo com o RustyDroid (PT-BR)
+Describe the problem, resulting behavior and validation. Include fixture
+identity, exact runtime commit, backend and reproduction commands for a
+compatibility issue. State which API or ABI contract is missing; an engine
+name alone is not enough evidence.
 
-Obrigado por querer contribuir! 🦀
+Conventional commit messages are preferred. AI-assisted contributions are
+welcome; disclose their use and subject them to the same tests and maintainer
+review as other changes. Update the roadmap/inventory when supported behavior
+changes. Avoid applying the retained Linux/Moto E5 or MCP policies as new
+Switch compatibility claims.
 
-## 🤖 Política de desenvolvimento assistido por IA
-
-Este projeto é **desenvolvido pesadamente com auxílio de IA** (especificação →
-arquitetura → código → CI). Contribuições geradas por IA são **permitidas e
-esperadas** — mas toda contribuição passa pelos mesmos gates (CI, testes, lint),
-e **revisão humana é obrigatória** antes do merge.
-
-## 🧭 Regras de ouro
-
-1. **Nenhuma falha silenciosa** — API ausente responde `NOT_IMPLEMENTED(module_id)`
-   estruturado e entra na `compat-matrix.md`
-2. **Compatibilidade > elegância**
-3. **Zero código copiado** de ATL/Robolectric
-4. **Piso Moto E5 é contrato** — estourou budget = bug bloqueante
-5. **Tudo com feature-gates** — build mínimo compila sem nenhum módulo opcional
-
-## 📋 Como contribuir
-
-- **API faltando?** Abra uma issue **`compat-gap`** (template pronto) — ela foi
-  desenhada para alimentar a matriz de compatibilidade (`docs/compat-matrix.md`,
-  gerada hoje por `cargo xtask compat-report`; ingestão automática issue→scoreboard
-  planejada para o M6)
-- **Código:** Conventional Commits + `cargo fmt` + `clippy` limpo + testes
-- **Decisões de arquitetura:** ADR antes do PR de código
-
-Obrigado por fazer o Android rodar sem Android! 🦀
+Report security-sensitive issues using [SECURITY.md](SECURITY.md), rather
+than attaching exploit payloads to a public compatibility issue.

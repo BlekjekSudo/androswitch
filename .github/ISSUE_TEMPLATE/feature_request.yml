@@ -1,5 +1,5 @@
-name: ✨ Feature request
-description: Propose a new module, tool or capability / Proponha um módulo, ferramenta ou capacidade
+name: Feature request
+description: Propose a shared Android runtime capability or AndroSwitch development improvement
 labels: ["enhancement", "triage"]
 body:
   - type: textarea
@@ -22,7 +22,9 @@ body:
         - CORE (apk/dex/vm)
         - Framework APIs (android.*)
         - UI / render
-        - Agent tools (MCP)
+        - JNI / native backend
+        - Horizon platform / libnx
+        - Package manager / persistent storage
         - Testing / QA
         - Performance
         - Docs / site
@@ -32,8 +34,8 @@ body:
   - type: checkboxes
     id: spec
     attributes:
-      label: Relation to the spec / Relação com a spec
-      description: The master spec defines ~85 modules — is this one of them?
+      label: Relation to the AndroSwitch roadmap
+      description: State the M0–M12 milestone and the shared API/ABI contract this would implement.
       options:
-        - label: This exists in RustyDroid.md (module ID informed below)
-        - label: This is new (not in the spec)
+        - label: This fits an existing AndroSwitch milestone (identify it in the proposal)
+        - label: This extends the roadmap (explain the scope and validation)

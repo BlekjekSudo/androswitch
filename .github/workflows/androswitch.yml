@@ -18,6 +18,8 @@ jobs:
           toolchain: 1.97.1
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Check documentation links
+        run: python -X utf8 scripts/check_md_links.py
       - run: cargo fmt --all -- --check
       - run: cargo clippy -p as-platform -p as-runtime -p as-cli --all-targets --locked -- -D warnings
       - run: cargo test -p as-platform -p as-runtime -p as-cli --locked
