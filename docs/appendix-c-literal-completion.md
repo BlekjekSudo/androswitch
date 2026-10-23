@@ -159,6 +159,25 @@ that exact prefix:
   Base64 stream classes and the rest of the `android.util` catalogue
   remain blockers.
 
+## Round 7 — `android.util.LruCache` with DEX callbacks
+
+- `LruCache` now implements constructor validation, access-order
+  `get`/`put`/`remove`, `trimToSize`, `resize`, `evictAll`, size and
+  hit/miss/create/put/eviction counters, ordered `snapshot()` maps and
+  the AOSP `toString()` summary shape.
+- Cache operations remain final host operations, but subclass hooks are
+  guest code: `create`, `sizeOf` and `entryRemoved` resolve and execute
+  DEX overrides, including the AOSP collision path when `create`
+  populates the requested key itself.
+- Proof: `lru_cache_access_order_eviction_and_stats_match_aosp` covers
+  the platform class directly, and
+  `dex_lru_cache_callbacks_drive_creation_sizing_and_eviction` uses a
+  DEX subclass whose entries cost 2 units, creates values on misses and
+  observes the exact evicted key through `entryRemoved`.
+- Status after Round 7: `android.util` remains **partial**. The rest of
+  its public catalogue, including IO/JSON/XML helpers and event/log
+  types, remains incomplete.
+
 ## Remaining literal blockers by partial surface
 
 | Domain | Surface | Main literal blockers |

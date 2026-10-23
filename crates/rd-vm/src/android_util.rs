@@ -10,6 +10,7 @@
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
+use crate::framework::HostObj;
 use crate::heap::ObjRef;
 use crate::value::Value;
 use std::collections::BTreeMap;
@@ -379,6 +380,358 @@ pub(crate) fn host_static(
     })))
 }
 
+const LRU_CACHE: &str = "Landroid/util/LruCache;";
+const LRU_MAX_SIZE: &str = "rd_lru_max_size";
+const LRU_SIZE: &str = "rd_lru_size";
+const LRU_PUT_COUNT: &str = "rd_lru_put_count";
+const LRU_CREATE_COUNT: &str = "rd_lru_create_count";
+const LRU_EVICTION_COUNT: &str = "rd_lru_eviction_count";
+const LRU_HIT_COUNT: &str = "rd_lru_hit_count";
+const LRU_MISS_COUNT: &str = "rd_lru_miss_count";
+
+fn lru_throw(class: &str, message: impl Into<String>) -> VmExit {
+    VmExit::Exception(Throwable::new(class, message.into()))
+}
+
+fn lru_int_field(vm: &Engine, recv: ObjRef, field: &str) -> i32 {
+    match get(vm, recv, field) {
+        Value::Int(value) => value,
+        _ => 0,
+    }
+}
+
+fn lru_set_int_field(vm: &mut Engine, recv: ObjRef, field: &str, value: i32) -> Result<(), VmExit> {
+    put(vm, recv, field, Value::Int(value))
+}
+
+fn lru_increment(vm: &mut Engine, recv: ObjRef, field: &str) -> Result<(), VmExit> {
+    lru_set_int_field(
+        vm,
+        recv,
+        field,
+        lru_int_field(vm, recv, field).wrapping_add(1),
+    )
+}
+
+fn lru_entries(vm: &mut Engine, recv: ObjRef) -> Vec<(Value, Value)> {
+    match vm.fw.objects.get(&recv) {
+        Some(HostObj::Map { entries }) => entries.clone(),
+        _ => {
+            vm.fw.objects.insert(
+                recv,
+                HostObj::Map {
+                    entries: Vec::new(),
+                },
+            );
+            Vec::new()
+        }
+    }
+}
+
+fn lru_set_entries(vm: &mut Engine, recv: ObjRef, entries: Vec<(Value, Value)>) {
+    vm.fw.objects.insert(recv, HostObj::Map { entries });
+}
+
+fn lru_find(vm: &Engine, entries: &[(Value, Value)], key: &Value) -> Result<Option<usize>, VmExit> {
+    for (index, (candidate, _)) in entries.iter().enumerate() {
+        if crate::intrinsics::values_equal(&vm.heap, candidate, key)? {
+            return Ok(Some(index));
+        }
+    }
+    Ok(None)
+}
+
+fn lru_guest_method(
+    vm: &mut Engine,
+    recv: ObjRef,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let class = vm.heap.class_of(recv)?.to_string();
+    if vm.cp.resolve_method(&class, name, sig).is_none() {
+        return Ok(None);
+    }
+    vm.invoke_instance(recv, name, sig, args).map(Some)
+}
+
+fn lru_size_of(vm: &mut Engine, recv: ObjRef, key: &Value, value: &Value) -> Result<i32, VmExit> {
+    let size = match lru_guest_method(
+        vm,
+        recv,
+        "sizeOf",
+        "(Ljava/lang/Object;Ljava/lang/Object;)I",
+        &[key.clone(), value.clone()],
+    )? {
+        Some(Value::Int(size)) => size,
+        Some(other) => other.as_int()?,
+        None => 1,
+    };
+    if size < 0 {
+        return Err(lru_throw(
+            "Ljava/lang/IllegalStateException;",
+            format!("Negative size: {key:?}={value:?}"),
+        ));
+    }
+    Ok(size)
+}
+
+fn lru_create(vm: &mut Engine, recv: ObjRef, key: &Value) -> Result<Value, VmExit> {
+    Ok(lru_guest_method(
+        vm,
+        recv,
+        "create",
+        "(Ljava/lang/Object;)Ljava/lang/Object;",
+        std::slice::from_ref(key),
+    )?
+    .unwrap_or(Value::Null))
+}
+
+fn lru_entry_removed(
+    vm: &mut Engine,
+    recv: ObjRef,
+    evicted: bool,
+    key: &Value,
+    old_value: &Value,
+    new_value: &Value,
+) -> Result<(), VmExit> {
+    lru_guest_method(
+        vm,
+        recv,
+        "entryRemoved",
+        "(ZLjava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V",
+        &[
+            Value::Int(evicted as i32),
+            key.clone(),
+            old_value.clone(),
+            new_value.clone(),
+        ],
+    )?;
+    Ok(())
+}
+
+fn lru_trim_to_size(vm: &mut Engine, recv: ObjRef, max_size: i32) -> Result<(), VmExit> {
+    loop {
+        let mut entries = lru_entries(vm, recv);
+        let size = lru_int_field(vm, recv, LRU_SIZE);
+        if size < 0 || (entries.is_empty() && size != 0) {
+            return Err(lru_throw(
+                "Ljava/lang/IllegalStateException;",
+                "LruCache.sizeOf() is reporting inconsistent values!",
+            ));
+        }
+        if size <= max_size || entries.is_empty() {
+            return Ok(());
+        }
+        let (key, value) = entries.remove(0);
+        lru_set_entries(vm, recv, entries);
+        let evicted_size = lru_size_of(vm, recv, &key, &value)?;
+        lru_set_int_field(
+            vm,
+            recv,
+            LRU_SIZE,
+            lru_int_field(vm, recv, LRU_SIZE).wrapping_sub(evicted_size),
+        )?;
+        lru_increment(vm, recv, LRU_EVICTION_COUNT)?;
+        lru_entry_removed(vm, recv, true, &key, &value, &Value::Null)?;
+    }
+}
+
+fn lru_require_key(key: &Value) -> Result<(), VmExit> {
+    if matches!(key, Value::Null) {
+        Err(lru_throw("Ljava/lang/NullPointerException;", "key == null"))
+    } else {
+        Ok(())
+    }
+}
+
+fn lru_cache(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let arg = |index: usize| args.get(index).cloned().unwrap_or(Value::Null);
+    Ok(Some(match (name, sig) {
+        ("<init>", "(I)V") => {
+            let max_size = arg(0).as_int()?;
+            if max_size <= 0 {
+                return Err(lru_throw(
+                    "Ljava/lang/IllegalArgumentException;",
+                    "maxSize <= 0",
+                ));
+            }
+            lru_set_entries(vm, recv, Vec::new());
+            for (field, value) in [
+                (LRU_MAX_SIZE, max_size),
+                (LRU_SIZE, 0),
+                (LRU_PUT_COUNT, 0),
+                (LRU_CREATE_COUNT, 0),
+                (LRU_EVICTION_COUNT, 0),
+                (LRU_HIT_COUNT, 0),
+                (LRU_MISS_COUNT, 0),
+            ] {
+                lru_set_int_field(vm, recv, field, value)?;
+            }
+            Value::Null
+        }
+        ("get", "(Ljava/lang/Object;)Ljava/lang/Object;") => {
+            let key = arg(0);
+            lru_require_key(&key)?;
+            let mut entries = lru_entries(vm, recv);
+            if let Some(index) = lru_find(vm, &entries, &key)? {
+                let entry = entries.remove(index);
+                let value = entry.1.clone();
+                entries.push(entry); // Access order: now most recently used.
+                lru_set_entries(vm, recv, entries);
+                lru_increment(vm, recv, LRU_HIT_COUNT)?;
+                return Ok(Some(value));
+            }
+            lru_increment(vm, recv, LRU_MISS_COUNT)?;
+            let created = lru_create(vm, recv, &key)?;
+            if matches!(created, Value::Null) {
+                return Ok(Some(Value::Null));
+            }
+            lru_increment(vm, recv, LRU_CREATE_COUNT)?;
+            let mut entries = lru_entries(vm, recv);
+            if let Some(index) = lru_find(vm, &entries, &key)? {
+                // `create` itself populated this key. AOSP restores that
+                // value and reports the created value as removed.
+                let entry = entries.remove(index);
+                let existing = entry.1.clone();
+                entries.push(entry);
+                lru_set_entries(vm, recv, entries);
+                lru_entry_removed(vm, recv, false, &key, &created, &existing)?;
+                return Ok(Some(existing));
+            }
+            let created_size = lru_size_of(vm, recv, &key, &created)?;
+            let mut entries = lru_entries(vm, recv);
+            entries.push((key, created.clone()));
+            lru_set_entries(vm, recv, entries);
+            lru_set_int_field(
+                vm,
+                recv,
+                LRU_SIZE,
+                lru_int_field(vm, recv, LRU_SIZE).wrapping_add(created_size),
+            )?;
+            let max_size = lru_int_field(vm, recv, LRU_MAX_SIZE);
+            lru_trim_to_size(vm, recv, max_size)?;
+            created
+        }
+        ("put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;") => {
+            let key = arg(0);
+            let value = arg(1);
+            if matches!(key, Value::Null) || matches!(value, Value::Null) {
+                return Err(lru_throw(
+                    "Ljava/lang/NullPointerException;",
+                    "key == null || value == null",
+                ));
+            }
+            lru_increment(vm, recv, LRU_PUT_COUNT)?;
+            let new_size = lru_size_of(vm, recv, &key, &value)?;
+            let mut entries = lru_entries(vm, recv);
+            let previous = if let Some(index) = lru_find(vm, &entries, &key)? {
+                let (existing_key, previous) = entries.remove(index);
+                entries.push((existing_key, value.clone()));
+                Some(previous)
+            } else {
+                entries.push((key.clone(), value.clone()));
+                None
+            };
+            lru_set_entries(vm, recv, entries);
+            let mut size = lru_int_field(vm, recv, LRU_SIZE).wrapping_add(new_size);
+            if let Some(previous) = &previous {
+                size = size.wrapping_sub(lru_size_of(vm, recv, &key, previous)?);
+            }
+            lru_set_int_field(vm, recv, LRU_SIZE, size)?;
+            if let Some(previous) = &previous {
+                lru_entry_removed(vm, recv, false, &key, previous, &value)?;
+            }
+            let max_size = lru_int_field(vm, recv, LRU_MAX_SIZE);
+            lru_trim_to_size(vm, recv, max_size)?;
+            previous.unwrap_or(Value::Null)
+        }
+        ("remove", "(Ljava/lang/Object;)Ljava/lang/Object;") => {
+            let key = arg(0);
+            lru_require_key(&key)?;
+            let mut entries = lru_entries(vm, recv);
+            let Some(index) = lru_find(vm, &entries, &key)? else {
+                return Ok(Some(Value::Null));
+            };
+            let (_, previous) = entries.remove(index);
+            lru_set_entries(vm, recv, entries);
+            let previous_size = lru_size_of(vm, recv, &key, &previous)?;
+            lru_set_int_field(
+                vm,
+                recv,
+                LRU_SIZE,
+                lru_int_field(vm, recv, LRU_SIZE).wrapping_sub(previous_size),
+            )?;
+            lru_entry_removed(vm, recv, false, &key, &previous, &Value::Null)?;
+            previous
+        }
+        ("trimToSize", "(I)V") => {
+            lru_trim_to_size(vm, recv, arg(0).as_int()?)?;
+            Value::Null
+        }
+        ("resize", "(I)V") => {
+            let max_size = arg(0).as_int()?;
+            if max_size <= 0 {
+                return Err(lru_throw(
+                    "Ljava/lang/IllegalArgumentException;",
+                    "maxSize <= 0",
+                ));
+            }
+            lru_set_int_field(vm, recv, LRU_MAX_SIZE, max_size)?;
+            lru_trim_to_size(vm, recv, max_size)?;
+            Value::Null
+        }
+        ("evictAll", "()V") => {
+            lru_trim_to_size(vm, recv, -1)?;
+            Value::Null
+        }
+        ("size", "()I") => Value::Int(lru_int_field(vm, recv, LRU_SIZE)),
+        ("maxSize", "()I") => Value::Int(lru_int_field(vm, recv, LRU_MAX_SIZE)),
+        ("hitCount", "()I") => Value::Int(lru_int_field(vm, recv, LRU_HIT_COUNT)),
+        ("missCount", "()I") => Value::Int(lru_int_field(vm, recv, LRU_MISS_COUNT)),
+        ("createCount", "()I") => Value::Int(lru_int_field(vm, recv, LRU_CREATE_COUNT)),
+        ("putCount", "()I") => Value::Int(lru_int_field(vm, recv, LRU_PUT_COUNT)),
+        ("evictionCount", "()I") => Value::Int(lru_int_field(vm, recv, LRU_EVICTION_COUNT)),
+        ("snapshot", "()Ljava/util/Map;") => {
+            let entries = lru_entries(vm, recv);
+            let map = vm
+                .heap
+                .alloc_instance("Ljava/util/LinkedHashMap;".to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            vm.fw.objects.insert(map, HostObj::Map { entries });
+            put(vm, map, "rd$linked_map_access_order", Value::Int(1))?;
+            Value::Obj(map)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let hits = lru_int_field(vm, recv, LRU_HIT_COUNT);
+            let misses = lru_int_field(vm, recv, LRU_MISS_COUNT);
+            let accesses = hits.wrapping_add(misses);
+            let hit_percent = if accesses != 0 {
+                (i64::from(hits) * 100 / i64::from(accesses)) as i32
+            } else {
+                0
+            };
+            Value::Obj(crate::intrinsics::alloc_string(
+                vm,
+                format!(
+                    "LruCache[maxSize={},hits={},misses={},hitRate={}%]",
+                    lru_int_field(vm, recv, LRU_MAX_SIZE),
+                    hits,
+                    misses,
+                    hit_percent
+                ),
+            )?)
+        }
+        _ => return Ok(None),
+    }))
+}
+
 pub(crate) fn static_intrinsic(
     vm: &mut Engine,
     class: &str,
@@ -412,6 +765,36 @@ pub(crate) fn instance_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    // LruCache's state operations are final, so a DEX subclass reference
+    // can safely use the same host implementation while its create/sizeOf/
+    // entryRemoved overrides remain guest methods.
+    let lru_final_method = matches!(
+        name,
+        "<init>"
+            | "get"
+            | "put"
+            | "remove"
+            | "trimToSize"
+            | "resize"
+            | "evictAll"
+            | "size"
+            | "maxSize"
+            | "hitCount"
+            | "missCount"
+            | "createCount"
+            | "putCount"
+            | "evictionCount"
+            | "snapshot"
+    );
+    if mref_class == LRU_CACHE
+        || (lru_final_method
+            && vm
+                .heap
+                .class_of(recv)
+                .is_ok_and(|class| vm.cp.is_subtype(class, LRU_CACHE)))
+    {
+        return lru_cache(vm, name, sig, recv, args);
+    }
     if !mref_class.starts_with("Landroid/util/") {
         return Ok(None);
     }
@@ -622,6 +1005,106 @@ mod tests {
         assert!(base64_decode(b"TQ=", 0).is_err());
         assert!(base64_decode(b"TWE==", 0).is_err());
         assert!(base64_decode(b"TQ==QQ", 0).is_err());
+    }
+
+    #[test]
+    fn lru_cache_access_order_eviction_and_stats_match_aosp() {
+        let mut vm = Engine::new(Vec::new(), crate::VmConfig::default());
+        let cache = vm
+            .heap
+            .alloc_instance(LRU_CACHE.to_string(), Vec::new())
+            .unwrap();
+        let call = |vm: &mut Engine, name: &str, sig: &str, args: &[Value]| {
+            instance_intrinsic(vm, LRU_CACHE, name, sig, cache, args)
+                .unwrap()
+                .unwrap()
+        };
+        let text = |vm: &mut Engine, value: &str| {
+            Value::Obj(vm.heap.alloc_string(value.to_string()).unwrap())
+        };
+
+        call(&mut vm, "<init>", "(I)V", &[Value::Int(2)]);
+        let a = text(&mut vm, "a");
+        let one = text(&mut vm, "one");
+        assert_eq!(
+            call(
+                &mut vm,
+                "put",
+                "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+                &[a.clone(), one],
+            ),
+            Value::Null
+        );
+        let b = text(&mut vm, "b");
+        let two = text(&mut vm, "two");
+        call(
+            &mut vm,
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            &[b.clone(), two],
+        );
+        // Accessing `a` makes `b` the eldest entry.
+        let a2 = text(&mut vm, "a");
+        assert!(matches!(
+            call(
+                &mut vm,
+                "get",
+                "(Ljava/lang/Object;)Ljava/lang/Object;",
+                &[a2],
+            ),
+            Value::Obj(_)
+        ));
+        let c = text(&mut vm, "c");
+        let three = text(&mut vm, "three");
+        call(
+            &mut vm,
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            &[c.clone(), three],
+        );
+        let b2 = text(&mut vm, "b");
+        assert_eq!(
+            call(
+                &mut vm,
+                "get",
+                "(Ljava/lang/Object;)Ljava/lang/Object;",
+                &[b2],
+            ),
+            Value::Null
+        );
+        assert_eq!(call(&mut vm, "size", "()I", &[]), Value::Int(2));
+        assert_eq!(call(&mut vm, "hitCount", "()I", &[]), Value::Int(1));
+        assert_eq!(call(&mut vm, "missCount", "()I", &[]), Value::Int(1));
+        assert_eq!(call(&mut vm, "putCount", "()I", &[]), Value::Int(3));
+        assert_eq!(call(&mut vm, "evictionCount", "()I", &[]), Value::Int(1));
+
+        let snapshot = call(&mut vm, "snapshot", "()Ljava/util/Map;", &[]);
+        let Value::Obj(snapshot) = snapshot else {
+            panic!("snapshot did not return a Map");
+        };
+        let Some(HostObj::Map { entries }) = vm.fw.objects.get(&snapshot) else {
+            panic!("snapshot has no host map");
+        };
+        let keys = entries
+            .iter()
+            .map(|(key, _)| match key {
+                Value::Obj(key) => vm.heap.as_str(*key).unwrap().to_string(),
+                other => panic!("snapshot key: {other:?}"),
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(keys, ["a", "c"]);
+
+        call(&mut vm, "resize", "(I)V", &[Value::Int(1)]);
+        assert_eq!(call(&mut vm, "size", "()I", &[]), Value::Int(1));
+        assert!(instance_intrinsic(
+            &mut vm,
+            LRU_CACHE,
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            cache,
+            &[Value::Null, Value::Null],
+        )
+        .is_err());
     }
 
     #[test]
