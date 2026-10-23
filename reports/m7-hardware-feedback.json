@@ -1,0 +1,424 @@
+{
+  "schema_version": 1,
+  "implementation_commit": "48e9ef2cc18353a1bf3ab8509d0b32704cde6551",
+  "stage": "M7 alpha hardware-feedback candidate; physical Plus fix unconfirmed",
+  "product_nro_sha256": "e39aa691180564378092ccb8b8a532d312e4fa7faa98db4af2b74d69e27e478d",
+  "verification": {
+    "host": "passed package and launcher regressions",
+    "ryujinx": "passed console workflow, repeated synthetic Plus dispatch and negative teardown/recovery",
+    "physical_device": "pending_retest",
+    "android_reference_device": "not_run"
+  },
+  "original_hardware_feedback": {
+    "date": "2026-10-24",
+    "evidence_type": "user_report",
+    "original_nro_sha256": "3d84164e6ba3227d6916e26bafff91f7485a817925f5450b85f5811c3738236b",
+    "sample_install_open": "reported working for four bundled APKs",
+    "native_animation_beeps": "reported working",
+    "native_plus_return": "reported Switch crash; session-report.json absent",
+    "crash_dump": "not_available",
+    "new_build_hardware": "pending_retest"
+  },
+  "console": {
+    "completed_sessions": 10,
+    "emulator": {
+      "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0",
+      "version": "1.3.3+e2143d4"
+    },
+    "commands": 65,
+    "status": "passed",
+    "backend": "ryujinx",
+    "physical_device": "not_run",
+    "schema_version": 1,
+    "scenario": "workflow",
+    "session_id": "55db263449a8409b9a3a38f3958fca90",
+    "expected_api_errors": 1,
+    "nro_sha256": "e39aa691180564378092ccb8b8a532d312e4fa7faa98db4af2b74d69e27e478d",
+    "artifact_root": "local-artifacts/m7/runs/55db263449a8409b9a3a38f3958fca90",
+    "receipt_sha256": "12faef722119497b1464ba3bf2891eb9eed8e866364e63866e7444aa1c2bb2fb"
+  },
+  "boundary": {
+    "scenario": "quiescence",
+    "next_boot_recovery": "passed",
+    "session_id": "3cfbc8173df543cdba7e48a9eee26782",
+    "physical_device": "not_run",
+    "backend": "ryujinx",
+    "nro_sha256": "e39aa691180564378092ccb8b8a532d312e4fa7faa98db4af2b74d69e27e478d",
+    "boundary": "process_exit_required",
+    "status": "passed",
+    "schema_version": 1,
+    "artifact_root": "local-artifacts/m7/runs/3cfbc8173df543cdba7e48a9eee26782",
+    "receipt_sha256": "88ff1ec37cea7708b46feeccfd74184893cb6c6255d55dbb28ea21cffe93074b"
+  },
+  "native_plus_sessions": [
+    {
+      "session_id": "55db263449a8409b9a3a38f3958fca90-5",
+      "revision": 1,
+      "native_frames": 513,
+      "audio_frames": 12000,
+      "teardown": [
+        {
+          "phase": "stop_requested",
+          "tick": 613557135
+        },
+        {
+          "phase": "native_activity_stop",
+          "tick": 613589268
+        },
+        {
+          "phase": "activity_focus_lost",
+          "tick": 613693964
+        },
+        {
+          "phase": "activity_pause",
+          "tick": 613712467
+        },
+        {
+          "phase": "activity_window_destroy",
+          "tick": 613726744
+        },
+        {
+          "phase": "guest_thread_join",
+          "tick": 613767183
+        },
+        {
+          "phase": "egl_wait_gpu",
+          "tick": 613932647
+        },
+        {
+          "phase": "egl_unbind",
+          "tick": 613957361
+        },
+        {
+          "phase": "egl_destroy_context",
+          "tick": 614005459
+        },
+        {
+          "phase": "egl_destroy_surface",
+          "tick": 615579219
+        },
+        {
+          "phase": "egl_terminate",
+          "tick": 615714247
+        },
+        {
+          "phase": "egl_terminated",
+          "tick": 616096364
+        },
+        {
+          "phase": "guest_thread_joined",
+          "tick": 616140915
+        },
+        {
+          "phase": "activity_input_destroy",
+          "tick": 616172002
+        },
+        {
+          "phase": "activity_stop",
+          "tick": 616220309
+        },
+        {
+          "phase": "activity_destroy",
+          "tick": 616239826
+        },
+        {
+          "phase": "java_activity_stop",
+          "tick": 616331485
+        },
+        {
+          "phase": "media_thread_quiesce",
+          "tick": 616350614
+        },
+        {
+          "phase": "guest_thread_quiesce",
+          "tick": 616372871
+        },
+        {
+          "phase": "media_reset",
+          "tick": 616390074
+        },
+        {
+          "phase": "media_released",
+          "tick": 616405121
+        },
+        {
+          "phase": "activity_dispose",
+          "tick": 616419899
+        },
+        {
+          "phase": "runtime_drop",
+          "tick": 616436428
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 616453353
+        },
+        {
+          "phase": "native_resource_reset",
+          "tick": 616641292
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 616660571
+        },
+        {
+          "phase": "native_tls_reset",
+          "tick": 616728320
+        },
+        {
+          "phase": "native_resources_released",
+          "tick": 616745665
+        },
+        {
+          "phase": "runtime_closed",
+          "tick": 616770228
+        },
+        {
+          "phase": "launcher_refresh",
+          "tick": 616817669
+        }
+      ]
+    },
+    {
+      "session_id": "55db263449a8409b9a3a38f3958fca90-7",
+      "revision": 1,
+      "native_frames": 736,
+      "audio_frames": 12000,
+      "teardown": [
+        {
+          "phase": "stop_requested",
+          "tick": 907374307
+        },
+        {
+          "phase": "native_activity_stop",
+          "tick": 907411599
+        },
+        {
+          "phase": "activity_focus_lost",
+          "tick": 907431598
+        },
+        {
+          "phase": "activity_pause",
+          "tick": 907445036
+        },
+        {
+          "phase": "activity_window_destroy",
+          "tick": 907457041
+        },
+        {
+          "phase": "guest_thread_join",
+          "tick": 907484720
+        },
+        {
+          "phase": "egl_wait_gpu",
+          "tick": 907605953
+        },
+        {
+          "phase": "egl_unbind",
+          "tick": 907629287
+        },
+        {
+          "phase": "egl_destroy_context",
+          "tick": 907657192
+        },
+        {
+          "phase": "egl_destroy_surface",
+          "tick": 908053140
+        },
+        {
+          "phase": "egl_terminate",
+          "tick": 908088241
+        },
+        {
+          "phase": "egl_terminated",
+          "tick": 908137457
+        },
+        {
+          "phase": "guest_thread_joined",
+          "tick": 908171230
+        },
+        {
+          "phase": "activity_input_destroy",
+          "tick": 908192442
+        },
+        {
+          "phase": "activity_stop",
+          "tick": 908211644
+        },
+        {
+          "phase": "activity_destroy",
+          "tick": 908227858
+        },
+        {
+          "phase": "java_activity_stop",
+          "tick": 908241911
+        },
+        {
+          "phase": "media_thread_quiesce",
+          "tick": 908257142
+        },
+        {
+          "phase": "guest_thread_quiesce",
+          "tick": 908269397
+        },
+        {
+          "phase": "media_reset",
+          "tick": 908281244
+        },
+        {
+          "phase": "media_released",
+          "tick": 908294864
+        },
+        {
+          "phase": "activity_dispose",
+          "tick": 908307841
+        },
+        {
+          "phase": "runtime_drop",
+          "tick": 908321569
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 908338488
+        },
+        {
+          "phase": "native_resource_reset",
+          "tick": 908364088
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 908390263
+        },
+        {
+          "phase": "native_tls_reset",
+          "tick": 908473361
+        },
+        {
+          "phase": "native_resources_released",
+          "tick": 908551906
+        },
+        {
+          "phase": "runtime_closed",
+          "tick": 908578794
+        },
+        {
+          "phase": "launcher_refresh",
+          "tick": 908595684
+        }
+      ]
+    }
+  ],
+  "native_media": {
+    "frames": 737,
+    "input": 2,
+    "asset_ok": 1,
+    "audio_frames": 12000,
+    "gl_ok": 1,
+    "readback_ok": 1,
+    "tls": 73,
+    "renderer": "NV120"
+  },
+  "host": [
+    {
+      "file": "target/evidence/hardware-fix-package.log",
+      "sha256": "7839929ef0c36b5df8208cbc895ce2390885892ed86824e7a261be8ea053cc32",
+      "passed_tests": 4
+    },
+    {
+      "file": "target/evidence/hardware-fix-shell.log",
+      "sha256": "faf2854d74a1f05bff451edb8fc38b5e5fc8b4efe93f1469c67fa25bd4f32c48",
+      "passed_tests": 1
+    }
+  ],
+  "clippy_log_sha256": "f4404b8594fb56756b83ad7b75f270f9697bfc87de5ae1752c4fc9e794bc9adb",
+  "sources": [
+    {
+      "path": "crates/as-package/src/lib.rs",
+      "sha256": "78429c8d665d331fa26ba727352933d263034418f4c5c8e39657b322d728579e"
+    },
+    {
+      "path": "crates/as-package/tests/persistence.rs",
+      "sha256": "c041a5c95fca730eb1f0e84bc8ea48ccea0d67cc9ac11642f14c92dc5c5c9bd4"
+    },
+    {
+      "path": "crates/as-launcher/src/lib.rs",
+      "sha256": "8822d1fa65be743ba74bb6d0ecda1d1566a2ab1d4658f6acfd23c933f5b1e198"
+    },
+    {
+      "path": "crates/as-launcher/tests/workflow.rs",
+      "sha256": "9db18b7a90e87ea52bbcf0caf736b4d8166a0e051d98f3d83d3757644ef8a68a"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/application.rs",
+      "sha256": "d977d0886098b40f3cdbd6edf6ecba1ad624b964742508a9ddc1b18ab44b87ca"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/launcher.rs",
+      "sha256": "59559e90697dc8102ce916f98061c72523bee6f7a3dc5a817f4923c8540659f1"
+    },
+    {
+      "path": "platform/androswitch/main.c",
+      "sha256": "437cbe6f41f5951e2126d1144883e923d0eac01a188d49f42e210f3c685e201a"
+    },
+    {
+      "path": "platform/androswitch/media.c",
+      "sha256": "88042c3977e2587dbbc3ed00d293f5cefd4bf493d9cd160e735088a8d6460258"
+    },
+    {
+      "path": "platform/switch-smoke/native.c",
+      "sha256": "b8394b2bd35069c062d9783ec9e2da337c5fee9e70ed55b5b6e7a99ce19ac8e7"
+    },
+    {
+      "path": "platform/switch-smoke/native.h",
+      "sha256": "e4cc4b945568b4e9f31c31bdfd487ef71e599fc003ec3f94861188ddb33e1c45"
+    },
+    {
+      "path": "scripts/test-ryujinx-launcher.ps1",
+      "sha256": "c14138c9c42861fb65e1e68e368a0bd5fe9f1e48ee088b87582dd2e5064472ef"
+    },
+    {
+      "path": "scripts/package-androswitch.ps1",
+      "sha256": "3c18c1e1f6cd1477ecdc4914b5d8e00a0b62670df780f91be2ffe63a732f24ce"
+    },
+    {
+      "path": "scripts/record-hardware-feedback-evidence.py",
+      "sha256": "1297f77d825ae6cb9089f9887c1caa0594b635d69f0308b6b6163c487008fcd0"
+    }
+  ],
+  "samples": [
+    {
+      "path": "local-artifacts/m5/fixture/java-ui.apk",
+      "sha256": "39c568280be3248058da636a80fad2378bca6e6a1496950bdcd273e36bba2d76"
+    },
+    {
+      "path": "local-artifacts/m5/fixture/kotlin-ui.apk",
+      "sha256": "34c9e552a70f48a629ad95399cf6b4c6a686139d7a1a0ef7557b60185514ae3b"
+    },
+    {
+      "path": "local-artifacts/m6/fixture/mixed-media.apk",
+      "sha256": "2ba8d1a3b7ca60f68cdc1fdc6347f62370ac0231a775956eea04b28afb53f27c"
+    },
+    {
+      "path": "local-artifacts/m6/fixture/native-media.apk",
+      "sha256": "540da2796c0e0bf941ba4ee22fa82a87f71fcdd75595007ce385bfa2795e877b"
+    }
+  ],
+  "commands": [
+    "cargo test -p as-package --locked",
+    "cargo test -p as-launcher --features host --test workflow --locked -- --include-ignored",
+    "cargo clippy -p as-launcher -p as-package --features as-launcher/host --all-targets --locked -- -D warnings",
+    "cargo clippy -p as-switch-smoke --features host-cli --all-targets --locked -- -D warnings",
+    "scripts/build-androswitch.ps1",
+    "scripts/test-ryujinx-launcher.ps1",
+    "scripts/test-ryujinx-launcher.ps1 -Scenario quiescence",
+    "cargo fmt --all -- --check",
+    "python scripts/check_md_links.py",
+    "git diff --check"
+  ],
+  "limitations": [
+    "GPU retirement is a candidate fix; the hardware crash cause is not confirmed",
+    "Synthetic return_to_launcher dispatches Plus in the C main loop; no physical HID event is claimed",
+    "Original JVM/VM regression evidence remains in reports/m6-m7.json; those suites were not rerun for this fix",
+    "Firmware, hardware model, launch mode and Atmosphere result code were not supplied"
+  ]
+}
