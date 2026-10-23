@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, MutableMapping, Sequence
 
 BOT_NAME = "RD Sentinel"
-BOT_VERSION = "1.1.0"
+BOT_VERSION = "1.2.0"
 SCHEMA_VERSION = 1
 REPORT_MARKER = "<!-- rd-sentinel-report -->"
 SEVERITY_RANK = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
@@ -903,7 +903,14 @@ def render_sarif(report: Mapping[str, Any]) -> dict[str, Any]:
             },
         }
         path = finding.get("path")
-        if isinstance(path, str) and path and not path.startswith(("/", "$")):
+        path_basename = path.replace("\\", "/").rsplit("/", 1)[-1] if isinstance(path, str) else ""
+        if (
+            isinstance(path, str)
+            and path
+            and not path.startswith(("/", "$"))
+            and not path.endswith("/")
+            and "." in path_basename
+        ):
             line = finding.get("line")
             result["locations"] = [
                 {

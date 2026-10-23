@@ -7,6 +7,8 @@ re-checks the PR identity and changed-file list through the GitHub API.
 
 from __future__ import annotations
 
+import base64
+import gzip
 import json
 import os
 import re
@@ -16,7 +18,15 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
-from .model import REPORT_MARKER, match_any, redact, render_markdown, validate_report
+from .model import (
+    BOT_VERSION,
+    REPORT_MARKER,
+    match_any,
+    redact,
+    render_markdown,
+    render_sarif,
+    validate_report,
+)
 
 API_ROOT = "https://api.github.com"
 COMMAND_PREFIX = "/rd-sentinel"
@@ -144,7 +154,7 @@ class GitHubClient:
                 "Authorization": f"Bearer {self.token}",
                 "Content-Type": "application/json",
                 "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "rd-sentinel/1.1",
+                "User-Agent": f"rd-sentinel/{BOT_VERSION}",
             },
         )
         try:
@@ -246,6 +256,30 @@ class GitHubClient:
             body["target_url"] = target_url
         return self.request("POST", f"/repos/{self.repo}/statuses/{sha}", body)
 
+    def create_check_run(self, payload: Mapping[str, Any]) -> Any:
+        return self.request("POST", f"/repos/{self.repo}/check-runs", dict(payload))
+
+    def update_check_run(self, check_run_id: int, payload: Mapping[str, Any]) -> Any:
+        return self.request(
+            "PATCH", f"/repos/{self.repo}/check-runs/{check_run_id}", dict(payload)
+        )
+
+    def upload_code_scanning_sarif(
+        self, *, sarif: Mapping[str, Any], commit_sha: str, ref: str
+    ) -> Any:
+        compressed = gzip.compress(
+            json.dumps(sarif, separators=(",", ":"), sort_keys=True).encode("utf-8"),
+            mtime=0,
+        )
+        if len(compressed) > 10 * 1024 * 1024:
+            raise GitHubError("SARIF payload exceeds GitHub code-scanning 10 MB gzip limit")
+        body = {
+            "commit_sha": commit_sha,
+            "ref": ref,
+            "sarif": base64.b64encode(compressed).decode("ascii"),
+        }
+        return self.request("POST", f"/repos/{self.repo}/code-scanning/sarifs", body)
+
     def repository_info(self) -> Mapping[str, Any]:
         value = self.request("GET", f"/repos/{self.repo}")
         if not isinstance(value, Mapping):
@@ -293,9 +327,11 @@ def _labels_for_report(report: Mapping[str, Any], policy: Mapping[str, Any], *, 
         "mutation-survivor",
         "mutation-timeout",
         "test-inventory-below-baseline",
+        "test-removed",
         "static-test-attributes-shrank",
         "golden-vector-count-shrank",
         "fuzz-target-count-shrank",
+        "fuzz-target-removed",
         "high-risk-change-without-test-evidence",
         "test-ignored",
     }
@@ -308,6 +344,167 @@ def _labels_for_report(report: Mapping[str, Any], policy: Mapping[str, Any], *, 
     if verdict == "incomplete":
         labels.append(name("deep_required", "sentinel:deep-required"))
     return list(dict.fromkeys(labels))
+
+
+def _policy_bool(policy: Mapping[str, Any], key: str, default: bool = True) -> bool:
+    bot = policy.get("bot", {}) if isinstance(policy.get("bot"), Mapping) else {}
+    value = bot.get(key, default)
+    return value if isinstance(value, bool) else default
+
+
+def _check_annotations_for_report(report: Mapping[str, Any]) -> list[dict[str, Any]]:
+    annotations: list[dict[str, Any]] = []
+    for finding in report.get("findings", []):
+        if not isinstance(finding, Mapping):
+            continue
+        path = finding.get("path")
+        line = finding.get("line")
+        if (
+            not isinstance(path, str)
+            or not path
+            or path.startswith(("/", "$"))
+            or path.endswith("/")
+            or not isinstance(line, int)
+            or isinstance(line, bool)
+            or line <= 0
+        ):
+            continue
+        severity = str(finding.get("severity") or "")
+        level = {
+            "P0": "failure",
+            "P1": "failure",
+            "P2": "warning",
+            "P3": "notice",
+        }.get(severity, "notice")
+        title = redact(
+            f"[{finding.get('id') or 'rd-sentinel'}] {finding.get('title') or 'RD Sentinel finding'}",
+            limit=255,
+        )
+        message_parts = [title]
+        evidence = str(finding.get("evidence") or "").strip()
+        remediation = str(finding.get("remediation") or "").strip()
+        if evidence:
+            message_parts.append(f"Evidence: {evidence}")
+        if remediation:
+            message_parts.append(f"Remediation: {remediation}")
+        annotations.append(
+            {
+                "path": path.replace("\\", "/"),
+                "start_line": line,
+                "end_line": line,
+                "annotation_level": level,
+                "message": redact("\n\n".join(message_parts), limit=5000),
+                "title": title,
+            }
+        )
+    return annotations
+
+
+def _check_run_payload(
+    report: Mapping[str, Any],
+    policy: Mapping[str, Any],
+    *,
+    verdict: str,
+    annotations: Sequence[Mapping[str, Any]],
+    details_url: str = "",
+) -> dict[str, Any]:
+    bot_cfg = policy.get("bot", {}) if isinstance(policy.get("bot"), Mapping) else {}
+    name = str(
+        bot_cfg.get("check_run_name")
+        or bot_cfg.get("commit_status_context")
+        or "rd-sentinel/gate"
+    )
+    conclusion = {
+        "pass": "success",
+        "blocked": "failure",
+        "incomplete": "action_required",
+    }.get(verdict, "action_required")
+    findings = [f for f in report.get("findings", []) if isinstance(f, Mapping)]
+    blocking = sum(1 for f in findings if f.get("severity") in {"P0", "P1"})
+    checks = [c for c in report.get("checks", []) if isinstance(c, Mapping)]
+    failed_checks = sum(1 for c in checks if c.get("status") in {"fail", "error", "planned"})
+    summary = "\n".join(
+        [
+            f"RD Sentinel verdict: **{verdict.upper()}**",
+            "",
+            f"- Risk: {report.get('risk_score', 0)}/100",
+            f"- Complete: {bool(report.get('complete'))}",
+            f"- Fingerprint: `{report.get('fingerprint') or 'unknown'}`",
+            f"- Findings: {len(findings)} ({blocking} blocking P0/P1)",
+            f"- Non-pass/planned checks: {failed_checks} of {len(checks)}",
+            "",
+            "The fingerprinted JSON report and trusted PR comment remain authoritative; "
+            "this Check Run carries line annotations for findings that have a concrete file and line.",
+        ]
+    )
+    payload: dict[str, Any] = {
+        "name": name,
+        "head_sha": str(report.get("head_sha") or ""),
+        "status": "completed",
+        "conclusion": conclusion,
+        "output": {
+            "title": f"RD Sentinel {verdict.upper()}",
+            "summary": summary,
+            "annotations": [dict(item) for item in annotations],
+        },
+    }
+    fingerprint = str(report.get("fingerprint") or "")
+    if fingerprint:
+        payload["external_id"] = fingerprint[:255]
+    if details_url:
+        payload["details_url"] = details_url
+    return payload
+
+
+def _publish_check_run(
+    client: GitHubClient,
+    report: Mapping[str, Any],
+    policy: Mapping[str, Any],
+    *,
+    verdict: str,
+    details_url: str = "",
+) -> dict[str, Any]:
+    annotations = _check_annotations_for_report(report)
+    payload = _check_run_payload(
+        report,
+        policy,
+        verdict=verdict,
+        annotations=annotations[:50],
+        details_url=details_url,
+    )
+    created = client.create_check_run(payload)
+    result: dict[str, Any] = {"created": created, "annotation_count": len(annotations)}
+    check_run_id = created.get("id") if isinstance(created, Mapping) else None
+    if isinstance(check_run_id, int) and len(annotations) > 50:
+        output = payload.get("output", {}) if isinstance(payload.get("output"), Mapping) else {}
+        updates: list[Any] = []
+        for start in range(50, len(annotations), 50):
+            updates.append(
+                client.update_check_run(
+                    check_run_id,
+                    {
+                        "output": {
+                            "title": output.get("title", "RD Sentinel"),
+                            "summary": output.get("summary", ""),
+                            "annotations": annotations[start : start + 50],
+                        }
+                    },
+                )
+            )
+        result["annotation_updates"] = updates
+    return result
+
+
+def _sarif_ref_for_report(report: Mapping[str, Any]) -> str | None:
+    pr_number = report.get("pr_number")
+    if isinstance(pr_number, int):
+        return f"refs/pull/{pr_number}/head"
+    head_ref = str(report.get("head_ref") or "").strip()
+    if not head_ref or re.fullmatch(r"[0-9a-fA-F]{40}", head_ref):
+        return None
+    if head_ref.startswith("refs/"):
+        return head_ref
+    return f"refs/heads/{head_ref}"
 
 
 def _ensure_policy_labels(client: GitHubClient, policy: Mapping[str, Any], wanted: Sequence[str]) -> None:
@@ -477,6 +674,31 @@ def publish_report(
                 # The analysis workflow check and PR comment remain available
                 # even if GitHub cannot attach a classic status to a fork SHA.
                 result["commit_status_error"] = str(exc)
+        if _policy_bool(policy, "create_check_run", True) and report.get("head_sha"):
+            try:
+                result["check_run"] = _publish_check_run(
+                    client,
+                    body_report,
+                    policy,
+                    verdict=verdict,
+                    details_url=str(body_report.get("run_url") or ""),
+                )
+            except GitHubError as exc:
+                # Check annotations are a presentation layer over the same
+                # fingerprinted report; never fail the trusted comment/status
+                # publication just because Checks API rejects a fork/head/ref.
+                result["check_run_error"] = str(exc)
+        if _policy_bool(policy, "upload_sarif_to_code_scanning", True) and report.get("head_sha"):
+            sarif_ref = _sarif_ref_for_report(body_report)
+            if sarif_ref and body_report.get("findings"):
+                try:
+                    result["code_scanning_sarif"] = client.upload_code_scanning_sarif(
+                        sarif=render_sarif(body_report),
+                        commit_sha=str(report["head_sha"]),
+                        ref=sarif_ref,
+                    )
+                except GitHubError as exc:
+                    result["code_scanning_sarif_error"] = str(exc)
         return result
 
     campaign = str(report.get("campaign") or "scheduled")

@@ -2,9 +2,12 @@
   "schema": 1,
   "bot": {
     "name": "RD Sentinel",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "report_marker": "<!-- rd-sentinel-report -->",
-    "commit_status_context": "rd-sentinel/gate"
+    "commit_status_context": "rd-sentinel/gate",
+    "check_run_name": "rd-sentinel/gate",
+    "create_check_run": true,
+    "upload_sarif_to_code_scanning": true
   },
   "severity": {
     "blocking": ["P0", "P1"],
@@ -104,6 +107,7 @@
     "mutation_test_timeout_seconds": 600,
     "mutation_max_missed": 0,
     "osv_timeout_seconds": 30,
+    "osv_max_pages": 10,
     "command_timeout_seconds": 7200,
     "short_command_timeout_seconds": 1800
   },

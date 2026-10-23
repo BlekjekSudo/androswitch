@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import argparse
+import base64
 import datetime as dt
+import gzip
 import json
 import subprocess
 import sys
@@ -15,6 +18,9 @@ sys.path.insert(0, str(ROOT))
 from sentinel import campaigns as campaigns_module  # noqa: E402
 from sentinel.audit import (  # noqa: E402
     _action_ref_kind,
+    _check_inventory_regression,
+    _fuzz_target_names,
+    _named_test_findings,
     _path_dependency_escapes,
     _public_api_findings,
     AuditContext,
@@ -26,6 +32,7 @@ from sentinel.audit import (  # noqa: E402
     collect_diff_lines,
     compare_cargo_locks,
     license_expression_allowed,
+    named_test_inventory_from_sources,
     public_api_inventory_from_sources,
     risk_assessment,
     workflow_template_injections,
@@ -43,13 +50,18 @@ from sentinel.campaigns import (  # noqa: E402
     parse_mutants_output,
     summarize_repeated_test_outcomes,
 )
-from sentinel.cli import main as cli_main  # noqa: E402
+from sentinel.cli import _context_from_args, main as cli_main  # noqa: E402
 from sentinel.github_api import (  # noqa: E402
     GitHubClient,
+    _check_annotations_for_report,
+    _check_run_payload,
     _labels_for_report,
+    _publish_check_run,
+    _sarif_ref_for_report,
     command_authorized,
     execute_comment_command,
     parse_command,
+    publish_report,
 )
 from sentinel.mcp_endurance import run_generic_apk_endurance  # noqa: E402
 from sentinel.model import (  # noqa: E402
@@ -237,7 +249,15 @@ class ModelTests(unittest.TestCase):
                     evidence="evidence",
                     path="crates/rd-vm/src/lib.rs",
                     line=7,
-                ).to_dict()
+                ).to_dict(),
+                Finding(
+                    id="directory-finding",
+                    severity="P2",
+                    area="tests",
+                    title="Directory-scoped finding",
+                    evidence="evidence",
+                    path="crates/rd-vm/src",
+                ).to_dict(),
             ],
         }
         finalize_report(report, POLICY)  # type: ignore[arg-type]
@@ -251,6 +271,7 @@ class ModelTests(unittest.TestCase):
             run["results"][0]["locations"][0]["physicalLocation"]["region"]["startLine"],
         )
         self.assertIn("rdSentinelFingerprint", run["results"][0]["partialFingerprints"])
+        self.assertNotIn("locations", run["results"][1])
 
 
 class AuditUnitTests(unittest.TestCase):
@@ -335,6 +356,52 @@ class AuditUnitTests(unittest.TestCase):
         findings, metrics = _public_api_findings(base, changed)
         self.assertEqual(["public-api-signature-changed"], [f.id for f in findings])
         self.assertEqual(1, metrics["public_api_changed_items"])
+
+    def test_named_test_inventory_detects_swap_and_ignores_same_crate_move(self):
+        source = "#[test]\nfn parses_header() {}\n#[tokio::test]\nasync fn parses_body() {}\n"
+        base = named_test_inventory_from_sources({"crates/rd-dex/src/lib.rs": source})
+        moved = named_test_inventory_from_sources({"crates/rd-dex/src/parser.rs": source})
+        findings, metrics = _named_test_findings(base, moved)
+        self.assertEqual([], findings)
+        self.assertEqual(2, metrics["named_test_base_total"])
+        self.assertEqual(2, metrics["named_test_head_total"])
+
+        swapped = named_test_inventory_from_sources(
+            {
+                "crates/rd-dex/src/lib.rs": "#[test]\nfn smoke() {}\n#[test]\nfn parses_body() {}\n"
+            }
+        )
+        findings, metrics = _named_test_findings(base, swapped)
+        self.assertEqual(["test-removed"], [f.id for f in findings])
+        self.assertEqual(1, metrics["named_test_removed_instances"])
+
+        duplicated = named_test_inventory_from_sources(
+            {
+                "crates/rd-dex/src/a.rs": "#[test]\nfn same_name() {}\n",
+                "crates/rd-dex/src/b.rs": "#[test]\nfn same_name() {}\n",
+            }
+        )
+        self.assertEqual(2, duplicated[("rd-dex", "same_name")])
+        findings, _metrics = _named_test_findings(
+            duplicated, {("rd-dex", "same_name"): 1}
+        )
+        self.assertEqual(["test-removed"], [f.id for f in findings])
+
+        self.assertEqual(
+            ["rd-apk:zip", "rd-dex:dex"],
+            _fuzz_target_names(
+                [
+                    "crates/rd-dex/fuzz/fuzz_targets/dex.rs",
+                    "crates/rd-apk/fuzz/fuzz_targets/zip.rs",
+                    "crates/rd-apk/src/lib.rs",
+                ]
+            ),
+        )
+        named_findings = _check_inventory_regression(
+            {"fuzz_target_names": ["rd-apk:zip", "rd-dex:dex"]},
+            {"fuzz_target_names": ["rd-apk:zip", "rd-dex:other"]},
+        )
+        self.assertEqual(["fuzz-target-removed"], [f.id for f in named_findings])
 
     def test_workflow_template_injection_and_action_pin_classification(self):
         workflow = """
@@ -622,10 +689,23 @@ test vm::stable ... ok
             self.assertEqual("CycloneDX", document["bomFormat"])
             self.assertEqual("1.5", document["specVersion"])
 
-    def test_osv_querybatch_uses_purls_and_discloses_pagination(self):
-        captured = {}
+    def test_osv_querybatch_uses_purls_and_follows_per_query_pagination(self):
+        captured_payloads: list[dict] = []
+        captured_timeouts: list[float] = []
+        responses = [
+            {
+                "results": [
+                    {"vulns": [{"id": "GHSA-1"}], "next_page_token": "serde-more"},
+                    {"vulns": [{"id": "RUSTSEC-1"}]},
+                ]
+            },
+            {"results": [{"vulns": [{"id": "GHSA-2"}]}]},
+        ]
 
         class Response:
+            def __init__(self, payload):
+                self.payload = payload
+
             def __enter__(self):
                 return self
 
@@ -633,30 +713,36 @@ test vm::stable ... ok
                 return False
 
             def read(self):
-                return json.dumps(
-                    {
-                        "results": [
-                            {
-                                "vulns": [{"id": "GHSA-example"}],
-                                "next_page_token": "more",
-                            }
-                        ]
-                    }
-                ).encode()
+                return json.dumps(self.payload).encode()
 
         def fake_urlopen(request, timeout):
-            captured["timeout"] = timeout
-            captured["payload"] = json.loads(request.data.decode())
-            return Response()
+            captured_timeouts.append(timeout)
+            captured_payloads.append(json.loads(request.data.decode()))
+            return Response(responses.pop(0))
 
         with mock.patch.object(campaigns_module.urllib_request, "urlopen", fake_urlopen):
-            result = CampaignRunner._query_osv([("serde", "1.0.0")], timeout=7)
+            result = CampaignRunner._query_osv(
+                [("serde", "1.0.0"), ("toml", "0.8.0")], timeout=7
+            )
+        self.assertEqual([7, 7], captured_timeouts)
+        self.assertEqual(
+            ["pkg:cargo/serde@1.0.0", "pkg:cargo/toml@0.8.0"],
+            [q["package"]["purl"] for q in captured_payloads[0]["queries"]],
+        )
+        # Only the unfinished serde query is resent, with its own page token;
+        # the completed toml query is not included in the follow-up batch.
+        self.assertEqual(1, len(captured_payloads[1]["queries"]))
         self.assertEqual(
             "pkg:cargo/serde@1.0.0",
-            captured["payload"]["queries"][0]["package"]["purl"],
+            captured_payloads[1]["queries"][0]["package"]["purl"],
         )
-        self.assertTrue(result["truncated"])
-        self.assertEqual("GHSA-example", result["results"][0]["vulnerability_ids"][0])
+        self.assertEqual("serde-more", captured_payloads[1]["queries"][0]["page_token"])
+        self.assertFalse(result["truncated"])
+        self.assertEqual(2, result["pages"])
+        self.assertEqual(0, result["pending_queries"])
+        by_package = {item["package"]: item["vulnerability_ids"] for item in result["results"]}
+        self.assertEqual(["GHSA-1", "GHSA-2"], by_package["serde"])
+        self.assertEqual(["RUSTSEC-1"], by_package["toml"])
 
     def test_efficiency_summary_accepts_legacy_sentinel_six_and_rejects_mismatch(self):
         script = ROOT.parents[1] / "scripts" / "summarize-efficiency-benchmarks.py"
@@ -801,6 +887,44 @@ class CommandTests(unittest.TestCase):
         self.assertIsNone(parse_command("/rd-sentinel-please deep"))
         self.assertIsNone(parse_command("quote: /rd-sentinel deep"))
 
+    def test_merge_group_event_context_uses_group_shas_without_inventing_pr_number(self):
+        with tempfile.TemporaryDirectory() as raw:
+            event_path = Path(raw) / "event.json"
+            event_path.write_text(
+                json.dumps(
+                    {
+                        "merge_group": {
+                            "base_sha": "a" * 40,
+                            "head_sha": "b" * 40,
+                            "head_ref": "refs/heads/gh-readonly-queue/main/pr-42-" + "c" * 8,
+                        },
+                        "sender": {"login": "queue-bot"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = argparse.Namespace(
+                event=str(event_path),
+                labels=None,
+                base=None,
+                head=None,
+                event_name=None,
+                campaign=None,
+                profile="auto",
+                actor=None,
+                author=None,
+                head_ref=None,
+                pr_number=None,
+                repository="owner/repo",
+                run_url=None,
+            )
+            context, base_ref, head_ref = _context_from_args(args, Path(raw))
+        self.assertEqual("a" * 40, base_ref)
+        self.assertEqual("b" * 40, head_ref)
+        self.assertEqual("merge_group", context.event_name)
+        self.assertIsNone(context.pr_number)
+        self.assertIn("gh-readonly-queue", context.head_ref)
+
     def test_only_maintainer_associations_are_authorized(self):
         self.assertTrue(command_authorized({"comment": {"author_association": "MEMBER"}}, POLICY))
         self.assertFalse(command_authorized({"comment": {"author_association": "CONTRIBUTOR"}}, POLICY))
@@ -888,9 +1012,11 @@ class PublisherAndMergeTests(unittest.TestCase):
     def test_test_gap_label_uses_real_finding_ids(self):
         for finding_id in (
             "test-inventory-below-baseline",
+            "test-removed",
             "static-test-attributes-shrank",
             "golden-vector-count-shrank",
             "fuzz-target-count-shrank",
+            "fuzz-target-removed",
             "high-risk-change-without-test-evidence",
         ):
             labels = _labels_for_report(
@@ -902,6 +1028,191 @@ class PublisherAndMergeTests(unittest.TestCase):
                 POLICY,
             )
             self.assertIn("sentinel:test-gap", labels, finding_id)
+
+    def test_check_annotations_payload_and_annotation_batching(self):
+        report = {
+            "head_sha": "b" * 40,
+            "fingerprint": "f" * 64,
+            "risk_score": 80,
+            "complete": True,
+            "checks": [{"status": "pass"}],
+            "findings": [
+                {
+                    "id": "blocked-example",
+                    "severity": "P1",
+                    "title": "Blocked",
+                    "evidence": "evidence",
+                    "remediation": "fix it",
+                    "path": "crates/rd-vm/src/lib.rs",
+                    "line": 12,
+                },
+                {
+                    "id": "warning-example",
+                    "severity": "P2",
+                    "title": "Warning",
+                    "evidence": "evidence",
+                    "remediation": "review it",
+                    "path": "crates/rd-vm/src/lib.rs",
+                    "line": 3,
+                },
+                {
+                    "id": "no-line",
+                    "severity": "P1",
+                    "title": "No line",
+                    "path": "Cargo.lock",
+                    "line": None,
+                },
+                {
+                    "id": "directory",
+                    "severity": "P1",
+                    "title": "Directory",
+                    "path": "crates/rd-vm/src/",
+                    "line": 1,
+                },
+            ],
+        }
+        annotations = _check_annotations_for_report(report)
+        self.assertEqual(["failure", "warning"], [a["annotation_level"] for a in annotations])
+        payload = _check_run_payload(
+            report,
+            POLICY,
+            verdict="blocked",
+            annotations=annotations,
+            details_url="https://example.invalid/run",
+        )
+        self.assertEqual("rd-sentinel/gate", payload["name"])
+        self.assertEqual("failure", payload["conclusion"])
+        self.assertEqual(2, len(payload["output"]["annotations"]))
+
+        class FakeClient(GitHubClient):
+            def __init__(self):
+                super().__init__("owner/repo", token="test", dry_run=False)
+                self.created = None
+                self.updates = []
+
+            def create_check_run(self, payload):
+                self.created = payload
+                return {"id": 77}
+
+            def update_check_run(self, check_run_id, payload):
+                self.updates.append((check_run_id, payload))
+                return {"id": check_run_id}
+
+        many_report = dict(report)
+        many_report["findings"] = [
+            {
+                "id": f"finding-{index}",
+                "severity": "P2",
+                "title": "Warning",
+                "path": "crates/rd-vm/src/lib.rs",
+                "line": index + 1,
+            }
+            for index in range(55)
+        ]
+        client = FakeClient()
+        result = _publish_check_run(client, many_report, POLICY, verdict="blocked")
+        self.assertEqual(55, result["annotation_count"])
+        self.assertEqual(50, len(client.created["output"]["annotations"]))
+        self.assertEqual(1, len(client.updates))
+        self.assertEqual(5, len(client.updates[0][1]["output"]["annotations"]))
+
+    def test_sarif_upload_payload_is_gzip_base64_and_pr_ref(self):
+        client = GitHubClient("owner/repo", token="test", dry_run=True)
+        sarif = {"version": "2.1.0", "runs": []}
+        ref = _sarif_ref_for_report({"pr_number": 170, "head_ref": "feature"})
+        self.assertEqual("refs/pull/170/head", ref)
+        client.upload_code_scanning_sarif(sarif=sarif, commit_sha="b" * 40, ref=ref)
+        body = client.requests[-1]["body"]
+        decoded = json.loads(gzip.decompress(base64.b64decode(body["sarif"])).decode())
+        self.assertEqual(sarif, decoded)
+        self.assertEqual("b" * 40, body["commit_sha"])
+
+    def test_publish_report_creates_check_run_and_uploads_sarif(self):
+        base = "a" * 40
+        head = "b" * 40
+
+        class FakeClient(GitHubClient):
+            def __init__(self):
+                super().__init__("owner/repo", token="test", dry_run=False)
+                self.check_payload = None
+                self.sarif_upload = None
+
+            def get_pr(self, number):
+                return {"head": {"sha": head}, "base": {"sha": base}, "labels": []}
+
+            def pr_files(self, number):
+                return ["crates/rd-vm/src/lib.rs"]
+
+            def ensure_label(self, name, color, description):
+                return None
+
+            def upsert_issue_comment(self, issue_number, body, marker="<!-- rd-sentinel-report -->"):
+                return {"id": 1}
+
+            def add_labels(self, issue_number, labels):
+                return {}
+
+            def remove_label(self, issue_number, label):
+                return {}
+
+            def create_commit_status(self, sha, state, *, context, description, target_url=""):
+                return {"state": state, "context": context}
+
+            def create_check_run(self, payload):
+                self.check_payload = payload
+                return {"id": 9}
+
+            def upload_code_scanning_sarif(self, *, sarif, commit_sha, ref):
+                self.sarif_upload = (sarif, commit_sha, ref)
+                return {"id": "sarif-1"}
+
+        report = {
+            "repository": "owner/repo",
+            "pr_number": 170,
+            "base_sha": base,
+            "head_sha": head,
+            "head_ref": "feature",
+            "campaign": "test",
+            "profile": "auto",
+            "areas": [],
+            "risk_score": 70,
+            "risk_factors": [],
+            "changed_files": [{"path": "crates/rd-vm/src/lib.rs"}],
+            "dependency_changes": [],
+            "plan": [],
+            "metrics": {},
+            "checks": [],
+            "findings": [
+                Finding(
+                    id="example-finding",
+                    severity="P1",
+                    area="vm-core",
+                    title="Example blocked",
+                    evidence="evidence",
+                    path="crates/rd-vm/src/lib.rs",
+                    line=7,
+                    remediation="fix it",
+                ).to_dict()
+            ],
+        }
+        finalize_report(report, POLICY)  # type: ignore[arg-type]
+        client = FakeClient()
+        result = publish_report(
+            client=client,
+            report=report,  # type: ignore[arg-type]
+            policy=POLICY,
+            expected_head_sha=head,
+            workflow_conclusion="success",
+            workflow_run_url="https://example.invalid/run",
+        )
+        self.assertIn("check_run", result)
+        self.assertEqual(1, len(client.check_payload["output"]["annotations"]))
+        self.assertEqual("sarif-1", result["code_scanning_sarif"]["id"])
+        self.assertEqual("refs/pull/170/head", client.sarif_upload[2])
+        self.assertEqual(
+            "example-finding",
+            client.sarif_upload[0]["runs"][0]["results"][0]["ruleId"],
+        )
 
     def test_upsert_ignores_marker_from_another_user(self):
         class FakeClient(GitHubClient):

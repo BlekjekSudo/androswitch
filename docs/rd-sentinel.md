@@ -31,6 +31,26 @@ The architecture and rationale are recorded in
   relative deltas must clear a noise-aware floor, while absolute <26 ms
   budgets remain strict.
 
+## What changed in v1.2
+
+- Evidence no-shrink checks are named, not only counted: Rust test identities
+  are compared by `(scope, test name)` with duplicate-name counts, and fuzz
+  targets are compared by crate-qualified target name. Deleting a meaningful
+  test/target and adding an unrelated one no longer looks neutral.
+- OSV `querybatch` pagination is completed per unfinished query (bounded by
+  `campaigns.osv_max_pages`), preserving the package-to-advisory mapping and
+  reporting page/pending/truncated metrics instead of silently stopping at the
+  first page.
+- The trusted publisher now also creates the `rd-sentinel/gate` Check Run with
+  up to GitHub's per-request annotation batches for findings that carry a file
+  and line, and uploads the SARIF rendering to code scanning when a PR report
+  has findings. These are presentation layers over the same verified JSON
+  report; API rejection there does not replace or weaken the trusted comment,
+  labels, or commit status.
+- The CLI can consume a raw `merge_group` event file directly for merge-queue
+  reproduction, using the group base/head SHAs without inventing a PR number
+  from the queue ref.
+
 ## What runs where
 
 | Bot part | Trigger | Permissions | Purpose |
@@ -38,7 +58,7 @@ The architecture and rationale are recorded in
 | Dependabot | weekly/monthly schedule | GitHub-managed | proposes Cargo, fuzz-crate, and Actions updates |
 | `RD Sentinel` | PR, merge queue, manual dispatch | contents/pull-requests **read** | trusted-base policy audit plus risk-selected campaigns |
 | `RD Sentinel Deep` | nightly, weekly, manual dispatch | contents/pull-requests **read** | long and broad campaigns on `main` |
-| `RD Sentinel Publish` | `workflow_run` completion | issues/PR/statuses **write** | verifies the artifact against GitHub, comments, labels, issues, verified status |
+| `RD Sentinel Publish` | `workflow_run` completion | issues/PR/statuses/checks/security-events **write** | verifies the artifact against GitHub, comments, labels, issues, verified status, annotated gate Check Run, code-scanning SARIF upload |
 | `RD Sentinel Command` | issue comment | actions/issues/PR **write**, contents read | maintainer-only campaign dispatch |
 
 Candidate-executing analysis jobs never receive a publishing token.
@@ -53,9 +73,9 @@ Sentinel fails closed:
   incompatible dependency sources.
 - **Required skipped evidence is not a pass.** In GitHub campaigns it blocks;
   locally it produces `incomplete` unless `--strict-skips` is also set.
-- **Evidence cannot shrink silently.** Test attributes, JVM golden vectors,
-  fuzz targets, and MCP tool count are compared to both the base revision and
-  `.github/rd-sentinel/baseline.json`.
+- **Evidence cannot shrink silently.** Test attributes, named Rust tests, JVM
+  golden vectors, named fuzz targets, and MCP tool count are compared to both
+  the base revision and `.github/rd-sentinel/baseline.json`.
 - **Performance budgets cannot be relaxed to hide a regression.** The
   1,500 ms real-execution startup budget and the <26 ms process-cold snapshot
   presentation budget are separate contracts and must stay separate.
@@ -362,13 +382,21 @@ merges. Enable it when a second maintainer or team exists.
 - `cargo audit`, `cargo-deny`, `cargo-machete`, and `cargo-mutants` are
   installed by workflows that need them. On a local runner without one, the
   report marks that evidence skipped/incomplete rather than inventing it.
-- OSV is queried only when network is explicitly allowed. Sentinel consumes
-  the first batch page and discloses if OSV returns a pagination token;
-  `cargo audit`/RustSec remains part of the evidence.
+- OSV is queried only when network is explicitly allowed. Sentinel follows
+  per-query `querybatch` pagination up to `campaigns.osv_max_pages`, reports
+  the number of pages and any still-pending queries, and still keeps
+  `cargo audit`/RustSec as separate evidence.
+- Check Run annotations and code-scanning SARIF are GitHub presentation
+  layers. A fork head, disabled code-scanning surface, or missing Checks API
+  acceptance is recorded as a publisher-side error for that layer; it never
+  turns a blocked fingerprinted report into a pass.
 - The public-API inventory is a conservative source-level comparison, not a
   rustdoc/semver proof. It intentionally ignores same-crate file moves;
   associated items, re-exports, trait implementations, and generic bounds can
   still require human review or future `cargo-semver-checks` adoption.
+- The named-test inventory is also source-level. Macro-generated tests without
+  a visible following `fn` still rely on the `#[test]` attribute count and on
+  compiled test evidence from campaigns.
 - Diff-scoped mutation testing gives fast changed-code evidence. It does not
   prove the unchanged workspace has a high global mutation score.
 - Sentinel workflows use reviewed full-SHA action pins. GitHub's newer

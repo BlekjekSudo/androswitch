@@ -15,8 +15,10 @@ Operational guidance lives in [`docs/rd-sentinel.md`](../../docs/rd-sentinel.md)
   mutation, soak, future-toolchain, SBOM, OSV, and dependency campaigns
 - `sentinel/mcp_endurance.py` — application-neutral persistent MCP session
   endurance for pinned launchable APKs
-- `sentinel/github_api.py` — trusted publisher and maintainer commands
-- `sentinel/cli.py` — command-line entry points
+- `sentinel/github_api.py` — trusted publisher (comment, labels, status,
+  Check Run annotations, code-scanning SARIF) and maintainer commands
+- `sentinel/cli.py` — command-line entry points, including raw
+  `pull_request`/`merge_group` event context
 - `tests/` — standard-library unit tests
 
 Only Python's standard library is used at runtime.
