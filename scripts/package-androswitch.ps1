@@ -19,6 +19,9 @@ Copy-Item "$projectRoot/docs/HARDWARE_FEEDBACK.md" "$package/HARDWARE_FEEDBACK.m
 if($Stage -eq 'm9-candidate'){
   Copy-Item "$projectRoot/docs" "$package/docs" -Recurse
   Copy-Item "$projectRoot/reports" "$package/reports" -Recurse
+  # A ZIP cannot contain its own digest; retain package validation beside the
+  # archive/source evidence rather than bundling a previous archive's result.
+  if(Test-Path "$package/reports/m9-package-validation.json"){Remove-Item -LiteralPath "$package/reports/m9-package-validation.json"}
   Copy-Item "$projectRoot/docs/M8_M9_E2E.md" "$package/M8-M9-STATUS.md"
   Copy-Item "$projectRoot/docs/ANDROSWITCH_COMPATIBILITY.md" "$package/COMPATIBILITY.md"
 }
