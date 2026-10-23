@@ -59,6 +59,14 @@ The compact follow-up report records exact NRO/source/fixture hashes, receipts
 and the synthetic Plus teardown phases. Its physical-device status remains
 pending retest. The original JVM/VM baseline was not rerun for this fix.
 
+Focused host verification passed four package tests (including 40 failure
+boundaries and no-write identical installation), the launcher workflow, both
+clippy commands, Rust/C formatting and internal Markdown links. Ryujinx passed
+the 65-command console workflow with ten completed app sessions and one expected
+missing-API error. Both native sessions reached GPU completion, EGL termination,
+thread join and resource release, then returned to the console. The stuck-worker
+test still required process exit and recovered the interruption notice on reboot.
+
 ## Hardware retest
 
 Update `androswitch.nro` from the new package while retaining installed APKs and
