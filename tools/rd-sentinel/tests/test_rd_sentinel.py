@@ -7,12 +7,16 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from sentinel import campaigns as campaigns_module  # noqa: E402
 from sentinel.audit import (  # noqa: E402
+    _action_ref_kind,
     _path_dependency_escapes,
+    _public_api_findings,
     AuditContext,
     ChangedFile,
     build_plan,
@@ -22,8 +26,23 @@ from sentinel.audit import (  # noqa: E402
     collect_diff_lines,
     compare_cargo_locks,
     license_expression_allowed,
+    public_api_inventory_from_sources,
+    risk_assessment,
+    workflow_template_injections,
+    _workflow_trigger_names,
+    workspace_graph_from_manifests,
 )
-from sentinel.campaigns import parse_cold26_output  # noqa: E402
+from sentinel.campaigns import (  # noqa: E402
+    CampaignOptions,
+    CampaignRunner,
+    _mad,
+    _noise_floor_ms,
+    mutation_check_status,
+    parse_cold26_output,
+    parse_mutants_outcomes,
+    parse_mutants_output,
+    summarize_repeated_test_outcomes,
+)
 from sentinel.cli import main as cli_main  # noqa: E402
 from sentinel.github_api import (  # noqa: E402
     GitHubClient,
@@ -37,9 +56,14 @@ from sentinel.model import (  # noqa: E402
     Finding,
     apply_exceptions,
     compute_report_fingerprint,
+    detect_secret_kind,
     finalize_report,
     match_any,
+    redact,
     render_markdown,
+    render_sarif,
+    validate_baseline,
+    validate_policy,
     validate_report,
 )
 
@@ -51,7 +75,11 @@ POLICY = {
         "dependency_major_label": "sentinel:dependency-major-approved",
         "authorized_comment_associations": ["OWNER", "MEMBER", "COLLABORATOR"],
     },
-    "protected_paths": [".github/rd-sentinel/**", "tools/rd-sentinel/**"],
+    "protected_paths": [
+        ".github/rd-sentinel/**",
+        ".github/workflows/rd-sentinel*.yml",
+        "tools/rd-sentinel/**",
+    ],
     "labels": {
         "pass": {"name": "sentinel:pass", "color": "0e8a16", "description": "passed"},
         "blocked": {"name": "sentinel:blocked", "color": "b60205", "description": "blocked"},
@@ -150,6 +178,80 @@ class ModelTests(unittest.TestCase):
         self.assertEqual("expired-policy-exception", out2[0].id)
         self.assertEqual("P1", out2[0].severity)
 
+    def test_secret_detector_names_high_confidence_shapes_without_echoing_values(self):
+        github_token = "gh" + "p_" + "A" * 30
+        aws_key = "AK" + "IA" + "B" * 16
+        self.assertIsNotNone(detect_secret_kind(github_token))
+        self.assertIsNotNone(detect_secret_kind(aws_key))
+        self.assertIsNotNone(detect_secret_kind("-----BEGIN " + "PRIVATE KEY-----"))
+        self.assertIsNone(detect_secret_kind("token_budget = 42"))
+        redacted = redact(f"before {github_token} after")
+        self.assertNotIn(github_token, redacted)
+        self.assertIn("[REDACTED]", redacted)
+
+    def test_policy_validation_catches_weakening_and_overbroad_exceptions(self):
+        policy = json.loads(json.dumps(POLICY))
+        policy["severity"]["blocking"] = ["P0"]
+        policy["exceptions"] = [
+            {
+                "id": "E-dup",
+                "finding_id": "x",
+                "path_glob": "crates/**",
+                "owner": "team",
+                "reason": "too broad",
+                "expires": "2099-01-01",
+            },
+            {
+                "id": "E-dup",
+                "finding_id": "y",
+                "path_glob": "crates/rd-vm/src/lib.rs",
+                "owner": "team",
+                "reason": "duplicate",
+                "expires": "2099-01-01",
+            },
+        ]
+        ids = {finding.id for finding in validate_policy(policy)}
+        self.assertIn("blocking-severities-weakened", ids)
+        self.assertIn("duplicate-policy-exception", ids)
+        bad_baseline = {
+            "contracts": {"mcp_tool_count": "47"},
+            "corpus": [{"id": "x", "path": "a.apk", "path_env": "X", "sha256": "nope"}],
+        }
+        self.assertTrue(validate_baseline(bad_baseline))
+
+    def test_sarif_carries_fingerprints_locations_and_severity_levels(self):
+        report = {
+            "bot_version": "1.1.0",
+            "repository": "owner/repo",
+            "verdict": "blocked",
+            "campaign": "test",
+            "profile": "auto",
+            "checks": [],
+            "metrics": {},
+            "findings": [
+                Finding(
+                    id="example-finding",
+                    severity="P1",
+                    area="tests",
+                    title="Example blocked",
+                    evidence="evidence",
+                    path="crates/rd-vm/src/lib.rs",
+                    line=7,
+                ).to_dict()
+            ],
+        }
+        finalize_report(report, POLICY)  # type: ignore[arg-type]
+        sarif = render_sarif(report)
+        self.assertEqual("2.1.0", sarif["version"])
+        run = sarif["runs"][0]
+        self.assertEqual("example-finding", run["results"][0]["ruleId"])
+        self.assertEqual("error", run["results"][0]["level"])
+        self.assertEqual(
+            7,
+            run["results"][0]["locations"][0]["physicalLocation"]["region"]["startLine"],
+        )
+        self.assertIn("rdSentinelFingerprint", run["results"][0]["partialFingerprints"])
+
 
 class AuditUnitTests(unittest.TestCase):
     def test_semver_and_lock_diff(self):
@@ -188,6 +290,115 @@ class AuditUnitTests(unittest.TestCase):
         self.assertIn("fuzz", components)
         self.assertIn("compare", components)
         self.assertIn("real-apk", components)
+
+    def test_risk_assessment_is_explainable_and_counts_downstream_packages(self):
+        files = [ChangedFile("M", "crates/rd-dex/src/lib.rs"), ChangedFile("M", "Cargo.lock")]
+        without_downstream, base_factors = risk_assessment(files, ["parsers"], 10, 2)
+        with_downstream, factors = risk_assessment(
+            files, ["parsers"], 10, 2, downstream_packages=3
+        )
+        self.assertGreater(with_downstream, without_downstream)
+        self.assertTrue(any(f["id"] == "downstream-blast-radius" for f in factors))
+        self.assertTrue(any(f["id"] == "lockfile" for f in base_factors))
+
+    def test_workspace_graph_from_manifests_keeps_workspace_edges_only(self):
+        manifests = {
+            "crates/rd-cli/Cargo.toml": {
+                "package": {"name": "rd-cli"},
+                "dependencies": {"rd-vm": {"path": "../rd-vm"}, "serde": "1"},
+            },
+            "crates/rd-vm/Cargo.toml": {
+                "package": {"name": "rd-vm"},
+                "dependencies": {"rd-dex": {"path": "../rd-dex"}},
+            },
+            "crates/rd-dex/Cargo.toml": {"package": {"name": "rd-dex"}},
+        }
+        graph = workspace_graph_from_manifests(manifests)
+        self.assertEqual({"rd-vm"}, graph["rd-cli"])
+        self.assertEqual({"rd-dex"}, graph["rd-vm"])
+        self.assertEqual(set(), graph["rd-dex"])
+
+    def test_public_api_inventory_ignores_same_crate_move_but_sees_signature_change(self):
+        base = public_api_inventory_from_sources(
+            {"crates/rd-dex/src/lib.rs": "pub fn parse(input: &[u8]) -> u8 { 1 }\n"}
+        )
+        moved = public_api_inventory_from_sources(
+            {"crates/rd-dex/src/parser.rs": "pub fn parse(input: &[u8]) -> u8 { 1 }\n"}
+        )
+        findings, metrics = _public_api_findings(base, moved)
+        self.assertEqual([], findings)
+        self.assertEqual(0, metrics["public_api_removed_items"])
+
+        changed = public_api_inventory_from_sources(
+            {"crates/rd-dex/src/lib.rs": "pub fn parse(input: &[u8]) -> u16 { 1 }\n"}
+        )
+        findings, metrics = _public_api_findings(base, changed)
+        self.assertEqual(["public-api-signature-changed"], [f.id for f in findings])
+        self.assertEqual(1, metrics["public_api_changed_items"])
+
+    def test_workflow_template_injection_and_action_pin_classification(self):
+        workflow = """
+steps:
+  - run: |
+      echo "${{ github.event.issue.title }}"
+  - env:
+      TITLE: ${{ github.event.issue.title }}
+    run: echo "$TITLE"
+"""
+        injections = workflow_template_injections(workflow)
+        self.assertEqual(1, len(injections))
+        self.assertEqual("pinned", _action_ref_kind("actions/checkout@" + "a" * 40))
+        self.assertEqual("mutable-tag", _action_ref_kind("actions/checkout@v4"))
+        self.assertEqual("moving-branch", _action_ref_kind("owner/action@main"))
+        triggers = _workflow_trigger_names(
+            "# The trusted workflow_run publisher is separate.\n"
+            "on:\n"
+            "  pull_request:\n"
+            "permissions:\n"
+            "  contents: read\n"
+        )
+        self.assertIn("pull_request", triggers)
+        self.assertNotIn("workflow_run", triggers)
+
+    def test_lock_diff_reports_duplicate_version_growth(self):
+        old = (
+            'version = 3\n[[package]]\nname="hashbrown"\nversion="0.14.0"\n'
+            'source="registry+https://github.com/rust-lang/crates.io-index"\n'
+        )
+        new = old + (
+            '[[package]]\nname="hashbrown"\nversion="0.15.0"\n'
+            'source="registry+https://github.com/rust-lang/crates.io-index"\n'
+        )
+        _changes, metrics = compare_cargo_locks(old, new)
+        self.assertEqual(0, metrics["dependency_duplicate_names_base"])
+        self.assertEqual(1, metrics["dependency_duplicate_names_head"])
+        self.assertEqual(1, metrics["dependency_duplicate_names_delta"])
+
+    def test_mutants_profile_is_explicitly_planned(self):
+        plan = build_plan(
+            profile="mutants",
+            areas=[],
+            files=[],
+            labels=[],
+            risk=0,
+            dependency_bot=False,
+        )
+        self.assertEqual(
+            ["static", "core", "mutation"], [item["component"] for item in plan]
+        )
+        for profile, expected in (("nightly", False), ("deep", True), ("weekly", True)):
+            components = [
+                item["component"]
+                for item in build_plan(
+                    profile=profile,
+                    areas=[],
+                    files=[],
+                    labels=[],
+                    risk=0,
+                    dependency_bot=False,
+                )
+            ]
+            self.assertEqual(expected, "mutation" in components, profile)
 
 
 class Cold26Tests(unittest.TestCase):
@@ -232,6 +443,287 @@ class Cold26Tests(unittest.TestCase):
         self.assertEqual(1, parsed["tap_successes"])
         self.assertEqual(1, parsed["tap_failures"])
         self.assertEqual(["a"], parsed["frame_hashes"])
+
+
+class CampaignUnitTests(unittest.TestCase):
+    def test_robust_cold_statistics_ignore_one_outlier_better_than_mean(self):
+        self.assertEqual(1.0, _mad([1.0, 2.0, 3.0, 100.0]))
+        self.assertAlmostEqual(
+            3.0 * 1.4826,
+            _noise_floor_ms([1.0, 2.0, 3.0, 100.0], [2.0, 2.0, 2.0]),
+        )
+
+    def test_repeated_test_outcomes_name_flaky_and_consistent_failures(self):
+        first = """
+test vm::flaky_case ... FAILED
+test vm::always_bad ... FAILED
+test vm::stable ... ok
+"""
+        second = """
+test vm::flaky_case ... ok
+test vm::always_bad ... FAILED
+test vm::stable ... ok
+"""
+        summary = summarize_repeated_test_outcomes([first, second])
+        self.assertEqual(["vm::flaky_case"], summary["flaky_tests"])
+        self.assertEqual(["vm::always_bad"], summary["consistent_failures"])
+
+    def test_dynamic_feature_sets_cover_singletons_pairs_and_all(self):
+        sets = CampaignRunner._feature_sets_from_names(
+            ["default", "jit", "native", "advanced-components"], full=False
+        )
+        self.assertIn((), sets)
+        self.assertIn(("jit",), sets)
+        self.assertIn(("jit", "native"), sets)
+        self.assertIn(("advanced-components", "jit", "native"), sets)
+        self.assertFalse(any("default" in item for item in sets))
+
+    def test_parse_mutants_output_counts_outcomes_and_kill_rate(self):
+        parsed = parse_mutants_output(
+            "12 mutants caught\n3 mutants missed\n1 mutants unviable\n"
+        )
+        self.assertEqual(12, parsed["caught"])
+        self.assertEqual(3, parsed["missed"])
+        self.assertEqual(1, parsed["unviable"])
+        self.assertAlmostEqual(12 / 15, parsed["kill_rate"])
+
+        current = parse_mutants_output(
+            "MISSED src/lib.rs:1:29: replace inc -> i32 with 1\n"
+            "5 mutants tested in 1s: 3 missed, 2 caught\n"
+        )
+        self.assertEqual(2, current["caught"])
+        self.assertEqual(3, current["missed"])
+        self.assertAlmostEqual(2 / 5, current["kill_rate"])
+        self.assertEqual("text", current["outcome_source"])
+
+        structured = parse_mutants_outcomes(
+            {
+                "total_mutants": 6,
+                "caught": 3,
+                "missed": 1,
+                "unviable": 1,
+                "timeout": 1,
+                "cargo_mutants_version": "27.1.0",
+                "outcomes": [
+                    {
+                        "summary": "MissedMutant",
+                        "scenario": {
+                            "Mutant": {
+                                "name": "src/lib.rs:1:29: replace inc -> i32 with 1"
+                            }
+                        },
+                    }
+                ],
+            }
+        )
+        self.assertIsNotNone(structured)
+        assert structured is not None
+        self.assertEqual(6, structured["total"])
+        self.assertEqual(5, structured["viable"])
+        self.assertAlmostEqual(3 / 5, structured["kill_rate"])
+        self.assertEqual("outcomes.json", structured["outcome_source"])
+        self.assertEqual(
+            ["src/lib.rs:1:29: replace inc -> i32 with 1"],
+            structured["missed_mutants"],
+        )
+        self.assertIsNone(parse_mutants_outcomes({"caught": True}))
+        self.assertEqual(
+            "fail",
+            mutation_check_status(
+                exit_code=2,
+                missed=1,
+                timeouts=0,
+                blocking_context=True,
+            ),
+        )
+        self.assertEqual(
+            "warn",
+            mutation_check_status(
+                exit_code=2,
+                missed=1,
+                timeouts=0,
+                blocking_context=False,
+            ),
+        )
+        self.assertEqual(
+            "warn",
+            mutation_check_status(
+                exit_code=2,
+                missed=2,
+                timeouts=0,
+                blocking_context=True,
+                max_missed=2,
+            ),
+        )
+        self.assertEqual(
+            "fail",
+            mutation_check_status(
+                exit_code=4,
+                missed=0,
+                timeouts=0,
+                blocking_context=False,
+            ),
+        )
+
+    def test_dependency_blast_radius_and_deterministic_sbom(self):
+        metadata = {
+            "workspace_members": ["workspace-id"],
+            "packages": [
+                {
+                    "id": "workspace-id",
+                    "name": "rd-cli",
+                    "version": "0.9.0",
+                    "license": "MIT OR Apache-2.0",
+                    "source": None,
+                    "targets": [],
+                },
+                {
+                    "id": "serde-id",
+                    "name": "serde",
+                    "version": "1.0.0",
+                    "license": "MIT OR Apache-2.0",
+                    "source": "registry+https://github.com/rust-lang/crates.io-index",
+                    "rust_version": "1.56",
+                    "targets": [{"kind": ["lib"], "crate_types": ["lib"]}],
+                },
+            ],
+            "resolve": {
+                "nodes": [
+                    {
+                        "id": "workspace-id",
+                        "deps": [
+                            {
+                                "pkg": "serde-id",
+                                "dep_kinds": [{"kind": None}],
+                            }
+                        ],
+                    },
+                    {"id": "serde-id", "deps": []},
+                ]
+            },
+        }
+        blast = CampaignRunner._dependency_blast_radius(metadata)
+        self.assertEqual(["rd-cli"], blast[("serde", "1.0.0")]["direct_workspace_consumers"])
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            report = {"bot_version": "1.1.0", "checks": [], "metrics": {}}
+            runner = CampaignRunner(
+                repo=root,
+                report=report,  # type: ignore[arg-type]
+                policy=POLICY,
+                baseline=BASELINE,
+                options=CampaignOptions(output_dir=root / "out"),
+            )
+            result = runner._write_cyclonedx_sbom(metadata)
+            self.assertIsNotNone(result)
+            path, count = result  # type: ignore[misc]
+            self.assertEqual(2, count)
+            document = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual("CycloneDX", document["bomFormat"])
+            self.assertEqual("1.5", document["specVersion"])
+
+    def test_osv_querybatch_uses_purls_and_discloses_pagination(self):
+        captured = {}
+
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return json.dumps(
+                    {
+                        "results": [
+                            {
+                                "vulns": [{"id": "GHSA-example"}],
+                                "next_page_token": "more",
+                            }
+                        ]
+                    }
+                ).encode()
+
+        def fake_urlopen(request, timeout):
+            captured["timeout"] = timeout
+            captured["payload"] = json.loads(request.data.decode())
+            return Response()
+
+        with mock.patch.object(campaigns_module.urllib_request, "urlopen", fake_urlopen):
+            result = CampaignRunner._query_osv([("serde", "1.0.0")], timeout=7)
+        self.assertEqual(
+            "pkg:cargo/serde@1.0.0",
+            captured["payload"]["queries"][0]["package"]["purl"],
+        )
+        self.assertTrue(result["truncated"])
+        self.assertEqual("GHSA-example", result["results"][0]["vulnerability_ids"][0])
+
+    def test_efficiency_summary_accepts_legacy_sentinel_six_and_rejects_mismatch(self):
+        script = ROOT.parents[1] / "scripts" / "summarize-efficiency-benchmarks.py"
+        six = ["roots", "host", "sweep", "minor", "resolve", "interp"]
+        nine = [*six, "strings", "subtype", "jit"]
+        rows = []
+        for workload in six:
+            for label, elapsed in (("baseline", 10.0), ("candidate", 9.8)):
+                for repetition in range(3):
+                    rows.append(
+                        {
+                            "workload": workload,
+                            "label": label,
+                            "repetition": repetition,
+                            "checksum": 123,
+                            "iterations": 100,
+                            "rss_source": "gnu-time-child",
+                            "elapsed_ms": elapsed + repetition * 0.01,
+                            "max_rss_kib": 6000,
+                        }
+                    )
+        with tempfile.TemporaryDirectory() as raw:
+            evidence = Path(raw)
+            bench = evidence / "benchmarks.json"
+            bench.write_text(json.dumps(rows), encoding="utf-8")
+            legacy = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--evidence",
+                    str(evidence),
+                    "--input",
+                    str(bench),
+                    "--resamples",
+                    "1000",
+                ],
+                text=True,
+                capture_output=True,
+                timeout=30,
+            )
+            self.assertEqual(0, legacy.returncode, legacy.stderr)
+            summary = json.loads((evidence / "final-benchmark-summary.json").read_text())
+            self.assertEqual(set(six), {row["workload"] for row in summary})
+            mismatch = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--evidence",
+                    str(evidence),
+                    "--input",
+                    str(bench),
+                    "--expected-workloads",
+                    *nine,
+                    "--resamples",
+                    "1000",
+                ],
+                text=True,
+                capture_output=True,
+                timeout=30,
+            )
+            self.assertNotEqual(0, mismatch.returncode)
+            self.assertIn("workload set mismatch", mismatch.stderr)
+        campaign_source = (ROOT / "sentinel" / "campaigns.py").read_text(encoding="utf-8")
+        self.assertIn('"--expected-workloads"', campaign_source)
+        self.assertIn('"--features"', campaign_source)
+        for workload in nine:
+            self.assertIn(f'"{workload}"', campaign_source)
 
 
 class GenericMcpEnduranceTests(unittest.TestCase):
@@ -298,6 +790,12 @@ class CommandTests(unittest.TestCase):
         cmd = parse_command("hello\n/rd-sentinel fuzz 123")
         self.assertEqual(123, cmd.fuzz_seconds)
         self.assertEqual("invalid", parse_command("/rd-sentinel fuzz nope").action)
+        mutants = parse_command("/rd-sentinel mutants 45")
+        self.assertEqual("mutants", mutants.profile)
+        self.assertEqual(45, mutants.mutation_minutes)
+        self.assertEqual(45, parse_command("/rd-sentinel mutants").mutation_minutes)
+        self.assertEqual("invalid", parse_command("/rd-sentinel mutants 241").action)
+        self.assertEqual("mutants", parse_command("/rd-sentinel rerun mutants").profile)
 
     def test_command_prefix_must_be_a_whole_token(self):
         self.assertIsNone(parse_command("/rd-sentinel-please deep"))
@@ -306,6 +804,39 @@ class CommandTests(unittest.TestCase):
     def test_only_maintainer_associations_are_authorized(self):
         self.assertTrue(command_authorized({"comment": {"author_association": "MEMBER"}}, POLICY))
         self.assertFalse(command_authorized({"comment": {"author_association": "CONTRIBUTOR"}}, POLICY))
+
+    def test_mutants_command_dispatches_pr_workflow_with_budget(self):
+        class FakeClient(GitHubClient):
+            def __init__(self):
+                super().__init__("owner/repo", token="test", dry_run=False)
+                self.dispatch = None
+                self.comments = []
+
+            def repository_info(self):
+                return {"default_branch": "main"}
+
+            def dispatch_workflow(self, workflow, ref, inputs):
+                self.dispatch = (workflow, ref, inputs)
+                return {"ok": True}
+
+            def comment(self, issue_number, body):
+                self.comments.append((issue_number, body))
+                return {"id": 2}
+
+        client = FakeClient()
+        event = {
+            "comment": {
+                "body": "/rd-sentinel mutants 37",
+                "author_association": "OWNER",
+            },
+            "issue": {"number": 44, "pull_request": {"url": "https://example.invalid/pr"}},
+        }
+        result = execute_comment_command(client=client, event=event, policy=POLICY)
+        self.assertEqual("rd-sentinel.yml", result["workflow"])
+        self.assertEqual("mutants", result["inputs"]["profile"])
+        self.assertEqual("37", result["inputs"]["mutation_minutes"])
+        self.assertEqual("44", result["inputs"]["pr_number"])
+        self.assertIn("37 minutes", client.comments[0][1])
 
     def test_status_quotes_latest_bot_report_not_a_forged_marker(self):
         class FakeClient(GitHubClient):
@@ -354,6 +885,24 @@ class PublisherAndMergeTests(unittest.TestCase):
         )
         self.assertIn("sentinel:risk-critical", labels)
 
+    def test_test_gap_label_uses_real_finding_ids(self):
+        for finding_id in (
+            "test-inventory-below-baseline",
+            "static-test-attributes-shrank",
+            "golden-vector-count-shrank",
+            "fuzz-target-count-shrank",
+            "high-risk-change-without-test-evidence",
+        ):
+            labels = _labels_for_report(
+                {
+                    "verdict": "blocked",
+                    "findings": [{"id": finding_id, "area": "tests"}],
+                    "metrics": {},
+                },
+                POLICY,
+            )
+            self.assertIn("sentinel:test-gap", labels, finding_id)
+
     def test_upsert_ignores_marker_from_another_user(self):
         class FakeClient(GitHubClient):
             def __init__(self):
@@ -378,7 +927,14 @@ class PublisherAndMergeTests(unittest.TestCase):
         self.assertEqual("POST", client.calls[0][0])
         self.assertIn("/issues/7/comments", client.calls[0][1])
 
-    def _write_merge_report(self, root: Path, name: str, status: str, findings: list[dict]) -> Path:
+    def _write_merge_report(
+        self,
+        root: Path,
+        name: str,
+        status: str,
+        findings: list[dict],
+        plan: list[dict] | None = None,
+    ) -> Path:
         report = {
             "base_sha": "a" * 40,
             "head_sha": "b" * 40,
@@ -386,6 +942,9 @@ class PublisherAndMergeTests(unittest.TestCase):
             "profile": "nightly",
             "areas": [],
             "metrics": {},
+            "plan": plan or [],
+            "executed_components": ["core"] if status != "planned" else [],
+            "requested_components": ["core"],
             "checks": [
                 {
                     "id": "planned-core",
@@ -429,6 +988,7 @@ class PublisherAndMergeTests(unittest.TestCase):
             merged = json.loads(out.read_text())
             self.assertEqual("blocked", merged["verdict"])
             self.assertFalse(validate_report(merged))
+            self.assertTrue((root / "merged.sarif").is_file())
 
     def test_merge_executed_check_wins_over_planned_placeholder(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -442,6 +1002,29 @@ class PublisherAndMergeTests(unittest.TestCase):
             merged = json.loads(out.read_text())
             self.assertEqual("pass", merged["checks"][0]["status"])
             self.assertEqual("pass", merged["verdict"])
+
+    def test_merge_marks_unexecuted_planned_component_incomplete(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self._merge_root(root)
+            partial = self._write_merge_report(
+                root,
+                "core-only",
+                "pass",
+                [],
+                plan=[
+                    {"component": "core", "reason": "test", "required": True},
+                    {"component": "mutation", "reason": "test", "required": True},
+                ],
+            )
+            out = root / "merged.json"
+            code = cli_main(["merge", str(partial), "--repo", str(root), "--out", str(out)])
+            self.assertEqual(3, code)
+            merged = json.loads(out.read_text())
+            self.assertEqual("incomplete", merged["verdict"])
+            planned = [c for c in merged["checks"] if c["id"] == "planned-mutation"]
+            self.assertEqual(1, len(planned))
+            self.assertEqual("planned", planned[0]["status"])
 
 
 class TinyRepoTests(unittest.TestCase):
@@ -493,6 +1076,58 @@ class TinyRepoTests(unittest.TestCase):
         removed = [line for line in lines if line.kind == "removed" and "gone" in line.text]
         self.assertEqual(1, len(removed))
         self.assertTrue(removed[0].path.endswith("z_deleted.rs"))
+
+    def test_public_api_same_crate_move_is_not_a_removal(self):
+        td, repo, base = self._repo()
+        self.addCleanup(td.cleanup)
+        src = repo / "crates/rd-vm/src"
+        (src / "lib.rs").write_text("pub mod moved;\n#[test] fn t() {}\n", encoding="utf-8")
+        (src / "moved.rs").write_text("pub fn answer() -> u8 { 1 }\n", encoding="utf-8")
+        (repo / "docs/adr").mkdir(parents=True)
+        (repo / "docs/adr/001.md").write_text("# move only\n", encoding="utf-8")
+        report = build_static_report(
+            repo=repo,
+            base_ref=base,
+            head_ref="WORKTREE",
+            policy=POLICY,
+            baseline=BASELINE,
+            context=AuditContext(profile="auto"),
+        )
+        ids = {f["id"] for f in report["findings"]}
+        self.assertNotIn("public-api-removed", ids)
+        self.assertEqual(0, report["metrics"]["public_api_removed_items"])
+        self.assertTrue(report["risk_factors"])
+
+    def test_workflow_change_scans_pinning_and_shell_injection(self):
+        td, repo, base = self._repo()
+        self.addCleanup(td.cleanup)
+        workflow = repo / ".github/workflows/test.yml"
+        workflow.parent.mkdir(parents=True)
+        workflow.write_text(
+            "name: test\n"
+            "on: [pull_request]\n"
+            "permissions:\n"
+            "  contents: read\n"
+            "jobs:\n"
+            "  test:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - uses: actions/checkout@v4\n"
+            "      - run: echo \"${{ github.event.pull_request.title }}\"\n",
+            encoding="utf-8",
+        )
+        report = build_static_report(
+            repo=repo,
+            base_ref=base,
+            head_ref="WORKTREE",
+            policy=POLICY,
+            baseline=BASELINE,
+            context=AuditContext(profile="auto"),
+        )
+        ids = {f["id"] for f in report["findings"]}
+        self.assertIn("workflow-action-not-sha-pinned", ids)
+        self.assertIn("workflow-template-injection", ids)
+        self.assertIn("workflow-checkout-persists-credentials", ids)
 
     def test_evidence_harness_change_requires_policy_label(self):
         td, repo, base = self._repo()

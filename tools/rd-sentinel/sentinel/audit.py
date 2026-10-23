@@ -16,7 +16,16 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 fallback uses narrow parsers below.
     tomllib = None  # type: ignore[assignment]
 
-from .model import CheckResult, Finding, apply_exceptions, match_any, sha256_file
+from .model import (
+    CheckResult,
+    Finding,
+    apply_exceptions,
+    detect_secret_kind,
+    match_any,
+    sha256_file,
+    validate_baseline,
+    validate_policy,
+)
 
 HIGH_RISK_AREAS = {
     "parsers",
@@ -89,6 +98,15 @@ def git_output(repo: Path, args: Sequence[str], *, check: bool = False) -> str:
     if check and proc.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} failed: {proc.stderr.strip()}")
     return proc.stdout if proc.returncode == 0 else ""
+
+
+def _safe_policy_int(value: Any, default: int) -> int:
+    if isinstance(value, bool):
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def resolve_rev(repo: Path, rev: str) -> str | None:
@@ -276,15 +294,70 @@ def areas_for_files(files: Sequence[ChangedFile]) -> list[str]:
     return sorted(found)
 
 
-def risk_score(files: Sequence[ChangedFile], areas: Sequence[str], added: int, deleted: int) -> int:
-    score = sum(AREA_WEIGHTS.get(area, 0) for area in areas)
-    score += min(20, len(files) // 8)
-    score += min(20, (added + deleted) // 1000)
-    if any(f.status.startswith("D") for f in files):
-        score += 8
+def risk_assessment(
+    files: Sequence[ChangedFile],
+    areas: Sequence[str],
+    added: int,
+    deleted: int,
+    *,
+    downstream_packages: int = 0,
+) -> tuple[int, list[dict[str, Any]]]:
+    """Return an explainable 0-100 risk score.
+
+    The factors are part of the fingerprinted report. A reviewer should be
+    able to see whether risk came from a sensitive area, raw churn, deletion,
+    a lockfile, or downstream workspace blast radius instead of trusting one
+    opaque number.
+    """
+
+    factors: list[dict[str, Any]] = []
+    score = 0
+
+    def add(fid: str, label: str, points: int, evidence: str) -> None:
+        nonlocal score
+        if points <= 0:
+            return
+        score += points
+        factors.append(
+            {"id": fid, "label": label, "points": int(points), "evidence": evidence}
+        )
+
+    for area in areas:
+        add(f"area:{area}", f"Sensitive area: {area}", AREA_WEIGHTS.get(area, 0), area)
+    add("file-churn", "Changed-file count", min(20, len(files) // 8), f"{len(files)} files")
+    add(
+        "line-churn",
+        "Changed-line count",
+        min(20, (added + deleted) // 1000),
+        f"+{added}/-{deleted} lines",
+    )
+    deleted_files = [f.path for f in files if f.status.startswith("D")]
+    if deleted_files:
+        add("file-deletion", "Files deleted", 8, ", ".join(deleted_files[:8]))
     if any(f.path.endswith("Cargo.lock") for f in files):
-        score += 10
-    return max(0, min(100, score))
+        add("lockfile", "Cargo.lock changed", 10, "resolved dependency graph moved")
+    if downstream_packages:
+        add(
+            "downstream-blast-radius",
+            "Downstream workspace packages affected",
+            min(12, downstream_packages * 2),
+            f"{downstream_packages} downstream package(s)",
+        )
+    capped = max(0, min(100, score))
+    if score > capped:
+        factors.append(
+            {
+                "id": "score-cap",
+                "label": "Risk score cap",
+                "points": capped - score,
+                "evidence": "raw factor total exceeds the 100-point report scale",
+            }
+        )
+    return capped, sorted(factors, key=lambda f: (-int(f["points"]), str(f["id"])))
+
+
+def risk_score(files: Sequence[ChangedFile], areas: Sequence[str], added: int, deleted: int) -> int:
+    return risk_assessment(files, areas, added, deleted)[0]
 
 
 def targeted_packages(files: Sequence[ChangedFile]) -> list[str]:
@@ -307,6 +380,125 @@ def targeted_packages(files: Sequence[ChangedFile]) -> list[str]:
             if item.path.startswith(prefix) and pkg not in found:
                 found.append(pkg)
     return found
+
+
+def _manifest_dependency_package_name(trail_key: str, spec: Any) -> str:
+    if isinstance(spec, Mapping) and spec.get("package"):
+        return str(spec["package"])
+    return trail_key.rsplit(".", 1)[-1]
+
+
+def workspace_graph_from_manifests(
+    manifests: Mapping[str, Mapping[str, Any]],
+) -> dict[str, set[str]]:
+    """Build package -> workspace-dependency edges from parsed manifests."""
+
+    package_names: set[str] = set()
+    parsed_by_package: dict[str, Mapping[str, Any]] = {}
+    for manifest in manifests.values():
+        package = manifest.get("package", {})
+        if isinstance(package, Mapping) and package.get("name"):
+            name = str(package["name"])
+            package_names.add(name)
+            parsed_by_package[name] = manifest
+
+    graph: dict[str, set[str]] = {name: set() for name in package_names}
+    for name, manifest in parsed_by_package.items():
+        for key, spec in _collect_dependencies(manifest).items():
+            dep_name = _manifest_dependency_package_name(str(key), spec)
+            if dep_name in package_names and dep_name != name:
+                graph[name].add(dep_name)
+    return graph
+
+
+def workspace_dependency_graph(repo: Path, rev: str | None) -> dict[str, set[str]]:
+    manifests: dict[str, Mapping[str, Any]] = {}
+    for path in list_files_at_rev(repo, rev):
+        if not path.endswith("Cargo.toml"):
+            continue
+        parsed = parse_toml(read_at_rev(repo, rev, path))
+        if parsed is not None:
+            manifests[path] = parsed
+
+    root = manifests.get("Cargo.toml", {})
+    workspace = root.get("workspace", {}) if isinstance(root, Mapping) else {}
+    members = workspace.get("members", []) if isinstance(workspace, Mapping) else []
+    excludes = workspace.get("exclude", []) if isinstance(workspace, Mapping) else []
+    if isinstance(members, list) and members:
+        member_patterns = [str(item).strip("/") for item in members if str(item).strip("/")]
+        exclude_patterns = (
+            [str(item).strip("/") for item in excludes if str(item).strip("/")]
+            if isinstance(excludes, list)
+            else []
+        )
+        selected: dict[str, Mapping[str, Any]] = {}
+        for path, parsed in manifests.items():
+            if path == "Cargo.toml":
+                continue
+            directory = path[: -len("/Cargo.toml")] if path.endswith("/Cargo.toml") else ""
+            if not directory:
+                continue
+            if directory in member_patterns or match_any(directory, member_patterns):
+                if exclude_patterns and (
+                    directory in exclude_patterns or match_any(directory, exclude_patterns)
+                ):
+                    continue
+                selected[path] = parsed
+        if selected:
+            return workspace_graph_from_manifests(selected)
+
+    # Fallback for a manifest shape we cannot interpret: exclude nested fuzz
+    # workspaces, which are not selectable with `cargo test -p` from the root.
+    fallback = {
+        path: parsed
+        for path, parsed in manifests.items()
+        if "/fuzz/" not in f"/{path}"
+    }
+    return workspace_graph_from_manifests(fallback)
+
+
+def affected_packages(
+    repo: Path, rev: str | None, files: Sequence[ChangedFile]
+) -> tuple[list[str], list[str]]:
+    """Return (direct packages, direct + downstream workspace dependents).
+
+    A parser fix in ``rd-dex`` can regress every workspace consumer above it,
+    even when no consumer file changed. Sentinel's targeted campaign therefore
+    follows reverse workspace edges instead of only testing the edited crate.
+    """
+
+    direct = targeted_packages(files)
+    graph = workspace_dependency_graph(repo, rev)
+    if not graph:
+        return direct, direct
+    if any(f.path in {"Cargo.toml", "Cargo.lock"} for f in files):
+        return direct, sorted(graph)
+
+    reverse: dict[str, set[str]] = {name: set() for name in graph}
+    for package, deps in graph.items():
+        for dep in deps:
+            reverse.setdefault(dep, set()).add(package)
+
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def push(name: str) -> None:
+        if name not in seen:
+            seen.add(name)
+            ordered.append(name)
+
+    for package in direct:
+        push(package)
+    frontier = list(direct)
+    while frontier:
+        next_frontier: list[str] = []
+        for package in frontier:
+            for dependent in sorted(reverse.get(package, ())):
+                if dependent not in seen:
+                    push(dependent)
+                    next_frontier.append(dependent)
+        frontier = next_frontier
+    return direct, ordered
 
 
 def build_plan(
@@ -343,6 +535,8 @@ def build_plan(
             add("deps", "Manifest/lockfile change needs supply-chain vetting")
         if "parsers" in area_set or "fuzz" in area_set:
             add("fuzz", "Parser/fuzz surface changed; CI only builds fuzz targets")
+        if "sentinel:mutants" in labels_set:
+            add("mutation", "Maintainer requested changed-code mutation testing")
         if "performance" in area_set or "sentinel:deep" in labels_set or "sentinel:perf" in labels_set:
             add("perf", "Performance-sensitive area or maintainer deep request")
         if risk >= 75 or "sentinel:deep" in labels_set:
@@ -360,6 +554,7 @@ def build_plan(
         add("real-apk", "Deep campaign exercises pinned real APKs")
         add("fuzz", "Deep campaign executes fuzz targets; CI only builds them")
         if profile in {"deep", "weekly"}:
+            add("mutation", "Deep/weekly campaign checks whether tests catch injected changed-code bugs")
             add("compare", "Deep campaign compares candidate behavior to base")
         if profile == "weekly":
             add("soak", "Weekly campaign runs bounded native/MCP endurance")
@@ -372,6 +567,7 @@ def build_plan(
         "fuzz": ["core", "fuzz"],
         "deps": ["core", "features", "deps", "dep-trial"],
         "determinism": ["core", "determinism"],
+        "mutants": ["core", "mutation"],
         "soak": ["core", "real-apk", "soak"],
     }
     for component in mapping.get(profile, []):
@@ -488,12 +684,16 @@ def compare_cargo_locks(
                             "kind": "source-or-checksum",
                             "old_source": old_pkg.get("source"),
                             "new_source": new_pkg.get("source"),
+                            "old_checksum": old_pkg.get("checksum"),
+                            "new_checksum": new_pkg.get("checksum"),
                         }
                     )
             continue
         common_old = old_versions[0] if old_versions else None
         common_new = new_versions[0] if new_versions else None
         kind = "added" if not old_versions else "removed" if not new_versions else classify_semver_change(common_old or "", common_new or "")
+        old_pkg = base.get((name, common_old), {}) if common_old else {}
+        new_pkg = head.get((name, common_new), {}) if common_new else {}
         changes.append(
             {
                 "name": name,
@@ -502,14 +702,24 @@ def compare_cargo_locks(
                 "old_versions": old_versions,
                 "new_versions": new_versions,
                 "kind": kind,
-                "new_source": head.get((name, common_new), {}).get("source") if common_new else None,
+                "old_source": old_pkg.get("source"),
+                "new_source": new_pkg.get("source"),
+                "old_checksum": old_pkg.get("checksum"),
+                "new_checksum": new_pkg.get("checksum"),
             }
         )
+    base_duplicates = sum(1 for versions in base_by_name.values() if len(set(versions)) > 1)
+    head_duplicates = sum(1 for versions in head_by_name.values() if len(set(versions)) > 1)
     metrics = {
         "dependency_changes": len(changes),
         "dependency_major_changes": sum(1 for c in changes if c.get("kind") == "major"),
         "dependency_added": sum(1 for c in changes if c.get("kind") == "added"),
         "dependency_removed": sum(1 for c in changes if c.get("kind") == "removed"),
+        "dependency_base_packages": len(base),
+        "dependency_head_packages": len(head),
+        "dependency_duplicate_names_base": base_duplicates,
+        "dependency_duplicate_names_head": head_duplicates,
+        "dependency_duplicate_names_delta": head_duplicates - base_duplicates,
     }
     return changes, metrics
 
@@ -779,6 +989,107 @@ def _rust_test_lines(repo: Path, path: str) -> set[int]:
     return test_lines
 
 
+_PUBLIC_DECL_RE = re.compile(
+    r"^\s*pub(?:\s*\([^)]*\))?\s+"
+    r"(?:default\s+)?(?:async\s+|const\s+|unsafe\s+|extern\s+(?:\"[^\"]*\"\s+)?)*?"
+    r"(fn|struct|enum|trait|type|const|static|mod|union)\s+"
+    r"([A-Za-z_][A-Za-z0-9_]*)\b"
+)
+
+
+def _normalized_public_signature(line: str) -> str:
+    value = re.sub(r"\s+", " ", line.strip())
+    for marker in ("{", ";", "="):
+        if marker in value:
+            value = value.split(marker, 1)[0].rstrip()
+    return value
+
+
+def public_api_inventory_from_sources(
+    sources: Mapping[str, str],
+) -> dict[tuple[str, str, str], set[str]]:
+    """Extract a conservative public-item inventory from Rust sources.
+
+    Keys are (crate, kind, name), deliberately ignoring the exact file so a
+    same-crate move is not misreported as removal. Values are normalized
+    declaration lines; a same-name item whose declaration no longer overlaps
+    the base declaration is reported as a signature change. This is not a
+    replacement for rustdoc-based semver tooling, but it is much less noisy
+    than flagging every removed ``pub`` diff line.
+    """
+
+    inventory: dict[tuple[str, str, str], set[str]] = {}
+    for path, text in sources.items():
+        parts = path.replace("\\", "/").split("/")
+        crate = parts[1] if len(parts) > 2 and parts[0] == "crates" else "workspace"
+        for line in text.splitlines():
+            match = _PUBLIC_DECL_RE.match(line)
+            if not match:
+                continue
+            kind, name = match.group(1), match.group(2)
+            inventory.setdefault((crate, kind, name), set()).add(
+                _normalized_public_signature(line)
+            )
+    return inventory
+
+
+def _public_api_inventory(repo: Path, rev: str | None) -> dict[tuple[str, str, str], set[str]]:
+    sources: dict[str, str] = {}
+    for path in list_files_at_rev(repo, rev):
+        if path.startswith("crates/") and "/src/" in path and path.endswith(".rs"):
+            text = read_at_rev(repo, rev, path)
+            if text is not None:
+                sources[path] = text
+    return public_api_inventory_from_sources(sources)
+
+
+def _public_api_findings(
+    base: Mapping[tuple[str, str, str], set[str]],
+    head: Mapping[tuple[str, str, str], set[str]],
+) -> tuple[list[Finding], dict[str, Any]]:
+    findings: list[Finding] = []
+    removed = sorted(set(base) - set(head))
+    changed: list[tuple[str, str, str]] = []
+    for key in sorted(set(base) & set(head)):
+        if base[key] and head[key] and not (base[key] & head[key]):
+            changed.append(key)
+
+    for crate, kind, name in removed[:50]:
+        findings.append(
+            Finding(
+                id="public-api-removed",
+                severity="P1",
+                area="contracts",
+                title=f"Public {kind} removed: {name}",
+                evidence=f"crate={crate}; base declarations={sorted(base[(crate, kind, name)])[:3]}",
+                path=f"crates/{crate}/src",
+                remediation="Restore the item, keep a compatibility wrapper/re-export, or document the breaking change and migration in an ADR.",
+            )
+        )
+    for crate, kind, name in changed[:50]:
+        findings.append(
+            Finding(
+                id="public-api-signature-changed",
+                severity="P1",
+                area="contracts",
+                title=f"Public {kind} signature changed: {name}",
+                evidence=(
+                    f"crate={crate}; base={sorted(base[(crate, kind, name)])[:2]}; "
+                    f"head={sorted(head[(crate, kind, name)])[:2]}"
+                ),
+                path=f"crates/{crate}/src",
+                remediation="Prove downstream callers still compile/behave the same, or document the breaking API change in an ADR.",
+            )
+        )
+    metrics = {
+        "public_api_base_items": len(base),
+        "public_api_head_items": len(head),
+        "public_api_removed_items": len(removed),
+        "public_api_changed_items": len(changed),
+    }
+    return findings, metrics
+
+
 def _candidate_baseline(repo: Path, head_rev: str | None) -> dict[str, Any] | None:
     text = read_at_rev(repo, head_rev, ".github/rd-sentinel/baseline.json")
     if not text:
@@ -877,6 +1188,278 @@ def _check_inventory_regression(
     return findings
 
 
+_WORKFLOW_USES_RE = re.compile(r"^\s*-?\s*uses:\s*([^#\s]+)")
+_DANGEROUS_RUN_EXPRESSIONS = (
+    "github.event.issue.title",
+    "github.event.issue.body",
+    "github.event.pull_request.title",
+    "github.event.pull_request.body",
+    "github.event.pull_request.head.ref",
+    "github.event.comment.body",
+    "github.event.review.body",
+    "github.event.discussion.title",
+    "github.event.discussion.body",
+    "github.event.head_commit.message",
+    "github.event.head_commit.author",
+    "github.event.commits",
+    "github.event.workflow_run.head_branch",
+    "github.head_ref",
+    "inputs.",
+)
+
+
+def workflow_action_refs(text: str) -> list[tuple[int, str]]:
+    refs: list[tuple[int, str]] = []
+    for idx, line in enumerate(text.splitlines(), 1):
+        match = _WORKFLOW_USES_RE.match(line)
+        if match:
+            refs.append((idx, match.group(1).strip("\"'")))
+    return refs
+
+
+def _action_ref_kind(value: str) -> str:
+    if value.startswith(("./", "../")):
+        return "local"
+    if value.startswith("docker://"):
+        return "pinned" if "@sha256:" in value else "mutable-tag"
+    if "@" not in value:
+        return "unpinned"
+    ref = value.rsplit("@", 1)[-1]
+    if re.fullmatch(r"[0-9a-fA-F]{40}", ref):
+        return "pinned"
+    if re.fullmatch(r"v?\d+(?:\.\d+){0,3}(?:[-+][A-Za-z0-9.-]+)?", ref):
+        return "mutable-tag"
+    return "moving-branch"
+
+
+def workflow_template_injections(text: str) -> list[tuple[int, str]]:
+    """Find user-controlled GitHub expressions interpolated into run scripts."""
+
+    findings: list[tuple[int, str]] = []
+    lines = text.splitlines()
+    run_block_indent: int | None = None
+
+    def inspect(line_no: int, value: str) -> None:
+        for expr in re.findall(r"\$\{\{\s*([^}]+?)\s*\}\}", value):
+            compact = re.sub(r"\s+", "", expr)
+            if any(marker.replace(" ", "") in compact for marker in _DANGEROUS_RUN_EXPRESSIONS):
+                findings.append((line_no, expr.strip()))
+
+    for idx, line in enumerate(lines, 1):
+        indent = len(line) - len(line.lstrip(" "))
+        if run_block_indent is not None:
+            if line.strip() and indent <= run_block_indent:
+                run_block_indent = None
+            else:
+                inspect(idx, line)
+                continue
+        match = re.match(r"^(\s*)-?\s*run:\s*(.*)$", line)
+        if not match:
+            continue
+        inline = match.group(2).strip()
+        if inline in {"|", ">", "|-", ">-", "|+", ">+"}:
+            run_block_indent = len(match.group(1))
+        elif inline:
+            inspect(idx, inline)
+    return findings
+
+
+def _workflow_trigger_names(text: str) -> set[str]:
+    """Extract names from the top-level ``on:`` block only.
+
+    Looking for trigger substrings anywhere makes comments and trusted
+    publisher references look like dangerous triggers. This small indentation
+    parser deliberately handles the common scalar, flow-list, block-list, and
+    mapping forms used by GitHub workflows.
+    """
+
+    triggers: set[str] = set()
+    in_on_block = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if indent == 0:
+            match = re.match(r"^['\"]?on['\"]?\s*:\s*(.*)$", stripped)
+            in_on_block = match is not None
+            if not match:
+                continue
+            inline = match.group(1).strip().strip("[]")
+            if inline:
+                for item in inline.split(","):
+                    name = item.strip().strip("\"'")
+                    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+                        triggers.add(name)
+            continue
+        if not in_on_block or indent > 4:
+            continue
+        key_match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:", stripped)
+        if key_match:
+            triggers.add(key_match.group(1))
+            continue
+        list_match = re.match(r"^-\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?\s*$", stripped)
+        if list_match:
+            triggers.add(list_match.group(1))
+    return triggers
+
+
+def _workflow_findings(
+    repo: Path, files: Sequence[ChangedFile], head_rev: str | None
+) -> tuple[list[Finding], dict[str, Any]]:
+    findings: list[Finding] = []
+    metrics: dict[str, Any] = {
+        "workflow_files_changed": 0,
+        "workflow_action_refs": 0,
+        "workflow_unpinned_action_refs": 0,
+        "workflow_template_injections": 0,
+    }
+    trusted_write_workflows = {
+        ".github/workflows/rd-sentinel-command.yml",
+        ".github/workflows/rd-sentinel-publish.yml",
+    }
+    sentinel_workflows = trusted_write_workflows | {
+        ".github/workflows/rd-sentinel.yml",
+        ".github/workflows/rd-sentinel-deep.yml",
+    }
+
+    for item in files:
+        path = item.path
+        if item.status.startswith("D") or not path.startswith(".github/workflows/"):
+            continue
+        if not path.endswith((".yml", ".yaml")):
+            continue
+        text = read_at_rev(repo, head_rev, path)
+        if text is None:
+            continue
+        metrics["workflow_files_changed"] += 1
+        lines = text.splitlines()
+        has_permissions = any(re.match(r"^\s*permissions\s*:", line) for line in lines)
+        has_write = bool(
+            re.search(r"(?m)^\s*[a-z][a-z-]*\s*:\s*write\s*$", text)
+            or re.search(r"(?m)^\s*permissions\s*:\s*write-all\s*$", text)
+        )
+        dangerous_trigger = next(
+            (
+                trigger
+                for trigger in ("pull_request_target", "workflow_run", "issue_comment")
+                if trigger in _workflow_trigger_names(text)
+            ),
+            None,
+        )
+        if not has_permissions:
+            findings.append(
+                Finding(
+                    id="workflow-permissions-missing",
+                    severity="P1" if dangerous_trigger or has_write else "P2",
+                    area="ci-security",
+                    title="Workflow does not declare explicit token permissions",
+                    evidence=path,
+                    path=path,
+                    remediation="Declare least-privilege permissions at the top level or per job; do not inherit repository defaults.",
+                )
+            )
+
+        refs = workflow_action_refs(text)
+        metrics["workflow_action_refs"] += len(refs)
+        unpinned: list[str] = []
+        moving: list[str] = []
+        for _line_no, ref in refs:
+            kind = _action_ref_kind(ref)
+            if kind == "moving-branch":
+                moving.append(ref)
+                unpinned.append(ref)
+            elif kind in {"mutable-tag", "unpinned"}:
+                unpinned.append(ref)
+        if unpinned:
+            metrics["workflow_unpinned_action_refs"] += len(unpinned)
+            third_party_unpinned = [
+                ref
+                for ref in unpinned
+                if not ref.startswith(("actions/", "github/"))
+            ]
+            severity = (
+                "P1"
+                if moving or third_party_unpinned or path in sentinel_workflows or has_write or dangerous_trigger
+                else "P2"
+            )
+            findings.append(
+                Finding(
+                    id="workflow-action-not-sha-pinned",
+                    severity=severity,
+                    area="ci-security",
+                    title="GitHub Action is not pinned to a full commit SHA",
+                    evidence=", ".join(sorted(set(unpinned))[:12]),
+                    path=path,
+                    remediation="Pin each action to the reviewed release commit SHA with a version comment, or adopt a verified workflow lockfile; tags and branches can move.",
+                )
+            )
+
+        injections = workflow_template_injections(text)
+        metrics["workflow_template_injections"] += len(injections)
+        for line_no, expr in injections[:20]:
+            findings.append(
+                Finding(
+                    id="workflow-template-injection",
+                    severity="P1",
+                    area="ci-security",
+                    title="Untrusted GitHub expression interpolated into a shell script",
+                    evidence=f"${{{{ {expr} }}}}",
+                    path=path,
+                    line=line_no,
+                    remediation="Bind the expression to an environment variable first and reference the shell variable; never template user-controlled text into run:.",
+                )
+            )
+
+        checkout_refs = [ref for _n, ref in refs if ref.startswith("actions/checkout@")]
+        persist_false = len(re.findall(r"persist-credentials\s*:\s*false", text))
+        if checkout_refs and persist_false < len(checkout_refs):
+            findings.append(
+                Finding(
+                    id="workflow-checkout-persists-credentials",
+                    severity="P1" if dangerous_trigger or has_write else "P2",
+                    area="ci-security",
+                    title="Checkout may persist the GitHub token in the worktree",
+                    evidence=f"checkouts={len(checkout_refs)}, persist-credentials:false={persist_false}",
+                    path=path,
+                    remediation="Set persist-credentials: false on checkouts that do not push; persisted tokens can be stolen by later build code.",
+                )
+            )
+
+        candidate_checkout = bool(
+            re.search(
+                r"ref\s*:\s*[^\n]*(?:pull_request\.head|workflow_run\.head_sha|github\.head_ref)",
+                text,
+            )
+        )
+        if dangerous_trigger and candidate_checkout:
+            findings.append(
+                Finding(
+                    id="workflow-dangerous-trigger-candidate-checkout",
+                    severity="P0",
+                    area="ci-security",
+                    title=f"Dangerous trigger {dangerous_trigger} checks out candidate code",
+                    evidence=path,
+                    path=path,
+                    remediation="Never execute or build untrusted head code in a base-repository privileged trigger; split read-only analysis from the trusted publisher.",
+                )
+            )
+
+        if "actions/cache@" in text and (has_write or dangerous_trigger):
+            findings.append(
+                Finding(
+                    id="workflow-cache-in-privileged-job",
+                    severity="P2",
+                    area="ci-security",
+                    title="Cache used in a privileged workflow",
+                    evidence=path,
+                    path=path,
+                    remediation="Review cache scope/keys for poisoning risk; avoid restoring untrusted caches in publish/write jobs.",
+                )
+            )
+    return findings, metrics
+
+
 def _diff_rule_findings(
     repo: Path,
     files: Sequence[ChangedFile],
@@ -894,25 +1477,20 @@ def _diff_rule_findings(
     )
     has_compat = any(match_any(p, diff_cfg.get("compat_evidence_globs", [])) for p in changed_paths)
 
-    secret_res = (
-        re.compile(r"ghp_[A-Za-z0-9_]{20,}"),
-        re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),
-        re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
-        re.compile(r"AKIA[0-9A-Z]{16}"),
-    )
     rust_test_line_cache: dict[str, set[int]] = {}
 
     for line in lines:
         text = line.text
         path = line.path
-        if line.kind == "added" and any(p.search(text) for p in secret_res):
+        secret_kind = detect_secret_kind(text) if line.kind == "added" else None
+        if secret_kind:
             findings.append(
                 Finding(
                     id="possible-secret-added",
                     severity="P0",
                     area="ci-security",
                     title="Possible credential added",
-                    evidence="A token/private-key shaped string was added (value intentionally not reproduced).",
+                    evidence=f"A {secret_kind} shaped string was added (value intentionally not reproduced).",
                     path=path,
                     line=line.line,
                     remediation="Remove and rotate the credential; load secrets from the CI secret store.",
@@ -921,18 +1499,8 @@ def _diff_rule_findings(
             triggers.add("secret")
 
         if line.kind == "removed" and re.search(r"^\s*pub\s+(?:async\s+)?(?:fn|struct|enum|trait|type|const|static)\b", text):
-            findings.append(
-                Finding(
-                    id="public-api-removed",
-                    severity="P1",
-                    area="contracts",
-                    title="Public API surface was removed",
-                    evidence=text.strip()[:300],
-                    path=path,
-                    line=line.line,
-                    remediation="Keep a compatibility path or document the breaking change and migration in an ADR.",
-                )
-            )
+            # The set-based public-API inventory in build_static_report emits
+            # the actual finding, so a same-crate move is not a false P1.
             triggers.add("public-api")
             continue
         if line.kind != "added":
@@ -1134,20 +1702,6 @@ def _diff_rule_findings(
                         remediation="Keep candidate-executing workflows read-only and isolate writes in trusted default-branch workflows; trusted workflow changes still require protected-path approval.",
                     )
                 )
-            uses = re.search(r"uses:\s*([^\s#]+)", text)
-            if uses and ("@main" in uses.group(1) or "@master" in uses.group(1) or "@HEAD" in uses.group(1)):
-                findings.append(
-                    Finding(
-                        id="workflow-action-moving-ref",
-                        severity="P1",
-                        area="ci-security",
-                        title="GitHub Action pinned to a moving branch",
-                        evidence=text.strip()[:300],
-                        path=path,
-                        line=line.line,
-                        remediation="Pin actions to a released version or full commit SHA and let Dependabot update them.",
-                    )
-                )
             if re.search(r"curl[^\n|]*\|\s*(?:sh|bash)|wget[^\n|]*\|\s*(?:sh|bash)", text):
                 findings.append(
                     Finding(
@@ -1251,7 +1805,7 @@ def build_static_report(
 ) -> dict[str, Any]:
     repo = repo.resolve()
     base_sha = resolve_rev(repo, base_ref)
-    findings: list[Finding] = []
+    findings: list[Finding] = validate_policy(policy)
     if base_sha is None:
         base_sha = resolve_rev(repo, "HEAD")
         findings.append(
@@ -1278,7 +1832,17 @@ def build_static_report(
     areas = areas_for_files(files)
     added_lines = sum(f.added or 0 for f in files)
     deleted_lines = sum(f.deleted or 0 for f in files)
-    risk = risk_score(files, areas, added_lines, deleted_lines)
+    direct_packages, affected = affected_packages(
+        repo, "WORKTREE" if head_is_worktree else head_sha, files
+    )
+    downstream_packages = [p for p in affected if p not in direct_packages]
+    risk, risk_factors = risk_assessment(
+        files,
+        areas,
+        added_lines,
+        deleted_lines,
+        downstream_packages=len(downstream_packages),
+    )
     dependency_bot = _is_dependabot(context, files)
     plan = build_plan(
         profile=context.profile,
@@ -1300,6 +1864,7 @@ def build_static_report(
         if candidate_baseline is not None:
             effective_baseline = candidate_baseline
             baseline_approval_applied = True
+    findings.extend(validate_baseline(effective_baseline))
     findings.extend(_check_baseline_inventory(head_inventory, effective_baseline))
     findings.extend(
         _check_inventory_regression(
@@ -1309,6 +1874,21 @@ def build_static_report(
 
     diff_findings, triggers = _diff_rule_findings(repo, files, diff_lines, policy)
     findings.extend(diff_findings)
+
+    workflow_findings, workflow_metrics = _workflow_findings(
+        repo, files, "WORKTREE" if head_is_worktree else head_sha
+    )
+    findings.extend(workflow_findings)
+
+    public_api_metrics: dict[str, Any] = {}
+    if any(f.path.startswith("crates/") and f.path.endswith(".rs") for f in files):
+        public_findings, public_api_metrics = _public_api_findings(
+            _public_api_inventory(repo, base_sha),
+            _public_api_inventory(repo, "WORKTREE" if head_is_worktree else head_sha),
+        )
+        findings.extend(public_findings)
+        if public_findings:
+            triggers.add("public-api")
 
     protected = policy.get("protected_paths", [])
     policy_label = str(approvals.get("policy_label", "sentinel:policy-approved"))
@@ -1410,23 +1990,52 @@ def build_static_report(
                 continue
             try:
                 deep_patterns.append(re.compile(pattern))
-            except re.error as exc:
-                findings.append(
-                    Finding(
-                        id="invalid-deep-dependency-pattern",
-                        severity="P0",
-                        area="policy",
-                        title="Deep dependency policy pattern is invalid",
-                        evidence=f"{pattern}: {exc}",
-                        remediation="Fix the trusted policy regex in a separately approved policy change.",
-                    )
-                )
+            except re.error:
+                # validate_policy already emitted the P0 for this trusted regex.
+                continue
 
         def add_deep_plan(component: str, reason: str) -> None:
             if context.profile in {"plan", "static"}:
                 return
             if not any(item.get("component") == component for item in plan):
                 plan.append({"component": component, "reason": reason, "required": True})
+
+        duplicate_delta = dependency_metrics.get("dependency_duplicate_names_delta")
+        if isinstance(duplicate_delta, int) and duplicate_delta > 0:
+            findings.append(
+                Finding(
+                    id="dependency-duplicate-versions-increased",
+                    severity="P2",
+                    area="dependencies-build",
+                    title="Duplicate dependency versions increased",
+                    evidence=(
+                        f"base duplicate names={dependency_metrics.get('dependency_duplicate_names_base')}, "
+                        f"head duplicate names={dependency_metrics.get('dependency_duplicate_names_head')}"
+                    ),
+                    path="Cargo.lock",
+                    remediation="Prefer updating the direct consumers to one compatible version; duplicate versions increase binary size, audit surface, and type-identity surprises.",
+                )
+            )
+            add_deep_plan("compare", "Duplicate dependency versions increased")
+
+        mass_threshold = _safe_policy_int(
+            dependencies_cfg.get("mass_update_change_threshold"), 20
+        )
+        if len(dependency_changes) >= mass_threshold:
+            findings.append(
+                Finding(
+                    id="dependency-mass-update",
+                    severity="P2",
+                    area="dependencies-build",
+                    title="Mass dependency update needs differential evidence",
+                    evidence=f"{len(dependency_changes)} resolved package changes >= threshold {mass_threshold}",
+                    path="Cargo.lock",
+                    remediation="Run feature, determinism, and A/B campaigns; split unrelated major updates so a regression can be bisected to one crate.",
+                )
+            )
+            add_deep_plan("features", "Mass dependency update")
+            add_deep_plan("determinism", "Mass dependency update")
+            add_deep_plan("compare", "Mass dependency update")
 
         for change in dependency_changes:
             name = str(change.get("name"))
@@ -1461,6 +2070,9 @@ def build_static_report(
                         remediation="Run the deep campaign, read the upstream changelog/MSRV notes, and apply the dependency-major approval label.",
                     )
                 )
+            if change.get("kind") == "major":
+                add_deep_plan("features", f"Major dependency changed: {name}")
+                add_deep_plan("compare", f"Major dependency changed: {name}")
             if change.get("kind") == "unknown":
                 findings.append(
                     Finding(
@@ -1530,7 +2142,7 @@ def build_static_report(
             )
 
     diff_cfg = policy.get("diff", {}) if isinstance(policy.get("diff"), Mapping) else {}
-    if len(files) > int(diff_cfg.get("very_large_diff_files", 120)) or (added_lines + deleted_lines) > int(diff_cfg.get("very_large_diff_lines", 12000)):
+    if len(files) > _safe_policy_int(diff_cfg.get("very_large_diff_files"), 120) or (added_lines + deleted_lines) > _safe_policy_int(diff_cfg.get("very_large_diff_lines"), 12000):
         findings.append(
             Finding(
                 id="very-large-diff",
@@ -1585,7 +2197,10 @@ def build_static_report(
         "added_lines": added_lines,
         "deleted_lines": deleted_lines,
         "risk_score": risk,
-        "targeted_packages": targeted_packages(files),
+        "targeted_packages": affected,
+        "direct_packages": direct_packages,
+        "downstream_packages": downstream_packages,
+        "affected_package_count": len(affected),
         "dependency_bot": dependency_bot,
         "baseline_approval_applied": baseline_approval_applied,
         "triggers": sorted(triggers),
@@ -1595,6 +2210,8 @@ def build_static_report(
         metrics[key] = value
         metrics[f"base_{key}"] = base_inventory.get(key)
     metrics.update(dependency_metrics)
+    metrics.update(public_api_metrics)
+    metrics.update(workflow_metrics)
     metrics.update(corpus_metrics)
 
     checks = [
@@ -1626,6 +2243,7 @@ def build_static_report(
         "run_url": context.run_url,
         "areas": areas,
         "risk_score": risk,
+        "risk_factors": risk_factors,
         "changed_files": [
             {
                 "status": f.status,

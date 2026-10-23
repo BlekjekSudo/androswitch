@@ -1,9 +1,10 @@
 # ADR 010 — RD Sentinel: Dependabot-like anti-regression bot beyond CI
 
 - **Status:** Accepted for implementation (repo-owner request, 2026-10-22)
-- **Scope:** `.github/dependabot.yml`, `.github/rd-sentinel/`,
-  `.github/workflows/rd-sentinel*.yml`, `tools/rd-sentinel/`, and the operator
-  guide in `docs/rd-sentinel.md`
+- **Scope:** `.github/dependabot.yml`, `.github/CODEOWNERS`, `deny.toml`,
+  `.github/rd-sentinel/`, `.github/workflows/rd-sentinel*.yml`,
+  `tools/rd-sentinel/`, and the operator guide in `docs/rd-sentinel.md`
+- **Current implementation:** RD Sentinel 1.1.0 (v1.1 amendment, 2026-10-22)
 - **Identity (unchanged):** Rust-native Android runtime; no VM, KVM, or guest
   kernel; MSRV 1.76; minSdk 26; deterministic MCP/runtime behavior; no new
   `unsafe` outside `rd-jni`/`rd-ndk`.
@@ -45,9 +46,9 @@ parts:
 1. **Dependabot proposes dependency and GitHub-Actions updates.** Sentinel
    does not reimplement update generation or auto-merge. It gives those PRs a
    stricter, RustyDroid-specific trial.
-2. **A read-only analyzer** (`tools/rd-sentinel/`) computes diff risk,
-   enforces versioned invariants, runs risk-selected campaigns, and emits a
-   fingerprinted JSON report plus a Markdown rendering.
+2. **A read-only analyzer** (`tools/rd-sentinel/`) computes explainable diff
+   risk, enforces versioned invariants, runs risk-selected campaigns, and
+   emits a fingerprinted JSON report plus Markdown and SARIF renderings.
 3. **Scheduled deep campaigns** run work that is too long or broad for normal
    PR CI: differential A/B probes, actual fuzz execution, repeated
    determinism checks, real-APK soak/endurance, future-toolchain trials,
@@ -81,6 +82,12 @@ endurance client instead of being forced through another app's UI script.
   green report if protected paths changed without approval.
 - Reports are schema-validated and content-fingerprinted. Command output is
   size-capped and redacted before it can appear in a report.
+- The trusted policy and baseline are themselves schema/range-validated before
+  use, so a typo cannot silently unblock P0/P1 findings or drop protection
+  from Sentinel's own workflow/code.
+- Sentinel workflows pin third-party actions to reviewed full commit SHAs and
+  are statically checked for template injection, credential persistence,
+  missing permissions, and candidate execution under privileged triggers.
 - Maintainer chat commands are accepted only from OWNER, MEMBER, or
   COLLABORATOR associations. Commands can rerun campaigns; they cannot approve
   policy, edit a baseline, merge, or push code.
@@ -108,7 +115,12 @@ Sentinel is **fail-closed**:
   proven otherwise.
 - Performance is compared both to absolute budgets and to the base revision.
   A result that is merely “still under budget” can still block if the A/B
-  delta exceeds the configured ratio and absolute-noise floor.
+  delta exceeds the configured ratio and a noise floor derived from sample
+  count and median absolute deviation. Noise handling never relaxes the
+  absolute <26 ms snapshot budget.
+- Targeted test selection follows downstream workspace dependents, and public
+  API evidence compares per-crate declaration inventories rather than every
+  removed `pub` line in isolation.
 - Determinism is evidence, not a hope: repeated tests must not alternate,
   repeated `inspect`/screenshot output must hash identically, and base and
   candidate cold-start frames for the launchable corpus must match unless an
@@ -121,7 +133,8 @@ Sentinel is **fail-closed**:
 | PR risk audit | pull request, merge queue, maintainer rerun | trusted-base policy, diff/evidence audit, targeted tests, feature submatrix, flaky repeats, dependency diff, optional A/B perf |
 | Nightly deep | daily on `main` | all-features workspace tests, broad feature powerset, repeated determinism, deps/audit/licenses, beta + MSRV, bounded real fuzz, cold/perf trends |
 | Weekly campaign | weekly on `main` | longer fuzz, native-language MCP soak, real-APK endurance, repeated golden run, base/candidate efficiency benchmarks, dependency-update trial |
-| Manual deep | dispatch or `/rd-sentinel` command | maintainer-selected profile and fuzz duration for a PR or `main` |
+| Manual deep | dispatch or `/rd-sentinel` command | maintainer-selected profile, fuzz duration, and changed-code mutation budget for a PR or `main` |
+| Mutation trial | `sentinel:mutants`, deep PR, weekly | `cargo mutants --in-diff` asks whether tests catch faults injected into changed production Rust |
 
 GitHub-hosted jobs still have a six-hour ceiling, so a literal 24-hour fuzz
 campaign remains a self-hosted/manual campaign. Sentinel reports the executed
@@ -130,7 +143,9 @@ duration and never describes a shorter hosted run as 24 hours.
 ## 6. Dependency-update behavior
 
 Dependabot opens grouped minor/patch Cargo updates, separate major updates,
-fuzz-workspace updates, and GitHub-Actions updates. Sentinel then:
+fuzz-workspace updates, and GitHub-Actions updates. Version updates use
+explicit release-age cooldowns, while security updates remain immediate.
+Sentinel then:
 
 - parses the exact `Cargo.lock` delta and classifies semver movement;
 - blocks source changes inside a bot dependency PR;
@@ -138,6 +153,10 @@ fuzz-workspace updates, and GitHub-Actions updates. Sentinel then:
 - checks every resolved package's declared Rust version against MSRV 1.76;
 - forces deep feature/test campaigns for native, JIT, parser, crypto,
   compression, rendering, and build-script dependencies;
+- computes direct and reachable workspace consumers for changed crates and
+  calls out build/proc-macro/native-link blast radius;
+- runs `cargo-deny` beside `cargo audit`, optionally queries OSV, and emits a
+  deterministic CycloneDX SBOM for the resolved graph;
 - requires maintainer approval for major-version movement; and
 - never enables auto-merge.
 
@@ -171,3 +190,29 @@ policy changes, or auto-merge.
    a product regression.
 5. Add a self-hosted runner only if the project wants unattended 24-hour
    fuzzing; keep its token read-only for analysis.
+
+## 9. v1.1 amendment — research-driven hardening
+
+The 1.1 release incorporates current Dependabot cooldown guidance, GitHub
+Actions hardening guidance, Renovate-style visibility/blast-radius thinking,
+cargo-deny/OSV supply-chain checks, SARIF reporting, named flaky-test
+extraction, downstream workspace test selection, and diff-scoped mutation
+testing. It does not change the fundamental trust split or enable auto-merge.
+
+Three rollout choices are deliberate:
+
+1. **Mutation survivors are blocking in an explicit mutants/deep campaign and
+   advisory in a trend context.** A repository-wide zero-survivor mandate
+   should follow measured baseline evidence, not be imposed retroactively on
+   unchanged code.
+2. **Full-SHA action pins are adopted before a workflow lockfile.** GitHub's
+   `actions.lock` support was still a preview-style adoption path at research
+   time; hand-writing a fake lockfile would be worse than reviewed SHAs.
+3. **CODEOWNERS routes review but is not yet a required approval source.**
+   Requiring code-owner review while the owner is the sole author would create
+   an unmergeable repository. Revisit when a second maintainer/team exists.
+
+Cargo-vet, a blocking OpenSSF Scorecard gate, and rustdoc-based semver
+checking remain future candidates. They should be adopted only with real
+audit corpora, measured false-positive rates, and a clear owner — not as
+decorative checks.

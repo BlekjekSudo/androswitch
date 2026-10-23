@@ -31,6 +31,7 @@ class Command:
     action: str
     profile: str = "auto"
     fuzz_seconds: int | None = None
+    mutation_minutes: int | None = None
     raw: str = ""
 
 
@@ -44,7 +45,7 @@ def parse_command(comment: str) -> Command | None:
             return Command("help", raw=line)
         action = parts[1].lower()
         if action == "rerun":
-            profile = parts[2] if len(parts) > 2 and parts[2] in {"auto", "deep", "nightly", "weekly", "perf", "fuzz", "deps", "determinism", "soak"} else "auto"
+            profile = parts[2] if len(parts) > 2 and parts[2] in {"auto", "deep", "nightly", "weekly", "perf", "fuzz", "deps", "determinism", "mutants", "soak"} else "auto"
             return Command("rerun", profile=profile, raw=line)
         if action == "deep":
             return Command("rerun", profile="deep", raw=line)
@@ -60,6 +61,21 @@ def parse_command(comment: str) -> Command | None:
             if seconds < 0 or seconds > 86400:
                 return Command("invalid", raw=line)
             return Command("rerun", profile="fuzz", fuzz_seconds=seconds, raw=line)
+        if action == "mutants":
+            minutes = 45
+            if len(parts) > 2:
+                try:
+                    minutes = int(parts[2])
+                except ValueError:
+                    return Command("invalid", raw=line)
+            if minutes < 1 or minutes > 240:
+                return Command("invalid", raw=line)
+            return Command(
+                "rerun",
+                profile="mutants",
+                mutation_minutes=minutes,
+                raw=line,
+            )
         if action == "baseline" and len(parts) > 2 and parts[2] == "propose":
             return Command("baseline-propose", profile="nightly", raw=line)
         if action == "status":
@@ -92,6 +108,7 @@ Maintainers (OWNER/MEMBER/COLLABORATOR) may use:
 - `/rd-sentinel fuzz 900` — run fuzz targets for 900s per target
 - `/rd-sentinel deps` — run the dependency-vetting campaign
 - `/rd-sentinel determinism` — repeat tests and byte-stability probes
+- `/rd-sentinel mutants 45` — run changed-code mutation testing for up to 45 minutes
 - `/rd-sentinel baseline propose` — produce fresh baseline evidence for a human-reviewed PR
 - `/rd-sentinel status` — link the latest trusted Sentinel report on this issue/PR
 
@@ -127,7 +144,7 @@ class GitHubClient:
                 "Authorization": f"Bearer {self.token}",
                 "Content-Type": "application/json",
                 "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "rd-sentinel/1.0",
+                "User-Agent": "rd-sentinel/1.1",
             },
         )
         try:
@@ -271,6 +288,23 @@ def _labels_for_report(report: Mapping[str, Any], policy: Mapping[str, Any], *, 
     metrics = report.get("metrics", {}) if isinstance(report.get("metrics"), Mapping) else {}
     if any(f.get("area") == "dependencies-build" for f in findings) or metrics.get("dependency_changes"):
         labels.append(name("dependency_risk", "sentinel:dependency-risk"))
+    test_gap_ids = {
+        "flaky-repeated-command",
+        "mutation-survivor",
+        "mutation-timeout",
+        "test-inventory-below-baseline",
+        "static-test-attributes-shrank",
+        "golden-vector-count-shrank",
+        "fuzz-target-count-shrank",
+        "high-risk-change-without-test-evidence",
+        "test-ignored",
+    }
+    if (
+        any(f.get("id") in test_gap_ids for f in findings)
+        or metrics.get("flaky_tests")
+        or (isinstance(metrics.get("mutation_missed"), (int, float)) and metrics["mutation_missed"] > 0)
+    ):
+        labels.append(name("test_gap", "sentinel:test-gap"))
     if verdict == "incomplete":
         labels.append(name("deep_required", "sentinel:deep-required"))
     return list(dict.fromkeys(labels))
@@ -298,7 +332,7 @@ def _remove_stale_result_labels(
     policy: Mapping[str, Any],
     desired: Sequence[str],
 ) -> None:
-    known: set[str] = {"sentinel:risk-high", "sentinel:risk-critical"}
+    known: set[str] = {"sentinel:risk-high", "sentinel:risk-critical", "sentinel:test-gap"}
     labels_cfg = policy.get("labels", {}) if isinstance(policy.get("labels"), Mapping) else {}
     for cfg in labels_cfg.values():
         if isinstance(cfg, Mapping) and cfg.get("name"):
@@ -563,6 +597,7 @@ def execute_comment_command(
             "campaign": f"command-{command.profile}",
             "pr_number": str(issue_number),
             "Fuzz_SECONDS": str(command.fuzz_seconds if command.fuzz_seconds is not None else ""),
+            "mutation_minutes": str(command.mutation_minutes if command.mutation_minutes is not None else ""),
             "baseline_proposal": "true" if command.action == "baseline-propose" else "false",
         }
     else:
@@ -570,6 +605,7 @@ def execute_comment_command(
             "profile": "nightly" if command.profile == "auto" else command.profile,
             "campaign": "manual",
             "Fuzz_SECONDS": str(command.fuzz_seconds if command.fuzz_seconds is not None else ""),
+            "mutation_minutes": str(command.mutation_minutes if command.mutation_minutes is not None else ""),
             "baseline_proposal": "true" if command.action == "baseline-propose" else "false",
         }
     dispatch = client.dispatch_workflow(workflow, default_branch, inputs)
@@ -578,6 +614,8 @@ def execute_comment_command(
         + (f" with fuzz duration {command.fuzz_seconds}s/target." if command.fuzz_seconds is not None else ".")
         + " The trusted publisher will update the fingerprinted report when it completes."
     )
+    if command.mutation_minutes is not None:
+        message += f"\n\nChanged-code mutation budget: {command.mutation_minutes} minutes."
     if command.action == "baseline-propose":
         message += "\n\nThis produces evidence only; a human must open a separately reviewed baseline PR."
     comment = client.comment(issue_number, message)

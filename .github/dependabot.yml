@@ -1,6 +1,10 @@
 # Dependabot proposes updates; RD Sentinel gives every proposal a strict,
 # RustyDroid-specific anti-regression trial.  Auto-merge is intentionally not
 # configured here or in the Sentinel publisher.
+#
+# Cooldowns are explicit even though GitHub now has a default: a version must
+# exist long enough for obvious compromised/broken releases to be noticed.
+# Dependabot security updates are not delayed by version-update cooldowns.
 version: 2
 
 updates:
@@ -11,6 +15,11 @@ updates:
       day: monday
       time: "06:00"
       timezone: America/Sao_Paulo
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
     open-pull-requests-limit: 10
     target-branch: main
     labels:
@@ -33,6 +42,11 @@ updates:
       interval: monthly
       time: "06:30"
       timezone: America/Sao_Paulo
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
     open-pull-requests-limit: 3
     target-branch: main
     labels:
@@ -49,6 +63,11 @@ updates:
       interval: monthly
       time: "06:45"
       timezone: America/Sao_Paulo
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
     open-pull-requests-limit: 3
     target-branch: main
     labels:
@@ -66,6 +85,8 @@ updates:
       day: monday
       time: "07:00"
       timezone: America/Sao_Paulo
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     target-branch: main
     labels:

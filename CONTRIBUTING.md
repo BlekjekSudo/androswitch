@@ -51,10 +51,12 @@ Big changes (new engine, IPC model, GC strategy…) require an **ADR**
 - Maintainers aim to review PRs within **48–72h**
 - CI must be green (docs integrity, lint, tests, feature/native/golden gates)
 - **RD Sentinel must not be blocked.** It is the strict anti-regression layer
-  beyond CI: diff-risk/evidence audit, differential A/B checks, repeated
-  determinism probes, bounded real fuzz execution, real-APK perf trends, and
-  dependency vetting (see [`docs/rd-sentinel.md`](./docs/rd-sentinel.md)).
-  A skipped required campaign is incomplete evidence, not a pass.
+  beyond CI: explainable diff-risk/evidence audit, downstream-package tests,
+  differential A/B checks, repeated determinism probes, bounded real fuzz
+  execution, changed-code mutation trials when requested, real-APK perf
+  trends, and dependency vetting (see
+  [`docs/rd-sentinel.md`](./docs/rd-sentinel.md)). A skipped required campaign
+  is incomplete evidence, not a pass.
 - Do not weaken `.github/rd-sentinel/policy.json` or a performance/test
   baseline in the same PR that introduces the regression. Baseline and bot
   policy changes need before/after artifacts and maintainer approval labels.
