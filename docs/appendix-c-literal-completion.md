@@ -76,6 +76,31 @@ that exact prefix:
   descriptors, Serializable/SparseArray forms, exact AOSP Bundle wire
   magic and every framework Parcelable layout remain blockers.
 
+## Round 3 — Named, persistent SharedPreferences
+
+- `Context.getSharedPreferences(name, mode)` no longer collapses every
+  name into one global object/map. Each name has a canonical
+  `SharedPreferencesImpl` object and an isolated typed store in this Engine.
+- Stores load lazily from and persist to
+  `/data/user/0/<package>/shared_prefs/<name>.xml` in the app-private VFS.
+  The XML uses Android's `<map>`, `<string>`, `<int>`, `<long>`, `<float>`,
+  `<boolean>` and `<set>` forms.
+- `PreferenceManager.getDefaultSharedPreferences` resolves the
+  `<package>_preferences` store; `Activity.getPreferences(mode)` resolves
+  the activity-local store name.
+- Editor string/string-set/int/long/float/boolean puts, remove and clear,
+  listeners, `contains`, and boxed `getAll` values preserve their guest
+  types. Typed getters now raise `ClassCastException` for a wrong stored
+  type, as AOSP does.
+- Proof: `shared_preferences_named_stores_persist_across_engine_launches`
+  writes two isolated named stores in one Engine, reads all supported value
+  types in a second Engine, removes/clears keys, and observes those changes
+  in a third Engine.
+- Status after Round 3: `android.content` and `android.preference` remain
+  **partial**. Preference screens/default-value inflation, ContentProvider
+  IPC, multi-process external-change reload, backup/restore semantics and
+  complete Context services remain blockers.
+
 ## Remaining literal blockers by partial surface
 
 | Domain | Surface | Main literal blockers |
@@ -109,10 +134,10 @@ that exact prefix:
 
 ## Sequence
 
-1. **Storage/IPC foundations:** SQLite durability (Round 1), then
-   Parcel/Parcelable bytes, local Binder transactions and SharedPreferences
-   file durability. These unblock `android.os`, `android.content` and
-   provider work.
+1. **Storage/IPC foundations:** SQLite durability (Round 1),
+   Parcel/Parcelable bytes and local Binder transactions (Round 2), and
+   SharedPreferences file durability (Round 3). These unblock `android.os`,
+   `android.content` and provider work.
 2. **Value surfaces:** `android.util`, `android.text` primitives and ICU data
    boundaries, because UI and providers depend on exact value semantics.
 3. **App/content:** PackageManager/resources first, then provider transport

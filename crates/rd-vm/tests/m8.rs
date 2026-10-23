@@ -1013,6 +1013,330 @@ fn m8_shared_preferences_change_listener_notifies_only_changed_keys() {
     );
 }
 
+fn named_prefs(e: &mut Engine, name: &str) -> u32 {
+    let context = obj(e, "Landroid/app/Activity;");
+    let name = s(e, name);
+    match rd_vm::framework::call_host_instance(
+        e,
+        "Landroid/content/Context;",
+        "getSharedPreferences",
+        "(Ljava/lang/String;I)Landroid/content/SharedPreferences;",
+        context,
+        &[name, Value::Int(0)],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(prefs)) => prefs,
+        other => panic!("getSharedPreferences: {other:?}"),
+    }
+}
+
+fn prefs_editor(e: &mut Engine, prefs: u32) -> u32 {
+    match rd_vm::framework::call_host_instance(
+        e,
+        "Landroid/content/SharedPreferences;",
+        "edit",
+        "()Landroid/content/SharedPreferences$Editor;",
+        prefs,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(editor)) => editor,
+        other => panic!("edit: {other:?}"),
+    }
+}
+
+fn prefs_put(e: &mut Engine, editor: u32, method: &str, sig: &str, key: &str, value: Value) {
+    let key = s(e, key);
+    rd_vm::framework::call_host_instance(
+        e,
+        "Landroid/content/SharedPreferences$Editor;",
+        method,
+        sig,
+        editor,
+        &[key, value],
+    )
+    .unwrap();
+}
+
+fn prefs_commit(e: &mut Engine, editor: u32) {
+    assert_eq!(
+        rd_vm::framework::call_host_instance(
+            e,
+            "Landroid/content/SharedPreferences$Editor;",
+            "commit",
+            "()Z",
+            editor,
+            &[],
+        )
+        .unwrap(),
+        Some(Value::Int(1))
+    );
+}
+
+fn prefs_get(
+    e: &mut Engine,
+    prefs: u32,
+    method: &str,
+    sig: &str,
+    key: &str,
+    default: Value,
+) -> Value {
+    let key = s(e, key);
+    rd_vm::framework::call_host_instance(
+        e,
+        "Landroid/content/SharedPreferences;",
+        method,
+        sig,
+        prefs,
+        &[key, default],
+    )
+    .unwrap()
+    .unwrap()
+}
+
+fn prefs_get_string(e: &mut Engine, prefs: u32, key: &str) -> String {
+    let default = s(e, "<missing>");
+    match prefs_get(
+        e,
+        prefs,
+        "getString",
+        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+        key,
+        default,
+    ) {
+        Value::Obj(text) => e.heap.as_str(text).unwrap().to_string(),
+        other => panic!("getString({key}): {other:?}"),
+    }
+}
+
+#[test]
+fn shared_preferences_named_stores_persist_across_engine_launches() {
+    const MAIN: &str = "literal-round3-main";
+    const OTHER: &str = "literal-round3-other";
+
+    {
+        let mut e = engine();
+        let main = named_prefs(&mut e, MAIN);
+        assert_eq!(named_prefs(&mut e, MAIN), main);
+        let other = named_prefs(&mut e, OTHER);
+        assert_ne!(other, main);
+
+        let editor = prefs_editor(&mut e, main);
+        let user = s(&mut e, "Ana & João");
+        prefs_put(
+            &mut e,
+            editor,
+            "putString",
+            "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;",
+            "user",
+            user,
+        );
+        prefs_put(
+            &mut e,
+            editor,
+            "putInt",
+            "(Ljava/lang/String;I)Landroid/content/SharedPreferences$Editor;",
+            "count",
+            Value::Int(7),
+        );
+        prefs_put(
+            &mut e,
+            editor,
+            "putLong",
+            "(Ljava/lang/String;J)Landroid/content/SharedPreferences$Editor;",
+            "stamp",
+            Value::Long(9_000_000_001),
+        );
+        prefs_put(
+            &mut e,
+            editor,
+            "putFloat",
+            "(Ljava/lang/String;F)Landroid/content/SharedPreferences$Editor;",
+            "ratio",
+            Value::Float(2.5),
+        );
+        prefs_put(
+            &mut e,
+            editor,
+            "putBoolean",
+            "(Ljava/lang/String;Z)Landroid/content/SharedPreferences$Editor;",
+            "enabled",
+            Value::Int(1),
+        );
+        let tags = obj(&mut e, "Ljava/util/HashSet;");
+        let z = s(&mut e, "z");
+        let a = s(&mut e, "a&b");
+        e.fw.objects
+            .insert(tags, rd_vm::framework::HostObj::List { elems: vec![z, a] });
+        prefs_put(
+            &mut e,
+            editor,
+            "putStringSet",
+            "(Ljava/lang/String;Ljava/util/Set;)Landroid/content/SharedPreferences$Editor;",
+            "tags",
+            Value::Obj(tags),
+        );
+        prefs_commit(&mut e, editor);
+
+        let editor = prefs_editor(&mut e, other);
+        let user = s(&mut e, "other-user");
+        prefs_put(
+            &mut e,
+            editor,
+            "putString",
+            "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;",
+            "user",
+            user,
+        );
+        prefs_commit(&mut e, editor);
+    }
+
+    {
+        let mut e = engine();
+        let main = named_prefs(&mut e, MAIN);
+        let other = named_prefs(&mut e, OTHER);
+        assert_eq!(prefs_get_string(&mut e, main, "user"), "Ana & João");
+        assert_eq!(prefs_get_string(&mut e, other, "user"), "other-user");
+        assert_eq!(
+            prefs_get(
+                &mut e,
+                main,
+                "getInt",
+                "(Ljava/lang/String;I)I",
+                "count",
+                Value::Int(-1),
+            ),
+            Value::Int(7)
+        );
+        assert_eq!(
+            prefs_get(
+                &mut e,
+                main,
+                "getLong",
+                "(Ljava/lang/String;J)J",
+                "stamp",
+                Value::Long(-1),
+            ),
+            Value::Long(9_000_000_001)
+        );
+        assert_eq!(
+            prefs_get(
+                &mut e,
+                main,
+                "getFloat",
+                "(Ljava/lang/String;F)F",
+                "ratio",
+                Value::Float(-1.0),
+            ),
+            Value::Float(2.5)
+        );
+        assert_eq!(
+            prefs_get(
+                &mut e,
+                main,
+                "getBoolean",
+                "(Ljava/lang/String;Z)Z",
+                "enabled",
+                Value::Int(0),
+            ),
+            Value::Int(1)
+        );
+        let tags = prefs_get(
+            &mut e,
+            main,
+            "getStringSet",
+            "(Ljava/lang/String;Ljava/util/Set;)Ljava/util/Set;",
+            "tags",
+            Value::Null,
+        );
+        let Value::Obj(tags) = tags else {
+            panic!("getStringSet: {tags:?}");
+        };
+        let Some(rd_vm::framework::HostObj::List { elems }) = e.fw.objects.get(&tags) else {
+            panic!("string set has no host elements");
+        };
+        let mut strings = elems
+            .iter()
+            .map(|value| match value {
+                Value::Obj(text) => e.heap.as_str(*text).unwrap().to_string(),
+                other => panic!("string set element: {other:?}"),
+            })
+            .collect::<Vec<_>>();
+        strings.sort();
+        assert_eq!(strings, ["a&b", "z"]);
+
+        // Named stores are isolated, and typed getters reject wrong types.
+        assert_eq!(
+            prefs_get(
+                &mut e,
+                other,
+                "getInt",
+                "(Ljava/lang/String;I)I",
+                "count",
+                Value::Int(-1),
+            ),
+            Value::Int(-1)
+        );
+        let count = s(&mut e, "count");
+        let default = s(&mut e, "wrong");
+        assert!(rd_vm::framework::call_host_instance(
+            &mut e,
+            "Landroid/content/SharedPreferences;",
+            "getString",
+            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+            main,
+            &[count, default],
+        )
+        .is_err());
+
+        let editor = prefs_editor(&mut e, main);
+        let user = s(&mut e, "user");
+        rd_vm::framework::call_host_instance(
+            &mut e,
+            "Landroid/content/SharedPreferences$Editor;",
+            "remove",
+            "(Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;",
+            editor,
+            &[user],
+        )
+        .unwrap();
+        prefs_commit(&mut e, editor);
+
+        let editor = prefs_editor(&mut e, other);
+        rd_vm::framework::call_host_instance(
+            &mut e,
+            "Landroid/content/SharedPreferences$Editor;",
+            "clear",
+            "()Landroid/content/SharedPreferences$Editor;",
+            editor,
+            &[],
+        )
+        .unwrap();
+        prefs_commit(&mut e, editor);
+    }
+
+    {
+        let mut e = engine();
+        let main = named_prefs(&mut e, MAIN);
+        let other = named_prefs(&mut e, OTHER);
+        assert_eq!(prefs_get_string(&mut e, main, "user"), "<missing>");
+        assert_eq!(prefs_get_string(&mut e, other, "user"), "<missing>");
+        assert_eq!(
+            prefs_get(
+                &mut e,
+                main,
+                "getInt",
+                "(Ljava/lang/String;I)I",
+                "count",
+                Value::Int(-1),
+            ),
+            Value::Int(7)
+        );
+    }
+}
+
 // ── Room builder over SQLite host ────────────────────────────────────────
 #[test]
 fn m8_room_builder_builds_database() {
