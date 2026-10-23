@@ -235,7 +235,7 @@ fn compat_report(root: &Path, out: &Path) -> Result<()> {
     let api_count = |k: &str| api_counts.get(k).copied().unwrap_or(0);
     md.push_str("\n## Superfície android.* (Apêndice C — registro, não execução)\n\n");
     md.push_str(&format!(
-        "**{} superfícies em {} domínios** (supported {}, partial {}, stub {}, not_implemented {}). Fonte executável: `data/api-coverage.toml`; relatório completo em [api-coverage.md](api-coverage.md), consulta via `rd api-coverage` e classificação estática no MCP `get_api_usage`. `supported` é apenas o subconjunto documentado de cada superfície — nunca o pacote AOSP inteiro; cobertura de execução continua sendo `get_coverage`.\n\n",
+        "**{} superfícies em {} domínios** (supported {}, partial {}, stub {}, not_implemented {}). Fonte executável: `data/api-coverage.toml`; relatório completo em [api-coverage.md](api-coverage.md), programa literal e bloqueadores em [appendix-c-literal-completion.md](appendix-c-literal-completion.md), consulta via `rd api-coverage` e classificação estática no MCP `get_api_usage`. `supported` é apenas o subconjunto documentado de cada superfície — nunca o pacote AOSP inteiro; cobertura de execução continua sendo `get_coverage`.\n\n",
         api_table.surface.len(),
         api_table.domain.len(),
         api_count("supported"),

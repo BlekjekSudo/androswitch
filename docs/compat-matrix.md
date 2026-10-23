@@ -85,7 +85,7 @@ Regras, dependências e limites em [engine-registry.md](engine-registry.md); fon
 
 ## Superfície android.* (Apêndice C — registro, não execução)
 
-**106 superfícies em 17 domínios** (supported 4, partial 29, stub 14, not_implemented 59). Fonte executável: `data/api-coverage.toml`; relatório completo em [api-coverage.md](api-coverage.md), consulta via `rd api-coverage` e classificação estática no MCP `get_api_usage`. `supported` é apenas o subconjunto documentado de cada superfície — nunca o pacote AOSP inteiro; cobertura de execução continua sendo `get_coverage`.
+**106 superfícies em 17 domínios** (supported 4, partial 29, stub 14, not_implemented 59). Fonte executável: `data/api-coverage.toml`; relatório completo em [api-coverage.md](api-coverage.md), programa literal e bloqueadores em [appendix-c-literal-completion.md](appendix-c-literal-completion.md), consulta via `rd api-coverage` e classificação estática no MCP `get_api_usage`. `supported` é apenas o subconjunto documentado de cada superfície — nunca o pacote AOSP inteiro; cobertura de execução continua sendo `get_coverage`.
 
 | Domínio | Superfícies/pacotes principais | Status das superfícies | Módulos |
 |---|---|---|---|
