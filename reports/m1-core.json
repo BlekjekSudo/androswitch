@@ -3,7 +3,7 @@
   "date": "2026-10-23",
   "milestone": "M1",
   "implementation_status": "complete_for_host_and_emulator_exit_gate",
-  "implementation_commit": null,
+  "implementation_commit": "5f134847004e616666cc0d43c38f5a05bd3d0c08",
   "upstream_revision": "6388281f66d254c8e01a0fdc7a5a9a30239bc762",
   "branch": "codex/androswitch-m0",
   "scope": "Shared no_std APK/DEX parser, upstream Engine/interpreter/classpath/heap, portable owned VM state/collector, libnx allocator/log/clock/file path; bounded APK method probe.",

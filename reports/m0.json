@@ -125,5 +125,6 @@
     "optional native/JIT/engine execution campaigns",
     "physical Switch execution"
   ],
-  "reverified_with_m1": "2026-10-23"
+  "reverified_with_m1": "2026-10-23",
+  "implementation_commit": "5f134847004e616666cc0d43c38f5a05bd3d0c08"
 }
