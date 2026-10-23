@@ -364,8 +364,13 @@ fn base64_static(vm: &mut Engine, name: &str, args: &[Value]) -> Result<Option<V
         }
         "encodeToString" => {
             let input = base64_input_slice(vm, args)?;
-            let encoded =
-                String::from_utf8(base64_encode(&input, flags)).expect("Base64 output is ASCII");
+            // The encoder emits only the ASCII Base64 alphabet, padding and
+            // line breaks; decode that byte alphabet directly instead of
+            // relying on a panicking UTF-8 assertion.
+            let encoded = base64_encode(&input, flags)
+                .iter()
+                .map(|byte| char::from(*byte))
+                .collect::<String>();
             Value::Obj(crate::intrinsics::alloc_string(vm, encoded)?)
         }
         _ => return Ok(None),

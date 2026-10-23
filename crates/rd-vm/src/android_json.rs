@@ -137,10 +137,18 @@ impl Token {
     }
 
     fn ordinal(self) -> i32 {
-        TOKENS
-            .iter()
-            .position(|candidate| *candidate == self)
-            .expect("token is in TOKENS") as i32
+        match self {
+            Token::BeginArray => 0,
+            Token::EndArray => 1,
+            Token::BeginObject => 2,
+            Token::EndObject => 3,
+            Token::Name => 4,
+            Token::String => 5,
+            Token::Number => 6,
+            Token::Boolean => 7,
+            Token::Null => 8,
+            Token::EndDocument => 9,
+        }
     }
 
     fn from_ordinal(ordinal: i32) -> Option<Self> {
