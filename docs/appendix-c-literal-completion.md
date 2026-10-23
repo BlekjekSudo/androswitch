@@ -140,6 +140,25 @@ that exact prefix:
   Serializable values, file descriptors, cross-process Binder and every
   framework Parcelable layout remain blockers.
 
+## Round 6 — `android.util.Base64` value codec
+
+- `android.util.Base64.encode`, `encodeToString` and `decode` now cover
+  the String and byte-array overloads, including offset/length forms.
+- The codec implements AOSP flags and output details: standard and
+  URL-safe alphabets, optional padding, 76-column wrapping with a final
+  line break, CRLF line endings and `NO_WRAP`.
+- Decoding follows Android's state machine: non-alphabet bytes are
+  skipped, two- and three-sextet tails may omit padding, and malformed
+  padding raises `IllegalArgumentException("bad base-64")`.
+- The public flag constants are available through host static-field
+  resolution as well as the constants normally inlined by compilers.
+- Proof: `android_base64_flags_and_wrapping_match_aosp`,
+  `android_base64_decode_skips_garbage_and_validates_padding` and
+  `android_base64_static_dispatch_uses_offsets_and_constants`.
+- Status after Round 6: `android.util` remains **partial**. The
+  Base64 stream classes and the rest of the `android.util` catalogue
+  remain blockers.
+
 ## Remaining literal blockers by partial surface
 
 | Domain | Surface | Main literal blockers |

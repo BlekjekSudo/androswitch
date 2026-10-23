@@ -1124,7 +1124,10 @@ fn platform_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<V
                 Some(v) => Some(v),
                 None => match crate::jbigdecimal::host_static(vm, owner, field)? {
                     Some(v) => Some(v),
-                    None => crate::jnormalizer::host_static(vm, owner, field)?,
+                    None => match crate::jnormalizer::host_static(vm, owner, field)? {
+                        Some(v) => Some(v),
+                        None => crate::android_util::host_static(vm, owner, field)?,
+                    },
                 },
             },
         },

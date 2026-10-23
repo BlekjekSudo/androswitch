@@ -566,11 +566,11 @@ status = "partial"
 domain_module = "fd-os"
 module = "rd-vm/android-util"
 code = ["crates/rd-vm/src/android_util.rs", "crates/rd-vm/src/android_display.rs", "crates/rd-vm/src/android_res.rs", "crates/rd-vm/src/intrinsics.rs"]
-milestone = "M4/M8"
-notes = "SparseArray family, Pair/Range/Rational/Size, DisplayMetrics, TypedValue and log/collection helpers used on hot paths are modelled. The full android.util catalogue is not complete."
-evidence = ["docs/compat-matrix.md"]
+milestone = "M4/M8+Literal-R5/R6"
+notes = "SparseArray family (including Parcel forms), Pair/Range/Rational/Size, DisplayMetrics, TypedValue, log/collection helpers used on hot paths and android.util.Base64 array/String encode/decode overloads with AOSP flags, 76-column wrapping, CRLF, URL-safe alphabet and padding validation are modelled. Base64 stream classes and the full android.util catalogue are not complete."
+evidence = ["crates/rd-vm/src/android_util.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-util-partial"
-key_apis = ["android.util.SparseArray.put", "android.util.DisplayMetrics.widthPixels", "android.util.TypedValue.applyDimension", "android.util.Log.d", "android.util.Range.contains"]
+key_apis = ["android.util.SparseArray.put", "android.util.Base64.encodeToString", "android.util.DisplayMetrics.widthPixels", "android.util.TypedValue.applyDimension", "android.util.Log.d", "android.util.Range.contains"]
 
 # ===================== Database =====================
 [[surface]]

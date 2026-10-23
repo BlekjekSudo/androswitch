@@ -164,12 +164,230 @@ fn sparse(
     }))
 }
 
+const BASE64: &str = "Landroid/util/Base64;";
+const BASE64_NO_PADDING: i32 = 1;
+const BASE64_NO_WRAP: i32 = 2;
+const BASE64_CRLF: i32 = 4;
+const BASE64_URL_SAFE: i32 = 8;
+const BASE64_NO_CLOSE: i32 = 16;
+
+fn base64_bad() -> VmExit {
+    VmExit::Exception(Throwable::new(
+        "Ljava/lang/IllegalArgumentException;",
+        "bad base-64",
+    ))
+}
+
+fn base64_encode(input: &[u8], flags: i32) -> Vec<u8> {
+    const STANDARD: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const WEB_SAFE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let alphabet = if flags & BASE64_URL_SAFE != 0 {
+        WEB_SAFE
+    } else {
+        STANDARD
+    };
+    let padding = flags & BASE64_NO_PADDING == 0;
+    let mut raw = Vec::with_capacity(input.len().div_ceil(3) * 4);
+    for chunk in input.chunks(3) {
+        let b0 = u32::from(chunk[0]);
+        let b1 = u32::from(*chunk.get(1).unwrap_or(&0));
+        let b2 = u32::from(*chunk.get(2).unwrap_or(&0));
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        raw.push(alphabet[(triple >> 18) as usize & 63]);
+        raw.push(alphabet[(triple >> 12) as usize & 63]);
+        if chunk.len() > 1 {
+            raw.push(alphabet[(triple >> 6) as usize & 63]);
+        } else if padding {
+            raw.push(b'=');
+        }
+        if chunk.len() > 2 {
+            raw.push(alphabet[triple as usize & 63]);
+        } else if padding {
+            raw.push(b'=');
+        }
+    }
+    if flags & BASE64_NO_WRAP != 0 || raw.is_empty() {
+        return raw;
+    }
+    let newline: &[u8] = if flags & BASE64_CRLF != 0 {
+        b"\r\n"
+    } else {
+        b"\n"
+    };
+    let mut wrapped = Vec::with_capacity(raw.len() + (raw.len() / 76 + 1) * newline.len());
+    for line in raw.chunks(76) {
+        wrapped.extend_from_slice(line);
+        wrapped.extend_from_slice(newline);
+    }
+    wrapped
+}
+
+fn base64_decode(input: &[u8], flags: i32) -> Result<Vec<u8>, VmExit> {
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum State {
+        Sextets(usize),
+        ExpectSecondPadding,
+        Done,
+    }
+    let web_safe = flags & BASE64_URL_SAFE != 0;
+    let mut state = State::Sextets(0);
+    let mut accumulator = 0u32;
+    let mut output = Vec::with_capacity(input.len() * 3 / 4 + 3);
+    for &byte in input {
+        if byte == b'=' {
+            match state {
+                State::Sextets(2) => state = State::ExpectSecondPadding,
+                State::Sextets(3) => {
+                    output.push((accumulator >> 10) as u8);
+                    output.push((accumulator >> 2) as u8);
+                    state = State::Done;
+                }
+                State::ExpectSecondPadding => {
+                    output.push((accumulator >> 4) as u8);
+                    state = State::Done;
+                }
+                _ => return Err(base64_bad()),
+            }
+            continue;
+        }
+        let sextet = match byte {
+            b'A'..=b'Z' => u32::from(byte - b'A'),
+            b'a'..=b'z' => u32::from(byte - b'a' + 26),
+            b'0'..=b'9' => u32::from(byte - b'0' + 52),
+            b'+' if !web_safe => 62,
+            b'/' if !web_safe => 63,
+            b'-' if web_safe => 62,
+            b'_' if web_safe => 63,
+            // Android's decoder skips whitespace and every other byte that
+            // is not in the selected alphabet.
+            _ => continue,
+        };
+        let State::Sextets(count) = state else {
+            return Err(base64_bad());
+        };
+        accumulator = (accumulator << 6) | sextet;
+        if count == 3 {
+            output.push((accumulator >> 16) as u8);
+            output.push((accumulator >> 8) as u8);
+            output.push(accumulator as u8);
+            accumulator = 0;
+            state = State::Sextets(0);
+        } else {
+            state = State::Sextets(count + 1);
+        }
+    }
+    match state {
+        State::Sextets(0) | State::Done => Ok(output),
+        State::Sextets(2) => {
+            output.push((accumulator >> 4) as u8);
+            Ok(output)
+        }
+        State::Sextets(3) => {
+            output.push((accumulator >> 10) as u8);
+            output.push((accumulator >> 2) as u8);
+            Ok(output)
+        }
+        _ => Err(base64_bad()),
+    }
+}
+
+fn base64_flags(args: &[Value]) -> i32 {
+    args.last().and_then(|v| v.as_int().ok()).unwrap_or(0)
+}
+
+fn base64_input_slice(vm: &Engine, args: &[Value]) -> Result<Vec<u8>, VmExit> {
+    let Some(Value::Obj(input)) = args.first() else {
+        return Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/NullPointerException;",
+            "input == null",
+        )));
+    };
+    let values = vm.heap.as_array_elems(*input)?.0;
+    let (offset, len) = if args.len() >= 4 {
+        (args[1].as_int().unwrap_or(0), args[2].as_int().unwrap_or(0))
+    } else {
+        (0, values.len() as i32)
+    };
+    let offset = usize::try_from(offset).ok();
+    let len = usize::try_from(len).ok();
+    let Some((offset, len)) = offset.zip(len) else {
+        return Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/ArrayIndexOutOfBoundsException;",
+            "negative offset or length",
+        )));
+    };
+    let Some(end) = offset.checked_add(len).filter(|end| *end <= values.len()) else {
+        return Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/ArrayIndexOutOfBoundsException;",
+            format!("offset={offset}, len={len}, array length={}", values.len()),
+        )));
+    };
+    Ok(values[offset..end]
+        .iter()
+        .map(|value| value.as_int().unwrap_or(0) as u8)
+        .collect())
+}
+
+fn base64_static(vm: &mut Engine, name: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+    let flags = base64_flags(args);
+    Ok(Some(match name {
+        "decode" => {
+            let input = if args.len() < 4 {
+                match args.first() {
+                    Some(Value::Obj(text)) if vm.heap.as_str(*text).is_ok() => {
+                        vm.heap.as_str(*text)?.as_bytes().to_vec()
+                    }
+                    _ => base64_input_slice(vm, args)?,
+                }
+            } else {
+                base64_input_slice(vm, args)?
+            };
+            crate::jlstring::byte_array(vm, &base64_decode(&input, flags)?)?
+        }
+        "encode" => {
+            let input = base64_input_slice(vm, args)?;
+            crate::jlstring::byte_array(vm, &base64_encode(&input, flags))?
+        }
+        "encodeToString" => {
+            let input = base64_input_slice(vm, args)?;
+            let encoded =
+                String::from_utf8(base64_encode(&input, flags)).expect("Base64 output is ASCII");
+            Value::Obj(crate::intrinsics::alloc_string(vm, encoded)?)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+/// `android.util.Base64` compile-time flag constants for `sget` and
+/// reflection paths that do not inline them.
+pub(crate) fn host_static(
+    _vm: &mut Engine,
+    class: &str,
+    name: &str,
+) -> Result<Option<Value>, VmExit> {
+    if class != BASE64 {
+        return Ok(None);
+    }
+    Ok(Some(Value::Int(match name {
+        "DEFAULT" => 0,
+        "NO_PADDING" => BASE64_NO_PADDING,
+        "NO_WRAP" => BASE64_NO_WRAP,
+        "CRLF" => BASE64_CRLF,
+        "URL_SAFE" => BASE64_URL_SAFE,
+        "NO_CLOSE" => BASE64_NO_CLOSE,
+        _ => return Ok(None),
+    })))
+}
+
 pub(crate) fn static_intrinsic(
     vm: &mut Engine,
     class: &str,
     name: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if class == BASE64 {
+        return base64_static(vm, name, args);
+    }
     match (class, name) {
         ("Landroid/util/Pair;", "create") | ("Landroid/util/Range;", "create") => {
             let r = vm.heap.alloc_instance(class.to_string(), Vec::new())?;
@@ -362,5 +580,93 @@ fn compare(vm: &mut Engine, a: &Value, b: &Value) -> Result<i32, VmExit> {
             _ => Ok(0),
         },
         _ => Ok(0),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn android_base64_flags_and_wrapping_match_aosp() {
+        assert_eq!(base64_encode(b"hello", 0), b"aGVsbG8=\n");
+        assert_eq!(base64_encode(b"hello", BASE64_NO_WRAP), b"aGVsbG8=");
+        assert_eq!(
+            base64_encode(b"hello", BASE64_NO_WRAP | BASE64_NO_PADDING),
+            b"aGVsbG8"
+        );
+        assert_eq!(
+            base64_encode(&[0xfb, 0xff], BASE64_NO_WRAP | BASE64_URL_SAFE),
+            b"-_8="
+        );
+        assert_eq!(base64_encode(b"hello", BASE64_CRLF), b"aGVsbG8=\r\n");
+        assert_eq!(base64_encode(b"", 0), b"");
+
+        let wrapped = base64_encode(&[b'a'; 58], 0);
+        assert_eq!(&wrapped[..4], b"YWFh");
+        assert_eq!(&wrapped[72..76], b"YWFh");
+        assert_eq!(wrapped[76], b'\n');
+        assert_eq!(&wrapped[77..], b"YQ==\n");
+    }
+
+    #[test]
+    fn android_base64_decode_skips_garbage_and_validates_padding() {
+        assert_eq!(base64_decode(b"aGVs bG8=\n", 0).unwrap(), b"hello");
+        assert_eq!(base64_decode(b"TQ", 0).unwrap(), b"M");
+        assert_eq!(base64_decode(b"TWE", 0).unwrap(), b"Ma");
+        assert_eq!(
+            base64_decode(b"-_8", BASE64_URL_SAFE).unwrap(),
+            vec![0xfb, 0xff]
+        );
+        assert!(base64_decode(b"T", 0).is_err());
+        assert!(base64_decode(b"TQ=", 0).is_err());
+        assert!(base64_decode(b"TWE==", 0).is_err());
+        assert!(base64_decode(b"TQ==QQ", 0).is_err());
+    }
+
+    #[test]
+    fn android_base64_static_dispatch_uses_offsets_and_constants() {
+        let mut vm = Engine::new(Vec::new(), crate::VmConfig::default());
+        let input = crate::jlstring::byte_array(&mut vm, b"xxhello!").unwrap();
+        let encoded = static_intrinsic(
+            &mut vm,
+            BASE64,
+            "encodeToString",
+            &[
+                input,
+                Value::Int(2),
+                Value::Int(5),
+                Value::Int(BASE64_NO_WRAP),
+            ],
+        )
+        .unwrap()
+        .unwrap();
+        let Value::Obj(encoded) = encoded else {
+            panic!("encodeToString did not return a String");
+        };
+        assert_eq!(vm.heap.as_str(encoded).unwrap(), "aGVsbG8=");
+
+        let encoded_ref = Value::Obj(encoded);
+        let decoded = static_intrinsic(&mut vm, BASE64, "decode", &[encoded_ref, Value::Int(0)])
+            .unwrap()
+            .unwrap();
+        let Value::Obj(decoded) = decoded else {
+            panic!("decode did not return byte[]");
+        };
+        let values = vm.heap.as_array_elems(decoded).unwrap().0;
+        assert_eq!(
+            values
+                .iter()
+                .map(|value| value.as_int().unwrap() as u8)
+                .collect::<Vec<_>>(),
+            b"hello"
+        );
+        assert_eq!(
+            host_static(&mut vm, BASE64, "URL_SAFE").unwrap(),
+            Some(Value::Int(BASE64_URL_SAFE))
+        );
+        assert!(
+            static_intrinsic(&mut vm, BASE64, "decode", &[Value::Null, Value::Int(0)],).is_err()
+        );
     }
 }
