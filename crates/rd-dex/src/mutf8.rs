@@ -9,6 +9,9 @@
 //! Decode é *lossy* (bytes inválidos → U+FFFD) — nunca pânico, nunca erro
 //! (strings malformadas não podem derrubar o parser; Lei 1).
 
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::String, vec::Vec};
+
 /// Decodifica bytes MUTF-8 para `String` (perda com U+FFFD em sequências inválidas).
 pub fn decode(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len());

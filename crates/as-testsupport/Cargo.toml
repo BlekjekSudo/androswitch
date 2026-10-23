@@ -1,0 +1,10 @@
+[package]
+name = "as-testsupport"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Host-only APK fixtures without the legacy VM dependency"
+
+[lints]
+workspace = true

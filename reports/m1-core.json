@@ -1,0 +1,312 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-23",
+  "milestone": "M1",
+  "implementation_status": "complete_for_host_and_emulator_exit_gate",
+  "implementation_commit": null,
+  "upstream_revision": "6388281f66d254c8e01a0fdc7a5a9a30239bc762",
+  "branch": "codex/androswitch-m0",
+  "scope": "Shared no_std APK/DEX parser, upstream Engine/interpreter/classpath/heap, portable owned VM state/collector, libnx allocator/log/clock/file path; bounded APK method probe.",
+  "verification": {
+    "host": "passed",
+    "horizon_emulator": "passed",
+    "physical_device": "not_run"
+  },
+  "toolchains": {
+    "rust_host": "1.97.1",
+    "rust_device": "nightly-2026-08-26",
+    "target": "aarch64-nintendo-switch-freestanding",
+    "c_linker": "WSL Ubuntu devkitPro devkitA64/libnx",
+    "java": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\r\nOpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)\r\nOpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+    "android_build_tools": "35.0.0",
+    "compile_sdk": 35,
+    "gcc": "aarch64-none-elf-gcc (devkitA64) 16.1.0"
+  },
+  "emulator": {
+    "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0",
+    "version": "1.3.3+e2143d4"
+  },
+  "latest_run": {
+    "session_id": "6de28bba025b4d7fb06daf39645b084c",
+    "started_at": "2026-10-23T11:20:17.8667520Z",
+    "finished_at": "2026-10-23T11:24:33.4209087Z",
+    "command": "./scripts/test-ryujinx-m1.ps1",
+    "artifact_root": "local-artifacts/m1/runs/6de28bba025b4d7fb06daf39645b084c",
+    "calls": 18,
+    "jvm_comparisons": 12,
+    "negative_cases": 6,
+    "portable_vm": true,
+    "apk_sha256": "06429bcabce22ba83f635f350d367ec70db27b80a2b26b1f298fad9833880a37",
+    "request_sha256": "1a6c05d6b442cb0abe6fde2e16f1018d19e80115c959b4e56f602e601255b519",
+    "nro_sha256": "08cc23e3e88abd6ed109ab27f53bf55f05e075794b6e1e7a93df249a6252b5b2",
+    "host_report_sha256": "56fff2f1a86241be187dce771658f97951a80603184bb10022437950a8205907",
+    "emulator_report_sha256": "527b40311f507224b46c011fd014ffcb9557355ab21bc30abc681faf26cd39db",
+    "receipt_sha256": "505a3f276374b8aaec471459915a6cbb867a84a34bc5d7480b2ed75e3d2c7ceb",
+    "results": [
+      {
+        "id": "arithmetic",
+        "value": "-99912682",
+        "error_code": null,
+        "instructions": 177
+      },
+      {
+        "id": "arrays",
+        "value": "10320",
+        "error_code": null,
+        "instructions": 359
+      },
+      {
+        "id": "objects",
+        "value": "44",
+        "error_code": null,
+        "instructions": 17
+      },
+      {
+        "id": "caught-zero",
+        "value": "-77",
+        "error_code": null,
+        "instructions": 5
+      },
+      {
+        "id": "caught-value",
+        "value": "24",
+        "error_code": null,
+        "instructions": 3
+      },
+      {
+        "id": "wide",
+        "value": "1311719052836037129",
+        "error_code": null,
+        "instructions": 4
+      },
+      {
+        "id": "floating",
+        "value": "-4.25",
+        "error_code": null,
+        "instructions": 5
+      },
+      {
+        "id": "switch-hit",
+        "value": "-4",
+        "error_code": null,
+        "instructions": 3
+      },
+      {
+        "id": "switch-miss",
+        "value": "19",
+        "error_code": null,
+        "instructions": 3
+      },
+      {
+        "id": "chain",
+        "value": "2873524",
+        "error_code": null,
+        "instructions": 273
+      },
+      {
+        "id": "static-first",
+        "value": "42",
+        "error_code": null,
+        "instructions": 4
+      },
+      {
+        "id": "static-second",
+        "value": "43",
+        "error_code": null,
+        "instructions": 4
+      },
+      {
+        "id": "missing-api",
+        "value": null,
+        "error_code": "NOT_FOUND",
+        "instructions": 1
+      },
+      {
+        "id": "missing-field",
+        "value": null,
+        "error_code": "API_UNAVAILABLE",
+        "instructions": 1
+      },
+      {
+        "id": "missing-monitor",
+        "value": null,
+        "error_code": "API_UNAVAILABLE",
+        "instructions": 2
+      },
+      {
+        "id": "missing-native",
+        "value": null,
+        "error_code": "NOT_IMPLEMENTED",
+        "instructions": 0
+      },
+      {
+        "id": "fuel-limit",
+        "value": null,
+        "error_code": "VM_FUEL",
+        "instructions": 1000001
+      },
+      {
+        "id": "stack-limit",
+        "value": null,
+        "error_code": "VM_STACK_OVERFLOW",
+        "instructions": 32
+      }
+    ]
+  },
+  "prior_run": {
+    "session_id": "3bf7dcd11f714c15bfa66071676a2c80",
+    "status": "passed",
+    "calls": 16,
+    "jvm_comparisons": 12,
+    "negative_cases": 4,
+    "nro_sha256": "715e5a8400355f155a42e92eaf463df07adcd9c045c0c06e8d36e3315ac86792"
+  },
+  "parser_proof": {
+    "schema_version": 1,
+    "kind": "dex_parser_smoke",
+    "allocator_checksum": 32640,
+    "parse_result": 0,
+    "version": 37,
+    "file_size": 9297608,
+    "classes": 11168,
+    "methods": 65003,
+    "strings": 62734,
+    "checksum_ok": 1,
+    "elapsed_micros": 1054966,
+    "apk_execution": false
+  },
+  "budgets": {
+    "nro_heap_bytes": 268435456,
+    "guest_heap_accounting_bytes": 33554432,
+    "guest_max_call_depth": 16,
+    "instructions_per_invocation": 1000000,
+    "host_worker_stack_bytes": 33554432
+  },
+  "checks": [
+    {
+      "id": "m1-portable-tests",
+      "command": "cargo test -p as-switch-smoke --features portable-tests --test portable_core --locked -- --include-ignored",
+      "exit_code": 0,
+      "log": "target/evidence/m1-portable-tests.log",
+      "log_sha256": "8ce859e4bab0dafcc17f785d4aa953495486ff5b7cfb9abe35750e35f168c615",
+      "passed_tests": 5
+    },
+    {
+      "id": "m1-core-clippy",
+      "command": "cargo clippy -p rd-apk -p rd-vm --no-default-features --lib --locked -- -D warnings",
+      "exit_code": 0,
+      "log": "target/evidence/m1-core-clippy.log",
+      "log_sha256": "4e5127f6763ee148417e66542e2c774041d5cb9ae6cc0a361f3249e7add60712",
+      "passed_tests": 0
+    },
+    {
+      "id": "m1-smoke-clippy",
+      "command": "cargo clippy -p as-switch-smoke --features host-cli,portable-tests --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "log": "target/evidence/m1-smoke-clippy.log",
+      "log_sha256": "dab4e4707b2e6fdbdead361b4487be475974a047edea846dd92bac44f319f872",
+      "passed_tests": 0
+    },
+    {
+      "id": "androswitch-tests",
+      "command": "cargo test -p as-platform -p as-runtime -p as-cli -p as-switch-smoke --locked",
+      "exit_code": 0,
+      "log": "target/evidence/androswitch-tests.log",
+      "log_sha256": "7ba3af901049ff241112bd7c60dafc25ebea1ec36526de9de9a1e89685e6cde1",
+      "passed_tests": 14
+    },
+    {
+      "id": "real-apk-test",
+      "command": "cargo test -p as-runtime --test inspection --locked -- --ignored",
+      "exit_code": 0,
+      "log": "target/evidence/real-apk-test.log",
+      "log_sha256": "234ed29ab1747db8c04df27d2efe0fbbca865c8ca5a980877af39d0efa4c6872",
+      "passed_tests": 1
+    },
+    {
+      "id": "parser-regressions",
+      "command": "cargo test -p rd-apk -p rd-dex --lib --locked -- --test-threads=1 --skip paged_open_handles_sparse_multigigabyte_container",
+      "exit_code": 0,
+      "log": "target/evidence/parser-regressions.log",
+      "log_sha256": "efdaa01b02a24cb427d248e89dce964aa637cd1c301da4e1698da4c131d6b68c",
+      "passed_tests": 127
+    },
+    {
+      "id": "dex-real-std",
+      "command": "cargo test -p rd-dex --test portable_index --locked -- --ignored",
+      "exit_code": 0,
+      "log": "target/evidence/dex-real-std.log",
+      "log_sha256": "9856fa28e77c794d6be2485a0b3bf8cdc9dc5916036e32aeef89538e38093e33",
+      "passed_tests": 1
+    },
+    {
+      "id": "dex-real-no-std",
+      "command": "cargo test -p rd-dex --no-default-features --test portable_index --locked -- --ignored",
+      "exit_code": 0,
+      "log": "target/evidence/dex-real-no-std.log",
+      "log_sha256": "987494574f8794390bd8b36bd74745a9a42b2e39c44206d2a211b71c746e62a5",
+      "passed_tests": 1
+    },
+    {
+      "id": "platform-no-std",
+      "command": "cargo check -p as-platform --no-default-features --locked",
+      "exit_code": 0,
+      "log": "target/evidence/platform-no-std.log",
+      "log_sha256": "8c798c75014ca8e4571a98e4be7530a89ec2ce9032dc7862466150bbd077d744",
+      "passed_tests": 0
+    },
+    {
+      "id": "dex-no-std",
+      "command": "cargo clippy -p rd-dex --no-default-features --lib --locked -- -D warnings",
+      "exit_code": 0,
+      "log": "target/evidence/dex-no-std.log",
+      "log_sha256": "9645c5edb80fef8436886aff68051ddf53f572d1afd9c92bcfcc82a8c3f96c35",
+      "passed_tests": 0
+    },
+    {
+      "id": "clippy",
+      "command": "cargo clippy -p as-platform -p as-runtime -p as-cli -p as-switch-smoke --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "log": "target/evidence/clippy.log",
+      "log_sha256": "ae942d4c0c719ec45978e4cc37e4f1342040a7826ef78c8232c8e82c2e0c9bca",
+      "passed_tests": 0
+    },
+    {
+      "id": "format",
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "log": "target/evidence/format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "passed_tests": 0
+    },
+    {
+      "id": "upstream-vm-regressions",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_TEST_DEBUG=0 cargo test -p rd-vm --lib --test vm_exec --test gc --test gc_generations --test collections_gc --locked",
+      "exit_code": 0,
+      "log": "target/evidence/m1-vm-regressions-final.log",
+      "log_sha256": "a71bce076e5c77bb2381db7fcf89cfa9019a576294dd2ee523d2bab8c2ba943e",
+      "passed_tests": 227
+    }
+  ],
+  "not_claimed": [
+    "Android Activity/Application lifecycle",
+    "JNI or native ELF execution",
+    "persistent shared Java/native VFS",
+    "Android framework, media, threads or monitor support",
+    "physical Switch execution",
+    "universal APK compatibility"
+  ],
+  "initial_failures_resolved": [
+    {
+      "failure": "Windows debug probe native stack overflow during recursive-limit scenario",
+      "resolution": "Explicit 32 MiB host worker stack and bounded guest depth; final host/emulator report VM_STACK_OVERFLOW."
+    }
+  ],
+  "next_milestone": "M2: atomic install/update registry and persistent shared VFS; no MCP work required.",
+  "device_dependencies": {
+    "log": "target/evidence/m1-device-dependencies.log",
+    "sha256": "a54bfdcb373bd099c92b1d6d28fab115dc6bfbe725945230251a0dc2b032c0df",
+    "python_unicorn_linux_kernel_in_device_graph": false
+  },
+  "packaged_inputs_match_verified_run": true
+}

@@ -1,5 +1,8 @@
 //! class_def_item + class_data_item — classes, campos e métodos por classe.
 
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec::Vec};
+
 use crate::error::{RdError, RdResult};
 use crate::fields::{self, EncodedField};
 use crate::methods::EncodedMethod;

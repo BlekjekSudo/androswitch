@@ -1,9 +1,9 @@
-name: CI
+name: Upstream reference audits
 
+# Retained for manual upstream audits. AndroSwitch's active push/PR gates and
+# pinned toolchain live in androswitch.yml; Moto E5 claims are upstream-only.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 # Least privilege (issue #6): GITHUB_TOKEN is read-only for every job.
 permissions:
@@ -88,7 +88,7 @@ jobs:
         run: |
           if grep -rnE '\bunsafe[[:space:]]*(\{|fn|impl|trait|extern)' \
                crates xtask --include='*.rs' \
-               --exclude-dir=rd-ndk --exclude-dir=rd-jni --exclude-dir=target ; then
+               --exclude-dir=rd-ndk --exclude-dir=rd-jni --exclude-dir=as-switch-smoke --exclude-dir=target ; then
             echo "::error::unsafe fora de rd-ndk/rd-jni (CONTRIBUTING item 5 / SECURITY.md)"
             exit 1
           fi

@@ -1,6 +1,10 @@
 //! Contrato de erro da VM (mesma forma {code, cause, suggestion, module_id}
 //! do projeto — Lei 1: falha sempre tipada, nunca pânico, nunca silêncio).
 
+use alloc::{
+    format,
+    string::{String, ToString},
+};
 pub use rd_dex::RdError;
 
 pub const MODULE_ID: &str = "rd-vm";
@@ -20,7 +24,7 @@ pub fn with_suggestion(mut e: RdError, s: impl Into<String>) -> RdError {
 }
 
 /// Recurso fora do escopo do M2 — sempre com pista do que usar.
-pub fn not_implemented(what: impl std::fmt::Display) -> RdError {
+pub fn not_implemented(what: impl core::fmt::Display) -> RdError {
     with_suggestion(
         vm_error(
             "NOT_IMPLEMENTED",
@@ -122,8 +126,8 @@ pub fn put_field_result(res: Result<(), crate::heap::FieldWriteErr>) -> Result<(
     }
 }
 
-impl std::fmt::Display for VmExit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for VmExit {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             VmExit::Exception(t) => {
                 write!(
@@ -138,4 +142,5 @@ impl std::fmt::Display for VmExit {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for VmExit {}

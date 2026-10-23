@@ -4,6 +4,9 @@
 //! instrução truncada/overrun vira erro tipado, nunca pânico. Os code units
 //! brutos ficam preservados (`insns`) junto do modelo decodificado (Lei 2).
 
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec::Vec};
+
 use crate::error::{RdError, RdResult};
 use crate::opcode::{info, Format, PayloadKind};
 use crate::read;

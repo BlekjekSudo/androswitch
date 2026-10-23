@@ -1,0 +1,4 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.androswitch.fixture" android:versionCode="1" android:versionName="1.0">
+  <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35"/>
+  <application android:label="AndroSwitch VM semantics" android:hasCode="true"/>
+</manifest>

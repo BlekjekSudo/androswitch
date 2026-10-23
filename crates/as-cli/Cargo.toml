@@ -1,0 +1,21 @@
+[package]
+name = "as-cli"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "AndroSwitch host CLI"
+
+[[bin]]
+name = "asctl"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+as-runtime = { path = "../as-runtime" }
+clap.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+as-testsupport = { path = "../as-testsupport" }

@@ -7,8 +7,13 @@
 //! 0x90..0xAF (rsub-int = 0xD1 é "lit - vB"), armadilha clássica (cf. #13).
 //! Toda anomalia vira exceção Java capturável ou erro estruturado — Lei 1.
 
-use std::sync::Arc;
-
+use alloc::{
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use rd_dex::code::{CodeItem, Insn, Kind, Payload};
 
 use crate::engine::{default_for, ACC_STATIC};
@@ -349,6 +354,12 @@ pub(crate) fn exec_frame(
                         )
                     );
                 }
+                #[cfg(not(feature = "std"))]
+                return Err(err::vm_error(
+                    "API_UNAVAILABLE",
+                    "monitor-enter/exit requires the portable monitor implementation",
+                )
+                .into());
             }
 
             // ── check-cast (1F) / instance-of (20) ──────────────────────────
@@ -360,6 +371,7 @@ pub(crate) fn exec_frame(
                 if let Some(r) = regs[*a as usize].as_ref()? {
                     let cls = vm.heap.class_of(r)?.to_string();
                     if cls != target && !vm.cp.is_subtype(&cls, &target) {
+                        #[cfg(feature = "std")]
                         if std::env::var_os("RD_VM_TRACE_CAST").is_some() {
                             eprintln!(
                                 "[cast] {} pc={cur_pc}: {cls} -> {target}",
@@ -626,9 +638,9 @@ pub(crate) fn exec_frame(
                 };
                 let (l, r) = (regs[*b as usize].as_long()?, regs[*c as usize].as_long()?);
                 regs[*a as usize] = Value::Int(match l.cmp(&r) {
-                    std::cmp::Ordering::Less => -1,
-                    std::cmp::Ordering::Equal => 0,
-                    std::cmp::Ordering::Greater => 1,
+                    core::cmp::Ordering::Less => -1,
+                    core::cmp::Ordering::Equal => 0,
+                    core::cmp::Ordering::Greater => 1,
                 });
             }
 
@@ -789,83 +801,98 @@ pub(crate) fn exec_frame(
                 // issues #43/#48: System.out/.err materializam um PrintStream
                 // embutido na primeira leitura (println/print são intrínsecos;
                 // saída vai para stdout/stderr do host, spec PrintStream: nunca lança)
-                if owner == "Ljava/lang/System;" && (fname == "out" || fname == "err") {
-                    let key = (owner.clone(), fname.clone());
-                    if let std::collections::hash_map::Entry::Vacant(e) = vm.statics.entry(key) {
-                        let fd = if fname == "err" { 2 } else { 1 };
-                        let r = step!(vm
-                            .heap
-                            .alloc_instance(
-                                "Ljava/io/PrintStream;".to_string(),
-                                vec![("fd".to_string(), Value::Int(fd))],
-                            )
-                            .map_err(oom_exception));
-                        e.insert(Value::Obj(r));
-                    }
-                }
-                if owner == "Ljava/util/concurrent/TimeUnit;"
-                    && !vm.statics.contains_key(&(owner.clone(), fname.clone()))
-                    && matches!(
-                        fname.as_str(),
-                        "NANOSECONDS"
-                            | "MICROSECONDS"
-                            | "MILLISECONDS"
-                            | "SECONDS"
-                            | "MINUTES"
-                            | "HOURS"
-                            | "DAYS"
-                    )
+                #[cfg(feature = "std")]
                 {
-                    let unit = step!(vm.time_unit_obj(&fname));
-                    vm.statics
-                        .insert((owner.clone(), fname.clone()), Value::Obj(unit));
-                }
-                // JDK constants not backed by any DEX (Boolean.TRUE/FALSE,
-                // MAX_VALUE, NaN, ...) are materialized on first read.
-                // Host-static resolution needs `&mut Engine`; keeping a map Entry
-                // live across those calls would conflict with the mutable borrow.
-                #[allow(clippy::map_entry)]
-                if !vm.statics.contains_key(&(owner.clone(), fname.clone())) {
-                    if let Some(c) = step!(crate::boxes::host_static(vm, &owner, &fname)) {
-                        vm.statics.insert((owner.clone(), fname.clone()), c);
-                    } else if let Some(c) =
-                        step!(crate::jnormalizer::host_static(vm, &owner, &fname))
-                    {
-                        vm.statics.insert((owner.clone(), fname.clone()), c);
-                    } else if let Some(c) =
-                        step!(crate::jbigdecimal::host_static(vm, &owner, &fname))
-                    {
-                        vm.statics.insert((owner.clone(), fname.clone()), c);
-                    } else if let Some(c) =
-                        step!(crate::jtext_format::host_static(vm, &owner, &fname))
-                    {
-                        vm.statics.insert((owner.clone(), fname.clone()), c);
-                    } else if let Some(c) =
-                        step!(crate::android_colorspace::host_static(vm, &owner, &fname))
-                    {
-                        vm.statics.insert((owner.clone(), fname.clone()), c);
-                    } else if let Some(c) =
-                        step!(crate::android_env::host_static(vm, &owner, &fname))
-                    {
-                        vm.statics.insert((owner.clone(), fname.clone()), c);
-                    } else if let Some(c) =
-                        step!(crate::android_build::host_static(vm, &owner, &fname))
-                    {
-                        vm.statics.insert((owner.clone(), fname.clone()), c);
-                    } else if let Some(c) = step!(crate::graphics::host_static(vm, &owner, &fname))
-                    {
-                        vm.statics.insert((owner.clone(), fname.clone()), c);
-                    } else if let Some(c) =
-                        step!(crate::platform_base::host_static(vm, &owner, &fname))
-                    {
-                        vm.statics.insert((owner.clone(), fname.clone()), c);
-                    } else if let Some(c) =
-                        step!(crate::collections::host_static(vm, &owner, &fname))
-                    {
-                        vm.statics.insert((owner.clone(), fname.clone()), c);
-                    } else if let Some(c) = step!(crate::jtime::host_static(vm, &owner, &fname)) {
-                        vm.statics.insert((owner.clone(), fname.clone()), c);
+                    if owner == "Ljava/lang/System;" && (fname == "out" || fname == "err") {
+                        let key = (owner.clone(), fname.clone());
+                        if let crate::maps::Entry::Vacant(e) = vm.statics.entry(key) {
+                            let fd = if fname == "err" { 2 } else { 1 };
+                            let r = step!(vm
+                                .heap
+                                .alloc_instance(
+                                    "Ljava/io/PrintStream;".to_string(),
+                                    vec![("fd".to_string(), Value::Int(fd))],
+                                )
+                                .map_err(oom_exception));
+                            e.insert(Value::Obj(r));
+                        }
                     }
+                    if owner == "Ljava/util/concurrent/TimeUnit;"
+                        && !vm.statics.contains_key(&(owner.clone(), fname.clone()))
+                        && matches!(
+                            fname.as_str(),
+                            "NANOSECONDS"
+                                | "MICROSECONDS"
+                                | "MILLISECONDS"
+                                | "SECONDS"
+                                | "MINUTES"
+                                | "HOURS"
+                                | "DAYS"
+                        )
+                    {
+                        let unit = step!(vm.time_unit_obj(&fname));
+                        vm.statics
+                            .insert((owner.clone(), fname.clone()), Value::Obj(unit));
+                    }
+                    // JDK constants not backed by any DEX (Boolean.TRUE/FALSE,
+                    // MAX_VALUE, NaN, ...) are materialized on first read.
+                    // Host-static resolution needs `&mut Engine`; keeping a map Entry
+                    // live across those calls would conflict with the mutable borrow.
+                    #[allow(clippy::map_entry)]
+                    if !vm.statics.contains_key(&(owner.clone(), fname.clone())) {
+                        if let Some(c) = step!(crate::boxes::host_static(vm, &owner, &fname)) {
+                            vm.statics.insert((owner.clone(), fname.clone()), c);
+                        } else if let Some(c) =
+                            step!(crate::jnormalizer::host_static(vm, &owner, &fname))
+                        {
+                            vm.statics.insert((owner.clone(), fname.clone()), c);
+                        } else if let Some(c) =
+                            step!(crate::jbigdecimal::host_static(vm, &owner, &fname))
+                        {
+                            vm.statics.insert((owner.clone(), fname.clone()), c);
+                        } else if let Some(c) =
+                            step!(crate::jtext_format::host_static(vm, &owner, &fname))
+                        {
+                            vm.statics.insert((owner.clone(), fname.clone()), c);
+                        } else if let Some(c) =
+                            step!(crate::android_colorspace::host_static(vm, &owner, &fname))
+                        {
+                            vm.statics.insert((owner.clone(), fname.clone()), c);
+                        } else if let Some(c) =
+                            step!(crate::android_env::host_static(vm, &owner, &fname))
+                        {
+                            vm.statics.insert((owner.clone(), fname.clone()), c);
+                        } else if let Some(c) =
+                            step!(crate::android_build::host_static(vm, &owner, &fname))
+                        {
+                            vm.statics.insert((owner.clone(), fname.clone()), c);
+                        } else if let Some(c) =
+                            step!(crate::graphics::host_static(vm, &owner, &fname))
+                        {
+                            vm.statics.insert((owner.clone(), fname.clone()), c);
+                        } else if let Some(c) =
+                            step!(crate::platform_base::host_static(vm, &owner, &fname))
+                        {
+                            vm.statics.insert((owner.clone(), fname.clone()), c);
+                        } else if let Some(c) =
+                            step!(crate::collections::host_static(vm, &owner, &fname))
+                        {
+                            vm.statics.insert((owner.clone(), fname.clone()), c);
+                        } else if let Some(c) = step!(crate::jtime::host_static(vm, &owner, &fname))
+                        {
+                            vm.statics.insert((owner.clone(), fname.clone()), c);
+                        }
+                    }
+                }
+                #[cfg(not(feature = "std"))]
+                if !vm.statics.contains_key(&(owner.clone(), fname.clone()))
+                    && vm.cp.find_class(&owner).is_none()
+                {
+                    return Err(err::vm_error(
+                        "API_UNAVAILABLE",
+                        format!("sget {owner}->{fname}:{ftype} requires a platform implementation"),
+                    )
+                    .into());
                 }
                 let v = vm
                     .statics
@@ -889,6 +916,14 @@ pub(crate) fn exec_frame(
                 let owner = step!(vm.resolve_static_owner(&ref_class, &fname));
                 // issue #41: EIIE de <clinit> despacha na frame corrente
                 step!(vm.ensure_initialized(&owner));
+                #[cfg(not(feature = "std"))]
+                if vm.cp.find_class(&owner).is_none() {
+                    return Err(err::vm_error(
+                        "API_UNAVAILABLE",
+                        format!("sput {owner}->{fname} requires a platform implementation"),
+                    )
+                    .into());
+                }
                 vm.statics.insert((owner, fname), regs[*a as usize].clone());
             }
 
@@ -1111,7 +1146,7 @@ fn new_filled_array(
         .alloc_array(elem, len, elem_class)
         .map_err(oom_exception)?;
     let elems = vm.heap.array_elems_mut(r)?;
-    elems.extend(std::iter::repeat(fill).take(len));
+    elems.extend(core::iter::repeat(fill).take(len));
     Ok(r)
 }
 
@@ -1162,10 +1197,10 @@ fn cmp_float(a: f32, b: f32, nan: i32) -> i32 {
     if a.is_nan() || b.is_nan() {
         return nan;
     }
-    match a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal) {
-        std::cmp::Ordering::Less => -1,
-        std::cmp::Ordering::Equal => 0,
-        std::cmp::Ordering::Greater => 1,
+    match a.partial_cmp(&b).unwrap_or(core::cmp::Ordering::Equal) {
+        core::cmp::Ordering::Less => -1,
+        core::cmp::Ordering::Equal => 0,
+        core::cmp::Ordering::Greater => 1,
     }
 }
 
@@ -1173,10 +1208,10 @@ fn cmp_double(a: f64, b: f64, nan: i32) -> i32 {
     if a.is_nan() || b.is_nan() {
         return nan;
     }
-    match a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal) {
-        std::cmp::Ordering::Less => -1,
-        std::cmp::Ordering::Equal => 0,
-        std::cmp::Ordering::Greater => 1,
+    match a.partial_cmp(&b).unwrap_or(core::cmp::Ordering::Equal) {
+        core::cmp::Ordering::Less => -1,
+        core::cmp::Ordering::Equal => 0,
+        core::cmp::Ordering::Greater => 1,
     }
 }
 
@@ -1548,11 +1583,13 @@ fn do_invoke(
             return Ok(v);
         }
         // M8: subsistemas de compat real (OkHttp/WorkManager/Room/Uri…)
+        #[cfg(feature = "std")]
         if let Some(v) = crate::m8::call_m8_static(vm, &mref.class, &mref.name, &mref.proto, slots)?
         {
             return Ok(v);
         }
         // M3: classes android/* são HOST (framework.rs) — nunca estão no DEX
+        #[cfg(feature = "std")]
         if mref.class.starts_with("Landroid/") {
             return match crate::framework::call_host_static(
                 vm,
@@ -1673,6 +1710,7 @@ fn do_invoke(
 
     // M8: compat real — host sequestra só os métodos listados em m8.rs;
     // `None` cai para o DEX real da biblioteca (androidx/okhttp no APK).
+    #[cfg(feature = "std")]
     if let Some(v) =
         crate::m8::call_m8_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
     {
@@ -1681,6 +1719,7 @@ fn do_invoke(
 
     // M3: framework host (Activity/View/TextView/Button/LinearLayout/
     // Handler/Intent/Bundle) — a classe DECLARANTE do method ref é android/*
+    #[cfg(feature = "std")]
     if mref.class.starts_with("Landroid/") {
         if !is_direct && !is_super {
             if let Some((d2, def, m)) = vm.cp.resolve_method(&recv_class, &mref.name, &mref.proto) {
@@ -1694,6 +1733,7 @@ fn do_invoke(
         }
         // Generic property storage is strictly last: it must not swallow
         // inherited View IDs, EditText text, or Activity/Context state.
+        #[cfg(feature = "std")]
         if let Some(value) = crate::view_props::fallback(
             vm,
             &mref.class,
@@ -1741,6 +1781,7 @@ fn do_invoke(
     let Some((d2, def, m)) = vm.cp.resolve_method(&start_class, &mref.name, &mref.proto) else {
         // D8 may use an app subclass as the inherited Android method owner.
         // DEX overrides above always win; direct app constructors stay direct.
+        #[cfg(feature = "std")]
         if !is_direct || is_super {
             if let Some(value) = inherited_android_host(
                 vm,
@@ -1761,6 +1802,7 @@ fn do_invoke(
 }
 
 /// Resolve only real inherited Android hosts; never invent an app method.
+#[cfg(feature = "std")]
 pub(crate) fn inherited_android_host(
     vm: &mut Engine,
     start: &str,
@@ -1818,6 +1860,7 @@ pub(crate) fn inherited_android_host(
         // Try generic properties only after every concrete Android host has had
         // a chance to handle the call (e.g. View.setId must not be shadowed by
         // a generic setId property on an intermediate EditText ancestor).
+        #[cfg(feature = "std")]
         if let Some(value) = crate::view_props::fallback(vm, &class, name, sig, recv, args)? {
             return Ok(Some(value));
         }

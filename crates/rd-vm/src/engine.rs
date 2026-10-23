@@ -2,9 +2,14 @@
 //! máquina de chamadas, inicialização de classes (`<clinit>`/static_values)
 //! e propagação de exceções entre frames.
 
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
-
+use crate::maps::{HashMap, HashSet};
+use alloc::{
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use rd_dex::classes::ClassDef;
 use rd_dex::code::CodeItem;
 use rd_dex::methods::EncodedMethod;
@@ -68,6 +73,7 @@ pub struct Engine {
     /// NoClassDefFoundError (issue #37)
     clinit_failed: HashSet<String>,
     /// M3: estado host do framework (Activity/View/Handler/…)
+    #[cfg(feature = "std")]
     pub fw: crate::framework::HostState,
     depth: usize,
     pub(crate) fuel_used: u64,
@@ -77,55 +83,81 @@ pub struct Engine {
     coverage: HashSet<u64>,
     pub(crate) frame_labels: Vec<String>,
     /// Cooperative green threads (threads.rs)
+    #[cfg(feature = "std")]
     pub threads: crate::threads::Threads,
     /// Session permission grant set (perms.rs); None = all granted.
+    #[cfg(feature = "std")]
     pub granted_permissions: Option<HashSet<String>>,
+    #[cfg(feature = "std")]
     pub(crate) pending_permission_results: Vec<crate::perms::PendingPermissionResult>,
     /// window → (decor, content frame) (window.rs)
+    #[cfg(feature = "std")]
     pub(crate) window_decor:
         HashMap<crate::heap::ObjRef, (crate::heap::ObjRef, crate::heap::ObjRef)>,
+    #[cfg(feature = "std")]
     pub(crate) system_ui_visibility: HashMap<crate::heap::ObjRef, i32>,
     /// General View property store (view_props.rs): (view, property) → value
+    #[cfg(feature = "std")]
     pub(crate) view_props: HashMap<(crate::heap::ObjRef, String), Value>,
     /// `java.text.BreakIterator` state (jbreakiter.rs)
+    #[cfg(feature = "std")]
     pub(crate) break_iters: HashMap<crate::heap::ObjRef, crate::jbreakiter::BreakState>,
     /// BigDecimal/BigInteger values: (unscaled, scale) (jbigdecimal.rs).
+    #[cfg(feature = "std")]
     pub(crate) bignums: HashMap<crate::heap::ObjRef, (i128, i32)>,
     /// dex pc of the instruction the interpreter executed last (diagnostics:
     /// VM errors name the faulting instruction of the innermost frame)
     pub(crate) last_pc: usize,
     /// view_attach.rs: OnAttachStateChangeListeners per view
+    #[cfg(feature = "std")]
     pub(crate) attach_listeners: HashMap<crate::heap::ObjRef, Vec<crate::heap::ObjRef>>,
     /// view_attach.rs: views currently attached to a window
+    #[cfg(feature = "std")]
     pub(crate) attached_views: HashSet<crate::heap::ObjRef>,
     /// graphics.rs: native state of host graphics objects + window display list
+    #[cfg(feature = "std")]
     pub(crate) gfx: crate::graphics::Gfx,
     /// android_util.rs: sparse-array contents (sorted)
+    #[cfg(feature = "std")]
     pub(crate) sparse: HashMap<crate::heap::ObjRef, std::collections::BTreeMap<i64, Value>>,
     /// view_attach.rs: windows made visible (makeVisible)
+    #[cfg(feature = "std")]
     pub(crate) window_attached: HashSet<crate::heap::ObjRef>,
     /// vto.rs: ViewTreeObserver state, and the observer of each tree root
+    #[cfg(feature = "std")]
     pub(crate) vto: HashMap<crate::heap::ObjRef, crate::vto::Observer>,
+    #[cfg(feature = "std")]
     pub(crate) vto_by_root: HashMap<crate::heap::ObjRef, crate::heap::ObjRef>,
     /// view_attach.rs: the window token handed to attached views
+    #[cfg(feature = "std")]
     pub(crate) window_token: Option<crate::heap::ObjRef>,
     /// choreographer.rs: frame callbacks
+    #[cfg(feature = "std")]
     pub(crate) frames: crate::choreographer::FrameState,
+    #[cfg(feature = "std")]
     pub(crate) frame_pump_active: bool,
     /// activity_callbacks.rs: ActivityLifecycleCallbacks registry
+    #[cfg(feature = "std")]
     pub(crate) activity_callbacks: crate::activity_callbacks::Registry,
     /// activity_extras.rs: setResult, back dispatchers and their callbacks
+    #[cfg(feature = "std")]
     pub(crate) activity_results: HashMap<crate::heap::ObjRef, (i32, Option<crate::heap::ObjRef>)>,
+    #[cfg(feature = "std")]
     pub(crate) back_dispatchers: HashMap<crate::heap::ObjRef, crate::heap::ObjRef>,
+    #[cfg(feature = "std")]
     pub(crate) back_callbacks: HashMap<crate::heap::ObjRef, Vec<(i32, crate::heap::ObjRef)>>,
     /// bundle.rs: Intent action/data/type/flags/package/categories
+    #[cfg(feature = "std")]
     pub(crate) intent_meta: HashMap<crate::heap::ObjRef, crate::bundle::IntentMeta>,
     /// content.rs: ContentResolver observers + Settings table
+    #[cfg(feature = "std")]
     pub(crate) content: crate::content::ContentState,
     /// Mark-sweep collector statistics (`gc.rs`).
     pub(crate) gc_stats: crate::gc::GcStats,
     pub(crate) gc_slots_after: usize,
     pub(crate) gc_frames: Vec<Vec<crate::heap::ObjRef>>,
+    #[cfg(not(feature = "std"))]
+    pub(crate) portable: crate::portable::State,
 }
 
 /// Cobertura por classe (AG-09, nível de método).
@@ -164,40 +196,67 @@ impl Engine {
             clinit_done: HashSet::new(),
             clinit_running: HashSet::new(),
             clinit_failed: HashSet::new(),
+            #[cfg(feature = "std")]
             fw: Default::default(),
             depth: 0,
             fuel_used: 0,
             fuel_window_start: 0,
             coverage: HashSet::new(),
             frame_labels: Vec::new(),
+            #[cfg(feature = "std")]
             threads: Default::default(),
+            #[cfg(feature = "std")]
             granted_permissions: None,
+            #[cfg(feature = "std")]
             pending_permission_results: Vec::new(),
+            #[cfg(feature = "std")]
             window_decor: HashMap::new(),
+            #[cfg(feature = "std")]
             system_ui_visibility: HashMap::new(),
+            #[cfg(feature = "std")]
             view_props: HashMap::new(),
+            #[cfg(feature = "std")]
             break_iters: HashMap::new(),
+            #[cfg(feature = "std")]
             bignums: HashMap::new(),
             last_pc: 0,
+            #[cfg(feature = "std")]
             attach_listeners: HashMap::new(),
+            #[cfg(feature = "std")]
             attached_views: HashSet::new(),
+            #[cfg(feature = "std")]
             gfx: Default::default(),
+            #[cfg(feature = "std")]
             sparse: HashMap::new(),
+            #[cfg(feature = "std")]
             window_attached: HashSet::new(),
+            #[cfg(feature = "std")]
             vto: HashMap::new(),
+            #[cfg(feature = "std")]
             vto_by_root: HashMap::new(),
+            #[cfg(feature = "std")]
             window_token: None,
+            #[cfg(feature = "std")]
             frames: Default::default(),
+            #[cfg(feature = "std")]
             frame_pump_active: false,
+            #[cfg(feature = "std")]
             activity_callbacks: Default::default(),
+            #[cfg(feature = "std")]
             activity_results: HashMap::new(),
+            #[cfg(feature = "std")]
             back_dispatchers: HashMap::new(),
+            #[cfg(feature = "std")]
             back_callbacks: HashMap::new(),
+            #[cfg(feature = "std")]
             intent_meta: HashMap::new(),
+            #[cfg(feature = "std")]
             content: Default::default(),
             gc_stats: Default::default(),
             gc_slots_after: 0,
             gc_frames: Vec::new(),
+            #[cfg(not(feature = "std"))]
+            portable: Default::default(),
             #[cfg(feature = "jit")]
             jit: {
                 let mut j = crate::jit::JitState::default();
@@ -238,6 +297,7 @@ impl Engine {
     /// AndroidManifest.xml (`android:name`). Quando presente, `launch_app`
     /// instancia ESSA classe (e não `Landroid/app/Application;`) e roda o
     /// onCreate DEX dela antes do onCreate da activity — como o Android faz.
+    #[cfg(feature = "std")]
     pub fn set_application_class(&mut self, application_desc: String) {
         self.fw.application_class = Some(application_desc);
     }
@@ -301,9 +361,11 @@ impl Engine {
         if let Some(v) = intrinsics::call_static_intrinsic(self, class, method, sig, &args)? {
             return Ok(v);
         }
+        #[cfg(feature = "std")]
         if let Some(v) = crate::m8::call_m8_static(self, class, method, sig, &args)? {
             return Ok(v);
         }
+        #[cfg(feature = "std")]
         if class.starts_with("Landroid/") {
             if let Some(v) = crate::framework::call_host_static(self, class, method, sig, &args)? {
                 return Ok(v);
@@ -376,14 +438,17 @@ impl Engine {
             )? {
                 return Ok(v);
             }
+            #[cfg(feature = "std")]
             if let Some(v) = crate::m8::call_m8_instance(self, &class, method, sig, recv, &args)? {
                 return Ok(v);
             }
+            #[cfg(feature = "std")]
             if let Some(v) =
                 crate::interp::inherited_android_host(self, &class, method, sig, recv, &args)?
             {
                 return Ok(v);
             }
+            #[cfg(feature = "std")]
             if let Some(v) = crate::view_props::fallback(self, &class, method, sig, recv, &args)? {
                 return Ok(v);
             }
@@ -424,6 +489,7 @@ impl Engine {
             )
             .into());
         }
+        #[cfg(feature = "std")]
         if let Some(pat) = trace_method_pattern() {
             let label = self.method_label(dex_idx, m);
             if label.contains(pat) {
@@ -550,7 +616,7 @@ impl Engine {
                 // the guest stack too, so an agent can see which app code
                 // hit the gap. The green-thread park signal is control flow,
                 // not an error.
-                Err(VmExit::Error(ref mut e)) if e.code != crate::threads::PARK_SIGNAL => {
+                Err(VmExit::Error(ref mut e)) if e.code != "RD_THREAD_PARK" => {
                     if !e.cause.contains("\n  at ") {
                         // innermost frame: name the faulting instruction
                         let pc = self.last_pc;
@@ -730,6 +796,7 @@ impl Engine {
     /// o LayoutInflater usa para resolver `@dimen`/`@bool` por referência.
     /// Erro tipado se o resid não existe ou o tipo não é representável
     /// (nunca default silencioso — resíduo da deferral da #46).
+    #[cfg(feature = "std")]
     pub fn resolve_resource_value(
         &self,
         resid: u32,
@@ -957,6 +1024,7 @@ pub fn parse_param_types(sig: &str) -> Option<Vec<String>> {
 
 /// `RD_TRACE_METHOD=<substring>`: log every guest method entry whose label
 /// (`Lpkg/Class;->name(sig)`) contains the substring (debugging aid).
+#[cfg(feature = "std")]
 fn trace_method_pattern() -> Option<&'static str> {
     static PAT: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
     PAT.get_or_init(|| {

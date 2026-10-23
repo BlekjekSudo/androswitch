@@ -7,7 +7,7 @@
 use crate::axml::ComplexUnit;
 use crate::error::{RdError, RdResult};
 use crate::pool::StringPool;
-use std::collections::BTreeMap;
+use alloc::{borrow::ToOwned, collections::BTreeMap, format, string::String, vec::Vec};
 
 pub const RES_TABLE_TYPE: u16 = 0x0002;
 pub const RES_TABLE_PACKAGE_TYPE: u16 = 0x0200;

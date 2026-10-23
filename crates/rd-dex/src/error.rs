@@ -3,8 +3,11 @@
 //! Toda falha é um `RdError` serializável em JSON:
 //! `{ "code", "cause", "suggestion", "module_id" }` — nunca pânico silencioso (Lei 1).
 
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::String};
+
+use core::fmt;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 /// Erro estruturado do RustyDroid. `code` é estável e consumível por agentes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,6 +63,7 @@ impl RdError {
     }
 
     /// Erro de I/O com contexto.
+    #[cfg(feature = "std")]
     pub fn io(err: &std::io::Error, context: impl Into<String>) -> Self {
         RdError::new(
             "IO_ERROR",
@@ -79,8 +83,13 @@ impl fmt::Display for RdError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for RdError {}
 
+#[cfg(not(feature = "std"))]
+impl core::error::Error for RdError {}
+
+#[cfg(feature = "std")]
 impl From<std::io::Error> for RdError {
     fn from(err: std::io::Error) -> Self {
         RdError::io(&err, "I/O failure")

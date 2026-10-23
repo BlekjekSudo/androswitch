@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-23",
+  "milestone": "M1",
+  "implementation_status": "partial",
+  "scope": "no_std DEX parser, allocation, SD file input and monotonic timing; no bytecode/APK execution",
+  "rust_toolchain": "nightly-2026-08-26",
+  "reference_apk_sha256": "19d51fad482239f6df6a99120e34513667e9a86d136dafdc4a211a68c3327b52",
+  "reference_dex_sha256": "a6aff7e100fb7e33b17fd11b2b594999016e4b099718c6ec393e462d269ac059",
+  "nro_sha256": "96e4c6cc505377be82cec4871cb334cec1e1f246addd2ef37693a892d42efc51",
+  "heap_bytes": 268435456,
+  "host_expected": {
+    "schema_version": 1,
+    "status": "ok",
+    "operation": "inspect_dex",
+    "version": 37,
+    "file_size": 9297608,
+    "classes": 11168,
+    "methods": 65003,
+    "strings": 62734,
+    "checksum_ok": 1,
+    "bytecode_executed": false
+  },
+  "observed": {
+    "schema_version": 1,
+    "kind": "dex_parser_smoke",
+    "allocator_checksum": 32640,
+    "parse_result": 0,
+    "version": 37,
+    "file_size": 9297608,
+    "classes": 11168,
+    "methods": 65003,
+    "strings": 62734,
+    "checksum_ok": 1,
+    "elapsed_micros": 1074602,
+    "apk_execution": false
+  },
+  "observed_report_sha256": "25ee997b226222f8d19c611f6b3203ffc5baac77127c28e56db83bf7bf5603df",
+  "verification": {
+    "host_parser": "passed",
+    "horizon_emulator": "passed_for_parser_smoke",
+    "physical_device": "pending"
+  },
+  "remaining": [
+    "portable APK parser",
+    "portable interpreter and shared VM platform state",
+    "complete M1 emulator gate",
+    "physical-device validation"
+  ],
+  "historical_snapshot": true,
+  "superseded_by": "m1-core.json"
+}

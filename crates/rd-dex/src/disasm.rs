@@ -23,7 +23,13 @@
 //! como `nop // unused 0xXX`; `nop` real (0x00) vira `nop` puro. 0xd8–0xe2 são
 //! os `*int/lit8` válidos — NÃO fazem parte do intervalo unused (issue #13).
 
-use std::collections::BTreeMap;
+use alloc::collections::BTreeMap;
+#[cfg(not(feature = "std"))]
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 use crate::annotations::{
     parse_annotation_item, parse_annotation_set_item, parse_annotation_set_ref_list,
@@ -991,7 +997,7 @@ impl<'a> MethodRender<'a> {
                         _ => {
                             // largura incomum — bytes brutos (tolerante)
                             let hex: String = b.iter().fold(String::new(), |mut acc, x| {
-                                use std::fmt::Write as _;
+                                use core::fmt::Write as _;
                                 let _ = write!(acc, "{x:02x}");
                                 acc
                             });
@@ -1710,12 +1716,12 @@ mod tests {
             }
 
             d.extend_from_slice(&self.buf);
-            let patches = std::mem::take(&mut self.patches);
+            let patches = core::mem::take(&mut self.patches);
             for (pos, target) in patches {
                 let at = data_base + pos;
                 d[at..at + 4].copy_from_slice(&((data_base + target) as u32).to_le_bytes());
             }
-            let uleb_patches = std::mem::take(&mut self.uleb_patches);
+            let uleb_patches = core::mem::take(&mut self.uleb_patches);
             for (pos, target) in uleb_patches {
                 let at = data_base + pos;
                 let abs = (data_base + target as usize) as u32;

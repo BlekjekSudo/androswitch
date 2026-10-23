@@ -3,6 +3,7 @@
 //! + wide (long/double ocupam 2 registradores) + referências de heap.
 
 use crate::heap::ObjRef;
+use alloc::{format, string::String};
 
 /// Valor de registrador/campo/elemento. `Lower` marca a metade alta de um wide
 /// (o par vN/vN+1 do Dalvik); nunca é lido diretamente — ler wide lê vN.

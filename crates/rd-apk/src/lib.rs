@@ -3,10 +3,24 @@
 //!
 //! Contrato de erro: `RdError { code, cause, suggestion, module_id }` (Apêndice I).
 
+#![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
+#[cfg(all(test, not(feature = "std")))]
+extern crate std;
+
+#[cfg(feature = "std")]
+use alloc::format;
+use alloc::{
+    collections::BTreeSet,
+    string::{String, ToString},
+    vec::Vec,
+};
+
 pub mod arsc;
 pub mod axml;
 pub mod error;
 pub mod manifest;
+#[cfg(feature = "std")]
 pub mod paged;
 pub mod pool;
 pub mod signing;
@@ -18,6 +32,7 @@ pub use signing::SigningInfo;
 pub use zip::Zip;
 
 use serde::Serialize;
+#[cfg(feature = "std")]
 use std::path::Path;
 
 /// Piso de API do RustyDroid (spec: minSdk 26 — Android 8.0 Oreo).
@@ -64,6 +79,7 @@ impl Apk {
     pub const MAX_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 
     /// Abre e parseia um APK do disco.
+    #[cfg(feature = "std")]
     pub fn open(path: &Path) -> RdResult<Apk> {
         let meta = std::fs::metadata(path)
             .map_err(|e| RdError::io(&e, format!("stat {}", path.display())))?;
@@ -106,7 +122,7 @@ impl Apk {
         let mut res_count = 0usize;
         // issue #84: inventário por nome ÚNICO — uma entrada repetida não
         // vira "dois DEX" (o que distorcia o resumo do `inspect`).
-        let mut seen_names = std::collections::HashSet::new();
+        let mut seen_names = BTreeSet::new();
         for name in zip.names() {
             if !seen_names.insert(name) {
                 continue;

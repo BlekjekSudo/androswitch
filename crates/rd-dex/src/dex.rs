@@ -4,6 +4,9 @@
 //! seu offset. Toda leitura é bounds-checked; contagens implausíveis falham
 //! tipado antes de alocar (estilo fuzz-hardened do rd-apk).
 
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::String, string::ToString, vec::Vec};
+
 use crate::annotations::EncodedValue;
 use crate::classes::{self, ClassData, ClassDef};
 use crate::error::{RdError, RdResult};
@@ -243,7 +246,11 @@ pub struct Dex {
     /// descriptor -> class_defs position, built lazily on first
     /// `find_class` (the linear scan dominated launch time on
     /// 10k-class apps).
+    #[cfg(feature = "std")]
     pub class_index: std::sync::OnceLock<std::collections::HashMap<String, usize>>,
+    /// The portable parser eagerly indexes classes without host synchronization.
+    #[cfg(not(feature = "std"))]
+    pub class_index: alloc::collections::BTreeMap<String, usize>,
 }
 
 impl Dex {
@@ -301,6 +308,19 @@ impl Dex {
             }
         }
 
+        #[cfg(not(feature = "std"))]
+        let class_index = {
+            let mut index = alloc::collections::BTreeMap::new();
+            for (position, def) in class_defs.iter().enumerate() {
+                let descriptor = type_ids
+                    .string_idx
+                    .get(def.class_idx as usize)
+                    .map(|&idx| strings.get_or_empty(idx))
+                    .unwrap_or("?");
+                index.entry(descriptor.to_string()).or_insert(position);
+            }
+            index
+        };
         Ok(Dex {
             data,
             header,
@@ -311,7 +331,10 @@ impl Dex {
             field_ids,
             method_ids,
             class_defs,
+            #[cfg(feature = "std")]
             class_index: std::sync::OnceLock::new(),
+            #[cfg(not(feature = "std"))]
+            class_index,
             call_site_offsets,
             method_handles,
         })
@@ -339,7 +362,7 @@ impl Dex {
         if data[0..4] != DEX_MAGIC {
             return Err(RdError::invalid_format(format!(
                 "dex: magic inválido (esperado {:?}, got {:?})",
-                std::str::from_utf8(&DEX_MAGIC).unwrap_or("?"),
+                core::str::from_utf8(&DEX_MAGIC).unwrap_or("?"),
                 String::from_utf8_lossy(&data[0..4])
             )));
         }
@@ -535,6 +558,7 @@ impl Dex {
     /// cross-DEX misses made fallback scans catastrophic. The lazy
     /// HashMap build measured faster end-to-end on the M7 gate APK.)
     pub fn find_class(&self, descriptor: &str) -> Option<&ClassDef> {
+        #[cfg(feature = "std")]
         let idx = self.class_index.get_or_init(|| {
             let mut m = std::collections::HashMap::with_capacity(self.class_defs.len());
             for (i, d) in self.class_defs.iter().enumerate() {
@@ -542,6 +566,8 @@ impl Dex {
             }
             m
         });
+        #[cfg(not(feature = "std"))]
+        let idx = &self.class_index;
         idx.get(descriptor).map(|&i| &self.class_defs[i])
     }
 }

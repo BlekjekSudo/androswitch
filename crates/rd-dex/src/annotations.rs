@@ -25,6 +25,9 @@
 //! expostos; os bytes brutos permanecem em `Dex::data`. Lei 1: toda leitura
 //! é bounds-checked, falha sempre tipada, sem pânico.
 
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec::Vec};
+
 use crate::error::{RdError, RdResult};
 use crate::read::Reader;
 

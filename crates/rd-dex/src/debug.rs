@@ -6,6 +6,9 @@
 //! 0x09 SET_FILE, 0x0a+ especial: `adjusted = op - 0x0a`;
 //! `addr += adjusted / 15`; `line += LINE_BASE(-4) + adjusted % 15`.
 
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec, vec::Vec};
+
 use crate::error::{RdError, RdResult};
 use crate::read::Reader;
 

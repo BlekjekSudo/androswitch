@@ -5,6 +5,10 @@
 //! decimal curto quando `1e-3 ≤ |v| < 1e7`, senão notação `1.0E23`/`1.0E-5`
 //! (mantissa com pelo menos um dígito após o ponto, `E` maiúsculo, sem `+`).
 
+use alloc::{
+    format,
+    string::{String, ToString},
+};
 /// Formata um `f64` como `Double.toString` do Java.
 pub fn java_double(v: f64) -> String {
     if v.is_nan() {

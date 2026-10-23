@@ -6,6 +6,12 @@
 
 use crate::error::{RdError, RdResult};
 use crate::pool::{StringPool, RES_STRING_POOL_TYPE};
+use alloc::{
+    borrow::ToOwned,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 pub const RES_XML_TYPE: u16 = 0x0003;
 pub const RES_XML_RESOURCE_MAP_TYPE: u16 = 0x0180;
@@ -59,8 +65,8 @@ pub enum ComplexUnit {
     Unknown(u8),
 }
 
-impl std::fmt::Display for ComplexUnit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for ComplexUnit {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let s = match self {
             ComplexUnit::Px => "px",
             ComplexUnit::Dip => "dp",
@@ -237,9 +243,9 @@ pub struct XmlElement {
 impl Drop for XmlElement {
     fn drop(&mut self) {
         let mut stack = Vec::new();
-        stack.extend(std::mem::take(&mut self.children));
+        stack.extend(core::mem::take(&mut self.children));
         while let Some(mut node) = stack.pop() {
-            stack.extend(std::mem::take(&mut node.children));
+            stack.extend(core::mem::take(&mut node.children));
         }
     }
 }

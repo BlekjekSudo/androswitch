@@ -13,9 +13,16 @@ authors.workspace = true
 workspace = true
 
 [dependencies]
-thiserror.workspace = true
-serde.workspace = true
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+flate2 = { workspace = true, optional = true }
+miniz_oxide = { version = "=0.9.1", default-features = false, features = ["with-alloc"] }
+
+[dev-dependencies]
 serde_json.workspace = true
 flate2.workspace = true
+
+[features]
+default = ["std"]
+std = ["serde/std", "dep:flate2"]
 
 # (integração com fixture real é opcional e guiada por env RD_TEST_APK)

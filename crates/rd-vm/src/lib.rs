@@ -5,87 +5,183 @@
 //! vectors vs execução real). Heap arena com o orçamento do piso moto-e5
 //! (heap ≤ 256 MB — PRF-06/A2); OOM é erro tipado, nunca abort (Lei 1).
 
+#![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
+
+use alloc::{
+    format,
+    string::{String, ToString},
+};
+
+#[cfg(not(feature = "std"))]
+mod portable;
+#[cfg(feature = "std")]
+pub(crate) mod maps {
+    pub use std::collections::{hash_map::Entry, HashMap, HashSet};
+}
+#[cfg(not(feature = "std"))]
+pub(crate) mod maps {
+    pub use alloc::collections::{BTreeMap as HashMap, BTreeSet as HashSet};
+}
+
 #[cfg(feature = "advanced-components")]
+#[cfg(feature = "std")]
 pub mod accessibility_node;
+#[cfg(feature = "std")]
 pub(crate) mod activity_callbacks;
+#[cfg(feature = "std")]
 pub(crate) mod activity_extras;
+#[cfg(feature = "std")]
 pub mod android_build;
+#[cfg(feature = "std")]
 pub(crate) mod android_colorspace;
+#[cfg(feature = "std")]
 pub(crate) mod android_display;
+#[cfg(feature = "std")]
 pub(crate) mod android_drawable;
+#[cfg(feature = "std")]
 pub(crate) mod android_env;
+#[cfg(feature = "std")]
 pub(crate) mod android_motion;
+#[cfg(feature = "std")]
 pub(crate) mod android_observable;
+#[cfg(feature = "std")]
 pub(crate) mod android_pm;
+#[cfg(feature = "std")]
 pub(crate) mod android_region;
+#[cfg(feature = "std")]
 pub(crate) mod android_res;
+#[cfg(feature = "std")]
 pub(crate) mod android_spannable;
+#[cfg(feature = "std")]
 pub(crate) mod android_text;
+#[cfg(feature = "std")]
 pub(crate) mod android_uri;
+#[cfg(feature = "std")]
 pub(crate) mod android_util;
+#[cfg(feature = "std")]
 pub(crate) mod arrays;
+#[cfg(feature = "std")]
 pub(crate) mod atomics;
+#[cfg(feature = "std")]
 pub(crate) mod boxes;
+#[cfg(feature = "std")]
 pub(crate) mod bundle;
+#[cfg(feature = "std")]
 pub(crate) mod choreographer;
 pub mod classpath;
+#[cfg(feature = "std")]
 pub(crate) mod collections;
+#[cfg(feature = "std")]
 pub(crate) mod content;
 pub mod engine;
 pub mod err;
+#[cfg(feature = "std")]
 pub mod framework;
+#[cfg(feature = "std")]
 pub mod gc;
+#[cfg(not(feature = "std"))]
+#[path = "portable/gc.rs"]
+pub mod gc;
+#[cfg(feature = "std")]
 pub mod graphics;
+#[cfg(feature = "std")]
 pub(crate) mod handler_msg;
 pub mod heap;
+#[cfg(feature = "std")]
 pub mod inflate;
 pub mod interp;
+#[cfg(feature = "std")]
 pub mod intrinsics;
+#[cfg(not(feature = "std"))]
+#[path = "portable/intrinsics.rs"]
+pub mod intrinsics;
+#[cfg(feature = "std")]
 pub(crate) mod jannotations;
+#[cfg(feature = "std")]
 pub(crate) mod jbigdecimal;
+#[cfg(feature = "std")]
 pub(crate) mod jbreakiter;
+#[cfg(feature = "std")]
 pub(crate) mod jcollections;
+#[cfg(feature = "std")]
 pub(crate) mod jfile;
+#[cfg(feature = "std")]
 pub(crate) mod jio_chars;
 #[cfg(feature = "jit")]
+#[cfg(feature = "std")]
 pub mod jit;
+#[cfg(feature = "std")]
 pub(crate) mod jiterator;
+#[cfg(feature = "std")]
 pub(crate) mod jlclass;
+#[cfg(feature = "std")]
 pub(crate) mod jlocks;
+#[cfg(feature = "std")]
 pub(crate) mod jlstring;
+#[cfg(feature = "std")]
 pub(crate) mod jlsystem;
+#[cfg(feature = "std")]
 pub(crate) mod jnormalizer;
+#[cfg(feature = "std")]
 pub(crate) mod jpriorityqueue;
+#[cfg(feature = "std")]
 pub(crate) mod jrandom;
+#[cfg(feature = "std")]
 pub(crate) mod jregex;
+#[cfg(feature = "std")]
 pub(crate) mod jresources;
+#[cfg(feature = "std")]
 pub(crate) mod jsb;
+#[cfg(feature = "std")]
 pub(crate) mod jsecurity;
+#[cfg(feature = "std")]
 pub(crate) mod jsorted;
+#[cfg(feature = "std")]
 pub(crate) mod jsqlite;
+#[cfg(feature = "std")]
 pub(crate) mod jstring_tokenizer;
+#[cfg(feature = "std")]
 pub(crate) mod jtext_format;
+#[cfg(feature = "std")]
 pub(crate) mod jtime;
+#[cfg(feature = "std")]
 pub(crate) mod juuid;
+#[cfg(feature = "std")]
 pub(crate) mod jxml;
+#[cfg(feature = "std")]
 pub mod m8;
 #[cfg(feature = "advanced-components")]
+#[cfg(feature = "std")]
 pub mod m9;
 #[cfg(feature = "native")]
+#[cfg(feature = "std")]
 pub mod native;
+#[cfg(feature = "std")]
 pub(crate) mod numerics;
+#[cfg(feature = "std")]
 pub mod perms;
+#[cfg(feature = "std")]
 pub(crate) mod platform_base;
+#[cfg(feature = "std")]
 pub(crate) mod reflect;
 pub mod repr;
+#[cfg(feature = "std")]
 pub mod threads;
+#[cfg(feature = "std")]
 pub(crate) mod throwable;
 pub mod value;
+#[cfg(feature = "std")]
 pub(crate) mod view_attach;
+#[cfg(feature = "std")]
 pub(crate) mod view_layout;
+#[cfg(feature = "std")]
 pub(crate) mod view_props;
+#[cfg(feature = "std")]
 pub(crate) mod vto;
+#[cfg(feature = "std")]
 pub(crate) mod window;
+#[cfg(feature = "std")]
 pub(crate) mod xml_res;
 
 use rd_dex::annotations::EncodedValue;
@@ -94,11 +190,14 @@ use rd_dex::Dex;
 pub use engine::{ClassCoverage, CoverageSnapshot, Engine, VmConfig};
 pub use err::{Throwable, VmExit};
 pub use heap::ObjRef;
+#[cfg(feature = "std")]
 pub use intrinsics::{route_app_stdout_to_stderr, set_app_stdout, HostOut};
 pub use value::Value;
 
 /// Módulo do contrato de erro.
 pub const MODULE_ID: &str = "rd-vm";
+/// Explicit evidence of the linked VM variant (Cargo features are additive).
+pub const PORTABLE_CORE: bool = !cfg!(feature = "std");
 
 /// Converte um `EncodedValue` (static_values de class_def) em `Value`,
 /// alocando strings no heap da VM. `None` = tipo não representável no M2

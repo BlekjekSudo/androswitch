@@ -5,7 +5,13 @@
 //! viram tombstones e são reciclados pela free list); o resto é liberado de
 //! uma vez quando o `Engine` morre.
 
+use crate::maps::HashSet;
 use crate::value::Value;
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 /// Referência de objeto (índice + 1 na arena; 0 = inválido).
 pub type ObjRef = u32;
@@ -85,7 +91,7 @@ pub struct Heap {
     /// Slots freed by the GC, reused LIFO by `alloc` (see `gc.rs`).
     free: Vec<ObjRef>,
     young: Vec<bool>,
-    remembered: std::collections::HashSet<ObjRef>,
+    remembered: HashSet<ObjRef>,
     // Some = host scope (pin allocations); None = guest execution.
     gc_scopes: Vec<Option<Vec<ObjRef>>>,
     births: Vec<u64>,
@@ -110,12 +116,14 @@ impl Heap {
         }
     }
 
+    #[cfg(feature = "std")]
     pub(crate) fn is_young(&self, r: ObjRef) -> bool {
         self.young
             .get(r.wrapping_sub(1) as usize)
             .copied()
             .unwrap_or(true)
     }
+    #[cfg(feature = "std")]
     pub(crate) fn remembered(&self) -> impl Iterator<Item = ObjRef> + '_ {
         self.remembered.iter().copied()
     }
@@ -140,6 +148,7 @@ impl Heap {
     /// A nested Rust host call can return a temporary to its enclosing host
     /// callback. Preserve all nested pins conservatively until that callback
     /// returns, but never promote them through an intervening Java frame.
+    #[cfg(feature = "std")]
     pub(crate) fn gc_host_restore(&mut self, depth: usize) {
         let roots = self
             .gc_scopes
@@ -318,7 +327,7 @@ impl Heap {
         // (Value = 32 B), não o tamanho lógico do elemento (4/8 B) — com a
         // contabilidade antiga o RSS real chegava a ~8× o orçamento (DoS)
         let bytes = len
-            .saturating_mul(std::mem::size_of::<Value>())
+            .saturating_mul(core::mem::size_of::<Value>())
             .saturating_add(16);
         let array_desc = if elem_class.starts_with('[') {
             elem_class.to_string()
@@ -374,7 +383,7 @@ impl Heap {
             HeapObj::Instance { fields, .. } => {
                 fields
                     .iter()
-                    .map(|(n, _)| std::mem::size_of::<Value>() + n.len())
+                    .map(|(n, _)| core::mem::size_of::<Value>() + n.len())
                     .sum::<usize>()
                     .max(fields.len() * 24)
                     + 32
@@ -382,7 +391,7 @@ impl Heap {
             HeapObj::Str(s) => s.len().saturating_mul(2).saturating_add(32),
             HeapObj::Array { elems, .. } => elems
                 .len()
-                .saturating_mul(std::mem::size_of::<Value>())
+                .saturating_mul(core::mem::size_of::<Value>())
                 .saturating_add(16),
         };
         *slot = HeapObj::Instance {
@@ -474,7 +483,7 @@ impl Heap {
             Err(_) => return Err(FieldWriteErr::NotInstance),
         };
         if is_new {
-            let cost = std::mem::size_of::<Value>() + name.len();
+            let cost = core::mem::size_of::<Value>() + name.len();
             let new_used = self
                 .used
                 .checked_add(cost)

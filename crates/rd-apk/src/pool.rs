@@ -5,6 +5,7 @@
 //! terminador nulo — decodificação total com bounds-checks (parsers nunca confiam).
 
 use crate::error::{RdError, RdResult};
+use alloc::{format, string::String, vec::Vec};
 
 pub const RES_STRING_POOL_TYPE: u16 = 0x0001;
 pub const UTF8_FLAG: u32 = 1 << 8;

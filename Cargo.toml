@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/as-platform",
+    "crates/as-runtime",
+    "crates/as-cli",
+    "crates/as-switch-smoke",
+    "crates/as-testsupport",
     "crates/rd-apk",
     "crates/rd-dex",
     "crates/rd-vm",

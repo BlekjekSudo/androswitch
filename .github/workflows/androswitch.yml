@@ -1,0 +1,54 @@
+name: AndroSwitch
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  inspection:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.1
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy -p as-platform -p as-runtime -p as-cli --all-targets --locked -- -D warnings
+      - run: cargo test -p as-platform -p as-runtime -p as-cli --locked
+      - run: cargo check -p as-platform --no-default-features --locked
+      - run: cargo check -p rd-dex --no-default-features --locked
+      - run: cargo clippy -p rd-apk -p rd-vm --no-default-features --lib --locked -- -D warnings
+      - run: cargo test -p as-switch-smoke --locked
+      - run: cargo test -p as-switch-smoke --features portable-tests --test portable_core --locked
+      - name: Download checksum-pinned real APK
+        shell: pwsh
+        run: ./scripts/fetch-fixtures.ps1 -ExtractDex
+      - run: cargo test -p as-runtime --test inspection --locked -- --ignored
+      - run: cargo test -p rd-dex --test portable_index --locked -- --ignored
+      - run: cargo test -p rd-dex --no-default-features --test portable_index --locked -- --ignored
+      - run: cargo test -p rd-apk -p rd-dex --lib --locked -- --test-threads=1 --skip paged_open_handles_sparse_multigigabyte_container
+      - run: cargo run -p as-cli --locked -- inspect fixtures/cache/org.fdroid.fdroid_2000052.apk --json
+
+  inherited-linux:
+    name: Inherited Linux baseline (known MCP failures)
+    runs-on: ubuntu-latest
+    # Recorded baseline failures do not weaken required AndroSwitch/parser gates.
+    continue-on-error: true
+    env:
+      CARGO_BUILD_JOBS: 1
+      CARGO_PROFILE_TEST_DEBUG: 0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.1
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --locked
+      - if: always()
+        run: python -X utf8 scripts/check_md_links.py

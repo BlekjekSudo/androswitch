@@ -2,9 +2,13 @@
 //! mais DEX (APK real = classes.dex/classes2.dex/…). Cache de `CodeItem`
 //! parseado por offset (loops invocam o mesmo método repetidamente).
 
-use std::collections::HashMap;
-use std::sync::Arc;
-
+use crate::maps::{HashMap, HashSet};
+use alloc::{
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use rd_dex::classes::{ClassData, ClassDef};
 use rd_dex::code::CodeItem;
 use rd_dex::{Dex, RdError, RdResult};
@@ -35,9 +39,9 @@ pub struct MethodRef {
 }
 
 /// method_id (dex, idx) -> resolved method reference (ADR 008 Stage 1b).
-type MethodRefCache = std::cell::RefCell<HashMap<(usize, u32), Arc<MethodRef>>>;
+type MethodRefCache = core::cell::RefCell<HashMap<(usize, u32), Arc<MethodRef>>>;
 /// field_id (dex, idx) -> (class, name, type) reference.
-type FieldRefCache = std::cell::RefCell<HashMap<(usize, u32), Arc<(String, String, String)>>>;
+type FieldRefCache = core::cell::RefCell<HashMap<(usize, u32), Arc<(String, String, String)>>>;
 /// (class, name, proto) -> virtual resolution result.
 type ResolveCache =
     HashMap<(String, String, String), Option<(usize, ClassDef, rd_dex::methods::EncodedMethod)>>;
@@ -62,7 +66,7 @@ pub struct Classpath {
     /// deliberately mutates DEX metadata to re-check), class *identity*
     /// lookup is only memoized as an index pair and re-borrowed from the
     /// live DEX each call, so in-place def edits stay visible.
-    find_class_cache: std::cell::RefCell<HashMap<String, Option<(usize, usize)>>>,
+    find_class_cache: core::cell::RefCell<HashMap<String, Option<(usize, usize)>>>,
 }
 
 impl Classpath {
@@ -71,10 +75,10 @@ impl Classpath {
             dexes,
             code_cache: HashMap::new(),
             class_data_cache: HashMap::new(),
-            method_ref_cache: std::cell::RefCell::new(HashMap::new()),
-            field_ref_cache: std::cell::RefCell::new(HashMap::new()),
+            method_ref_cache: core::cell::RefCell::new(HashMap::new()),
+            field_ref_cache: core::cell::RefCell::new(HashMap::new()),
             resolve_cache: HashMap::new(),
-            find_class_cache: std::cell::RefCell::new(HashMap::new()),
+            find_class_cache: core::cell::RefCell::new(HashMap::new()),
         }
     }
 
@@ -149,7 +153,7 @@ impl Classpath {
                 let ci = dex
                     .class_defs
                     .iter()
-                    .position(|d| std::ptr::eq(d, def))
+                    .position(|d| core::ptr::eq(d, def))
                     .unwrap_or(usize::MAX);
                 found = if ci == usize::MAX {
                     return Some((i, def));
@@ -390,7 +394,7 @@ impl Classpath {
         // interfaces: mesma ordem de visita do resolve_method (da classe mais
         // derivada para a raiz — fase 2 do JVMS 5.4.3.2)
         let mut queue: Vec<String> = self.interfaces_of(class_desc);
-        let mut visited: std::collections::HashSet<String> = queue.iter().cloned().collect();
+        let mut visited: HashSet<String> = queue.iter().cloned().collect();
         let mut budget = 64;
         while let Some(iface) = queue.pop() {
             budget -= 1;
@@ -501,7 +505,7 @@ impl Classpath {
     /// Closure de interfaces: `sup` é interface de `start` (direta ou via
     /// superinterfaces, com guard de ciclo e cap de profundidade) — issue #26.
     fn interface_closure_contains(&self, mut queue: Vec<String>, sup: &str) -> bool {
-        let mut visited: std::collections::HashSet<String> = queue.iter().cloned().collect();
+        let mut visited: HashSet<String> = queue.iter().cloned().collect();
         let mut budget = 64;
         while let Some(cur) = queue.pop() {
             if cur == sup {
@@ -1764,7 +1768,7 @@ mod tests {
     use super::*;
     fn legacy_interface_closure(cp: &Classpath, start: &str, sup: &str) -> bool {
         let mut queue = cp.interfaces_of(start);
-        let mut visited: std::collections::HashSet<String> = queue.iter().cloned().collect();
+        let mut visited: HashSet<String> = queue.iter().cloned().collect();
         let mut budget = 64;
         while let Some(cur) = queue.pop() {
             if cur == sup {

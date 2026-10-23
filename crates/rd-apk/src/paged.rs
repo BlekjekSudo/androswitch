@@ -19,8 +19,23 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Read as _;
+#[cfg(unix)]
 use std::os::unix::fs::FileExt;
+#[cfg(windows)]
+use std::os::windows::fs::FileExt;
 use std::path::Path;
+
+/// Positional I/O without changing the file cursor on either host platform.
+fn read_at(file: &File, buf: &mut [u8], offset: u64) -> std::io::Result<usize> {
+    #[cfg(unix)]
+    {
+        file.read_at(buf, offset)
+    }
+    #[cfg(windows)]
+    {
+        file.seek_read(buf, offset)
+    }
+}
 
 pub const PAGE_BYTES: usize = 64 * 1024;
 pub const CACHE_PAGES: usize = 256; // 256 * 64 KiB = 16 MiB hard cap
@@ -50,9 +65,7 @@ impl LruPageCache {
                 self.pages.push_back((page_idx, page));
             } else {
                 let mut page = vec![0u8; PAGE_BYTES];
-                let n = self
-                    .file
-                    .read_at(&mut page, page_idx * PAGE_BYTES as u64)
+                let n = read_at(&self.file, &mut page, page_idx * PAGE_BYTES as u64)
                     .map_err(|e| RdError::io(&e, "paged-zip read_at"))?;
                 page.truncate(n);
                 if page_off + take > page.len() {
@@ -328,7 +341,7 @@ impl PagedZip {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write as _;
+    use std::io::{Seek as _, SeekFrom, Write as _};
 
     fn stored_zip_bytes(entries: &[(&str, &[u8])]) -> Vec<u8> {
         let mut out = Vec::new();
@@ -458,7 +471,8 @@ mod tests {
         let mut f = std::fs::File::create(&path).unwrap();
         f.write_all(&lh).unwrap();
         f.set_len(cd_off).unwrap();
-        f.write_at(&cd, cd_off).unwrap();
+        f.seek(SeekFrom::Start(cd_off)).unwrap();
+        f.write_all(&cd).unwrap();
         let mut eocd = Vec::new();
         eocd.extend_from_slice(&EOCD_SIG.to_le_bytes());
         eocd.extend_from_slice(&0u16.to_le_bytes());
@@ -468,7 +482,8 @@ mod tests {
         eocd.extend_from_slice(&(cd.len() as u32).to_le_bytes());
         eocd.extend_from_slice(&(cd_off as u32).to_le_bytes());
         eocd.extend_from_slice(&0u16.to_le_bytes());
-        f.write_at(&eocd, cd_off + cd.len() as u64).unwrap();
+        f.seek(SeekFrom::Start(cd_off + cd.len() as u64)).unwrap();
+        f.write_all(&eocd).unwrap();
         drop(f);
         let z = PagedZip::open(&path).unwrap();
         let e = z.find("assets/model.bin").unwrap();

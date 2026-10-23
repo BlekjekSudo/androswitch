@@ -1,5 +1,8 @@
 //! method_id_item + encoded_method + method_handle_item + call_site offsets.
 
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec::Vec};
+
 use crate::error::{RdError, RdResult};
 use crate::read::{self, Reader};
 

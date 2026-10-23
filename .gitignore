@@ -1,5 +1,7 @@
 # Rust / Cargo
 /target/
+/fixtures/cache/
+/local-artifacts/
 **/*.rs.bk
 Cargo.lock.bak
 

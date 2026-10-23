@@ -3,6 +3,9 @@
 //! Parsers nunca confiam (mesmo estilo fuzz-hardened do rd-apk): todo acesso
 //! passa por fatias verificadas; LEB128 tem limite de bytes (anti-loop/anti-DoS).
 
+#[cfg(not(feature = "std"))]
+use alloc::format;
+
 use crate::error::{RdError, RdResult};
 
 /// Cursor bounds-checked sobre uma fatia de bytes.

@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "frozen_on": "2026-10-23",
+  "fixtures": [
+    {
+      "id": "fdroid-inspect",
+      "role": "real APK inspection; not an execution compatibility claim",
+      "source_url": "https://f-droid.org/repo/org.fdroid.fdroid_2000052.apk",
+      "file": "org.fdroid.fdroid_2000052.apk",
+      "sha256": "19d51fad482239f6df6a99120e34513667e9a86d136dafdc4a211a68c3327b52",
+      "bytes": 12569951,
+      "package": "org.fdroid.fdroid",
+      "version_code": 2000052,
+      "dex": {
+        "entry": "classes.dex",
+        "file": "fdroid-classes.dex",
+        "bytes": 9297608,
+        "sha256": "a6aff7e100fb7e33b17fd11b2b594999016e4b099718c6ec393e462d269ac059"
+      },
+      "state": "apk_frozen"
+    },
+    {
+      "id": "upstream-jni-c-cpp-rust",
+      "source_url": "https://github.com/nadabgfccvd/RustyDroid",
+      "revision": "6388281f66d254c8e01a0fdc7a5a9a30239bc762",
+      "source_path": "golden/native-languages",
+      "state": "source_frozen_apk_build_pending",
+      "milestone": "M4"
+    },
+    {
+      "id": "ndk-samples",
+      "source_url": "https://github.com/android/ndk-samples",
+      "revision": "abb0d8ef36a5ee1be5cebc67025678f42970c393",
+      "samples": [
+        "hello-jni",
+        "native-activity"
+      ],
+      "state": "source_frozen_apk_build_pending",
+      "milestones": [
+        "M4",
+        "M6"
+      ]
+    },
+    {
+      "id": "vector-pinball",
+      "source_url": "https://github.com/dozingcat/Vector-Pinball",
+      "revision": "b8c57cd5929b052ca6b7c3bd34cbb409af7d7af9",
+      "state": "source_frozen_apk_build_pending",
+      "milestone": "M8"
+    },
+    {
+      "id": "androswitch-java-kotlin",
+      "state": "planned_no_fixture_yet",
+      "milestone": "M4",
+      "note": "Record sources, compiler inputs and generated APK hashes when these fixtures are authored."
+    },
+    {
+      "id": "androswitch-vm-java",
+      "role": "M1 portable interpreter semantics; no Android lifecycle/JNI claim",
+      "state": "source_frozen_with_observed_local_build",
+      "milestone": "M1",
+      "sources": [
+        {
+          "path": "fixtures/m1/java/org/androswitch/fixture/Probe.java",
+          "sha256": "846c4a5cb574136167ae8e94346a56fdf506a25aa15eb64999dcf7fb233efa92"
+        },
+        {
+          "path": "fixtures/m1/AndroidManifest.xml",
+          "sha256": "ab8fb5a0c0acc7a60d5d73778f135d058d08224e1a693c3eee85ffe699d3b5fa"
+        }
+      ],
+      "compiler": {
+        "jdk": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\r\nOpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)\r\nOpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+        "java_release": 8,
+        "d8_min_api": 24,
+        "build_tools": "35.0.0",
+        "compile_sdk": 35,
+        "tools": [
+          {
+            "file": "d8.jar",
+            "sha256": "305622ad00535684534eb8f742cbf5e628a9abc09d8ea4d39d1babb95bf0cee5"
+          },
+          {
+            "file": "aapt2.exe",
+            "sha256": "cbfe5deda5f7074ce47b6f33818b456ee8046a076a11af13e29c837d3c80c564"
+          },
+          {
+            "file": "android.jar",
+            "sha256": "4566663c3876e022b4fa4ced8c8697c4ab1688267f090114fd92d027b32e619b"
+          }
+        ]
+      },
+      "observed_apk": {
+        "file": "local-artifacts/m1/fixture/vm-semantics.apk",
+        "sha256": "06429bcabce22ba83f635f350d367ec70db27b80a2b26b1f298fad9833880a37",
+        "bytes": 2917
+      },
+      "note": "Source and tool hashes are frozen; each rebuilt APK is hashed in its receipt because ZIP timestamps can differ."
+    }
+  ]
+}

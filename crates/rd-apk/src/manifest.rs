@@ -6,6 +6,12 @@
 use crate::arsc::Arsc;
 use crate::axml::{AttrValue, AxmlDocument, XmlAttribute, XmlElement};
 use crate::error::RdResult;
+use alloc::{
+    borrow::ToOwned,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 use serde::Serialize;
 
 pub const NS_ANDROID_HINT: &str = "schemas.android.com/apk/res/android";
@@ -21,8 +27,8 @@ pub enum ComponentKind {
     Provider,
 }
 
-impl std::fmt::Display for ComponentKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for ComponentKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let s = match self {
             ComponentKind::Activity => "activity",
             ComponentKind::ActivityAlias => "activity-alias",
@@ -40,7 +46,7 @@ pub struct UsesPermission {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_sdk: Option<u32>,
     /// Declarado via `uses-permission-sdk-23`.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default, skip_serializing_if = "core::ops::Not::not")]
     pub sdk23: bool,
 }
 
@@ -126,7 +132,7 @@ pub struct IntentFilter {
     pub data: Vec<IntentData>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<i32>,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default, skip_serializing_if = "core::ops::Not::not")]
     pub auto_verify: bool,
     /// Ordem de declaração (estável para o agente).
     pub order: usize,
@@ -372,7 +378,8 @@ pub fn build(doc: &AxmlDocument, arsc: Option<&Arsc>) -> RdResult<Manifest> {
 
     let mut m = Manifest {
         package: package.clone(),
-        split: attr_str(root, "split"),
+        // The manifest split attribute is unnamespaced, unlike android:* attrs.
+        split: root.attr("split").map(XmlAttribute::text),
         ..Default::default()
     };
 

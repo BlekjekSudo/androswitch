@@ -10,6 +10,10 @@
 //! Lei 2: nada se perde — os bytes brutos ficam preservados em `Dex::data` e os
 //! offsets de cada seção ficam expostos junto do modelo tipado.
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
 pub mod annotations;
 pub mod classes;
 pub mod code;

@@ -18,7 +18,8 @@ fn repo_root() -> PathBuf {
 
 /// Extrai as linhas do primeiro bloco ```console … ``` do README, sem o `$`.
 fn readme_console_block() -> Vec<String> {
-    let text = std::fs::read_to_string(repo_root().join("README.md")).expect("README legível");
+    let text = std::fs::read_to_string(repo_root().join("README.rustydroid.md"))
+        .expect("upstream README legível");
     let mut inside = false;
     let mut block = Vec::new();
     for line in text.lines() {

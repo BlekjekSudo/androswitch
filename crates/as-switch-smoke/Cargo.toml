@@ -1,0 +1,34 @@
+[package]
+name = "as-switch-smoke"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "AndroSwitch M1 no_std APK/DEX/interpreter libnx proof"
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[lints.rust]
+unsafe_code = "deny"
+
+[dependencies]
+rd-dex = { path = "../rd-dex", default-features = false }
+rd-apk = { path = "../rd-apk", default-features = false }
+rd-vm = { path = "../rd-vm", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+as-platform = { path = "../as-platform", default-features = false }
+
+[features]
+host-cli = []
+portable-tests = []
+
+[[bin]]
+name = "as-probe"
+path = "src/bin/as-probe.rs"
+required-features = ["host-cli"]
+
+[[test]]
+name = "portable_core"
+path = "tests/portable_core.rs"
+required-features = ["portable-tests"]

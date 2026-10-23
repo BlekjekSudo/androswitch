@@ -1,5 +1,8 @@
 //! field_id_item + encoded_field — referências de campo e entradas de class_data.
 
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::String, vec::Vec};
+
 use crate::error::{RdError, RdResult};
 use crate::read::{self, Reader};
 

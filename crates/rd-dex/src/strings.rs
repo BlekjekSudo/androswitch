@@ -2,6 +2,9 @@
 //! (uleb utf16_len + bytes MUTF-8 + NUL). Decode total com bounds-checks;
 //! offsets brutos preservados (Lei 2).
 
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::String, vec::Vec};
+
 use crate::error::{RdError, RdResult};
 use crate::mutf8;
 use crate::read::Reader;

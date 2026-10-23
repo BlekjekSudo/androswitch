@@ -1,6 +1,9 @@
 //! type_id_item — tabela de descritores de tipo (`Ljava/lang/String;`, `[I`, `I`…).
 //! Cada entrada é um índice para a tabela de strings; validação básica de forma.
 
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::String, string::ToString, vec::Vec};
+
 use crate::error::{RdError, RdResult};
 use crate::read;
 

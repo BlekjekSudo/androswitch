@@ -5,8 +5,7 @@
 //! (apps malformados mentem no local header — o CD é o registro de verdade).
 
 use crate::error::{RdError, RdResult};
-use flate2::read::DeflateDecoder;
-use std::io::Read;
+use alloc::{collections::BTreeSet, format, string::String, vec::Vec};
 
 pub const EOCD_SIG: u32 = 0x0605_4b50;
 pub const ZIP64_EOCD_LOCATOR_SIG: u32 = 0x0706_4b50;
@@ -177,8 +176,8 @@ impl Zip {
         }
 
         // issue #84: detecção de nomes repetidos (ordem de aparição).
-        let mut seen = std::collections::HashSet::new();
-        let mut dup_seen = std::collections::HashSet::new();
+        let mut seen = BTreeSet::new();
+        let mut dup_seen = BTreeSet::new();
         let mut duplicates = Vec::new();
         for e in &entries {
             if !seen.insert(e.name.as_str()) && dup_seen.insert(e.name.as_str()) {
@@ -195,6 +194,7 @@ impl Zip {
     }
 
     /// Lê arquivo do disco e faz parse.
+    #[cfg(feature = "std")]
     pub fn open(path: &std::path::Path) -> RdResult<Zip> {
         let data = std::fs::read(path)
             .map_err(|e| RdError::io(&e, format!("reading {}", path.display())))?;
@@ -354,11 +354,20 @@ impl Zip {
                         entry.name, declared, MAX_INFLATE_BUDGET
                     )));
                 }
-                let mut decoder = DeflateDecoder::new(compressed).take(declared.saturating_add(1));
-                let mut buf = Vec::with_capacity(declared.min(64 * 1024 * 1024) as usize);
-                decoder
-                    .read_to_end(&mut buf)
-                    .map_err(|e| RdError::parse(format!("zip: inflate {:?}: {e}", entry.name)))?;
+                // Same raw-DEFLATE backend on host and device; the limit is
+                // enforced while growing the output, before CRC/size checks.
+                let buf = miniz_oxide::inflate::decompress_to_vec_with_limit(
+                    compressed, declared.saturating_add(1) as usize,
+                ).map_err(|e| {
+                    if e.status == miniz_oxide::inflate::TINFLStatus::HasMoreOutput {
+                        RdError::invalid_format(format!(
+                            "zip: {:?} expandiu além do declarado no CD (> {} bytes): descompressão limitada (suspeita de bomba)",
+                            entry.name, declared
+                        ))
+                    } else {
+                        RdError::parse(format!("zip: inflate {:?}: {:?}", entry.name, e.status))
+                    }
+                })?;
                 if buf.len() as u64 > declared {
                     return Err(RdError::invalid_format(format!(
                         "zip: {:?} expandiu além do declarado no CD (> {} bytes): descompressão limitada (suspeita de bomba)",

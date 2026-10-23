@@ -1,6 +1,9 @@
 //! proto_id_item — assinaturas de método: shorty + return type + lista de
 //! parâmetros (type_list). A type_list é lida sob demanda via `Dex`.
 
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec::Vec};
+
 use crate::error::{RdError, RdResult};
 use crate::read;
 

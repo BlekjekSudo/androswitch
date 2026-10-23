@@ -5,6 +5,7 @@
 //! source.android.com → APK Signature Scheme v2/v3). v1 = JAR signing (META-INF).
 
 use crate::zip::Zip;
+use alloc::vec::Vec;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SigningInfo {
