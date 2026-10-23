@@ -24,6 +24,7 @@ enum Command {
     Touch { x: i32, y: i32 },
     Open { events: Vec<Event> },
     Frame,
+    Frames { count: u32 },
 }
 struct Launcher {
     shell: Shell,
@@ -36,6 +37,7 @@ struct Launcher {
     sessions: Vec<serde_json::Value>,
     serial: u64,
     reported: bool,
+    remaining_frames: Option<u32>,
 }
 fn open() -> Result<Launcher, String> {
     let fs = Rc::new(LibnxFileSystem::new("sdmc:/switch/androswitch").map_err(|e| e.to_string())?);
@@ -83,6 +85,7 @@ fn open() -> Result<Launcher, String> {
         sessions: Vec::new(),
         serial: 0,
         reported: false,
+        remaining_frames: None,
     })
 }
 impl Launcher {
@@ -136,11 +139,19 @@ impl Launcher {
             return Ok(0);
         }
         let command = &script.commands[self.cursor];
+        if let Command::Frames { count } = command {
+            let remaining = self.remaining_frames.get_or_insert((*count).min(600));
+            if *remaining > 0 {
+                *remaining -= 1;
+                return Ok(0);
+            }
+            self.remaining_frames = None;
+        }
         let selection = match command {
             Command::Key { key } => self.shell.key(*key),
             Command::Touch { x, y } => self.shell.touch(*x, *y),
             Command::Open { .. } => self.shell.key(Key::Accept),
-            Command::Frame => None,
+            Command::Frame | Command::Frames { .. } => None,
         };
         if let Some(selection) = selection {
             let events = match command {

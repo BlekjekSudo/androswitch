@@ -45,6 +45,12 @@ implements the bounded audio subset itself, using those public ABI definitions.
 
 ## Linked platform components
 
+`platform/androswitch/framebuffer_copy.h` adapts the 16-byte sector copy from
+fincs/libnx `v4.12.0`'s `nx/source/display/framebuffer.c` so queue/fence failures
+can be returned instead of invoking libnx's fatal framebuffer convenience API.
+The complete [libnx ISC license](libnx-framebuffer.LICENSE) is retained. Source:
+https://github.com/switchbrew/libnx/blob/v4.12.0/nx/source/display/framebuffer.c
+
 The tested product uses libnx `4.12.0-1`, Switch Mesa `20.1.0-5` (EGL metadata
 `20.1.0-rc3`), and `switch-libdrm_nouveau 1.0.1-2`. Mesa, Nouveau, libnx,
 libstdc++, newlib, Rust libraries and Cargo dependencies keep their individual

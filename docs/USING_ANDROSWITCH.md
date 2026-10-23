@@ -4,7 +4,7 @@ This is the first one-NRO package, not the offline v0.1 compatibility release.
 Host and Ryujinx evidence do not establish physical Switch compatibility.
 The user reported that the four bundled samples install/open on a real Switch
 and the native triangle animation and beeps work, but Plus crashes there.
-This build's shutdown changes await hardware retesting; see the
+This build's display handoff changes await hardware retesting; see the
 [hardware feedback record](HARDWARE_FEEDBACK.md).
 The runtime builds on **RustyDroid by nadabgfccvd and contributors**; retain
 the packaged credits, license notices and source link when redistributing it.
@@ -32,7 +32,7 @@ worker or Linux guest kernel is required on the SD card.
 | App external data | `Android/data/<package>/` |
 | OBB files | `Android/obb/<package>/`; opaque files, no automatic extraction |
 | Shared pictures/downloads | `DCIM/`, `Download/`; aliases `/sdcard` and `/storage/emulated/0` |
-| Runtime reports | `logs/session-report.json`, `teardown.log`, `last-interrupted.json`, `teardown-failure.json` |
+| Runtime reports | `logs/session-report.json`, `teardown.log`, `display-handoffs.log`, `display-error.json`, `last-interrupted.json`, `teardown-failure.json` |
 | Lists | L/R, Up/Down; touch selects, a second tap opens |
 | Install/update/launch | A; identical APK updates reuse the verified revision; changed APKs get a new revision and retain data |
 | Details/back | X/B |
@@ -92,3 +92,9 @@ GPU completion on the EGL owner thread, callbacks, joins, mapping release and
 launcher framebuffer reopening. `launcher_ready` means a console frame was
 actually submitted after cleanup. A missing final report cannot by itself locate
 a crash; keep the phase trace and the Atmosphère error report as well.
+
+On the native graphics return path, `launcher_stable` records eight successful
+CPU queue submissions, with queue slots and stable nvmap/fence service IDs in
+`display-handoffs.log`. Display failures produce `display-error.json` instead of
+using libnx's fatal framebuffer convenience APIs. GPU readback dumps are enabled
+only for scripted tests, to avoid diagnostic SD writes during normal startup.

@@ -22,6 +22,7 @@ New-Item -ItemType Directory -Force -Path "$package/licenses" | Out-Null
 & "$PSScriptRoot/collect-product-licenses.ps1" -OutputRoot "$package/licenses/dependencies" | Out-Null
 Copy-Item "$projectRoot/third_party/fonts/DejaVu.LICENSE" "$package/licenses/DejaVu.LICENSE"
 Copy-Item "$projectRoot/third_party/so_util.LICENSE" "$package/licenses/so_util.LICENSE"
+Copy-Item "$projectRoot/third_party/libnx-framebuffer.LICENSE" "$package/licenses/libnx-framebuffer.LICENSE"
 Copy-Item "$projectRoot/third_party/README.md" "$package/licenses/SOURCE-NOTICES.md"
 $samples=@()
 if(-not $WithoutSamples){

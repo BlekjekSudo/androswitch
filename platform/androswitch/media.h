@@ -26,6 +26,7 @@ int as_media_finished(void);
 int as_media_reset(void);
 int as_media_quiesce(void);
 int as_media_error(void);
+void as_media_capture(int enabled);
 uint64_t as_media_frames(void);
 uint64_t as_media_audio_frames(void);
 int64_t as_audio_open(int rate, int channels, int format);

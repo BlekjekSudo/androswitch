@@ -67,14 +67,63 @@ missing-API error. Both native sessions reached GPU completion, EGL termination,
 thread join and resource release, then returned to the console. The stuck-worker
 test still required process exit and recovered the interruption notice on reboot.
 
+## Second hardware result: shutdown completed, crash persisted
+
+The user supplied `session-report.json` and `teardown.log`. Their hashes and
+parsed contents are retained in `reports/hardware-native-plus-20261024.json`.
+The session was `console-4`, revision 1 of Native Graphics and Audio. Its status
+is `stopped`, and every shutdown phase completed through `launcher_ready`.
+The other three sample APKs return safely. The system message was “the software
+was closed because an error occurred”, with no numeric exception code supplied.
+The user also observed an initial stall before graphics became responsive.
+
+This disproves the sufficiency of the first GPU-retirement candidate. The logs
+prove one launcher submission, not continued display stability. The fault could
+be asynchronous; no crash dump establishes its exact cause.
+
+The next candidate retains one process-owned reference to nvdrv, nvmap, fences
+and GPU services throughout CPU/EGL transitions. Both libnx framebufferClose and
+Nouveau's device destructor otherwise release those service guards between
+renderers. CPU presentation now uses three buffers, checks dequeue results,
+slot bounds, compositor fences and queue results before treating a frame as
+submitted. This avoids unchecked slot indexing and fatal convenience-function
+errors. The sector copy follows fincs/libnx, retains its ISC license, and is
+checked against independent Tegra byte-address calculations and allocation guards.
+The ownership paths are in the pinned
+[libnx framebuffer source](https://github.com/switchbrew/libnx/blob/v4.12.0/nx/source/display/framebuffer.c)
+and [Nouveau device source](https://github.com/devkitPro/libdrm_nouveau/blob/master/source/nouveau.c).
+
+Two GPU diagnostic dumps at frames 2/30 are now enabled only for scripted tests.
+Their readback/SD writes previously ran during ordinary interactive launches,
+adding startup stalls. The APK fixture itself also performs a full-frame read;
+removing runtime dumps does not promise that all startup work disappears.
+
+The emulator workflow now waits 60 launcher frames after each native Plus return.
+The first eight queue submissions per return are recorded in
+`logs/display-handoffs.log`; they must keep valid slots and stable service IDs.
+Errors are recorded in `logs/display-error.json` with the operation/result/slot.
+`launcher_stable` follows eight successful submissions. This remains an emulator
+proof until the replacement NRO is retested on the physical Switch.
+
+Use `--display-handoff` when recording this candidate, then package with
+`-EvidencePath reports/m7-display-handoff.json`. Prior reports remain unchanged.
+
+The candidate also builds the no_std device path and passes the four independent
+framebuffer-copy address/guard cases and both clippy commands. The extended
+67-command Ryujinx workflow verifies the two native returns with valid slot
+0/1/2 cycling, stable service handles and 60 further launcher frames each;
+the negative worker/next-boot recovery test remains required separately.
+
 ## Hardware retest
 
 Update `androswitch.nro` from the new package while retaining installed APKs and
 data. Install the same APK twice: its revision must remain stable and it must be
 launchable immediately. Run Native Graphics and Audio, wait for animation/beeps,
 then press Plus. A successful return ends `logs/teardown.log` with
-`launcher_ready`; relaunch the native app and return again.
+`launcher_stable` after eight successful launcher frames; relaunch the native app
+and return again.
 
 If it crashes, preserve the last phase in `teardown.log`, `session-report.json`,
-`pending-session.json` and the Atmosphère crash report. Reopen homebrew to show
+`display-handoffs.log`, `display-error.json` if present, `pending-session.json`
+and a system crash report if available. Reopen homebrew to show
 the interrupted-session notice. The updated build is **pending hardware retest**.

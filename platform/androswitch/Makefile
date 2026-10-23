@@ -13,7 +13,7 @@ OBJECTS := $(addprefix $(OUTPUT_DIR)/,main.o media.o opensl.o fs.o native.o nati
 all: $(OUTPUT_DIR)/androswitch.nro
 $(OUTPUT_DIR):
 	mkdir -p "$@"
-$(OUTPUT_DIR)/main.o: main.c | $(OUTPUT_DIR)
+$(OUTPUT_DIR)/main.o: main.c media.h framebuffer_copy.h | $(OUTPUT_DIR)
 	$(CC) $(CFLAGS) -c "$<" -o "$@"
 $(OUTPUT_DIR)/media.o: media.c media.h gles2_imports.inc | $(OUTPUT_DIR)
 	$(CC) $(CFLAGS) -fno-strict-aliasing -c "$<" -o "$@"

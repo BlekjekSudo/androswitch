@@ -1,0 +1,159 @@
+{
+  "user_report": {
+    "startup": "initial graphics stall, then animation responds",
+    "numeric_crash_code": "not_available",
+    "native_plus": "Software was closed because an error occurred",
+    "other_three_samples": "return safely"
+  },
+  "date": "2026-10-24",
+  "binary_identity_verified": false,
+  "delivered_candidate_nro_sha256": "e39aa691180564378092ccb8b8a532d312e4fa7faa98db4af2b74d69e27e478d",
+  "teardown": {
+    "phases": [
+      {
+        "phase": "stop_requested",
+        "tick": 124180040606
+      },
+      {
+        "phase": "native_activity_stop",
+        "tick": 124180201456
+      },
+      {
+        "phase": "activity_focus_lost",
+        "tick": 124180269322
+      },
+      {
+        "phase": "activity_pause",
+        "tick": 124180333918
+      },
+      {
+        "phase": "activity_window_destroy",
+        "tick": 124180434384
+      },
+      {
+        "phase": "guest_thread_join",
+        "tick": 124180505716
+      },
+      {
+        "phase": "egl_wait_gpu",
+        "tick": 124180958560
+      },
+      {
+        "phase": "egl_unbind",
+        "tick": 124181051516
+      },
+      {
+        "phase": "egl_destroy_context",
+        "tick": 124181120357
+      },
+      {
+        "phase": "egl_destroy_surface",
+        "tick": 124181693711
+      },
+      {
+        "phase": "egl_terminate",
+        "tick": 124182059970
+      },
+      {
+        "phase": "egl_terminated",
+        "tick": 124182509031
+      },
+      {
+        "phase": "guest_thread_joined",
+        "tick": 124182652016
+      },
+      {
+        "phase": "activity_input_destroy",
+        "tick": 124182724716
+      },
+      {
+        "phase": "activity_stop",
+        "tick": 124182793191
+      },
+      {
+        "phase": "activity_destroy",
+        "tick": 124182862310
+      },
+      {
+        "phase": "java_activity_stop",
+        "tick": 124182939762
+      },
+      {
+        "phase": "media_thread_quiesce",
+        "tick": 124183015449
+      },
+      {
+        "phase": "guest_thread_quiesce",
+        "tick": 124183786535
+      },
+      {
+        "phase": "media_reset",
+        "tick": 124183855398
+      },
+      {
+        "phase": "media_released",
+        "tick": 124183931820
+      },
+      {
+        "phase": "activity_dispose",
+        "tick": 124183999630
+      },
+      {
+        "phase": "runtime_drop",
+        "tick": 124184278994
+      },
+      {
+        "phase": "native_mapping_release",
+        "tick": 124184350392
+      },
+      {
+        "phase": "native_resource_reset",
+        "tick": 124184441381
+      },
+      {
+        "phase": "native_mapping_release",
+        "tick": 124184508529
+      },
+      {
+        "phase": "native_tls_reset",
+        "tick": 124184750183
+      },
+      {
+        "phase": "native_resources_released",
+        "tick": 124184822312
+      },
+      {
+        "phase": "runtime_closed",
+        "tick": 124185066574
+      },
+      {
+        "phase": "launcher_refresh",
+        "tick": 124185134264
+      },
+      {
+        "phase": "launcher_framebuffer_open",
+        "tick": 124187598775
+      },
+      {
+        "phase": "launcher_ready",
+        "tick": 124188268074
+      }
+    ],
+    "sha256": "d35f6e6d8378b7d3f867dfff69a0f3036bbb1f6cf88d687b1dbf318a3d522c95",
+    "file": "teardown.log"
+  },
+  "schema_version": 1,
+  "conclusion": "Native shutdown and one launcher submission completed; the later display failure cause remains unconfirmed",
+  "evidence_type": "user_supplied_logs_and_report",
+  "session_report": {
+    "sha256": "b06369480ac8dc5981fabd405d4eeaba05eea5399b9fbb3f7266f3e2bc0e9e45",
+    "file": "session-report.json",
+    "content": {
+      "package": "org.fixture.nativemedia",
+      "revision": 1,
+      "schema_version": 1,
+      "session_id": "console-4",
+      "status": "stopped"
+    }
+  }
+}

@@ -34,5 +34,7 @@ proses Horizon. Buka ulang homebrew untuk melihat pemberitahuan gangguan.
 Simpan folder `logs/` untuk laporan. `session-report.json` kini dibuat saat
 peluncuran biasa juga. `teardown.log` mencatat tahap penutupan sebelum operasi
 dijalankan; baris terakhir membantu melacak crash Plus. Jika berhasil kembali,
-baris terakhir adalah `launcher_ready`. Detail cakupan dan pengujian ada di
+jalur grafik mencatat `launcher_ready` untuk frame pertama dan `launcher_stable`
+setelah delapan frame. Jika masih gagal, simpan juga `display-handoffs.log`
+dan `display-error.json` bila ada. Detail cakupan dan pengujian ada di
 [panduan pemakaian](USING_ANDROSWITCH.md) dan [bukti M6/M7](M6_M7_E2E.md).

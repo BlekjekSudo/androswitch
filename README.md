@@ -18,8 +18,9 @@ installs, updates and launches supported APKs using the shared RustyDroid
 interpreter and native ARM64 backend. Java/Kotlin UI, NativeActivity GLES2,
 assets, PCM audio and repeated application switching have Ryujinx evidence.
 The user reports that the four bundled APKs open on a physical Switch, including
-native animation/beeps, but Plus crashes in the native sample. The shutdown
-changes await a hardware retest; see [hardware feedback](docs/HARDWARE_FEEDBACK.md).
+native animation/beeps, but Plus crashes in the native sample. Supplied logs show
+shutdown and one launcher frame completed; the latest display handoff changes
+await a hardware retest. See [hardware feedback](docs/HARDWARE_FEEDBACK.md).
 This is not the v0.1 compatibility release.
 
 ![AndroSwitch console after the verified Ryujinx workflow](docs/images/androswitch-m7.png)

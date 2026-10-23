@@ -71,8 +71,8 @@ The build is serialized with one Cargo job; generated APKs are not source files.
 ./scripts/test-ryujinx-media.ps1
 ./scripts/test-ryujinx-launcher.ps1
 ./scripts/test-ryujinx-launcher.ps1 -Scenario quiescence
-python scripts/record-hardware-feedback-evidence.py --implementation-commit (git rev-parse HEAD)
-./scripts/package-androswitch.ps1 -EvidencePath reports/m7-hardware-feedback.json
+python scripts/record-hardware-feedback-evidence.py --implementation-commit (git rev-parse HEAD) --display-handoff
+./scripts/package-androswitch.ps1 -EvidencePath reports/m7-display-handoff.json
 ```
 
 The launcher test temporarily moves an existing `sdcard/switch/androswitch`
@@ -86,6 +86,10 @@ ten completed app sessions, a named missing-service failure, repeated native
 media teardown/reopen, restart/save retention, update, uninstall/reinstall,
 cancelled deletion and explicit data clearing. It compares hashes after actual
 console framebuffer submissions. A PNG resource icon must decode successfully.
+The display-handoff candidate uses 67 commands, including two 60-frame console
+waits after native Plus. Eight queue submissions per native return must have valid
+triple-buffer slots and stable nvmap/fence service IDs. Layout conversion is
+separately checked against Tegra byte addresses with allocation guards on host.
 
 The native-media fixture renders a moving GLES2 triangle on its own pthread,
 reads/seeks a 150 KB compressed asset, receives input and plays 12,000 frames

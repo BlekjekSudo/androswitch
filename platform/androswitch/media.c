@@ -17,6 +17,8 @@ extern int64_t as_guest_asset(uint32_t, uint64_t, const char *, int64_t,
 extern uint64_t as_jni_java_vm(void), as_jni_environment(void);
 static int media_failure, finish_requested;
 static uint64_t submitted_frames, played_frames;
+static int diagnostic_capture;
+void as_media_capture(int enabled) { diagnostic_capture = enabled; }
 static int window_token, assets_token, queue_token;
 static AsActivity *active_activity;
 static void *owner;
@@ -437,7 +439,7 @@ static void guest_read_pixels(GLint x, GLint y, GLsizei width, GLsizei height,
 }
 static EGLBoolean guest_swap(EGLDisplay d, EGLSurface s) {
   uint64_t frame = as_media_frames();
-  if (frame == 2 || frame == 30) {
+  if (diagnostic_capture && (frame == 2 || frame == 30)) {
     uint8_t *pixels = malloc(1280 * 720 * 4);
     if (pixels) {
       /* Read scanlines so the capture stays bounded and does not rely on a
@@ -478,7 +480,7 @@ static EGLBoolean guest_terminate(EGLDisplay d) {
   EGLBoolean ok = eglTerminate(d);
   if (ok)
     display = 0;
-  as_teardown_phase("egl_terminated");
+  as_teardown_phase(ok ? "egl_terminated" : "egl_terminate_failed");
   return ok;
 }
 static uint64_t media_lookup(const char *name);
@@ -860,6 +862,7 @@ int as_media_reset(void) {
   owner = NULL;
   media_failure = finish_requested = 0;
   submitted_frames = played_frames = 0;
+  diagnostic_capture = 0;
   as_teardown_phase("media_released");
   return 0;
 }

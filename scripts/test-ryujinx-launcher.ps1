@@ -51,8 +51,10 @@ try{
   Key down;OpenApp $kotlin
   Key down;OpenApp @(@{kind='frame'})
   Key down;OpenApp $native
+  $commands.Add(@{kind='frames';count=60})
   Key up;Key up;OpenApp $kotlin
   Key down;Key down;OpenApp $native
+  $commands.Add(@{kind='frames';count=60})
   Key down;OpenApp @(@{kind='frame'})
   for($i=0;$i -lt 4;$i++){Key up}
   Key remove;Key back;Key remove;Key accept
@@ -71,6 +73,7 @@ try{
   $process=Start-Process -FilePath $Ryujinx -ArgumentList @($nro) -WorkingDirectory (Split-Path -Parent $Ryujinx) -WindowStyle Hidden -RedirectStandardOutput "$run/ryujinx.stdout.log" -RedirectStandardError "$run/ryujinx.stderr.log" -PassThru
   $receipt.pid=$process.Id;$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds);$result=$null
   do{
+    if(Test-Path "$root/logs/display-error.json"){throw "Display failure: $(Get-Content "$root/logs/display-error.json" -Raw)"}
     if($Scenario -eq 'quiescence' -and (Test-Path "$root/logs/session-report.json")){
       try{$failure=Get-Content "$root/logs/session-report.json" -Raw | ConvertFrom-Json;if($failure.session_id -eq "$id-1" -and $failure.error -match 'NATIVE_NOT_QUIESCENT'){break}}catch{}
     }
@@ -124,6 +127,15 @@ try{
   $trace=Get-Content "$root/logs/teardown.log" | ForEach-Object {$_ | ConvertFrom-Json}
   if($trace[-1].phase -ne 'launcher_ready'){throw 'Teardown did not reach a presented launcher framebuffer'}
   Copy-Item "$root/logs/teardown.log" "$run/teardown.log"
+  if(Test-Path "$root/logs/display-error.json"){throw 'Display backend recorded a checked failure'}
+  $handoffs=@(Get-Content "$root/logs/display-handoffs.log" | ForEach-Object {$_ | ConvertFrom-Json})
+  if($handoffs.Count -ne 16){throw 'Both native returns must survive eight CPU frames'}
+  foreach($generation in @($handoffs | Group-Object generation)){
+    if(($generation.Group.frame -join ',') -ne '1,2,3,4,5,6,7,8'){throw 'Incomplete display handoff sequence'}
+  }
+  foreach($frame in $handoffs){if($frame.buffers -ne 3 -or $frame.slot -lt 0 -or $frame.slot -ge $frame.buffers -or $frame.result -ne 0){throw 'Invalid display queue slot/result'}}
+  if(@($handoffs.map_fd | Sort-Object -Unique).Count -ne 1 -or @($handoffs.fence_fd | Sort-Object -Unique).Count -ne 1){throw 'Display service handles changed between renderer sessions'}
+  Copy-Item "$root/logs/display-handoffs.log" "$run/display-handoffs.log"
   Copy-Item "$root/logs/launcher-report.json" "$run/emulator.json";Copy-Item "$root/logs/last-frame.ppm" "$run/launcher.ppm"
   $receipt.status='passed';$receipt.commands=$commands.Count;$receipt.completed_sessions=$successful.Count;$receipt.expected_api_errors=$failed.Count;$receipt.nro_sha256=(Get-FileHash $nro).Hash.ToLowerInvariant();$receipt.emulator=@{version=(Get-Item $Ryujinx).VersionInfo.ProductVersion;sha256=(Get-FileHash $Ryujinx).Hash.ToLowerInvariant()}
   Write-Output "M7 one-NRO launcher E2E passed: $run/verification.json"

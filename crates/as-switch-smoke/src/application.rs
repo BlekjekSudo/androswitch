@@ -24,6 +24,7 @@ extern "C" {
     fn as_media_quiesce() -> i32;
     fn as_media_finished() -> i32;
     fn as_media_error() -> i32;
+    fn as_media_capture(enabled: i32);
     fn as_media_frames() -> u64;
     fn as_media_audio_frames() -> u64;
     fn as_native_quiesce(timeout: u64) -> i32;
@@ -159,6 +160,11 @@ fn open() -> Result<Running, String> {
         .map_err(|e| e.to_string())?;
     let bytes = bytes.map_err(|e| e.to_string())?;
     let request: Launch = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    // GPU dumps are opt-in for scripted verification, never ordinary launches.
+    #[allow(unsafe_code)]
+    unsafe {
+        as_media_capture(i32::from(request.events.is_some()));
+    }
     if request.schema_version != 1
         || request.session_id.is_empty()
         || request.session_id.len() > 128

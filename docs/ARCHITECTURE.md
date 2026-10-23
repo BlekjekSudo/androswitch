@@ -86,6 +86,14 @@ survives an interrupted process and is archived/shown on next boot. The normal
 path destroys JNI veneers/tables, guest TLS/heap, synchronization objects, ELF
 mappings and media before allowing a new App. See [M6/M7](M6_M7_E2E.md).
 
+The Horizon platform retains process-owned nvdrv/nvmap/fence/GPU service guards
+across frontend changes. Guest EGL contexts and surfaces are released per session;
+their underlying shared service client is not torn down between CPU and EGL
+presentation. CPU presentation uses a checked triple-buffer queue and licensed
+libnx sector conversion. Native returns monitor eight successful console
+submissions, with operation/result/slot diagnostics on display failures. Runtime
+GPU dumps are opt-in to scripted tests, not interactive startup work.
+
 ## Verification
 
 Track implementation, host, Horizon emulator and physical device separately.
