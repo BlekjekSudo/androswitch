@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "status": "passed_package_integrity",
+  "archive": "androswitch-m9-candidate-20261023-220511-1b6cacc7.zip",
+  "archive_sha256": "88bd22166463a3d0121a03f877337864f23750aae5596c8d338ded692f515fe7",
+  "nro_sha256": "f35e3a4734ac0ba91a1cd5221b414a7c231588fdfc140dff5800e9b1919502cb",
+  "source_commit": "b2080379c7fe6a751b01989b11fe88593a475fa0",
+  "implementation_commit": "b2080379c7fe6a751b01989b11fe88593a475fa0",
+  "nro_count": 1,
+  "sample_apks": 7,
+  "verified_license_files": 58,
+  "checked_relative_documentation_links": 164,
+  "verification_scope": "ZIP CRC, paths, APK/NRO hashes, credits, dependency notices and guide links; no Horizon execution claim",
+  "new_horizon_execution": "not_run",
+  "physical_device_new_build": "not_run"
+}

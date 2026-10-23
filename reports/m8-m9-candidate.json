@@ -1,0 +1,2126 @@
+{
+  "schema_version": 1,
+  "recorded_utc": "2026-10-23T22:05:01.365430+00:00",
+  "stage": "M9 validation candidate; release gates incomplete",
+  "candidate_only": true,
+  "implementation_commit": "b2080379c7fe6a751b01989b11fe88593a475fa0",
+  "upstream": {
+    "project": "RustyDroid",
+    "authors": "nadabgfccvd and contributors",
+    "revision": "6388281f66d254c8e01a0fdc7a5a9a30239bc762"
+  },
+  "product_nro_sha256": "f35e3a4734ac0ba91a1cd5221b414a7c231588fdfc140dff5800e9b1919502cb",
+  "verification": {
+    "host": "passed focused shared contracts and required repeated corpus; see commands/counts",
+    "ryujinx": "not_run_for_this_build; desktop opt-in required after window-disappearance incident",
+    "physical_device": "not_run_for_this_build; M1-M7 user-confirmed baseline is separate",
+    "android_reference_device": "not_run; JVM differential and AOSP contract references only"
+  },
+  "host_checks": {
+    "completed": true,
+    "schema_version": 1,
+    "checks": [
+      {
+        "exit_code": 0,
+        "seconds": 4.2691647,
+        "command": "cargo fmt --all -- --check",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "id": "format",
+        "log": "target/evidence/m9-format.log",
+        "passed_tests": 0,
+        "ignored_tests": 0
+      },
+      {
+        "exit_code": 0,
+        "seconds": 24.3486604,
+        "command": "cargo test -p rd-apk --lib --no-default-features --locked",
+        "log_sha256": "8ca6242f3e266fd8b484ac6b605039463895b4ccec81990cdf2b3b1975724318",
+        "id": "parser",
+        "log": "target/evidence/m9-parser.log",
+        "passed_tests": 26,
+        "ignored_tests": 0
+      },
+      {
+        "exit_code": 0,
+        "seconds": 1.6701582,
+        "command": "cargo test -p as-platform --features std --locked",
+        "log_sha256": "e8dd2a2b3e4443519220de31fd2dd8721176c223c68a44720de8f26b79188127",
+        "id": "platform",
+        "log": "target/evidence/m9-platform.log",
+        "passed_tests": 1,
+        "ignored_tests": 0
+      },
+      {
+        "exit_code": 0,
+        "seconds": 273.4857412,
+        "command": "cargo test -p as-package --locked",
+        "log_sha256": "6760a823435b1a7e9567abd32ba78d6748dbcce9cd81afffd6f8fdf3b3bfd6e1",
+        "id": "packages",
+        "log": "target/evidence/m9-packages.log",
+        "passed_tests": 5,
+        "ignored_tests": 0
+      },
+      {
+        "command": "cargo test -p as-storage -p as-sqlite --locked",
+        "seconds": 21.8543098,
+        "log": "target/evidence/m9-persistent.log",
+        "log_sha256": "61881740bc8db99c1a14506734926a08b355de5be4fb0dc5ae22da5edc69c48d",
+        "id": "persistent",
+        "exit_code": 0,
+        "passed_tests": 5,
+        "ignored_tests": 0
+      },
+      {
+        "command": "cargo test -p as-native --locked -- --include-ignored",
+        "seconds": 0.8332441,
+        "log": "target/evidence/m9-native-loader.log",
+        "log_sha256": "81f18fff1d4930be78179eabc3546a952796252916332f5665d078c0e9e9af13",
+        "id": "native-loader",
+        "exit_code": 0,
+        "passed_tests": 5,
+        "ignored_tests": 0
+      },
+      {
+        "command": "cargo test -p as-launcher --features host --locked -- --include-ignored",
+        "seconds": 19.3106894,
+        "log": "target/evidence/m9-launcher.log",
+        "log_sha256": "ccc3d9a13ba8739d2440dc69de26e94b6adb64ed561e104d169f87f63a9e35f3",
+        "id": "launcher",
+        "exit_code": 0,
+        "passed_tests": 1,
+        "ignored_tests": 0
+      },
+      {
+        "command": "cargo test -p as-framework --features host --tests --locked -- --include-ignored",
+        "seconds": 199.1619484,
+        "log": "target/evidence/m9-framework.log",
+        "log_sha256": "098ab06dc26748c5df676a55879958f1e0a9a942f56d1f156c3384a09352907c",
+        "id": "framework",
+        "exit_code": 0,
+        "passed_tests": 7,
+        "ignored_tests": 0
+      },
+      {
+        "command": "cargo test -p as-switch-smoke --features host-cli,portable-tests --test portable_core --locked -- --include-ignored",
+        "seconds": 125.902392,
+        "log": "target/evidence/m9-portable-core.log",
+        "log_sha256": "b4008fe91be9147ab522054e7ece8adb3fd398dec8fc55f35fe60364d4c765b3",
+        "id": "portable-core",
+        "exit_code": 0,
+        "passed_tests": 5,
+        "ignored_tests": 0
+      },
+      {
+        "command": "cargo clippy -p as-framework --features host --all-targets --locked -- -D warnings",
+        "seconds": 26.7837846,
+        "log": "target/evidence/m9-framework-clippy.log",
+        "log_sha256": "195a6ea95d3675893c214511e98cfbcf6798a7a7e362cdb6a71c37f4563adc77",
+        "id": "framework-clippy",
+        "exit_code": 0,
+        "passed_tests": 0,
+        "ignored_tests": 0
+      },
+      {
+        "command": "cargo clippy -p as-launcher -p as-package --features as-launcher/host --all-targets --locked -- -D warnings",
+        "seconds": 22.5972772,
+        "log": "target/evidence/m9-package-clippy.log",
+        "log_sha256": "c39b945a1810bb7acaa2f6e2d4b555a19d638485bd8ce12c3fc9e7d76bd3dab2",
+        "id": "package-clippy",
+        "exit_code": 0,
+        "passed_tests": 0,
+        "ignored_tests": 0
+      },
+      {
+        "command": "cargo clippy -p as-storage -p as-sqlite --all-targets --locked -- -D warnings",
+        "seconds": 15.4686686,
+        "log": "target/evidence/m9-storage-clippy.log",
+        "log_sha256": "1d5a1ad710ebc36e6aa225f6efebe7454d8dcc523a31fd5cfe1bf4ea7f7f2446",
+        "id": "storage-clippy",
+        "exit_code": 0,
+        "passed_tests": 0,
+        "ignored_tests": 0
+      },
+      {
+        "command": "cargo clippy -p as-switch-smoke --features host-cli,portable-tests --all-targets --locked -- -D warnings",
+        "seconds": 28.6720235,
+        "log": "target/evidence/m9-device-bridge-clippy.log",
+        "log_sha256": "7f93e8151178244a369476ed1a0ae50d7802c2d38fbaca485d98f80331544440",
+        "id": "device-bridge-clippy",
+        "exit_code": 0,
+        "passed_tests": 0,
+        "ignored_tests": 0
+      },
+      {
+        "seconds": 3.9350212,
+        "command": "cargo test -p as-sqlite --locked",
+        "log": "target/evidence/m9-sqlite-final.log",
+        "log_sha256": "f517eb48755e42305dce2f2d47d862c9ae3ce0dc1984379f465aef15d006c1fa",
+        "id": "sqlite-final",
+        "exit_code": 0,
+        "passed_tests": 2,
+        "ignored_tests": 0
+      },
+      {
+        "log": "target/evidence/m9-final-framework.log",
+        "command": "cargo test -p as-framework --features host --test m8_contracts --locked -- --include-ignored",
+        "log_sha256": "c1db9e1978c06e3f35e06231315d46dbdcfece64236a2d2a29c9251f3c397407",
+        "id": "final-framework-contracts",
+        "seconds": null,
+        "exit_code": 0,
+        "passed_tests": 2,
+        "ignored_tests": 0
+      },
+      {
+        "log": "target/evidence/m9-final-framework-clippy.log",
+        "command": "cargo clippy -p as-framework --features host --all-targets --locked -- -D warnings",
+        "log_sha256": "ec921edb59ee29cc0ba2811ca7a3f30e0d44b627a474aaeb61fe7810216c04dd",
+        "id": "final-framework-clippy",
+        "seconds": null,
+        "exit_code": 0,
+        "passed_tests": 0,
+        "ignored_tests": 0
+      }
+    ],
+    "desktop_emulator": "not_started"
+  },
+  "passed_test_executions": 59,
+  "host_corpus": {
+    "status": "passed_required_host_cases",
+    "cycles_per_required_case": 12,
+    "completed_sessions": 84,
+    "cases": [
+      {
+        "apk_sha256": "39c568280be3248058da636a80fad2378bca6e6a1496950bdcd273e36bba2d76",
+        "error": null,
+        "expected": "run",
+        "id": "java-ui",
+        "package": "org.fixture.uiproof",
+        "status": "passed_host_execution",
+        "completed_sessions": 12,
+        "measurements": {
+          "load_apk_ms_median": 1.58085,
+          "vm_startup_ms_median": 19.81715,
+          "vm_startup_ms_p95": 29.9958,
+          "software_frame_us_median": 16957.0,
+          "software_frame_us_p95": 28850.600000000002,
+          "managed_heap_bytes_after_gc_min": 930,
+          "managed_heap_bytes_after_gc_max": 930
+        },
+        "last_labels": [
+          "Count 0 / app 1",
+          "Add and save",
+          "Open second activity"
+        ],
+        "last_frame_hash": "222976a3759a0f82"
+      },
+      {
+        "apk_sha256": "34c9e552a70f48a629ad95399cf6b4c6a686139d7a1a0ef7557b60185514ae3b",
+        "error": null,
+        "expected": "run",
+        "id": "kotlin-ui",
+        "package": "org.fixture.kotlinui",
+        "status": "passed_host_execution",
+        "completed_sessions": 12,
+        "measurements": {
+          "load_apk_ms_median": 15.59855,
+          "vm_startup_ms_median": 104.48975,
+          "vm_startup_ms_p95": 112.1018,
+          "software_frame_us_median": 9396.050000000001,
+          "software_frame_us_p95": 17500.2,
+          "managed_heap_bytes_after_gc_min": 453,
+          "managed_heap_bytes_after_gc_max": 453
+        },
+        "last_labels": [
+          "Kotlin ready",
+          "Kotlin callback"
+        ],
+        "last_frame_hash": "7b88b74b3bc6f157"
+      },
+      {
+        "apk_sha256": "2b5091dece4347ab3c32cbc969e8b9ba59ea6b67fbb16fe1e764e9618f862c80",
+        "error": null,
+        "expected": "run",
+        "id": "preferences",
+        "package": "org.fixture.preferences",
+        "status": "passed_host_execution",
+        "completed_sessions": 12,
+        "measurements": {
+          "load_apk_ms_median": 1.68335,
+          "vm_startup_ms_median": 935.9344,
+          "vm_startup_ms_p95": 1519.4185,
+          "software_frame_us_median": 6982.5,
+          "software_frame_us_p95": 13385.7,
+          "managed_heap_bytes_after_gc_min": 1597,
+          "managed_heap_bytes_after_gc_max": 1597
+        },
+        "last_labels": [
+          "Prefs 12 / listener 1 / 1200:2:survives:1"
+        ],
+        "last_frame_hash": "f9deab35a3aa2526"
+      },
+      {
+        "apk_sha256": "2fdf67896dfc7dd515b50a1ba4319659879443e38892bad37450e0ddbe6b94f8",
+        "error": null,
+        "expected": "run",
+        "id": "renamed-preferences",
+        "package": "net.example.renamednotes",
+        "status": "passed_host_execution",
+        "completed_sessions": 12,
+        "measurements": {
+          "load_apk_ms_median": 1.60495,
+          "vm_startup_ms_median": 1146.97205,
+          "vm_startup_ms_p95": 1553.0311000000002,
+          "software_frame_us_median": 7123.9,
+          "software_frame_us_p95": 13599.699999999999,
+          "managed_heap_bytes_after_gc_min": 1597,
+          "managed_heap_bytes_after_gc_max": 1597
+        },
+        "last_labels": [
+          "Prefs 12 / listener 1 / 1200:2:survives:1"
+        ],
+        "last_frame_hash": "f9deab35a3aa2526"
+      },
+      {
+        "apk_sha256": "315c3938830afc17f277f8f215412732b3092c2ffbed9ef370100aee79060d61",
+        "error": null,
+        "expected": "run",
+        "id": "native-sqlite-notes",
+        "package": "org.fixture.database",
+        "status": "passed_host_execution",
+        "completed_sessions": 12,
+        "measurements": {
+          "load_apk_ms_median": 1.5195,
+          "vm_startup_ms_median": 124.5316,
+          "vm_startup_ms_p95": 344.7468,
+          "software_frame_us_median": 6998.650000000001,
+          "software_frame_us_p95": 13522.1,
+          "managed_heap_bytes_after_gc_min": 1884,
+          "managed_heap_bytes_after_gc_max": 2090
+        },
+        "last_labels": [
+          "Notes 12 / org.androswitch.persistence.Contracts:19:caught:3"
+        ],
+        "last_frame_hash": "46b8fcd0c5482b0f"
+      },
+      {
+        "apk_sha256": "a80b99b1c660ead34a5d16a1c6f8dccc4a161313b911ce15c84e6f4ef116b069",
+        "error": null,
+        "expected": "run",
+        "id": "renamed-notes",
+        "package": "net.example.renameddb",
+        "status": "passed_host_execution",
+        "completed_sessions": 12,
+        "measurements": {
+          "load_apk_ms_median": 1.64445,
+          "vm_startup_ms_median": 126.21285,
+          "vm_startup_ms_p95": 484.7524,
+          "software_frame_us_median": 7286.599999999999,
+          "software_frame_us_p95": 12518.400000000001,
+          "managed_heap_bytes_after_gc_min": 1884,
+          "managed_heap_bytes_after_gc_max": 2090
+        },
+        "last_labels": [
+          "Notes 12 / org.androswitch.persistence.Contracts:19:caught:3"
+        ],
+        "last_frame_hash": "46b8fcd0c5482b0f"
+      },
+      {
+        "apk_sha256": "833b8a478d6a4701e28f4a1865c33aa58ae1c9c3baf464d023697e91a9f32f34",
+        "error": null,
+        "expected": "run",
+        "id": "aosp-hello-activity",
+        "package": "com.example.android.helloactivity",
+        "status": "passed_host_execution",
+        "completed_sessions": 12,
+        "measurements": {
+          "load_apk_ms_median": 1.5909,
+          "vm_startup_ms_median": 8.26765,
+          "vm_startup_ms_p95": 9.1869,
+          "software_frame_us_median": 6803.65,
+          "software_frame_us_p95": 11730.900000000001,
+          "managed_heap_bytes_after_gc_min": 200,
+          "managed_heap_bytes_after_gc_max": 200
+        },
+        "last_labels": [
+          "Hello, World!"
+        ],
+        "last_frame_hash": "7eb53854ff340221"
+      },
+      {
+        "apk_sha256": "ffda0d9cb0b1b2aa58be9559dda891c4fa24391bc481d297a8e3d96c31f62721",
+        "error": "NOT_FOUND [rd-vm]: método Landroid/support/multidex/MultiDexApplication;->getApplicationInfo()Landroid/content/pm/ApplicationInfo; não resolvido [pc 0x0: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 11, regs: [2, 0, 0, 0, 0] } }]\n  at Landroid/support/multidex/MultiDex;->getApplicationInfo(Landroid/content/Context;)Landroid/content/pm/ApplicationInfo;\n  at Landroid/support/multidex/MultiDex;->install(Landroid/content/Context;)V\n  at Landroid/support/multidex/MultiDexApplication;->attachBaseContext(Landroid/content/Context;)V — a classe pode depender de plataforma fora do escopo M2",
+        "expected": "evaluate",
+        "id": "vector-pinball-1.16.0",
+        "package": "com.dozingcatsoftware.bouncy",
+        "status": "blocked_execution",
+        "completed_sessions": 0
+      }
+    ],
+    "measurement_scope": "CPU software UI and managed VM heap only; excludes native Horizon GPU/audio and host side-table/C allocations; host timings are not Switch FPS",
+    "receipt": {
+      "sampling_ms": 100,
+      "corpus_sha256": "32b5068debf014234c02938f536612889d232f1b59243993357fba0acc434e6c",
+      "elapsed_seconds": 66.4442817,
+      "command": "as-corpus fixtures/m9/host-corpus.json <fresh-storage> <report> 12",
+      "profile": "Cargo dev, unoptimized",
+      "exit_code": 0,
+      "sampled_process_peak_working_set_bytes": 20303872,
+      "tool_sha256": "488f978168dcbb120eac1140cc93da729bc92a77f9e296d8ac8ad34dba6742fd",
+      "run_id": "20261023-220140-289f1df9",
+      "schema_version": 1,
+      "scope": "Entire Windows host corpus process; includes managed heap, parser, Rust/C state and OS allocations; not device memory"
+    },
+    "artifact_root": "local-artifacts/m9/host-20261023-220140-289f1df9",
+    "raw_corpus_sha256": "32b5068debf014234c02938f536612889d232f1b59243993357fba0acc434e6c"
+  },
+  "device_build": {
+    "command": "./scripts/build-androswitch.ps1",
+    "log": "target/evidence/m9-device-build.log",
+    "log_sha256": "e379615f2cb5cb64c5799a927b536a0337f32fffb0eeabfe2b214cf4a9a8f8bb",
+    "receipt": {
+      "rust_toolchain": "nightly",
+      "sqlite_source_lock_sha256": "cce2cc3f0b3e6354568cc3da7d6067980ef88788f451349711975d7cb7f85e95",
+      "profile": "release panic=abort",
+      "nro_sha256": "f35e3a4734ac0ba91a1cd5221b414a7c231588fdfc140dff5800e9b1919502cb",
+      "executed": false,
+      "status": "built",
+      "target": "aarch64-nintendo-switch-freestanding",
+      "nro_bytes": 8478776,
+      "schema_version": 1
+    },
+    "executed": false
+  },
+  "fixtures": [
+    {
+      "path": "local-artifacts/m8/fixture/build-receipt.json",
+      "sha256": "a3be3ee60ade1db00feaa8a15597aaa3bc5a4a56376fc764ca8771f474de8c83",
+      "receipt": {
+        "jvm_oracle": [
+          "1200:2:survives:1",
+          "org.androswitch.persistence.Contracts:19:caught:3"
+        ],
+        "schema_version": 1,
+        "build_tools": "35.0.0",
+        "api": 26,
+        "apks": [
+          {
+            "sha256": "a80b99b1c660ead34a5d16a1c6f8dccc4a161313b911ce15c84e6f4ef116b069",
+            "file": "database-renamed.apk"
+          },
+          {
+            "sha256": "315c3938830afc17f277f8f215412732b3092c2ffbed9ef370100aee79060d61",
+            "file": "database.apk"
+          },
+          {
+            "sha256": "2b5091dece4347ab3c32cbc969e8b9ba59ea6b67fbb16fe1e764e9618f862c80",
+            "file": "preferences.apk"
+          },
+          {
+            "sha256": "2fdf67896dfc7dd515b50a1ba4319659879443e38892bad37450e0ddbe6b94f8",
+            "file": "renamed.apk"
+          }
+        ],
+        "sources": [
+          {
+            "sha256": "4c420241563578db8377b60fd73daf93c8c912a4f19704eb9fb24daf7f1426e1",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m8\\java\\org\\androswitch\\persistence\\Contracts.java"
+          },
+          {
+            "sha256": "b94009a4fc4495f29651fb6455ce56cc54e8d99851942ecef75fd12e3c837caf",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m8\\java\\org\\androswitch\\persistence\\DatabaseActivity.java"
+          },
+          {
+            "sha256": "efba65413cca5319f897ba2da68e7fc45508def1563aa3088af7d0e2cab6b02b",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m8\\java\\org\\androswitch\\persistence\\PreferencesActivity.java"
+          },
+          {
+            "sha256": "8294a2876888e9bed9a9d7b5a10c1cf2b359c1b6f108ff1841005ef88c902860",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\scripts\\build-m8-fixture.ps1"
+          }
+        ]
+      }
+    },
+    {
+      "path": "local-artifacts/m9/aosp-hello/build-receipt.json",
+      "sha256": "f6645cc6700de79793b390225bdaeaf27ae8be7f4fb073a14e652b84d9277c55",
+      "receipt": {
+        "build_tools": "35.0.0",
+        "source_lock": "fixtures/m9/external.lock.json",
+        "compile_sdk": 35,
+        "manifest_min_sdk_modified": false,
+        "build_script_sha256": "5d9182cd45341d7e7c0dd8683767d95ab2be895a1cb90dae6e539e2fba1a5cf5",
+        "d8_min_api": 26,
+        "schema_version": 1,
+        "java_release": 8,
+        "source_modifications": false,
+        "apk_sha256": "833b8a478d6a4701e28f4a1865c33aa58ae1c9c3baf464d023697e91a9f32f34"
+      }
+    },
+    {
+      "path": "local-artifacts/m7-improvements/fixture/build-receipt.json",
+      "sha256": "cf9e955af135cbec928ba58bc32fdde842a896d747e216cc8365ca1c3afa21a1",
+      "receipt": {
+        "schema_version": 1,
+        "source": "local-artifacts\\m5\\fixture\\java-ui.apk",
+        "source_sha256": "39c568280be3248058da636a80fad2378bca6e6a1496950bdcd273e36bba2d76",
+        "apk": "local-artifacts\\m7-improvements\\fixture\\large-ui.apk",
+        "apk_bytes": 134223818,
+        "apk_sha256": "c46fb27bfc4c5c88b9cac9b9d266aad37f0b2dbf64908e48e54ec636213e9776",
+        "payload_bytes": 134217728,
+        "method": "STORED",
+        "zip64_local_header": true,
+        "generator_sha256": "aa21f0286561e2fbd190ad953951571e99cf6ecd371c01f6951f5140d46dce2b",
+        "claim": "Original UI corpus fixture with large data asset; not external APK compatibility"
+      }
+    },
+    {
+      "path": "local-artifacts/dependencies/sqlite/source-receipt.json",
+      "sha256": "ddd2ac9a932cdd57bb754af1f0d1fdee41044c2cd6fa7be61acc009bb6c5ae07",
+      "receipt": {
+        "version": "3.54.1",
+        "archive_sha3_256": "92281c86e2957f9b9305890f9ac04204caa7b677cc868dc326d942689df28e30",
+        "files": {
+          "sqlite3.c": "0c657666d819f261cc4007526ad57e1669de9949df7a8ea847aa284a2bf0ee52",
+          "sqlite3.h": "d6c84557261893439b341d2e6c35187ae3ea24fbfd843ad94616f72d89242b8c"
+        }
+      }
+    },
+    {
+      "id": "java-ui",
+      "apk": "local-artifacts/m5/fixture/java-ui.apk",
+      "sha256": "39c568280be3248058da636a80fad2378bca6e6a1496950bdcd273e36bba2d76",
+      "bytes": 5950
+    },
+    {
+      "id": "kotlin-ui",
+      "apk": "local-artifacts/m5/fixture/kotlin-ui.apk",
+      "sha256": "34c9e552a70f48a629ad95399cf6b4c6a686139d7a1a0ef7557b60185514ae3b",
+      "bytes": 755722
+    },
+    {
+      "id": "preferences",
+      "apk": "local-artifacts/m8/fixture/preferences.apk",
+      "sha256": "2b5091dece4347ab3c32cbc969e8b9ba59ea6b67fbb16fe1e764e9618f862c80",
+      "bytes": 6247
+    },
+    {
+      "id": "renamed-preferences",
+      "apk": "local-artifacts/m8/fixture/renamed.apk",
+      "sha256": "2fdf67896dfc7dd515b50a1ba4319659879443e38892bad37450e0ddbe6b94f8",
+      "bytes": 6255
+    },
+    {
+      "id": "native-sqlite-notes",
+      "apk": "local-artifacts/m8/fixture/database.apk",
+      "sha256": "315c3938830afc17f277f8f215412732b3092c2ffbed9ef370100aee79060d61",
+      "bytes": 6247
+    },
+    {
+      "id": "renamed-notes",
+      "apk": "local-artifacts/m8/fixture/database-renamed.apk",
+      "sha256": "a80b99b1c660ead34a5d16a1c6f8dccc4a161313b911ce15c84e6f4ef116b069",
+      "bytes": 6251
+    },
+    {
+      "id": "aosp-hello-activity",
+      "apk": "local-artifacts/m9/aosp-hello/hello-activity.apk",
+      "sha256": "833b8a478d6a4701e28f4a1865c33aa58ae1c9c3baf464d023697e91a9f32f34",
+      "bytes": 3706
+    },
+    {
+      "id": "vector-pinball-1.16.0",
+      "apk": "local-artifacts/m9/external/vector-pinball-43.apk",
+      "sha256": "ffda0d9cb0b1b2aa58be9559dda891c4fa24391bc481d297a8e3d96c31f62721",
+      "bytes": 3233743
+    }
+  ],
+  "source_inputs": [
+    {
+      "path": "Cargo.lock",
+      "sha256": "cadf29ed74cefe19aa182541c6c6e64398536d846fd19f400130cb4f9c822ed4"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "c2d906db4a03b80b0fbbb3a01bbad0dc485b53633be0dca5f2f77735870361ea"
+    },
+    {
+      "path": "crates/as-cli/Cargo.toml",
+      "sha256": "f9d2fb572c755edcd1614d76420a6a8c333d21a2fec3d3327378e3765a34fde7"
+    },
+    {
+      "path": "crates/as-cli/src/main.rs",
+      "sha256": "98c0e790adf718282cdfbc4cc0735119929940867a39a16e5220a14873257eb4"
+    },
+    {
+      "path": "crates/as-cli/tests/inspect.rs",
+      "sha256": "e63fa3d10a25dc299f06c90b1de218fe4aefbfd8046d52f709fa3b3d3b96de12"
+    },
+    {
+      "path": "crates/as-framework/Cargo.toml",
+      "sha256": "ba54e8a3c56bbbcef2b52c1f3cc01b895345f7628017aa76d1b8471a8223f38f"
+    },
+    {
+      "path": "crates/as-framework/src/android.rs",
+      "sha256": "c29ad6debc6107937e87640a5bd59bad910216ddaa68f4f8edd7ed3173ba115d"
+    },
+    {
+      "path": "crates/as-framework/src/audio.rs",
+      "sha256": "869a4646ac37bb8e2cd8b85c055671f8666cd55a6880805327d3aa3056463dcb"
+    },
+    {
+      "path": "crates/as-framework/src/bin/as-corpus.rs",
+      "sha256": "5e4607c814c1e35f5e358069d641533fc87dbba20000db19fabddeea0ea39950"
+    },
+    {
+      "path": "crates/as-framework/src/bin/as-ui-probe.rs",
+      "sha256": "3279f9422469e8cd950f809d5a401008ddafc52c264b59f7dc906565405dfeb9"
+    },
+    {
+      "path": "crates/as-framework/src/lib.rs",
+      "sha256": "f055d58dbddeaf965b606209761de0e22989476b083e735e647730699ee80468"
+    },
+    {
+      "path": "crates/as-framework/src/raster.rs",
+      "sha256": "8b212d9c17a6b9a222113bb275b384ce222075ba73c1492c24d4542de2be30cf"
+    },
+    {
+      "path": "crates/as-framework/src/services/collections.rs",
+      "sha256": "04c656c945b750d4c10e73eeb88ed384b126dde38db08f8f38bb290e9db88b24"
+    },
+    {
+      "path": "crates/as-framework/src/services/database.rs",
+      "sha256": "39944117b8147f32b524c07e3d5d2d98e51ae07e8a841b112844c9cc83faa3fb"
+    },
+    {
+      "path": "crates/as-framework/src/services/mod.rs",
+      "sha256": "693548636e99ddb8a68933112670240c66cae3a5da09a71aa87c70f37a5b3564"
+    },
+    {
+      "path": "crates/as-framework/src/services/permissions.rs",
+      "sha256": "af9197cc625122bd42c3af21f521229bc215af2c449ffa5ab3ead12ccbefaf1a"
+    },
+    {
+      "path": "crates/as-framework/src/services/preferences.rs",
+      "sha256": "97e446f3a10e0de325e035467dac9e4395d9195aa691f0f2d037c4ad44632224"
+    },
+    {
+      "path": "crates/as-framework/src/services/reflection.rs",
+      "sha256": "10d6e1bf2d2c120fcb62bd86afbf38b54be04d24de7b9da9049ee794bf8ecfdc"
+    },
+    {
+      "path": "crates/as-framework/tests/lifecycle.rs",
+      "sha256": "58a46ce4df5e51ee333c8137715294adccc5516b4965e4a141d57a61fea75542"
+    },
+    {
+      "path": "crates/as-framework/tests/m8_contracts.rs",
+      "sha256": "93adc1652d64faea3a76cb6098065492d7e6b12ccc2014cc99a47c04b267aa81"
+    },
+    {
+      "path": "crates/as-launcher/Cargo.toml",
+      "sha256": "05ce3203b057d0f48795c2168a0ed081aa7156678f9e29548132b3807f7934bb"
+    },
+    {
+      "path": "crates/as-launcher/src/lib.rs",
+      "sha256": "cd3ffdfe3bc39ca4bbc59777cc918d2a4b7cd1dc8449ccb6e7c31022a53eb681"
+    },
+    {
+      "path": "crates/as-launcher/src/png.rs",
+      "sha256": "0e96b665b3b1e8da602e5a8cdbbc6c880b8c39442c2af8da2f0bc802525a0b21"
+    },
+    {
+      "path": "crates/as-launcher/tests/workflow.rs",
+      "sha256": "9db18b7a90e87ea52bbcf0caf736b4d8166a0e051d98f3d83d3757644ef8a68a"
+    },
+    {
+      "path": "crates/as-native/Cargo.toml",
+      "sha256": "e108d8e723319d182b4509ae73443026980461c1a3f8e85659d9db7afc622fde"
+    },
+    {
+      "path": "crates/as-native/src/jni_refs.rs",
+      "sha256": "c23a89138a2a1d824423b94df293d0a0b119946812ac0d3f619bfe7f3ff5f1ab"
+    },
+    {
+      "path": "crates/as-native/src/lib.rs",
+      "sha256": "5746f176f3a5d438a985419bd75f94b438d2ffb4812a94c2b6f39c191b5878e0"
+    },
+    {
+      "path": "crates/as-native/src/oracle.rs",
+      "sha256": "49eb900c8ba0b82356554864bb7527bc02cb14263bc673454418a9508d1a126f"
+    },
+    {
+      "path": "crates/as-native/tests/loader.rs",
+      "sha256": "faaa27eaea366bbb56e35018fba5d8806c0b519cb933edfd4561a14d9c9056cc"
+    },
+    {
+      "path": "crates/as-package/Cargo.toml",
+      "sha256": "90e2831c81cf45d2a700c16515a97e4d77c5e182809c0451dfff63eedb097211"
+    },
+    {
+      "path": "crates/as-package/src/archive.rs",
+      "sha256": "bbc4958986927e5922df24ae3fe68fd90cb3fee5c606215425a9e39c796048c0"
+    },
+    {
+      "path": "crates/as-package/src/lib.rs",
+      "sha256": "9d33bb3c1fbd3fb963235c3c23d48c37ceda7f81ae15479868c0061d4a9e810d"
+    },
+    {
+      "path": "crates/as-package/tests/persistence.rs",
+      "sha256": "5567822f5076df474309c2f988f87fa231b1949f14c37099958b0998faddb235"
+    },
+    {
+      "path": "crates/as-platform/Cargo.toml",
+      "sha256": "3387a60b4cc9b176561c4f775b64fca9f6b519ae42a9ff2604c559f9150e4167"
+    },
+    {
+      "path": "crates/as-platform/src/fs.rs",
+      "sha256": "4fe4f9d1acc44160a15be655f78795b2ab1a21ae760c63524ba24af8e607d242"
+    },
+    {
+      "path": "crates/as-platform/src/host.rs",
+      "sha256": "cfcc03512e9ea6e468bc03079ca7f38ef01189ae64a90502255c4204c9910eff"
+    },
+    {
+      "path": "crates/as-platform/src/host_fs.rs",
+      "sha256": "e6c00d0af670736dabf1533fedfcfded6d9f280b369e0abcdb25fec616146721"
+    },
+    {
+      "path": "crates/as-platform/src/lib.rs",
+      "sha256": "33ebc8af821817cd52458867cb43e27f56b8d000313ab404ab220c5c8feccbe5"
+    },
+    {
+      "path": "crates/as-platform/src/vfs.rs",
+      "sha256": "6efe0150b4c26b6c79a9c547db75a38d1991f3272dc9c09e40d86616f80adcbd"
+    },
+    {
+      "path": "crates/as-runtime/Cargo.toml",
+      "sha256": "4bab837f94060039052fd3a1941363dc868ab302612f86043d4dd50c8b0e0fdf"
+    },
+    {
+      "path": "crates/as-runtime/src/lib.rs",
+      "sha256": "1e988c8df888a121437650e8feabf9b71318d0c7cf1957b8e887269f3de5b345"
+    },
+    {
+      "path": "crates/as-runtime/tests/inspection.rs",
+      "sha256": "a58f67698e1ed8c9986de2061e6a277e8349f3ba841dc21c9b163e7e44802afe"
+    },
+    {
+      "path": "crates/as-sqlite/Cargo.toml",
+      "sha256": "1381e7c3cb0eb679ebbb9164b7c6eaaf8644c3c9b2036d414795d7dcc2b0c15f"
+    },
+    {
+      "path": "crates/as-sqlite/build.rs",
+      "sha256": "10066468d3a6ebe07bd398837b83507987150c3bb85f9b16066d335376354b4d"
+    },
+    {
+      "path": "crates/as-sqlite/src/ffi.rs",
+      "sha256": "5595e747880351baf124321d7933822d23d23342b7c0efb33388132501a95d27"
+    },
+    {
+      "path": "crates/as-sqlite/src/lib.rs",
+      "sha256": "0261424c9dace24804f565faca8b18ac4553ecb0aaf43ba4881b29ea3e60716a"
+    },
+    {
+      "path": "crates/as-storage/Cargo.toml",
+      "sha256": "5ab8194d13f5fa317cfd49ddf5ddc69655243519f68275edc8c7fe47f5d4defc"
+    },
+    {
+      "path": "crates/as-storage/src/faults.rs",
+      "sha256": "e246c1601f36bd90545ce4d79d8e89ddef68bd9ab885c945294cb3f641455e9a"
+    },
+    {
+      "path": "crates/as-storage/src/lib.rs",
+      "sha256": "3c0975020a0dade39654766a275b6f03d1222af81abd6c0308d9d6d8b807f727"
+    },
+    {
+      "path": "crates/as-storage/src/preferences.rs",
+      "sha256": "7d1e83a3b144789a3ffb82d61b5154bb852e89d44f3448ba3e3fa01ffdd6f0b2"
+    },
+    {
+      "path": "crates/as-switch-smoke/Cargo.toml",
+      "sha256": "360450cea870d36688e6bac6ab8348149f1a0efa495f9ecf925cff9127014c03"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/application.rs",
+      "sha256": "4ddc4eab0acda7f0f6f83e2ac6f8430b134d8c92d56dd1e1816758d2052eca73"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/bin/as-probe.rs",
+      "sha256": "dfc72488dcad2388d7b1285940ffeaf9ca6b208616a9b811c36bdfebd451bff5"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_fs.rs",
+      "sha256": "056c98565b2a5cd89dd3916bb8e9f532d51ef20ed8e7ee3700c42a5dc1c7f2ac"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_jni.rs",
+      "sha256": "0cbc08594ce3a4b8a1945860510b1c2943be88763054f0f2cc9e7394a277cdf3"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_native.rs",
+      "sha256": "135c21019c150a8c6711a15d84ce098cd67e353b9efb001db07a33fde1008807"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/launcher.rs",
+      "sha256": "234afb5a887faa6b018a7987a19c7b0103c0588484c64701794d2e3d5842bf11"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/lib.rs",
+      "sha256": "3cdfb250a6bda4461c2bb89598ceaf20b67db11a0268de2d2c0f2fbc68945293"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/native_probe.rs",
+      "sha256": "b0a0ecf2d3ab7c722efd85895dac3a9823b3f353e8c622da1601839359d30938"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/probe.rs",
+      "sha256": "62d701ca008df051542ab7df14ecc0f78c5dbda6e5f9e9300b8855cadc32d4ab"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_core.rs",
+      "sha256": "8bac1bf2dd69e606be4c4ad4061900c51055aeb40f58bc8d2c81da56f88dbd50"
+    },
+    {
+      "path": "crates/as-testsupport/Cargo.toml",
+      "sha256": "8970abfb7f556bfc04dff551c887fce044fc636b3508c4b16d4730748a7b15ef"
+    },
+    {
+      "path": "crates/as-testsupport/src/lib.rs",
+      "sha256": "89a763f2acf6328c1d9f76c73ca81ff7cb7300f7327dee0fcff4c44df4451abf"
+    },
+    {
+      "path": "crates/rd-agent/Cargo.toml",
+      "sha256": "8a6b2eecc69320a34a9c111c84e61bbd612fae0f0eac3f68fe51ad6ae1c6f2b1"
+    },
+    {
+      "path": "crates/rd-agent/src/api_usage.rs",
+      "sha256": "7f069df6764c44cc5a8c83c552e286485c13fde817b84b675fb5eff87ba13d1e"
+    },
+    {
+      "path": "crates/rd-agent/src/lib.rs",
+      "sha256": "fc22da3f704fa19e381283a9052213454a3eab571323ca3fd7cf2ff256b7e547"
+    },
+    {
+      "path": "crates/rd-agent/src/m9_tools.rs",
+      "sha256": "efbdc7452d581bb82e54dd06dcc820a159eacfb1bdcdf4cd340c8b07841f064c"
+    },
+    {
+      "path": "crates/rd-agent/src/mcp.rs",
+      "sha256": "0d09985404c81f5ce4f91518ffde80f69769a7cb55fc6067cd25f1e9a66187ea"
+    },
+    {
+      "path": "crates/rd-agent/src/observe.rs",
+      "sha256": "059647df8ffe0487686ecfd649f404a7fd2f022e6d41ec3ef73ba4fa6896c544"
+    },
+    {
+      "path": "crates/rd-agent/src/runtime_tools.rs",
+      "sha256": "3e111321399c43a4f652290969ec529cf2f5af3990ec79dbe2bbf39a4d9b2812"
+    },
+    {
+      "path": "crates/rd-agent/src/runtime_tools_tests.rs",
+      "sha256": "dd7f379be4c9a2a3ff3a12acce82be200ea7de0966cb25605ee402654ebe04f9"
+    },
+    {
+      "path": "crates/rd-agent/src/snapshot.rs",
+      "sha256": "20d50c3d5846899a802299822f0c72958cc759e1c644009883697d38d4e57da2"
+    },
+    {
+      "path": "crates/rd-agent/src/suite.rs",
+      "sha256": "fe54f3d9dc60f1e92a319b5c5e26a49d951578ece0dbce3febf0415b9d8db64f"
+    },
+    {
+      "path": "crates/rd-agent/src/ui_tools.rs",
+      "sha256": "902d33b3daff8a9b7e622d8af1a92dab500a880dc1f861b41f85e9805c12f820"
+    },
+    {
+      "path": "crates/rd-agent/src/ui_tools_tests.rs",
+      "sha256": "f63b74201120a0c4460525ee616e3497216c7ba86c51d9909f66a872256b9d00"
+    },
+    {
+      "path": "crates/rd-apk/Cargo.toml",
+      "sha256": "981136a56e8b73c46d125ba710ef4a212186842514703a8448477e643e7d612e"
+    },
+    {
+      "path": "crates/rd-apk/examples/dump_arsc.rs",
+      "sha256": "03b7bf69b6c073dcf01d7de39579d7cb82516e0507505b89bc83dfbf6187162f"
+    },
+    {
+      "path": "crates/rd-apk/examples/dump_manifest_attrs.rs",
+      "sha256": "aaf390eb4379f25348cb623faa421595c806afeb47df7596346f6643557d783c"
+    },
+    {
+      "path": "crates/rd-apk/examples/verify_config_apilevel.rs",
+      "sha256": "fd3392f26890afd4605f580f7e1eb6adcd0ebfeab59732b08f95753e99a5ce6f"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/Cargo.toml",
+      "sha256": "df99a7b58b5252e2cf5ca716c4f9744e9fcaa08dec10979e0a09d97eb3413184"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/fuzz_targets/apk_full.rs",
+      "sha256": "c7aa104ce03c50bc0c030f129c02c65866decf6d041443d3687a225cb471fbe5"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/fuzz_targets/arsc.rs",
+      "sha256": "c9d49ffb3eb50e95a991443d13149a41501a76336611f88e21ed4bea6fc6e780"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/fuzz_targets/axml.rs",
+      "sha256": "e1d37157bd8d7311e379fb65ce4741e4c6b08e4513ff3d1c7311079e5fd79c5f"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/fuzz_targets/zip.rs",
+      "sha256": "713f269af141586aad870569526cc6e03bc2ae35d6b67cf1bdd077bf37bdccf4"
+    },
+    {
+      "path": "crates/rd-apk/src/arsc.rs",
+      "sha256": "7003cc34cdf3052ba75a3185c771a74c73a7d87122ca513a828cc9d538dae5b6"
+    },
+    {
+      "path": "crates/rd-apk/src/axml.rs",
+      "sha256": "e14212884ef6249247ba5449606334873a9de17b8d9ef614a7e9636beefae6f6"
+    },
+    {
+      "path": "crates/rd-apk/src/error.rs",
+      "sha256": "47e43a0fe344638f6837c71e8ed1694c7e75d759619a40ca23b9f9ad6143aaae"
+    },
+    {
+      "path": "crates/rd-apk/src/lib.rs",
+      "sha256": "46348247fc16dc24fa742b5bb5d547d71e1120ada050433237e6d4cac7d1f0de"
+    },
+    {
+      "path": "crates/rd-apk/src/manifest.rs",
+      "sha256": "b06006cb14663b86c0b88f3dc9fb1f52afcd841f2f82063206d2c2d04cac2987"
+    },
+    {
+      "path": "crates/rd-apk/src/paged.rs",
+      "sha256": "d2cc458380e3cb0da1c4f60b80662f72f75bac3c6acb85d677271e5f1db727d3"
+    },
+    {
+      "path": "crates/rd-apk/src/pool.rs",
+      "sha256": "775c2ba46cab430ec44b75984f0d3a6b2ae1b245f87ad6a91946dad8973ddf95"
+    },
+    {
+      "path": "crates/rd-apk/src/signing.rs",
+      "sha256": "6cc671a99f6a39bfd42f2a88fee35211f1339470536b1ba6156b3d09012464ad"
+    },
+    {
+      "path": "crates/rd-apk/src/zip.rs",
+      "sha256": "d6b65fb5b1a5680c7ada15b88f91c6b7672c763ad20bbfab1a1faeff65a37e79"
+    },
+    {
+      "path": "crates/rd-apk/src/zip_source.rs",
+      "sha256": "ad36282bca5f5897eea7315d49c797f39283b751c71608ae818ec81fcd59fc25"
+    },
+    {
+      "path": "crates/rd-apk/tests/integration_apk.rs",
+      "sha256": "9b9bccffb096c0a260fe10d14d81c9bded123fb994bd7b2a03b19e8eb31946e1"
+    },
+    {
+      "path": "crates/rd-cli/Cargo.toml",
+      "sha256": "b879099c6d463beb6c6e9d5569540b5a0e522ded390c3bbebfd14150b2c0d556"
+    },
+    {
+      "path": "crates/rd-cli/src/engines.rs",
+      "sha256": "423c2ef1c14ce678ac5de72e8d7ae71771e6138699a25d06fe45f0a95aa46ea4"
+    },
+    {
+      "path": "crates/rd-cli/src/main.rs",
+      "sha256": "ac92613408177ae8caca14677edafa89cf719e96fd88f00c8da0804fbe25a289"
+    },
+    {
+      "path": "crates/rd-cli/src/perf.rs",
+      "sha256": "c213e5d281ad786a85d694c78f6446c0c7df900f4430ee958f56e0983595d10d"
+    },
+    {
+      "path": "crates/rd-cli/tests/app_cli.rs",
+      "sha256": "36d0190b245d61e13aca0f4eba93b57bd6face652949037647d62f3c2169d301"
+    },
+    {
+      "path": "crates/rd-cli/tests/engine_cli.rs",
+      "sha256": "f5b2dee8d3441ba6adef14f384d10097f9d4e0f4502b6e8f991ffb3ae5497d1c"
+    },
+    {
+      "path": "crates/rd-cli/tests/inspect_cli.rs",
+      "sha256": "e72c0e0bc7873dbcda69874c8c549c10a30b41fe495b208a314ef1235ba0dbd7"
+    },
+    {
+      "path": "crates/rd-cli/tests/mcp_cli.rs",
+      "sha256": "28d13fc1cef179875851ab10a1fe0ba22a8cbb7a3032024108f1b39de1f66f5b"
+    },
+    {
+      "path": "crates/rd-cli/tests/perf_cli.rs",
+      "sha256": "3bfae39216a8034525301f5ae82f850d78212c297917c76d956c29509b080b0d"
+    },
+    {
+      "path": "crates/rd-cli/tests/readme_inspect.rs",
+      "sha256": "b2dd2c77c3050a18a3462386cc84bfb4ed6a0f880f25ef1c35c0898b3382029a"
+    },
+    {
+      "path": "crates/rd-cli/tests/test_cli.rs",
+      "sha256": "22bd52e8aeeacd8f96524fc72873ecbe8e61c63458a2bb51a0cb6eec97c93bc5"
+    },
+    {
+      "path": "crates/rd-dex/Cargo.toml",
+      "sha256": "e606c815da61956b3c43d54c5a8e5da5c72a4821faf48067d6ec2353d9df3fce"
+    },
+    {
+      "path": "crates/rd-dex/examples/dump_dex.rs",
+      "sha256": "da4b1a893bad5140508aad63e1c6b9f8327036e53354528513000cda08da97e7"
+    },
+    {
+      "path": "crates/rd-dex/fuzz/Cargo.toml",
+      "sha256": "15d565add271f23627650951882973a8b5a66c1f28473ff629fc4f992cf3912e"
+    },
+    {
+      "path": "crates/rd-dex/fuzz/fuzz_targets/dex.rs",
+      "sha256": "dcc3c0ebc8d59396528eeeb743e07dabb42829424c58aacf0a99e52bde7a0259"
+    },
+    {
+      "path": "crates/rd-dex/src/annotations.rs",
+      "sha256": "1bcdf384589ed8ac23e3e75a3471c9bef9ad503fd11333433c4894479ffc29be"
+    },
+    {
+      "path": "crates/rd-dex/src/classes.rs",
+      "sha256": "b148aee13ec44c0fe4ae41876e5178ad1ac715e3e3d4df84f0e6a23902b72130"
+    },
+    {
+      "path": "crates/rd-dex/src/code.rs",
+      "sha256": "cf3341422b3328f8b8f9be64cdc01534d0d48c0b1105fc76c55a5c04163f5b53"
+    },
+    {
+      "path": "crates/rd-dex/src/debug.rs",
+      "sha256": "6e8c6ff2f1c3f2a5a0c6f81e5fb0a7defd12a6bcbfaee1c01fd9c362e3225b37"
+    },
+    {
+      "path": "crates/rd-dex/src/dex.rs",
+      "sha256": "3671aef0873b43a441e5390dd520b76a69fb3421ea4df92fed3428ad60afdd62"
+    },
+    {
+      "path": "crates/rd-dex/src/disasm.rs",
+      "sha256": "34fd59a800ec3bc10b8e2f27a7f85073a8d769786502495562e9d4bc13aefb07"
+    },
+    {
+      "path": "crates/rd-dex/src/error.rs",
+      "sha256": "3c9407c7bd24bc460c7126de97b36afd5ec259972a55b68e8de1c63099158890"
+    },
+    {
+      "path": "crates/rd-dex/src/fields.rs",
+      "sha256": "1f038723c7c86b7e700c5e2fbed119d1568bd35d364f76399ddbab762d2f373b"
+    },
+    {
+      "path": "crates/rd-dex/src/lib.rs",
+      "sha256": "f37c425f5dde4122619177da1e7718db91552846ff6ee7e2072fe29895bce982"
+    },
+    {
+      "path": "crates/rd-dex/src/methods.rs",
+      "sha256": "54f8c4836e4c2f9780d61b5323a3a6acc2018e338504475b0943a5b3dcfd0abe"
+    },
+    {
+      "path": "crates/rd-dex/src/mutf8.rs",
+      "sha256": "5509f6674656bd201882d60466923643837b41e56568140c176c56ee1d58323f"
+    },
+    {
+      "path": "crates/rd-dex/src/opcode.rs",
+      "sha256": "363997c7f81e9a775bc0a491fe0c7f7b88f0a04ba10db6ecfde038f56d167dea"
+    },
+    {
+      "path": "crates/rd-dex/src/protos.rs",
+      "sha256": "cd0afa28c024618e4920a7a37cbea6b8bceae368517962525fd41fac211da19a"
+    },
+    {
+      "path": "crates/rd-dex/src/read.rs",
+      "sha256": "7851734336ea36d59c7defaafc1efb9cffdb70fca12a2079f0ab15414d2b96fd"
+    },
+    {
+      "path": "crates/rd-dex/src/strings.rs",
+      "sha256": "60cc899177fd9ae2670aec267ef2353d504ab6081cc6a72ae37b47e53118f9d8"
+    },
+    {
+      "path": "crates/rd-dex/src/types.rs",
+      "sha256": "983088569f552d0d74e6e3efd6b6467fb711ce6d3c8faa5a2b483dac7281549c"
+    },
+    {
+      "path": "crates/rd-dex/tests/integration_dex.rs",
+      "sha256": "558c70b823c818d57d3814fd9e7001d211c9ad77028794e15959377bf51726f1"
+    },
+    {
+      "path": "crates/rd-dex/tests/portable_index.rs",
+      "sha256": "cabb37941c5da5eb0ed22531023954ee40916a55ed8b5d90d7c649fc4bcdd488"
+    },
+    {
+      "path": "crates/rd-engine-registry/Cargo.toml",
+      "sha256": "089df7dcab817bf40128c31dc23380bd86ed9a0be813963c77d411165431d88f"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/contract.rs",
+      "sha256": "7255aebd248cd11a6b49683243252c603f1db212e9c35119fa320427fdeea8a2"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/detect.rs",
+      "sha256": "4188091047b14439f4ff23101dcdb8fd4ac6ce6b673dc258ea3895926085f465"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/lib.rs",
+      "sha256": "3802c16ffc9a8d11913baf12193b07111bbbb1aa4a4834c2e9e6454a6bf9266e"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/native_execution.rs",
+      "sha256": "7d90bc778f7793b3d224d7df8471628e37b311ece41fcb491fb2f3907c2090fd"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/report.rs",
+      "sha256": "b49a3b0fac8fedd410dbf3fad225fe209334dea1b1c616086bd4e0c6396a59bd"
+    },
+    {
+      "path": "crates/rd-engine-registry/tests/native_execution.rs",
+      "sha256": "516c7ea2514201cbd64a94deb83a4694222a9af5d4d120861769fcbffece83bf"
+    },
+    {
+      "path": "crates/rd-engine-registry/tests/registry.rs",
+      "sha256": "5384b9eff9f4878f5235c457f81b9199b894c0e59349ec969c61a15ccf83a322"
+    },
+    {
+      "path": "crates/rd-framework/Cargo.toml",
+      "sha256": "a8df57c05f1edfeffb6bda12bd22b8ab77ea59eee0015574f97395a99a827f41"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_behavior.rs",
+      "sha256": "9678949c3a22ece3860754879357d120f66e0f4cb98a41842d6d18a8947a04a6"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_devices.rs",
+      "sha256": "d21cf66c2d3bb1f605dc11aa19a621ed4d6d31fe4d96fa28c4464b3fd53aafc5"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_permissions.rs",
+      "sha256": "389f31a9606fdfc31c3d619f5abfc579b2ed0234bcd2a6bf71f6e23054b93399"
+    },
+    {
+      "path": "crates/rd-framework/src/lib.rs",
+      "sha256": "9fa88986572db44c59b232eca14a88cec8f2206dfd5fbda0b74967d632ef7fa8"
+    },
+    {
+      "path": "crates/rd-jni/Cargo.toml",
+      "sha256": "d6a118b3c7972fa4485829cd7cafcc1c41e83fb53c976e2ee2eda3c56bc38cfd"
+    },
+    {
+      "path": "crates/rd-jni/src/jit.rs",
+      "sha256": "436f4310a866f2deab7a6bfa5e4356657a8b100016a8501a40470015cb6757d8"
+    },
+    {
+      "path": "crates/rd-jni/src/lib.rs",
+      "sha256": "278386d518c12a11e7a9cc8cc7f6dd7b967efeb6c60b8ee90da474e1ac9a523b"
+    },
+    {
+      "path": "crates/rd-ndk/Cargo.toml",
+      "sha256": "1c58268490629cf669356ad592ac920c99e1b9c3dbf8b2b1754714154f9199e9"
+    },
+    {
+      "path": "crates/rd-ndk/examples/elf_campaign.rs",
+      "sha256": "74bca02e1a7f1c1c8e4487c3e5cfcf6986ccdcc0598dbb658668e37858f694e8"
+    },
+    {
+      "path": "crates/rd-ndk/examples/native_probe.rs",
+      "sha256": "686857e1fa3ae6f04370a02a59cd92e824a12a6a54f05abdc12ef4fc80071d84"
+    },
+    {
+      "path": "crates/rd-ndk/src/elf.rs",
+      "sha256": "1856c0000e87135e4c73e2a3e45ff7ca12d88f33045edb378f6e13fe67826332"
+    },
+    {
+      "path": "crates/rd-ndk/src/lib.rs",
+      "sha256": "e0bd68fa8f3b16149380d01727671bc093a17ba2a58fa7bd5eb58f3cb84a0332"
+    },
+    {
+      "path": "crates/rd-ndk/src/runtime.rs",
+      "sha256": "4afe0fc0d3bfd2193625e1111de33bd10ff7d22cc200f4144fdc90a8e93d2332"
+    },
+    {
+      "path": "crates/rd-ndk/tests/native.rs",
+      "sha256": "6a0ee9ca2e7560f18ce74fc49d3c900eba3bdb93801ad33897426a65fe34c9bc"
+    },
+    {
+      "path": "crates/rd-ndk/worker/native_worker.py",
+      "sha256": "89e07c4fb89a7bba7c3ab073705972c4d47440032c6fd8590212028f4760f652"
+    },
+    {
+      "path": "crates/rd-render/Cargo.toml",
+      "sha256": "078cf892f343bc81ccbebc2684394559ff832b2d7343109cce7570d631b4ac4a"
+    },
+    {
+      "path": "crates/rd-render/src/lib.rs",
+      "sha256": "13bea0cb84c997e8e28058dbad310dd61542e3e1e3049ee25f90740e79369a4e"
+    },
+    {
+      "path": "crates/rd-render/src/shot.rs",
+      "sha256": "6b9268490472a8466e740b513454f756814a3ae431e407509133bd0b91f1f9f8"
+    },
+    {
+      "path": "crates/rd-render/src/ui_dump.rs",
+      "sha256": "74d950fc0c12d3263b5a541596b9e0d6dd98adf17cc132d577004f5adc88f8cc"
+    },
+    {
+      "path": "crates/rd-testsupport/Cargo.toml",
+      "sha256": "02cb20ecea80922c4366bec439f5fc278a9c2cd0bcecae12151f638666fb78b1"
+    },
+    {
+      "path": "crates/rd-testsupport/src/apkfix.rs",
+      "sha256": "1333fe91a28d298514127f3678a0e7fb83769d79e157086e34fe2e97f02f7c88"
+    },
+    {
+      "path": "crates/rd-testsupport/src/lib.rs",
+      "sha256": "0d6c1f2cb5b4e5af979c977a19d9789859710698915f1aff31baf944357c78b5"
+    },
+    {
+      "path": "crates/rd-testsupport/src/m9_app.rs",
+      "sha256": "e54dbb6e3d3dd9238df076b82ca67e81c60affbe17fe510edf636aab35c5159f"
+    },
+    {
+      "path": "crates/rd-testsupport/src/trivial_app.rs",
+      "sha256": "7f9b550194946c5ae433f01e6afab138b6816ba175c39e747e58b3a45061cc59"
+    },
+    {
+      "path": "crates/rd-testsupport/src/vm.rs",
+      "sha256": "7e6a3566051377e61b8fb4a1b0a9c3aa4e5716b5c442520ecd0034bef770a43b"
+    },
+    {
+      "path": "crates/rd-vm/Cargo.toml",
+      "sha256": "a45a791dc7dc10d39161aa3b4b448c251255f1fb405d01c3b4e91eb73148b7ab"
+    },
+    {
+      "path": "crates/rd-vm/assets/glyphs.bin",
+      "sha256": "f9cd0a65b8f9f872bb317770c609dea7f71bbec63a423748e06160fceafb4665"
+    },
+    {
+      "path": "crates/rd-vm/examples/efficiency_bench.rs",
+      "sha256": "1dae6e741bfa2bf1ce91b671d1cf7e8353d62138e0bd95557320b3573fdd8657"
+    },
+    {
+      "path": "crates/rd-vm/examples/native_gate.rs",
+      "sha256": "c70e03310f3f69225ddd9c9d35f45666d3d0e184bdfcbc03b1b5759e72498dd5"
+    },
+    {
+      "path": "crates/rd-vm/examples/scan_pure_methods.rs",
+      "sha256": "dd8177358f00e5e7a1c002299a8ad3b1de463df1ad63e464e9216e5b0151b191"
+    },
+    {
+      "path": "crates/rd-vm/src/accessibility_node.rs",
+      "sha256": "b7a3b5e7e5f33ee0b33f2cc8baf04e0957948a8398aa1e3f7e5cc0110951c1a7"
+    },
+    {
+      "path": "crates/rd-vm/src/activity_callbacks.rs",
+      "sha256": "17f8400794ca46db3cea93ea2c98da29f811ebb146e19fb14067fb315312573d"
+    },
+    {
+      "path": "crates/rd-vm/src/activity_extras.rs",
+      "sha256": "f08fc76478dcc2455e3a86d82ba1fbefc97bf9649584337dc25817f596b343cc"
+    },
+    {
+      "path": "crates/rd-vm/src/android_build.rs",
+      "sha256": "ec4af962ed4e12683c16953ed5392b9485380ed4727e99f556fad7c35d85cbfb"
+    },
+    {
+      "path": "crates/rd-vm/src/android_colorspace.rs",
+      "sha256": "4aeb191a58a32989fbe6d7f179aa161a605365055a2963904428dd845150a12d"
+    },
+    {
+      "path": "crates/rd-vm/src/android_display.rs",
+      "sha256": "4480e46a75a2fc42a13ad6b00d5da1f72deca6d5da38acbe80f88f37c41a1763"
+    },
+    {
+      "path": "crates/rd-vm/src/android_drawable.rs",
+      "sha256": "273a28ea326869d1498b65f2a212e9387367eb3fa0101345f2cca1bcd4082e64"
+    },
+    {
+      "path": "crates/rd-vm/src/android_env.rs",
+      "sha256": "465b69f91e767a3bc804f1fcdf8651d2c2a12648f813ef561bee9489dacc4abc"
+    },
+    {
+      "path": "crates/rd-vm/src/android_motion.rs",
+      "sha256": "4d953bb87422afe985cd7984a71c044144d986fe66400b64a9d614e54a6f7639"
+    },
+    {
+      "path": "crates/rd-vm/src/android_observable.rs",
+      "sha256": "bba8dae2df9e0580d8dfd775a67e29adcc8b479f6cdb6a5050adb79c77300630"
+    },
+    {
+      "path": "crates/rd-vm/src/android_pm.rs",
+      "sha256": "b16a7e3013ffd0c1b28daf36c7b5ba34c0fbbfef884a24ce495df7b2ed2f4b26"
+    },
+    {
+      "path": "crates/rd-vm/src/android_region.rs",
+      "sha256": "7741826bbb121aa38eb16f28e4ceec221f4bdb26a93aa9da1e4cf8fc7e757649"
+    },
+    {
+      "path": "crates/rd-vm/src/android_res.rs",
+      "sha256": "dd25c740ad77d8271808097deea83d0ee6a412c47022ad0b7b11b80e62e2aa66"
+    },
+    {
+      "path": "crates/rd-vm/src/android_spannable.rs",
+      "sha256": "e00f60e42c16e14d30da22bca721b8c188370c1c0154ebcf412a59d29aad6d99"
+    },
+    {
+      "path": "crates/rd-vm/src/android_text.rs",
+      "sha256": "760e8436f7690b3ba99b6d5c04427559f5d99661fdc4cf604c5711f311f96ec9"
+    },
+    {
+      "path": "crates/rd-vm/src/android_uri.rs",
+      "sha256": "cff77e47280cd645278607a0905f4c06d9845d8ec573ea0dc312f4572368fe77"
+    },
+    {
+      "path": "crates/rd-vm/src/android_util.rs",
+      "sha256": "b78ccd5c306f6aa9847ac42f3146c454451182f95271a79096a32cad0e8ee808"
+    },
+    {
+      "path": "crates/rd-vm/src/arrays.rs",
+      "sha256": "667666c4174c5373207223008f07272f09e8867af03948cbeebf5d91b74e32d3"
+    },
+    {
+      "path": "crates/rd-vm/src/atomics.rs",
+      "sha256": "a39868d61e726f63ab9268495d40561b03040e6342b43b47e77ce3d5dcc5aba3"
+    },
+    {
+      "path": "crates/rd-vm/src/boxes.rs",
+      "sha256": "241c5c3e42c56d78b39b4bded07b24d0ae2734bbf210c59ae6bc47ceab7ea784"
+    },
+    {
+      "path": "crates/rd-vm/src/bundle.rs",
+      "sha256": "ee5d412caa25a4283e2b50beecf5a2eadca6d53a37e2f01800cc1af7e55f4ec2"
+    },
+    {
+      "path": "crates/rd-vm/src/choreographer.rs",
+      "sha256": "c302620cc8c82292b44332afebff1643eebcf233efef4c11ea04d01d8fcccfd4"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "sha256": "cc9fa99695fa736eb32c7bb0f744987b03106f398d19ff8bab50ab407fa51217"
+    },
+    {
+      "path": "crates/rd-vm/src/collections.rs",
+      "sha256": "2fe41bf45177f548fbd2b18715e601817a969ec2c1090ff97de21e7b557ce50a"
+    },
+    {
+      "path": "crates/rd-vm/src/content.rs",
+      "sha256": "35ecc3401054a3fc8749c82c3eab3674ee1db028b64dfb8f4b0f85863116a4c6"
+    },
+    {
+      "path": "crates/rd-vm/src/engine.rs",
+      "sha256": "cbb799e44a0de1d042150a305f1ffabd2a8faac049edc40edee9f0d3120f1c55"
+    },
+    {
+      "path": "crates/rd-vm/src/err.rs",
+      "sha256": "59205ac2d1f3e197a2a878da1305324253e1388988d69e2fd6ffeda58c2a4e93"
+    },
+    {
+      "path": "crates/rd-vm/src/framework.rs",
+      "sha256": "2c143651140487194d7c2e0f87787308481ddcb77ff374eff9417dc3c6e1d682"
+    },
+    {
+      "path": "crates/rd-vm/src/framework_host.rs",
+      "sha256": "1b3ef22c2491f38512bc2e236c392bf6a911dbb9d79753ba686b34637b3b8021"
+    },
+    {
+      "path": "crates/rd-vm/src/gc.rs",
+      "sha256": "ec713c8d7e945c6a80c1d07efc3447f7bec3c83ad3699b80add97ccc4ac1f94c"
+    },
+    {
+      "path": "crates/rd-vm/src/graphics.rs",
+      "sha256": "8f87307795d6bce5ab47f74ba6f4c149daa82972d2cc17bb81f8594fb67b7aa6"
+    },
+    {
+      "path": "crates/rd-vm/src/handler_msg.rs",
+      "sha256": "118d61f0cd1c7e7078f833b8ce7fc209eb03816077ee1ffbb6197a71e7fc5a20"
+    },
+    {
+      "path": "crates/rd-vm/src/heap.rs",
+      "sha256": "da0a6bb92bbe474f3eafaeac4c0204e6edc7fcd6f916f28773e8f0ae83e6952b"
+    },
+    {
+      "path": "crates/rd-vm/src/inflate.rs",
+      "sha256": "caecbbe1900885219d706c871c44273df642af019f55aba63d5cf77bfcdea644"
+    },
+    {
+      "path": "crates/rd-vm/src/interp.rs",
+      "sha256": "4caec6ecfa86e6a249dcaa4c2c5b614223a6b20d37a4d68c2c2bb051a35e4571"
+    },
+    {
+      "path": "crates/rd-vm/src/intrinsics.rs",
+      "sha256": "e45e71c3e2372e66fc9950d2673004d427077efd0065f71788f877f86619e21f"
+    },
+    {
+      "path": "crates/rd-vm/src/jannotations.rs",
+      "sha256": "19db00d7f164d27bf8366a81ae6b74e8282ace7dfdfef65f37783385172b0b6d"
+    },
+    {
+      "path": "crates/rd-vm/src/jbigdecimal.rs",
+      "sha256": "192fff8568a0576fcde5d299ac390dcd4dc0022fc3e83038fff1f1ade2fe6551"
+    },
+    {
+      "path": "crates/rd-vm/src/jbreakiter.rs",
+      "sha256": "f3922d836b1101b6d7f13f3894825ae9e748ca5ed267162cdf40e83be8415acc"
+    },
+    {
+      "path": "crates/rd-vm/src/jcollections.rs",
+      "sha256": "26ce130b841f7c23a5acb23ac54855cef6e248a214f57d7768392b20ad7485f9"
+    },
+    {
+      "path": "crates/rd-vm/src/jfile.rs",
+      "sha256": "64bce3790859129eef6a30ff3e69df9c4785d728eada7ea8fb295d26e4c325b1"
+    },
+    {
+      "path": "crates/rd-vm/src/jio_chars.rs",
+      "sha256": "d4d7616f8fbb36625573a8dabb59b9163bfbd77c8d6a119620e6dbc073d4dcee"
+    },
+    {
+      "path": "crates/rd-vm/src/jit.rs",
+      "sha256": "8bc13ca119e3f7c4ac6de3633006fbfef5cc8f7302f941e52f611add24c92e8e"
+    },
+    {
+      "path": "crates/rd-vm/src/jiterator.rs",
+      "sha256": "10b1e84124d5718c57f48d944b9f51569882d6b96ee5189f1128456527839205"
+    },
+    {
+      "path": "crates/rd-vm/src/jlclass.rs",
+      "sha256": "e7b9c4591b8f64d7fc1e0d3aa916f9fb2893d2fe2b4c8abb13f3d055598df9de"
+    },
+    {
+      "path": "crates/rd-vm/src/jlocks.rs",
+      "sha256": "df8ba8d009a5ee8d6cfc033959cf4f9a47130891f9f18eea6b5700b880884aef"
+    },
+    {
+      "path": "crates/rd-vm/src/jlstring.rs",
+      "sha256": "9c50960ce2c3404f75c964c88f2e820c670cd55288241cc138304f26c0551bb5"
+    },
+    {
+      "path": "crates/rd-vm/src/jlsystem.rs",
+      "sha256": "2b26f7f3c2de7b709b975a66fda6c81af64d44cb167ec8cb7bd39034f01c8b86"
+    },
+    {
+      "path": "crates/rd-vm/src/jnormalizer.rs",
+      "sha256": "04c35370e6413815a554a1c0901114c993b691dbd319f83bd684e87fbdc51628"
+    },
+    {
+      "path": "crates/rd-vm/src/jpriorityqueue.rs",
+      "sha256": "bece422e7bf4acbd313f06bd9ad33a662003b20810113db11ca458c08b7c6118"
+    },
+    {
+      "path": "crates/rd-vm/src/jrandom.rs",
+      "sha256": "9f02846253883e0ccc2bcaabbb2b2e0936d104be85929627cf4ff9309300d4be"
+    },
+    {
+      "path": "crates/rd-vm/src/jregex.rs",
+      "sha256": "c404d15c95b27882184bdd2741168379d24c849294f6bca82c4bfd884373a3a5"
+    },
+    {
+      "path": "crates/rd-vm/src/jresources.rs",
+      "sha256": "7f322004ef29253e167846c9dd28ee67d03541964332e3c62d5bc37c1c0b5948"
+    },
+    {
+      "path": "crates/rd-vm/src/jsb.rs",
+      "sha256": "1a0606cfaabde368b1d054575403e1ba5bd657c50aa18714e7b740bfb14736ef"
+    },
+    {
+      "path": "crates/rd-vm/src/jsecurity.rs",
+      "sha256": "b95008a0f6be3a5883fd255752547cb1b82e1d2f5aeda96ec4ebc526294901ce"
+    },
+    {
+      "path": "crates/rd-vm/src/jsorted.rs",
+      "sha256": "df6e3ec155ec5a59fef213b2aa29eb08b70c205db978e3dd1b772426f2a2db47"
+    },
+    {
+      "path": "crates/rd-vm/src/jsqlite.rs",
+      "sha256": "5227931e3afe17f8bb02409a9055e2afae81366aa31e93b68d1a23e6220a74f7"
+    },
+    {
+      "path": "crates/rd-vm/src/jstring_tokenizer.rs",
+      "sha256": "e1548fa79a3a1fd486acdab16d01df580c2c225e5144a1d21688b8df7853163a"
+    },
+    {
+      "path": "crates/rd-vm/src/jtext_format.rs",
+      "sha256": "44e4f2333f77a991c27bfe30bdc34de3b1944dc7554fb8b7d763f3df45f728aa"
+    },
+    {
+      "path": "crates/rd-vm/src/jtime.rs",
+      "sha256": "b6db435f244f4123be74c04441133b81cb5b63e3728a6a196dec96440f69f4b8"
+    },
+    {
+      "path": "crates/rd-vm/src/juuid.rs",
+      "sha256": "3c4cc31d4ee3313705541e6850acd3f50ed769897e8de0277e653676a0118e60"
+    },
+    {
+      "path": "crates/rd-vm/src/jxml.rs",
+      "sha256": "b1a775d835ec129ffc99791e3ce71bc27f36949e307ad448c0fb3d786115e006"
+    },
+    {
+      "path": "crates/rd-vm/src/lib.rs",
+      "sha256": "06edfb8c805a3c5fcdadad0f9bf1f60fab99f2cdf746ec001bdfcc20fceddde5"
+    },
+    {
+      "path": "crates/rd-vm/src/m8.rs",
+      "sha256": "73df7a0ee025f0d8701519ac0fd973b786aeb6f98d00ac5a56eebebde608682c"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/accessibility.rs",
+      "sha256": "9adc597ca52a885cfac6955317a443a640528bb47d0c3cfff6d4dfac4f9ff149"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/ime.rs",
+      "sha256": "a8d2ea9e2051c0b167731d202bca6223b9fd94ab436be6ed7309ddb42f4729f3"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/mod.rs",
+      "sha256": "dc8fc25dc6d063bdc72649b4faad49c1fed321e6f6874ed6a9f457260138e4f6"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/notifications.rs",
+      "sha256": "ce69d059b24fc6a6b2e68e435bd13dcf7cdda5508063b8c3ac3d796fed6eaa11"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/shortcuts.rs",
+      "sha256": "d5494ed0668eca8b44450b460a5564fe3a64320e0e310763e950f93ca4347e11"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/widgets.rs",
+      "sha256": "626088303fd66fd6149f1166d9038200599a0b0e29cb6e592d9531809d3df3e5"
+    },
+    {
+      "path": "crates/rd-vm/src/native.rs",
+      "sha256": "7c91f4c8429222c65d19ea0ea19a1c9608fc59e359156e9253996989d2370346"
+    },
+    {
+      "path": "crates/rd-vm/src/native_host.rs",
+      "sha256": "50d9356fdb9f77e0fd628a6b4480c38a6111f95557e40a98875044603e0feca2"
+    },
+    {
+      "path": "crates/rd-vm/src/numerics.rs",
+      "sha256": "97feddce43f87550cb09ccb565817e2f5893bcfa09f396095c6898a98f1856f4"
+    },
+    {
+      "path": "crates/rd-vm/src/perms.rs",
+      "sha256": "9ce3563301935c66909b75e964dba6a6f449bc741ee39b726d0441ae70778b06"
+    },
+    {
+      "path": "crates/rd-vm/src/platform_base.rs",
+      "sha256": "299879eb3042128857256d0cbca6b1de5d3e4b9dcd2d7c2cdcf29cb4cc1e2af7"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/file.rs",
+      "sha256": "944a70c9339a71771f1d227d271e4ed3b33f3e782beddc2e889d139b3a2a0a24"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/gc.rs",
+      "sha256": "9365cfb0b56ea99366fc2fae9324f8f918c070fc8c582ec5e772738190a4ed95"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/intrinsics.rs",
+      "sha256": "d9987e55717a8ce7318b247a045cae356d88f6a923d002a3d2601a4ed5c9104d"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/mod.rs",
+      "sha256": "d2f815d7cc638b3f4f9dcd60d3880d561ae69797038770cf9aa92e4461db6c91"
+    },
+    {
+      "path": "crates/rd-vm/src/reflect.rs",
+      "sha256": "ba0e729ec56fb4ba2fa169b159ab988938bd7235f589158fa8946047c4618a11"
+    },
+    {
+      "path": "crates/rd-vm/src/repr.rs",
+      "sha256": "0fbac8a829f59b9ebb02d4dbe7162d5db5f4bff95bf175e5daf4fbb9c09a3077"
+    },
+    {
+      "path": "crates/rd-vm/src/screen_model.rs",
+      "sha256": "4f87c084d07792451315e3189498a0091941af63c5f44479f2f594656d192cc3"
+    },
+    {
+      "path": "crates/rd-vm/src/threads.rs",
+      "sha256": "b4633e4873c53434763ca48003f96145f7cb110cada114ceccd14d9a224261f1"
+    },
+    {
+      "path": "crates/rd-vm/src/throwable.rs",
+      "sha256": "d352402af7554ea75092c88a25984ba7d33ced6f7730c140f169767fd4117fdd"
+    },
+    {
+      "path": "crates/rd-vm/src/value.rs",
+      "sha256": "38f7fdd55e731ac9da98694d165ffd638f9e80b564e1cfee15538549fe456159"
+    },
+    {
+      "path": "crates/rd-vm/src/view_attach.rs",
+      "sha256": "846aa88a6d922bb20bb3628177cc90c6296981dacfff946efaf9f73ac75fa70d"
+    },
+    {
+      "path": "crates/rd-vm/src/view_layout.rs",
+      "sha256": "6191bce6c5d349b85bb23089a0e9f4c61f87b8651e15fc1e5d44506ab3ce73ca"
+    },
+    {
+      "path": "crates/rd-vm/src/view_props.rs",
+      "sha256": "936c85fdfa6837399e0a8182ad8cc06c1edbb574a3f36eabfbbc3d4504030c76"
+    },
+    {
+      "path": "crates/rd-vm/src/vto.rs",
+      "sha256": "3031326c0a2f03d3d1e673a9cf9b840e2da1931a024a9d8e4e05e7ad47567594"
+    },
+    {
+      "path": "crates/rd-vm/src/window.rs",
+      "sha256": "2c2267f06a7e8fa5b0999a54f7a3aa22cb07911515fe6817c9f38a59c9fe7c3b"
+    },
+    {
+      "path": "crates/rd-vm/src/xml_res.rs",
+      "sha256": "75a7f674b9cd1361bf1f4f9fb39c3af624a9db3bab5c57fe36e87bd8b332cf7a"
+    },
+    {
+      "path": "crates/rd-vm/tests/accessibility_virtual.rs",
+      "sha256": "3ea92180e7c8c7acec62638c81e92cc8557e156a34691e0c16ca3ea98705ad71"
+    },
+    {
+      "path": "crates/rd-vm/tests/activity_history.rs",
+      "sha256": "99bdd0768be0a118249d1627f7ed0cf6f08152b848cce875912e2de687f069fe"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_inherited_dispatch.rs",
+      "sha256": "0b348738dcddb36b52fa58dcc09ae0fbedacc3c55565547561e4436f0e267843"
+    },
+    {
+      "path": "crates/rd-vm/tests/app.rs",
+      "sha256": "558346bf230550c91b99bd160c748ceff60f94300d3177d3f290cbc2cdeb7fd8"
+    },
+    {
+      "path": "crates/rd-vm/tests/app_xml.rs",
+      "sha256": "938fb4de77edf442676f5e4bdd58248cd6b363ef05507ef9a6859f1535803e17"
+    },
+    {
+      "path": "crates/rd-vm/tests/collections_gc.rs",
+      "sha256": "64e8f51ec9d75bef8bfae9fb08c75d6f36390f0fd83ec3a4e4eecb61dda30447"
+    },
+    {
+      "path": "crates/rd-vm/tests/common/mod.rs",
+      "sha256": "0211722728827d2e50b11625572cdcc871fbd1efadb644189b4410e2665dca10"
+    },
+    {
+      "path": "crates/rd-vm/tests/gc.rs",
+      "sha256": "7c886ebcae4f0914d76a0a9df8281db751087d6fe5ef71babe1130768a098d90"
+    },
+    {
+      "path": "crates/rd-vm/tests/gc_generations.rs",
+      "sha256": "1b5c932e6941dd3587b4de0a3968acd3922eb3e6dc9cfb7c67d802b38686734b"
+    },
+    {
+      "path": "crates/rd-vm/tests/jit.rs",
+      "sha256": "c07eb0fe3a2b470eb3ec4f322c8098c08d9a5ffbbe80fa8a849cb3d1823f8925"
+    },
+    {
+      "path": "crates/rd-vm/tests/m8.rs",
+      "sha256": "a65a688a59247a850c0d66ff42a1175d7723e29fe3daf5b1f1bf1310799eeb07"
+    },
+    {
+      "path": "crates/rd-vm/tests/m9.rs",
+      "sha256": "d57e3e34b1807765c8c6ad1a576615d258e3d68636161f38ba9ac3f88891fd51"
+    },
+    {
+      "path": "crates/rd-vm/tests/native.rs",
+      "sha256": "5d91c1f288d221c679cc829c0c2c1c7316af350959262e07798996036e4ca080"
+    },
+    {
+      "path": "crates/rd-vm/tests/regex_lookaround.rs",
+      "sha256": "856c97ad0c6064e0b3f92cb8c35891236210a3d8bcb77c93397680088f10ca23"
+    },
+    {
+      "path": "crates/rd-vm/tests/vm_exec.rs",
+      "sha256": "8ca4f257bd4c832be6f976073a434b124de354574a0435a0183f6f660fefd716"
+    },
+    {
+      "path": "fixtures/corpus.lock.json",
+      "sha256": "065c6a9d866ba1866a2878dcac7ff26ba81b94c58d21bb6333374bc0290e4d55"
+    },
+    {
+      "path": "fixtures/m1/AndroidManifest.xml",
+      "sha256": "ab8fb5a0c0acc7a60d5d73778f135d058d08224e1a693c3eee85ffe699d3b5fa"
+    },
+    {
+      "path": "fixtures/m1/java/org/androswitch/fixture/Probe.java",
+      "sha256": "846c4a5cb574136167ae8e94346a56fdf506a25aa15eb64999dcf7fb233efa92"
+    },
+    {
+      "path": "fixtures/m2/java/org/androswitch/fixture/StorageProbe.java",
+      "sha256": "9f42ee7de95343de0dfc4804591ee89b09362fe2b5d32d9f478ee0552d506fcc"
+    },
+    {
+      "path": "fixtures/m3/native/dependency.c",
+      "sha256": "6e9ce56f6734c4415df7c513b159db5a76b97e79f4f4ce8ef73c5c5208e88574"
+    },
+    {
+      "path": "fixtures/m3/native/missing.c",
+      "sha256": "423d71c622666e39b9832c149499557435f9a32869418b3a195a78da26ffff82"
+    },
+    {
+      "path": "fixtures/m3/native/probe.c",
+      "sha256": "95a208a988c050836fc34033260538b78a23a2cc06cedc93ebf4b7e7ac46d219"
+    },
+    {
+      "path": "fixtures/m3/native/syscall.S",
+      "sha256": "69d4ba2a6686afa2b96a5571c3b36eb3584f9ba2787d887cdbe296043c92b052"
+    },
+    {
+      "path": "fixtures/m3/native/tls.c",
+      "sha256": "c92f33aa3c3a75323ce817161096ab3d50efc7f2a94b016bf46d5bdea08f60e5"
+    },
+    {
+      "path": "fixtures/m4/java/org/androswitch/fixture/Bridge.java",
+      "sha256": "9e989bfe798863157384e041657a69cb9fa5c2998b3fc758687678f38eb43b4f"
+    },
+    {
+      "path": "fixtures/m4/java/org/androswitch/fixture/RustBridge.java",
+      "sha256": "fc0b79a64324cbef9966ad7eeeaf04d590e7edb452c13d86a60a16863a0592c0"
+    },
+    {
+      "path": "fixtures/m4/kotlin/org/androswitch/fixture/KotlinBridge.kt",
+      "sha256": "4560677a3b425f9faac96f745abcb97e0a8fbc3cdf5343be25e257d23858cbf6"
+    },
+    {
+      "path": "fixtures/m4/native/bridge.c",
+      "sha256": "cbd299c78fcfce84fd7086b61ce48b73974fa014623920a6eba47e0076a66b88"
+    },
+    {
+      "path": "fixtures/m4/native/kotlin_bridge.cpp",
+      "sha256": "d6daf61987b2895bd9027fe650005e7059493ffccdb814008ee787de09b4145e"
+    },
+    {
+      "path": "fixtures/m4/rust/Cargo.lock",
+      "sha256": "81c72d8210b87ab796cdd910256a1b6196ce2c4de01550be8effe50e66f4ffad"
+    },
+    {
+      "path": "fixtures/m4/rust/Cargo.toml",
+      "sha256": "9d11ae8929b196b3d4aeb294dff5b5b7cabb9febc120cc5b3fa340dd7c806af8"
+    },
+    {
+      "path": "fixtures/m4/rust/src/lib.rs",
+      "sha256": "860464f5b9864d9d49a389d61e5005033891b7344ee658cbb59aa915503ab260"
+    },
+    {
+      "path": "fixtures/m5/java/org/androswitch/ui/DetailActivity.java",
+      "sha256": "89802c035010e86c5c0b46a874594de4f67346447c8bc2c7d51d81d795f73bd3"
+    },
+    {
+      "path": "fixtures/m5/java/org/androswitch/ui/MainActivity.java",
+      "sha256": "37c643111868209eedade489ac7b2602ea0051b50a4f4aed7a291af0b9307289"
+    },
+    {
+      "path": "fixtures/m5/java/org/androswitch/ui/ProofApplication.java",
+      "sha256": "2e45a10da7bc9bcb76143dd7d4f276ca7f966837ff72da7a0fec0cad55e6d8c8"
+    },
+    {
+      "path": "fixtures/m5/java/org/androswitch/ui/SquareView.java",
+      "sha256": "5811532b8a90b2e47e182f82a72fd2d97161f3cf65dd4636b0306f0ab98ec295"
+    },
+    {
+      "path": "fixtures/m5/kotlin/org/androswitch/kui/MainActivity.kt",
+      "sha256": "b318167aec31e0477e0f41c4ee9e99bb818833f6ee5cd76adaf689f207611c49"
+    },
+    {
+      "path": "fixtures/m5/res/layout/main.xml",
+      "sha256": "fbe0b51edc10888313da30b23c7602ba80451aeb29fb53535d9829aa727cac2d"
+    },
+    {
+      "path": "fixtures/m5/res/values/strings.xml",
+      "sha256": "ecd5ff45bd728efbff446db3fa6009c513efde1018520771b5dd281b4b901e44"
+    },
+    {
+      "path": "fixtures/m6/java/org/androswitch/media/MainActivity.java",
+      "sha256": "3341161adf7152a2c4e905491ad8dcf2dc5f416e5b9d69755eec499a6190daf4"
+    },
+    {
+      "path": "fixtures/m6/java/org/androswitch/media/UnavailableActivity.java",
+      "sha256": "f0aae9f1d3a2c7e9206760e967ad30f987c9127f56853fc29dab5f1208562211"
+    },
+    {
+      "path": "fixtures/m6/native/activity.c",
+      "sha256": "1051164e8c686d823761113b9969eca5e18f687868b523f1b372c7639fa2fdd7"
+    },
+    {
+      "path": "fixtures/m6/native/mixed.c",
+      "sha256": "684741cd181f2f5f0f300de99de85c9d7e395b2fa317d2f768afcc81a1e5852f"
+    },
+    {
+      "path": "fixtures/m6/native/nonquiescent.c",
+      "sha256": "5aa47c9bbfd69f0bc8ebfce65f387f9f88c4259b15b8032a1419e5239ee3b51d"
+    },
+    {
+      "path": "fixtures/m8/java/org/androswitch/persistence/Contracts.java",
+      "sha256": "4c420241563578db8377b60fd73daf93c8c912a4f19704eb9fb24daf7f1426e1"
+    },
+    {
+      "path": "fixtures/m8/java/org/androswitch/persistence/DatabaseActivity.java",
+      "sha256": "b94009a4fc4495f29651fb6455ce56cc54e8d99851942ecef75fd12e3c837caf"
+    },
+    {
+      "path": "fixtures/m8/java/org/androswitch/persistence/PreferencesActivity.java",
+      "sha256": "efba65413cca5319f897ba2da68e7fc45508def1563aa3088af7d0e2cab6b02b"
+    },
+    {
+      "path": "fixtures/m9/external.lock.json",
+      "sha256": "8cdb8d762331b32775fc6ae01ae1a5e9c99145a5c7255b638c72f3393e25e1f7"
+    },
+    {
+      "path": "fixtures/m9/host-corpus.json",
+      "sha256": "a6dab5561da66ab8dd8bc04259a4945c939147c0fba807ecb9b09364348d99e0"
+    },
+    {
+      "path": "fixtures/startup-failure/MainActivity.java",
+      "sha256": "042334a5fee193baa48568761e7505b1550adb4151d5986a763411ed0aec78bd"
+    },
+    {
+      "path": "fixtures/startup-failure/dependency.c",
+      "sha256": "bea7bf68ee1a3bfebf94a26ca6599a6240726bdcf8ccf71651c34ccf32678acd"
+    },
+    {
+      "path": "fixtures/startup-failure/missing.c",
+      "sha256": "f65f1d95e5cfe622c78682e362880e220b0d252b0dfbdbf7e6ebf7897ada6ce4"
+    },
+    {
+      "path": "fixtures/startup-failure/worker.c",
+      "sha256": "a6fbfa804339eb33171d968f231b01d2ac7ba52ff9b7a5d5c575f1ff85179cb3"
+    },
+    {
+      "path": "platform/androswitch/Makefile",
+      "sha256": "c054b3068425ce459774eae1b59fb357c24f03ac89308a28d86e1d2c9872a779"
+    },
+    {
+      "path": "platform/androswitch/framebuffer_copy.h",
+      "sha256": "886ba44f63572ef616b139c17b394a8bd218124011c7cd59f23992018d0a8ac7"
+    },
+    {
+      "path": "platform/androswitch/gles2_imports.inc",
+      "sha256": "c628db079425a2f85c6661ba83a1bae20055da66083bf8e508b3bbb273b0b2fa"
+    },
+    {
+      "path": "platform/androswitch/main.c",
+      "sha256": "9d0136bb93ad7b31911dbc656b0a55b952395f1c07baa2d38dc21ae8264794a8"
+    },
+    {
+      "path": "platform/androswitch/media.c",
+      "sha256": "ad03659002fb350fce794043851260ddd9dbe40cffe65ba93e58987477d0d0b3"
+    },
+    {
+      "path": "platform/androswitch/media.h",
+      "sha256": "498a9ce71c5f18e2076a93df354d4d7d27abcca10e36effdaf5b371289f46d34"
+    },
+    {
+      "path": "platform/androswitch/opensl.c",
+      "sha256": "7da979781460dcdcc7f5f45be891de1a009e794878762f9e6f55a2faf7f753e3"
+    },
+    {
+      "path": "platform/androswitch/tests/framebuffer_copy.c",
+      "sha256": "913a4435ce84dc202a3f8e453ac6f47e11bb4dff20f2b33aca958b2af3c26381"
+    },
+    {
+      "path": "platform/sqlite/memory_vfs.c",
+      "sha256": "552fd148fa1a058948e8b9f4affabb6a4b55b174302ca3e36ef3c428e93fc6b8"
+    },
+    {
+      "path": "platform/switch-smoke/Makefile",
+      "sha256": "32fdf4a270a5d3b4a0e7bcb6eddd52a51b0cac1849ca5b0bc1316985cb7bd7da"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_io.c",
+      "sha256": "d7f6aab528fe251a2f0f63af857e8138210092a7f7afdf1a34b96c330274415e"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_sync.c",
+      "sha256": "a27cea91589663a0337f0460b5d3090b0295fce5d59ad005e9f64cc31bd938e8"
+    },
+    {
+      "path": "platform/switch-smoke/fs.c",
+      "sha256": "90fa9534e42fec5a25f5e5f63c03b08023519148aa25f20d4f128ed08a34b30a"
+    },
+    {
+      "path": "platform/switch-smoke/jni.c",
+      "sha256": "70c6069fcab60de448e31c590ab94dd1b2544652f173fa903cb3267ca2303953"
+    },
+    {
+      "path": "platform/switch-smoke/jni_traps.inc",
+      "sha256": "d9402f07f94e1308b9a0597e2c4a75c773a2a680c5bdfdaf645af4f4790d325a"
+    },
+    {
+      "path": "platform/switch-smoke/main.c",
+      "sha256": "808df628f3d8fbfe88ff24ca79e8622ab46ce3f3708d6c254aadfabb64074b23"
+    },
+    {
+      "path": "platform/switch-smoke/native.c",
+      "sha256": "b8394b2bd35069c062d9783ec9e2da337c5fee9e70ed55b5b6e7a99ce19ac8e7"
+    },
+    {
+      "path": "platform/switch-smoke/native.h",
+      "sha256": "e4cc4b945568b4e9f31c31bdfd487ef71e599fc003ec3f94861188ddb33e1c45"
+    },
+    {
+      "path": "platform/switch-smoke/native_call.S",
+      "sha256": "eca514bb5270dc88bbd9b7f008bc41155692f79bd69a7b2a4969dde68cdc115f"
+    },
+    {
+      "path": "scripts/build-androswitch.ps1",
+      "sha256": "b770856764e4781b0f1b0d30f7b128025ea79589b22ea95776441dff10bf51d9"
+    },
+    {
+      "path": "scripts/build-aosp-hello.ps1",
+      "sha256": "5d9182cd45341d7e7c0dd8683767d95ab2be895a1cb90dae6e539e2fba1a5cf5"
+    },
+    {
+      "path": "scripts/build-large-apk-fixture.py",
+      "sha256": "aa21f0286561e2fbd190ad953951571e99cf6ecd371c01f6951f5140d46dce2b"
+    },
+    {
+      "path": "scripts/build-m1-fixture.ps1",
+      "sha256": "a481cbde5323c579876c03041c1e0ecbf4f1d5eecc603b3c6082f39ab79ac9b2"
+    },
+    {
+      "path": "scripts/build-m2-fixture.ps1",
+      "sha256": "9badb9ff2d630decd24938b43711c7bc5888d1811fcf7d38b14ac0e31ed03337"
+    },
+    {
+      "path": "scripts/build-m3-fixture.ps1",
+      "sha256": "b965936e90362d633d1c23664c625bd37180f6475e789d5fa41e9d6305b6e44b"
+    },
+    {
+      "path": "scripts/build-m4-fixture.ps1",
+      "sha256": "e70e873fc9a047e985efc6ed688439b738f7c38eb130a36b49fe2c1ca7db08e9"
+    },
+    {
+      "path": "scripts/build-m5-fixture.ps1",
+      "sha256": "4e3ade3263f0c08322ea71fc117508ea8aa04257b27c53ae5282c1d32327835c"
+    },
+    {
+      "path": "scripts/build-m6-fixture.ps1",
+      "sha256": "e8ee48db549968f4e015152351cf2f389783a7dd57a40a6e43aa88ed6f8f8b98"
+    },
+    {
+      "path": "scripts/build-m8-fixture.ps1",
+      "sha256": "8294a2876888e9bed9a9d7b5a10c1cf2b359c1b6f108ff1841005ef88c902860"
+    },
+    {
+      "path": "scripts/build-native-oracle-fixtures.ps1",
+      "sha256": "233a1931cf72bca8cfc3e7db8f9f311e9f58a334904e6cf1f8d65e1bcafa57ec"
+    },
+    {
+      "path": "scripts/build-startup-failure-fixtures.ps1",
+      "sha256": "f9c3a557ce6575c0526df3d89d19775d05f4d8dd6a52318f735e6e9efdb8e461"
+    },
+    {
+      "path": "scripts/build-switch-smoke.ps1",
+      "sha256": "613ce5dc1019456df68ea23e5ba2c215200c6ae19487f851eee7d3cdf0340977"
+    },
+    {
+      "path": "scripts/check-m0.ps1",
+      "sha256": "dea7a94b8f934267ddd5059d97f7ee9bc711f24db55aac0389f4d99a16dec149"
+    },
+    {
+      "path": "scripts/check-m1.ps1",
+      "sha256": "1135774d931734d20b40a74ac1fe9bf69e23d9fbd6304f7ea8121f6682cf3c3b"
+    },
+    {
+      "path": "scripts/check-m7-m9.ps1",
+      "sha256": "f0308bd15ad9e58774a945ddb107f02c6e3e8e602882355cabe9529c204a248f"
+    },
+    {
+      "path": "scripts/check_md_links.py",
+      "sha256": "c473ed8f45d15f6ba9b7b47bc600cb391664555e77d234d99d12583103654b4e"
+    },
+    {
+      "path": "scripts/cold26.py",
+      "sha256": "a7022a89d734a959ea931ee8f2b7d156dcd1b582290a4cde44e6c34d9872f66e"
+    },
+    {
+      "path": "scripts/collect-product-licenses.ps1",
+      "sha256": "c41c927eaf135856f8a96382edb6fb4f6dc017c62a89f4360c706ecc1577966c"
+    },
+    {
+      "path": "scripts/comprix-regression.py",
+      "sha256": "91f0069e3dfd288a781a91beb4c2c7c2668395535a88788e21c2443a6b0a8671"
+    },
+    {
+      "path": "scripts/efficiency-benchmark.py",
+      "sha256": "145d7a8e5719ece3983648412f2981a48df17601bd06cd19c7fe966d4cbc97ae"
+    },
+    {
+      "path": "scripts/fetch-fixtures.ps1",
+      "sha256": "bc3a00afc8a7542d1cedfc9885bf4d968d8f6174f14a1b2417ae797489954147"
+    },
+    {
+      "path": "scripts/fetch-m9-corpus.py",
+      "sha256": "5dd21957b94f1fd89a2581232cb492bb21b1a7386a5a12690d997bdd12201a2a"
+    },
+    {
+      "path": "scripts/fetch-sqlite.py",
+      "sha256": "3448f50fc5a68810a145761057f9ad51aa1e56a173a88dcb124abca9efafbbef"
+    },
+    {
+      "path": "scripts/fuzz-campaign.sh",
+      "sha256": "638b886b962c8790e000d6e4d1bb9caf30a8670f57fba74e5ed37329cfb09e13"
+    },
+    {
+      "path": "scripts/gen_glyph_atlas.py",
+      "sha256": "03b5766044f6e5053ef7d2f1447277a753e9b5c34e675bd27b1a6800cd16507e"
+    },
+    {
+      "path": "scripts/generate-jni-traps.py",
+      "sha256": "c21a02af47bbf477e8e8d78d825dc1058aa18cac67a0ddc7f927ffdad80c989c"
+    },
+    {
+      "path": "scripts/make-fixture-icon.py",
+      "sha256": "8d005267abd1be08ef47d0d7c5722745416d4ab49005ae669deb8b07836feb8c"
+    },
+    {
+      "path": "scripts/mcp-session-soak.py",
+      "sha256": "58047e74af53ef3d2bb34a88c3c70fdbf1ed890d11d241eb5378b037ad946e47"
+    },
+    {
+      "path": "scripts/native-languages-mcp.py",
+      "sha256": "f5b6e1f6f7bff29eda1f93d61bd40b7883f8323a7eef1809106c64211e68c54d"
+    },
+    {
+      "path": "scripts/native-languages-negative.py",
+      "sha256": "939400c0e7459af935e6e0575e15302a1a0a9d5b72b4c8ba1695d274ee488922"
+    },
+    {
+      "path": "scripts/package-androswitch.ps1",
+      "sha256": "df5006b2cf369e4bb0dd67bc8d6e4d95bf65d9523a5c580b99e1ab1c5e830033"
+    },
+    {
+      "path": "scripts/package-m4-proof.ps1",
+      "sha256": "1193ef605e688013fe9a6cfb2d272e40b4609066c1c328b4ef481fb8a3b20ce8"
+    },
+    {
+      "path": "scripts/prepare-package-docs.py",
+      "sha256": "b1cf2e3c5e293a237fdad69a85ec315f7192b646e958c7ee518b0608830aeae4"
+    },
+    {
+      "path": "scripts/prepare-switch-smoke.ps1",
+      "sha256": "4642b4b48564c310c2cda0e526c6112a1cc999c90a7cb5a805e3454f3c4fb3f7"
+    },
+    {
+      "path": "scripts/record-hardware-feedback-evidence.py",
+      "sha256": "74e8d85b2fd18138c77bb91934408f96d19a6f654ea495ad501f13ae9c199e40"
+    },
+    {
+      "path": "scripts/record-m6-m7-evidence.py",
+      "sha256": "09e7eec5dd9afa1e492835dbfcadab2999ae0738635f27f38baf57bb0a6070f6"
+    },
+    {
+      "path": "scripts/record-m8-m9-evidence.py",
+      "sha256": "78ad17c8d2771b5597aa62670dd50f22f611f401d2d40e5ace60b2ff253299d2"
+    },
+    {
+      "path": "scripts/record-startup-recovery-evidence.py",
+      "sha256": "411a1a7c50eb9afdd9a1622e370c21948b68332d5f0c90cb6d794f99c761f150"
+    },
+    {
+      "path": "scripts/setup-wsl-rust.sh",
+      "sha256": "36ebf5ccab59ba0c79c69788d70409ca54dc8f098cd0aac18be9f15198407e52"
+    },
+    {
+      "path": "scripts/summarize-efficiency-benchmarks.py",
+      "sha256": "4becab6a2184b9378e0914080861ac4e4726b8d0e67eebe9d89e0d114e5b0226"
+    },
+    {
+      "path": "scripts/test-m9-host.ps1",
+      "sha256": "295f45ba6e1f7e5ae34a7eccd767a33e01b7d448b9918c292e56604fb04e6c3f"
+    },
+    {
+      "path": "scripts/test-ryujinx-launcher.ps1",
+      "sha256": "13ff7e51008e7f55e085ecf59fc5e98f9ad0f0bbcf123ad500bfe702b539c5df"
+    },
+    {
+      "path": "scripts/test-ryujinx-m1.ps1",
+      "sha256": "a1dea1e7847bc24048ab53d901269173ded8eef9910d9b8db1763266429e3d8e"
+    },
+    {
+      "path": "scripts/test-ryujinx-m2.ps1",
+      "sha256": "5488dce67c5fddda3625be9b0b498daa7fbdb3948adb7b46781f448ee303c79c"
+    },
+    {
+      "path": "scripts/test-ryujinx-media.ps1",
+      "sha256": "93fc8fe0e9e4c2d89bb788a3e6554e865125a33d84d3482c75c7a6ab95d6c4ff"
+    },
+    {
+      "path": "scripts/test-ryujinx-probe.ps1",
+      "sha256": "22c4bfb670518ac6c5cf7d914a182c61f46af1f6015f14f210e9bea84186e139"
+    },
+    {
+      "path": "scripts/test-ryujinx-ui.ps1",
+      "sha256": "f1cb92afb49adcba705de82183a68f9d8389033a09d6b86d87bf6f6009f06704"
+    },
+    {
+      "path": "scripts/test-upstream-baseline.sh",
+      "sha256": "0cd3f040c2a8a871d22b5ad916bb65cfaa3be7ed9af8c78b32fd9aa1559502fe"
+    },
+    {
+      "path": "scripts/validate-launcher-report.ps1",
+      "sha256": "e8cce612fa37df6558569c90da0e601967fbdbc07d949d274d88f58e24613b91"
+    },
+    {
+      "path": "scripts/verify-saved-launcher-run.ps1",
+      "sha256": "20b3fc1890eec337a8a6166e75e136cd0fad3c95b0dac054924fdd53f32c4652"
+    },
+    {
+      "path": "scripts/verify-switch-smoke.ps1",
+      "sha256": "39fe9b0dca471fca71c6589e9604fe61211991ecce3a0d3858656479e30c5b08"
+    },
+    {
+      "path": "third_party/README.md",
+      "sha256": "8b9dab29779570cafd26d79c8b5b3906872691adb5439771c966dc813272c5bd"
+    },
+    {
+      "path": "third_party/SQLite-NOTICE.txt",
+      "sha256": "ae80d0129c762e5721c181350ecf6db07ea5c091fa63b7448a0bcac6957c2459"
+    },
+    {
+      "path": "third_party/android/jni.h",
+      "sha256": "5df9074457c041b372f2c68ff646d6e8600cd673a223885e8df21c44c94ec667"
+    },
+    {
+      "path": "third_party/android/opensles/OpenSLES.h",
+      "sha256": "580dca493bdf75a0541ed18b7d05b9e087e1bf95fe5e8d52695584670de03e20"
+    },
+    {
+      "path": "third_party/android/opensles/OpenSLES_Android.h",
+      "sha256": "284ad1666c8951068a5d544ab842a4a47410aa2f3a5b9579ca4008e914bf92d7"
+    },
+    {
+      "path": "third_party/android/opensles/OpenSLES_AndroidConfiguration.h",
+      "sha256": "3b3e5e81dc1120448c2f890480c5ccdac68f27b703c20af72e2da311f249c5a9"
+    },
+    {
+      "path": "third_party/android/opensles/OpenSLES_AndroidMetadata.h",
+      "sha256": "d159a419fcfeaedc471355f4e00269c055d8ba05bc1785db32b77d6bfcd1da4a"
+    },
+    {
+      "path": "third_party/android/opensles/OpenSLES_IID.c",
+      "sha256": "6b7c2d6ea5b61ff695b95e929827900e5715dfbce0a7571f8ad9ff2916b7a627"
+    },
+    {
+      "path": "third_party/android/opensles/OpenSLES_Platform.h",
+      "sha256": "993bd76a087fd99e12205b9872c19567b0a17098f124ff71800bb1a3e5fef28a"
+    },
+    {
+      "path": "third_party/fonts/DejaVu.LICENSE",
+      "sha256": "7a083b136e64d064794c3419751e5c7dd10d2f64c108fe5ba161eae5e5958a93"
+    },
+    {
+      "path": "third_party/libnx-framebuffer.LICENSE",
+      "sha256": "5b6675f85016009624d29c9222201d3c0fc6a2d5c59253367f27d3e15011cdb2"
+    },
+    {
+      "path": "third_party/so_util.LICENSE",
+      "sha256": "fec1f8b2d059658c82660fea5e25320f7ec7fecdd4b2fb5e335ce6365412dcbd"
+    },
+    {
+      "path": "third_party/sqlite.lock.json",
+      "sha256": "cce2cc3f0b3e6354568cc3da7d6067980ef88788f451349711975d7cb7f85e95"
+    }
+  ],
+  "open_gates": [
+    "Execute new NRO Horizon regression: workflow, startup, quiescence and m9 24-session corpus",
+    "Record Horizon startup/frame/total-memory measurements",
+    "Test new preferences/database/large-container/return behavior on physical Switch",
+    "Independent NDK sample integration and wider Android-reference semantics",
+    "Resolve Vector Pinball's observed API blocker and any subsequent failures before claiming gameplay"
+  ]
+}
