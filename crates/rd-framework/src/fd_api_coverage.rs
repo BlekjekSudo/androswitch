@@ -661,7 +661,7 @@ impl ApiCoverageTable {
                 ));
             }
         }
-        out.push_str("\n## Como atualizar\n\n1. Ao mudar uma API Android, atualize a linha correspondente em `data/api-coverage.toml` no mesmo PR.\n2. Rode `rd api-coverage check --json` (ou os testes de `rd-framework`).\n3. Regenere este arquivo e a tabela da spec com `cargo xtask api-coverage-report` e `cargo xtask api-coverage-spec`.\n");
+        out.push_str("\n## Como atualizar\n\n1. Ao mudar uma API Android, atualize a linha correspondente em `data/api-coverage.toml` no mesmo PR.\n2. Rode `rd api-coverage check --json` (ou os testes de `rd-framework`).\n3. Regenere este arquivo e a tabela da spec com `cargo xtask api-coverage-report` e `cargo xtask api-coverage-spec`.\n\nPara o critério literal de conclusão e os bloqueadores por superfície, veja [appendix-c-literal-completion.md](appendix-c-literal-completion.md).\n");
         out
     }
 }

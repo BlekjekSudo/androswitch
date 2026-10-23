@@ -497,10 +497,10 @@ domain = "os-ipc"
 status = "supported"
 domain_module = "fd-os"
 module = "rd-vm/bundle"
-code = ["crates/rd-vm/src/bundle.rs"]
-milestone = "M3/M8"
+code = ["crates/rd-vm/src/bundle.rs", "crates/rd-vm/src/parcel.rs"]
+milestone = "M3/M8+Literal-R2/R4"
 notes = "Supported subset: Bundle/BaseBundle/PersistableBundle typed key-value accessors by dispatch shape, keySet/size/clear/copy semantics, plus Literal-R2/R4 writeToParcel/readFromParcel using AOSP length + BNDL magic + ArrayMap framing for the Parcel value types implemented in rd-vm/parcel. Unsupported Parcel value forms are tracked under android.os.Parcelable."
-evidence = ["crates/rd-vm/src/bundle.rs", "docs/compat-matrix.md"]
+evidence = ["crates/rd-vm/src/bundle.rs", "crates/rd-vm/src/parcel.rs", "crates/rd-vm/tests/parcel_binder.rs", "docs/compat-matrix.md"]
 key_apis = ["android.os.Bundle.putString", "android.os.Bundle.getString", "android.os.Bundle.putInt", "android.os.Bundle.keySet"]
 
 [[surface]]

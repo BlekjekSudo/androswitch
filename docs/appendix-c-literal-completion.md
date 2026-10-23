@@ -37,7 +37,24 @@ that exact prefix:
    api-coverage-report`, `cargo xtask api-coverage-spec` and
    `cargo xtask compat-report` agree with the code and tests in the same PR.
 
-## Round 1 — storage durability foundation (done in this branch)
+## Current checkpoint status
+
+As of 2026-10-23, Rounds 1–10 below are merged, not merely local branch
+work. [PR #172](https://github.com/nadabgfccvd/RustyDroid/pull/172) merged
+`appendix-c-literal-round10-20261023` into
+`appendix-c-api-coverage-20261023` at merge commit `e16632b`. The merged
+stack contains the ten checkpoint commits plus two RD Sentinel remediation
+commits: `9ffc7b4` (production `expect(...)` removal) and `82cc58c`
+(keeping Android dispatch off the String hot path). The final pre-merge
+Sentinel run
+[`39930840914`](https://github.com/nadabgfccvd/RustyDroid/actions/runs/39930840914)
+passed complete with no findings.
+
+That publication status does not change the completion bar: every surface
+named below remains at the status recorded in `data/api-coverage.toml`
+until its whole-package blockers are closed.
+
+## Round 1 — storage durability foundation (merged)
 
 - `android.database.sqlite`: named databases now serialize to the
   app-private VFS database path after committed mutations and deserialize on
@@ -275,7 +292,7 @@ that exact prefix:
 | Text | `android.text.method` | Complete movement/key/transformation method catalogue and editor interaction edge cases. |
 | Text | `android.text.style` | Exact span precedence/rendering for character, paragraph, suggestion, locale and metric-affecting spans. |
 | OS/IPC | `android.os` | Remaining after Rounds 2/4/5: cross-process/kernel Binder and servicemanager, death recipients/oneway scheduling, file-descriptor Parcels, Serializable forms, exact wire layouts for every framework-owned Parcelable, process/power/vibration/strict-mode/users and all manager semantics. |
-| OS/IPC | `android.util` | Remaining public helper/value catalogue (IO, JSON/XML, event log, printers, state sets, time/date helpers and deprecated classes). |
+| OS/IPC | `android.util` | Remaining public helper/value catalogue beyond the implemented SparseArray/Base64/LruCache/AtomicFile/JSON subsets (XML helpers, event log, printers, state sets, time/date helpers and deprecated classes). |
 | Database | `android.database` | ContentProvider query/insert/update/delete/call transport, bulk operations, cursor windows/extras/notifications across apps. |
 | Database | `android.database.sqlite` | See Round 1 remaining blockers above. |
 | Net | `android.net` | ConnectivityService/network agents, DNS, link properties/capabilities callbacks, VPN/tethering and traffic/accounting semantics. |
@@ -289,12 +306,14 @@ that exact prefix:
 
 ## Sequence
 
-1. **Storage/IPC foundations:** SQLite durability (Round 1),
-   Parcel/Parcelable bytes and local Binder transactions (Round 2), and
-   SharedPreferences file durability (Round 3). These unblock `android.os`,
-   `android.content` and provider work.
-2. **Value surfaces:** `android.util`, `android.text` primitives and ICU data
-   boundaries, because UI and providers depend on exact value semantics.
+1. **Storage/IPC foundations (merged checkpoints; package blockers remain):**
+   SQLite durability (Round 1), Parcel/Parcelable bytes and local Binder
+   transactions (Round 2), and SharedPreferences file durability (Round 3).
+   These unblock `android.os`, `android.content` and provider work.
+2. **Value surfaces:** continue `android.util` beyond the merged
+   SparseArray/Base64/LruCache/AtomicFile/JSON subsets, then `android.text`
+   primitives and ICU data boundaries, because UI and providers depend on
+   exact value semantics.
 3. **App/content:** PackageManager/resources first, then provider transport
    and the remaining `android.app` managers.
 4. **UI/rendering:** view/widget input and focus, drawable/graphics pixel

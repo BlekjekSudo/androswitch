@@ -262,7 +262,7 @@ rustydroid/
 │   └── rd-agent/      # MCP (rmcp) + JSON-RPC + scenario DSL + coverage + batch
 ├── data/
 │   ├── permissions.toml      # Apêndice B inteiro como dado versionado
-│   ├── api-coverage.toml     # pacote.classe.método → módulo que implementa
+│   ├── api-coverage.toml     # prefixos android.* → domínio/status/módulo (Apêndice C)
 │   ├── devices.toml          # profiles de device (phone/tablet/foldable/tv/wear) — INCLUI piso: moto-e5 (Apêndice A2)
 │   └── behavior-switches.toml # behavior changes por targetSdk 26→36 (PRF-07)
 ├── golden-apks/       # script de download de APKs OSS por feature-tier (GH-05)
@@ -450,7 +450,7 @@ LOCATION_HARDWARE · CONTROL_LOCATION_UPDATES · DEVICE_POWER · REBOOT · FACTO
 
 ## Apêndice C — Superfície android.* por domínio (api-coverage.toml)
 
-A fonte executável deste apêndice é `data/api-coverage.toml`, validada por `rd-framework::fd_api_coverage` e consumida por `rd api-coverage`, pelo MCP (`get_api_usage`/`compat_gaps`) e pelos relatórios gerados. A tabela abaixo é **gerada** por `cargo xtask api-coverage-spec`; o relatório completo sai em `docs/api-coverage.md` (`cargo xtask api-coverage-report`). O programa de conclusão literal dos campos `partial` — critério de pacote completo, bloqueadores e ordem de execução — vive em `docs/appendix-c-literal-completion.md`; ele não promove status por si só. Status é conservador: `supported` cobre só o subconjunto documentado da superfície, nunca um pacote AOSP inteiro; `partial` executa subconjunto real; `stub` é hierarquia/fallback; `not_implemented` continua `NOT_IMPLEMENTED(module_id)`.
+A fonte executável deste apêndice é [`data/api-coverage.toml`](data/api-coverage.toml), validada por `rd-framework::fd_api_coverage` e consumida por `rd api-coverage`, pelo MCP (`get_api_usage`/`compat_gaps`) e pelos relatórios gerados. O instantâneo atual registra **106 superfícies em 17 domínios** (supported 4, partial 29, stub 14, not_implemented 59). A tabela abaixo é **gerada** por `cargo xtask api-coverage-spec`; o relatório completo sai em [`docs/api-coverage.md`](docs/api-coverage.md) (`cargo xtask api-coverage-report`). O programa de conclusão literal dos campos `partial` — critério de pacote completo, bloqueadores e ordem de execução — vive em [`docs/appendix-c-literal-completion.md`](docs/appendix-c-literal-completion.md); os Rounds 1–10 foram mergeados pelo PR #172 sem promovê-los automaticamente. Status é conservador: `supported` cobre só o subconjunto documentado da superfície, nunca um pacote AOSP inteiro; `partial` executa subconjunto real; `stub` é hierarquia/fallback; `not_implemented` continua `NOT_IMPLEMENTED(module_id)`.
 
 <!-- BEGIN API COVERAGE -->
 | Domínio | Superfícies/pacotes principais | Status das superfícies | Módulos |
