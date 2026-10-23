@@ -63,7 +63,8 @@
     "adr_path_globs": ["docs/adr/**"],
     "compat_evidence_globs": [
       "docs/compat-matrix.md",
-      "docs/api-coverage.toml",
+      "data/api-coverage.toml",
+      "docs/api-coverage.md",
       "docs/m8-*.md",
       "docs/m9-*.md",
       "spec.md",

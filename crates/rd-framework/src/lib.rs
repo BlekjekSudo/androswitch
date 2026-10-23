@@ -1,15 +1,24 @@
 //! rd-framework — implementação nativa do subconjunto `android.*` por domínio.
 //!
 //! Domínios (Apêndice C da spec): fd-ui, fd-content, fd-os, fd-net, fd-media,
-//! fd-hardware, fd-system-services, fd-permissions. M0 entrega **fd-permissions**
-//! (motor completo, dado versionado), **fd-devices** (perfis/budgets) e
-//! **fd-behavior** (comutadores por targetSdk). Os demais domínios são stubs
-//! estruturados `NOT_IMPLEMENTED` (Lei 1).
+//! fd-hardware, fd-system-services, fd-permissions. Este crate entrega os dados
+//! e motores versionados transversais: **fd-permissions** (Apêndice B),
+//! **fd-devices** (perfis/budgets), **fd-behavior** (comutadores por targetSdk)
+//! e **fd-api-coverage** (registro executável do Apêndice C em
+//! `data/api-coverage.toml`). A maior parte do comportamento `android.*` em
+//! tempo de execução vive hoje no host de `rd-vm`; o registro mapeia cada
+//! pacote/classe para o módulo real e mantém lacunas `NOT_IMPLEMENTED`
+//! explícitas (Lei 1), em vez de fingir que um stub é implementação.
 
+pub mod fd_api_coverage;
 pub mod fd_behavior;
 pub mod fd_devices;
 pub mod fd_permissions;
 
+pub use fd_api_coverage::{
+    ApiClassification, ApiCoverageSummary, ApiCoverageTable, ApiDomain, ApiDomainSummary,
+    ApiStatus, ApiSurface,
+};
 pub use fd_behavior::{BehaviorSwitch, SwitchTable};
 pub use fd_devices::{DeviceProfile, DeviceTable};
 pub use fd_permissions::{GrantState, PermissionDef, PermissionEngine, PermissionTable};
