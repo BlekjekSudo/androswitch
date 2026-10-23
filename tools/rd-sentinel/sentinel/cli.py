@@ -57,6 +57,7 @@ def _event_data(path: str | None) -> dict[str, Any]:
 def _context_from_args(args: argparse.Namespace, repo: Path) -> tuple[AuditContext, str, str]:
     event = _event_data(getattr(args, "event", None))
     pr = event.get("pull_request", {}) if isinstance(event.get("pull_request"), Mapping) else {}
+    merge_group = event.get("merge_group", {}) if isinstance(event.get("merge_group"), Mapping) else {}
     sender = event.get("sender", {}) if isinstance(event.get("sender"), Mapping) else {}
 
     labels = _parse_labels(getattr(args, "labels", None))
@@ -67,9 +68,20 @@ def _context_from_args(args: argparse.Namespace, repo: Path) -> tuple[AuditConte
         child = mapping.get(key, {})
         return str(child.get(field, "")) if isinstance(child, Mapping) else ""
 
-    base_ref = getattr(args, "base", None) or nested(pr, "base", "sha")
-    head_ref = getattr(args, "head", None) or nested(pr, "head", "sha") or "HEAD"
+    base_ref = (
+        getattr(args, "base", None)
+        or nested(pr, "base", "sha")
+        or str(merge_group.get("base_sha") or "")
+    )
+    head_ref = (
+        getattr(args, "head", None)
+        or nested(pr, "head", "sha")
+        or str(merge_group.get("head_sha") or "")
+        or "HEAD"
+    )
     event_name = getattr(args, "event_name", None) or os.environ.get("GITHUB_EVENT_NAME", "local")
+    if merge_group and event_name == "local":
+        event_name = "merge_group"
     if not base_ref:
         if event_name == "schedule":
             parent = resolve_rev(repo, "HEAD^")
@@ -93,7 +105,11 @@ def _context_from_args(args: argparse.Namespace, repo: Path) -> tuple[AuditConte
         profile=str(getattr(args, "profile", "auto") or "auto"),
         actor=str(getattr(args, "actor", None) or sender.get("login") or nested(pr, "user", "login")),
         author=str(getattr(args, "author", None) or nested(pr, "user", "login")),
-        head_ref=str(getattr(args, "head_ref", None) or nested(pr, "head", "ref")),
+        head_ref=str(
+            getattr(args, "head_ref", None)
+            or nested(pr, "head", "ref")
+            or str(merge_group.get("head_ref") or "")
+        ),
         labels=labels,
         pr_number=pr_number,
         run_url=str(run_url),

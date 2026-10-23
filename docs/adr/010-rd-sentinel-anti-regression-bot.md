@@ -4,7 +4,7 @@
 - **Scope:** `.github/dependabot.yml`, `.github/CODEOWNERS`, `deny.toml`,
   `.github/rd-sentinel/`, `.github/workflows/rd-sentinel*.yml`,
   `tools/rd-sentinel/`, and the operator guide in `docs/rd-sentinel.md`
-- **Current implementation:** RD Sentinel 1.1.0 (v1.1 amendment, 2026-10-22)
+- **Current implementation:** RD Sentinel 1.2.0 (v1.2 amendment, 2026-10-23)
 - **Identity (unchanged):** Rust-native Android runtime; no VM, KVM, or guest
   kernel; MSRV 1.76; minSdk 26; deterministic MCP/runtime behavior; no new
   `unsafe` outside `rd-jni`/`rd-ndk`.
@@ -216,3 +216,25 @@ Cargo-vet, a blocking OpenSSF Scorecard gate, and rustdoc-based semver
 checking remain future candidates. They should be adopted only with real
 audit corpora, measured false-positive rates, and a clear owner — not as
 decorative checks.
+
+## 10. v1.2 amendment — named evidence and GitHub-native publication
+
+The 1.2 release keeps the same trust split and no-auto-merge rule. It closes
+three evidence/presentation gaps found after 1.1:
+
+1. **No-shrink becomes identity-aware.** Counts remain useful floors, but the
+   static audit also compares named Rust tests by `(scope, name)` (counting
+   duplicate names in one crate) and fuzz targets by crate-qualified name.
+   Same-crate moves are still tolerated; a same-count swap that deletes the
+   meaningful entry is a finding.
+2. **OSV pagination is completed, not sampled.** `querybatch` pagination is
+   per query, so Sentinel resubmits only unfinished package queries with their
+   own page tokens, bounded by `campaigns.osv_max_pages`, and records
+   pages/pending/truncated metrics.
+3. **Publication gains GitHub-native review surfaces without moving trust.**
+   Only the default-branch publisher may create the annotated
+   `rd-sentinel/gate` Check Run or upload SARIF to code scanning, and only
+   after the fingerprinted report has been verified against the live PR. If
+   GitHub rejects that presentation layer (for example a fork head or a
+   disabled code-scanning surface), the error is recorded and the verified
+   comment/labels/commit-status decision remains authoritative.

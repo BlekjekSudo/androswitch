@@ -7,6 +7,7 @@ import os
 import posixpath
 import re
 import subprocess
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -902,6 +903,109 @@ def _count_test_attributes(repo: Path, rev: str | None) -> int:
     return total
 
 
+_TEST_ATTR_RE = re.compile(r"#\[(?:[A-Za-z_][\w:]*::)?test(?:\([^\]]*\))?\]")
+_TEST_FN_RE = re.compile(r"\b(?:async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+
+
+def _test_scope(path: str) -> str:
+    parts = path.replace("\\", "/").split("/")
+    if len(parts) > 2 and parts[0] == "crates":
+        return parts[1]
+    return parts[0] if parts else "workspace"
+
+
+def named_test_inventory_from_sources(
+    sources: Mapping[str, str],
+) -> dict[tuple[str, str], int]:
+    """Count named Rust tests by (scope, test name).
+
+    Counts alone allow a bad swap: delete the one test that catches a bug and
+    add an unrelated smoke test, and the total still looks healthy. This
+    inventory tracks identities. The scope is the crate for ``crates/<crate>``
+    paths (or the first path segment elsewhere) rather than the exact file, so
+    moving a test module inside the same crate is not misreported as removal;
+    duplicate test names in different modules of one crate are counted.
+    """
+
+    counts: Counter[tuple[str, str]] = Counter()
+    for path, text in sources.items():
+        lines = text.splitlines()
+        scope = _test_scope(path)
+        counted_fn_lines: set[int] = set()
+        for index, line in enumerate(lines):
+            if not _TEST_ATTR_RE.search(line):
+                continue
+            for fn_index in range(index + 1, min(len(lines), index + 13)):
+                candidate = lines[fn_index].strip()
+                if not candidate or candidate.startswith("#[") or candidate.startswith("//"):
+                    continue
+                match = _TEST_FN_RE.search(lines[fn_index])
+                if match and fn_index not in counted_fn_lines:
+                    counts[(scope, match.group(1))] += 1
+                    counted_fn_lines.add(fn_index)
+                break
+    return dict(counts)
+
+
+def _named_test_inventory(repo: Path, rev: str | None) -> dict[tuple[str, str], int]:
+    sources: dict[str, str] = {}
+    for path in list_files_at_rev(repo, rev):
+        if not path.endswith(".rs"):
+            continue
+        text = read_at_rev(repo, rev, path)
+        if text is not None:
+            sources[path] = text
+    return named_test_inventory_from_sources(sources)
+
+
+def _named_test_findings(
+    base: Mapping[tuple[str, str], int],
+    head: Mapping[tuple[str, str], int],
+    *,
+    baseline_approved: bool = False,
+) -> tuple[list[Finding], dict[str, Any]]:
+    findings: list[Finding] = []
+    decreased: list[tuple[str, str, int, int]] = []
+    removed_instances = 0
+    for (scope, name), before in sorted(base.items()):
+        after = head.get((scope, name), 0)
+        if after < before:
+            decreased.append((scope, name, before, after))
+            removed_instances += before - after
+    for scope, name, before, after in decreased[:50]:
+        path = f"crates/{scope}" if scope and scope not in {"tests", "golden"} else scope
+        findings.append(
+            Finding(
+                id="test-removed",
+                severity="P2" if baseline_approved else "P1",
+                area="tests",
+                title=f"Named test removed or renamed without same-name replacement: {name}",
+                evidence=f"scope={scope}; base count={before}; head count={after}",
+                path=path,
+                remediation="Restore the named test, or keep the historical name when moving it inside the same crate. If the behavior is intentionally replaced, use a reviewed baseline change/exception and point to the stronger replacement test.",
+            )
+        )
+    metrics = {
+        "named_test_base_total": sum(base.values()),
+        "named_test_head_total": sum(head.values()),
+        "named_test_decreased_keys": len(decreased),
+        "named_test_removed_instances": removed_instances,
+    }
+    return findings, metrics
+
+
+def _fuzz_target_names(files: Sequence[str]) -> list[str]:
+    names: list[str] = []
+    for path in files:
+        parts = path.replace("\\", "/").split("/")
+        if "fuzz_targets" not in parts or not path.endswith(".rs"):
+            continue
+        stem = parts[-1][:-3]
+        scope = parts[1] if len(parts) > 2 and parts[0] == "crates" else "/".join(parts[:-2])
+        names.append(f"{scope}:{stem}" if scope else stem)
+    return sorted(names)
+
+
 def _regex_int(text: str | None, pattern: str) -> int | None:
     if not text:
         return None
@@ -937,6 +1041,7 @@ def inventory_at(repo: Path, rev: str | None) -> dict[str, Any]:
         "static_test_attributes": _count_test_attributes(repo, rev),
         "golden_vector_count": _regex_int(golden_text, r"(\d+)"),
         "fuzz_target_count": len([f for f in files if "/fuzz/fuzz_targets/" in f and f.endswith(".rs")]),
+        "fuzz_target_names": _fuzz_target_names(files),
         "mcp_tool_count": mcp_count,
         "rust_version": str(rust_version) if rust_version else None,
         "cargo_lock_version": lock_version(read_at_rev(repo, rev, "Cargo.lock")),
@@ -1183,6 +1288,26 @@ def _check_inventory_regression(
                     title=f"{label} shrank versus base",
                     evidence=f"base={before}, head={after}",
                     remediation="Restore the evidence surface or obtain a dated baseline exception with equivalent replacement coverage.",
+                )
+            )
+    named_shrinkable = {
+        "fuzz_target_names": ("fuzz target", "fuzz", "fuzz-target-removed"),
+    }
+    for key, (label, area, finding_id) in named_shrinkable.items():
+        before_values = base.get(key)
+        after_values = head.get(key)
+        if not isinstance(before_values, list) or not isinstance(after_values, list):
+            continue
+        after_set = {str(item) for item in after_values}
+        for missing in sorted({str(item) for item in before_values} - after_set)[:20]:
+            findings.append(
+                Finding(
+                    id=finding_id,
+                    severity="P2" if baseline_approved else "P1",
+                    area=area,
+                    title=f"Named {label} removed or renamed: {missing}",
+                    evidence=f"base has {missing}; head does not",
+                    remediation="Restore the named evidence entry, or use a reviewed baseline change/exception that names the replacement coverage. Matching counts alone do not prove the same surface is still exercised.",
                 )
             )
     return findings
@@ -1881,6 +2006,7 @@ def build_static_report(
     findings.extend(workflow_findings)
 
     public_api_metrics: dict[str, Any] = {}
+    named_test_metrics: dict[str, Any] = {}
     if any(f.path.startswith("crates/") and f.path.endswith(".rs") for f in files):
         public_findings, public_api_metrics = _public_api_findings(
             _public_api_inventory(repo, base_sha),
@@ -1889,6 +2015,15 @@ def build_static_report(
         findings.extend(public_findings)
         if public_findings:
             triggers.add("public-api")
+    if any(f.path.endswith(".rs") for f in files):
+        named_test_findings, named_test_metrics = _named_test_findings(
+            _named_test_inventory(repo, base_sha),
+            _named_test_inventory(repo, "WORKTREE" if head_is_worktree else head_sha),
+            baseline_approved=baseline_approval_applied,
+        )
+        findings.extend(named_test_findings)
+        if named_test_findings:
+            triggers.add("named-test-removal")
 
     protected = policy.get("protected_paths", [])
     policy_label = str(approvals.get("policy_label", "sentinel:policy-approved"))
@@ -2211,6 +2346,7 @@ def build_static_report(
         metrics[f"base_{key}"] = base_inventory.get(key)
     metrics.update(dependency_metrics)
     metrics.update(public_api_metrics)
+    metrics.update(named_test_metrics)
     metrics.update(workflow_metrics)
     metrics.update(corpus_metrics)
 

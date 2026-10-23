@@ -1257,45 +1257,80 @@ class CampaignRunner:
 
     @staticmethod
     def _query_osv(
-        packages: Sequence[tuple[str, str]], *, timeout: float = 30.0
+        packages: Sequence[tuple[str, str]], *, timeout: float = 30.0, max_pages: int = 10
     ) -> dict[str, Any]:
         if not packages:
-            return {"results": [], "queries": 0, "truncated": False}
+            return {
+                "results": [],
+                "queries": 0,
+                "truncated": False,
+                "pages": 0,
+                "pending_queries": 0,
+            }
         unique = sorted(set(packages))
-        payload = {
-            "queries": [
-                {"package": {"purl": CampaignRunner._cargo_purl(name, version)}}
-                for name, version in unique
-            ]
+        try:
+            page_limit = max(1, min(100, int(max_pages)))
+        except (TypeError, ValueError):
+            page_limit = 10
+        ids_by_package: dict[tuple[str, str], list[str]] = {pkg: [] for pkg in unique}
+        seen_by_package: dict[tuple[str, str], set[str]] = {pkg: set() for pkg in unique}
+        pending: list[tuple[tuple[str, str], str | None]] = [(pkg, None) for pkg in unique]
+        pages = 0
+        while pending and pages < page_limit:
+            pages += 1
+            queries: list[dict[str, Any]] = []
+            for (name, version), page_token in pending:
+                query: dict[str, Any] = {
+                    "package": {"purl": CampaignRunner._cargo_purl(name, version)}
+                }
+                if page_token:
+                    query["page_token"] = page_token
+                queries.append(query)
+            request = urllib_request.Request(
+                OSV_QUERYBATCH_URL,
+                data=json.dumps({"queries": queries}, separators=(",", ":")).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": "RD-Sentinel",
+                },
+                method="POST",
+            )
+            with urllib_request.urlopen(request, timeout=timeout) as response:
+                document = json.loads(response.read().decode("utf-8"))
+            raw_results = document.get("results", []) if isinstance(document, Mapping) else []
+            next_pending: list[tuple[tuple[str, str], str | None]] = []
+            # OSV querybatch pagination is per-query: each result may carry its
+            # own next_page_token. Follow-up batches must contain only those
+            # unfinished queries, each with its own token, while this map keeps
+            # the original package identity stable across subset responses.
+            for (package_key, _old_token), result in zip(pending, raw_results):
+                vulns = result.get("vulns", []) if isinstance(result, Mapping) else []
+                for vuln in vulns:
+                    if not isinstance(vuln, Mapping) or not vuln.get("id"):
+                        continue
+                    vuln_id = str(vuln["id"])
+                    if vuln_id not in seen_by_package[package_key]:
+                        seen_by_package[package_key].add(vuln_id)
+                        ids_by_package[package_key].append(vuln_id)
+                if isinstance(result, Mapping) and result.get("next_page_token"):
+                    next_pending.append((package_key, str(result["next_page_token"])))
+            pending = next_pending
+        results = [
+            {
+                "package": name,
+                "version": version,
+                "vulnerability_ids": ids_by_package[(name, version)],
+            }
+            for name, version in unique
+            if ids_by_package[(name, version)]
+        ]
+        return {
+            "results": results,
+            "queries": len(unique),
+            "truncated": bool(pending),
+            "pages": pages,
+            "pending_queries": len(pending),
         }
-        request = urllib_request.Request(
-            OSV_QUERYBATCH_URL,
-            data=json.dumps(payload, separators=(",", ":")).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "User-Agent": "RD-Sentinel",
-            },
-            method="POST",
-        )
-        with urllib_request.urlopen(request, timeout=timeout) as response:
-            document = json.loads(response.read().decode("utf-8"))
-        raw_results = document.get("results", []) if isinstance(document, Mapping) else []
-        results: list[dict[str, Any]] = []
-        truncated = False
-        for (name, version), result in zip(unique, raw_results):
-            vulns = result.get("vulns", []) if isinstance(result, Mapping) else []
-            ids = [
-                str(v.get("id"))
-                for v in vulns
-                if isinstance(v, Mapping) and v.get("id")
-            ]
-            if isinstance(result, Mapping) and result.get("next_page_token"):
-                truncated = True
-            if ids:
-                results.append(
-                    {"package": name, "version": version, "vulnerability_ids": ids}
-                )
-        return {"results": results, "queries": len(unique), "truncated": truncated}
 
     def _component_deps(self) -> None:
         raw = self._run_raw(["cargo", "metadata", "--locked", "--format-version", "1"], timeout=600)
@@ -1493,7 +1528,13 @@ class CampaignRunner:
                         )
                     except (TypeError, ValueError):
                         osv_timeout = 30.0
-                    osv = self._query_osv(osv_packages, timeout=osv_timeout)
+                    try:
+                        osv_max_pages = max(1, min(100, int(self._cfg("osv_max_pages", 10))))
+                    except (TypeError, ValueError):
+                        osv_max_pages = 10
+                    osv = self._query_osv(
+                        osv_packages, timeout=osv_timeout, max_pages=osv_max_pages
+                    )
                     vuln_total = sum(
                         len(item.get("vulnerability_ids", []))
                         for item in osv.get("results", [])
@@ -1501,6 +1542,8 @@ class CampaignRunner:
                     )
                     self._metric("osv_vulnerability_count", vuln_total)
                     self._metric("osv_packages_queried", osv.get("queries"))
+                    self._metric("osv_pages", osv.get("pages"))
+                    self._metric("osv_pagination_truncated", bool(osv.get("truncated")))
                     if vuln_total:
                         self._add_finding(
                             Finding(
@@ -1522,13 +1565,20 @@ class CampaignRunner:
                             component="deps",
                             summary=(
                                 f"queried {osv.get('queries')} crates, {vuln_total} vulnerability IDs"
-                                + ("; first page only (pagination token returned)" if osv.get("truncated") else "")
+                                + (
+                                    f"; pagination incomplete after {osv.get('pages')} page(s), "
+                                    f"{osv.get('pending_queries')} unfinished queries"
+                                    if osv.get("truncated")
+                                    else f"; pagination complete in {osv.get('pages')} page(s)"
+                                )
                             ),
                             metrics={
                                 "packages_queried": osv.get("queries"),
                                 "vulnerabilities": vuln_total,
                                 "affected": osv.get("results", []),
                                 "truncated": osv.get("truncated"),
+                                "pages": osv.get("pages"),
+                                "pending_queries": osv.get("pending_queries"),
                             },
                         )
                     )
