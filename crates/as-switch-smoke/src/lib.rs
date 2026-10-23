@@ -13,6 +13,8 @@ pub mod device_fs;
 pub mod device_jni;
 #[cfg(target_os = "horizon")]
 pub mod device_native;
+#[cfg(target_os = "horizon")]
+mod launcher;
 pub mod native_probe;
 pub mod probe;
 

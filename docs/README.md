@@ -7,13 +7,16 @@
 AndroSwitch adapts [RustyDroid](https://github.com/nadabgfccvd/RustyDroid) for
 HorizonOS. Start with the [project README](../README.md) and
 [credits/provenance](../CREDITS.md). M0–M4 developer proof gates have host and
-Ryujinx evidence. Android UI/lifecycle and the consumer launcher remain later
-milestones; physical Switch validation is pending.
+Ryujinx evidence. M5–M7 add supported UI/native media and a one-NRO console;
+physical Switch validation is pending.
 
 ## Use and reproduce the current work
 
 | Guide | Contents |
 | --- | --- |
+| [Using the M7 alpha](USING_ANDROSWITCH.md) | One-NRO SD package, controls, samples, storage, limits and recovery |
+| [Mulai dalam bahasa Indonesia](QUICK_START_ID.md) | Panduan singkat penggunaan dan pengujian hardware |
+| [M6/M7 E2E](M6_M7_E2E.md) | Native media, console workflow, quiescent teardown and exact evidence scope |
 | [Getting started](GETTING_STARTED.md) | Clone, prerequisites and first APK inspection |
 | [Building](BUILDING.md) | Host tools, pinned device Rust, libnx and Java fixture builds |
 | [CLI reference](CLI.md) | Actual `asctl` commands, JSON, preflight and the separate method probe |
@@ -44,6 +47,9 @@ Large generated output is kept in ignored `target/evidence/` and
 `local-artifacts/`; a fresh clone contains the compact reports and source
 needed to rebuild the fixtures. Reports distinguish host, emulator and
 physical Switch evidence. Physical Switch verification is still pending.
+Current console/media source, run IDs and binary/fixture hashes are recorded
+in [M6/M7 results](../reports/m6-m7.json). The M5 UI proof remains historical
+evidence in [its report](../reports/m5-ui.json).
 
 ## Contributing and original material
 

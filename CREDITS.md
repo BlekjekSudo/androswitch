@@ -74,6 +74,9 @@ Linux documentation.
 | [Vector Pinball](https://github.com/dozingcat/Vector-Pinball) / dozingcat contributors | Frozen independent integration target for later milestones |
 | Cargo dependency authors | Parser, compression, serialization and other library dependencies recorded in `Cargo.lock` |
 | DejaVu / Bitstream / Arev contributors | Glyphs in RustyDroid's retained text atlas; full notices in `third_party/fonts/DejaVu.LICENSE` |
+| [Mesa](https://docs.mesa3d.org/) / [devkitPro Switch Mesa](https://github.com/devkitPro/mesa) / Nouveau contributors | Actual EGL/GLES2 driver and shader compiler linked into the product NRO |
+| [Khronos](https://www.khronos.org/) / AOSP OpenSL ES contributors | Public OpenSL ES interface layouts and identifiers; original headers/notices retained |
+| GCC / GNU libstdc++ / newlib contributors | Device C/C++ runtime; redistribution notices and the GCC Runtime Library Exception are included in packaged dependencies |
 
 These acknowledgements do not change the components' individual licenses.
 Tools, external APKs and proprietary game assets are not bundled in the

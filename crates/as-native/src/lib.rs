@@ -40,6 +40,12 @@ pub struct Allocation {
     pub length: usize,
 }
 pub trait NativeBackend {
+    fn system_library(&self, name: &str) -> bool {
+        matches!(
+            name,
+            "libc.so" | "libm.so" | "libdl.so" | "liblog.so" | "libandroid.so"
+        )
+    }
     fn allocate(&mut self, length: usize) -> Result<Allocation>;
     fn write(&mut self, memory: Allocation, offset: usize, bytes: &[u8]) -> Result<()>;
     fn finalize(&mut self, memory: Allocation, executable_pages: &[u8]) -> Result<()>;
@@ -117,10 +123,7 @@ impl<B: NativeBackend> Loader<B> {
             for dependency in &elf.needed {
                 if self.sources.contains_key(dependency) {
                     self.load(dependency)?;
-                } else if !matches!(
-                    dependency.as_str(),
-                    "libc.so" | "libm.so" | "libdl.so" | "liblog.so" | "libandroid.so"
-                ) {
+                } else if !self.backend.system_library(dependency) {
                     return Err(error("LIBRARY_NOT_FOUND", "dependency", name, dependency));
                 }
             }

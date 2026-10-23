@@ -13,10 +13,16 @@ See [credits and provenance](CREDITS.md) and [NOTICE](NOTICE.md).
 
 ## Current status
 
-**Development has reached the M5 UI proof; M6–M7 are in progress.** The
-`no_std + alloc` NRO runs real Java/Kotlin Activity bodies, XML/widgets/Canvas,
-input and lifecycle callbacks on the shared RustyDroid interpreter. M4's
-ARM64/JNI proof remains separate evidence. Physical Switch testing is pending.
+**M7 development alpha: one `androswitch.nro`, one SD folder.** The console
+installs, updates and launches supported APKs using the shared RustyDroid
+interpreter and native ARM64 backend. Java/Kotlin UI, NativeActivity GLES2,
+assets, PCM audio and repeated application switching have Ryujinx evidence.
+Physical Switch testing is pending. This is not the v0.1 compatibility release.
+
+![AndroSwitch console after the verified Ryujinx workflow](docs/images/androswitch-m7.png)
+
+Actual submitted console framebuffer from the M7 test; physical-device status
+remains unverified.
 
 | Area | Verified status |
 | --- | --- |
@@ -28,12 +34,15 @@ ARM64/JNI proof remains separate evidence. Physical Switch testing is pending.
 | Ryujinx E2E | DEX semantics, persistent storage, native CPU oracle and mixed Java/Kotlin JNI fixtures; see milestone evidence |
 | Upstream VM regression subset | 227 tests pass; separate from the recorded full-upstream baseline |
 | Android lifecycle/UI | Supported M5 subset; 14 Java/Kotlin UI snapshots pass in Ryujinx |
-| Native graphics/audio and consumer launcher | M6–M7 in progress |
+| Native graphics/audio | NativeActivity, incremental assets, input queue, EGL/GLES2; Java AudioTrack, AAudio writes and OpenSL ES PCM queue callbacks |
+| Console launcher | Scan/install/update/launch/return/uninstall; persistent saves, named failures and one NRO |
 | Physical Switch | Not tested yet |
 
-This is a development project, not a general-purpose APK launcher release.
-The M5 runner launches supported Activities; individual proofs do not establish
-that an entire arbitrary app works.
+The launcher is usable for the supported test corpus. Arbitrary apps can still
+require missing Android APIs. This alpha accepts single APKs up to **64 MiB**
+on device, API 26 or lower minimum SDK, and ARM64 native libraries. OBB files
+stream separately. Network, Google Play Services, split APKs, WebView and modern
+engine compatibility are not established. There is no per-game configuration.
 Inherited RustyDroid capabilities are not automatically Switch capabilities.
 Read the [compatibility inventory](docs/ANDROSWITCH_COMPATIBILITY.md) and
 [M2–M4 implementation and evidence guide](docs/M2_M4_E2E.md) for the exact scope.
@@ -53,6 +62,26 @@ Read the [compatibility inventory](docs/ANDROSWITCH_COMPATIBILITY.md) and
 Android API 26 is the initial behavior reference. An APK with `minSdk <= 26`
 may enter evaluation; `targetSdk` is not a minimum requirement. Passing these
 static checks does not establish Android API coverage or app compatibility.
+
+## Use the Switch package
+
+Extract the development ZIP's `switch/` folder to the SD card. Open
+`switch/androswitch/androswitch.nro` through homebrew application/title override.
+The package includes four original sample APKs, ready to install from the APKs
+list. Put additional single APK files in `switch/androswitch/apks/`.
+
+- **L/R:** Installed/APKs list. **A:** launch or install/update. **B:** back.
+- **X:** details. **Y:** uninstall with saved data retained. **ZR:** separate
+  clear-internal-data action. Both deletion actions require confirmation.
+- **Minus:** rescan. **Plus:** return from an app to the console; from the
+  console, exit homebrew. Touch selects a row; tap it again to open it.
+
+If native workers cannot stop safely, the runtime records the reason and exits
+the Horizon process. Reopen homebrew to read the interruption notice; it does
+not reuse live guest code. APKs run native code in the homebrew process, so
+install APKs you trust. See [using AndroSwitch](docs/USING_ANDROSWITCH.md),
+[the Indonesian quick start](docs/QUICK_START_ID.md) and
+[M6/M7 scope and evidence](docs/M6_M7_E2E.md).
 
 ## Try the host tools
 
@@ -86,7 +115,25 @@ lifecycle execution flags in `asctl` remain false until that integration exists.
 See the
 [CLI reference](docs/CLI.md) and [getting started guide](docs/GETTING_STARTED.md).
 
-## Build and test the Switch proof
+## Build the product NRO
+
+The product uses the same portable core as the earlier proofs, plus libnx,
+Switch Mesa EGL/GLES2 and PCM output. See [building](docs/BUILDING.md) for
+prerequisites and [M6/M7](docs/M6_M7_E2E.md) for exact checks.
+
+```powershell
+./scripts/build-m5-fixture.ps1
+./scripts/build-m6-fixture.ps1
+./scripts/build-androswitch.ps1
+./scripts/test-ryujinx-launcher.ps1
+./scripts/package-androswitch.ps1
+```
+
+Output: `local-artifacts/product/androswitch.nro` and a copy-ready ZIP under
+`local-artifacts/releases/`. APKs and compiled binaries are generated locally;
+they are not committed to the source repository.
+
+## Reproduce the earlier Switch proof
 
 The current NRO build uses Windows Rust, WSL Ubuntu with devkitPro/libnx,
 PowerShell 7, a JDK and Android SDK build-tools/platform 35. The device Rust
@@ -105,16 +152,16 @@ stops only its own emulator process. Outputs stay in ignored
 `local-artifacts/m1/`; compact evidence and fixture source hashes are tracked.
 See [testing](docs/TESTING.md) and the [M1 E2E procedure](docs/M1_E2E.md).
 
-## Planned SD layout
+## SD layout
 
-The launcher/install layout below is the product target for later milestones.
-The M1–M4 developer runner uses `switch/androswitch-smoke/` for its inputs;
-M2–M4 persistent installations and saves already use `switch/androswitch/`.
+The console creates the directories below on first boot. Installation keeps
+its own APK copy, so the source in `apks/` can be moved after installation.
+The earlier developer proofs use a separate `androswitch-smoke/` input folder.
 
 ```text
 switch/androswitch/
 ├── androswitch.nro
-├── runtime/runner.nro
+├── runtime/
 ├── apks/
 ├── Android/
 │   ├── data/<package>/
@@ -127,10 +174,9 @@ switch/androswitch/
 └── logs/
 ```
 
-Users will import APKs through `apks/` when the M7 launcher is available.
-Java and native file APIs already share the same filesystem mappings;
-OBBs remain ordinary app-readable files. Persistent installation is available
-through the host CLI and the device developer runner.
+Java and native file APIs share the same filesystem mappings. Put OBB files in
+`Android/obb/<package>/`; they remain ordinary app-readable files and are not
+automatically extracted. Private saves live in `userdata/<package>/`.
 
 ## Documentation and development
 

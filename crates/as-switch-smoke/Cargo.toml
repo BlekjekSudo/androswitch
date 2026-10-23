@@ -21,6 +21,7 @@ as-platform = { path = "../as-platform", default-features = false }
 as-package = { path = "../as-package" }
 as-native = { path = "../as-native" }
 as-framework = { path = "../as-framework" }
+as-launcher = { path = "../as-launcher" }
 rd-jni = { path = "../rd-jni", default-features = false }
 
 [features]

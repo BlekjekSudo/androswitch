@@ -5,6 +5,7 @@ members = [
     "crates/as-package",
     "crates/as-native",
     "crates/as-framework",
+    "crates/as-launcher",
     "crates/as-runtime",
     "crates/as-cli",
     "crates/as-switch-smoke",

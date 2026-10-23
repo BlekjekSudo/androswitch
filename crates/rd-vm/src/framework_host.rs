@@ -25,6 +25,19 @@ pub trait FrameworkHost {
         Vec::new()
     }
     fn collect(&self, _marked: &[bool]) {}
+    fn asset_open(&self, _name: &str) -> Result<u64, VmExit> {
+        Err(crate::err::vm_error("API_UNAVAILABLE", "AssetManager.open").into())
+    }
+    fn asset_read(&self, _handle: u64, _output: &mut [u8]) -> Result<usize, VmExit> {
+        Err(crate::err::vm_error("API_UNAVAILABLE", "Asset.read").into())
+    }
+    fn asset_seek(&self, _handle: u64, _offset: i64, _origin: i32) -> Result<u64, VmExit> {
+        Err(crate::err::vm_error("API_UNAVAILABLE", "Asset.seek").into())
+    }
+    fn asset_len(&self, _handle: u64) -> Result<u64, VmExit> {
+        Err(crate::err::vm_error("API_UNAVAILABLE", "Asset.length").into())
+    }
+    fn asset_close(&self, _handle: u64) {}
 }
 impl Engine {
     pub fn bind_device_storage(

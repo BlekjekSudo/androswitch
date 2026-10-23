@@ -16,6 +16,9 @@ public final class Bridge {
     private static native int unsupported();
     private static native double many(int a,int b,int c,int d,int e,int f,int g,int h,int i,double j,double k,double l,double m,double n,double o,double p,double q,double r);
     private static native double nativeFloatCallback();
+    private static native double nativeStackCallback();
+    public static double stackCallback(int a,int b,int c,int d,int e,int f,int g,int h,int i,double j,double k,double l,double m,double n,double o,double p,double q,double r){return a+b+c+d+e+f+g+h+i+j+k+l+m+n+o+p+q+r;}
+    public static double stackCallbackTest(){return nativeStackCallback();}
     public static double manyArguments(){return many(1,2,3,4,5,6,7,8,9,0.25,1.25,2.25,3.25,4.25,5.25,6.25,7.25,8.25);}
     public static double floatCallback(int a,double b,float c,long d){return a+b*c+d;}
     public static double floatCallbackTest(){return nativeFloatCallback();}
@@ -42,7 +45,10 @@ public final class Bridge {
         int result = input.read(); input.close();
         return nativeValue * 256 + result;
     }
+    private static native int synchronization();
+    public static int synchronizationTest() {return synchronization();}
     public static void main(String[] args) throws Exception {
+        System.out.println("synchronization="+synchronizationTest());
         System.out.println("numeric=" + numeric());
         System.out.println("registration=" + registration());
         System.out.println("reentry=" + reentry());
@@ -55,6 +61,7 @@ public final class Bridge {
         System.out.println("storage=" + storageTest());
         System.out.println("many=" + manyArguments());
         System.out.println("float-callback=" + floatCallbackTest());
+        System.out.println("stack-callback=" + stackCallbackTest());
         System.out.println("rust=" + RustBridge.exercise());
     }
 }

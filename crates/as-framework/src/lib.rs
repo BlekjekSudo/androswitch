@@ -2,6 +2,8 @@
 #![no_std]
 extern crate alloc;
 mod android;
+mod audio;
+pub use audio::PcmOutput;
 mod raster;
 use alloc::{
     boxed::Box,

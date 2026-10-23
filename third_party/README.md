@@ -31,3 +31,24 @@ based on Bitstream Vera; DejaVu changes are public domain, and some imported
 glyphs have Arev notices. The complete [font license](fonts/DejaVu.LICENSE)
 is retained from the [DejaVu project](https://github.com/dejavu-fonts/dejavu-fonts).
 This does not identify a new font build or replace the inherited atlas.
+
+## OpenSL ES ABI and interface identifiers
+
+`android/opensles/OpenSLES*.h` are unmodified headers from Android NDK
+`28.2.13676358`. Khronos permissive notices remain in `OpenSLES.h` and
+`OpenSLES_Platform.h`; the Android extensions retain AOSP Apache-2.0 notices.
+`OpenSLES_IID.c` is retained as the identifier reference, not compiled. Source:
+https://android.googlesource.com/platform/system/media/+/gingerbread/opensles/libopensles/OpenSLES_IID.c
+SHA-256: `6b7c2d6ea5b61ff695b95e929827900e5715dfbce0a7571f8ad9ff2916b7a627`.
+The complete original notices are in these files. `platform/androswitch/opensl.c`
+implements the bounded audio subset itself, using those public ABI definitions.
+
+## Linked platform components
+
+The tested product uses libnx `4.12.0-1`, Switch Mesa `20.1.0-5` (EGL metadata
+`20.1.0-rc3`), and `switch-libdrm_nouveau 1.0.1-2`. Mesa, Nouveau, libnx,
+libstdc++, newlib, Rust libraries and Cargo dependencies keep their individual
+licenses. `scripts/collect-product-licenses.ps1` prepares the source-linked
+notices used by `package-androswitch.ps1`; the package contains a license
+inventory and full copied texts. This does not relicense dependencies under
+AndroSwitch's own MIT/Apache-2.0 choice.

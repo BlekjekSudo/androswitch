@@ -10,9 +10,11 @@ minSdk above the reference environment is. Required splits wait for M10.
 
 ## Components
 
-`as-runtime` is the facade consumed by the host CLI and eventually launcher and
-runner. Inspection and package management are implemented; the M5 Activity
-adapter is implemented separately, with launcher integration in M7. `as-platform` defines portable
+`as-runtime` is the inspection/package facade consumed by the host CLI. The
+device console uses `as-launcher`, `as-package` and the `as-framework::App`
+session adapter through documented C ABI entry points in `as-switch-smoke`.
+Host CLI execution flags describe that inspection facade, not product-NRO
+corpus verification. `as-platform` defines portable
 storage, clock and logging contracts, with host and libnx filesystem adapters. Further services
 are added with their implementation milestones. The inherited `rd-*` crates
 retain their upstream behavior and tests.
@@ -64,19 +66,25 @@ One VFS resolves paths for Java and native APIs:
 | `/data/user/0/<package>` | `userdata/<package>` |
 
 Normalize guest paths before mount resolution and separate app-private storage.
-OBBs remain opaque files; stream reads instead of loading complete archives.
-M0 inspection uses a bounded 512 MiB whole-APK reader, not the final large-asset
-runtime reader.
+OBBs remain opaque files with positioned reads. Asset readers share APK bytes
+and inflate incrementally with bounded output and a 32 KiB dictionary. M0 host
+inspection accepts up to 512 MiB; the M7 alpha's memory-resident device APK
+container is explicitly limited to 64 MiB. The existing paged ZIP parser has
+not yet replaced the product's whole-container path.
 
 ## Lifecycle (M7)
 
-`androswitch.nro` will present apps/imports and execute one guest at a time,
+`androswitch.nro` presents apps/imports and executes one guest at a time,
 using a versioned request carrying package, install revision and session ID.
-NRO chainloading uses the same Horizon process. M7 must verify guest threads,
+NRO chainloading uses the same Horizon process. M7 verifies guest threads,
 media and mappings are quiescent before returning to the launcher; otherwise
 exit the Horizon application and report the reason on next launch. See
 [ADR 015](adr/015-portable-framework-and-session-boundary.md). Seamless recovery
 from arbitrary native crashes is not promised.
+One-shot requests are consumed before execution. The pending-session marker
+survives an interrupted process and is archived/shown on next boot. The normal
+path destroys JNI veneers/tables, guest TLS/heap, synchronization objects, ELF
+mappings and media before allowing a new App. See [M6/M7](M6_M7_E2E.md).
 
 ## Verification
 

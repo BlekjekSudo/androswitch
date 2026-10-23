@@ -1,0 +1,396 @@
+{
+  "schema_version": 1,
+  "implementation_commit": null,
+  "stage": "M7 development alpha; supported proof corpus, not universal APK compatibility",
+  "product_nro_sha256": "3d84164e6ba3227d6916e26bafff91f7485a817925f5450b85f5811c3738236b",
+  "verification": {
+    "host": "passed stated contracts",
+    "ryujinx": "passed supported corpus and negative lifecycle boundary",
+    "physical_device": "not_run",
+    "android_reference_device": "not_run"
+  },
+  "console": {
+    "completed_sessions": 10,
+    "schema_version": 1,
+    "backend": "ryujinx",
+    "emulator": {
+      "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0",
+      "version": "1.3.3+e2143d4"
+    },
+    "nro_sha256": "3d84164e6ba3227d6916e26bafff91f7485a817925f5450b85f5811c3738236b",
+    "scenario": "workflow",
+    "commands": 52,
+    "physical_device": "not_run",
+    "session_id": "597d633cb5944e8eb66c0aaca467cd62",
+    "expected_api_errors": 1,
+    "status": "passed",
+    "artifact_root": "local-artifacts/m7/runs/597d633cb5944e8eb66c0aaca467cd62",
+    "receipt_sha256": "1b29da067cd7e586104d606131d7de05100963c00bf32de12e3f8d79d6f4ba09"
+  },
+  "boundary": {
+    "schema_version": 1,
+    "backend": "ryujinx",
+    "boundary": "process_exit_required",
+    "scenario": "quiescence",
+    "nro_sha256": "3d84164e6ba3227d6916e26bafff91f7485a817925f5450b85f5811c3738236b",
+    "physical_device": "not_run",
+    "session_id": "a5b5e253372546dc955fdd05a0dc5c08",
+    "next_boot_recovery": "passed",
+    "status": "passed",
+    "artifact_root": "local-artifacts/m7/runs/a5b5e253372546dc955fdd05a0dc5c08",
+    "receipt_sha256": "d6ebcd3113eaf2bf2ad2dca5af03196090475ac8c73209fcc2719039ab7c1a99"
+  },
+  "boundary_error": {
+    "error": "NATIVE_NOT_QUIESCENT: -116; reopen homebrew",
+    "package": "org.fixture.nonquiescent",
+    "revision": 1,
+    "schema_version": 1,
+    "session_id": "a5b5e253372546dc955fdd05a0dc5c08-1",
+    "status": "failed"
+  },
+  "native_media": {
+    "frames": 678,
+    "input": 2,
+    "asset_ok": 1,
+    "audio_frames": 12000,
+    "gl_ok": 1,
+    "readback_ok": 1,
+    "tls": 73,
+    "renderer": "NV120"
+  },
+  "captures": {
+    "console_framebuffer_sha256": "28ba75ecee66724c579a35d1f1643e1f45eedb0bf3fe41a3e0813b9cfe35b469",
+    "documentation_png_sha256": "f8d5f455cb02a0e0e9d71ad35f7aeaac71ca8eee39d18f01a11737e5c2ec8bfb"
+  },
+  "sessions": [
+    {
+      "session_id": "597d633cb5944e8eb66c0aaca467cd62-1",
+      "package": "org.fixture.uiproof",
+      "status": "passed_execution",
+      "error": null,
+      "snapshots": 10,
+      "last_native_frames": 0,
+      "last_audio_frames": 0
+    },
+    {
+      "session_id": "597d633cb5944e8eb66c0aaca467cd62-2",
+      "package": "org.fixture.uiproof",
+      "status": "passed_execution",
+      "error": null,
+      "snapshots": 2,
+      "last_native_frames": 0,
+      "last_audio_frames": 0
+    },
+    {
+      "session_id": "597d633cb5944e8eb66c0aaca467cd62-3",
+      "package": "org.fixture.kotlinui",
+      "status": "passed_execution",
+      "error": null,
+      "snapshots": 4,
+      "last_native_frames": 0,
+      "last_audio_frames": 0
+    },
+    {
+      "session_id": "597d633cb5944e8eb66c0aaca467cd62-4",
+      "package": "org.fixture.mixedmedia",
+      "status": "passed_execution",
+      "error": null,
+      "snapshots": 2,
+      "last_native_frames": 0,
+      "last_audio_frames": 9600
+    },
+    {
+      "session_id": "597d633cb5944e8eb66c0aaca467cd62-5",
+      "package": "org.fixture.nativemedia",
+      "status": "passed_execution",
+      "error": null,
+      "snapshots": 5,
+      "last_native_frames": 454,
+      "last_audio_frames": 12000
+    },
+    {
+      "session_id": "597d633cb5944e8eb66c0aaca467cd62-6",
+      "package": "org.fixture.kotlinui",
+      "status": "passed_execution",
+      "error": null,
+      "snapshots": 4,
+      "last_native_frames": 0,
+      "last_audio_frames": 0
+    },
+    {
+      "session_id": "597d633cb5944e8eb66c0aaca467cd62-7",
+      "package": "org.fixture.nativemedia",
+      "status": "passed_execution",
+      "error": null,
+      "snapshots": 5,
+      "last_native_frames": 676,
+      "last_audio_frames": 12000
+    },
+    {
+      "session_id": "597d633cb5944e8eb66c0aaca467cd62-8",
+      "package": "org.fixture.unavailable",
+      "status": "failed",
+      "error": "NOT_FOUND [rd-vm]: m\u00e9todo Lorg/androswitch/media/UnavailableActivity;->getSystemService(Ljava/lang/String;)Ljava/lang/Object; n\u00e3o resolvido [pc 0x5: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 3, regs: [0, 1, 0, 0, 0] } }]\n  at Lorg/androswitch/media/UnavailableActivity;->onCreate(Landroid/os/Bundle;)V \u2014 a classe pode depender de plataforma fora do escopo M2",
+      "snapshots": 0,
+      "last_native_frames": null,
+      "last_audio_frames": null
+    },
+    {
+      "session_id": "597d633cb5944e8eb66c0aaca467cd62-9",
+      "package": "org.fixture.uiproof",
+      "status": "passed_execution",
+      "error": null,
+      "snapshots": 2,
+      "last_native_frames": 0,
+      "last_audio_frames": 0
+    },
+    {
+      "session_id": "597d633cb5944e8eb66c0aaca467cd62-10",
+      "package": "org.fixture.uiproof",
+      "status": "passed_execution",
+      "error": null,
+      "snapshots": 2,
+      "last_native_frames": 0,
+      "last_audio_frames": 0
+    },
+    {
+      "session_id": "597d633cb5944e8eb66c0aaca467cd62-11",
+      "package": "org.fixture.uiproof",
+      "status": "passed_execution",
+      "error": null,
+      "snapshots": 2,
+      "last_native_frames": 0,
+      "last_audio_frames": 0
+    }
+  ],
+  "jni_regressions": {
+    "runs": [
+      {
+        "schema_version": 1,
+        "session_id": "06e3656217664fc7accd8afa4bc4d5fb",
+        "milestone": "M7",
+        "status": "passed",
+        "physical_device": "not_run",
+        "started_at": "2026-10-23T17:22:55.3046690Z",
+        "native_calls": 0,
+        "dex_calls": 16,
+        "emulator": {
+          "version": "1.3.3+e2143d4",
+          "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0"
+        },
+        "finished_at": "2026-10-23T17:23:22.0469905Z",
+        "artifact_root": "local-artifacts/m7/runs/06e3656217664fc7accd8afa4bc4d5fb",
+        "receipt_sha256": "dba61aea837faba846ecf556d4650e7c910220a48094444926db6f1dae2f2f41",
+        "inputs": [
+          {
+            "file": "java-jni.apk",
+            "sha256": "be68f8372e38e1ec658c8236954d8f5e9e0d08239b26b93ddc2117034e32a393"
+          },
+          {
+            "file": "java-request.json",
+            "sha256": "0a55ae4533783277c9518ea03cdc0a1763789949743280f41a3da0e863a99b9f"
+          },
+          {
+            "file": "java-expected.json",
+            "sha256": "f33a271ef88f6855094a9931638cee92b1a98708f202b36a12177c426412d968"
+          },
+          {
+            "file": "androswitch-smoke.nro",
+            "sha256": "7051fcb26b0cb6423064ac40353547906f213cac5eb5195122f96404e46f7bab"
+          }
+        ]
+      },
+      {
+        "schema_version": 1,
+        "session_id": "5ac60867f57b4d6aaf3c738f69154784",
+        "milestone": "M7",
+        "status": "passed",
+        "physical_device": "not_run",
+        "started_at": "2026-10-23T17:23:22.3784300Z",
+        "native_calls": 0,
+        "dex_calls": 16,
+        "emulator": {
+          "version": "1.3.3+e2143d4",
+          "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0"
+        },
+        "finished_at": "2026-10-23T17:23:40.0055985Z",
+        "artifact_root": "local-artifacts/m7/runs/5ac60867f57b4d6aaf3c738f69154784",
+        "receipt_sha256": "42ec0d255173a6e565133fa18ea3d035086c478c071f119af31851ce8fd6e191",
+        "inputs": [
+          {
+            "file": "java-jni-emutls.apk",
+            "sha256": "cb0e557c99cc33ccce807a73acd55b004a89961d41b68e327a2cc72bff11fbfc"
+          },
+          {
+            "file": "emutls-request.json",
+            "sha256": "3881d69e95362331192115a880a2b9e0970dfc935caa7cba5cb25faa97ef64b4"
+          },
+          {
+            "file": "java-expected.json",
+            "sha256": "f33a271ef88f6855094a9931638cee92b1a98708f202b36a12177c426412d968"
+          },
+          {
+            "file": "androswitch-smoke.nro",
+            "sha256": "7051fcb26b0cb6423064ac40353547906f213cac5eb5195122f96404e46f7bab"
+          }
+        ]
+      },
+      {
+        "schema_version": 1,
+        "session_id": "be109f13b72a451b8b8e5e845c780ef6",
+        "milestone": "M7",
+        "status": "passed",
+        "physical_device": "not_run",
+        "started_at": "2026-10-23T17:23:40.0130699Z",
+        "native_calls": 0,
+        "dex_calls": 1,
+        "emulator": {
+          "version": "1.3.3+e2143d4",
+          "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0"
+        },
+        "finished_at": "2026-10-23T17:23:50.6530746Z",
+        "artifact_root": "local-artifacts/m7/runs/be109f13b72a451b8b8e5e845c780ef6",
+        "receipt_sha256": "178be8feedf1f7187316275390888c5e00d89963fe3d71ea40966e247c3c7f21",
+        "inputs": [
+          {
+            "file": "kotlin-jni.apk",
+            "sha256": "640a5552916ad2f817c5a21a2362b0f4fdbbb0e4be5fb084416b36db1e608720"
+          },
+          {
+            "file": "kotlin-request.json",
+            "sha256": "e99f9be557d07ec110183afd1c106f8729af1cb6703bf020bd585ed887b2cf13"
+          },
+          {
+            "file": "kotlin-expected.json",
+            "sha256": "92d8fcbfa84abc93040dfb861b0be159a30007aa696e43962bce21c28c48556a"
+          },
+          {
+            "file": "androswitch-smoke.nro",
+            "sha256": "7051fcb26b0cb6423064ac40353547906f213cac5eb5195122f96404e46f7bab"
+          }
+        ]
+      }
+    ],
+    "total_cases": 33,
+    "positive_reference": "real JVM/native fixture build",
+    "expected_api_errors": 2,
+    "stack_callback_expected": 83.25,
+    "synchronization_expected": 619,
+    "old_nro_regression_failure": "local-artifacts/m6/runs/2c2e0a841c2246e7b867847e3b81962f"
+  },
+  "host": {
+    "passed_test_executions": 265,
+    "note": "Executions across commands; the loader scalar case is intentionally rerun with its fixture-dependent suite.",
+    "logs": [
+      {
+        "file": "target/evidence/m7-apk-tests.log",
+        "sha256": "9ca4ce4e9304ed95aaf557c59ca00ec4eb091ef406544ecf23da22021a2a4e53",
+        "passed_test_executions": 26
+      },
+      {
+        "file": "target/evidence/m7-shell-tests.log",
+        "sha256": "5d80c06145f7980b793955bbef4b449cb9d7131f8b20d9796deae68fbe5479de",
+        "passed_test_executions": 1
+      },
+      {
+        "file": "target/evidence/m7-framework-tests.log",
+        "sha256": "9acaf9996c000bf695140f07c398296ce513e7480af7024f66959b34dd3e028a",
+        "passed_test_executions": 3
+      },
+      {
+        "file": "target/evidence/m7-vm-tests.log",
+        "sha256": "3b2b00e2a28264d63616b3882be8229342ec5671ea195f13e3cdfd99c1f05239",
+        "passed_test_executions": 227
+      },
+      {
+        "file": "target/evidence/m7-core-tests.log",
+        "sha256": "a5f3bcb5284a4833c5fcdfc673e19c346bcaa791590dac8cabb7d758eb087f00",
+        "passed_test_executions": 5
+      },
+      {
+        "file": "target/evidence/m7-loader-tests.log",
+        "sha256": "6ea657023358e36d9471fe8ab2e5e9da846f678b51d56229e4dbe39c8f4c7a62",
+        "passed_test_executions": 3
+      }
+    ]
+  },
+  "commands": [
+    "scripts/build-m5-fixture.ps1",
+    "scripts/build-m6-fixture.ps1",
+    "scripts/build-m4-fixture.ps1",
+    "scripts/build-androswitch.ps1",
+    "scripts/test-ryujinx-launcher.ps1",
+    "scripts/test-ryujinx-launcher.ps1 -Scenario quiescence",
+    "scripts/build-switch-smoke.ps1",
+    "scripts/test-ryujinx-probe.ps1 (Java/classic TLS, Java/emutls, Kotlin; -SkipHost, JVM expected values)",
+    "cargo clippy -p as-launcher --features host --all-targets -- -D warnings",
+    "cargo clippy -p as-switch-smoke --features host-cli --all-targets -- -D warnings",
+    "cargo fmt --all -- --check",
+    "python scripts/check_md_links.py"
+  ],
+  "fixtures": {
+    "sources": [
+      {
+        "path": "fixtures/m6/java/org/androswitch/media/MainActivity.java",
+        "sha256": "3341161adf7152a2c4e905491ad8dcf2dc5f416e5b9d69755eec499a6190daf4"
+      },
+      {
+        "path": "fixtures/m6/java/org/androswitch/media/UnavailableActivity.java",
+        "sha256": "f0aae9f1d3a2c7e9206760e967ad30f987c9127f56853fc29dab5f1208562211"
+      },
+      {
+        "path": "fixtures/m6/native/activity.c",
+        "sha256": "1051164e8c686d823761113b9969eca5e18f687868b523f1b372c7639fa2fdd7"
+      },
+      {
+        "path": "fixtures/m6/native/mixed.c",
+        "sha256": "684741cd181f2f5f0f300de99de85c9d7e395b2fa317d2f768afcc81a1e5852f"
+      },
+      {
+        "path": "fixtures/m6/native/nonquiescent.c",
+        "sha256": "5aa47c9bbfd69f0bc8ebfce65f387f9f88c4259b15b8032a1419e5239ee3b51d"
+      },
+      {
+        "path": "scripts/build-m6-fixture.ps1",
+        "sha256": "e8ee48db549968f4e015152351cf2f389783a7dd57a40a6e43aa88ed6f8f8b98"
+      },
+      {
+        "path": "scripts/make-fixture-icon.py",
+        "sha256": "8d005267abd1be08ef47d0d7c5722745416d4ab49005ae669deb8b07836feb8c"
+      }
+    ],
+    "apks": [
+      {
+        "path": "local-artifacts/m6/fixture/mixed-media.apk",
+        "sha256": "2ba8d1a3b7ca60f68cdc1fdc6347f62370ac0231a775956eea04b28afb53f27c",
+        "bytes": 6665
+      },
+      {
+        "path": "local-artifacts/m6/fixture/native-media.apk",
+        "sha256": "540da2796c0e0bf941ba4ee22fa82a87f71fcdd75595007ce385bfa2795e877b",
+        "bytes": 9494
+      },
+      {
+        "path": "local-artifacts/m6/fixture/nonquiescent.apk",
+        "sha256": "3cdb716d2c764f29bb95080e85c971c9595aaa8a4996b55d6c86ce02697cd1d7",
+        "bytes": 2298
+      },
+      {
+        "path": "local-artifacts/m6/fixture/unavailable.apk",
+        "sha256": "c71e01ed1b2f5a245b845945fd957d1a605d53e8653378ac7d65aab4b94b0e81",
+        "bytes": 1602
+      }
+    ],
+    "ndk": "28.2.13676358",
+    "build_tools": "35.0.0",
+    "compile_api": 26
+  },
+  "limitations": [
+    "Physical Switch and Android reference-device media/framework runs not performed",
+    "Synthetic inputs use real dispatchers; physical Joy-Con/touchscreen unverified",
+    "Audio proof checks released PCM buffers, not acoustic quality",
+    "Console captures are CPU submissions; GLES captures are GPU readback",
+    "External NDK samples and Vector Pinball remain independent pending targets",
+    "Whole device APK container limited to 64 MiB; OBB/assets use bounded reads"
+  ]
+}

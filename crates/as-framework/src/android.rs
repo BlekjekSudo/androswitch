@@ -158,6 +158,10 @@ struct State {
     resources: Option<ObjRef>,
     looper: Option<ObjRef>,
     title: String,
+    assets: BTreeMap<u64, rd_apk::zip::ZipStream>,
+    asset_streams: BTreeMap<ObjRef, u64>,
+    asset_serial: u64,
+    audio_tracks: BTreeMap<ObjRef, (u64, bool)>,
 }
 pub struct Android {
     pub apk: Apk,
@@ -165,6 +169,7 @@ pub struct Android {
     pub height: i32,
     clock: Rc<dyn Clock>,
     state: RefCell<State>,
+    audio: RefCell<Option<Rc<dyn crate::PcmOutput>>>,
 }
 impl Android {
     pub fn new(apk: Apk, clock: Rc<dyn Clock>, width: i32, height: i32) -> Rc<Self> {
@@ -174,16 +179,40 @@ impl Android {
             width,
             height,
             state: RefCell::new(State::default()),
+            audio: RefCell::new(None),
         })
     }
     pub fn now(&self) -> u64 {
         self.clock.monotonic_micros() / 1000
+    }
+    pub fn bind_audio(&self, audio: Rc<dyn crate::PcmOutput>) {
+        *self.audio.borrow_mut() = Some(audio);
+    }
+    fn audio(&self) -> Result<Rc<dyn crate::PcmOutput>> {
+        self.audio
+            .borrow()
+            .clone()
+            .ok_or_else(|| error("API_UNAVAILABLE", "platform PCM output"))
     }
     pub fn finished(&self) -> bool {
         self.state.borrow().finished
     }
     pub fn title(&self) -> String {
         self.state.borrow().title.clone()
+    }
+    pub fn activity_object(&self) -> Option<ObjRef> {
+        self.state.borrow().activities.last().map(|a| a.object)
+    }
+    pub fn stop(&self, vm: &mut Engine) -> Result<()> {
+        while let Some(r) = self.activity_object() {
+            self.finish(vm, r)?;
+        }
+        self.state.borrow_mut().tasks.clear();
+        let tracks = core::mem::take(&mut self.state.borrow_mut().audio_tracks);
+        for (_, (id, _)) in tracks {
+            self.audio()?.close(id)?;
+        }
+        Ok(())
     }
     pub fn views(&self) -> Vec<View> {
         let mut out = Vec::new();
@@ -866,6 +895,10 @@ impl Android {
             if matches!(
                 c.as_str(),
                 "Landroid/app/Activity;"
+                    | "Landroid/app/NativeActivity;"
+                    | "Landroid/content/res/AssetManager;"
+                    | "Landroid/content/res/AssetManager$AssetInputStream;"
+                    | "Landroid/media/AudioTrack;"
                     | "Landroid/app/Application;"
                     | "Landroid/content/Context;"
                     | "Landroid/content/ContextWrapper;"
@@ -909,6 +942,68 @@ impl Android {
 }
 
 impl FrameworkHost for Android {
+    fn asset_open(&self, name: &str) -> Result<u64> {
+        if name.is_empty()
+            || name.starts_with('/')
+            || name.contains('\\')
+            || name
+                .split('/')
+                .any(|s| s == ".." || s == "." || s.is_empty())
+        {
+            return Err(error("INVALID_ASSET_PATH", name));
+        }
+        let stream = self
+            .apk
+            .zip
+            .stream(&format!("assets/{name}"))
+            .map_err(|e| error(&e.code, e.cause))?;
+        let mut s = self.state.borrow_mut();
+        if s.assets.len() >= 256 {
+            return Err(error("ASSET_HANDLE_LIMIT", "256 open assets"));
+        }
+        s.asset_serial += 1;
+        let id = s.asset_serial;
+        s.assets.insert(id, stream);
+        Ok(id)
+    }
+    fn asset_read(&self, id: u64, output: &mut [u8]) -> Result<usize> {
+        self.state
+            .borrow_mut()
+            .assets
+            .get_mut(&id)
+            .ok_or_else(|| error("ASSET_CLOSED", "read"))?
+            .read(output)
+            .map_err(|e| error(&e.code, e.cause))
+    }
+    fn asset_len(&self, id: u64) -> Result<u64> {
+        Ok(self
+            .state
+            .borrow()
+            .assets
+            .get(&id)
+            .ok_or_else(|| error("ASSET_CLOSED", "length"))?
+            .len())
+    }
+    fn asset_seek(&self, id: u64, offset: i64, origin: i32) -> Result<u64> {
+        let mut s = self.state.borrow_mut();
+        let stream = s
+            .assets
+            .get_mut(&id)
+            .ok_or_else(|| error("ASSET_CLOSED", "seek"))?;
+        let base = match origin {
+            0 => 0,
+            1 => stream.position(),
+            2 => stream.len(),
+            _ => return Err(error("INVALID_SEEK", "origin")),
+        };
+        let target = (base as i128 + offset as i128)
+            .try_into()
+            .map_err(|_| error("INVALID_SEEK", "overflow/negative"))?;
+        stream.seek(target).map_err(|e| error(&e.code, e.cause))
+    }
+    fn asset_close(&self, id: u64) {
+        self.state.borrow_mut().assets.remove(&id);
+    }
     fn references(&self, r: ObjRef) -> Vec<ObjRef> {
         let s = self.state.borrow();
         let mut refs = vec![];
@@ -931,6 +1026,28 @@ impl FrameworkHost for Android {
         s.intents.retain(|r, _| live(r));
         s.motion.retain(|r, _| live(r));
         s.canvases.retain(|r, _| live(r));
+        let dead: Vec<_> = s
+            .asset_streams
+            .iter()
+            .filter(|(r, _)| !live(r))
+            .map(|(r, id)| (*r, *id))
+            .collect();
+        for (r, id) in dead {
+            s.asset_streams.remove(&r);
+            s.assets.remove(&id);
+        }
+        let dead: Vec<_> = s
+            .audio_tracks
+            .iter()
+            .filter(|(r, _)| !live(r))
+            .map(|(r, (id, _))| (*r, *id))
+            .collect();
+        for (r, id) in dead {
+            s.audio_tracks.remove(&r);
+            if let Ok(audio) = self.audio() {
+                let _ = audio.close(id);
+            }
+        }
     }
     fn attach(&self, vm: &mut Engine, class: &str, r: ObjRef) -> Result<bool> {
         let Some(platform) = self.platform_class(vm, class) else {
@@ -966,6 +1083,13 @@ impl FrameworkHost for Android {
         args: &[Value],
     ) -> Result<Option<Value>> {
         let value = match (class, name, sig) {
+            ("Landroid/media/AudioTrack;", "getMinBufferSize", "(III)I") => Value::Int(
+                if int(args, 0)? == 48000 && int(args, 1)? == 12 && int(args, 2)? == 2 {
+                    1920
+                } else {
+                    -2
+                },
+            ),
             ("Landroid/os/SystemClock;", "uptimeMillis" | "elapsedRealtime", "()J") => {
                 Value::Long(self.now() as i64)
             }
@@ -1070,6 +1194,144 @@ impl FrameworkHost for Android {
             return Ok(None);
         };
         let value = match (name, sig) {
+            ("<init>", "(IIIIII)V") if platform == "Landroid/media/AudioTrack;" => {
+                if int(args, 0)? != 3
+                    || int(args, 1)? != 48000
+                    || int(args, 2)? != 12
+                    || int(args, 3)? != 2
+                    || int(args, 4)? < 1920
+                    || int(args, 5)? != 1
+                {
+                    return Err(error("AUDIO_FORMAT_UNAVAILABLE","AudioTrack requires STREAM_MUSIC, 48kHz stereo PCM16, MODE_STREAM, buffer>=1920"));
+                }
+                let id = self.audio()?.open(48000, 2, 1)?;
+                self.state.borrow_mut().audio_tracks.insert(r, (id, false));
+                Value::Null
+            }
+            ("getState", "()I") if platform == "Landroid/media/AudioTrack;" => {
+                Value::Int(self.state.borrow().audio_tracks.contains_key(&r) as i32)
+            }
+            ("getPlayState", "()I") if platform == "Landroid/media/AudioTrack;" => Value::Int(
+                if self
+                    .state
+                    .borrow()
+                    .audio_tracks
+                    .get(&r)
+                    .is_some_and(|(_, playing)| *playing)
+                {
+                    3
+                } else {
+                    1
+                },
+            ),
+            ("play", "()V") if platform == "Landroid/media/AudioTrack;" => {
+                let id = self
+                    .state
+                    .borrow()
+                    .audio_tracks
+                    .get(&r)
+                    .ok_or_else(|| error("AUDIO_RELEASED", "play"))?
+                    .0;
+                self.audio()?.start(id)?;
+                self.state.borrow_mut().audio_tracks.get_mut(&r).unwrap().1 = true;
+                Value::Null
+            }
+            ("stop", "()V") if platform == "Landroid/media/AudioTrack;" => {
+                let id = self
+                    .state
+                    .borrow()
+                    .audio_tracks
+                    .get(&r)
+                    .ok_or_else(|| error("AUDIO_RELEASED", "stop"))?
+                    .0;
+                self.audio()?.stop(id)?;
+                self.state.borrow_mut().audio_tracks.get_mut(&r).unwrap().1 = false;
+                Value::Null
+            }
+            ("release", "()V") if platform == "Landroid/media/AudioTrack;" => {
+                let old = self.state.borrow_mut().audio_tracks.remove(&r);
+                if let Some((id, _)) = old {
+                    self.audio()?.close(id)?;
+                }
+                Value::Null
+            }
+            ("write", "([SII)I" | "([BII)I") if platform == "Landroid/media/AudioTrack;" => {
+                let id = self
+                    .state
+                    .borrow()
+                    .audio_tracks
+                    .get(&r)
+                    .ok_or_else(|| error("AUDIO_RELEASED", "write"))?
+                    .0;
+                let shorts = sig.starts_with("([S");
+                let pcm = crate::audio::samples(
+                    vm,
+                    obj(&args[0])?,
+                    int(args, 1)?,
+                    int(args, 2)?,
+                    shorts,
+                )?;
+                let frames = self.audio()?.write(id, &pcm)?;
+                Value::Int((frames * if shorts { 2 } else { 4 }) as i32)
+            }
+            ("getAssets", "()Landroid/content/res/AssetManager;") => {
+                Value::Obj(shell(vm, "Landroid/content/res/AssetManager;")?)
+            }
+            ("open", "(Ljava/lang/String;)Ljava/io/InputStream;")
+            | ("open", "(Ljava/lang/String;I)Ljava/io/InputStream;")
+                if platform == "Landroid/content/res/AssetManager;" =>
+            {
+                let id = self.asset_open(&text(vm, &args[0])?)?;
+                let stream = shell(vm, "Landroid/content/res/AssetManager$AssetInputStream;")?;
+                self.state.borrow_mut().asset_streams.insert(stream, id);
+                Value::Obj(stream)
+            }
+            ("read", "()I") if self.state.borrow().asset_streams.contains_key(&r) => {
+                let id = self.state.borrow().asset_streams[&r];
+                let mut byte = [0];
+                Value::Int(if self.asset_read(id, &mut byte)? == 0 {
+                    -1
+                } else {
+                    byte[0] as i32
+                })
+            }
+            ("read", "([B)I" | "([BII)I") if self.state.borrow().asset_streams.contains_key(&r) => {
+                let array = obj(&args[0])?;
+                let length = vm
+                    .heap
+                    .as_array_elems(array)
+                    .map_err(|e| error("INVALID_ARRAY", e))?
+                    .0
+                    .len();
+                let (off, len) = if args.len() == 1 {
+                    (0, length)
+                } else {
+                    (int(args, 1)? as usize, int(args, 2)? as usize)
+                };
+                if off > length || len > length - off {
+                    return Err(Throwable::new(
+                        "Ljava/lang/IndexOutOfBoundsException;",
+                        "asset read",
+                    )
+                    .into());
+                }
+                let mut bytes = vec![0; len.min(64 << 10)];
+                let id = self.state.borrow().asset_streams[&r];
+                let n = self.asset_read(id, &mut bytes)?;
+                let values = vm
+                    .heap
+                    .array_elems_mut(array)
+                    .map_err(|e| error("INVALID_ARRAY", e))?;
+                for (i, b) in bytes[..n].iter().enumerate() {
+                    values[off + i] = Value::Int(*b as i8 as i32);
+                }
+                Value::Int(if n == 0 && len != 0 { -1 } else { n as i32 })
+            }
+            ("close", "()V") if self.state.borrow().asset_streams.contains_key(&r) => {
+                let id = self.state.borrow_mut().asset_streams.remove(&r).unwrap();
+                self.asset_close(id);
+                Value::Null
+            }
             (
                 "<init>",
                 "()V"
@@ -1077,7 +1339,10 @@ impl FrameworkHost for Android {
                 | "(Landroid/content/Context;Landroid/util/AttributeSet;)V"
                 | "(I)V",
             ) if !platform.contains("Intent") => Value::Null,
-            ("onCreate", "(Landroid/os/Bundle;)V") if platform == "Landroid/app/Activity;" => {
+            ("onCreate", "(Landroid/os/Bundle;)V")
+                if platform == "Landroid/app/Activity;"
+                    || platform == "Landroid/app/NativeActivity;" =>
+            {
                 Value::Null
             }
             (
@@ -1085,6 +1350,7 @@ impl FrameworkHost for Android {
                 | "onDestroy",
                 "()V",
             ) if platform == "Landroid/app/Activity;"
+                || platform == "Landroid/app/NativeActivity;"
                 || platform == "Landroid/app/Application;" =>
             {
                 Value::Null

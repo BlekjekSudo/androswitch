@@ -82,13 +82,15 @@ $javaCases=@(@('numeric','numeric','()D'),@('registration','registration','()I')
 $javaCalls=@($javaCases | ForEach-Object {@{id=$_[0];class='Lorg/androswitch/fixture/Bridge;';method=$_[1];descriptor=$_[2];args=@()}})
 $javaCalls+=@{id='many';class='Lorg/androswitch/fixture/Bridge;';method='manyArguments';descriptor='()D';args=@()}
 $javaCalls+=@{id='float-callback';class='Lorg/androswitch/fixture/Bridge;';method='floatCallbackTest';descriptor='()D';args=@()}
+$javaCalls+=@{id='stack-callback';class='Lorg/androswitch/fixture/Bridge;';method='stackCallbackTest';descriptor='()D';args=@()}
+$javaCalls+=@{id='synchronization';class='Lorg/androswitch/fixture/Bridge;';method='synchronizationTest';descriptor='()I';args=@()}
 $javaCalls+=@{id='rust';class='Lorg/androswitch/fixture/RustBridge;';method='exercise';descriptor='()J';args=@()}
 $javaCalls+=@{id='unsupported';class='Lorg/androswitch/fixture/Bridge;';method='missingApiTest';descriptor='()I';args=@()}
 # Install/update uses immutable revisions so test re-runs retain normal user-data semantics.
 @{schema_version=1;session_id='m4-java';storage=@{operation='update';package='org.fixture.jnibridge'};calls=$javaCalls} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath "$output/java-request.json" -Encoding utf8NoBOM
 @{schema_version=1;session_id='m4-emutls';storage=@{operation='update';package='org.fixture.jniemutls'};calls=$javaCalls} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath "$output/emutls-request.json" -Encoding utf8NoBOM
 $javaExpected=@($javaCases | ForEach-Object {$expected[$_[0]]})
-$javaExpected+=@($expected['many'],$expected['float-callback'],$expected['rust'],@{error='JNI_API_UNAVAILABLE'})
+$javaExpected+=@($expected['many'],$expected['float-callback'],$expected['stack-callback'],$expected['synchronization'],$expected['rust'],@{error='JNI_API_UNAVAILABLE'})
 @{calls=$javaExpected;native=@()} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath "$output/java-expected.json" -Encoding utf8NoBOM
 @{schema_version=1;session_id='m4-kotlin';calls=@(@{id='kotlin';class='Lorg/androswitch/fixture/KotlinBridgeKt;';method='exercise';descriptor='()I';args=@()})} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath "$output/kotlin-request.json" -Encoding utf8NoBOM
 @{calls=@($expected['kotlin']);native=@()} | ConvertTo-Json | Set-Content -LiteralPath "$output/kotlin-expected.json" -Encoding utf8NoBOM

@@ -2,17 +2,22 @@
  * AndroSwitch contributors, MIT OR Apache-2.0. */
 #include "native.h"
 #include <errno.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <switch.h>
 extern int64_t as_guest_fs(uint32_t, const char *, uint64_t, uint8_t *, size_t,
                            uint32_t);
-typedef struct {
+typedef struct GuestFile {
   char *path;
   uint64_t position;
   int readable, writable, eof, error;
+  struct GuestFile *next;
 } GuestFile;
+static GuestFile *files;
+static Mutex files_mutex;
 static int64_t operation(uint32_t op, const char *path, uint64_t offset,
                          void *bytes, size_t length, uint32_t flags) {
   as_jni_vm_lock();
@@ -48,6 +53,10 @@ static GuestFile *guest_fopen(const char *path, const char *mode) {
   file->position = (uint64_t)position;
   file->readable = read;
   file->writable = write;
+  mutexLock(&files_mutex);
+  file->next = files;
+  files = file;
+  mutexUnlock(&files_mutex);
   return file;
 }
 static size_t guest_fread(void *bytes, size_t size, size_t count,
@@ -131,26 +140,68 @@ static int guest_fclose(GuestFile *file) {
     errno = EINVAL;
     return EOF;
   }
+  mutexLock(&files_mutex);
+  GuestFile **link = &files;
+  while (*link && *link != file)
+    link = &(*link)->next;
+  if (*link)
+    *link = file->next;
+  mutexUnlock(&files_mutex);
   free(file->path);
   free(file);
   return 0;
 }
+void as_bionic_io_reset(void) {
+  while (files) {
+    GuestFile *file = files;
+    files = file->next;
+    free(file->path);
+    free(file);
+  }
+}
 static int guest_feof(GuestFile *file) { return file->eof; }
 static int guest_ferror(GuestFile *file) { return file->error; }
+static int guest_vfprintf(GuestFile *file, const char *format, va_list args) {
+  va_list copy;
+  va_copy(copy, args);
+  int length = vsnprintf(NULL, 0, format, copy);
+  va_end(copy);
+  if (length < 0 || length > 1 << 20) {
+    errno = EOVERFLOW;
+    return -1;
+  }
+  char *bytes = malloc((size_t)length + 1);
+  if (!bytes) {
+    errno = ENOMEM;
+    return -1;
+  }
+  vsnprintf(bytes, (size_t)length + 1, format, args);
+  size_t wrote = guest_fwrite(bytes, 1, length, file);
+  free(bytes);
+  return wrote == (size_t)length ? length : -1;
+}
+static int guest_fprintf(GuestFile *file, const char *format, ...) {
+  va_list args;
+  va_start(args, format);
+  int n = guest_vfprintf(file, format, args);
+  va_end(args);
+  return n;
+}
 uint64_t as_bionic_io_import(const char *name) {
   struct {
     const char *name;
     void *function;
-  } imports[] = {{"fopen", guest_fopen},    {"fopen64", guest_fopen},
-                 {"fclose", guest_fclose},  {"fread", guest_fread},
-                 {"fwrite", guest_fwrite},  {"fgetc", guest_fgetc},
-                 {"getc", guest_fgetc},     {"fputc", guest_fputc},
-                 {"putc", guest_fputc},     {"fseek", guest_fseek},
-                 {"fseeko", guest_fseek},   {"fseeko64", guest_fseek},
-                 {"ftell", guest_ftell},    {"ftello", guest_ftell},
-                 {"ftello64", guest_ftell}, {"rewind", guest_rewind},
-                 {"fflush", guest_fflush},  {"feof", guest_feof},
-                 {"ferror", guest_ferror}};
+  } imports[] = {{"fopen", guest_fopen},      {"fopen64", guest_fopen},
+                 {"fclose", guest_fclose},    {"fread", guest_fread},
+                 {"fwrite", guest_fwrite},    {"fgetc", guest_fgetc},
+                 {"getc", guest_fgetc},       {"fputc", guest_fputc},
+                 {"putc", guest_fputc},       {"fseek", guest_fseek},
+                 {"fseeko", guest_fseek},     {"fseeko64", guest_fseek},
+                 {"ftell", guest_ftell},      {"ftello", guest_ftell},
+                 {"ftello64", guest_ftell},   {"rewind", guest_rewind},
+                 {"fflush", guest_fflush},    {"feof", guest_feof},
+                 {"ferror", guest_ferror},    {"fprintf", guest_fprintf},
+                 {"vfprintf", guest_vfprintf}};
   for (size_t i = 0; i < sizeof(imports) / sizeof(imports[0]); i++)
     if (!strcmp(name, imports[i].name))
       return (uint64_t)imports[i].function;

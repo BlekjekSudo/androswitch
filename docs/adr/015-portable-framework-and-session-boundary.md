@@ -1,6 +1,6 @@
 # ADR 015: portable framework and a verified application boundary
 
-Status: M5 implemented for the supported UI gate; M6/M7 in progress.
+Status: implemented for the supported M5–M7 corpus; hardware validation pending.
 
 `rd-vm::FrameworkHost` binds Android API state to the real Engine. Virtual DEX
 overrides and invoke-super/direct dispatch retain their existing semantics.
@@ -23,3 +23,11 @@ Never report chainloading alone as process isolation. This correction preserves
 the user's one-entry, one-folder packaging goal without claiming an unavailable
 isolation guarantee. Exact implemented teardown and emulator evidence belong
 in the M7 report before that milestone is marked complete.
+
+M7 implements one product NRO with a console/App mode boundary. Its shared
+package selection contains a checked install revision and a one-shot session
+request. Callbacks run while VM references are valid; platform/guest workers
+must stop before JNI/GC roots, media, TLS, synchronization objects, heap and
+executable mappings are released. A bounded watchdog exits the Horizon process
+if teardown cannot finish. A pending marker reports interruption on next boot.
+The exact subset and positive/negative evidence are in [M6/M7](../M6_M7_E2E.md).

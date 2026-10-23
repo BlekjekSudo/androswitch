@@ -52,6 +52,7 @@ pub struct Session {
     loads: Cell<u64>,
     calls: Cell<u64>,
     callbacks: Cell<u64>,
+    rooted: Cell<bool>,
 }
 pub fn thread() -> u64 {
     // SAFETY: scalar thread identity from libnx, no borrowed data.
@@ -76,6 +77,7 @@ impl Session {
             loads: Cell::new(0),
             calls: Cell::new(0),
             callbacks: Cell::new(0),
+            rooted: Cell::new(true),
         });
         // SAFETY: Rc allocation is stable and retained by the Engine for its
         // entire native session. The C boundary never frees this pointer.
@@ -90,8 +92,7 @@ impl Session {
             .borrow_mut()
             .insert(thread(), ThreadState::default());
         // Native code and pthreads may outlive the last DEX frame. Keep their
-        // mappings/session owned by this runner process; M7 replaces the whole
-        // process when switching applications. Never unmap live native code.
+        // mappings/session rooted until quiescence is proved during shutdown.
         let _process_root = Rc::into_raw(session.clone());
         Ok(session)
     }
@@ -100,6 +101,49 @@ impl Session {
     }
     pub fn close_vm(&self) {
         self.vm.set(core::ptr::null_mut());
+    }
+    /// Caller has joined every guest/platform callback thread before releasing
+    /// the retained root. Engine/Running still own Rc references during this call.
+    pub fn release_root(self: &Rc<Self>) {
+        if self.rooted.replace(false) {
+            // SAFETY: balances exactly one Rc::into_raw in Session::new, after quiescence.
+            #[allow(unsafe_code)]
+            unsafe {
+                Rc::decrement_strong_count(Rc::as_ptr(self));
+            }
+        }
+    }
+    pub fn native_entry(&self, vm: &mut Engine, library: &str, symbol: &str) -> Result<u64> {
+        NativeHost::load(self, vm, library, false)?;
+        self.loader
+            .borrow()
+            .symbol(symbol)
+            .ok_or_else(|| error("SYMBOL_NOT_FOUND", symbol))
+    }
+    pub fn native_call(&self, vm: &mut Engine, function: u64, args: &[u64]) -> Result<u64> {
+        let mut frame = CallFrame {
+            function,
+            ..Default::default()
+        };
+        if args.len() > 8 {
+            return Err(error("NATIVE_ARGUMENT_LIMIT", "callback integer args"));
+        }
+        frame.integer[..args.len()].copy_from_slice(args);
+        self.foreign(vm, &mut frame)?;
+        Ok(frame.result_integer[0])
+    }
+    pub fn activity_reference(&self, object: ObjRef) -> Result<u64> {
+        let local = self.local(Handle::Object(object))?;
+        let global = self
+            .refs
+            .borrow_mut()
+            .duplicate(thread(), local, true)
+            .map_err(jni)?;
+        self.refs
+            .borrow_mut()
+            .delete(thread(), local, false)
+            .map_err(jni)?;
+        Ok(global)
     }
     fn class(&self, token: u64) -> Result<String> {
         match self.refs.borrow().get(thread(), token).map_err(jni)? {
@@ -667,6 +711,8 @@ fn platform_class(class: &str) -> bool {
             | "Ljava/lang/IllegalArgumentException;"
             | "Ljava/lang/IllegalStateException;"
             | "Ljava/lang/ArithmeticException;"
+            | "Landroid/app/NativeActivity;"
+            | "Landroid/content/res/AssetManager;"
     )
 }
 #[repr(C)]
@@ -772,6 +818,83 @@ pub fn unlock() {
     #[allow(unsafe_code)]
     unsafe {
         as_jni_vm_unlock()
+    }
+}
+/// # Safety
+/// C holds the VM lease. Buffer/name are valid for this synchronous operation.
+#[allow(unsafe_code)]
+#[no_mangle]
+pub unsafe extern "C" fn as_guest_asset(
+    op: u32,
+    id: u64,
+    name: *const c_char,
+    offset: i64,
+    origin: i32,
+    output: *mut u8,
+    length: usize,
+) -> i64 {
+    let pointer = unsafe { as_native_session() }.cast::<Session>();
+    if pointer.is_null() {
+        return -38;
+    }
+    let session = unsafe { &*pointer };
+    if session.vm.get().is_null() {
+        return -38;
+    }
+    let vm = unsafe { &mut *session.vm.get() };
+    let Some(framework) = vm.framework_host() else {
+        return -38;
+    };
+    let result = (|| -> Result<i64> {
+        Ok(match op {
+            5 => {
+                (vm.heap.class_of(session.object(id)?)? == "Landroid/content/res/AssetManager;")
+                    as i64
+            }
+            0 => framework.asset_open(&cstr(name as u64)?)? as i64,
+            1 => {
+                if length == 0 {
+                    return Ok(0);
+                }
+                if length > 1 << 24 || output.is_null() {
+                    return Err(error("INVALID_ASSET_BUFFER", "read"));
+                }
+                framework.asset_read(id, unsafe {
+                    core::slice::from_raw_parts_mut(output, length)
+                })? as i64
+            }
+            2 => framework.asset_seek(id, offset, origin)? as i64,
+            3 => framework.asset_len(id)? as i64,
+            4 => {
+                framework.asset_close(id);
+                0
+            }
+            _ => return Err(error("API_UNAVAILABLE", "asset operation")),
+        })
+    })();
+    match result {
+        Ok(n) => n,
+        Err(VmExit::Error(e))
+            if matches!(
+                e.code.as_str(),
+                "MISSING_ENTRY"
+                    | "INVALID_ASSET_PATH"
+                    | "INVALID_SEEK"
+                    | "ASSET_CLOSED"
+                    | "INVALID_ASSET_BUFFER"
+            ) =>
+        {
+            match e.code.as_str() {
+                "MISSING_ENTRY" => -2,
+                "ASSET_CLOSED" => -9,
+                _ => -22,
+            }
+        }
+        Err(e) => {
+            *session.fatal.borrow_mut() = Some(e);
+            unsafe { as_native_fail(-1010) };
+            -5
+        }
     }
 }
 /// # Safety

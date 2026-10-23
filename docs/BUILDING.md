@@ -102,6 +102,38 @@ The E2E script writes its own inputs under the emulator's
 the NRO, real DEX parser fixture, test APK and request. This is a developer
 proof, not `androswitch.nro` or the planned install/launcher package.
 
+## M7 product, fixtures and package
+
+Install the devkitPro Switch Mesa/GL portlibs in the same WSL toolchain as
+libnx. The recorded packages are libnx `4.12.0-1`, Switch Mesa `20.1.0-5`,
+and `switch-libdrm_nouveau 1.0.1-2`. Mesa includes a C++ shader compiler, so
+the product linker also includes libstdc++. Device core remains no_std Rust.
+Use `cargo +nightly ...` only for the freestanding build; do not change the
+global toolchain. This workspace's installed nightly corresponds to the pinned
+manifest date documented above.
+
+```powershell
+./scripts/build-m5-fixture.ps1
+./scripts/build-m6-fixture.ps1
+./scripts/build-androswitch.ps1 -Toolchain nightly-2026-08-26
+./scripts/test-ryujinx-launcher.ps1
+./scripts/test-ryujinx-launcher.ps1 -Scenario quiescence
+./scripts/package-androswitch.ps1
+```
+
+`build-m6-fixture.ps1` uses NDK `28.2.13676358`, compile API 26 and SDK
+build-tools 35; it builds ordinary NativeActivity and mixed Java/JNI media APKs.
+An installed Python with only its standard library produces the original PNG
+test icon. Kotlin M5 fixtures use the compiler/cache versions recorded by the
+existing M4/M5 builder. The output NRO is
+`local-artifacts/product/androswitch.nro`; release ZIPs and their hashes appear
+under `local-artifacts/releases/`. Package generation collects full linked
+dependency notices and retains RustyDroid's attribution. Large outputs stay
+ignored. The package has one product NRO; no runner NRO is required.
+
+See [M6/M7](M6_M7_E2E.md) for verification scope and [using the alpha](USING_ANDROSWITCH.md)
+for SD layout, controls, data retention and the current compatibility limits.
+
 ## Troubleshooting
 
 - **Nightly date rejected:** use `-Toolchain nightly-2026-08-26`, then run E2E

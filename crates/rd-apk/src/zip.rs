@@ -5,7 +5,7 @@
 //! (apps malformados mentem no local header — o CD é o registro de verdade).
 
 use crate::error::{RdError, RdResult};
-use alloc::{collections::BTreeSet, format, string::String, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeSet, format, string::String, sync::Arc, vec::Vec};
 
 pub const EOCD_SIG: u32 = 0x0605_4b50;
 pub const ZIP64_EOCD_LOCATOR_SIG: u32 = 0x0706_4b50;
@@ -38,7 +38,7 @@ impl ZipEntry {
 
 #[derive(Debug, Clone)]
 pub struct Zip {
-    data: Vec<u8>,
+    data: Arc<Vec<u8>>,
     entries: Vec<ZipEntry>,
     /// Offset do central directory já resolvido (ZIP64-aware) — fonte única
     /// para a detecção de assinatura (issue #35: o re-scan duplicado em
@@ -186,7 +186,7 @@ impl Zip {
         }
 
         Ok(Zip {
-            data,
+            data: Arc::new(data),
             entries,
             duplicates,
             cd_offset,
@@ -314,6 +314,52 @@ impl Zip {
             .find(name)
             .ok_or_else(|| RdError::missing_entry(name))?;
         self.read_entry(entry)
+    }
+
+    /// A bounded reader over shared APK bytes. DEFLATE keeps a 32 KiB dictionary;
+    /// seeking backwards restarts inflation instead of materializing the asset.
+    pub fn stream(&self, name: &str) -> RdResult<ZipStream> {
+        let entry = self
+            .find(name)
+            .ok_or_else(|| RdError::missing_entry(name))?
+            .clone();
+        if entry.flags & 1 != 0 || !matches!(entry.method, METHOD_STORED | METHOD_DEFLATE) {
+            return Err(RdError::invalid_format(
+                "asset: encrypted/unsupported ZIP method",
+            ));
+        }
+        let off = usize::try_from(entry.local_header_offset)
+            .map_err(|_| RdError::parse("asset offset overflow"))?;
+        if u32_at(&self.data, off)? != LOCAL_HEADER_SIG {
+            return Err(RdError::parse("asset: invalid local header"));
+        }
+        let start = off
+            .checked_add(
+                30 + u16_at(&self.data, off + 26)? as usize
+                    + u16_at(&self.data, off + 28)? as usize,
+            )
+            .ok_or_else(|| RdError::parse("asset offset overflow"))?;
+        let length = usize::try_from(entry.compressed_size)
+            .map_err(|_| RdError::parse("asset size overflow"))?;
+        let end = start
+            .checked_add(length)
+            .filter(|n| *n <= self.data.len())
+            .ok_or_else(|| RdError::parse("asset outside APK"))?;
+        if entry.method == METHOD_STORED && entry.compressed_size != entry.uncompressed_size {
+            return Err(RdError::invalid_format("stored asset size mismatch"));
+        }
+        Ok(ZipStream {
+            data: self.data.clone(),
+            entry,
+            start,
+            end,
+            input: start,
+            position: 0,
+            crc: !0,
+            done: false,
+            failed: false,
+            inflate: None,
+        })
     }
 
     pub fn read_entry(&self, entry: &ZipEntry) -> RdResult<Vec<u8>> {
@@ -450,6 +496,132 @@ impl Zip {
     }
 }
 
+pub struct ZipStream {
+    data: Arc<Vec<u8>>,
+    entry: ZipEntry,
+    start: usize,
+    end: usize,
+    input: usize,
+    position: u64,
+    crc: u32,
+    done: bool,
+    failed: bool,
+    inflate: Option<Box<miniz_oxide::inflate::stream::InflateState>>,
+}
+impl ZipStream {
+    pub fn len(&self) -> u64 {
+        self.entry.uncompressed_size
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    pub fn position(&self) -> u64 {
+        self.position
+    }
+    pub fn read(&mut self, output: &mut [u8]) -> RdResult<usize> {
+        if self.failed {
+            return Err(RdError::invalid_format(
+                "asset reader poisoned after corruption",
+            ));
+        }
+        let result = self.read_inner(output);
+        if result.is_err() {
+            self.failed = true;
+        }
+        result
+    }
+    fn read_inner(&mut self, output: &mut [u8]) -> RdResult<usize> {
+        if self.done || output.is_empty() {
+            return Ok(0);
+        }
+        let remaining = self.len() - self.position;
+        let limit = (output.len() as u64).min(remaining) as usize;
+        let mut sentinel = [0u8; 1];
+        let target = if limit == 0 {
+            &mut sentinel[..]
+        } else {
+            &mut output[..limit]
+        };
+        let (written, ended) = if self.entry.method == METHOD_STORED {
+            target[..limit].copy_from_slice(&self.data[self.input..self.input + limit]);
+            self.input += limit;
+            (limit, self.input == self.end)
+        } else {
+            let state = self.inflate.get_or_insert_with(|| {
+                miniz_oxide::inflate::stream::InflateState::new_boxed(miniz_oxide::DataFormat::Raw)
+            });
+            let result = miniz_oxide::inflate::stream::inflate(
+                state,
+                &self.data[self.input..self.end],
+                target,
+                miniz_oxide::MZFlush::None,
+            );
+            self.input += result.bytes_consumed;
+            let status = result
+                .status
+                .map_err(|e| RdError::parse(format!("asset inflate: {e:?}")))?;
+            if result.bytes_consumed == 0
+                && result.bytes_written == 0
+                && status != miniz_oxide::MZStatus::StreamEnd
+            {
+                return Err(RdError::parse("asset: truncated DEFLATE stream"));
+            }
+            (
+                result.bytes_written,
+                status == miniz_oxide::MZStatus::StreamEnd,
+            )
+        };
+        if written as u64 > remaining {
+            return Err(RdError::invalid_format(
+                "asset expands beyond declared size",
+            ));
+        }
+        for b in &target[..written] {
+            self.crc = CRC_TABLE[((self.crc ^ *b as u32) & 255) as usize] ^ (self.crc >> 8);
+        }
+        self.position += written as u64;
+        if ended {
+            if self.position != self.len()
+                || self.input != self.end
+                || !self.crc != self.entry.crc32
+            {
+                return Err(RdError::invalid_format(
+                    "asset size/CRC/compressed extent mismatch",
+                ));
+            }
+            self.done = true;
+        } else if self.position == self.len() {
+            // Validate the terminator and catch a forged size before returning EOF.
+            let mut end = [0];
+            self.read_inner(&mut end)?;
+        }
+        Ok(written)
+    }
+    pub fn seek(&mut self, position: u64) -> RdResult<u64> {
+        if position > self.len() {
+            return Err(RdError::invalid_format("asset seek outside extent"));
+        }
+        if self.failed {
+            return Err(RdError::invalid_format("asset reader poisoned"));
+        }
+        if position < self.position {
+            self.input = self.start;
+            self.position = 0;
+            self.crc = !0;
+            self.done = false;
+            self.inflate = None;
+        }
+        let mut discard = [0; 8192];
+        while self.position < position {
+            let count = (position - self.position).min(discard.len() as u64) as usize;
+            if self.read(&mut discard[..count])? == 0 {
+                return Err(RdError::parse("asset seek truncated"));
+            }
+        }
+        Ok(self.position)
+    }
+}
+
 #[inline]
 fn extra_len_of(data: &[u8], off: usize) -> RdResult<usize> {
     Ok(u16_at(data, off)? as usize)
@@ -462,6 +634,44 @@ fn comment_len_of(data: &[u8], off: usize) -> RdResult<usize> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn streamed_assets_chunk_seek_and_corruption() {
+        let content: Vec<u8> = (0..150_000).map(|n| (n % 251) as u8).collect();
+        let compressed = deflate_bytes(&content);
+        let archive =
+            handcrafted_zip_deflate(&compressed, content.len() as u32, crc32(&content), "asset");
+        let zip = Zip::parse(archive).unwrap();
+        let mut stream = zip.stream("asset").unwrap();
+        let mut out = Vec::new();
+        let mut buffer = [0; 137];
+        loop {
+            let n = stream.read(&mut buffer).unwrap();
+            if n == 0 {
+                break;
+            }
+            out.extend_from_slice(&buffer[..n]);
+        }
+        assert_eq!(out, content);
+        stream.seek(42).unwrap();
+        assert_eq!(stream.read(&mut buffer).unwrap(), 137);
+        assert_eq!(&buffer[..], &content[42..179]);
+        assert!(stream.seek(150_001).is_err());
+        for (size, crc) in [
+            (content.len() as u32 - 1, crc32(&content)),
+            (content.len() as u32, 0),
+        ] {
+            let zip = Zip::parse(handcrafted_zip_deflate(&compressed, size, crc, "bad")).unwrap();
+            let mut bad = zip.stream("bad").unwrap();
+            loop {
+                match bad.read(&mut buffer) {
+                    Ok(0) => panic!("accepted corrupt asset"),
+                    Ok(_) => (),
+                    Err(_) => break,
+                }
+            }
+            assert!(bad.read(&mut buffer).is_err());
+        }
+    }
     use super::*;
 
     /// Monta um ZIP mínimo com 1 entrada STORED — estrutura real, byte a byte.

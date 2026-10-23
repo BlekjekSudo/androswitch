@@ -1014,6 +1014,19 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         // AOSP: Activity → ContextThemeWrapper → ContextWrapper → Context;
         // Application/Service → ContextWrapper (apps unwrap contexts with
         // `while (c instanceof ContextWrapper)` looking for owners)
+        "Landroid/app/NativeActivity;" => Some(&[
+            "Landroid/app/Activity;",
+            "Landroid/view/ContextThemeWrapper;",
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/content/res/AssetManager$AssetInputStream;" => {
+            Some(&["Ljava/io/InputStream;", "Ljava/lang/Object;"])
+        }
+        "Landroid/content/res/AssetManager;" | "Landroid/media/AudioTrack;" => {
+            Some(&["Ljava/lang/Object;"])
+        }
         "Landroid/app/Activity;" => Some(&[
             "Landroid/view/ContextThemeWrapper;",
             "Landroid/content/ContextWrapper;",

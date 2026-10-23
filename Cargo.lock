@@ -117,6 +117,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "as-launcher"
+version = "0.1.0"
+dependencies = [
+ "as-framework",
+ "as-package",
+ "as-platform",
+ "miniz_oxide",
+ "rd-apk",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "as-native"
 version = "0.1.0"
 dependencies = [
@@ -160,6 +173,7 @@ name = "as-switch-smoke"
 version = "0.1.0"
 dependencies = [
  "as-framework",
+ "as-launcher",
  "as-native",
  "as-package",
  "as-platform",

@@ -13,6 +13,7 @@ extern "C" {
     fn as_native_finalize(token: u64, pages: *const u8, length: usize) -> i32;
     fn as_native_release(token: u64);
     fn as_native_import(name: *const core::ffi::c_char) -> u64;
+    fn as_native_library(name: *const core::ffi::c_char) -> i32;
     fn as_native_veneer(function: u64) -> u64;
     fn as_native_tls(
         module: usize,
@@ -41,6 +42,16 @@ fn rc(operation: &str, code: i32) -> Result<()> {
     }
 }
 impl NativeBackend for HorizonNative {
+    fn system_library(&self, name: &str) -> bool {
+        let Ok(c) = CString::new(name) else {
+            return false;
+        };
+        // SAFETY: synchronous bounded NUL-terminated library lookup.
+        #[allow(unsafe_code)]
+        unsafe {
+            as_native_library(c.as_ptr()) != 0
+        }
+    }
     fn allocate(&mut self, length: usize) -> Result<Allocation> {
         let (mut address, mut token) = (0, 0);
         // SAFETY: writable scalar outputs; C retains its own allocation, not these pointers.
@@ -83,7 +94,7 @@ impl NativeBackend for HorizonNative {
         if target == 0 {
             return Ok(None);
         }
-        let address = if name == "__stack_chk_guard" {
+        let address = if name == "__stack_chk_guard" || name.starts_with("SL_IID_") {
             target
         } else {
             veneer(target)?

@@ -13,14 +13,104 @@
 #include <string.h>
 #include <switch.h>
 
-typedef struct {
+typedef struct Mapping {
   void *backing, *address;
   size_t size;
   VirtmemReservation *reservation;
   int mapped;
   uint8_t *executable;
+  struct Mapping *next;
 } Mapping;
 static Handle own_process;
+static Mapping *mappings;
+static Mutex resource_mutex;
+typedef struct GuestAllocation {
+  void *pointer;
+  size_t size;
+  struct GuestAllocation *next;
+} GuestAllocation;
+static GuestAllocation *guest_allocations;
+static void *guest_malloc(size_t size) {
+  if (size > (128u << 20)) {
+    errno = ENOMEM;
+    return NULL;
+  }
+  void *p = malloc(size ? size : 1);
+  if (!p)
+    return NULL;
+  GuestAllocation *entry = malloc(sizeof(*entry));
+  if (!entry) {
+    free(p);
+    return NULL;
+  }
+  entry->pointer = p;
+  entry->size = size;
+  mutexLock(&resource_mutex);
+  entry->next = guest_allocations;
+  guest_allocations = entry;
+  mutexUnlock(&resource_mutex);
+  return p;
+}
+static void guest_free(void *p) {
+  if (!p)
+    return;
+  mutexLock(&resource_mutex);
+  GuestAllocation **link = &guest_allocations;
+  while (*link && (*link)->pointer != p)
+    link = &(*link)->next;
+  if (*link) {
+    GuestAllocation *entry = *link;
+    *link = entry->next;
+    free(entry->pointer);
+    free(entry);
+  } else
+    errno = EINVAL;
+  mutexUnlock(&resource_mutex);
+}
+static void *guest_calloc(size_t count, size_t size) {
+  if (size && count > SIZE_MAX / size) {
+    errno = ENOMEM;
+    return NULL;
+  }
+  void *p = guest_malloc(count * size);
+  if (p)
+    memset(p, 0, count * size);
+  return p;
+}
+static void *guest_realloc(void *p, size_t size) {
+  if (!p)
+    return guest_malloc(size);
+  if (!size) {
+    guest_free(p);
+    return NULL;
+  }
+  if (size > (128u << 20)) {
+    errno = ENOMEM;
+    return NULL;
+  }
+  mutexLock(&resource_mutex);
+  GuestAllocation *entry = guest_allocations;
+  while (entry && entry->pointer != p)
+    entry = entry->next;
+  void *result = NULL;
+  if (entry) {
+    result = realloc(p, size);
+    if (result) {
+      entry->pointer = result;
+      entry->size = size;
+    }
+  } else
+    errno = EINVAL;
+  mutexUnlock(&resource_mutex);
+  return result;
+}
+static char *guest_strdup(const char *s) {
+  size_t n = strlen(s) + 1;
+  char *p = guest_malloc(n);
+  if (p)
+    memcpy(p, s, n);
+  return p;
+}
 typedef struct {
   Handle server, received;
   Result result;
@@ -98,6 +188,10 @@ int as_native_allocate(size_t size, uint64_t *address, uint64_t *token) {
   }
   *address = (uint64_t)m->address;
   *token = (uint64_t)m;
+  mutexLock(&resource_mutex);
+  m->next = mappings;
+  mappings = m;
+  mutexUnlock(&resource_mutex);
   return 0;
 }
 int as_native_write(uint64_t token, size_t offset, const uint8_t *bytes,
@@ -174,6 +268,13 @@ void as_native_release(uint64_t token) {
   virtmemLock();
   virtmemRemoveReservation(m->reservation);
   virtmemUnlock();
+  mutexLock(&resource_mutex);
+  Mapping **link = &mappings;
+  while (*link && *link != m)
+    link = &(*link)->next;
+  if (*link)
+    *link = m->next;
+  mutexUnlock(&resource_mutex);
   free(m->backing);
   free(m->executable);
   free(m);
@@ -193,6 +294,14 @@ typedef struct Context {
   struct EmulatedTls *emulated;
 } Context;
 static __thread Context context;
+/* The native-bridge TLS slot points to private bridge state. Keeping saved
+ * return addresses here leaves SP unchanged for imported stack/variadic args.
+ * Layout is shared with native_call.S; this fits in the reserved prefix page.
+ */
+typedef struct {
+  uint64_t host_tp, guest_tp, depth, returns[128], saved_x19[128];
+} ImportBridge;
+_Static_assert(sizeof(ImportBridge) < 4096 - 32, "bridge prefix capacity");
 static uint8_t tls_template[65536];
 static size_t tls_used = 256;
 typedef struct EmulatedTls {
@@ -237,11 +346,24 @@ static void *guest_tls_address(const uint64_t *index) {
     as_native_trap(-1007);
   return (void *)(as_native_guest_tls() + tls_modules[index[0]] + index[1]);
 }
-typedef struct {
+void as_native_thread_cleanup(void) {
+  while (context.emulated) {
+    EmulatedTls *entry = context.emulated;
+    context.emulated = entry->next;
+    free(entry->bytes);
+    free(entry);
+  }
+  free(context.guest);
+  memset(&context, 0, sizeof(context));
+}
+typedef struct GuestThread {
   Thread thread;
   uint64_t function, argument, result;
   void *session;
+  struct GuestThread *next;
+  int joining;
 } GuestThread;
+static GuestThread *guest_threads;
 static void guest_thread_main(void *argument) {
   GuestThread *thread = argument;
   context.session = thread->session;
@@ -284,18 +406,41 @@ static int guest_pthread_create(uint64_t *out, const void *attributes,
     return EAGAIN;
   }
   *out = (uint64_t)thread;
+  mutexLock(&resource_mutex);
+  thread->next = guest_threads;
+  guest_threads = thread;
+  mutexUnlock(&resource_mutex);
   return 0;
 }
 static int guest_pthread_join(uint64_t handle, void **result) {
   GuestThread *thread = (void *)handle;
-  if (!thread)
+  mutexLock(&resource_mutex);
+  GuestThread *found = guest_threads;
+  while (found && found != thread)
+    found = found->next;
+  if (!found || found->joining) {
+    mutexUnlock(&resource_mutex);
     return ESRCH;
+  }
+  if (handle == context.thread_identity) {
+    mutexUnlock(&resource_mutex);
+    return EDEADLK;
+  }
+  found->joining = 1;
+  mutexUnlock(&resource_mutex);
   Result rc = threadWaitForExit(&thread->thread);
   if (R_FAILED(rc))
     return EINVAL;
   if (result)
     *result = (void *)thread->result;
   threadClose(&thread->thread);
+  mutexLock(&resource_mutex);
+  GuestThread **link = &guest_threads;
+  while (*link && *link != thread)
+    link = &(*link)->next;
+  if (*link)
+    *link = thread->next;
+  mutexUnlock(&resource_mutex);
   free(thread);
   return 0;
 }
@@ -311,6 +456,9 @@ uint64_t as_native_guest_tls(void) {
       return 0;
     memset(context.guest, 0, sizeof(tls_template) + 4096);
     memcpy(context.guest + 4096, tls_template, sizeof(tls_template));
+    ImportBridge *bridge = (void *)context.guest;
+    bridge->guest_tp = (uint64_t)(context.guest + 4096);
+    *(ImportBridge **)(context.guest + 4096 - 16) = bridge;
   }
   return (uint64_t)(context.guest + 4096);
 }
@@ -345,12 +493,15 @@ int as_native_call(AsNativeCall *frame) {
   if (!frame->guest_tls)
     return -ENOMEM;
   context.error = 0;
+  ImportBridge *bridge = (void *)context.guest;
+  uint64_t bridge_depth = bridge->depth;
   jmp_buf escape;
   jmp_buf *previous = context.escape;
   context.escape = &escape;
   if (!setjmp(escape))
     as_native_call_asm(frame);
   context.escape = previous;
+  bridge->depth = bridge_depth;
   return context.error;
 }
 
@@ -382,16 +533,103 @@ static void stack_fail(void) {
 }
 static int *guest_errno(void) { return &errno; }
 extern uint64_t as_bionic_io_import(const char *name);
+extern uint64_t as_media_import(const char *name) __attribute__((weak));
+extern int as_media_library(const char *name) __attribute__((weak));
+int as_native_library(const char *name) {
+  const char *base[] = {"libc.so", "libm.so", "libdl.so", "liblog.so",
+                        "libandroid.so"};
+  for (size_t i = 0; i < sizeof(base) / sizeof(base[0]); i++)
+    if (!strcmp(name, base[i]))
+      return 1;
+  return as_media_library ? as_media_library(name) : 0;
+}
+/* Exit paths never unmap a live thread. Timeout is a hard boundary: caller
+ * records the failure and exits the Horizon process before another app starts.
+ */
+int as_native_quiesce(uint64_t timeout_ns) {
+  uint64_t deadline = armGetSystemTick() + armNsToTicks(timeout_ns);
+  for (;;) {
+    mutexLock(&resource_mutex);
+    GuestThread *t = guest_threads;
+    Handle handle = t ? t->thread.handle : INVALID_HANDLE;
+    int joining = t ? t->joining : 0;
+    if (t && !joining)
+      t->joining = 2;
+    mutexUnlock(&resource_mutex);
+    if (!t)
+      return 0;
+    uint64_t now = armGetSystemTick();
+    if (now >= deadline)
+      return -ETIMEDOUT;
+    if (joining) {
+      svcSleepThread(1000000);
+      continue;
+    }
+    int32_t index;
+    Result rc = svcWaitSynchronization(&index, &handle, 1,
+                                       armTicksToNs(deadline - now));
+    if (R_FAILED(rc))
+      return -ETIMEDOUT;
+    threadWaitForExit(&t->thread);
+    threadClose(&t->thread);
+    mutexLock(&resource_mutex);
+    GuestThread **p = &guest_threads;
+    while (*p && *p != t)
+      p = &(*p)->next;
+    if (*p)
+      *p = t->next;
+    mutexUnlock(&resource_mutex);
+    free(t);
+  }
+}
+int as_native_reset(void) {
+  if (guest_threads)
+    return -EBUSY;
+  extern int as_bionic_sync_reset(void);
+  if (as_bionic_sync_reset())
+    return -EBUSY;
+  extern void as_jni_reset(void);
+  as_jni_reset();
+  while (mappings) {
+    Mapping *before = mappings;
+    as_native_release((uint64_t)before);
+    if (mappings == before)
+      return -EIO;
+  }
+  while (guest_allocations)
+    guest_free(guest_allocations->pointer);
+  extern void as_bionic_io_reset(void);
+  as_bionic_io_reset();
+  while (context.emulated) {
+    EmulatedTls *e = context.emulated;
+    context.emulated = e->next;
+    free(e->bytes);
+    free(e);
+  }
+  free(context.guest);
+  memset(&context, 0, sizeof(context));
+  memset(tls_template, 0, sizeof(tls_template));
+  memset(tls_modules, 0, sizeof(tls_modules));
+  tls_used = 256;
+  if (own_process) {
+    svcCloseHandle(own_process);
+    own_process = 0;
+  }
+  return 0;
+}
 uint64_t as_native_import(const char *name) {
   if (!strcmp(name, "__stack_chk_guard"))
     return (uint64_t)&guard;
   struct {
     const char *name;
     void *function;
-  } imports[] = {{"malloc", malloc},
-                 {"calloc", calloc},
-                 {"realloc", realloc},
-                 {"free", free},
+  } imports[] = {{"malloc", guest_malloc},
+                 {"calloc", guest_calloc},
+                 {"realloc", guest_realloc},
+                 {"free", guest_free},
+                 {"strdup", guest_strdup},
+                 {"snprintf", snprintf},
+                 {"vsnprintf", vsnprintf},
                  {"memcpy", memcpy},
                  {"memmove", memmove},
                  {"memset", memset},
@@ -416,5 +654,9 @@ uint64_t as_native_import(const char *name) {
   for (size_t i = 0; i < sizeof(imports) / sizeof(imports[0]); i++)
     if (!strcmp(name, imports[i].name))
       return (uint64_t)imports[i].function;
-  return as_bionic_io_import(name);
+  uint64_t address = as_bionic_io_import(name);
+  extern uint64_t as_bionic_sync_import(const char *);
+  if (!address)
+    address = as_bionic_sync_import(name);
+  return address ? address : (as_media_import ? as_media_import(name) : 0);
 }

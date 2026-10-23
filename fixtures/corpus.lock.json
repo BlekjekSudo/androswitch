@@ -96,6 +96,24 @@
         "bytes": 2917
       },
       "note": "Source and tool hashes are frozen; each rebuilt APK is hashed in its receipt because ZIP timestamps can differ."
+    },
+    {
+      "id": "androswitch-portable-ui",
+      "milestone": "M5",
+      "state": "source_and_apks_recorded_host_and_ryujinx_verified",
+      "report": "reports/m5-ui.json"
+    },
+    {
+      "id": "androswitch-native-media-console",
+      "milestones": [
+        "M6",
+        "M7"
+      ],
+      "state": "source_and_apks_frozen_in_source_pinned_evidence",
+      "source_path": "fixtures/m6",
+      "report": "reports/m6-m7.json",
+      "note": "Original SDK/NDK Java/native fixtures; no runtime package profiles. Includes separate expected-failure lifecycle/API fixtures."
     }
-  ]
+  ],
+  "updated_on": "2026-10-24"
 }

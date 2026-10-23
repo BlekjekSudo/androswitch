@@ -18,6 +18,15 @@ static __thread int attached;
 static Mutex vm_mutex;
 static __thread unsigned lease_depth;
 static int initialized;
+/* Called only after all guest callbacks/threads are quiescent. JNI tables own
+ * executable import veneers, so they cannot survive native mapping teardown. */
+void as_jni_reset(void) {
+  initialized = 0;
+  environment = NULL;
+  attached = 0;
+  memset(&table, 0, sizeof(table));
+  memset(&vm_table, 0, sizeof(vm_table));
+}
 enum {
   FIND_CLASS = 1,
   METHOD = 2,
