@@ -139,6 +139,7 @@ evidence, not a physical-device run of the full milestone corpus.
 
 The next report concerns Mekorama 1.7.2, not the previous native sample. Its fresh
 session report identifies a missing `libstdc++.so` dependency during static class
-initialization. The accompanying display/teardown traces still describe the prior
-native sample and show a successful return. They do not demonstrate a new GPU
-failure in Mekorama. See [startup diagnosis and recovery](STARTUP_FAILURES.md).
+initialization. The accompanying display/teardown traces lack session IDs and
+show a successful NativeActivity return, consistent with the prior native sample.
+They do not demonstrate a new GPU failure in Mekorama. See
+[startup diagnosis and recovery](STARTUP_FAILURES.md).

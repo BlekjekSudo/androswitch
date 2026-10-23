@@ -33,10 +33,11 @@ first observed blocker; later requirements have not been executed. The runtime
 does not currently supply the requested legacy C++ library. Adding its name to
 an allowlist or fabricating successful imports would not implement its ABI.
 
-The accompanying `teardown.log` and `display-handoffs.log` belong to the previous
-Native Graphics and Audio return. They show `launcher_stable` and eight valid
-CPU submissions. Mekorama's error occurs before its graphics initialization;
-these files do not establish that the earlier display bug recurred.
+The accompanying `teardown.log` and `display-handoffs.log` have no session ID.
+They show NativeActivity shutdown, `launcher_stable` and eight valid CPU
+submissions, consistent with an earlier Native Graphics and Audio return.
+Mekorama's error occurs before its graphics initialization, so these traces are
+treated as stale; they do not establish that the earlier display bug recurred.
 
 ## Recovery contract
 

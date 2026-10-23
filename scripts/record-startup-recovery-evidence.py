@@ -45,7 +45,7 @@ for session in failed:
     if not {"java_startup_abort", "runtime_closed", "native_resources_released"} <= phases:
         raise SystemExit("A failed startup did not complete owned cleanup")
 worker = read(runs["startup-quiescence"][0] / "expected-stop-failure.json")
-if not all(text in worker["error"] for text in ("JNI_VERSION_UNSUPPORTED", "NATIVE_NOT_QUIESCENT")):
+if not all(text in worker["error"] for text in ("JNI_OnLoad returned 0x0", "NATIVE_NOT_QUIESCENT")):
     raise SystemExit("Failed JNI_OnLoad worker must preserve both causes and fail closed")
 
 host = {}

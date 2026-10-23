@@ -101,7 +101,7 @@ try{
   }while([DateTime]::UtcNow -lt $deadline)
   if($Scenario -in @('quiescence','startup-quiescence')){
     if($failure.session_id -ne "$id-1" -or $failure.error -notmatch 'NATIVE_NOT_QUIESCENT'){throw 'Nonquiescent worker did not fail closed with a named error'}
-    if($Scenario -eq 'startup-quiescence' -and $failure.error -notmatch 'JNI_VERSION_UNSUPPORTED'){throw 'Startup cleanup erased the original JNI_OnLoad failure'}
+    if($Scenario -eq 'startup-quiescence' -and $failure.error -notmatch 'JNI_OnLoad returned 0x0'){throw 'Startup cleanup erased the original JNI_OnLoad failure'}
     if(Test-Path "$root/logs/launcher-report.json"){throw 'Unsafe worker returned to a completed launcher workflow'}
     if(Test-Path "$root/runtime/launch.json"){throw 'Launch request was not consumed; crash recovery would relaunch the same APK'}
     Copy-Item "$root/logs/session-report.json" "$run/expected-stop-failure.json"
