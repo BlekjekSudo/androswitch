@@ -1,0 +1,342 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-24",
+  "evidence_type": "user_supplied_hardware_logs_and_static_apk_inspection",
+  "binary_identity_verified": false,
+  "expected_previous_nro_sha256": "449917f0f53a88d6c66ecf09aa5b820e3612e7ec9bd2192aa839f3c59da4ad32",
+  "apk": {
+    "file": "mekorama-1-7-2.apk",
+    "bytes": 13099584,
+    "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+    "package": "com.martinmagni.mekorama",
+    "version": "1.7.2",
+    "version_code": 44,
+    "min_sdk": 21,
+    "target_sdk": 33,
+    "abi": "arm64-v8a"
+  },
+  "observed_blocker": "libBarcodeScannerLib.so requires unavailable libstdc++.so during Mekorama.<clinit>",
+  "gameplay": "not_reached",
+  "gpu_failure": "not_demonstrated_by_supplied_logs",
+  "trace_identity_limit": "Teardown/display logs have no session ID. NativeActivity callbacks and launcher_stable indicate an earlier native sample return; Mekorama failed during Java class initialization. Treat the traces as stale, not as Mekorama GPU execution.",
+  "inputs": [
+    {
+      "file": "session-report.json",
+      "sha256": "2051382c34b9a97dc65e5f03a049e27b55efcb62fa2c57803c9f9b393e9b1dc8",
+      "content": {
+        "error": "exception java.lang.ExceptionInInitializerError: dependency: libBarcodeScannerLib.so: dependency requires libstdc++.so [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 26419, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/martinmagni/mekorama/Mekorama;-><clinit>()V",
+        "package": "com.martinmagni.mekorama",
+        "revision": 1,
+        "schema_version": 1,
+        "session_id": "console-1",
+        "status": "failed"
+      }
+    },
+    {
+      "file": "pending-session.json",
+      "sha256": "fb4785d7c781ef14753e15afb7324fd573cc0162ad3257d827754326d90493f5",
+      "content": {
+        "events": null,
+        "package": "com.martinmagni.mekorama",
+        "revision": 1,
+        "schema_version": 1,
+        "session_id": "console-1"
+      }
+    },
+    {
+      "file": "teardown.log",
+      "sha256": "6227dcecce3f48769dc97b605da85e57e70dba272c9b3c013ece9e9e3166b86c",
+      "content": [
+        {
+          "phase": "stop_requested",
+          "tick": 164104495437
+        },
+        {
+          "phase": "native_activity_stop",
+          "tick": 164104650129
+        },
+        {
+          "phase": "activity_focus_lost",
+          "tick": 164104721872
+        },
+        {
+          "phase": "activity_pause",
+          "tick": 164104792103
+        },
+        {
+          "phase": "activity_window_destroy",
+          "tick": 164104857685
+        },
+        {
+          "phase": "guest_thread_join",
+          "tick": 164104956793
+        },
+        {
+          "phase": "egl_wait_gpu",
+          "tick": 164105247028
+        },
+        {
+          "phase": "egl_unbind",
+          "tick": 164105330882
+        },
+        {
+          "phase": "egl_destroy_context",
+          "tick": 164105399189
+        },
+        {
+          "phase": "egl_destroy_surface",
+          "tick": 164105936167
+        },
+        {
+          "phase": "egl_terminate",
+          "tick": 164106285423
+        },
+        {
+          "phase": "egl_terminated",
+          "tick": 164106635205
+        },
+        {
+          "phase": "guest_thread_joined",
+          "tick": 164106706854
+        },
+        {
+          "phase": "activity_input_destroy",
+          "tick": 164106775137
+        },
+        {
+          "phase": "activity_stop",
+          "tick": 164106859873
+        },
+        {
+          "phase": "activity_destroy",
+          "tick": 164106927923
+        },
+        {
+          "phase": "java_activity_stop",
+          "tick": 164106999654
+        },
+        {
+          "phase": "media_thread_quiesce",
+          "tick": 164107067150
+        },
+        {
+          "phase": "guest_thread_quiesce",
+          "tick": 164107137256
+        },
+        {
+          "phase": "media_reset",
+          "tick": 164107221102
+        },
+        {
+          "phase": "media_released",
+          "tick": 164107290597
+        },
+        {
+          "phase": "activity_dispose",
+          "tick": 164107362171
+        },
+        {
+          "phase": "runtime_drop",
+          "tick": 164107661090
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 164107746850
+        },
+        {
+          "phase": "native_resource_reset",
+          "tick": 164107842295
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 164107931459
+        },
+        {
+          "phase": "native_tls_reset",
+          "tick": 164108215855
+        },
+        {
+          "phase": "native_resources_released",
+          "tick": 164108288179
+        },
+        {
+          "phase": "runtime_closed",
+          "tick": 164108539811
+        },
+        {
+          "phase": "launcher_refresh",
+          "tick": 164108610847
+        },
+        {
+          "phase": "launcher_framebuffer_open",
+          "tick": 164110770679
+        },
+        {
+          "phase": "launcher_ready",
+          "tick": 164111325514
+        },
+        {
+          "phase": "launcher_stable",
+          "tick": 164113522705
+        }
+      ]
+    },
+    {
+      "file": "display-handoffs.log",
+      "sha256": "44f48c649afd8345b7834224b0c2f41dccc928a0738f645fb2de106feddc7845",
+      "content": [
+        {
+          "generation": 1,
+          "frame": 1,
+          "slot": 0,
+          "buffers": 3,
+          "map_fd": 24444928,
+          "fence_fd": 24444929,
+          "result": 0
+        },
+        {
+          "generation": 1,
+          "frame": 2,
+          "slot": 1,
+          "buffers": 3,
+          "map_fd": 24444928,
+          "fence_fd": 24444929,
+          "result": 0
+        },
+        {
+          "generation": 1,
+          "frame": 3,
+          "slot": 0,
+          "buffers": 3,
+          "map_fd": 24444928,
+          "fence_fd": 24444929,
+          "result": 0
+        },
+        {
+          "generation": 1,
+          "frame": 4,
+          "slot": 1,
+          "buffers": 3,
+          "map_fd": 24444928,
+          "fence_fd": 24444929,
+          "result": 0
+        },
+        {
+          "generation": 1,
+          "frame": 5,
+          "slot": 0,
+          "buffers": 3,
+          "map_fd": 24444928,
+          "fence_fd": 24444929,
+          "result": 0
+        },
+        {
+          "generation": 1,
+          "frame": 6,
+          "slot": 1,
+          "buffers": 3,
+          "map_fd": 24444928,
+          "fence_fd": 24444929,
+          "result": 0
+        },
+        {
+          "generation": 1,
+          "frame": 7,
+          "slot": 0,
+          "buffers": 3,
+          "map_fd": 24444928,
+          "fence_fd": 24444929,
+          "result": 0
+        },
+        {
+          "generation": 1,
+          "frame": 8,
+          "slot": 1,
+          "buffers": 3,
+          "map_fd": 24444928,
+          "fence_fd": 24444929,
+          "result": 0
+        }
+      ]
+    }
+  ],
+  "static_elf_evidence": {
+    "producer": "Android NDK 28.2.13676358 llvm-readelf -d --dyn-syms, not REA execution",
+    "libraries": [
+      {
+        "name": "libBarcodeScannerLib.so",
+        "needed": [
+          "liblog.so",
+          "libstdc++.so",
+          "libm.so",
+          "libc.so",
+          "libdl.so"
+        ]
+      },
+      {
+        "name": "libmekorama.so",
+        "needed": [
+          "libBarcodeScannerLib.so",
+          "libGLESv2.so",
+          "libOpenSLES.so",
+          "libandroid.so",
+          "liblog.so",
+          "libm.so",
+          "libdl.so",
+          "libc.so"
+        ]
+      }
+    ],
+    "raw_output": [
+      {
+        "file": "libBarcodeScannerLib.so.elf.txt",
+        "sha256": "ff28065ec77bf652c6bc684082758400127167c9d5c14cc8b19108feaa77d0b2"
+      },
+      {
+        "file": "libcrashlytics-common.so.elf.txt",
+        "sha256": "0f88349a142c97a62962c180e135ed12467f0540798bc43d779fc9550a2d00c1"
+      },
+      {
+        "file": "libcrashlytics-handler.so.elf.txt",
+        "sha256": "048b87016024f0801d9dadf237c781b18f48f39e9f05a2acbe347917747d65d1"
+      },
+      {
+        "file": "libcrashlytics-trampoline.so.elf.txt",
+        "sha256": "f0c4ea018cb1b72bdccb9e8e95691dc9fbd443e9a96648719fd05af047a5619e"
+      },
+      {
+        "file": "libcrashlytics.so.elf.txt",
+        "sha256": "6dcce14fd8b133a81cd692df0b80367ac0c245d426782b41aa1d02a5891151cd"
+      },
+      {
+        "file": "libmekorama.so.elf.txt",
+        "sha256": "3fb506da752b25193b8263ce9915770fcc78672c89f64aa3f14a8f9be7512e48"
+      }
+    ]
+  },
+  "rea": {
+    "artifact_evidence_id": "ev_22b6327f74d9d620a48810ac309c4523fb197ae155041c88c21af86dc45b58f3",
+    "inventory_evidence_id": "ev_c38fcb485014dedc96ff1afe97663cca70b18a8ba49c95fb2099eef5dd1028c7",
+    "graph_manifest_id": "agm_a0bdd837c4c4b0428390e9557865b9f1c1be4e537e2dab70776cc65a38ad7f37",
+    "graph_sha256": "e60d79d14a0a9122a6f92377356a02fd9a6b397598a06be060af70a676d241f1",
+    "nodes": 813,
+    "occurrences": 861,
+    "edges": 860,
+    "limitations": [
+      "Archive inventory only; not execution evidence",
+      "Android semantic inspector unavailable: caller-supplied Jadx MCP helper absent",
+      "ZIP inventory omits APK signing block/comment and reports a case-fold collision"
+    ]
+  },
+  "previous_display_fix_user_confirmation": {
+    "native_plus": "user reported fixed",
+    "startup_stall": "user reported resolved",
+    "binary_hash_collected": false,
+    "scope": "bundled native sample only; not full milestone corpus"
+  },
+  "limitations": [
+    "Only the first runtime blocker is established",
+    "No claim that implementing this dependency alone makes the game playable",
+    "Proprietary APK/libraries excluded from Git and release packages"
+  ]
+}

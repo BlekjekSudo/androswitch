@@ -3,8 +3,8 @@
 This is the first one-NRO package, not the offline v0.1 compatibility release.
 Host and Ryujinx evidence do not establish physical Switch compatibility.
 The user reported that the four bundled samples install/open on a real Switch
-and the native triangle animation and beeps work, but Plus crashes there.
-This build's display handoff changes await hardware retesting; see the
+and the native triangle animation and beeps work. The user subsequently confirmed
+that the display handoff fix resolves Plus return and the startup stall; see the
 [hardware feedback record](HARDWARE_FEEDBACK.md).
 The runtime builds on **RustyDroid by nadabgfccvd and contributors**; retain
 the packaged credits, license notices and source link when redistributing it.
@@ -85,6 +85,12 @@ code mappings. A stuck thread or unsafe teardown causes a process exit.
 Reopen homebrew; the one-shot launch request is consumed and the console
 records the interrupted package/session. Seamless recovery from a native crash
 within the same process is not promised. Do not delete the logs before reporting it.
+
+Failed initialization also owns its VM/JNI state until bounded cleanup finishes.
+Missing native dependencies can return to the console with their original error;
+an initializer that leaves a live worker still requires process exit. This does
+not make the rejected APK compatible. See [startup failures](STARTUP_FAILURES.md)
+for the Mekorama diagnosis and the reason for the 64 MiB container budget.
 
 Interactive launches write a `running` session report before executing the APK.
 Shutdown flushes each phase to `logs/teardown.log` before that operation, including

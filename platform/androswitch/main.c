@@ -107,6 +107,7 @@ uint64_t as_platform_micros(void) {
   return armTicksToNs(armGetSystemTick()) / 1000;
 }
 extern uint64_t as_runtime_open(void);
+extern bool as_runtime_failed(uint64_t);
 extern int as_runtime_step(uint64_t);
 extern const uint32_t *as_runtime_pixels(uint64_t);
 extern void as_runtime_presented(uint64_t, uint64_t);
@@ -292,6 +293,11 @@ int main(int argc, char **argv) {
       }
       app = as_runtime_open();
       launch = false;
+      if (app && as_runtime_failed(app)) {
+        if (close_application(app))
+          svcExitProcess();
+        app = 0;
+      }
       if (!app) {
         if (as_native_session())
           svcExitProcess();

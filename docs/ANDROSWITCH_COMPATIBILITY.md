@@ -40,8 +40,9 @@ reproduction](M2_M4_E2E.md). Native session roots remain alive until M7 proves
 thread/media quiescence, then are released with JNI tables, TLS and mappings.
 `asctl` execution flags describe its inspection/package host facade; product-NRO
 evidence is listed separately. The user reports bundled sample execution and
-native animation/beeps on a real Switch, but native Plus crashes; full scenario
-verification and the candidate fix's hardware retest remain pending. See
+native animation/beeps on a real Switch, and subsequently confirmed that the
+display fix resolves native Plus return and startup stalls. Full scenario
+verification remains pending. See
 [hardware feedback](HARDWARE_FEEDBACK.md) and [M0 baseline](M0_BASELINE.md) for the
 passing AndroSwitch checks and failing immutable-upstream reference tests.
 
@@ -51,3 +52,9 @@ reads. Audio is one 48 kHz stereo PCM16 output. Full native_app_glue FD support,
 AAudio callback/low-latency modes, audio input/effects, arbitrary applications,
 Compose/WebView/modern engines and external NDK samples remain unverified.
 Only bounded RGB/RGBA PNG icons decode; other icon formats use a visible fallback.
+
+Mekorama 1.7.2 is **not compatible**: the supplied ARM64 APK fails during class
+initialization because `libBarcodeScannerLib.so` requires unavailable
+`libstdc++.so`. No gameplay was reached. The alpha's startup recovery reports
+this error after cleanup; it does not fabricate the missing ABI. See
+[diagnosis and evidence](STARTUP_FAILURES.md).

@@ -71,6 +71,10 @@ and inflate incrementally with bounded output and a 32 KiB dictionary. M0 host
 inspection accepts up to 512 MiB; the M7 alpha's memory-resident device APK
 container is explicitly limited to 64 MiB. The existing paged ZIP parser has
 not yet replaced the product's whole-container path.
+The 256 MiB product heap must also hold decoded DEX, VM objects, native source
+images/mappings and platform/media allocations. Raising the cap requires replacing
+the whole-container installation/execution path and measuring peak allocation;
+streamed OBB reads alone do not solve APK-container residency.
 
 ## Lifecycle (M7)
 
@@ -85,6 +89,14 @@ One-shot requests are consumed before execution. The pending-session marker
 survives an interrupted process and is archived/shown on next boot. The normal
 path destroys JNI veneers/tables, guest TLS/heap, synchronization objects, ELF
 mappings and media before allowing a new App. See [M6/M7](M6_M7_E2E.md).
+
+Startup is owned by a `Running` transaction before Java initialization or native
+entry. A failed startup returns an owner token to C for watchdog-bounded teardown,
+not an already-dropped VM with live JNI roots. The abort path cancels Java tasks
+and closes PCM tracks without invoking lifecycle methods on partly initialized
+objects. Native activity allocations are retained before calling guest onCreate.
+The same callback/thread/media checks gate reuse after both success and failure;
+cleanup failure preserves the startup cause and requires process exit.
 
 The Horizon platform retains process-owned nvdrv/nvmap/fence/GPU service guards
 across frontend changes. Guest EGL contexts and surfaces are released per session;

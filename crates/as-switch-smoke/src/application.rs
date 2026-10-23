@@ -129,6 +129,7 @@ struct Running {
     reported: bool,
     presents: u64,
     native_activity: u64,
+    startup_error: Option<String>,
 }
 fn save_error(message: &str) {
     if let Ok(fs) = LibnxFileSystem::new("sdmc:/switch/androswitch") {
@@ -202,61 +203,8 @@ fn open() -> Result<Running, String> {
         app.vm.bind_native(native.clone());
         Some(native)
     };
-    device_jni::lock();
-    let result = app.launch().map_err(|e| e.to_string());
-    device_jni::unlock();
-    result?;
-    let mut native_activity = 0;
-    if app.vm.cp.is_subtype(
-        &alloc::format!("L{};", app.entry.replace('.', "/")),
-        "Landroid/app/NativeActivity;",
-    ) {
-        let session = native.as_ref().ok_or("NATIVE_ACTIVITY_LIBRARY_MISSING")?;
-        let component = app
-            .android
-            .apk
-            .manifest
-            .application
-            .components
-            .iter()
-            .find(|c| c.class_name == app.entry)
-            .ok_or("ACTIVITY_NOT_FOUND")?;
-        let metadata = |key: &str, default: &str| {
-            component
-                .meta_data
-                .iter()
-                .find(|m| m.name.as_deref() == Some(key))
-                .and_then(|m| m.value.clone())
-                .unwrap_or_else(|| default.into())
-        };
-        let library = metadata("android.app.lib_name", "main");
-        let symbol = metadata("android.app.func_name", "ANativeActivity_onCreate");
-        device_jni::lock();
-        let created = (|| -> Result<u64, String> {
-            let function = session
-                .native_entry(&mut app.vm, &library, &symbol)
-                .map_err(|e| e.to_string())?;
-            let object = session
-                .activity_reference(app.android.activity_object().ok_or("ACTIVITY_STATE")?)
-                .map_err(|e| e.to_string())?;
-            let package = alloc::ffi::CString::new(app.android.apk.manifest.package.as_str())
-                .map_err(|e| e.to_string())?;
-            // SAFETY: C copies package path and retains a real global JNI activity reference.
-            #[allow(unsafe_code)]
-            let activity = unsafe { as_activity_create(package.as_ptr(), object) };
-            if activity == 0 {
-                return Err("NATIVE_ACTIVITY_ALLOCATION".into());
-            }
-            session
-                .native_call(&mut app.vm, function, &[activity, 0, 0])
-                .map_err(|e| e.to_string())?;
-            Ok(activity)
-        })();
-        device_jni::unlock();
-        native_activity = created?;
-    }
     let pending = request.events.as_ref().map(|_| 0);
-    Ok(Running {
+    let mut running = Running {
         app,
         native,
         fs,
@@ -267,10 +215,86 @@ fn open() -> Result<Running, String> {
         snapshots: Vec::new(),
         reported: false,
         presents: 0,
-        native_activity,
-    })
+        native_activity: 0,
+        startup_error: None,
+    };
+    if let Err(error) = running.start() {
+        save_error(&error);
+        running.startup_error = Some(error);
+    }
+    // Even failed initialization returns an owner. C runs bounded teardown
+    // before returning to the console; VM/JNI roots cannot dangle on an error.
+    Ok(running)
 }
 impl Running {
+    fn start(&mut self) -> Result<(), String> {
+        device_jni::lock();
+        let result = self.app.launch().map_err(|e| e.to_string());
+        device_jni::unlock();
+        result?;
+        let app = &mut self.app;
+        if app.vm.cp.is_subtype(
+            &alloc::format!("L{};", app.entry.replace('.', "/")),
+            "Landroid/app/NativeActivity;",
+        ) {
+            let session = self
+                .native
+                .as_ref()
+                .ok_or("NATIVE_ACTIVITY_LIBRARY_MISSING")?;
+            let component = app
+                .android
+                .apk
+                .manifest
+                .application
+                .components
+                .iter()
+                .find(|c| c.class_name == app.entry)
+                .ok_or("ACTIVITY_NOT_FOUND")?;
+            let metadata = |key: &str, default: &str| {
+                component
+                    .meta_data
+                    .iter()
+                    .find(|m| m.name.as_deref() == Some(key))
+                    .and_then(|m| m.value.clone())
+                    .unwrap_or_else(|| default.into())
+            };
+            let library = metadata("android.app.lib_name", "main");
+            let symbol = metadata("android.app.func_name", "ANativeActivity_onCreate");
+            device_jni::lock();
+            let created = (|| -> Result<u64, String> {
+                let function = session
+                    .native_entry(&mut app.vm, &library, &symbol)
+                    .map_err(|e| e.to_string())?;
+                let object = session
+                    .activity_reference(app.android.activity_object().ok_or("ACTIVITY_STATE")?)
+                    .map_err(|e| e.to_string())?;
+                let package = alloc::ffi::CString::new(app.android.apk.manifest.package.as_str())
+                    .map_err(|e| e.to_string())?;
+                // SAFETY: C copies package path and retains a real global JNI activity reference.
+                #[allow(unsafe_code)]
+                let activity = unsafe { as_activity_create(package.as_ptr(), object) };
+                if activity == 0 {
+                    return Err("NATIVE_ACTIVITY_ALLOCATION".into());
+                }
+                // Retain ownership before entering guest code, including failed onCreate.
+                self.native_activity = activity;
+                session
+                    .native_call(&mut app.vm, function, &[activity, 0, 0])
+                    .map_err(|e| e.to_string())?;
+                Ok(activity)
+            })();
+            device_jni::unlock();
+            created?;
+        }
+        Ok(())
+    }
+    fn cleanup_error(&self, message: &str) {
+        if let Some(cause) = &self.startup_error {
+            save_error(&alloc::format!("{cause}; cleanup: {message}"));
+        } else {
+            save_error(message);
+        }
+    }
     fn event(&mut self, event: Event) -> Result<(), String> {
         if self.native_activity != 0 {
             // SAFETY: scalars are copied into the synchronized NDK input queue.
@@ -356,6 +380,16 @@ pub extern "C" fn as_runtime_open() -> u64 {
             0
         }
     }
+}
+/// # Safety
+/// Token is live and uniquely owned by the C loop. A failed startup must be
+/// closed through the same watchdog/quiescence boundary as a running app.
+#[allow(unsafe_code)]
+#[no_mangle]
+pub unsafe extern "C" fn as_runtime_failed(token: u64) -> bool {
+    unsafe { &*(token as *const Running) }
+        .startup_error
+        .is_some()
 }
 /// # Safety
 /// `token` is a live, uniquely accessed token from as_runtime_open.
@@ -450,31 +484,39 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
     if running.native_activity != 0 {
         let rc = unsafe { as_activity_stop(running.native_activity) };
         if rc != 0 {
-            save_error(&alloc::format!("NATIVE_STOP_FAILED: {rc}"));
+            running.cleanup_error(&alloc::format!("NATIVE_STOP_FAILED: {rc}"));
             core::mem::forget(running);
             return -1;
         }
     }
     // Java lifecycle may invoke native code or create threads too. Deliver it
     // before the final quiescence check, then release the VM lease while joining.
-    phase(c"java_activity_stop");
+    phase(if running.startup_error.is_some() {
+        c"java_startup_abort"
+    } else {
+        c"java_activity_stop"
+    });
     device_jni::lock();
-    let stopped = running.app.android.stop(&mut running.app.vm);
+    let stopped = if running.startup_error.is_some() {
+        running.app.android.abort_startup()
+    } else {
+        running.app.android.stop(&mut running.app.vm)
+    };
     device_jni::unlock();
     if let Err(error) = stopped {
-        save_error(&alloc::format!("ACTIVITY_STOP_ERROR: {error}"));
+        running.cleanup_error(&alloc::format!("ACTIVITY_STOP_ERROR: {error}"));
     }
     phase(c"media_thread_quiesce");
     let media_threads = unsafe { as_media_quiesce() };
     if media_threads != 0 {
-        save_error("MEDIA_CALLBACK_NOT_QUIESCENT: reopen homebrew");
+        running.cleanup_error("MEDIA_CALLBACK_NOT_QUIESCENT: reopen homebrew");
         core::mem::forget(running);
         return -1;
     }
     phase(c"guest_thread_quiesce");
     let rc = unsafe { as_native_quiesce(2_000_000_000) };
     if rc != 0 {
-        save_error(&alloc::format!(
+        running.cleanup_error(&alloc::format!(
             "NATIVE_NOT_QUIESCENT: {rc}; reopen homebrew"
         ));
         core::mem::forget(running);
@@ -484,7 +526,7 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
     let media = unsafe { as_media_reset() };
     if media != 0 {
         device_jni::unlock();
-        save_error("MEDIA_NOT_QUIESCENT: reopen homebrew");
+        running.cleanup_error("MEDIA_NOT_QUIESCENT: reopen homebrew");
         core::mem::forget(running);
         return -1;
     }
@@ -497,6 +539,7 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
     // Ordinary interactive sessions also need a report; otherwise the shell
     // can display a stale result from a previous APK. Preserve any named error.
     let fs = running.fs.clone();
+    let startup_error = running.startup_error.clone();
     let final_report = if running.request.events.is_none() {
         fs::read_all(fs.as_ref(), "logs/session-report.json", 1 << 20)
             .ok()
@@ -517,9 +560,11 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
     device_jni::unlock();
     let rc = unsafe { as_native_reset() };
     if rc != 0 {
-        save_error(&alloc::format!(
-            "NATIVE_RESOURCE_RESET_FAILED: {rc}; reopen homebrew"
-        ));
+        let message = alloc::format!("NATIVE_RESOURCE_RESET_FAILED: {rc}; reopen homebrew");
+        save_error(&match startup_error {
+            Some(cause) => alloc::format!("{cause}; cleanup: {message}"),
+            None => message,
+        });
     } else if let Some(bytes) = final_report {
         let _ = fs::write_all(fs.as_ref(), "logs/session-report.json", &bytes);
     }

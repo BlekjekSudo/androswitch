@@ -1,4 +1,4 @@
-param([string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',[string]$RyujinxProfile="$env:APPDATA/Ryujinx",[int]$TimeoutSeconds=300,[ValidateSet('workflow','quiescence')][string]$Scenario='workflow')
+param([string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',[string]$RyujinxProfile="$env:APPDATA/Ryujinx",[int]$TimeoutSeconds=300,[ValidateSet('workflow','quiescence','startup-failure','startup-quiescence')][string]$Scenario='workflow',[string]$ExternalApk='')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path -Parent $PSScriptRoot
 $runStarted=[DateTime]::UtcNow
@@ -62,9 +62,27 @@ try{
   Key right;Key accept;OpenApp @(@{kind='wait';ms=1500})
   Key clear_data;Key accept;OpenApp @(@{kind='wait';ms=1500})
   Key details;Key back;$commands.Add(@{kind='frame'})
-  if($Scenario -eq 'quiescence'){
+  if($Scenario -eq 'startup-failure'){
     foreach($file in Get-ChildItem "$root/apks" -File){Remove-Item -LiteralPath $file.FullName}
-    Copy-Item "$projectRoot/local-artifacts/m6/fixture/nonquiescent.apk" "$root/apks/01-nonquiescent.apk"
+    $startupFiles=@(@('startup-failure/fixture/java.apk','01-failure-java.apk'),@('startup-failure/fixture/native.apk','02-failure-native.apk'),@('startup-failure/fixture/renamed.apk','03-failure-renamed.apk'))
+    foreach($item in $startupFiles){Copy-Item "$projectRoot/local-artifacts/$($item[0])" "$root/apks/$($item[1])"}
+    $failures=3
+    if($ExternalApk){Copy-Item -LiteralPath $ExternalApk -Destination "$root/apks/04-external.apk";$failures++;$receipt.external_apk_sha256=(Get-FileHash -LiteralPath $ExternalApk).Hash.ToLowerInvariant()}
+    Copy-Item "$projectRoot/local-artifacts/m5/fixture/java-ui.apk" "$root/apks/05-java.apk"
+    Copy-Item "$projectRoot/local-artifacts/m6/fixture/native-media.apk" "$root/apks/06-native.apk"
+    $commands.Clear()
+    for($i=0;$i -lt $failures+2;$i++){
+      Key right;for($row=0;$row -lt $i;$row++){Key down};Key accept
+      if($i -lt $failures){OpenApp @(@{kind='frame'})}elseif($i -eq $failures){OpenApp $java}else{OpenApp $native}
+      $commands.Add(@{kind='frames';count=60})
+    }
+    for($i=0;$i -lt $failures+2;$i++){Key up}
+    OpenApp @(@{kind='wait';ms=1500});$commands.Add(@{kind='frames';count=60})
+  }
+  if($Scenario -in @('quiescence','startup-quiescence')){
+    foreach($file in Get-ChildItem "$root/apks" -File){Remove-Item -LiteralPath $file.FullName}
+    $boundaryFixture=if($Scenario -eq 'startup-quiescence'){'startup-failure/fixture/worker.apk'}else{'m6/fixture/nonquiescent.apk'}
+    Copy-Item "$projectRoot/local-artifacts/$boundaryFixture" "$root/apks/01-nonquiescent.apk"
     $commands.Clear();Key right;Key accept;OpenApp @(@{kind='wait';ms=50})
   }
   @{schema_version=1;session_id=$id;commands=@($commands.ToArray())} | ConvertTo-Json -Depth 20 | Set-Content "$root/runtime/launcher-test.json" -Encoding utf8NoBOM
@@ -74,15 +92,16 @@ try{
   $receipt.pid=$process.Id;$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds);$result=$null
   do{
     if(Test-Path "$root/logs/display-error.json"){throw "Display failure: $(Get-Content "$root/logs/display-error.json" -Raw)"}
-    if($Scenario -eq 'quiescence' -and (Test-Path "$root/logs/session-report.json")){
+    if($Scenario -in @('quiescence','startup-quiescence') -and (Test-Path "$root/logs/session-report.json")){
       try{$failure=Get-Content "$root/logs/session-report.json" -Raw | ConvertFrom-Json;if($failure.session_id -eq "$id-1" -and $failure.error -match 'NATIVE_NOT_QUIESCENT'){break}}catch{}
     }
     if($process.HasExited){throw "Ryujinx exited $($process.ExitCode); inspect pending session and teardown logs"}
     if(Test-Path "$root/logs/launcher-report.json"){try{$result=Get-Content "$root/logs/launcher-report.json" -Raw | ConvertFrom-Json;if($result.session_id -eq $id){break}}catch{}}
     Start-Sleep -Milliseconds 500
   }while([DateTime]::UtcNow -lt $deadline)
-  if($Scenario -eq 'quiescence'){
+  if($Scenario -in @('quiescence','startup-quiescence')){
     if($failure.session_id -ne "$id-1" -or $failure.error -notmatch 'NATIVE_NOT_QUIESCENT'){throw 'Nonquiescent worker did not fail closed with a named error'}
+    if($Scenario -eq 'startup-quiescence' -and $failure.error -notmatch 'JNI_VERSION_UNSUPPORTED'){throw 'Startup cleanup erased the original JNI_OnLoad failure'}
     if(Test-Path "$root/logs/launcher-report.json"){throw 'Unsafe worker returned to a completed launcher workflow'}
     if(Test-Path "$root/runtime/launch.json"){throw 'Launch request was not consumed; crash recovery would relaunch the same APK'}
     Copy-Item "$root/logs/session-report.json" "$run/expected-stop-failure.json"
@@ -102,6 +121,24 @@ try{
   if($null -eq $result -or $result.session_id -ne $id -or $result.status -ne 'passed_execution'){throw 'No fresh completed launcher workflow report'}
   if($result.snapshots.Count -ne $commands.Count+1){throw 'Launcher snapshot count mismatch'}
   foreach($snapshot in $result.snapshots){if($snapshot.presented_hash -cne $snapshot.shell.frame_hash){throw "Launcher framebuffer mismatch at step $($snapshot.step)"}}
+  if($Scenario -eq 'startup-failure'){
+    $failed=@($result.sessions | Where-Object status -eq 'failed');$successful=@($result.sessions | Where-Object status -eq 'passed_execution')
+    if($failed.Count -ne $failures -or $successful.Count -ne 3){throw 'Startup failures did not recover into three successful sessions'}
+    foreach($session in $failed){
+      $dependency=if($session.package -eq 'com.martinmagni.mekorama'){'libstdc\+\+\.so'}else{'libunavailable-contract\.so'}
+      if($session.error -notmatch $dependency){throw "Wrong native dependency error: $($session.error)"}
+      foreach($phase in @('java_startup_abort','native_resources_released','runtime_closed')){if($phase -notin $session.teardown.phase){throw "Failed startup skipped $phase"}}
+    }
+    if(@($failed | Where-Object package -eq 'org.example.renamedstartup').Count -ne 1){throw 'Renamed package did not use the same error/recovery path'}
+    if($successful[-1].package -ne 'org.fixture.uiproof' -or $successful[-2].package -ne 'org.fixture.nativemedia'){throw 'Java/native/Java recovery order mismatch'}
+    if($successful[-2].snapshots[-1].native_frames -lt 31 -or $successful[-2].snapshots[-1].audio_frames -ne 12000){throw 'Post-failure native graphics/audio did not execute'}
+    if(Test-Path "$root/logs/pending-session.json"){throw 'Recovered startup left an interruption marker'}
+    Copy-Item "$root/logs/launcher-report.json" "$run/emulator.json"
+    Copy-Item "$root/logs/display-handoffs.log" "$run/display-handoffs.log"
+    $receipt.status='passed';$receipt.completed_sessions=$successful.Count;$receipt.expected_startup_errors=$failed.Count;$receipt.nro_sha256=(Get-FileHash $nro).Hash.ToLowerInvariant();$receipt.emulator=@{version=(Get-Item $Ryujinx).VersionInfo.ProductVersion;sha256=(Get-FileHash $Ryujinx).Hash.ToLowerInvariant()}
+    Write-Output "Native startup recovery E2E passed: $run/verification.json"
+    return
+  }
   if($result.snapshots[-1].shell.installed.Count -ne 5){throw 'Installed list mismatch'}
   if($result.snapshots[-1].shell.decoded_icons -ne 1){throw 'APK resource PNG icon was not decoded'}
   if(-not ($result.snapshots | Where-Object {$_.shell.message -match 'INVALID_APK'})){throw 'Broken APK install did not report its failure'}

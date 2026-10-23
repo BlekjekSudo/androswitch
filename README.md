@@ -18,9 +18,9 @@ installs, updates and launches supported APKs using the shared RustyDroid
 interpreter and native ARM64 backend. Java/Kotlin UI, NativeActivity GLES2,
 assets, PCM audio and repeated application switching have Ryujinx evidence.
 The user reports that the four bundled APKs open on a physical Switch, including
-native animation/beeps, but Plus crashes in the native sample. Supplied logs show
-shutdown and one launcher frame completed; the latest display handoff changes
-await a hardware retest. See [hardware feedback](docs/HARDWARE_FEEDBACK.md).
+native animation/beeps, and that the display handoff fix resolves the native
+Plus crash and startup stall. This is sample-level user feedback; see
+[hardware feedback](docs/HARDWARE_FEEDBACK.md).
 This is not the v0.1 compatibility release.
 
 ![AndroSwitch console after the verified Ryujinx workflow](docs/images/androswitch-m7.png)
@@ -39,16 +39,21 @@ Actual submitted console framebuffer from the M7 Ryujinx test.
 | Android lifecycle/UI | Supported M5 subset; 14 Java/Kotlin UI snapshots pass in Ryujinx |
 | Native graphics/audio | NativeActivity, incremental assets, input queue, EGL/GLES2; Java AudioTrack, AAudio writes and OpenSL ES PCM queue callbacks |
 | Console launcher | Scan/install/update/launch/return/uninstall; persistent saves, named failures and one NRO |
-| Physical Switch | User reports sample install/open, native animation/beeps; native Plus crash remains pending retest |
+| Physical Switch | User reports sample install/open, native animation/beeps and successful native Plus return after the display fix |
 
 The launcher is usable for the supported test corpus. Arbitrary apps can still
 require missing Android APIs. This alpha accepts single APKs up to **64 MiB**
-on device, API 26 or lower minimum SDK, and ARM64 native libraries. OBB files
-stream separately. Network, Google Play Services, split APKs, WebView and modern
+on device, API 26 or lower minimum SDK, and ARM64 native libraries. The APK cap
+reserves headroom in the current 256 MiB heap for DEX, VM, native mappings and
+media; it is an implementation budget. OBB files stream separately.
+Network, Google Play Services, split APKs, WebView and modern
 engine compatibility are not established. There is no per-game configuration.
 Inherited RustyDroid capabilities are not automatically Switch capabilities.
 Read the [compatibility inventory](docs/ANDROSWITCH_COMPATIBILITY.md) and
 [M2–M4 implementation and evidence guide](docs/M2_M4_E2E.md) for the exact scope.
+Mekorama 1.7.2 currently fails during class initialization on an unavailable
+`libstdc++.so` dependency. Installation is not a compatibility guarantee; see
+[startup-failure diagnosis and recovery](docs/STARTUP_FAILURES.md).
 
 ## Project direction
 

@@ -127,10 +127,14 @@ the compact report record exact commands and artifacts.
 - **Android reference device/emulator:** not run for these framework/media APKs.
   JVM comparisons cover the stated VM/JNI semantics, not Android framework APIs.
 - **Physical Switch:** the user reports all four samples install/open and native
-  graphics/beeps work; Plus crashes in the native sample. The candidate fix is
-  pending hardware retest. See the dated hardware feedback; the original baseline
+  graphics/beeps work, then confirmed that the display fix resolves native Plus
+  return and the startup stall. See the dated hardware feedback; the original baseline
   did not include device runs. Suspend/resume/docked/memory validation remains M12.
 - **Corpus:** original SDK/NDK fixtures; frozen external NDK samples and Vector
   Pinball remain independent pending targets. NativeActivity FD watchers/full
   native_app_glue, arbitrary apps, modern engines, Compose and WebView are not
   established by these passes.
+
+Failed class/native initialization has separate recovery and live-worker
+regressions, including the supplied external Mekorama APK. Those results and
+reproduction commands are in [startup failures](STARTUP_FAILURES.md).

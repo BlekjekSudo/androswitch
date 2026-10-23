@@ -2,8 +2,9 @@
 
 Ini paket pengembangan M7. Pengujian regresi dilakukan di Ryujinx. Pengguna
 melaporkan empat contoh bisa dibuka di Switch asli, termasuk animasi dan beep;
-tetapi Plus pada contoh native crash. Perubahan penutupan dalam build ini
-masih perlu dites ulang di Switch. Fondasinya adalah **RustyDroid karya nadabgfccvd dan para
+pengguna kemudian mengonfirmasi perbaikan display menyelesaikan crash Plus dan
+tersendat saat awal membuka contoh native. Perubahan pemulihan startup terbaru
+masih perlu dites di Switch. Fondasinya adalah **RustyDroid karya nadabgfccvd dan para
 kontributornya**. Kredit dan lisensi lengkap ikut disertakan dalam paket.
 
 1. Ekstrak folder `switch/` dari ZIP ke SD. Jangan hapus folder data lama saat
@@ -28,6 +29,13 @@ APK umum masih bisa gagal karena API Android yang belum tersedia. Batas awal:
 APK tunggal maksimal 64 MiB, minSdk maksimal 26, native ARM64, offline. Belum
 ada dukungan Google Play Services, split APK atau jaminan engine/game umum.
 Pakai empat contoh APK untuk pengujian awal di perangkat.
+
+Batas 64 MiB berasal dari APK yang masih dimuat utuh ke RAM, dengan heap runtime
+256 MiB yang juga dipakai DEX, VM, library dan media. OBB dibaca bertahap.
+Mekorama 1.7.2 berukuran sekitar 12,5 MiB, tetapi gagal karena dependency native
+`libstdc++.so` belum tersedia. Runtime sekarang membersihkan startup gagal sebelum
+kembali ke console bila aman; ini belum berarti Mekorama bisa dimainkan.
+Lihat [diagnosis dan pengujian startup](https://github.com/BlekjekSudo/androswitch/blob/main/docs/STARTUP_FAILURES.md).
 
 Jika worker native tidak mau berhenti, runtime mencatat alasan lalu menutup
 proses Horizon. Buka ulang homebrew untuk melihat pemberitahuan gangguan.

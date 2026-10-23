@@ -126,4 +126,19 @@ and return again.
 If it crashes, preserve the last phase in `teardown.log`, `session-report.json`,
 `display-handoffs.log`, `display-error.json` if present, `pending-session.json`
 and a system crash report if available. Reopen homebrew to show
-the interrupted-session notice. The updated build is **pending hardware retest**.
+the interrupted-session notice. At the time of that candidate, hardware retesting
+was pending; the subsequent report below supersedes that status.
+
+## User confirmation and external APK failure
+
+The user subsequently confirmed that the display handoff fix resolves the native
+sample's Plus crash and startup stall. The delivered NRO was expected to be
+`449917f0f53a88d6c66ecf09aa5b820e3612e7ec9bd2192aa839f3c59da4ad32`;
+the running binary was not independently hashed. This is user-reported sample
+evidence, not a physical-device run of the full milestone corpus.
+
+The next report concerns Mekorama 1.7.2, not the previous native sample. Its fresh
+session report identifies a missing `libstdc++.so` dependency during static class
+initialization. The accompanying display/teardown traces still describe the prior
+native sample and show a successful return. They do not demonstrate a new GPU
+failure in Mekorama. See [startup diagnosis and recovery](STARTUP_FAILURES.md).

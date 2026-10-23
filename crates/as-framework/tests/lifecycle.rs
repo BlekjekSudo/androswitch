@@ -147,3 +147,16 @@ fn unavailable_framework_method_reports_exact_descriptor() {
     assert!(e.contains("getSystemService"), "{e}");
     assert!(e.contains("NOT_FOUND"), "{e}");
 }
+
+#[test]
+#[ignore = "requires built APK fixtures"]
+fn abort_startup_cancels_handler_without_delivering_lifecycle_callbacks() {
+    let (mut app, clock, _) = make("java");
+    app.launch().unwrap();
+    let events = app.android.lifecycle().len();
+    app.android.abort_startup().unwrap();
+    clock.0.set(2000);
+    app.draw().unwrap();
+    assert!(has(&app, "Count 0 / app 1"));
+    assert_eq!(app.android.lifecycle().len(), events);
+}

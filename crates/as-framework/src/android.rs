@@ -207,7 +207,14 @@ impl Android {
         while let Some(r) = self.activity_object() {
             self.finish(vm, r)?;
         }
+        self.abort_startup()
+    }
+    /// Release platform-owned resources after a failed launch without invoking
+    /// lifecycle methods on an activity whose initialization did not complete.
+    /// The caller must still join native callbacks/threads before dropping VM state.
+    pub fn abort_startup(&self) -> Result<()> {
         self.state.borrow_mut().tasks.clear();
+        self.state.borrow_mut().actions.clear();
         let tracks = core::mem::take(&mut self.state.borrow_mut().audio_tracks);
         for (_, (id, _)) in tracks {
             self.audio()?.close(id)?;
