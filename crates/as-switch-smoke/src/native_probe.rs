@@ -1,5 +1,5 @@
 //! Descriptor-driven native method probe, using one loader on both backends.
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{collections::BTreeMap, rc::Rc, string::String, vec::Vec};
 use as_native::{error, Result};
 #[cfg(any(target_os = "horizon", feature = "host-native"))]
 use as_native::{CallFrame, Loader};
@@ -19,6 +19,38 @@ pub struct NativeResult {
     pub symbol: String,
     pub value: Option<String>,
     pub error: Option<as_native::Error>,
+}
+struct ApkLibraries {
+    zip: rd_apk::Zip,
+    entries: BTreeMap<String, String>,
+}
+impl as_native::LibrarySource for ApkLibraries {
+    fn contains(&self, name: &str) -> bool {
+        self.entries.contains_key(name)
+    }
+    fn read(&self, name: &str) -> Result<Vec<u8>> {
+        let path = self
+            .entries
+            .get(name)
+            .ok_or_else(|| error("LIBRARY_NOT_FOUND", "load", name, "APK ARM64 entry"))?;
+        self.zip
+            .read(path)
+            .map_err(|e| error(&e.code, "extract", name, e.cause))
+    }
+}
+pub fn library_source(apk: &rd_apk::Apk) -> Rc<dyn as_native::LibrarySource> {
+    let entries = apk
+        .native_libs
+        .iter()
+        .filter_map(|path| {
+            let name = path.strip_prefix("lib/arm64-v8a/")?;
+            (!name.contains('/')).then(|| (String::from(name), path.clone()))
+        })
+        .collect();
+    Rc::new(ApkLibraries {
+        zip: apk.zip.clone(),
+        entries,
+    })
 }
 pub fn sources(apk: &rd_apk::Apk) -> Result<BTreeMap<String, Vec<u8>>> {
     let mut sources = BTreeMap::new();

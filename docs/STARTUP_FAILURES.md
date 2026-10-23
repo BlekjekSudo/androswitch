@@ -1,12 +1,18 @@
 # APK budgets and failed initialization
 
-The M7 alpha loads the complete APK container into memory. Its 64 MiB cap reserves
+The historical M7 alpha loaded the complete APK container into memory. Its 64 MiB cap reserved
 headroom within the 256 MiB homebrew heap for decoded DEX, VM objects, extracted
 native images, executable mappings and media. It is a current implementation
 budget, not an Android APK format or Switch file-size limit. Host inspection can
 accept 512 MiB. Supporting larger APKs requires using positioned/streamed storage
 through the package loader and runtime, then measuring peak memory. Increasing
 the constant alone does not establish that larger APKs can launch safely.
+
+**Current M7 improvement/M9 candidate:** positioned ZIP reads and staged copies
+replace the resident container path. The cap is now 512 MiB, with independent
+entry/DEX budgets and a 128 MiB host execution test. See [storage evidence](M7_STORAGE_E2E.md).
+The historical Mekorama diagnosis below is unchanged; container streaming does
+not implement its missing native ABI.
 
 OBBs remain opaque files read in bounded chunks. Moving an APK into an OBB does
 not change how Android code/resources are loaded.

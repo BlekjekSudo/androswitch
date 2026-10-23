@@ -113,6 +113,27 @@
       "source_path": "fixtures/m6",
       "report": "reports/m6-m7.json",
       "note": "Original SDK/NDK Java/native fixtures; no runtime package profiles. Includes separate expected-failure lifecycle/API fixtures."
+    },
+    {
+      "id": "androswitch-m8-persistent-contracts",
+      "state": "source_and_host_contracts_recorded",
+      "milestone": "M8",
+      "source_path": "fixtures/m8",
+      "report": "reports/m8-m9-candidate.json"
+    },
+    {
+      "source_lock": "fixtures/m9/external.lock.json",
+      "id": "aosp-hello-activity-api26",
+      "state": "unmodified_source_build_host_render_scenario",
+      "milestone": "M8/M9",
+      "report": "reports/m8-m9-candidate.json"
+    },
+    {
+      "source_lock": "fixtures/m9/external.lock.json",
+      "id": "vector-pinball-fdroid-43",
+      "state": "apk_frozen_evaluation_only_no_gameplay",
+      "milestone": "M9",
+      "report": "reports/m8-m9-candidate.json"
     }
   ],
   "updated_on": "2026-10-24"

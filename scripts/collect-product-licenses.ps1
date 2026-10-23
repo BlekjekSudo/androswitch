@@ -12,6 +12,9 @@ $sources=@(
   @{name='gcc-COPYING3';version='GCC 16.1.0 GPLv3; see Runtime Library Exception';url='https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-16.1.0/COPYING3';sha256='8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903'}
 )
 $inventory=[Collections.Generic.List[object]]::new()
+Copy-Item "$projectRoot/third_party/SQLite-NOTICE.txt" "$output/platform/SQLite-NOTICE.txt"
+Copy-Item "$projectRoot/third_party/sqlite.lock.json" "$output/platform/sqlite.lock.json"
+$inventory.Add(@{component='SQLite 3.54.1';license='public-domain';source='https://www.sqlite.org/2026/sqlite-amalgamation-3540100.zip';files=@(@{path='platform/SQLite-NOTICE.txt';sha256=(Get-FileHash "$output/platform/SQLite-NOTICE.txt").Hash.ToLowerInvariant()},@{path='platform/sqlite.lock.json';sha256=(Get-FileHash "$output/platform/sqlite.lock.json").Hash.ToLowerInvariant()})})
 foreach($source in $sources){
   $path=Join-Path $output "platform/$($source.name)"
   $cache=Join-Path $projectRoot "local-artifacts/product-licenses/platform/$($source.name)"

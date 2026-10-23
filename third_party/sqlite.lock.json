@@ -1,0 +1,13 @@
+{
+  "version": "3.54.1",
+  "source_url": "https://www.sqlite.org/2026/sqlite-amalgamation-3540100.zip",
+  "archive_sha3_256": "92281c86e2957f9b9305890f9ac04204caa7b677cc868dc326d942689df28e30",
+  "upstream_download_page": "https://www.sqlite.org/download.html",
+  "license_url": "https://www.sqlite.org/copyright.html",
+  "source_directory": "sqlite-amalgamation-3540100",
+  "cache": "local-artifacts/dependencies/sqlite",
+  "source_sha256": {
+    "sqlite3.c": "0c657666d819f261cc4007526ad57e1669de9949df7a8ea847aa284a2bf0ee52",
+    "sqlite3.h": "d6c84557261893439b341d2e6c35187ae3ea24fbfd843ad94616f72d89242b8c"
+  }
+}

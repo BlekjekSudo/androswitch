@@ -1,6 +1,20 @@
 //! Root-relative storage shared by package management and the guest VFS.
 use crate::PlatformError;
-use alloc::{string::String, vec::Vec};
+use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
+pub trait WriteFile {
+    fn write(&mut self, bytes: &[u8]) -> Result<usize, PlatformError>;
+    /// Commit bytes durably before installation can publish its revision marker.
+    fn finish(&mut self) -> Result<(), PlatformError>;
+}
+/// An owned, thread-safe positional reader. Implementations retain their file
+/// or resolved path independently of a caller's filesystem/VM borrow.
+pub trait ReadOnlyFile: Send + Sync {
+    fn len(&self) -> u64;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> Result<usize, PlatformError>;
+}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Metadata {
     pub directory: bool,
@@ -12,6 +26,16 @@ pub struct Entry {
     pub directory: bool,
 }
 pub trait FileSystem {
+    fn begin_write(&self, _path: &str) -> Result<Option<Box<dyn WriteFile>>, PlatformError> {
+        Ok(None)
+    }
+    fn open_read(&self, _path: &str) -> Result<Arc<dyn ReadOnlyFile>, PlatformError> {
+        Err(error(
+            "API_UNAVAILABLE",
+            "open_read",
+            "owned positional reader",
+        ))
+    }
     fn stat(&self, path: &str) -> Result<Option<Metadata>, PlatformError>;
     fn read_at(&self, path: &str, offset: u64, output: &mut [u8]) -> Result<usize, PlatformError>;
     fn write_at(
@@ -28,6 +52,12 @@ pub trait FileSystem {
     fn remove(&self, path: &str, recursive: bool) -> Result<(), PlatformError>;
 }
 impl<T: FileSystem + ?Sized> FileSystem for alloc::rc::Rc<T> {
+    fn begin_write(&self, p: &str) -> Result<Option<Box<dyn WriteFile>>, PlatformError> {
+        (**self).begin_write(p)
+    }
+    fn open_read(&self, p: &str) -> Result<Arc<dyn ReadOnlyFile>, PlatformError> {
+        (**self).open_read(p)
+    }
     fn stat(&self, p: &str) -> Result<Option<Metadata>, PlatformError> {
         (**self).stat(p)
     }

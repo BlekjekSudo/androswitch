@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-24",
+  "evidence_type": "direct_user_confirmation",
+  "milestones": [
+    "M1",
+    "M2",
+    "M3",
+    "M4",
+    "M5",
+    "M6",
+    "M7"
+  ],
+  "status": "tested_on_physical_switch_user_reported",
+  "statement": "User explicitly confirms M1\u2013M7 were tested on a physical Switch and requests marking the roadmap.",
+  "binary_identity": "not_supplied",
+  "individual_scenario_results": "not_supplied",
+  "scope_limit": "This confirmation applies to the existing milestone builds. It does not certify future M7 improvement/M8/M9 artifacts, every API, or every APK."
+}

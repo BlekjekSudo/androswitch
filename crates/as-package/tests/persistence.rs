@@ -70,6 +70,9 @@ impl FaultFs {
     }
 }
 impl FileSystem for FaultFs {
+    fn open_read(&self, p: &str) -> Result<std::sync::Arc<dyn fs::ReadOnlyFile>, PlatformError> {
+        self.fs.open_read(p)
+    }
     fn stat(&self, p: &str) -> Result<Option<Metadata>, PlatformError> {
         self.fs.stat(p)
     }
@@ -95,6 +98,40 @@ impl FileSystem for FaultFs {
         self.tick()?;
         self.fs.remove(p, r)
     }
+}
+#[test]
+fn file_updates_keep_previous_revision_at_each_failed_mutation() {
+    let mut failures = 0;
+    let mut successes = 0;
+    for boundary in 0..48 {
+        let fs = FaultFs {
+            fs: HostFileSystem::new(root("file-fault")).unwrap(),
+            fail: Rc::new(Cell::new(None)),
+            count: Rc::new(Cell::new(0)),
+        };
+        let pm = PackageManager::new(fs.clone());
+        let old = pm
+            .install(apk("org.fixture.stream", 1), false, None)
+            .unwrap();
+        fs::write_all(&fs, "apks/input.apk", &apk("org.fixture.stream", 2)).unwrap();
+        fs.count.set(0);
+        fs.fail.set(Some(boundary));
+        let result = pm.install_file("apks/input.apk", true, None);
+        fs.fail.set(None);
+        let (active, loaded) = pm.load_apk("org.fixture.stream", None).unwrap();
+        assert!(loaded.zip.is_file_backed());
+        match result {
+            Ok(record) => {
+                assert_eq!(active, record);
+                successes += 1;
+            }
+            Err(_) => {
+                assert_eq!(active, old);
+                failures += 1;
+            }
+        }
+    }
+    assert!(failures > 20 && successes > 0);
 }
 #[test]
 fn failed_updates_preserve_previous_committed_apk_and_data() {

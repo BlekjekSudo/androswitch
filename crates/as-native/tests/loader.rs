@@ -87,6 +87,44 @@ fn scalar_calling_convention_keeps_integer_float_banks_and_spill_order() {
     assert_eq!(&frame.stack[..2], &[8, 17]);
     assert!(frame.arguments(&["I".into()], &[]).is_err());
 }
+
+#[test]
+#[ignore = "requires rebuilt NDK fixtures"]
+fn library_provider_extracts_only_requested_dependency_graph() {
+    struct Source {
+        files: BTreeMap<String, Vec<u8>>,
+        reads: std::cell::RefCell<Vec<String>>,
+    }
+    impl as_native::LibrarySource for Source {
+        fn contains(&self, name: &str) -> bool {
+            self.files.contains_key(name)
+        }
+        fn read(&self, name: &str) -> Result<Vec<u8>> {
+            self.reads.borrow_mut().push(name.into());
+            self.files
+                .get(name)
+                .cloned()
+                .ok_or_else(|| as_native::error("LIBRARY_NOT_FOUND", "test", name, "fixture"))
+        }
+    }
+    let source = std::rc::Rc::new(Source {
+        files: fixtures(),
+        reads: Default::default(),
+    });
+    let mut loader = Loader::with_source(Memory::default(), source.clone());
+    assert!(source.reads.borrow().is_empty());
+    loader.load("libarithmetic.so").unwrap();
+    assert_eq!(
+        &*source.reads.borrow(),
+        &["libarithmetic.so", "libcalculation.so"]
+    );
+    loader.load("libarithmetic.so").unwrap();
+    assert_eq!(source.reads.borrow().len(), 2);
+    assert!(loader
+        .modules
+        .iter()
+        .all(|module| module.name != "libthreadstate.so"));
+}
 #[test]
 #[ignore = "requires rebuilt NDK fixtures"]
 fn missing_dependency_and_symbol_have_required_names() {

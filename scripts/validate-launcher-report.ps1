@@ -8,6 +8,28 @@ if(Test-Path (Join-Path $Root 'logs/display-error.json')){throw 'Display failure
   if($null -eq $result -or $result.session_id -ne $id -or $result.status -ne 'passed_execution'){throw 'No fresh completed launcher workflow report'}
   if($result.snapshots.Count -ne $CommandCount+1){throw 'Launcher snapshot count mismatch'}
   foreach($snapshot in $result.snapshots){if($snapshot.presented_hash -cne $snapshot.shell.frame_hash){throw "Launcher framebuffer mismatch at step $($snapshot.step)"}}
+  if($Scenario -eq 'm9'){
+    if($result.sessions.Count -ne 24 -or @($result.sessions|Where-Object status -ne 'passed_execution').Count){throw 'M9 requires 24 successful complete sessions'}
+    foreach($package in @('org.fixture.preferences','net.example.renamednotes','org.fixture.database','net.example.renameddb','com.example.android.helloactivity','org.fixture.uiproof','org.fixture.kotlinui','org.fixture.nativemedia')){
+      $sessions=@($result.sessions|Where-Object package -eq $package)
+      if($sessions.Count -ne 3){throw "M9 package did not complete three sessions: $package"}
+      for($cycle=0;$cycle -lt 3;$cycle++){
+        $session=$sessions[$cycle]
+        foreach($phase in @('java_activity_stop','native_resources_released','runtime_closed')){if($phase -notin $session.teardown.phase){throw "M9 teardown missing $phase"}}
+        $labels=(@($session.snapshots[-1].views|ForEach-Object text) -join ' | ')
+        if($package -in @('org.fixture.preferences','net.example.renamednotes') -and $labels -notmatch "Prefs $($cycle+1) /"){throw "M9 preferences did not persist: $labels"}
+        if($package -in @('org.fixture.database','net.example.renameddb') -and $labels -notmatch "Notes $($cycle+1) /"){throw "M9 database did not persist: $labels"}
+        if($package -eq 'com.example.android.helloactivity' -and $labels -notmatch 'Hello, World!'){throw 'AOSP layout was not displayed'}
+        if($package -eq 'org.fixture.nativemedia' -and ($session.snapshots[-1].native_frames -lt 31 -or $session.snapshots[-1].audio_frames -ne 12000)){throw 'M9 native graphics/audio did not execute'}
+      }
+    }
+    if(Test-Path "$root/logs/pending-session.json"){throw 'M9 left pending session marker'}
+    Copy-Item "$root/logs/launcher-report.json" "$run/emulator.json"
+    Copy-Item "$root/logs/display-handoffs.log" "$run/display-handoffs.log"
+    $receipt.status='passed';$receipt.completed_sessions=24;$receipt.nro_sha256=(Get-FileHash $nro).Hash.ToLowerInvariant()
+    Write-Output "M9 Horizon corpus passed: $run/verification.json"
+    return
+  }
   if($Scenario -eq 'startup-failure'){
     $failed=@($result.sessions | Where-Object status -eq 'failed');$successful=@($result.sessions | Where-Object status -eq 'passed_execution')
     if($failed.Count -ne $failures -or $successful.Count -ne 3){throw 'Startup failures did not recover into three successful sessions'}

@@ -47,6 +47,31 @@ pub const BLOCK_ID_V2: u32 = 0x7109_871a;
 pub const BLOCK_ID_V3: u32 = 0xf053_68c0;
 pub const BLOCK_ID_V3_1: u32 = 0x3ba0_6f8c;
 
+/// Inspect the signing footer/block using bounded positional reads. Presence
+/// detection is identical to the resident parser; signatures are not verified.
+pub fn detect_zip(zip: &Zip) -> crate::RdResult<SigningInfo> {
+    if let Ok(bytes) = zip.raw_bytes() {
+        return Ok(detect(bytes, zip.cd_offset(), zip));
+    }
+    let end = zip.cd_offset();
+    if end < 24 {
+        return Ok(detect(&[], 0, zip));
+    }
+    let footer = zip.read_range(end - 24, 24)?;
+    if &footer[8..] != APK_SIG_BLOCK_MAGIC {
+        return Ok(detect(&[], 0, zip));
+    }
+    let size = u64_at(&footer, 0).unwrap_or(0);
+    let total = size
+        .checked_add(8)
+        .filter(|n| *n <= end && *n <= 16 << 20)
+        .ok_or_else(|| {
+            crate::RdError::invalid_format("APK signing block exceeds extent/16 MiB budget")
+        })?;
+    let block = zip.read_range(end - total, total as usize)?;
+    Ok(detect(&block, total, zip))
+}
+
 #[inline]
 fn u32_at(d: &[u8], off: usize) -> Option<u32> {
     d.get(off..off + 4)

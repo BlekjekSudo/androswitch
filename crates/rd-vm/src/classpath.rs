@@ -1071,7 +1071,20 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroid/app/AlertDialog;" => Some(&["Landroid/app/Dialog;", "Ljava/lang/Object;"]),
         "Landroid/app/AlertDialog$Builder;" => Some(OBJECT),
         "Landroid/database/sqlite/SQLiteDatabase;" => Some(OBJECT),
+        "Landroid/content/SharedPreferences;" | "Landroid/content/SharedPreferences$Editor;" => {
+            Some(OBJECT)
+        }
+        "Landroid/app/SharedPreferencesImpl;" => {
+            Some(&["Ljava/lang/Object;", "Landroid/content/SharedPreferences;"])
+        }
+        "Landroid/app/SharedPreferencesImpl$EditorImpl;" => Some(&[
+            "Ljava/lang/Object;",
+            "Landroid/content/SharedPreferences$Editor;",
+        ]),
         "Landroid/database/sqlite/SQLiteOpenHelper;" => Some(OBJECT),
+        "Landroid/database/MatrixCursor;" => {
+            Some(&["Landroid/database/AbstractCursor;", "Ljava/lang/Object;"])
+        }
         // jtext_format
         "Ljava/text/Format;"
         | "Ljava/text/DecimalFormatSymbols;"
@@ -1374,7 +1387,7 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Ljava/lang/InheritableThreadLocal;" => {
             Some(&["Ljava/lang/ThreadLocal;", "Ljava/lang/Object;"])
         }
-        "Ljava/lang/Class;" => Some(OBJECT),
+        "Ljava/lang/Class;" | "Lorg/androswitch/runtime/CollectionIterator;" => Some(OBJECT),
         "Ljava/lang/ClassLoader;" => Some(OBJECT),
         // M8: ServiceLoader host é um Iterable vazio enquanto a descoberta
         // `META-INF/services` do APK permanece fora do runtime.
@@ -1443,6 +1456,10 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
     const MAP_IFACES: &[&str] = &["Ljava/util/Map;"];
     match class {
         "Ljava/lang/String;" => Some(STRING_IFACES),
+        "Landroid/database/MatrixCursor;" => {
+            Some(&["Landroid/database/Cursor;", "Ljava/io/Closeable;"])
+        }
+        "Lorg/androswitch/runtime/CollectionIterator;" => Some(&["Ljava/util/Iterator;"]),
         "Ljava/lang/StringBuilder;" | "Ljava/lang/StringBuffer;" => Some(SB_IFACES),
         "Ljava/util/regex/Pattern;" => Some(&["Ljava/io/Serializable;"]),
         "Ljava/util/regex/Matcher;" => Some(&["Ljava/util/regex/MatchResult;"]),

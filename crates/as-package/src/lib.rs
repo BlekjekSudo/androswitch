@@ -2,11 +2,13 @@
 //! a *new* commit marker: no rename-overwrite assumption on Horizon's SD FS.
 #![no_std]
 extern crate alloc;
+mod archive;
 use alloc::{
     format,
     string::{String, ToString},
     vec::Vec,
 };
+pub use archive::open_apk;
 use as_platform::{
     fs::{self, FileSystem},
     vfs::{valid_package, Vfs},
@@ -227,6 +229,53 @@ impl<F: FileSystem> PackageManager<F> {
             return Err(error("INPUT_TOO_LARGE", "APK exceeds 512 MiB"));
         }
         let apk = Apk::from_bytes(bytes).map_err(|e| error("INVALID_APK", e.to_string()))?;
+        let hash = digest(apk.zip.raw_bytes().map_err(json)?);
+        self.install_parsed(&apk, hash, update, entry, |output| {
+            fs::write_all(&self.fs, output, apk.zip.raw_bytes().map_err(json)?)
+        })
+    }
+    /// Copy to a private staging directory before parsing/validating. The source
+    /// can be removed after publication; partial imports never replace a revision.
+    pub fn install_file(
+        &self,
+        path: &str,
+        update: bool,
+        entry: Option<&str>,
+    ) -> Result<Record, PlatformError> {
+        self.initialize()?;
+        let bucket = format!("cache/imports/{}", digest(path.as_bytes()));
+        fs::mkdirs(&self.fs, &bucket)?;
+        let mut staging = None;
+        for serial in 0..1024 {
+            let candidate = format!("{bucket}/{serial}");
+            if self.fs.create_dir(&candidate, true)? {
+                staging = Some(candidate);
+                break;
+            }
+        }
+        let staging = staging.ok_or_else(|| error("PACKAGE_BUSY", "import staging"))?;
+        let temp = format!("{staging}/package.apk");
+        let result = (|| {
+            let (length, hash) = archive::transfer(&self.fs, path, Some(&temp))?;
+            if archive::transfer(&self.fs, &temp, None)? != (length, hash.clone()) {
+                return Err(error("INSTALL_VERIFY_FAILED", &temp));
+            }
+            let apk = open_apk(&self.fs, &temp)?;
+            self.install_parsed(&apk, hash, update, entry, |output| {
+                self.fs.rename_new(&temp, output)
+            })
+        })();
+        let _ = self.fs.remove(&staging, true);
+        result
+    }
+    fn install_parsed(
+        &self,
+        apk: &Apk,
+        apk_sha256: String,
+        update: bool,
+        entry: Option<&str>,
+        copy: impl FnOnce(&str) -> Result<(), PlatformError>,
+    ) -> Result<Record, PlatformError> {
         package(&apk.manifest.package)?;
         if apk.manifest.min_sdk > 26 {
             return Err(error(
@@ -286,12 +335,11 @@ impl<F: FileSystem> PackageManager<F> {
         let entry_activity = entry
             .map(str::to_string)
             .or_else(|| activities.first().cloned());
-        let apk_sha256 = digest(apk.zip.raw_bytes());
         if let Some(old) = previous.filter(|r| r.installed) {
             if old.apk_sha256 == apk_sha256 && old.entry_activity == entry_activity {
                 // Verify the installed copy before accepting a no-op. A damaged
                 // or missing copy must not be reported as a healthy install.
-                self.load(&old.package, Some(old.revision))?;
+                self.verify_record(&old)?;
                 return Ok(old);
             }
         }
@@ -312,8 +360,10 @@ impl<F: FileSystem> PackageManager<F> {
             signature_verified: false,
         };
         let output = format!("{}/package.apk", revision_dir(&record.package, revision));
-        fs::write_all(&self.fs, &output, apk.zip.raw_bytes())?;
-        if digest(&fs::read_all(&self.fs, &output, MAX_APK_BYTES)?) != record.apk_sha256 {
+        copy(&output)?;
+        if archive::transfer(&self.fs, &output, None)?
+            != (record.apk_bytes, record.apk_sha256.clone())
+        {
             return Err(error("INSTALL_VERIFY_FAILED", output));
         }
         for path in [
@@ -326,6 +376,35 @@ impl<F: FileSystem> PackageManager<F> {
         }
         self.publish(&record)?;
         Ok(record)
+    }
+    fn verify_record(&self, record: &Record) -> Result<(), PlatformError> {
+        let path = format!(
+            "{}/package.apk",
+            revision_dir(&record.package, record.revision)
+        );
+        if archive::transfer(&self.fs, &path, None)?
+            != (record.apk_bytes, record.apk_sha256.clone())
+        {
+            return Err(error("INSTALLATION_CORRUPT", &record.package));
+        }
+        Ok(())
+    }
+    pub fn load_apk(
+        &self,
+        name: &str,
+        revision: Option<u64>,
+    ) -> Result<(Record, Apk), PlatformError> {
+        let record = self
+            .latest(name)?
+            .filter(|r| r.installed)
+            .ok_or_else(|| error("NOT_INSTALLED", name))?;
+        if revision.is_some_and(|r| r != record.revision) {
+            return Err(error("STALE_INSTALLATION", name));
+        }
+        self.verify_record(&record)?;
+        let path = format!("{}/package.apk", revision_dir(name, record.revision));
+        let apk = open_apk(&self.fs, &path)?;
+        Ok((record, apk))
     }
     pub fn load(
         &self,

@@ -12,7 +12,8 @@
 | DEX parser (not execution) | `rd-dex` implementation/tests | `no_std + alloc` build; real DEX smoke matched host in Ryujinx |
 | JNI/native | Bounded Unicorn/Python worker | Real Horizon ARM64 execution and VM JNI callbacks; supported subset below |
 | Filesystem | Java in-memory VFS | Persistent shared Java/native VFS, private package mounts and opaque OBB reads |
-| SQLite | Python subprocess/subset | Device backend planned for M8 |
+| SQLite | Python subprocess/subset | Actual native SQLite C engine, durable 8 MiB snapshots and bounded Android SQLiteDatabase/helper/cursor contracts; no subprocess |
+| Preferences/collections/reflection | Desktop subsets | Persistent XML SharedPreferences, GC-backed boxed collections/iterators and declared DEX method reflection; exact overloads in M8/M9 guide |
 | Graphics/audio/input | Headless software snapshots | CPU UI framebuffer, actual NativeActivity EGL/GLES2, input queue and PCM AudioTrack/AAudio/OpenSL ES subset |
 | Registry | Host agent facilities | Immutable copied-APK revisions, update/data retention, uninstall and explicit clear-data |
 | Consumer launcher | Host agent facilities | One-NRO console; scan/install/update/launch/return/uninstall and separate clear-data; ten-session Ryujinx corpus |
@@ -47,8 +48,10 @@ verification remains pending. See
 passing AndroSwitch checks and failing immutable-upstream reference tests.
 
 M6/M7's exact subset and negative boundary tests are in [M6/M7](M6_M7_E2E.md).
-Device APKs are currently limited to 64 MiB, while assets/OBBs use bounded
-reads. Audio is one 48 kHz stereo PCM16 output. Full native_app_glue FD support,
+Device APK containers now use file-backed reads and a 512 MiB cap. Materialized
+entries remain capped at 64 MiB and combined raw DEX at 32 MiB. The 128 MiB
+container proof is host-tested; the new NRO still needs Horizon/hardware testing.
+Assets/OBBs use bounded reads. Audio is one 48 kHz stereo PCM16 output. Full native_app_glue FD support,
 AAudio callback/low-latency modes, audio input/effects, arbitrary applications,
 Compose/WebView/modern engines and external NDK samples remain unverified.
 Only bounded RGB/RGBA PNG icons decode; other icon formats use a visible fallback.
@@ -58,3 +61,19 @@ initialization because `libBarcodeScannerLib.so` requires unavailable
 `libstdc++.so`. No gameplay was reached. The alpha's startup recovery reports
 this error after cleanup; it does not fabricate the missing ABI. See
 [diagnosis and evidence](STARTUP_FAILURES.md).
+
+M8/M9 results are scoped by scenario, not an APK-wide compatibility badge:
+
+| Scenario | Host | New Horizon NRO | Physical Switch |
+| --- | --- | --- | --- |
+| Preferences / renamed preferences, restart and GC | Contract tests passed | not run | not run |
+| Native SQLite notes / renamed notes, transaction/cursor/reflection | Contract tests passed | not run | not run |
+| AOSP HelloActivity original source/layout | Recorded in candidate corpus; static rendering only | not run | not run |
+| Vector Pinball 1.16.0, unmodified F-Droid APK | Blocked at Context.getApplicationInfo; no gameplay | not run | not run |
+| External NDK hello-jni/native-activity | Build/integration pending | pending | pending |
+
+The [candidate report](../reports/m8-m9-candidate.json) records exact fixture
+hashes, repeated-run counts and host measurements. [M8/M9 contracts](M8_M9_E2E.md)
+list unavailable overloads, memory budgets, SQLite limitations, permission policy
+and remaining release gates. Earlier M1–M7 hardware testing is user-confirmed;
+it is separate from every new build in this table.

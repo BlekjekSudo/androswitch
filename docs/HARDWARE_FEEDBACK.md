@@ -1,5 +1,14 @@
 # M7 physical Switch feedback — 2026-10-24
 
+## M1–M7 hardware confirmation
+
+On 2026-10-24 the user explicitly confirmed that M1–M7 had been tested on a
+physical Switch. The roadmap now records that status for all seven milestones.
+[The confirmation record](../reports/hardware-m1-m7-user-confirmation-20261024.json)
+distinguishes this user evidence from collected per-scenario runs. Binary hashes,
+firmware and individual scenario outputs were not supplied. Future M7 improvement,
+M8 and M9 binaries need separate tests; this does not certify arbitrary APKs.
+
 Evidence here is user-reported in the development conversation. No device crash
 dump, Atmosphère result code or collected hardware trace was available during
 the fix. The exact hardware, firmware and homebrew launch mode are unrecorded.

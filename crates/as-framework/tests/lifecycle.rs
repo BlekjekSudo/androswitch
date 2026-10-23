@@ -31,10 +31,10 @@ fn make(language: &str) -> (App, Rc<TestClock>, PathBuf) {
     )))
     .expect("run scripts/build-m5-fixture.ps1");
     let pm = as_package::PackageManager::new(storage.clone());
-    pm.install(bytes.clone(), true, None).unwrap();
+    let installed = pm.install(bytes, true, None).unwrap();
     let clock = Rc::new(TestClock::default());
     let app = App::new(
-        rd_apk::Apk::from_bytes(bytes).unwrap(),
+        pm.load_apk(&installed.package, None).unwrap().1,
         storage,
         clock.clone(),
         640,
@@ -159,4 +159,74 @@ fn abort_startup_cancels_handler_without_delivering_lifecycle_callbacks() {
     app.draw().unwrap();
     assert!(has(&app, "Count 0 / app 1"));
     assert_eq!(app.android.lifecycle().len(), events);
+}
+
+#[test]
+#[ignore = "requires scripts/build-large-apk-fixture.py"]
+fn large_file_backed_apk_launches_and_shares_streamed_assets_after_restart() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!(
+        "../../target/m7-large-tests/{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let storage = Rc::new(HostFileSystem::new(&root).unwrap());
+    let pm = as_package::PackageManager::new(storage.clone());
+    pm.initialize().unwrap();
+    std::fs::copy(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../local-artifacts/m7-improvements/fixture/large-ui.apk"),
+        root.join("apks/large.apk"),
+    )
+    .unwrap();
+    let record = pm.install_file("apks/large.apk", true, None).unwrap();
+    assert!(record.apk_bytes > 64 << 20);
+    let mut app = App::new(
+        pm.load_apk(&record.package, None).unwrap().1,
+        storage.clone(),
+        Rc::new(TestClock::default()),
+        640,
+        360,
+        None,
+    )
+    .unwrap();
+    assert!(app.android.apk.zip.is_file_backed());
+    app.launch().unwrap();
+    assert!(has(&app, "Count 0 / app 1"));
+    click(&mut app, 100., 64.);
+    let mut asset = app
+        .android
+        .apk
+        .zip
+        .stream("assets/big-payload.bin")
+        .unwrap();
+    assert!(asset.len() > 64 << 20);
+    asset.seek(65520).unwrap();
+    let mut actual = [0; 128];
+    assert_eq!(asset.read(&mut actual).unwrap(), actual.len());
+    let mut block = vec![0xa5; 65536];
+    let label = b"AndroSwitch archive streaming fixture\n";
+    block[..label.len()].copy_from_slice(label);
+    let expected = (65520..65648)
+        .map(|i| block[i % block.len()])
+        .collect::<Vec<_>>();
+    assert_eq!(actual.as_slice(), expected);
+    app.android.stop(&mut app.vm).unwrap();
+    drop(app);
+    let mut next = App::new(
+        pm.load_apk(&record.package, None).unwrap().1,
+        storage,
+        Rc::new(TestClock::default()),
+        640,
+        360,
+        None,
+    )
+    .unwrap();
+    next.launch().unwrap();
+    assert!(has(&next, "Count 1 / app 1"));
+    assert_eq!(
+        pm.install_file("apks/large.apk", true, None)
+            .unwrap()
+            .revision,
+        record.revision
+    );
 }

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "frozen_on": "2026-10-24",
+  "aosp_hello_activity": {
+    "source_base": "https://raw.githubusercontent.com/aosp-mirror/platform_development/android-8.0.0_r1/samples/HelloActivity",
+    "reference": "android-8.0.0_r1",
+    "authors": "The Android Open Source Project, Copyright 2007",
+    "license": "Apache-2.0",
+    "source_modifications": false,
+    "files": {
+      "src/com/example/android/helloactivity/HelloActivity.java": "be8d9944963aeaadda06d4ff8bdc911356c1402216583050fa146b6f26ee9407",
+      "AndroidManifest.xml": "1dafecf8cadca6683cb09af91e3fb65b6021177a46356445869f0665ced486ca",
+      "res/layout/hello_activity.xml": "e73dfe27d154ca529c57d61f1c500f066e969809088a154c0bba48477fe3d7f2",
+      "res/values/strings.xml": "0f902ef499db642db63fafecb1959885ce3ebda7063303e89fb0a4daaae0683d"
+    }
+  },
+  "vector_pinball": {
+    "apk_url": "https://f-droid.org/repo/com.dozingcatsoftware.bouncy_43.apk",
+    "sha256": "ffda0d9cb0b1b2aa58be9559dda891c4fa24391bc481d297a8e3d96c31f62721",
+    "bytes": 3233743,
+    "version": "1.16.0",
+    "role": "independent evaluation; errors are compatibility blockers, not execution passes",
+    "source_reference": "https://github.com/dozingcat/Vector-Pinball/tree/b8c57cd5929b052ca6b7c3bd34cbb409af7d7af9",
+    "source_build_equivalence_verified": false,
+    "license": "GPL v3; see upstream README/COPYING.txt",
+    "redistributed_in_zip": false
+  }
+}

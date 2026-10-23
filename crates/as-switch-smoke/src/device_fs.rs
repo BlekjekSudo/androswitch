@@ -1,9 +1,11 @@
 //! libnx filesystem FFI. All buffers are owned by Rust for each synchronous
 //! call. The C adapter commits writes before atomic revision publication.
 use alloc::{
+    boxed::Box,
     ffi::CString,
     format,
     string::{String, ToString},
+    sync::Arc,
     vec,
     vec::Vec,
 };
@@ -13,6 +15,10 @@ use as_platform::{
 };
 #[allow(unsafe_code)]
 extern "C" {
+    fn as_storage_writer_open(path: *const core::ffi::c_char) -> u64;
+    fn as_storage_writer_write(handle: u64, bytes: *const u8, length: usize) -> i64;
+    fn as_storage_writer_finish(handle: u64) -> i32;
+    fn as_storage_writer_close(handle: u64);
     fn as_storage_prepare(path: *const core::ffi::c_char) -> i32;
     fn as_storage_stat(
         path: *const core::ffi::c_char,
@@ -76,6 +82,29 @@ impl LibnxFileSystem {
     }
 }
 impl FileSystem for LibnxFileSystem {
+    fn begin_write(&self, p: &str) -> Result<Option<Box<dyn fs::WriteFile>>, PlatformError> {
+        let path = self.path(p)?;
+        // SAFETY: C returns a uniquely owned FILE token; only LibnxWriteFile
+        // closes it, after the final synchronous write/commit operation.
+        #[allow(unsafe_code)]
+        let handle = unsafe { as_storage_writer_open(path.as_ptr()) };
+        if handle == 0 {
+            return Err(error("begin_write", -1));
+        }
+        Ok(Some(Box::new(LibnxWriteFile(handle))))
+    }
+    fn open_read(&self, p: &str) -> Result<Arc<dyn fs::ReadOnlyFile>, PlatformError> {
+        let meta = self
+            .stat(p)?
+            .ok_or_else(|| fs::error("NOT_FOUND", "open_read", p))?;
+        if meta.directory {
+            return Err(fs::error("IS_DIRECTORY", "open_read", p));
+        }
+        Ok(Arc::new(LibnxReadFile {
+            path: self.path(p)?,
+            length: meta.length,
+        }))
+    }
     fn stat(&self, p: &str) -> Result<Option<Metadata>, PlatformError> {
         let path = self.path(p)?;
         let (mut length, mut directory) = (0, 0);
@@ -193,6 +222,68 @@ impl FileSystem for LibnxFileSystem {
             Err(error("remove", rc as i64))
         } else {
             Ok(())
+        }
+    }
+}
+
+struct LibnxReadFile {
+    path: CString,
+    length: u64,
+}
+struct LibnxWriteFile(u64);
+impl fs::WriteFile for LibnxWriteFile {
+    fn write(&mut self, bytes: &[u8]) -> Result<usize, PlatformError> {
+        // SAFETY: live unique FILE token and readable bytes for this call.
+        #[allow(unsafe_code)]
+        let result = unsafe { as_storage_writer_write(self.0, bytes.as_ptr(), bytes.len()) };
+        if result < 0 {
+            Err(error("write_stream", result))
+        } else {
+            Ok(result as usize)
+        }
+    }
+    fn finish(&mut self) -> Result<(), PlatformError> {
+        let handle = core::mem::take(&mut self.0);
+        // SAFETY: finish consumes/closes this unique FILE even on commit failure.
+        #[allow(unsafe_code)]
+        let result = unsafe { as_storage_writer_finish(handle) };
+        if result < 0 {
+            Err(error("write_commit", result as i64))
+        } else {
+            Ok(())
+        }
+    }
+}
+impl Drop for LibnxWriteFile {
+    fn drop(&mut self) {
+        // SAFETY: a failed/incomplete transfer still owns its FILE; a finished
+        // writer has token zero and cannot close another resource.
+        #[allow(unsafe_code)]
+        unsafe {
+            as_storage_writer_close(self.0)
+        };
+    }
+}
+impl fs::ReadOnlyFile for LibnxReadFile {
+    fn len(&self) -> u64 {
+        self.length
+    }
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> Result<usize, PlatformError> {
+        // SAFETY: immutable resolved path and exclusive output slice live for
+        // this call. C opens a separate FILE handle for each positioned read.
+        #[allow(unsafe_code)]
+        let rc = unsafe {
+            as_storage_read(
+                self.path.as_ptr(),
+                offset,
+                output.as_mut_ptr(),
+                output.len(),
+            )
+        };
+        if rc < 0 {
+            Err(error("read_at", rc))
+        } else {
+            Ok(rc as usize)
         }
     }
 }

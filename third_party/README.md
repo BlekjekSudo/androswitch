@@ -58,3 +58,11 @@ licenses. `scripts/collect-product-licenses.ps1` prepares the source-linked
 notices used by `package-androswitch.ps1`; the package contains a license
 inventory and full copied texts. This does not relicense dependencies under
 AndroSwitch's own MIT/Apache-2.0 choice.
+# M8 native storage additions
+
+SQLite 3.54.1 comes from its official, hash-pinned amalgamation archive;
+`scripts/fetch-sqlite.py` verifies SHA3-256 and the build verifies each source
+SHA-256. See `sqlite.lock.json` and `SQLite-NOTICE.txt`. Generated source stays
+in ignored local artifacts. The native C code is public domain. xmlparser
+0.13.6 (MIT OR Apache-2.0) supplies the no_std XML tokenizer; its notices are
+collected with the actual device Cargo dependency graph.

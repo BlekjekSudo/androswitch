@@ -81,6 +81,15 @@ impl HostFileSystem {
     }
 }
 impl FileSystem for HostFileSystem {
+    fn begin_write(&self, p: &str) -> Result<Option<Box<dyn fs::WriteFile>>, PlatformError> {
+        let file = disk::File::create(self.path(p)?).map_err(|e| io("begin_write", p, e))?;
+        Ok(Some(Box::new(HostWriteFile(file))))
+    }
+    fn open_read(&self, p: &str) -> Result<Arc<dyn fs::ReadOnlyFile>, PlatformError> {
+        let file = disk::File::open(self.path(p)?).map_err(|e| io("open_read", p, e))?;
+        let length = file.metadata().map_err(|e| io("stat", p, e))?.len();
+        Ok(Arc::new(HostReadFile { file, length }))
+    }
     fn stat(&self, p: &str) -> Result<Option<Metadata>, PlatformError> {
         match disk::metadata(self.path(p)?) {
             Ok(m) => Ok(Some(Metadata {
@@ -161,5 +170,40 @@ impl FileSystem for HostFileSystem {
             disk::remove_file(&target)
         }
         .map_err(|e| io("remove", p, e))
+    }
+}
+
+struct HostReadFile {
+    file: disk::File,
+    length: u64,
+}
+struct HostWriteFile(disk::File);
+impl fs::WriteFile for HostWriteFile {
+    fn write(&mut self, bytes: &[u8]) -> Result<usize, PlatformError> {
+        self.0
+            .write_all(bytes)
+            .map_err(|e| io("write_stream", "APK staging", e))?;
+        Ok(bytes.len())
+    }
+    fn finish(&mut self) -> Result<(), PlatformError> {
+        self.0.sync_all().map_err(|e| io("sync", "APK staging", e))
+    }
+}
+impl fs::ReadOnlyFile for HostReadFile {
+    fn len(&self) -> u64 {
+        self.length
+    }
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> Result<usize, PlatformError> {
+        #[cfg(windows)]
+        let result = {
+            use std::os::windows::fs::FileExt;
+            self.file.seek_read(output, offset)
+        };
+        #[cfg(unix)]
+        let result = {
+            use std::os::unix::fs::FileExt;
+            self.file.read_at(output, offset)
+        };
+        result.map_err(|e| io("read_at", "owned APK", e))
     }
 }

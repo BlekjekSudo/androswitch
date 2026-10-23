@@ -179,12 +179,11 @@ fn open() -> Result<Running, String> {
         .map_err(|e| e.to_string())?
         .ok_or("PACKAGE_NOT_INSTALLED")?;
     if current.apk_bytes > as_launcher::APK_MEMORY_LIMIT as u64 {
-        return Err("APK_MEMORY_BUDGET: this alpha supports memory-resident APKs <=64 MiB; OBB files stream separately".into());
+        return Err("APK_CONTAINER_BUDGET: file-backed APK exceeds 512 MiB".into());
     }
-    let (record, bytes) = pm
-        .load(&request.package, Some(request.revision))
+    let (record, apk) = pm
+        .load_apk(&request.package, Some(request.revision))
         .map_err(|e| e.to_string())?;
-    let apk = rd_apk::Apk::from_bytes(bytes).map_err(|e| e.to_string())?;
     let mut app = App::new(
         apk,
         fs.clone(),

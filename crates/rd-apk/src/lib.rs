@@ -4,6 +4,7 @@
 //! Contrato de erro: `RdError { code, cause, suggestion, module_id }` (Apêndice I).
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#[cfg_attr(all(test, not(feature = "std")), macro_use)]
 extern crate alloc;
 #[cfg(all(test, not(feature = "std")))]
 extern crate std;
@@ -98,8 +99,16 @@ impl Apk {
 
     /// Parseia um APK já em memória.
     pub fn from_bytes(data: Vec<u8>) -> RdResult<Apk> {
-        let file_size_bytes = data.len() as u64;
-        let zip = Zip::parse(data)?;
+        Self::from_zip(Zip::parse(data)?)
+    }
+    pub fn from_source(
+        source: alloc::sync::Arc<dyn zip::ReadAt>,
+        limits: zip::ZipLimits,
+    ) -> RdResult<Apk> {
+        Self::from_zip(Zip::from_source(source, limits)?)
+    }
+    fn from_zip(zip: Zip) -> RdResult<Apk> {
+        let file_size_bytes = zip.len();
 
         // 1. AndroidManifest.xml (binário)
         let manifest_entry = "AndroidManifest.xml";
@@ -153,7 +162,7 @@ impl Apk {
             // o offset em vez de re-variar (o scan duplicado tinha off-by-one
             // em i==start e perdia o sentinela ZIP64 → APK v2-only reportado
             // como unsigned)
-            signing::detect(zip.raw_bytes(), zip.cd_offset(), &zip)
+            signing::detect_zip(&zip)?
         };
 
         let zip_entry_count = zip.entry_count();

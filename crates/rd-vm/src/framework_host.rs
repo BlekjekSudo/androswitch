@@ -2,6 +2,15 @@
 use crate::{Engine, ObjRef, Value, VmExit};
 use alloc::{rc::Rc, vec::Vec};
 pub trait FrameworkHost {
+    fn static_field(
+        &self,
+        _vm: &mut Engine,
+        _class: &str,
+        _name: &str,
+        _descriptor: &str,
+    ) -> Result<Option<Value>, VmExit> {
+        Ok(None)
+    }
     fn attach(&self, vm: &mut Engine, class: &str, object: ObjRef) -> Result<bool, VmExit>;
     fn call_static(
         &self,
@@ -40,6 +49,17 @@ pub trait FrameworkHost {
     fn asset_close(&self, _handle: u64) {}
 }
 impl Engine {
+    pub fn device_class_object(&mut self, descriptor: &str) -> Result<ObjRef, VmExit> {
+        #[cfg(not(feature = "std"))]
+        {
+            self.class_object_for(descriptor)
+        }
+        #[cfg(feature = "std")]
+        {
+            let _ = descriptor;
+            Err(crate::err::vm_error("PORTABLE_CORE_REQUIRED", "device class object").into())
+        }
+    }
     pub fn bind_device_storage(
         &mut self,
         package: &str,

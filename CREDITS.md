@@ -59,6 +59,17 @@ Linux documentation.
 
 ## Platform, tooling and test sources
 
+M8 adds native **SQLite 3.54.1**, by the SQLite authors/contributors (public
+domain), compiled from its hash-pinned original amalgamation. See
+[SQLite notice](third_party/SQLite-NOTICE.txt). XML preferences use
+**xmlparser 0.13.6**, by Yevhenii Reizner and contributors, MIT OR Apache-2.0;
+its original license files are included in packaged dependency notices.
+SharedPreferences behavior is referenced against AOSP Android 8.0.0_r1
+`SharedPreferencesImpl` (Android Open Source Project, Apache-2.0).
+The M9 external evaluation downloads an unmodified Vector Pinball APK from
+F-Droid, credited to dozingcat/Vector Pinball contributors (GPL v3);
+that APK is not bundled in the AndroSwitch distribution.
+
 | Project / contributors | Use in AndroSwitch |
 | --- | --- |
 | [Rust](https://github.com/rust-lang/rust) and its contributors | Language, compiler, `core` and `alloc` |

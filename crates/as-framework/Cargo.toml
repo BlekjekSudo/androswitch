@@ -7,6 +7,7 @@ description = "Portable Android lifecycle, UI and event-loop adapter for AndroSw
 [lints]
 workspace = true
 [dependencies]
+as-storage = { path = "../as-storage" }
 rd-vm = { path = "../rd-vm", default-features = false }
 rd-apk = { path = "../rd-apk", default-features = false }
 as-platform = { path = "../as-platform", default-features = false }
@@ -20,6 +21,15 @@ host = ["as-platform/std", "dep:serde_json", "dep:as-package"]
 [[bin]]
 name = "as-ui-probe"
 path = "src/bin/as-ui-probe.rs"
+required-features = ["host"]
+
+[[test]]
+name = "m8_contracts"
+path = "tests/m8_contracts.rs"
+required-features = ["host"]
+[[bin]]
+name = "as-corpus"
+path = "src/bin/as-corpus.rs"
 required-features = ["host"]
 [[test]]
 name = "lifecycle"

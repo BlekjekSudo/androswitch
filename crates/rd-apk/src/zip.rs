@@ -6,6 +6,10 @@
 
 use crate::error::{RdError, RdResult};
 use alloc::{boxed::Box, collections::BTreeSet, format, string::String, sync::Arc, vec::Vec};
+#[path = "zip_source.rs"]
+mod source;
+use source::Data;
+pub use source::{ReadAt, ZipLimits};
 
 pub const EOCD_SIG: u32 = 0x0605_4b50;
 pub const ZIP64_EOCD_LOCATOR_SIG: u32 = 0x0706_4b50;
@@ -38,7 +42,8 @@ impl ZipEntry {
 
 #[derive(Debug, Clone)]
 pub struct Zip {
-    data: Arc<Vec<u8>>,
+    data: Data,
+    max_entry_bytes: u64,
     entries: Vec<ZipEntry>,
     /// Offset do central directory já resolvido (ZIP64-aware) — fonte única
     /// para a detecção de assinatura (issue #35: o re-scan duplicado em
@@ -175,6 +180,14 @@ impl Zip {
             p += 46 + name_len + extra_len + comment_len;
         }
 
+        Ok(Self::index(
+            Data::Memory(Arc::new(data)),
+            entries,
+            cd_offset,
+            512 << 20,
+        ))
+    }
+    fn index(data: Data, entries: Vec<ZipEntry>, cd_offset: u64, max_entry_bytes: u64) -> Self {
         // issue #84: detecção de nomes repetidos (ordem de aparição).
         let mut seen = BTreeSet::new();
         let mut dup_seen = BTreeSet::new();
@@ -185,12 +198,13 @@ impl Zip {
             }
         }
 
-        Ok(Zip {
-            data: Arc::new(data),
+        Zip {
+            data,
+            max_entry_bytes,
             entries,
             duplicates,
             cd_offset,
-        })
+        }
     }
 
     /// Lê arquivo do disco e faz parse.
@@ -323,6 +337,9 @@ impl Zip {
             .find(name)
             .ok_or_else(|| RdError::missing_entry(name))?
             .clone();
+        self.stream_entry(entry)
+    }
+    fn stream_entry(&self, entry: ZipEntry) -> RdResult<ZipStream> {
         if entry.flags & 1 != 0 || !matches!(entry.method, METHOD_STORED | METHOD_DEFLATE) {
             return Err(RdError::invalid_format(
                 "asset: encrypted/unsupported ZIP method",
@@ -330,14 +347,12 @@ impl Zip {
         }
         let off = usize::try_from(entry.local_header_offset)
             .map_err(|_| RdError::parse("asset offset overflow"))?;
-        if u32_at(&self.data, off)? != LOCAL_HEADER_SIG {
+        let header = self.data.bytes(off, 30)?;
+        if u32_at(&header, 0)? != LOCAL_HEADER_SIG {
             return Err(RdError::parse("asset: invalid local header"));
         }
         let start = off
-            .checked_add(
-                30 + u16_at(&self.data, off + 26)? as usize
-                    + u16_at(&self.data, off + 28)? as usize,
-            )
+            .checked_add(30 + u16_at(&header, 26)? as usize + u16_at(&header, 28)? as usize)
             .ok_or_else(|| RdError::parse("asset offset overflow"))?;
         let length = usize::try_from(entry.compressed_size)
             .map_err(|_| RdError::parse("asset size overflow"))?;
@@ -359,25 +374,50 @@ impl Zip {
             done: false,
             failed: false,
             inflate: None,
+            buffer: Vec::new(),
+            buffer_offset: start,
         })
     }
 
     pub fn read_entry(&self, entry: &ZipEntry) -> RdResult<Vec<u8>> {
+        if self.is_file_backed() && entry.uncompressed_size > self.max_entry_bytes {
+            return Err(RdError::invalid_format(
+                "zip: entry exceeds materialization budget; use streaming",
+            ));
+        }
+        if self.is_file_backed() {
+            let mut stream = self.stream_entry(entry.clone())?;
+            let mut out = Vec::new();
+            out.try_reserve_exact(entry.uncompressed_size as usize)
+                .map_err(|_| RdError::invalid_format("zip: entry allocation failed"))?;
+            let mut buffer = [0; 16 << 10];
+            loop {
+                let n = stream.read(&mut buffer)?;
+                if n == 0 {
+                    break;
+                }
+                out.extend_from_slice(&buffer[..n]);
+            }
+            return Ok(out);
+        }
+        let Data::Memory(data) = &self.data else {
+            unreachable!()
+        };
         let off = entry.local_header_offset as usize;
-        if u32_at(&self.data, off)? != LOCAL_HEADER_SIG {
+        if u32_at(data, off)? != LOCAL_HEADER_SIG {
             return Err(RdError::parse(format!(
                 "zip: bad local header for {:?}",
                 entry.name
             )));
         }
         // usar extra_len do LOCAL header (pode diferir do CD!)
-        let name_len = u16_at(&self.data, off + 26)? as usize;
-        let extra_len = u16_at(&self.data, off + 28)? as usize;
+        let name_len = u16_at(data, off + 26)? as usize;
+        let extra_len = u16_at(data, off + 28)? as usize;
         let data_start = off + 30 + name_len + extra_len;
         let data_end = data_start
             .checked_add(entry.compressed_size as usize)
             .ok_or_else(|| RdError::parse("zip: compressed size overflow"))?;
-        let compressed = self.data.get(data_start..data_end).ok_or_else(|| {
+        let compressed = data.get(data_start..data_end).ok_or_else(|| {
             RdError::parse(format!("zip: payload of {:?} out of bounds", entry.name))
         })?;
 
@@ -483,8 +523,13 @@ impl Zip {
     }
 
     /// Bytes brutos do container (uso interno: detecção do bloco de assinatura).
-    pub fn raw_bytes(&self) -> &[u8] {
-        &self.data
+    pub fn raw_bytes(&self) -> RdResult<&[u8]> {
+        match &self.data {
+            Data::Memory(data) => Ok(data),
+            Data::Source(_) => Err(RdError::invalid_format(
+                "zip: file-backed container has no resident raw slice",
+            )),
+        }
     }
 
     /// Nomes que casam com um prefixo (ex.: "assets/", "lib/arm64-v8a/").
@@ -497,7 +542,7 @@ impl Zip {
 }
 
 pub struct ZipStream {
-    data: Arc<Vec<u8>>,
+    data: Data,
     entry: ZipEntry,
     start: usize,
     end: usize,
@@ -507,6 +552,8 @@ pub struct ZipStream {
     done: bool,
     failed: bool,
     inflate: Option<Box<miniz_oxide::inflate::stream::InflateState>>,
+    buffer: Vec<u8>,
+    buffer_offset: usize,
 }
 impl ZipStream {
     pub fn len(&self) -> u64 {
@@ -543,16 +590,22 @@ impl ZipStream {
             &mut output[..limit]
         };
         let (written, ended) = if self.entry.method == METHOD_STORED {
-            target[..limit].copy_from_slice(&self.data[self.input..self.input + limit]);
+            self.data.read(self.input, &mut target[..limit])?;
             self.input += limit;
             (limit, self.input == self.end)
         } else {
+            if self.input >= self.buffer_offset + self.buffer.len() {
+                self.buffer_offset = self.input;
+                self.buffer = self
+                    .data
+                    .bytes(self.input, (self.end - self.input).min(16 << 10))?;
+            }
             let state = self.inflate.get_or_insert_with(|| {
                 miniz_oxide::inflate::stream::InflateState::new_boxed(miniz_oxide::DataFormat::Raw)
             });
             let result = miniz_oxide::inflate::stream::inflate(
                 state,
-                &self.data[self.input..self.end],
+                &self.buffer[self.input - self.buffer_offset..],
                 target,
                 miniz_oxide::MZFlush::None,
             );
@@ -610,6 +663,8 @@ impl ZipStream {
             self.crc = !0;
             self.done = false;
             self.inflate = None;
+            self.buffer.clear();
+            self.buffer_offset = self.start;
         }
         let mut discard = [0; 8192];
         while self.position < position {
@@ -634,6 +689,85 @@ fn comment_len_of(data: &[u8], off: usize) -> RdResult<usize> {
 
 #[cfg(test)]
 mod tests {
+    #[derive(Debug)]
+    struct TestSource {
+        bytes: Vec<u8>,
+        max_read: core::sync::atomic::AtomicUsize,
+    }
+    impl ReadAt for TestSource {
+        fn len(&self) -> u64 {
+            self.bytes.len() as u64
+        }
+        fn read_at(&self, offset: u64, out: &mut [u8]) -> RdResult<usize> {
+            self.max_read
+                .fetch_max(out.len(), core::sync::atomic::Ordering::Relaxed);
+            // Exercise partial reads as well as buffer boundaries.
+            let n = out
+                .len()
+                .min(997)
+                .min(self.bytes.len().saturating_sub(offset as usize));
+            out[..n].copy_from_slice(&self.bytes[offset as usize..offset as usize + n]);
+            Ok(n)
+        }
+    }
+    #[test]
+    fn positional_sources_match_resident_zip_and_enforce_metadata_budgets() {
+        let mut seed = 1u32;
+        let content: Vec<u8> = (0..190_000)
+            .map(|_| {
+                seed ^= seed << 13;
+                seed ^= seed >> 17;
+                seed ^= seed << 5;
+                seed as u8
+            })
+            .collect();
+        for archive in [
+            handcrafted_zip(&content, "asset"),
+            handcrafted_zip_deflate(
+                &deflate_bytes(&content),
+                content.len() as u32,
+                crc32(&content),
+                "asset",
+            ),
+        ] {
+            let source = Arc::new(TestSource {
+                bytes: archive.clone(),
+                max_read: Default::default(),
+            });
+            let zip = Zip::from_source(source.clone(), ZipLimits::default()).unwrap();
+            assert!(zip.is_file_backed());
+            assert!(zip.raw_bytes().is_err());
+            assert_eq!(
+                zip.read("asset").unwrap(),
+                Zip::parse(archive).unwrap().read("asset").unwrap()
+            );
+            let mut stream = zip.stream("asset").unwrap();
+            stream.seek(150_013).unwrap();
+            let mut out = [0; 317];
+            stream.read(&mut out).unwrap();
+            assert_eq!(&out, &content[150_013..150_330]);
+            stream.seek(0).unwrap();
+            stream.read(&mut out).unwrap();
+            assert_eq!(&out, &content[..317]);
+            assert!(source.max_read.load(core::sync::atomic::Ordering::Relaxed) <= 64 << 10);
+            let limits = ZipLimits {
+                max_directory_bytes: 1,
+                ..Default::default()
+            };
+            assert!(Zip::from_source(source, limits).is_err());
+        }
+        let source = Arc::new(TestSource {
+            bytes: handcrafted_zip_deflate(
+                &deflate_bytes(&content),
+                content.len() as u32,
+                0,
+                "bad",
+            ),
+            max_read: Default::default(),
+        });
+        let zip = Zip::from_source(source, ZipLimits::default()).unwrap();
+        assert!(zip.read("bad").is_err());
+    }
     #[test]
     fn streamed_assets_chunk_seek_and_corruption() {
         let content: Vec<u8> = (0..150_000).map(|n| (n % 251) as u8).collect();

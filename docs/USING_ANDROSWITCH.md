@@ -1,11 +1,13 @@
-# Using the M7 development alpha
+# Using the M9 validation candidate
 
-This is the first one-NRO package, not the offline v0.1 compatibility release.
+This is a one-NRO validation candidate, not the completed offline v0.1 release.
 Host and Ryujinx evidence do not establish physical Switch compatibility.
 The user reported that the four bundled samples install/open on a real Switch
 and the native triangle animation and beeps work. The user subsequently confirmed
 that the display handoff fix resolves Plus return and the startup stall; see the
 [hardware feedback record](HARDWARE_FEEDBACK.md).
+M1–M7 hardware testing is user-confirmed. This newer file-backed/M8/M9 build
+still needs its own Horizon/hardware run; see [candidate status](M8_M9_E2E.md).
 The runtime builds on **RustyDroid by nadabgfccvd and contributors**; retain
 the packaged credits, license notices and source link when redistributing it.
 
@@ -54,6 +56,11 @@ handheld/docked modes still need device validation.
   writes PCM via Java AudioTrack and AAudio, then OpenSL ES queue callbacks.
 - **Native Graphics and Audio:** NativeActivity draws a moving triangle through
   GLES2, plays PCM and changes its background in response to input.
+- **Persistent Preferences:** typed XML settings and a launch counter.
+- **Persistent Notes:** native SQLite transactions, cursor reads, reflection and
+  a count that increases after reopening.
+- **AOSP HelloActivity:** original external Java/layout source displaying Hello,
+  World. IME/editable-buffer input is outside the tested rendering scenario.
 
 The samples use ordinary Android SDK/NDK APIs. Their source and build scripts
 are in this repository; they have no runtime package-name exceptions.
@@ -63,9 +70,12 @@ are not included in the normal ZIP.
 ## Compatibility limits and errors
 
 This alpha supports the explicitly tested framework/NDK subset, not all API 26
-classes. Device APK containers are currently memory-resident and limited to
-64 MiB. Assets decompress incrementally; external OBB reads are positioned and
-bounded. Native libraries must be ARM64; DEX-only APKs need no native ABI.
+classes. Device APK containers are file-backed and capped at **512 MiB**.
+Materialized entries are capped at 64 MiB; combined raw DEX at 32 MiB. A larger
+container can still exceed decoded memory or require missing APIs. Assets/OBB
+use positioned, bounded reads. Native libraries must be ARM64; DEX-only APKs
+need no native ABI. M8 SQLite is limited to 8 MiB per database and does not
+implement Android's full database API/connection pool. See [M8/M9 limits](M8_M9_E2E.md).
 
 The initial audio format is 48 kHz stereo PCM16, one output at a time.
 AAudio callback streams/low-latency modes, audio input, codecs and general

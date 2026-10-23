@@ -1,0 +1,9 @@
+SQLite 3.54.1, SQLite authors and contributors.
+The SQLite deliverable code is in the public domain.
+Official statement: https://www.sqlite.org/copyright.html
+Official amalgamation source: https://www.sqlite.org/2026/sqlite-amalgamation-3540100.zip
+Exact archive/source hashes: third_party/sqlite.lock.json in AndroSwitch source.
+
+AndroSwitch compiles the original amalgamation and provides its own memory VFS,
+bounded API bridge and durable snapshot adapter (MIT OR Apache-2.0). This does
+not imply Android's full SQLite connection pool, WAL or multiprocess behavior.

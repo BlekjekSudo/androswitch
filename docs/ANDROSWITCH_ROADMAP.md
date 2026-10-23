@@ -6,15 +6,15 @@ Implementation and verification are independent. `pending` is not a pass.
 | Milestone | Deliverable / exit gate | Implementation | Host | Horizon emulator | Physical Switch |
 | --- | --- | --- | --- | --- | --- |
 | M0 | Fork/provenance, frozen fixtures, `asctl inspect`, upstream baseline/evidence | complete | passed for M0 | not_applicable | not_applicable |
-| M1 | Portable core/libnx C ABI; allocator/log/clock/file/APK/DEX/interpreter smoke NRO agrees with host | complete for M1 gate | passed | passed in Ryujinx | pending |
-| M2 | Atomic install/update; persistent shared Java/native VFS; restart/app-isolation tests | implemented for proof gate | passed | passed in Ryujinx | not run |
-| M3 | ARM64 ELF dependencies/relocations/TLS/constructors/Bionic, including stripped objects | supported subset implemented | passed native oracle/core tests | passed native execution in Ryujinx | not run |
-| M4 | DEX ↔ JNI ↔ native; references/strings/arrays/exceptions/callbacks/thread attach; Java/Kotlin mixed APK proof | implemented for proof gate | passed JVM JNI oracle | passed Java/C/Rust and Kotlin/C++ in Ryujinx | not run |
-| M5 | Activity/resources/layout/views/Canvas/Looper; interactive Java/Kotlin lifecycle | supported subset implemented | passed | passed, 14 UI snapshots | not run |
-| M6 | NativeActivity/assets/window/input/threading/EGL/GLES2/PCM audio | supported proof subset implemented | passed shared contracts; Android reference pending | passed native/mixed media corpus | user reports native triangle animation and beeps; see hardware feedback |
-| M7 | Console launcher/verified session teardown; scan/install/launch/return/update/uninstall; one copy-ready folder | implemented for the alpha corpus; failed-startup cleanup added | passed package workflow | console workflow / ten completed sessions; startup and boundary evidence in reports | user reports install/open and native Plus return work after display fix; new startup recovery pending retest |
-| M8 | SharedPreferences/native SQLite/reflection/collections/permissions; independent APK integration | planned | pending | pending | pending |
-| M9 | Offline v0.1 corpus/lifecycle stress/benchmarks/copy-ready package/evidence matrix | planned | pending | pending | pending |
+| M1 | Portable core/libnx C ABI; allocator/log/clock/file/APK/DEX/interpreter smoke NRO agrees with host | complete for M1 gate | passed | passed in Ryujinx | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
+| M2 | Atomic install/update; persistent shared Java/native VFS; restart/app-isolation tests | implemented for proof gate | passed | passed in Ryujinx | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
+| M3 | ARM64 ELF dependencies/relocations/TLS/constructors/Bionic, including stripped objects | supported subset implemented | passed native oracle/core tests | passed native execution in Ryujinx | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
+| M4 | DEX ↔ JNI ↔ native; references/strings/arrays/exceptions/callbacks/thread attach; Java/Kotlin mixed APK proof | implemented for proof gate | passed JVM JNI oracle | passed Java/C/Rust and Kotlin/C++ in Ryujinx | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
+| M5 | Activity/resources/layout/views/Canvas/Looper; interactive Java/Kotlin lifecycle | supported subset implemented | passed | passed, 14 UI snapshots | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
+| M6 | NativeActivity/assets/window/input/threading/EGL/GLES2/PCM audio | supported proof subset implemented | passed shared contracts; Android reference pending | passed native/mixed media corpus | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
+| M7 | Console launcher/verified session teardown; scan/install/launch/return/update/uninstall; one copy-ready folder | implemented for the alpha corpus; failed-startup cleanup added | passed package workflow | console workflow / ten completed sessions; startup and boundary evidence in reports | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
+| M8 | SharedPreferences/native SQLite/reflection/collections/permissions; independent APK integration | bounded shared contracts implemented; wider integration ongoing | contract/JVM/persistence/fault tests; see candidate report | pending for new build | pending for new build |
+| M9 | Offline v0.1 corpus/lifecycle stress/benchmarks/copy-ready package/evidence matrix | validation candidate tooling/package; release gate incomplete | repeated corpus/measurements in candidate report | prepared 24-session scenario; not run | pending for new build |
 | M10 | DNS/socket/TLS/HTTP(S), Java/native networking and split APKs | planned | pending | pending | pending |
 | M11 | Higher API/GLES3/engine ecosystem; separate ARM32/x86 research | planned | pending | pending | pending |
 | M12 | Physical Switch stability, suspend/resume, handheld/docked, migrations, v1.0 | planned | pending | pending | pending |
@@ -35,6 +35,17 @@ are inferred from scaffolding.
 
 ## Current evidence
 
+M7 improvements now use file-backed APKs with a 512 MiB container cap, bounded
+copy/hash/entry reads and lazy native extraction. A 128 MiB original UI APK passes
+host install/launch/asset/save/restart checks. This new build is separate from the
+user-confirmed M1–M7 hardware baseline. See [M7 storage evidence](M7_STORAGE_E2E.md).
+M8 adds persistent SharedPreferences and real native SQLite, boxed collections,
+DEX method reflection and a bounded permission policy. M9 adds a repeatable host
+corpus, original AOSP sample, external Vector Pinball evaluation, measurements,
+and a copy-ready candidate. **M9 is not marked complete:** new Horizon/hardware
+regressions and broader independent compatibility remain open. See
+[M8/M9 contracts, exact limits and reproduction](M8_M9_E2E.md).
+
 M0's nine verification commands passed (144 test executions across feature,
 real-APK, parser and std/no_std class-index checks; formatting/clippy also pass).
 The immutable upstream baseline has five failing MCP tests, documented in
@@ -51,8 +62,10 @@ Java/native storage. M3 executes real ARM64 objects on Horizon and compares
 the supported native suite against Unicorn. M4 executes JNI in both directions,
 including Java/Kotlin, C/C++/Rust, exceptions, GC references and pthread callbacks.
 See [M2–M4 evidence and exact subset limits](M2_M4_E2E.md);
-physical-device proof of all M2–M4 scenarios remains pending. Later sample-level
-observations are tracked in [hardware feedback](HARDWARE_FEEDBACK.md).
+the user now confirms M1–M7 were tested on a physical Switch. This is recorded
+as user-reported hardware testing, without inventing individual test results or
+binary hashes. New M7 improvement/M8/M9 builds require their own verification.
+See [hardware feedback](HARDWARE_FEEDBACK.md).
 
 M5 now executes Java/Kotlin Activities and visible software UI in Ryujinx;
 see [M5 evidence](M5_UI_E2E.md). M6/M7 now integrate the supported native media

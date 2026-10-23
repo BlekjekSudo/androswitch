@@ -1,0 +1,10 @@
+[
+  {"id":"java-ui","apk":"local-artifacts/m5/fixture/java-ui.apk","expected":"run","label_prefix":"Count "},
+  {"id":"kotlin-ui","apk":"local-artifacts/m5/fixture/kotlin-ui.apk","expected":"run","label_prefix":"Kotlin "},
+  {"id":"preferences","apk":"local-artifacts/m8/fixture/preferences.apk","expected":"run","label_prefix":"Prefs "},
+  {"id":"renamed-preferences","apk":"local-artifacts/m8/fixture/renamed.apk","expected":"run","label_prefix":"Prefs "},
+  {"id":"native-sqlite-notes","apk":"local-artifacts/m8/fixture/database.apk","expected":"run","label_prefix":"Notes "},
+  {"id":"renamed-notes","apk":"local-artifacts/m8/fixture/database-renamed.apk","expected":"run","label_prefix":"Notes "},
+  {"id":"aosp-hello-activity","apk":"local-artifacts/m9/aosp-hello/hello-activity.apk","expected":"run","label_prefix":"Hello, World!"},
+  {"id":"vector-pinball-1.16.0","apk":"local-artifacts/m9/external/vector-pinball-43.apk","expected":"evaluate"}
+]

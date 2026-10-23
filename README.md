@@ -13,7 +13,7 @@ See [credits and provenance](CREDITS.md) and [NOTICE](NOTICE.md).
 
 ## Current status
 
-**M7 development alpha: one `androswitch.nro`, one SD folder.** The console
+**M9 validation candidate: one `androswitch.nro`, one SD folder.** The console
 installs, updates and launches supported APKs using the shared RustyDroid
 interpreter and native ARM64 backend. Java/Kotlin UI, NativeActivity GLES2,
 assets, PCM audio and repeated application switching have Ryujinx evidence.
@@ -21,7 +21,12 @@ The user reports that the four bundled APKs open on a physical Switch, including
 native animation/beeps, and that the display handoff fix resolves the native
 Plus crash and startup stall. This is sample-level user feedback; see
 [hardware feedback](docs/HARDWARE_FEEDBACK.md).
-This is not the v0.1 compatibility release.
+The user has also confirmed M1–M7 testing on physical Switch. The new M7
+file-backed storage and M8/M9 build have separate pending Horizon/hardware gates.
+M8 adds persistent XML SharedPreferences, native SQLite, boxed collections and
+DEX method reflection. M9 adds a repeated host corpus, external APK evaluation
+and startup/frame/heap measurements. See [exact evidence and limitations](docs/M8_M9_E2E.md).
+This is a candidate, not the completed v0.1 compatibility release.
 
 ![AndroSwitch console after the verified Ryujinx workflow](docs/images/androswitch-m7.png)
 
@@ -42,10 +47,11 @@ Actual submitted console framebuffer from the M7 Ryujinx test.
 | Physical Switch | User reports sample install/open, native animation/beeps and successful native Plus return after the display fix |
 
 The launcher is usable for the supported test corpus. Arbitrary apps can still
-require missing Android APIs. This alpha accepts single APKs up to **64 MiB**
-on device, API 26 or lower minimum SDK, and ARM64 native libraries. The APK cap
-reserves headroom in the current 256 MiB heap for DEX, VM, native mappings and
-media; it is an implementation budget. OBB files stream separately.
+require missing Android APIs. The M7 improvement source accepts file-backed APKs up to **512 MiB**
+on device, API 26 or lower minimum SDK, and ARM64 native libraries. A 128 MiB
+container passes host install/launch/restart tests. New file-backed device behavior
+still needs hardware/emulator verification. DEX, native mappings and media retain
+separate budgets within the current 256 MiB heap. OBB files stream separately.
 Network, Google Play Services, split APKs, WebView and modern
 engine compatibility are not established. There is no per-game configuration.
 Inherited RustyDroid capabilities are not automatically Switch capabilities.
@@ -54,6 +60,7 @@ Read the [compatibility inventory](docs/ANDROSWITCH_COMPATIBILITY.md) and
 Mekorama 1.7.2 currently fails during class initialization on an unavailable
 `libstdc++.so` dependency. Installation is not a compatibility guarantee; see
 [startup-failure diagnosis and recovery](docs/STARTUP_FAILURES.md).
+See [M7 storage improvements](docs/M7_STORAGE_E2E.md) for the new I/O path and limits.
 
 ## Project direction
 
@@ -75,7 +82,7 @@ static checks does not establish Android API coverage or app compatibility.
 
 Extract the development ZIP's `switch/` folder to the SD card. Open
 `switch/androswitch/androswitch.nro` through homebrew application/title override.
-The package includes four original sample APKs, ready to install from the APKs
+The M9 candidate includes seven sample APKs, ready to install from the APKs
 list. Put additional single APK files in `switch/androswitch/apks/`.
 
 - **L/R:** Installed/APKs list. **A:** launch or install/update. **B:** back.
@@ -132,9 +139,13 @@ prerequisites and [M6/M7](docs/M6_M7_E2E.md) for exact checks.
 ```powershell
 ./scripts/build-m5-fixture.ps1
 ./scripts/build-m6-fixture.ps1
+./scripts/build-m8-fixture.ps1
+./scripts/build-aosp-hello.ps1
+./scripts/test-m9-host.ps1
 ./scripts/build-androswitch.ps1
-./scripts/test-ryujinx-launcher.ps1
-./scripts/package-androswitch.ps1
+# Desktop emulator execution is a separate explicit opt-in; see M8/M9 guide.
+# After recording this build's evidence:
+./scripts/package-androswitch.ps1 -Stage m9-candidate -EvidencePath reports/m8-m9-candidate.json
 ```
 
 Output: `local-artifacts/product/androswitch.nro` and a copy-ready ZIP under

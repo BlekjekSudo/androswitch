@@ -254,11 +254,27 @@ impl Arsc {
     /// desconhecido ou tipo não representável (bag/complex — o caller falha
     /// tipado; nunca default silencioso).
     pub fn resolve_value(&self, res_id: u32) -> Option<ResolvedValue> {
+        self.resolve_value_version(res_id, None)
+    }
+    /// Runtime selection: retain locale/density precedence, choose the newest
+    /// eligible SDK variant, and never use an entry requiring a newer SDK.
+    /// This does not implement Android's remaining configuration qualifiers.
+    pub fn resolve_value_for_api(&self, res_id: u32, api: u16) -> Option<ResolvedValue> {
+        self.resolve_value_version(res_id, Some(api))
+    }
+    fn resolve_value_version(&self, res_id: u32, api: Option<u16>) -> Option<ResolvedValue> {
         let pkg = self.package_for(res_id)?;
         let entries = pkg.entries.get(&res_id)?;
         let best = entries
             .iter()
-            .min_by_key(|e| (e.config.specificity(), !e.config.is_default()))?;
+            .filter(|e| api.map_or(true, |api| e.config.api_level.unwrap_or(0) <= api))
+            .min_by_key(|e| {
+                (
+                    e.config.specificity(),
+                    !e.config.is_default(),
+                    core::cmp::Reverse(api.map_or(0, |_| e.config.api_level.unwrap_or(0))),
+                )
+            })?;
         match best.data_type {
             0x03 => best.string.clone().map(ResolvedValue::Str),
             0x01 => Some(ResolvedValue::Reference(best.data)),
@@ -647,6 +663,59 @@ mod tests {
         assert_eq!(info.density, Some(256));
         assert_eq!(info.language.as_deref(), Some("en"));
         assert_eq!(info.country.as_deref(), Some("US"));
+    }
+    #[test]
+    fn runtime_resource_selects_newest_eligible_sdk_without_changing_inspection() {
+        let id = 0x7f020000;
+        let variant = |api, label: &str| ResEntry {
+            config: ResConfigInfo {
+                api_level: api,
+                ..Default::default()
+            },
+            data_type: 3,
+            data: 0,
+            string: Some(label.into()),
+            complex: false,
+            parent: None,
+            bag: None,
+            key_idx: 0,
+        };
+        let mut entries = BTreeMap::new();
+        entries.insert(
+            id,
+            vec![
+                variant(None, "base"),
+                variant(Some(1), "v1"),
+                variant(Some(26), "v26"),
+                variant(Some(27), "future"),
+            ],
+        );
+        let arsc = Arsc {
+            global_strings: Default::default(),
+            packages: vec![Package {
+                id: 0x7f,
+                name: "test".into(),
+                type_strings: Default::default(),
+                key_strings: Default::default(),
+                entries,
+            }],
+        };
+        assert_eq!(
+            arsc.resolve_value(id),
+            Some(ResolvedValue::Str("base".into()))
+        );
+        assert_eq!(
+            arsc.resolve_value_for_api(id, 25),
+            Some(ResolvedValue::Str("v1".into()))
+        );
+        assert_eq!(
+            arsc.resolve_value_for_api(id, 26),
+            Some(ResolvedValue::Str("v26".into()))
+        );
+        assert_eq!(
+            arsc.resolve_value_for_api(id, 27),
+            Some(ResolvedValue::Str("future".into()))
+        );
     }
 
     #[test]

@@ -55,6 +55,20 @@ impl App {
                     "APK has no enabled MAIN/LAUNCHER activity",
                 )
             })?;
+        // Raw DEX is only one contributor to decoded VM memory. Bound the total
+        // before materializing any entry, independently of APK/container size.
+        let dex_bytes = apk.dex_files.iter().try_fold(0u64, |total, name| {
+            apk.zip
+                .find(name)
+                .and_then(|e| total.checked_add(e.uncompressed_size))
+        });
+        if dex_bytes.is_none_or(|bytes| bytes > 32 << 20) {
+            return Err(rd_vm::err::vm_error(
+                "DEX_MEMORY_BUDGET",
+                "combined DEX input exceeds 32 MiB",
+            )
+            .into());
+        }
         let mut dexes = Vec::new();
         for name in &apk.dex_files {
             let bytes = apk
@@ -76,10 +90,10 @@ impl App {
                 exception_trace: true,
             },
         ));
-        let vfs = as_platform::vfs::Vfs::new(fs, &apk.manifest.package)
+        let vfs = as_platform::vfs::Vfs::new(fs.clone(), &apk.manifest.package)
             .map_err(|e| rd_vm::err::vm_error(e.code, e.to_string()))?;
         vm.bind_device_storage(&apk.manifest.package, Box::new(vfs))?;
-        let android = Android::new(apk, clock, width, height);
+        let android = Android::new(apk, clock, width, height, fs)?;
         vm.bind_framework(android.clone());
         Ok(Self {
             vm,

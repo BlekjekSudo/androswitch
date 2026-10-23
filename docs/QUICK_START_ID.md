@@ -1,6 +1,8 @@
 # AndroSwitch: mulai dari satu NRO
 
-Ini paket pengembangan M7. Pengujian regresi dilakukan di Ryujinx. Pengguna
+Ini kandidat validasi M9. Baseline M1–M7 sudah dikonfirmasi diuji di Switch asli.
+Build baru dengan storage/M8/M9 belum diuji ulang di Ryujinx atau Switch.
+Pengguna sebelumnya
 melaporkan empat contoh bisa dibuka di Switch asli, termasuk animasi dan beep;
 pengguna kemudian mengonfirmasi perbaikan display menyelesaikan crash Plus dan
 tersendat saat awal membuka contoh native. Perubahan pemulihan startup terbaru
@@ -26,12 +28,16 @@ OBB masuk ke `Android/obb/<nama.paket>/`, data eksternal ke
 Save internal ada di `userdata/<nama.paket>/`.
 
 APK umum masih bisa gagal karena API Android yang belum tersedia. Batas awal:
-APK tunggal maksimal 64 MiB, minSdk maksimal 26, native ARM64, offline. Belum
+APK tunggal maksimal **512 MiB**, minSdk maksimal 26, native ARM64, offline. Belum
 ada dukungan Google Play Services, split APK atau jaminan engine/game umum.
-Pakai empat contoh APK untuk pengujian awal di perangkat.
+Kandidat ini menyertakan tujuh contoh: empat contoh sebelumnya, preferences,
+catatan SQLite, dan HelloActivity asli AOSP. Buka preferences/catatan beberapa
+kali untuk memeriksa data tetap tersimpan, lalu periksa kembali tombol Plus.
 
-Batas 64 MiB berasal dari APK yang masih dimuat utuh ke RAM, dengan heap runtime
-256 MiB yang juga dipakai DEX, VM, library dan media. OBB dibaca bertahap.
+Batas 64 MiB pada alpha lama sudah diganti pembacaan APK bertahap. Batas container
+kini 512 MiB; entry yang dimuat utuh tetap maksimal 64 MiB, total DEX mentah
+32 MiB, database SQLite 8 MiB. Heap runtime 256 MiB juga dipakai VM, library
+dan media, sehingga APK lebih besar belum tentu bisa berjalan. OBB dibaca bertahap.
 Mekorama 1.7.2 berukuran sekitar 12,5 MiB, tetapi gagal karena dependency native
 `libstdc++.so` belum tersedia. Runtime sekarang membersihkan startup gagal sebelum
 kembali ke console bila aman; ini belum berarti Mekorama bisa dimainkan.

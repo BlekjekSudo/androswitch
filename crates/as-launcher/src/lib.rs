@@ -10,14 +10,12 @@ use alloc::{
 };
 use as_framework::Frame;
 use as_package::{PackageManager, Record};
-use as_platform::{
-    fs::{self, FileSystem},
-    PlatformError,
-};
+use as_platform::{fs::FileSystem, PlatformError};
 use serde::{Deserialize, Serialize};
 /// Container remains memory-resident in this alpha. Large OBB files use VFS
 /// streaming; increasing the APK limit requires a positioned ZIP container.
-pub const APK_MEMORY_LIMIT: usize = 64 << 20;
+/// Container budget; file-backed APKs do not reserve this much RAM.
+pub const APK_MEMORY_LIMIT: usize = as_package::MAX_APK_BYTES;
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Selection {
     pub package: String,
@@ -132,13 +130,11 @@ impl Shell {
         Ok(())
     }
     fn icon(&self, r: &Record) -> Option<png::Icon> {
-        let bytes = fs::read_all(
+        let apk = as_package::open_apk(
             self.fs.as_ref(),
             &format!("installed/{}/{:020}/package.apk", r.package, r.revision),
-            APK_MEMORY_LIMIT,
         )
         .ok()?;
-        let apk = rd_apk::Apk::from_bytes(bytes).ok()?;
         let id = apk.manifest.application.icon_res?;
         let path = apk.arsc.as_ref()?.resolve_string(id)?;
         let bytes = apk.zip.read(&path).ok()?;
@@ -240,14 +236,12 @@ impl Shell {
                 Tab::Apks => {
                     if let Some(file) = self.apks.get(self.selected).cloned() {
                         self.message = format!("Installing {file}...");
-                        let bytes = fs::read_all(
-                            self.fs.as_ref(),
-                            &format!("apks/{file}"),
-                            APK_MEMORY_LIMIT,
-                        )?;
                         let before = self.installed.clone();
-                        let record =
-                            PackageManager::new(self.fs.clone()).install(bytes, true, None)?;
+                        let record = PackageManager::new(self.fs.clone()).install_file(
+                            &format!("apks/{file}"),
+                            true,
+                            None,
+                        )?;
                         self.refresh()?;
                         self.tab = Tab::Installed;
                         self.selected = self

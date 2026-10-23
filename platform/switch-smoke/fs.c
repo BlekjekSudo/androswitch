@@ -70,6 +70,32 @@ int64_t as_storage_write(const char *path, uint64_t offset,
     e = EIO;
   return e ? -e : (int64_t)n;
 }
+uint64_t as_storage_writer_open(const char *path) {
+  return (uint64_t)fopen(path, "wb");
+}
+int64_t as_storage_writer_write(uint64_t handle, const uint8_t *bytes,
+                                size_t length) {
+  FILE *file = (FILE *)handle;
+  if (!file)
+    return -EINVAL;
+  size_t written = fwrite(bytes, 1, length, file);
+  return written == length ? (int64_t)written : -EIO;
+}
+int as_storage_writer_finish(uint64_t handle) {
+  FILE *file = (FILE *)handle;
+  if (!file)
+    return -EINVAL;
+  int error = fflush(file) ? EIO : 0;
+  if (fclose(file))
+    error = EIO;
+  if (!error && R_FAILED(fsdevCommitDevice("sdmc")))
+    error = EIO;
+  return error ? -error : 0;
+}
+void as_storage_writer_close(uint64_t handle) {
+  if (handle)
+    fclose((FILE *)handle);
+}
 int as_storage_mkdir(const char *path, uint32_t exclusive) {
   if (!mkdir(path, 0777))
     return 1;

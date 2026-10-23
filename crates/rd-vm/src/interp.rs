@@ -888,6 +888,18 @@ pub(crate) fn exec_frame(
                 if !vm.statics.contains_key(&(owner.clone(), fname.clone()))
                     && vm.cp.find_class(&owner).is_none()
                 {
+                    if let Some(framework) = vm.framework_host() {
+                        if let Some(value) =
+                            step!(framework.static_field(vm, &owner, &fname, &ftype))
+                        {
+                            vm.statics.insert((owner.clone(), fname.clone()), value);
+                        }
+                    }
+                }
+                #[cfg(not(feature = "std"))]
+                if !vm.statics.contains_key(&(owner.clone(), fname.clone()))
+                    && vm.cp.find_class(&owner).is_none()
+                {
                     return Err(err::vm_error(
                         "API_UNAVAILABLE",
                         format!("sget {owner}->{fname}:{ftype} requires a platform implementation"),

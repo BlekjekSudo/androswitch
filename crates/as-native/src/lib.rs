@@ -8,6 +8,7 @@ pub mod oracle;
 use alloc::{
     collections::BTreeMap,
     format,
+    rc::Rc,
     string::{String, ToString},
     vec,
     vec::Vec,
@@ -64,10 +65,17 @@ pub struct Module {
     pub tls_offset: Option<u64>,
     pub initialized: bool,
 }
+/// APK/container-backed libraries are extracted only when the dependency graph
+/// requests them. Existing in-memory oracle fixtures keep using Loader::new.
+pub trait LibrarySource {
+    fn contains(&self, name: &str) -> bool;
+    fn read(&self, name: &str) -> Result<Vec<u8>>;
+}
 pub struct Loader<B: NativeBackend> {
     pub backend: B,
     pub modules: Vec<Module>,
     sources: BTreeMap<String, Vec<u8>>,
+    provider: Option<Rc<dyn LibrarySource>>,
     loading: Vec<String>,
     poisoned: bool,
 }
@@ -77,9 +85,15 @@ impl<B: NativeBackend> Loader<B> {
             backend,
             modules: Vec::new(),
             sources,
+            provider: None,
             loading: Vec::new(),
             poisoned: false,
         }
+    }
+    pub fn with_source(backend: B, source: Rc<dyn LibrarySource>) -> Self {
+        let mut loader = Self::new(backend, BTreeMap::new());
+        loader.provider = Some(source);
+        loader
     }
     pub fn symbol(&self, name: &str) -> Option<u64> {
         self.modules
@@ -110,18 +124,28 @@ impl<B: NativeBackend> Loader<B> {
                 "acyclic dependency graph",
             ));
         }
-        let bytes = self
-            .sources
-            .get(name)
-            .ok_or_else(|| error("LIBRARY_NOT_FOUND", "load", name, "APK lib/arm64-v8a entry"))?;
-        let elf = Elf::parse(bytes).map_err(|e| error(&e.code, "parse", name, e.cause))?;
+        let elf = if let Some(bytes) = self.sources.get(name) {
+            Elf::parse(bytes)
+        } else {
+            let provider = self.provider.as_ref().ok_or_else(|| {
+                error("LIBRARY_NOT_FOUND", "load", name, "APK lib/arm64-v8a entry")
+            })?;
+            let bytes = provider.read(name)?;
+            Elf::parse(&bytes)
+        }
+        .map_err(|e| error(&e.code, "parse", name, e.cause))?;
         if elf.abi != Abi::Arm64 {
             return Err(error("UNSUPPORTED_NATIVE_ABI", "load", name, "ARM64"));
         }
         self.loading.push(name.to_string());
         let result = (|| {
             for dependency in &elf.needed {
-                if self.sources.contains_key(dependency) {
+                if self.sources.contains_key(dependency)
+                    || self
+                        .provider
+                        .as_ref()
+                        .is_some_and(|p| p.contains(dependency))
+                {
                     self.load(dependency)?;
                 } else if !self.backend.system_library(dependency) {
                     return Err(error("LIBRARY_NOT_FOUND", "dependency", name, dependency));

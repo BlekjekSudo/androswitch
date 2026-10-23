@@ -30,6 +30,17 @@ separately using its [official documentation](https://devkitpro.org/).
 
 ## Host tools
 
+M8's framework now links native SQLite. Before building framework/launcher/NRO
+targets, run `python scripts/fetch-sqlite.py`. It downloads the pinned official
+amalgamation and validates its hash. Host SQLite builds need a GNU C compiler
+and `ar` (Windows defaults: `C:/w64devkit/bin/gcc.exe` and `ar.exe`; override
+with `CC`/`AR`). The Switch Makefile compiles the same source with devkitA64.
+There is no Python dependency on the device. The host inspection CLI alone
+does not require this database backend.
+
+The consolidated host regression command is `./scripts/check-m7-m9.ps1` after
+building the fixtures listed in [M8/M9](M8_M9_E2E.md). It does not open Ryujinx.
+
 From the repository root:
 
 ```powershell

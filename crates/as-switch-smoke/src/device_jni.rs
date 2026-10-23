@@ -64,9 +64,9 @@ pub fn thread() -> u64 {
 impl Session {
     pub fn new(apk: &rd_apk::Apk) -> Result<Rc<Self>> {
         let session = Rc::new(Self {
-            loader: RefCell::new(Loader::new(
+            loader: RefCell::new(Loader::with_source(
                 HorizonNative::default(),
-                crate::native_probe::sources(apk).map_err(jni)?,
+                crate::native_probe::library_source(apk),
             )),
             refs: RefCell::new(References::default()),
             registrations: RefCell::new(BTreeMap::new()),

@@ -17,6 +17,8 @@ use rd_apk::{
     Apk,
 };
 use rd_vm::{framework_host::FrameworkHost, Engine, ObjRef, Throwable, Value, VmExit};
+#[path = "services/mod.rs"]
+mod services;
 use serde::Serialize;
 type Result<T> = core::result::Result<T, VmExit>;
 fn error(code: &str, cause: impl Into<String>) -> VmExit {
@@ -43,6 +45,31 @@ fn text(vm: &Engine, v: &Value) -> Result<String> {
 }
 fn string(vm: &mut Engine, s: impl Into<String>) -> Result<Value> {
     Ok(Value::Obj(vm.heap.alloc_string(s.into())?))
+}
+// Dalvik registers contain untyped bits. Host services receive the types in
+// the actual method descriptor, including zero-as-null and float constants.
+fn typed_args(sig: &str, args: &[Value]) -> Result<Vec<Value>> {
+    let parameters =
+        rd_vm::engine::parse_param_types(sig).ok_or_else(|| error("INVALID_DESCRIPTOR", sig))?;
+    if parameters.len() != args.len() {
+        return Err(error("INVALID_ARGUMENT", sig));
+    }
+    parameters
+        .iter()
+        .zip(args)
+        .map(|(d, v)| {
+            Ok(match d.as_str() {
+                d if d.starts_with(['L', '[']) && matches!(v, Value::Int(0) | Value::Null) => {
+                    Value::Null
+                }
+                "F" => Value::Float(v.as_float()?),
+                "D" => Value::Double(v.as_double()?),
+                "Z" | "B" | "C" | "S" | "I" => Value::Int(rd_vm::value::narrow_i32(v.as_int()?, d)),
+                "J" => Value::Long(v.as_long()?),
+                _ => v.clone(),
+            })
+        })
+        .collect()
 }
 fn shell(vm: &mut Engine, class: &str) -> Result<ObjRef> {
     vm.ensure_initialized(class)?;
@@ -76,6 +103,7 @@ pub struct View {
     pub orientation: i32,
     pub listener: Option<ObjRef>,
     pub click_method: Option<String>,
+    pub input_type: Option<i32>,
 }
 impl View {
     fn new(object: ObjRef, class: &str) -> Self {
@@ -101,6 +129,7 @@ impl View {
             orientation: 0,
             listener: None,
             click_method: None,
+            input_type: (class == "Landroid/widget/EditText;").then_some(1),
         }
     }
 }
@@ -164,6 +193,7 @@ struct State {
     audio_tracks: BTreeMap<ObjRef, (u64, bool)>,
 }
 pub struct Android {
+    services: services::Services,
     pub apk: Apk,
     pub width: i32,
     pub height: i32,
@@ -172,15 +202,23 @@ pub struct Android {
     audio: RefCell<Option<Rc<dyn crate::PcmOutput>>>,
 }
 impl Android {
-    pub fn new(apk: Apk, clock: Rc<dyn Clock>, width: i32, height: i32) -> Rc<Self> {
-        Rc::new(Self {
+    pub fn new(
+        apk: Apk,
+        clock: Rc<dyn Clock>,
+        width: i32,
+        height: i32,
+        fs: Rc<dyn as_platform::fs::FileSystem>,
+    ) -> Result<Rc<Self>> {
+        let services = services::Services::new(fs, &apk)?;
+        Ok(Rc::new(Self {
+            services,
             apk,
             clock,
             width,
             height,
             state: RefCell::new(State::default()),
             audio: RefCell::new(None),
-        })
+        }))
     }
     pub fn now(&self) -> u64 {
         self.clock.monotonic_micros() / 1000
@@ -213,6 +251,7 @@ impl Android {
     /// lifecycle methods on an activity whose initialization did not complete.
     /// The caller must still join native callbacks/threads before dropping VM state.
     pub fn abort_startup(&self) -> Result<()> {
+        self.services.flush()?;
         self.state.borrow_mut().tasks.clear();
         self.state.borrow_mut().actions.clear();
         let tracks = core::mem::take(&mut self.state.borrow_mut().audio_tracks);
@@ -330,6 +369,7 @@ impl Android {
         Ok(())
     }
     pub fn tick(&self, vm: &mut Engine) -> Result<()> {
+        self.services.flush()?;
         for _ in 0..256 {
             let action = self.state.borrow_mut().actions.pop_front();
             if let Some(action) = action {
@@ -727,7 +767,7 @@ impl Android {
             .apk
             .arsc
             .as_ref()
-            .and_then(|a| a.resolve_value(id))
+            .and_then(|a| a.resolve_value_for_api(id, 26))
             .ok_or_else(|| error("RESOURCE_NOT_FOUND", format!("{id:#x}")))?
         {
             ResolvedValue::Reference(id) => self.resource(id, depth + 1),
@@ -765,7 +805,7 @@ impl Android {
         } else {
             match node.name.as_str() {
                 "View" => "Landroid/view/View;".into(),
-                "LinearLayout" | "FrameLayout" | "TextView" | "Button" => {
+                "LinearLayout" | "FrameLayout" | "TextView" | "Button" | "EditText" => {
                     format!("Landroid/widget/{};", node.name)
                 }
                 _ => {
@@ -789,6 +829,27 @@ impl Android {
             let value = attribute.value.clone();
             let name = attribute.name.as_str();
             match name {
+                "autoText" | "capitalize"
+                    if vm.cp.is_subtype(&class, "Landroid/widget/EditText;") =>
+                {
+                    let bits = if name == "autoText" {
+                        if attribute.as_bool() == Some(true) {
+                            0x8000
+                        } else {
+                            0
+                        }
+                    } else {
+                        match attribute.as_i32().unwrap_or(0) {
+                            1 => 0x1000,
+                            2 => 0x2000,
+                            3 => 0x4000,
+                            _ => 0,
+                        }
+                    };
+                    let mut state = self.state.borrow_mut();
+                    let view = state.views.get_mut(&r).unwrap();
+                    view.input_type = Some(view.input_type.unwrap_or(1) | bits);
+                }
                 "id" => {
                     self.state.borrow_mut().views.get_mut(&r).unwrap().id =
                         attribute.as_u32().unwrap_or(0) as i32
@@ -912,6 +973,7 @@ impl Android {
                     | "Landroid/view/View;"
                     | "Landroid/view/ViewGroup;"
                     | "Landroid/widget/TextView;"
+                    | "Landroid/widget/EditText;"
                     | "Landroid/widget/Button;"
                     | "Landroid/widget/LinearLayout;"
                     | "Landroid/widget/FrameLayout;"
@@ -949,6 +1011,15 @@ impl Android {
 }
 
 impl FrameworkHost for Android {
+    fn static_field(
+        &self,
+        vm: &mut Engine,
+        class: &str,
+        name: &str,
+        descriptor: &str,
+    ) -> Result<Option<Value>> {
+        self.services.static_field(vm, class, name, descriptor)
+    }
     fn asset_open(&self, name: &str) -> Result<u64> {
         if name.is_empty()
             || name.starts_with('/')
@@ -1021,9 +1092,11 @@ impl FrameworkHost for Android {
         if let Some(bundle) = s.bundles.get(&r) {
             refs.extend(bundle.values().filter_map(|v| v.as_ref().ok().flatten()));
         }
+        refs.extend(self.services.references(r));
         refs
     }
     fn collect(&self, marked: &[bool]) {
+        self.services.collect(marked);
         let live = |r: &ObjRef| marked.get(*r as usize).copied().unwrap_or(false);
         let mut s = self.state.borrow_mut();
         s.views.retain(|r, _| live(r));
@@ -1057,6 +1130,9 @@ impl FrameworkHost for Android {
         }
     }
     fn attach(&self, vm: &mut Engine, class: &str, r: ObjRef) -> Result<bool> {
+        if self.services.attach(vm, class, r)? {
+            return Ok(true);
+        }
         let Some(platform) = self.platform_class(vm, class) else {
             return Ok(false);
         };
@@ -1089,6 +1165,11 @@ impl FrameworkHost for Android {
         sig: &str,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        let arguments = typed_args(sig, args)?;
+        let args = arguments.as_slice();
+        if let Some(value) = self.services.call_static(vm, class, name, sig, args)? {
+            return Ok(Some(value));
+        }
         let value = match (class, name, sig) {
             ("Landroid/media/AudioTrack;", "getMinBufferSize", "(III)I") => Value::Int(
                 if int(args, 0)? == 48000 && int(args, 1)? == 12 && int(args, 2)? == 2 {
@@ -1160,6 +1241,11 @@ impl FrameworkHost for Android {
         r: ObjRef,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        let arguments = typed_args(sig, args)?;
+        let args = arguments.as_slice();
+        if let Some(value) = self.services.call(self, vm, class, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
         if vm.heap.class_of(r)? == "Ljava/lang/String;" {
             let s = vm.heap.as_str(r)?.to_string();
             let v = match (name, sig) {
@@ -1186,11 +1272,8 @@ impl FrameworkHost for Android {
             return Ok(Some(v));
         }
         if class == "Ljava/lang/Object;" && name == "getClass" && sig == "()Ljava/lang/Class;" {
-            let value = vm.heap.alloc_string(vm.heap.class_of(r)?.to_string())?;
-            let c = vm.heap.alloc_instance(
-                "Ljava/lang/Class;".into(),
-                vec![("class_name".into(), Value::Obj(value))],
-            )?;
+            let descriptor = vm.heap.class_of(r)?.to_string();
+            let c = vm.device_class_object(&descriptor)?;
             return Ok(Some(Value::Obj(c)));
         }
         let actual = vm.heap.class_of(r)?.to_string();
@@ -1398,6 +1481,15 @@ impl FrameworkHost for Android {
                 )?;
                 Value::Obj(file)
             }
+            ("getLayoutInflater", "()Landroid/view/LayoutInflater;")
+                if vm
+                    .cp
+                    .is_subtype(vm.heap.class_of(r)?, "Landroid/app/Activity;") =>
+            {
+                let inflater = shell(vm, "Landroid/view/LayoutInflater;")?;
+                write(vm, inflater, "context", Value::Obj(r))?;
+                Value::Obj(inflater)
+            }
             ("attachBaseContext", "(Landroid/content/Context;)V") => {
                 obj(&args[0])?;
                 write(vm, r, "base_context", args[0].clone())?;
@@ -1522,6 +1614,7 @@ impl FrameworkHost for Android {
     fn roots(&self) -> Vec<ObjRef> {
         let s = self.state.borrow();
         let mut roots = s.roots.clone();
+        roots.extend(self.services.roots());
         roots.extend(s.application);
         roots.extend(s.resources);
         roots.extend(s.looper);

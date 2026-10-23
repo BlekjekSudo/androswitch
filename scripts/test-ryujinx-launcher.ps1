@@ -1,4 +1,4 @@
-param([string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',[string]$RyujinxProfile="$env:APPDATA/Ryujinx",[int]$TimeoutSeconds=300,[ValidateSet('workflow','quiescence','startup-failure','startup-quiescence')][string]$Scenario='workflow',[string]$ExternalApk='',[switch]$AllowDesktopEmulator)
+param([string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',[string]$RyujinxProfile="$env:APPDATA/Ryujinx",[int]$TimeoutSeconds=300,[ValidateSet('workflow','quiescence','startup-failure','startup-quiescence','m9')][string]$Scenario='workflow',[string]$ExternalApk='',[switch]$AllowDesktopEmulator)
 $ErrorActionPreference='Stop'
 if(-not $AllowDesktopEmulator){throw 'Desktop Ryujinx E2E is opt-in after reported disappearance of other app windows. Use -AllowDesktopEmulator only when ready; scripts/verify-saved-launcher-run.ps1 validates existing evidence without opening apps.'}
 $projectRoot=Split-Path -Parent $PSScriptRoot
@@ -79,6 +79,20 @@ try{
     }
     for($i=0;$i -lt $failures+2;$i++){Key up}
     OpenApp @(@{kind='wait';ms=1500});$commands.Add(@{kind='frames';count=60})
+  }
+  if($Scenario -eq 'm9'){
+    foreach($file in Get-ChildItem "$root/apks" -File){Remove-Item -LiteralPath $file.FullName}
+    $m9Files=@(@('m8/fixture/preferences.apk','01-preferences.apk'),@('m8/fixture/renamed.apk','02-renamed-preferences.apk'),@('m8/fixture/database.apk','03-database.apk'),@('m8/fixture/database-renamed.apk','04-renamed-database.apk'),@('m9/aosp-hello/hello-activity.apk','05-aosp.apk'),@('m5/fixture/java-ui.apk','06-java.apk'),@('m5/fixture/kotlin-ui.apk','07-kotlin.apk'),@('m6/fixture/native-media.apk','08-native.apk'))
+    foreach($item in $m9Files){Copy-Item "$projectRoot/local-artifacts/$($item[0])" "$root/apks/$($item[1])"}
+    $commands.Clear()
+    for($i=0;$i -lt $m9Files.Count;$i++){
+      Key right;for($row=0;$row -lt $i;$row++){Key down};Key accept
+      for($cycle=0;$cycle -lt 3;$cycle++){
+        if($i -eq 7){OpenApp $native}else{OpenApp @(@{kind='gc'},@{kind='frame'},@{kind='return_to_launcher'})}
+        $commands.Add(@{kind='frames';count=60})
+      }
+    }
+    $receipt.inputs=@($m9Files|ForEach-Object{@{file=$_[1];sha256=(Get-FileHash "$root/apks/$($_[1])").Hash.ToLowerInvariant()}})
   }
   if($Scenario -in @('quiescence','startup-quiescence')){
     foreach($file in Get-ChildItem "$root/apks" -File){Remove-Item -LiteralPath $file.FullName}

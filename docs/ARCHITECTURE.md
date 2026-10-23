@@ -68,13 +68,15 @@ One VFS resolves paths for Java and native APIs:
 Normalize guest paths before mount resolution and separate app-private storage.
 OBBs remain opaque files with positioned reads. Asset readers share APK bytes
 and inflate incrementally with bounded output and a 32 KiB dictionary. M0 host
-inspection accepts up to 512 MiB; the M7 alpha's memory-resident device APK
-container is explicitly limited to 64 MiB. The existing paged ZIP parser has
-not yet replaced the product's whole-container path.
+inspection accepts up to 512 MiB. The M7 improvement path also accepts containers
+up to 512 MiB using an owned positional reader through the shared ZIP parser.
+Installation, registry verification, icons and execution avoid whole-container
+reads. Materialized entries, total DEX input and directory/signing metadata have
+separate budgets; see [storage improvements](M7_STORAGE_E2E.md).
 The 256 MiB product heap must also hold decoded DEX, VM objects, native source
-images/mappings and platform/media allocations. Raising the cap requires replacing
-the whole-container installation/execution path and measuring peak allocation;
-streamed OBB reads alone do not solve APK-container residency.
+images/mappings and platform/media allocations. Expanding these budgets requires
+measuring decoded and native allocations independently
+of container size. Streamed OBBs and file-backed APKs use the same persistent root.
 
 ## Lifecycle (M7)
 
@@ -107,6 +109,13 @@ submissions, with operation/result/slot diagnostics on display failures. Runtime
 GPU dumps are opt-in to scripted tests, not interactive startup work.
 
 ## Verification
+
+M8 uses `as-storage` for typed XML preferences and real native SQLite snapshots.
+The shared framework owns collection/editor/helper/cursor state and reports its
+object graph to the same VM collector used by JNI. Method reflection resolves
+actual DEX definitions. Resource lookup selects the newest SDK variant <=26;
+the inherited inspection resolver retains its original default preference.
+See [M8/M9 contracts](M8_M9_E2E.md) for snapshot, API and configuration limits.
 
 Track implementation, host, Horizon emulator and physical device separately.
 CLI JSON is versioned; errors include operation, module and cause. Static
