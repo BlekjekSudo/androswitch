@@ -1439,6 +1439,7 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         "Ljava/nio/charset/Charset;" => Some(&["Ljava/lang/Comparable;"]),
         "Ljava/util/UUID;" => Some(&["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
         "Landroid/net/Uri;" => Some(&["Landroid/os/Parcelable;", "Ljava/lang/Comparable;"]),
+        "Landroid/os/Binder;" => Some(&["Landroid/os/IBinder;"]),
         // framework value types that apps (and Compose's SaveableStateRegistry)
         // test with `Parcelable.class.isInstance(..)` / check-cast
         "Landroid/os/Bundle;"

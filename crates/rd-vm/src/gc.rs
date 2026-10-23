@@ -350,6 +350,15 @@ impl Engine {
                         }
                     }
                 }
+                Some(HostObj::Parcel { objects, .. }) => {
+                    // Precise: the byte buffer must not be conservatively
+                    // scanned (raw parcel bytes would look like object ids).
+                    for v in objects {
+                        if let Value::Obj(x) = v {
+                            cand.push(*x);
+                        }
+                    }
+                }
                 Some(HostObj::Map { entries }) => {
                     // java.util.WeakHashMap holds values strongly (a value
                     // pointing back to its key keeps the entry alive), but

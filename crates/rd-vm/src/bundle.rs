@@ -316,6 +316,33 @@ fn bundle(
         }
         ("setClassLoader", _) | ("setDefusable", _) => return Ok(Some(Value::Null)),
         ("getClassLoader", "()Ljava/lang/ClassLoader;") => return Ok(Some(Value::Null)),
+        ("describeContents", "()I") => return Ok(Some(Value::Int(0))),
+        ("writeToParcel", "(Landroid/os/Parcel;I)V") => {
+            let Some(Value::Obj(parcel)) = args.first() else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "Bundle.writeToParcel: parcel is null",
+                )));
+            };
+            crate::parcel::write_bundle_map(vm, *parcel, recv)?;
+            return Ok(Some(Value::Null));
+        }
+        ("readFromParcel", "(Landroid/os/Parcel;)V") => {
+            let Some(Value::Obj(parcel)) = args.first() else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "Bundle.readFromParcel: parcel is null",
+                )));
+            };
+            let entries = crate::parcel::read_bundle_map(vm, *parcel)?;
+            if let Some(m) = map_mut(vm, recv) {
+                m.clear();
+                for (k, v) in entries {
+                    store(m, k, v);
+                }
+            }
+            return Ok(Some(Value::Null));
+        }
         ("size", "()I") => {
             return Ok(Some(Value::Int(
                 map_of(vm, recv).map_or(0, |m| m.len()) as i32

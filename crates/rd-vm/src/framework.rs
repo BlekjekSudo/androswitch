@@ -46,6 +46,7 @@ pub const FRAGMENT_CLS: &str = "Landroid/app/Fragment;";
 pub const CONTEXT: &str = "Landroid/content/Context;";
 pub const INTENT: &str = "Landroid/content/Intent;";
 pub const BUNDLE: &str = "Landroid/os/Bundle;";
+pub const PARCEL: &str = "Landroid/os/Parcel;";
 pub const VIEW: &str = "Landroid/view/View;";
 pub(crate) const VIEW_ON_TOUCH_LISTENER: &str = "view:on_touch_listener";
 pub const VIEWGROUP: &str = "Landroid/view/ViewGroup;";
@@ -846,6 +847,14 @@ pub enum HostObj {
     Bundle {
         map: Vec<(String, Value)>,
     },
+    /// `android.os.Parcel`: the byte buffer, read/write cursor and the
+    /// out-of-band object side table used for local strong references that
+    /// have no portable byte representation in a single-Engine transport.
+    Parcel {
+        data: Vec<u8>,
+        pos: usize,
+        objects: Vec<Value>,
+    },
     /// M8: coleções java.util host — Map (HashMap/WeakHashMap) e List
     /// (ArrayList/LinkedList). Estado linear (volumes pequenos); igualdade
     /// de chave/elemento via `intrinsics::values_equal` (String/boxes por
@@ -924,6 +933,11 @@ pub struct HostState {
     /// `jcollections::sublist_*` (write-through semantics).
     pub(crate) sublists: HashMap<ObjRef, (ObjRef, usize, usize)>,
     pub(crate) sublist_order: std::collections::VecDeque<ObjRef>,
+    /// Engine-local Binder handle table for `Parcel.writeStrongBinder`:
+    /// the marshalled int handle is `index + 1` (0 is null). This models
+    /// local Binder transport inside one Engine; it is not a kernel Binder
+    /// handle and does not survive leaving the Engine.
+    pub(crate) binder_refs: Vec<Value>,
     /// clock virtual (ms) — postDelayed/dispatch por ordem de tempo
     pub clock_ms: u64,
     /// Last platform `InputConnection` + its `EditorInfo` opened by
@@ -1180,6 +1194,15 @@ impl Engine {
             self.fw
                 .objects
                 .insert(r, HostObj::Bundle { map: Vec::new() });
+        } else if class == PARCEL {
+            self.fw.objects.insert(
+                r,
+                HostObj::Parcel {
+                    data: Vec::new(),
+                    pos: 0,
+                    objects: Vec::new(),
+                },
+            );
         } else if self.cp.is_subtype(class, VIEW) {
             let mut v = new_view();
             // TextView/Button têm altura de touch target por default

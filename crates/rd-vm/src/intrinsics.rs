@@ -354,6 +354,10 @@ fn call_static_intrinsic_rooted(
     if let Some(v) = crate::boxes::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
     }
+    // Parcel.obtain / Binder identity statics (parcel.rs)
+    if let Some(v) = crate::parcel::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
     if let Some(v) = crate::xml_res::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
@@ -4175,6 +4179,12 @@ fn instance_intrinsic_dispatch(
     }
     // java.lang.String extended surface (jlstring.rs)
     if let Some(v) = crate::jlstring::instance_intrinsic(vm, mref_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // Parcel/Parcelable/Binder local transport (parcel.rs)
+    if let Some(v) =
+        crate::parcel::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
         return Ok(Some(v));
     }
     // Bundle/BaseBundle/PersistableBundle + Intent data (bundle.rs)
