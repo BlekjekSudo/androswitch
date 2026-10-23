@@ -15,6 +15,13 @@ Copy-Item $nro "$sd/androswitch.nro"
 foreach($name in @('CREDITS.md','NOTICE.md','LICENSE-MIT','LICENSE-APACHE')){Copy-Item "$projectRoot/$name" "$package/$name"}
 Copy-Item "$projectRoot/docs/USING_ANDROSWITCH.md" "$package/READ-ME.md"
 Copy-Item "$projectRoot/docs/HARDWARE_FEEDBACK.md" "$package/HARDWARE_FEEDBACK.md"
+if(Test-Path "$projectRoot/docs/STARTUP_FAILURES.md"){
+  $startup=Get-Content "$projectRoot/docs/STARTUP_FAILURES.md" -Raw
+  $startup.Replace('(../reports/','(reports/') | Set-Content "$package/STARTUP_FAILURES.md" -Encoding utf8NoBOM
+  New-Item -ItemType Directory -Force -Path "$package/reports" | Out-Null
+  Copy-Item $evidencePath (Join-Path "$package/reports" ([IO.Path]::GetFileName($evidencePath)))
+  if(Test-Path "$projectRoot/reports/mekorama-startup-20261024.json"){Copy-Item "$projectRoot/reports/mekorama-startup-20261024.json" "$package/reports/mekorama-startup-20261024.json"}
+}
 Copy-Item "$projectRoot/docs/QUICK_START_ID.md" "$package/MULAI-DI-SINI.md"
 $quick=Get-Content "$package/MULAI-DI-SINI.md" -Raw
 $quick.Replace('(USING_ANDROSWITCH.md)','(READ-ME.md)').Replace('(M6_M7_E2E.md)','(https://github.com/BlekjekSudo/androswitch/blob/main/docs/M6_M7_E2E.md)') | Set-Content "$package/MULAI-DI-SINI.md" -Encoding utf8NoBOM

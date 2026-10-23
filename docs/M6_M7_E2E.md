@@ -138,3 +138,7 @@ the compact report record exact commands and artifacts.
 Failed class/native initialization has separate recovery and live-worker
 regressions, including the supplied external Mekorama APK. Those results and
 reproduction commands are in [startup failures](STARTUP_FAILURES.md).
+Desktop Ryujinx testing now requires `-AllowDesktopEmulator` after reported
+disappearance of other desktop windows. Its cause is undetermined. Existing
+workflow evidence can be validated using `scripts/verify-saved-launcher-run.ps1`
+without reopening the emulator.

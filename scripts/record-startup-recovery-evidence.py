@@ -9,6 +9,7 @@ import re
 root = pathlib.Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument("--implementation-commit", required=True)
+parser.add_argument("--unrun-normal-boundary-reason", default="")
 options = parser.parse_args()
 if not re.fullmatch(r"[0-9a-f]{40}", options.implementation_commit):
     raise SystemExit("Supply the full reviewed implementation commit")
@@ -30,8 +31,10 @@ for path in sorted((root / "local-artifacts/m7/runs").glob("*/verification.json"
     if receipt.get("status") == "passed" and receipt.get("nro_sha256") == nro_hash:
         runs[receipt["scenario"]] = (path.parent, receipt)
 scenarios = ("startup-failure", "startup-quiescence", "workflow", "quiescence")
-if any(name not in runs for name in scenarios):
-    raise SystemExit("All four scenarios must pass against the current product NRO")
+if any(name not in runs for name in scenarios[:3]):
+    raise SystemExit("Startup recovery, failed-onload worker and console workflow must pass against the current NRO")
+if "quiescence" not in runs and not options.unrun_normal_boundary_reason:
+    raise SystemExit("Normal worker boundary must pass, or carry an explicit not-run reason")
 startup_dir, startup = runs["startup-failure"]
 if startup.get("external_apk_sha256") != "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01":
     raise SystemExit("The external Mekorama reproduction is required")
@@ -67,6 +70,8 @@ sources = [
     "crates/as-switch-smoke/src/application.rs", "platform/androswitch/main.c",
     "scripts/test-ryujinx-launcher.ps1", "scripts/build-startup-failure-fixtures.ps1",
     "scripts/record-startup-recovery-evidence.py",
+    "scripts/validate-launcher-report.ps1", "scripts/verify-saved-launcher-run.ps1",
+    "scripts/package-androswitch.ps1",
 ]
 sources += [p.relative_to(root).as_posix() for p in sorted((root / "fixtures/startup-failure").glob("*"))]
 report = {
@@ -75,11 +80,22 @@ report = {
     "implementation_commit": options.implementation_commit, "product_nro_sha256": nro_hash,
     "verification": {
         "host": "11 focused tests passed; two unchanged oracle tests ignored; three clippy commands passed",
-        "ryujinx": "passed four startup errors including unmodified Mekorama, Java/native/Java recovery, full console workflow, normal and failed-onload live-worker exit/reboot boundaries",
+        "ryujinx": "passed four startup errors including unmodified Mekorama, Java/native/Java recovery, full console workflow validated from saved SD, and failed-onload live-worker exit/reboot boundary; see normal_boundary for separate status",
         "physical_device": "startup recovery pending retest; prior display fix confirmed by user for bundled native sample",
         "android_reference_device": "not_run",
     },
     "runs": {name: receipt for name, (_, receipt) in runs.items() if name in scenarios},
+    "normal_boundary": runs["quiescence"][1] if "quiescence" in runs else {
+        "status": "not_run_on_current_nro", "reason": options.unrun_normal_boundary_reason,
+        "prior_evidence": "reports/m7-display-handoff.json; different NRO hash, not a current-build pass",
+    },
+    "desktop_incident": {
+        "evidence_type": "user_report", "affected_apps": "browser and Codex",
+        "symptom": "windows disappeared while emulator testing; processes initially remained",
+        "user_action": "user later closed the affected processes; reopening declined",
+        "cause": "undetermined; no claim that Hidden, fullscreen, GPU or memory is the established cause",
+        "response": "emulator stopped, original SD folder restored, saved workflow validated without app launch; desktop E2E now requires explicit opt-in",
+    },
     "startup_failures": [{"session_id": s["session_id"], "package": s["package"],
         "error": s["error"], "teardown": s["teardown"]} for s in failed],
     "following_sessions": [{"session_id": s["session_id"], "package": s["package"],
@@ -96,11 +112,12 @@ report = {
     "sources": [{"path": p, "sha256": sha(root / p)} for p in sources],
     "supplied_hardware_and_static_evidence": {"path": "reports/mekorama-startup-20261024.json",
         "sha256": sha(root / "reports/mekorama-startup-20261024.json")},
-    "commands": [
+    "reproduction_commands": [
         "scripts/build-startup-failure-fixtures.ps1", "scripts/build-androswitch.ps1",
-        "scripts/test-ryujinx-launcher.ps1 -Scenario startup-failure -ExternalApk D:/Download/mekorama-1-7-2.apk",
-        "scripts/test-ryujinx-launcher.ps1 -Scenario startup-quiescence",
-        "scripts/test-ryujinx-launcher.ps1", "scripts/test-ryujinx-launcher.ps1 -Scenario quiescence",
+        "scripts/test-ryujinx-launcher.ps1 -AllowDesktopEmulator -Scenario startup-failure -ExternalApk D:/Download/mekorama-1-7-2.apk",
+        "scripts/test-ryujinx-launcher.ps1 -AllowDesktopEmulator -Scenario startup-quiescence",
+        "scripts/test-ryujinx-launcher.ps1 -AllowDesktopEmulator", "scripts/test-ryujinx-launcher.ps1 -AllowDesktopEmulator -Scenario quiescence",
+        "scripts/verify-saved-launcher-run.ps1 -RunId 9f6be525dd8f41d69bd640cf574dd7c0",
         "cargo test -p as-framework --features host --test lifecycle --locked -- --include-ignored",
         "cargo test -p as-package -p as-native --locked",
         "cargo test -p as-launcher --features host --test workflow --locked -- --include-ignored",
@@ -117,6 +134,7 @@ report = {
         "Synthetic Plus dispatch and PCM counters are emulator evidence, not physical controls/acoustic measurement",
         "Full upstream VM/JVM regression corpus was not rerun; prior milestone reports retain that evidence",
         "Supplied teardown/display traces lack session identity and are treated as earlier sample traces",
+        "Desktop window loss was reported during emulator testing; cause remains undetermined; no further emulator run was started",
     ],
 }
 (root / "reports/m7-startup-recovery.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

@@ -58,13 +58,25 @@ compatibility. No package-specific runtime behavior or APK modification is used.
 
 ## Reproduce
 
+Desktop emulator runs are now opt-in. During this investigation the user reported
+that other application windows disappeared while Ryujinx testing was active;
+the cause is undetermined. Testing was stopped, the original SD directory was
+restored, and the completed console report was checked with the shared validator
+without reopening any app. The normal stuck-worker scenario was not rerun on
+the latest NRO; its prior-build result is retained separately. The failed-onload
+worker and Mekorama recovery scenarios did complete on the latest NRO.
+
+The commands below intentionally enable desktop emulator execution. To validate
+an existing interrupted workflow without launching apps, use
+`scripts/verify-saved-launcher-run.ps1 -RunId <recorded-run-id>` instead.
+
 ```powershell
 ./scripts/build-startup-failure-fixtures.ps1
 ./scripts/build-androswitch.ps1
-./scripts/test-ryujinx-launcher.ps1 -Scenario startup-failure -ExternalApk D:/Download/mekorama-1-7-2.apk
-./scripts/test-ryujinx-launcher.ps1 -Scenario startup-quiescence
-./scripts/test-ryujinx-launcher.ps1
-./scripts/test-ryujinx-launcher.ps1 -Scenario quiescence
+./scripts/test-ryujinx-launcher.ps1 -AllowDesktopEmulator -Scenario startup-failure -ExternalApk D:/Download/mekorama-1-7-2.apk
+./scripts/test-ryujinx-launcher.ps1 -AllowDesktopEmulator -Scenario startup-quiescence
+./scripts/test-ryujinx-launcher.ps1 -AllowDesktopEmulator
+./scripts/test-ryujinx-launcher.ps1 -AllowDesktopEmulator -Scenario quiescence
 python scripts/record-startup-recovery-evidence.py --implementation-commit (git rev-parse HEAD)
 ./scripts/package-androswitch.ps1 -EvidencePath reports/m7-startup-recovery.json
 ```
