@@ -15,12 +15,40 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--evidence", type=Path, required=True)
 parser.add_argument("--input", default="final-original-nine-paired.json")
 parser.add_argument("--resamples", type=int, default=10000)
+parser.add_argument(
+    "--expected-workloads",
+    nargs="+",
+    help=(
+        "Exact workload set to require. Defaults to the original nine for "
+        "the historical evidence file and to Sentinel's six-workload paired "
+        "run for benchmarks.json."
+    ),
+)
 args = parser.parse_args()
 if args.resamples < 1000:
     parser.error("--resamples must be at least 1000")
 rows = json.loads((args.evidence / args.input).read_text())
-expected = {"roots", "host", "sweep", "minor", "resolve", "interp", "strings", "subtype", "jit"}
-assert {row["workload"] for row in rows} == expected
+original_nine = {
+    "roots", "host", "sweep", "minor", "resolve", "interp", "strings", "subtype", "jit"
+}
+sentinel_core = {"roots", "host", "sweep", "minor", "resolve", "interp"}
+if args.expected_workloads:
+    expected = set(args.expected_workloads)
+elif Path(args.input).name == "benchmarks.json":
+    # RD Sentinel v1.0 invokes efficiency-benchmark.py without --workloads,
+    # whose documented default is these six. Keep that older trusted-bot
+    # invocation exact instead of silently accepting any subset.
+    expected = sentinel_core
+else:
+    expected = original_nine
+if not expected or not expected.issubset(original_nine):
+    parser.error(f"--expected-workloads must be a non-empty subset of {sorted(original_nine)}")
+actual_workloads = {row["workload"] for row in rows}
+if actual_workloads != expected:
+    parser.error(
+        "workload set mismatch: "
+        f"expected {sorted(expected)}, got {sorted(actual_workloads)}"
+    )
 summary = []
 for name in dict.fromkeys(row["workload"] for row in rows):
     selected = [row for row in rows if row["workload"] == name]

@@ -1,0 +1,68 @@
+name: RD Sentinel Publish
+
+# Trusted publisher. This workflow exists on the default branch, checks out
+# only that default branch, validates the artifact against the live PR API,
+# and is the sole Sentinel writer. Candidate code is never executed here.
+on:
+  workflow_run:
+    workflows: [RD Sentinel, RD Sentinel Deep]
+    types: [completed]
+
+permissions:
+  actions: read
+  checks: write
+  contents: read
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
+
+concurrency:
+  group: rd-sentinel-publish-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: publish
+    if: github.event.workflow_run.conclusion != 'cancelled' && github.event.workflow_run.conclusion != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout trusted default-branch publisher
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: trusted
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Download fingerprinted report artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p report
+          gh run download "${{ github.event.workflow_run.id }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name rd-sentinel-report \
+            --dir report
+          find report -maxdepth 3 -type f -print
+
+      - name: Verify and publish report
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          report=$(find report -name 'rd-sentinel-report.json' -type f | head -n 1)
+          test -n "$report"
+          python3 trusted/tools/rd-sentinel/rd_sentinel.py validate --report "$report"
+          python3 trusted/tools/rd-sentinel/rd_sentinel.py publish \
+            --repo "$GITHUB_WORKSPACE/trusted" \
+            --report "$report" \
+            --repository "$GITHUB_REPOSITORY" \
+            --expected-head-sha "${{ github.event.workflow_run.head_sha }}" \
+            --workflow-conclusion "${{ github.event.workflow_run.conclusion }}" \
+            --run-url "${{ github.event.workflow_run.html_url }}"

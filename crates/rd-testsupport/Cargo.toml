@@ -14,4 +14,4 @@ workspace = true
 
 [dependencies]
 rd-dex = { workspace = true }
-rd-vm = { path = "../rd-vm" }
+rd-vm = { workspace = true }
