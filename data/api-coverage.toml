@@ -594,11 +594,11 @@ domain = "database"
 status = "partial"
 domain_module = "fd-content"
 module = "rd-vm/jsqlite"
-code = ["crates/rd-vm/src/jsqlite.rs", "crates/rd-vm/src/m8.rs"]
-milestone = "M8"
-notes = "Real SQLite runs in an isolated Python sqlite3 subprocess with an in-memory SQL subset fallback. Databases are Engine-lifetime/in-memory rather than persistent Android app storage, so this remains partial despite the broad SQLiteDatabase/OpenHelper surface."
-evidence = ["crates/rd-vm/src/jsqlite.rs", "docs/compat-matrix.md"]
-gap_id = "gap-android-database-sqlite-persistence"
+code = ["crates/rd-vm/src/jsqlite.rs", "crates/rd-vm/src/jfile.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8/Literal-R1"
+notes = "Real SQLite runs in an isolated Python sqlite3 subprocess; named databases are serialized to the app-private VFS database path after committed mutations and reloaded across Engine launches, while :memory:/createInMemory and the forced subset fallback remain memory-only. Literal completion still lacks exact result-code/WAL/locale/custom-function/locking fidelity and every overload nuance, so the package remains partial."
+evidence = ["crates/rd-vm/src/jsqlite.rs", "crates/rd-vm/tests/m8.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-database-sqlite-literal"
 key_apis = ["android.database.sqlite.SQLiteOpenHelper.getWritableDatabase", "android.database.sqlite.SQLiteDatabase.execSQL", "android.database.sqlite.SQLiteDatabase.query", "android.database.sqlite.SQLiteStatement.executeInsert"]
 
 [[surface]]

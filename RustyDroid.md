@@ -450,7 +450,7 @@ LOCATION_HARDWARE · CONTROL_LOCATION_UPDATES · DEVICE_POWER · REBOOT · FACTO
 
 ## Apêndice C — Superfície android.* por domínio (api-coverage.toml)
 
-A fonte executável deste apêndice é `data/api-coverage.toml`, validada por `rd-framework::fd_api_coverage` e consumida por `rd api-coverage`, pelo MCP (`get_api_usage`/`compat_gaps`) e pelos relatórios gerados. A tabela abaixo é **gerada** por `cargo xtask api-coverage-spec`; o relatório completo sai em `docs/api-coverage.md` (`cargo xtask api-coverage-report`). Status é conservador: `supported` cobre só o subconjunto documentado da superfície, nunca um pacote AOSP inteiro; `partial` executa subconjunto real; `stub` é hierarquia/fallback; `not_implemented` continua `NOT_IMPLEMENTED(module_id)`.
+A fonte executável deste apêndice é `data/api-coverage.toml`, validada por `rd-framework::fd_api_coverage` e consumida por `rd api-coverage`, pelo MCP (`get_api_usage`/`compat_gaps`) e pelos relatórios gerados. A tabela abaixo é **gerada** por `cargo xtask api-coverage-spec`; o relatório completo sai em `docs/api-coverage.md` (`cargo xtask api-coverage-report`). O programa de conclusão literal dos campos `partial` — critério de pacote completo, bloqueadores e ordem de execução — vive em `docs/appendix-c-literal-completion.md`; ele não promove status por si só. Status é conservador: `supported` cobre só o subconjunto documentado da superfície, nunca um pacote AOSP inteiro; `partial` executa subconjunto real; `stub` é hierarquia/fallback; `not_implemented` continua `NOT_IMPLEMENTED(module_id)`.
 
 <!-- BEGIN API COVERAGE -->
 | Domínio | Superfícies/pacotes principais | Status das superfícies | Módulos |

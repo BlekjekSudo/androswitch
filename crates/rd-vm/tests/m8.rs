@@ -154,6 +154,162 @@ fn m8_sqlite_crud_cursor() {
     );
 }
 
+fn sqlite_open_helper(e: &mut Engine, name: &str) -> u32 {
+    let helper = obj(e, SQLITE_HELPER);
+    let dbname = s(e, name);
+    call_m8_instance(
+        e,
+        SQLITE_HELPER,
+        "<init>",
+        "(Landroid/content/Context;Ljava/lang/String;Landroid/database/sqlite/SQLiteDatabase$CursorFactory;I)V",
+        helper,
+        &[Value::Null, dbname, Value::Null, Value::Int(1)],
+    )
+    .unwrap();
+    match call_m8_instance(
+        e,
+        SQLITE_HELPER,
+        "getWritableDatabase",
+        "()Landroid/database/sqlite/SQLiteDatabase;",
+        helper,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(db)) => db,
+        other => panic!("db: {other:?}"),
+    }
+}
+
+fn sqlite_exec(e: &mut Engine, db: u32, sql: &str) {
+    let sql = s(e, sql);
+    call_m8_instance(e, SQLITE_DB, "execSQL", "(Ljava/lang/String;)V", db, &[sql]).unwrap();
+}
+
+fn sqlite_first_string(e: &mut Engine, db: u32, sql: &str) -> String {
+    let q = s(e, sql);
+    let cur = match call_m8_instance(
+        e,
+        SQLITE_DB,
+        "rawQuery",
+        "(Ljava/lang/String;[Ljava/lang/String;)Landroid/database/Cursor;",
+        db,
+        &[q, Value::Null],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(c)) => c,
+        other => panic!("cursor: {other:?}"),
+    };
+    assert_eq!(
+        call_m8_instance(e, CURSOR, "moveToNext", "()Z", cur, &[]).unwrap(),
+        Some(Value::Int(1))
+    );
+    match call_m8_instance(
+        e,
+        CURSOR,
+        "getString",
+        "(I)Ljava/lang/String;",
+        cur,
+        &[Value::Int(0)],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => e.heap.as_str(r).unwrap().to_string(),
+        other => panic!("getString: {other:?}"),
+    }
+}
+
+/// Literal Appendix C Round 1: a named SQLite database is serialized to the
+/// app-private VFS image and reopened by a fresh Engine (the cross-launch
+/// boundary), instead of living only in the first Engine's backend process.
+#[test]
+fn sqlite_named_database_persists_across_engine_launches() {
+    let dbname = format!(
+        "persist-{}-{}.db",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    {
+        let mut e = engine();
+        let db = sqlite_open_helper(&mut e, &dbname);
+        sqlite_exec(
+            &mut e,
+            db,
+            "CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT)",
+        );
+        sqlite_exec(
+            &mut e,
+            db,
+            "INSERT INTO notes(id, title) VALUES (7, 'persisted')",
+        );
+        call_m8_instance(&mut e, SQLITE_DB, "close", "()V", db, &[]).unwrap();
+    }
+    {
+        let mut e = engine();
+        let db = sqlite_open_helper(&mut e, &dbname);
+        assert_eq!(
+            sqlite_first_string(&mut e, db, "SELECT title FROM notes WHERE id = 7"),
+            "persisted"
+        );
+        sqlite_exec(
+            &mut e,
+            db,
+            "INSERT INTO notes(id, title) VALUES (8, 'again')",
+        );
+    }
+    {
+        let mut e = engine();
+        let db = sqlite_open_helper(&mut e, &dbname);
+        assert_eq!(
+            sqlite_first_string(&mut e, db, "SELECT CAST(count(*) AS TEXT) FROM notes"),
+            "2"
+        );
+        // Context.deleteDatabase must close/forget the open backend handle as
+        // well as remove the VFS image; otherwise the next mutation would
+        // resurrect the deleted database.
+        if e.fw.package_name.is_empty() {
+            e.fw.package_name = "app".into();
+        }
+        let ctx = obj(&mut e, "Landroid/content/Context;");
+        let name = s(&mut e, &dbname);
+        assert_eq!(
+            rd_vm::intrinsics::call_instance_intrinsic(
+                &mut e,
+                "Landroid/content/Context;",
+                "deleteDatabase",
+                "(Ljava/lang/String;)Z",
+                ctx,
+                &[name],
+            )
+            .unwrap(),
+            Some(Value::Int(1))
+        );
+    }
+    {
+        let mut e = engine();
+        let db = sqlite_open_helper(&mut e, &dbname);
+        // Succeeds only if the deleted image was not resurrected.
+        sqlite_exec(
+            &mut e,
+            db,
+            "CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT)",
+        );
+        sqlite_exec(
+            &mut e,
+            db,
+            "INSERT INTO notes(id, title) VALUES (1, 'fresh')",
+        );
+        assert_eq!(
+            sqlite_first_string(&mut e, db, "SELECT title FROM notes WHERE id = 1"),
+            "fresh"
+        );
+    }
+}
+
 // ── OkHttp: canned response determinística + request registrada ─────────
 #[test]
 fn m8_okhttp_execute_and_enqueue() {
