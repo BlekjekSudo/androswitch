@@ -874,7 +874,10 @@ mod tests {
             manifest["registries"]["appendix_c"]["scope"],
             "registry-and-classification-only"
         );
-        assert_eq!(manifest["registries"]["appendix_c"]["execution_claimed"], false);
+        assert_eq!(
+            manifest["registries"]["appendix_c"]["execution_claimed"],
+            false
+        );
         assert_eq!(manifest["registries"]["appendix_g"]["engines"], 28);
         assert_eq!(
             manifest["registries"]["appendix_g"]["scope"],
