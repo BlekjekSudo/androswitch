@@ -420,6 +420,10 @@ fn call_static_intrinsic_rooted(
     if let Some(v) = crate::android_util::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
+    // BaseBundle.dumpStats (bundle.rs)
+    if let Some(v) = crate::bundle::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
     // android.graphics / android.text layout statics (graphics.rs)
     if let Some(v) = crate::graphics::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
