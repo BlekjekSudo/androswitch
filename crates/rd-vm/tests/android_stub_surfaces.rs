@@ -10453,3 +10453,870 @@ fn media_browser_root_result_and_unconnected_service_are_guest_visible() {
         "Ljava/lang/IllegalStateException;",
     );
 }
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 35-A: android.speech + android.service.textservice.
+// ---------------------------------------------------------------------------
+
+const P35_RECOGNIZER: &str = "Landroid/speech/SpeechRecognizer;";
+const P35_RECOGNIZER_PROXY: &str = "Landroid/speech/SpeechRecognizerProxy;";
+const P35_LISTENER: &str = "Landroid/speech/RecognitionListener;";
+const P35_ILISTENER: &str = "Landroid/speech/IRecognitionListener;";
+const P35_REC_SERVICE: &str = "Landroid/speech/RecognitionService;";
+const P35_REC_BINDER: &str = "Landroid/speech/RecognitionService$RecognitionServiceBinder;";
+const P35_REC_CALLBACK: &str = "Landroid/speech/RecognitionService$Callback;";
+const P35_ISUPPORT: &str = "Landroid/speech/IRecognitionSupportCallback;";
+const P35_SUPPORT_CB: &str = "Landroid/speech/RecognitionSupportCallback;";
+const P35_IMDL: &str = "Landroid/speech/IModelDownloadListener;";
+const P35_SUPPORT_BUILDER: &str = "Landroid/speech/RecognitionSupport$Builder;";
+const P35_PART: &str = "Landroid/speech/RecognitionPart;";
+const P35_PART_BUILDER: &str = "Landroid/speech/RecognitionPart$Builder;";
+const P35_SPAN: &str = "Landroid/speech/AlternativeSpan;";
+const P35_RINTENT: &str = "Landroid/speech/RecognizerIntent;";
+const P35_SPELL: &str = "Landroid/service/textservice/SpellCheckerService;";
+const P35_SPELL_BINDER: &str =
+    "Landroid/service/textservice/SpellCheckerService$SpellCheckerServiceBinder;";
+const P35_SPELL_SESSION: &str = "Landroid/service/textservice/SpellCheckerService$Session;";
+const P35_SPELL_INTERNAL: &str =
+    "Landroid/service/textservice/SpellCheckerService$InternalISpellCheckerSession;";
+const P35_SPELL_LISTENER: &str = "Lcom/android/internal/textservice/ISpellCheckerSessionListener;";
+
+fn p35_string_list(engine: &mut Engine, items: &[&str]) -> Value {
+    let list = p49_new(engine, "Ljava/util/ArrayList;", "()V", &[]);
+    for item in items {
+        let value = text(engine, item);
+        call(engine, list, "add", "(Ljava/lang/Object;)Z", &[value]);
+    }
+    Value::Obj(list)
+}
+
+fn p35_array_len(engine: &Engine, value: &Value) -> usize {
+    match value {
+        Value::Obj(r) => engine
+            .heap
+            .as_array_elems(*r)
+            .map(|(elems, _)| elems.len())
+            .unwrap_or(0),
+        other => panic!("expected array, got {other:?}"),
+    }
+}
+
+#[test]
+fn speech_recognizer_and_recognition_service_without_a_recognizer_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, CONTEXT);
+
+    // No RecognitionService is installed in this profile.
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P35_RECOGNIZER,
+            "isRecognitionAvailable",
+            "(Landroid/content/Context;)Z",
+            &[Value::Obj(context)],
+        ),
+        Value::Int(0)
+    );
+    assert_throws(
+        engine.invoke_static(
+            P35_RECOGNIZER,
+            "isRecognitionAvailable",
+            "(Landroid/content/Context;)Z",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P35_RECOGNIZER,
+            "isOnDeviceRecognitionAvailable",
+            "(Landroid/content/Context;)Z",
+            &[Value::Obj(context)],
+        ),
+        Value::Int(0)
+    );
+    assert_throws(
+        engine.invoke_static(
+            P35_RECOGNIZER,
+            "createOnDeviceSpeechRecognizer",
+            "(Landroid/content/Context;)Landroid/speech/SpeechRecognizer;",
+            &[Value::Obj(context)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P35_RECOGNIZER,
+            "createSpeechRecognizer",
+            "(Landroid/content/Context;)Landroid/speech/SpeechRecognizer;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    let recognizer = object(call_static(
+        &mut engine,
+        P35_RECOGNIZER,
+        "createSpeechRecognizer",
+        "(Landroid/content/Context;)Landroid/speech/SpeechRecognizer;",
+        &[Value::Obj(context)],
+    ));
+    assert_eq!(
+        engine.heap.class_of(recognizer).unwrap(),
+        P35_RECOGNIZER_PROXY
+    );
+    assert!(engine.cp.is_subtype(P35_RECOGNIZER_PROXY, P35_RECOGNIZER));
+
+    let listener = instance(&mut engine, P35_LISTENER);
+    call(
+        &mut engine,
+        recognizer,
+        "setRecognitionListener",
+        "(Landroid/speech/RecognitionListener;)V",
+        &[Value::Obj(listener)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            recognizer,
+            "startListening",
+            "(Landroid/content/Intent;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let intent = p41_intent(&mut engine, "android.speech.action.RECOGNIZE_SPEECH");
+    call(
+        &mut engine,
+        recognizer,
+        "startListening",
+        "(Landroid/content/Intent;)V",
+        &[Value::Obj(intent)],
+    );
+    // ERROR_CLIENT: the recognition manager service does not exist.
+    assert_eq!(field(&engine, listener, "rd_error"), Value::Int(5));
+    assert_eq!(field(&engine, listener, "rd_count"), Value::Int(1));
+    assert_eq!(
+        text_of(&engine, &field(&engine, listener, "rd_last")),
+        "onError"
+    );
+
+    // stop/cancel only queue pending messages in AOSP: no new callbacks.
+    call(&mut engine, recognizer, "stopListening", "()V", &[]);
+    call(&mut engine, recognizer, "cancel", "()V", &[]);
+    assert_eq!(field(&engine, listener, "rd_count"), Value::Int(1));
+
+    // checkRecognitionSupport never reaches the support callback without a
+    // manager; the recognition listener gets another ERROR_CLIENT.
+    let support_callback = instance(&mut engine, P35_SUPPORT_CB);
+    call(
+        &mut engine,
+        recognizer,
+        "checkRecognitionSupport",
+        "(Landroid/content/Intent;Ljava/util/concurrent/Executor;Landroid/speech/RecognitionSupportCallback;)V",
+        &[Value::Obj(intent), Value::Null, Value::Obj(support_callback)],
+    );
+    assert_eq!(
+        p49_field_or_null(&engine, support_callback, "rd_count"),
+        Value::Null
+    );
+    assert_eq!(field(&engine, listener, "rd_count"), Value::Int(2));
+
+    call(
+        &mut engine,
+        recognizer,
+        "triggerModelDownload",
+        "(Landroid/content/Intent;)V",
+        &[Value::Obj(intent)],
+    );
+    assert_eq!(field(&engine, listener, "rd_count"), Value::Int(3));
+
+    // destroy() is also queued behind the missing connection, so the
+    // listener is still registered for the next failed connect attempt.
+    call(&mut engine, recognizer, "destroy", "()V", &[]);
+    call(
+        &mut engine,
+        recognizer,
+        "startListening",
+        "(Landroid/content/Intent;)V",
+        &[Value::Obj(intent)],
+    );
+    assert_eq!(field(&engine, listener, "rd_count"), Value::Int(4));
+
+    // The exact public base class throws UnsupportedOperationException.
+    let base = p49_new(&mut engine, P35_RECOGNIZER, "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            base,
+            "startListening",
+            "(Landroid/content/Intent;)V",
+            &[Value::Obj(intent)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+
+    // RecognitionService base-class defaults.
+    let service = p49_new(&mut engine, P35_REC_SERVICE, "()V", &[]);
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "getMaxConcurrentSessionsCount",
+            "()I",
+            &[]
+        ),
+        Value::Int(1)
+    );
+    let binder = object(call(
+        &mut engine,
+        service,
+        "onBind",
+        "(Landroid/content/Intent;)Landroid/os/IBinder;",
+        &[Value::Obj(intent)],
+    ));
+    assert_eq!(engine.heap.class_of(binder).unwrap(), P35_REC_BINDER);
+    assert!(engine.cp.is_subtype(P35_REC_BINDER, "Landroid/os/IBinder;"));
+    let binder_again = object(call(
+        &mut engine,
+        service,
+        "onBind",
+        "(Landroid/content/Intent;)Landroid/os/IBinder;",
+        &[Value::Obj(intent)],
+    ));
+    assert_eq!(binder_again, binder);
+
+    // Default support check reports ERROR_CANNOT_CHECK_SUPPORT (14).
+    let support_recorder = instance(&mut engine, P35_ISUPPORT);
+    call(
+        &mut engine,
+        binder,
+        "checkRecognitionSupport",
+        "(Landroid/content/Intent;Landroid/content/AttributionSource;Landroid/speech/IRecognitionSupportCallback;)V",
+        &[Value::Obj(intent), Value::Null, Value::Obj(support_recorder)],
+    );
+    assert_eq!(field(&engine, support_recorder, "rd_error"), Value::Int(14));
+
+    // Default download-with-listener reports
+    // ERROR_CANNOT_LISTEN_TO_DOWNLOAD_EVENTS (15) through the wrapper.
+    let download_recorder = instance(&mut engine, P35_IMDL);
+    call(
+        &mut engine,
+        binder,
+        "triggerModelDownload",
+        "(Landroid/content/Intent;Landroid/content/AttributionSource;Landroid/speech/IModelDownloadListener;)V",
+        &[Value::Obj(intent), Value::Null, Value::Obj(download_recorder)],
+    );
+    assert_eq!(
+        field(&engine, download_recorder, "rd_error"),
+        Value::Int(15)
+    );
+
+    // stopListening for a listener with no session reports ERROR_CLIENT.
+    let session_listener = instance(&mut engine, P35_ILISTENER);
+    call(
+        &mut engine,
+        binder,
+        "stopListening",
+        "(Landroid/speech/IRecognitionListener;)V",
+        &[Value::Obj(session_listener)],
+    );
+    assert_eq!(field(&engine, session_listener, "rd_error"), Value::Int(5));
+
+    // Callback forwards to the IRecognitionListener.
+    let forwarded = instance(&mut engine, P35_ILISTENER);
+    let callback = p49_new(
+        &mut engine,
+        P35_REC_CALLBACK,
+        "(Landroid/speech/RecognitionService;Landroid/speech/IRecognitionListener;Landroid/content/AttributionSource;)V",
+        &[Value::Obj(service), Value::Obj(forwarded), Value::Null],
+    );
+    let bundle = p41_bundle(&mut engine);
+    call(
+        &mut engine,
+        callback,
+        "readyForSpeech",
+        "(Landroid/os/Bundle;)V",
+        &[Value::Obj(bundle)],
+    );
+    assert_eq!(
+        text_of(&engine, &field(&engine, forwarded, "rd_last")),
+        "onReadyForSpeech"
+    );
+    assert_eq!(field(&engine, forwarded, "rd_bundle"), Value::Obj(bundle));
+    call(
+        &mut engine,
+        callback,
+        "rmsChanged",
+        "(F)V",
+        &[Value::Float(2.5)],
+    );
+    assert_eq!(field(&engine, forwarded, "rd_rms"), Value::Float(2.5));
+    call(&mut engine, callback, "error", "(I)V", &[Value::Int(7)]);
+    assert_eq!(field(&engine, forwarded, "rd_error"), Value::Int(7));
+    assert_eq!(
+        call(
+            &mut engine,
+            callback,
+            "getCallingAttributionSource",
+            "()Landroid/content/AttributionSource;",
+            &[],
+        ),
+        Value::Null
+    );
+    assert_throws(
+        engine.invoke_instance(callback, "getCallingUid", "()I", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+
+    // After onDestroy the binder drops its service reference: further
+    // stopListening calls are ignored.
+    call(&mut engine, service, "onDestroy", "()V", &[]);
+    let before = field(&engine, session_listener, "rd_count");
+    call(
+        &mut engine,
+        binder,
+        "stopListening",
+        "(Landroid/speech/IRecognitionListener;)V",
+        &[Value::Obj(session_listener)],
+    );
+    assert_eq!(field(&engine, session_listener, "rd_count"), before);
+}
+
+#[test]
+fn speech_recognition_value_builders_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+
+    // RecognitionSupport.Builder.
+    let builder = p49_new(&mut engine, P35_SUPPORT_BUILDER, "()V", &[]);
+    let en_us = text(&mut engine, "en-US");
+    let returned = call(
+        &mut engine,
+        builder,
+        "addInstalledOnDeviceLanguage",
+        "(Ljava/lang/String;)Landroid/speech/RecognitionSupport$Builder;",
+        &[en_us],
+    );
+    assert_eq!(returned, Value::Obj(builder));
+    let online = p35_string_list(&mut engine, &["en", "de"]);
+    call(
+        &mut engine,
+        builder,
+        "setOnlineLanguages",
+        "(Ljava/util/List;)Landroid/speech/RecognitionSupport$Builder;",
+        &[online],
+    );
+    let support = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/speech/RecognitionSupport;",
+        &[],
+    ));
+    let installed = call(
+        &mut engine,
+        support,
+        "getInstalledOnDeviceLanguages",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, installed.clone()), 1);
+    assert_eq!(
+        call_text(
+            &mut engine,
+            object(installed),
+            "get",
+            "(I)Ljava/lang/Object;",
+            &[Value::Int(0)],
+        ),
+        "en-US"
+    );
+    let pending = call(
+        &mut engine,
+        support,
+        "getPendingOnDeviceLanguages",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, pending), 0);
+    assert_eq!(
+        call_text(&mut engine, support, "toString", "()Ljava/lang/String;", &[]),
+        "RecognitionSupport { installedOnDeviceLanguages = [en-US], pendingOnDeviceLanguages = [], supportedOnDeviceLanguages = [], onlineLanguages = [en, de] }"
+    );
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "build",
+            "()Landroid/speech/RecognitionSupport;",
+            &[],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+    // Builders are one-shot, and explicitly-set null lists fail at build.
+    let null_builder = p49_new(&mut engine, P35_SUPPORT_BUILDER, "()V", &[]);
+    call(
+        &mut engine,
+        null_builder,
+        "setOnlineLanguages",
+        "(Ljava/util/List;)Landroid/speech/RecognitionSupport$Builder;",
+        &[Value::Null],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            null_builder,
+            "build",
+            "()Landroid/speech/RecognitionSupport;",
+            &[],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    // An identically-built instance is equal with the same hash.
+    let builder2 = p49_new(&mut engine, P35_SUPPORT_BUILDER, "()V", &[]);
+    let en_us2 = text(&mut engine, "en-US");
+    call(
+        &mut engine,
+        builder2,
+        "addInstalledOnDeviceLanguage",
+        "(Ljava/lang/String;)Landroid/speech/RecognitionSupport$Builder;",
+        &[en_us2],
+    );
+    let online2 = p35_string_list(&mut engine, &["en", "de"]);
+    call(
+        &mut engine,
+        builder2,
+        "setOnlineLanguages",
+        "(Ljava/util/List;)Landroid/speech/RecognitionSupport$Builder;",
+        &[online2],
+    );
+    let support2 = object(call(
+        &mut engine,
+        builder2,
+        "build",
+        "()Landroid/speech/RecognitionSupport;",
+        &[],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            support,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(support2)],
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, support, "hashCode", "()I", &[]),
+        call(&mut engine, support2, "hashCode", "()I", &[])
+    );
+    assert_eq!(
+        call(&mut engine, support, "describeContents", "()I", &[]),
+        Value::Int(0)
+    );
+
+    // RecognitionPart.Builder.
+    let raw = text(&mut engine, "hello");
+    let part_builder = p49_new(
+        &mut engine,
+        P35_PART_BUILDER,
+        "(Ljava/lang/String;)V",
+        &[raw],
+    );
+    let part = object(call(
+        &mut engine,
+        part_builder,
+        "build",
+        "()Landroid/speech/RecognitionPart;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(&mut engine, part, "getRawText", "()Ljava/lang/String;", &[]),
+        "hello"
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            part,
+            "getFormattedText",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(&mut engine, part, "getTimestampMillis", "()J", &[]),
+        Value::Long(0)
+    );
+    assert_eq!(
+        call(&mut engine, part, "getConfidenceLevel", "()I", &[]),
+        Value::Int(0)
+    );
+
+    let raw2 = text(&mut engine, "word");
+    let part_builder2 = p49_new(
+        &mut engine,
+        P35_PART_BUILDER,
+        "(Ljava/lang/String;)V",
+        &[raw2],
+    );
+    let formatted = text(&mut engine, "Word");
+    call(
+        &mut engine,
+        part_builder2,
+        "setFormattedText",
+        "(Ljava/lang/String;)Landroid/speech/RecognitionPart$Builder;",
+        &[formatted],
+    );
+    call(
+        &mut engine,
+        part_builder2,
+        "setTimestampMillis",
+        "(J)Landroid/speech/RecognitionPart$Builder;",
+        &[Value::Long(1500)],
+    );
+    call(
+        &mut engine,
+        part_builder2,
+        "setConfidenceLevel",
+        "(I)Landroid/speech/RecognitionPart$Builder;",
+        &[Value::Int(5)],
+    );
+    let part2 = object(call(
+        &mut engine,
+        part_builder2,
+        "build",
+        "()Landroid/speech/RecognitionPart;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(&mut engine, part2, "toString", "()Ljava/lang/String;", &[]),
+        "RecognitionPart { rawText = word, formattedText = Word, timestampMillis = 1500, confidenceLevel = CONFIDENCE_LEVEL_HIGH }"
+    );
+
+    let null_part = instance(&mut engine, P35_PART_BUILDER);
+    assert_throws(
+        engine.invoke_instance(null_part, "<init>", "(Ljava/lang/String;)V", &[Value::Null]),
+        "Ljava/lang/NullPointerException;",
+    );
+    let raw3 = text(&mut engine, "x");
+    let part_builder3 = p49_new(
+        &mut engine,
+        P35_PART_BUILDER,
+        "(Ljava/lang/String;)V",
+        &[raw3],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            part_builder3,
+            "setFormattedText",
+            "(Ljava/lang/String;)Landroid/speech/RecognitionPart$Builder;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    call(
+        &mut engine,
+        part_builder3,
+        "setConfidenceLevel",
+        "(I)Landroid/speech/RecognitionPart$Builder;",
+        &[Value::Int(6)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            part_builder3,
+            "build",
+            "()Landroid/speech/RecognitionPart;",
+            &[],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let raw4 = text(&mut engine, "y");
+    let part_builder4 = p49_new(
+        &mut engine,
+        P35_PART_BUILDER,
+        "(Ljava/lang/String;)V",
+        &[raw4],
+    );
+    call(
+        &mut engine,
+        part_builder4,
+        "setTimestampMillis",
+        "(J)Landroid/speech/RecognitionPart$Builder;",
+        &[Value::Long(-1)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            part_builder4,
+            "build",
+            "()Landroid/speech/RecognitionPart;",
+            &[],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P35_PART,
+            "confidenceLevelToString",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(3)],
+        ),
+        "CONFIDENCE_LEVEL_MEDIUM"
+    );
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P35_PART,
+            "confidenceLevelToString",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(99)],
+        ),
+        "63"
+    );
+
+    // AlternativeSpan.
+    let alternatives = p35_string_list(&mut engine, &["hello", "hallo"]);
+    let span = p49_new(
+        &mut engine,
+        P35_SPAN,
+        "(IILjava/util/List;)V",
+        &[Value::Int(0), Value::Int(4), alternatives],
+    );
+    assert_eq!(
+        call(&mut engine, span, "getStartPosition", "()I", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_text(&mut engine, span, "toString", "()Ljava/lang/String;", &[]),
+        "AlternativeSpan { startPosition = 0, endPosition = 4, alternatives = [hello, hallo] }"
+    );
+    let bad_start = instance(&mut engine, P35_SPAN);
+    let alternatives2 = p35_string_list(&mut engine, &["a"]);
+    assert_throws(
+        engine.invoke_instance(
+            bad_start,
+            "<init>",
+            "(IILjava/util/List;)V",
+            &[Value::Int(-1), Value::Int(2), alternatives2.clone()],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let bad_range = instance(&mut engine, P35_SPAN);
+    assert_throws(
+        engine.invoke_instance(
+            bad_range,
+            "<init>",
+            "(IILjava/util/List;)V",
+            &[Value::Int(2), Value::Int(2), alternatives2],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let empty_span = instance(&mut engine, P35_SPAN);
+    let no_alternatives = p35_string_list(&mut engine, &[]);
+    assert_throws(
+        engine.invoke_instance(
+            empty_span,
+            "<init>",
+            "(IILjava/util/List;)V",
+            &[Value::Int(0), Value::Int(1), no_alternatives],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let null_span = instance(&mut engine, P35_SPAN);
+    assert_throws(
+        engine.invoke_instance(
+            null_span,
+            "<init>",
+            "(IILjava/util/List;)V",
+            &[Value::Int(0), Value::Int(1), Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+
+    // No web-search activity exists, so there is no voice-details intent.
+    let context = instance(&mut engine, CONTEXT);
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P35_RINTENT,
+            "getVoiceDetailsIntent",
+            "(Landroid/content/Context;)Landroid/content/Intent;",
+            &[Value::Obj(context)],
+        ),
+        Value::Null
+    );
+}
+
+#[test]
+fn spell_checker_service_session_defaults_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let service = p49_new(&mut engine, P35_SPELL, "()V", &[]);
+    let binder = object(call(
+        &mut engine,
+        service,
+        "onBind",
+        "(Landroid/content/Intent;)Landroid/os/IBinder;",
+        &[Value::Null],
+    ));
+    assert_eq!(engine.heap.class_of(binder).unwrap(), P35_SPELL_BINDER);
+    assert!(engine
+        .cp
+        .is_subtype(P35_SPELL_BINDER, "Landroid/os/IBinder;"));
+    let binder_again = object(call(
+        &mut engine,
+        service,
+        "onBind",
+        "(Landroid/content/Intent;)Landroid/os/IBinder;",
+        &[Value::Null],
+    ));
+    assert_eq!(binder_again, binder);
+    // createSession is abstract on the exact base: session creation fails.
+    assert!(engine
+        .invoke_instance(
+            binder,
+            "getISpellCheckerSession",
+            "(Ljava/lang/String;Lcom/android/internal/textservice/ISpellCheckerSessionListener;Landroid/os/Bundle;ILcom/android/internal/textservice/ISpellCheckerServiceCallback;)V",
+            &[Value::Null, Value::Null, Value::Null, Value::Int(0), Value::Null],
+        )
+        .is_err());
+
+    let session = p49_new(&mut engine, P35_SPELL_SESSION, "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(session, "getLocale", "()Ljava/lang/String;", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+    call(&mut engine, session, "onCancel", "()V", &[]);
+    call(&mut engine, session, "onClose", "()V", &[]);
+
+    let empty_infos = object_array(&mut engine, "[Landroid/view/textservice/TextInfo;", vec![]);
+    let multiple = call(
+        &mut engine,
+        session,
+        "onGetSuggestionsMultiple",
+        "([Landroid/view/textservice/TextInfo;IZ)[Landroid/view/textservice/SuggestionsInfo;",
+        &[empty_infos.clone(), Value::Int(5), Value::Int(0)],
+    );
+    assert_eq!(p35_array_len(&engine, &multiple), 0);
+    assert_throws(
+        engine.invoke_instance(
+            session,
+            "onGetSuggestionsMultiple",
+            "([Landroid/view/textservice/TextInfo;IZ)[Landroid/view/textservice/SuggestionsInfo;",
+            &[Value::Null, Value::Int(5), Value::Int(0)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let sentences = call(
+        &mut engine,
+        session,
+        "onGetSentenceSuggestionsMultiple",
+        "([Landroid/view/textservice/TextInfo;I)[Landroid/view/textservice/SentenceSuggestionsInfo;",
+        &[Value::Null, Value::Int(5)],
+    );
+    assert_eq!(p35_array_len(&engine, &sentences), 0);
+
+    // Installing an internal session with an empty locale: getters work and
+    // sentence-level requests return the empty result.
+    let listener = instance(&mut engine, P35_SPELL_LISTENER);
+    let bundle = p41_bundle(&mut engine);
+    let empty_locale = text(&mut engine, "");
+    let internal = p49_new(
+        &mut engine,
+        P35_SPELL_INTERNAL,
+        "(Ljava/lang/String;Lcom/android/internal/textservice/ISpellCheckerSessionListener;Landroid/os/Bundle;Landroid/service/textservice/SpellCheckerService$Session;I)V",
+        &[
+            empty_locale,
+            Value::Obj(listener),
+            Value::Obj(bundle),
+            Value::Obj(session),
+            Value::Int(3),
+        ],
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            session,
+            "getLocale",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        ""
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            session,
+            "getBundle",
+            "()Landroid/os/Bundle;",
+            &[]
+        ),
+        Value::Obj(bundle)
+    );
+    assert_eq!(
+        call(&mut engine, session, "getSupportedAttributes", "()I", &[]),
+        Value::Int(3)
+    );
+    assert_eq!(
+        call(&mut engine, internal, "getSupportedAttributes", "()I", &[]),
+        Value::Int(3)
+    );
+
+    call(
+        &mut engine,
+        internal,
+        "onGetSuggestionsMultiple",
+        "([Landroid/view/textservice/TextInfo;IZ)V",
+        &[empty_infos.clone(), Value::Int(5), Value::Int(1)],
+    );
+    assert_eq!(
+        text_of(&engine, &field(&engine, listener, "rd_last")),
+        "onGetSuggestions"
+    );
+    assert_eq!(
+        p35_array_len(&engine, &field(&engine, listener, "rd_suggestions")),
+        0
+    );
+
+    let word = text(&mut engine, "helo");
+    let info = p49_new(
+        &mut engine,
+        "Landroid/view/textservice/TextInfo;",
+        "(Ljava/lang/String;II)V",
+        &[word, Value::Int(7), Value::Int(11)],
+    );
+    let infos = object_array(
+        &mut engine,
+        "[Landroid/view/textservice/TextInfo;",
+        vec![Value::Obj(info)],
+    );
+    call(
+        &mut engine,
+        internal,
+        "onGetSentenceSuggestionsMultiple",
+        "([Landroid/view/textservice/TextInfo;I)V",
+        &[infos, Value::Int(5)],
+    );
+    assert_eq!(
+        text_of(&engine, &field(&engine, listener, "rd_last")),
+        "onGetSentenceSuggestions"
+    );
+    assert_eq!(
+        p35_array_len(
+            &engine,
+            &field(&engine, listener, "rd_sentence_suggestions")
+        ),
+        0
+    );
+
+    call(&mut engine, internal, "onCancel", "()V", &[]);
+    call(&mut engine, internal, "onClose", "()V", &[]);
+    // onClose nulls the listener, so a later delivery dereferences null.
+    assert_throws(
+        engine.invoke_instance(
+            internal,
+            "onGetSuggestionsMultiple",
+            "([Landroid/view/textservice/TextInfo;IZ)V",
+            &[empty_infos, Value::Int(5), Value::Int(0)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+}

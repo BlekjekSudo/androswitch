@@ -1837,6 +1837,56 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroid/service/media/IMediaBrowserService$Stub;" => {
             Some(&["Landroid/os/Binder;", "Ljava/lang/Object;"])
         }
+        // Appendix C Batch 35-A bounded android.speech /
+        // android.service.textservice slices.
+        "Landroid/speech/RecognitionService;"
+        | "Landroid/service/textservice/SpellCheckerService;" => Some(&[
+            "Landroid/app/Service;",
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/speech/SpeechRecognizer;"
+        | "Landroid/speech/RecognizerIntent;"
+        | "Landroid/speech/RecognitionService$Callback;"
+        | "Landroid/speech/RecognitionService$SupportCallback;"
+        | "Landroid/speech/RecognitionSupport;"
+        | "Landroid/speech/RecognitionSupport$Builder;"
+        | "Landroid/speech/RecognitionPart;"
+        | "Landroid/speech/RecognitionPart$BaseBuilder;"
+        | "Landroid/speech/AlternativeSpan;"
+        | "Landroid/service/textservice/SpellCheckerService$Session;" => Some(OBJECT),
+        "Landroid/speech/SpeechRecognizerProxy;" | "Landroid/speech/SpeechRecognizerImpl;" => {
+            Some(&["Landroid/speech/SpeechRecognizer;", "Ljava/lang/Object;"])
+        }
+        "Landroid/speech/RecognitionPart$Builder;" => Some(&[
+            "Landroid/speech/RecognitionPart$BaseBuilder;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/speech/RecognitionService$RecognitionServiceBinder;" => Some(&[
+            "Landroid/speech/IRecognitionService$Stub;",
+            "Landroid/os/Binder;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/speech/IRecognitionService$Stub;" => {
+            Some(&["Landroid/os/Binder;", "Ljava/lang/Object;"])
+        }
+        "Landroid/service/textservice/SpellCheckerService$InternalISpellCheckerSession;" => {
+            Some(&[
+                "Lcom/android/internal/textservice/ISpellCheckerSession$Stub;",
+                "Landroid/os/Binder;",
+                "Ljava/lang/Object;",
+            ])
+        }
+        "Lcom/android/internal/textservice/ISpellCheckerSession$Stub;"
+        | "Lcom/android/internal/textservice/ISpellCheckerService$Stub;" => {
+            Some(&["Landroid/os/Binder;", "Ljava/lang/Object;"])
+        }
+        "Landroid/service/textservice/SpellCheckerService$SpellCheckerServiceBinder;" => Some(&[
+            "Lcom/android/internal/textservice/ISpellCheckerService$Stub;",
+            "Landroid/os/Binder;",
+            "Ljava/lang/Object;",
+        ]),
         _ => None,
     }
 }
@@ -2368,6 +2418,28 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         "Landroid/service/media/MediaBrowserService$ServiceBinder;"
         | "Landroid/service/media/IMediaBrowserService$Stub;" => Some(&[
             "Landroid/service/media/IMediaBrowserService;",
+            "Landroid/os/IBinder;",
+            "Landroid/os/IInterface;",
+        ]),
+        // Interfaces in the Batch 35-A bounded slices.
+        "Landroid/speech/RecognitionSupport;"
+        | "Landroid/speech/RecognitionPart;"
+        | "Landroid/speech/AlternativeSpan;" => Some(&["Landroid/os/Parcelable;"]),
+        "Landroid/speech/RecognitionService$RecognitionServiceBinder;"
+        | "Landroid/speech/IRecognitionService$Stub;" => Some(&[
+            "Landroid/speech/IRecognitionService;",
+            "Landroid/os/IBinder;",
+            "Landroid/os/IInterface;",
+        ]),
+        "Landroid/service/textservice/SpellCheckerService$InternalISpellCheckerSession;"
+        | "Lcom/android/internal/textservice/ISpellCheckerSession$Stub;" => Some(&[
+            "Lcom/android/internal/textservice/ISpellCheckerSession;",
+            "Landroid/os/IBinder;",
+            "Landroid/os/IInterface;",
+        ]),
+        "Landroid/service/textservice/SpellCheckerService$SpellCheckerServiceBinder;"
+        | "Lcom/android/internal/textservice/ISpellCheckerService$Stub;" => Some(&[
+            "Lcom/android/internal/textservice/ISpellCheckerService;",
             "Landroid/os/IBinder;",
             "Landroid/os/IInterface;",
         ]),

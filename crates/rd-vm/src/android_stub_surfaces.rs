@@ -422,6 +422,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial41_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial35_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -563,6 +566,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial41_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial35_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -635,6 +641,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial41_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial35_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -33516,6 +33525,1764 @@ pub(crate) fn partial41_host_static(
         (P41_DREAM_SERVICE, "DEFAULT_SHOW_COMPLICATIONS") => Some(0),
         (P41_CARRIER_WRAPPER, "RESULT_OK") => Some(0),
         (P41_CARRIER_WRAPPER, "RESULT_ERROR") => Some(1),
+        _ => None,
+    };
+    Ok(value.map(Value::Int))
+}
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 35-A: bounded slices for android.speech and
+// android.service.textservice.
+//
+// Modeled profile: no speech-recognition manager service or on-device
+// recognizer is configured, so SpeechRecognizer behaves exactly as AOSP
+// does when `IRecognitionServiceManager` is unavailable (factory succeeds,
+// connect attempts report ERROR_CLIENT to the registered listener, and
+// queued stop/cancel/destroy messages have no observable effect). The
+// RecognitionService base-class defaults, Callback/SupportCallback
+// forwarding, the RecognitionSupport/RecognitionPart/AlternativeSpan data
+// classes, RecognizerIntent.getVoiceDetailsIntent resolution, and the
+// SpellCheckerService Session/internal-session contracts are modeled
+// without microphone capture, a recognition engine, model downloads,
+// binder session transport, or WordIterator sentence splitting. Callbacks
+// that AOSP posts to a Handler are delivered inline in the VM's
+// deterministic model.
+// ---------------------------------------------------------------------------
+
+const P35_SPEECH_RECOGNIZER: &str = "Landroid/speech/SpeechRecognizer;";
+const P35_SPEECH_RECOGNIZER_PROXY: &str = "Landroid/speech/SpeechRecognizerProxy;";
+const P35_SPEECH_RECOGNIZER_IMPL: &str = "Landroid/speech/SpeechRecognizerImpl;";
+const P35_RECOGNITION_LISTENER: &str = "Landroid/speech/RecognitionListener;";
+const P35_IRECOGNITION_LISTENER: &str = "Landroid/speech/IRecognitionListener;";
+const P35_RECOGNIZER_INTENT: &str = "Landroid/speech/RecognizerIntent;";
+const P35_RECOGNITION_SERVICE: &str = "Landroid/speech/RecognitionService;";
+const P35_RECOGNITION_BINDER: &str = "Landroid/speech/RecognitionService$RecognitionServiceBinder;";
+const P35_RECOGNITION_CALLBACK: &str = "Landroid/speech/RecognitionService$Callback;";
+const P35_SUPPORT_CALLBACK: &str = "Landroid/speech/RecognitionService$SupportCallback;";
+const P35_IRECOGNITION_SUPPORT_CALLBACK: &str = "Landroid/speech/IRecognitionSupportCallback;";
+const P35_RECOGNITION_SUPPORT_CALLBACK: &str = "Landroid/speech/RecognitionSupportCallback;";
+const P35_MODEL_DOWNLOAD_LISTENER: &str = "Landroid/speech/ModelDownloadListener;";
+const P35_IMODEL_DOWNLOAD_LISTENER: &str = "Landroid/speech/IModelDownloadListener;";
+const P35_RECOGNITION_SUPPORT: &str = "Landroid/speech/RecognitionSupport;";
+const P35_RECOGNITION_SUPPORT_BUILDER: &str = "Landroid/speech/RecognitionSupport$Builder;";
+const P35_RECOGNITION_PART: &str = "Landroid/speech/RecognitionPart;";
+const P35_RECOGNITION_PART_BUILDER: &str = "Landroid/speech/RecognitionPart$Builder;";
+const P35_RECOGNITION_PART_BASE_BUILDER: &str = "Landroid/speech/RecognitionPart$BaseBuilder;";
+const P35_ALTERNATIVE_SPAN: &str = "Landroid/speech/AlternativeSpan;";
+
+const P35_SPELL_SERVICE: &str = "Landroid/service/textservice/SpellCheckerService;";
+const P35_SPELL_SESSION: &str = "Landroid/service/textservice/SpellCheckerService$Session;";
+const P35_SPELL_INTERNAL: &str =
+    "Landroid/service/textservice/SpellCheckerService$InternalISpellCheckerSession;";
+const P35_SPELL_BINDER: &str =
+    "Landroid/service/textservice/SpellCheckerService$SpellCheckerServiceBinder;";
+const P35_SPELL_LISTENER: &str = "Lcom/android/internal/textservice/ISpellCheckerSessionListener;";
+const P35_SPELL_CALLBACK: &str = "Lcom/android/internal/textservice/ISpellCheckerServiceCallback;";
+
+fn p35_class(c: &str) -> bool {
+    matches!(
+        c,
+        P35_SPEECH_RECOGNIZER
+            | P35_SPEECH_RECOGNIZER_PROXY
+            | P35_SPEECH_RECOGNIZER_IMPL
+            | P35_RECOGNITION_LISTENER
+            | P35_IRECOGNITION_LISTENER
+            | P35_RECOGNIZER_INTENT
+            | P35_RECOGNITION_SERVICE
+            | P35_RECOGNITION_BINDER
+            | P35_RECOGNITION_CALLBACK
+            | P35_SUPPORT_CALLBACK
+            | P35_IRECOGNITION_SUPPORT_CALLBACK
+            | P35_RECOGNITION_SUPPORT_CALLBACK
+            | P35_MODEL_DOWNLOAD_LISTENER
+            | P35_IMODEL_DOWNLOAD_LISTENER
+            | P35_RECOGNITION_SUPPORT
+            | P35_RECOGNITION_SUPPORT_BUILDER
+            | P35_RECOGNITION_PART
+            | P35_RECOGNITION_PART_BUILDER
+            | P35_RECOGNITION_PART_BASE_BUILDER
+            | P35_ALTERNATIVE_SPAN
+            | P35_SPELL_SERVICE
+            | P35_SPELL_SESSION
+            | P35_SPELL_INTERNAL
+            | P35_SPELL_BINDER
+            | P35_SPELL_LISTENER
+            | P35_SPELL_CALLBACK
+    )
+}
+
+fn p35_arg(args: &[Value], i: usize) -> Value {
+    args.get(i).cloned().unwrap_or(Value::Null)
+}
+
+fn p35_check_not_used(vm: &Engine, recv: ObjRef, used_bit: i64) -> Result<(), VmExit> {
+    if field_long(vm, recv, "mBuilderFieldsSet") & used_bit != 0 {
+        return Err(ise(
+            "This Builder should not be reused. Use a new Builder instance instead",
+        ));
+    }
+    Ok(())
+}
+
+fn p35_mark_field(vm: &mut Engine, recv: ObjRef, bit: i64) -> Result<i64, VmExit> {
+    let value = field_long(vm, recv, "mBuilderFieldsSet") | bit;
+    put(vm, recv, "mBuilderFieldsSet", Value::Long(value))?;
+    Ok(value)
+}
+
+fn p35_empty_list(vm: &mut Engine) -> Result<Value, VmExit> {
+    Ok(Value::Obj(new_collection(
+        vm,
+        "Ljava/util/ArrayList;",
+        Vec::new(),
+    )?))
+}
+
+/// `maybeInitializeManagerService()` in this profile: there is no
+/// SPEECH_RECOGNITION_SERVICE, so the internal listener reports
+/// `ERROR_CLIENT` (5), exactly as AOSP does when the manager is missing.
+fn p35_recognizer_connect_error(vm: &mut Engine, impl_recv: ObjRef) -> Result<(), VmExit> {
+    if let Some(listener) = field_obj(vm, impl_recv, "rd_listener") {
+        vm.invoke_instance(listener, "onError", "(I)V", &[Value::Int(5)])?;
+    }
+    Ok(())
+}
+
+fn p35_new_recognizer(
+    vm: &mut Engine,
+    context: Value,
+    component: Value,
+    on_device: bool,
+) -> Result<Value, VmExit> {
+    let delegate = alloc_obj(
+        vm,
+        P35_SPEECH_RECOGNIZER_IMPL,
+        vec![
+            ("mContext".to_string(), context),
+            ("mServiceComponent".to_string(), component),
+            ("mOnDevice".to_string(), Value::Int(on_device as i32)),
+            ("rd_listener".to_string(), Value::Null),
+        ],
+    )?;
+    let proxy = alloc_obj(
+        vm,
+        P35_SPEECH_RECOGNIZER_PROXY,
+        vec![("mDelegate".to_string(), Value::Obj(delegate))],
+    )?;
+    Ok(Value::Obj(proxy))
+}
+
+fn p35_speech_recognizer_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P35_SPEECH_RECOGNIZER_PROXY {
+        let value = match (name, sig) {
+            ("<init>", "(Landroid/speech/SpeechRecognizer;)V") => {
+                put(vm, recv, "mDelegate", p35_arg(args, 0))?;
+                Value::Null
+            }
+            ("setRecognitionListener", "(Landroid/speech/RecognitionListener;)V")
+            | ("startListening", "(Landroid/content/Intent;)V")
+            | ("stopListening", "()V")
+            | ("cancel", "()V")
+            | ("destroy", "()V")
+            | (
+                "checkRecognitionSupport",
+                "(Landroid/content/Intent;Ljava/util/concurrent/Executor;Landroid/speech/RecognitionSupportCallback;)V",
+            )
+            | ("triggerModelDownload", "(Landroid/content/Intent;)V")
+            | (
+                "triggerModelDownload",
+                "(Landroid/content/Intent;Ljava/util/concurrent/Executor;Landroid/speech/ModelDownloadListener;)V",
+            )
+            | ("setTemporaryOnDeviceRecognizer", "(Landroid/content/ComponentName;)V") => {
+                let Some(delegate) = field_obj(vm, recv, "mDelegate") else {
+                    return Err(npe(""));
+                };
+                vm.invoke_instance(delegate, name, sig, args)?
+            }
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+
+    if class == P35_SPEECH_RECOGNIZER_IMPL {
+        let value = match (name, sig) {
+            ("<init>", "(Landroid/content/Context;Landroid/content/ComponentName;)V") => {
+                put(vm, recv, "mContext", p35_arg(args, 0))?;
+                put(vm, recv, "mServiceComponent", p35_arg(args, 1))?;
+                put(vm, recv, "mOnDevice", Value::Int(0))?;
+                put(vm, recv, "rd_listener", Value::Null)?;
+                Value::Null
+            }
+            ("<init>", "(Landroid/content/Context;Z)V") => {
+                put(vm, recv, "mContext", p35_arg(args, 0))?;
+                put(vm, recv, "mServiceComponent", Value::Null)?;
+                put(vm, recv, "mOnDevice", Value::Int(iarg(args, 1)))?;
+                put(vm, recv, "rd_listener", Value::Null)?;
+                Value::Null
+            }
+            (
+                "<init>",
+                "(Landroid/content/Context;Landroid/content/ComponentName;Z)V",
+            ) => {
+                put(vm, recv, "mContext", p35_arg(args, 0))?;
+                put(vm, recv, "mServiceComponent", p35_arg(args, 1))?;
+                put(vm, recv, "mOnDevice", Value::Int(iarg(args, 2)))?;
+                put(vm, recv, "rd_listener", Value::Null)?;
+                Value::Null
+            }
+            ("setRecognitionListener", "(Landroid/speech/RecognitionListener;)V") => {
+                put(vm, recv, "rd_listener", p35_arg(args, 0))?;
+                Value::Null
+            }
+            ("startListening", "(Landroid/content/Intent;)V") => {
+                if oarg(args, 0).is_none() {
+                    return Err(iae("intent must not be null"));
+                }
+                p35_recognizer_connect_error(vm, recv)?;
+                Value::Null
+            }
+            ("stopListening", "()V") | ("cancel", "()V") => {
+                // AOSP only queues a pending message; without a connection
+                // attempt there is no observable callback.
+                Value::Null
+            }
+            ("destroy", "()V") => {
+                // Also queued behind the never-established connection.
+                put(vm, recv, "rd_pending_destroy", Value::Int(1))?;
+                Value::Null
+            }
+            (
+                "checkRecognitionSupport",
+                "(Landroid/content/Intent;Ljava/util/concurrent/Executor;Landroid/speech/RecognitionSupportCallback;)V",
+            ) => {
+                if oarg(args, 0).is_none() {
+                    return Err(npe("intent must not be null"));
+                }
+                if oarg(args, 2).is_none() {
+                    return Err(npe("listener must not be null"));
+                }
+                p35_recognizer_connect_error(vm, recv)?;
+                Value::Null
+            }
+            ("triggerModelDownload", "(Landroid/content/Intent;)V")
+            | (
+                "triggerModelDownload",
+                "(Landroid/content/Intent;Ljava/util/concurrent/Executor;Landroid/speech/ModelDownloadListener;)V",
+            ) => {
+                if oarg(args, 0).is_none() {
+                    return Err(npe("intent must not be null"));
+                }
+                p35_recognizer_connect_error(vm, recv)?;
+                Value::Null
+            }
+            ("setTemporaryOnDeviceRecognizer", "(Landroid/content/ComponentName;)V") => {
+                // Sent straight to the handler, whose manager lookup fails
+                // and reports ERROR_CLIENT before returning.
+                p35_recognizer_connect_error(vm, recv)?;
+                Value::Null
+            }
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+
+    // The exact public base class: AOSP's methods throw
+    // UnsupportedOperationException; real instances are the proxy/impl.
+    if class_of(vm, recv) != P35_SPEECH_RECOGNIZER {
+        return Ok(None);
+    }
+    let value = match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        ("setRecognitionListener", "(Landroid/speech/RecognitionListener;)V")
+        | ("startListening", "(Landroid/content/Intent;)V")
+        | ("stopListening", "()V")
+        | ("cancel", "()V")
+        | ("destroy", "()V")
+        | (
+            "checkRecognitionSupport",
+            "(Landroid/content/Intent;Ljava/util/concurrent/Executor;Landroid/speech/RecognitionSupportCallback;)V",
+        )
+        | ("triggerModelDownload", "(Landroid/content/Intent;)V")
+        | (
+            "triggerModelDownload",
+            "(Landroid/content/Intent;Ljava/util/concurrent/Executor;Landroid/speech/ModelDownloadListener;)V",
+        )
+        | ("setTemporaryOnDeviceRecognizer", "(Landroid/content/ComponentName;)V") => {
+            return Err(throw("Ljava/lang/UnsupportedOperationException;", ""));
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+/// Host-created exact listener/callback endpoints used to observe in-VM
+/// callbacks. DEX implementations have a different runtime class and are
+/// never shadowed.
+fn p35_listener_recorder(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class_of(vm, recv) != class {
+        return Ok(None);
+    }
+    // The terminating ModelDownloadListener wrapper created by
+    // RecognitionService.dispatchTriggerModelDownload.
+    if class == P35_MODEL_DOWNLOAD_LISTENER {
+        if let Some(target) = field_obj(vm, recv, "rd_target") {
+            let terminated = field_bool(vm, recv, "rd_terminated");
+            let value = match (name, sig) {
+                ("onProgress", "(I)V") => {
+                    if !terminated {
+                        vm.invoke_instance(target, name, sig, args)?;
+                    }
+                    Value::Null
+                }
+                ("onSuccess", "()V") | ("onScheduled", "()V") | ("onError", "(I)V") => {
+                    if !terminated {
+                        put(vm, recv, "rd_terminated", Value::Int(1))?;
+                        vm.invoke_instance(target, name, sig, args)?;
+                    }
+                    Value::Null
+                }
+                _ => return Ok(None),
+            };
+            return Ok(Some(value));
+        }
+    }
+    let record = matches!(
+        (name, sig),
+        ("onReadyForSpeech", "(Landroid/os/Bundle;)V")
+            | ("onBeginningOfSpeech", "()V")
+            | ("onRmsChanged", "(F)V")
+            | ("onBufferReceived", "([B)V")
+            | ("onEndOfSpeech", "()V")
+            | ("onError", "(I)V")
+            | ("onResults", "(Landroid/os/Bundle;)V")
+            | ("onPartialResults", "(Landroid/os/Bundle;)V")
+            | ("onEvent", "(ILandroid/os/Bundle;)V")
+            | ("onSegmentResults", "(Landroid/os/Bundle;)V")
+            | ("onEndOfSegmentedSession", "()V")
+            | ("onLanguageDetection", "(Landroid/os/Bundle;)V")
+            | ("onSupportResult", "(Landroid/speech/RecognitionSupport;)V")
+            | ("onProgress", "(I)V")
+            | ("onSuccess", "()V")
+            | ("onScheduled", "()V")
+            | (
+                "onGetSuggestions",
+                "([Landroid/view/textservice/SuggestionsInfo;)V"
+            )
+            | (
+                "onGetSentenceSuggestions",
+                "([Landroid/view/textservice/SentenceSuggestionsInfo;)V"
+            )
+            | (
+                "onSessionCreated",
+                "(Lcom/android/internal/textservice/ISpellCheckerSession;)V"
+            )
+    );
+    if !record {
+        return Ok(None);
+    }
+    let last = jstr(vm, name)?;
+    put(vm, recv, "rd_last", last)?;
+    put(
+        vm,
+        recv,
+        "rd_count",
+        Value::Int(field_int(vm, recv, "rd_count") + 1),
+    )?;
+    match name {
+        "onError" => put(vm, recv, "rd_error", Value::Int(iarg(args, 0)))?,
+        "onProgress" => put(vm, recv, "rd_progress", Value::Int(iarg(args, 0)))?,
+        "onRmsChanged" => put(vm, recv, "rd_rms", Value::Float(farg(args, 0)))?,
+        "onEvent" => {
+            put(vm, recv, "rd_event_type", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "rd_bundle", p35_arg(args, 1))?;
+        }
+        "onReadyForSpeech"
+        | "onResults"
+        | "onPartialResults"
+        | "onSegmentResults"
+        | "onLanguageDetection" => put(vm, recv, "rd_bundle", p35_arg(args, 0))?,
+        "onBufferReceived" => put(vm, recv, "rd_buffer", p35_arg(args, 0))?,
+        "onSupportResult" => put(vm, recv, "rd_support", p35_arg(args, 0))?,
+        "onGetSuggestions" => put(vm, recv, "rd_suggestions", p35_arg(args, 0))?,
+        "onGetSentenceSuggestions" => put(vm, recv, "rd_sentence_suggestions", p35_arg(args, 0))?,
+        "onSessionCreated" => put(vm, recv, "rd_session", p35_arg(args, 0))?,
+        _ => {}
+    }
+    Ok(Some(Value::Null))
+}
+
+fn p35_recognition_binder_service(vm: &Engine, binder: ObjRef) -> Option<ObjRef> {
+    if field_bool(vm, binder, "rd_cleared") {
+        None
+    } else {
+        field_obj(vm, binder, "rd_service")
+    }
+}
+
+fn p35_recognition_service_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P35_RECOGNITION_BINDER {
+        let value = match (name, sig) {
+            ("<init>", "(Landroid/speech/RecognitionService;)V") => {
+                put(vm, recv, "rd_service", p35_arg(args, 0))?;
+                Value::Null
+            }
+            ("clearReference", "()V") => {
+                put(vm, recv, "rd_cleared", Value::Int(1))?;
+                Value::Null
+            }
+            ("stopListening", "(Landroid/speech/IRecognitionListener;)V") => {
+                if p35_recognition_binder_service(vm, recv).is_some() {
+                    let Some(listener) = oarg(args, 0) else {
+                        return Err(npe(""));
+                    };
+                    // No session was ever started for this listener.
+                    vm.invoke_instance(listener, "onError", "(I)V", &[Value::Int(5)])?;
+                }
+                Value::Null
+            }
+            ("cancel", "(Landroid/speech/IRecognitionListener;Z)V") => {
+                if p35_recognition_binder_service(vm, recv).is_some() && oarg(args, 0).is_none() {
+                    return Err(npe(""));
+                }
+                Value::Null
+            }
+            (
+                "checkRecognitionSupport",
+                "(Landroid/content/Intent;Landroid/content/AttributionSource;Landroid/speech/IRecognitionSupportCallback;)V",
+            ) => {
+                if let Some(service) = p35_recognition_binder_service(vm, recv) {
+                    let support = alloc_obj(
+                        vm,
+                        P35_SUPPORT_CALLBACK,
+                        vec![("mCallback".to_string(), p35_arg(args, 2))],
+                    )?;
+                    vm.invoke_instance(
+                        service,
+                        "onCheckRecognitionSupport",
+                        "(Landroid/content/Intent;Landroid/content/AttributionSource;Landroid/speech/RecognitionService$SupportCallback;)V",
+                        &[p35_arg(args, 0), p35_arg(args, 1), Value::Obj(support)],
+                    )?;
+                }
+                Value::Null
+            }
+            (
+                "triggerModelDownload",
+                "(Landroid/content/Intent;Landroid/content/AttributionSource;Landroid/speech/IModelDownloadListener;)V",
+            ) => {
+                if let Some(service) = p35_recognition_binder_service(vm, recv) {
+                    if let Value::Obj(listener) = p35_arg(args, 2) {
+                        let wrapper = alloc_obj(
+                            vm,
+                            P35_MODEL_DOWNLOAD_LISTENER,
+                            vec![
+                                ("rd_target".to_string(), Value::Obj(listener)),
+                                ("rd_terminated".to_string(), Value::Int(0)),
+                            ],
+                        )?;
+                        vm.invoke_instance(
+                            service,
+                            "onTriggerModelDownload",
+                            "(Landroid/content/Intent;Landroid/content/AttributionSource;Landroid/speech/ModelDownloadListener;)V",
+                            &[p35_arg(args, 0), p35_arg(args, 1), Value::Obj(wrapper)],
+                        )?;
+                    } else {
+                        vm.invoke_instance(
+                            service,
+                            "onTriggerModelDownload",
+                            "(Landroid/content/Intent;Landroid/content/AttributionSource;)V",
+                            &[p35_arg(args, 0), p35_arg(args, 1)],
+                        )?;
+                    }
+                }
+                Value::Null
+            }
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+
+    if class == P35_RECOGNITION_CALLBACK {
+        let forward: Option<(&str, &str)> = match (name, sig) {
+            ("beginningOfSpeech", "()V") => Some(("onBeginningOfSpeech", "()V")),
+            ("bufferReceived", "([B)V") => Some(("onBufferReceived", "([B)V")),
+            ("endOfSpeech", "()V") => Some(("onEndOfSpeech", "()V")),
+            ("error", "(I)V") => Some(("onError", "(I)V")),
+            ("partialResults", "(Landroid/os/Bundle;)V") => {
+                Some(("onPartialResults", "(Landroid/os/Bundle;)V"))
+            }
+            ("readyForSpeech", "(Landroid/os/Bundle;)V") => {
+                Some(("onReadyForSpeech", "(Landroid/os/Bundle;)V"))
+            }
+            ("results", "(Landroid/os/Bundle;)V") => Some(("onResults", "(Landroid/os/Bundle;)V")),
+            ("rmsChanged", "(F)V") => Some(("onRmsChanged", "(F)V")),
+            ("segmentResults", "(Landroid/os/Bundle;)V") => {
+                Some(("onSegmentResults", "(Landroid/os/Bundle;)V"))
+            }
+            ("endOfSegmentedSession", "()V") => Some(("onEndOfSegmentedSession", "()V")),
+            ("languageDetection", "(Landroid/os/Bundle;)V") => {
+                Some(("onLanguageDetection", "(Landroid/os/Bundle;)V"))
+            }
+            _ => None,
+        };
+        let value = match (name, sig) {
+            (
+                "<init>",
+                "(Landroid/speech/RecognitionService;Landroid/speech/IRecognitionListener;Landroid/content/AttributionSource;)V",
+            ) => {
+                put(vm, recv, "this$0", p35_arg(args, 0))?;
+                put(vm, recv, "mListener", p35_arg(args, 1))?;
+                put(vm, recv, "mCallingAttributionSource", p35_arg(args, 2))?;
+                Value::Null
+            }
+            ("getCallingAttributionSource", "()Landroid/content/AttributionSource;") => {
+                get(vm, recv, "mCallingAttributionSource")
+            }
+            ("getCallingUid", "()I") => {
+                let Some(source) = field_obj(vm, recv, "mCallingAttributionSource") else {
+                    return Err(npe(""));
+                };
+                vm.invoke_instance(source, "getUid", "()I", &[])?
+            }
+            _ => {
+                let Some((target_name, target_sig)) = forward else {
+                    return Ok(None);
+                };
+                let Some(listener) = field_obj(vm, recv, "mListener") else {
+                    return Err(npe(""));
+                };
+                vm.invoke_instance(listener, target_name, target_sig, args)?
+            }
+        };
+        return Ok(Some(value));
+    }
+
+    if class == P35_SUPPORT_CALLBACK {
+        let value = match (name, sig) {
+            ("<init>", "(Landroid/speech/IRecognitionSupportCallback;)V") => {
+                put(vm, recv, "mCallback", p35_arg(args, 0))?;
+                Value::Null
+            }
+            ("onSupportResult", "(Landroid/speech/RecognitionSupport;)V") | ("onError", "(I)V") => {
+                let Some(callback) = field_obj(vm, recv, "mCallback") else {
+                    return Err(npe(""));
+                };
+                vm.invoke_instance(callback, name, sig, args)?
+            }
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+
+    // RecognitionService base class.
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            let binder = alloc_obj(
+                vm,
+                P35_RECOGNITION_BINDER,
+                vec![("rd_service".to_string(), Value::Obj(recv))],
+            )?;
+            put(vm, recv, "mBinder", Value::Obj(binder))?;
+            Value::Null
+        }
+        ("onBind", "(Landroid/content/Intent;)Landroid/os/IBinder;") => {
+            vm.invoke_instance(recv, "onBindInternal", "()V", &[])?;
+            if let Value::Obj(binder) = get(vm, recv, "mBinder") {
+                Value::Obj(binder)
+            } else {
+                let binder = alloc_obj(
+                    vm,
+                    P35_RECOGNITION_BINDER,
+                    vec![("rd_service".to_string(), Value::Obj(recv))],
+                )?;
+                put(vm, recv, "mBinder", Value::Obj(binder))?;
+                Value::Obj(binder)
+            }
+        }
+        ("onBindInternal", "()V") => Value::Null,
+        ("onDestroy", "()V") => {
+            if let Some(binder) = field_obj(vm, recv, "mBinder") {
+                put(vm, binder, "rd_cleared", Value::Int(1))?;
+            }
+            Value::Null
+        }
+        ("getMaxConcurrentSessionsCount", "()I") => Value::Int(1),
+        (
+            "onCheckRecognitionSupport",
+            "(Landroid/content/Intent;Landroid/speech/RecognitionService$SupportCallback;)V",
+        ) => {
+            let Some(callback) = oarg(args, 1) else {
+                return Err(npe(""));
+            };
+            // ERROR_CANNOT_CHECK_SUPPORT.
+            vm.invoke_instance(callback, "onError", "(I)V", &[Value::Int(14)])?
+        }
+        (
+            "onCheckRecognitionSupport",
+            "(Landroid/content/Intent;Landroid/content/AttributionSource;Landroid/speech/RecognitionService$SupportCallback;)V",
+        ) => vm.invoke_instance(
+            recv,
+            "onCheckRecognitionSupport",
+            "(Landroid/content/Intent;Landroid/speech/RecognitionService$SupportCallback;)V",
+            &[p35_arg(args, 0), p35_arg(args, 2)],
+        )?,
+        ("onTriggerModelDownload", "(Landroid/content/Intent;)V") => Value::Null,
+        (
+            "onTriggerModelDownload",
+            "(Landroid/content/Intent;Landroid/content/AttributionSource;)V",
+        ) => vm.invoke_instance(
+            recv,
+            "onTriggerModelDownload",
+            "(Landroid/content/Intent;)V",
+            std::slice::from_ref(&p35_arg(args, 0)),
+        )?,
+        (
+            "onTriggerModelDownload",
+            "(Landroid/content/Intent;Landroid/content/AttributionSource;Landroid/speech/ModelDownloadListener;)V",
+        ) => {
+            let Some(listener) = oarg(args, 2) else {
+                return Err(npe(""));
+            };
+            // ERROR_CANNOT_LISTEN_TO_DOWNLOAD_EVENTS.
+            vm.invoke_instance(listener, "onError", "(I)V", &[Value::Int(15)])?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35_hash_mix(h: i32, x: i32) -> i32 {
+    h.wrapping_mul(31).wrapping_add(x)
+}
+
+fn p35_recognition_support_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    const FIELDS: [(&str, &str, &str, i64); 4] = [
+        (
+            "mInstalledOnDeviceLanguages",
+            "setInstalledOnDeviceLanguages",
+            "addInstalledOnDeviceLanguage",
+            0x1,
+        ),
+        (
+            "mPendingOnDeviceLanguages",
+            "setPendingOnDeviceLanguages",
+            "addPendingOnDeviceLanguage",
+            0x2,
+        ),
+        (
+            "mSupportedOnDeviceLanguages",
+            "setSupportedOnDeviceLanguages",
+            "addSupportedOnDeviceLanguage",
+            0x4,
+        ),
+        (
+            "mOnlineLanguages",
+            "setOnlineLanguages",
+            "addOnlineLanguage",
+            0x8,
+        ),
+    ];
+    if class == P35_RECOGNITION_SUPPORT_BUILDER {
+        if (name, sig) == ("<init>", "()V") {
+            for (field, ..) in FIELDS {
+                put(vm, recv, field, Value::Null)?;
+            }
+            put(vm, recv, "mBuilderFieldsSet", Value::Long(0))?;
+            return Ok(Some(Value::Null));
+        }
+        if (name, sig) == ("build", "()Landroid/speech/RecognitionSupport;") {
+            p35_check_not_used(vm, recv, 0x10)?;
+            let set = p35_mark_field(vm, recv, 0x10)?;
+            let mut values = Vec::new();
+            for (field, _, _, bit) in FIELDS {
+                let value = if set & bit == 0 {
+                    p35_empty_list(vm)?
+                } else {
+                    match get(vm, recv, field) {
+                        Value::Obj(r) => Value::Obj(r),
+                        // AnnotationValidations.NonNull in the generated
+                        // RecognitionSupport constructor.
+                        _ => return Err(npe("")),
+                    }
+                };
+                values.push((field.to_string(), value));
+            }
+            let support = alloc_obj(vm, P35_RECOGNITION_SUPPORT, values)?;
+            return Ok(Some(Value::Obj(support)));
+        }
+        for (field, setter, adder, bit) in FIELDS {
+            if name == setter
+                && sig == "(Ljava/util/List;)Landroid/speech/RecognitionSupport$Builder;"
+            {
+                p35_check_not_used(vm, recv, 0x10)?;
+                p35_mark_field(vm, recv, bit)?;
+                put(vm, recv, field, p35_arg(args, 0))?;
+                return Ok(Some(Value::Obj(recv)));
+            }
+            if name == adder
+                && sig == "(Ljava/lang/String;)Landroid/speech/RecognitionSupport$Builder;"
+            {
+                let list = match get(vm, recv, field) {
+                    Value::Obj(r) => r,
+                    _ => {
+                        p35_check_not_used(vm, recv, 0x10)?;
+                        p35_mark_field(vm, recv, bit)?;
+                        let created = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+                        put(vm, recv, field, Value::Obj(created))?;
+                        created
+                    }
+                };
+                vm.invoke_instance(
+                    list,
+                    "add",
+                    "(Ljava/lang/Object;)Z",
+                    std::slice::from_ref(&p35_arg(args, 0)),
+                )?;
+                return Ok(Some(Value::Obj(recv)));
+            }
+        }
+        return Ok(None);
+    }
+
+    let value = match (name, sig) {
+        ("<init>", "(Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;)V") => {
+            for (i, (field, ..)) in FIELDS.iter().enumerate() {
+                let v = p35_arg(args, i);
+                if !matches!(v, Value::Obj(_)) {
+                    return Err(npe(""));
+                }
+                put(vm, recv, field, v)?;
+            }
+            Value::Null
+        }
+        ("getInstalledOnDeviceLanguages", "()Ljava/util/List;") => {
+            get(vm, recv, "mInstalledOnDeviceLanguages")
+        }
+        ("getPendingOnDeviceLanguages", "()Ljava/util/List;") => {
+            get(vm, recv, "mPendingOnDeviceLanguages")
+        }
+        ("getSupportedOnDeviceLanguages", "()Ljava/util/List;") => {
+            get(vm, recv, "mSupportedOnDeviceLanguages")
+        }
+        ("getOnlineLanguages", "()Ljava/util/List;") => get(vm, recv, "mOnlineLanguages"),
+        ("describeContents", "()I") => Value::Int(0),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let same = match oarg(args, 0) {
+                Some(other) if other == recv => true,
+                Some(other) if class_of(vm, other) == class_of(vm, recv) => {
+                    let mut eq = true;
+                    for (field, ..) in FIELDS {
+                        eq = eq
+                            && af_objects_equal(vm, &get(vm, recv, field), &get(vm, other, field))?;
+                    }
+                    eq
+                }
+                _ => false,
+            };
+            Value::Int(same as i32)
+        }
+        ("hashCode", "()I") => {
+            let mut h = 1i32;
+            for (field, ..) in FIELDS {
+                h = p35_hash_mix(h, af_objects_hash(vm, &get(vm, recv, field))?);
+            }
+            Value::Int(h)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let text = format!(
+                "RecognitionSupport {{ installedOnDeviceLanguages = {}, pendingOnDeviceLanguages = {}, supportedOnDeviceLanguages = {}, onlineLanguages = {} }}",
+                value_string(vm, &get(vm, recv, "mInstalledOnDeviceLanguages"))?,
+                value_string(vm, &get(vm, recv, "mPendingOnDeviceLanguages"))?,
+                value_string(vm, &get(vm, recv, "mSupportedOnDeviceLanguages"))?,
+                value_string(vm, &get(vm, recv, "mOnlineLanguages"))?
+            );
+            jstr(vm, text)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35_confidence_level_name(value: i32) -> String {
+    match value {
+        0 => "CONFIDENCE_LEVEL_UNKNOWN".to_string(),
+        1 => "CONFIDENCE_LEVEL_LOW".to_string(),
+        2 => "CONFIDENCE_LEVEL_MEDIUM_LOW".to_string(),
+        3 => "CONFIDENCE_LEVEL_MEDIUM".to_string(),
+        4 => "CONFIDENCE_LEVEL_MEDIUM_HIGH".to_string(),
+        5 => "CONFIDENCE_LEVEL_HIGH".to_string(),
+        other => format!("{:x}", other as u32),
+    }
+}
+
+fn p35_validate_recognition_part(
+    raw: &Value,
+    timestamp: i64,
+    confidence: i32,
+) -> Result<(), VmExit> {
+    if !matches!(raw, Value::Obj(_)) {
+        return Err(npe(""));
+    }
+    if !(0..=5).contains(&confidence) {
+        return Err(iae(format!(
+            "confidenceLevel was {confidence} but must be one of: CONFIDENCE_LEVEL_UNKNOWN(0), CONFIDENCE_LEVEL_LOW(1), CONFIDENCE_LEVEL_MEDIUM_LOW(2), CONFIDENCE_LEVEL_MEDIUM(3), CONFIDENCE_LEVEL_MEDIUM_HIGH(4), CONFIDENCE_LEVEL_HIGH(5)"
+        )));
+    }
+    if timestamp < 0 {
+        return Err(iae("The timestamp must be non-negative."));
+    }
+    Ok(())
+}
+
+fn p35_recognition_part_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P35_RECOGNITION_PART_BUILDER || class == P35_RECOGNITION_PART_BASE_BUILDER {
+        let value = match (name, sig) {
+            ("<init>", "(Ljava/lang/String;)V") => {
+                if oarg(args, 0).is_none() {
+                    return Err(npe(""));
+                }
+                put(vm, recv, "mRawText", p35_arg(args, 0))?;
+                put(vm, recv, "mFormattedText", Value::Null)?;
+                put(vm, recv, "mTimestampMillis", Value::Long(0))?;
+                put(vm, recv, "mConfidenceLevel", Value::Int(0))?;
+                put(vm, recv, "mBuilderFieldsSet", Value::Long(0))?;
+                Value::Null
+            }
+            ("setRawText", "(Ljava/lang/String;)Landroid/speech/RecognitionPart$Builder;") => {
+                p35_check_not_used(vm, recv, 0x10)?;
+                p35_mark_field(vm, recv, 0x1)?;
+                put(vm, recv, "mRawText", p35_arg(args, 0))?;
+                Value::Obj(recv)
+            }
+            (
+                "setFormattedText",
+                "(Ljava/lang/String;)Landroid/speech/RecognitionPart$Builder;",
+            ) => {
+                // BaseBuilder validates NonNull before checkNotUsed.
+                if oarg(args, 0).is_none() {
+                    return Err(npe(""));
+                }
+                p35_check_not_used(vm, recv, 0x10)?;
+                p35_mark_field(vm, recv, 0x2)?;
+                put(vm, recv, "mFormattedText", p35_arg(args, 0))?;
+                Value::Obj(recv)
+            }
+            ("setTimestampMillis", "(J)Landroid/speech/RecognitionPart$Builder;") => {
+                p35_check_not_used(vm, recv, 0x10)?;
+                p35_mark_field(vm, recv, 0x4)?;
+                put(vm, recv, "mTimestampMillis", Value::Long(larg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setConfidenceLevel", "(I)Landroid/speech/RecognitionPart$Builder;") => {
+                p35_check_not_used(vm, recv, 0x10)?;
+                p35_mark_field(vm, recv, 0x8)?;
+                put(vm, recv, "mConfidenceLevel", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("build", "()Landroid/speech/RecognitionPart;") => {
+                p35_check_not_used(vm, recv, 0x10)?;
+                let set = p35_mark_field(vm, recv, 0x10)?;
+                let raw = get(vm, recv, "mRawText");
+                let formatted = if set & 0x2 == 0 {
+                    Value::Null
+                } else {
+                    get(vm, recv, "mFormattedText")
+                };
+                let timestamp = if set & 0x4 == 0 {
+                    0
+                } else {
+                    field_long(vm, recv, "mTimestampMillis")
+                };
+                let confidence = if set & 0x8 == 0 {
+                    0
+                } else {
+                    field_int(vm, recv, "mConfidenceLevel")
+                };
+                p35_validate_recognition_part(&raw, timestamp, confidence)?;
+                let part = alloc_obj(
+                    vm,
+                    P35_RECOGNITION_PART,
+                    vec![
+                        ("mRawText".to_string(), raw),
+                        ("mFormattedText".to_string(), formatted),
+                        ("mTimestampMillis".to_string(), Value::Long(timestamp)),
+                        ("mConfidenceLevel".to_string(), Value::Int(confidence)),
+                    ],
+                )?;
+                Value::Obj(part)
+            }
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+
+    let value = match (name, sig) {
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;JI)V") => {
+            let raw = p35_arg(args, 0);
+            let timestamp = larg(args, 2);
+            let confidence = iarg(args, 3);
+            p35_validate_recognition_part(&raw, timestamp, confidence)?;
+            put(vm, recv, "mRawText", raw)?;
+            put(vm, recv, "mFormattedText", p35_arg(args, 1))?;
+            put(vm, recv, "mTimestampMillis", Value::Long(timestamp))?;
+            put(vm, recv, "mConfidenceLevel", Value::Int(confidence))?;
+            Value::Null
+        }
+        ("getRawText", "()Ljava/lang/String;") => get(vm, recv, "mRawText"),
+        ("getFormattedText", "()Ljava/lang/String;") => get(vm, recv, "mFormattedText"),
+        ("getTimestampMillis", "()J") => Value::Long(field_long(vm, recv, "mTimestampMillis")),
+        ("getConfidenceLevel", "()I") => Value::Int(field_int(vm, recv, "mConfidenceLevel")),
+        ("describeContents", "()I") => Value::Int(0),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let same = match oarg(args, 0) {
+                Some(other) if other == recv => true,
+                Some(other) if class_of(vm, other) == class_of(vm, recv) => {
+                    af_objects_equal(vm, &get(vm, recv, "mRawText"), &get(vm, other, "mRawText"))?
+                        && af_objects_equal(
+                            vm,
+                            &get(vm, recv, "mFormattedText"),
+                            &get(vm, other, "mFormattedText"),
+                        )?
+                        && field_long(vm, recv, "mTimestampMillis")
+                            == field_long(vm, other, "mTimestampMillis")
+                        && field_int(vm, recv, "mConfidenceLevel")
+                            == field_int(vm, other, "mConfidenceLevel")
+                }
+                _ => false,
+            };
+            Value::Int(same as i32)
+        }
+        ("hashCode", "()I") => {
+            let ts = field_long(vm, recv, "mTimestampMillis");
+            let ts_hash = ((ts as u64) ^ ((ts as u64) >> 32)) as i32;
+            let mut h = 1i32;
+            h = p35_hash_mix(h, af_objects_hash(vm, &get(vm, recv, "mRawText"))?);
+            h = p35_hash_mix(h, af_objects_hash(vm, &get(vm, recv, "mFormattedText"))?);
+            h = p35_hash_mix(h, ts_hash);
+            h = p35_hash_mix(h, field_int(vm, recv, "mConfidenceLevel"));
+            Value::Int(h)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let text = format!(
+                "RecognitionPart {{ rawText = {}, formattedText = {}, timestampMillis = {}, confidenceLevel = {} }}",
+                value_string(vm, &get(vm, recv, "mRawText"))?,
+                value_string(vm, &get(vm, recv, "mFormattedText"))?,
+                field_long(vm, recv, "mTimestampMillis"),
+                p35_confidence_level_name(field_int(vm, recv, "mConfidenceLevel"))
+            );
+            jstr(vm, text)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35_alternative_span_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(IILjava/util/List;)V") => {
+            let start = iarg(args, 0);
+            let end = iarg(args, 1);
+            let alternatives = p35_arg(args, 2);
+            put(vm, recv, "mStartPosition", Value::Int(start))?;
+            put(vm, recv, "mEndPosition", Value::Int(end))?;
+            put(vm, recv, "mAlternatives", alternatives.clone())?;
+            if !matches!(alternatives, Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            if start < 0 {
+                return Err(iae("The range start must be non-negative."));
+            }
+            if start >= end {
+                return Err(iae(format!(
+                    "Illegal range [{start}, {end}), must be start < end."
+                )));
+            }
+            let size = match vm.invoke_instance(oarg(args, 2).unwrap_or(0), "size", "()I", &[]) {
+                Ok(v) => v.as_int().unwrap_or(0),
+                Err(_) => collection_items(vm, Some(&alternatives)).len() as i32,
+            };
+            if size == 0 {
+                return Err(iae("List of alternative strings must not be empty."));
+            }
+            Value::Null
+        }
+        ("getStartPosition", "()I") => Value::Int(field_int(vm, recv, "mStartPosition")),
+        ("getEndPosition", "()I") => Value::Int(field_int(vm, recv, "mEndPosition")),
+        ("getAlternatives", "()Ljava/util/List;") => get(vm, recv, "mAlternatives"),
+        ("describeContents", "()I") => Value::Int(0),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let same = match oarg(args, 0) {
+                Some(other) if other == recv => true,
+                Some(other) if class_of(vm, other) == class_of(vm, recv) => {
+                    field_int(vm, recv, "mStartPosition") == field_int(vm, other, "mStartPosition")
+                        && field_int(vm, recv, "mEndPosition")
+                            == field_int(vm, other, "mEndPosition")
+                        && af_objects_equal(
+                            vm,
+                            &get(vm, recv, "mAlternatives"),
+                            &get(vm, other, "mAlternatives"),
+                        )?
+                }
+                _ => false,
+            };
+            Value::Int(same as i32)
+        }
+        ("hashCode", "()I") => {
+            let mut h = 1i32;
+            h = p35_hash_mix(h, field_int(vm, recv, "mStartPosition"));
+            h = p35_hash_mix(h, field_int(vm, recv, "mEndPosition"));
+            h = p35_hash_mix(h, af_objects_hash(vm, &get(vm, recv, "mAlternatives"))?);
+            Value::Int(h)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let text = format!(
+                "AlternativeSpan {{ startPosition = {}, endPosition = {}, alternatives = {} }}",
+                field_int(vm, recv, "mStartPosition"),
+                field_int(vm, recv, "mEndPosition"),
+                value_string(vm, &get(vm, recv, "mAlternatives"))?
+            );
+            jstr(vm, text)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35_spell_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P35_SPELL_SERVICE {
+        let value = match (name, sig) {
+            ("<init>", "()V") => {
+                let binder = alloc_obj(
+                    vm,
+                    P35_SPELL_BINDER,
+                    vec![("rd_service".to_string(), Value::Obj(recv))],
+                )?;
+                put(vm, recv, "mBinder", Value::Obj(binder))?;
+                Value::Null
+            }
+            ("onBind", "(Landroid/content/Intent;)Landroid/os/IBinder;") => {
+                if let Value::Obj(binder) = get(vm, recv, "mBinder") {
+                    Value::Obj(binder)
+                } else {
+                    let binder = alloc_obj(
+                        vm,
+                        P35_SPELL_BINDER,
+                        vec![("rd_service".to_string(), Value::Obj(recv))],
+                    )?;
+                    put(vm, recv, "mBinder", Value::Obj(binder))?;
+                    Value::Obj(binder)
+                }
+            }
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+
+    if class == P35_SPELL_BINDER {
+        let value = match (name, sig) {
+            ("<init>", "(Landroid/service/textservice/SpellCheckerService;)V") => {
+                put(vm, recv, "rd_service", p35_arg(args, 0))?;
+                Value::Null
+            }
+            (
+                "getISpellCheckerSession",
+                "(Ljava/lang/String;Lcom/android/internal/textservice/ISpellCheckerSessionListener;Landroid/os/Bundle;ILcom/android/internal/textservice/ISpellCheckerServiceCallback;)V",
+            ) => {
+                let internal_value = match field_obj(vm, recv, "rd_service") {
+                    None => Value::Null,
+                    Some(service) => {
+                        let session = vm.invoke_instance(
+                            service,
+                            "createSession",
+                            "()Landroid/service/textservice/SpellCheckerService$Session;",
+                            &[],
+                        )?;
+                        let Value::Obj(session_obj) = session else {
+                            // InternalISpellCheckerSession's constructor
+                            // dereferences the session.
+                            return Err(npe(""));
+                        };
+                        let internal = alloc_obj(
+                            vm,
+                            P35_SPELL_INTERNAL,
+                            vec![
+                                ("mLocale".to_string(), p35_arg(args, 0)),
+                                ("mListener".to_string(), p35_arg(args, 1)),
+                                ("mBundle".to_string(), p35_arg(args, 2)),
+                                ("mSession".to_string(), Value::Obj(session_obj)),
+                                (
+                                    "mSupportedAttributes".to_string(),
+                                    Value::Int(iarg(args, 3)),
+                                ),
+                            ],
+                        )?;
+                        vm.invoke_instance(
+                            session_obj,
+                            "setInternalISpellCheckerSession",
+                            "(Landroid/service/textservice/SpellCheckerService$InternalISpellCheckerSession;)V",
+                            &[Value::Obj(internal)],
+                        )?;
+                        vm.invoke_instance(session_obj, "onCreate", "()V", &[])?;
+                        Value::Obj(internal)
+                    }
+                };
+                let Some(callback) = oarg(args, 4) else {
+                    return Err(npe(""));
+                };
+                vm.invoke_instance(
+                    callback,
+                    "onSessionCreated",
+                    "(Lcom/android/internal/textservice/ISpellCheckerSession;)V",
+                    &[internal_value],
+                )?
+            }
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+
+    if class == P35_SPELL_INTERNAL {
+        let value = match (name, sig) {
+            (
+                "<init>",
+                "(Ljava/lang/String;Lcom/android/internal/textservice/ISpellCheckerSessionListener;Landroid/os/Bundle;Landroid/service/textservice/SpellCheckerService$Session;I)V",
+            ) => {
+                put(vm, recv, "mLocale", p35_arg(args, 0))?;
+                put(vm, recv, "mListener", p35_arg(args, 1))?;
+                put(vm, recv, "mBundle", p35_arg(args, 2))?;
+                put(vm, recv, "mSession", p35_arg(args, 3))?;
+                put(
+                    vm,
+                    recv,
+                    "mSupportedAttributes",
+                    Value::Int(iarg(args, 4)),
+                )?;
+                let Some(session) = oarg(args, 3) else {
+                    return Err(npe(""));
+                };
+                vm.invoke_instance(
+                    session,
+                    "setInternalISpellCheckerSession",
+                    "(Landroid/service/textservice/SpellCheckerService$InternalISpellCheckerSession;)V",
+                    &[Value::Obj(recv)],
+                )?
+            }
+            ("getLocale", "()Ljava/lang/String;") => get(vm, recv, "mLocale"),
+            ("getBundle", "()Landroid/os/Bundle;") => get(vm, recv, "mBundle"),
+            ("getSupportedAttributes", "()I") => {
+                Value::Int(field_int(vm, recv, "mSupportedAttributes"))
+            }
+            (
+                "onGetSuggestionsMultiple",
+                "([Landroid/view/textservice/TextInfo;IZ)V",
+            ) => {
+                let Some(session) = field_obj(vm, recv, "mSession") else {
+                    return Err(npe(""));
+                };
+                let result = vm.invoke_instance(
+                    session,
+                    "onGetSuggestionsMultiple",
+                    "([Landroid/view/textservice/TextInfo;IZ)[Landroid/view/textservice/SuggestionsInfo;",
+                    args,
+                )?;
+                let Some(listener) = field_obj(vm, recv, "mListener") else {
+                    return Err(npe(""));
+                };
+                vm.invoke_instance(
+                    listener,
+                    "onGetSuggestions",
+                    "([Landroid/view/textservice/SuggestionsInfo;)V",
+                    &[result],
+                )?
+            }
+            (
+                "onGetSentenceSuggestionsMultiple",
+                "([Landroid/view/textservice/TextInfo;I)V",
+            ) => {
+                let Some(session) = field_obj(vm, recv, "mSession") else {
+                    return Err(npe(""));
+                };
+                let result = vm.invoke_instance(
+                    session,
+                    "onGetSentenceSuggestionsMultiple",
+                    "([Landroid/view/textservice/TextInfo;I)[Landroid/view/textservice/SentenceSuggestionsInfo;",
+                    args,
+                )?;
+                let Some(listener) = field_obj(vm, recv, "mListener") else {
+                    return Err(npe(""));
+                };
+                vm.invoke_instance(
+                    listener,
+                    "onGetSentenceSuggestions",
+                    "([Landroid/view/textservice/SentenceSuggestionsInfo;)V",
+                    &[result],
+                )?
+            }
+            ("onCancel", "()V") => {
+                let Some(session) = field_obj(vm, recv, "mSession") else {
+                    return Err(npe(""));
+                };
+                vm.invoke_instance(session, "onCancel", "()V", &[])?
+            }
+            ("onClose", "()V") => {
+                let Some(session) = field_obj(vm, recv, "mSession") else {
+                    return Err(npe(""));
+                };
+                let result = vm.invoke_instance(session, "onClose", "()V", &[]);
+                put(vm, recv, "mListener", Value::Null)?;
+                result?
+            }
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+
+    // SpellCheckerService.Session.
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            put(vm, recv, "mInternalSession", Value::Null)?;
+            Value::Null
+        }
+        (
+            "setInternalISpellCheckerSession",
+            "(Landroid/service/textservice/SpellCheckerService$InternalISpellCheckerSession;)V",
+        ) => {
+            put(vm, recv, "mInternalSession", p35_arg(args, 0))?;
+            Value::Null
+        }
+        ("getLocale", "()Ljava/lang/String;") => {
+            let Some(internal) = field_obj(vm, recv, "mInternalSession") else {
+                return Err(npe(""));
+            };
+            get(vm, internal, "mLocale")
+        }
+        ("getBundle", "()Landroid/os/Bundle;") => {
+            let Some(internal) = field_obj(vm, recv, "mInternalSession") else {
+                return Err(npe(""));
+            };
+            get(vm, internal, "mBundle")
+        }
+        ("getSupportedAttributes", "()I") => {
+            let Some(internal) = field_obj(vm, recv, "mInternalSession") else {
+                return Err(npe(""));
+            };
+            Value::Int(field_int(vm, internal, "mSupportedAttributes"))
+        }
+        ("onCancel", "()V") | ("onClose", "()V") => Value::Null,
+        (
+            "onGetSuggestionsMultiple",
+            "([Landroid/view/textservice/TextInfo;IZ)[Landroid/view/textservice/SuggestionsInfo;",
+        ) => {
+            if oarg(args, 0).is_none() {
+                return Err(npe(""));
+            }
+            let limit = iarg(args, 1);
+            let mut results = Vec::new();
+            for info in array_elems(vm, args.first()) {
+                let suggestion = vm.invoke_instance(
+                    recv,
+                    "onGetSuggestions",
+                    "(Landroid/view/textservice/TextInfo;I)Landroid/view/textservice/SuggestionsInfo;",
+                    &[info.clone(), Value::Int(limit)],
+                )?;
+                let Value::Obj(suggestion_obj) = suggestion else {
+                    return Err(npe(""));
+                };
+                let Value::Obj(info_obj) = info else {
+                    return Err(npe(""));
+                };
+                let cookie = vm.invoke_instance(info_obj, "getCookie", "()I", &[])?;
+                let sequence = vm.invoke_instance(info_obj, "getSequence", "()I", &[])?;
+                vm.invoke_instance(
+                    suggestion_obj,
+                    "setCookieAndSequence",
+                    "(II)V",
+                    &[cookie, sequence],
+                )?;
+                results.push(Value::Obj(suggestion_obj));
+            }
+            obj_array(vm, "[Landroid/view/textservice/SuggestionsInfo;", results)?
+        }
+        (
+            "onGetSentenceSuggestionsMultiple",
+            "([Landroid/view/textservice/TextInfo;I)[Landroid/view/textservice/SentenceSuggestionsInfo;",
+        ) => {
+            let empty = "[Landroid/view/textservice/SentenceSuggestionsInfo;";
+            if oarg(args, 0).is_none() || array_elems(vm, args.first()).is_empty() {
+                obj_array(vm, empty, Vec::new())?
+            } else {
+                let Some(internal) = field_obj(vm, recv, "mInternalSession") else {
+                    return Err(npe(""));
+                };
+                match field_str(vm, internal, "mLocale") {
+                    None => obj_array(vm, empty, Vec::new())?,
+                    Some(locale) if locale.is_empty() => obj_array(vm, empty, Vec::new())?,
+                    // SentenceLevelAdapter word splitting (WordIterator)
+                    // is outside this slice.
+                    Some(_) => return Ok(None),
+                }
+            }
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn partial35_instance_for_class(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P35_SPEECH_RECOGNIZER | P35_SPEECH_RECOGNIZER_PROXY | P35_SPEECH_RECOGNIZER_IMPL => {
+            p35_speech_recognizer_instance(vm, class, name, sig, recv, args)
+        }
+        P35_RECOGNITION_LISTENER
+        | P35_IRECOGNITION_LISTENER
+        | P35_IRECOGNITION_SUPPORT_CALLBACK
+        | P35_RECOGNITION_SUPPORT_CALLBACK
+        | P35_MODEL_DOWNLOAD_LISTENER
+        | P35_IMODEL_DOWNLOAD_LISTENER
+        | P35_SPELL_LISTENER
+        | P35_SPELL_CALLBACK => p35_listener_recorder(vm, class, name, sig, recv, args),
+        P35_RECOGNITION_SERVICE
+        | P35_RECOGNITION_BINDER
+        | P35_RECOGNITION_CALLBACK
+        | P35_SUPPORT_CALLBACK => {
+            p35_recognition_service_instance(vm, class, name, sig, recv, args)
+        }
+        P35_RECOGNITION_SUPPORT | P35_RECOGNITION_SUPPORT_BUILDER => {
+            p35_recognition_support_instance(vm, class, name, sig, recv, args)
+        }
+        P35_RECOGNITION_PART | P35_RECOGNITION_PART_BUILDER | P35_RECOGNITION_PART_BASE_BUILDER => {
+            p35_recognition_part_instance(vm, class, name, sig, recv, args)
+        }
+        P35_ALTERNATIVE_SPAN => p35_alternative_span_instance(vm, name, sig, recv, args),
+        P35_SPELL_SERVICE | P35_SPELL_SESSION | P35_SPELL_INTERNAL | P35_SPELL_BINDER => {
+            p35_spell_instance(vm, class, name, sig, recv, args)
+        }
+        _ => Ok(None),
+    }
+}
+
+pub(crate) fn partial35_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    for class in [recv_class, mref_class] {
+        if p35_class(class) {
+            let value = partial35_instance_for_class(vm, class, name, sig, recv, args)?;
+            if value.is_some() {
+                return Ok(value);
+            }
+        }
+    }
+    let actual = class_of(vm, recv);
+    if actual != recv_class && actual != mref_class && p35_class(&actual) {
+        return partial35_instance_for_class(vm, &actual, name, sig, recv, args);
+    }
+    Ok(None)
+}
+
+fn p35_new_intent(vm: &mut Engine, action: &str) -> Result<ObjRef, VmExit> {
+    let intent = alloc_obj(vm, "Landroid/content/Intent;", Vec::new())?;
+    let action = jstr(vm, action)?;
+    vm.invoke_instance(intent, "<init>", "(Ljava/lang/String;)V", &[action])?;
+    Ok(intent)
+}
+
+pub(crate) fn partial35_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P35_SPEECH_RECOGNIZER {
+        let value = match (name, sig) {
+            ("isRecognitionAvailable", "(Landroid/content/Context;)Z") => {
+                let Some(context) = oarg(args, 0) else {
+                    return Err(npe(""));
+                };
+                let pm = vm.invoke_instance(
+                    context,
+                    "getPackageManager",
+                    "()Landroid/content/pm/PackageManager;",
+                    &[],
+                )?;
+                let Value::Obj(pm) = pm else {
+                    return Err(npe(""));
+                };
+                let intent = p35_new_intent(vm, "android.speech.RecognitionService")?;
+                let list = vm.invoke_instance(
+                    pm,
+                    "queryIntentServices",
+                    "(Landroid/content/Intent;I)Ljava/util/List;",
+                    &[Value::Obj(intent), Value::Int(0)],
+                )?;
+                let Value::Obj(list) = list else {
+                    return Ok(Some(Value::Int(0)));
+                };
+                let size = vm.invoke_instance(list, "size", "()I", &[])?;
+                Value::Int((size.as_int().unwrap_or(0) != 0) as i32)
+            }
+            ("isOnDeviceRecognitionAvailable", "(Landroid/content/Context;)Z") => {
+                if oarg(args, 0).is_none() {
+                    return Err(npe(""));
+                }
+                // No default on-device recognition service is configured
+                // in this profile, so unflattenFromString yields null.
+                Value::Int(0)
+            }
+            (
+                "createSpeechRecognizer",
+                "(Landroid/content/Context;)Landroid/speech/SpeechRecognizer;",
+            ) => {
+                if oarg(args, 0).is_none() {
+                    return Err(iae("Context cannot be null"));
+                }
+                p35_new_recognizer(vm, p35_arg(args, 0), Value::Null, false)?
+            }
+            (
+                "createSpeechRecognizer",
+                "(Landroid/content/Context;Landroid/content/ComponentName;)Landroid/speech/SpeechRecognizer;",
+            ) => {
+                if oarg(args, 0).is_none() {
+                    return Err(iae("Context cannot be null"));
+                }
+                p35_new_recognizer(vm, p35_arg(args, 0), p35_arg(args, 1), false)?
+            }
+            (
+                "createOnDeviceSpeechRecognizer",
+                "(Landroid/content/Context;)Landroid/speech/SpeechRecognizer;",
+            ) => {
+                if oarg(args, 0).is_none() {
+                    return Err(npe(""));
+                }
+                return Err(throw(
+                    "Ljava/lang/UnsupportedOperationException;",
+                    "On-device recognition is not available",
+                ));
+            }
+            (
+                "createOnDeviceTestingSpeechRecognizer",
+                "(Landroid/content/Context;)Landroid/speech/SpeechRecognizer;",
+            ) => {
+                if oarg(args, 0).is_none() {
+                    return Err(iae("Context cannot be null"));
+                }
+                p35_new_recognizer(vm, p35_arg(args, 0), Value::Null, true)?
+            }
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+
+    if class == P35_RECOGNIZER_INTENT
+        && (name, sig)
+            == (
+                "getVoiceDetailsIntent",
+                "(Landroid/content/Context;)Landroid/content/Intent;",
+            )
+    {
+        let Some(context) = oarg(args, 0) else {
+            return Err(npe(""));
+        };
+        let pm = vm.invoke_instance(
+            context,
+            "getPackageManager",
+            "()Landroid/content/pm/PackageManager;",
+            &[],
+        )?;
+        let Value::Obj(pm) = pm else {
+            return Err(npe(""));
+        };
+        let search = p35_new_intent(vm, "android.speech.action.WEB_SEARCH")?;
+        // PackageManager.GET_META_DATA = 128.
+        let info = vm.invoke_instance(
+            pm,
+            "resolveActivity",
+            "(Landroid/content/Intent;I)Landroid/content/pm/ResolveInfo;",
+            &[Value::Obj(search), Value::Int(128)],
+        )?;
+        let Value::Obj(info) = info else {
+            return Ok(Some(Value::Null));
+        };
+        let Some(activity) = field_obj(vm, info, "activityInfo") else {
+            return Ok(Some(Value::Null));
+        };
+        let Some(meta) = field_obj(vm, activity, "metaData") else {
+            return Ok(Some(Value::Null));
+        };
+        let key = jstr(vm, "android.speech.DETAILS")?;
+        let class_name = vm.invoke_instance(
+            meta,
+            "getString",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            &[key],
+        )?;
+        let Value::Obj(_) = class_name else {
+            return Ok(Some(Value::Null));
+        };
+        let Some(package) = field_str(vm, activity, "packageName") else {
+            return Ok(Some(Value::Null));
+        };
+        let details = p35_new_intent(vm, "android.speech.action.GET_LANGUAGE_DETAILS")?;
+        let component = alloc_obj(vm, "Landroid/content/ComponentName;", Vec::new())?;
+        let package = jstr(vm, package)?;
+        vm.invoke_instance(
+            component,
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[package, class_name],
+        )?;
+        vm.invoke_instance(
+            details,
+            "setComponent",
+            "(Landroid/content/ComponentName;)Landroid/content/Intent;",
+            &[Value::Obj(component)],
+        )?;
+        return Ok(Some(Value::Obj(details)));
+    }
+
+    if class == P35_RECOGNITION_PART
+        && (name, sig) == ("confidenceLevelToString", "(I)Ljava/lang/String;")
+    {
+        return jstr(vm, p35_confidence_level_name(iarg(args, 0))).map(Some);
+    }
+    Ok(None)
+}
+
+pub(crate) fn partial35_host_static(
+    vm: &mut Engine,
+    class: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    let text = match (class, field) {
+        (P35_SPEECH_RECOGNIZER, "RESULTS_RECOGNITION") => Some("results_recognition"),
+        (P35_SPEECH_RECOGNIZER, "CONFIDENCE_SCORES") => Some("confidence_scores"),
+        (P35_SPEECH_RECOGNIZER, "RESULTS_ALTERNATIVES") => Some("results_alternatives"),
+        (P35_SPEECH_RECOGNIZER, "RECOGNITION_PARTS") => Some("recognition_parts"),
+        (P35_SPEECH_RECOGNIZER, "DETECTED_LANGUAGE") => Some("detected_language"),
+        (P35_SPEECH_RECOGNIZER, "LANGUAGE_DETECTION_CONFIDENCE_LEVEL") => {
+            Some("language_detection_confidence_level")
+        }
+        (P35_SPEECH_RECOGNIZER, "TOP_LOCALE_ALTERNATIVES") => Some("top_locale_alternatives"),
+        (P35_SPEECH_RECOGNIZER, "LANGUAGE_SWITCH_RESULT") => Some("language_switch_result"),
+        (P35_RECOGNIZER_INTENT, "ACTION_RECOGNIZE_SPEECH") => {
+            Some("android.speech.action.RECOGNIZE_SPEECH")
+        }
+        (P35_RECOGNIZER_INTENT, "ACTION_WEB_SEARCH") => Some("android.speech.action.WEB_SEARCH"),
+        (P35_RECOGNIZER_INTENT, "ACTION_VOICE_SEARCH_HANDS_FREE") => {
+            Some("android.speech.action.VOICE_SEARCH_HANDS_FREE")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_AUDIO_SOURCE") => Some("android.speech.extra.AUDIO_SOURCE"),
+        (P35_RECOGNIZER_INTENT, "EXTRA_AUDIO_SOURCE_CHANNEL_COUNT") => {
+            Some("android.speech.extra.AUDIO_SOURCE_CHANNEL_COUNT")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_AUDIO_SOURCE_ENCODING") => {
+            Some("android.speech.extra.AUDIO_SOURCE_ENCODING")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_AUDIO_SOURCE_SAMPLING_RATE") => {
+            Some("android.speech.extra.AUDIO_SOURCE_SAMPLING_RATE")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_ENABLE_BIASING_DEVICE_CONTEXT") => {
+            Some("android.speech.extra.ENABLE_BIASING_DEVICE_CONTEXT")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_BIASING_STRINGS") => {
+            Some("android.speech.extra.BIASING_STRINGS")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_ENABLE_FORMATTING") => {
+            Some("android.speech.extra.ENABLE_FORMATTING")
+        }
+        (P35_RECOGNIZER_INTENT, "FORMATTING_OPTIMIZE_QUALITY") => Some("quality"),
+        (P35_RECOGNIZER_INTENT, "FORMATTING_OPTIMIZE_LATENCY") => Some("latency"),
+        (P35_RECOGNIZER_INTENT, "EXTRA_HIDE_PARTIAL_TRAILING_PUNCTUATION") => {
+            Some("android.speech.extra.HIDE_PARTIAL_TRAILING_PUNCTUATION")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_MASK_OFFENSIVE_WORDS") => {
+            Some("android.speech.extra.MASK_OFFENSIVE_WORDS")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_CALLING_PACKAGE") => Some("calling_package"),
+        (P35_RECOGNIZER_INTENT, "EXTRA_AUDIO_INJECT_SOURCE") => {
+            Some("android.speech.extra.AUDIO_INJECT_SOURCE")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_SECURE") => Some("android.speech.extras.EXTRA_SECURE"),
+        (P35_RECOGNIZER_INTENT, "EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS") => {
+            Some("android.speech.extras.SPEECH_INPUT_MINIMUM_LENGTH_MILLIS")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS") => {
+            Some("android.speech.extras.SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS") => {
+            Some("android.speech.extras.SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_LANGUAGE_MODEL") => {
+            Some("android.speech.extra.LANGUAGE_MODEL")
+        }
+        (P35_RECOGNIZER_INTENT, "LANGUAGE_MODEL_FREE_FORM") => Some("free_form"),
+        (P35_RECOGNIZER_INTENT, "LANGUAGE_MODEL_WEB_SEARCH") => Some("web_search"),
+        (P35_RECOGNIZER_INTENT, "EXTRA_PROMPT") => Some("android.speech.extra.PROMPT"),
+        (P35_RECOGNIZER_INTENT, "EXTRA_LANGUAGE") => Some("android.speech.extra.LANGUAGE"),
+        (P35_RECOGNIZER_INTENT, "EXTRA_ORIGIN") => Some("android.speech.extra.ORIGIN"),
+        (P35_RECOGNIZER_INTENT, "EXTRA_MAX_RESULTS") => Some("android.speech.extra.MAX_RESULTS"),
+        (P35_RECOGNIZER_INTENT, "EXTRA_WEB_SEARCH_ONLY") => {
+            Some("android.speech.extra.WEB_SEARCH_ONLY")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_PARTIAL_RESULTS") => {
+            Some("android.speech.extra.PARTIAL_RESULTS")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_RESULTS_PENDINGINTENT") => {
+            Some("android.speech.extra.RESULTS_PENDINGINTENT")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_RESULTS_PENDINGINTENT_BUNDLE") => {
+            Some("android.speech.extra.RESULTS_PENDINGINTENT_BUNDLE")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_RESULTS") => Some("android.speech.extra.RESULTS"),
+        (P35_RECOGNIZER_INTENT, "EXTRA_CONFIDENCE_SCORES") => {
+            Some("android.speech.extra.CONFIDENCE_SCORES")
+        }
+        (P35_RECOGNIZER_INTENT, "DETAILS_META_DATA") => Some("android.speech.DETAILS"),
+        (P35_RECOGNIZER_INTENT, "ACTION_GET_LANGUAGE_DETAILS") => {
+            Some("android.speech.action.GET_LANGUAGE_DETAILS")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE") => {
+            Some("android.speech.extra.ONLY_RETURN_LANGUAGE_PREFERENCE")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_LANGUAGE_PREFERENCE") => {
+            Some("android.speech.extra.LANGUAGE_PREFERENCE")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_SUPPORTED_LANGUAGES") => {
+            Some("android.speech.extra.SUPPORTED_LANGUAGES")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_PREFER_OFFLINE") => {
+            Some("android.speech.extra.PREFER_OFFLINE")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_SEGMENTED_SESSION") => {
+            Some("android.speech.extra.SEGMENTED_SESSION")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_REQUEST_WORD_TIMING") => {
+            Some("android.speech.extra.REQUEST_WORD_TIMING")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_REQUEST_WORD_CONFIDENCE") => {
+            Some("android.speech.extra.REQUEST_WORD_CONFIDENCE")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_ENABLE_LANGUAGE_DETECTION") => {
+            Some("android.speech.extra.ENABLE_LANGUAGE_DETECTION")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES") => {
+            Some("android.speech.extra.LANGUAGE_DETECTION_ALLOWED_LANGUAGES")
+        }
+        (P35_RECOGNIZER_INTENT, "EXTRA_ENABLE_LANGUAGE_SWITCH") => {
+            Some("android.speech.extra.ENABLE_LANGUAGE_SWITCH")
+        }
+        (P35_RECOGNIZER_INTENT, "LANGUAGE_SWITCH_HIGH_PRECISION") => Some("high_precision"),
+        (P35_RECOGNIZER_INTENT, "LANGUAGE_SWITCH_BALANCED") => Some("balanced"),
+        (P35_RECOGNIZER_INTENT, "LANGUAGE_SWITCH_QUICK_RESPONSE") => Some("quick_response"),
+        (P35_RECOGNIZER_INTENT, "EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES") => {
+            Some("android.speech.extra.LANGUAGE_SWITCH_ALLOWED_LANGUAGES")
+        }
+        (P35_RECOGNITION_SERVICE, "SERVICE_INTERFACE") => Some("android.speech.RecognitionService"),
+        (P35_RECOGNITION_SERVICE, "SERVICE_META_DATA") => Some("android.speech"),
+        (P35_SPELL_SERVICE, "SERVICE_INTERFACE") => {
+            Some("android.service.textservice.SpellCheckerService")
+        }
+        _ => None,
+    };
+    if let Some(text) = text {
+        return jstr(vm, text).map(Some);
+    }
+
+    let value = match (class, field) {
+        (P35_SPEECH_RECOGNIZER, "LANGUAGE_DETECTION_CONFIDENCE_LEVEL_UNKNOWN") => Some(0),
+        (P35_SPEECH_RECOGNIZER, "LANGUAGE_DETECTION_CONFIDENCE_LEVEL_NOT_CONFIDENT") => Some(1),
+        (P35_SPEECH_RECOGNIZER, "LANGUAGE_DETECTION_CONFIDENCE_LEVEL_CONFIDENT") => Some(2),
+        (P35_SPEECH_RECOGNIZER, "LANGUAGE_DETECTION_CONFIDENCE_LEVEL_HIGHLY_CONFIDENT") => Some(3),
+        (P35_SPEECH_RECOGNIZER, "LANGUAGE_SWITCH_RESULT_NOT_ATTEMPTED") => Some(0),
+        (P35_SPEECH_RECOGNIZER, "LANGUAGE_SWITCH_RESULT_SUCCEEDED") => Some(1),
+        (P35_SPEECH_RECOGNIZER, "LANGUAGE_SWITCH_RESULT_FAILED") => Some(2),
+        (P35_SPEECH_RECOGNIZER, "LANGUAGE_SWITCH_RESULT_SKIPPED_NO_MODEL") => Some(3),
+        (P35_SPEECH_RECOGNIZER, "ERROR_NETWORK_TIMEOUT") => Some(1),
+        (P35_SPEECH_RECOGNIZER, "ERROR_NETWORK") => Some(2),
+        (P35_SPEECH_RECOGNIZER, "ERROR_AUDIO") => Some(3),
+        (P35_SPEECH_RECOGNIZER, "ERROR_SERVER") => Some(4),
+        (P35_SPEECH_RECOGNIZER, "ERROR_CLIENT") => Some(5),
+        (P35_SPEECH_RECOGNIZER, "ERROR_SPEECH_TIMEOUT") => Some(6),
+        (P35_SPEECH_RECOGNIZER, "ERROR_NO_MATCH") => Some(7),
+        (P35_SPEECH_RECOGNIZER, "ERROR_RECOGNIZER_BUSY") => Some(8),
+        (P35_SPEECH_RECOGNIZER, "ERROR_INSUFFICIENT_PERMISSIONS") => Some(9),
+        (P35_SPEECH_RECOGNIZER, "ERROR_TOO_MANY_REQUESTS") => Some(10),
+        (P35_SPEECH_RECOGNIZER, "ERROR_SERVER_DISCONNECTED") => Some(11),
+        (P35_SPEECH_RECOGNIZER, "ERROR_LANGUAGE_NOT_SUPPORTED") => Some(12),
+        (P35_SPEECH_RECOGNIZER, "ERROR_LANGUAGE_UNAVAILABLE") => Some(13),
+        (P35_SPEECH_RECOGNIZER, "ERROR_CANNOT_CHECK_SUPPORT") => Some(14),
+        (P35_SPEECH_RECOGNIZER, "ERROR_CANNOT_LISTEN_TO_DOWNLOAD_EVENTS") => Some(15),
+        (P35_RECOGNIZER_INTENT, "RESULT_NO_MATCH") => Some(1),
+        (P35_RECOGNIZER_INTENT, "RESULT_CLIENT_ERROR") => Some(2),
+        (P35_RECOGNIZER_INTENT, "RESULT_SERVER_ERROR") => Some(3),
+        (P35_RECOGNIZER_INTENT, "RESULT_NETWORK_ERROR") => Some(4),
+        (P35_RECOGNIZER_INTENT, "RESULT_AUDIO_ERROR") => Some(5),
+        (P35_RECOGNITION_PART, "CONFIDENCE_LEVEL_UNKNOWN") => Some(0),
+        (P35_RECOGNITION_PART, "CONFIDENCE_LEVEL_LOW") => Some(1),
+        (P35_RECOGNITION_PART, "CONFIDENCE_LEVEL_MEDIUM_LOW") => Some(2),
+        (P35_RECOGNITION_PART, "CONFIDENCE_LEVEL_MEDIUM") => Some(3),
+        (P35_RECOGNITION_PART, "CONFIDENCE_LEVEL_MEDIUM_HIGH") => Some(4),
+        (P35_RECOGNITION_PART, "CONFIDENCE_LEVEL_HIGH") => Some(5),
         _ => None,
     };
     Ok(value.map(Value::Int))

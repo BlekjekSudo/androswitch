@@ -1288,15 +1288,15 @@ key_apis = ["android.service.credentials.CredentialProviderService.onBeginGetCre
 id = "android-speech"
 prefix = "android.speech"
 domain = "speech-ml"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
-milestone = "future"
-notes = "RecognizerIntent/SpeechRecognizer integration is not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-speech"
-key_apis = ["android.speech.SpeechRecognizer.createSpeechRecognizer", "android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "SpeechRecognizer follows AOSP when no recognition manager service or on-device recognizer exists: isRecognitionAvailable queries PackageManager intent services (none installed), the factory returns the proxy/impl pair, connect attempts from startListening/checkRecognitionSupport/triggerModelDownload/setTemporaryOnDeviceRecognizer report ERROR_CLIENT to the registered RecognitionListener (delivered inline in the deterministic model), queued stop/cancel/destroy have no observable effect, createOnDeviceSpeechRecognizer throws UnsupportedOperationException, and the exact base class throws UnsupportedOperationException. RecognitionService base defaults (stable onBind binder, onCheckRecognitionSupport reporting ERROR_CANNOT_CHECK_SUPPORT, listener download reporting ERROR_CANNOT_LISTEN_TO_DOWNLOAD_EVENTS, stopListening without a session reporting ERROR_CLIENT, Callback/SupportCallback forwarding, binder reference clearing on destroy), the RecognitionSupport/RecognitionPart/AlternativeSpan data-class builders, validation, equality and toString contracts, and RecognizerIntent.getVoiceDetailsIntent resolution are implemented. No microphone/audio capture, recognition engine or session, model download, binder startListening permission/session dispatch, or Parcel round trips for the value classes are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-speech-recognition-engine"
+key_apis = ["android.speech.SpeechRecognizer.createSpeechRecognizer", "android.speech.SpeechRecognizer.isRecognitionAvailable", "android.speech.RecognitionService.onCheckRecognitionSupport", "android.speech.RecognitionSupport.Builder.build", "android.speech.RecognitionPart.Builder.build", "android.speech.RecognizerIntent.getVoiceDetailsIntent"]
 
 [[surface]]
 id = "android-speech-tts"
@@ -1429,15 +1429,15 @@ key_apis = ["android.service.media.MediaBrowserService$BrowserRoot.getRootId", "
 id = "android-service-textservice"
 prefix = "android.service.textservice"
 domain = "services-ext"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "SpellCheckerService is not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-service-textservice"
-key_apis = ["android.service.textservice.SpellCheckerService.createSession"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "SpellCheckerService.onBind returns one stable binder for any intent. SpellCheckerService.Session models the uninstalled-internal-session state (getLocale/getBundle/getSupportedAttributes throw NullPointerException before setInternalISpellCheckerSession), the default onGetSuggestionsMultiple loop that forwards each TextInfo to onGetSuggestions and stamps cookie/sequence on the result, empty/null sentence-level requests returning an empty array, empty-locale sentence requests returning an empty array, and no-op onCancel/onClose. InternalISpellCheckerSession stores locale/listener/bundle/attributes, installs itself on the session, delivers multiple/sentence results to the listener, forwards cancel, and nulls the listener on close; the service binder creates the session through createSession/onCreate and reports it through the callback. No WordIterator sentence splitting or reconstruction for a non-empty locale, system TextServicesManager session binding, cross-process Binder transport, or actual spell-check dictionaries/suggestions are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-service-textservice-sentence-splitting"
+key_apis = ["android.service.textservice.SpellCheckerService.onBind", "android.service.textservice.SpellCheckerService.Session.getLocale", "android.service.textservice.SpellCheckerService.Session.getSupportedAttributes", "android.service.textservice.SpellCheckerService.Session.onGetSuggestionsMultiple", "android.service.textservice.SpellCheckerService.Session.onGetSentenceSuggestionsMultiple", "android.service.textservice.SpellCheckerService.Session.setInternalISpellCheckerSession"]
 
 [[surface]]
 id = "android-service-chooser"
