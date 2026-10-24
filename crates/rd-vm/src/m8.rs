@@ -2248,6 +2248,7 @@ const SERVICES: &[(&str, &str)] = &[
     ),
     ("user", "Landroid/os/UserManager;"),
     ("appops", "Landroid/app/AppOpsManager;"),
+    ("account", "Landroid/accounts/AccountManager;"),
     ("batterymanager", "Landroid/os/BatteryManager;"),
     ("wifi", "Landroid/net/wifi/WifiManager;"),
     ("telephony", "Landroid/telephony/TelephonyManager;"),

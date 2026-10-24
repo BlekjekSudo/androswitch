@@ -85,14 +85,14 @@ Regras, dependências e limites em [engine-registry.md](engine-registry.md); fon
 
 ## Superfície android.* (Apêndice C — registro, não execução)
 
-**106 superfícies em 17 domínios** (supported 4, partial 29, stub 14, not_implemented 59). Fonte executável: `data/api-coverage.toml`; relatório completo em [api-coverage.md](api-coverage.md), programa literal e bloqueadores em [appendix-c-literal-completion.md](appendix-c-literal-completion.md), consulta via `rd api-coverage` e classificação estática no MCP `get_api_usage`. `supported` é apenas o subconjunto documentado de cada superfície — nunca o pacote AOSP inteiro; cobertura de execução continua sendo `get_coverage`.
+**106 superfícies em 17 domínios** (supported 4, partial 33, stub 11, not_implemented 58). Fonte executável: `data/api-coverage.toml`; relatório completo em [api-coverage.md](api-coverage.md), programa literal e bloqueadores em [appendix-c-literal-completion.md](appendix-c-literal-completion.md), consulta via `rd api-coverage` e classificação estática no MCP `get_api_usage`. `supported` é apenas o subconjunto documentado de cada superfície — nunca o pacote AOSP inteiro; cobertura de execução continua sendo `get_coverage`.
 
 | Domínio | Superfícies/pacotes principais | Status das superfícies | Módulos |
 |---|---|---|---|
 | App/lifecycle | `android.app`, `android.app.admin`, `android.app.backup`, `android.app.job`, `android.app.slice`, `android.content`, `android.content.pm`, `android.content.res` | partial 5 · not_implemented 3 | `none`, `rd-vm/android-pm`, `rd-vm/android-res`, `rd-vm/framework`, `rd-vm/m8` |
-| View/UI | `android.view`, `android.view.accessibility`, `android.view.animation`, `android.view.inputmethod`, `android.view.textservice`, `android.view.translation`, `android.webkit`, `android.widget` | partial 4 · stub 2 · not_implemented 2 | `none`, `rd-vm/classpath`, `rd-vm/framework`, `rd-vm/m9`, `rd-vm/view-layout` |
+| View/UI | `android.view`, `android.view.accessibility`, `android.view.animation`, `android.view.inputmethod`, `android.view.textservice`, `android.view.translation`, `android.webkit`, `android.widget` | partial 5 · stub 1 · not_implemented 2 | `none`, `rd-vm/android-sysservices`, `rd-vm/classpath`, `rd-vm/m9`, `rd-vm/view-layout` |
 | Graphics | `android.graphics`, `android.graphics.drawable`, `android.graphics.pdf`, `android.opengl`, `android.renderscript` | partial 2 · not_implemented 3 | `none`, `rd-vm/graphics` |
-| Text | `android.text`, `android.text.format`, `android.text.method`, `android.text.style`, `android.text.util` | partial 3 · stub 2 | `rd-vm/android-text`, `rd-vm/graphics`, `rd-vm/jtext-format` |
+| Text | `android.text`, `android.text.format`, `android.text.method`, `android.text.style`, `android.text.util` | partial 5 | `rd-vm/android-sysservices`, `rd-vm/android-text`, `rd-vm/graphics` |
 | OS/IPC | `android.os`, `android.os.Binder`, `android.os.Build`, `android.os.Bundle`, `android.os.Parcel`, `android.os.Parcelable`, `android.util` | supported 2 · partial 5 | `rd-vm/android-build`, `rd-vm/android-util`, `rd-vm/bundle`, `rd-vm/framework`, `rd-vm/parcel` |
 | Database | `android.database`, `android.database.sqlite`, `android.provider`, `android.provider.Settings` | supported 1 · partial 2 · stub 1 | `rd-vm/content`, `rd-vm/jsqlite` |
 | Net | `android.net`, `android.net.Uri`, `android.net.http`, `android.net.ipsec.ike`, `android.net.nsd`, `android.net.sip`, `android.net.wifi` | supported 1 · partial 1 · not_implemented 5 | `none`, `rd-vm/android-uri`, `rd-vm/framework` |
@@ -105,7 +105,7 @@ Regras, dependências e limites em [engine-registry.md](engine-registry.md); fon
 | Speech/ML | `android.service.voice`, `android.speech`, `android.speech.tts`, `android.view.textclassifier` | stub 1 · not_implemented 3 | `none`, `rd-vm/classpath` |
 | Services ext | `android.service.autofill`, `android.service.carrier`, `android.service.chooser`, `android.service.dreams`, `android.service.media`, `android.service.notification`, `android.service.quicksettings`, `android.service.textservice`, `android.service.wallpaper` | partial 1 · stub 1 · not_implemented 7 | `none`, `rd-vm/classpath`, `rd-vm/m9` |
 | System UI | `android.accessibilityservice`, `android.app.usage`, `android.appwidget`, `android.inputmethodservice`, `android.print` | partial 3 · not_implemented 2 | `none`, `rd-vm/m9` |
-| Misc | `android.accounts`, `android.animation`, `android.gesture`, `android.icu`, `android.mtp`, `android.preference`, `android.system`, `android.transition` | partial 2 · stub 3 · not_implemented 3 | `none`, `rd-vm/classpath`, `rd-vm/framework`, `rd-vm/intrinsics` |
+| Misc | `android.accounts`, `android.animation`, `android.gesture`, `android.icu`, `android.mtp`, `android.preference`, `android.system`, `android.transition` | partial 3 · stub 3 · not_implemented 2 | `none`, `rd-vm/android-sysservices`, `rd-vm/classpath`, `rd-vm/framework`, `rd-vm/intrinsics` |
 
 ## Dados versionados (M0)
 

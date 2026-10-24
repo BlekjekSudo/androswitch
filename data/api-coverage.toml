@@ -267,15 +267,27 @@ key_apis = ["android.view.inputmethod.InputConnection.commitText", "android.view
 id = "android-view-animation"
 prefix = "android.view.animation"
 domain = "view-ui"
-status = "stub"
+status = "partial"
 domain_module = "fd-ui"
-module = "rd-vm/framework"
-code = ["crates/rd-vm/src/framework.rs", "crates/rd-vm/src/choreographer.rs", "crates/rd-vm/src/classpath.rs"]
-milestone = "M3+"
-notes = "Animation/interpolator types and timing hooks exist mainly as hierarchy/fallback; deterministic frame-accurate view animation is not claimed."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-view-animation-stub"
-key_apis = ["android.view.animation.Animation", "android.view.animation.LinearInterpolator.getInterpolation"]
+module = "rd-vm/android-sysservices"
+code = [
+    "crates/rd-vm/src/framework.rs",
+    "crates/rd-vm/src/choreographer.rs",
+    "crates/rd-vm/src/classpath.rs",
+    "crates/rd-vm/src/android_sysservices.rs",
+]
+milestone = "M3+/AA1"
+notes = "Pure android.view.animation interpolators (Linear, Accelerate, Decelerate, AccelerateDecelerate, Anticipate, Overshoot, AnticipateOvershoot, Bounce and Cycle) evaluate AOSP easing formulas. View Animation transformation and timeline playback remain incomplete."
+evidence = [
+    "docs/compat-matrix.md",
+    "crates/rd-vm/tests/android_sysservices_batch1.rs",
+]
+gap_id = "gap-android-view-animation-partial"
+key_apis = [
+    "android.view.animation.LinearInterpolator.getInterpolation",
+    "android.view.animation.AccelerateInterpolator.getInterpolation",
+    "android.view.animation.CycleInterpolator.getInterpolation",
+]
 
 [[surface]]
 id = "android-view-textservice"
@@ -423,15 +435,27 @@ key_apis = ["android.text.TextUtils.isEmpty", "android.text.SpannableStringBuild
 id = "android-text-format"
 prefix = "android.text.format"
 domain = "text"
-status = "stub"
+status = "partial"
 domain_module = "fd-ui"
-module = "rd-vm/jtext-format"
-code = ["crates/rd-vm/src/jtext_format.rs", "crates/rd-vm/src/jtime.rs", "crates/rd-vm/src/classpath.rs"]
-milestone = "M8+"
-notes = "Java text/date support exists nearby, but android.text.format DateFormat/Formatter is mainly hierarchy/fallback rather than a complete model."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-text-format-stub"
-key_apis = ["android.text.format.DateFormat.format", "android.text.format.Formatter.formatFileSize"]
+module = "rd-vm/android-sysservices"
+code = [
+    "crates/rd-vm/src/jtext_format.rs",
+    "crates/rd-vm/src/jtime.rs",
+    "crates/rd-vm/src/classpath.rs",
+    "crates/rd-vm/src/android_sysservices.rs",
+]
+milestone = "M8+/AA1"
+notes = "Formatter file-size/IPv4 formatting and DateFormat.format/date-order helpers run over the deterministic en-US/UTC model with AOSP rounding. Locale/ICU DateFormat factories, android.text.format.Time/DateUtils and bidi wrapping remain incomplete."
+evidence = [
+    "docs/compat-matrix.md",
+    "crates/rd-vm/tests/android_sysservices_batch1.rs",
+]
+gap_id = "gap-android-text-format-partial"
+key_apis = [
+    "android.text.format.DateFormat.format",
+    "android.text.format.Formatter.formatFileSize",
+    "android.text.format.Formatter.formatIpAddress",
+]
 
 [[surface]]
 id = "android-text-method"
@@ -465,17 +489,25 @@ key_apis = ["android.text.style.ForegroundColorSpan", "android.text.style.StyleS
 id = "android-text-util"
 prefix = "android.text.util"
 domain = "text"
-status = "stub"
+status = "partial"
 domain_module = "fd-ui"
-module = "rd-vm/android-text"
-code = ["crates/rd-vm/src/android_text.rs", "crates/rd-vm/src/classpath.rs"]
-milestone = "M8+"
-notes = "Linkify/Rfc822 helpers are not a complete host model; do not infer linkification fidelity from TextUtils support."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-text-util-stub"
-key_apis = ["android.text.util.Linkify.addLinks", "android.text.util.Rfc822Tokenizer"]
-
-# ===================== OS/IPC =====================
+module = "rd-vm/android-sysservices"
+code = [
+    "crates/rd-vm/src/android_text.rs",
+    "crates/rd-vm/src/classpath.rs",
+    "crates/rd-vm/src/android_sysservices.rs",
+]
+milestone = "M8+/AA1"
+notes = "Rfc822Tokenizer and Rfc822Token parse, quote and format RFC 822 address lists with AOSP token boundaries. Linkify link detection and span application are not implemented."
+evidence = [
+    "docs/compat-matrix.md",
+    "crates/rd-vm/tests/android_sysservices_batch1.rs",
+]
+gap_id = "gap-android-text-util-partial"
+key_apis = [
+    "android.text.util.Rfc822Tokenizer.tokenize",
+    "android.text.util.Rfc822Token.toString",
+]
 [[surface]]
 id = "android-os"
 prefix = "android.os"
@@ -1510,15 +1542,26 @@ key_apis = ["android.gesture.GestureLibraries.fromRawResource"]
 id = "android-accounts"
 prefix = "android.accounts"
 domain = "misc"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "M10"
-notes = "AccountManager/Authenticator account database and tokens are not modelled; no fake account credentials are returned."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-accounts"
-key_apis = ["android.accounts.AccountManager.getAccounts", "android.accounts.AccountManager.getAuthToken"]
+module = "rd-vm/android-sysservices"
+code = [
+    "crates/rd-vm/src/android_sysservices.rs",
+    "crates/rd-vm/src/m8.rs",
+]
+milestone = "M10/AA1"
+notes = "Account value semantics plus an in-memory AccountManager explicit-account database cover getAccounts/getAccountsByType, passwords, user data and cached auth tokens. Authenticator flows, AccountManagerFuture operations, account visibility/permissions and sync adapters are not implemented."
+evidence = [
+    "docs/compat-matrix.md",
+    "crates/rd-vm/tests/android_sysservices_batch1.rs",
+]
+gap_id = "gap-android-accounts-partial"
+key_apis = [
+    "android.accounts.AccountManager.getAccounts",
+    "android.accounts.AccountManager.addAccountExplicitly",
+    "android.accounts.AccountManager.getPassword",
+    "android.accounts.AccountManager.peekAuthToken",
+]
 
 [[surface]]
 id = "android-preference"
