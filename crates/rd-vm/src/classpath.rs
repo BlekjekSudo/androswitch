@@ -42,6 +42,9 @@ pub struct MethodRef {
 type MethodRefCache = core::cell::RefCell<HashMap<(usize, u32), Arc<MethodRef>>>;
 /// field_id (dex, idx) -> (class, name, type) reference.
 type FieldRefCache = core::cell::RefCell<HashMap<(usize, u32), Arc<(String, String, String)>>>;
+/// Real declared field: owner, name, descriptor, access flags, static storage.
+/// A bytecode field reference alone does not establish this metadata.
+pub type DeclaredFieldInfo = (String, String, String, u32, bool);
 /// (class, name, proto) -> virtual resolution result.
 type ResolveCache =
     HashMap<(String, String, String), Option<(usize, ClassDef, rd_dex::methods::EncodedMethod)>>;
@@ -505,6 +508,50 @@ impl Classpath {
 
     /// Declared field metadata for reflection: owner, name, type descriptor,
     /// access flags, and whether storage is static.
+    /// Unlike the legacy convenience API, preserves malformed class-data
+    /// errors and distinguishes absent DEX definitions from empty classes.
+    pub fn declared_fields_info_checked(
+        &mut self,
+        class_desc: &str,
+    ) -> RdResult<Option<Vec<DeclaredFieldInfo>>> {
+        let Some((dex_idx, definition)) = self.find_class(class_desc) else {
+            return Ok(None);
+        };
+        let definition = *definition;
+        let Some(data) = self.class_data(dex_idx, &definition)? else {
+            return Ok(Some(Vec::new()));
+        };
+        let mut fields = Vec::with_capacity(data.total_fields());
+        for (is_static, group) in [
+            (true, data.static_fields.as_slice()),
+            (false, data.instance_fields.as_slice()),
+        ] {
+            for field in group {
+                let reference = self.field_ref(dex_idx, field.field_idx)?;
+                if reference.0 != class_desc
+                    || reference.1.is_empty()
+                    || reference.2.is_empty()
+                    || reference.2 == "V"
+                    || (field.access_flags & 8 != 0) != is_static
+                {
+                    return Err(crate::err::vm_error(
+                        "INVALID_CLASS_METADATA",
+                        "invalid declared field owner/type/storage",
+                    ));
+                }
+                fields.push((
+                    reference.0.clone(),
+                    reference.1.clone(),
+                    reference.2.clone(),
+                    field.access_flags,
+                    is_static,
+                ));
+            }
+        }
+        Ok(Some(fields))
+    }
+
+    /// Legacy convenience lookup; use the checked API for new reflection.
     pub fn declared_fields_info(
         &mut self,
         class_desc: &str,
@@ -1355,6 +1402,10 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Object;",
         ]),
         "Ljava/nio/charset/Charset;" | "Ljava/util/UUID;" => Some(OBJECT),
+        "Ljava/lang/reflect/AccessibleObject;" => Some(OBJECT),
+        "Ljava/lang/reflect/Field;" => {
+            Some(&["Ljava/lang/reflect/AccessibleObject;", "Ljava/lang/Object;"])
+        }
         // jio_chars
         "Ljava/io/Writer;"
         | "Ljava/io/Reader;"
@@ -1664,6 +1715,15 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
 fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
     if host_interface_modifiers(class).is_some() {
         return Some(&[]);
+    }
+    if class == "Ljava/lang/reflect/AccessibleObject;" {
+        return Some(&["Ljava/lang/reflect/AnnotatedElement;"]);
+    }
+    if class == "Ljava/lang/reflect/Field;" {
+        return Some(&[
+            "Ljava/lang/reflect/AnnotatedElement;",
+            "Ljava/lang/reflect/Member;",
+        ]);
     }
     if class == "Ljavax/microedition/khronos/opengles/GL10;" {
         return Some(&["Ljavax/microedition/khronos/opengles/GL;"]);
@@ -2018,12 +2078,12 @@ pub fn host_class_known(desc: &str) -> bool {
         || builtin_interfaces(desc).is_some()
 }
 
-/// Exact root callback interfaces whose dispatch contracts are implemented by
-/// the portable framework. Nested public interfaces are implicitly static;
-/// Class modifiers are PUBLIC|STATIC|INTERFACE|ABSTRACT (JLS9.1.1).
-/// This metadata does not make arbitrary Android listeners available.
+/// Exact interfaces with modeled portable contracts. Public nested callbacks
+/// are implicitly static (JLS9.1.1); top-level reflection interfaces have no
+/// STATIC modifier. These facts do not implement arbitrary interface methods.
 pub fn host_interface_modifiers(desc: &str) -> Option<u32> {
     match desc {
+        "Ljava/lang/reflect/Member;" | "Ljava/lang/reflect/AnnotatedElement;" => Some(0x0601),
         "Landroid/view/View$OnClickListener;"
         | "Landroid/app/Application$ActivityLifecycleCallbacks;"
         | "Ljava/lang/Thread$UncaughtExceptionHandler;"

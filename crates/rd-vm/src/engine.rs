@@ -354,6 +354,34 @@ impl Engine {
         }
     }
 
+    /// Actual declaring DEX class on this execution owner's stack. No parsed
+    /// diagnostic labels or another suspended thread's frame are consulted.
+    /// No frame means a direct host call has no Java access-checking caller.
+    pub fn active_declaring_class(&self) -> Result<Option<String>, VmExit> {
+        #[cfg(not(feature = "std"))]
+        {
+            let owner = match self.native_host() {
+                None => 0,
+                Some(provider) => provider
+                    .current_thread_id()
+                    .filter(|id| *id != 0)
+                    .ok_or_else(|| {
+                        crate::err::vm_error("API_UNAVAILABLE", "reflection caller thread identity")
+                    })?,
+            };
+            Ok(self
+                .execution_frames
+                .declaring_class(owner)
+                .map(str::to_string))
+        }
+        #[cfg(feature = "std")]
+        Err(crate::err::vm_error(
+            "API_UNAVAILABLE",
+            "portable DEX caller metadata is unavailable on the legacy engine",
+        )
+        .into())
+    }
+
     /// Ponto de entrada público: invoca um método static e devolve o valor.
     /// Exceções Java não capturadas sobem como `VmExit::Exception`.
     pub fn invoke_static(
@@ -612,7 +640,21 @@ impl Engine {
                 #[cfg(not(feature = "std"))]
                 if let Some(backend) = self.native_host() {
                     let r = self.cp.method_ref(dex_idx, m.method_idx)?;
-                    return backend.invoke(
+                    let declaring_class = self.cp.type_str(dex_idx, def.class_idx);
+                    let roots = ins
+                        .iter()
+                        .filter_map(|value| match value {
+                            Value::Obj(r) => Some(*r),
+                            _ => None,
+                        })
+                        .collect();
+                    let frame = self.execution_frames.enter(
+                        self.heap.execution_owner(),
+                        self.method_label(dex_idx, m),
+                        declaring_class,
+                        roots,
+                    )?;
+                    let result = backend.invoke(
                         self,
                         &r.class,
                         &r.name,
@@ -620,6 +662,8 @@ impl Engine {
                         m.access_flags & ACC_STATIC != 0,
                         &ins,
                     );
+                    self.execution_frames.leave(frame);
+                    return result;
                 }
                 #[cfg(not(feature = "native"))]
                 return Err(crate::err::not_implemented(format!(
@@ -674,9 +718,12 @@ impl Engine {
         #[cfg(feature = "std")]
         self.gc_frames.push(roots);
         #[cfg(not(feature = "std"))]
-        let frame = self
-            .execution_frames
-            .enter(self.heap.execution_owner(), frame_label, roots)?;
+        let frame = self.execution_frames.enter(
+            self.heap.execution_owner(),
+            frame_label,
+            self.cp.type_str(dex_idx, def.class_idx),
+            roots,
+        )?;
         if outermost {
             self.heap.gc_host_enter(true);
         }

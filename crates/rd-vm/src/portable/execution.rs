@@ -40,6 +40,7 @@ pub(crate) struct FrameTicket {
 struct Frame {
     serial: u64,
     label: String,
+    declaring_class: String,
     roots: Vec<ObjRef>,
 }
 #[derive(Default)]
@@ -52,6 +53,7 @@ impl Frames {
         &mut self,
         owner: u64,
         label: String,
+        declaring_class: String,
         roots: Vec<ObjRef>,
     ) -> Result<FrameTicket, VmExit> {
         if self.owners.len() >= MAX_OWNERS && !self.owners.contains_key(&owner) {
@@ -65,6 +67,7 @@ impl Frames {
         self.owners.entry(owner).or_default().push(Frame {
             serial,
             label,
+            declaring_class,
             roots,
         });
         Ok(FrameTicket { owner, serial })
@@ -87,6 +90,12 @@ impl Frames {
     }
     pub(crate) fn depth(&self, owner: u64) -> usize {
         self.owners.get(&owner).map_or(0, Vec::len)
+    }
+    pub(crate) fn declaring_class(&self, owner: u64) -> Option<&str> {
+        self.owners
+            .get(&owner)?
+            .last()
+            .map(|frame| frame.declaring_class.as_str())
     }
     pub(crate) fn labels(
         &self,
@@ -231,7 +240,7 @@ pub(crate) mod contracts {
         vm.heap.gc_guest_enter();
         let frame_a = vm
             .execution_frames
-            .enter(10, "A.run".into(), vec![])
+            .enter(10, "A.run".into(), "LA;".into(), vec![])
             .unwrap();
         let local_a = vm.heap.alloc_instance("LOnlyA;".into(), vec![]).unwrap();
         vm.publish_frame_roots(&[Value::Obj(local_a)], &Value::Null, None);
@@ -244,7 +253,7 @@ pub(crate) mod contracts {
         vm.heap.gc_guest_enter();
         let frame_b = vm
             .execution_frames
-            .enter(20, "B.run".into(), vec![])
+            .enter(20, "B.run".into(), "LB;".into(), vec![])
             .unwrap();
         let local_b = vm.heap.alloc_instance("LOnlyB;".into(), vec![]).unwrap();
         vm.publish_frame_roots(&[Value::Obj(local_b)], &Value::Null, None);
@@ -303,8 +312,14 @@ pub(crate) mod contracts {
     #[cfg_attr(test, test)]
     pub fn independent_frames_resume_and_unwind_in_non_lifo_order() {
         let mut frames = Frames::default();
-        let a = frames.enter(10, "A.run".into(), vec![101]).unwrap();
-        let b = frames.enter(20, "B.run".into(), vec![202]).unwrap();
+        let a = frames
+            .enter(10, "A.run".into(), "LA;".into(), vec![101])
+            .unwrap();
+        let b = frames
+            .enter(20, "B.run".into(), "LB;".into(), vec![202])
+            .unwrap();
+        assert_eq!(frames.declaring_class(10), Some("LA;"));
+        assert_eq!(frames.declaring_class(20), Some("LB;"));
         *frames.current_roots(10).unwrap() = vec![103];
         assert_eq!(frames.roots().collect::<Vec<_>>(), vec![103, 202]);
         assert_eq!(
@@ -326,8 +341,12 @@ pub(crate) mod contracts {
     #[cfg_attr(test, test)]
     pub fn same_owner_nested_callbacks_keep_distinct_frame_tickets() {
         let mut frames = Frames::default();
-        let outer = frames.enter(10, "outer".into(), vec![101]).unwrap();
-        let callback = frames.enter(10, "callback".into(), vec![102]).unwrap();
+        let outer = frames
+            .enter(10, "outer".into(), "LOuter;".into(), vec![101])
+            .unwrap();
+        let callback = frames
+            .enter(10, "callback".into(), "LCallback;".into(), vec![102])
+            .unwrap();
         assert_eq!(frames.depth(10), 2);
         frames.current_roots(10).unwrap().push(103);
         assert_eq!(frames.roots().collect::<Vec<_>>(), vec![101, 102, 103]);
@@ -341,17 +360,28 @@ pub(crate) mod contracts {
     pub fn owner_bound_is_checked_and_completed_owners_do_not_accumulate() {
         let mut frames = Frames::default();
         let tickets: Vec<_> = (0..MAX_OWNERS as u64)
-            .map(|owner| frames.enter(owner, "live".into(), vec![]).unwrap())
+            .map(|owner| {
+                frames
+                    .enter(owner, "live".into(), "LLive;".into(), vec![])
+                    .unwrap()
+            })
             .collect();
         let error = frames
-            .enter(MAX_OWNERS as u64, "excess".into(), vec![])
+            .enter(
+                MAX_OWNERS as u64,
+                "excess".into(),
+                "LExcess;".into(),
+                vec![],
+            )
             .unwrap_err();
         assert!(matches!(error, VmExit::Error(error) if error.code == "VM_FRAME_BUDGET"));
         for ticket in tickets {
             frames.leave(ticket);
         }
         for owner in 1..=4096 {
-            let ticket = frames.enter(owner, "next".into(), vec![]).unwrap();
+            let ticket = frames
+                .enter(owner, "next".into(), "LNext;".into(), vec![])
+                .unwrap();
             frames.leave(ticket);
         }
         assert!(frames.owners.is_empty());

@@ -3,6 +3,8 @@ use super::*;
 const CLASS: &str = "Ljava/lang/Class;";
 const METHOD: &str = "Ljava/lang/reflect/Method;";
 mod class_for_name;
+mod fields;
+pub(super) use fields::Fields;
 pub(super) fn link_class(
     vm: &Engine,
     class: &str,
@@ -15,6 +17,9 @@ pub(super) fn metadata(
     name: &str,
     sig: &str,
 ) -> Option<rd_vm::framework_host::HostMethodKind> {
+    if let Some(kind) = Fields::metadata(class, name, sig) {
+        return Some(kind);
+    }
     (class == CLASS
         && name == "forName"
         && matches!(
@@ -162,6 +167,12 @@ pub(super) fn call(
     args: &[Value],
 ) -> Result<Option<Value>> {
     let actual = vm.heap.class_of(r)?.to_string();
+    if let Some(value) = services
+        .reflection_fields
+        .call(services, vm, name, sig, r, args)?
+    {
+        return Ok(Some(value));
+    }
     if actual == CLASS {
         let d = desc(vm, r)?;
         let value = match (name, sig) {

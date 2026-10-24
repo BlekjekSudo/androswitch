@@ -1,0 +1,402 @@
+{
+  "schema_version": 1,
+  "recorded_utc": "2026-10-24T19:19:07.114035+00:00",
+  "milestone": "M9 general compatibility improvements; incomplete",
+  "scope": "Genuine bounded CopyOnWriteArrayList with immutable array generations, snapshot iterators, actual virtual equality and VM-owner monitors; no package branches",
+  "verification": {
+    "host": "passed",
+    "emulator": "not run for this change by this agent",
+    "physical_device": "not run for this change",
+    "game_startup": "not established"
+  },
+  "source_checkpoint": {
+    "git_head": "32b784cb055ad249bc77079467c9eec5e7e4debe",
+    "worktree_changes": true,
+    "frozen_sources": [
+      {
+        "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/as-framework/Cargo.toml",
+        "sha256": "a089de4822c9bac54c5ddcdd5970ac3074f9cfc058a272665f75dec6a5b81a24",
+        "bytes": 2556,
+        "original_path": "crates/as-framework/Cargo.toml"
+      },
+      {
+        "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/as-framework/src/android.rs",
+        "sha256": "dd79a2397b462ed1eb4718382176afab8186a050c7bc8ea320187e455c0f4920",
+        "bytes": 91411,
+        "original_path": "crates/as-framework/src/android.rs"
+      },
+      {
+        "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/as-framework/src/services/collections.rs",
+        "sha256": "fff0b9cc05ee1e70a266bbf03cbadd24e0ff99035a36569910dc3f37665b2c71",
+        "bytes": 22144,
+        "original_path": "crates/as-framework/src/services/collections.rs"
+      },
+      {
+        "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/as-framework/src/services/copy_on_write.rs",
+        "sha256": "a40a38ffd7e6687212714862be1a90da69e1b27cb25e6cad1281848fdbe5fc24",
+        "bytes": 27459,
+        "original_path": "crates/as-framework/src/services/copy_on_write.rs"
+      },
+      {
+        "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/as-framework/src/services/mod.rs",
+        "sha256": "c1c7d581658d15f474e5a3986cb060709a46fa9f4e5c9fe53cc25162e3d3e380",
+        "bytes": 12199,
+        "original_path": "crates/as-framework/src/services/mod.rs"
+      },
+      {
+        "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/as-framework/tests/copy_on_write.rs",
+        "sha256": "b6b80ee3776e303501bf3ab0af7e46c9485bc6d70796e111bbfeb3dfbe453f43",
+        "bytes": 11442,
+        "original_path": "crates/as-framework/tests/copy_on_write.rs"
+      },
+      {
+        "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/rd-vm/src/classpath.rs",
+        "sha256": "b096e1df40b1e9a81892f45f625ca5d04369ab17e777ae739f6eb5d457090f20",
+        "bytes": 106570,
+        "original_path": "crates/rd-vm/src/classpath.rs"
+      },
+      {
+        "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/fixtures/m9/copy-on-write/build.ps1",
+        "sha256": "c8bab37c524d45f5a0ad4d13363ca59d5d78a0cb67717ba1b6040ea7bf7f3a36",
+        "bytes": 3406,
+        "original_path": "fixtures/m9/copy-on-write/build.ps1"
+      },
+      {
+        "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowActivity.java",
+        "sha256": "92283b29861959e48aad5b937a12839ab3da3a43dac786d1158fc343adf40183",
+        "bytes": 167,
+        "original_path": "fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowActivity.java"
+      },
+      {
+        "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowCases.java",
+        "sha256": "f252f1c45f48e170043513ee7235199a219255838a8adf0166c1165eb89914c5",
+        "bytes": 8396,
+        "original_path": "fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowCases.java"
+      },
+      {
+        "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowProofActivity.java",
+        "sha256": "e6381dab24cefd9f6b2067fa9be420f14e64642ff9b5c4a6d6c5d258d4e25dc6",
+        "bytes": 1203,
+        "original_path": "fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowProofActivity.java"
+      },
+      {
+        "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowValidation.java",
+        "sha256": "1362d91b757f7d3e31da3e90429d8fae73db322ea34b38f43297cac3dcb3fde6",
+        "bytes": 316,
+        "original_path": "fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowValidation.java"
+      }
+    ],
+    "shared_context_note": "Android.rs frozen for descriptor-based StringBuilder/StringBuffer repair; services/mod.rs/Cargo/classpath frozen for exact metadata, target and COWIterator closure. Later reflection/TimeUnit integration is outside this focused execution."
+  },
+  "api26_reference": {
+    "path": "local-artifacts/m9/copy-on-write-host/20261025/references/CopyOnWriteArrayList.java",
+    "sha256": "a631ef22dc8ad53cb1caa237df2583bce1964810ffd68e1f4950b48285151f5e",
+    "bytes": 58408,
+    "revision": "android-8.0.0_r1",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/util/concurrent/CopyOnWriteArrayList.java",
+    "relevant_lines": [
+      124,
+      136,
+      157,
+      188,
+      324,
+      405,
+      430,
+      508,
+      518,
+      588,
+      598,
+      772,
+      807,
+      1010,
+      1064,
+      1086,
+      1093,
+      1111,
+      1120
+    ],
+    "provenance": "Behavioral reference, no Java implementation source copied into Rust runtime"
+  },
+  "public_reference": "https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CopyOnWriteArrayList.html",
+  "implementation": {
+    "storage": "COW state separate from mutable Collections ArrayList state; shared immutable Rc<Vec<Value>> generations, exact generation IDs and weak allocation registry",
+    "iterator": "full immutable snapshot independent of later list writes and independent of owning list lifetime; independent cursors; no ConcurrentModificationException",
+    "supported": [
+      "empty/Object[]/Collection constructors",
+      "size/isEmpty/get/set/clear",
+      "appending and indexed add, object and indexed remove",
+      "contains/indexOf(Object)/lastIndexOf(Object)/addIfAbsent",
+      "appending/indexed addAll(Collection)",
+      "toArray() and typed toArray(T[]) including partial stores on ArrayStoreException",
+      "iterator/listIterator()/listIterator(int), hasNext/hasPrevious/next/previous/nextIndex/previousIndex",
+      "iterator remove/set/add throw real noarg UnsupportedOperationException; exhaustion real noarg NoSuchElementException, Java getMessage null"
+    ],
+    "equality": "query.equals(element), not reversed; actual DEX/native callback, source API26 remove/addIfAbsent snapshot revalidation; callback mutations and exceptions remain observable",
+    "callback_roots": "exact scope-ticket maps root owner, query and snapshot values without holding RefCell across DEX/native callbacks; non-LIFO release cannot remove another scope",
+    "mutation_lock": "separate private actual Java monitor; same-owner recursion supported. Cross-owner contention is existing explicit API_UNAVAILABLE scheduler/lease-handoff gap, with owner preserved and no fake mutation/blocking",
+    "same_reference_set": "same generation preserved; monitor enter/exit publication fences retained",
+    "error_priority": "indexed mutations checked before buffer allocation; original callback error retained on monitor unwind",
+    "arrays": "input arrays copied, collection virtual toArray used, array snapshots copied, typed output preserves reuse/null-termination and partial ArrayStoreException writes",
+    "gc": "live list traces current values/private lock, iterator traces all historical snapshot values but not list; unreachable object records removed by VM collection. Dead weak generation registry pruned; actual old buffers count while iterators or callbacks retain them",
+    "budgets": {
+      "shared_collection_value_bytes": 8388608,
+      "elements_per_list": 10000,
+      "collection_objects": 8192,
+      "active_root_scopes": 128,
+      "pending_object_roots": 32768,
+      "generation_registry_entries": 16384,
+      "error": "COLLECTION_BUDGET",
+      "transients": "new buffer admitted before reservation/publication; addAll incoming buffer registered as temporary immutable generation while final replacement allocates",
+      "reserve": "fallible try_reserve_exact and actual capacity accounting",
+      "remaining_infallible_allocations": "bounded map/Rc/root metadata uses existing infallible allocator path; not a full allocator-failure guarantee"
+    },
+    "unsupported": [
+      "subList/list equality/hash/string/clone/serialization",
+      "addAllAbsent, containsAll/removeAll/retainAll and broad bulk predicates",
+      "streams/spliterators/forEachRemaining",
+      "blocking cross-owner Java monitor contention",
+      "exact VM-generated index/null exception message text"
+    ]
+  },
+  "builder_fix": {
+    "source": "crates/as-framework/src/android.rs",
+    "problem": "existing append dispatcher treated C/Z primitive slots as integers; original comma char fixture rendered44",
+    "repair": "descriptor C selects UTF16 char, Z selects boolean, both StringBuilder and StringBuffer retain chaining/length; isolated surrogate explicit API_UNAVAILABLE before mutation",
+    "standalone_test": "builder_scalar_overloads_use_the_descriptor_and_reject_unrepresentable_units",
+    "tested": [
+      "comma",
+      "true/false",
+      "null char",
+      "nonASCII \u00e9",
+      "chaining",
+      "length",
+      "isolated surrogate error rollback"
+    ],
+    "fixture_policy": "normal append(char comma) fixture restored; final evidence uses genuine shared runtime fix, no workaround APK"
+  },
+  "toolchain": {
+    "rustc": "1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "1.97.1 (c980f4866 2026-06-30)",
+    "host": "x86_64-pc-windows-gnu",
+    "jvm": "Microsoft OpenJDK21.0.12.1+1-LTS",
+    "android_build_tools": "35.0.0",
+    "compile_sdk_jar": 35,
+    "min_and_target_sdk": 26
+  },
+  "commands": [
+    {
+      "command": "./fixtures/m9/copy-on-write/build.ps1",
+      "executed_by": "parent root final frozen graph",
+      "exit_code": 0,
+      "log": "root-final-fixture.log"
+    },
+    {
+      "command": "cargo test -p as-framework --features host --test copy_on_write -- --nocapture",
+      "executed_by": "parent root after coordinated slot release",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "log": "root-final-tests.log"
+    },
+    {
+      "command": "cargo clippy -p as-framework --features host --lib --test copy_on_write -- -D warnings",
+      "executed_by": "parent root final frozen graph",
+      "exit_code": 0,
+      "log": "root-final-clippy.log"
+    },
+    {
+      "command": "rustfmt --edition2021 --check [owned collections/helper/test files]; git diff --check [owned COW changes]",
+      "exit_code": 0
+    }
+  ],
+  "command_scoped_cargo_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  },
+  "coverage": {
+    "actual_rd_vm_PORTABLE_CORE_asserted": true,
+    "total_tests": 10,
+    "cow_tests": 9,
+    "shared_builder_test": 1,
+    "jvm_oracle_rows_per_namespace": 16,
+    "jvm_differential_comparisons": 64,
+    "namespaces": [
+      "org.androswitch.contracts",
+      "net.example.snapshots"
+    ],
+    "cases": [
+      "immutable snapshot across set/add/remove/clear",
+      "query-side asymmetric virtual equality",
+      "reentrant remove/addIfAbsent pre-write revalidation",
+      "equality clears list and GC while search keeps old values",
+      "equality throws, original exception and later writer work",
+      "backward/forward cursors, unsupported mutations, null noarg exception messages",
+      "Object[] and Collection constructor copies, covariant typed arrays/reuse/partial ArrayStoreException",
+      "self-addAll and indexed bulk insertion; derived add not called by base addAll",
+      "null/duplicate addIfAbsent",
+      "native reentry and GC without borrow conflicts",
+      "different-owner private lock contention rejects; same-owner recursion survives; later writer proves released lock",
+      "iterator retains old payload after list collection, drops payload after iterator collection",
+      "10000-element limit and8MiB retained-generation failure before publication, same-reference set/invalid-index precedence at capacity, collection restores capacity after frames return",
+      "17000 generation changes without stale registry false budget failure",
+      "ordinary ArrayList remains fail-fast rather than COW alias",
+      "normal SDK proof checks actual COW/GC/VFS callbacks"
+    ],
+    "host_transport": "native callbacks use controlled actual VM-owner IDs within one host interpreter; no OS concurrency claim"
+  },
+  "history": [
+    {
+      "log": "cow-tests-1.log",
+      "result": "3/9 passed: ordinary append(char) exposed existing builder integer dispatch bug, plus budget release required GC after DEX release frame returned; failures preserved"
+    },
+    {
+      "log": "cow-tests-2.log",
+      "result": "9/9 intermediate tests passed using String comma; parent requested restore original char fixture and genuine shared overload repair, so this is not final proof"
+    },
+    {
+      "log": "cow-clippy-1.log",
+      "result": "intermediate focused Clippy passed before final noarg exception/char-dispatch changes"
+    },
+    {
+      "final": "normal append(char) restored, noarg NSEE/UOE materialized, genuine shared descriptor fix added, final10/10 plus focused Clippy pass"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/tested-artifacts-final/androswitch-cow-proof.txt",
+      "sha256": "94c54b479b1e6c7e1a92fbfa49f03f2f7b8f9cfc052bdfc3e935efdc71d5df3e",
+      "bytes": 108
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/tested-artifacts-final/build-receipt.json",
+      "sha256": "a6165164224f2534bde8ae40e0ee5fc1e1f0bea290e06c5d35ab993c8f59da74",
+      "bytes": 2652
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/tested-artifacts-final/original/cow-proof.apk",
+      "sha256": "d35b7adaf2e05f1e3133131dfab999d597307aaacc0540434946ef3eed821962",
+      "bytes": 6276
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/tested-artifacts-final/original/cow.apk",
+      "sha256": "b2980473d23e9a4bcd1ac6da34d0d5397ed4b7d3da20a403201defccaa2702a4",
+      "bytes": 6280
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/tested-artifacts-final/original/dex/classes.dex",
+      "sha256": "874208c0631f3e1fa9260586195b03041368175c6e44c15aa2dc28eab02e0c1e",
+      "bytes": 11072
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/tested-artifacts-final/original/oracle.tsv",
+      "sha256": "f72aa09f0eba03dd7acf62a78edb4369f312489661aeaace21c33188d3156bb8",
+      "bytes": 324
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/tested-artifacts-final/renamed/cow.apk",
+      "sha256": "7f2690006da1a526e57ce98b3cd8e926778ceefcc8a4ffc4151e1add978bb42d",
+      "bytes": 6282
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/tested-artifacts-final/renamed/dex/classes.dex",
+      "sha256": "6afd0e0b6549c827d961a3e71cf075707bbb5ebd58fd89d864e046fda0e56de4",
+      "bytes": 11040
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/tested-artifacts-final/renamed/oracle.tsv",
+      "sha256": "f72aa09f0eba03dd7acf62a78edb4369f312489661aeaace21c33188d3156bb8",
+      "bytes": 324
+    }
+  ],
+  "logs": [
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/cow-clippy-1.log",
+      "sha256": "411acf8eb237109a19d2e93746dd0ad2a74730f37015f6611fe529d4af9708fd",
+      "bytes": 371
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/cow-tests-1.log",
+      "sha256": "cc288f6a9b42b705203d2c13d713bb219dc2c8e4e889140aac4f40356919cd8b",
+      "bytes": 3790
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/cow-tests-2.log",
+      "sha256": "abda27b413cee08a308ba499e832ab5dda8f91b6bb9598f20495d29ca6c5591b",
+      "bytes": 1133
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/diff-check.log",
+      "sha256": "0fef92614ccca6d2a1c1029a65acfbe829c75dd940819118849ccf6e8abdf81d",
+      "bytes": 28
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/fixture-build-1.log",
+      "sha256": "e762dc687a38c726e9cdc7f3a39bcd84fcba8ce7bd7b82bfb29eb617284e92ba",
+      "bytes": 619
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/fixture-build-2.log",
+      "sha256": "e762dc687a38c726e9cdc7f3a39bcd84fcba8ce7bd7b82bfb29eb617284e92ba",
+      "bytes": 619
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/fixture-build-3.log",
+      "sha256": "e762dc687a38c726e9cdc7f3a39bcd84fcba8ce7bd7b82bfb29eb617284e92ba",
+      "bytes": 619
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/fixture-build-4.log",
+      "sha256": "e762dc687a38c726e9cdc7f3a39bcd84fcba8ce7bd7b82bfb29eb617284e92ba",
+      "bytes": 619
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/fixture-build-5.log",
+      "sha256": "e762dc687a38c726e9cdc7f3a39bcd84fcba8ce7bd7b82bfb29eb617284e92ba",
+      "bytes": 619
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/root-final-clippy.log",
+      "sha256": "06b35fa04ad84809e762b6fa2c61caf006a536098923b171a6d61c4cc2f6670c",
+      "bytes": 211
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/root-final-fixture.log",
+      "sha256": "e762dc687a38c726e9cdc7f3a39bcd84fcba8ce7bd7b82bfb29eb617284e92ba",
+      "bytes": 619
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/root-final-tests.log",
+      "sha256": "e45efc64221a4a9f0b7950abe5c3b785dd202f0d68505f82db5e45367a3b4873",
+      "bytes": 1294
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/rustfmt-check.log",
+      "sha256": "5ba14584baf2df07e4c42e5b86cbe07a30690985dd74915ce11e4f99a4f2837f",
+      "bytes": 21
+    }
+  ],
+  "host_vfs_source": "D:\\PESNX-Cache\\Temp\\as-cow-256432-1792869339504903700\\Download\\androswitch-cow-proof.txt",
+  "host_vfs_note": "actual host SDK proof output, same bytes as expected final portable proof; file bound in frozen artifacts. Not emulator output.",
+  "device_proof": {
+    "apk": "local-artifacts/m9/copy-on-write-host/20261025/tested-artifacts-final/original/cow-proof.apk",
+    "sha256": "d35b7adaf2e05f1e3133131dfab999d597307aaacc0540434946ef3eed821962",
+    "package": "org.fixture.cowproof",
+    "vfs_file": "/sdcard/Download/androswitch-cow-proof.txt",
+    "expected_ui": "COW proof PASS: snapshots, callback mutation, GC; VFS saved",
+    "status": "SDK built; host callback/VFS proof passed; actual NRO verification pending parent"
+  },
+  "limitations": [
+    "No Android reference-device execution; pinned API26 source-derived semantics and actual OpenJDK21 differential",
+    "No full CopyOnWriteArrayList API compatibility",
+    "No concurrent OS worker execution or blocking-contended monitor claim",
+    "No physical Switch or game first-screen compatibility claim",
+    "No forced native allocator-failure injection; explicit list/generation budgets tested",
+    "Final required gate and NRO/package evidence remain root-owned"
+  ],
+  "documentation": {
+    "path": "docs/JAVA_COPY_ON_WRITE.md",
+    "sha256": "6f91f80eccc91b64fe65f98e12435c481f17febc23f591adcd8c28f227206bdc",
+    "bytes": 5361
+  }
+}

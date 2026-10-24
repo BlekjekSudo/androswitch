@@ -25,6 +25,7 @@ pub(super) struct Services {
     pub(super) timers: timer::Timers,
     pub(super) executors: executors::Executors,
     package_metadata: package::PackageService,
+    reflection_fields: reflection::Fields,
     package: String,
     fs: Rc<dyn as_platform::fs::FileSystem>,
 }
@@ -62,6 +63,7 @@ impl Services {
             timers: Default::default(),
             executors: Default::default(),
             package_metadata: Default::default(),
+            reflection_fields: Default::default(),
             package: apk.manifest.package.clone(),
             fs,
         })
@@ -302,6 +304,7 @@ impl Services {
         roots.extend(self.lifecycle_observers.roots());
         roots.extend(self.collections.roots());
         roots.extend(self.package_metadata.roots());
+        roots.extend(self.reflection_fields.roots());
         roots.extend(self.glsurface.roots());
         roots.extend(self.communication.roots());
         roots.extend(self.timers.roots());
@@ -314,6 +317,7 @@ impl Services {
         refs.extend(self.preferences.references(r));
         refs.extend(self.database.references(r));
         refs.extend(self.executors.references(r));
+        refs.extend(self.reflection_fields.references(r));
         refs
     }
     pub(super) fn collect(&self, marked: &[bool]) {
@@ -326,6 +330,7 @@ impl Services {
         self.collections.collect(marked);
         self.preferences.collect(marked);
         self.database.collect(marked);
+        self.reflection_fields.collect(marked);
     }
 }
 fn storage_error(e: as_platform::PlatformError) -> VmExit {

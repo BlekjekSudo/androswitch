@@ -123,6 +123,12 @@ fn check_default_interface_initialization(vm: &mut Engine, class: &str) -> Resul
     }
     Ok(())
 }
+/// Shared initialization admission for reflection operations that actively use
+/// a class, without pretending unimplemented default-interface scheduling ran.
+pub(super) fn initialize_class(vm: &mut Engine, class: &str) -> Result<()> {
+    check_default_interface_initialization(vm, class)?;
+    vm.ensure_initialized(class)
+}
 pub(super) fn call(
     services: &Services,
     vm: &mut Engine,
@@ -162,8 +168,7 @@ pub(super) fn call(
         super::link_class(vm, component, scope)?;
     }
     if !d.starts_with('[') && (!explicit || int(args, 1)? != 0) {
-        check_default_interface_initialization(vm, &d)?;
-        vm.ensure_initialized(&d)?;
+        initialize_class(vm, &d)?;
     }
     Ok(Some(Value::Obj(vm.device_class_object(&d)?)))
 }

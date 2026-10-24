@@ -111,3 +111,8 @@ required-features = ["host"]
 name = "copy_on_write"
 path = "tests/copy_on_write.rs"
 required-features = ["host"]
+
+[[test]]
+name = "reflection_fields"
+path = "tests/reflection_fields.rs"
+required-features = ["host"]

@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "recorded_utc": "2026-10-24T19:20:10.150123+00:00",
+  "scope": "Supplemental immutable tested-source checkpoint; no new execution",
+  "tested_commit": "32b784cb055ad249bc77079467c9eec5e7e4debe",
+  "host_receipt": {
+    "path": "reports/m9-copy-on-write-host-20261025.json",
+    "sha256": "55a53ce40d04d4da602602b41fea54c2eabd52ec347d5a7cc115549185656a81"
+  },
+  "finding": "All12 source snapshots in original host receipt are byte-for-byte identical to tested commit32b784c, including Android/services metadata/classpath/Cargo. They were frozen before later reflection hooks. No correction to test attribution was required.",
+  "sources": [
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/as-framework/Cargo.toml",
+      "original_path": "crates/as-framework/Cargo.toml",
+      "sha256": "a089de4822c9bac54c5ddcdd5970ac3074f9cfc058a272665f75dec6a5b81a24",
+      "byte_equal_to_git_commit": true
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/as-framework/src/android.rs",
+      "original_path": "crates/as-framework/src/android.rs",
+      "sha256": "dd79a2397b462ed1eb4718382176afab8186a050c7bc8ea320187e455c0f4920",
+      "byte_equal_to_git_commit": true
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/as-framework/src/services/collections.rs",
+      "original_path": "crates/as-framework/src/services/collections.rs",
+      "sha256": "fff0b9cc05ee1e70a266bbf03cbadd24e0ff99035a36569910dc3f37665b2c71",
+      "byte_equal_to_git_commit": true
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/as-framework/src/services/copy_on_write.rs",
+      "original_path": "crates/as-framework/src/services/copy_on_write.rs",
+      "sha256": "a40a38ffd7e6687212714862be1a90da69e1b27cb25e6cad1281848fdbe5fc24",
+      "byte_equal_to_git_commit": true
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/as-framework/src/services/mod.rs",
+      "original_path": "crates/as-framework/src/services/mod.rs",
+      "sha256": "c1c7d581658d15f474e5a3986cb060709a46fa9f4e5c9fe53cc25162e3d3e380",
+      "byte_equal_to_git_commit": true
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/as-framework/tests/copy_on_write.rs",
+      "original_path": "crates/as-framework/tests/copy_on_write.rs",
+      "sha256": "b6b80ee3776e303501bf3ab0af7e46c9485bc6d70796e111bbfeb3dfbe453f43",
+      "byte_equal_to_git_commit": true
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/crates/rd-vm/src/classpath.rs",
+      "original_path": "crates/rd-vm/src/classpath.rs",
+      "sha256": "b096e1df40b1e9a81892f45f625ca5d04369ab17e777ae739f6eb5d457090f20",
+      "byte_equal_to_git_commit": true
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/fixtures/m9/copy-on-write/build.ps1",
+      "original_path": "fixtures/m9/copy-on-write/build.ps1",
+      "sha256": "c8bab37c524d45f5a0ad4d13363ca59d5d78a0cb67717ba1b6040ea7bf7f3a36",
+      "byte_equal_to_git_commit": true
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowActivity.java",
+      "original_path": "fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowActivity.java",
+      "sha256": "92283b29861959e48aad5b937a12839ab3da3a43dac786d1158fc343adf40183",
+      "byte_equal_to_git_commit": true
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowCases.java",
+      "original_path": "fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowCases.java",
+      "sha256": "f252f1c45f48e170043513ee7235199a219255838a8adf0166c1165eb89914c5",
+      "byte_equal_to_git_commit": true
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowProofActivity.java",
+      "original_path": "fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowProofActivity.java",
+      "sha256": "e6381dab24cefd9f6b2067fa9be420f14e64642ff9b5c4a6d6c5d258d4e25dc6",
+      "byte_equal_to_git_commit": true
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/verified-source/fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowValidation.java",
+      "original_path": "fixtures/m9/copy-on-write/java/org/androswitch/contracts/CowValidation.java",
+      "sha256": "1362d91b757f7d3e31da3e90429d8fae73db322ea34b38f43297cac3dcb3fde6",
+      "byte_equal_to_git_commit": true
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/git-32b784c/crates/rd-vm/src/engine.rs",
+      "original_path": "crates/rd-vm/src/engine.rs",
+      "sha256": "e5be8483f4ad07b2152809d5ec6f96f2b6e467070f5cba957f79eaeed6aeaf44",
+      "origin": "git show32b784c only, not later reflection working tree"
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/git-32b784c/crates/rd-vm/src/heap.rs",
+      "original_path": "crates/rd-vm/src/heap.rs",
+      "sha256": "aad67df50aaa6d8f787496a4b171c0ddd00067869a07617b7c9d519efb8e449d",
+      "origin": "git show32b784c only, not later reflection working tree"
+    },
+    {
+      "path": "local-artifacts/m9/copy-on-write-host/20261025/git-32b784c/crates/rd-vm/src/portable/gc.rs",
+      "original_path": "crates/rd-vm/src/portable/gc.rs",
+      "sha256": "c86e6405779bb39acbec32f9474cf19a6aad11695e484f157646d6cd67d7db35",
+      "origin": "git show32b784c only, not later reflection working tree"
+    }
+  ],
+  "documentation_snapshot": {
+    "path": "local-artifacts/m9/copy-on-write-host/20261025/git-32b784c/docs/JAVA_COPY_ON_WRITE.md",
+    "sha256": "6f91f80eccc91b64fe65f98e12435c481f17febc23f591adcd8c28f227206bdc"
+  },
+  "limits": "Later reflection/TimeUnit changes not validated by this focused receipt; no NRO/physical/game proof claim"
+}
