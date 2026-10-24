@@ -7,6 +7,11 @@ branches or second toy interpreter are linked into the NRO.
 
 ## Observed evidence
 
+This section preserves the original M1 run. Current fixtures classify the
+implemented monitor method as a positive JVM comparison (thirteen positives,
+five negative cases); see [current test commands](TESTING.md). That fixture
+update alone does not replace the original Horizon evidence below.
+
 The latest run passed 18 calls from the Java APK fixture:
 
 - Twelve results match both the portable host and a real JVM: arithmetic with

@@ -70,7 +70,7 @@ try {
         if ($observed.$field -cne $hostReport.$field) { throw "Host/emulator metadata differs: $field" }
     }
     $jvm = Get-Content -LiteralPath (Join-Path $fixtureRoot 'jvm-expected.json') -Raw | ConvertFrom-Json
-    $expectedErrors = @{'missing-api'='NOT_FOUND';'missing-field'='API_UNAVAILABLE';'missing-monitor'='API_UNAVAILABLE';'missing-native'='NOT_IMPLEMENTED';'fuel-limit'='VM_FUEL';'stack-limit'='VM_STACK_OVERFLOW'}
+    $expectedErrors = @{'missing-api'='NOT_FOUND';'missing-field'='API_UNAVAILABLE';'missing-native'='NOT_IMPLEMENTED';'fuel-limit'='VM_FUEL';'stack-limit'='VM_STACK_OVERFLOW'}
     if ($observed.calls.Count -ne $request.calls.Count -or $hostReport.calls.Count -ne $request.calls.Count) { throw 'Missing call results.' }
     for ($i = 0; $i -lt $request.calls.Count; $i++) {
         $actual = $observed.calls[$i]; $hostCall = $hostReport.calls[$i]; $id = $request.calls[$i].id

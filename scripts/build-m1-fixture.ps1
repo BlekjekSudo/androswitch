@@ -41,7 +41,7 @@ $cases = @(
     @('static-second','next','()I',@()),
     @('missing-api','unavailable','()J',@()),
     @('missing-field','platformField','()Ljava/lang/Object;',@()),
-    @('missing-monitor','monitor','()I',@()),
+    @('class-monitor','monitor','()I',@()),
     @('missing-native','nativeMissing','()I',@()),
     @('fuel-limit','spin','()I',@()),
     @('stack-limit','recurse','(I)I',@('0'))

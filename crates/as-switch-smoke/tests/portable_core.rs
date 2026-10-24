@@ -101,7 +101,7 @@ fn real_apk_results_match_jvm_and_guard_missing_services() {
             assert!(call["error"].is_null(), "{id}: {call}");
             assert_eq!(&call["value"], value, "{id}");
         } else {
-            assert!(call["value"].is_null());
+            assert!(call["value"].is_null(), "{id}: {call}");
             assert!(call["error"]["code"].is_string(), "{id}");
         }
     }

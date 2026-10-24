@@ -130,7 +130,7 @@ fn malformed_inner_annotation_is_not_silently_replaced_with_a_binary_guess() {
     // A duplicate actual system annotation is malformed even though either
     // copy alone contains a plausible short name.
     let data = &mut vm.cp.dexes[dex_index].data;
-    while data.len() % 4 != 0 {
+    while !data.len().is_multiple_of(4) {
         data.push(0);
     }
     let duplicate_set = data.len() as u32;

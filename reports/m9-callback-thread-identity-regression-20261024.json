@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T16:56:10.1113881Z",
+  "status": "scoped_host_regression_passed_integrated_checks_pending",
+  "scope": "General currentThread admission for logical background callbacks without a platform thread identity; no application-specific behavior.",
+  "problem": "The new general adopted Thread handler ran before the legacy Services GL callback guard and returned single-interpreter main identity inside a logical renderer callback with no NativeHost. Full required tests correctly caught this regression; their original failing result is preserved separately by parent.",
+  "implementation": "Executors.current_thread first preserves an existing explicit Executor worker mapping. Otherwise Interpreter fallback in a logical GL or Timer callback fails API_UNAVAILABLE before returning/adopting a main Thread. Single-interpreter main outside callbacks remains valid, and actual nonzero NativeHost identities retain real Thread adoption. No GL production scope or cleanup/lifetime ordering is changed.",
+  "tests": [
+    {
+      "name": "gl_callback_admission_and_actual_owner_identity",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p as-framework --features host --test glsurface -- --include-ignored --test-threads=1",
+      "status": "passed",
+      "tests": 6,
+      "test_seconds": 1.55,
+      "result": "Original no-provider negative still requires typed error and verifies main interpreter identity/mainLooper restored after callback failure. Positive test binds supplied owner11, captures the actual renderer Thread returned while owner44 runs, verifies worker differs from main and survives GC, restores owner11 and verifies exact mainThread/mainLooper. Both original and renamed SDK APKs share the contract. This models owners and is not OS concurrency/GPU proof."
+    },
+    {
+      "name": "executor_and_timer_owner_regressions",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p as-framework --features host --test executors --test timer -- --test-threads=1",
+      "status": "passed",
+      "executor_tests": 10,
+      "timer_tests": 10,
+      "test_seconds": {
+        "executors": 2.71,
+        "timer": 2.64
+      }
+    },
+    {
+      "name": "ordinary_sdk_gl_fixture_build",
+      "command": "pwsh -File scripts/build-glsurface-fixture.ps1",
+      "status": "passed",
+      "change": "Adds only a public static Thread field capturing the ordinary Thread.currentThread return value in renderer callback; no runtime-specific imports or package hooks.",
+      "receipt": {
+        "path": "local-artifacts/m9/glsurface-fixture/build-receipt.json",
+        "sha256": "f77bc68e7e583ba25b5956a60b19f644305a153b595d24654ba2dfbd1554cc3a"
+      }
+    }
+  ],
+  "sources": [
+    {
+      "path": "crates/as-framework/src/services/executors.rs",
+      "sha256": "0f4da15c752ebd9f202fc4086aa2d27201196316d6497e66b29696cde90c3f8f"
+    },
+    {
+      "path": "crates/as-framework/tests/glsurface.rs",
+      "sha256": "3802c85fa403238ab18f8850b081f79216e734dc87f5af56d889d54c377a3c7e"
+    },
+    {
+      "path": "fixtures/m9/glsurface/java/org/androswitch/graphics/SurfaceActivity.java",
+      "sha256": "23fc3fee0b0a7610a17bd284d61c2b5059c1cc37fa0333f32c244746da3ac244"
+    }
+  ],
+  "verification": {
+    "host": "passed_26_focused_tests",
+    "integrated_checks": "parent_will_rerun_final_required_checks",
+    "emulator": "not_run_for_this_source",
+    "physical_device": "not_run_for_this_source"
+  },
+  "limits": [
+    "Tests supply deterministic NativeHost owner identities; this does not establish OS thread execution.",
+    "Existing GL callback Looper scope implementation is unchanged; complete Java Thread/Looper semantics are not claimed.",
+    "Earlier context-loader/JNI receipts remain immutable and separate from this regression correction."
+  ]
+}

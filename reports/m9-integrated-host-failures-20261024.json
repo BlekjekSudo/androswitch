@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T16:55:42.573291+00:00",
+  "status": "failed_integrated_host_attempt_preserved",
+  "implementation_commit": "2c8b554aa20490b9811ad7c67c132a6f04634838",
+  "checks_completed": 50,
+  "passed": 47,
+  "failed": [
+    {
+      "log": "target/evidence/m9-framework.log",
+      "seconds": 75.2411912,
+      "id": "framework",
+      "command": "cargo test -p as-framework --features host --lib --tests --locked -- --include-ignored --test-threads=1",
+      "log_sha256": "faaec70458c58845ac56758883230feff4670a497f546f3af199c1296c805d26",
+      "exit_code": 101
+    },
+    {
+      "log": "target/evidence/m9-portable-core.log",
+      "seconds": 3.7995255,
+      "id": "portable-core",
+      "command": "cargo test -p as-switch-smoke --features host-cli,portable-tests --test portable_core --locked -- --include-ignored",
+      "log_sha256": "de6e73060b6fa0b6319b56583ffb8e0244352235e34bcc04bb58eab995df7555",
+      "exit_code": 101
+    },
+    {
+      "log": "target/evidence/m9-device-bridge-clippy.log",
+      "seconds": 6.7218423,
+      "id": "device-bridge-clippy",
+      "command": "cargo clippy -p as-switch-smoke --features host-cli,portable-tests --all-targets --locked -- -D warnings",
+      "log_sha256": "a365a69620fce1e0896f697508212339e3f9ec3b9d82dea63e9728e17c7f319b",
+      "exit_code": 101
+    }
+  ],
+  "observations": [
+    "Framework GL test caught a real regression: logical background callback without NativeHost fell back to the interpreter/main Thread after new adoption handled the call ahead of the former missing-provider guard.",
+    "Portable M1 core still classified its implemented class monitor as an unavailable service; the old JVM oracle omitted that formerly negative method. Current fixture adds an actual JVM monitor result rather than ignoring failure.",
+    "All-target device bridge Clippy rejects a test alignment loop using modulo instead of is_multiple_of. This is a test lint failure, not an emulator or runtime result."
+  ],
+  "subsequent_verification": "Separate corrected run required; this attempt remains failed.",
+  "raw": [
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-atomic-fixture.log",
+      "sha256": "05d3401f5c91007a3202ea1beccb17848a4a1c9b5888e468f9ead4a0825abce2"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-background-workers.log",
+      "sha256": "73b7bfec241f8cd7b217cc7644716348110cde3395c2f6f5e242ca10cf74e2fd"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-bitmap-fixture.log",
+      "sha256": "707aa6fba1be47a4c9c27b788430dd4ecda1af84b83a357416ee0b8fb8f875c1"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-bundle-fixture.log",
+      "sha256": "2d56171909c14a587e567dd1d739786129dac4d1efccb1cb7fe96b8517b3b557"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-capture-ownership.log",
+      "sha256": "6577e4352f9614a638b0ee35853e5cd3e4233c1a9c41b0e24f08ad3ea29c26d3"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-checks.json",
+      "sha256": "96506429af9f8c24b44258478821dfa59634988521d4a9244b6468e928bf1cba"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-class-forname-fixture.log",
+      "sha256": "2b0aa46b08bf5de62bda50d0aab9e196e5de84fbadcd9d022668dd96fa9a09ee"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-class-names-fixture.log",
+      "sha256": "a1bf0b4826f32b7d144cdb4480833ce3c85de8f877b5bcc6907da8495f37435a"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-communication-fixture.log",
+      "sha256": "234b920f38465a5c1a7a92057c2f98a026724bd1dc1b3777cf5a4f8b1e5cd7d7"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-device-bridge-clippy.log",
+      "sha256": "a365a69620fce1e0896f697508212339e3f9ec3b9d82dea63e9728e17c7f319b"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-dex-memory.log",
+      "sha256": "97fa928518b5aea95163ed82b83e39239f0ee04056355bee05a4df7cdab5f891"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-encoding-fixture.log",
+      "sha256": "87d4ffc891ad48bb2a1b5f7763200e7f809e481d469900570c90bae104b418f9"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-enum-fixture.log",
+      "sha256": "fc9db74f171704ccc1bf4e3c1594a85c1840ef080458a3dc2ec05c1ca9af2b80"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-executor-fixture.log",
+      "sha256": "017eba937d6c0bc85d2542ddcc821c48599c2bc09362caaf295b2cf432519fff"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-format-fixture.log",
+      "sha256": "37d71bf7f9522ab6d7340990eb8510c43d71b8599bfcc62a3b2f935e4ca6f017"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-framework-clippy.log",
+      "sha256": "fec317c2a38e0b3905050c68768c5fe579b83fa854aeca6f90326a63809ff367"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-framework.log",
+      "sha256": "faaec70458c58845ac56758883230feff4670a497f546f3af199c1296c805d26"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-gc-owners-fixture.log",
+      "sha256": "2ffed54414b0513a6d26001653217feb375d950292b319c05049d8d040c630da"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-horizon-display.log",
+      "sha256": "55d6da07626fdf0dfdb7c09a8232c3608725019cf857394fefe90dfe2d54ffee"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-inherited-dispatch-fixture.log",
+      "sha256": "935a15814af4866b635eb41b437be607a68251503b1c61559323257c3f1e0623"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-integrated-checks-classloader.log",
+      "sha256": "06d46ad10a8fff168a718596b17abbeb5ed2569ad53e5dea99a5bb3036b43f28"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-jni-constructor-abi.log",
+      "sha256": "870d826cca72a9e3f84dff2ae73ec46b49440729a79e3808507b5cd8eb7586c7"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-jni-constructor-fixture.log",
+      "sha256": "67613809702088df4c55449455338379c5e66d39586b1606bf057043047b3a83"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-jni-constructor.log",
+      "sha256": "3e4a80be9943058ffaa7f21a6f6ddd8e5defeed88d89e89152c5299cf6bfd8c0"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-jni-method-metadata.log",
+      "sha256": "699b09dbf1706d0b9cac42896906da3218063446b4494f19657eb647d833ab46"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-launcher.log",
+      "sha256": "eae47cee8e3d260d9dc584c98a0c4676e9758dca1ed2d9a6a243f781010f4380"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-legacy-enum.log",
+      "sha256": "8a1f0e5b75281cab3b92eff8905e2b5719c34a102eb66a8151ad005e147df266"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-monitor-fixture.log",
+      "sha256": "09f3defdf4a2c34380bb1baeca86602f276a7ed96bb174efb82d57a292e300f4"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-native-abi.log",
+      "sha256": "68e0772ae269a9440fa1df6cfd85fa6043e14047dd63cf2a2b1a98374021452c"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-native-time.log",
+      "sha256": "eb135706c4b3d9c1356ea762f2c23c2fcc5670ee0cd34bcce0737c46dea9aaaf"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-package-clippy.log",
+      "sha256": "81a1c35fcce3ef9d6aaec26fa5a9b18e9079eab8525b79eb4800c11d9c3c038f"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-packages.log",
+      "sha256": "bc362d01ac707550ba86e285bac19aadaa0506512509af95f245ef5c65af3d63"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-parser.log",
+      "sha256": "34b297124ef92b8642475d73abb5f429c68dba3a35fb65ad829164a763b38eae"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-persistent.log",
+      "sha256": "4fff984aaa2212a89699209f79f31da2754e38cb5347a2e1466c2362148f0992"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-platform.log",
+      "sha256": "0b30b388d057da5645b65705cb545b82bbdc6360e329fdd9d9910a5243ea7d61"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-portable-atomic.log",
+      "sha256": "04e28cbba954e75455c70e9614f1d16a73c79cf298d85f60aed2decd4e6f2f16"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-portable-class-names.log",
+      "sha256": "3b3f7d1966205608cece32dcc9370f58459b951477b6c49d7202bfdfbb39d1c6"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-portable-core.log",
+      "sha256": "de6e73060b6fa0b6319b56583ffb8e0244352235e34bcc04bb58eab995df7555"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-portable-encoding.log",
+      "sha256": "4d839b4d68f85f58270529ef413c1414effa6262438fbdce5f890235d5d6ffe9"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-portable-enum.log",
+      "sha256": "21e090c6fb53fb7c8cb8cfe276658af5a71679e3dbf3d197523eaffd9448de29"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-portable-execution-owners.log",
+      "sha256": "3a0300b11a99f384cd0859b00c7876a681d48eb51d5691c33a2e9b305e295f84"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-portable-format.log",
+      "sha256": "80441b0adf2fc3e01563014427e0852b3cf702eeb9c70803902ed2bc251c8f42"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-portable-monitor.log",
+      "sha256": "2b982bad5ead072fb11dc31f06eb3c55ff97a2dd0bb28757379c4fabd6fd02cb"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-portable-throwable.log",
+      "sha256": "247c3efa2e54fd9947359b125c7553728594e2c1f4c0bc33805ae31f622645b2"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-resource-name-parser.log",
+      "sha256": "b547a51f71de450a891bf4a4dc6186e7f8a3fdd3e62c09d0d7dca61a7ecb01a5"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-resource-names-fixture.log",
+      "sha256": "bfaffffbc284a795fc7453c1a604b5aa851e08dcb7db7f65ebf35bb8dc114aa9"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-session-reports.log",
+      "sha256": "29d8a73c4f8b3bfaa9026597b0e7ccbe5d9872150363b95d436a35b388736770"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-storage-clippy.log",
+      "sha256": "d83b745d78e7e97730337da3c057a58c6fb8166961358bca7aa8b90e1defd158"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-text-utils-fixture.log",
+      "sha256": "2605ab47e262b9b5ca88cd1baf103a7b852f61e629c6f4d96c8b1cc239632466"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-throwable-fixture.log",
+      "sha256": "762015b267e77b9f8ff194a14fc1f7e8b343e049c6139a0757215a8ba75ce0f1"
+    },
+    {
+      "path": "local-artifacts/m9/integrated-checks-before-callback-fix/m9-timer-fixture.log",
+      "sha256": "b013b2fb5f72b1442e8465e98a5ca17fcec6e148058d9eccbd01dc78345e076e"
+    }
+  ],
+  "emulator": "not_run_by_this_check_attempt",
+  "physical_device": "not_run"
+}

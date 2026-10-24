@@ -102,11 +102,17 @@ nonuniform framebuffer alone cannot pass that gate.
 For a dated-toolchain/custom-SDK build, follow [building](BUILDING.md) and use
 `-SkipBuild -SkipFixtureBuild`. A fresh run still gets a new session ID.
 
-The test asserts 12 JVM reference results and six structured negative cases
+The current fixture asserts 13 JVM reference results and five structured negative cases
 against both the portable host and actual emulator output. It also checks the
 real F-Droid DEX parser counts/checksum and allocator proof. Session checking,
 old-report archiving and an exclusive SD lock prevent stale results from
 being accepted. See [M1 E2E](M1_E2E.md) for all steps and budget limits.
+
+The original M1 receipt retains its twelve comparisons and six negative cases.
+After portable monitor support was implemented, the same monitor method became
+a positive `class-monitor` case, executed by the JVM oracle. Rebuilding the
+fixture is mandatory before the current portable-core regression. This harness
+description is not a new thirteen-case Horizon execution claim.
 
 ## CI and the upstream baseline
 

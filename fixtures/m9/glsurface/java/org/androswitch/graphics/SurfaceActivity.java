@@ -17,6 +17,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** Independent Android API fixture; no native code or runtime-specific APIs. */
 public final class SurfaceActivity extends Activity {
     public static GLSurfaceView surface;
+    public static Thread renderThread;
     private static String events = "";
     private static int requestNext;
     private static boolean askThread;
@@ -96,7 +97,7 @@ public final class SurfaceActivity extends Activity {
             events += "Z" + width + ":" + height + ";";
         }
         public void onDrawFrame(GL10 gl) {
-            if (askThread) Thread.currentThread();
+            if (askThread) renderThread = Thread.currentThread();
             if (askGl) gl.glClear(GL10.GL_COLOR_BUFFER_BIT);
             events += "D;";
             if (requestNext != 0) { requestNext = 0; surface.requestRender(); }

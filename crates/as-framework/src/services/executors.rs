@@ -274,6 +274,14 @@ impl Executors {
             return Ok(worker);
         }
         let current = owner(vm)?;
+        if current == Owner::Interpreter
+            && (android.services.glsurface.in_callback()
+                || android.services.timers.in_callback(vm)?)
+        {
+            return Err(unavailable(
+                "Java Thread identity for a logical background callback requires NativeHost",
+            ));
+        }
         if let Some(object) = self.state.borrow().adopted.get(&current).copied() {
             return Ok(object);
         }

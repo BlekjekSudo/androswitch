@@ -49,5 +49,6 @@ public class Probe {
         System.out.println("chain=" + chain(3));
         System.out.println("static-first=" + next());
         System.out.println("static-second=" + next());
+        System.out.println("class-monitor=" + monitor());
     }
 }

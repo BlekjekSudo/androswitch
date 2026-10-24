@@ -35,6 +35,11 @@ explicit errors for missing imports, unsupported relocations/dependency cycles,
 arbitrary `System.load` paths and direct Linux SVC instructions. JNI monitors,
 weak references and unpaired UTF-16 strings remain unsupported. The tested
 JNI instance/static field subset is implemented; this is not full reflection.
+JNI `FindClass` still searches the session DEX/builtin registry. Native-caller
+defining-loader selection, `JNI_OnLoad` loader association and bootstrap-only
+lookup on a newly attached native thread are not implemented. Java
+`Class.forName`/`loadClass` provenance checks do not establish that JNI behavior;
+the attached-thread proof currently looks up platform classes only.
 Default-attribute pthreads are covered; general pthread attributes and broader
 NDK services need additional implementation. See [M2–M4 coverage and
 reproduction](M2_M4_E2E.md). Native session roots remain alive until M7 proves

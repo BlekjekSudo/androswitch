@@ -1,7 +1,7 @@
 //! A recording backend checks API scheduling; it does not claim GPU execution.
 use as_framework::{App, AppOptions, EglConfigBackend, EglConfigs, GlEvent, GraphicsCaps};
 use as_platform::{host::HostPlatform, host_fs::HostFileSystem};
-use rd_vm::{ObjRef, Value, VmExit};
+use rd_vm::{native_host::NativeHost, Engine, ObjRef, Value, VmExit};
 use std::{
     cell::{Cell, RefCell},
     path::PathBuf,
@@ -534,6 +534,15 @@ fn missing_backend_and_unsupported_java_gl_calls_fail_explicitly() {
 fn renderer_thread_identity_is_not_fabricated_and_callback_scope_restores_main_looper() {
     let (mut app, _) = make("surface", true);
     let view = initialize_surface(&mut app);
+    let main = app
+        .vm
+        .invoke_static(
+            "Ljava/lang/Thread;",
+            "currentThread",
+            "()Ljava/lang/Thread;",
+            &[],
+        )
+        .unwrap();
     app.vm
         .invoke_static(ACTIVITY, "queryThreadDuringNextFrame", "()V", &[])
         .unwrap();
@@ -557,4 +566,140 @@ fn renderer_thread_identity_is_not_fabricated_and_callback_scope_restores_main_l
             .unwrap(),
         Value::Obj(_)
     ));
+    assert_eq!(
+        app.vm
+            .invoke_static(
+                "Ljava/lang/Thread;",
+                "currentThread",
+                "()Ljava/lang/Thread;",
+                &[]
+            )
+            .unwrap(),
+        main,
+        "single interpreter main identity remains valid outside the logical callback"
+    );
+}
+struct ThreadIdentity(Cell<u64>);
+impl NativeHost for ThreadIdentity {
+    fn current_thread_id(&self) -> Option<u64> {
+        Some(self.0.get())
+    }
+    fn load(&self, _: &mut Engine, _: &str, _: bool) -> Result<(), VmExit> {
+        Err(rd_vm::err::vm_error(
+            "TEST_UNEXPECTED_NATIVE_LOAD",
+            "no native code in SDK GL fixture",
+        )
+        .into())
+    }
+    fn invoke(
+        &self,
+        _: &mut Engine,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: bool,
+        _: &[Value],
+    ) -> Result<Value, VmExit> {
+        Err(rd_vm::err::vm_error(
+            "TEST_UNEXPECTED_NATIVE_CALL",
+            "no native code in SDK GL fixture",
+        )
+        .into())
+    }
+    fn roots(&self) -> Vec<ObjRef> {
+        vec![]
+    }
+}
+#[test]
+#[ignore = "requires scripts/build-glsurface-fixture.ps1"]
+fn renderer_uses_actual_platform_thread_identity_and_restores_main_after_success() {
+    for fixture in ["surface", "renamed"] {
+        let (mut app, _) = make(fixture, true);
+        let identity = Rc::new(ThreadIdentity(Cell::new(11)));
+        app.vm.bind_native(identity.clone());
+        let view = initialize_surface(&mut app);
+        let main = app
+            .vm
+            .invoke_static(
+                "Ljava/lang/Thread;",
+                "currentThread",
+                "()Ljava/lang/Thread;",
+                &[],
+            )
+            .unwrap();
+        let main_looper = app
+            .vm
+            .invoke_static(
+                "Landroid/os/Looper;",
+                "myLooper",
+                "()Landroid/os/Looper;",
+                &[],
+            )
+            .unwrap();
+        assert!(matches!(main_looper, Value::Obj(_)));
+        app.vm
+            .invoke_static(ACTIVITY, "queryThreadDuringNextFrame", "()V", &[])
+            .unwrap();
+        identity.0.set(44);
+        app.android
+            .gl_callback(&mut app.vm, view, GlEvent::DrawFrame)
+            .unwrap();
+        let renderer = app
+            .vm
+            .statics
+            .get(&(ACTIVITY.into(), "renderThread".into()))
+            .unwrap()
+            .clone();
+        assert!(matches!(renderer, Value::Obj(_)));
+        assert_ne!(
+            renderer, main,
+            "renderer returned its own actual native-owner Java Thread"
+        );
+        app.vm.gc();
+        assert_eq!(
+            app.vm
+                .invoke_static(
+                    "Ljava/lang/Thread;",
+                    "currentThread",
+                    "()Ljava/lang/Thread;",
+                    &[]
+                )
+                .unwrap(),
+            renderer
+        );
+        identity.0.set(11);
+        assert_eq!(
+            app.vm
+                .invoke_static(
+                    "Ljava/lang/Thread;",
+                    "currentThread",
+                    "()Ljava/lang/Thread;",
+                    &[]
+                )
+                .unwrap(),
+            main
+        );
+        assert_eq!(
+            app.vm
+                .invoke_static(
+                    "Landroid/os/Looper;",
+                    "myLooper",
+                    "()Landroid/os/Looper;",
+                    &[]
+                )
+                .unwrap(),
+            main_looper
+        );
+        assert_eq!(
+            app.vm
+                .invoke_static(
+                    "Landroid/os/Looper;",
+                    "getMainLooper",
+                    "()Landroid/os/Looper;",
+                    &[]
+                )
+                .unwrap(),
+            main_looper
+        );
+    }
 }
