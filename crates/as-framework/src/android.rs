@@ -321,9 +321,9 @@ impl Android {
     /// Bind the readable guest APK alias installed by the runtime's VFS.
     /// Call before launching: package metadata must not advertise an APK path
     /// that the application cannot actually open.
-    pub fn bind_package_source(&self, guest_path: String) -> Result<()> {
+    pub fn bind_package_source(&self, guest_path: String, storage_path: String) -> Result<()> {
         self.services
-            .bind_package_source(&self.apk.manifest.package, guest_path)
+            .bind_package_source(&self.apk, guest_path, storage_path)
     }
     pub fn bind_graphics_caps(&self, caps: GraphicsCaps) -> Result<()> {
         self.services.glsurface.bind_caps(caps)

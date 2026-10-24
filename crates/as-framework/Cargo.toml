@@ -96,3 +96,13 @@ required-features = ["host"]
 name = "application_lifecycle"
 path = "tests/application_lifecycle.rs"
 required-features = ["host"]
+
+[[test]]
+name = "package_info"
+path = "tests/package_info.rs"
+required-features = ["host"]
+
+[[test]]
+name = "thread_local"
+path = "tests/thread_local.rs"
+required-features = ["host"]

@@ -1,0 +1,336 @@
+{
+  "schema_version": 1,
+  "recorded_utc": "2026-10-24T18:40:11.523290+00:00",
+  "milestone": "M9 general compatibility improvements; milestone remains incomplete",
+  "scope": "Bounded genuine shared java.lang.ThreadLocal; no application-specific branches",
+  "verification": {
+    "host": "passed",
+    "emulator": "not run for this change by this agent",
+    "physical_device": "not run for this change",
+    "game_first_screen": "not established"
+  },
+  "source_checkpoint": {
+    "git_head": "7915d15daa76697b40e1f1b294fa64331dc44097",
+    "worktree_changes": true,
+    "frozen_owned_sources": [
+      {
+        "path": "local-artifacts/m9/thread-local-host/20261025/verified-source/crates/as-framework/src/services/executors.rs",
+        "sha256": "72ead70620483d31431c435ea8d4542293aff053e0eef6794d24a039e0d02e2b",
+        "bytes": 54605,
+        "original_path": "crates/as-framework/src/services/executors.rs"
+      },
+      {
+        "path": "local-artifacts/m9/thread-local-host/20261025/verified-source/crates/as-framework/src/services/thread_local.rs",
+        "sha256": "765e91f0db61fb50a50c610dd750cd34030846fa11551956b52ee7618bce385f",
+        "bytes": 7208,
+        "original_path": "crates/as-framework/src/services/thread_local.rs"
+      },
+      {
+        "path": "local-artifacts/m9/thread-local-host/20261025/verified-source/crates/as-framework/tests/thread_local.rs",
+        "sha256": "7ac8bd4137cedf3aaa209409f06bb6eb203ed652a057319bfb05af95fb7c6a90",
+        "bytes": 12479,
+        "original_path": "crates/as-framework/tests/thread_local.rs"
+      },
+      {
+        "path": "local-artifacts/m9/thread-local-host/20261025/verified-source/fixtures/m9/thread-local/build.ps1",
+        "sha256": "9a7680bb6bc1f480c354e673682b2b289a1a04630b99c31ddada0ed3defd15f1",
+        "bytes": 3902,
+        "original_path": "fixtures/m9/thread-local/build.ps1"
+      },
+      {
+        "path": "local-artifacts/m9/thread-local-host/20261025/verified-source/fixtures/m9/thread-local/java/org/androswitch/contracts/ThreadLocalActivity.java",
+        "sha256": "01426aa66d5d953eb7f6423d7f656e733d450bdd32a1eecc9ad71a874e7e7d06",
+        "bytes": 178,
+        "original_path": "fixtures/m9/thread-local/java/org/androswitch/contracts/ThreadLocalActivity.java"
+      },
+      {
+        "path": "local-artifacts/m9/thread-local-host/20261025/verified-source/fixtures/m9/thread-local/java/org/androswitch/contracts/ThreadLocalCases.java",
+        "sha256": "f70105586324a5beee4ee85bbd27ee2e2bf0f658b9178b9e837ea8ee8bcd5153",
+        "bytes": 6285,
+        "original_path": "fixtures/m9/thread-local/java/org/androswitch/contracts/ThreadLocalCases.java"
+      },
+      {
+        "path": "local-artifacts/m9/thread-local-host/20261025/verified-source/fixtures/m9/thread-local/java/org/androswitch/contracts/ThreadLocalProofActivity.java",
+        "sha256": "0ff0c7d0cb5bd694e69d81889e7ca3798a012d34730e45b3b95b56b354502b8d",
+        "bytes": 1958,
+        "original_path": "fixtures/m9/thread-local/java/org/androswitch/contracts/ThreadLocalProofActivity.java"
+      },
+      {
+        "path": "local-artifacts/m9/thread-local-host/20261025/verified-source/fixtures/m9/thread-local/java/org/androswitch/contracts/ThreadLocalValidation.java",
+        "sha256": "e6797fee771a652b873aa5e09183a2fcbcb2a01c3ffcbab650d189dd80a88587",
+        "bytes": 748,
+        "original_path": "fixtures/m9/thread-local/java/org/androswitch/contracts/ThreadLocalValidation.java"
+      }
+    ],
+    "shared_context_not_bound": [
+      "crates/as-framework/src/android.rs",
+      "crates/as-framework/src/lib.rs",
+      "crates/as-framework/src/services/mod.rs",
+      "crates/rd-vm/src/classpath.rs"
+    ],
+    "note": "Peer PackageManager implementation may continue after focused Cargo release; final integrated gate/NRO validation required"
+  },
+  "implementation": {
+    "descriptors": [
+      "<init>()V",
+      "get()Ljava/lang/Object;",
+      "set(Ljava/lang/Object;)V",
+      "remove()V",
+      "initialValue()Ljava/lang/Object;"
+    ],
+    "owner": "actual managed or JNI-adopted Java Thread ObjRef through Executors; not native ID alone",
+    "stored_null": "present null suppresses initialization and differs from missing entry",
+    "dispatch": "virtual DEX initialValue, covariant bridge, actual DEX super/base precedence; base initialValue returns null",
+    "reentry": "no RefCell borrow across DEX/native calls or collection; exact root-scope tickets protect key/owner/values. Successful initializer commit bypasses overridden set and overwrites reentrant set/remove; initializer exception preserves actual mutations and leaves absent entries retryable",
+    "gc": "keys weak; Thread strongly traces stored values. GC expunges unreachable keys/maps. Already-marked stale value may remain until next collection; exact JVM reclamation timing not promised. Value-to-key strong cycles have normal graph semantics",
+    "cleanup": "actual managed worker stop or JNI detach drops owner table even if Thread object remains reachable",
+    "bounds": {
+      "live_keys": 1024,
+      "entries_per_java_thread": 1024,
+      "total_entries": 4096,
+      "java_thread_maps": 128,
+      "failure": "THREAD_LOCAL_BUDGET",
+      "replacement_at_capacity": "allowed for existing slot",
+      "allocation_limit": "bounded Rust BTreeMap metadata still uses existing infallible allocator operations; fragmentation/allocator failure not made recoverable"
+    },
+    "unsupported": [
+      "InheritableThreadLocal inheritance/childValue explicitly unavailable",
+      "withInitial(Supplier) absent from method metadata and execution explicitly unavailable",
+      "protected-member reflection flag fidelity not separately tested"
+    ],
+    "api26_references": [
+      {
+        "path": "local-artifacts/m9/thread-local-host/20261025/references/ThreadLocal.java",
+        "sha256": "2533b8e5f1c21db32e3ce48c4cf2f6869fb040d2b262feadc2d748b2d6d997cc",
+        "bytes": 26457,
+        "revision": "android-8.0.0_r1",
+        "url": "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/lang/ThreadLocal.java",
+        "relevant_lines": [
+          126,
+          148,
+          159,
+          179,
+          199,
+          219,
+          294,
+          308
+        ],
+        "use": "Behavioral reference only; no Java implementation code copied into Rust runtime"
+      },
+      {
+        "path": "local-artifacts/m9/thread-local-host/20261025/references/Thread.java",
+        "sha256": "e53214c5fd86f69fe1b1472d6dc88f795d2b377e9436059ce31bfa084452ecdb",
+        "bytes": 85792,
+        "revision": "android-8.0.0_r1",
+        "url": "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/lang/Thread.java",
+        "relevant_lines": [
+          190,
+          772,
+          780,
+          781
+        ],
+        "use": "Behavioral reference only; no Java implementation code copied into Rust runtime"
+      }
+    ],
+    "public_reference": "https://docs.oracle.com/javase/8/docs/api/java/lang/ThreadLocal.html"
+  },
+  "toolchain": {
+    "rustc": "1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "1.97.1 (c980f4866 2026-06-30)",
+    "host": "x86_64-pc-windows-gnu",
+    "llvm": "22.1.6",
+    "jvm": "Microsoft OpenJDK21.0.12.1+1-LTS",
+    "android_build_tools": "35.0.0",
+    "compile_sdk_jar": 35,
+    "min_and_target_sdk": 26
+  },
+  "commands": [
+    {
+      "command": "./fixtures/m9/thread-local/build.ps1",
+      "exit_code": 0,
+      "result": "normal javac/d8/aapt2 original and renamed Java namespaces; actual JVM oracle in both"
+    },
+    {
+      "command": "cargo test -p as-framework --features host --test thread_local -- --nocapture",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "log": "thread-local-tests-3.log"
+    },
+    {
+      "command": "cargo clippy -p as-framework --features host --lib --test thread_local -- -D warnings",
+      "exit_code": 0,
+      "log": "thread-local-clippy-1.log"
+    },
+    {
+      "command": "cargo test -p as-framework --features host --test executors --test timer --test uncaught -- --nocapture",
+      "exit_code": 0,
+      "passed": 29,
+      "suites": {
+        "executors": 10,
+        "timer": 10,
+        "uncaught": 9
+      },
+      "log": "worker-regressions-1.log"
+    },
+    {
+      "command": "rustfmt --edition 2021 --check [three owned Rust files]; git diff --check [Executors/Cargo manifest]",
+      "exit_code": 0
+    }
+  ],
+  "command_scoped_cargo_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  },
+  "coverage": {
+    "actual_rd_vm_PORTABLE_CORE_asserted": true,
+    "jvm_oracle_rows_per_namespace": 12,
+    "jvm_differential_comparisons": 44,
+    "namespaces": [
+      "org.androswitch.contracts",
+      "net.example.locals"
+    ],
+    "cases": [
+      "default/stable/null/reinitialization after remove",
+      "set-null before first get suppresses initializer",
+      "initializer set/remove/recursive get and overridden set bypass",
+      "initializer exceptions retry and preserve actual reentrant mutation",
+      "virtual initializer, host base, DEX super and covariant bridge precedence",
+      "different live Java workers and reused native ID after stop",
+      "native reentry and GC retaining payload objects",
+      "weak-key collection and eventual stale-value reclamation",
+      "retained terminated Thread releases values",
+      "JNI detach/reattach does not inherit old owner map",
+      "1024-key and 4096-entry admission rejection retains existing slots",
+      "unsupported inheritance/supplier metadata truthful",
+      "same normal SDK proof callback/VFS transcript"
+    ],
+    "delivery": "controlled NativeHost IDs and deterministic serial callbacks, not concurrent OS worker execution"
+  },
+  "history": [
+    {
+      "log": "thread-local-tests-1.log",
+      "result": "test compile error from nonexistent Heap.as_string; corrected test to actual as_str; production library compiled"
+    },
+    {
+      "log": "thread-local-tests-2.log",
+      "result": "8/10 passed. Existing StringBuilder.append(Z) emitted numeric booleans unlike JVM; fixture explicitly encodes identical boolean invariants as integer ternaries to avoid testing unrelated formatting. Bounds test queried deliberately removed slot after capacity refilled; corrected to read an existing owner slot. No runtime semantics changes for either test correction."
+    }
+  ],
+  "artifact_freeze_note": "Final SDK builder raw log captured by rebuilding unchanged sources after tests; ZIP timestamps changed container hashes. Exact executed APKs recovered from 13 identified PackageManager test-install copies (successful test process255924), frozen and DEX bytes checked equal to final rebuild. Executed APK attribution uses frozen copies, not new target ZIP hashes.",
+  "test_artifacts": [
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/tested-artifacts/androswitch-threadlocal-proof.txt",
+      "sha256": "f827c5baaf59bca3ab3a32fffca4b484a5181643c421c6aca47ced57c1dc8fd8",
+      "bytes": 100
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/tested-artifacts/original/classes.dex",
+      "sha256": "dd2e97706adac9e61168f2f4946bc3d82e37885c029ec0348192509c26efb434",
+      "bytes": 10888
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/tested-artifacts/original/oracle.tsv",
+      "sha256": "55ec7ea87e29137d7e47234967a3ddc7d1f78808d9f1940c9c06eb675581d902",
+      "bytes": 235
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/tested-artifacts/original/thread-local-proof.apk",
+      "sha256": "ff54458f8f37a15d2583893069e9c6fb604f45f86dc5dc7ba56eae013bf75ef3",
+      "bytes": 6122
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/tested-artifacts/original/thread-local.apk",
+      "sha256": "fff29bf11c86d186b22d81770602926e4de8dbadfe9f125d5fdfd86c13506afd",
+      "bytes": 6126
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/tested-artifacts/renamed/classes.dex",
+      "sha256": "9a6d3e18982fdf946ed78809ae506447702d9de18194aba0aab84c3320b1380a",
+      "bytes": 10800
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/tested-artifacts/renamed/oracle.tsv",
+      "sha256": "55ec7ea87e29137d7e47234967a3ddc7d1f78808d9f1940c9c06eb675581d902",
+      "bytes": 235
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/tested-artifacts/renamed/thread-local.apk",
+      "sha256": "ed4f9482c95898dba445fadba6cf15ba667da0dc95066ac8da63b725c88300ce",
+      "bytes": 6125
+    }
+  ],
+  "logs_and_build_metadata": [
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/thread-local-tests-1.log",
+      "sha256": "6784a084042de86d5a71914df22f9362240fd34209d968e0251b75921ef431b5",
+      "bytes": 772
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/thread-local-tests-2.log",
+      "sha256": "227f798ee7cdd93e4fb39d93b477b2d9b8ca969509148570e16993454388d249",
+      "bytes": 2323
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/thread-local-tests-3.log",
+      "sha256": "20d0017505f38ea6bf48759320105348dfdead2cfaafcb56e5adac86854959d1",
+      "bytes": 1187
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/thread-local-clippy-1.log",
+      "sha256": "12ad78e8c93cea917aecebe8eb0e1e35d12c62633e3b96195902cc663d5129bb",
+      "bytes": 224
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/worker-regressions-1.log",
+      "sha256": "ed0d289961470973222fa50d4c107f1981baa719ab05c8fd58363ace9e868169",
+      "bytes": 3196
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/fixture-build-final.log",
+      "sha256": "04f9977696d009ea33be8fb2d27d88be172a44f871dce2fa592e5d34df8be1ba",
+      "bytes": 1021
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/rustfmt-check.log",
+      "sha256": "5ba14584baf2df07e4c42e5b86cbe07a30690985dd74915ce11e4f99a4f2837f",
+      "bytes": 21
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/diff-check.log",
+      "sha256": "0fef92614ccca6d2a1c1029a65acfbe829c75dd940819118849ccf6e8abdf81d",
+      "bytes": 28
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/sdk-final-build-receipt.json",
+      "sha256": "26a6cd65ec8595306782ca4ca2d0897ac7346dd9b1c5d3db0cf5e3baf6636ea7",
+      "bytes": 2918
+    },
+    {
+      "path": "local-artifacts/m9/thread-local-host/20261025/tested-input-recovery.json",
+      "sha256": "ef20af96e0c9f2cda96fa62fc2d52e6b16ef1c03b9a6b91adec7834573b6e20c",
+      "bytes": 7080
+    }
+  ],
+  "device_proof": {
+    "apk": "local-artifacts/m9/thread-local-host/20261025/tested-artifacts/original/thread-local-proof.apk",
+    "sha256": "ff54458f8f37a15d2583893069e9c6fb604f45f86dc5dc7ba56eae013bf75ef3",
+    "package": "org.fixture.threadlocalproof",
+    "file": "/sdcard/Download/androswitch-threadlocal-proof.txt",
+    "expected": "THREAD_LOCAL_PROOF_PASS; main101,worker202,separate=true,storedNull=true,actualThreadIdentity=true; main Handler writes VFS and PASS UI",
+    "status": "SDK build and host callback/VFS transcript passed; NRO not yet claimed"
+  },
+  "limitations": [
+    "API26 behavior compared to pinned source, no Android reference execution; JVM differential actual OpenJDK21",
+    "No Horizon emulator/physical execution or game startup claim from this agent",
+    "No forced allocator-failure callback injection; map admission bounds tested",
+    "Map layout/hash order and precise stale-value GC timing unspecified",
+    "Final required gate/NRO/package evidence remains parent-owned"
+  ],
+  "documentation": {
+    "path": "docs/JAVA_THREAD_LOCAL.md",
+    "sha256": "c1b680c5b8fbcfdfdcd6cfe94db1cb261a7c1d79a603d65000cd04201b6df333",
+    "bytes": 4210
+  }
+}

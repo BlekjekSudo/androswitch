@@ -28,14 +28,16 @@ Static inventory identifies imports and DEX calls; it cannot establish that a
 path executes or that a game renders. The runtime does not select behavior
 using the package/library names in this documentation.
 
-The [latest shared-API startup runs](../reports/m9-classloader-startup-ryujinx-20261024.json)
+The [latest shared-API startup run](../reports/m9-lifecycle-threadlocal-startup-ryujinx-20261025.json)
 use the same NRO and unmodified APK hashes. Mekorama passes monitor operations,
 Executor construction, resource-name lookup, TextUtils and resource identifier
-lookup and loader-aware `Class.forName`, then reports unavailable
-`Application.registerActivityLifecycleCallbacks`.
+lookup, loader-aware `Class.forName` and Application lifecycle registration.
+Its Executor next rejects unavailable `ThreadLocal` construction during
+`DynamiteModule` initialization.
 Candy Crush passes Timer, inherited `getResources`, Bitmap decoding, native
 constructors, `Thread.currentThread` and context loader lookup, then reports
-unavailable `Thread.getDefaultUncaughtExceptionHandler()` during `onCreate`.
+unavailable `PackageManager.getPackageInfo(String,int)` while its exception
+writer reads the package version during `onCreate`.
 Both complete worker/native resource closure and return to the launcher.
 Mekorama's original execution error and later `onPause` error remain recorded;
 resource closure does not imply that every Java lifecycle callback succeeded.
@@ -51,10 +53,17 @@ three constructor forms produce JVM-matching values, callbacks and exceptions;
 named pthread attachment retains the expected identity across detach. The
 session writes the exact expected UTF-8 result, displays its verified proof
 screen and returns cleanly to the launcher.
-The extended context-loader proof fails on NRO16 when a valid `jclass` is used
+The extended context-loader proof failed on NRO16 when a valid `jclass` was used
 as a `java.lang.Class` receiver. The
-[canonical class-reference host correction](../reports/m9-jni-class-objects-host-20261025.json)
-is separate evidence and still requires a corrected NRO execution.
+[corrected NRO17 SDK run](../reports/m9-callback-jni-ryujinx-20261025.json)
+verifies the canonical class-reference correction, including context value103,
+all constructor values and its actual proof image. The same run verifies six
+real lifecycle callbacks and a worker handler with original Thread/Throwable
+identity, followed by a successful next application. Saved state was not
+observed on device. The overall SDK harness retained `cleanup_failed` after
+its owned emulator exceeded a ten-second exit wait; a separate, identity-checked
+recovery record restores the originally absent SD folder state after process
+exit. Those scoped runtime proofs do not relabel that harness result as a pass.
 
 ## Shared implementation changes
 
@@ -173,8 +182,8 @@ is separate evidence and still requires a corrected NRO execution.
   remain opaque metadata. Four
   [production-dispatch tests](../reports/m9-jni-class-objects-host-20261025.json)
   cover identity, object operations, GC, primitive/array Class values and
-  invalid-reference failures. The extended SDK context proof still requires
-  a successful NRO run after the observed class-reference rejection.
+  invalid-reference failures. The corrected NRO17 SDK context proof now writes
+  the expected context value103 after the earlier class-reference rejection.
 - Application lifecycle observers use the actual Application, Activity and
   saved Bundle objects, dispatching at the real base Activity method's API 26
   timing. Ordered snapshots survive mutation, GC and reentry; registrations are
@@ -194,7 +203,8 @@ is separate evidence and still requires a corrected NRO execution.
   wrapper-type recursion found by those extra cases.
   The independent SDK
   proof records real startup/return callbacks; save remains `not_observed`
-  unless an actual save callback occurs. NRO verification is still pending.
+  unless an actual save callback occurs. NRO17 verifies C/S/R and P/T/D; saved
+  state remains host-tested and unobserved in that device-proof scenario.
 - Thread default/per-thread uncaught exception handlers use actual Java Thread
   and Throwable identities, including virtual handler lookup and root-group
   delegation. Nine [portable tests](../reports/m9-uncaught-handlers-host-20261025.json)

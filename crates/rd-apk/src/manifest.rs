@@ -401,7 +401,7 @@ pub fn build(doc: &AxmlDocument, arsc: Option<&Arsc>) -> RdResult<Manifest> {
         .and_then(|a| a.as_u32());
     m.platform_build_version_name = root.attr("platformBuildVersionName").map(|a| a.text());
     m.min_sdk = attr_u32(root, "minSdkVersion").unwrap_or(1);
-    m.target_sdk = attr_u32(root, "targetSdkVersion").unwrap_or(m.min_sdk);
+    let mut declared_target_sdk = attr_u32(root, "targetSdkVersion");
     m.max_sdk = attr_u32(root, "maxSdkVersion");
     // local canônico: elemento filho <uses-sdk> (AGP/aapt) — prevalece sobre attrs do root
     if let Some(uses_sdk) = root.children_named("uses-sdk").next() {
@@ -409,12 +409,15 @@ pub fn build(doc: &AxmlDocument, arsc: Option<&Arsc>) -> RdResult<Manifest> {
             m.min_sdk = v;
         }
         if let Some(v) = attr_u32(uses_sdk, "targetSdkVersion") {
-            m.target_sdk = v;
+            declared_target_sdk = Some(v);
         }
         if let Some(v) = attr_u32(uses_sdk, "maxSdkVersion") {
             m.max_sdk = Some(v);
         }
     }
+    // An absent target defaults to the effective minimum, after the canonical
+    // uses-sdk child has overridden any legacy root attributes.
+    m.target_sdk = declared_target_sdk.unwrap_or(m.min_sdk);
     m.shared_user_id = attr_str(root, "sharedUserId");
     m.install_location = attr_str(root, "installLocation");
     m.original_package = root
@@ -924,6 +927,40 @@ mod tests {
                 text: None,
             },
             ..Default::default()
+        }
+    }
+
+    #[test]
+    fn absent_target_sdk_defaults_to_the_effective_minimum() {
+        let cases = [
+            (None, None, false, 1, 1),
+            (None, None, true, 1, 1),
+            (Some(26), None, true, 26, 26),
+            (Some(21), Some(26), true, 21, 26),
+            (None, Some(23), true, 1, 23),
+            (Some(26), Some(1), true, 26, 1),
+        ];
+        for (minimum, target, has_sdk, expected_min, expected_target) in cases {
+            let mut doc = doc_with_component("activity", vec![], vec![]);
+            doc.root.attrs.retain(|a| a.name == "package");
+            if has_sdk {
+                let mut attrs = vec![];
+                if let Some(v) = minimum {
+                    attrs.push(android_attr("minSdkVersion", AttrValue::Int(v)));
+                }
+                if let Some(v) = target {
+                    attrs.push(android_attr("targetSdkVersion", AttrValue::Int(v)));
+                }
+                doc.root.children.push(XmlElement {
+                    name: "uses-sdk".into(),
+                    attrs,
+                    children: vec![],
+                    text: None,
+                });
+            }
+            let manifest = build(&doc, None).expect("manifest SDK defaults");
+            assert_eq!(manifest.min_sdk, expected_min);
+            assert_eq!(manifest.target_sdk, expected_target);
         }
     }
 

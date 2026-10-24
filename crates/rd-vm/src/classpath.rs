@@ -1085,7 +1085,8 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Throwable;",
             "Ljava/lang/Object;",
         ]),
-        "Landroid/provider/Settings$SettingNotFoundException;" => Some(&[
+        "Landroid/provider/Settings$SettingNotFoundException;"
+        | "Landroid/content/pm/PackageManager$NameNotFoundException;" => Some(&[
             "Landroid/util/AndroidException;",
             "Ljava/lang/Exception;",
             "Ljava/lang/Throwable;",

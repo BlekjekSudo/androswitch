@@ -128,13 +128,13 @@ impl App {
             .map_err(|e| rd_vm::err::vm_error(e.code, e.to_string()))?;
         let source = options
             .source_apk
-            .map(|path| vfs.bind_apk(path))
+            .map(|path| vfs.bind_apk(path.clone()).map(|guest| (guest, path)))
             .transpose()
             .map_err(|e| rd_vm::err::vm_error(e.code, e.to_string()))?;
         vm.bind_device_storage(&apk.manifest.package, Box::new(vfs))?;
         let android = Android::new(apk, clock, width, height, fs)?;
-        if let Some(source) = source {
-            android.bind_package_source(source)?;
+        if let Some((source, storage)) = source {
+            android.bind_package_source(source, storage)?;
         }
         options.memory.stage("vm_ready")?;
         vm.bind_framework(android.clone());

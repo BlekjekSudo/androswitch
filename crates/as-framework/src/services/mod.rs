@@ -79,10 +79,19 @@ impl Services {
         }
         self.communication.pump(android, vm)
     }
-    pub(super) fn bind_package_source(&self, package: &str, path: String) -> Result<()> {
-        self.package_metadata.bind_source(package, path)
+    pub(super) fn bind_package_source(
+        &self,
+        apk: &Apk,
+        path: String,
+        storage: String,
+    ) -> Result<()> {
+        self.package_metadata
+            .bind_source(self.fs.clone(), apk, path, storage)
     }
     pub(super) fn attach(&self, vm: &mut Engine, class: &str, r: ObjRef) -> Result<bool> {
+        if class == "Landroid/content/pm/PackageInfo;" {
+            return Ok(true);
+        }
         if self.bitmaps.attach(vm, class, r)? {
             return Ok(true);
         }

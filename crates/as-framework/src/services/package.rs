@@ -1,11 +1,19 @@
 //! Package metadata and directories describe the same installation/VFS as the
 //! application executes. Loaded DEX classes share one canonical class loader.
 use super::*;
+mod installed;
 
 const CONTEXT: &str = "Landroid/content/Context;";
 const CLASS_LOADER: &str = "Ljava/lang/ClassLoader;";
 const BOOT_LOADER: &str = "Ljava/lang/BootClassLoader;";
 const APPLICATION_INFO: &str = "Landroid/content/pm/ApplicationInfo;";
+const PACKAGE_INFO: &str = "Landroid/content/pm/PackageInfo;";
+const PACKAGE_MANAGER: &str = "Landroid/content/pm/PackageManager;";
+const NAME_NOT_FOUND: &str = "Landroid/content/pm/PackageManager$NameNotFoundException;";
+struct MountedSource {
+    guest: String,
+    record: as_package::Record,
+}
 
 /// Provenance of the only loaders backed by this runtime's classpath.
 /// A Java ClassLoader-shaped object alone does not confer loading behavior.
@@ -17,33 +25,73 @@ pub(super) enum LoaderScope {
 
 #[derive(Default)]
 pub(super) struct PackageService {
-    source: RefCell<Option<String>>,
+    source: RefCell<Option<MountedSource>>,
     application_info: RefCell<Option<ObjRef>>,
     class_loader: RefCell<Option<ObjRef>>,
     boot_loader: RefCell<Option<ObjRef>>,
 }
 impl PackageService {
-    pub(super) fn bind_source(&self, package: &str, path: String) -> Result<()> {
+    pub(super) fn bind_source(
+        &self,
+        fs: Rc<dyn as_platform::fs::FileSystem>,
+        apk: &Apk,
+        path: String,
+        storage: String,
+    ) -> Result<()> {
+        let package = &apk.manifest.package;
         if path != format!("/data/app/{package}/base.apk") {
             return Err(error(
                 "INVALID_PACKAGE_SOURCE",
                 "expected mounted installed APK alias",
             ));
         }
+        let record = as_package::PackageManager::new(fs.clone())
+            .latest(package)
+            .map_err(storage_error)?
+            .filter(|r| r.installed)
+            .ok_or_else(|| {
+                error(
+                    "INVALID_PACKAGE_SOURCE",
+                    "mounted APK has no installed record",
+                )
+            })?;
+        if storage != installed::path(&record)
+            || apk.manifest.version_code != record.version_code
+            || apk.manifest.version_name != record.version_name
+            || !fs
+                .stat(&storage)
+                .map_err(storage_error)?
+                .is_some_and(|m| !m.directory && m.length == record.apk_bytes)
+        {
+            return Err(error(
+                "INVALID_PACKAGE_SOURCE",
+                "mounted APK differs from current immutable installation",
+            ));
+        }
         let mut source = self.source.borrow_mut();
-        if source.as_ref().is_some_and(|old| old != &path) {
+        if source
+            .as_ref()
+            .is_some_and(|old| old.guest != path || old.record != record)
+        {
             return Err(error("PACKAGE_STATE", "APK source is already bound"));
         }
-        *source = Some(path);
+        *source = Some(MountedSource {
+            guest: path,
+            record,
+        });
         Ok(())
     }
     fn source(&self) -> Result<String> {
-        self.source.borrow().clone().ok_or_else(|| {
-            error(
-                "API_UNAVAILABLE",
-                "installed APK source path is not bound to the VFS",
-            )
-        })
+        self.source
+            .borrow()
+            .as_ref()
+            .map(|source| source.guest.clone())
+            .ok_or_else(|| {
+                error(
+                    "API_UNAVAILABLE",
+                    "installed APK source path is not bound to the VFS",
+                )
+            })
     }
     pub(super) fn app_loader(&self, vm: &mut Engine) -> Result<ObjRef> {
         if let Some(loader) = *self.class_loader.borrow() {
@@ -93,9 +141,13 @@ impl PackageService {
         use rd_vm::framework_host::HostMethodKind::Instance;
         match (class, name, sig) {
             (CONTEXT | "Ljava/lang/Class;", "getClassLoader", "()Ljava/lang/ClassLoader;")
-            | (CLASS_LOADER, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;") => {
-                Some(Instance)
-            }
+            | (CLASS_LOADER, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;")
+            | (CONTEXT, "getPackageManager", "()Landroid/content/pm/PackageManager;")
+            | (
+                PACKAGE_MANAGER,
+                "getPackageInfo",
+                "(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;",
+            ) => Some(Instance),
             _ => None,
         }
     }
@@ -104,15 +156,22 @@ impl PackageService {
             return Ok(info);
         }
         let source = self.source()?;
-        let manifest = &android.apk.manifest;
+        let info = Self::application_info(vm, &android.apk.manifest, Some(source), true)?;
+        *self.application_info.borrow_mut() = Some(info);
+        Ok(info)
+    }
+    fn application_info(
+        vm: &mut Engine,
+        manifest: &rd_apk::manifest::Manifest,
+        source: Option<String>,
+        legacy_context_flags: bool,
+    ) -> Result<ObjRef> {
         let application = &manifest.application;
         let info = shell(vm, APPLICATION_INFO)?;
         for (name, value) in [
             ("packageName", Some(manifest.package.clone())),
             ("name", application.name.clone()),
             ("className", application.name.clone()),
-            ("sourceDir", Some(source.clone())),
-            ("publicSourceDir", Some(source)),
             (
                 "dataDir",
                 Some(format!("/data/user/0/{}", manifest.package)),
@@ -129,30 +188,111 @@ impl PackageService {
             let value = value.map_or(Ok(Value::Null), |v| string(vm, v))?;
             write(vm, info, name, value)?;
         }
-        let flags = (i32::from(application.debuggable == Some(true)) * 2)
-            | (i32::from(application.has_code != Some(false)) * 4)
-            | (i32::from(application.allow_backup != Some(false)) * (1 << 15))
-            | (i32::from(application.extract_native_libs != Some(false)) * (1 << 28))
-            | (i32::from(
-                application
-                    .hardware_accelerated
-                    .unwrap_or(manifest.target_sdk >= 14),
-            ) * (1 << 29))
-            | (1 << 23); // FLAG_INSTALLED: source is bound to an installed revision.
+        if let Some(source) = source {
+            let value = string(vm, source)?;
+            write(vm, info, "sourceDir", value.clone())?;
+            write(vm, info, "publicSourceDir", value)?;
+        }
+        if legacy_context_flags {
+            // Preserve the preexisting Context subset separately. A fresh
+            // PackageInfo must not advertise this incomplete full bitset.
+            let flags = (i32::from(application.debuggable == Some(true)) * 2)
+                | (i32::from(application.has_code != Some(false)) * 4)
+                | (i32::from(application.allow_backup != Some(false)) * (1 << 15))
+                | (i32::from(application.extract_native_libs != Some(false)) * (1 << 28))
+                | (i32::from(
+                    application
+                        .hardware_accelerated
+                        .unwrap_or(manifest.target_sdk >= 14),
+                ) * (1 << 29))
+                | (1 << 23);
+            write(vm, info, "flags", Value::Int(flags))?;
+        }
         for (name, value) in [
             ("minSdkVersion", manifest.min_sdk as i32),
             ("targetSdkVersion", manifest.target_sdk as i32),
             ("labelRes", application.label_res.unwrap_or(0) as i32),
             ("icon", application.icon_res.unwrap_or(0) as i32),
             ("theme", application.theme_res.unwrap_or(0) as i32),
-            ("flags", flags),
         ] {
             write(vm, info, name, Value::Int(value))?;
         }
         // nativeLibraryDir/uid/process and package-manager services are not
         // fabricated: their backing platform contracts are not implemented.
-        *self.application_info.borrow_mut() = Some(info);
         Ok(info)
+    }
+    fn package_info(&self, services: &Services, vm: &mut Engine, args: &[Value]) -> Result<Value> {
+        if int(args, 1)? != 0 {
+            return Err(error(
+                "API_UNAVAILABLE",
+                "PackageManager.getPackageInfo supports flags=0 only",
+            ));
+        }
+        let missing = |vm: &mut Engine, name: Option<String>| {
+            let mut throwable = Throwable {
+                class: NAME_NOT_FOUND.into(),
+                message: name,
+                obj: None,
+            };
+            // Materialize before diagnostic frame strings are attached to the
+            // transport error. Java getMessage retains the actual nullable
+            // package argument through an intermediate DEX call/catch.
+            match vm.materialize_throwable(&throwable) {
+                Ok(object) => {
+                    throwable.obj = Some(object);
+                    VmExit::Exception(throwable)
+                }
+                Err(error) => error,
+            }
+        };
+        let Some(name) = args[0].as_ref()? else {
+            return Err(missing(vm, None));
+        };
+        let name = vm.heap.as_str(name)?;
+        if name.len() > 4096 {
+            return Err(error(
+                "PACKAGE_QUERY_BUDGET",
+                "4096 bytes per queried package name",
+            ));
+        }
+        let name = name.to_string();
+        if !as_platform::vfs::valid_package(&name) {
+            return Err(missing(vm, Some(name)));
+        }
+        let record = match as_package::PackageManager::new(services.fs.clone()).latest(&name) {
+            Ok(Some(record)) if record.installed => record,
+            Ok(_) => return Err(missing(vm, Some(name))),
+            Err(e) if e.code == "PACKAGE_CASE_COLLISION" => return Err(missing(vm, Some(name))),
+            Err(e) => return Err(storage_error(e)),
+        };
+        let metadata = installed::read(services.fs.as_ref(), &record)?;
+        let source = self
+            .source
+            .borrow()
+            .as_ref()
+            .filter(|mounted| {
+                mounted.record.package == record.package
+                    && mounted.record.revision == record.revision
+                    && mounted.record.apk_sha256 == record.apk_sha256
+                    && mounted.record.apk_bytes == record.apk_bytes
+            })
+            .map(|mounted| mounted.guest.clone());
+        let info = shell(vm, PACKAGE_INFO)?;
+        let application = Self::application_info(vm, &metadata.manifest, source, false)?;
+        let package = string(vm, record.package)?;
+        write(vm, info, "packageName", package)?;
+        write(
+            vm,
+            info,
+            "versionCode",
+            Value::Int(metadata.manifest.version_code.unwrap_or(0) as u32 as i32),
+        )?;
+        let version = metadata
+            .version_name
+            .map_or(Ok(Value::Null), |name| string(vm, name))?;
+        write(vm, info, "versionName", version)?;
+        write(vm, info, "applicationInfo", Value::Obj(application))?;
+        Ok(Value::Obj(info))
     }
     fn directory(
         services: &Services,
@@ -186,6 +326,12 @@ impl PackageService {
         args: &[Value],
     ) -> Result<Option<Value>> {
         let actual = vm.heap.class_of(receiver)?.to_string();
+        if vm.cp.is_subtype(&actual, PACKAGE_MANAGER)
+            && name == "getPackageInfo"
+            && sig == "(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;"
+        {
+            return self.package_info(services, vm, args).map(Some);
+        }
         if vm.cp.is_subtype(&actual, CONTEXT) {
             let value = match (name, sig) {
                 ("getApplicationInfo", "()Landroid/content/pm/ApplicationInfo;") => {

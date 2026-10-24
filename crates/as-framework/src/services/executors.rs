@@ -8,6 +8,8 @@ use rd_vm::framework_host::HostMethodKind;
 #[path = "uncaught.rs"]
 mod uncaught;
 pub use uncaught::{MainExceptionScope, UncaughtExceptionReport};
+#[path = "thread_local.rs"]
+mod thread_local;
 
 pub(in crate::android) const TOKEN_BIT: u64 = 1 << 62;
 const THREAD: &str = "Ljava/lang/Thread;";
@@ -91,6 +93,7 @@ struct State {
 #[derive(Default)]
 pub(in crate::android) struct Executors {
     uncaught: uncaught::Handlers,
+    locals: RefCell<thread_local::Locals>,
     state: RefCell<State>,
     backend: RefCell<Option<Rc<dyn BackgroundWorkers>>>,
     serial: Cell<u64>,
@@ -205,6 +208,9 @@ impl Executors {
         if let Some(method) = Self::uncaught_metadata(class, name, sig) {
             return Some(method);
         }
+        if let Some(method) = Self::thread_local_metadata(class, name, sig) {
+            return Some(method);
+        }
         use HostMethodKind::{Constructor, Instance, Static};
         match (class,name,sig){
             (THREAD,"currentThread","()Ljava/lang/Thread;")=>Some(Static),
@@ -270,6 +276,7 @@ impl Executors {
         }
         state.attach_names.remove(&owner);
         if let Some(object) = state.adopted.remove(&owner) {
+            self.locals.borrow_mut().forget_thread(object);
             if let Some(thread) = state.threads.get_mut(&object) {
                 thread.phase = Phase::Terminated;
                 thread.owner = None;
@@ -355,6 +362,9 @@ impl Executors {
             .ok_or_else(|| unavailable("Java Thread dedicated worker backend"))
     }
     pub(super) fn attach(&self, vm: &Engine, class: &str, r: ObjRef) -> Result<bool> {
+        if self.thread_local_attach(vm, class, r)? {
+            return Ok(true);
+        }
         if vm.cp.is_subtype(class, THREAD) {
             let mut state = self.state.borrow_mut();
             if !state.threads.contains_key(&r) {
@@ -500,6 +510,9 @@ impl Executors {
     ) -> Result<Option<Value>> {
         if let Some(value) = self.uncaught_call_static(vm, class, name, sig, args)? {
             return Ok(Some(value));
+        }
+        if class == thread_local::CLASS && name == "withInitial" {
+            return Err(unavailable("ThreadLocal.withInitial Supplier contract"));
         }
         if class == THREAD && name == "currentThread" && sig == "()Ljava/lang/Thread;" {
             return Ok(Some(Value::Obj(self.current_thread(android, vm)?)));
@@ -766,6 +779,9 @@ impl Executors {
         args: &[Value],
     ) -> Result<Option<Value>> {
         let actual = vm.heap.class_of(r)?.to_string();
+        if let Some(value) = self.thread_local_call(android, vm, &actual, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
         if let Some(value) = self.uncaught_call_group(vm, r, name, sig, args)? {
             return Ok(Some(value));
         }
@@ -1269,6 +1285,7 @@ impl Executors {
         let Some(thread) = state.tokens.remove(&token) else {
             return;
         };
+        self.locals.borrow_mut().forget_thread(thread);
         let t = state.threads.get_mut(&thread).unwrap();
         t.phase = Phase::Terminated;
         // The actual worker and TLS destructors have stopped. Retaining the
@@ -1325,7 +1342,7 @@ impl Executors {
     }
     pub(super) fn references(&self, r: ObjRef) -> Vec<ObjRef> {
         let state = self.state.borrow();
-        let mut refs = Vec::new();
+        let mut refs = self.locals.borrow().references(r);
         if let Some(thread) = state.threads.get(&r) {
             refs.extend(thread.target);
             refs.extend(thread.context_loader);
@@ -1345,6 +1362,7 @@ impl Executors {
         refs
     }
     pub(super) fn collect(&self, marked: &[bool]) {
+        self.locals.borrow_mut().collect(marked);
         let live = |r: &ObjRef| marked.get(*r as usize).copied().unwrap_or(false);
         let mut state = self.state.borrow_mut();
         state.threads.retain(|r, _| live(r));

@@ -1,0 +1,1595 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T18:22:56.799472+00:00",
+  "implementation_commit": "46982ab",
+  "status": "scoped_runtime_proofs_verified; harness_process_cleanup_failed_then_manually_recovered",
+  "scope": "Actual original SDK/NDK lifecycle, worker-handler and extended JNI/context proofs; no game compatibility or hardware pass.",
+  "build": {
+    "rustc_verbose": "rustc 1.100.0-nightly (787af2b8c 2026-08-25)\r\nbinary: rustc\r\ncommit-hash: 787af2b8c80638c51a4fc8e44f84e6891f243ec7\r\ncommit-date: 2026-08-25\r\nhost: x86_64-pc-windows-gnu\r\nrelease: 1.100.0-nightly\r\nLLVM version: 23.1.0",
+    "status": "built",
+    "target": "aarch64-nintendo-switch-freestanding",
+    "sqlite_source_lock_sha256": "cce2cc3f0b3e6354568cc3da7d6067980ef88788f451349711975d7cb7f85e95",
+    "nro_sha256": "79cf988d8a4fb646d4d5a71e9fd009885eb6d92eda76040a416c8762170438ed",
+    "target_directory": "C:\\Users\\Administrator\\.cache\\androswitch\\37b5fa1d-switch-target",
+    "nro_bytes": 9285688,
+    "executed": false,
+    "rust_toolchain": "nightly",
+    "cargo_version": "cargo 1.100.0-nightly (e8cb624d5 2026-08-22)",
+    "schema_version": 1,
+    "link_backend": "Windows",
+    "c_compiler_version": "15.2.0",
+    "profile": "release panic=abort",
+    "windows_devkitpro": "C:/devkitPro"
+  },
+  "runtime_results": {
+    "lifecycle": {
+      "startup": "passed",
+      "safe_return": "passed",
+      "actual_callbacks": [
+        "created",
+        "started",
+        "resumed",
+        "paused",
+        "stopped",
+        "destroyed"
+      ],
+      "saved_state": "not_observed",
+      "transcript": "startup=PASS\nreturn=PASS\nsave=not_observed\ntrace=c<;C;c>;s<;S;s>;r<;R;r>;p<;P;p>;t<;T;t>;d<;D;d>;\n",
+      "visual_review": "Fresh protocol-bound capture viewed: recognizable LIFECYCLE STARTUP PASS label. Multiline TextView layout is not implemented correctly; newline renders a replacement glyph and remaining text clips horizontally."
+    },
+    "uncaught_worker": {
+      "handler_execution": "passed_real_thread_throwable_identity_liveness_gc_payload",
+      "terminal_application_status": "failed_expected_original_exception",
+      "handler_diagnostics": {
+        "package": "org.fixture.uncaughtproof",
+        "reports": [
+          {
+            "handler": 8,
+            "handler_failure": null,
+            "handler_invoked": true,
+            "origin": "thread",
+            "original": {
+              "class": "Ljava/lang/RuntimeException;",
+              "message": "original-failure\n  at Lorg/androswitch/contracts/UncaughtCases$Task;->run()V",
+              "object": 6
+            },
+            "serial": 1,
+            "thread": 12,
+            "via_thread_group": true
+          }
+        ],
+        "revision": 1,
+        "schema_version": 1,
+        "scope": "bounded uncaught Java diagnostics after quiescence; object IDs belong only to this session; original worker-stop policy retained",
+        "session_id": "47ae5b0beee04f9e9000fd15bdadf05a-2"
+      },
+      "safe_return": "passed",
+      "next_application": "JNI proof launches and completes after this failure; no stale fatal state"
+    },
+    "jni": {
+      "constructor_variants": [
+        "NewObject",
+        "NewObjectA",
+        "NewObjectV"
+      ],
+      "main_thread_identity": 89,
+      "named_native_attachment": 97,
+      "context_loader_identity": 103,
+      "exact_vfs_lines": [
+        "threads identity=89",
+        "threads attached=97",
+        "threads context=103",
+        "value 0=-1985187208",
+        "reentry 0=-1985187171",
+        "exception 0=constructor failure",
+        "value 1=-1985187208",
+        "reentry 1=-1985187171",
+        "exception 1=constructor failure",
+        "value 2=-1985187208",
+        "reentry 2=-1985187171",
+        "exception 2=constructor failure",
+        "JNI_CONSTRUCTOR_PROOF_PASS"
+      ],
+      "native_catch_71": "All three assertions executed by unchanged SDK/NDK source; not separate VFS lines",
+      "visual_review": "Fresh protocol-bound capture viewed: correct JNI constructor proof PASS text",
+      "safe_return": "passed"
+    }
+  },
+  "harness_result": {
+    "observed_sessions": [
+      {
+        "completed_case_verified": false,
+        "error": null,
+        "session_id": "47ae5b0beee04f9e9000fd15bdadf05a-1",
+        "package": "org.fixture.lifecycleproof",
+        "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+        "runtime_status": "passed_execution",
+        "revision": 1,
+        "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\47ae5b0beee04f9e9000fd15bdadf05a\\sessions\\47ae5b0beee04f9e9000fd15bdadf05a-1\\session-report.json"
+      },
+      {
+        "completed_case_verified": false,
+        "error": "exception java.lang.RuntimeException: original-failure\n  at Lorg/androswitch/contracts/UncaughtCases$Task;->run()V",
+        "session_id": "47ae5b0beee04f9e9000fd15bdadf05a-2",
+        "package": "org.fixture.uncaughtproof",
+        "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+        "runtime_status": "failed",
+        "revision": 1,
+        "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\47ae5b0beee04f9e9000fd15bdadf05a\\sessions\\47ae5b0beee04f9e9000fd15bdadf05a-2\\session-report.json"
+      },
+      {
+        "completed_case_verified": false,
+        "error": null,
+        "session_id": "47ae5b0beee04f9e9000fd15bdadf05a-3",
+        "package": "org.fixture.constructorproof",
+        "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+        "runtime_status": "passed_execution",
+        "revision": 1,
+        "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\47ae5b0beee04f9e9000fd15bdadf05a\\sessions\\47ae5b0beee04f9e9000fd15bdadf05a-3\\session-report.json"
+      }
+    ],
+    "emulator_version": "1.3.3+e2143d4",
+    "sd_original_restore": "manual_recovery_required",
+    "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+    "visual_review": "required",
+    "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-47ae5b0beee04f9e9000fd15bdadf05a",
+    "latest_media_stop": [
+      {
+        "operation": "cpu_capture_publish_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1475867447
+      },
+      {
+        "operation": "cpu_capture_publish_result",
+        "result": -7,
+        "detail": 0,
+        "tick": 1517360194
+      },
+      {
+        "operation": "glsurface_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1518572106
+      },
+      {
+        "operation": "opensl_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1518587458
+      },
+      {
+        "operation": "glsurface_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1518637843
+      },
+      {
+        "operation": "opensl_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1518653729
+      },
+      {
+        "operation": "cpu_capture_publish_result",
+        "result": -7,
+        "detail": 0,
+        "tick": 1576005204
+      }
+    ],
+    "backend": "ryujinx",
+    "root_stop_error": "The owned root process did not stop; preserve its SD backup.",
+    "inputs": [
+      {
+        "index": 0,
+        "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\proofs-frozen-46982ab-iteration17\\01-lifecycle-proof.apk",
+        "expected_session_id": "47ae5b0beee04f9e9000fd15bdadf05a-1",
+        "staged_name": "0000-external.apk",
+        "install_snapshot_step": 3,
+        "bytes": 7296,
+        "sha256": "62f2413ad0aff20d32f7368ae0b93eeb414b2546a18ef72e696be948fa2ff620"
+      },
+      {
+        "index": 1,
+        "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\proofs-frozen-46982ab-iteration17\\02-uncaught-proof.apk",
+        "expected_session_id": "47ae5b0beee04f9e9000fd15bdadf05a-2",
+        "staged_name": "0001-external.apk",
+        "install_snapshot_step": 8,
+        "bytes": 5649,
+        "sha256": "5cfe01ca9b0675380a2cb4c617a8c5fa7fcd961e8d4653637b91d1b2128a788e"
+      },
+      {
+        "index": 2,
+        "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\proofs-frozen-46982ab-iteration17\\03-jni-constructor-proof.apk",
+        "expected_session_id": "47ae5b0beee04f9e9000fd15bdadf05a-3",
+        "staged_name": "0002-external.apk",
+        "install_snapshot_step": 14,
+        "bytes": 9255,
+        "sha256": "007c331512e84b0efee395932600c9a48552cd85c846dcd394f666379438c725"
+      }
+    ],
+    "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-47ae5b0beee04f9e9000fd15bdadf05a",
+    "root_handle_pinned": true,
+    "execution_attempted": true,
+    "capture_ownership_contract": "Protocol1 runtime generation identity; matching pending request for CPU frames; identity rechecked after copy. Filesystem timestamps are not ownership evidence.",
+    "nro_sha256": "79cf988d8a4fb646d4d5a71e9fd009885eb6d92eda76040a416c8762170438ed",
+    "native_trace_requested": true,
+    "schema_version": 1,
+    "completed_sessions": 3,
+    "emulator_frontend": "headless_sdl2",
+    "physical_device": "not_run",
+    "session_id": "47ae5b0beee04f9e9000fd15bdadf05a",
+    "commands": 16,
+    "cases": [
+      {
+        "error": null,
+        "returned_to_launcher": true,
+        "installed_identity_matches": true,
+        "teardown_phases": [
+          "stop_requested",
+          "native_activity_stop",
+          "java_activity_stop",
+          "worker_admission_closed",
+          "background_worker_quiesce",
+          "media_thread_quiesce",
+          "guest_thread_quiesce",
+          "native_destructors",
+          "media_reset",
+          "media_released",
+          "activity_dispose",
+          "runtime_drop",
+          "native_resource_reset",
+          "native_reset_guest_threads",
+          "native_reset_cxx",
+          "native_reset_keys",
+          "native_reset_sync",
+          "native_reset_locale",
+          "native_reset_admitted",
+          "native_mapping_release",
+          "native_tls_reset",
+          "native_resources_released",
+          "display_geometry_reset",
+          "runtime_closed",
+          "launcher_refresh"
+        ],
+        "presented_frames": 1000,
+        "status": "execution_verified_visual_review_required",
+        "first_screen": "not_visually_verified",
+        "input": {
+          "index": 0,
+          "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\proofs-frozen-46982ab-iteration17\\01-lifecycle-proof.apk",
+          "expected_session_id": "47ae5b0beee04f9e9000fd15bdadf05a-1",
+          "staged_name": "0000-external.apk",
+          "install_snapshot_step": 3,
+          "bytes": 7296,
+          "sha256": "62f2413ad0aff20d32f7368ae0b93eeb414b2546a18ef72e696be948fa2ff620"
+        },
+        "captures": [
+          {
+            "recognizable_app_screen": "requires_visual_review",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\47ae5b0beee04f9e9000fd15bdadf05a\\sessions\\47ae5b0beee04f9e9000fd15bdadf05a-1\\last-frame.ppm",
+            "valid_ppm": true,
+            "height": 720,
+            "width": 1280,
+            "sha256": "7164471596cc88034f0d691bd178ee8278a272a3946d3386ec13084624b36063",
+            "sampled_nonuniform": true
+          }
+        ],
+        "runtime_status": "passed_execution",
+        "snapshots": [
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "feb0c23a05bca85b",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onCreate",
+                "time_ms": 8880
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onStart",
+                "time_ms": 8889
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onResume",
+                "time_ms": 9032
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "feb0c23a05bca85b",
+            "step": 0,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 4280299584,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 34,
+                "orientation": 0,
+                "text": "LIFECYCLE STARTUP PASS\nC/S/R observer order verified\nExit to record P/T/D\nSave is not observed until a real save callback",
+                "text_color": 4294967295,
+                "text_size": 23.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "feb0c23a05bca85b",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onCreate",
+                "time_ms": 8880
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onStart",
+                "time_ms": 8889
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onResume",
+                "time_ms": 9032
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "feb0c23a05bca85b",
+            "step": 1,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 4280299584,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 34,
+                "orientation": 0,
+                "text": "LIFECYCLE STARTUP PASS\nC/S/R observer order verified\nExit to record P/T/D\nSave is not observed until a real save callback",
+                "text_color": 4294967295,
+                "text_size": 23.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "feb0c23a05bca85b",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onCreate",
+                "time_ms": 8880
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onStart",
+                "time_ms": 8889
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onResume",
+                "time_ms": 9032
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "feb0c23a05bca85b",
+            "step": 2,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 4280299584,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 34,
+                "orientation": 0,
+                "text": "LIFECYCLE STARTUP PASS\nC/S/R observer order verified\nExit to record P/T/D\nSave is not observed until a real save callback",
+                "text_color": 4294967295,
+                "text_size": 23.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "feb0c23a05bca85b",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onCreate",
+                "time_ms": 8880
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onStart",
+                "time_ms": 8889
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onResume",
+                "time_ms": 9032
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "feb0c23a05bca85b",
+            "step": 3,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 4280299584,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 34,
+                "orientation": 0,
+                "text": "LIFECYCLE STARTUP PASS\nC/S/R observer order verified\nExit to record P/T/D\nSave is not observed until a real save callback",
+                "text_color": 4294967295,
+                "text_size": 23.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "feb0c23a05bca85b",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onCreate",
+                "time_ms": 8880
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onStart",
+                "time_ms": 8889
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/LifecycleProofActivity;",
+                "event": "onResume",
+                "time_ms": 9032
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "feb0c23a05bca85b",
+            "step": 4,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 4280299584,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 34,
+                "orientation": 0,
+                "text": "LIFECYCLE STARTUP PASS\nC/S/R observer order verified\nExit to record P/T/D\nSave is not observed until a real save callback",
+                "text_color": 4294967295,
+                "text_size": 23.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "error": "exception java.lang.RuntimeException: original-failure\n  at Lorg/androswitch/contracts/UncaughtCases$Task;->run()V",
+        "returned_to_launcher": true,
+        "installed_identity_matches": true,
+        "teardown_phases": [
+          "stop_requested",
+          "native_activity_stop",
+          "java_activity_stop",
+          "worker_admission_closed",
+          "background_worker_quiesce",
+          "media_thread_quiesce",
+          "guest_thread_quiesce",
+          "native_destructors",
+          "media_reset",
+          "media_released",
+          "activity_dispose",
+          "runtime_drop",
+          "native_resource_reset",
+          "native_reset_guest_threads",
+          "native_reset_cxx",
+          "native_reset_keys",
+          "native_reset_sync",
+          "native_reset_locale",
+          "native_reset_admitted",
+          "native_mapping_release",
+          "native_tls_reset",
+          "native_resources_released",
+          "display_geometry_reset",
+          "runtime_closed",
+          "launcher_refresh"
+        ],
+        "presented_frames": null,
+        "status": "blocked_or_unreported",
+        "first_screen": "not_visually_verified",
+        "input": {
+          "index": 1,
+          "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\proofs-frozen-46982ab-iteration17\\02-uncaught-proof.apk",
+          "expected_session_id": "47ae5b0beee04f9e9000fd15bdadf05a-2",
+          "staged_name": "0001-external.apk",
+          "install_snapshot_step": 8,
+          "bytes": 5649,
+          "sha256": "5cfe01ca9b0675380a2cb4c617a8c5fa7fcd961e8d4653637b91d1b2128a788e"
+        },
+        "captures": [],
+        "runtime_status": "failed",
+        "snapshots": []
+      },
+      {
+        "error": null,
+        "returned_to_launcher": true,
+        "installed_identity_matches": true,
+        "teardown_phases": [
+          "stop_requested",
+          "native_activity_stop",
+          "java_activity_stop",
+          "worker_admission_closed",
+          "background_worker_quiesce",
+          "media_thread_quiesce",
+          "guest_thread_quiesce",
+          "native_destructors",
+          "media_reset",
+          "media_released",
+          "activity_dispose",
+          "runtime_drop",
+          "native_mapping_release",
+          "native_resource_reset",
+          "native_reset_guest_threads",
+          "native_reset_cxx",
+          "native_reset_keys",
+          "native_reset_sync",
+          "native_reset_locale",
+          "native_reset_admitted",
+          "native_mapping_release",
+          "native_tls_reset",
+          "native_resources_released",
+          "display_geometry_reset",
+          "runtime_closed",
+          "launcher_refresh"
+        ],
+        "presented_frames": 1120,
+        "status": "execution_verified_visual_review_required",
+        "first_screen": "not_visually_verified",
+        "input": {
+          "index": 2,
+          "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\proofs-frozen-46982ab-iteration17\\03-jni-constructor-proof.apk",
+          "expected_session_id": "47ae5b0beee04f9e9000fd15bdadf05a-3",
+          "staged_name": "0002-external.apk",
+          "install_snapshot_step": 14,
+          "bytes": 9255,
+          "sha256": "007c331512e84b0efee395932600c9a48552cd85c846dcd394f666379438c725"
+        },
+        "captures": [
+          {
+            "recognizable_app_screen": "requires_visual_review",
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\47ae5b0beee04f9e9000fd15bdadf05a\\sessions\\47ae5b0beee04f9e9000fd15bdadf05a-3\\last-frame.ppm",
+            "valid_ppm": true,
+            "height": 720,
+            "width": 1280,
+            "sha256": "87675cc1085616f48fe4ba15e44a1e667ee769c39af882bf21c4abfb8f3bea85",
+            "sampled_nonuniform": true
+          }
+        ],
+        "runtime_status": "passed_execution",
+        "snapshots": [
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "317b3affd6758fbe",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onCreate",
+                "time_ms": 46682
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onStart",
+                "time_ms": 46683
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onResume",
+                "time_ms": 46683
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "317b3affd6758fbe",
+            "step": 0,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 6,
+                "orientation": 0,
+                "text": "JNI constructor proof PASS: NewObject/A/V, GC, reentry, exceptions",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "317b3affd6758fbe",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onCreate",
+                "time_ms": 46682
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onStart",
+                "time_ms": 46683
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onResume",
+                "time_ms": 46683
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "317b3affd6758fbe",
+            "step": 1,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 6,
+                "orientation": 0,
+                "text": "JNI constructor proof PASS: NewObject/A/V, GC, reentry, exceptions",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "317b3affd6758fbe",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onCreate",
+                "time_ms": 46682
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onStart",
+                "time_ms": 46683
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onResume",
+                "time_ms": 46683
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "317b3affd6758fbe",
+            "step": 2,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 6,
+                "orientation": 0,
+                "text": "JNI constructor proof PASS: NewObject/A/V, GC, reentry, exceptions",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "317b3affd6758fbe",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onCreate",
+                "time_ms": 46682
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onStart",
+                "time_ms": 46683
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onResume",
+                "time_ms": 46683
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "317b3affd6758fbe",
+            "step": 3,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 6,
+                "orientation": 0,
+                "text": "JNI constructor proof PASS: NewObject/A/V, GC, reentry, exceptions",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "317b3affd6758fbe",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onCreate",
+                "time_ms": 46682
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onStart",
+                "time_ms": 46683
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+                "event": "onResume",
+                "time_ms": 46683
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "317b3affd6758fbe",
+            "step": 4,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 6,
+                "orientation": 0,
+                "text": "JNI constructor proof PASS: NewObject/A/V, GC, reentry, exceptions",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "latest_teardown": [
+      {
+        "phase": "stop_requested",
+        "tick": 1517471347
+      },
+      {
+        "phase": "native_activity_stop",
+        "tick": 1518480435
+      },
+      {
+        "phase": "java_activity_stop",
+        "tick": 1518501586
+      },
+      {
+        "phase": "worker_admission_closed",
+        "tick": 1518523630
+      },
+      {
+        "phase": "background_worker_quiesce",
+        "tick": 1518538719
+      },
+      {
+        "phase": "media_thread_quiesce",
+        "tick": 1518557312
+      },
+      {
+        "phase": "guest_thread_quiesce",
+        "tick": 1518604725
+      },
+      {
+        "phase": "native_destructors",
+        "tick": 1518621313
+      },
+      {
+        "phase": "media_reset",
+        "tick": 1518668987
+      },
+      {
+        "phase": "media_released",
+        "tick": 1518683779
+      },
+      {
+        "phase": "activity_dispose",
+        "tick": 1518697966
+      },
+      {
+        "phase": "runtime_drop",
+        "tick": 1518809068
+      },
+      {
+        "phase": "native_mapping_release",
+        "tick": 1518954604
+      },
+      {
+        "phase": "native_resource_reset",
+        "tick": 1519034365
+      },
+      {
+        "phase": "native_reset_guest_threads",
+        "tick": 1519058261
+      },
+      {
+        "phase": "native_reset_cxx",
+        "tick": 1521012867
+      },
+      {
+        "phase": "native_reset_keys",
+        "tick": 1521027331
+      },
+      {
+        "phase": "native_reset_sync",
+        "tick": 1521042725
+      },
+      {
+        "phase": "native_reset_locale",
+        "tick": 1521057235
+      },
+      {
+        "phase": "native_reset_admitted",
+        "tick": 1521073549
+      },
+      {
+        "phase": "native_mapping_release",
+        "tick": 1521088855
+      },
+      {
+        "phase": "native_tls_reset",
+        "tick": 1521229055
+      },
+      {
+        "phase": "native_resources_released",
+        "tick": 1521277349
+      },
+      {
+        "phase": "display_geometry_reset",
+        "tick": 1521300545
+      },
+      {
+        "phase": "runtime_closed",
+        "tick": 1521328014
+      },
+      {
+        "phase": "launcher_refresh",
+        "tick": 1521378660
+      },
+      {
+        "phase": "launcher_framebuffer_open",
+        "tick": 1528268737
+      },
+      {
+        "phase": "launcher_ready",
+        "tick": 1528765127
+      }
+    ],
+    "pid": 251432,
+    "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\47ae5b0beee04f9e9000fd15bdadf05a\\androswitch.nro",
+    "emulator_path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-bin-9f3cd3d2\\Ryujinx.exe",
+    "restore_error": "The owned root process did not stop; preserve its SD backup.",
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "status": "cleanup_failed",
+    "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+    "latest_session_report": {
+      "package": "org.fixture.constructorproof",
+      "physical_device": "unclassified",
+      "presented_frames": 1120,
+      "revision": 1,
+      "schema_version": 1,
+      "session_id": "47ae5b0beee04f9e9000fd15bdadf05a-3",
+      "snapshots": [
+        {
+          "audio_frames": 0,
+          "finished": false,
+          "frame_hash": "317b3affd6758fbe",
+          "lifecycle": [
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onCreate",
+              "time_ms": 46682
+            },
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onStart",
+              "time_ms": 46683
+            },
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onResume",
+              "time_ms": 46683
+            }
+          ],
+          "native_frames": 0,
+          "presented_hash": "317b3affd6758fbe",
+          "step": 0,
+          "views": [
+            {
+              "bounds": [
+                0,
+                0,
+                640,
+                360
+              ],
+              "children": [],
+              "class": "Landroid/widget/TextView;",
+              "click_method": null,
+              "clickable": false,
+              "color": 0,
+              "enabled": true,
+              "height": -2,
+              "id": -1,
+              "input_type": null,
+              "listener": null,
+              "object": 6,
+              "orientation": 0,
+              "text": "JNI constructor proof PASS: NewObject/A/V, GC, reentry, exceptions",
+              "text_color": 4293916154,
+              "text_size": 18.0,
+              "touch_listener": null,
+              "visible": true,
+              "width": -2
+            }
+          ]
+        },
+        {
+          "audio_frames": 0,
+          "finished": false,
+          "frame_hash": "317b3affd6758fbe",
+          "lifecycle": [
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onCreate",
+              "time_ms": 46682
+            },
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onStart",
+              "time_ms": 46683
+            },
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onResume",
+              "time_ms": 46683
+            }
+          ],
+          "native_frames": 0,
+          "presented_hash": "317b3affd6758fbe",
+          "step": 1,
+          "views": [
+            {
+              "bounds": [
+                0,
+                0,
+                640,
+                360
+              ],
+              "children": [],
+              "class": "Landroid/widget/TextView;",
+              "click_method": null,
+              "clickable": false,
+              "color": 0,
+              "enabled": true,
+              "height": -2,
+              "id": -1,
+              "input_type": null,
+              "listener": null,
+              "object": 6,
+              "orientation": 0,
+              "text": "JNI constructor proof PASS: NewObject/A/V, GC, reentry, exceptions",
+              "text_color": 4293916154,
+              "text_size": 18.0,
+              "touch_listener": null,
+              "visible": true,
+              "width": -2
+            }
+          ]
+        },
+        {
+          "audio_frames": 0,
+          "finished": false,
+          "frame_hash": "317b3affd6758fbe",
+          "lifecycle": [
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onCreate",
+              "time_ms": 46682
+            },
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onStart",
+              "time_ms": 46683
+            },
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onResume",
+              "time_ms": 46683
+            }
+          ],
+          "native_frames": 0,
+          "presented_hash": "317b3affd6758fbe",
+          "step": 2,
+          "views": [
+            {
+              "bounds": [
+                0,
+                0,
+                640,
+                360
+              ],
+              "children": [],
+              "class": "Landroid/widget/TextView;",
+              "click_method": null,
+              "clickable": false,
+              "color": 0,
+              "enabled": true,
+              "height": -2,
+              "id": -1,
+              "input_type": null,
+              "listener": null,
+              "object": 6,
+              "orientation": 0,
+              "text": "JNI constructor proof PASS: NewObject/A/V, GC, reentry, exceptions",
+              "text_color": 4293916154,
+              "text_size": 18.0,
+              "touch_listener": null,
+              "visible": true,
+              "width": -2
+            }
+          ]
+        },
+        {
+          "audio_frames": 0,
+          "finished": false,
+          "frame_hash": "317b3affd6758fbe",
+          "lifecycle": [
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onCreate",
+              "time_ms": 46682
+            },
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onStart",
+              "time_ms": 46683
+            },
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onResume",
+              "time_ms": 46683
+            }
+          ],
+          "native_frames": 0,
+          "presented_hash": "317b3affd6758fbe",
+          "step": 3,
+          "views": [
+            {
+              "bounds": [
+                0,
+                0,
+                640,
+                360
+              ],
+              "children": [],
+              "class": "Landroid/widget/TextView;",
+              "click_method": null,
+              "clickable": false,
+              "color": 0,
+              "enabled": true,
+              "height": -2,
+              "id": -1,
+              "input_type": null,
+              "listener": null,
+              "object": 6,
+              "orientation": 0,
+              "text": "JNI constructor proof PASS: NewObject/A/V, GC, reentry, exceptions",
+              "text_color": 4293916154,
+              "text_size": 18.0,
+              "touch_listener": null,
+              "visible": true,
+              "width": -2
+            }
+          ]
+        },
+        {
+          "audio_frames": 0,
+          "finished": false,
+          "frame_hash": "317b3affd6758fbe",
+          "lifecycle": [
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onCreate",
+              "time_ms": 46682
+            },
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onStart",
+              "time_ms": 46683
+            },
+            {
+              "activity": "Lorg/androswitch/contracts/ConstructorActivity;",
+              "event": "onResume",
+              "time_ms": 46683
+            }
+          ],
+          "native_frames": 0,
+          "presented_hash": "317b3affd6758fbe",
+          "step": 4,
+          "views": [
+            {
+              "bounds": [
+                0,
+                0,
+                640,
+                360
+              ],
+              "children": [],
+              "class": "Landroid/widget/TextView;",
+              "click_method": null,
+              "clickable": false,
+              "color": 0,
+              "enabled": true,
+              "height": -2,
+              "id": -1,
+              "input_type": null,
+              "listener": null,
+              "object": 6,
+              "orientation": 0,
+              "text": "JNI constructor proof PASS: NewObject/A/V, GC, reentry, exceptions",
+              "text_color": 4293916154,
+              "text_size": 18.0,
+              "touch_listener": null,
+              "visible": true,
+              "width": -2
+            }
+          ]
+        }
+      ],
+      "status": "passed_execution"
+    },
+    "startup_wait_ms": 30000,
+    "latest_memory_admission": {
+      "allocator_available_after_load": 1600017488,
+      "allocator_available_before_load": 1600993920,
+      "estimated_parser_bytes": 1094294,
+      "package": "org.fixture.constructorproof",
+      "parser_budget_bytes": 268435456,
+      "raw_dex_bytes": 8860,
+      "revision": 1,
+      "schema_version": 1,
+      "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+      "session_id": "47ae5b0beee04f9e9000fd15bdadf05a-3",
+      "status": "vm_ready"
+    }
+  },
+  "cleanup_recovery": {
+    "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-47ae5b0beee04f9e9000fd15bdadf05a",
+    "recorded_utc": "2026-10-24T18:20:10.0568853Z",
+    "original_receipt": "verification.json",
+    "completed_launcher_session_id": "47ae5b0beee04f9e9000fd15bdadf05a",
+    "schema_version": 1,
+    "original_pid": 251432,
+    "nro_sha256": "79cf988d8a4fb646d4d5a71e9fd009885eb6d92eda76040a416c8762170438ed",
+    "status": "restored_after_owned_process_exit",
+    "original_sd_state": "originally_absent_folder_is_absent_again",
+    "live_ryujinx_count": 0,
+    "original_backup_existed": false,
+    "root_pid_absent": true,
+    "original_status": "cleanup_failed"
+  },
+  "cleanup_limit": "Do not relabel the original cleanup_failed receipt. Its pinned root process exceeded the original ten-second exit wait. Subsequent recovery verifies zero live Ryujinx processes and exact staged NRO/final launcher identity, then moves only the owned SD result and restores the originally absent folder state. A later harness change bounds three waits on the same pinned process handle.",
+  "backend_scope": "Isolated e2143d4 diagnostic system-register decoder; see reports/m9-cpu-id-emulator-20261024.json. Not stock Ryujinx or physical Switch evidence.",
+  "physical_switch": "not_run_for_this_build",
+  "m9_complete": false,
+  "host_scope": "Earlier complete56-gate baseline216 test executions is retained separately; final equality correction has lifecycle10/JNI5 focused tests and Clippy. Final candidate regressions remain pending.",
+  "inputs": [
+    {
+      "path": "local-artifacts/m9/proofs-frozen-46982ab-iteration17/01-lifecycle-proof.apk",
+      "sha256": "62f2413ad0aff20d32f7368ae0b93eeb414b2546a18ef72e696be948fa2ff620",
+      "bytes": 7296
+    },
+    {
+      "path": "local-artifacts/m9/proofs-frozen-46982ab-iteration17/02-uncaught-proof.apk",
+      "sha256": "5cfe01ca9b0675380a2cb4c617a8c5fa7fcd961e8d4653637b91d1b2128a788e",
+      "bytes": 5649
+    },
+    {
+      "path": "local-artifacts/m9/proofs-frozen-46982ab-iteration17/03-jni-constructor-proof.apk",
+      "sha256": "007c331512e84b0efee395932600c9a48552cd85c846dcd394f666379438c725",
+      "bytes": 9255
+    },
+    {
+      "path": "local-artifacts/m9/proofs-frozen-46982ab-iteration17/build.log",
+      "sha256": "f81f3232777bf5e93bf94899eb8432186a613f5dfb5747c5c42e741595ad349c",
+      "bytes": 3607
+    },
+    {
+      "path": "local-artifacts/m9/proofs-frozen-46982ab-iteration17/jni-build.json",
+      "sha256": "35494952a072d94fba828ae2ecc4fb3b24dfbf497be8bdff3f5e5fef1009cdc9",
+      "bytes": 2404
+    },
+    {
+      "path": "local-artifacts/m9/proofs-frozen-46982ab-iteration17/jni-oracle.txt",
+      "sha256": "cf60da2d22275742fceedddd80151341e94e24c778a045c21db1208db71e0aa0",
+      "bytes": 498
+    },
+    {
+      "path": "local-artifacts/m9/proofs-frozen-46982ab-iteration17/lifecycle-build.json",
+      "sha256": "65c2de9c5c90d3ceebf486f80c257d8f39f0f4c064d24c4cad99b4d14c0fd415",
+      "bytes": 3231
+    },
+    {
+      "path": "local-artifacts/m9/proofs-frozen-46982ab-iteration17/product-build.json",
+      "sha256": "013f99ace5b0c24df2969c0bb3bc5160b7d7f506b30fba38ebea3b7e109466e9",
+      "bytes": 926
+    }
+  ],
+  "raw": [
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/emulator.json",
+      "sha256": "a7987c342526007c19db4f8dab67f1ea76776d4b430a93fc12b3230afa2045a3",
+      "bytes": 29966
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/launcher-test.json",
+      "sha256": "f8bfda79976590d73aad816c1b8a5944a0610533c0f97cab984b614bc2d5c487",
+      "bytes": 1819
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/proof-1.png",
+      "sha256": "3b2127f91ac3239c4e10bedd68cd0e0923d2377d3d41557decc788f1bb73d410",
+      "bytes": 10804
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/proof-3.png",
+      "sha256": "f67fcdd620b97b71235784f9ffa23345834d55d66a57aa7d635e3f33eb6f79ff",
+      "bytes": 10569
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/proofs/androswitch-jni-constructor-proof.txt",
+      "sha256": "cfd11055d817b7224f954db53cf58c3bc9b6814ee2809f75a34f85617e65b614",
+      "bytes": 309
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/proofs/androswitch-lifecycle-proof.txt",
+      "sha256": "e44867dda39a3dc6311c4331a4d3ea1d19c32773af0f40a16a9b5d5930624698",
+      "bytes": 98
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/proofs/androswitch-uncaught-proof.txt",
+      "sha256": "0a0d1580d4f8a5e7762627a455e23a4ec4ce118a52bfa806e4826c1689780a8e",
+      "bytes": 86
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/recovery.json",
+      "sha256": "880412c0f11fcad5ed869addca8d00ad8a5f240816756f5852d806bdd5b7803a",
+      "bytes": 719
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/ryujinx.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/ryujinx.stdout.log",
+      "sha256": "3e95ac594a9e6a03416e1749fe515fcdcb01d1eb74584f9314eaea2ce525f9f6",
+      "bytes": 6663
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-1/capture-owner.json",
+      "sha256": "1e9e7c5b83a0c7de64e6e16d8d425372a37bd0f965d9dd2be2deed7febdbb5f5",
+      "bytes": 172
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-1/jni-failures.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-1/media-stop.log",
+      "sha256": "5ec2459fff2607a7544cf6f1527a3e528b3e4b71c30bf751bd94733688719e75",
+      "bytes": 479
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-1/memory-admission.json",
+      "sha256": "61fc4da7b370afcce8afa6b7c5b4195587882d3770e949f9abfa0fbf364ba87c",
+      "bytes": 498
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-1/memory.log",
+      "sha256": "2c7f9945fc463ce763bbec469e3997445d8fbbdb77b5f8581bec70d344c514b6",
+      "bytes": 3661
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-1/native-calls.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-1/native-compatibility.json",
+      "sha256": "bc03cd75ffdf97d4ef1a4502e6323fa5c38a6549d43a01c9052dde15973f844f",
+      "bytes": 385
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-1/session-report.json",
+      "sha256": "795774f039f920ae144634044bb10d3840ab3b6798815465e577432fcd116a29",
+      "bytes": 7859
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-1/teardown.log",
+      "sha256": "c5a9d94a7f4f256317280ffc64ac73eaf0fad0349fd13888b859e46f7b2d29ed",
+      "bytes": 1312
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-2/capture-owner.json",
+      "sha256": "52fc63c312516fdd512a16182c0b7f9c51c69693c69792d48ccf083d9f24b9b4",
+      "bytes": 171
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-2/jni-failures.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-2/media-stop.log",
+      "sha256": "9902ff8d3b9a4ce537cc1685b9f07c47f335f4d92ed06233df1941435aabbed0",
+      "bytes": 385
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-2/memory-admission.json",
+      "sha256": "e463973d108d86a9bbc7e40c521bdabcdc19683eed314b803225add80650d0fc",
+      "bytes": 496
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-2/memory.log",
+      "sha256": "1bab494cb071471ac2b6d20ddd20ded1695b227b2a516afdd37e996c9b235648",
+      "bytes": 6418
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-2/native-calls.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-2/native-compatibility.json",
+      "sha256": "30457538f9476ca5e5fad8a869cce8db3d9ca54ac6597baa9189fbe5cd4ab6d0",
+      "bytes": 384
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-2/session-report.json",
+      "sha256": "27a7522e0ace9ea106afe1d90495775e2994029f5c73cbe6dedb422df28c0e9b",
+      "bytes": 330
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-2/teardown.log",
+      "sha256": "0008cb58a627dafcdb49fd076f3c758f4d5db86c252575e940b062f7b4447a5c",
+      "bytes": 1312
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-2/uncaught-exceptions.json",
+      "sha256": "6c9e0db6d50f7ce851abfe1da05c2f574dbe47b1158fa3dff24ff15920aaeb9b",
+      "bytes": 713
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-3/capture-owner.json",
+      "sha256": "6a4bc8ab57bd60e0f485c6a5342c08758568d409d98871e45855094a497c11ee",
+      "bytes": 174
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-3/jni-failures.log",
+      "sha256": "dbf46195436245737e7b40a2c0bdb0fc263a3ad2d66a63131a1f8cb4b435a971",
+      "bytes": 1764
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-3/media-stop.log",
+      "sha256": "2c0ff3c5a13b0489d966ecfad5176572a6641a29399cb75b35064c364d39489c",
+      "bytes": 569
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-3/memory-admission.json",
+      "sha256": "ad0d80d4ab1a900f7ec1557118cfa38bdbf61a037a958a5b112b6dedbaa507d4",
+      "bytes": 499
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-3/memory.log",
+      "sha256": "4710f2a5ab3c55a923d49bd7afeb1f6c5a22ee1c38090aa97ae6bf1b6709818f",
+      "bytes": 9641
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-3/native-calls.log",
+      "sha256": "dfaf3d1ddd3cbf0d2956a936cf66ed6e0dbe8a257e3b0086ef5e74a3da15b9e3",
+      "bytes": 2603
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-3/native-compatibility.json",
+      "sha256": "2cea614471b04e196774edf24873168668461c441d075ef14a63c210dec51eba",
+      "bytes": 387
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-3/native-modules.log",
+      "sha256": "bc5b5c3de4cb0954cf377c611590cea0d5519feecf336366c5c805433c685cef",
+      "bytes": 88
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-3/session-report.json",
+      "sha256": "3a4e04cb9fa747368f2df6d713fd24b3c130210aa73ae8fb5c3928e7728e95c9",
+      "bytes": 7491
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/sessions/47ae5b0beee04f9e9000fd15bdadf05a-3/teardown.log",
+      "sha256": "7e08dbdf2bf7acf344f08ac450a1597ec2c3b56ed69ae9f08d1748c37374e0b9",
+      "bytes": 1392
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/47ae5b0beee04f9e9000fd15bdadf05a/verification.json",
+      "sha256": "f1732e06f85521ce2dea6bced1e24f96417ac6b6506ee6be17201c493e00c17f",
+      "bytes": 39720
+    }
+  ]
+}

@@ -14,7 +14,7 @@ Implementation and verification are independent. `pending` is not a pass.
 | M6 | NativeActivity/assets/window/input/threading/EGL/GLES2/PCM audio | supported proof subset implemented | passed shared contracts; Android reference pending | passed native/mixed media corpus | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
 | M7 | Console launcher/verified session teardown; scan/install/launch/return/update/uninstall; one copy-ready folder | implemented for the alpha corpus; failed-startup cleanup added | passed package workflow | console workflow / ten completed sessions; startup and boundary evidence in reports | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
 | M8 | SharedPreferences/native SQLite/reflection/collections/permissions; independent APK integration | bounded shared contracts implemented; wider integration ongoing | contract/JVM/persistence/fault tests; see candidate report | pending for new build | SQLite readable / SharedPreferences working — user reported 2026-10-24; detailed scenario results not recorded |
-| M9 | Offline v0.1 corpus/lifecycle stress/benchmarks/copy-ready package/evidence matrix; independent first-screen gate | general DEX/memory/native/GLSurfaceView startup improvements in progress; release gate incomplete | repeated candidate corpus plus scoped new API/ABI contracts | latest run reaches Application lifecycle registration (Mekorama) and Thread default exception handler lookup (Candy); both release resources and return, neither has a first-screen pass; extended JNI context proof requires correction | delivered candidate reaches Java/native startup but both games remain blocked; hardware binary hash unrecorded; full gate incomplete |
+| M9 | Offline v0.1 corpus/lifecycle stress/benchmarks/copy-ready package/evidence matrix; independent first-screen gate | general DEX/memory/native/GLSurfaceView startup improvements in progress; release gate incomplete | repeated candidate corpus plus scoped new API/ABI contracts | latest run reaches ThreadLocal on a worker (Mekorama) and PackageManager.getPackageInfo (Candy); both release resources and return, neither has a first-screen pass; scoped SDK lifecycle/handler/JNI-context proofs verified, with harness cleanup recovery recorded separately | delivered candidate reaches Java/native startup but both games remain blocked; hardware binary hash unrecorded; full gate incomplete |
 | M10 | DNS/socket/TLS/HTTP(S), Java/native networking and split APKs | planned | pending | pending | pending |
 | M11 | Higher API/GLES3/engine ecosystem; separate ARM32/x86 research | planned | pending | pending | pending |
 | M12 | Physical Switch stability, suspend/resume, handheld/docked, migrations, v1.0 | planned | pending | pending | pending |
@@ -63,13 +63,14 @@ verify the shared Bundle and AtomicBoolean fixes: Mekorama reaches monitor
 operations and Candy reaches Timer. Both complete native cleanup and return to
 the launcher, including Candy's formerly pending current-thread C++ destructors.
 Neither game has a recognizable first screen. Subsequent
-[shared-API attempts](../reports/m9-classloader-startup-ryujinx-20261024.json)
+[shared-API attempt](../reports/m9-lifecycle-threadlocal-startup-ryujinx-20261025.json)
 pass monitor/Timer/Executor/resource/Bitmap/TextUtils/JNI constructor blockers,
 then pass loader-aware Class.forName and Thread context lookup. They stop at
-Application lifecycle registration (Mekorama) and Thread default uncaught
-exception handler lookup (Candy). The extended SDK JNI context proof fails
-when a class reference is used as a Class receiver; its correction requires
-another NRO run. Earlier independent NRO proofs qualify actual
+ThreadLocal construction on an analytics worker (Mekorama) and installed
+package version lookup (Candy). The corrected extended SDK JNI context proof
+now passes, alongside scoped lifecycle and worker-handler execution; the SDK
+harness's emulator-exit timeout and explicit SD recovery remain recorded.
+Earlier independent NRO proofs qualify actual
 workers, native-suspended GC roots, PNG pixels and JNI constructor/thread values.
 Those proofs are separate from the still-open game first-screen gate.
 The original portrait fixture now has real 720x1280 buffers, four successful

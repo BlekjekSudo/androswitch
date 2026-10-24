@@ -73,9 +73,8 @@ Shared C++ ABI support advances both games beyond their original startup
 blockers. The latest emulator attempts pass monitor, Timer, Executor, resource,
 Bitmap, JNI constructor and Thread identity blockers. Independent SDK APKs
 verify actual workers, native-suspended GC roots, PNG pixels and JVM-matching
-JNI constructor/thread results. Candy Crush now reports unavailable
-Thread.getDefaultUncaughtExceptionHandler; Mekorama reports Application lifecycle
-callback registration. Both
+JNI constructor/thread/context results. Candy Crush now reports unavailable
+PackageManager.getPackageInfo; Mekorama reports ThreadLocal on a worker. Both
 return to the launcher, and neither game has a first-screen pass yet.
 Installation is not a compatibility guarantee; see
 [startup-failure diagnosis and recovery](docs/STARTUP_FAILURES.md).
