@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "status": "passed_package_integrity",
+  "archive": "androswitch-m9-candidate-20261024-085320-a6b78a41.zip",
+  "archive_sha256": "5ee36181d8b81c58fc1c924a3ac137dfc070a3a2f74102e8bc24ce96f9015630",
+  "nro_sha256": "6a46553edcc12cbe4239cc4a58fa0b647efca52d58f7d23eadee9843f9e87cf3",
+  "source_commit": "fca6d69b7dd805a28151d43f0a9fe88967c1c973",
+  "implementation_commit": "fca6d69b7dd805a28151d43f0a9fe88967c1c973",
+  "nro_count": 1,
+  "sample_apks": 7,
+  "verified_license_files": 58,
+  "checked_relative_documentation_links": 199,
+  "verification_scope": "ZIP CRC, paths, APK/NRO hashes, credits, dependency notices and guide links; no Horizon execution claim",
+  "horizon_emulator": "not_run; user selected physical Switch test first",
+  "physical_device_new_build": "not_run",
+  "external_game_first_screens": "not_verified"
+}
