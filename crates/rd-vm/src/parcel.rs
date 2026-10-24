@@ -38,6 +38,15 @@ const DUMP_TRANSACTION: i32 = 0x5f44_4d50; // '_DMP'
 /// `BaseBundle.BUNDLE_MAGIC`; as little-endian bytes this is `BNDL`.
 const BUNDLE_MAGIC: i32 = 0x4c44_4e42;
 
+/// Heap field holding a Bundle's retained, not-yet-materialized parcelled
+/// data: an ObjRef to a hidden host `Parcel` whose buffer is the Bundle
+/// frame's ArrayMap payload (frame length and magic excluded). This is the
+/// analogue of AOSP `BaseBundle.mParcelledData`; presence of the field is
+/// exactly `isParcelled()`.
+pub(crate) const PARCELLED_FIELD: &str = "rd$parcelled_data";
+
+// `Parcel` value type tags, exactly as AOSP `Parcel.java` defines them
+// (kept in sync with libbinder's ParcelValTypes.h).
 const VAL_NULL: i32 = -1;
 const VAL_STRING: i32 = 0;
 const VAL_INTEGER: i32 = 1;
@@ -55,15 +64,23 @@ const VAL_SPARSEARRAY: i32 = 12;
 const VAL_BYTEARRAY: i32 = 13;
 const VAL_STRINGARRAY: i32 = 14;
 const VAL_IBINDER: i32 = 15;
-const VAL_OBJECTARRAY: i32 = 16;
-const VAL_INTARRAY: i32 = 17;
-const VAL_LONGARRAY: i32 = 18;
-const VAL_BYTE: i32 = 19;
+const VAL_PARCELABLEARRAY: i32 = 16;
+const VAL_OBJECTARRAY: i32 = 17;
+const VAL_INTARRAY: i32 = 18;
+const VAL_LONGARRAY: i32 = 19;
+const VAL_BYTE: i32 = 20;
+const VAL_SERIALIZABLE: i32 = 21;
 const VAL_SPARSEBOOLEANARRAY: i32 = 22;
 const VAL_BOOLEANARRAY: i32 = 23;
-const VAL_CHARARRAY: i32 = 24;
-const VAL_DOUBLEARRAY: i32 = 25;
-const VAL_FLOATARRAY: i32 = 27;
+const VAL_CHARSEQUENCEARRAY: i32 = 24;
+const VAL_PERSISTABLEBUNDLE: i32 = 25;
+const VAL_SIZE: i32 = 26;
+const VAL_SIZEF: i32 = 27;
+const VAL_DOUBLEARRAY: i32 = 28;
+const VAL_CHAR: i32 = 29;
+const VAL_SHORTARRAY: i32 = 30;
+const VAL_CHARARRAY: i32 = 31;
+const VAL_FLOATARRAY: i32 = 32;
 
 fn bad(msg: impl Into<String>) -> VmExit {
     Throwable::new("Landroid/os/BadParcelableException;", msg).into()
@@ -260,6 +277,18 @@ pub(crate) fn new_parcel(vm: &mut Engine) -> Result<Value, VmExit> {
     Ok(Value::Obj(r))
 }
 
+/// Size of `v` under `Parcel.writeValue`, measured on a scratch Parcel.
+/// AOSP `BaseBundle.dumpStats` reports entries by exactly this measure
+/// (it parcels each value and prints those over its 1 KiB threshold).
+pub(crate) fn value_size(vm: &mut Engine, v: &Value) -> Result<usize, VmExit> {
+    let scratch = match new_parcel(vm)? {
+        Value::Obj(r) => r,
+        _ => return Ok(0),
+    };
+    write_value(vm, scratch, v)?;
+    Ok(load(vm, scratch).data.len())
+}
+
 fn obj_arg(args: &[Value], i: usize) -> Option<ObjRef> {
     match args.get(i) {
         Some(Value::Obj(r)) => Some(*r),
@@ -443,6 +472,209 @@ fn binder_for_handle(vm: &Engine, h: i32) -> Result<Value, VmExit> {
         .ok_or_else(|| bad(format!("Parcel: unknown local Binder handle {h}")))
 }
 
+/// Write one strong Binder handle (the body of `writeStrongBinder`).
+/// The binder is also recorded in the parcel's object table, mirroring the
+/// native flat-binder-object list that `hasBinders` inspects.
+fn write_strong_binder_to(vm: &mut Engine, parcel: ObjRef, v: &Value) {
+    let h = binder_handle(vm, v);
+    let mut st = load(vm, parcel);
+    st.write_i32(h);
+    if matches!(v, Value::Obj(_)) {
+        st.objects.push(v.clone());
+    }
+    store(vm, parcel, st);
+}
+
+/// Heap field holding a Parcel's class-cookie `ArrayMap<Class, Object>`
+/// (AOSP `Parcel.mClassCookies`, created lazily by `setClassCookie`).
+const CLASS_COOKIES_FIELD: &str = "rd$class_cookies";
+
+fn class_cookies(vm: &mut Engine, parcel: ObjRef, create: bool) -> Result<Option<ObjRef>, VmExit> {
+    if let Ok(Value::Obj(r)) = vm.heap.get_field(parcel, CLASS_COOKIES_FIELD) {
+        return Ok(Some(r));
+    }
+    if !create {
+        return Ok(None);
+    }
+    let r = vm
+        .heap
+        .alloc_instance("Landroid/util/ArrayMap;".to_string(), Vec::new())
+        .map_err(crate::err::oom_throwable)?;
+    vm.fw.objects.insert(
+        r,
+        HostObj::Map {
+            entries: Vec::new(),
+        },
+    );
+    crate::err::put_field_result(
+        vm.heap
+            .put_field(parcel, CLASS_COOKIES_FIELD, Value::Obj(r)),
+    )?;
+    Ok(Some(r))
+}
+
+fn cookie_entries(vm: &Engine, cookies: ObjRef) -> Vec<(Value, Value)> {
+    match vm.fw.get(cookies) {
+        Some(HostObj::Map { entries }) => entries.clone(),
+        _ => Vec::new(),
+    }
+}
+
+/// libbinder `Parcel::compareData` ordering over two byte ranges:
+/// lexicographic `memcmp` over the common prefix, then length.
+fn compare_ranges(a: &[u8], b: &[u8]) -> i32 {
+    for (x, y) in a.iter().zip(b.iter()) {
+        if x != y {
+            return *x as i32 - *y as i32;
+        }
+    }
+    a.len() as i32 - b.len() as i32
+}
+
+/// Read one strong Binder handle (the body of `readStrongBinder`).
+fn read_strong_binder_from(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
+    let mut st = load(vm, parcel);
+    let h = st.read_i32()?;
+    store(vm, parcel, st);
+    binder_for_handle(vm, h)
+}
+
+/// Write one `IInterface` as its strong Binder (the body of
+/// `writeStrongInterface`): null writes a null Binder, a `Binder` subclass
+/// writes itself, and any other interface implementation is asked for its
+/// `asBinder()`, exactly as AOSP does.
+fn write_strong_interface_to(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit> {
+    let binder = match v {
+        Value::Obj(r) => {
+            let class = vm.heap.class_of(*r)?.to_string();
+            if class == BINDER || vm.cp.is_subtype(&class, BINDER) {
+                Value::Obj(*r)
+            } else {
+                vm.invoke_instance(*r, "asBinder", "()Landroid/os/IBinder;", &[])?
+            }
+        }
+        _ => Value::Null,
+    };
+    write_strong_binder_to(vm, parcel, &binder);
+    Ok(())
+}
+
+/// Read one strong Binder and convert it with a guest
+/// `java.util.function.Function<IBinder, T>.apply`, the `asInterface`
+/// callback of the `*Interface*` container readers. The callback is invoked
+/// even for a null Binder, matching AOSP.
+fn read_strong_interface_with(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    as_interface: ObjRef,
+) -> Result<Value, VmExit> {
+    let binder = read_strong_binder_from(vm, parcel)?;
+    vm.invoke_instance(
+        as_interface,
+        "apply",
+        "(Ljava/lang/Object;)Ljava/lang/Object;",
+        &[binder],
+    )
+}
+
+// Reply-header exception codes (AOSP `Parcel` EX_* constants, in sync with
+// libbinder's binder/Status.h).
+const EX_SECURITY: i32 = -1;
+const EX_BAD_PARCELABLE: i32 = -2;
+const EX_ILLEGAL_ARGUMENT: i32 = -3;
+const EX_NULL_POINTER: i32 = -4;
+const EX_ILLEGAL_STATE: i32 = -5;
+const EX_NETWORK_MAIN_THREAD: i32 = -6;
+const EX_UNSUPPORTED_OPERATION: i32 = -7;
+const EX_SERVICE_SPECIFIC: i32 = -8;
+const EX_PARCELABLE: i32 = -9;
+const EX_HAS_STRICTMODE_REPLY_HEADER: i32 = -128;
+
+/// AOSP `Parcel.readExceptionCode`: consume any fat reply header and return
+/// the real exception code (0 = no exception). The StrictMode header's
+/// payload is skipped by its declared size (violations are not modeled);
+/// AppOps noted-op headers are never produced locally.
+fn read_exception_code(vm: &mut Engine, parcel: ObjRef) -> Result<i32, VmExit> {
+    let mut st = load(vm, parcel);
+    let mut code = st.read_i32()?;
+    if code == EX_HAS_STRICTMODE_REPLY_HEADER {
+        let header_size = st.read_i32()?;
+        if header_size > 4 {
+            let skip = (header_size - 4) as usize;
+            if st.pos + skip > st.data.len() {
+                return Err(bad("Parcel under-run reading StrictMode reply header"));
+            }
+            st.pos += skip;
+        }
+        code = 0;
+    }
+    store(vm, parcel, st);
+    Ok(code)
+}
+
+/// AOSP `Parcel.readException`: rethrow the exception written by
+/// `writeException` (code, message, remote-stack-trace header, then any
+/// code-specific payload).
+fn read_exception(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
+    let code = read_exception_code(vm, parcel)?;
+    if code == 0 {
+        return Ok(Value::Null);
+    }
+    let msg = read_string_from(vm, parcel)?.unwrap_or_default();
+    {
+        let mut st = load(vm, parcel);
+        let stack_payload_size = st.read_i32()?;
+        if stack_payload_size > 0 {
+            // Remote stack trace string: consumed (AOSP attaches it as a
+            // RemoteException cause; the thrown type/message are what
+            // guest catch blocks observe).
+            let _ = st.read_string()?;
+        }
+        store(vm, parcel, st);
+    }
+    let class = match code {
+        EX_SECURITY => "Ljava/lang/SecurityException;",
+        EX_BAD_PARCELABLE => "Landroid/os/BadParcelableException;",
+        EX_ILLEGAL_ARGUMENT => "Ljava/lang/IllegalArgumentException;",
+        EX_NULL_POINTER => "Ljava/lang/NullPointerException;",
+        EX_ILLEGAL_STATE => "Ljava/lang/IllegalStateException;",
+        EX_NETWORK_MAIN_THREAD => "Landroid/os/NetworkOnMainThreadException;",
+        EX_UNSUPPORTED_OPERATION => "Ljava/lang/UnsupportedOperationException;",
+        EX_SERVICE_SPECIFIC => {
+            let _error_code = read_i32_from(vm, parcel)?;
+            "Landroid/os/ServiceSpecificException;"
+        }
+        EX_PARCELABLE => {
+            let size = read_i32_from(vm, parcel)?;
+            if size > 0 {
+                if let Value::Obj(e) = read_parcelable(vm, parcel)? {
+                    let class = vm.heap.class_of(e)?.to_string();
+                    let detail = match vm.heap.get_field(e, "detailMessage") {
+                        Ok(Value::Obj(s)) => {
+                            vm.heap.as_str(s).ok().map(str::to_string).unwrap_or(msg)
+                        }
+                        _ => msg,
+                    };
+                    return Err(Throwable::new(&class, detail).into());
+                }
+            }
+            return Err(Throwable::new(
+                "Ljava/lang/RuntimeException;",
+                format!("{msg} [missing Parcelable]"),
+            )
+            .into());
+        }
+        _ => {
+            return Err(Throwable::new(
+                "Ljava/lang/RuntimeException;",
+                format!("Unknown exception code: {code} msg {msg}"),
+            )
+            .into());
+        }
+    };
+    Err(Throwable::new(class, msg).into())
+}
+
 fn write_string_to(vm: &mut Engine, parcel: ObjRef, s: Option<&str>) {
     let mut st = load(vm, parcel);
     st.write_string(s);
@@ -587,6 +819,21 @@ pub(crate) fn write_bundle_map(
     parcel: ObjRef,
     bundle: ObjRef,
 ) -> Result<(), VmExit> {
+    // A still-parcelled Bundle is written by appending its retained frame
+    // payload verbatim (AOSP `Parcel.appendFrom` path in
+    // `BaseBundle.writeToParcelInner`); it must not be materialized first.
+    if let Some(payload) = parcelled_payload(vm, bundle) {
+        let mut st = load(vm, parcel);
+        st.pos = align4(st.pos);
+        st.write_i32(
+            i32::try_from(payload.len())
+                .map_err(|_| bad("Parcel: Bundle exceeds the maximum parcelable size"))?,
+        );
+        st.write_i32(BUNDLE_MAGIC);
+        st.write_raw(&payload);
+        store(vm, parcel, st);
+        return Ok(());
+    }
     let entries = bundle_map(vm, bundle);
     let (length_pos, start_pos) = {
         let mut st = load(vm, parcel);
@@ -609,9 +856,11 @@ pub(crate) fn write_bundle_map(
     Ok(())
 }
 
-/// Read one AOSP-framed Bundle. The declared length bounds the map and is
-/// honored even if a forward-compatible producer leaves unread bytes inside
-/// the Bundle frame.
+/// Read one AOSP-framed Bundle eagerly. The declared length bounds the map
+/// and is honored even if a forward-compatible producer leaves unread bytes
+/// inside the Bundle frame. Production Bundle reads are lazy
+/// (`new_lazy_bundle`); this eager form remains for the parcel unit tests.
+#[cfg(test)]
 pub(crate) fn read_bundle_map(
     vm: &mut Engine,
     parcel: ObjRef,
@@ -648,34 +897,182 @@ pub(crate) fn read_bundle_map(
     Ok(entries)
 }
 
+/// The retained parcelled-data Parcel of a lazy Bundle, if it is still
+/// parcelled (AOSP `BaseBundle.mParcelledData != null`).
+pub(crate) fn parcelled_data(vm: &Engine, bundle: ObjRef) -> Option<ObjRef> {
+    match vm.heap.get_field(bundle, PARCELLED_FIELD) {
+        Ok(Value::Obj(r)) => Some(r),
+        _ => None,
+    }
+}
+
+/// The retained ArrayMap payload bytes of a lazy Bundle (frame length and
+/// magic excluded), or `None` when the Bundle is materialized.
+pub(crate) fn parcelled_payload(vm: &Engine, bundle: ObjRef) -> Option<Vec<u8>> {
+    let data = parcelled_data(vm, bundle)?;
+    match vm.fw.get(data) {
+        Some(HostObj::Parcel { data, .. }) => Some(data.clone()),
+        _ => None,
+    }
+}
+
+/// Read one Bundle frame (`length | magic | payload`) without parsing the
+/// payload: the payload bytes are copied into a fresh hidden Parcel and the
+/// source cursor advances past the whole frame. This mirrors the AOSP
+/// `Bundle(Parcel, length)` constructor used by `Parcel.readBundle`.
+fn read_bundle_frame_retained(vm: &mut Engine, parcel: ObjRef) -> Result<ObjRef, VmExit> {
+    let length = {
+        let mut st = load(vm, parcel);
+        let length = st.read_i32()?;
+        store(vm, parcel, st);
+        length
+    };
+    if length < 0 {
+        return Err(bad(format!("Parcel: negative Bundle length {length}")));
+    }
+    read_bundle_frame_after_length(vm, parcel, length)
+}
+
+/// Second half of a Bundle frame read, for callers (like
+/// `Parcel.readBundle`) that have already consumed the length int because
+/// it doubles as the null marker.
+fn read_bundle_frame_after_length(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    length: i32,
+) -> Result<ObjRef, VmExit> {
+    let (payload, objects) = {
+        let mut st = load(vm, parcel);
+        let magic = st.read_i32()?;
+        if magic != BUNDLE_MAGIC {
+            return Err(bad(format!(
+                "Parcel: Bundle magic mismatch: expected {BUNDLE_MAGIC:#010x}, got {magic:#010x}"
+            )));
+        }
+        let end_pos = st
+            .pos
+            .checked_add(length as usize)
+            .filter(|end| *end <= st.data.len())
+            .ok_or_else(|| bad("Parcel under-run reading Bundle: length exceeds parcel size"))?;
+        let payload = st.data[st.pos..end_pos].to_vec();
+        let objects = st.objects.clone();
+        st.pos = end_pos;
+        store(vm, parcel, st);
+        (payload, objects)
+    };
+    let retained = match new_parcel(vm)? {
+        Value::Obj(r) => r,
+        _ => return Err(bad("Parcel: could not allocate retained Bundle data")),
+    };
+    store(
+        vm,
+        retained,
+        PState {
+            data: payload,
+            pos: 0,
+            objects,
+        },
+    );
+    Ok(retained)
+}
+
+/// Attach retained parcelled data to `bundle`, marking it parcelled. Any
+/// existing (materialized) map is dropped, matching AOSP
+/// `BaseBundle.readFromParcelInner`, which replaces the map state with the
+/// retained Parcel.
+fn set_parcelled_data(vm: &mut Engine, bundle: ObjRef, retained: ObjRef) -> Result<(), VmExit> {
+    vm.fw
+        .objects
+        .insert(bundle, HostObj::Bundle { map: Vec::new() });
+    crate::err::put_field_result(
+        vm.heap
+            .put_field(bundle, PARCELLED_FIELD, Value::Obj(retained)),
+    )
+}
+
+/// Create a new lazy Bundle of `class` from retained parcelled data.
+fn new_bundle_with_retained(
+    vm: &mut Engine,
+    class: &str,
+    retained: ObjRef,
+) -> Result<Value, VmExit> {
+    let r = vm
+        .heap
+        .alloc_instance(class.to_string(), Vec::new())
+        .map_err(crate::err::oom_throwable)?;
+    set_parcelled_data(vm, r, retained)?;
+    Ok(Value::Obj(r))
+}
+
+/// Create a new lazy Bundle of `class` from the next Bundle frame in
+/// `parcel` (no nullable marker). Used by `readValue` and `readParcelable`,
+/// which are lazy in AOSP just like `readBundle`.
+fn new_lazy_bundle(vm: &mut Engine, class: &str, parcel: ObjRef) -> Result<Value, VmExit> {
+    let retained = read_bundle_frame_retained(vm, parcel)?;
+    new_bundle_with_retained(vm, class, retained)
+}
+
+/// `Bundle.readFromParcel` adoption: read the next frame from `parcel` and
+/// install it as `bundle`'s retained data without materializing it.
+pub(crate) fn adopt_bundle_frame(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    bundle: ObjRef,
+) -> Result<(), VmExit> {
+    let retained = read_bundle_frame_retained(vm, parcel)?;
+    set_parcelled_data(vm, bundle, retained)
+}
+
+/// Materialize a lazy Bundle in place (AOSP `BaseBundle.unparcel`): parse
+/// the retained ArrayMap payload into the host map and drop the retained
+/// Parcel. A no-op for an already-materialized Bundle.
+pub(crate) fn unparcel_bundle(vm: &mut Engine, bundle: ObjRef) -> Result<(), VmExit> {
+    let Some(retained) = parcelled_data(vm, bundle) else {
+        return Ok(());
+    };
+    let entries = read_bundle_entries(vm, retained)?;
+    crate::err::put_field_result(vm.heap.put_field(bundle, PARCELLED_FIELD, Value::Null))?;
+    vm.fw
+        .objects
+        .insert(bundle, HostObj::Bundle { map: entries });
+    Ok(())
+}
+
+/// AOSP `Parcel.writeBundle` / `writePersistableBundle`: a null Bundle is
+/// a lone int `-1` (where the frame length would be); a non-null Bundle is
+/// its `writeToParcel` frame with no extra marker.
 fn write_nullable_bundle(
     vm: &mut Engine,
     parcel: ObjRef,
     bundle: Option<ObjRef>,
 ) -> Result<(), VmExit> {
-    let mut st = load(vm, parcel);
-    st.write_i32(bundle.is_some() as i32);
-    store(vm, parcel, st);
-    if let Some(bundle) = bundle {
-        write_bundle_map(vm, parcel, bundle)?;
+    match bundle {
+        None => {
+            let mut st = load(vm, parcel);
+            st.write_i32(-1);
+            store(vm, parcel, st);
+            Ok(())
+        }
+        Some(bundle) => write_bundle_map(vm, parcel, bundle),
     }
-    Ok(())
 }
 
+/// AOSP `Parcel.readBundle` / `readPersistableBundle`: read the length int;
+/// negative means the written Bundle was null. Otherwise construct the
+/// Bundle lazily over the following frame (`new Bundle(Parcel, length)`),
+/// retaining the payload until first real access (`unparcel`).
 fn read_nullable_bundle(vm: &mut Engine, parcel: ObjRef, class: &str) -> Result<Value, VmExit> {
-    let mut st = load(vm, parcel);
-    let present = st.read_i32()?;
-    store(vm, parcel, st);
-    match present {
-        0 => Ok(Value::Null),
-        1 => {
-            let entries = read_bundle_map(vm, parcel)?;
-            new_bundle(vm, class, entries)
-        }
-        other => Err(bad(format!(
-            "Parcel: invalid nullable Bundle marker {other}"
-        ))),
+    let length = {
+        let mut st = load(vm, parcel);
+        let length = st.read_i32()?;
+        store(vm, parcel, st);
+        length
+    };
+    if length < 0 {
+        return Ok(Value::Null);
     }
+    let retained = read_bundle_frame_after_length(vm, parcel, length)?;
+    new_bundle_with_retained(vm, class, retained)
 }
 
 fn sparse_entries(vm: &mut Engine, sparse: ObjRef) -> Result<Vec<(i32, Value)>, VmExit> {
@@ -730,6 +1127,40 @@ fn new_sparse(vm: &mut Engine, class: &str, entries: Vec<(i32, Value)>) -> Resul
             .collect(),
     );
     Ok(Value::Obj(r))
+}
+
+/// Entries of a `SparseIntArray`: the host sparse map when present, else
+/// the guest `size()/keyAt()/valueAt()` surface (Parcel's own algorithm).
+fn sparse_int_entries(vm: &mut Engine, sparse: ObjRef) -> Result<Vec<(i32, i32)>, VmExit> {
+    if let Some(entries) = vm.sparse.get(&sparse) {
+        return entries
+            .iter()
+            .map(|(key, value)| {
+                let key = i32::try_from(*key).map_err(|_| {
+                    bad(format!(
+                        "Parcel: SparseIntArray key {key} is outside int range"
+                    ))
+                })?;
+                Ok((key, value.as_int().unwrap_or(0)))
+            })
+            .collect();
+    }
+    let n = match vm.invoke_instance(sparse, "size", "()I", &[])? {
+        Value::Int(n) if n >= 0 => n as usize,
+        _ => return Err(bad("Parcel: SparseIntArray.size() did not return a count")),
+    };
+    let mut entries = Vec::with_capacity(n.min(1_000_000));
+    for i in 0..n {
+        let index = Value::Int(i as i32);
+        let key = vm
+            .invoke_instance(sparse, "keyAt", "(I)I", std::slice::from_ref(&index))?
+            .as_int()?;
+        let value = vm
+            .invoke_instance(sparse, "valueAt", "(I)I", std::slice::from_ref(&index))?
+            .as_int()?;
+        entries.push((key, value));
+    }
+    Ok(entries)
 }
 
 fn write_sparse_array(
@@ -807,15 +1238,6 @@ fn read_sparse_boolean_array(vm: &mut Engine, parcel: ObjRef) -> Result<Value, V
     new_sparse(vm, SPARSE_BOOLEAN_ARRAY, entries)
 }
 
-fn new_bundle(vm: &mut Engine, class: &str, map: Vec<(String, Value)>) -> Result<Value, VmExit> {
-    let r = vm
-        .heap
-        .alloc_instance(class.to_string(), Vec::new())
-        .map_err(crate::err::oom_throwable)?;
-    vm.fw.objects.insert(r, HostObj::Bundle { map });
-    Ok(Value::Obj(r))
-}
-
 fn write_parcelable(vm: &mut Engine, parcel: ObjRef, v: &Value, flags: i32) -> Result<(), VmExit> {
     let Some(r) = v.as_ref()? else {
         write_string_to(vm, parcel, None);
@@ -836,8 +1258,9 @@ fn read_parcelable(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
     };
     let desc = descriptor_of(&name);
     if desc == BUNDLE || desc == PERSISTABLE_BUNDLE {
-        let map = read_bundle_map(vm, parcel)?;
-        return new_bundle(vm, &desc, map);
+        // `Bundle.CREATOR.createFromParcel` constructs `Bundle(Parcel)`,
+        // which retains the frame lazily just like `readBundle`.
+        return new_lazy_bundle(vm, &desc, parcel);
     }
     let creator = creator_for(vm, &desc)?;
     creator_create(vm, creator, parcel, Some(&desc))
@@ -845,6 +1268,44 @@ fn read_parcelable(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
 
 fn boxed(vm: &mut Engine, class: &str, v: Value) -> Result<Value, VmExit> {
     Ok(Value::Obj(crate::boxes::box_value(vm, class, v)?))
+}
+
+/// The length-prefixed value tags (AOSP `Parcel.isLengthPrefixed`):
+/// `writeValue` writes tag, a placeholder length, the payload, then
+/// backpatches the payload byte count — letting readers (notably lazy
+/// Bundle values) skip a value without parsing it.
+fn is_length_prefixed(tag: i32) -> bool {
+    matches!(
+        tag,
+        VAL_MAP
+            | VAL_PARCELABLE
+            | VAL_LIST
+            | VAL_SPARSEARRAY
+            | VAL_PARCELABLEARRAY
+            | VAL_OBJECTARRAY
+            | VAL_SERIALIZABLE
+    )
+}
+
+/// Write the `-1` length placeholder after a length-prefixed tag and
+/// return its absolute position for `backpatch_value_length`.
+fn write_length_placeholder(vm: &mut Engine, parcel: ObjRef) -> usize {
+    let mut st = load(vm, parcel);
+    st.pos = align4(st.pos);
+    let length_pos = st.pos;
+    st.write_i32(-1);
+    store(vm, parcel, st);
+    length_pos
+}
+
+/// Backpatch a length placeholder with the payload byte count written
+/// since (AOSP `writeValue` performs the same seek-and-patch).
+fn backpatch_value_length(vm: &mut Engine, parcel: ObjRef, length_pos: usize) {
+    let mut st = load(vm, parcel);
+    let end = st.pos;
+    st.patch_i32(length_pos, (end - (length_pos + 4)) as i32);
+    st.pos = end;
+    store(vm, parcel, st);
 }
 
 fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit> {
@@ -921,9 +1382,10 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
                 st.write_i32(inner.as_int().unwrap_or(0));
             }
             'C' => {
-                st.write_i32(VAL_CHARSEQUENCE);
-                let c = char::from_u32(inner.as_int().unwrap_or(0) as u32).unwrap_or('\0');
-                st.write_string(Some(&c.to_string()));
+                // AOSP writes Character as VAL_CHAR + writeInt(char), not
+                // as a one-character CharSequence.
+                st.write_i32(VAL_CHAR);
+                st.write_i32(inner.as_int().unwrap_or(0));
             }
             'I' => {
                 st.write_i32(VAL_INTEGER);
@@ -947,10 +1409,34 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
         return Ok(());
     }
     if class == BUNDLE || class == PERSISTABLE_BUNDLE {
+        // Distinct value tags in AOSP: a PersistableBundle must not decode
+        // back as a plain Bundle.
         let mut st = load(vm, parcel);
-        st.write_i32(VAL_BUNDLE);
+        st.write_i32(if class == BUNDLE {
+            VAL_BUNDLE
+        } else {
+            VAL_PERSISTABLEBUNDLE
+        });
         store(vm, parcel, st);
         return write_bundle_map(vm, parcel, r);
+    }
+    if class == "Landroid/util/Size;" || class == "Landroid/util/SizeF;" {
+        // `writeSize` writes two ints, `writeSizeF` two floats; the host
+        // representation keeps them in the `rd_w`/`rd_h` fields.
+        let w = vm.heap.get_field(r, "rd_w").unwrap_or(Value::Null);
+        let h = vm.heap.get_field(r, "rd_h").unwrap_or(Value::Null);
+        let mut st = load(vm, parcel);
+        if class == "Landroid/util/Size;" {
+            st.write_i32(VAL_SIZE);
+            st.write_i32(w.as_int().unwrap_or(0));
+            st.write_i32(h.as_int().unwrap_or(0));
+        } else {
+            st.write_i32(VAL_SIZEF);
+            st.write_i32(w.as_float().unwrap_or(0.0).to_bits() as i32);
+            st.write_i32(h.as_float().unwrap_or(0.0).to_bits() as i32);
+        }
+        store(vm, parcel, st);
+        return Ok(());
     }
     if class == SPARSE_BOOLEAN_ARRAY {
         let mut st = load(vm, parcel);
@@ -962,7 +1448,10 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
         let mut st = load(vm, parcel);
         st.write_i32(VAL_SPARSEARRAY);
         store(vm, parcel, st);
-        return write_sparse_array(vm, parcel, Some(r));
+        let length_pos = write_length_placeholder(vm, parcel);
+        write_sparse_array(vm, parcel, Some(r))?;
+        backpatch_value_length(vm, parcel, length_pos);
+        return Ok(());
     }
     if class.starts_with('[') {
         let elems = vm.heap.as_array_elems(r)?.0.to_vec();
@@ -977,7 +1466,13 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
                 st.write_byte_blob(Some(&bytes));
             }
             "[I" | "[S" => {
-                st.write_i32(VAL_INTARRAY);
+                // short[] has its own tag in AOSP (same int-per-element
+                // encoding as int[]); it must not decode back as int[].
+                st.write_i32(if class == "[S" {
+                    VAL_SHORTARRAY
+                } else {
+                    VAL_INTARRAY
+                });
                 st.write_i32(elems.len() as i32);
                 for e in &elems {
                     st.write_i32(e.as_int().unwrap_or(0));
@@ -986,11 +1481,9 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
             "[Z" => {
                 st.write_i32(VAL_BOOLEANARRAY);
                 st.write_i32(elems.len() as i32);
-                let bytes: Vec<u8> = elems
-                    .iter()
-                    .map(|e| (e.as_int().unwrap_or(0) != 0) as u8)
-                    .collect();
-                st.write_padded(&bytes);
+                for e in &elems {
+                    st.write_i32((e.as_int().unwrap_or(0) != 0) as i32);
+                }
             }
             "[C" => {
                 st.write_i32(VAL_CHARARRAY);
@@ -1033,13 +1526,49 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
                 }
                 return Ok(());
             }
-            _ => {
-                st.write_i32(VAL_OBJECTARRAY);
+            "[Ljava/lang/CharSequence;" => {
+                drop(st);
+                let mut st = load(vm, parcel);
+                st.write_i32(VAL_CHARSEQUENCEARRAY);
                 st.write_i32(elems.len() as i32);
                 store(vm, parcel, st);
                 for e in &elems {
-                    write_value(vm, parcel, e)?;
+                    let s = char_seq_of(vm, Some(e))?;
+                    write_string_to(vm, parcel, s.as_deref());
                 }
+                return Ok(());
+            }
+            _ => {
+                // A Parcelable[] uses the dedicated VAL_PARCELABLEARRAY
+                // form (count, then one writeParcelable per element, a
+                // null class name marking a null element). Any other
+                // object array keeps the Object[] value form; AOSP only
+                // writes pure Object[] this way and serializes the rest,
+                // which remains an Appendix C gap.
+                let component = class.trim_start_matches('[');
+                let parcelable_array = component.starts_with('L')
+                    && (component == "Landroid/os/Parcelable;"
+                        || vm.cp.is_subtype(component, "Landroid/os/Parcelable;"));
+                st.write_i32(if parcelable_array {
+                    VAL_PARCELABLEARRAY
+                } else {
+                    VAL_OBJECTARRAY
+                });
+                store(vm, parcel, st);
+                let length_pos = write_length_placeholder(vm, parcel);
+                let mut st = load(vm, parcel);
+                st.write_i32(elems.len() as i32);
+                store(vm, parcel, st);
+                if parcelable_array {
+                    for e in &elems {
+                        write_parcelable(vm, parcel, e, 0)?;
+                    }
+                } else {
+                    for e in &elems {
+                        write_value(vm, parcel, e)?;
+                    }
+                }
+                backpatch_value_length(vm, parcel, length_pos);
                 return Ok(());
             }
         }
@@ -1052,22 +1581,30 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
     } {
         let mut st = load(vm, parcel);
         st.write_i32(VAL_MAP);
+        store(vm, parcel, st);
+        let length_pos = write_length_placeholder(vm, parcel);
+        let mut st = load(vm, parcel);
         st.write_i32(entries.len() as i32);
         store(vm, parcel, st);
         for (k, val) in &entries {
             write_value(vm, parcel, k)?;
             write_value(vm, parcel, val)?;
         }
+        backpatch_value_length(vm, parcel, length_pos);
         return Ok(());
     }
     if let Some(elems) = list_values(vm, v)? {
         let mut st = load(vm, parcel);
         st.write_i32(VAL_LIST);
+        store(vm, parcel, st);
+        let length_pos = write_length_placeholder(vm, parcel);
+        let mut st = load(vm, parcel);
         st.write_i32(elems.len() as i32);
         store(vm, parcel, st);
         for e in &elems {
             write_value(vm, parcel, e)?;
         }
+        backpatch_value_length(vm, parcel, length_pos);
         return Ok(());
     }
     if class == BINDER || vm.cp.is_subtype(&class, BINDER) || vm.cp.is_subtype(&class, IBINDER) {
@@ -1090,11 +1627,43 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
         let mut st = load(vm, parcel);
         st.write_i32(VAL_PARCELABLE);
         store(vm, parcel, st);
-        return write_parcelable(vm, parcel, v, 0);
+        let length_pos = write_length_placeholder(vm, parcel);
+        write_parcelable(vm, parcel, v, 0)?;
+        backpatch_value_length(vm, parcel, length_pos);
+        return Ok(());
     }
     Err(bad(format!(
         "Parcel.writeValue: unsupported value class {class}"
     )))
+}
+
+/// AOSP boolean arrays are one int per element (`writeBooleanArray`
+/// loops `writeInt(v ? 1 : 0)`), like short/char arrays — not one byte.
+fn write_bool_array_to(vm: &mut Engine, parcel: ObjRef, elems: Option<&[Value]>) {
+    let mut st = load(vm, parcel);
+    match elems {
+        None => st.write_i32(-1),
+        Some(es) => {
+            st.write_i32(es.len() as i32);
+            for e in es {
+                st.write_i32((e.as_int().unwrap_or(0) != 0) as i32);
+            }
+        }
+    }
+    store(vm, parcel, st);
+}
+
+fn read_bool_array_from(vm: &mut Engine, parcel: ObjRef) -> Result<Option<Vec<Value>>, VmExit> {
+    let Some(n) = read_typed_len(vm, parcel, "boolean array")? else {
+        return Ok(None);
+    };
+    let mut vals = Vec::with_capacity(n);
+    let mut st = load(vm, parcel);
+    for _ in 0..n {
+        vals.push(Value::Int((st.read_i32()? != 0) as i32));
+    }
+    store(vm, parcel, st);
+    Ok(Some(vals))
 }
 
 fn read_typed_len(vm: &mut Engine, parcel: ObjRef, what: &str) -> Result<Option<usize>, VmExit> {
@@ -1136,6 +1705,20 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
     let mut st = load(vm, parcel);
     let tag = st.read_i32()?;
     store(vm, parcel, st);
+    if is_length_prefixed(tag) {
+        // Consume the backpatched payload length. AOSP only logs (wtf) if
+        // the parser does not consume exactly that many bytes and leaves
+        // the cursor where parsing stopped; we keep the same cursor
+        // behavior but reject a length that runs past the parcel here.
+        let mut st = load(vm, parcel);
+        let length = st.read_i32()?;
+        if length < 0 || st.pos + length as usize > st.data.len() {
+            return Err(bad(format!(
+                "Parcel.readValue: invalid length-prefixed size {length} for tag {tag}"
+            )));
+        }
+        store(vm, parcel, st);
+    }
     Ok(match tag {
         VAL_NULL => Value::Null,
         VAL_STRING | VAL_CHARSEQUENCE => {
@@ -1153,6 +1736,35 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
         VAL_BYTE => {
             let v = read_i32_from(vm, parcel)?;
             boxed(vm, "Ljava/lang/Byte;", Value::Int(v))?
+        }
+        VAL_CHAR => {
+            let v = read_i32_from(vm, parcel)?;
+            boxed(vm, "Ljava/lang/Character;", Value::Int(v))?
+        }
+        VAL_SIZE | VAL_SIZEF => {
+            let (w, h) = {
+                let mut st = load(vm, parcel);
+                let w = st.read_i32()?;
+                let h = st.read_i32()?;
+                store(vm, parcel, st);
+                (w, h)
+            };
+            let (class, w, h) = if tag == VAL_SIZE {
+                ("Landroid/util/Size;", Value::Int(w), Value::Int(h))
+            } else {
+                (
+                    "Landroid/util/SizeF;",
+                    Value::Float(f32::from_bits(w as u32)),
+                    Value::Float(f32::from_bits(h as u32)),
+                )
+            };
+            let r = vm
+                .heap
+                .alloc_instance(class.to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            crate::err::put_field_result(vm.heap.put_field(r, "rd_w", w))?;
+            crate::err::put_field_result(vm.heap.put_field(r, "rd_h", h))?;
+            Value::Obj(r)
         }
         VAL_BOOLEAN => {
             let v = read_i32_from(vm, parcel)?;
@@ -1182,7 +1794,7 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             Some(b) => crate::jlstring::byte_array(vm, &b)?,
             None => Value::Null,
         },
-        VAL_INTARRAY | VAL_CHARARRAY => {
+        VAL_INTARRAY | VAL_SHORTARRAY | VAL_CHARARRAY => {
             let Some(n) = read_typed_len(vm, parcel, "int array")? else {
                 return Ok(Value::Null);
             };
@@ -1194,7 +1806,11 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             store(vm, parcel, st);
             crate::arrays::new_array(
                 vm,
-                if tag == VAL_CHARARRAY { "[C" } else { "[I" },
+                match tag {
+                    VAL_CHARARRAY => "[C",
+                    VAL_SHORTARRAY => "[S",
+                    _ => "[I",
+                },
                 ElemKind::Int,
                 vals,
             )?
@@ -1235,20 +1851,11 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             store(vm, parcel, st);
             crate::arrays::new_array(vm, "[D", ElemKind::Double, vals)?
         }
-        VAL_BOOLEANARRAY => {
-            let Some(n) = read_typed_len(vm, parcel, "boolean array")? else {
-                return Ok(Value::Null);
-            };
-            let mut st = load(vm, parcel);
-            let bytes = st.read_padded(n, "boolean array")?;
-            store(vm, parcel, st);
-            let vals = bytes
-                .into_iter()
-                .map(|b| Value::Int((b != 0) as i32))
-                .collect();
-            crate::arrays::new_array(vm, "[Z", ElemKind::Int, vals)?
-        }
-        VAL_STRINGARRAY => {
+        VAL_BOOLEANARRAY => match read_bool_array_from(vm, parcel)? {
+            Some(vals) => crate::arrays::new_array(vm, "[Z", ElemKind::Int, vals)?,
+            None => Value::Null,
+        },
+        VAL_STRINGARRAY | VAL_CHARSEQUENCEARRAY => {
             let Some(n) = read_typed_len(vm, parcel, "string array")? else {
                 return Ok(Value::Null);
             };
@@ -1259,7 +1866,26 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
                 store(vm, parcel, st);
                 vals.push(jstring(vm, s)?);
             }
-            crate::arrays::new_array(vm, "[Ljava/lang/String;", ElemKind::Obj, vals)?
+            crate::arrays::new_array(
+                vm,
+                if tag == VAL_CHARSEQUENCEARRAY {
+                    "[Ljava/lang/CharSequence;"
+                } else {
+                    "[Ljava/lang/String;"
+                },
+                ElemKind::Obj,
+                vals,
+            )?
+        }
+        VAL_PARCELABLEARRAY => {
+            let Some(n) = read_typed_len(vm, parcel, "parcelable array")? else {
+                return Ok(Value::Null);
+            };
+            let mut vals = Vec::with_capacity(n);
+            for _ in 0..n {
+                vals.push(read_parcelable(vm, parcel)?);
+            }
+            crate::arrays::new_array(vm, "[Landroid/os/Parcelable;", ElemKind::Obj, vals)?
         }
         VAL_OBJECTARRAY => {
             let Some(n) = read_typed_len(vm, parcel, "object array")? else {
@@ -1293,10 +1919,8 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             }
             new_map(vm, entries)?
         }
-        VAL_BUNDLE => {
-            let map = read_bundle_map(vm, parcel)?;
-            new_bundle(vm, BUNDLE, map)?
-        }
+        VAL_BUNDLE => new_lazy_bundle(vm, BUNDLE, parcel)?,
+        VAL_PERSISTABLEBUNDLE => new_lazy_bundle(vm, PERSISTABLE_BUNDLE, parcel)?,
         VAL_SPARSEARRAY => read_sparse_array(vm, parcel)?,
         VAL_SPARSEBOOLEANARRAY => read_sparse_boolean_array(vm, parcel)?,
         VAL_IBINDER => {
@@ -1306,6 +1930,11 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             binder_for_handle(vm, h)?
         }
         VAL_PARCELABLE => read_parcelable(vm, parcel)?,
+        VAL_SERIALIZABLE => {
+            return Err(bad(
+                "Parcel.readValue: Java-serialized values are not supported",
+            ))
+        }
         other => return Err(bad(format!("Parcel.readValue: unsupported tag {other}"))),
     })
 }
@@ -1458,7 +2087,184 @@ fn parcel_instance(
             store(vm, recv, st);
             return some(Value::Null);
         }
-        ("hasFileDescriptors", "()Z") => return some(Value::Int(0)),
+        ("hasFileDescriptors", "()Z") | ("hasFileDescriptors", "(II)Z") => {
+            // No file-descriptor object can ever be written into a host
+            // parcel (FD forms are typed-unsupported), so this is exact.
+            return some(Value::Int(0));
+        }
+        ("setClassCookie", "(Ljava/lang/Class;Ljava/lang/Object;)V") => {
+            let Some(cookies) = class_cookies(vm, recv, true)? else {
+                return some(Value::Null);
+            };
+            let key = args.first().cloned().unwrap_or(Value::Null);
+            let value = args.get(1).cloned().unwrap_or(Value::Null);
+            let mut entries = cookie_entries(vm, cookies);
+            if let Some(e) = entries.iter_mut().find(|(k, _)| *k == key) {
+                e.1 = value;
+            } else {
+                entries.push((key, value));
+            }
+            vm.fw.objects.insert(cookies, HostObj::Map { entries });
+            return some(Value::Null);
+        }
+        ("getClassCookie", "(Ljava/lang/Class;)Ljava/lang/Object;") => {
+            let found = match class_cookies(vm, recv, false)? {
+                Some(cookies) => cookie_entries(vm, cookies)
+                    .into_iter()
+                    .find(|(k, _)| Some(k) == args.first())
+                    .map(|(_, v)| v),
+                None => None,
+            };
+            return some(found.unwrap_or(Value::Null));
+        }
+        ("hasClassCookie", "(Ljava/lang/Class;)Z") => {
+            let found = match class_cookies(vm, recv, false)? {
+                Some(cookies) => cookie_entries(vm, cookies)
+                    .iter()
+                    .any(|(k, _)| Some(k) == args.first()),
+                None => false,
+            };
+            return some(Value::Int(found as i32));
+        }
+        ("removeClassCookie", "(Ljava/lang/Class;Ljava/lang/Object;)V") => {
+            if let Some(cookies) = class_cookies(vm, recv, false)? {
+                let mut entries = cookie_entries(vm, cookies);
+                entries.retain(|(k, _)| Some(k) != args.first());
+                vm.fw.objects.insert(cookies, HostObj::Map { entries });
+            }
+            return some(Value::Null);
+        }
+        ("adoptClassCookies", "(Landroid/os/Parcel;)V") => {
+            // AOSP adopts the source's cookie map reference itself.
+            let Some(from) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.adoptClassCookies: source is null"));
+            };
+            let adopted = vm
+                .heap
+                .get_field(from, CLASS_COOKIES_FIELD)
+                .unwrap_or(Value::Null);
+            crate::err::put_field_result(vm.heap.put_field(recv, CLASS_COOKIES_FIELD, adopted))?;
+            return some(Value::Null);
+        }
+        ("copyClassCookies", "()Ljava/util/Map;") => {
+            // AOSP `new ArrayMap<>(mClassCookies)` — a copy even when the
+            // parcel has no cookies (empty map, tolerating null).
+            let entries = match class_cookies(vm, recv, false)? {
+                Some(cookies) => cookie_entries(vm, cookies),
+                None => Vec::new(),
+            };
+            let copy = vm
+                .heap
+                .alloc_instance("Landroid/util/ArrayMap;".to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            vm.fw.objects.insert(copy, HostObj::Map { entries });
+            return some(Value::Obj(copy));
+        }
+        ("putClassCookies", "(Ljava/util/Map;)V") => {
+            if let Some(Value::Obj(source)) = args.first() {
+                if let Some(entries) = match vm.fw.get(*source) {
+                    Some(HostObj::Map { entries }) => Some(entries.clone()),
+                    _ => None,
+                } {
+                    if let Some(cookies) = class_cookies(vm, recv, true)? {
+                        let mut mine = cookie_entries(vm, cookies);
+                        for (k, v) in entries {
+                            if let Some(e) = mine.iter_mut().find(|(ek, _)| *ek == k) {
+                                e.1 = v;
+                            } else {
+                                mine.push((k, v));
+                            }
+                        }
+                        vm.fw.objects.insert(cookies, HostObj::Map { entries: mine });
+                    }
+                }
+            }
+            return some(Value::Null);
+        }
+        ("hasBinders", "()Z") => {
+            let st = load(vm, recv);
+            return some(Value::Int(
+                st.objects.iter().any(|o| matches!(o, Value::Obj(_))) as i32,
+            ));
+        }
+        ("enforceNoDataAvail", "()V") => {
+            let st = load(vm, recv);
+            let unread = st.data.len().saturating_sub(st.pos);
+            if unread > 0 {
+                return Err(bad(format!(
+                    "Parcel data not fully consumed, unread size: {unread}"
+                )));
+            }
+            return some(Value::Null);
+        }
+        ("compareData", "(Landroid/os/Parcel;)I") => {
+            let Some(other) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.compareData: other is null"));
+            };
+            let a = load(vm, recv).data;
+            let b = load(vm, other).data;
+            return some(Value::Int(compare_ranges(&a, &b)));
+        }
+        ("writeSize", "(Landroid/util/Size;)V") => {
+            let Some(r) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.writeSize: size is null"));
+            };
+            let w = vm.heap.get_field(r, "rd_w").unwrap_or(Value::Null);
+            let h = vm.heap.get_field(r, "rd_h").unwrap_or(Value::Null);
+            let mut st = load(vm, recv);
+            st.write_i32(w.as_int().unwrap_or(0));
+            st.write_i32(h.as_int().unwrap_or(0));
+            store(vm, recv, st);
+            return some(Value::Null);
+        }
+        ("readSize", "()Landroid/util/Size;") => {
+            let (w, h) = {
+                let mut st = load(vm, recv);
+                let pair = (st.read_i32()?, st.read_i32()?);
+                store(vm, recv, st);
+                pair
+            };
+            let r = vm
+                .heap
+                .alloc_instance("Landroid/util/Size;".to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            crate::err::put_field_result(vm.heap.put_field(r, "rd_w", Value::Int(w)))?;
+            crate::err::put_field_result(vm.heap.put_field(r, "rd_h", Value::Int(h)))?;
+            return some(Value::Obj(r));
+        }
+        ("writeSizeF", "(Landroid/util/SizeF;)V") => {
+            let Some(r) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.writeSizeF: size is null"));
+            };
+            let w = vm.heap.get_field(r, "rd_w").unwrap_or(Value::Null);
+            let h = vm.heap.get_field(r, "rd_h").unwrap_or(Value::Null);
+            let mut st = load(vm, recv);
+            st.write_i32(w.as_float().unwrap_or(0.0).to_bits() as i32);
+            st.write_i32(h.as_float().unwrap_or(0.0).to_bits() as i32);
+            store(vm, recv, st);
+            return some(Value::Null);
+        }
+        ("readSizeF", "()Landroid/util/SizeF;") => {
+            let (w, h) = {
+                let mut st = load(vm, recv);
+                let pair = (st.read_i32()?, st.read_i32()?);
+                store(vm, recv, st);
+                pair
+            };
+            // `SizeF`'s constructor rejects NaN/infinite dimensions; the
+            // same check applies when unmarshalling one.
+            let (wf, hf) = (f32::from_bits(w as u32), f32::from_bits(h as u32));
+            if !wf.is_finite() || !hf.is_finite() {
+                return Err(iae("Parcel.readSizeF: non-finite dimension"));
+            }
+            let r = vm
+                .heap
+                .alloc_instance("Landroid/util/SizeF;".to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            crate::err::put_field_result(vm.heap.put_field(r, "rd_w", Value::Float(wf)))?;
+            crate::err::put_field_result(vm.heap.put_field(r, "rd_h", Value::Float(hf)))?;
+            return some(Value::Obj(r));
+        }
         ("writeInterfaceToken", "(Ljava/lang/String;)V") => {
             let token = str_of(vm, args.first())?;
             let mut st = load(vm, recv);
@@ -1491,52 +2297,62 @@ fn parcel_instance(
             store(vm, recv, st);
             return some(Value::Null);
         }
+        ("readExceptionCode", "()I") => {
+            return some(Value::Int(read_exception_code(vm, recv)?));
+        }
         ("readException", "()V") => {
-            let mut st = load(vm, recv);
-            let code = st.read_i32()?;
-            let msg = if code != 0 { st.read_string()? } else { None };
-            store(vm, recv, st);
-            if code != 0 {
-                let class = match code {
-                    -1 => "Ljava/lang/SecurityException;",
-                    -3 => "Ljava/lang/IllegalArgumentException;",
-                    -4 => "Ljava/lang/NullPointerException;",
-                    -5 => "Ljava/lang/IllegalStateException;",
-                    -7 => "Landroid/os/BadParcelableException;",
-                    _ => "Ljava/lang/RuntimeException;",
-                };
-                return Err(Throwable::new(
-                    class,
-                    msg.unwrap_or_else(|| format!("remote exception code {code}")),
-                )
-                .into());
-            }
-            return some(Value::Null);
+            return some(read_exception(vm, recv)?);
         }
         ("writeException", "(Ljava/lang/Exception;)V") => {
-            let (code, msg) = match obj_arg(args, 0) {
-                Some(e) => {
-                    let class = vm.heap.class_of(e)?.to_string();
-                    let code = match class.as_str() {
-                        "Ljava/lang/SecurityException;" => -1,
-                        "Landroid/os/BadParcelableException;" => -7,
-                        "Ljava/lang/IllegalArgumentException;" => -3,
-                        "Ljava/lang/NullPointerException;" => -4,
-                        "Ljava/lang/IllegalStateException;" => -5,
-                        _ => -128,
-                    };
-                    let msg = match vm.heap.get_field(e, "detailMessage") {
-                        Ok(Value::Obj(s)) => vm.heap.as_str(s).ok().map(str::to_string),
-                        _ => None,
-                    };
-                    (code, msg)
-                }
-                None => (0, None),
+            let Some(e) = obj_arg(args, 0) else {
+                let mut st = load(vm, recv);
+                st.write_i32(0);
+                store(vm, recv, st);
+                return some(Value::Null);
+            };
+            let class = vm.heap.class_of(e)?.to_string();
+            // AOSP `getExceptionCode` (instanceof order matters):
+            // Parcelable-boot exceptions first, then by exception class.
+            let is = |target: &str| class == target || vm.cp.is_subtype(&class, target);
+            let code = if is("Ljava/lang/SecurityException;") {
+                EX_SECURITY
+            } else if is("Landroid/os/BadParcelableException;") {
+                EX_BAD_PARCELABLE
+            } else if is("Ljava/lang/IllegalArgumentException;") {
+                EX_ILLEGAL_ARGUMENT
+            } else if is("Ljava/lang/NullPointerException;") {
+                EX_NULL_POINTER
+            } else if is("Ljava/lang/IllegalStateException;") {
+                EX_ILLEGAL_STATE
+            } else if is("Landroid/os/NetworkOnMainThreadException;") {
+                EX_NETWORK_MAIN_THREAD
+            } else if is("Ljava/lang/UnsupportedOperationException;") {
+                EX_UNSUPPORTED_OPERATION
+            } else if is("Landroid/os/ServiceSpecificException;") {
+                EX_SERVICE_SPECIFIC
+            } else {
+                0
+            };
+            let msg = match vm.heap.get_field(e, "detailMessage") {
+                Ok(Value::Obj(s)) => vm.heap.as_str(s).ok().map(str::to_string),
+                _ => None,
             };
             let mut st = load(vm, recv);
             st.write_i32(code);
-            if code != 0 {
-                st.write_string(msg.as_deref());
+            if code == 0 {
+                // AOSP writes the 0 code and then rethrows exceptions it
+                // has no code for instead of marshalling them.
+                store(vm, recv, st);
+                return Err(Throwable::new(&class, msg.unwrap_or_default()).into());
+            }
+            st.write_string(msg.as_deref());
+            st.write_i32(0); // no remote stack-trace payload
+            if code == EX_SERVICE_SPECIFIC {
+                let error_code = match vm.heap.get_field(e, "errorCode") {
+                    Ok(v) => v.as_int().unwrap_or(0),
+                    Err(_) => 0,
+                };
+                st.write_i32(error_code);
             }
             store(vm, recv, st);
             return some(Value::Null);
@@ -1710,37 +2526,22 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("writeStrongBinder", "(Landroid/os/IBinder;)V") => {
-            let h = binder_handle(
+            write_strong_binder_to(
                 vm,
+                recv,
                 args.first().cloned().unwrap_or(Value::Null).as_ref_value(),
             );
-            let mut st = load(vm, recv);
-            st.write_i32(h);
-            store(vm, recv, st);
             return some(Value::Null);
         }
         ("readStrongBinder", "()Landroid/os/IBinder;") => {
-            let mut st = load(vm, recv);
-            let h = st.read_i32()?;
-            store(vm, recv, st);
-            return some(binder_for_handle(vm, h)?);
+            return some(read_strong_binder_from(vm, recv)?);
         }
         ("writeStrongInterface", "(Landroid/os/IInterface;)V") => {
-            let binder = match obj_arg(args, 0) {
-                None => Value::Null,
-                Some(r) => {
-                    let class = vm.heap.class_of(r)?.to_string();
-                    if class == BINDER || vm.cp.is_subtype(&class, BINDER) {
-                        Value::Obj(r)
-                    } else {
-                        vm.invoke_instance(r, "asBinder", "()Landroid/os/IBinder;", &[])?
-                    }
-                }
-            };
-            let h = binder_handle(vm, &binder);
-            let mut st = load(vm, recv);
-            st.write_i32(h);
-            store(vm, recv, st);
+            write_strong_interface_to(
+                vm,
+                recv,
+                args.first().cloned().unwrap_or(Value::Null).as_ref_value(),
+            )?;
             return some(Value::Null);
         }
         ("writeValue", "(Ljava/lang/Object;)V") => {
@@ -1782,6 +2583,42 @@ fn parcel_instance(
         ("readSparseArray", "(Ljava/lang/ClassLoader;)Landroid/util/SparseArray;")
         | ("readSparseArray", "(Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/Object;") => {
             return some(read_sparse_array(vm, recv)?);
+        }
+        ("writeSparseIntArray", "(Landroid/util/SparseIntArray;)V") => {
+            // AOSP: -1 for null, else count then key/value int pairs in
+            // ascending-key order.
+            match obj_arg(args, 0) {
+                None => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(-1);
+                    store(vm, recv, st);
+                }
+                Some(sparse) => {
+                    let entries = sparse_int_entries(vm, sparse)?;
+                    let mut st = load(vm, recv);
+                    st.write_i32(entries.len() as i32);
+                    for (key, value) in entries {
+                        st.write_i32(key);
+                        st.write_i32(value);
+                    }
+                    store(vm, recv, st);
+                }
+            }
+            return some(Value::Null);
+        }
+        ("readSparseIntArray", "()Landroid/util/SparseIntArray;") => {
+            let Some(n) = read_typed_len(vm, recv, "SparseIntArray")? else {
+                return some(Value::Null);
+            };
+            let mut entries = Vec::with_capacity(n.min(1_000_000));
+            let mut st = load(vm, recv);
+            for _ in 0..n {
+                let key = st.read_i32()?;
+                let value = st.read_i32()?;
+                entries.push((key, Value::Int(value)));
+            }
+            store(vm, recv, st);
+            return some(new_sparse(vm, "Landroid/util/SparseIntArray;", entries)?);
         }
         ("writeSparseBooleanArray", "(Landroid/util/SparseBooleanArray;)V") => {
             write_sparse_boolean_array(vm, recv, obj_arg(args, 0))?;
@@ -1992,6 +2829,165 @@ fn parcel_instance(
             }
             return some(Value::Null);
         }
+        ("writeArrayMap", "(Landroid/util/ArrayMap;)V") => {
+            // AOSP `writeArrayMapInternal`: -1 for null, else the entry
+            // count followed by String key / writeValue pairs in the map's
+            // (hash-sorted) iteration order.
+            match obj_arg(args, 0) {
+                None => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(-1);
+                    store(vm, recv, st);
+                }
+                Some(map) => {
+                    let entries = match vm.fw.get(map) {
+                        Some(HostObj::Map { entries }) => entries.clone(),
+                        _ => {
+                            return Err(bad(
+                                "Parcel.writeArrayMap: only host ArrayMap state can be written",
+                            ))
+                        }
+                    };
+                    let mut st = load(vm, recv);
+                    st.write_i32(entries.len() as i32);
+                    store(vm, recv, st);
+                    for (k, v) in &entries {
+                        let key = match k {
+                            Value::Obj(o) => vm.heap.as_str(*o).ok().map(str::to_string),
+                            _ => None,
+                        };
+                        write_string_to(vm, recv, key.as_deref());
+                        write_value(vm, recv, v)?;
+                    }
+                }
+            }
+            return some(Value::Null);
+        }
+        ("readArrayMap", "(Landroid/util/ArrayMap;Ljava/lang/ClassLoader;)V") => {
+            // AOSP appends the parcelled entries to the destination, in
+            // stream order (the producer wrote them hash-sorted).
+            let Some(dest) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.readArrayMap: destination is null"));
+            };
+            let Some(n) = read_typed_len(vm, recv, "ArrayMap")? else {
+                return some(Value::Null);
+            };
+            let mut pairs = Vec::with_capacity(n);
+            for _ in 0..n {
+                let key = read_string_from(vm, recv)?;
+                let value = read_value(vm, recv)?;
+                pairs.push((jstring(vm, key)?, value));
+            }
+            if matches!(vm.fw.get(dest), Some(HostObj::Map { .. }) | None) {
+                let mut entries = match vm.fw.get(dest) {
+                    Some(HostObj::Map { entries }) => entries.clone(),
+                    _ => Vec::new(),
+                };
+                entries.extend(pairs);
+                vm.fw.objects.insert(dest, HostObj::Map { entries });
+            } else {
+                for (k, v) in pairs {
+                    vm.invoke_instance(
+                        dest,
+                        "append",
+                        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+                        &[k, v],
+                    )?;
+                }
+            }
+            return some(Value::Null);
+        }
+        ("writeTypedArrayMap", "(Landroid/util/ArrayMap;I)V") => {
+            match obj_arg(args, 0) {
+                None => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(-1);
+                    store(vm, recv, st);
+                }
+                Some(map) => {
+                    let entries = match vm.fw.get(map) {
+                        Some(HostObj::Map { entries }) => entries.clone(),
+                        _ => {
+                            return Err(bad(
+                                "Parcel.writeTypedArrayMap: only host ArrayMap state can be written",
+                            ))
+                        }
+                    };
+                    let mut st = load(vm, recv);
+                    st.write_i32(entries.len() as i32);
+                    store(vm, recv, st);
+                    for (k, v) in &entries {
+                        let key = match k {
+                            Value::Obj(o) => vm.heap.as_str(*o).ok().map(str::to_string),
+                            _ => None,
+                        };
+                        write_string_to(vm, recv, key.as_deref());
+                        write_present_typed(vm, recv, std::slice::from_ref(v), int_arg(args, 1))?;
+                    }
+                }
+            }
+            return some(Value::Null);
+        }
+        (
+            "createTypedArrayMap",
+            "(Landroid/os/Parcelable$Creator;)Landroid/util/ArrayMap;",
+        ) => {
+            let Some(creator) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.createTypedArrayMap: creator is null"));
+            };
+            let Some(n) = read_typed_len(vm, recv, "typed ArrayMap")? else {
+                return some(Value::Null);
+            };
+            let mut entries = Vec::with_capacity(n);
+            for _ in 0..n {
+                let key = read_string_from(vm, recv)?;
+                let mut value = read_present_typed(vm, recv, creator, 1)?;
+                entries.push((jstring(vm, key)?, value.pop().unwrap_or(Value::Null)));
+            }
+            let map = vm
+                .heap
+                .alloc_instance("Landroid/util/ArrayMap;".to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            vm.fw.objects.insert(map, HostObj::Map { entries });
+            return some(Value::Obj(map));
+        }
+        ("writeArraySet", "(Landroid/util/ArraySet;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            match list_values(vm, &v)? {
+                None => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(-1);
+                    store(vm, recv, st);
+                }
+                Some(elems) => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(elems.len() as i32);
+                    store(vm, recv, st);
+                    for e in &elems {
+                        write_value(vm, recv, e)?;
+                    }
+                }
+            }
+            return some(Value::Null);
+        }
+        ("readArraySet", "(Ljava/lang/ClassLoader;)Landroid/util/ArraySet;") => {
+            // AOSP `readArraySet` appends in stream order; the producer
+            // wrote the set's hash-sorted order, which the host list
+            // representation preserves verbatim.
+            let Some(n) = read_typed_len(vm, recv, "ArraySet")? else {
+                return some(Value::Null);
+            };
+            let mut elems = Vec::with_capacity(n);
+            for _ in 0..n {
+                elems.push(read_value(vm, recv)?);
+            }
+            let set = vm
+                .heap
+                .alloc_instance("Landroid/util/ArraySet;".to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            vm.fw.objects.insert(set, HostObj::List { elems });
+            return some(Value::Obj(set));
+        }
         ("createTypedArray", "(Landroid/os/Parcelable$Creator;)[Ljava/lang/Object;") => {
             let Some(creator) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.createTypedArray: creator is null"));
@@ -2038,7 +3034,7 @@ fn parcel_instance(
             slot.clone_from(&vals);
             return some(Value::Null);
         }
-        ("writeIntArray", "([I)V") | ("writeCharArray", "([C)V") => {
+        ("writeIntArray", "([I)V") | ("writeCharArray", "([C)V") | ("writeShortArray", "([S)V") => {
             let mut st = load(vm, recv);
             match array_elems(vm, args.first())? {
                 None => st.write_i32(-1),
@@ -2052,7 +3048,7 @@ fn parcel_instance(
             store(vm, recv, st);
             return some(Value::Null);
         }
-        ("createIntArray", "()[I") | ("createCharArray", "()[C") => {
+        ("createIntArray", "()[I") | ("createCharArray", "()[C") | ("createShortArray", "()[S") => {
             let Some(n) = read_typed_len(vm, recv, "int array")? else {
                 return some(Value::Null);
             };
@@ -2064,16 +3060,16 @@ fn parcel_instance(
             store(vm, recv, st);
             return some(crate::arrays::new_array(
                 vm,
-                if name == "createCharArray" {
-                    "[C"
-                } else {
-                    "[I"
+                match name {
+                    "createCharArray" => "[C",
+                    "createShortArray" => "[S",
+                    _ => "[I",
                 },
                 ElemKind::Int,
                 vals,
             )?);
         }
-        ("readIntArray", "([I)V") | ("readCharArray", "([C)V") => {
+        ("readIntArray", "([I)V") | ("readCharArray", "([C)V") | ("readShortArray", "([S)V") => {
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readIntArray: destination is null"));
             };
@@ -2232,48 +3228,23 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("writeBooleanArray", "([Z)V") => {
-            let mut st = load(vm, recv);
-            match array_elems(vm, args.first())? {
-                None => st.write_i32(-1),
-                Some(es) => {
-                    st.write_i32(es.len() as i32);
-                    let bytes: Vec<u8> = es
-                        .iter()
-                        .map(|e| (e.as_int().unwrap_or(0) != 0) as u8)
-                        .collect();
-                    st.write_padded(&bytes);
-                }
-            }
-            store(vm, recv, st);
+            let elems = array_elems(vm, args.first())?;
+            write_bool_array_to(vm, recv, elems.as_deref());
             return some(Value::Null);
         }
         ("createBooleanArray", "()[Z") => {
-            let Some(n) = read_typed_len(vm, recv, "boolean array")? else {
+            let Some(vals) = read_bool_array_from(vm, recv)? else {
                 return some(Value::Null);
             };
-            let mut st = load(vm, recv);
-            let bytes = st.read_padded(n, "boolean array")?;
-            store(vm, recv, st);
-            let vals = bytes
-                .into_iter()
-                .map(|b| Value::Int((b != 0) as i32))
-                .collect();
             return some(crate::arrays::new_array(vm, "[Z", ElemKind::Int, vals)?);
         }
         ("readBooleanArray", "([Z)V") => {
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readBooleanArray: destination is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "boolean array")? else {
+            let Some(vals) = read_bool_array_from(vm, recv)? else {
                 return some(Value::Null);
             };
-            let mut st = load(vm, recv);
-            let bytes = st.read_padded(n, "boolean array")?;
-            store(vm, recv, st);
-            let vals: Vec<Value> = bytes
-                .into_iter()
-                .map(|b| Value::Int((b != 0) as i32))
-                .collect();
             let slot = vm.heap.array_elems_mut(dest)?;
             if slot.len() != vals.len() {
                 return Err(bad("Parcel.readBooleanArray: destination length mismatch"));
@@ -2282,6 +3253,7 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("writeStringArray", "([Ljava/lang/String;)V")
+        | ("writeString16Array", "([Ljava/lang/String;)V")
         | ("writeCharSequenceArray", "([Ljava/lang/CharSequence;)V") => {
             match array_elems(vm, args.first())? {
                 None => {
@@ -2302,6 +3274,7 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("createStringArray", "()[Ljava/lang/String;")
+        | ("createString16Array", "()[Ljava/lang/String;")
         | ("createCharSequenceArray", "()[Ljava/lang/CharSequence;") => {
             let Some(n) = read_typed_len(vm, recv, "string array")? else {
                 return some(Value::Null);
@@ -2325,6 +3298,7 @@ fn parcel_instance(
             )?);
         }
         ("readStringArray", "([Ljava/lang/String;)V")
+        | ("readString16Array", "([Ljava/lang/String;)V")
         | ("readCharSequenceArray", "([Ljava/lang/CharSequence;)V") => {
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readStringArray: destination is null"));
@@ -2342,6 +3316,73 @@ fn parcel_instance(
             let slot = vm.heap.array_elems_mut(dest)?;
             if slot.len() != vals.len() {
                 return Err(bad("Parcel.readStringArray: destination length mismatch"));
+            }
+            slot.clone_from(&vals);
+            return some(Value::Null);
+        }
+        ("writeString8Array", "([Ljava/lang/String;)V") => {
+            match array_elems(vm, args.first())? {
+                None => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(-1);
+                    store(vm, recv, st);
+                }
+                Some(elems) => {
+                    let mut strings = Vec::with_capacity(elems.len());
+                    for e in &elems {
+                        strings.push(str_of(vm, Some(e))?);
+                    }
+                    let mut st = load(vm, recv);
+                    st.write_i32(strings.len() as i32);
+                    for s in &strings {
+                        st.write_string8(s.as_deref());
+                    }
+                    store(vm, recv, st);
+                }
+            }
+            return some(Value::Null);
+        }
+        ("createString8Array", "()[Ljava/lang/String;") => {
+            let Some(n) = read_typed_len(vm, recv, "string8 array")? else {
+                return some(Value::Null);
+            };
+            let mut vals = Vec::with_capacity(n);
+            let mut st = load(vm, recv);
+            for _ in 0..n {
+                vals.push(st.read_string8()?);
+            }
+            store(vm, recv, st);
+            let mut out = Vec::with_capacity(n);
+            for s in vals {
+                out.push(jstring(vm, s)?);
+            }
+            return some(crate::arrays::new_array(
+                vm,
+                "[Ljava/lang/String;",
+                ElemKind::Obj,
+                out,
+            )?);
+        }
+        ("readString8Array", "([Ljava/lang/String;)V") => {
+            let Some(dest) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.readString8Array: destination is null"));
+            };
+            let Some(n) = read_typed_len(vm, recv, "string8 array")? else {
+                return some(Value::Null);
+            };
+            let mut strs = Vec::with_capacity(n);
+            let mut st = load(vm, recv);
+            for _ in 0..n {
+                strs.push(st.read_string8()?);
+            }
+            store(vm, recv, st);
+            let mut vals = Vec::with_capacity(n);
+            for s in strs {
+                vals.push(jstring(vm, s)?);
+            }
+            let slot = vm.heap.array_elems_mut(dest)?;
+            if slot.len() != vals.len() {
+                return Err(bad("Parcel.readString8Array: destination length mismatch"));
             }
             slot.clone_from(&vals);
             return some(Value::Null);
@@ -2460,6 +3501,150 @@ fn parcel_instance(
                 return Err(bad("Parcel.readIBinderArray: destination length mismatch"));
             }
             slot.clone_from(&vals);
+            return some(Value::Null);
+        }
+        ("writeInterfaceArray", "([Landroid/os/IInterface;)V") => {
+            // AOSP: null writes -1, otherwise the length followed by one
+            // strong Binder per element (`writeStrongInterface`).
+            match array_elems(vm, args.first())? {
+                None => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(-1);
+                    store(vm, recv, st);
+                }
+                Some(elems) => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(elems.len() as i32);
+                    store(vm, recv, st);
+                    for e in &elems {
+                        write_strong_interface_to(vm, recv, e)?;
+                    }
+                }
+            }
+            return some(Value::Null);
+        }
+        (
+            "createInterfaceArray",
+            "(Ljava/util/function/IntFunction;Ljava/util/function/Function;)[Landroid/os/IInterface;",
+        ) => {
+            // AOSP: a negative count returns null; otherwise the guest
+            // IntFunction allocates the typed array and each element is
+            // `asInterface.apply(readStrongBinder())`.
+            let Some(factory) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.createInterfaceArray: factory is null"));
+            };
+            let Some(as_interface) = obj_arg(args, 1) else {
+                return Err(npe("Parcel.createInterfaceArray: asInterface is null"));
+            };
+            let Some(n) = read_typed_len(vm, recv, "interface array")? else {
+                return some(Value::Null);
+            };
+            let array = match vm.invoke_instance(
+                factory,
+                "apply",
+                "(I)Ljava/lang/Object;",
+                &[Value::Int(n as i32)],
+            )? {
+                Value::Obj(r) => r,
+                _ => {
+                    return Err(bad(
+                        "Parcel.createInterfaceArray: factory did not return an array",
+                    ))
+                }
+            };
+            if vm.heap.as_array_elems(array)?.0.len() != n {
+                return Err(bad(
+                    "Parcel.createInterfaceArray: factory returned an array of the wrong length",
+                ));
+            }
+            let mut vals = Vec::with_capacity(n);
+            for _ in 0..n {
+                vals.push(read_strong_interface_with(vm, recv, as_interface)?);
+            }
+            vm.heap.array_elems_mut(array)?.clone_from(&vals);
+            return some(Value::Obj(array));
+        }
+        (
+            "readInterfaceArray",
+            "([Landroid/os/IInterface;Ljava/util/function/Function;)V",
+        ) => {
+            // AOSP fills the destination in place and rejects a parcelled
+            // count larger than the destination array.
+            let Some(dest) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.readInterfaceArray: destination is null"));
+            };
+            let Some(as_interface) = obj_arg(args, 1) else {
+                return Err(npe("Parcel.readInterfaceArray: asInterface is null"));
+            };
+            let Some(n) = read_typed_len(vm, recv, "interface array")? else {
+                return some(Value::Null);
+            };
+            if n > vm.heap.as_array_elems(dest)?.0.len() {
+                return Err(bad(
+                    "Parcel.readInterfaceArray: parcelled count exceeds destination length",
+                ));
+            }
+            let mut vals = Vec::with_capacity(n);
+            for _ in 0..n {
+                vals.push(read_strong_interface_with(vm, recv, as_interface)?);
+            }
+            vm.heap.array_elems_mut(dest)?[..n].clone_from_slice(&vals);
+            return some(Value::Null);
+        }
+        ("writeInterfaceList", "(Ljava/util/List;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            match list_values(vm, &v)? {
+                None => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(-1);
+                    store(vm, recv, st);
+                }
+                Some(elems) => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(elems.len() as i32);
+                    store(vm, recv, st);
+                    for e in &elems {
+                        write_strong_interface_to(vm, recv, e)?;
+                    }
+                }
+            }
+            return some(Value::Null);
+        }
+        (
+            "createInterfaceArrayList",
+            "(Ljava/util/function/Function;)Ljava/util/ArrayList;",
+        ) => {
+            let Some(as_interface) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.createInterfaceArrayList: asInterface is null"));
+            };
+            let Some(n) = read_typed_len(vm, recv, "interface list")? else {
+                return some(Value::Null);
+            };
+            let mut vals = Vec::with_capacity(n);
+            for _ in 0..n {
+                vals.push(read_strong_interface_with(vm, recv, as_interface)?);
+            }
+            return some(new_list(vm, vals)?);
+        }
+        ("readInterfaceList", "(Ljava/util/List;Ljava/util/function/Function;)V") => {
+            // AOSP reuses destination slots (`set`), appends (`add`) or
+            // truncates (`remove`) so the destination ends with exactly the
+            // parcelled elements; replacing the host contents has the same
+            // observable result while keeping the same list object.
+            let Some(dest) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.readInterfaceList: destination is null"));
+            };
+            let Some(as_interface) = obj_arg(args, 1) else {
+                return Err(npe("Parcel.readInterfaceList: asInterface is null"));
+            };
+            let Some(n) = read_typed_len(vm, recv, "interface list")? else {
+                return some(Value::Null);
+            };
+            let mut vals = Vec::with_capacity(n);
+            for _ in 0..n {
+                vals.push(read_strong_interface_with(vm, recv, as_interface)?);
+            }
+            fill_list(vm, dest, vals)?;
             return some(Value::Null);
         }
         ("writeBinderList", "(Ljava/util/List;)V") => {
@@ -2615,6 +3800,10 @@ fn binder_instance(
             Some(jstring(vm, binder_descriptor(vm, recv))?)
         }
         ("isBinderAlive", "()Z") | ("pingBinder", "()Z") => Some(Value::Int(1)),
+        // AOSP's local `Binder.linkToDeath` is documented as a no-op (a
+        // local object cannot die), and `unlinkToDeath` returns true.
+        ("linkToDeath", "(Landroid/os/IBinder$DeathRecipient;I)V") => Some(Value::Null),
+        ("unlinkToDeath", "(Landroid/os/IBinder$DeathRecipient;I)Z") => Some(Value::Int(1)),
         ("transact", "(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z") => {
             let code = int_arg(args, 0);
             if code == INTERFACE_TRANSACTION {
@@ -2688,6 +3877,27 @@ pub(crate) fn static_intrinsic(
 ) -> Result<Option<Value>, VmExit> {
     Ok(match (class, name, sig) {
         (PARCEL, "obtain", "()Landroid/os/Parcel;") => Some(new_parcel(vm)?),
+        (PARCEL, "compareData", "(Landroid/os/Parcel;ILandroid/os/Parcel;II)Z") => {
+            let (Some(a), Some(b)) = (obj_arg(args, 0), obj_arg(args, 2)) else {
+                return Err(npe("Parcel.compareData: parcel is null"));
+            };
+            let (off_a, off_b, len) = (int_arg(args, 1), int_arg(args, 3), int_arg(args, 4));
+            let da = load(vm, a).data;
+            let db = load(vm, b).data;
+            let slice = |d: &Vec<u8>, off: i32| -> Option<Vec<u8>> {
+                if off < 0 || len < 0 {
+                    return None;
+                }
+                let (off, len) = (off as usize, len as usize);
+                let end = off.checked_add(len)?;
+                d.get(off..end).map(<[u8]>::to_vec)
+            };
+            let equal = match (slice(&da, off_a), slice(&db, off_b)) {
+                (Some(x), Some(y)) => x == y,
+                _ => false,
+            };
+            Some(Value::Int(equal as i32))
+        }
         (BINDER, "getCallingPid", "()I") => Some(Value::Int(10000)),
         (BINDER, "getCallingUid", "()I") => Some(Value::Int(10000)),
         (BINDER, "getCallingUidOrThrow", "()I") => Some(Value::Int(10000)),
@@ -2990,7 +4200,131 @@ mod tests {
     }
 
     #[test]
-    fn bundle_parcel_uses_aosp_length_magic_and_nullable_marker() {
+    fn value_tags_and_primitive_array_forms_match_aosp() {
+        fn tag_of(st: &PState) -> i32 {
+            i32::from_le_bytes(st.data[0..4].try_into().unwrap())
+        }
+        fn roundtrip(vm: &mut Engine, v: &Value) -> (PState, Value) {
+            let p = obj(new_parcel(vm).unwrap());
+            write_value(vm, p, v).unwrap();
+            let st = load(vm, p);
+            let mut reset = st.clone();
+            reset.pos = 0;
+            store(vm, p, reset);
+            let got = read_value(vm, p).unwrap();
+            (st, got)
+        }
+        let mut vm = engine();
+
+        // Character: VAL_CHAR (29) + writeInt, not a CharSequence string.
+        let ch = Value::Obj(
+            crate::boxes::box_value(&mut vm, "Ljava/lang/Character;", Value::Int(120)).unwrap(),
+        );
+        let (st, got) = roundtrip(&mut vm, &ch);
+        assert_eq!(tag_of(&st), VAL_CHAR);
+        assert_eq!(i32::from_le_bytes(st.data[4..8].try_into().unwrap()), 120);
+        let got = obj(got);
+        assert_eq!(vm.heap.class_of(got).unwrap(), "Ljava/lang/Character;");
+        assert_eq!(vm.heap.get_field(got, "value").unwrap(), Value::Int(120));
+
+        // boolean[]: VAL_BOOLEANARRAY (23), count, then one int per element.
+        let bools = crate::arrays::new_array(
+            &mut vm,
+            "[Z",
+            ElemKind::Int,
+            vec![Value::Int(1), Value::Int(0), Value::Int(1)],
+        )
+        .unwrap();
+        let (st, got) = roundtrip(&mut vm, &bools);
+        assert_eq!(tag_of(&st), VAL_BOOLEANARRAY);
+        assert_eq!(st.data.len(), 4 + 4 + 3 * 4);
+        assert_eq!(i32::from_le_bytes(st.data[8..12].try_into().unwrap()), 1);
+        assert_eq!(i32::from_le_bytes(st.data[12..16].try_into().unwrap()), 0);
+        let got = obj(got);
+        assert_eq!(vm.heap.class_of(got).unwrap(), "[Z");
+        assert_eq!(
+            vm.heap.as_array_elems(got).unwrap().0,
+            &[Value::Int(1), Value::Int(0), Value::Int(1)]
+        );
+
+        // short[]: VAL_SHORTARRAY (30), decodes back as short[] not int[].
+        let shorts = crate::arrays::new_array(
+            &mut vm,
+            "[S",
+            ElemKind::Int,
+            vec![Value::Int(7), Value::Int(-2)],
+        )
+        .unwrap();
+        let (st, got) = roundtrip(&mut vm, &shorts);
+        assert_eq!(tag_of(&st), VAL_SHORTARRAY);
+        assert_eq!(vm.heap.class_of(obj(got)).unwrap(), "[S");
+
+        // PersistableBundle: VAL_PERSISTABLEBUNDLE (25), lazy on read.
+        let pb = vm
+            .heap
+            .alloc_instance(PERSISTABLE_BUNDLE.to_string(), Vec::new())
+            .unwrap();
+        vm.fw
+            .objects
+            .insert(pb, HostObj::Bundle { map: Vec::new() });
+        let (st, got) = roundtrip(&mut vm, &Value::Obj(pb));
+        assert_eq!(tag_of(&st), VAL_PERSISTABLEBUNDLE);
+        let got = obj(got);
+        assert_eq!(vm.heap.class_of(got).unwrap(), PERSISTABLE_BUNDLE);
+        assert!(parcelled_data(&vm, got).is_some());
+
+        // Size: VAL_SIZE (26) + two ints.
+        let size = vm
+            .heap
+            .alloc_instance("Landroid/util/Size;".to_string(), Vec::new())
+            .unwrap();
+        vm.heap.put_field(size, "rd_w", Value::Int(3)).unwrap();
+        vm.heap.put_field(size, "rd_h", Value::Int(4)).unwrap();
+        let (st, got) = roundtrip(&mut vm, &Value::Obj(size));
+        assert_eq!(tag_of(&st), VAL_SIZE);
+        assert_eq!(i32::from_le_bytes(st.data[4..8].try_into().unwrap()), 3);
+        assert_eq!(i32::from_le_bytes(st.data[8..12].try_into().unwrap()), 4);
+        let got = obj(got);
+        assert_eq!(vm.heap.get_field(got, "rd_w").unwrap(), Value::Int(3));
+        assert_eq!(vm.heap.get_field(got, "rd_h").unwrap(), Value::Int(4));
+    }
+
+    #[test]
+    fn length_prefixed_values_backpatch_payload_length() {
+        let mut vm = engine();
+        let p = obj(new_parcel(&mut vm).unwrap());
+        let item = s(&mut vm, "inside");
+        let list = new_list(&mut vm, vec![item]).unwrap();
+        write_value(&mut vm, p, &list).unwrap();
+        let st = load(&vm, p);
+        assert_eq!(
+            i32::from_le_bytes(st.data[0..4].try_into().unwrap()),
+            VAL_LIST
+        );
+        assert_eq!(
+            i32::from_le_bytes(st.data[4..8].try_into().unwrap()) as usize,
+            st.data.len() - 8,
+            "length covers only the payload after tag+length"
+        );
+        assert_eq!(i32::from_le_bytes(st.data[8..12].try_into().unwrap()), 1);
+
+        // And it reads back through the same length-prefixed form.
+        let mut reset = load(&vm, p);
+        reset.pos = 0;
+        store(&mut vm, p, reset);
+        let got = obj(read_value(&mut vm, p).unwrap());
+        match vm.fw.get(got) {
+            Some(HostObj::List { elems }) => {
+                assert_eq!(elems.len(), 1);
+                assert_eq!(vm.heap.as_str(obj(elems[0].clone())).unwrap(), "inside");
+            }
+            _ => panic!("list value did not roundtrip"),
+        }
+        assert_eq!(load(&vm, p).pos, st.data.len());
+    }
+
+    #[test]
+    fn bundle_parcel_uses_aosp_length_magic_and_null_length() {
         let mut vm = engine();
         let empty = vm
             .heap
@@ -3031,7 +4365,9 @@ mod tests {
             "(Landroid/os/Bundle;)V",
             &[Value::Null],
         );
-        assert_eq!(load(&vm, p2).data, vec![0, 0, 0, 0]);
+        // AOSP: a null Bundle is a lone int -1 where the frame length
+        // would be — there is no separate presence marker.
+        assert_eq!(load(&vm, p2).data, vec![255, 255, 255, 255]);
         callp(&mut vm, p2, "setDataPosition", "(I)V", &[Value::Int(0)]);
         assert_eq!(
             callp(
@@ -3089,11 +4425,378 @@ mod tests {
             &[Value::Obj(p3)],
         )
         .unwrap();
+        // `readFromParcel` adopts the frame lazily; the map materializes
+        // only on unparcel (first real access in guest code).
+        assert!(parcelled_data(&vm, target).is_some());
+        unparcel_bundle(&mut vm, target).unwrap();
+        assert!(parcelled_data(&vm, target).is_none());
         let map = bundle_map(&vm, target);
         assert_eq!(map.len(), 1);
         assert_eq!(map[0].0, "answer");
         let got = obj(map[0].1.clone());
         assert_eq!(vm.heap.get_field(got, "value").unwrap(), Value::Int(12));
+    }
+
+    #[test]
+    fn array_map_and_array_set_roundtrip_through_parcel() {
+        let mut vm = engine();
+        let p = obj(new_parcel(&mut vm).unwrap());
+
+        // ArrayMap<String, Integer> in the host's signed-hash order
+        // ("a" = 97 before "b" = 98).
+        let a = s(&mut vm, "a");
+        let one = Value::Obj(
+            crate::boxes::box_value(&mut vm, "Ljava/lang/Integer;", Value::Int(1)).unwrap(),
+        );
+        let b = s(&mut vm, "b");
+        let two = Value::Obj(
+            crate::boxes::box_value(&mut vm, "Ljava/lang/Integer;", Value::Int(2)).unwrap(),
+        );
+        let map = vm
+            .heap
+            .alloc_instance("Landroid/util/ArrayMap;".to_string(), Vec::new())
+            .unwrap();
+        vm.fw.objects.insert(
+            map,
+            HostObj::Map {
+                entries: vec![(a, one), (b, two)],
+            },
+        );
+        callp(
+            &mut vm,
+            p,
+            "writeArrayMap",
+            "(Landroid/util/ArrayMap;)V",
+            &[Value::Obj(map)],
+        );
+        let map_end = load(&vm, p).data.len();
+
+        // ArraySet with Integer 9 and "x": hash order is 9 (9) then "x"
+        // (120); the reader preserves the written stream order.
+        let nine = Value::Obj(
+            crate::boxes::box_value(&mut vm, "Ljava/lang/Integer;", Value::Int(9)).unwrap(),
+        );
+        let x = s(&mut vm, "x");
+        let set = vm
+            .heap
+            .alloc_instance("Landroid/util/ArraySet;".to_string(), Vec::new())
+            .unwrap();
+        vm.fw.objects.insert(
+            set,
+            HostObj::List {
+                elems: vec![nine, x],
+            },
+        );
+        callp(
+            &mut vm,
+            p,
+            "writeArraySet",
+            "(Landroid/util/ArraySet;)V",
+            &[Value::Obj(set)],
+        );
+
+        callp(&mut vm, p, "setDataPosition", "(I)V", &[Value::Int(0)]);
+        let dest = vm
+            .heap
+            .alloc_instance("Landroid/util/ArrayMap;".to_string(), Vec::new())
+            .unwrap();
+        vm.fw.objects.insert(
+            dest,
+            HostObj::Map {
+                entries: Vec::new(),
+            },
+        );
+        callp(
+            &mut vm,
+            p,
+            "readArrayMap",
+            "(Landroid/util/ArrayMap;Ljava/lang/ClassLoader;)V",
+            &[Value::Obj(dest), Value::Null],
+        );
+        assert_eq!(load(&vm, p).pos, map_end);
+        let entries = match vm.fw.get(dest) {
+            Some(HostObj::Map { entries }) => entries.clone(),
+            _ => panic!("destination ArrayMap has no host state"),
+        };
+        assert_eq!(entries.len(), 2);
+        assert_eq!(vm.heap.as_str(obj(entries[0].0.clone())).unwrap(), "a");
+        assert_eq!(
+            vm.heap
+                .get_field(obj(entries[0].1.clone()), "value")
+                .unwrap(),
+            Value::Int(1)
+        );
+        assert_eq!(vm.heap.as_str(obj(entries[1].0.clone())).unwrap(), "b");
+
+        let got_set = obj(callp(
+            &mut vm,
+            p,
+            "readArraySet",
+            "(Ljava/lang/ClassLoader;)Landroid/util/ArraySet;",
+            &[Value::Null],
+        ));
+        assert_eq!(
+            vm.heap.class_of(got_set).unwrap(),
+            "Landroid/util/ArraySet;"
+        );
+        let elems = match vm.fw.get(got_set) {
+            Some(HostObj::List { elems }) => elems.clone(),
+            _ => panic!("read ArraySet has no host state"),
+        };
+        assert_eq!(elems.len(), 2);
+        assert_eq!(
+            vm.heap.get_field(obj(elems[0].clone()), "value").unwrap(),
+            Value::Int(9),
+            "Integer 9 (hash 9) precedes \"x\" (hash 120)"
+        );
+        assert_eq!(vm.heap.as_str(obj(elems[1].clone())).unwrap(), "x");
+    }
+
+    #[test]
+    fn parcel_compare_enforce_binders_sparse_int_and_string8() {
+        let mut vm = engine();
+        let p = obj(new_parcel(&mut vm).unwrap());
+        let q = obj(new_parcel(&mut vm).unwrap());
+        for parcel in [p, q] {
+            callp(&mut vm, parcel, "writeInt", "(I)V", &[Value::Int(7)]);
+        }
+        assert_eq!(
+            callp(
+                &mut vm,
+                p,
+                "compareData",
+                "(Landroid/os/Parcel;)I",
+                &[Value::Obj(q)],
+            ),
+            Value::Int(0)
+        );
+        callp(&mut vm, q, "writeInt", "(I)V", &[Value::Int(1)]);
+        assert!(
+            callp(
+                &mut vm,
+                p,
+                "compareData",
+                "(Landroid/os/Parcel;)I",
+                &[Value::Obj(q)],
+            )
+            .as_int()
+            .unwrap()
+                < 0
+        );
+        assert_eq!(
+            vm.invoke_static(
+                PARCEL,
+                "compareData",
+                "(Landroid/os/Parcel;ILandroid/os/Parcel;II)Z",
+                &[
+                    Value::Obj(p),
+                    Value::Int(0),
+                    Value::Obj(q),
+                    Value::Int(0),
+                    Value::Int(4),
+                ],
+            )
+            .unwrap(),
+            Value::Int(1)
+        );
+
+        // enforceNoDataAvail: unread bytes remain until consumed.
+        callp(&mut vm, p, "setDataPosition", "(I)V", &[Value::Int(0)]);
+        assert!(
+            call_instance_intrinsic(&mut vm, PARCEL, "enforceNoDataAvail", "()V", p, &[],).is_err()
+        );
+        assert_eq!(callp(&mut vm, p, "readInt", "()I", &[]), Value::Int(7));
+        callp(&mut vm, p, "enforceNoDataAvail", "()V", &[]);
+
+        // hasBinders tracks strong-binder writes through the object table.
+        assert_eq!(callp(&mut vm, p, "hasBinders", "()Z", &[]), Value::Int(0));
+        let binder = vm
+            .heap
+            .alloc_instance(BINDER.to_string(), Vec::new())
+            .unwrap();
+        callp(
+            &mut vm,
+            p,
+            "writeStrongBinder",
+            "(Landroid/os/IBinder;)V",
+            &[Value::Obj(binder)],
+        );
+        assert_eq!(callp(&mut vm, p, "hasBinders", "()Z", &[]), Value::Int(1));
+
+        // SparseIntArray form: count then ascending key/value int pairs.
+        let sp = obj(new_parcel(&mut vm).unwrap());
+        let sia = vm
+            .heap
+            .alloc_instance("Landroid/util/SparseIntArray;".to_string(), Vec::new())
+            .unwrap();
+        vm.sparse.insert(
+            sia,
+            [(2i64, Value::Int(20)), (1i64, Value::Int(10))]
+                .into_iter()
+                .collect(),
+        );
+        callp(
+            &mut vm,
+            sp,
+            "writeSparseIntArray",
+            "(Landroid/util/SparseIntArray;)V",
+            &[Value::Obj(sia)],
+        );
+        callp(&mut vm, sp, "setDataPosition", "(I)V", &[Value::Int(0)]);
+        let got = obj(callp(
+            &mut vm,
+            sp,
+            "readSparseIntArray",
+            "()Landroid/util/SparseIntArray;",
+            &[],
+        ));
+        assert_eq!(
+            vm.sparse.get(&got).cloned().unwrap_or_default(),
+            [(1i64, Value::Int(10)), (2i64, Value::Int(20))]
+                .into_iter()
+                .collect()
+        );
+
+        // String8 array form uses the UTF-8 codec, not UTF-16.
+        let hello = s(&mut vm, "hé");
+        let arr = crate::arrays::new_array(
+            &mut vm,
+            "[Ljava/lang/String;",
+            ElemKind::Obj,
+            vec![hello, Value::Null],
+        )
+        .unwrap();
+        let sp8 = obj(new_parcel(&mut vm).unwrap());
+        callp(
+            &mut vm,
+            sp8,
+            "writeString8Array",
+            "([Ljava/lang/String;)V",
+            std::slice::from_ref(&arr),
+        );
+        callp(&mut vm, sp8, "setDataPosition", "(I)V", &[Value::Int(0)]);
+        let got = obj(callp(
+            &mut vm,
+            sp8,
+            "createString8Array",
+            "()[Ljava/lang/String;",
+            &[],
+        ));
+        let elems = vm.heap.as_array_elems(got).unwrap().0.to_vec();
+        assert_eq!(vm.heap.as_str(obj(elems[0].clone())).unwrap(), "hé");
+        assert_eq!(elems[1], Value::Null);
+
+        // Class cookies live in a lazily-created host ArrayMap.
+        let cookie = s(&mut vm, "cookie");
+        let clazz = s(&mut vm, "not-a-class-but-a-key");
+        callp(
+            &mut vm,
+            p,
+            "setClassCookie",
+            "(Ljava/lang/Class;Ljava/lang/Object;)V",
+            &[clazz.clone(), cookie.clone()],
+        );
+        assert_eq!(
+            callp(
+                &mut vm,
+                p,
+                "hasClassCookie",
+                "(Ljava/lang/Class;)Z",
+                std::slice::from_ref(&clazz),
+            ),
+            Value::Int(1)
+        );
+        assert_eq!(
+            callp(
+                &mut vm,
+                p,
+                "getClassCookie",
+                "(Ljava/lang/Class;)Ljava/lang/Object;",
+                std::slice::from_ref(&clazz),
+            ),
+            cookie
+        );
+        let copy = obj(callp(
+            &mut vm,
+            p,
+            "copyClassCookies",
+            "()Ljava/util/Map;",
+            &[],
+        ));
+        assert_eq!(vm.heap.class_of(copy).unwrap(), "Landroid/util/ArrayMap;");
+        callp(
+            &mut vm,
+            p,
+            "removeClassCookie",
+            "(Ljava/lang/Class;Ljava/lang/Object;)V",
+            &[clazz.clone(), cookie],
+        );
+        assert_eq!(
+            callp(
+                &mut vm,
+                p,
+                "getClassCookie",
+                "(Ljava/lang/Class;)Ljava/lang/Object;",
+                std::slice::from_ref(&clazz),
+            ),
+            Value::Null
+        );
+    }
+
+    #[test]
+    fn exception_codes_match_aosp_status_table() {
+        let mut vm = engine();
+        for (class, code) in [
+            ("Ljava/lang/SecurityException;", EX_SECURITY),
+            ("Landroid/os/BadParcelableException;", EX_BAD_PARCELABLE),
+            ("Ljava/lang/IllegalArgumentException;", EX_ILLEGAL_ARGUMENT),
+            ("Ljava/lang/NullPointerException;", EX_NULL_POINTER),
+            ("Ljava/lang/IllegalStateException;", EX_ILLEGAL_STATE),
+            (
+                "Ljava/lang/UnsupportedOperationException;",
+                EX_UNSUPPORTED_OPERATION,
+            ),
+        ] {
+            let p = obj(new_parcel(&mut vm).unwrap());
+            let e = vm
+                .heap
+                .alloc_instance(class.to_string(), Vec::new())
+                .unwrap();
+            let message = s(&mut vm, "boom");
+            vm.heap.put_field(e, "detailMessage", message).unwrap();
+            callp(
+                &mut vm,
+                p,
+                "writeException",
+                "(Ljava/lang/Exception;)V",
+                &[Value::Obj(e)],
+            );
+            let st = load(&vm, p);
+            assert_eq!(
+                i32::from_le_bytes(st.data[0..4].try_into().unwrap()),
+                code,
+                "{class} must use its AOSP status code"
+            );
+            // Full frame: code, message string, zero stack-trace header.
+            callp(&mut vm, p, "setDataPosition", "(I)V", &[Value::Int(0)]);
+            assert_eq!(
+                callp(&mut vm, p, "readExceptionCode", "()I", &[]),
+                Value::Int(code)
+            );
+            callp(&mut vm, p, "setDataPosition", "(I)V", &[Value::Int(0)]);
+            match call_instance_intrinsic(&mut vm, PARCEL, "readException", "()V", p, &[]) {
+                Err(VmExit::Exception(t)) => {
+                    assert_eq!(t.class, class);
+                    assert_eq!(t.message.as_deref(), Some("boom"));
+                }
+                other => panic!("readException: {other:?}"),
+            }
+            assert_eq!(
+                load(&vm, p).pos,
+                load(&vm, p).data.len(),
+                "exception frame must be fully consumed"
+            );
+        }
     }
 
     #[test]
@@ -3123,12 +4826,13 @@ mod tests {
             &[Value::Obj(bundle)],
         );
         let framed = load(&vm, p);
-        assert_eq!(i32::from_le_bytes(framed.data[0..4].try_into().unwrap()), 1);
+        // AOSP `writeBundle`: the frame starts directly with its length —
+        // no presence marker int before it.
         assert_eq!(
-            i32::from_le_bytes(framed.data[4..8].try_into().unwrap()) as usize,
-            framed.data.len() - 12
+            i32::from_le_bytes(framed.data[0..4].try_into().unwrap()) as usize,
+            framed.data.len() - 8
         );
-        assert_eq!(&framed.data[8..12], b"BNDL");
+        assert_eq!(&framed.data[4..8], b"BNDL");
 
         let binder = vm
             .heap
@@ -3181,6 +4885,10 @@ mod tests {
             "(Ljava/lang/ClassLoader;)Landroid/os/Bundle;",
             &[Value::Null],
         ));
+        // `readBundle` is lazy: unmarshalled bytes stay retained until the
+        // Bundle is actually accessed.
+        assert!(parcelled_data(&vm, got_bundle).is_some());
+        unparcel_bundle(&mut vm, got_bundle).unwrap();
         let map = bundle_map(&vm, got_bundle);
         assert_eq!(map.len(), 2);
         let got_n = obj(map[0].1.clone());

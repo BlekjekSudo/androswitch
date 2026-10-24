@@ -17,6 +17,12 @@ const CREATOR_CLASS: &str = "Lrd/test/ParcelPoint$Creator;";
 const CREATOR_IFACE: &str = "Landroid/os/Parcelable$Creator;";
 const BINDER: &str = "Landroid/os/Binder;";
 const ECHO: &str = "Lrd/test/EchoBinder;";
+const BINDER_IDENTITY: &str = "Lrd/test/BinderIdentity;";
+const INTERFACE_ARRAY_FACTORY: &str = "Lrd/test/InterfaceArrayFactory;";
+const RECORDING_PROTO: &str = "Lrd/test/RecordingProto;";
+const RECORDING_WRITER: &str = "Lrd/test/RecordingIndentingPrintWriter;";
+const BUNDLE_CLASS: &str = "Landroid/os/Bundle;";
+const BASE_BUNDLE_CLASS: &str = "Landroid/os/BaseBundle;";
 const DESCRIPTOR: &str = "rd.test.IEcho";
 
 fn obj(v: Value) -> u32 {
@@ -237,6 +243,246 @@ fn build() -> DexBuilder {
         })),
     );
 
+    // ── Function<IBinder, IInterface> identity ───────────────────────────
+    let identity = b.class(BINDER_IDENTITY, "Ljava/lang/Object;");
+    b.direct(
+        identity,
+        "<init>",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(1, 1, 1, {
+            let mut u = op35c(0x70, 1, obj_init, [0, 0, 0, 0, 0]);
+            u.extend(op10x(0x0e));
+            u
+        })),
+    );
+    // apply(Object)Object: this=v1, arg=v2.
+    b.r#virtual(
+        identity,
+        "apply",
+        "Ljava/lang/Object;",
+        vec!["Ljava/lang/Object;"],
+        ACC_PUBLIC,
+        Some(b.code(3, 2, 0, op11x(0x11, 2))),
+    );
+
+    // ── IntFunction<IInterface[]> ─────────────────────────────────────────
+    let factory = b.class(INTERFACE_ARRAY_FACTORY, "Ljava/lang/Object;");
+    b.direct(
+        factory,
+        "<init>",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(1, 1, 1, {
+            let mut u = op35c(0x70, 1, obj_init, [0, 0, 0, 0, 0]);
+            u.extend(op10x(0x0e));
+            u
+        })),
+    );
+    let interface_array_tidx = b.type_idx("[Landroid/os/IInterface;");
+    // apply(I)Object: this=v1, size=v2, out=v0.
+    b.r#virtual(
+        factory,
+        "apply",
+        "Ljava/lang/Object;",
+        vec!["I"],
+        ACC_PUBLIC,
+        Some(b.code(3, 2, 0, {
+            let mut u = op22c(0x23, 0, 2, interface_array_tidx);
+            u.extend(op11x(0x11, 0));
+            u
+        })),
+    );
+
+    // ── Recording ProtoOutputStream-shaped sink ───────────────────────────
+    let proto = b.class(RECORDING_PROTO, "Ljava/lang/Object;");
+    for (name, ftype) in [
+        ("startField", "J"),
+        ("token", "J"),
+        ("startCount", "I"),
+        ("intField", "J"),
+        ("intValue", "I"),
+        ("hasInt", "I"),
+        ("stringField", "J"),
+        ("stringValue", "Ljava/lang/String;"),
+        ("hasString", "I"),
+        ("endToken", "J"),
+        ("endCount", "I"),
+    ] {
+        b.instance_field(proto, name, ftype);
+    }
+    let f_proto_start_field = b.field_idx(RECORDING_PROTO, "J", "startField");
+    let f_proto_token = b.field_idx(RECORDING_PROTO, "J", "token");
+    let f_proto_start_count = b.field_idx(RECORDING_PROTO, "I", "startCount");
+    let f_proto_int_field = b.field_idx(RECORDING_PROTO, "J", "intField");
+    let f_proto_int_value = b.field_idx(RECORDING_PROTO, "I", "intValue");
+    let f_proto_has_int = b.field_idx(RECORDING_PROTO, "I", "hasInt");
+    let f_proto_string_field = b.field_idx(RECORDING_PROTO, "J", "stringField");
+    let f_proto_string_value = b.field_idx(RECORDING_PROTO, "Ljava/lang/String;", "stringValue");
+    let f_proto_has_string = b.field_idx(RECORDING_PROTO, "I", "hasString");
+    let f_proto_end_token = b.field_idx(RECORDING_PROTO, "J", "endToken");
+    let f_proto_end_count = b.field_idx(RECORDING_PROTO, "I", "endCount");
+    b.direct(
+        proto,
+        "<init>",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(1, 1, 1, {
+            let mut u = op35c(0x70, 1, obj_init, [0, 0, 0, 0, 0]);
+            u.extend(op10x(0x0e));
+            u
+        })),
+    );
+    // start(J)J: locals v0/v1, this=v2, fieldId=v3/v4.
+    b.r#virtual(
+        proto,
+        "start",
+        "J",
+        vec!["J"],
+        ACC_PUBLIC,
+        Some(b.code(5, 3, 0, {
+            let mut u = op22c(0x5a, 3, 2, f_proto_start_field);
+            u.extend(op22c(0x52, 0, 2, f_proto_start_count));
+            u.extend(op22b(0xd8, 0, 0, 1));
+            u.extend(op22c(0x59, 0, 2, f_proto_start_count));
+            u.extend(op22c(0x53, 0, 2, f_proto_token));
+            u.extend(op11x(0x10, 0));
+            u
+        })),
+    );
+    // write(JI)V: locals v0/v1, this=v2, fieldId=v3/v4, value=v5.
+    b.r#virtual(
+        proto,
+        "write",
+        "V",
+        vec!["J", "I"],
+        ACC_PUBLIC,
+        Some(b.code(6, 4, 0, {
+            let mut u = op22c(0x5a, 3, 2, f_proto_int_field);
+            u.extend(op22c(0x59, 5, 2, f_proto_int_value));
+            u.extend(op11n(0x12, 0, 1));
+            u.extend(op22c(0x59, 0, 2, f_proto_has_int));
+            u.extend(op10x(0x0e));
+            u
+        })),
+    );
+    // write(J,String;)V: locals v0/v1, this=v2, fieldId=v3/v4, value=v5.
+    b.r#virtual(
+        proto,
+        "write",
+        "V",
+        vec!["J", "Ljava/lang/String;"],
+        ACC_PUBLIC,
+        Some(b.code(6, 4, 0, {
+            let mut u = op22c(0x5a, 3, 2, f_proto_string_field);
+            u.extend(op22c(0x5b, 5, 2, f_proto_string_value));
+            u.extend(op11n(0x12, 0, 1));
+            u.extend(op22c(0x59, 0, 2, f_proto_has_string));
+            u.extend(op10x(0x0e));
+            u
+        })),
+    );
+    // end(J)V: locals v0/v1, this=v2, token=v3/v4.
+    b.r#virtual(
+        proto,
+        "end",
+        "V",
+        vec!["J"],
+        ACC_PUBLIC,
+        Some(b.code(5, 3, 0, {
+            let mut u = op22c(0x5a, 3, 2, f_proto_end_token);
+            u.extend(op22c(0x52, 0, 2, f_proto_end_count));
+            u.extend(op22b(0xd8, 0, 0, 1));
+            u.extend(op22c(0x59, 0, 2, f_proto_end_count));
+            u.extend(op10x(0x0e));
+            u
+        })),
+    );
+
+    // ── Recording IndentingPrintWriter-shaped sink ────────────────────────
+    let writer = b.class(RECORDING_WRITER, "Ljava/lang/Object;");
+    for (name, ftype) in [
+        ("indent", "I"),
+        ("increases", "I"),
+        ("decreases", "I"),
+        ("lineCount", "I"),
+        ("lastLine", "Ljava/lang/String;"),
+    ] {
+        b.instance_field(writer, name, ftype);
+    }
+    let f_writer_indent = b.field_idx(RECORDING_WRITER, "I", "indent");
+    let f_writer_increases = b.field_idx(RECORDING_WRITER, "I", "increases");
+    let f_writer_decreases = b.field_idx(RECORDING_WRITER, "I", "decreases");
+    let f_writer_line_count = b.field_idx(RECORDING_WRITER, "I", "lineCount");
+    let f_writer_last_line = b.field_idx(RECORDING_WRITER, "Ljava/lang/String;", "lastLine");
+    b.direct(
+        writer,
+        "<init>",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_CONSTRUCTOR,
+        Some(b.code(1, 1, 1, {
+            let mut u = op35c(0x70, 1, obj_init, [0, 0, 0, 0, 0]);
+            u.extend(op10x(0x0e));
+            u
+        })),
+    );
+    // increaseIndent(): locals v0/v1, this=v2.
+    b.r#virtual(
+        writer,
+        "increaseIndent",
+        "Lcom/android/internal/util/IndentingPrintWriter;",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(3, 1, 0, {
+            let mut u = op22c(0x52, 0, 2, f_writer_indent);
+            u.extend(op22b(0xd8, 0, 0, 1));
+            u.extend(op22c(0x59, 0, 2, f_writer_indent));
+            u.extend(op22c(0x52, 0, 2, f_writer_increases));
+            u.extend(op22b(0xd8, 0, 0, 1));
+            u.extend(op22c(0x59, 0, 2, f_writer_increases));
+            u.extend(op11x(0x11, 2));
+            u
+        })),
+    );
+    // decreaseIndent(): locals v0/v1, this=v2.
+    b.r#virtual(
+        writer,
+        "decreaseIndent",
+        "Lcom/android/internal/util/IndentingPrintWriter;",
+        vec![],
+        ACC_PUBLIC,
+        Some(b.code(3, 1, 0, {
+            let mut u = op22c(0x52, 0, 2, f_writer_indent);
+            u.extend(op22b(0xd8, 0, 0, -1));
+            u.extend(op22c(0x59, 0, 2, f_writer_indent));
+            u.extend(op22c(0x52, 0, 2, f_writer_decreases));
+            u.extend(op22b(0xd8, 0, 0, 1));
+            u.extend(op22c(0x59, 0, 2, f_writer_decreases));
+            u.extend(op11x(0x11, 2));
+            u
+        })),
+    );
+    // println(String;)V: locals v0/v1, this=v2, line=v3.
+    b.r#virtual(
+        writer,
+        "println",
+        "V",
+        vec!["Ljava/lang/String;"],
+        ACC_PUBLIC,
+        Some(b.code(4, 2, 0, {
+            let mut u = op22c(0x5b, 3, 2, f_writer_last_line);
+            u.extend(op22c(0x52, 0, 2, f_writer_line_count));
+            u.extend(op22b(0xd8, 0, 0, 1));
+            u.extend(op22c(0x59, 0, 2, f_writer_line_count));
+            u.extend(op10x(0x0e));
+            u
+        })),
+    );
+
     b
 }
 
@@ -396,5 +642,366 @@ fn dex_binder_stub_on_transact_runs_through_transact() {
     assert_eq!(
         e.invoke_instance(reply, "readInt", "()I", &[]).unwrap(),
         Value::Int(42)
+    );
+}
+
+#[test]
+fn dex_interface_containers_use_function_callbacks() {
+    let b = build();
+    let mut e = engine_of(&b);
+    let binder = e.new_instance(ECHO).unwrap();
+    let identity = e.new_instance(BINDER_IDENTITY).unwrap();
+    let factory = e.new_instance(INTERFACE_ARRAY_FACTORY).unwrap();
+    let p = parcel(&mut e);
+
+    let source_array = e
+        .heap
+        .alloc_array_zeroed(rd_vm::heap::ElemKind::Obj, 2, "[Landroid/os/IInterface;")
+        .unwrap();
+    e.heap
+        .array_elems_mut(source_array)
+        .unwrap()
+        .clone_from_slice(&[Value::Obj(binder), Value::Null]);
+    e.invoke_instance(
+        p,
+        "writeInterfaceArray",
+        "([Landroid/os/IInterface;)V",
+        &[Value::Obj(source_array)],
+    )
+    .unwrap();
+
+    e.invoke_instance(p, "setDataPosition", "(I)V", &[Value::Int(0)])
+        .unwrap();
+    let got_array = obj(e
+        .invoke_instance(
+            p,
+            "createInterfaceArray",
+            "(Ljava/util/function/IntFunction;Ljava/util/function/Function;)[Landroid/os/IInterface;",
+            &[Value::Obj(factory), Value::Obj(identity)],
+        )
+        .unwrap());
+    assert_eq!(
+        e.heap.class_of(got_array).unwrap(),
+        "[Landroid/os/IInterface;"
+    );
+    assert_eq!(
+        e.heap.as_array_elems(got_array).unwrap().0,
+        &[Value::Obj(binder), Value::Null]
+    );
+
+    let dest_array = e
+        .heap
+        .alloc_array_zeroed(rd_vm::heap::ElemKind::Obj, 2, "[Landroid/os/IInterface;")
+        .unwrap();
+    e.invoke_instance(p, "setDataPosition", "(I)V", &[Value::Int(0)])
+        .unwrap();
+    e.invoke_instance(
+        p,
+        "readInterfaceArray",
+        "([Landroid/os/IInterface;Ljava/util/function/Function;)V",
+        &[Value::Obj(dest_array), Value::Obj(identity)],
+    )
+    .unwrap();
+    assert_eq!(
+        e.heap.as_array_elems(dest_array).unwrap().0,
+        &[Value::Obj(binder), Value::Null]
+    );
+
+    let list_pos = e.invoke_instance(p, "dataSize", "()I", &[]).unwrap();
+    e.invoke_instance(p, "setDataPosition", "(I)V", &[list_pos.clone()])
+        .unwrap();
+    let source_list = e
+        .heap
+        .alloc_instance("Ljava/util/ArrayList;".to_string(), Vec::new())
+        .unwrap();
+    e.fw.objects.insert(
+        source_list,
+        HostObj::List {
+            elems: vec![Value::Obj(binder)],
+        },
+    );
+    e.invoke_instance(
+        p,
+        "writeInterfaceList",
+        "(Ljava/util/List;)V",
+        &[Value::Obj(source_list)],
+    )
+    .unwrap();
+    e.invoke_instance(p, "setDataPosition", "(I)V", &[list_pos.clone()])
+        .unwrap();
+    let got_list = obj(e
+        .invoke_instance(
+            p,
+            "createInterfaceArrayList",
+            "(Ljava/util/function/Function;)Ljava/util/ArrayList;",
+            &[Value::Obj(identity)],
+        )
+        .unwrap());
+    assert!(matches!(
+        e.fw.get(got_list),
+        Some(HostObj::List { elems }) if elems == &[Value::Obj(binder)]
+    ));
+
+    let dest_list = e
+        .heap
+        .alloc_instance("Ljava/util/ArrayList;".to_string(), Vec::new())
+        .unwrap();
+    e.fw.objects.insert(
+        dest_list,
+        HostObj::List {
+            elems: vec![Value::Null],
+        },
+    );
+    e.invoke_instance(p, "setDataPosition", "(I)V", &[list_pos])
+        .unwrap();
+    e.invoke_instance(
+        p,
+        "readInterfaceList",
+        "(Ljava/util/List;Ljava/util/function/Function;)V",
+        &[Value::Obj(dest_list), Value::Obj(identity)],
+    )
+    .unwrap();
+    assert!(matches!(
+        e.fw.get(dest_list),
+        Some(HostObj::List { elems }) if elems == &[Value::Obj(binder)]
+    ));
+}
+
+#[test]
+fn dex_bundle_dump_debug_and_dump_stats_use_guest_writers() {
+    const PARCELLED_DATA_SIZE_FIELD: i64 = 1_120_986_464_257;
+    const MAP_DATA_FIELD: i64 = 1_138_166_333_442;
+
+    let b = build();
+    let mut e = engine_of(&b);
+
+    fn init_proto(e: &mut rd_vm::engine::Engine, proto: u32, token: i64) {
+        for (field, value) in [
+            ("startField", Value::Long(0)),
+            ("token", Value::Long(token)),
+            ("startCount", Value::Int(0)),
+            ("intField", Value::Long(0)),
+            ("intValue", Value::Int(0)),
+            ("hasInt", Value::Int(0)),
+            ("stringField", Value::Long(0)),
+            ("stringValue", Value::Null),
+            ("hasString", Value::Int(0)),
+            ("endToken", Value::Long(0)),
+            ("endCount", Value::Int(0)),
+        ] {
+            e.heap.put_field(proto, field, value).unwrap();
+        }
+    }
+    fn init_writer(e: &mut rd_vm::engine::Engine, writer: u32) {
+        for field in ["indent", "increases", "decreases", "lineCount"] {
+            e.heap.put_field(writer, field, Value::Int(0)).unwrap();
+        }
+        e.heap.put_field(writer, "lastLine", Value::Null).unwrap();
+    }
+    fn text_of(e: &rd_vm::engine::Engine, v: Value) -> String {
+        let r = obj(v);
+        e.heap.as_str(r).unwrap().to_string()
+    }
+
+    // Materialized Bundle: dumpDebug writes the map_data string field.
+    let bundle = e.new_instance(BUNDLE_CLASS).unwrap();
+    let name_key = alloc_string(&mut e, "name".to_string()).unwrap();
+    let name_value = alloc_string(&mut e, "Rusty".to_string()).unwrap();
+    e.invoke_instance(
+        bundle,
+        "putString",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+        &[Value::Obj(name_key), Value::Obj(name_value)],
+    )
+    .unwrap();
+    let count_key = alloc_string(&mut e, "count".to_string()).unwrap();
+    e.invoke_instance(
+        bundle,
+        "putInt",
+        "(Ljava/lang/String;I)V",
+        &[Value::Obj(count_key), Value::Int(3)],
+    )
+    .unwrap();
+
+    let proto = e.new_instance(RECORDING_PROTO).unwrap();
+    init_proto(&mut e, proto, 99);
+    e.invoke_instance(
+        bundle,
+        "dumpDebug",
+        "(Landroid/util/proto/ProtoOutputStream;J)V",
+        &[Value::Obj(proto), Value::Long(777)],
+    )
+    .unwrap();
+    assert_eq!(
+        e.heap.get_field(proto, "startField").unwrap(),
+        Value::Long(777)
+    );
+    assert_eq!(
+        e.heap.get_field(proto, "startCount").unwrap(),
+        Value::Int(1)
+    );
+    assert_eq!(e.heap.get_field(proto, "hasInt").unwrap(), Value::Int(0));
+    assert_eq!(e.heap.get_field(proto, "hasString").unwrap(), Value::Int(1));
+    assert_eq!(
+        e.heap.get_field(proto, "stringField").unwrap(),
+        Value::Long(MAP_DATA_FIELD)
+    );
+    let map_text = text_of(&e, e.heap.get_field(proto, "stringValue").unwrap());
+    assert!(map_text.contains("name=Rusty"), "map text: {map_text}");
+    assert!(map_text.contains("count=3"), "map text: {map_text}");
+    assert_eq!(
+        e.heap.get_field(proto, "endToken").unwrap(),
+        Value::Long(99)
+    );
+    assert_eq!(e.heap.get_field(proto, "endCount").unwrap(), Value::Int(1));
+
+    // Parcelled Bundle: dumpDebug writes only the retained data size and
+    // leaves the Bundle lazy.
+    let source = e.new_instance(BUNDLE_CLASS).unwrap();
+    let k = alloc_string(&mut e, "k".to_string()).unwrap();
+    let v = alloc_string(&mut e, "v".to_string()).unwrap();
+    e.invoke_instance(
+        source,
+        "putString",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+        &[Value::Obj(k), Value::Obj(v)],
+    )
+    .unwrap();
+    let p = parcel(&mut e);
+    e.invoke_instance(
+        p,
+        "writeBundle",
+        "(Landroid/os/Bundle;)V",
+        &[Value::Obj(source)],
+    )
+    .unwrap();
+    let frame_size = match e.invoke_instance(p, "dataSize", "()I", &[]).unwrap() {
+        Value::Int(n) => n,
+        other => panic!("dataSize: {other:?}"),
+    };
+    e.invoke_instance(p, "setDataPosition", "(I)V", &[Value::Int(0)])
+        .unwrap();
+    let parcelled = obj(e
+        .invoke_instance(
+            p,
+            "readBundle",
+            "(Ljava/lang/ClassLoader;)Landroid/os/Bundle;",
+            &[Value::Null],
+        )
+        .unwrap());
+    assert_eq!(
+        e.invoke_instance(parcelled, "isParcelled", "()Z", &[])
+            .unwrap(),
+        Value::Int(1)
+    );
+    let proto2 = e.new_instance(RECORDING_PROTO).unwrap();
+    init_proto(&mut e, proto2, 55);
+    e.invoke_instance(
+        parcelled,
+        "dumpDebug",
+        "(Landroid/util/proto/ProtoOutputStream;J)V",
+        &[Value::Obj(proto2), Value::Long(888)],
+    )
+    .unwrap();
+    assert_eq!(
+        e.heap.get_field(proto2, "hasString").unwrap(),
+        Value::Int(0)
+    );
+    assert_eq!(e.heap.get_field(proto2, "hasInt").unwrap(), Value::Int(1));
+    assert_eq!(
+        e.heap.get_field(proto2, "intField").unwrap(),
+        Value::Long(PARCELLED_DATA_SIZE_FIELD)
+    );
+    assert_eq!(
+        e.heap.get_field(proto2, "intValue").unwrap(),
+        Value::Int(frame_size - 8),
+        "retained ArrayMap payload excludes the Bundle frame length+magic"
+    );
+    assert_eq!(
+        e.heap.get_field(proto2, "endToken").unwrap(),
+        Value::Long(55)
+    );
+    assert_eq!(
+        e.invoke_instance(parcelled, "isParcelled", "()Z", &[])
+            .unwrap(),
+        Value::Int(1),
+        "dumpDebug must not materialize a parcelled Bundle"
+    );
+
+    // dumpStats: small values are silent; a >1 KiB value is reported with
+    // balanced indentation calls.
+    let stats_bundle = e.new_instance(BUNDLE_CLASS).unwrap();
+    let small_key = alloc_string(&mut e, "small".to_string()).unwrap();
+    e.invoke_instance(
+        stats_bundle,
+        "putInt",
+        "(Ljava/lang/String;I)V",
+        &[Value::Obj(small_key), Value::Int(1)],
+    )
+    .unwrap();
+    let big = e
+        .heap
+        .alloc_array_zeroed(rd_vm::heap::ElemKind::Int, 2048, "[B")
+        .unwrap();
+    let big_key = alloc_string(&mut e, "big".to_string()).unwrap();
+    e.invoke_instance(
+        stats_bundle,
+        "putByteArray",
+        "(Ljava/lang/String;[B)V",
+        &[Value::Obj(big_key), Value::Obj(big)],
+    )
+    .unwrap();
+    let writer = e.new_instance(RECORDING_WRITER).unwrap();
+    init_writer(&mut e, writer);
+    e.invoke_static(
+        BASE_BUNDLE_CLASS,
+        "dumpStats",
+        "(Lcom/android/internal/util/IndentingPrintWriter;Landroid/os/BaseBundle;)V",
+        &[Value::Obj(writer), Value::Obj(stats_bundle)],
+    )
+    .unwrap();
+    assert_eq!(
+        e.heap.get_field(writer, "increases").unwrap(),
+        Value::Int(1)
+    );
+    assert_eq!(
+        e.heap.get_field(writer, "decreases").unwrap(),
+        Value::Int(1)
+    );
+    assert_eq!(e.heap.get_field(writer, "indent").unwrap(), Value::Int(0));
+    assert_eq!(
+        e.heap.get_field(writer, "lineCount").unwrap(),
+        Value::Int(1)
+    );
+    let line = text_of(&e, e.heap.get_field(writer, "lastLine").unwrap());
+    assert!(line.starts_with("big [size="), "stats line: {line}");
+    let reported_size: usize = line
+        .trim_start_matches("big [size=")
+        .trim_end_matches(']')
+        .parse()
+        .unwrap();
+    assert!(reported_size > 1024, "stats line: {line}");
+
+    // The null-Bundle static form prints AOSP's [null] marker.
+    let null_writer = e.new_instance(RECORDING_WRITER).unwrap();
+    init_writer(&mut e, null_writer);
+    e.invoke_static(
+        BASE_BUNDLE_CLASS,
+        "dumpStats",
+        "(Lcom/android/internal/util/IndentingPrintWriter;Landroid/os/BaseBundle;)V",
+        &[Value::Obj(null_writer), Value::Null],
+    )
+    .unwrap();
+    assert_eq!(
+        e.heap.get_field(null_writer, "lineCount").unwrap(),
+        Value::Int(1)
+    );
+    assert_eq!(
+        text_of(&e, e.heap.get_field(null_writer, "lastLine").unwrap()),
+        "[null]"
+    );
+    assert_eq!(
+        e.heap.get_field(null_writer, "indent").unwrap(),
+        Value::Int(0)
     );
 }

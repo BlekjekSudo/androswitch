@@ -1383,6 +1383,9 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Ljava/lang/Enum;" => Some(OBJECT),
         "Landroid/util/JsonReader;" | "Landroid/util/JsonWriter;" => Some(OBJECT),
         "Landroid/util/JsonToken;" => Some(&["Ljava/lang/Enum;", "Ljava/lang/Object;"]),
+        "Landroid/util/SimpleArrayMap;" => Some(OBJECT),
+        "Landroid/util/ArrayMap;" => Some(&["Landroid/util/SimpleArrayMap;", "Ljava/lang/Object;"]),
+        "Landroid/util/ArraySet;" => Some(OBJECT),
         // java.util.Random (jrandom.rs)
         "Ljava/util/Random;" => Some(OBJECT),
         "Ljava/util/concurrent/ThreadLocalRandom;" => {
@@ -1614,6 +1617,12 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Ljava/util/Map;",
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",
+        ]),
+        "Landroid/util/ArrayMap;" => Some(&["Ljava/util/Map;"]),
+        "Landroid/util/ArraySet;" => Some(&[
+            "Ljava/util/Set;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Iterable;",
         ]),
         "Ljava/util/WeakHashMap;"
         | "Ljava/util/IdentityHashMap;"
