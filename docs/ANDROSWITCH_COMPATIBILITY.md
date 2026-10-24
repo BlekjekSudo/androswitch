@@ -50,7 +50,8 @@ passing AndroSwitch checks and failing immutable-upstream reference tests.
 M6/M7's exact subset and negative boundary tests are in [M6/M7](M6_M7_E2E.md).
 Device APK containers now use file-backed reads and a 512 MiB cap. Materialized
 entries remain capped at 64 MiB and combined raw DEX at 32 MiB. The 128 MiB
-container proof is host-tested; the new NRO still needs Horizon/hardware testing.
+container proof is host-tested. The user reports installation of a Candy Crush
+APK larger than 65 MB on Switch; detailed file-backed scenarios remain unrecorded.
 Assets/OBBs use bounded reads. Audio is one 48 kHz stereo PCM16 output. Full native_app_glue FD support,
 AAudio callback/low-latency modes, audio input/effects, arbitrary applications,
 Compose/WebView/modern engines and external NDK samples remain unverified.
@@ -64,16 +65,19 @@ this error after cleanup; it does not fabricate the missing ABI. See
 
 M8/M9 results are scoped by scenario, not an APK-wide compatibility badge:
 
-| Scenario | Host | New Horizon NRO | Physical Switch |
+| Scenario | Host | New candidate emulator | Physical Switch |
 | --- | --- | --- | --- |
-| Preferences / renamed preferences, restart and GC | Contract tests passed | not run | not run |
-| Native SQLite notes / renamed notes, transaction/cursor/reflection | Contract tests passed | not run | not run |
-| AOSP HelloActivity original source/layout | Recorded in candidate corpus; static rendering only | not run | not run |
-| Vector Pinball 1.16.0, unmodified F-Droid APK | Blocked at Context.getApplicationInfo; no gameplay | not run | not run |
+| Preferences / renamed preferences, restart and GC | Contract tests passed | not run in emulator | SharedPreferences works (user report); individual renamed/restart/GC results not recorded |
+| Native SQLite notes / renamed notes, transaction/cursor/reflection | Contract tests passed | not run in emulator | SQLite readable (user report); individual transaction/renamed/reflection results not recorded |
+| AOSP HelloActivity original source/layout | Recorded in candidate corpus; static rendering only | not run | individual result not recorded |
+| Vector Pinball 1.16.0, unmodified F-Droid APK | Blocked at Context.getApplicationInfo; no gameplay | not run | individual result not recorded |
+| Candy Crush Saga, version/hash not supplied | not run | not run in emulator | Installation passed (user report); launch blocked before DEX execution by combined raw DEX >32 MiB |
 | External NDK hello-jni/native-activity | Build/integration pending | pending | pending |
 
 The [candidate report](../reports/m8-m9-candidate.json) records exact fixture
 hashes, repeated-run counts and host measurements. [M8/M9 contracts](M8_M9_E2E.md)
 list unavailable overloads, memory budgets, SQLite limitations, permission policy
-and remaining release gates. Earlier M1–M7 hardware testing is user-confirmed;
-it is separate from every new build in this table.
+and remaining release gates. Earlier M1–M7 hardware testing and the later scoped
+M7–M9 candidate feedback are recorded separately in
+[hardware feedback](HARDWARE_FEEDBACK.md). Immutable candidate/package reports
+retain their original not-run statuses; the later feedback supplements them.

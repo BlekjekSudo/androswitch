@@ -13,8 +13,8 @@ Implementation and verification are independent. `pending` is not a pass.
 | M5 | Activity/resources/layout/views/Canvas/Looper; interactive Java/Kotlin lifecycle | supported subset implemented | passed | passed, 14 UI snapshots | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
 | M6 | NativeActivity/assets/window/input/threading/EGL/GLES2/PCM audio | supported proof subset implemented | passed shared contracts; Android reference pending | passed native/mixed media corpus | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
 | M7 | Console launcher/verified session teardown; scan/install/launch/return/update/uninstall; one copy-ready folder | implemented for the alpha corpus; failed-startup cleanup added | passed package workflow | console workflow / ten completed sessions; startup and boundary evidence in reports | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
-| M8 | SharedPreferences/native SQLite/reflection/collections/permissions; independent APK integration | bounded shared contracts implemented; wider integration ongoing | contract/JVM/persistence/fault tests; see candidate report | pending for new build | pending for new build |
-| M9 | Offline v0.1 corpus/lifecycle stress/benchmarks/copy-ready package/evidence matrix | validation candidate tooling/package; release gate incomplete | repeated corpus/measurements in candidate report | prepared 24-session scenario; not run | pending for new build |
+| M8 | SharedPreferences/native SQLite/reflection/collections/permissions; independent APK integration | bounded shared contracts implemented; wider integration ongoing | contract/JVM/persistence/fault tests; see candidate report | pending for new build | SQLite readable / SharedPreferences working — user reported 2026-10-24; detailed scenario results not recorded |
+| M9 | Offline v0.1 corpus/lifecycle stress/benchmarks/copy-ready package/evidence matrix | validation candidate tooling/package; release gate incomplete | repeated corpus/measurements in candidate report | prepared 24-session scenario; not run | candidate tested — user reported 2026-10-24; Candy Crush installs but launch blocked by 32 MiB DEX guard; full gate incomplete |
 | M10 | DNS/socket/TLS/HTTP(S), Java/native networking and split APKs | planned | pending | pending | pending |
 | M11 | Higher API/GLES3/engine ecosystem; separate ARM32/x86 research | planned | pending | pending | pending |
 | M12 | Physical Switch stability, suspend/resume, handheld/docked, migrations, v1.0 | planned | pending | pending | pending |
@@ -37,13 +37,17 @@ are inferred from scaffolding.
 
 M7 improvements now use file-backed APKs with a 512 MiB container cap, bounded
 copy/hash/entry reads and lazy native extraction. A 128 MiB original UI APK passes
-host install/launch/asset/save/restart checks. This new build is separate from the
-user-confirmed M1–M7 hardware baseline. See [M7 storage evidence](M7_STORAGE_E2E.md).
+host install/launch/asset/save/restart checks. In a later hardware test the user
+reports successful installation of a Candy Crush APK larger than 65 MB, separately
+from the earlier M1–M7 baseline. See [M7 storage evidence](M7_STORAGE_E2E.md).
 M8 adds persistent SharedPreferences and real native SQLite, boxed collections,
 DEX method reflection and a bounded permission policy. M9 adds a repeatable host
 corpus, original AOSP sample, external Vector Pinball evaluation, measurements,
-and a copy-ready candidate. **M9 is not marked complete:** new Horizon/hardware
-regressions and broader independent compatibility remain open. See
+and a copy-ready candidate. The user now confirms working SQLite and
+SharedPreferences on Switch, with no detailed scenario/binary identity supplied.
+**M9 is not marked complete:** full regression evidence and broader independent
+compatibility remain open. Candy Crush launch is blocked before execution by the
+32 MiB combined raw DEX guard. See [hardware feedback](HARDWARE_FEEDBACK.md) and
 [M8/M9 contracts, exact limits and reproduction](M8_M9_E2E.md).
 
 M0's nine verification commands passed (144 test executions across feature,
@@ -64,7 +68,9 @@ including Java/Kotlin, C/C++/Rust, exceptions, GC references and pthread callbac
 See [M2–M4 evidence and exact subset limits](M2_M4_E2E.md);
 the user now confirms M1–M7 were tested on a physical Switch. This is recorded
 as user-reported hardware testing, without inventing individual test results or
-binary hashes. New M7 improvement/M8/M9 builds require their own verification.
+binary hashes. The later M7 improvement/M8/M9 hardware feedback is scoped to
+large APK installation, SQLite and SharedPreferences; full scenario verification
+remains open.
 See [hardware feedback](HARDWARE_FEEDBACK.md).
 
 M5 now executes Java/Kotlin Activities and visible software UI in Ryujinx;
@@ -77,6 +83,13 @@ The process-isolation assumption has been corrected in
 does not create a fresh Horizon process.
 
 ## Corpus and scenarios
+
+The general-runtime architecture does not confer general APK compatibility.
+M9's release gate requires independent APK execution evidence alongside the
+fixtures. Candy Crush and Mekorama remain blocked evaluation targets, not
+compatibility passes. Before expanding milestones, prioritize measured DEX
+memory use, general native dependency/ABI support and the shared Android APIs
+required by independent apps. A larger DEX cap alone does not meet that gate.
 
 `fixtures/corpus.lock.json` freezes F-Droid's real inspection APK, upstream JNI
 C/C++/Rust sources, NDK samples and Vector Pinball sources. Future APK builds

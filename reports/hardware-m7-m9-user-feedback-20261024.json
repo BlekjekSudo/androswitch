@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-24",
+  "evidence_type": "direct_user_report_and_supplied_screenshot",
+  "reported_scope": ["M7 improvements", "M8", "M9 candidate"],
+  "status": "physical_switch_testing_user_reported_with_external_apk_blocker",
+  "binary_identity_verified": false,
+  "last_offered_candidate": {
+    "archive": "androswitch-m9-candidate-20261023-220511-1b6cacc7.zip",
+    "archive_sha256": "88bd22166463a3d0121a03f877337864f23750aae5596c8d338ded692f515fe7",
+    "nro_sha256": "f35e3a4734ac0ba91a1cd5221b414a7c231588fdfc140dff5800e9b1919502cb",
+    "identity_limit": "Offered artifact identity only; the user did not independently supply the running NRO hash."
+  },
+  "observations": [
+    {
+      "scenario": "Candy Crush Saga installation",
+      "package": "com.king.candycrushsaga",
+      "result": "passed_user_reported",
+      "reported_apk_size": "above 65 MB",
+      "exact_bytes": null,
+      "apk_version": null,
+      "apk_sha256": null
+    },
+    {
+      "scenario": "Candy Crush Saga launch",
+      "result": "blocked_before_dex_execution",
+      "error": "DEX_MEMORY_BUDGET [rd-vm]: combined DEX input exceeds 32 MiB",
+      "combined_dex_bytes": null,
+      "actual_memory_exhaustion_demonstrated": false,
+      "gameplay": "not_reached"
+    },
+    {
+      "scenario": "SQLite",
+      "result": "works_user_reported",
+      "scope_limit": "User reports SQLite is readable; individual operations, renamed-package, restart and fault scenarios were not supplied."
+    },
+    {
+      "scenario": "SharedPreferences",
+      "result": "works_user_reported",
+      "scope_limit": "User reports SharedPreferences works; individual operations, renamed-package, restart, listener and GC scenarios were not supplied."
+    }
+  ],
+  "screenshot": {
+    "file": "codex-clipboard-4b786455-e0e9-441a-b6ab-c30c90b32c59.jpg",
+    "sha256": "6f60fe94197eb35af0d325307cb13bb99071ae1c6e9fed95f9464dd5d50a7130",
+    "scope": "Launcher lists Candy Crush Saga revision 1 and displays the DEX_MEMORY_BUDGET launch failure. Image supplied in the development conversation, not redistributed in the repository."
+  },
+  "code_at_review": "654ff7e2ba93500564782bfbbbee7ded59834453",
+  "code_findings": {
+    "apk_container_cap_mib": 512,
+    "combined_raw_dex_cap_mib": 32,
+    "managed_vm_heap_budget_mib": 64,
+    "configured_homebrew_heap_mib": 256,
+    "memory_limit": "Raw DEX buffers, eagerly decoded strings/tables, indexes, VM objects, native code and media have separate costs. The raw DEX guard is not a measurement of total live memory."
+  },
+  "new_candidate_emulator_execution": "not_run",
+  "full_release_gate": "incomplete",
+  "documentation_update_checks": [
+    {"command": "python -X utf8 scripts/check_md_links.py", "result": "passed", "links_checked": 248, "files_checked": 63},
+    {"command": "git diff --check", "result": "passed"},
+    {"command": "cargo fmt --all -- --check", "result": "passed"},
+    {"command": "cargo test -p rd-apk --lib --no-default-features --locked", "result": "passed", "tests": 26},
+    {"command": "cargo clippy -p as-framework --features host --all-targets --locked -- -D warnings", "result": "passed"}
+  ],
+  "scope_limit": "Scoped hardware feedback supplements the immutable candidate/package reports. It does not certify all M7-M9 scenarios, arbitrary APK compatibility, Candy Crush execution, or new Mekorama results. Firmware, launch mode, detailed logs and device memory measurements were not supplied."
+}

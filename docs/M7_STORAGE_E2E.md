@@ -56,6 +56,10 @@ cargo test -p as-framework --features host --test lifecycle --locked -- --includ
 ```
 
 M1–M7 hardware testing is confirmed separately by the user in the roadmap.
-**This file-backed improvement build has not yet been executed in Ryujinx or on
-the physical Switch.** Desktop emulator launch remains opt-in after the reported
-window-disappearance incident. Keep that distinction when recording M8/M9 results.
+The user subsequently confirms installation of a Candy Crush APK larger than
+65 MB on a physical Switch with the later M7–M9 candidate. Its launch is blocked
+by the separate 32 MiB combined raw DEX guard, not the APK size cap. The exact
+binary hash and complete large-asset/restart/update scenario results were not
+supplied. See [hardware feedback](HARDWARE_FEEDBACK.md). The new candidate has
+not been executed in Ryujinx; desktop emulator launch remains opt-in after the
+reported window-disappearance incident.

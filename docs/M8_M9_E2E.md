@@ -2,9 +2,12 @@
 
 This candidate extends the history-preserving **RustyDroid** fork with shared
 storage/framework contracts and a repeatable corpus. It is **not a completed
-v0.1 release gate**: the new NRO still needs its own Horizon emulator run and
-physical Switch verification. M1–M7 hardware testing was confirmed by the user
-on 2026-10-24; that confirmation does not validate these later changes.
+v0.1 release gate**. On 2026-10-24 the user confirmed testing the later candidate
+on Switch: an APK larger than 65 MB installs, SQLite is readable and
+SharedPreferences works. Candy Crush launch is blocked by the raw DEX guard.
+This is scoped user feedback, without individual scenario logs or a measured
+running binary hash. The new Horizon emulator suite and full release checks
+remain open. See [hardware feedback](HARDWARE_FEEDBACK.md).
 
 ## Implemented contracts
 
@@ -92,6 +95,12 @@ receipt. It preserves missing Horizon/hardware gates in the candidate manifest.
 
 ## Remaining Horizon gate
 
+The [hardware feedback record](../reports/hardware-m7-m9-user-feedback-20261024.json)
+supplements the original candidate report. SQLite/SharedPreferences working and
+large APK installation do not establish every restart, renamed-package, GC,
+fault, native-media switching or stress scenario. Those detailed results remain
+unrecorded for this hardware test.
+
 Desktop Ryujinx testing stays explicitly opt-in after the reported disappearance
 of unrelated app windows. The cause remains undetermined. The prepared command
 below has **not** been run for this candidate:
@@ -110,6 +119,32 @@ sample APKs. It excludes Vector Pinball, Mekorama and negative test fixtures.
 Copy `switch/` onto the SD while retaining existing user data. Test preferences
 and notes twice, check Plus return, then repeat Java/native switching. Retain
 the package manifest and logs when recording physical results.
+
+## Independent APK compatibility and memory
+
+Candy Crush Saga installs on Switch in the user's test, but the supplied
+screenshot reports `DEX_MEMORY_BUDGET`: combined uncompressed `classes*.dex`
+input exceeds 32 MiB. This happens before DEX parsing/VM execution. It is not
+the APK container cap, and does not demonstrate actual memory exhaustion.
+The exact APK version/hash and combined DEX byte count were not supplied.
+
+The current parser retains each complete raw DEX plus decoded strings,
+tables and indexes. Method bodies already have an on-demand code cache.
+The VM's 64 MiB managed heap budget is separate from those allocations; the
+product NRO configures a 256 MiB homebrew heap shared with other runtime costs.
+Neither number is a measurement of free RAM or sufficient headroom for this APK.
+
+The next compatibility work should measure load/parse/index/VM/native/media
+memory, reduce retained/decoded DEX costs and bound caches, then validate a
+larger DEX corpus before revising the guard. Subsequent missing API/ABI behavior
+must be implemented through shared contracts. Mekorama's observed legacy
+`libstdc++.so` dependency and Vector Pinball's missing `getApplicationInfo`
+contract are separate blockers. Removing one guard does not establish gameplay.
+
+An independent game compatibility claim needs recorded startup/menu rendering,
+input/gameplay, save/relaunch and safe return to the console for the tested
+offline scenario. The candidate's seven bundled positive samples alone do not
+demonstrate broad commercial game support.
 
 ## Contract references and attribution
 

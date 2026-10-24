@@ -1,4 +1,4 @@
-# M7 physical Switch feedback — 2026-10-24
+# M7–M9 physical Switch feedback — 2026-10-24
 
 ## M1–M7 hardware confirmation
 
@@ -6,12 +6,31 @@ On 2026-10-24 the user explicitly confirmed that M1–M7 had been tested on a
 physical Switch. The roadmap now records that status for all seven milestones.
 [The confirmation record](../reports/hardware-m1-m7-user-confirmation-20261024.json)
 distinguishes this user evidence from collected per-scenario runs. Binary hashes,
-firmware and individual scenario outputs were not supplied. Future M7 improvement,
-M8 and M9 binaries need separate tests; this does not certify arbitrary APKs.
+firmware and individual scenario outputs were not supplied. This original record
+covers the earlier baseline; the later candidate report below adds scoped M7–M9
+feedback. Neither confirmation certifies arbitrary APKs.
 
-Evidence here is user-reported in the development conversation. No device crash
-dump, Atmosphère result code or collected hardware trace was available during
-the fix. The exact hardware, firmware and homebrew launch mode are unrecorded.
+## M7 improvement / M8 / M9 candidate hardware feedback
+
+The user subsequently reports that the M7–M9 candidate works on a physical Switch:
+Candy Crush Saga installs from an APK larger than 65 MB, SQLite is readable and
+SharedPreferences works. Individual restart, renamed-package, GC, stress and
+fault scenarios were not supplied. The running NRO hash was not independently
+supplied. See [the scoped feedback record](../reports/hardware-m7-m9-user-feedback-20261024.json).
+
+The supplied launcher screenshot shows Candy Crush Saga revision 1 and
+`DEX_MEMORY_BUDGET [rd-vm]: combined DEX input exceeds 32 MiB`. This is an explicit
+pre-execution guard, separate from the 512 MiB APK container cap. It does not
+demonstrate an out-of-memory crash or any Candy Crush gameplay. The APK version,
+hash and exact combined DEX size are unknown.
+
+This feedback supplements the immutable candidate/package reports, which retain
+their original not-run statuses. New-candidate Ryujinx execution remains not run.
+M9's wider independent compatibility and full release checks remain incomplete.
+
+The earlier crash evidence below is user-reported in the development conversation.
+No device crash dump, Atmosphère result code or collected hardware trace was
+available during the fix. The exact hardware, firmware and homebrew launch mode are unrecorded.
 This does not certify the general APK corpus or the replacement build.
 
 ## Original alpha

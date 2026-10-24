@@ -21,8 +21,11 @@ The user reports that the four bundled APKs open on a physical Switch, including
 native animation/beeps, and that the display handoff fix resolves the native
 Plus crash and startup stall. This is sample-level user feedback; see
 [hardware feedback](docs/HARDWARE_FEEDBACK.md).
-The user has also confirmed M1–M7 testing on physical Switch. The new M7
-file-backed storage and M8/M9 build have separate pending Horizon/hardware gates.
+The user has also confirmed M1–M7 testing on physical Switch. In a later M7–M9
+candidate test, an APK larger than 65 MB installs, SQLite is readable and
+SharedPreferences works. Candy Crush launch is blocked by the separate 32 MiB
+combined raw DEX guard. This is scoped user feedback; full candidate regression
+and independent compatibility gates remain open.
 M8 adds persistent XML SharedPreferences, native SQLite, boxed collections and
 DEX method reflection. M9 adds a repeated host corpus, external APK evaluation
 and startup/frame/heap measurements. See [exact evidence and limitations](docs/M8_M9_E2E.md).
@@ -44,13 +47,14 @@ Actual submitted console framebuffer from the M7 Ryujinx test.
 | Android lifecycle/UI | Supported M5 subset; 14 Java/Kotlin UI snapshots pass in Ryujinx |
 | Native graphics/audio | NativeActivity, incremental assets, input queue, EGL/GLES2; Java AudioTrack, AAudio writes and OpenSL ES PCM queue callbacks |
 | Console launcher | Scan/install/update/launch/return/uninstall; persistent saves, named failures and one NRO |
-| Physical Switch | User reports sample install/open, native animation/beeps and successful native Plus return after the display fix |
+| Physical Switch | User reports sample install/open, native animation/beeps, safe native Plus return; later candidate: large APK install, SQLite and SharedPreferences working |
 
 The launcher is usable for the supported test corpus. Arbitrary apps can still
 require missing Android APIs. The M7 improvement source accepts file-backed APKs up to **512 MiB**
 on device, API 26 or lower minimum SDK, and ARM64 native libraries. A 128 MiB
-container passes host install/launch/restart tests. New file-backed device behavior
-still needs hardware/emulator verification. DEX, native mappings and media retain
+container passes host install/launch/restart tests. Large APK installation is
+also user-reported on Switch; full device/emulator scenarios remain open.
+Combined raw DEX is separately capped at **32 MiB**. DEX, native mappings and media retain
 separate budgets within the current 256 MiB heap. OBB files stream separately.
 Network, Google Play Services, split APKs, WebView and modern
 engine compatibility are not established. There is no per-game configuration.
