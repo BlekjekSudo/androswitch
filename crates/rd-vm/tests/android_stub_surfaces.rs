@@ -9195,3 +9195,1261 @@ fn companion_absent_service_values_filters_and_mac_are_guest_visible() {
         Value::Obj(sender)
     );
 }
+
+// ---------------------------------------------------------------------------
+// Batch 41-A: six android.service.* surfaces in their bounded
+// unbound/unattached profiles (Quick Settings, wallpaper, dreams, Chooser,
+// carrier and media-browser service bases/values).
+// ---------------------------------------------------------------------------
+
+const P41_TILE: &str = "Landroid/service/quicksettings/Tile;";
+const P41_TILE_SERVICE: &str = "Landroid/service/quicksettings/TileService;";
+const P41_WALLPAPER_SERVICE: &str = "Landroid/service/wallpaper/WallpaperService;";
+const P41_WALLPAPER_ENGINE: &str = "Landroid/service/wallpaper/WallpaperService$Engine;";
+const P41_DREAM_SERVICE: &str = "Landroid/service/dreams/DreamService;";
+const P41_CHOOSER_TARGET: &str = "Landroid/service/chooser/ChooserTarget;";
+const P41_CHOOSER_SERVICE: &str = "Landroid/service/chooser/ChooserTargetService;";
+const P41_CHOOSER_RESULT: &str = "Landroid/service/chooser/IChooserTargetResult;";
+const P41_CARRIER_IDENTIFIER: &str = "Landroid/service/carrier/CarrierIdentifier;";
+const P41_CARRIER_SERVICE: &str = "Landroid/service/carrier/CarrierService;";
+const P41_MEDIA_SERVICE: &str = "Landroid/service/media/MediaBrowserService;";
+const P41_MEDIA_ROOT: &str = "Landroid/service/media/MediaBrowserService$BrowserRoot;";
+const P41_MEDIA_RESULT: &str = "Landroid/service/media/MediaBrowserService$Result;";
+
+fn p41_new(engine: &mut Engine, class: &str, sig: &str, args: &[Value]) -> ObjRef {
+    p49_new(engine, class, sig, args)
+}
+
+fn p41_intent(engine: &mut Engine, action: &str) -> ObjRef {
+    let action = text(engine, action);
+    p41_new(
+        engine,
+        "Landroid/content/Intent;",
+        "(Ljava/lang/String;)V",
+        &[action],
+    )
+}
+
+fn p41_component(engine: &mut Engine) -> ObjRef {
+    let package = text(engine, "dev.RustyDroid.test");
+    let cls = text(engine, "dev.RustyDroid.test.ShareActivity");
+    p41_new(
+        engine,
+        "Landroid/content/ComponentName;",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+        &[package, cls],
+    )
+}
+
+fn p41_bundle(engine: &mut Engine) -> ObjRef {
+    p41_new(engine, "Landroid/os/Bundle;", "()V", &[])
+}
+
+fn p41_pending(engine: &mut Engine, method: &str, request: i32) -> Value {
+    let context = instance(engine, CONTEXT);
+    let intent = p41_intent(engine, "dev.RustyDroid.test.PENDING");
+    call_static(
+        engine,
+        "Landroid/app/PendingIntent;",
+        method,
+        "(Landroid/content/Context;ILandroid/content/Intent;I)Landroid/app/PendingIntent;",
+        &[
+            Value::Obj(context),
+            Value::Int(request),
+            Value::Obj(intent),
+            Value::Int(0x0400_0000),
+        ],
+    )
+}
+
+fn p41_byte_array(engine: &mut Engine, values: &[i32]) -> Value {
+    let array = engine
+        .heap
+        .alloc_array_zeroed(ElemKind::Int, values.len(), "[B")
+        .unwrap();
+    *engine.heap.array_elems_mut(array).unwrap() = values.iter().copied().map(Value::Int).collect();
+    Value::Obj(array)
+}
+
+#[test]
+fn quicksettings_tile_and_unbound_service_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let tile = p41_new(&mut engine, P41_TILE, "()V", &[]);
+    assert_eq!(
+        call(&mut engine, tile, "getState", "()I", &[]),
+        Value::Int(1),
+        "Tile defaults to STATE_INACTIVE"
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            tile,
+            "getIcon",
+            "()Landroid/graphics/drawable/Icon;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            tile,
+            "getLabel",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        Value::Null
+    );
+
+    call(&mut engine, tile, "setState", "(I)V", &[Value::Int(2)]);
+    let label = text(&mut engine, "Wi-Fi");
+    call(
+        &mut engine,
+        tile,
+        "setLabel",
+        "(Ljava/lang/CharSequence;)V",
+        &[label],
+    );
+    let subtitle = text(&mut engine, "Connected");
+    call(
+        &mut engine,
+        tile,
+        "setSubtitle",
+        "(Ljava/lang/CharSequence;)V",
+        &[subtitle],
+    );
+    let content = text(&mut engine, "Toggle Wi-Fi");
+    call(
+        &mut engine,
+        tile,
+        "setContentDescription",
+        "(Ljava/lang/CharSequence;)V",
+        &[content],
+    );
+    let state_description = text(&mut engine, "On");
+    call(
+        &mut engine,
+        tile,
+        "setStateDescription",
+        "(Ljava/lang/CharSequence;)V",
+        &[state_description],
+    );
+    let icon = instance(&mut engine, "Landroid/graphics/drawable/Icon;");
+    call(
+        &mut engine,
+        tile,
+        "setIcon",
+        "(Landroid/graphics/drawable/Icon;)V",
+        &[Value::Obj(icon)],
+    );
+    assert_eq!(
+        call(&mut engine, tile, "getState", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            tile,
+            "getLabel",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        "Wi-Fi"
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            tile,
+            "getSubtitle",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        "Connected"
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            tile,
+            "getIcon",
+            "()Landroid/graphics/drawable/Icon;",
+            &[]
+        ),
+        Value::Obj(icon)
+    );
+    assert_eq!(
+        call(&mut engine, tile, "describeContents", "()I", &[]),
+        Value::Int(0)
+    );
+
+    let broadcast = p41_pending(&mut engine, "getBroadcast", 41);
+    assert_throws(
+        engine.invoke_instance(
+            tile,
+            "setActivityLaunchForClick",
+            "(Landroid/app/PendingIntent;)V",
+            &[broadcast],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let activity = p41_pending(&mut engine, "getActivity", 42);
+    call(
+        &mut engine,
+        tile,
+        "setActivityLaunchForClick",
+        "(Landroid/app/PendingIntent;)V",
+        std::slice::from_ref(&activity),
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            tile,
+            "getActivityLaunchForClick",
+            "()Landroid/app/PendingIntent;",
+            &[]
+        ),
+        activity
+    );
+    assert_throws(
+        engine.invoke_instance(tile, "updateTile", "()V", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+
+    let service = p41_new(&mut engine, P41_TILE_SERVICE, "()V", &[]);
+    for method in [
+        "onTileAdded",
+        "onTileRemoved",
+        "onStartListening",
+        "onStopListening",
+        "onClick",
+        "onDestroy",
+    ] {
+        call(&mut engine, service, method, "()V", &[]);
+    }
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "getQsTile",
+            "()Landroid/service/quicksettings/Tile;",
+            &[]
+        ),
+        Value::Null,
+        "no Tile exists before SystemUI binds the service"
+    );
+    call(
+        &mut engine,
+        service,
+        "setStatusIcon",
+        "(Landroid/graphics/drawable/Icon;Ljava/lang/String;)V",
+        &[Value::Null, Value::Null],
+    );
+    assert_throws(
+        engine.invoke_instance(service, "isSecure", "()Z", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_instance(service, "isLocked", "()Z", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+    let runnable = instance(&mut engine, "Ljava/lang/Runnable;");
+    assert_throws(
+        engine.invoke_instance(
+            service,
+            "unlockAndRun",
+            "(Ljava/lang/Runnable;)V",
+            &[Value::Obj(runnable)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_eq!(
+        field(&engine, service, "mUnlockRunnable"),
+        Value::Obj(runnable),
+        "AOSP stores the Runnable before dereferencing the absent QS service"
+    );
+    assert_throws(
+        engine.invoke_instance(
+            service,
+            "startActivityAndCollapse",
+            "(Landroid/app/PendingIntent;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+}
+
+#[test]
+fn wallpaper_engine_unattached_state_and_defaults_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let service = p41_new(&mut engine, P41_WALLPAPER_SERVICE, "()V", &[]);
+    let wallpaper = p41_new(
+        &mut engine,
+        P41_WALLPAPER_ENGINE,
+        "(Landroid/service/wallpaper/WallpaperService;)V",
+        &[Value::Obj(service)],
+    );
+
+    let holder = call(
+        &mut engine,
+        wallpaper,
+        "getSurfaceHolder",
+        "()Landroid/view/SurfaceHolder;",
+        &[],
+    );
+    assert!(!matches!(holder, Value::Null));
+    assert_eq!(
+        call(
+            &mut engine,
+            wallpaper,
+            "getSurfaceHolder",
+            "()Landroid/view/SurfaceHolder;",
+            &[]
+        ),
+        holder
+    );
+    assert_eq!(
+        call(&mut engine, wallpaper, "isVisible", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, wallpaper, "isInAmbientMode", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            wallpaper,
+            "supportsLocalColorExtraction",
+            "()Z",
+            &[]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, wallpaper, "getZoom", "()F", &[]),
+        Value::Float(0.0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            wallpaper,
+            "getDisplayContext",
+            "()Landroid/content/Context;",
+            &[]
+        ),
+        Value::Null
+    );
+    for (method, sig) in [
+        ("getWallpaperFlags", "()I"),
+        ("getDesiredMinimumWidth", "()I"),
+        ("getDesiredMinimumHeight", "()I"),
+        ("isPreview", "()Z"),
+    ] {
+        assert_throws(
+            engine.invoke_instance(wallpaper, method, sig, &[]),
+            "Ljava/lang/NullPointerException;",
+        );
+    }
+
+    call(
+        &mut engine,
+        wallpaper,
+        "setTouchEventsEnabled",
+        "(Z)V",
+        &[Value::Int(1)],
+    );
+    assert_eq!(field(&engine, wallpaper, "mWindowFlags"), Value::Int(0));
+    call(
+        &mut engine,
+        wallpaper,
+        "setTouchEventsEnabled",
+        "(Z)V",
+        &[Value::Int(0)],
+    );
+    assert_eq!(field(&engine, wallpaper, "mWindowFlags"), Value::Int(0x10));
+    call(
+        &mut engine,
+        wallpaper,
+        "setOffsetNotificationsEnabled",
+        "(Z)V",
+        &[Value::Int(0)],
+    );
+    assert_eq!(
+        field(&engine, wallpaper, "mWindowPrivateFlags"),
+        Value::Int(1 << 25)
+    );
+    call(
+        &mut engine,
+        wallpaper,
+        "setShowForAllUsers",
+        "(Z)V",
+        &[Value::Int(1)],
+    );
+    assert_eq!(
+        field(&engine, wallpaper, "mWindowPrivateFlags"),
+        Value::Int((1 << 25) | (1 << 4))
+    );
+
+    call(
+        &mut engine,
+        wallpaper,
+        "setZoom",
+        "(F)V",
+        &[Value::Float(0.25)],
+    );
+    assert_eq!(
+        call(&mut engine, wallpaper, "getZoom", "()F", &[]),
+        Value::Float(0.25)
+    );
+    call(
+        &mut engine,
+        wallpaper,
+        "doAmbientModeChanged",
+        "(ZJ)V",
+        &[Value::Int(1), Value::Long(0)],
+    );
+    assert_eq!(
+        call(&mut engine, wallpaper, "isInAmbientMode", "()Z", &[]),
+        Value::Int(1)
+    );
+    call(
+        &mut engine,
+        wallpaper,
+        "onCreate",
+        "(Landroid/view/SurfaceHolder;)V",
+        std::slice::from_ref(&holder),
+    );
+    let action = text(&mut engine, "android.wallpaper.tap");
+    assert_eq!(
+        call(
+            &mut engine,
+            wallpaper,
+            "onCommand",
+            "(Ljava/lang/String;IIILandroid/os/Bundle;Z)Landroid/os/Bundle;",
+            &[
+                action,
+                Value::Int(1),
+                Value::Int(2),
+                Value::Int(3),
+                Value::Null,
+                Value::Int(1),
+            ]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            wallpaper,
+            "onComputeColors",
+            "()Landroid/app/WallpaperColors;",
+            &[]
+        ),
+        Value::Null
+    );
+    call(
+        &mut engine,
+        wallpaper,
+        "onSurfaceDestroyed",
+        "(Landroid/view/SurfaceHolder;)V",
+        &[holder],
+    );
+    call(&mut engine, wallpaper, "onDestroy", "()V", &[]);
+}
+
+#[test]
+fn dream_service_unattached_state_and_finish_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let dream = p41_new(&mut engine, P41_DREAM_SERVICE, "()V", &[]);
+    assert_eq!(
+        call(&mut engine, dream, "isInteractive", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, dream, "isFullscreen", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, dream, "isScreenBright", "()Z", &[]),
+        Value::Int(1),
+        "DreamService.mScreenBright defaults to true"
+    );
+    assert_eq!(
+        call(&mut engine, dream, "isWindowless", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, dream, "canDoze", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, dream, "isDozing", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, dream, "getDozeScreenState", "()I", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, dream, "getDozeScreenBrightness", "()I", &[]),
+        Value::Int(-1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            dream,
+            "getWindow",
+            "()Landroid/view/Window;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            dream,
+            "getWindowManager",
+            "()Landroid/view/WindowManager;",
+            &[]
+        ),
+        Value::Null
+    );
+
+    call(
+        &mut engine,
+        dream,
+        "setInteractive",
+        "(Z)V",
+        &[Value::Int(1)],
+    );
+    call(
+        &mut engine,
+        dream,
+        "setFullscreen",
+        "(Z)V",
+        &[Value::Int(1)],
+    );
+    call(
+        &mut engine,
+        dream,
+        "setScreenBright",
+        "(Z)V",
+        &[Value::Int(0)],
+    );
+    call(
+        &mut engine,
+        dream,
+        "setWindowless",
+        "(Z)V",
+        &[Value::Int(1)],
+    );
+    assert_eq!(
+        call(&mut engine, dream, "isInteractive", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, dream, "isFullscreen", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, dream, "isScreenBright", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, dream, "isWindowless", "()Z", &[]),
+        Value::Int(1)
+    );
+
+    call(
+        &mut engine,
+        dream,
+        "setDozeScreenBrightness",
+        "(I)V",
+        &[Value::Int(999)],
+    );
+    assert_eq!(
+        call(&mut engine, dream, "getDozeScreenBrightness", "()I", &[]),
+        Value::Int(255)
+    );
+    call(
+        &mut engine,
+        dream,
+        "setDozeScreenBrightness",
+        "(I)V",
+        &[Value::Int(-50)],
+    );
+    assert_eq!(
+        call(&mut engine, dream, "getDozeScreenBrightness", "()I", &[]),
+        Value::Int(0)
+    );
+    call(
+        &mut engine,
+        dream,
+        "setDozeScreenBrightness",
+        "(I)V",
+        &[Value::Int(-1)],
+    );
+    call(
+        &mut engine,
+        dream,
+        "setDozeScreenState",
+        "(I)V",
+        &[Value::Int(4)],
+    );
+    assert_eq!(
+        call(&mut engine, dream, "getDozeScreenState", "()I", &[]),
+        Value::Int(4)
+    );
+    call(&mut engine, dream, "startDozing", "()V", &[]);
+    assert_eq!(
+        call(&mut engine, dream, "isDozing", "()Z", &[]),
+        Value::Int(0),
+        "startDozing is a no-op when the dream cannot doze"
+    );
+    call(&mut engine, dream, "onDreamingStarted", "()V", &[]);
+    call(&mut engine, dream, "wakeUp", "()V", &[]);
+    assert_eq!(field(&engine, dream, "mWaking"), Value::Int(1));
+    assert_eq!(
+        field(&engine, dream, "mFinished"),
+        Value::Int(1),
+        "the default onWakeUp calls finish()"
+    );
+    call(&mut engine, dream, "wakeUp", "()V", &[]);
+    call(&mut engine, dream, "finish", "()V", &[]);
+    call(&mut engine, dream, "onDreamingStopped", "()V", &[]);
+
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P41_DREAM_SERVICE,
+            "getDreamMetadata",
+            "(Landroid/content/Context;Landroid/content/pm/ServiceInfo;)Landroid/service/dreams/DreamService$DreamMetadata;",
+            &[Value::Null, Value::Null]
+        ),
+        Value::Null,
+        "AOSP returns null immediately for a null ServiceInfo"
+    );
+    let intent = p41_intent(&mut engine, "android.service.dreams.DreamService");
+    assert_eq!(
+        call(
+            &mut engine,
+            dream,
+            "onUnbind",
+            "(Landroid/content/Intent;)Z",
+            &[Value::Obj(intent)]
+        ),
+        Value::Int(0)
+    );
+}
+
+#[test]
+fn chooser_target_validation_and_service_binding_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let component = p41_component(&mut engine);
+    let title = text(&mut engine, "Alice");
+    let icon = instance(&mut engine, "Landroid/graphics/drawable/Icon;");
+    let extras = p41_bundle(&mut engine);
+    let target_sig =
+        "(Ljava/lang/CharSequence;Landroid/graphics/drawable/Icon;FLandroid/content/ComponentName;Landroid/os/Bundle;)V";
+    let bad = instance(&mut engine, P41_CHOOSER_TARGET);
+    assert_throws(
+        engine.invoke_instance(
+            bad,
+            "<init>",
+            target_sig,
+            &[
+                title.clone(),
+                Value::Obj(icon),
+                Value::Float(1.1),
+                Value::Obj(component),
+                Value::Obj(extras),
+            ],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    let target = p41_new(
+        &mut engine,
+        P41_CHOOSER_TARGET,
+        target_sig,
+        &[
+            title,
+            Value::Obj(icon),
+            Value::Float(0.75),
+            Value::Obj(component),
+            Value::Obj(extras),
+        ],
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            target,
+            "getTitle",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        "Alice"
+    );
+    assert_eq!(
+        call(&mut engine, target, "getScore", "()F", &[]),
+        Value::Float(0.75)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            target,
+            "getComponentName",
+            "()Landroid/content/ComponentName;",
+            &[]
+        ),
+        Value::Obj(component)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            target,
+            "getIntentExtras",
+            "()Landroid/os/Bundle;",
+            &[]
+        ),
+        Value::Obj(extras)
+    );
+    assert_eq!(
+        call(&mut engine, target, "describeContents", "()I", &[]),
+        Value::Int(0)
+    );
+
+    let plain_title = text(&mut engine, "Share");
+    let plain = p41_new(
+        &mut engine,
+        P41_CHOOSER_TARGET,
+        target_sig,
+        &[
+            plain_title,
+            Value::Null,
+            Value::Float(0.5),
+            Value::Null,
+            Value::Null,
+        ],
+    );
+    assert_eq!(
+        call_text(&mut engine, plain, "toString", "()Ljava/lang/String;", &[]),
+        "ChooserTarget{null, null, 'Share', 0.5}"
+    );
+    let nan_title = text(&mut engine, "NaN");
+    let nan_target = p41_new(
+        &mut engine,
+        P41_CHOOSER_TARGET,
+        target_sig,
+        &[
+            nan_title,
+            Value::Null,
+            Value::Float(f32::NAN),
+            Value::Null,
+            Value::Null,
+        ],
+    );
+    assert!(matches!(
+        call(&mut engine, nan_target, "getScore", "()F", &[]),
+        Value::Float(score) if score.is_nan()
+    ));
+
+    let service = p41_new(&mut engine, P41_CHOOSER_SERVICE, "()V", &[]);
+    let wrong = p41_intent(&mut engine, "example.WRONG");
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Obj(wrong)]
+        ),
+        Value::Null
+    );
+    let correct = p41_intent(&mut engine, "android.service.chooser.ChooserTargetService");
+    let wrapper = call(
+        &mut engine,
+        service,
+        "onBind",
+        "(Landroid/content/Intent;)Landroid/os/IBinder;",
+        &[Value::Obj(correct)],
+    );
+    let wrapper_ref = object(wrapper.clone());
+    assert_eq!(
+        engine.heap.class_of(wrapper_ref).unwrap(),
+        "Landroid/service/chooser/ChooserTargetService$IChooserTargetServiceWrapper;"
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Obj(correct)]
+        ),
+        wrapper
+    );
+
+    let result = instance(&mut engine, P41_CHOOSER_RESULT);
+    let filter = instance(&mut engine, "Landroid/content/IntentFilter;");
+    assert!(
+        engine
+            .invoke_instance(
+                wrapper_ref,
+                "getChooserTargets",
+                "(Landroid/content/ComponentName;Landroid/content/IntentFilter;Landroid/service/chooser/IChooserTargetResult;)V",
+                &[Value::Obj(component), Value::Obj(filter), Value::Obj(result)],
+            )
+            .is_err(),
+        "the exact abstract service has no onGetChooserTargets implementation"
+    );
+    assert_eq!(
+        p49_field_or_null(&engine, result, "rd_targets"),
+        Value::Null
+    );
+    assert_eq!(field(&engine, result, "rd_send_count"), Value::Int(1));
+}
+
+#[test]
+fn carrier_identifier_and_service_binding_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let mcc = text(&mut engine, "724");
+    let mnc = text(&mut engine, "05");
+    let spn = text(&mut engine, "Rusty Mobile");
+    let imsi = text(&mut engine, "724051234567890");
+    let gid1 = text(&mut engine, "01");
+    let gid2 = text(&mut engine, "02");
+    let full_sig =
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V";
+    let identifier = p41_new(
+        &mut engine,
+        P41_CARRIER_IDENTIFIER,
+        full_sig,
+        &[
+            mcc.clone(),
+            mnc.clone(),
+            spn.clone(),
+            imsi.clone(),
+            gid1.clone(),
+            gid2.clone(),
+            Value::Int(1234),
+            Value::Int(5678),
+        ],
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            identifier,
+            "getMcc",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "724"
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            identifier,
+            "getMnc",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "05"
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            identifier,
+            "getSpn",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "Rusty Mobile"
+    );
+    assert_eq!(
+        call(&mut engine, identifier, "getCarrierId", "()I", &[]),
+        Value::Int(1234)
+    );
+    assert_eq!(
+        call(&mut engine, identifier, "getSpecificCarrierId", "()I", &[]),
+        Value::Int(5678)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            identifier,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "CarrierIdentifier{mcc=724,mnc=05,spn=Rusty Mobile,imsi=[****],gid1=01,gid2=02,carrierid=1234,specificCarrierId=5678}"
+    );
+
+    let same = p41_new(
+        &mut engine,
+        P41_CARRIER_IDENTIFIER,
+        full_sig,
+        &[
+            mcc.clone(),
+            mnc.clone(),
+            spn,
+            imsi,
+            gid1.clone(),
+            gid2.clone(),
+            Value::Int(1234),
+            Value::Int(5678),
+        ],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            identifier,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(same)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, identifier, "hashCode", "()I", &[]),
+        call(&mut engine, same, "hashCode", "()I", &[])
+    );
+    let different = p41_new(
+        &mut engine,
+        P41_CARRIER_IDENTIFIER,
+        full_sig,
+        &[
+            mcc,
+            mnc,
+            Value::Null,
+            Value::Null,
+            gid1,
+            gid2,
+            Value::Int(1234),
+            Value::Int(9999),
+        ],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            identifier,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(different)]
+        ),
+        Value::Int(0)
+    );
+
+    let unknown_mcc = text(&mut engine, "310");
+    let unknown_mnc = text(&mut engine, "260");
+    let unknown = p41_new(
+        &mut engine,
+        P41_CARRIER_IDENTIFIER,
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+        &[
+            unknown_mcc,
+            unknown_mnc,
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            Value::Null,
+        ],
+    );
+    assert_eq!(
+        call(&mut engine, unknown, "getCarrierId", "()I", &[]),
+        Value::Int(-1)
+    );
+
+    let bytes = p41_byte_array(&mut engine, &[0x27, -12, 0x50]);
+    let from_bytes = p41_new(
+        &mut engine,
+        P41_CARRIER_IDENTIFIER,
+        "([BLjava/lang/String;Ljava/lang/String;)V",
+        &[bytes, Value::Null, Value::Null],
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            from_bytes,
+            "getMcc",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "724"
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            from_bytes,
+            "getMnc",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "05"
+    );
+    let bad_bytes = p41_byte_array(&mut engine, &[1, 2]);
+    let bad = instance(&mut engine, P41_CARRIER_IDENTIFIER);
+    assert_throws(
+        engine.invoke_instance(
+            bad,
+            "<init>",
+            "([BLjava/lang/String;Ljava/lang/String;)V",
+            &[bad_bytes, Value::Null, Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    let service = p41_new(&mut engine, P41_CARRIER_SERVICE, "()V", &[]);
+    let binder = call(
+        &mut engine,
+        service,
+        "onBind",
+        "(Landroid/content/Intent;)Landroid/os/IBinder;",
+        &[Value::Null],
+    );
+    let binder_ref = object(binder.clone());
+    assert_eq!(
+        engine.heap.class_of(binder_ref).unwrap(),
+        "Landroid/service/carrier/CarrierService$ICarrierServiceWrapper;"
+    );
+    let intent = p41_intent(&mut engine, "example.IGNORED");
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Obj(intent)]
+        ),
+        binder
+    );
+    assert!(
+        engine
+            .invoke_instance(
+                service,
+                "onLoadConfig",
+                "(ILandroid/service/carrier/CarrierIdentifier;)Landroid/os/PersistableBundle;",
+                &[Value::Int(3), Value::Obj(identifier)],
+            )
+            .is_err(),
+        "the exact abstract service has no one-argument onLoadConfig implementation"
+    );
+}
+
+#[test]
+fn media_browser_root_result_and_unconnected_service_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let bad_root = instance(&mut engine, P41_MEDIA_ROOT);
+    assert_throws(
+        engine.invoke_instance(
+            bad_root,
+            "<init>",
+            "(Ljava/lang/String;Landroid/os/Bundle;)V",
+            &[Value::Null, Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let root_id = text(&mut engine, "library-root");
+    let extras = p41_bundle(&mut engine);
+    let root = p41_new(
+        &mut engine,
+        P41_MEDIA_ROOT,
+        "(Ljava/lang/String;Landroid/os/Bundle;)V",
+        &[root_id, Value::Obj(extras)],
+    );
+    assert_eq!(
+        call_text(&mut engine, root, "getRootId", "()Ljava/lang/String;", &[]),
+        "library-root"
+    );
+    assert_eq!(
+        call(&mut engine, root, "getExtras", "()Landroid/os/Bundle;", &[]),
+        Value::Obj(extras)
+    );
+
+    let service = p41_new(&mut engine, P41_MEDIA_SERVICE, "()V", &[]);
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "getSessionToken",
+            "()Landroid/media/session/MediaSession$Token;",
+            &[]
+        ),
+        Value::Null
+    );
+    let correct = p41_intent(&mut engine, "android.media.browse.MediaBrowserService");
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Obj(correct)]
+        ),
+        Value::Null,
+        "onCreate has not created the ServiceBinder yet"
+    );
+    call(&mut engine, service, "onCreate", "()V", &[]);
+    let wrong = p41_intent(&mut engine, "example.WRONG");
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Obj(wrong)]
+        ),
+        Value::Null
+    );
+    let binder = call(
+        &mut engine,
+        service,
+        "onBind",
+        "(Landroid/content/Intent;)Landroid/os/IBinder;",
+        &[Value::Obj(correct)],
+    );
+    assert!(!matches!(binder, Value::Null));
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Obj(correct)]
+        ),
+        binder
+    );
+
+    let debug = text(&mut engine, "load-children");
+    let result = p41_new(
+        &mut engine,
+        P41_MEDIA_RESULT,
+        "(Landroid/service/media/MediaBrowserService;Ljava/lang/Object;)V",
+        &[Value::Obj(service), debug],
+    );
+    assert_eq!(
+        call(&mut engine, result, "isDone", "()Z", &[]),
+        Value::Int(0)
+    );
+    call(&mut engine, result, "detach", "()V", &[]);
+    assert_eq!(
+        call(&mut engine, result, "isDone", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_throws(
+        engine.invoke_instance(result, "detach", "()V", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    call(
+        &mut engine,
+        result,
+        "sendResult",
+        "(Ljava/lang/Object;)V",
+        &[Value::Null],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            result,
+            "sendResult",
+            "(Ljava/lang/Object;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    let item_id = text(&mut engine, "missing-item");
+    let item_debug = text(&mut engine, "load-item");
+    let item_result = p41_new(
+        &mut engine,
+        P41_MEDIA_RESULT,
+        "(Landroid/service/media/MediaBrowserService;Ljava/lang/Object;)V",
+        &[Value::Obj(service), item_debug],
+    );
+    call(
+        &mut engine,
+        service,
+        "onLoadItem",
+        "(Ljava/lang/String;Landroid/service/media/MediaBrowserService$Result;)V",
+        &[item_id, Value::Obj(item_result)],
+    );
+    assert_eq!(field(&engine, item_result, "mFlags"), Value::Int(2));
+    assert_eq!(
+        call(&mut engine, item_result, "isDone", "()Z", &[]),
+        Value::Int(1)
+    );
+
+    let parent = text(&mut engine, "library-root");
+    call(
+        &mut engine,
+        service,
+        "notifyChildrenChanged",
+        "(Ljava/lang/String;)V",
+        std::slice::from_ref(&parent),
+    );
+    let options = p41_bundle(&mut engine);
+    call(
+        &mut engine,
+        service,
+        "notifyChildrenChanged",
+        "(Ljava/lang/String;Landroid/os/Bundle;)V",
+        &[parent, Value::Obj(options)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            service,
+            "notifyChildrenChanged",
+            "(Ljava/lang/String;Landroid/os/Bundle;)V",
+            &[Value::Null, Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_instance(service, "getBrowserRootHints", "()Landroid/os/Bundle;", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            service,
+            "getCurrentBrowserInfo",
+            "()Landroid/media/session/MediaSessionManager$RemoteUserInfo;",
+            &[],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    assert_throws(
+        engine.invoke_instance(
+            service,
+            "setSessionToken",
+            "(Landroid/media/session/MediaSession$Token;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let token = instance(&mut engine, "Landroid/media/session/MediaSession$Token;");
+    call(
+        &mut engine,
+        service,
+        "setSessionToken",
+        "(Landroid/media/session/MediaSession$Token;)V",
+        &[Value::Obj(token)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "getSessionToken",
+            "()Landroid/media/session/MediaSession$Token;",
+            &[]
+        ),
+        Value::Obj(token)
+    );
+    assert_throws(
+        engine.invoke_instance(
+            service,
+            "setSessionToken",
+            "(Landroid/media/session/MediaSession$Token;)V",
+            &[Value::Obj(token)],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+}

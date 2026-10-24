@@ -1789,6 +1789,54 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Landroid/view/translation/TranslationContext$BaseBuilder;",
             "Ljava/lang/Object;",
         ]),
+        // Appendix C Batch 41-A bounded service-extension slices.
+        "Landroid/service/quicksettings/TileService;"
+        | "Landroid/service/wallpaper/WallpaperService;"
+        | "Landroid/service/dreams/DreamService;"
+        | "Landroid/service/chooser/ChooserTargetService;"
+        | "Landroid/service/carrier/CarrierService;"
+        | "Landroid/service/media/MediaBrowserService;" => Some(&[
+            "Landroid/app/Service;",
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/service/quicksettings/Tile;"
+        | "Landroid/service/wallpaper/WallpaperService$Engine;"
+        | "Lcom/android/internal/view/BaseSurfaceHolder;"
+        | "Landroid/service/dreams/DreamService$DreamMetadata;"
+        | "Landroid/service/chooser/ChooserTarget;"
+        | "Landroid/service/carrier/CarrierIdentifier;"
+        | "Landroid/service/media/MediaBrowserService$BrowserRoot;"
+        | "Landroid/service/media/MediaBrowserService$Result;" => Some(OBJECT),
+        "Landroid/service/wallpaper/WallpaperService$Engine$1;" => Some(&[
+            "Lcom/android/internal/view/BaseSurfaceHolder;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/service/chooser/ChooserTargetService$IChooserTargetServiceWrapper;" => Some(&[
+            "Landroid/service/chooser/IChooserTargetService$Stub;",
+            "Landroid/os/Binder;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/service/chooser/IChooserTargetService$Stub;" => {
+            Some(&["Landroid/os/Binder;", "Ljava/lang/Object;"])
+        }
+        "Landroid/service/carrier/CarrierService$ICarrierServiceWrapper;" => Some(&[
+            "Landroid/service/carrier/ICarrierService$Stub;",
+            "Landroid/os/Binder;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/service/carrier/ICarrierService$Stub;" => {
+            Some(&["Landroid/os/Binder;", "Ljava/lang/Object;"])
+        }
+        "Landroid/service/media/MediaBrowserService$ServiceBinder;" => Some(&[
+            "Landroid/service/media/IMediaBrowserService$Stub;",
+            "Landroid/os/Binder;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/service/media/IMediaBrowserService$Stub;" => {
+            Some(&["Landroid/os/Binder;", "Ljava/lang/Object;"])
+        }
         _ => None,
     }
 }
@@ -2296,6 +2344,33 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         "Landroid/companion/AssociationInfo$Builder;" => {
             Some(&["Landroid/companion/AssociationInfo$NonActionableBuilder;"])
         }
+        // Interfaces in the Batch 41-A bounded slices.
+        "Landroid/service/quicksettings/Tile;"
+        | "Landroid/service/chooser/ChooserTarget;"
+        | "Landroid/service/carrier/CarrierIdentifier;" => Some(&["Landroid/os/Parcelable;"]),
+        "Lcom/android/internal/view/BaseSurfaceHolder;"
+        | "Landroid/service/wallpaper/WallpaperService$Engine$1;" => {
+            Some(&["Landroid/view/SurfaceHolder;"])
+        }
+        "Landroid/service/dreams/DreamService;" => Some(&["Landroid/view/Window$Callback;"]),
+        "Landroid/service/chooser/ChooserTargetService$IChooserTargetServiceWrapper;"
+        | "Landroid/service/chooser/IChooserTargetService$Stub;" => Some(&[
+            "Landroid/service/chooser/IChooserTargetService;",
+            "Landroid/os/IBinder;",
+            "Landroid/os/IInterface;",
+        ]),
+        "Landroid/service/carrier/CarrierService$ICarrierServiceWrapper;"
+        | "Landroid/service/carrier/ICarrierService$Stub;" => Some(&[
+            "Landroid/service/carrier/ICarrierService;",
+            "Landroid/os/IBinder;",
+            "Landroid/os/IInterface;",
+        ]),
+        "Landroid/service/media/MediaBrowserService$ServiceBinder;"
+        | "Landroid/service/media/IMediaBrowserService$Stub;" => Some(&[
+            "Landroid/service/media/IMediaBrowserService;",
+            "Landroid/os/IBinder;",
+            "Landroid/os/IInterface;",
+        ]),
         _ => None,
     }
 }

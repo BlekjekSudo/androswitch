@@ -419,6 +419,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial49_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial41_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -557,6 +560,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial49_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial41_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -626,6 +632,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial49_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial41_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -32182,6 +32191,1331 @@ pub(crate) fn partial49_host_static(
         (P49_MAC_ADDRESS, "TYPE_UNICAST") => Some(1),
         (P49_MAC_ADDRESS, "TYPE_MULTICAST") => Some(2),
         (P49_MAC_ADDRESS, "TYPE_BROADCAST") => Some(3),
+        _ => None,
+    };
+    Ok(value.map(Value::Int))
+}
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 41-A: bounded service-extension slices for
+// android.service.quicksettings, android.service.wallpaper,
+// android.service.dreams, android.service.chooser, android.service.carrier
+// and android.service.media.
+//
+// The modeled profile is deliberately the *unbound/unattached* state that
+// AOSP exposes before SystemUI, the wallpaper/dream controllers, chooser,
+// telephony, or a media-browsing client connects: value objects and the
+// field/default/validation behavior of the service base classes in that
+// state. It does not model SystemUI tile updates, wallpaper surfaces or
+// windows, dream attach/window/content, chooser ranking UI, carrier-privilege
+// telephony calls, SIM/subscription lookup, or media-browser client binder
+// connections/subscriptions.
+// ---------------------------------------------------------------------------
+
+const P41_TILE: &str = "Landroid/service/quicksettings/Tile;";
+const P41_TILE_SERVICE: &str = "Landroid/service/quicksettings/TileService;";
+
+const P41_WALLPAPER_SERVICE: &str = "Landroid/service/wallpaper/WallpaperService;";
+const P41_WALLPAPER_ENGINE: &str = "Landroid/service/wallpaper/WallpaperService$Engine;";
+const P41_WALLPAPER_HOLDER: &str = "Landroid/service/wallpaper/WallpaperService$Engine$1;";
+
+const P41_DREAM_SERVICE: &str = "Landroid/service/dreams/DreamService;";
+
+const P41_CHOOSER_TARGET: &str = "Landroid/service/chooser/ChooserTarget;";
+const P41_CHOOSER_SERVICE: &str = "Landroid/service/chooser/ChooserTargetService;";
+const P41_CHOOSER_WRAPPER: &str =
+    "Landroid/service/chooser/ChooserTargetService$IChooserTargetServiceWrapper;";
+const P41_CHOOSER_RESULT: &str = "Landroid/service/chooser/IChooserTargetResult;";
+
+const P41_CARRIER_IDENTIFIER: &str = "Landroid/service/carrier/CarrierIdentifier;";
+const P41_CARRIER_SERVICE: &str = "Landroid/service/carrier/CarrierService;";
+const P41_CARRIER_WRAPPER: &str = "Landroid/service/carrier/CarrierService$ICarrierServiceWrapper;";
+
+const P41_MEDIA_BROWSER_SERVICE: &str = "Landroid/service/media/MediaBrowserService;";
+const P41_MEDIA_BROWSER_ROOT: &str = "Landroid/service/media/MediaBrowserService$BrowserRoot;";
+const P41_MEDIA_RESULT: &str = "Landroid/service/media/MediaBrowserService$Result;";
+const P41_MEDIA_BINDER: &str = "Landroid/service/media/MediaBrowserService$ServiceBinder;";
+
+fn p41_class(c: &str) -> bool {
+    matches!(
+        c,
+        P41_TILE
+            | P41_TILE_SERVICE
+            | P41_WALLPAPER_SERVICE
+            | P41_WALLPAPER_ENGINE
+            | P41_DREAM_SERVICE
+            | P41_CHOOSER_TARGET
+            | P41_CHOOSER_SERVICE
+            | P41_CHOOSER_WRAPPER
+            | P41_CHOOSER_RESULT
+            | P41_CARRIER_IDENTIFIER
+            | P41_CARRIER_SERVICE
+            | P41_CARRIER_WRAPPER
+            | P41_MEDIA_BROWSER_SERVICE
+            | P41_MEDIA_BROWSER_ROOT
+            | P41_MEDIA_RESULT
+    )
+}
+
+fn p41_arg(args: &[Value], i: usize) -> Value {
+    args.get(i).cloned().unwrap_or(Value::Null)
+}
+
+#[cfg(feature = "advanced-components")]
+fn p41_pending_is_activity(vm: &Engine, r: ObjRef) -> bool {
+    vm.fw
+        .m9
+        .pending
+        .get(&r)
+        .map(|pending| pending.kind == "activity")
+        .unwrap_or(false)
+}
+
+#[cfg(not(feature = "advanced-components"))]
+fn p41_pending_is_activity(_vm: &Engine, _r: ObjRef) -> bool {
+    false
+}
+
+fn p41_intent_action(vm: &mut Engine, args: &[Value], i: usize) -> Result<Option<String>, VmExit> {
+    let Some(intent) = oarg(args, i) else {
+        return Err(npe(""));
+    };
+    let action = vm.invoke_instance(intent, "getAction", "()Ljava/lang/String;", &[])?;
+    Ok(opt_str(vm, Some(&action)))
+}
+
+fn p41_tile_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            put(vm, recv, "mState", Value::Int(1))?;
+            put(vm, recv, "mIcon", Value::Null)?;
+            put(vm, recv, "mLabel", Value::Null)?;
+            put(vm, recv, "mSubtitle", Value::Null)?;
+            put(vm, recv, "mContentDescription", Value::Null)?;
+            put(vm, recv, "mStateDescription", Value::Null)?;
+            put(vm, recv, "mPendingIntent", Value::Null)?;
+            put(vm, recv, "mService", Value::Null)?;
+            put(vm, recv, "mToken", Value::Null)?;
+            Value::Null
+        }
+        ("getState", "()I") => Value::Int(match get(vm, recv, "mState") {
+            Value::Int(state) => state,
+            _ => 1,
+        }),
+        ("setState", "(I)V") => {
+            put(vm, recv, "mState", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("getIcon", "()Landroid/graphics/drawable/Icon;") => get(vm, recv, "mIcon"),
+        ("setIcon", "(Landroid/graphics/drawable/Icon;)V") => {
+            put(vm, recv, "mIcon", p41_arg(args, 0))?;
+            Value::Null
+        }
+        ("getLabel", "()Ljava/lang/CharSequence;") => get(vm, recv, "mLabel"),
+        ("setLabel", "(Ljava/lang/CharSequence;)V") => {
+            put(vm, recv, "mLabel", p41_arg(args, 0))?;
+            Value::Null
+        }
+        ("getSubtitle", "()Ljava/lang/CharSequence;") => get(vm, recv, "mSubtitle"),
+        ("setSubtitle", "(Ljava/lang/CharSequence;)V") => {
+            put(vm, recv, "mSubtitle", p41_arg(args, 0))?;
+            Value::Null
+        }
+        ("getContentDescription", "()Ljava/lang/CharSequence;") => {
+            get(vm, recv, "mContentDescription")
+        }
+        ("setContentDescription", "(Ljava/lang/CharSequence;)V") => {
+            put(vm, recv, "mContentDescription", p41_arg(args, 0))?;
+            Value::Null
+        }
+        ("getStateDescription", "()Ljava/lang/CharSequence;") => get(vm, recv, "mStateDescription"),
+        ("setStateDescription", "(Ljava/lang/CharSequence;)V") => {
+            put(vm, recv, "mStateDescription", p41_arg(args, 0))?;
+            Value::Null
+        }
+        ("getActivityLaunchForClick", "()Landroid/app/PendingIntent;") => {
+            get(vm, recv, "mPendingIntent")
+        }
+        ("setActivityLaunchForClick", "(Landroid/app/PendingIntent;)V") => {
+            if let Some(pending) = oarg(args, 0) {
+                if !p41_pending_is_activity(vm, pending) {
+                    return Err(iae(""));
+                }
+            }
+            put(vm, recv, "mPendingIntent", p41_arg(args, 0))?;
+            Value::Null
+        }
+        ("setService", "(Landroid/service/quicksettings/IQSService;Landroid/os/IBinder;)V") => {
+            put(vm, recv, "mService", p41_arg(args, 0))?;
+            put(vm, recv, "mToken", p41_arg(args, 1))?;
+            Value::Null
+        }
+        ("updateTile", "()V") => {
+            if matches!(get(vm, recv, "mService"), Value::Null) {
+                return Err(npe(""));
+            }
+            return Ok(None);
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p41_tile_service_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            put(vm, recv, "mListening", Value::Int(0))?;
+            put(vm, recv, "mTile", Value::Null)?;
+            put(vm, recv, "mToken", Value::Null)?;
+            put(vm, recv, "mService", Value::Null)?;
+            put(vm, recv, "mUnlockRunnable", Value::Null)?;
+            put(vm, recv, "mTileToken", Value::Null)?;
+            Value::Null
+        }
+        ("onDestroy", "()V") => {
+            if field_bool(vm, recv, "mListening") {
+                vm.invoke_instance(recv, "onStopListening", "()V", &[])?;
+                put(vm, recv, "mListening", Value::Int(0))?;
+            }
+            Value::Null
+        }
+        (
+            "onTileAdded" | "onTileRemoved" | "onStartListening" | "onStopListening" | "onClick",
+            "()V",
+        ) => Value::Null,
+        ("getQsTile", "()Landroid/service/quicksettings/Tile;") => get(vm, recv, "mTile"),
+        ("setStatusIcon", "(Landroid/graphics/drawable/Icon;Ljava/lang/String;)V") => {
+            if !matches!(get(vm, recv, "mService"), Value::Null) {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("isSecure" | "isLocked", "()Z") => {
+            if matches!(get(vm, recv, "mService"), Value::Null) {
+                return Err(npe(""));
+            }
+            return Ok(None);
+        }
+        ("unlockAndRun", "(Ljava/lang/Runnable;)V") => {
+            put(vm, recv, "mUnlockRunnable", p41_arg(args, 0))?;
+            if matches!(get(vm, recv, "mService"), Value::Null) {
+                return Err(npe(""));
+            }
+            return Ok(None);
+        }
+        ("startActivityAndCollapse", "(Landroid/app/PendingIntent;)V") => {
+            if oarg(args, 0).is_none() || matches!(get(vm, recv, "mService"), Value::Null) {
+                return Err(npe(""));
+            }
+            return Ok(None);
+        }
+        ("onBind", "(Landroid/content/Intent;)Landroid/os/IBinder;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe(""));
+            }
+            return Ok(None);
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p41_float_bits(value: f32) -> u32 {
+    if value.is_nan() {
+        0x7fc0_0000
+    } else {
+        value.to_bits()
+    }
+}
+
+fn p41_wallpaper_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P41_WALLPAPER_SERVICE {
+        return Ok(match (name, sig) {
+            ("<init>", "()V") => Some(Value::Null),
+            _ => None,
+        });
+    }
+    if name == "<init>"
+        && matches!(
+            sig,
+            "(Landroid/service/wallpaper/WallpaperService;)V"
+                | "(Landroid/service/wallpaper/WallpaperService;Ljava/util/function/Supplier;Landroid/os/Handler;)V"
+        )
+    {
+        let holder = alloc_obj(
+            vm,
+            P41_WALLPAPER_HOLDER,
+            vec![
+                ("this$0".to_string(), Value::Obj(recv)),
+                ("mRequestedFormat".to_string(), Value::Int(1)),
+            ],
+        )?;
+        put(vm, recv, "this$0", p41_arg(args, 0))?;
+        if args.len() > 1 {
+            put(vm, recv, "mClockFunction", p41_arg(args, 1))?;
+            put(vm, recv, "mHandler", p41_arg(args, 2))?;
+        }
+        put(vm, recv, "mSurfaceHolder", Value::Obj(holder))?;
+        put(vm, recv, "mInitializing", Value::Int(1))?;
+        put(vm, recv, "mVisible", Value::Int(0))?;
+        put(vm, recv, "mReportedVisible", Value::Int(0))?;
+        put(vm, recv, "mCreated", Value::Int(0))?;
+        put(vm, recv, "mDestroyed", Value::Int(0))?;
+        put(vm, recv, "mIsInAmbientMode", Value::Int(0))?;
+        put(vm, recv, "mFixedSizeAllowed", Value::Int(0))?;
+        put(vm, recv, "mZoom", Value::Float(0.0))?;
+        put(vm, recv, "mWindowFlags", Value::Int(0x10))?;
+        put(
+            vm,
+            recv,
+            "mWindowPrivateFlags",
+            Value::Int((1 << 2) | (1 << 25)),
+        )?;
+        put(vm, recv, "mCurWindowFlags", Value::Int(0x10))?;
+        put(
+            vm,
+            recv,
+            "mCurWindowPrivateFlags",
+            Value::Int((1 << 2) | (1 << 25)),
+        )?;
+        put(vm, recv, "mIWallpaperEngine", Value::Null)?;
+        put(vm, recv, "mDisplayContext", Value::Null)?;
+        return Ok(Some(Value::Null));
+    }
+
+    let value = match (name, sig) {
+        ("getSurfaceHolder", "()Landroid/view/SurfaceHolder;") => get(vm, recv, "mSurfaceHolder"),
+        ("getWallpaperFlags" | "getDesiredMinimumWidth" | "getDesiredMinimumHeight", "()I")
+        | ("isPreview", "()Z") => {
+            if matches!(get(vm, recv, "mIWallpaperEngine"), Value::Null) {
+                return Err(npe(""));
+            }
+            return Ok(None);
+        }
+        ("isVisible", "()Z") => bool_value(field_bool(vm, recv, "mReportedVisible")),
+        (
+            "supportsLocalColorExtraction" | "shouldZoomOutWallpaper" | "shouldWaitForEngineShown",
+            "()Z",
+        ) => Value::Int(0),
+        ("isInAmbientMode", "()Z") => bool_value(field_bool(vm, recv, "mIsInAmbientMode")),
+        ("setTouchEventsEnabled", "(Z)V") => {
+            let old = field_int(vm, recv, "mWindowFlags");
+            let updated = if iarg(args, 0) != 0 {
+                old & !0x10
+            } else {
+                old | 0x10
+            };
+            put(vm, recv, "mWindowFlags", Value::Int(updated))?;
+            if field_bool(vm, recv, "mCreated") {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("setOffsetNotificationsEnabled", "(Z)V") => {
+            let old = field_int(vm, recv, "mWindowPrivateFlags");
+            let flag = 1 << 2;
+            let updated = if iarg(args, 0) != 0 {
+                old | flag
+            } else {
+                old & !flag
+            };
+            put(vm, recv, "mWindowPrivateFlags", Value::Int(updated))?;
+            if field_bool(vm, recv, "mCreated") {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("setShowForAllUsers", "(Z)V") => {
+            let old = field_int(vm, recv, "mWindowPrivateFlags");
+            let flag = 1 << 4;
+            let updated = if iarg(args, 0) != 0 {
+                old | flag
+            } else {
+                old & !flag
+            };
+            put(vm, recv, "mWindowPrivateFlags", Value::Int(updated))?;
+            if field_bool(vm, recv, "mCreated") {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("setFixedSizeAllowed", "(Z)V") => {
+            put(
+                vm,
+                recv,
+                "mFixedSizeAllowed",
+                Value::Int((iarg(args, 0) != 0) as i32),
+            )?;
+            Value::Null
+        }
+        ("setCreated", "(Z)V") => {
+            put(
+                vm,
+                recv,
+                "mCreated",
+                Value::Int((iarg(args, 0) != 0) as i32),
+            )?;
+            Value::Null
+        }
+        ("getZoom", "()F") => Value::Float(field_float(vm, recv, "mZoom")),
+        ("setZoom", "(F)V") => {
+            if field_bool(vm, recv, "mIsInAmbientMode") {
+                put(vm, recv, "mZoom", Value::Float(0.0))?;
+            }
+            let zoom = farg(args, 0);
+            let current = field_float(vm, recv, "mZoom");
+            let updated = p41_float_bits(zoom) != p41_float_bits(current);
+            if updated {
+                put(vm, recv, "mZoom", Value::Float(zoom))?;
+                if !field_bool(vm, recv, "mDestroyed") {
+                    vm.invoke_instance(recv, "onZoomChanged", "(F)V", &[Value::Float(zoom)])?;
+                }
+            }
+            Value::Null
+        }
+        ("onCreate", "(Landroid/view/SurfaceHolder;)V")
+        | ("onDestroy", "()V")
+        | ("onVisibilityChanged", "(Z)V")
+        | ("onApplyWindowInsets", "(Landroid/view/WindowInsets;)V")
+        | ("onTouchEvent", "(Landroid/view/MotionEvent;)V")
+        | ("onOffsetsChanged", "(FFFFII)V")
+        | ("onAmbientModeChanged", "(ZJ)V")
+        | ("onDesiredSizeChanged", "(II)V")
+        | ("onSurfaceChanged", "(Landroid/view/SurfaceHolder;III)V")
+        | (
+            "onSurfaceRedrawNeeded" | "onSurfaceCreated" | "onSurfaceDestroyed",
+            "(Landroid/view/SurfaceHolder;)V",
+        )
+        | ("onWallpaperFlagsChanged", "(I)V")
+        | ("onZoomChanged", "(F)V") => Value::Null,
+        ("onCommand", "(Ljava/lang/String;IIILandroid/os/Bundle;Z)Landroid/os/Bundle;") => {
+            Value::Null
+        }
+        ("onComputeColors", "()Landroid/app/WallpaperColors;") => Value::Null,
+        ("getDisplayContext", "()Landroid/content/Context;") => get(vm, recv, "mDisplayContext"),
+        ("doAmbientModeChanged", "(ZJ)V") => {
+            if !field_bool(vm, recv, "mDestroyed") {
+                put(
+                    vm,
+                    recv,
+                    "mIsInAmbientMode",
+                    Value::Int((iarg(args, 0) != 0) as i32),
+                )?;
+                if field_bool(vm, recv, "mCreated") {
+                    vm.invoke_instance(
+                        recv,
+                        "onAmbientModeChanged",
+                        "(ZJ)V",
+                        &[p41_arg(args, 0), p41_arg(args, 1)],
+                    )?;
+                }
+            }
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p41_dream_update_doze(vm: &Engine, recv: ObjRef) -> Result<Option<Value>, VmExit> {
+    if matches!(get(vm, recv, "mDreamToken"), Value::Null) || !field_bool(vm, recv, "mDozing") {
+        return Ok(Some(Value::Null));
+    }
+    if matches!(get(vm, recv, "mDreamManager"), Value::Null) {
+        return Err(npe(""));
+    }
+    Ok(None)
+}
+
+fn p41_dream_finish(vm: &mut Engine, recv: ObjRef) -> Result<Option<Value>, VmExit> {
+    if matches!(get(vm, recv, "mOverlayConnection"), Value::Obj(_))
+        || matches!(get(vm, recv, "mActivity"), Value::Obj(_))
+    {
+        return Ok(None);
+    }
+    if field_bool(vm, recv, "mFinished") {
+        return Ok(Some(Value::Null));
+    }
+    put(vm, recv, "mFinished", Value::Int(1))?;
+    if matches!(get(vm, recv, "mDreamToken"), Value::Null) {
+        // AOSP calls stopSelf() on an unattached Service; that has no
+        // additional guest-visible DreamService state in this profile.
+        return Ok(Some(Value::Null));
+    }
+    if matches!(get(vm, recv, "mDreamManager"), Value::Null) {
+        return Err(npe(""));
+    }
+    Ok(None)
+}
+
+fn p41_dream_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            put(vm, recv, "mDreamManager", Value::Null)?;
+            put(vm, recv, "mDreamToken", Value::Null)?;
+            put(vm, recv, "mWindow", Value::Null)?;
+            put(vm, recv, "mActivity", Value::Null)?;
+            put(vm, recv, "mOverlayConnection", Value::Null)?;
+            put(vm, recv, "mInteractive", Value::Int(0))?;
+            put(vm, recv, "mFullscreen", Value::Int(0))?;
+            put(vm, recv, "mScreenBright", Value::Int(1))?;
+            put(vm, recv, "mStarted", Value::Int(0))?;
+            put(vm, recv, "mWaking", Value::Int(0))?;
+            put(vm, recv, "mFinished", Value::Int(0))?;
+            put(vm, recv, "mCanDoze", Value::Int(0))?;
+            put(vm, recv, "mDozing", Value::Int(0))?;
+            put(vm, recv, "mWindowless", Value::Int(0))?;
+            put(vm, recv, "mDozeScreenState", Value::Int(0))?;
+            put(vm, recv, "mDozeScreenBrightness", Value::Int(-1))?;
+            put(vm, recv, "mDebug", Value::Int(0))?;
+            Value::Null
+        }
+        ("setDebug", "(Z)V") => {
+            put(vm, recv, "mDebug", Value::Int((iarg(args, 0) != 0) as i32))?;
+            Value::Null
+        }
+        ("setInteractive", "(Z)V") => {
+            put(
+                vm,
+                recv,
+                "mInteractive",
+                Value::Int((iarg(args, 0) != 0) as i32),
+            )?;
+            Value::Null
+        }
+        ("isInteractive", "()Z") => bool_value(field_bool(vm, recv, "mInteractive")),
+        ("setFullscreen", "(Z)V") => {
+            let updated = iarg(args, 0) != 0;
+            if field_bool(vm, recv, "mFullscreen") != updated {
+                put(vm, recv, "mFullscreen", Value::Int(updated as i32))?;
+                if matches!(get(vm, recv, "mWindow"), Value::Obj(_)) {
+                    return Ok(None);
+                }
+            }
+            Value::Null
+        }
+        ("isFullscreen", "()Z") => bool_value(field_bool(vm, recv, "mFullscreen")),
+        ("setScreenBright", "(Z)V") => {
+            let updated = iarg(args, 0) != 0;
+            let current = match get(vm, recv, "mScreenBright") {
+                Value::Int(v) => v != 0,
+                _ => true,
+            };
+            if current != updated {
+                put(vm, recv, "mScreenBright", Value::Int(updated as i32))?;
+                if matches!(get(vm, recv, "mWindow"), Value::Obj(_)) {
+                    return Ok(None);
+                }
+            }
+            Value::Null
+        }
+        ("isScreenBright", "()Z") => {
+            if matches!(get(vm, recv, "mWindow"), Value::Obj(_)) {
+                return Ok(None);
+            }
+            bool_value(match get(vm, recv, "mScreenBright") {
+                Value::Int(v) => v != 0,
+                _ => true,
+            })
+        }
+        ("setWindowless", "(Z)V") => {
+            put(
+                vm,
+                recv,
+                "mWindowless",
+                Value::Int((iarg(args, 0) != 0) as i32),
+            )?;
+            Value::Null
+        }
+        ("isWindowless", "()Z") => bool_value(field_bool(vm, recv, "mWindowless")),
+        ("getWindow", "()Landroid/view/Window;") => get(vm, recv, "mWindow"),
+        ("getWindowManager", "()Landroid/view/WindowManager;") => {
+            if matches!(get(vm, recv, "mWindow"), Value::Obj(_)) {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("canDoze", "()Z") => bool_value(field_bool(vm, recv, "mCanDoze")),
+        ("startDozing", "()V") => {
+            if field_bool(vm, recv, "mCanDoze") && !field_bool(vm, recv, "mDozing") {
+                put(vm, recv, "mDozing", Value::Int(1))?;
+                match p41_dream_update_doze(vm, recv)? {
+                    Some(v) => v,
+                    None => return Ok(None),
+                }
+            } else {
+                Value::Null
+            }
+        }
+        ("stopDozing", "()V") => {
+            if field_bool(vm, recv, "mDozing") {
+                put(vm, recv, "mDozing", Value::Int(0))?;
+                if matches!(get(vm, recv, "mDreamManager"), Value::Null) {
+                    return Err(npe(""));
+                }
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("isDozing", "()Z") => bool_value(field_bool(vm, recv, "mDozing")),
+        ("getDozeScreenState", "()I") => Value::Int(field_int(vm, recv, "mDozeScreenState")),
+        ("setDozeScreenState", "(I)V") => {
+            let updated = iarg(args, 0);
+            if field_int(vm, recv, "mDozeScreenState") != updated {
+                put(vm, recv, "mDozeScreenState", Value::Int(updated))?;
+                match p41_dream_update_doze(vm, recv)? {
+                    Some(v) => v,
+                    None => return Ok(None),
+                }
+            } else {
+                Value::Null
+            }
+        }
+        ("getDozeScreenBrightness", "()I") => {
+            Value::Int(match get(vm, recv, "mDozeScreenBrightness") {
+                Value::Int(v) => v,
+                _ => -1,
+            })
+        }
+        ("setDozeScreenBrightness", "(I)V") => {
+            let raw = iarg(args, 0);
+            let updated = if raw == -1 { -1 } else { raw.clamp(0, 255) };
+            let current = match get(vm, recv, "mDozeScreenBrightness") {
+                Value::Int(v) => v,
+                _ => -1,
+            };
+            if current != updated {
+                put(vm, recv, "mDozeScreenBrightness", Value::Int(updated))?;
+                match p41_dream_update_doze(vm, recv)? {
+                    Some(v) => v,
+                    None => return Ok(None),
+                }
+            } else {
+                Value::Null
+            }
+        }
+        ("onDreamingStarted" | "onDreamingStopped", "()V") => Value::Null,
+        ("onWakeUp", "()V") => match p41_dream_finish(vm, recv)? {
+            Some(v) => v,
+            None => return Ok(None),
+        },
+        ("finish", "()V") => match p41_dream_finish(vm, recv)? {
+            Some(v) => v,
+            None => return Ok(None),
+        },
+        ("wakeUp", "()V") => {
+            if !field_bool(vm, recv, "mWaking") && !field_bool(vm, recv, "mFinished") {
+                put(vm, recv, "mWaking", Value::Int(1))?;
+                if matches!(get(vm, recv, "mActivity"), Value::Obj(_)) {
+                    return Ok(None);
+                }
+                vm.invoke_instance(recv, "onWakeUp", "()V", &[])?;
+            }
+            Value::Null
+        }
+        ("onUnbind", "(Landroid/content/Intent;)Z") => {
+            if matches!(get(vm, recv, "mOverlayConnection"), Value::Obj(_)) {
+                return Ok(None);
+            }
+            Value::Int(0)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p41_chooser_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P41_CHOOSER_RESULT {
+        // Host-created exact result endpoint used to observe the in-VM
+        // wrapper callback. A DEX/Binder implementation has a different
+        // runtime class and is not shadowed.
+        if class_of(vm, recv) != P41_CHOOSER_RESULT {
+            return Ok(None);
+        }
+        return Ok(match (name, sig) {
+            ("sendResult", "(Ljava/util/List;)V") => {
+                let count = field_int(vm, recv, "rd_send_count");
+                put(vm, recv, "rd_targets", p41_arg(args, 0))?;
+                put(vm, recv, "rd_send_count", Value::Int(count + 1))?;
+                Some(Value::Null)
+            }
+            _ => None,
+        });
+    }
+
+    if class == P41_CHOOSER_SERVICE {
+        let value = match (name, sig) {
+            ("<init>", "()V") => {
+                put(vm, recv, "mWrapper", Value::Null)?;
+                Value::Null
+            }
+            ("onBind", "(Landroid/content/Intent;)Landroid/os/IBinder;") => {
+                let action = p41_intent_action(vm, args, 0)?;
+                if action.as_deref() != Some("android.service.chooser.ChooserTargetService") {
+                    Value::Null
+                } else if let Value::Obj(wrapper) = get(vm, recv, "mWrapper") {
+                    Value::Obj(wrapper)
+                } else {
+                    let wrapper = alloc_obj(
+                        vm,
+                        P41_CHOOSER_WRAPPER,
+                        vec![("this$0".to_string(), Value::Obj(recv))],
+                    )?;
+                    put(vm, recv, "mWrapper", Value::Obj(wrapper))?;
+                    Value::Obj(wrapper)
+                }
+            }
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+
+    if class == P41_CHOOSER_WRAPPER {
+        let value = match (name, sig) {
+            (
+                "<init>",
+                "(Landroid/service/chooser/ChooserTargetService;)V",
+            ) => {
+                put(vm, recv, "this$0", p41_arg(args, 0))?;
+                Value::Null
+            }
+            (
+                "getChooserTargets",
+                "(Landroid/content/ComponentName;Landroid/content/IntentFilter;Landroid/service/chooser/IChooserTargetResult;)V",
+            ) => {
+                let Some(service) = field_obj(vm, recv, "this$0") else {
+                    return Err(npe(""));
+                };
+                let (targets, pending) = match vm.invoke_instance(
+                    service,
+                    "onGetChooserTargets",
+                    "(Landroid/content/ComponentName;Landroid/content/IntentFilter;)Ljava/util/List;",
+                    &[p41_arg(args, 0), p41_arg(args, 1)],
+                ) {
+                    Ok(value) => (value, None),
+                    Err(error) => (Value::Null, Some(error)),
+                };
+                let Some(result) = oarg(args, 2) else {
+                    return Err(npe(""));
+                };
+                vm.invoke_instance(result, "sendResult", "(Ljava/util/List;)V", &[targets])?;
+                if let Some(error) = pending {
+                    return Err(error);
+                }
+                Value::Null
+            }
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+
+    // ChooserTarget.
+    let value = match (name, sig) {
+        (
+            "<init>",
+            "(Ljava/lang/CharSequence;Landroid/graphics/drawable/Icon;FLandroid/content/ComponentName;Landroid/os/Bundle;)V",
+        ) => {
+            put(vm, recv, "mTitle", p41_arg(args, 0))?;
+            put(vm, recv, "mIcon", p41_arg(args, 1))?;
+            let score = farg(args, 2);
+            if score > 1.0 || score < 0.0 {
+                return Err(iae(format!(
+                    "Score {} out of range; must be between 0.0f and 1.0f",
+                    crate::repr::java_float(score)
+                )));
+            }
+            put(vm, recv, "mScore", Value::Float(score))?;
+            put(vm, recv, "mComponentName", p41_arg(args, 3))?;
+            put(vm, recv, "mIntentExtras", p41_arg(args, 4))?;
+            Value::Null
+        }
+        ("getTitle", "()Ljava/lang/CharSequence;") => get(vm, recv, "mTitle"),
+        ("getIcon", "()Landroid/graphics/drawable/Icon;") => get(vm, recv, "mIcon"),
+        ("getScore", "()F") => Value::Float(field_float(vm, recv, "mScore")),
+        ("getComponentName", "()Landroid/content/ComponentName;") => {
+            get(vm, recv, "mComponentName")
+        }
+        ("getIntentExtras", "()Landroid/os/Bundle;") => get(vm, recv, "mIntentExtras"),
+        ("describeContents", "()I") => Value::Int(0),
+        ("toString", "()Ljava/lang/String;") => {
+            let component = get(vm, recv, "mComponentName");
+            let extras = get(vm, recv, "mIntentExtras");
+            let title = get(vm, recv, "mTitle");
+            let score = field_float(vm, recv, "mScore");
+            let text = format!(
+                "ChooserTarget{{{}, {}, '{}', {}}}",
+                value_string(vm, &component)?,
+                value_string(vm, &extras)?,
+                value_string(vm, &title)?,
+                crate::repr::java_float(score)
+            );
+            jstr(vm, text)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p41_carrier_identifier_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        (
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+        )
+        | (
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V",
+        ) => {
+            put(vm, recv, "mMcc", p41_arg(args, 0))?;
+            put(vm, recv, "mMnc", p41_arg(args, 1))?;
+            put(vm, recv, "mSpn", p41_arg(args, 2))?;
+            put(vm, recv, "mImsi", p41_arg(args, 3))?;
+            put(vm, recv, "mGid1", p41_arg(args, 4))?;
+            put(vm, recv, "mGid2", p41_arg(args, 5))?;
+            let (carrier, specific) = if args.len() >= 8 {
+                (iarg(args, 6), iarg(args, 7))
+            } else {
+                (-1, -1)
+            };
+            put(vm, recv, "mCarrierId", Value::Int(carrier))?;
+            put(vm, recv, "mSpecificCarrierId", Value::Int(specific))?;
+            Value::Null
+        }
+        ("<init>", "([BLjava/lang/String;Ljava/lang/String;)V") => {
+            let Some(array) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            let bytes = p49_byte_values(vm, &Value::Obj(array));
+            if bytes.len() != 3 {
+                return Err(iae(format!(
+                    "MCC & MNC must be set by a 3-byte array: byte[{}]",
+                    bytes.len()
+                )));
+            }
+            let hex: Vec<char> = bytes
+                .iter()
+                .flat_map(|byte| format!("{byte:02X}").chars().collect::<Vec<_>>())
+                .collect();
+            let mcc: String = [hex[1], hex[0], hex[3]].into_iter().collect();
+            let mnc: String = if hex[2] == 'F' {
+                [hex[5], hex[4]].into_iter().collect()
+            } else {
+                [hex[5], hex[4], hex[2]].into_iter().collect()
+            };
+            let mcc = jstr(vm, mcc)?;
+            let mnc = jstr(vm, mnc)?;
+            put(vm, recv, "mMcc", mcc)?;
+            put(vm, recv, "mMnc", mnc)?;
+            put(vm, recv, "mSpn", Value::Null)?;
+            put(vm, recv, "mImsi", Value::Null)?;
+            put(vm, recv, "mGid1", p41_arg(args, 1))?;
+            put(vm, recv, "mGid2", p41_arg(args, 2))?;
+            put(vm, recv, "mCarrierId", Value::Int(-1))?;
+            put(vm, recv, "mSpecificCarrierId", Value::Int(-1))?;
+            Value::Null
+        }
+        ("getMcc", "()Ljava/lang/String;") => get(vm, recv, "mMcc"),
+        ("getMnc", "()Ljava/lang/String;") => get(vm, recv, "mMnc"),
+        ("getSpn", "()Ljava/lang/String;") => get(vm, recv, "mSpn"),
+        ("getImsi", "()Ljava/lang/String;") => get(vm, recv, "mImsi"),
+        ("getGid1", "()Ljava/lang/String;") => get(vm, recv, "mGid1"),
+        ("getGid2", "()Ljava/lang/String;") => get(vm, recv, "mGid2"),
+        ("getCarrierId", "()I") => Value::Int(match get(vm, recv, "mCarrierId") {
+            Value::Int(v) => v,
+            _ => -1,
+        }),
+        ("getSpecificCarrierId", "()I") => {
+            Value::Int(match get(vm, recv, "mSpecificCarrierId") {
+                Value::Int(v) => v,
+                _ => -1,
+            })
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let equal = match oarg(args, 0) {
+                Some(other) if other == recv => true,
+                Some(other) if class_of(vm, other) == class_of(vm, recv) => {
+                    ["mMcc", "mMnc", "mSpn", "mImsi", "mGid1", "mGid2"]
+                        .iter()
+                        .all(|field| {
+                            objects_equal(vm, &get(vm, recv, field), &get(vm, other, field))
+                        })
+                        && field_int(vm, recv, "mCarrierId")
+                            == field_int(vm, other, "mCarrierId")
+                        && field_int(vm, recv, "mSpecificCarrierId")
+                            == field_int(vm, other, "mSpecificCarrierId")
+                }
+                _ => false,
+            };
+            bool_value(equal)
+        }
+        ("hashCode", "()I") => {
+            let values = [
+                get(vm, recv, "mMcc"),
+                get(vm, recv, "mMnc"),
+                get(vm, recv, "mSpn"),
+                get(vm, recv, "mImsi"),
+                get(vm, recv, "mGid1"),
+                get(vm, recv, "mGid2"),
+                Value::Int(field_int(vm, recv, "mCarrierId")),
+                Value::Int(field_int(vm, recv, "mSpecificCarrierId")),
+            ];
+            Value::Int(p49_objects_hash(vm, &values))
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        ("toString", "()Ljava/lang/String;") => {
+            let text = |field| {
+                field_str(vm, recv, field).unwrap_or_else(|| "null".to_string())
+            };
+            let imsi = match field_str(vm, recv, "mImsi") {
+                None => "null".to_string(),
+                Some(value) if value.is_empty() => value,
+                // The VM profile reports Build.TYPE=user, for which
+                // Rlog.secureHash returns "****".
+                Some(_) => "[****]".to_string(),
+            };
+            jstr(
+                vm,
+                format!(
+                    "CarrierIdentifier{{mcc={},mnc={},spn={},imsi={},gid1={},gid2={},carrierid={},specificCarrierId={}}}",
+                    text("mMcc"),
+                    text("mMnc"),
+                    text("mSpn"),
+                    imsi,
+                    text("mGid1"),
+                    text("mGid2"),
+                    field_int(vm, recv, "mCarrierId"),
+                    field_int(vm, recv, "mSpecificCarrierId")
+                ),
+            )?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p41_carrier_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P41_CARRIER_IDENTIFIER {
+        return p41_carrier_identifier_instance(vm, name, sig, recv, args);
+    }
+    if class == P41_CARRIER_WRAPPER {
+        return Ok(match (name, sig) {
+            ("<init>", "(Landroid/service/carrier/CarrierService;)V") => {
+                put(vm, recv, "this$0", p41_arg(args, 0))?;
+                Some(Value::Null)
+            }
+            _ => None,
+        });
+    }
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            let wrapper = alloc_obj(
+                vm,
+                P41_CARRIER_WRAPPER,
+                vec![("this$0".to_string(), Value::Obj(recv))],
+            )?;
+            put(vm, recv, "mStubWrapper", Value::Obj(wrapper))?;
+            Value::Null
+        }
+        ("onBind", "(Landroid/content/Intent;)Landroid/os/IBinder;") => {
+            get(vm, recv, "mStubWrapper")
+        }
+        (
+            "onLoadConfig",
+            "(ILandroid/service/carrier/CarrierIdentifier;)Landroid/os/PersistableBundle;",
+        ) => vm.invoke_instance(
+            recv,
+            "onLoadConfig",
+            "(Landroid/service/carrier/CarrierIdentifier;)Landroid/os/PersistableBundle;",
+            &[p41_arg(args, 1)],
+        )?,
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p41_media_result_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/service/media/MediaBrowserService;Ljava/lang/Object;)V") => {
+            put(vm, recv, "this$0", p41_arg(args, 0))?;
+            put(vm, recv, "mDebug", p41_arg(args, 1))?;
+            put(vm, recv, "mDetachCalled", Value::Int(0))?;
+            put(vm, recv, "mSendResultCalled", Value::Int(0))?;
+            put(vm, recv, "mFlags", Value::Int(0))?;
+            Value::Null
+        }
+        ("sendResult", "(Ljava/lang/Object;)V") => {
+            if field_bool(vm, recv, "mSendResultCalled") {
+                let debug = get(vm, recv, "mDebug");
+                return Err(ise(format!(
+                    "sendResult() called twice for: {}",
+                    value_string(vm, &debug)?
+                )));
+            }
+            put(vm, recv, "mSendResultCalled", Value::Int(1))?;
+            let flags = field_int(vm, recv, "mFlags");
+            vm.invoke_instance(
+                recv,
+                "onResultSent",
+                "(Ljava/lang/Object;I)V",
+                &[p41_arg(args, 0), Value::Int(flags)],
+            )?;
+            Value::Null
+        }
+        ("detach", "()V") => {
+            let debug = get(vm, recv, "mDebug");
+            if field_bool(vm, recv, "mDetachCalled") {
+                return Err(ise(format!(
+                    "detach() called when detach() had already been called for: {}",
+                    value_string(vm, &debug)?
+                )));
+            }
+            if field_bool(vm, recv, "mSendResultCalled") {
+                return Err(ise(format!(
+                    "detach() called when sendResult() had already been called for: {}",
+                    value_string(vm, &debug)?
+                )));
+            }
+            put(vm, recv, "mDetachCalled", Value::Int(1))?;
+            Value::Null
+        }
+        ("isDone", "()Z") => bool_value(
+            field_bool(vm, recv, "mDetachCalled") || field_bool(vm, recv, "mSendResultCalled"),
+        ),
+        ("setFlags", "(I)V") => {
+            put(vm, recv, "mFlags", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("onResultSent", "(Ljava/lang/Object;I)V") => Value::Null,
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p41_media_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P41_MEDIA_RESULT {
+        return p41_media_result_instance(vm, name, sig, recv, args);
+    }
+    if class == P41_MEDIA_BROWSER_ROOT {
+        let value = match (name, sig) {
+            ("<init>", "(Ljava/lang/String;Landroid/os/Bundle;)V") => {
+                if oarg(args, 0).is_none() {
+                    return Err(iae(
+                        "The root id in BrowserRoot cannot be null. Use null for BrowserRoot instead.",
+                    ));
+                }
+                put(vm, recv, "mRootId", p41_arg(args, 0))?;
+                put(vm, recv, "mExtras", p41_arg(args, 1))?;
+                Value::Null
+            }
+            ("getRootId", "()Ljava/lang/String;") => get(vm, recv, "mRootId"),
+            ("getExtras", "()Landroid/os/Bundle;") => get(vm, recv, "mExtras"),
+            _ => return Ok(None),
+        };
+        return Ok(Some(value));
+    }
+
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            put(vm, recv, "mCurConnection", Value::Null)?;
+            put(vm, recv, "mBinder", Value::Null)?;
+            put(vm, recv, "mSession", Value::Null)?;
+            Value::Null
+        }
+        ("onCreate", "()V") => {
+            let binder = alloc_obj(
+                vm,
+                P41_MEDIA_BINDER,
+                vec![("rd_service".to_string(), Value::Obj(recv))],
+            )?;
+            put(vm, recv, "mBinder", Value::Obj(binder))?;
+            Value::Null
+        }
+        ("onBind", "(Landroid/content/Intent;)Landroid/os/IBinder;") => {
+            let action = p41_intent_action(vm, args, 0)?;
+            if action.as_deref() == Some("android.media.browse.MediaBrowserService") {
+                get(vm, recv, "mBinder")
+            } else {
+                Value::Null
+            }
+        }
+        (
+            "dump",
+            "(Ljava/io/FileDescriptor;Ljava/io/PrintWriter;[Ljava/lang/String;)V",
+        ) => Value::Null,
+        (
+            "onLoadChildren",
+            "(Ljava/lang/String;Landroid/service/media/MediaBrowserService$Result;Landroid/os/Bundle;)V",
+        ) => {
+            let Some(result) = oarg(args, 1) else {
+                return Err(npe(""));
+            };
+            vm.invoke_instance(result, "setFlags", "(I)V", &[Value::Int(1)])?;
+            vm.invoke_instance(
+                recv,
+                "onLoadChildren",
+                "(Ljava/lang/String;Landroid/service/media/MediaBrowserService$Result;)V",
+                &[p41_arg(args, 0), p41_arg(args, 1)],
+            )?
+        }
+        (
+            "onLoadItem",
+            "(Ljava/lang/String;Landroid/service/media/MediaBrowserService$Result;)V",
+        ) => {
+            let Some(result) = oarg(args, 1) else {
+                return Err(npe(""));
+            };
+            vm.invoke_instance(result, "setFlags", "(I)V", &[Value::Int(2)])?;
+            vm.invoke_instance(
+                result,
+                "sendResult",
+                "(Ljava/lang/Object;)V",
+                &[Value::Null],
+            )?
+        }
+        ("setSessionToken", "(Landroid/media/session/MediaSession$Token;)V") => {
+            let Some(token) = oarg(args, 0) else {
+                return Err(iae("Session token may not be null."));
+            };
+            if matches!(get(vm, recv, "mSession"), Value::Obj(_)) {
+                return Err(ise("The session token has already been set."));
+            }
+            put(vm, recv, "mSession", Value::Obj(token))?;
+            Value::Null
+        }
+        ("getSessionToken", "()Landroid/media/session/MediaSession$Token;") => {
+            get(vm, recv, "mSession")
+        }
+        ("getBrowserRootHints", "()Landroid/os/Bundle;")
+        | (
+            "getCurrentBrowserInfo",
+            "()Landroid/media/session/MediaSessionManager$RemoteUserInfo;",
+        ) => {
+            if matches!(get(vm, recv, "mCurConnection"), Value::Null) {
+                return Err(ise(
+                    "This should be called inside of onGetRoot or onLoadChildren or onLoadItem methods",
+                ));
+            }
+            return Ok(None);
+        }
+        ("notifyChildrenChanged", "(Ljava/lang/String;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(iae("parentId cannot be null in notifyChildrenChanged"));
+            }
+            Value::Null
+        }
+        ("notifyChildrenChanged", "(Ljava/lang/String;Landroid/os/Bundle;)V") => {
+            if oarg(args, 1).is_none() {
+                return Err(iae("options cannot be null in notifyChildrenChanged"));
+            }
+            if oarg(args, 0).is_none() {
+                return Err(iae("parentId cannot be null in notifyChildrenChanged"));
+            }
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn partial41_instance_for_class(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P41_TILE => p41_tile_instance(vm, name, sig, recv, args),
+        P41_TILE_SERVICE => p41_tile_service_instance(vm, name, sig, recv, args),
+        P41_WALLPAPER_SERVICE | P41_WALLPAPER_ENGINE => {
+            p41_wallpaper_instance(vm, class, name, sig, recv, args)
+        }
+        P41_DREAM_SERVICE => p41_dream_instance(vm, name, sig, recv, args),
+        P41_CHOOSER_TARGET | P41_CHOOSER_SERVICE | P41_CHOOSER_WRAPPER | P41_CHOOSER_RESULT => {
+            p41_chooser_instance(vm, class, name, sig, recv, args)
+        }
+        P41_CARRIER_IDENTIFIER | P41_CARRIER_SERVICE | P41_CARRIER_WRAPPER => {
+            p41_carrier_instance(vm, class, name, sig, recv, args)
+        }
+        P41_MEDIA_BROWSER_SERVICE | P41_MEDIA_BROWSER_ROOT | P41_MEDIA_RESULT => {
+            p41_media_instance(vm, class, name, sig, recv, args)
+        }
+        _ => Ok(None),
+    }
+}
+
+pub(crate) fn partial41_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    for class in [recv_class, mref_class] {
+        if p41_class(class) {
+            let value = partial41_instance_for_class(vm, class, name, sig, recv, args)?;
+            if value.is_some() {
+                return Ok(value);
+            }
+        }
+    }
+    let actual = class_of(vm, recv);
+    if actual != recv_class && actual != mref_class && p41_class(&actual) {
+        return partial41_instance_for_class(vm, &actual, name, sig, recv, args);
+    }
+    Ok(None)
+}
+
+pub(crate) fn partial41_static(
+    _vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P41_DREAM_SERVICE
+        && name == "getDreamMetadata"
+        && sig
+            == "(Landroid/content/Context;Landroid/content/pm/ServiceInfo;)Landroid/service/dreams/DreamService$DreamMetadata;"
+        && oarg(args, 1).is_none()
+    {
+        return Ok(Some(Value::Null));
+    }
+    Ok(None)
+}
+
+pub(crate) fn partial41_host_static(
+    vm: &mut Engine,
+    class: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    if class == P41_TILE_SERVICE && field == "START_ACTIVITY_NEEDS_PENDING_INTENT" {
+        return Ok(Some(Value::Long(241_766_793)));
+    }
+
+    let text = match (class, field) {
+        (P41_TILE_SERVICE, "ACTION_QS_TILE_PREFERENCES") => {
+            Some("android.service.quicksettings.action.QS_TILE_PREFERENCES")
+        }
+        (P41_TILE_SERVICE, "ACTION_QS_TILE") => {
+            Some("android.service.quicksettings.action.QS_TILE")
+        }
+        (P41_TILE_SERVICE, "META_DATA_ACTIVE_TILE") => {
+            Some("android.service.quicksettings.ACTIVE_TILE")
+        }
+        (P41_TILE_SERVICE, "META_DATA_TOGGLEABLE_TILE") => {
+            Some("android.service.quicksettings.TOGGLEABLE_TILE")
+        }
+        (P41_TILE_SERVICE, "EXTRA_SERVICE") => Some("service"),
+        (P41_TILE_SERVICE, "EXTRA_TOKEN") => Some("token"),
+        (P41_TILE_SERVICE, "EXTRA_STATE") => Some("state"),
+        (P41_WALLPAPER_SERVICE, "SERVICE_INTERFACE") => {
+            Some("android.service.wallpaper.WallpaperService")
+        }
+        (P41_WALLPAPER_SERVICE, "SERVICE_META_DATA") => Some("android.service.wallpaper"),
+        (P41_DREAM_SERVICE, "DREAM_SERVICE") => Some("dreams"),
+        (P41_DREAM_SERVICE, "SERVICE_INTERFACE") => Some("android.service.dreams.DreamService"),
+        (P41_DREAM_SERVICE, "EXTRA_DREAM_OVERLAY_COMPONENT") => {
+            Some("android.service.dream.DreamService.dream_overlay_component")
+        }
+        (P41_DREAM_SERVICE, "DREAM_META_DATA") => Some("android.service.dream"),
+        (P41_CHOOSER_SERVICE, "SERVICE_INTERFACE") => {
+            Some("android.service.chooser.ChooserTargetService")
+        }
+        (P41_CHOOSER_SERVICE, "META_DATA_NAME") => {
+            Some("android.service.chooser.chooser_target_service")
+        }
+        (P41_CHOOSER_SERVICE, "BIND_PERMISSION") => {
+            Some("android.permission.BIND_CHOOSER_TARGET_SERVICE")
+        }
+        (P41_CARRIER_SERVICE, "CARRIER_SERVICE_INTERFACE") => {
+            Some("android.service.carrier.CarrierService")
+        }
+        (P41_CARRIER_WRAPPER, "KEY_CONFIG_BUNDLE") => Some("config_bundle"),
+        (P41_MEDIA_BROWSER_SERVICE, "SERVICE_INTERFACE") => {
+            Some("android.media.browse.MediaBrowserService")
+        }
+        (P41_MEDIA_BROWSER_SERVICE, "KEY_MEDIA_ITEM") => Some("media_item"),
+        (P41_MEDIA_BROWSER_ROOT, "EXTRA_RECENT") => Some("android.service.media.extra.RECENT"),
+        (P41_MEDIA_BROWSER_ROOT, "EXTRA_OFFLINE") => Some("android.service.media.extra.OFFLINE"),
+        (P41_MEDIA_BROWSER_ROOT, "EXTRA_SUGGESTED") => {
+            Some("android.service.media.extra.SUGGESTED")
+        }
+        _ => None,
+    };
+    if let Some(text) = text {
+        return jstr(vm, text).map(Some);
+    }
+
+    let value = match (class, field) {
+        (P41_TILE, "STATE_UNAVAILABLE") => Some(0),
+        (P41_TILE, "STATE_INACTIVE") => Some(1),
+        (P41_TILE, "STATE_ACTIVE") => Some(2),
+        (P41_DREAM_SERVICE, "DEFAULT_SHOW_COMPLICATIONS") => Some(0),
+        (P41_CARRIER_WRAPPER, "RESULT_OK") => Some(0),
+        (P41_CARRIER_WRAPPER, "RESULT_ERROR") => Some(1),
         _ => None,
     };
     Ok(value.map(Value::Int))
