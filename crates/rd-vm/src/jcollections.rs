@@ -240,7 +240,11 @@ fn new_iter(
     Ok(Value::Obj(r))
 }
 
-fn to_array(vm: &mut Engine, items: Vec<Value>, given: Option<&Value>) -> Result<Value, VmExit> {
+pub(crate) fn to_array(
+    vm: &mut Engine,
+    items: Vec<Value>,
+    given: Option<&Value>,
+) -> Result<Value, VmExit> {
     match given {
         Some(Value::Obj(a)) => {
             let (cur, _, desc) = crate::arrays::elems(vm, *a)?;
@@ -328,6 +332,22 @@ pub(crate) fn instance_intrinsic(
 
     if !COLLECTION_TYPES.contains(&mref_class) {
         return Ok(None);
+    }
+    // `android.util.ArraySet` also stores its elements in HostObj::List,
+    // but in signed Java-hash order. Its `addAll` must therefore defer to
+    // android_util instead of appending through this insertion-order path,
+    // including when named through Collection/Set and inherited by a DEX
+    // subclass that does not override it.
+    if name == "addAll" && sig == "(Ljava/util/Collection;)Z" {
+        let recv_class = vm.heap.class_of(recv)?.to_string();
+        const ARRAY_SET: &str = "Landroid/util/ArraySet;";
+        if recv_class == ARRAY_SET
+            || (vm.cp.find_class(&recv_class).is_some()
+                && vm.cp.is_subtype(&recv_class, ARRAY_SET)
+                && vm.cp.resolve_method(&recv_class, name, sig).is_none())
+        {
+            return Ok(None);
+        }
     }
     let host = match vm.fw.objects.get(&recv) {
         Some(HostObj::List { elems }) => Some(elems.clone()),
