@@ -3985,3 +3985,730 @@ fn change_bounds_interpolates_captured_view_bounds_linearly() {
         Value::Int(85)
     );
 }
+
+const ANDROID_OS: &str = "Landroid/system/Os;";
+const ANDROID_OS_CONSTANTS: &str = "Landroid/system/OsConstants;";
+const ANDROID_ERRNO: &str = "Landroid/system/ErrnoException;";
+const ANDROID_STRUCT_STAT: &str = "Landroid/system/StructStat;";
+const ANDROID_STRUCT_TIMESPEC: &str = "Landroid/system/StructTimespec;";
+
+fn byte_array(engine: &mut Engine, values: &[u8]) -> Value {
+    let array = engine
+        .heap
+        .alloc_array_zeroed(ElemKind::Int, values.len(), "[B")
+        .unwrap();
+    *engine.heap.array_elems_mut(array).unwrap() = values
+        .iter()
+        .map(|value| Value::Int(*value as i8 as i32))
+        .collect();
+    Value::Obj(array)
+}
+fn byte_array_values(engine: &Engine, value: &Value) -> Vec<u8> {
+    array_values(engine, value)
+        .iter()
+        .map(|value| match value {
+            Value::Int(v) => *v as u8,
+            other => panic!("expected byte array element, got {other:?}"),
+        })
+        .collect()
+}
+fn assert_errno(result: Result<Value, VmExit>, errno: i32, function: &str) -> ObjRef {
+    let Err(VmExit::Exception(throwable)) = result else {
+        panic!("expected ErrnoException {errno} from {function}, got {result:?}");
+    };
+    assert_eq!(throwable.class, ANDROID_ERRNO);
+    throwable
+        .obj
+        .expect("ErrnoException must retain its materialized object")
+}
+fn assert_errno_fields(engine: &Engine, object: ObjRef, errno: i32, function: &str) {
+    assert_eq!(field(engine, object, "errno"), Value::Int(errno));
+    assert_eq!(
+        text_of(engine, &field(engine, object, "functionName")),
+        function
+    );
+}
+fn os_text_arg(engine: &mut Engine, value: &str) -> Value {
+    text(engine, value)
+}
+fn os_open(engine: &mut Engine, path: &str, flags: i32, mode: i32) -> ObjRef {
+    let path = os_text_arg(engine, path);
+    object(call_static(
+        engine,
+        ANDROID_OS,
+        "open",
+        "(Ljava/lang/String;II)Ljava/io/FileDescriptor;",
+        &[path, Value::Int(flags), Value::Int(mode)],
+    ))
+}
+fn os_close(engine: &mut Engine, fd: ObjRef) {
+    call_static(
+        engine,
+        ANDROID_OS,
+        "close",
+        "(Ljava/io/FileDescriptor;)V",
+        &[Value::Obj(fd)],
+    );
+}
+fn os_stat(engine: &mut Engine, path: &str) -> ObjRef {
+    let path = os_text_arg(engine, path);
+    object(call_static(
+        engine,
+        ANDROID_OS,
+        "stat",
+        "(Ljava/lang/String;)Landroid/system/StructStat;",
+        &[path],
+    ))
+}
+
+#[test]
+fn android_system_constants_structs_and_errno_values_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            ANDROID_OS_CONSTANTS,
+            "errnoName",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(2)]
+        ),
+        "ENOENT"
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            ANDROID_OS_CONSTANTS,
+            "S_ISDIR",
+            "(I)Z",
+            &[Value::Int(0o040755)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            ANDROID_OS_CONSTANTS,
+            "S_ISREG",
+            "(I)Z",
+            &[Value::Int(0o040755)]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            ANDROID_OS,
+            "strerror",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(13)]
+        ),
+        "Permission denied"
+    );
+
+    let function = text(&mut engine, "stat");
+    let errno = instance(&mut engine, ANDROID_ERRNO);
+    call(
+        &mut engine,
+        errno,
+        "<init>",
+        "(Ljava/lang/String;I)V",
+        &[function, Value::Int(2)],
+    );
+    assert_eq!(field(&engine, errno, "errno"), Value::Int(2));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            errno,
+            "getMessage",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "stat failed: ENOENT (No such file or directory)"
+    );
+    let rethrown = engine.invoke_instance(
+        errno,
+        "rethrowAsIOException",
+        "()Ljava/io/IOException;",
+        &[],
+    );
+    let Err(VmExit::Exception(throwable)) = rethrown else {
+        panic!("expected IOException, got {rethrown:?}");
+    };
+    assert_eq!(throwable.class, "Ljava/io/IOException;");
+    let io = throwable.obj.expect("IOException object");
+    assert_eq!(field(&engine, io, "cause"), Value::Obj(errno));
+
+    let invalid = instance(&mut engine, ANDROID_STRUCT_TIMESPEC);
+    assert_throws(
+        engine.invoke_instance(
+            invalid,
+            "<init>",
+            "(JJ)V",
+            &[Value::Long(1), Value::Long(1_000_000_000)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let first = transition_new(
+        &mut engine,
+        ANDROID_STRUCT_TIMESPEC,
+        "(JJ)V",
+        &[Value::Long(10), Value::Long(20)],
+    );
+    let equal = transition_new(
+        &mut engine,
+        ANDROID_STRUCT_TIMESPEC,
+        "(JJ)V",
+        &[Value::Long(10), Value::Long(20)],
+    );
+    let later = transition_new(
+        &mut engine,
+        ANDROID_STRUCT_TIMESPEC,
+        "(JJ)V",
+        &[Value::Long(10), Value::Long(21)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            first,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(equal)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, first, "hashCode", "()I", &[]),
+        call(&mut engine, equal, "hashCode", "()I", &[])
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            first,
+            "compareTo",
+            "(Landroid/system/StructTimespec;)I",
+            &[Value::Obj(later)]
+        ),
+        Value::Int(-1)
+    );
+
+    let stat = transition_new(
+        &mut engine,
+        ANDROID_STRUCT_STAT,
+        "(JJIJIIJJJJJJJ)V",
+        &[
+            Value::Long(7),
+            Value::Long(42),
+            Value::Int(0o100644),
+            Value::Long(1),
+            Value::Int(10000),
+            Value::Int(10000),
+            Value::Long(0),
+            Value::Long(123),
+            Value::Long(11),
+            Value::Long(12),
+            Value::Long(13),
+            Value::Long(4096),
+            Value::Long(8),
+        ],
+    );
+    assert_eq!(field(&engine, stat, "st_size"), Value::Long(123));
+    let mtim = object(field(&engine, stat, "st_mtim"));
+    assert_eq!(field(&engine, mtim, "tv_sec"), Value::Long(12));
+
+    assert!(engine.cp.is_subtype(ANDROID_ERRNO, "Ljava/lang/Exception;"));
+    assert!(engine
+        .cp
+        .is_subtype(ANDROID_STRUCT_TIMESPEC, "Ljava/lang/Comparable;"));
+}
+
+#[test]
+fn android_system_os_files_descriptors_and_metadata_use_the_vfs() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let root = "/rd-system-file";
+    let root_arg = os_text_arg(&mut engine, root);
+    call_static(
+        &mut engine,
+        ANDROID_OS,
+        "mkdir",
+        "(Ljava/lang/String;I)V",
+        &[root_arg, Value::Int(0o755)],
+    );
+    let path = "/rd-system-file/data.bin";
+
+    let missing_arg = os_text_arg(&mut engine, path);
+    let missing = assert_errno(
+        engine.invoke_static(
+            ANDROID_OS,
+            "open",
+            "(Ljava/lang/String;II)Ljava/io/FileDescriptor;",
+            &[missing_arg, Value::Int(0), Value::Int(0)],
+        ),
+        2,
+        "open",
+    );
+    assert_errno_fields(&engine, missing, 2, "open");
+
+    // O_WRONLY | O_CREAT | O_TRUNC, mode 0640.
+    let writer = os_open(&mut engine, path, 1 | 0o100 | 0o1000, 0o640);
+    assert!(matches!(
+        field(&engine, writer, "descriptor"),
+        Value::Int(fd) if fd >= 3
+    ));
+    let bytes = byte_array(&mut engine, b"hello system");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            ANDROID_OS,
+            "write",
+            "(Ljava/io/FileDescriptor;[BII)I",
+            &[Value::Obj(writer), bytes, Value::Int(0), Value::Int(12)],
+        ),
+        Value::Int(12)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            ANDROID_OS,
+            "lseek",
+            "(Ljava/io/FileDescriptor;JI)J",
+            &[Value::Obj(writer), Value::Long(0), Value::Int(1)],
+        ),
+        Value::Long(12)
+    );
+    os_close(&mut engine, writer);
+    assert_eq!(field(&engine, writer, "descriptor"), Value::Int(-1));
+    let closed = assert_errno(
+        engine.invoke_static(
+            ANDROID_OS,
+            "close",
+            "(Ljava/io/FileDescriptor;)V",
+            &[Value::Obj(writer)],
+        ),
+        9,
+        "close",
+    );
+    assert_errno_fields(&engine, closed, 9, "close");
+
+    let stat = os_stat(&mut engine, path);
+    assert_eq!(field(&engine, stat, "st_mode"), Value::Int(0o100640));
+    assert_eq!(field(&engine, stat, "st_size"), Value::Long(12));
+    assert_eq!(field(&engine, stat, "st_uid"), Value::Int(10000));
+
+    let reader = os_open(&mut engine, path, 0, 0);
+    let out = byte_array(&mut engine, &[0; 16]);
+    assert_eq!(
+        call_static(
+            &mut engine,
+            ANDROID_OS,
+            "read",
+            "(Ljava/io/FileDescriptor;[BII)I",
+            &[
+                Value::Obj(reader),
+                out.clone(),
+                Value::Int(2),
+                Value::Int(5)
+            ],
+        ),
+        Value::Int(5)
+    );
+    assert_eq!(&byte_array_values(&engine, &out)[2..7], b"hello");
+    let pread_out = byte_array(&mut engine, &[0; 6]);
+    assert_eq!(
+        call_static(
+            &mut engine,
+            ANDROID_OS,
+            "pread",
+            "(Ljava/io/FileDescriptor;[BIIJ)I",
+            &[
+                Value::Obj(reader),
+                pread_out.clone(),
+                Value::Int(0),
+                Value::Int(6),
+                Value::Long(6),
+            ],
+        ),
+        Value::Int(6)
+    );
+    assert_eq!(byte_array_values(&engine, &pread_out), b"system");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            ANDROID_OS,
+            "lseek",
+            "(Ljava/io/FileDescriptor;JI)J",
+            &[Value::Obj(reader), Value::Long(0), Value::Int(1)],
+        ),
+        Value::Long(5),
+        "pread does not move the shared descriptor offset"
+    );
+    let rest = byte_array(&mut engine, &[0; 16]);
+    assert_eq!(
+        call_static(
+            &mut engine,
+            ANDROID_OS,
+            "read",
+            "(Ljava/io/FileDescriptor;[BII)I",
+            &[
+                Value::Obj(reader),
+                rest.clone(),
+                Value::Int(0),
+                Value::Int(16)
+            ],
+        ),
+        Value::Int(7)
+    );
+    assert_eq!(&byte_array_values(&engine, &rest)[..7], b" system");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            ANDROID_OS,
+            "read",
+            "(Ljava/io/FileDescriptor;[BII)I",
+            &[Value::Obj(reader), rest, Value::Int(0), Value::Int(1)],
+        ),
+        Value::Int(-1)
+    );
+    let bad_bounds = byte_array(&mut engine, &[0; 2]);
+    assert_throws(
+        engine.invoke_static(
+            ANDROID_OS,
+            "read",
+            "(Ljava/io/FileDescriptor;[BII)I",
+            &[Value::Obj(reader), bad_bounds, Value::Int(1), Value::Int(2)],
+        ),
+        "Ljava/lang/IndexOutOfBoundsException;",
+    );
+    let read_only_write = byte_array(&mut engine, b"x");
+    let bad_write = assert_errno(
+        engine.invoke_static(
+            ANDROID_OS,
+            "write",
+            "(Ljava/io/FileDescriptor;[BII)I",
+            &[
+                Value::Obj(reader),
+                read_only_write,
+                Value::Int(0),
+                Value::Int(1),
+            ],
+        ),
+        9,
+        "write",
+    );
+    assert_errno_fields(&engine, bad_write, 9, "write");
+    os_close(&mut engine, reader);
+
+    let rdwr = os_open(&mut engine, path, 2, 0);
+    let replacement = byte_array(&mut engine, b"HELLO");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            ANDROID_OS,
+            "pwrite",
+            "(Ljava/io/FileDescriptor;[BIIJ)I",
+            &[
+                Value::Obj(rdwr),
+                replacement,
+                Value::Int(0),
+                Value::Int(5),
+                Value::Long(0),
+            ],
+        ),
+        Value::Int(5)
+    );
+    call_static(
+        &mut engine,
+        ANDROID_OS,
+        "ftruncate",
+        "(Ljava/io/FileDescriptor;J)V",
+        &[Value::Obj(rdwr), Value::Long(5)],
+    );
+    os_close(&mut engine, rdwr);
+
+    let appender = os_open(&mut engine, path, 1 | 0o2000, 0);
+    call_static(
+        &mut engine,
+        ANDROID_OS,
+        "lseek",
+        "(Ljava/io/FileDescriptor;JI)J",
+        &[Value::Obj(appender), Value::Long(0), Value::Int(0)],
+    );
+    let bang = byte_array(&mut engine, b"!");
+    call_static(
+        &mut engine,
+        ANDROID_OS,
+        "write",
+        "(Ljava/io/FileDescriptor;[BII)I",
+        &[Value::Obj(appender), bang, Value::Int(0), Value::Int(1)],
+    );
+    os_close(&mut engine, appender);
+    let stat = os_stat(&mut engine, path);
+    assert_eq!(field(&engine, stat, "st_size"), Value::Long(6));
+
+    let original = os_open(&mut engine, path, 0, 0);
+    let duplicate = object(call_static(
+        &mut engine,
+        ANDROID_OS,
+        "dup",
+        "(Ljava/io/FileDescriptor;)Ljava/io/FileDescriptor;",
+        &[Value::Obj(original)],
+    ));
+    let dup_out = byte_array(&mut engine, &[0; 5]);
+    call_static(
+        &mut engine,
+        ANDROID_OS,
+        "read",
+        "(Ljava/io/FileDescriptor;[BII)I",
+        &[
+            Value::Obj(duplicate),
+            dup_out.clone(),
+            Value::Int(0),
+            Value::Int(5),
+        ],
+    );
+    assert_eq!(byte_array_values(&engine, &dup_out), b"HELLO");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            ANDROID_OS,
+            "lseek",
+            "(Ljava/io/FileDescriptor;JI)J",
+            &[Value::Obj(original), Value::Long(0), Value::Int(1)],
+        ),
+        Value::Long(5),
+        "dup shares the open-file description offset"
+    );
+    os_close(&mut engine, duplicate);
+    os_close(&mut engine, original);
+
+    let path_arg = os_text_arg(&mut engine, path);
+    call_static(
+        &mut engine,
+        ANDROID_OS,
+        "chmod",
+        "(Ljava/lang/String;I)V",
+        &[path_arg, Value::Int(0o600)],
+    );
+    let stat = os_stat(&mut engine, path);
+    assert_eq!(field(&engine, stat, "st_mode"), Value::Int(0o100600));
+    for (mode, expected) in [(4, 1), (2, 1), (1, 0)] {
+        let path_arg = os_text_arg(&mut engine, path);
+        assert_eq!(
+            call_static(
+                &mut engine,
+                ANDROID_OS,
+                "access",
+                "(Ljava/lang/String;I)Z",
+                &[path_arg, Value::Int(mode)],
+            ),
+            Value::Int(expected)
+        );
+    }
+
+    let root_arg = os_text_arg(&mut engine, root);
+    let dir_write = assert_errno(
+        engine.invoke_static(
+            ANDROID_OS,
+            "open",
+            "(Ljava/lang/String;II)Ljava/io/FileDescriptor;",
+            &[root_arg, Value::Int(2), Value::Int(0)],
+        ),
+        21,
+        "open",
+    );
+    assert_errno_fields(&engine, dir_write, 21, "open");
+
+    let renamed = "/rd-system-file/renamed.bin";
+    let old_arg = os_text_arg(&mut engine, path);
+    let new_arg = os_text_arg(&mut engine, renamed);
+    call_static(
+        &mut engine,
+        ANDROID_OS,
+        "rename",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+        &[old_arg, new_arg],
+    );
+    let renamed_arg = os_text_arg(&mut engine, renamed);
+    call_static(
+        &mut engine,
+        ANDROID_OS,
+        "remove",
+        "(Ljava/lang/String;)V",
+        &[renamed_arg],
+    );
+    let removed_arg = os_text_arg(&mut engine, renamed);
+    let removed = assert_errno(
+        engine.invoke_static(
+            ANDROID_OS,
+            "stat",
+            "(Ljava/lang/String;)Landroid/system/StructStat;",
+            &[removed_arg],
+        ),
+        2,
+        "stat",
+    );
+    assert_errno_fields(&engine, removed, 2, "stat");
+}
+
+#[test]
+fn android_system_interoperates_with_java_io_environment_and_statvfs() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let root_arg = os_text_arg(&mut engine, "/rd-system-interop");
+    call_static(
+        &mut engine,
+        ANDROID_OS,
+        "mkdir",
+        "(Ljava/lang/String;I)V",
+        &[root_arg, Value::Int(0o755)],
+    );
+    let path = "/rd-system-interop/from-java.bin";
+    let output = instance(&mut engine, "Ljava/io/FileOutputStream;");
+    let path_arg = os_text_arg(&mut engine, path);
+    call(
+        &mut engine,
+        output,
+        "<init>",
+        "(Ljava/lang/String;)V",
+        &[path_arg],
+    );
+    let payload = byte_array(&mut engine, b"java-io");
+    call(
+        &mut engine,
+        output,
+        "write",
+        "([B)V",
+        std::slice::from_ref(&payload),
+    );
+    call(&mut engine, output, "close", "()V", &[]);
+    let stat = os_stat(&mut engine, path);
+    assert_eq!(field(&engine, stat, "st_size"), Value::Long(7));
+
+    let input = instance(&mut engine, "Ljava/io/FileInputStream;");
+    let path_arg = os_text_arg(&mut engine, path);
+    call(
+        &mut engine,
+        input,
+        "<init>",
+        "(Ljava/lang/String;)V",
+        &[path_arg],
+    );
+    let fd = object(call(
+        &mut engine,
+        input,
+        "getFD",
+        "()Ljava/io/FileDescriptor;",
+        &[],
+    ));
+    let fstat = object(call_static(
+        &mut engine,
+        ANDROID_OS,
+        "fstat",
+        "(Ljava/io/FileDescriptor;)Landroid/system/StructStat;",
+        &[Value::Obj(fd)],
+    ));
+    assert_eq!(field(&engine, fstat, "st_size"), Value::Long(7));
+    let out = byte_array(&mut engine, &[0; 7]);
+    assert_eq!(
+        call_static(
+            &mut engine,
+            ANDROID_OS,
+            "read",
+            "(Ljava/io/FileDescriptor;[BII)I",
+            &[Value::Obj(fd), out.clone(), Value::Int(0), Value::Int(7)],
+        ),
+        Value::Int(7)
+    );
+    assert_eq!(byte_array_values(&engine, &out), b"java-io");
+
+    let key = os_text_arg(&mut engine, "RD_SYSTEM_TEST");
+    let value = os_text_arg(&mut engine, "vfs");
+    call_static(
+        &mut engine,
+        ANDROID_OS,
+        "setenv",
+        "(Ljava/lang/String;Ljava/lang/String;Z)V",
+        &[key.clone(), value, Value::Int(1)],
+    );
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            ANDROID_OS,
+            "getenv",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            std::slice::from_ref(&key),
+        ),
+        "vfs"
+    );
+    let second = os_text_arg(&mut engine, "other");
+    call_static(
+        &mut engine,
+        ANDROID_OS,
+        "setenv",
+        "(Ljava/lang/String;Ljava/lang/String;Z)V",
+        &[key.clone(), second, Value::Int(0)],
+    );
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            ANDROID_OS,
+            "getenv",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            std::slice::from_ref(&key),
+        ),
+        "vfs",
+        "overwrite=false preserves an existing value"
+    );
+    let environ = call_static(
+        &mut engine,
+        ANDROID_OS,
+        "environ",
+        "()[Ljava/lang/String;",
+        &[],
+    );
+    assert!(array_values(&engine, &environ)
+        .iter()
+        .map(|value| text_of(&engine, value))
+        .any(|entry| entry == "RD_SYSTEM_TEST=vfs"));
+    call_static(
+        &mut engine,
+        ANDROID_OS,
+        "unsetenv",
+        "(Ljava/lang/String;)V",
+        std::slice::from_ref(&key),
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            ANDROID_OS,
+            "getenv",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            &[key],
+        ),
+        Value::Null
+    );
+
+    let path_arg = os_text_arg(&mut engine, path);
+    let statvfs = object(call_static(
+        &mut engine,
+        ANDROID_OS,
+        "statvfs",
+        "(Ljava/lang/String;)Landroid/system/StructStatVfs;",
+        &[path_arg],
+    ));
+    assert_eq!(field(&engine, statvfs, "f_bsize"), Value::Long(4096));
+    assert!(matches!(
+        field(&engine, statvfs, "f_blocks"),
+        Value::Long(blocks) if blocks > 0
+    ));
+    let uname = object(call_static(
+        &mut engine,
+        ANDROID_OS,
+        "uname",
+        "()Landroid/system/StructUtsname;",
+        &[],
+    ));
+    assert_eq!(text_of(&engine, &field(&engine, uname, "sysname")), "Linux");
+    assert!(!text_of(&engine, &field(&engine, uname, "machine")).is_empty());
+    assert_eq!(call(&mut engine, fd, "valid", "()Z", &[]), Value::Int(1));
+    os_close(&mut engine, fd);
+    assert_eq!(call(&mut engine, fd, "valid", "()Z", &[]), Value::Int(0));
+}

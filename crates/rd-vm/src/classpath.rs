@@ -1622,6 +1622,17 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroid/transition/ChangeBounds$1;" | "Landroid/transition/ChangeBounds$ViewBounds;" => {
             Some(OBJECT)
         }
+        "Landroid/system/Os;"
+        | "Landroid/system/OsConstants;"
+        | "Landroid/system/StructStat;"
+        | "Landroid/system/StructStatVfs;"
+        | "Landroid/system/StructTimespec;"
+        | "Landroid/system/StructUtsname;" => Some(OBJECT),
+        "Landroid/system/ErrnoException;" => Some(&[
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
         _ => None,
     }
 }
@@ -2056,6 +2067,7 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         "Landroid/transition/ChangeBounds$1;" => {
             Some(&["Landroid/animation/ValueAnimator$AnimatorUpdateListener;"])
         }
+        "Landroid/system/StructTimespec;" => Some(&["Ljava/lang/Comparable;"]),
         _ => None,
     }
 }

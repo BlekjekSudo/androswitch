@@ -24,10 +24,32 @@ use crate::value::Value;
 const FILE: &str = "Ljava/io/File;";
 const ATOMIC_FILE: &str = "Landroid/util/AtomicFile;";
 
+#[derive(Clone)]
+struct VfsMeta {
+    mode: i32,
+    uid: i32,
+    gid: i32,
+    ino: i64,
+    atime_ms: i64,
+    mtime_ms: i64,
+    ctime_ms: i64,
+}
+
+struct OpenDesc {
+    path: String,
+    flags: i32,
+    pos: u64,
+}
+
 #[derive(Default)]
 struct Vfs {
     dirs: BTreeSet<String>,
     files: BTreeMap<String, Vec<u8>>,
+    meta: BTreeMap<String, VfsMeta>,
+    next_ino: i64,
+    open_descs: BTreeMap<i64, OpenDesc>,
+    fds: BTreeMap<i32, i64>,
+    next_desc: i64,
 }
 
 thread_local! {
@@ -869,8 +891,30 @@ fn stream_intrinsic(
         | (CHANNEL, "close" | "force")
         | (FLOCK, "release" | "close") => Value::Null,
         (FOS | FIS, "getChannel") => with_path(vm, CHANNEL, &p)?,
-        (FOS | FIS, "getFD") => with_path(vm, FD, &p)?,
-        (FD, "valid") => Value::Int(1),
+        (FOS | FIS, "getFD") => {
+            let value = with_path(vm, FD, &p)?;
+            if let Value::Obj(fd_obj) = value {
+                let flags = if class == FOS {
+                    OS_O_WRONLY | OS_O_APPEND
+                } else {
+                    OS_O_RDONLY
+                };
+                if let Some(fd) = os_register_path(&p, flags, pos as u64) {
+                    crate::err::put_field_result(vm.heap.put_field(
+                        fd_obj,
+                        "descriptor",
+                        Value::Int(fd),
+                    ))?;
+                }
+                Value::Obj(fd_obj)
+            } else {
+                value
+            }
+        }
+        (FD, "valid") => match vm.heap.get_field(recv, "descriptor") {
+            Ok(Value::Int(fd)) => Value::Int(os_fd_valid(fd) as i32),
+            _ => Value::Int(1),
+        },
         (FD, "sync") => Value::Null,
         (FIS, "available") => Value::Int(len.saturating_sub(pos) as i32),
         (FIS, "skip") => {
@@ -989,4 +1033,770 @@ mod tests {
         mkdirs("/x/y/z");
         assert!(is_dir("/x/y") && is_dir("/x/y/z") && !is_file("/x/y"));
     }
+}
+
+// ---------------------------------------------------------------------------
+// Bounded android.system.Os support over the same in-memory VFS.
+//
+// This is deliberately *not* a host-syscall bridge: paths are normalized into
+// the VM's virtual filesystem, descriptors are synthetic entries in the VFS
+// descriptor table, and file contents / metadata live only in VM memory.
+// ---------------------------------------------------------------------------
+
+pub(crate) const OS_EPERM: i32 = 1;
+pub(crate) const OS_ENOENT: i32 = 2;
+pub(crate) const OS_EBADF: i32 = 9;
+pub(crate) const OS_EACCES: i32 = 13;
+pub(crate) const OS_EEXIST: i32 = 17;
+pub(crate) const OS_ENOTDIR: i32 = 20;
+pub(crate) const OS_EISDIR: i32 = 21;
+pub(crate) const OS_EINVAL: i32 = 22;
+pub(crate) const OS_ENOTEMPTY: i32 = 39;
+
+const OS_O_RDONLY: i32 = 0;
+const OS_O_WRONLY: i32 = 1;
+const OS_O_RDWR: i32 = 2;
+const OS_O_CREAT: i32 = 0o100;
+const OS_O_EXCL: i32 = 0o200;
+const OS_O_TRUNC: i32 = 0o1000;
+const OS_O_APPEND: i32 = 0o2000;
+const OS_O_DIRECTORY: i32 = 0o200000;
+const OS_O_PATH: i32 = 0o10000000;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OsPathKind {
+    File,
+    Dir,
+    Missing,
+    NotDir,
+}
+
+#[derive(Clone)]
+pub(crate) struct OsStatData {
+    pub dev: i64,
+    pub ino: i64,
+    pub mode: i32,
+    pub nlink: i64,
+    pub uid: i32,
+    pub gid: i32,
+    pub rdev: i64,
+    pub size: i64,
+    pub atime_ms: i64,
+    pub mtime_ms: i64,
+    pub ctime_ms: i64,
+    pub blksize: i64,
+    pub blocks: i64,
+}
+
+#[derive(Clone)]
+pub(crate) struct OsStatVfsData {
+    pub bsize: i64,
+    pub frsize: i64,
+    pub blocks: i64,
+    pub bfree: i64,
+    pub bavail: i64,
+    pub files: i64,
+    pub ffree: i64,
+    pub favail: i64,
+    pub fsid: i64,
+    pub flag: i64,
+    pub namemax: i64,
+}
+
+fn os_abs(path: &str) -> String {
+    absolute(path)
+}
+
+fn os_classify(vfs: &Vfs, path: &str) -> OsPathKind {
+    if vfs.files.contains_key(path) {
+        return OsPathKind::File;
+    }
+    if path == "/" || vfs.dirs.contains(path) {
+        return OsPathKind::Dir;
+    }
+    let mut current = String::new();
+    let parts: Vec<&str> = path.split('/').filter(|part| !part.is_empty()).collect();
+    for part in parts.iter().take(parts.len().saturating_sub(1)) {
+        current.push('/');
+        current.push_str(part);
+        if vfs.files.contains_key(&current) {
+            return OsPathKind::NotDir;
+        }
+    }
+    OsPathKind::Missing
+}
+
+fn os_meta_mut(vfs: &mut Vfs, path: &str, kind: OsPathKind) -> VfsMeta {
+    if let Some(meta) = vfs.meta.get(path) {
+        return meta.clone();
+    }
+    if vfs.next_ino < 2 {
+        vfs.next_ino = 2;
+    }
+    let ino = vfs.next_ino;
+    vfs.next_ino += 1;
+    let now = crate::jlsystem::epoch_ms();
+    let meta = VfsMeta {
+        mode: if kind == OsPathKind::Dir {
+            0o040000 | 0o755
+        } else {
+            0o100000 | 0o644
+        },
+        uid: 10000,
+        gid: 10000,
+        ino,
+        atime_ms: now,
+        mtime_ms: now,
+        ctime_ms: now,
+    };
+    vfs.meta.insert(path.to_string(), meta.clone());
+    meta
+}
+
+fn os_parent_status(vfs: &Vfs, path: &str) -> Result<(), i32> {
+    let Some(parent) = parent_of(path) else {
+        return Ok(());
+    };
+    match os_classify(vfs, &parent) {
+        OsPathKind::Dir => Ok(()),
+        OsPathKind::File | OsPathKind::NotDir => Err(OS_ENOTDIR),
+        OsPathKind::Missing => Err(OS_ENOENT),
+    }
+}
+
+fn os_owner_perm(meta: &VfsMeta, read: bool, write: bool, exec: bool) -> bool {
+    (!read || meta.mode & 0o400 != 0)
+        && (!write || meta.mode & 0o200 != 0)
+        && (!exec || meta.mode & 0o100 != 0)
+}
+
+fn os_stat_in(vfs: &mut Vfs, path: &str) -> Result<OsStatData, i32> {
+    let kind = os_classify(vfs, path);
+    match kind {
+        OsPathKind::Missing => return Err(OS_ENOENT),
+        OsPathKind::NotDir => return Err(OS_ENOTDIR),
+        _ => {}
+    }
+    let meta = os_meta_mut(vfs, path, kind);
+    let (size, nlink) = match kind {
+        OsPathKind::File => (vfs.files.get(path).map_or(0, |bytes| bytes.len() as i64), 1),
+        OsPathKind::Dir => {
+            let prefix = if path == "/" {
+                "/".to_string()
+            } else {
+                format!("{path}/")
+            };
+            let subdirs = vfs
+                .dirs
+                .iter()
+                .filter(|dir| {
+                    dir.strip_prefix(&prefix)
+                        .is_some_and(|rest| !rest.is_empty() && !rest.contains('/'))
+                })
+                .count() as i64;
+            (4096, 2 + subdirs)
+        }
+        _ => unreachable!(),
+    };
+    Ok(OsStatData {
+        dev: 64769,
+        ino: meta.ino,
+        mode: meta.mode,
+        nlink,
+        uid: meta.uid,
+        gid: meta.gid,
+        rdev: 0,
+        size,
+        atime_ms: meta.atime_ms,
+        mtime_ms: meta.mtime_ms,
+        ctime_ms: meta.ctime_ms,
+        blksize: 4096,
+        blocks: (size + 511) / 512,
+    })
+}
+
+pub(crate) fn os_stat(path: &str) -> Result<OsStatData, i32> {
+    let path = os_abs(path);
+    VFS.with(|v| os_stat_in(&mut v.borrow_mut(), &path))
+}
+
+pub(crate) fn os_access(path: &str, mode: i32) -> Result<bool, i32> {
+    if mode & !0o7 != 0 {
+        return Err(OS_EINVAL);
+    }
+    let path = os_abs(path);
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        let kind = os_classify(&vfs, &path);
+        if !matches!(kind, OsPathKind::File | OsPathKind::Dir) {
+            return Ok(false);
+        }
+        let meta = os_meta_mut(&mut vfs, &path, kind);
+        Ok(os_owner_perm(
+            &meta,
+            mode & 4 != 0,
+            mode & 2 != 0,
+            mode & 1 != 0,
+        ))
+    })
+}
+
+fn os_alloc_desc(vfs: &mut Vfs, path: String, flags: i32, pos: u64) -> i32 {
+    if vfs.next_desc < 1 {
+        vfs.next_desc = 1;
+    }
+    let desc_id = vfs.next_desc;
+    vfs.next_desc += 1;
+    vfs.open_descs
+        .insert(desc_id, OpenDesc { path, flags, pos });
+    let mut fd = 3;
+    while vfs.fds.contains_key(&fd) {
+        fd += 1;
+    }
+    vfs.fds.insert(fd, desc_id);
+    fd
+}
+
+pub(crate) fn os_open(path: &str, flags: i32, mode: i32) -> Result<i32, i32> {
+    let path = os_abs(path);
+    let access = flags & 0o3;
+    if access == 3 {
+        return Err(OS_EINVAL);
+    }
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        let kind = os_classify(&vfs, &path);
+        match kind {
+            OsPathKind::NotDir => return Err(OS_ENOTDIR),
+            OsPathKind::Dir => {
+                if flags & OS_O_CREAT != 0 && flags & OS_O_EXCL != 0 {
+                    return Err(OS_EEXIST);
+                }
+                if access != OS_O_RDONLY || flags & OS_O_TRUNC != 0 {
+                    return Err(OS_EISDIR);
+                }
+                let meta = os_meta_mut(&mut vfs, &path, kind);
+                if !os_owner_perm(&meta, true, false, true) {
+                    return Err(OS_EACCES);
+                }
+            }
+            OsPathKind::File => {
+                if flags & OS_O_CREAT != 0 && flags & OS_O_EXCL != 0 {
+                    return Err(OS_EEXIST);
+                }
+                if flags & OS_O_DIRECTORY != 0 {
+                    return Err(OS_ENOTDIR);
+                }
+                let meta = os_meta_mut(&mut vfs, &path, kind);
+                let readable = access == OS_O_RDONLY || access == OS_O_RDWR;
+                let writable = access == OS_O_WRONLY || access == OS_O_RDWR;
+                if !os_owner_perm(&meta, readable, writable, false) {
+                    return Err(OS_EACCES);
+                }
+                if flags & OS_O_TRUNC != 0 && writable {
+                    if let Some(bytes) = vfs.files.get_mut(&path) {
+                        bytes.clear();
+                    }
+                }
+            }
+            OsPathKind::Missing => {
+                os_parent_status(&vfs, &path)?;
+                if flags & OS_O_CREAT == 0 {
+                    return Err(OS_ENOENT);
+                }
+                if flags & OS_O_DIRECTORY != 0 {
+                    return Err(OS_ENOENT);
+                }
+                vfs.files.insert(path.clone(), Vec::new());
+                let mut meta = os_meta_mut(&mut vfs, &path, OsPathKind::File);
+                meta.mode = 0o100000 | (mode & 0o777 & !0o022);
+                vfs.meta.insert(path.clone(), meta);
+            }
+        }
+        Ok(os_alloc_desc(&mut vfs, path, flags, 0))
+    })
+}
+
+pub(crate) fn os_register_path(path: &str, flags: i32, pos: u64) -> Option<i32> {
+    let path = os_abs(path);
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        if os_classify(&vfs, &path) != OsPathKind::File {
+            return None;
+        }
+        Some(os_alloc_desc(&mut vfs, path, flags, pos))
+    })
+}
+
+fn os_desc_id(vfs: &Vfs, fd: i32) -> Result<i64, i32> {
+    vfs.fds.get(&fd).copied().ok_or(OS_EBADF)
+}
+
+fn os_desc_snapshot(vfs: &Vfs, fd: i32) -> Result<(i64, String, i32, u64), i32> {
+    let id = os_desc_id(vfs, fd)?;
+    let desc = vfs.open_descs.get(&id).ok_or(OS_EBADF)?;
+    Ok((id, desc.path.clone(), desc.flags, desc.pos))
+}
+
+fn os_cleanup_desc(vfs: &mut Vfs, desc_id: i64) {
+    if !vfs.fds.values().any(|id| *id == desc_id) {
+        vfs.open_descs.remove(&desc_id);
+    }
+}
+
+pub(crate) fn os_close(fd: i32) -> Result<(), i32> {
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        let desc_id = vfs.fds.remove(&fd).ok_or(OS_EBADF)?;
+        os_cleanup_desc(&mut vfs, desc_id);
+        Ok(())
+    })
+}
+
+pub(crate) fn os_dup(fd: i32) -> Result<i32, i32> {
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        let desc_id = os_desc_id(&vfs, fd)?;
+        let mut new_fd = 3;
+        while vfs.fds.contains_key(&new_fd) {
+            new_fd += 1;
+        }
+        vfs.fds.insert(new_fd, desc_id);
+        Ok(new_fd)
+    })
+}
+
+pub(crate) fn os_dup2(fd: i32, new_fd: i32) -> Result<i32, i32> {
+    if new_fd < 0 {
+        return Err(OS_EBADF);
+    }
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        let desc_id = os_desc_id(&vfs, fd)?;
+        if fd == new_fd {
+            return Ok(new_fd);
+        }
+        if let Some(old_desc) = vfs.fds.remove(&new_fd) {
+            os_cleanup_desc(&mut vfs, old_desc);
+        }
+        vfs.fds.insert(new_fd, desc_id);
+        Ok(new_fd)
+    })
+}
+
+pub(crate) fn os_fd_path(fd: i32) -> Result<String, i32> {
+    VFS.with(|v| {
+        let vfs = v.borrow();
+        Ok(os_desc_snapshot(&vfs, fd)?.1)
+    })
+}
+
+pub(crate) fn os_fd_valid(fd: i32) -> bool {
+    VFS.with(|v| v.borrow().fds.contains_key(&fd))
+}
+
+pub(crate) fn os_fstat(fd: i32) -> Result<OsStatData, i32> {
+    let path = os_fd_path(fd)?;
+    os_stat(&path)
+}
+
+fn os_read_at(fd: i32, count: usize, offset: Option<i64>) -> Result<Vec<u8>, i32> {
+    if offset.is_some_and(|value| value < 0) {
+        return Err(OS_EINVAL);
+    }
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        let (desc_id, path, flags, pos) = os_desc_snapshot(&vfs, fd)?;
+        let access = flags & 0o3;
+        if flags & OS_O_PATH != 0 || access == OS_O_WRONLY {
+            return Err(OS_EBADF);
+        }
+        if os_classify(&vfs, &path) == OsPathKind::Dir {
+            return Err(OS_EISDIR);
+        }
+        let bytes = vfs.files.get(&path).ok_or(OS_ENOENT)?;
+        let start = offset.map_or(pos, |value| value as u64) as usize;
+        if start >= bytes.len() || count == 0 {
+            return Ok(Vec::new());
+        }
+        let end = start.saturating_add(count).min(bytes.len());
+        let out = bytes[start..end].to_vec();
+        if offset.is_none() {
+            if let Some(desc) = vfs.open_descs.get_mut(&desc_id) {
+                desc.pos = end as u64;
+            }
+        }
+        Ok(out)
+    })
+}
+
+pub(crate) fn os_read(fd: i32, count: usize) -> Result<Vec<u8>, i32> {
+    os_read_at(fd, count, None)
+}
+
+pub(crate) fn os_pread(fd: i32, count: usize, offset: i64) -> Result<Vec<u8>, i32> {
+    os_read_at(fd, count, Some(offset))
+}
+
+fn os_write_at(fd: i32, data: &[u8], offset: Option<i64>) -> Result<usize, i32> {
+    if offset.is_some_and(|value| value < 0) {
+        return Err(OS_EINVAL);
+    }
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        let (desc_id, path, flags, pos) = os_desc_snapshot(&vfs, fd)?;
+        let access = flags & 0o3;
+        if flags & OS_O_PATH != 0 || access == OS_O_RDONLY {
+            return Err(OS_EBADF);
+        }
+        if os_classify(&vfs, &path) != OsPathKind::File {
+            return Err(OS_EISDIR);
+        }
+        let append = flags & OS_O_APPEND != 0;
+        let bytes = vfs.files.entry(path).or_default();
+        let start = if append {
+            bytes.len()
+        } else {
+            offset.map_or(pos, |value| value as u64) as usize
+        };
+        if start > bytes.len() {
+            bytes.resize(start, 0);
+        }
+        let end = start.saturating_add(data.len());
+        if end > bytes.len() {
+            bytes.resize(end, 0);
+        }
+        bytes[start..end].copy_from_slice(data);
+        if let Some(desc) = vfs.open_descs.get_mut(&desc_id) {
+            if offset.is_none() || append {
+                desc.pos = end as u64;
+            }
+        }
+        Ok(data.len())
+    })
+}
+
+pub(crate) fn os_write(fd: i32, data: &[u8]) -> Result<usize, i32> {
+    os_write_at(fd, data, None)
+}
+
+pub(crate) fn os_pwrite(fd: i32, data: &[u8], offset: i64) -> Result<usize, i32> {
+    os_write_at(fd, data, Some(offset))
+}
+
+pub(crate) fn os_lseek(fd: i32, offset: i64, whence: i32) -> Result<i64, i32> {
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        let (desc_id, path, flags, pos) = os_desc_snapshot(&vfs, fd)?;
+        if flags & OS_O_PATH != 0 {
+            return Err(OS_EBADF);
+        }
+        let len = match os_classify(&vfs, &path) {
+            OsPathKind::File => vfs.files.get(&path).map_or(0, |bytes| bytes.len() as i64),
+            OsPathKind::Dir => 0,
+            _ => return Err(OS_ENOENT),
+        };
+        let base = match whence {
+            0 => 0,
+            1 => pos as i64,
+            2 => len,
+            _ => return Err(OS_EINVAL),
+        };
+        let next = base.checked_add(offset).ok_or(OS_EINVAL)?;
+        if next < 0 {
+            return Err(OS_EINVAL);
+        }
+        if let Some(desc) = vfs.open_descs.get_mut(&desc_id) {
+            desc.pos = next as u64;
+        }
+        Ok(next)
+    })
+}
+
+pub(crate) fn os_ftruncate(fd: i32, length: i64) -> Result<(), i32> {
+    if length < 0 {
+        return Err(OS_EINVAL);
+    }
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        let (_id, path, flags, _pos) = os_desc_snapshot(&vfs, fd)?;
+        if flags & OS_O_PATH != 0 || flags & 0o3 == OS_O_RDONLY {
+            return Err(OS_EINVAL);
+        }
+        if os_classify(&vfs, &path) != OsPathKind::File {
+            return Err(OS_EINVAL);
+        }
+        let bytes = vfs.files.entry(path).or_default();
+        bytes.resize(length as usize, 0);
+        Ok(())
+    })
+}
+
+pub(crate) fn os_fsync(fd: i32) -> Result<(), i32> {
+    VFS.with(|v| {
+        let vfs = v.borrow();
+        os_desc_id(&vfs, fd).map(|_| ())
+    })
+}
+
+pub(crate) fn os_chmod(path: &str, mode: i32) -> Result<(), i32> {
+    let path = os_abs(path);
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        let kind = os_classify(&vfs, &path);
+        if !matches!(kind, OsPathKind::File | OsPathKind::Dir) {
+            return Err(match kind {
+                OsPathKind::NotDir => OS_ENOTDIR,
+                _ => OS_ENOENT,
+            });
+        }
+        let mut meta = os_meta_mut(&mut vfs, &path, kind);
+        meta.mode = (meta.mode & 0o170000) | (mode & 0o7777);
+        meta.ctime_ms = crate::jlsystem::epoch_ms();
+        vfs.meta.insert(path, meta);
+        Ok(())
+    })
+}
+
+pub(crate) fn os_fchmod(fd: i32, mode: i32) -> Result<(), i32> {
+    let path = os_fd_path(fd)?;
+    os_chmod(&path, mode)
+}
+
+fn os_chown_path(path: &str, uid: i32, gid: i32) -> Result<(), i32> {
+    let path = os_abs(path);
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        let kind = os_classify(&vfs, &path);
+        if !matches!(kind, OsPathKind::File | OsPathKind::Dir) {
+            return Err(match kind {
+                OsPathKind::NotDir => OS_ENOTDIR,
+                _ => OS_ENOENT,
+            });
+        }
+        let meta = os_meta_mut(&mut vfs, &path, kind);
+        // The virtual app process is uid/gid 10000 and is not privileged;
+        // changing either owner away from the current one is EPERM, as for a
+        // normal Android app process.
+        if (uid != -1 && uid != meta.uid) || (gid != -1 && gid != meta.gid) {
+            return Err(OS_EPERM);
+        }
+        Ok(())
+    })
+}
+
+pub(crate) fn os_chown(path: &str, uid: i32, gid: i32) -> Result<(), i32> {
+    os_chown_path(path, uid, gid)
+}
+
+pub(crate) fn os_fchown(fd: i32, uid: i32, gid: i32) -> Result<(), i32> {
+    let path = os_fd_path(fd)?;
+    os_chown_path(&path, uid, gid)
+}
+
+pub(crate) fn os_mkdir(path: &str, mode: i32) -> Result<(), i32> {
+    let path = os_abs(path);
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        match os_classify(&vfs, &path) {
+            OsPathKind::File | OsPathKind::Dir => Err(OS_EEXIST),
+            OsPathKind::NotDir => Err(OS_ENOTDIR),
+            OsPathKind::Missing => {
+                os_parent_status(&vfs, &path)?;
+                vfs.dirs.insert(path.clone());
+                let mut meta = os_meta_mut(&mut vfs, &path, OsPathKind::Dir);
+                meta.mode = 0o040000 | (mode & 0o777 & !0o022);
+                vfs.meta.insert(path, meta);
+                Ok(())
+            }
+        }
+    })
+}
+
+fn os_dir_empty(vfs: &Vfs, path: &str) -> bool {
+    let prefix = if path == "/" {
+        "/".to_string()
+    } else {
+        format!("{path}/")
+    };
+    !vfs.dirs.iter().any(|dir| dir.starts_with(&prefix))
+        && !vfs.files.keys().any(|file| file.starts_with(&prefix))
+}
+
+pub(crate) fn os_remove(path: &str) -> Result<(), i32> {
+    let path = os_abs(path);
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        match os_classify(&vfs, &path) {
+            OsPathKind::File => {
+                vfs.files.remove(&path);
+                vfs.meta.remove(&path);
+                Ok(())
+            }
+            OsPathKind::Dir => {
+                if path == "/" {
+                    Err(OS_EINVAL)
+                } else if !os_dir_empty(&vfs, &path) {
+                    Err(OS_ENOTEMPTY)
+                } else {
+                    vfs.dirs.remove(&path);
+                    vfs.meta.remove(&path);
+                    Ok(())
+                }
+            }
+            OsPathKind::NotDir => Err(OS_ENOTDIR),
+            OsPathKind::Missing => Err(OS_ENOENT),
+        }
+    })
+}
+
+pub(crate) fn os_unlink(path: &str) -> Result<(), i32> {
+    let path = os_abs(path);
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        match os_classify(&vfs, &path) {
+            OsPathKind::File => {
+                vfs.files.remove(&path);
+                vfs.meta.remove(&path);
+                Ok(())
+            }
+            OsPathKind::Dir => Err(OS_EISDIR),
+            OsPathKind::NotDir => Err(OS_ENOTDIR),
+            OsPathKind::Missing => Err(OS_ENOENT),
+        }
+    })
+}
+
+fn os_move_prefix(value: &str, old: &str, new: &str) -> String {
+    if value == old {
+        new.to_string()
+    } else if let Some(rest) = value.strip_prefix(&format!("{old}/")) {
+        format!("{new}/{rest}")
+    } else {
+        value.to_string()
+    }
+}
+
+pub(crate) fn os_rename(old_path: &str, new_path: &str) -> Result<(), i32> {
+    let old_path = os_abs(old_path);
+    let new_path = os_abs(new_path);
+    if old_path == new_path {
+        return os_stat(&old_path).map(|_| ());
+    }
+    VFS.with(|v| {
+        let mut vfs = v.borrow_mut();
+        let old_kind = os_classify(&vfs, &old_path);
+        let new_kind = os_classify(&vfs, &new_path);
+        match (old_kind, new_kind) {
+            (OsPathKind::Missing, _) => return Err(OS_ENOENT),
+            (OsPathKind::NotDir, _) | (_, OsPathKind::NotDir) => return Err(OS_ENOTDIR),
+            (OsPathKind::File, OsPathKind::Dir) => return Err(OS_EISDIR),
+            (OsPathKind::Dir, OsPathKind::File) => return Err(OS_ENOTDIR),
+            (OsPathKind::Dir, OsPathKind::Dir) if !os_dir_empty(&vfs, &new_path) => {
+                return Err(OS_ENOTEMPTY)
+            }
+            _ => {}
+        }
+        os_parent_status(&vfs, &new_path)?;
+        if old_kind == OsPathKind::Dir && new_path.starts_with(&format!("{old_path}/")) {
+            return Err(OS_EINVAL);
+        }
+        if new_kind == OsPathKind::File {
+            vfs.files.remove(&new_path);
+            vfs.meta.remove(&new_path);
+        } else if new_kind == OsPathKind::Dir {
+            vfs.dirs.remove(&new_path);
+            vfs.meta.remove(&new_path);
+        }
+        if old_kind == OsPathKind::File {
+            if let Some(bytes) = vfs.files.remove(&old_path) {
+                vfs.files.insert(new_path.clone(), bytes);
+            }
+            if let Some(meta) = vfs.meta.remove(&old_path) {
+                vfs.meta.insert(new_path.clone(), meta);
+            }
+        } else {
+            let dirs: Vec<String> = vfs
+                .dirs
+                .iter()
+                .filter(|dir| *dir == &old_path || dir.starts_with(&format!("{old_path}/")))
+                .cloned()
+                .collect();
+            for dir in &dirs {
+                vfs.dirs.remove(dir);
+            }
+            for dir in dirs {
+                vfs.dirs.insert(os_move_prefix(&dir, &old_path, &new_path));
+            }
+            let files: Vec<String> = vfs
+                .files
+                .keys()
+                .filter(|file| file.starts_with(&format!("{old_path}/")))
+                .cloned()
+                .collect();
+            for file in files {
+                if let Some(bytes) = vfs.files.remove(&file) {
+                    vfs.files
+                        .insert(os_move_prefix(&file, &old_path, &new_path), bytes);
+                }
+            }
+            let metas: Vec<String> = vfs
+                .meta
+                .keys()
+                .filter(|path| *path == &old_path || path.starts_with(&format!("{old_path}/")))
+                .cloned()
+                .collect();
+            for path in metas {
+                if let Some(meta) = vfs.meta.remove(&path) {
+                    vfs.meta
+                        .insert(os_move_prefix(&path, &old_path, &new_path), meta);
+                }
+            }
+        }
+        for desc in vfs.open_descs.values_mut() {
+            desc.path = os_move_prefix(&desc.path, &old_path, &new_path);
+        }
+        Ok(())
+    })
+}
+
+pub(crate) fn os_statvfs(path: &str) -> Result<OsStatVfsData, i32> {
+    let path = os_abs(path);
+    VFS.with(|v| {
+        let vfs = v.borrow();
+        match os_classify(&vfs, &path) {
+            OsPathKind::File | OsPathKind::Dir => {}
+            OsPathKind::NotDir => return Err(OS_ENOTDIR),
+            OsPathKind::Missing => return Err(OS_ENOENT),
+        }
+        let used_bytes: i64 = vfs.files.values().map(|bytes| bytes.len() as i64).sum();
+        let blocks = (8_i64 << 30) / 4096;
+        let used_blocks = ((used_bytes + 4095) / 4096).min(blocks);
+        let file_count = (vfs.files.len() + vfs.dirs.len()) as i64;
+        Ok(OsStatVfsData {
+            bsize: 4096,
+            frsize: 4096,
+            blocks,
+            bfree: blocks - used_blocks,
+            bavail: blocks - used_blocks,
+            files: 1_000_000,
+            ffree: 1_000_000 - file_count,
+            favail: 1_000_000 - file_count,
+            fsid: 0x5255_5354,
+            flag: 0,
+            namemax: 255,
+        })
+    })
+}
+
+pub(crate) fn os_fstatvfs(fd: i32) -> Result<OsStatVfsData, i32> {
+    let path = os_fd_path(fd)?;
+    os_statvfs(&path)
+}
+
+pub(crate) fn os_realpath(path: &str) -> Result<String, i32> {
+    // The VFS has no symbolic links, so canonicalization is normalization
+    // after verifying that the path exists.
+    os_stat(path)?;
+    Ok(os_abs(path))
 }

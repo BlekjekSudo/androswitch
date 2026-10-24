@@ -26,6 +26,10 @@
 //!   `ChangeBounds`, `TransitionSet`, `Scene`, and delayed transitions on
 //!   the deterministic frame clock. Overlay snapshot copies, shared-element
 //!   window handoff, explode/slide/arc motions, and XML inflation are out.
+//! * `android.system` file/stat/descriptor operations over the VM's
+//!   in-memory VFS, plus `ErrnoException` and struct value objects. There is
+//!   no host syscall passthrough, socket/process/memory operation, symlink,
+//!   hard-link, pipe, or ByteBuffer overload in this slice.
 //! * `android.animation` `ValueAnimator`/`ObjectAnimator` timing on the
 //!   deterministic virtual Choreographer clock, with keyframes, evaluators,
 //!   listeners and JavaBeans/Property application. AnimatorSet, Path and
@@ -198,6 +202,15 @@ const TRANSITION_FADE_ANIM_LISTENER: &str = "Landroid/transition/Fade$FadeAnimat
 const TRANSITION_DISAPPEAR_LISTENER: &str = "Landroid/transition/Visibility$DisappearListener;";
 const TRANSITION_VISIBILITY_OVERLAY_LISTENER: &str = "Landroid/transition/Visibility$1;";
 const TRANSITION_CHANGE_BOUNDS_LISTENER: &str = "Landroid/transition/ChangeBounds$1;";
+
+const ANDROID_OS: &str = "Landroid/system/Os;";
+const ANDROID_OS_CONSTANTS: &str = "Landroid/system/OsConstants;";
+const ANDROID_ERRNO: &str = "Landroid/system/ErrnoException;";
+const ANDROID_STRUCT_STAT: &str = "Landroid/system/StructStat;";
+const ANDROID_STRUCT_STAT_VFS: &str = "Landroid/system/StructStatVfs;";
+const ANDROID_STRUCT_TIMESPEC: &str = "Landroid/system/StructTimespec;";
+const ANDROID_STRUCT_UTSNAME: &str = "Landroid/system/StructUtsname;";
+const JAVA_FILE_DESCRIPTOR: &str = "Ljava/io/FileDescriptor;";
 
 fn ise(msg: impl Into<String>) -> VmExit {
     throw("Ljava/lang/IllegalStateException;", msg)
@@ -395,6 +408,11 @@ pub(crate) fn host_static(
     owner: &str,
     field: &str,
 ) -> Result<Option<Value>, VmExit> {
+    if owner == ANDROID_OS_CONSTANTS {
+        if let Some(value) = android_os_constant(field) {
+            return Ok(Some(Value::Int(value)));
+        }
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -559,6 +577,8 @@ pub(crate) fn static_intrinsic(
         AF_FILL_RESPONSE if name == "shallowCopy" => {
             af_fill_response_copy_static(vm, args).map(Some)
         }
+        ANDROID_OS => android_os_static(vm, name, sig, args),
+        ANDROID_OS_CONSTANTS => android_os_constants_static(vm, name, sig, args),
         TRANSITION_MANAGER => transition_manager_static(vm, name, sig, args),
         TRANSITION_SCENE => transition_scene_static(vm, name, sig, args),
         WEBVIEW => webview_static(vm, name, sig, args),
@@ -756,6 +776,11 @@ pub(crate) fn instance_intrinsic(
         | TRANSITION_CHANGE_BOUNDS_LISTENER => {
             transition_callback_instance(vm, class, name, sig, recv, args)
         }
+        ANDROID_ERRNO
+        | ANDROID_STRUCT_STAT
+        | ANDROID_STRUCT_STAT_VFS
+        | ANDROID_STRUCT_TIMESPEC
+        | ANDROID_STRUCT_UTSNAME => android_system_instance(vm, class, name, sig, recv, args),
         _ => Ok(None),
     }
 }
@@ -895,6 +920,13 @@ fn is_stub_class(c: &str) -> bool {
             | TRANSITION_DISAPPEAR_LISTENER
             | TRANSITION_VISIBILITY_OVERLAY_LISTENER
             | TRANSITION_CHANGE_BOUNDS_LISTENER
+            | ANDROID_OS
+            | ANDROID_OS_CONSTANTS
+            | ANDROID_ERRNO
+            | ANDROID_STRUCT_STAT
+            | ANDROID_STRUCT_STAT_VFS
+            | ANDROID_STRUCT_TIMESPEC
+            | ANDROID_STRUCT_UTSNAME
     )
 }
 
@@ -18935,6 +18967,1078 @@ fn tr_transition_specific_instance(
                 Value::Int(i32::from(iarg(args, 0) != 0)),
             )?;
             Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+// ---------------------------------------------------------------------------
+// android.system: a VFS-backed Os file/descriptor slice
+// ---------------------------------------------------------------------------
+
+const SYSEO_ENOENT: i32 = 2;
+const SYSEO_EINVAL: i32 = 22;
+
+const SYSOS_ERRNOS: &[(&str, i32, &str)] = &[
+    ("EPERM", 1, "Operation not permitted"),
+    ("ENOENT", 2, "No such file or directory"),
+    ("ESRCH", 3, "No such process"),
+    ("EINTR", 4, "Interrupted system call"),
+    ("EIO", 5, "Input/output error"),
+    ("ENXIO", 6, "No such device or address"),
+    ("E2BIG", 7, "Argument list too long"),
+    ("ENOEXEC", 8, "Exec format error"),
+    ("EBADF", 9, "Bad file descriptor"),
+    ("ECHILD", 10, "No child processes"),
+    ("EAGAIN", 11, "Resource temporarily unavailable"),
+    ("EWOULDBLOCK", 11, "Resource temporarily unavailable"),
+    ("ENOMEM", 12, "Cannot allocate memory"),
+    ("EACCES", 13, "Permission denied"),
+    ("EFAULT", 14, "Bad address"),
+    ("ENOTBLK", 15, "Block device required"),
+    ("EBUSY", 16, "Device or resource busy"),
+    ("EEXIST", 17, "File exists"),
+    ("EXDEV", 18, "Invalid cross-device link"),
+    ("ENODEV", 19, "No such device"),
+    ("ENOTDIR", 20, "Not a directory"),
+    ("EISDIR", 21, "Is a directory"),
+    ("EINVAL", 22, "Invalid argument"),
+    ("ENFILE", 23, "Too many open files in system"),
+    ("EMFILE", 24, "Too many open files"),
+    ("ENOTTY", 25, "Inappropriate ioctl for device"),
+    ("ETXTBSY", 26, "Text file busy"),
+    ("EFBIG", 27, "File too large"),
+    ("ENOSPC", 28, "No space left on device"),
+    ("ESPIPE", 29, "Illegal seek"),
+    ("EROFS", 30, "Read-only file system"),
+    ("EMLINK", 31, "Too many links"),
+    ("EPIPE", 32, "Broken pipe"),
+    ("EDOM", 33, "Numerical argument out of domain"),
+    ("ERANGE", 34, "Numerical result out of range"),
+    ("EDEADLK", 35, "Resource deadlock avoided"),
+    ("EDEADLOCK", 35, "Resource deadlock avoided"),
+    ("ENAMETOOLONG", 36, "File name too long"),
+    ("ENOLCK", 37, "No locks available"),
+    ("ENOSYS", 38, "Function not implemented"),
+    ("ENOTEMPTY", 39, "Directory not empty"),
+    ("ELOOP", 40, "Too many levels of symbolic links"),
+    ("ENOMSG", 42, "No message of desired type"),
+    ("EIDRM", 43, "Identifier removed"),
+    ("EPROTO", 71, "Protocol error"),
+    ("EBADMSG", 74, "Bad message"),
+    ("EOVERFLOW", 75, "Value too large for defined data type"),
+    (
+        "EILSEQ",
+        84,
+        "Invalid or incomplete multibyte or wide character",
+    ),
+    ("EUSERS", 87, "Too many users"),
+    ("ENOTSOCK", 88, "Socket operation on non-socket"),
+    ("EDESTADDRREQ", 89, "Destination address required"),
+    ("EMSGSIZE", 90, "Message too long"),
+    ("EPROTOTYPE", 91, "Protocol wrong type for socket"),
+    ("ENOPROTOOPT", 92, "Protocol not available"),
+    ("EPROTONOSUPPORT", 93, "Protocol not supported"),
+    ("ENOTSUP", 95, "Operation not supported"),
+    ("EOPNOTSUPP", 95, "Operation not supported"),
+    (
+        "EAFNOSUPPORT",
+        97,
+        "Address family not supported by protocol",
+    ),
+    ("EADDRINUSE", 98, "Address already in use"),
+    ("EADDRNOTAVAIL", 99, "Cannot assign requested address"),
+    ("ECONNABORTED", 103, "Software caused connection abort"),
+    ("ECONNRESET", 104, "Connection reset by peer"),
+    ("ENOTCONN", 107, "Transport endpoint is not connected"),
+    ("ETIMEDOUT", 110, "Connection timed out"),
+    ("ECONNREFUSED", 111, "Connection refused"),
+    ("EALREADY", 114, "Operation already in progress"),
+    ("EINPROGRESS", 115, "Operation now in progress"),
+    ("ESTALE", 116, "Stale file handle"),
+    ("ECANCELED", 125, "Operation canceled"),
+];
+
+fn android_os_constant(field: &str) -> Option<i32> {
+    if let Some((_, value, _)) = SYSOS_ERRNOS.iter().find(|(name, _, _)| *name == field) {
+        return Some(*value);
+    }
+    Some(match field {
+        "F_OK" => 0,
+        "X_OK" => 1,
+        "W_OK" => 2,
+        "R_OK" => 4,
+        "SEEK_SET" => 0,
+        "SEEK_CUR" => 1,
+        "SEEK_END" => 2,
+        "SEEK_DATA" => 3,
+        "SEEK_HOLE" => 4,
+        "O_RDONLY" => 0,
+        "O_WRONLY" => 1,
+        "O_RDWR" => 2,
+        "O_ACCMODE" => 0o3,
+        "O_CREAT" => 0o100,
+        "O_EXCL" => 0o200,
+        "O_NOCTTY" => 0o400,
+        "O_TRUNC" => 0o1000,
+        "O_APPEND" => 0o2000,
+        "O_NONBLOCK" => 0o4000,
+        "O_DSYNC" => 0o10000,
+        "O_DIRECT" => 0o40000,
+        "O_DIRECTORY" => 0o200000,
+        "O_NOFOLLOW" => 0o400000,
+        "O_NOATIME" => 0o1000000,
+        "O_CLOEXEC" => 0o2000000,
+        "O_SYNC" => 0o4010000,
+        "O_PATH" => 0o10000000,
+        "S_IFMT" => 0o170000,
+        "S_IFSOCK" => 0o140000,
+        "S_IFLNK" => 0o120000,
+        "S_IFREG" => 0o100000,
+        "S_IFBLK" => 0o060000,
+        "S_IFDIR" => 0o040000,
+        "S_IFCHR" => 0o020000,
+        "S_IFIFO" => 0o010000,
+        "S_ISUID" => 0o4000,
+        "S_ISGID" => 0o2000,
+        "S_ISVTX" => 0o1000,
+        "S_IRUSR" => 0o400,
+        "S_IWUSR" => 0o200,
+        "S_IXUSR" => 0o100,
+        "S_IRWXU" => 0o700,
+        "S_IRGRP" => 0o040,
+        "S_IWGRP" => 0o020,
+        "S_IXGRP" => 0o010,
+        "S_IRWXG" => 0o070,
+        "S_IROTH" => 0o004,
+        "S_IWOTH" => 0o002,
+        "S_IXOTH" => 0o001,
+        "S_IRWXO" => 0o007,
+        "ST_RDONLY" => 0x0001,
+        "ST_NOSUID" => 0x0002,
+        "ST_NODEV" => 0x0004,
+        "ST_NOEXEC" => 0x0008,
+        "ST_SYNCHRONOUS" => 0x0010,
+        "ST_NOATIME" => 0x0400,
+        "ST_NODIRATIME" => 0x0800,
+        "ST_RELATIME" => 0x1000,
+        "AF_UNSPEC" => 0,
+        "AF_UNIX" | "AF_LOCAL" => 1,
+        "AF_INET" => 2,
+        "AF_INET6" => 10,
+        "AF_NETLINK" => 16,
+        "AF_PACKET" => 17,
+        "AF_VSOCK" => 40,
+        "EAI_BADFLAGS" => -1,
+        "EAI_NONAME" => -2,
+        "EAI_AGAIN" => -3,
+        "EAI_FAIL" => -4,
+        "EAI_NODATA" => -5,
+        "EAI_FAMILY" => -6,
+        "EAI_SOCKTYPE" => -7,
+        "EAI_SERVICE" => -8,
+        "EAI_MEMORY" => -10,
+        "EAI_SYSTEM" => -11,
+        "EAI_OVERFLOW" => -12,
+        _ => return None,
+    })
+}
+
+fn sysos_errno_entry(errno: i32) -> Option<(&'static str, &'static str)> {
+    SYSOS_ERRNOS
+        .iter()
+        .find(|(_, value, _)| *value == errno)
+        .map(|(name, _, description)| (*name, *description))
+}
+fn sysos_errno_name(errno: i32) -> Option<&'static str> {
+    sysos_errno_entry(errno).map(|(name, _)| name)
+}
+fn sysos_strerror(errno: i32) -> String {
+    sysos_errno_entry(errno).map_or_else(
+        || format!("Unknown error {errno}"),
+        |(_, description)| description.to_string(),
+    )
+}
+fn sysos_errno_message(function: &str, errno: i32) -> String {
+    let name = sysos_errno_name(errno)
+        .map(str::to_string)
+        .unwrap_or_else(|| format!("errno {errno}"));
+    format!("{function} failed: {name} ({})", sysos_strerror(errno))
+}
+fn sysos_new_errno_obj(vm: &mut Engine, function: &str, errno: i32) -> Result<ObjRef, VmExit> {
+    let function_value = jstr(vm, function)?;
+    let message = sysos_errno_message(function, errno);
+    let message_value = jstr(vm, &message)?;
+    alloc_obj(
+        vm,
+        ANDROID_ERRNO,
+        vec![
+            ("functionName".to_string(), function_value),
+            ("errno".to_string(), Value::Int(errno)),
+            ("message".to_string(), message_value),
+            ("cause".to_string(), Value::Null),
+            ("rd_cause_set".to_string(), Value::Int(0)),
+        ],
+    )
+}
+fn sysos_errno_exit(vm: &mut Engine, function: &str, errno: i32) -> VmExit {
+    let message = sysos_errno_message(function, errno);
+    match sysos_new_errno_obj(vm, function, errno) {
+        Ok(obj) => VmExit::Exception(crate::err::Throwable {
+            class: ANDROID_ERRNO.to_string(),
+            message: Some(message),
+            obj: Some(obj),
+        }),
+        Err(error) => error,
+    }
+}
+fn sysos_map<T>(vm: &mut Engine, function: &str, result: Result<T, i32>) -> Result<T, VmExit> {
+    match result {
+        Ok(value) => Ok(value),
+        Err(errno) => Err(sysos_errno_exit(vm, function, errno)),
+    }
+}
+fn sysos_path_arg(
+    vm: &mut Engine,
+    args: &[Value],
+    index: usize,
+    function: &str,
+) -> Result<String, VmExit> {
+    let path = req_str(vm, args, index, "path")?;
+    if path.is_empty() {
+        return Err(sysos_errno_exit(vm, function, SYSEO_ENOENT));
+    }
+    Ok(path)
+}
+fn sysos_fd_arg(vm: &mut Engine, args: &[Value], index: usize) -> Result<(ObjRef, i32), VmExit> {
+    let fd_obj = req_obj(args, index, "fd")?;
+    let fd = match get(vm, fd_obj, "descriptor") {
+        Value::Int(value) => value,
+        _ => {
+            // Compatibility with path-only FileDescriptor host objects made
+            // by older stream paths: lazily place them in the VFS table.
+            let path = match get(vm, fd_obj, "rd_path") {
+                Value::Obj(path_ref) => vm.heap.as_str(path_ref).unwrap_or("").to_string(),
+                _ => String::new(),
+            };
+            if path.is_empty() {
+                -1
+            } else if let Some(registered) = crate::jfile::os_register_path(&path, 2, 0) {
+                put(vm, fd_obj, "descriptor", Value::Int(registered))?;
+                registered
+            } else {
+                -1
+            }
+        }
+    };
+    Ok((fd_obj, fd))
+}
+fn sysos_new_fd_obj(vm: &mut Engine, fd: i32) -> Result<Value, VmExit> {
+    let path = crate::jfile::os_fd_path(fd).unwrap_or_default();
+    let path_value = jstr(vm, path)?;
+    let obj = alloc_obj(
+        vm,
+        JAVA_FILE_DESCRIPTOR,
+        vec![
+            ("descriptor".to_string(), Value::Int(fd)),
+            ("rd_path".to_string(), path_value),
+        ],
+    )?;
+    Ok(Value::Obj(obj))
+}
+fn sysos_check_bytes(
+    vm: &Engine,
+    args: &[Value],
+    array_index: usize,
+    offset_index: usize,
+    count_index: usize,
+) -> Result<(ObjRef, usize, usize, Vec<u8>), VmExit> {
+    let array = req_obj(args, array_index, "bytes")?;
+    let elems = vm
+        .heap
+        .as_array_elems(array)
+        .map_err(VmExit::from)?
+        .0
+        .to_vec();
+    let offset = iarg(args, offset_index);
+    let count = iarg(args, count_index);
+    if offset < 0
+        || count < 0
+        || offset as usize > elems.len()
+        || count as usize > elems.len() - offset as usize
+    {
+        return Err(idx_oob(format!(
+            "length={}; offset={offset}; count={count}",
+            elems.len()
+        )));
+    }
+    let bytes = elems[offset as usize..offset as usize + count as usize]
+        .iter()
+        .map(|value| value.as_int().unwrap_or(0) as u8)
+        .collect();
+    Ok((array, offset as usize, count as usize, bytes))
+}
+fn sysos_write_bytes_to_array(
+    vm: &mut Engine,
+    array: ObjRef,
+    offset: usize,
+    bytes: &[u8],
+) -> Result<(), VmExit> {
+    let elems = vm.heap.array_elems_mut(array).map_err(VmExit::from)?;
+    for (index, byte) in bytes.iter().enumerate() {
+        if let Some(slot) = elems.get_mut(offset + index) {
+            *slot = Value::Int(*byte as i8 as i32);
+        }
+    }
+    Ok(())
+}
+fn sysos_timespec_obj(vm: &mut Engine, sec: i64, nsec: i64) -> Result<Value, VmExit> {
+    let obj = alloc_obj(
+        vm,
+        ANDROID_STRUCT_TIMESPEC,
+        vec![
+            ("tv_sec".to_string(), Value::Long(sec)),
+            ("tv_nsec".to_string(), Value::Long(nsec)),
+        ],
+    )?;
+    Ok(Value::Obj(obj))
+}
+fn sysos_timespec_from_ms(vm: &mut Engine, millis: i64) -> Result<Value, VmExit> {
+    sysos_timespec_obj(
+        vm,
+        millis.div_euclid(1000),
+        millis.rem_euclid(1000) * 1_000_000,
+    )
+}
+fn sysos_stat_obj(vm: &mut Engine, stat: &crate::jfile::OsStatData) -> Result<Value, VmExit> {
+    let atim = sysos_timespec_from_ms(vm, stat.atime_ms)?;
+    let mtim = sysos_timespec_from_ms(vm, stat.mtime_ms)?;
+    let ctim = sysos_timespec_from_ms(vm, stat.ctime_ms)?;
+    let obj = alloc_obj(
+        vm,
+        ANDROID_STRUCT_STAT,
+        vec![
+            ("st_dev".to_string(), Value::Long(stat.dev)),
+            ("st_ino".to_string(), Value::Long(stat.ino)),
+            ("st_mode".to_string(), Value::Int(stat.mode)),
+            ("st_nlink".to_string(), Value::Long(stat.nlink)),
+            ("st_uid".to_string(), Value::Int(stat.uid)),
+            ("st_gid".to_string(), Value::Int(stat.gid)),
+            ("st_rdev".to_string(), Value::Long(stat.rdev)),
+            ("st_size".to_string(), Value::Long(stat.size)),
+            (
+                "st_atime".to_string(),
+                Value::Long(stat.atime_ms.div_euclid(1000)),
+            ),
+            ("st_atim".to_string(), atim),
+            (
+                "st_mtime".to_string(),
+                Value::Long(stat.mtime_ms.div_euclid(1000)),
+            ),
+            ("st_mtim".to_string(), mtim),
+            (
+                "st_ctime".to_string(),
+                Value::Long(stat.ctime_ms.div_euclid(1000)),
+            ),
+            ("st_ctim".to_string(), ctim),
+            ("st_blksize".to_string(), Value::Long(stat.blksize)),
+            ("st_blocks".to_string(), Value::Long(stat.blocks)),
+        ],
+    )?;
+    Ok(Value::Obj(obj))
+}
+fn sysos_statvfs_obj(vm: &mut Engine, stat: &crate::jfile::OsStatVfsData) -> Result<Value, VmExit> {
+    let obj = alloc_obj(
+        vm,
+        ANDROID_STRUCT_STAT_VFS,
+        vec![
+            ("f_bsize".to_string(), Value::Long(stat.bsize)),
+            ("f_frsize".to_string(), Value::Long(stat.frsize)),
+            ("f_blocks".to_string(), Value::Long(stat.blocks)),
+            ("f_bfree".to_string(), Value::Long(stat.bfree)),
+            ("f_bavail".to_string(), Value::Long(stat.bavail)),
+            ("f_files".to_string(), Value::Long(stat.files)),
+            ("f_ffree".to_string(), Value::Long(stat.ffree)),
+            ("f_favail".to_string(), Value::Long(stat.favail)),
+            ("f_fsid".to_string(), Value::Long(stat.fsid)),
+            ("f_flag".to_string(), Value::Long(stat.flag)),
+            ("f_namemax".to_string(), Value::Long(stat.namemax)),
+        ],
+    )?;
+    Ok(Value::Obj(obj))
+}
+fn sysos_utsname_obj(vm: &mut Engine, fields: [&str; 5]) -> Result<Value, VmExit> {
+    let mut values = Vec::new();
+    for field in fields {
+        values.push(jstr(vm, field)?);
+    }
+    let obj = alloc_obj(
+        vm,
+        ANDROID_STRUCT_UTSNAME,
+        vec![
+            ("sysname".to_string(), values[0].clone()),
+            ("nodename".to_string(), values[1].clone()),
+            ("release".to_string(), values[2].clone()),
+            ("version".to_string(), values[3].clone()),
+            ("machine".to_string(), values[4].clone()),
+        ],
+    )?;
+    Ok(Value::Obj(obj))
+}
+fn sysos_long_hash(value: i64) -> i32 {
+    ((value as u64) ^ ((value as u64) >> 32)) as u32 as i32
+}
+fn sysos_struct_string(
+    vm: &mut Engine,
+    class: &str,
+    recv: ObjRef,
+    fields: &[&str],
+) -> Result<Value, VmExit> {
+    let simple = class
+        .trim_start_matches('L')
+        .trim_end_matches(';')
+        .rsplit('/')
+        .next()
+        .unwrap_or("Object");
+    let mut rendered = Vec::new();
+    for field in fields {
+        rendered.push(format!(
+            "{field}={}",
+            value_string(vm, &get(vm, recv, field))?
+        ));
+    }
+    jstr(vm, format!("{simple}{{{}}}", rendered.join(", ")))
+}
+
+fn android_system_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match class {
+        ANDROID_ERRNO => match (name, sig) {
+            ("<init>", "(Ljava/lang/String;I)V") => {
+                put(
+                    vm,
+                    recv,
+                    "functionName",
+                    args.first().cloned().unwrap_or(Value::Null),
+                )?;
+                put(vm, recv, "errno", Value::Int(iarg(args, 1)))?;
+                Value::Null
+            }
+            ("<init>", "(Ljava/lang/String;ILjava/lang/Throwable;)V") => {
+                put(
+                    vm,
+                    recv,
+                    "functionName",
+                    args.first().cloned().unwrap_or(Value::Null),
+                )?;
+                put(vm, recv, "errno", Value::Int(iarg(args, 1)))?;
+                put(
+                    vm,
+                    recv,
+                    "cause",
+                    args.get(2).cloned().unwrap_or(Value::Null),
+                )?;
+                put(vm, recv, "rd_cause_set", Value::Int(1))?;
+                Value::Null
+            }
+            ("getMessage", "()Ljava/lang/String;") => {
+                let function = opt_str(vm, Some(&get(vm, recv, "functionName")))
+                    .unwrap_or_else(|| "null".to_string());
+                let message = sysos_errno_message(&function, field_int(vm, recv, "errno"));
+                jstr(vm, message)?
+            }
+            ("rethrowAsIOException", "()Ljava/io/IOException;") => {
+                let function = opt_str(vm, Some(&get(vm, recv, "functionName")))
+                    .unwrap_or_else(|| "null".to_string());
+                let message = sysos_errno_message(&function, field_int(vm, recv, "errno"));
+                let message_value = jstr(vm, &message)?;
+                let obj = alloc_obj(
+                    vm,
+                    "Ljava/io/IOException;",
+                    vec![
+                        ("message".to_string(), message_value),
+                        ("cause".to_string(), Value::Obj(recv)),
+                        ("rd_cause_set".to_string(), Value::Int(1)),
+                    ],
+                )?;
+                return Err(VmExit::Exception(crate::err::Throwable {
+                    class: "Ljava/io/IOException;".to_string(),
+                    message: Some(message),
+                    obj: Some(obj),
+                }));
+            }
+            ("rethrowAsSocketException", "()Ljava/net/SocketException;") => {
+                let function = opt_str(vm, Some(&get(vm, recv, "functionName")))
+                    .unwrap_or_else(|| "null".to_string());
+                let message = sysos_errno_message(&function, field_int(vm, recv, "errno"));
+                let message_value = jstr(vm, &message)?;
+                let obj = alloc_obj(
+                    vm,
+                    "Ljava/net/SocketException;",
+                    vec![
+                        ("message".to_string(), message_value),
+                        ("cause".to_string(), Value::Obj(recv)),
+                        ("rd_cause_set".to_string(), Value::Int(1)),
+                    ],
+                )?;
+                return Err(VmExit::Exception(crate::err::Throwable {
+                    class: "Ljava/net/SocketException;".to_string(),
+                    message: Some(message),
+                    obj: Some(obj),
+                }));
+            }
+            _ => return Ok(None),
+        },
+        ANDROID_STRUCT_TIMESPEC => match (name, sig) {
+            ("<init>", "(JJ)V") => {
+                let sec = larg(args, 0);
+                let nsec = larg(args, 1);
+                put(vm, recv, "tv_sec", Value::Long(sec))?;
+                put(vm, recv, "tv_nsec", Value::Long(nsec))?;
+                if !(0..=999_999_999).contains(&nsec) {
+                    return Err(iae(format!(
+                        "tv_nsec value {nsec} is not in [0, 999999999]"
+                    )));
+                }
+                Value::Null
+            }
+            ("compareTo", "(Landroid/system/StructTimespec;)I")
+            | ("compareTo", "(Ljava/lang/Object;)I") => {
+                let other = req_obj(args, 0, "other")?;
+                if class_of(vm, other) != ANDROID_STRUCT_TIMESPEC {
+                    return Err(throw(
+                        "Ljava/lang/ClassCastException;",
+                        "StructTimespec",
+                    ));
+                }
+                let sec = field_long(vm, recv, "tv_sec");
+                let other_sec = field_long(vm, other, "tv_sec");
+                let nsec = field_long(vm, recv, "tv_nsec");
+                let other_nsec = field_long(vm, other, "tv_nsec");
+                Value::Int(match sec.cmp(&other_sec) {
+                    std::cmp::Ordering::Less => -1,
+                    std::cmp::Ordering::Greater => 1,
+                    std::cmp::Ordering::Equal => match nsec.cmp(&other_nsec) {
+                        std::cmp::Ordering::Less => -1,
+                        std::cmp::Ordering::Greater => 1,
+                        std::cmp::Ordering::Equal => 0,
+                    },
+                })
+            }
+            ("equals", "(Ljava/lang/Object;)Z") => {
+                let equal = match obj(args.first()) {
+                    Some(other) if other == recv => true,
+                    Some(other) if class_of(vm, other) == ANDROID_STRUCT_TIMESPEC => {
+                        field_long(vm, recv, "tv_sec") == field_long(vm, other, "tv_sec")
+                            && field_long(vm, recv, "tv_nsec") == field_long(vm, other, "tv_nsec")
+                    }
+                    _ => false,
+                };
+                bool_value(equal)
+            }
+            ("hashCode", "()I") => Value::Int(
+                sysos_long_hash(field_long(vm, recv, "tv_sec"))
+                    .wrapping_mul(31)
+                    .wrapping_add(sysos_long_hash(field_long(vm, recv, "tv_nsec"))),
+            ),
+            ("toString", "()Ljava/lang/String;") => {
+                sysos_struct_string(vm, class, recv, &["tv_sec", "tv_nsec"])?
+            }
+            _ => return Ok(None),
+        },
+        ANDROID_STRUCT_STAT => match (name, sig) {
+            ("<init>", "(JJIJIIJJJJJJJ)V") => {
+                put(vm, recv, "st_dev", Value::Long(larg(args, 0)))?;
+                put(vm, recv, "st_ino", Value::Long(larg(args, 1)))?;
+                put(vm, recv, "st_mode", Value::Int(iarg(args, 2)))?;
+                put(vm, recv, "st_nlink", Value::Long(larg(args, 3)))?;
+                put(vm, recv, "st_uid", Value::Int(iarg(args, 4)))?;
+                put(vm, recv, "st_gid", Value::Int(iarg(args, 5)))?;
+                put(vm, recv, "st_rdev", Value::Long(larg(args, 6)))?;
+                put(vm, recv, "st_size", Value::Long(larg(args, 7)))?;
+                for (index, sec_field, tim_field) in [
+                    (8, "st_atime", "st_atim"),
+                    (9, "st_mtime", "st_mtim"),
+                    (10, "st_ctime", "st_ctim"),
+                ] {
+                    put(vm, recv, sec_field, Value::Long(larg(args, index)))?;
+                    let tim = sysos_timespec_obj(vm, larg(args, index), 0)?;
+                    put(vm, recv, tim_field, tim)?;
+                }
+                put(vm, recv, "st_blksize", Value::Long(larg(args, 11)))?;
+                put(vm, recv, "st_blocks", Value::Long(larg(args, 12)))?;
+                Value::Null
+            }
+            (
+                "<init>",
+                "(JJIJIIJJLandroid/system/StructTimespec;Landroid/system/StructTimespec;Landroid/system/StructTimespec;JJ)V",
+            ) => {
+                put(vm, recv, "st_dev", Value::Long(larg(args, 0)))?;
+                put(vm, recv, "st_ino", Value::Long(larg(args, 1)))?;
+                put(vm, recv, "st_mode", Value::Int(iarg(args, 2)))?;
+                put(vm, recv, "st_nlink", Value::Long(larg(args, 3)))?;
+                put(vm, recv, "st_uid", Value::Int(iarg(args, 4)))?;
+                put(vm, recv, "st_gid", Value::Int(iarg(args, 5)))?;
+                put(vm, recv, "st_rdev", Value::Long(larg(args, 6)))?;
+                put(vm, recv, "st_size", Value::Long(larg(args, 7)))?;
+                for (index, sec_field, tim_field) in [
+                    (8, "st_atime", "st_atim"),
+                    (9, "st_mtime", "st_mtim"),
+                    (10, "st_ctime", "st_ctim"),
+                ] {
+                    let tim = req_obj(args, index, tim_field)?;
+                    put(
+                        vm,
+                        recv,
+                        sec_field,
+                        Value::Long(field_long(vm, tim, "tv_sec")),
+                    )?;
+                    put(vm, recv, tim_field, Value::Obj(tim))?;
+                }
+                put(vm, recv, "st_blksize", Value::Long(larg(args, 11)))?;
+                put(vm, recv, "st_blocks", Value::Long(larg(args, 12)))?;
+                Value::Null
+            }
+            ("toString", "()Ljava/lang/String;") => sysos_struct_string(
+                vm,
+                class,
+                recv,
+                &[
+                    "st_dev", "st_ino", "st_mode", "st_nlink", "st_uid", "st_gid", "st_rdev",
+                    "st_size", "st_atim", "st_mtim", "st_ctim", "st_blksize", "st_blocks",
+                ],
+            )?,
+            _ => return Ok(None),
+        },
+        ANDROID_STRUCT_STAT_VFS => match (name, sig) {
+            ("<init>", "(JJJJJJJJJJJ)V") => {
+                for (index, field) in [
+                    "f_bsize", "f_frsize", "f_blocks", "f_bfree", "f_bavail", "f_files",
+                    "f_ffree", "f_favail", "f_fsid", "f_flag", "f_namemax",
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    put(vm, recv, field, Value::Long(larg(args, index)))?;
+                }
+                Value::Null
+            }
+            ("toString", "()Ljava/lang/String;") => sysos_struct_string(
+                vm,
+                class,
+                recv,
+                &[
+                    "f_bsize", "f_frsize", "f_blocks", "f_bfree", "f_bavail", "f_files",
+                    "f_ffree", "f_favail", "f_fsid", "f_flag", "f_namemax",
+                ],
+            )?,
+            _ => return Ok(None),
+        },
+        ANDROID_STRUCT_UTSNAME => match (name, sig) {
+            (
+                "<init>",
+                "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+            ) => {
+                for (index, field) in ["sysname", "nodename", "release", "version", "machine"]
+                    .into_iter()
+                    .enumerate()
+                {
+                    put(
+                        vm,
+                        recv,
+                        field,
+                        args.get(index).cloned().unwrap_or(Value::Null),
+                    )?;
+                }
+                Value::Null
+            }
+            ("toString", "()Ljava/lang/String;") => sysos_struct_string(
+                vm,
+                class,
+                recv,
+                &["sysname", "nodename", "release", "version", "machine"],
+            )?,
+            _ => return Ok(None),
+        },
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn android_os_constants_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let mode = iarg(args, 0);
+    let value = match (name, sig) {
+        ("errnoName", "(I)Ljava/lang/String;") => match sysos_errno_name(mode) {
+            Some(name) => jstr(vm, name)?,
+            None => Value::Null,
+        },
+        ("gaiName", "(I)Ljava/lang/String;") => {
+            let found = [
+                ("EAI_AGAIN", -3),
+                ("EAI_BADFLAGS", -1),
+                ("EAI_FAIL", -4),
+                ("EAI_FAMILY", -6),
+                ("EAI_MEMORY", -10),
+                ("EAI_NODATA", -5),
+                ("EAI_NONAME", -2),
+                ("EAI_OVERFLOW", -12),
+                ("EAI_SERVICE", -8),
+                ("EAI_SOCKTYPE", -7),
+                ("EAI_SYSTEM", -11),
+            ]
+            .into_iter()
+            .find(|(_, value)| *value == mode)
+            .map(|(name, _)| name);
+            match found {
+                Some(name) => jstr(vm, name)?,
+                None => Value::Null,
+            }
+        }
+        ("S_ISBLK", "(I)Z") => bool_value(mode & 0o170000 == 0o060000),
+        ("S_ISCHR", "(I)Z") => bool_value(mode & 0o170000 == 0o020000),
+        ("S_ISDIR", "(I)Z") => bool_value(mode & 0o170000 == 0o040000),
+        ("S_ISFIFO", "(I)Z") => bool_value(mode & 0o170000 == 0o010000),
+        ("S_ISREG", "(I)Z") => bool_value(mode & 0o170000 == 0o100000),
+        ("S_ISLNK", "(I)Z") => bool_value(mode & 0o170000 == 0o120000),
+        ("S_ISSOCK", "(I)Z") => bool_value(mode & 0o170000 == 0o140000),
+        ("CAP_TO_MASK", "(I)I") => Value::Int(1 << (mode & 31)),
+        ("WEXITSTATUS", "(I)I") | ("WSTOPSIG", "(I)I") => Value::Int((mode & 0xff00) >> 8),
+        ("WTERMSIG", "(I)I") => Value::Int(mode & 0x7f),
+        ("WCOREDUMP", "(I)Z") => bool_value(mode & 0x80 != 0),
+        ("WIFEXITED", "(I)Z") => bool_value(mode & 0x7f == 0),
+        ("WIFSTOPPED", "(I)Z") => bool_value(mode & 0x7f == 0x7f),
+        ("WIFSIGNALED", "(I)Z") => bool_value((mode.wrapping_add(1) & 0x7f) >= 2),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn sysos_environment_map(vm: &mut Engine) -> Result<ObjRef, VmExit> {
+    if let Value::Obj(map) = tr_static_get(vm, ANDROID_OS, "rdEnvironment") {
+        return Ok(map);
+    }
+    let map = tr_new_map(vm)?;
+    let package = if vm.fw.package_name.is_empty() {
+        "app".to_string()
+    } else {
+        vm.fw.package_name.clone()
+    };
+    for (key, value) in [
+        ("ANDROID_DATA", "/data".to_string()),
+        ("ANDROID_ROOT", "/system".to_string()),
+        ("ANDROID_STORAGE", "/storage".to_string()),
+        ("EXTERNAL_STORAGE", "/storage/emulated/0".to_string()),
+        ("HOME", format!("/data/user/0/{package}")),
+        ("PATH", "/system/bin:/system/xbin".to_string()),
+        ("TMPDIR", "/data/local/tmp".to_string()),
+    ] {
+        let key = jstr(vm, key)?;
+        let value = jstr(vm, &value)?;
+        tr_map_put(vm, map, key, value)?;
+    }
+    tr_static_set(vm, ANDROID_OS, "rdEnvironment", Value::Obj(map));
+    Ok(map)
+}
+fn sysos_valid_env_name(name: &str) -> bool {
+    !name.is_empty() && !name.contains('=') && !name.contains('\0')
+}
+
+#[allow(clippy::too_many_lines)]
+fn android_os_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("access", "(Ljava/lang/String;I)Z") => {
+            let path = sysos_path_arg(vm, args, 0, "access")?;
+            bool_value(sysos_map(
+                vm,
+                "access",
+                crate::jfile::os_access(&path, iarg(args, 1)),
+            )?)
+        }
+        ("chmod", "(Ljava/lang/String;I)V") => {
+            let path = sysos_path_arg(vm, args, 0, "chmod")?;
+            sysos_map(vm, "chmod", crate::jfile::os_chmod(&path, iarg(args, 1)))?;
+            Value::Null
+        }
+        ("chown", "(Ljava/lang/String;II)V") | ("lchown", "(Ljava/lang/String;II)V") => {
+            let path = sysos_path_arg(vm, args, 0, name)?;
+            sysos_map(
+                vm,
+                name,
+                crate::jfile::os_chown(&path, iarg(args, 1), iarg(args, 2)),
+            )?;
+            Value::Null
+        }
+        ("close", "(Ljava/io/FileDescriptor;)V") => {
+            let (fd_obj, fd) = sysos_fd_arg(vm, args, 0)?;
+            sysos_map(vm, "close", crate::jfile::os_close(fd))?;
+            put(vm, fd_obj, "descriptor", Value::Int(-1))?;
+            Value::Null
+        }
+        ("dup", "(Ljava/io/FileDescriptor;)Ljava/io/FileDescriptor;") => {
+            let (_, fd) = sysos_fd_arg(vm, args, 0)?;
+            let new_fd = sysos_map(vm, "dup", crate::jfile::os_dup(fd))?;
+            sysos_new_fd_obj(vm, new_fd)?
+        }
+        ("dup2", "(Ljava/io/FileDescriptor;I)Ljava/io/FileDescriptor;") => {
+            let (fd_obj, fd) = sysos_fd_arg(vm, args, 0)?;
+            let new_fd = sysos_map(vm, "dup2", crate::jfile::os_dup2(fd, iarg(args, 1)))?;
+            if new_fd == fd {
+                Value::Obj(fd_obj)
+            } else {
+                sysos_new_fd_obj(vm, new_fd)?
+            }
+        }
+        ("environ", "()[Ljava/lang/String;") => {
+            let map = sysos_environment_map(vm)?;
+            let mut values = Vec::new();
+            for (key, value) in tr_map_entries(vm, &Value::Obj(map)) {
+                let entry = format!("{}={}", value_string(vm, &key)?, value_string(vm, &value)?);
+                values.push(jstr(vm, entry)?);
+            }
+            obj_array(vm, "[Ljava/lang/String;", values)?
+        }
+        ("fchmod", "(Ljava/io/FileDescriptor;I)V") => {
+            let (_, fd) = sysos_fd_arg(vm, args, 0)?;
+            sysos_map(vm, "fchmod", crate::jfile::os_fchmod(fd, iarg(args, 1)))?;
+            Value::Null
+        }
+        ("fchown", "(Ljava/io/FileDescriptor;II)V") => {
+            let (_, fd) = sysos_fd_arg(vm, args, 0)?;
+            sysos_map(
+                vm,
+                "fchown",
+                crate::jfile::os_fchown(fd, iarg(args, 1), iarg(args, 2)),
+            )?;
+            Value::Null
+        }
+        ("fdatasync", "(Ljava/io/FileDescriptor;)V") | ("fsync", "(Ljava/io/FileDescriptor;)V") => {
+            let (_, fd) = sysos_fd_arg(vm, args, 0)?;
+            sysos_map(vm, name, crate::jfile::os_fsync(fd))?;
+            Value::Null
+        }
+        ("fstat", "(Ljava/io/FileDescriptor;)Landroid/system/StructStat;") => {
+            let (_, fd) = sysos_fd_arg(vm, args, 0)?;
+            let stat = sysos_map(vm, "fstat", crate::jfile::os_fstat(fd))?;
+            sysos_stat_obj(vm, &stat)?
+        }
+        ("fstatvfs", "(Ljava/io/FileDescriptor;)Landroid/system/StructStatVfs;") => {
+            let (_, fd) = sysos_fd_arg(vm, args, 0)?;
+            let stat = sysos_map(vm, "fstatvfs", crate::jfile::os_fstatvfs(fd))?;
+            sysos_statvfs_obj(vm, &stat)?
+        }
+        ("ftruncate", "(Ljava/io/FileDescriptor;J)V") => {
+            let (_, fd) = sysos_fd_arg(vm, args, 0)?;
+            sysos_map(
+                vm,
+                "ftruncate",
+                crate::jfile::os_ftruncate(fd, larg(args, 1)),
+            )?;
+            Value::Null
+        }
+        ("getenv", "(Ljava/lang/String;)Ljava/lang/String;") => {
+            let name_arg = req_str(vm, args, 0, "name")?;
+            let map = sysos_environment_map(vm)?;
+            let key = jstr(vm, &name_arg)?;
+            tr_map_get(vm, &Value::Obj(map), &key).unwrap_or(Value::Null)
+        }
+        ("setenv", "(Ljava/lang/String;Ljava/lang/String;Z)V") => {
+            let env_name = req_str(vm, args, 0, "name")?;
+            let env_value = req_str(vm, args, 1, "value")?;
+            if !sysos_valid_env_name(&env_name) {
+                return Err(sysos_errno_exit(vm, "setenv", SYSEO_EINVAL));
+            }
+            let map = sysos_environment_map(vm)?;
+            let key = jstr(vm, &env_name)?;
+            if iarg(args, 2) != 0 || tr_map_get(vm, &Value::Obj(map), &key).is_none() {
+                let value = jstr(vm, &env_value)?;
+                tr_map_put(vm, map, key, value)?;
+            }
+            Value::Null
+        }
+        ("unsetenv", "(Ljava/lang/String;)V") => {
+            let env_name = req_str(vm, args, 0, "name")?;
+            if !sysos_valid_env_name(&env_name) {
+                return Err(sysos_errno_exit(vm, "unsetenv", SYSEO_EINVAL));
+            }
+            let map = sysos_environment_map(vm)?;
+            let key = jstr(vm, &env_name)?;
+            tr_map_remove(vm, map, &key)?;
+            Value::Null
+        }
+        ("getpid", "()I")
+        | ("gettid", "()I")
+        | ("getuid", "()I")
+        | ("geteuid", "()I")
+        | ("getgid", "()I")
+        | ("getegid", "()I") => Value::Int(10000),
+        ("getppid", "()I") => Value::Int(1),
+        ("isatty", "(Ljava/io/FileDescriptor;)Z") => {
+            if obj(args.first()).is_none() {
+                Value::Int(0)
+            } else {
+                // All descriptors in this slice are regular VFS files or
+                // directories, never terminals.
+                let _ = sysos_fd_arg(vm, args, 0)?;
+                Value::Int(0)
+            }
+        }
+        ("lseek", "(Ljava/io/FileDescriptor;JI)J") => {
+            let (_, fd) = sysos_fd_arg(vm, args, 0)?;
+            Value::Long(sysos_map(
+                vm,
+                "lseek",
+                crate::jfile::os_lseek(fd, larg(args, 1), iarg(args, 2)),
+            )?)
+        }
+        ("stat", "(Ljava/lang/String;)Landroid/system/StructStat;")
+        | ("lstat", "(Ljava/lang/String;)Landroid/system/StructStat;") => {
+            let path = sysos_path_arg(vm, args, 0, name)?;
+            let stat = sysos_map(vm, name, crate::jfile::os_stat(&path))?;
+            sysos_stat_obj(vm, &stat)?
+        }
+        ("statvfs", "(Ljava/lang/String;)Landroid/system/StructStatVfs;") => {
+            let path = sysos_path_arg(vm, args, 0, "statvfs")?;
+            let stat = sysos_map(vm, "statvfs", crate::jfile::os_statvfs(&path))?;
+            sysos_statvfs_obj(vm, &stat)?
+        }
+        ("mkdir", "(Ljava/lang/String;I)V") => {
+            let path = sysos_path_arg(vm, args, 0, "mkdir")?;
+            sysos_map(vm, "mkdir", crate::jfile::os_mkdir(&path, iarg(args, 1)))?;
+            Value::Null
+        }
+        ("open", "(Ljava/lang/String;II)Ljava/io/FileDescriptor;") => {
+            let path = sysos_path_arg(vm, args, 0, "open")?;
+            let fd = sysos_map(
+                vm,
+                "open",
+                crate::jfile::os_open(&path, iarg(args, 1), iarg(args, 2)),
+            )?;
+            sysos_new_fd_obj(vm, fd)?
+        }
+        ("read", "(Ljava/io/FileDescriptor;[BII)I") => {
+            let (_, fd) = sysos_fd_arg(vm, args, 0)?;
+            let (array, offset, count, _) = sysos_check_bytes(vm, args, 1, 2, 3)?;
+            if count == 0 {
+                Value::Int(0)
+            } else {
+                let bytes = sysos_map(vm, "read", crate::jfile::os_read(fd, count))?;
+                if bytes.is_empty() {
+                    Value::Int(-1)
+                } else {
+                    let read_count = bytes.len() as i32;
+                    sysos_write_bytes_to_array(vm, array, offset, &bytes)?;
+                    Value::Int(read_count)
+                }
+            }
+        }
+        ("pread", "(Ljava/io/FileDescriptor;[BIIJ)I") => {
+            let (_, fd) = sysos_fd_arg(vm, args, 0)?;
+            let (array, offset, count, _) = sysos_check_bytes(vm, args, 1, 2, 3)?;
+            if count == 0 {
+                Value::Int(0)
+            } else {
+                let bytes = sysos_map(
+                    vm,
+                    "pread",
+                    crate::jfile::os_pread(fd, count, larg(args, 4)),
+                )?;
+                if bytes.is_empty() {
+                    Value::Int(-1)
+                } else {
+                    let read_count = bytes.len() as i32;
+                    sysos_write_bytes_to_array(vm, array, offset, &bytes)?;
+                    Value::Int(read_count)
+                }
+            }
+        }
+        ("write", "(Ljava/io/FileDescriptor;[BII)I") => {
+            let (_, fd) = sysos_fd_arg(vm, args, 0)?;
+            let (_, _, count, bytes) = sysos_check_bytes(vm, args, 1, 2, 3)?;
+            if count == 0 {
+                Value::Int(0)
+            } else {
+                Value::Int(sysos_map(vm, "write", crate::jfile::os_write(fd, &bytes))? as i32)
+            }
+        }
+        ("pwrite", "(Ljava/io/FileDescriptor;[BIIJ)I") => {
+            let (_, fd) = sysos_fd_arg(vm, args, 0)?;
+            let (_, _, count, bytes) = sysos_check_bytes(vm, args, 1, 2, 3)?;
+            if count == 0 {
+                Value::Int(0)
+            } else {
+                Value::Int(sysos_map(
+                    vm,
+                    "pwrite",
+                    crate::jfile::os_pwrite(fd, &bytes, larg(args, 4)),
+                )? as i32)
+            }
+        }
+        ("readlink", "(Ljava/lang/String;)Ljava/lang/String;") => {
+            let path = sysos_path_arg(vm, args, 0, "readlink")?;
+            // The VFS has no links: a path that exists is not a symbolic
+            // link (EINVAL), and all other failures keep their errno.
+            sysos_map(vm, "readlink", crate::jfile::os_stat(&path))?;
+            return Err(sysos_errno_exit(vm, "readlink", SYSEO_EINVAL));
+        }
+        ("realpath", "(Ljava/lang/String;)Ljava/lang/String;") => {
+            if obj(args.first()).is_none() {
+                Value::Null
+            } else {
+                let path = sysos_path_arg(vm, args, 0, "realpath")?;
+                let canonical = sysos_map(vm, "realpath", crate::jfile::os_realpath(&path))?;
+                jstr(vm, canonical)?
+            }
+        }
+        ("remove", "(Ljava/lang/String;)V") => {
+            let path = sysos_path_arg(vm, args, 0, "remove")?;
+            sysos_map(vm, "remove", crate::jfile::os_remove(&path))?;
+            Value::Null
+        }
+        ("unlink", "(Ljava/lang/String;)V") => {
+            let path = sysos_path_arg(vm, args, 0, "unlink")?;
+            sysos_map(vm, "unlink", crate::jfile::os_unlink(&path))?;
+            Value::Null
+        }
+        ("rename", "(Ljava/lang/String;Ljava/lang/String;)V") => {
+            let old_path = sysos_path_arg(vm, args, 0, "rename")?;
+            let new_path = sysos_path_arg(vm, args, 1, "rename")?;
+            sysos_map(vm, "rename", crate::jfile::os_rename(&old_path, &new_path))?;
+            Value::Null
+        }
+        ("strerror", "(I)Ljava/lang/String;") => jstr(vm, sysos_strerror(iarg(args, 0)))?,
+        ("uname", "()Landroid/system/StructUtsname;") => {
+            let machine = match std::env::consts::ARCH {
+                "aarch64" => "aarch64",
+                "arm" => "armv7l",
+                _ => "x86_64",
+            };
+            sysos_utsname_obj(
+                vm,
+                [
+                    "Linux",
+                    "localhost",
+                    "6.1.0-rustydroid",
+                    "#1 SMP PREEMPT_DYNAMIC",
+                    machine,
+                ],
+            )?
         }
         _ => return Ok(None),
     };
