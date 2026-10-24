@@ -402,9 +402,24 @@ impl GlSurfaces {
         }
         Ok(requests)
     }
-    pub(crate) fn choose_config(&self, vm: &mut Engine, view: ObjRef, display: u64) -> Result<u64> {
+    pub(crate) fn choose_config(
+        &self,
+        android: &Android,
+        vm: &mut Engine,
+        view: ObjRef,
+        display: u64,
+    ) -> Result<u64> {
         self.mark_display_started();
         let _scope = self.enter_callback();
+        self.choose_config_inner(vm, view, display)
+            .map_err(|failure| {
+                android
+                    .services
+                    .executors
+                    .dispatch_uncaught(android, vm, "gl-config", failure)
+            })
+    }
+    fn choose_config_inner(&self, vm: &mut Engine, view: ObjRef, display: u64) -> Result<u64> {
         if display == 0 {
             return Err(invalid("null EGL display"));
         }
@@ -492,8 +507,22 @@ impl GlSurfaces {
         }
         Ok(token)
     }
-    pub(crate) fn callback(&self, vm: &mut Engine, view: ObjRef, event: GlEvent) -> Result<()> {
+    pub(crate) fn callback(
+        &self,
+        android: &Android,
+        vm: &mut Engine,
+        view: ObjRef,
+        event: GlEvent,
+    ) -> Result<()> {
         let _scope = self.enter_callback();
+        self.callback_inner(vm, view, event).map_err(|failure| {
+            android
+                .services
+                .executors
+                .dispatch_uncaught(android, vm, "gl", failure)
+        })
+    }
+    fn callback_inner(&self, vm: &mut Engine, view: ObjRef, event: GlEvent) -> Result<()> {
         if matches!(event, GlEvent::DrainQueue) {
             for _ in 0..1024 {
                 let event = self

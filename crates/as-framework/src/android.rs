@@ -20,6 +20,7 @@ use rd_vm::{framework_host::FrameworkHost, Engine, ObjRef, Throwable, Value, VmE
 #[path = "services/mod.rs"]
 mod services;
 use serde::Serialize;
+pub use services::executors::{MainExceptionScope, UncaughtExceptionReport};
 pub use services::glsurface::{
     EglConfigBackend, EglConfigs, GlEvent, GlSurfaceRequest, GraphicsCaps,
 };
@@ -150,6 +151,7 @@ struct Activity {
     class: String,
     root: Option<ObjRef>,
     intent: Option<ObjRef>,
+    saved_state: Option<ObjRef>,
 }
 #[derive(Clone)]
 enum Action {
@@ -234,6 +236,41 @@ impl Android {
     pub fn now(&self) -> u64 {
         self.clock.monotonic_micros() / 1000
     }
+    pub fn begin_main_exception_scope(&self, vm: &Engine) -> Result<MainExceptionScope> {
+        self.services.executors.begin_main_exception_scope(vm)
+    }
+    pub fn finish_main_exception_scope<T>(
+        &self,
+        vm: &mut Engine,
+        scope: MainExceptionScope,
+        result: Result<T>,
+    ) -> Result<T> {
+        self.services
+            .executors
+            .finish_main_exception_scope(self, vm, scope, result)
+    }
+    pub fn dispatch_uncaught(
+        &self,
+        vm: &mut Engine,
+        origin: &'static str,
+        failure: VmExit,
+    ) -> VmExit {
+        self.services
+            .executors
+            .dispatch_uncaught(self, vm, origin, failure)
+    }
+    pub fn uncaught_exception_reports(&self) -> Vec<UncaughtExceptionReport> {
+        self.services.executors.uncaught_reports()
+    }
+    fn main_boundary<T>(
+        &self,
+        vm: &mut Engine,
+        callback: impl FnOnce(&mut Engine) -> Result<T>,
+    ) -> Result<T> {
+        let scope = self.begin_main_exception_scope(vm)?;
+        let result = callback(vm);
+        self.finish_main_exception_scope(vm, scope, result)
+    }
     /// Pixels retained by live Java bitmaps and pending Canvas commands.
     pub fn bitmap_memory_bytes(&self) -> usize {
         self.services.bitmaps.bytes()
@@ -304,10 +341,12 @@ impl Android {
         self.services.glsurface.requests(self)
     }
     pub fn gl_choose_config(&self, vm: &mut Engine, view: ObjRef, display: u64) -> Result<u64> {
-        self.services.glsurface.choose_config(vm, view, display)
+        self.services
+            .glsurface
+            .choose_config(self, vm, view, display)
     }
     pub fn gl_callback(&self, vm: &mut Engine, view: ObjRef, event: GlEvent) -> Result<()> {
-        self.services.glsurface.callback(vm, view, event)
+        self.services.glsurface.callback(self, vm, view, event)
     }
     pub fn bind_audio(&self, audio: Rc<dyn crate::PcmOutput>) {
         *self.audio.borrow_mut() = Some(audio);
@@ -327,7 +366,40 @@ impl Android {
     pub fn activity_object(&self) -> Option<ObjRef> {
         self.state.borrow().activities.last().map(|a| a.object)
     }
+    /// Capture application-managed state in one real Bundle. Automatic window
+    /// hierarchy serialization/recreation is not part of this callback contract.
+    pub fn save_state(&self, vm: &mut Engine) -> Result<ObjRef> {
+        self.main_boundary(vm, |vm| {
+            let (activity, class) = self
+                .state
+                .borrow()
+                .activities
+                .last()
+                .map(|a| (a.object, a.class.clone()))
+                .ok_or_else(|| error("ACTIVITY_STATE", "no foreground activity to save"))?;
+            let bundle = shell(vm, "Landroid/os/Bundle;")?;
+            self.callback(vm, bundle, "<init>", "()V", &[])?;
+            self.state
+                .borrow_mut()
+                .activities
+                .last_mut()
+                .ok_or_else(|| error("ACTIVITY_STATE", "foreground activity disappeared"))?
+                .saved_state = Some(bundle);
+            self.callback(
+                vm,
+                activity,
+                "onSaveInstanceState",
+                "(Landroid/os/Bundle;)V",
+                &[Value::Obj(bundle)],
+            )?;
+            self.record(&class, "onSaveInstanceState");
+            Ok(bundle)
+        })
+    }
     pub fn stop(&self, vm: &mut Engine) -> Result<()> {
+        self.main_boundary(vm, |vm| self.stop_inner(vm))
+    }
+    fn stop_inner(&self, vm: &mut Engine) -> Result<()> {
         while let Some(r) = self.activity_object() {
             self.finish(vm, r)?;
         }
@@ -377,10 +449,27 @@ impl Android {
         args: &[Value],
     ) -> Result<()> {
         vm.reset_fuel_window();
+        if vm
+            .cp
+            .is_subtype(vm.heap.class_of(r)?, "Landroid/app/Activity;")
+        {
+            if let Some(event) = services::application_lifecycle::Event::from_method(name, sig) {
+                return self.services.lifecycle_observers.perform(
+                    vm,
+                    r,
+                    event,
+                    args,
+                    self.apk.manifest.target_sdk,
+                );
+            }
+        }
         vm.invoke_instance(r, name, sig, args)?;
         Ok(())
     }
     pub fn launch(&self, vm: &mut Engine, entry: &str) -> Result<()> {
+        self.main_boundary(vm, |vm| self.launch_inner(vm, entry))
+    }
+    fn launch_inner(&self, vm: &mut Engine, entry: &str) -> Result<()> {
         let app_class = self
             .apk
             .manifest
@@ -428,6 +517,7 @@ impl Android {
             class: class.into(),
             root: None,
             intent,
+            saved_state: None,
         });
         self.callback(vm, r, "<init>", "()V", &[])?;
         let base = self.state.borrow().application.unwrap();
@@ -455,6 +545,9 @@ impl Android {
         Ok(())
     }
     pub fn tick(&self, vm: &mut Engine) -> Result<()> {
+        self.main_boundary(vm, |vm| self.tick_inner(vm))
+    }
+    fn tick_inner(&self, vm: &mut Engine) -> Result<()> {
         self.services.flush()?;
         self.services.pump(self, vm)?;
         for _ in 0..256 {
@@ -525,6 +618,9 @@ impl Android {
         Ok(())
     }
     pub fn back(&self, vm: &mut Engine) -> Result<()> {
+        self.main_boundary(vm, |vm| self.back_inner(vm))
+    }
+    fn back_inner(&self, vm: &mut Engine) -> Result<()> {
         let r = self.state.borrow().activities.last().map(|a| a.object);
         if let Some(r) = r {
             self.callback(vm, r, "onBackPressed", "()V", &[])?;
@@ -548,6 +644,9 @@ impl Android {
         self.state.borrow().activities.last().and_then(|a| a.root)
     }
     pub fn click(&self, vm: &mut Engine, r: ObjRef) -> Result<bool> {
+        self.main_boundary(vm, |vm| self.click_inner(vm, r))
+    }
+    fn click_inner(&self, vm: &mut Engine, r: ObjRef) -> Result<bool> {
         let view = self
             .state
             .borrow()
@@ -578,10 +677,13 @@ impl Android {
         } else {
             return Ok(false);
         }
-        self.tick(vm)?;
+        self.tick_inner(vm)?;
         Ok(true)
     }
     pub fn touch(&self, vm: &mut Engine, action: i32, x: f32, y: f32) -> Result<()> {
+        self.main_boundary(vm, |vm| self.touch_inner(vm, action, x, y))
+    }
+    fn touch_inner(&self, vm: &mut Engine, action: i32, x: f32, y: f32) -> Result<()> {
         self.layout();
         let root = self.active_root();
         let hit = root.and_then(|r| self.hit(r, x as i32, y as i32));
@@ -708,6 +810,9 @@ impl Android {
         Some(r)
     }
     pub fn key(&self, vm: &mut Engine, key: i32) -> Result<()> {
+        self.main_boundary(vm, |vm| self.key_inner(vm, key))
+    }
+    fn key_inner(&self, vm: &mut Engine, key: i32) -> Result<()> {
         if key == 4 {
             return self.back(vm);
         }
@@ -728,7 +833,7 @@ impl Android {
         let focus = all[s.focus % all.len()];
         drop(s);
         if key == 23 || key == 66 {
-            self.click(vm, focus)?;
+            self.click_inner(vm, focus)?;
         }
         Ok(())
     }
@@ -1488,6 +1593,9 @@ impl FrameworkHost for Android {
                 ("concat", "(Ljava/lang/String;)Ljava/lang/String;") => {
                     string(vm, format!("{s}{}", text(vm, &args[0])?))?
                 }
+                ("endsWith", "(Ljava/lang/String;)Z") => {
+                    Value::Int(s.ends_with(&text(vm, &args[0])?) as i32)
+                }
                 ("charAt", "(I)C") => Value::Int(
                     s.encode_utf16()
                         .nth(int(args, 0)? as usize)
@@ -1505,6 +1613,40 @@ impl FrameworkHost for Android {
             return Ok(Some(Value::Obj(c)));
         }
         let actual = vm.heap.class_of(r)?.to_string();
+        if name == "equals"
+            && sig == "(Ljava/lang/Object;)Z"
+            && !vm
+                .cp
+                .resolve_method(&actual, name, sig)
+                .is_some_and(|(_, definition, _)| definition.access_flags & 0x0200 == 0)
+        {
+            // A virtual reference declared on Object can still select a
+            // builtin override. Arrays and a DEX-only class chain reaching
+            // Object prove inherited identity here. True invoke-super
+            // Object.equals is handled by the opcode-aware interpreter path.
+            let array = matches!(
+                vm.heap.get(r).map_err(|cause| error("HEAP_READ", cause))?,
+                rd_vm::heap::HeapObj::Array { .. }
+            );
+            let mut ancestor = actual.clone();
+            let mut remaining = 64;
+            while !array && ancestor != "Ljava/lang/Object;" {
+                if remaining == 0 || vm.cp.find_class(&ancestor).is_none() {
+                    return Err(error(
+                        "API_UNAVAILABLE",
+                        format!("Object.equals implementation for builtin boundary {ancestor}"),
+                    ));
+                }
+                ancestor = vm.cp.superclass_of(&ancestor).ok_or_else(|| {
+                    error(
+                        "INVALID_CLASS_HIERARCHY",
+                        "Object.equals superclass missing",
+                    )
+                })?;
+                remaining -= 1;
+            }
+            return Ok(Some(Value::Int((args[0].as_ref()? == Some(r)) as i32)));
+        }
         let Some(platform) = self
             .platform_class(vm, class)
             .or_else(|| self.platform_class(vm, &actual))
@@ -1661,6 +1803,32 @@ impl FrameworkHost for Android {
                 if platform == "Landroid/app/Activity;"
                     || platform == "Landroid/app/NativeActivity;" =>
             {
+                let application = self.state.borrow().application.ok_or_else(|| {
+                    error("APPLICATION_STATE", "Activity has no attached Application")
+                })?;
+                self.services.lifecycle_observers.base(
+                    vm,
+                    application,
+                    r,
+                    services::application_lifecycle::Event::Created,
+                    args,
+                )?;
+                Value::Null
+            }
+            ("onSaveInstanceState", "(Landroid/os/Bundle;)V")
+                if platform == "Landroid/app/Activity;"
+                    || platform == "Landroid/app/NativeActivity;" =>
+            {
+                let application = self.state.borrow().application.ok_or_else(|| {
+                    error("APPLICATION_STATE", "Activity has no attached Application")
+                })?;
+                self.services.lifecycle_observers.base(
+                    vm,
+                    application,
+                    r,
+                    services::application_lifecycle::Event::Save,
+                    args,
+                )?;
                 Value::Null
             }
             (
@@ -1671,6 +1839,18 @@ impl FrameworkHost for Android {
                 || platform == "Landroid/app/NativeActivity;"
                 || platform == "Landroid/app/Application;" =>
             {
+                if platform != "Landroid/app/Application;" {
+                    if let Some(event) =
+                        services::application_lifecycle::Event::from_method(name, sig)
+                    {
+                        let application = self.state.borrow().application.ok_or_else(|| {
+                            error("APPLICATION_STATE", "Activity has no attached Application")
+                        })?;
+                        self.services
+                            .lifecycle_observers
+                            .base(vm, application, r, event, args)?;
+                    }
+                }
                 Value::Null
             }
             ("getPackageName", "()Ljava/lang/String;") => {
@@ -1836,6 +2016,7 @@ impl FrameworkHost for Android {
         for a in &s.activities {
             roots.push(a.object);
             roots.extend(a.intent);
+            roots.extend(a.saved_state);
             if let Some(r) = a.root {
                 let mut nodes = vec![r];
                 while let Some(r) = nodes.pop() {
@@ -2142,7 +2323,7 @@ impl Android {
                 Value::Null
             }
             ("isEnabled", "()Z") => Value::Int(self.state.borrow().views[&r].enabled as i32),
-            ("performClick", "()Z") => Value::Int(self.click(vm, r)? as i32),
+            ("performClick", "()Z") => Value::Int(self.click_inner(vm, r)? as i32),
             ("setVisibility", "(I)V") => {
                 self.state.borrow_mut().views.get_mut(&r).unwrap().visible = int(args, 0)? == 0;
                 Value::Null

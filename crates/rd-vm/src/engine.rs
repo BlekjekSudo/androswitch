@@ -1046,8 +1046,11 @@ impl Engine {
             .unwrap_or_else(|| Err(VmExit::Exception(t)))
     }
 
-    /// Materializa um Throwable como instância de heap (para move-exception).
-    pub(super) fn materialize_throwable(&mut self, t: &Throwable) -> Result<ObjRef, VmExit> {
+    /// Materialize a VM-built Throwable for exception delivery or a host callback.
+    /// Keeps an existing exception object and its subclass state unchanged;
+    /// otherwise uses the same path as the interpreter's `move-exception`.
+    /// The caller must root the returned object across subsequent VM calls.
+    pub fn materialize_throwable(&mut self, t: &Throwable) -> Result<ObjRef, VmExit> {
         if let Some(obj) = t.obj {
             return Ok(obj);
         }

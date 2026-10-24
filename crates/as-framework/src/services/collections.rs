@@ -55,8 +55,10 @@ fn equals(vm: &mut Engine, left: &Value, right: &Value) -> Result<bool> {
     if let (Ok(a), Ok(b)) = (vm.heap.as_str(*a), vm.heap.as_str(*b)) {
         return Ok(a == b);
     }
-    if vm.heap.class_of(*a)? == vm.heap.class_of(*b)? && primitive(vm.heap.class_of(*a)?).is_some()
-    {
+    if primitive(vm.heap.class_of(*a)?).is_some() {
+        if vm.heap.class_of(*a)? != vm.heap.class_of(*b)? {
+            return Ok(false);
+        }
         let a = vm.heap.get_field(*a, "value")?;
         let b = vm.heap.get_field(*b, "value")?;
         return Ok(match (&a, &b) {
@@ -206,7 +208,7 @@ impl Collections {
     pub(super) fn call(
         &self,
         vm: &mut Engine,
-        class: &str,
+        _class: &str,
         name: &str,
         sig: &str,
         r: ObjRef,
@@ -282,13 +284,6 @@ impl Collections {
         self.budget(2)?;
         let container = self.objects.borrow().get(&r).cloned();
         let Some(container) = container else {
-            if class == "Ljava/lang/Object;"
-                && name == "equals"
-                && sig == "(Ljava/lang/Object;)Z"
-                && vm.cp.find_own_method(&actual, name, sig).is_none()
-            {
-                return Ok(Some(Value::Int((args[0] == Value::Obj(r)) as i32)));
-            }
             return Ok(None);
         };
         let size = match &container {

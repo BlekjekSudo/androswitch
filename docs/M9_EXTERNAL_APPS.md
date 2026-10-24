@@ -28,13 +28,14 @@ Static inventory identifies imports and DEX calls; it cannot establish that a
 path executes or that a game renders. The runtime does not select behavior
 using the package/library names in this documentation.
 
-The [latest shared-API startup runs](../reports/m9-jni-identifiers-encoding-ryujinx-20261024.json)
+The [latest shared-API startup runs](../reports/m9-classloader-startup-ryujinx-20261024.json)
 use the same NRO and unmodified APK hashes. Mekorama passes monitor operations,
 Executor construction, resource-name lookup, TextUtils and resource identifier
-lookup, then reports unavailable `Class.forName(String, boolean, ClassLoader)`.
+lookup and loader-aware `Class.forName`, then reports unavailable
+`Application.registerActivityLifecycleCallbacks`.
 Candy Crush passes Timer, inherited `getResources`, Bitmap decoding, native
-constructors and `Thread.currentThread`, then reports unavailable JNI lookup
-of `Thread.getContextClassLoader()`.
+constructors, `Thread.currentThread` and context loader lookup, then reports
+unavailable `Thread.getDefaultUncaughtExceptionHandler()` during `onCreate`.
 Both complete worker/native resource closure and return to the launcher.
 Mekorama's original execution error and later `onPause` error remain recorded;
 resource closure does not imply that every Java lifecycle callback succeeded.
@@ -45,11 +46,15 @@ Independent SDK/NDK proof APKs establish [Timer execution](../reports/horizon-ti
 [actual Bitmap pixels](../reports/horizon-bitmap-ryujinx-20261024.json) and
 [native-suspended GC ownership](../reports/horizon-gc-owners-ryujinx-20261024.json).
 These are separate framework/VM proofs, not game compatibility passes.
-The latest NRO also runs the independent JNI constructor/thread proof: all
+The earlier [NRO15 proof](../reports/m9-jni-identifiers-encoding-ryujinx-20261024.json) runs independent JNI constructor/thread checks: all
 three constructor forms produce JVM-matching values, callbacks and exceptions;
 named pthread attachment retains the expected identity across detach. The
 session writes the exact expected UTF-8 result, displays its verified proof
 screen and returns cleanly to the launcher.
+The extended context-loader proof fails on NRO16 when a valid `jclass` is used
+as a `java.lang.Class` receiver. The
+[canonical class-reference host correction](../reports/m9-jni-class-objects-host-20261025.json)
+is separate evidence and still requires a corrected NRO execution.
 
 ## Shared implementation changes
 
@@ -162,6 +167,41 @@ screen and returns cleanly to the launcher.
   [metadata/context tests and twenty JVM rows](../reports/m9-context-loaders-host-20261024.json)
   establish the host contract. A subsequent NRO run is needed for device proof;
   system/parent loader APIs and custom loader execution are not added here.
+- JNI class references now point to the VM's canonical `java.lang.Class`
+  objects, using the same local/global reference and GC rules as other objects.
+  Class references can be receivers, arguments and results; method/field IDs
+  remain opaque metadata. Four
+  [production-dispatch tests](../reports/m9-jni-class-objects-host-20261025.json)
+  cover identity, object operations, GC, primitive/array Class values and
+  invalid-reference failures. The extended SDK context proof still requires
+  a successful NRO run after the observed class-reference rejection.
+- Application lifecycle observers use the actual Application, Activity and
+  saved Bundle objects, dispatching at the real base Activity method's API 26
+  timing. Ordered snapshots survive mutation, GC and reentry; registrations are
+  owned by their Application. Ten
+  [portable tests](../reports/m9-application-lifecycle-host-20261025.json) include
+  duplicate/null/error cases, missing-super rules, legacy targetSdk pause
+  behavior and 42 JVM comparisons. `Object.equals` and `String.endsWith` are
+  shared contracts with real DEX overrides preserved. Equality dispatch now
+  selects implemented String/boxed value bodies before inherited Object
+  identity. Object, arrays and DEX-only inheritance to Object have the identity
+  body; unimplemented builtin equality bodies, including collection equality,
+  report `API_UNAVAILABLE`. True invoke-super is dispatched by the opcode;
+  a method reference declaring Object does not imply a nonvirtual call.
+  The independent SDK
+  proof records real startup/return callbacks; save remains `not_observed`
+  unless an actual save callback occurs. NRO verification is still pending.
+- Thread default/per-thread uncaught exception handlers use actual Java Thread
+  and Throwable identities, including virtual handler lookup and root-group
+  delegation. Nine [portable tests](../reports/m9-uncaught-handlers-host-20261025.json)
+  cover worker ownership, main-boundary forwarding, handler failures, Timer/GL
+  callbacks, GC and reentry. The original runtime worker-stop policy remains;
+  dispatching a handler does not turn a failed worker into successful execution.
+  Null default handlers retain runtime diagnostics. Custom ThreadGroup hierarchy,
+  hidden pre-handlers and a System.err stack-trace sink remain unavailable.
+  Android API 26 behavior after thread termination is recorded separately from
+  the differing desktop JVM oracle. `logs/uncaught-exceptions.json` preserves
+  original and handler failures after quiescence, bound to the session identity.
 - Loader-aware `Class.forName` shares the actual app/bootstrap loader provenance
   and dependency checks with `ClassLoader.loadClass`. It honors optional class
   initialization, array component visibility and failure state. Four
@@ -256,8 +296,9 @@ Horizon EGL behavior or recognizable application rendering.
 
 The refreshed required host corpus passes seven scenarios over 12 cycles each
 (84 sessions). The independent Vector Pinball evaluation advances past the old
-package-metadata blocker and now reports the unavailable portable monitor
-implementation in `MultiDex.doInstallation`. It remains blocked, not compatible.
+package-metadata and portable-monitor blockers and now reports unavailable
+`java.io.RandomAccessFile` in `MultiDex` ZIP checksum calculation. It remains
+blocked, not compatible.
 
 Source-bound receipts cover [native ABI](../reports/m9-native-abi.json),
 [portable media contracts](../reports/m9-media-host.json),

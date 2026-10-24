@@ -180,7 +180,7 @@ function Capture-Session([object]$Session){
     $destination=Join-Path $run "sessions/$($Session.session_id)"
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
     $Session|ConvertTo-Json -Depth 28|Set-Content (Join-Path $destination 'session-report.json') -Encoding utf8NoBOM
-    foreach($name in @('memory-admission.json','native-compatibility.json','capture-owner.json')){
+    foreach($name in @('memory-admission.json','native-compatibility.json','capture-owner.json','uncaught-exceptions.json')){
         $source=Join-Path $sdRoot "logs/$name"
         if(-not (Test-Path -LiteralPath $source)){continue}
         try{

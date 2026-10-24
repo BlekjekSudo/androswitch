@@ -1100,6 +1100,14 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         ]),
         "Ljava/lang/NegativeArraySizeException;" => Some(RUNTIME),
         "Ljava/lang/IllegalStateException;" => Some(RUNTIME),
+        "Landroid/util/AndroidRuntimeException;" => Some(RUNTIME),
+        "Landroid/app/SuperNotCalledException;" => Some(&[
+            "Landroid/util/AndroidRuntimeException;",
+            "Ljava/lang/RuntimeException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
         "Landroid/content/res/Resources$NotFoundException;" => Some(RUNTIME),
         "Ljava/lang/IllegalArgumentException;" => Some(RUNTIME),
         "Ljava/lang/IllegalThreadStateException;" => Some(&[
@@ -1607,6 +1615,7 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Object;",
         ]),
         "Ljava/lang/Thread;" => Some(OBJECT),
+        "Ljava/lang/ThreadGroup;" => Some(OBJECT),
         "Ljava/lang/ThreadLocal;" => Some(OBJECT),
         "Ljava/lang/InheritableThreadLocal;" => {
             Some(&["Ljava/lang/ThreadLocal;", "Ljava/lang/Object;"])
@@ -1689,6 +1698,7 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         // A modeled root interface is itself a known type even though it
         // extends no interfaces; Thread/TimerTask execute this real contract.
         "Ljava/lang/Runnable;" => Some(&[]),
+        "Ljava/lang/ThreadGroup;" => Some(&["Ljava/lang/Thread$UncaughtExceptionHandler;"]),
         "Ljava/lang/String;" => Some(STRING_IFACES),
         "Landroid/database/MatrixCursor;" => {
             Some(&["Landroid/database/Cursor;", "Ljava/io/Closeable;"])
@@ -2010,6 +2020,8 @@ pub fn host_class_known(desc: &str) -> bool {
 pub fn host_interface_modifiers(desc: &str) -> Option<u32> {
     match desc {
         "Landroid/view/View$OnClickListener;"
+        | "Landroid/app/Application$ActivityLifecycleCallbacks;"
+        | "Ljava/lang/Thread$UncaughtExceptionHandler;"
         | "Landroid/view/View$OnTouchListener;"
         | "Landroid/content/SharedPreferences$OnSharedPreferenceChangeListener;"
         | "Landroid/opengl/GLSurfaceView$Renderer;"

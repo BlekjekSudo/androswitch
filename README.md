@@ -74,7 +74,8 @@ blockers. The latest emulator attempts pass monitor, Timer, Executor, resource,
 Bitmap, JNI constructor and Thread identity blockers. Independent SDK APKs
 verify actual workers, native-suspended GC roots, PNG pixels and JVM-matching
 JNI constructor/thread results. Candy Crush now reports unavailable
-Thread.getContextClassLoader; Mekorama reports Class.forName with a loader. Both
+Thread.getDefaultUncaughtExceptionHandler; Mekorama reports Application lifecycle
+callback registration. Both
 return to the launcher, and neither game has a first-screen pass yet.
 Installation is not a compatibility guarantee; see
 [startup-failure diagnosis and recovery](docs/STARTUP_FAILURES.md).

@@ -253,6 +253,15 @@ impl Session {
     pub fn runtime_error(&self) -> Option<String> {
         self.fatal.borrow().as_ref().map(ToString::to_string)
     }
+    /// Acknowledge an execution failure after every worker/callback has joined,
+    /// while holding the VM lease and before entering any native finalizer.
+    /// New failures raised by a destructor remain fatal finalization failures.
+    pub fn take_runtime_error(&self) -> Option<String> {
+        self.fatal
+            .borrow_mut()
+            .take()
+            .map(|error| error.to_string())
+    }
     pub fn activity_reference(&self, object: ObjRef) -> Result<u64> {
         let local = self.local(Handle::Object(object))?;
         let global = self
@@ -266,17 +275,11 @@ impl Session {
             .map_err(jni)?;
         Ok(global)
     }
-    fn class(&self, token: u64) -> Result<String> {
-        match self.refs.borrow().get(thread(), token).map_err(jni)? {
-            Handle::Class(name) => Ok(name.clone()),
-            _ => Err(error("JNI_REFERENCE_KIND", "expected class reference")),
-        }
+    fn class(&self, vm: &mut Engine, token: u64) -> Result<String> {
+        crate::jni_objects::class_descriptor(vm, &self.refs, thread(), token)
     }
     fn object(&self, token: u64) -> Result<ObjRef> {
-        match self.refs.borrow().get(thread(), token).map_err(jni)? {
-            Handle::Object(r) => Ok(*r),
-            _ => Err(error("JNI_REFERENCE_KIND", "expected object reference")),
-        }
+        crate::jni_objects::object(&self.refs, thread(), token)
     }
     fn local(&self, value: Handle) -> Result<u64> {
         self.refs.borrow_mut().local(thread(), value).map_err(jni)
@@ -295,33 +298,10 @@ impl Session {
             .pending = Some(t);
     }
     fn value(&self, bits: u64, kind: &str) -> Result<Value> {
-        Ok(match kind {
-            "V" => Value::Null,
-            "J" => Value::Long(bits as i64),
-            "F" => Value::Float(f32::from_bits(bits as u32)),
-            "D" => Value::Double(f64::from_bits(bits)),
-            t if t.starts_with('L') || t.starts_with('[') => {
-                if bits == 0 {
-                    Value::Null
-                } else {
-                    Value::Obj(self.object(bits)?)
-                }
-            }
-            "Z" => Value::Int((bits != 0) as i32),
-            "B" => Value::Int(bits as i8 as i32),
-            "C" => Value::Int(bits as u16 as i32),
-            "S" => Value::Int(bits as i16 as i32),
-            _ => Value::Int(bits as i32),
-        })
+        crate::jni_objects::from_bits(&self.refs, thread(), bits, kind)
     }
     fn bits(&self, value: &Value, kind: &str) -> Result<u64> {
-        if kind.starts_with('L') || kind.starts_with('[') {
-            return match value.as_ref()? {
-                Some(r) => self.local(Handle::Object(r)),
-                None => Ok(0),
-            };
-        }
-        crate::native_probe::bits(value).map_err(jni)
+        crate::jni_objects::to_bits(&self.refs, thread(), value, kind)
     }
     fn method(&self, token: u64) -> Result<(String, String, String, bool)> {
         match self.refs.borrow().get(thread(), token).map_err(jni)? {
@@ -373,18 +353,20 @@ impl Session {
             1 => {
                 let name = text(data, length)?;
                 let class = if name.starts_with('[') {
-                    name
+                    name.clone()
                 } else {
                     format!("L{name};")
                 };
-                if !crate::jni_constructor::class_known(vm, &class) {
+                let result =
+                    crate::jni_objects::dispatch(vm, &self.refs, thread(), op, a, b, Some(&name));
+                if matches!(&result, Err(VmExit::Exception(e)) if e.class == "Ljava/lang/NoClassDefFoundError;")
+                {
                     jni_diagnostic(op, a, b, c, &format!("missing_class={class}"));
-                    return Err(Throwable::new("Ljava/lang/NoClassDefFoundError;", class).into());
                 }
-                self.local(Handle::Class(class))
+                result
             }
             2 => {
-                let class = self.class(a)?;
+                let class = self.class(vm, a)?;
                 let name = cstr(b)?;
                 let sig = cstr(c)?;
                 rd_jni::descriptor(&sig).map_err(|e| error(&e.code, e.cause))?;
@@ -416,7 +398,7 @@ impl Session {
                     .map_err(jni)
             }
             3 => {
-                let class = self.class(a)?;
+                let class = self.class(vm, a)?;
                 if length > 1024 {
                     return Err(error("JNI_ARGUMENT_LIMIT", "RegisterNatives >1024 methods"));
                 }
@@ -445,35 +427,18 @@ impl Session {
                 Ok(0)
             }
             4 => {
-                let (class, name, sig, is_static) = self.method(b)?;
-                if is_static != (c != 0) {
-                    return Err(error(
-                        "JNI_METHOD_KIND",
-                        "static/instance invocation mismatch",
-                    ));
-                }
-                let (types, result) =
-                    rd_jni::descriptor(&sig).map_err(|e| error(&e.code, e.cause))?;
-                if length != types.len() {
-                    return Err(error("JNI_SIGNATURE", "callback argument count"));
-                }
-                let values = read_slice::<u64>(data, length)?
-                    .iter()
-                    .zip(types.iter())
-                    .map(|(bits, ty)| self.value(*bits, ty))
-                    .collect::<Result<Vec<_>>>()?;
+                let invocation = crate::jni_objects::Invocation::decode(
+                    &self.refs,
+                    thread(),
+                    a,
+                    b,
+                    c != 0,
+                    read_slice::<u64>(data, length)?,
+                )?;
                 self.callbacks.set(self.callbacks.get() + 1);
-                let value = if is_static {
-                    vm.invoke_static(&class, &name, &sig, &values)
-                } else {
-                    vm.invoke_instance(self.object(a)?, &name, &sig, &values)
-                }?;
-                self.bits(&value, &result)
+                invocation.invoke(vm, &self.refs, thread())
             }
-            5 => {
-                let object = self.object(a)?;
-                self.local(Handle::Class(vm.heap.class_of(object)?.to_string()))
-            }
+            5 => crate::jni_objects::dispatch(vm, &self.refs, thread(), op, a, b, None),
             6 | 28 => {
                 let value = if op == 6 {
                     rd_jni::decode_modified_utf8(read_slice::<u8>(data, length)?)
@@ -565,24 +530,7 @@ impl Session {
                 }
                 Ok(0)
             }
-            13 | 14 => self
-                .refs
-                .borrow_mut()
-                .duplicate(thread(), a, op == 14)
-                .map_err(jni),
-            15 | 16 => {
-                self.refs
-                    .borrow_mut()
-                    .delete(thread(), a, op == 16)
-                    .map_err(jni)?;
-                Ok(0)
-            }
-            17 => Ok(self.refs.borrow().same(thread(), a, b).map_err(jni)? as u64),
-            18 => {
-                self.refs.borrow_mut().push(thread()).map_err(jni)?;
-                Ok(0)
-            }
-            19 => self.refs.borrow_mut().pop(thread(), a).map_err(jni),
+            13..=19 => crate::jni_objects::dispatch(vm, &self.refs, thread(), op, a, b, None),
             20 => Ok(self.pending().is_some() as u64),
             21 => {
                 self.threads
@@ -593,7 +541,7 @@ impl Session {
                 Ok(0)
             }
             22 => {
-                self.set_pending(Throwable::new(&self.class(a)?, text(data, length)?));
+                self.set_pending(Throwable::new(&self.class(vm, a)?, text(data, length)?));
                 Ok(0)
             }
             23 => {
@@ -653,31 +601,17 @@ impl Session {
                 self.threads.borrow_mut().remove(&thread());
                 Ok(0)
             }
-            31 => self.refs.borrow().kind(thread(), a).map_err(jni),
+            31 => crate::jni_objects::dispatch(vm, &self.refs, thread(), op, a, b, None),
             32 => {
-                let class = self.class(a)?;
+                let class = self.class(vm, a)?;
                 vm.ensure_initialized(&class)?;
                 let object = vm.heap.alloc_instance(class.clone(), Vec::new())?;
                 vm.attach_host_state(&class, object)?;
                 self.local(Handle::Object(object))
             }
-            33 => {
-                if a == 0 {
-                    return Ok(1);
-                }
-                let actual = vm.heap.class_of(self.object(a)?)?.to_string();
-                let expected = self.class(b)?;
-                let mut next = Some(actual);
-                while let Some(class) = next {
-                    if class == expected {
-                        return Ok(1);
-                    }
-                    next = vm.cp.superclass_of(&class);
-                }
-                Ok(0)
-            }
+            33 => crate::jni_objects::dispatch(vm, &self.refs, thread(), op, a, b, None),
             37 => {
-                let class = self.class(a)?;
+                let class = self.class(vm, a)?;
                 self.registrations
                     .borrow_mut()
                     .retain(|(c, _, _), _| c != &class);
@@ -689,7 +623,7 @@ impl Session {
                 if self.pending().is_some() {
                     return Ok(0);
                 }
-                let class = self.class(a)?;
+                let class = self.class(vm, a)?;
                 let (declaring, name, sig, is_static) = self.method(b)?;
                 if declaring != class || name != "<init>" || is_static {
                     jni_diagnostic(op, a, b, c, &format!("constructor_kind={declaring}->{name}{sig} allocated={class} static={is_static}"));
@@ -835,7 +769,7 @@ impl NativeHost for Session {
         self.refs.borrow_mut().push(thread()).map_err(jni)?;
         let value = (|| {
             let receiver = if is_static {
-                self.local(Handle::Class(class.into()))?
+                crate::jni_objects::local_class(vm, &self.refs, thread(), class)?
             } else {
                 let object = slots[0].as_ref()?.ok_or_else(|| {
                     Throwable::new("Ljava/lang/NullPointerException;", "JNI receiver")

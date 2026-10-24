@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T17:31:51.0988815Z",
+  "status": "shared_production_reference_dispatch_host_passed_Horizon_build_and_NRO_pending",
+  "scope": "General JNI canonical Class-object references and actual production safe reference/invocation dispatch, not a Class.getClassLoader-specific workaround.",
+  "basis": {
+    "runtime": "History-preserving RustyDroid fork at 6388281f66d254c8e01a0fdc7a5a9a30239bc762",
+    "implementation": "Independent JNI contract implementation; no JDK/ART implementation source copied."
+  },
+  "observed_blocker": {
+    "run": "0588ece69dea45be99fbd52f78e6930a",
+    "nro_sha256": "47358504ddcd5f68f3eb68f4da39fcb95b5d0f912d567ca490aa7155eb34efd8",
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "source_commit": "0325910",
+    "api": "CallObjectMethod(jclass receiver, Class.getClassLoader method ID)",
+    "result": "The unchanged original SDK/NDK proof correctly supplies its static native jclass as a java.lang.Class receiver. Actual dispatch op4 rejects token0x17 as JNI_REFERENCE_KIND before reaching the real shared Class.getClassLoader implementation. Method token0x1b and receiver are preserved in raw diagnostics; failed run returned to launcher and SD restored.",
+    "raw": [
+      {
+        "path": "local-artifacts/m9/external-runs/0588ece69dea45be99fbd52f78e6930a/verification.json",
+        "sha256": "92ab032f3ad5afcba114280e30fe19ea08b76cc126b9e3ec527029dc4c7ea2e4"
+      },
+      {
+        "path": "local-artifacts/m9/external-runs/0588ece69dea45be99fbd52f78e6930a/sessions/0588ece69dea45be99fbd52f78e6930a-1/session-report.json",
+        "sha256": "411b6212b03344e302613e706a303c953940329b48411028d30eb5136ee338e7"
+      },
+      {
+        "path": "local-artifacts/m9/external-runs/0588ece69dea45be99fbd52f78e6930a/sessions/0588ece69dea45be99fbd52f78e6930a-1/jni-failures.log",
+        "sha256": "c7ecac6d4136ab3181b8e1847516e2350138c76967132a9cca3e62e8b062eea1"
+      }
+    ]
+  },
+  "primary_sources": [
+    "https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/types.html",
+    "https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html"
+  ],
+  "implementation": {
+    "normalization": "Every new production class reference from FindClass, GetObjectClass and static native receivers uses Handle::Object pointing to the existing canonical Engine java.lang.Class heap object. No parallel descriptor-only object identity is created; descriptor-only Handle::Class is no longer emitted by device Session. Upstream handle enum/oracle compatibility is retained.",
+    "class_positions": "jclass-consuming operations validate a genuine canonical Class object and recover its represented descriptor. Actual member IDs retain their declaring class/name/signature/static-kind metadata. Genuine Java-returned primitive and array Class objects remain valid in jclass positions; FindClass name admission policy is unchanged.",
+    "object_positions": "A Class object passes the same jobject receiver/argument/return resolver as other Java heap objects. Method/field IDs cannot become jobjects or class objects. GetObjectClass on a jclass returns canonical Class.class, and IsInstanceOf uses the shared real type hierarchy rather than interpreting the represented class as the object runtime type.",
+    "references": "Actual as-native::jni_refs::References still owns thread-local/global/frame/kind limits and roots. Local/global duplicates refer to one canonical heap identity, wrong-thread/deleted references remain rejected, frame results survive only via valid escaped refs, opaque member IDs are rejected in object operations and report JNIInvalidRefType0 for GetObjectRefType. Null reference type is0.",
+    "shared_execution": "The real Session delegates reference operations and invocation decode/execute to the new no_std jni_objects module. Host tests call these exact production functions using the actual References table, actual DEX declarations, actual FrameworkHost and actual GC root traversal. No table borrow survives VM invocation/native callbacks.",
+    "proof_preservation": "Existing fixtures/m9/jni-construct Java/NDK proof was not edited. Its previously failed NRO/raw report remains immutable and must be replayed on a new exact NRO."
+  },
+  "checks": [
+    {
+      "name": "independent_original_SDK_DEX_and_actual_JVM_oracle",
+      "command": "pwsh -File fixtures/m9/jni-objects/build.ps1",
+      "status": "passed",
+      "oracle_rows": 8,
+      "manifest_identities": 2,
+      "result": "Actual JVM establishes Class/Object echo identity, class runtime type, primitive/array names, distinct type identities and actual uncaught DEX Throwable payload. The APKs contain ordinary Java/Android APIs only."
+    },
+    {
+      "name": "actual_production_reference_and_invocation_dispatch",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p as-switch-smoke --features portable-tests,host-cli --test jni_objects -- --test-threads=1",
+      "status": "passed",
+      "tests": 4,
+      "test_seconds": 1.54,
+      "result": "Canonical jclass-as-jobject receiver reaches the real framework Class.getClassLoader; DEX Class/Object argument and return paths execute System.gc and match8 actual JVM rows in2 manifest identities. Covers Class.class, primitive/array Class recovery, IsSameObject, IsInstanceOf, local/global kinds, frames, wrong-thread/deleted refs, member-ID rejection, real GC roots and canonical-object validation. VM-only diagnostic call-frame suffix is separated from the original Java Throwable payload for oracle comparison."
+    },
+    {
+      "name": "prior_JNI_constructor_and_metadata_regression",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p as-switch-smoke --features portable-tests,host-cli --test jni_objects --test jni_constructor --test jni_method_metadata -- --test-threads=1",
+      "status": "constructor_and_metadata_passed",
+      "constructor_tests": 6,
+      "metadata_tests": 6,
+      "result": "The initial combined run passed both prior test targets. New-reference tests were then corrected to avoid requesting unadvertised Class.getName JNI metadata and to distinguish VM diagnostic frames from Java message payload; final4-case reference target independently passed. No new Class.getName metadata was fabricated."
+    },
+    {
+      "name": "focused_clippy",
+      "command": "cargo clippy -p as-switch-smoke --features portable-tests,host-cli --lib --test jni_objects -- -D warnings",
+      "status": "passed"
+    },
+    {
+      "name": "format_and_scoped_diff",
+      "command": "rustfmt --edition 2021 scoped Rust files; git diff --check scoped files",
+      "status": "passed"
+    }
+  ],
+  "fixture": {
+    "directory": "local-artifacts/m9/jni-class-object-contracts-20261025",
+    "build_receipt": {
+      "path": "local-artifacts/m9/jni-class-object-contracts-20261025/build-receipt.json",
+      "sha256": "1adeb784382f65b02c636f23345da0a52568dfd35d35aa988f7123c07b576705"
+    },
+    "jvm": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\r\nOpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)\r\nOpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+    "api": 26,
+    "build_tools": "35.0.0",
+    "oracle": {
+      "path": "local-artifacts/m9/jni-class-object-contracts-20261025/jvm-oracle.txt",
+      "sha256": "951767aacf226946c14e79edd58340eb9bfbdee28927d4566e9e52a92e38486a"
+    },
+    "artifacts": [
+      {
+        "path": "local-artifacts/m9/jni-class-object-contracts-20261025/objects.apk",
+        "sha256": "1e9a3851bbf82cd9b59728ff8eeb6b769e70fd0f5d440bf1a88ce98b982d0ac3"
+      },
+      {
+        "path": "local-artifacts/m9/jni-class-object-contracts-20261025/renamed.apk",
+        "sha256": "c98b7df9fb3b06865bc510accce4d2e5ff3e76091d48ea7c46c6e87c91bb4be2"
+      }
+    ],
+    "device_proof": "The unchanged existing JNI constructor/context NDK APK is the required external replay; new Java reference APKs serve scoped host reference dispatch contracts and are not represented as machine JNI/Horizon proof."
+  },
+  "limits": [
+    "JNI FindClass still searches the flat current session DEX/builtin classpath; implicit native-caller defining-loader/JNI_OnLoad loader selection and attached-thread bootstrap visibility are not implemented. Java forName/loadClass provenance checks do not establish JNI loader selection.",
+    "Complete JNI behavior, weak global references, all Class methods, raw C pointer/varargs transport and class verification are not newly claimed. The bounded explicit method catalog remains authoritative.",
+    "Canonical Class metadata remains interned/rooted for the VM lifetime; ordinary object refs are released/collected when their actual JNI/frame/global roots disappear.",
+    "Horizon-only Session wiring requires the parent target check/product build, and actual unchanged-proof NRO execution plus physical Switch evidence are separate.",
+    "No application-specific behavior or proprietary payload/source is included."
+  ],
+  "verification": {
+    "host": "passed_scoped_shared_production_contracts",
+    "Horizon_build": "parent_pending",
+    "emulator": "pending_new_exact_NRO",
+    "physical_device": "not_run_for_this_source"
+  },
+  "source_sha256": [
+    {
+      "path": "crates/as-switch-smoke/src/jni_objects.rs",
+      "sha256": "d1a669181feefcff042bb0fda9c75467e9daddac17d34295b017bd6dfdfcf2b6"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_jni.rs",
+      "sha256": "4d64712d8269d42d25a846e4e25761873a41d9b35e270c33b7058fae1b0c1563"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/lib.rs",
+      "sha256": "483357f5c22a63d6637323c2ff5803e0cb92945d3b9b678a26ac7d01e03f9b8f"
+    },
+    {
+      "path": "crates/as-switch-smoke/Cargo.toml",
+      "sha256": "395ea2be97a06441b4068b503b7726891f42bd5bbe10eb470b0f29f60c79982e"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/jni_objects.rs",
+      "sha256": "ad532a04061dcdcc95455f803a2386ad9c1e7514fcafdb9a1e6411e9300a89c9"
+    },
+    {
+      "path": "fixtures/m9/jni-objects/build.ps1",
+      "sha256": "88cab0c2f07dffab093e1882f4339615a47dbdb355f4a6f86a70e7a27fdcd418"
+    },
+    {
+      "path": "fixtures/m9/jni-objects/java/org/androswitch/references/ClassReferenceCases.java",
+      "sha256": "f4293908086cd676860bb08dd711b1ba2f29da3f3e334eef8ce448ac87818f75"
+    },
+    {
+      "path": "fixtures/m9/jni-objects/java/org/androswitch/references/ClassReferenceActivity.java",
+      "sha256": "14bc2f464186a7947cab6fc6c02f9627c0ff4391b80a9df52f7c7a6027582ced"
+    }
+  ]
+}

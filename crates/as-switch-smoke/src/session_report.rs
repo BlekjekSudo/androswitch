@@ -72,6 +72,7 @@ pub fn clear_current_evidence(fs: &dyn FileSystem) -> Result<(), as_platform::Pl
         "logs/capture-owner.json",
         "logs/teardown.log",
         "logs/native-compatibility.json",
+        "logs/uncaught-exceptions.json",
         "logs/memory-admission.json",
         "logs/reporting-error.json",
         "logs/gles-frame-2.ppm",
@@ -204,6 +205,7 @@ mod tests {
             "logs/gles-frame-2.ppm",
             "logs/teardown.log",
             "logs/native-compatibility.json",
+            "logs/uncaught-exceptions.json",
             "logs/memory-admission.json",
             "logs/memory.log",
             "logs/last-interrupted.json",
@@ -219,6 +221,7 @@ mod tests {
             "logs/gles-frame-2.ppm",
             "logs/teardown.log",
             "logs/native-compatibility.json",
+            "logs/uncaught-exceptions.json",
             "logs/memory-admission.json",
         ] {
             assert!(!files.0.borrow().contains_key(path));

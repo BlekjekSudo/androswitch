@@ -1,4 +1,5 @@
 use super::*;
+pub(super) mod application_lifecycle;
 pub(super) mod bitmap;
 mod bundle;
 mod collections;
@@ -14,6 +15,7 @@ mod resource_names;
 mod text_utils;
 pub(super) mod timer;
 pub(super) struct Services {
+    pub(super) lifecycle_observers: application_lifecycle::Observers,
     pub(super) bitmaps: bitmap::Bitmaps,
     collections: collections::Collections,
     communication: communication::Communication,
@@ -35,11 +37,21 @@ impl Services {
         executors::Executors::metadata(class, name, sig)
             .or_else(|| package::PackageService::metadata(class, name, sig))
             .or_else(|| reflection::metadata(class, name, sig))
+            .or_else(|| application_lifecycle::Observers::metadata(class, name, sig))
+            .or_else(|| {
+                matches!(
+                    (class, name, sig),
+                    ("Ljava/lang/Object;", "equals", "(Ljava/lang/Object;)Z")
+                        | ("Ljava/lang/String;", "endsWith", "(Ljava/lang/String;)Z")
+                )
+                .then_some(rd_vm::framework_host::HostMethodKind::Instance)
+            })
     }
     pub(super) fn new(fs: Rc<dyn as_platform::fs::FileSystem>, apk: &Apk) -> Result<Self> {
         let store =
             as_storage::Store::new(fs.clone(), &apk.manifest.package).map_err(storage_error)?;
         Ok(Self {
+            lifecycle_observers: Default::default(),
             bitmaps: Default::default(),
             collections: Default::default(),
             communication: Default::default(),
@@ -57,8 +69,14 @@ impl Services {
         self.preferences.flush()
     }
     pub(super) fn pump(&self, android: &Android, vm: &mut Engine) -> Result<()> {
-        self.timers.pump()?;
-        self.executors.pump()?;
+        if let Err(failure) = self.timers.pump() {
+            self.executors.forward_worker_exception(vm, &failure);
+            return Err(failure);
+        }
+        if let Err(failure) = self.executors.pump() {
+            self.executors.forward_worker_exception(vm, &failure);
+            return Err(failure);
+        }
         self.communication.pump(android, vm)
     }
     pub(super) fn bind_package_source(&self, package: &str, path: String) -> Result<()> {
@@ -216,6 +234,9 @@ impl Services {
         r: ObjRef,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        if let Some(value) = self.lifecycle_observers.call(vm, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
         if let Some(value) = self.bitmaps.call(vm, class, name, sig, r, args)? {
             return Ok(Some(value));
         }
@@ -268,6 +289,7 @@ impl Services {
     }
     pub(super) fn roots(&self) -> Vec<ObjRef> {
         let mut roots = self.preferences.roots();
+        roots.extend(self.lifecycle_observers.roots());
         roots.extend(self.collections.roots());
         roots.extend(self.package_metadata.roots());
         roots.extend(self.glsurface.roots());
@@ -278,12 +300,14 @@ impl Services {
     }
     pub(super) fn references(&self, r: ObjRef) -> Vec<ObjRef> {
         let mut refs = self.collections.references(r);
+        refs.extend(self.lifecycle_observers.references(r));
         refs.extend(self.preferences.references(r));
         refs.extend(self.database.references(r));
         refs.extend(self.executors.references(r));
         refs
     }
     pub(super) fn collect(&self, marked: &[bool]) {
+        self.lifecycle_observers.collect(marked);
         self.bitmaps.collect(marked);
         self.communication.collect(marked);
         self.timers.collect(marked);

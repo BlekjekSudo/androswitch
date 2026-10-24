@@ -86,3 +86,13 @@ required-features = ["host"]
 name = "class_forname"
 path = "tests/class_forname.rs"
 required-features = ["host"]
+
+[[test]]
+name = "uncaught"
+path = "tests/uncaught.rs"
+required-features = ["host"]
+
+[[test]]
+name = "application_lifecycle"
+path = "tests/application_lifecycle.rs"
+required-features = ["host"]

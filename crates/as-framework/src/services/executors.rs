@@ -5,6 +5,9 @@ use super::*;
 use as_platform::BackgroundWorkers;
 use core::cell::Cell;
 use rd_vm::framework_host::HostMethodKind;
+#[path = "uncaught.rs"]
+mod uncaught;
+pub use uncaught::{MainExceptionScope, UncaughtExceptionReport};
 
 pub(in crate::android) const TOKEN_BIT: u64 = 1 << 62;
 const THREAD: &str = "Ljava/lang/Thread;";
@@ -41,6 +44,7 @@ struct JavaThread {
     failed: bool,
     owner: Option<Owner>,
     context_loader: Option<ObjRef>,
+    uncaught_handler: Option<ObjRef>,
 }
 struct Queue {
     initialized: bool,
@@ -86,6 +90,7 @@ struct State {
 }
 #[derive(Default)]
 pub(in crate::android) struct Executors {
+    uncaught: uncaught::Handlers,
     state: RefCell<State>,
     backend: RefCell<Option<Rc<dyn BackgroundWorkers>>>,
     serial: Cell<u64>,
@@ -197,6 +202,9 @@ impl Executors {
         name: &str,
         sig: &str,
     ) -> Option<HostMethodKind> {
+        if let Some(method) = Self::uncaught_metadata(class, name, sig) {
+            return Some(method);
+        }
         use HostMethodKind::{Constructor, Instance, Static};
         match (class,name,sig){
             (THREAD,"currentThread","()Ljava/lang/Thread;")=>Some(Static),
@@ -266,6 +274,7 @@ impl Executors {
                 thread.phase = Phase::Terminated;
                 thread.owner = None;
                 thread.target = None;
+                thread.uncaught_handler = None;
             }
         }
     }
@@ -370,6 +379,7 @@ impl Executors {
                         failed: false,
                         owner: None,
                         context_loader: None,
+                        uncaught_handler: None,
                     },
                 );
             }
@@ -386,7 +396,10 @@ impl Executors {
             });
             return Ok(true);
         }
-        Ok(matches!(class, POOL | FACTORY | WRAPPER | WORKER | UNIT))
+        Ok(matches!(
+            class,
+            POOL | FACTORY | WRAPPER | WORKER | UNIT | uncaught::GROUP
+        ))
     }
     fn initialize_thread(
         &self,
@@ -485,6 +498,9 @@ impl Executors {
         sig: &str,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        if let Some(value) = self.uncaught_call_static(vm, class, name, sig, args)? {
+            return Ok(Some(value));
+        }
         if class == THREAD && name == "currentThread" && sig == "()Ljava/lang/Thread;" {
             return Ok(Some(Value::Obj(self.current_thread(android, vm)?)));
         }
@@ -750,7 +766,13 @@ impl Executors {
         args: &[Value],
     ) -> Result<Option<Value>> {
         let actual = vm.heap.class_of(r)?.to_string();
+        if let Some(value) = self.uncaught_call_group(vm, r, name, sig, args)? {
+            return Ok(Some(value));
+        }
         if vm.cp.is_subtype(&actual, THREAD) {
+            if let Some(value) = self.uncaught_call_thread(vm, r, name, sig, args)? {
+                return Ok(Some(value));
+            }
             return Ok(Some(match (name, sig) {
                 (
                     "<init>",
@@ -852,13 +874,11 @@ impl Executors {
                         .get(&r)
                         .is_some_and(|t| t.phase == Phase::Running),
                 )),
-                ("join", _)
-                | ("interrupt", _)
-                | ("setDaemon", _)
-                | ("setPriority", _)
-                | ("setUncaughtExceptionHandler", _) => return Err(unavailable(
-                    "Thread waiting/interruption/daemon/priority/custom uncaught-handler contract",
-                )),
+                ("join", _) | ("interrupt", _) | ("setDaemon", _) | ("setPriority", _) => {
+                    return Err(unavailable(
+                        "Thread waiting/interruption/daemon/priority contract",
+                    ))
+                }
                 _ => return Ok(None),
             }));
         }
@@ -1199,6 +1219,10 @@ impl Executors {
         } else {
             vm.invoke_instance(thread, "run", "()V", &[])
         };
+        // Deliver before clearing the running task or dropping the active
+        // Thread owner. A handler may reenter Java/native code and run GC.
+        let result =
+            result.map_err(|failure| self.dispatch_uncaught(android, vm, "thread", failure));
         if let Some((pool, _)) = task {
             let mut state = self.state.borrow_mut();
             let p = state.pools.get_mut(&pool).unwrap();
@@ -1250,6 +1274,7 @@ impl Executors {
         // The actual worker and TLS destructors have stopped. Retaining the
         // Java Thread object must not retain its completed task/worker loop.
         t.target = None;
+        t.uncaught_handler = None;
         let kind = t.kind;
         let current = t.owner.take();
         if let Some(current) = current {
@@ -1295,6 +1320,7 @@ impl Executors {
             _ => None,
         }));
         roots.extend(self.pending.borrow().values().flatten().copied());
+        roots.extend(self.uncaught.roots());
         roots
     }
     pub(super) fn references(&self, r: ObjRef) -> Vec<ObjRef> {
@@ -1303,6 +1329,7 @@ impl Executors {
         if let Some(thread) = state.threads.get(&r) {
             refs.extend(thread.target);
             refs.extend(thread.context_loader);
+            refs.extend(thread.uncaught_handler);
         }
         if let Some(q) = state.queues.get(&r) {
             refs.extend(q.entries.iter().copied());

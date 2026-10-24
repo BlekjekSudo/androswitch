@@ -523,6 +523,12 @@ impl Timers {
             owner: callback_owner,
         };
         let result = vm.invoke_instance(run, "run", "()V", &[]);
+        let result = result.map_err(|failure| {
+            android
+                .services
+                .executors
+                .dispatch_uncaught(android, vm, "timer", failure)
+        });
         if let Some(timer) = self.state.borrow_mut().timers.get_mut(&token) {
             timer.running = None;
         }

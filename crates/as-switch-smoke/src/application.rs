@@ -396,6 +396,34 @@ impl Running {
             let _ = fs::write_all(self.fs.as_ref(), "logs/native-compatibility.json", &bytes);
         }
     }
+    /// Caller holds the VM lease after every callback/guest worker has joined.
+    /// Retain handler failures separately; they must not replace the original
+    /// application failure or inspect a still-running worker's VM state.
+    fn record_uncaught_exceptions(&self) {
+        let reports = self.app.android.uncaught_exception_reports();
+        if reports.is_empty() {
+            return;
+        }
+        let rows: Vec<_> = reports
+            .into_iter()
+            .map(|report| {
+                serde_json::json!({"serial":report.serial,"origin":report.origin,
+                    "thread":report.thread,"handler":report.handler,
+                    "original":{"class":report.original.class,"message":report.original.message,
+                        "object":report.original.obj},
+                    "handler_failure":report.handler_failure.map(|error|error.to_string()),
+                    "via_thread_group":report.via_thread_group,
+                    "handler_invoked":report.handler_invoked})
+            })
+            .collect();
+        let value = serde_json::json!({"schema_version":1,
+            "session_id":self.request.session_id,"package":self.request.package,
+            "revision":self.request.revision,"reports":rows,
+            "scope":"bounded uncaught Java diagnostics after quiescence; object IDs belong only to this session; original worker-stop policy retained"});
+        if let Ok(bytes) = serde_json::to_vec(&value) {
+            let _ = fs::write_all(self.fs.as_ref(), "logs/uncaught-exceptions.json", &bytes);
+        }
+    }
     fn cleanup_error(&mut self, message: &str) {
         let combined = crate::session_report::cleanup_failure(
             self.startup_error
@@ -726,6 +754,21 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
         core::mem::forget(running);
         return -1;
     }
+    // Execution errors reported by now-joined workers are application errors,
+    // not failures of a destructor that has not started. Acknowledge them before
+    // finalization so only a newly raised callback failure stops that phase.
+    device_jni::lock();
+    let worker_error = running
+        .native
+        .as_ref()
+        .and_then(|native| native.take_runtime_error());
+    device_jni::unlock();
+    if let Some(error) = worker_error {
+        if running.startup_error.is_none() && running.runtime_error.is_none() {
+            save_error(&error);
+            running.runtime_error = Some(error);
+        }
+    }
     // Static/thread-local C++ destructors may call Java, files, or media.
     // Execute them while both the VM session and all mapped code are alive.
     let mut finalization_settled = false;
@@ -754,6 +797,16 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
             return -1;
         }
         device_jni::lock();
+        let finalizer_worker_error = running
+            .native
+            .as_ref()
+            .and_then(|native| native.runtime_error());
+        if let Some(error) = finalizer_worker_error {
+            device_jni::unlock();
+            running.cleanup_error(&alloc::format!("NATIVE_FINALIZE_FAILED: {error}"));
+            core::mem::forget(running);
+            return -1;
+        }
         let pending = running
             .native
             .as_ref()
@@ -780,6 +833,7 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
     }
     phase(c"activity_dispose");
     unsafe { as_activity_dispose(running.native_activity) };
+    running.record_uncaught_exceptions();
     if let Some(native) = &running.native {
         native.close_vm();
         native.release_root();

@@ -147,16 +147,29 @@ impl App {
         })
     }
     pub fn launch(&mut self) -> Result<(), VmExit> {
-        self.android.bind_main_thread(&self.vm)?;
-        self.android.launch(&mut self.vm, &self.entry)?;
-        self.draw()
+        let scope = self.android.begin_main_exception_scope(&self.vm)?;
+        let result = (|| {
+            self.android.bind_main_thread(&self.vm)?;
+            self.android.launch(&mut self.vm, &self.entry)?;
+            self.draw()
+        })();
+        self.android
+            .finish_main_exception_scope(&mut self.vm, scope, result)
     }
     pub fn draw(&mut self) -> Result<(), VmExit> {
-        self.android.tick(&mut self.vm)?;
-        let (width, height) = self.android.software_size();
-        if (self.frame.width, self.frame.height) != (width as usize, height as usize) {
-            self.frame = Frame::new(width as usize, height as usize);
-        }
-        self.android.render(&mut self.vm, &mut self.frame)
+        let scope = self.android.begin_main_exception_scope(&self.vm)?;
+        let result = (|| {
+            self.android.tick(&mut self.vm)?;
+            let (width, height) = self.android.software_size();
+            if (self.frame.width, self.frame.height) != (width as usize, height as usize) {
+                self.frame = Frame::new(width as usize, height as usize);
+            }
+            self.android.render(&mut self.vm, &mut self.frame)
+        })();
+        self.android
+            .finish_main_exception_scope(&mut self.vm, scope, result)
+    }
+    pub fn save_state(&mut self) -> Result<rd_vm::ObjRef, VmExit> {
+        self.android.save_state(&mut self.vm)
     }
 }

@@ -1,0 +1,305 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T17:58:24.8809614Z",
+  "scope": "General API 26 Application lifecycle observers, real Activity super dispatch, bounded ordered snapshot/GC ownership, inherited Object.equals and String.endsWith. Original normal SDK fixtures; no package-specific runtime behavior.",
+  "status": "host_passed_emulator_pending",
+  "portable_core_asserted": true,
+  "observed_blocker": {
+    "run": "local-artifacts/m9/external-runs/2538cb9a51364bc383e8ef2859fd544d",
+    "api": "Landroid/app/Application;->registerActivityLifecycleCallbacks(Landroid/app/Application$ActivityLifecycleCallbacks;)V",
+    "returned_to_launcher": true,
+    "nro_sha256_prefix": "47358504",
+    "game_first_screen_verified": false
+  },
+  "contract": [
+    "Registration belongs to the actual Application object; null/duplicates are retained and unregister removes the first match using real virtual callback.equals.",
+    "Each real Activity super body dispatches an ordered snapshot, so reentrant register/unregister affects later events and does not remove an in-flight callback.",
+    "All seven callbacks receive the actual Activity. Created uses its actual nullable input Bundle; saved application state uses one real Bundle shared with Activity and callbacks.",
+    "API 26 mCalled timing is preserved: Start/Destroy/Restart mark before dispatch; Create/Resume/Pause/Stop mark after successful dispatch. Saved state does not require super; Pause requires it for targetSdk >= 9.",
+    "Callbacks and in-flight Application/Activity/Bundle payloads are GC traced. Side tables have weak Application keys and do not retain a dead detached Application.",
+    "Missing/null callback bodies, invalid registration types, callback exceptions, and missing required super calls propagate actual typed failures; no silent successful delivery.",
+    "Object.equals inherits identity only when no DEX class override exists. Explicit resolved Object super/nonvirtual calls retain identity without redispatch. String.endsWith reads actual content and throws NullPointerException for null suffix.",
+    "Exact newly implemented Object.equals and String.endsWith instance descriptors are in the shared JNI method catalog.",
+    "Main launch/draw/input/tick/stop boundaries integrate scoped uncaught reporting; caught DEX exceptions remain catchable and already-dispatched worker exceptions are not reported twice."
+  ],
+  "bounds": {
+    "execution_identity": "Actual NativeHost.current_thread_id when a backend is bound; otherwise single interpreter identity. A backend lacking identity fails explicitly.",
+    "active_snapshots": 64,
+    "active_activity_calls": 64,
+    "registrations": 4096
+  },
+  "commands": [
+    {
+      "status": "passed",
+      "command": "fixtures/m9/application-lifecycle/build.ps1",
+      "exit_code": 0,
+      "toolchain": "javac 21 --release 8, Android build-tools 35.0.0, d8 --min-api 26, android-35 SDK compile definitions"
+    },
+    {
+      "ignored": 0,
+      "jvm_value_comparisons": 36,
+      "test_seconds": 4.19,
+      "manifest_identities_compared": 2,
+      "log": "local-artifacts/m9/application-lifecycle-host/20261025/tests-4.log",
+      "compile_seconds": 31.78,
+      "jvm_arraylist_comparisons": 6,
+      "passed": 10,
+      "failed": 0,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-framework --features host --test application_lifecycle --locked -- --test-threads=1",
+      "status": "passed",
+      "exit_code": 0
+    },
+    {
+      "seconds": 12.31,
+      "status": "passed",
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1 cargo clippy -p as-framework --features host --lib --test application_lifecycle --locked -- -D warnings",
+      "exit_code": 0,
+      "log": "local-artifacts/m9/application-lifecycle-host/20261025/clippy-1.log"
+    }
+  ],
+  "test_names": [
+    "all_seven_notifications_run_inside_actual_super_calls_and_share_the_real_bundle",
+    "registration_duplicates_and_snapshot_mutation_match_arraylist_oracle_in_both_packages",
+    "null_observer_exceptions_and_missing_super_are_real_failures_with_correct_ancestry",
+    "invalid_types_and_missing_callback_methods_fail_without_silent_delivery",
+    "application_owns_its_callbacks_and_weak_side_tables_do_not_keep_dead_applications_alive",
+    "save_without_super_is_permitted_but_pause_checks_target_and_observers_only_run_at_super",
+    "super_called_marker_uses_real_api26_before_or_after_observer_exception_timing",
+    "unregister_uses_real_equality_first_match_and_rejects_mutation_during_equals",
+    "device_proof_uses_standard_apis_visible_output_and_real_return_transcript_without_native_hooks",
+    "suffix_and_object_equality_preserve_jvm_null_unicode_override_and_super_behavior"
+  ],
+  "independent_device_proof": {
+    "activity": "org.androswitch.contracts.LifecycleProofActivity",
+    "horizon_emulator": "not_run_for_this_source",
+    "checks": "Startup transcript and normal P/T/D return. Save remains not_observed until a real save callback occurs.",
+    "application": "org.androswitch.contracts.LifecycleProof",
+    "hardware": "not_run_for_this_source",
+    "apk": "target/application-lifecycle-fixture/lifecycle-proof.apk",
+    "uses_native_test_hooks": false,
+    "visible": "LIFECYCLE STARTUP PASS after actual C/S/R order checks",
+    "host_passed": true,
+    "file": "/sdcard/Download/androswitch-lifecycle-proof.txt"
+  },
+  "limits": [
+    "Application-managed Bundle save callback is implemented; automatic Window hierarchy serialization, state recreation, and process restoration are not claimed.",
+    "No device save event is fabricated. The standard proof leaves save=not_observed when the device harness does not request state saving.",
+    "Registration mutation during callback.equals is rejected with API_UNAVAILABLE after preserving actual callback side effects; the complete reentrant ArrayList.remove algorithm is not claimed.",
+    "String.endsWith differential cases cover empty/null/BMP and valid supplementary Unicode scalar strings. Existing Rust UTF8 string storage does not preserve arbitrary unpaired UTF16 surrogate code units.",
+    "Snapshot/equality oracle is ordinary JVM ArrayList/value behavior; Android lifecycle ordering and super-call checks are grounded in pinned AOSP API 26 source, not executed against an Android reference device.",
+    "Latest proprietary APKs have not yet been rerun with this source. No Mekorama/Candy Crush first screen or Switch hardware compatibility is claimed by this host receipt."
+  ],
+  "fixture_build": {
+    "build_tools": "35.0.0",
+    "apks": [
+      {
+        "sha256": "6e4b0cf2db7713bb3273fda2e78753e8dd373b609b903bcd7127c4399210da95",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture\\lifecycle.apk"
+      },
+      {
+        "sha256": "0fb5873aeaa0f00e5b9c261417f0198d32ad57bb83560623e931e41032ce4f53",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture\\renamed.apk"
+      },
+      {
+        "sha256": "bff142647d7a70152dd573f637f4c1ebda8134cbcae830c56598274b88e98e0e",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture\\legacy-pause.apk"
+      },
+      {
+        "sha256": "ee285a17b32662324fe556383a46f7641b880a07ff61cbbf5e89bd2387dcdb63",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture\\lifecycle-proof.apk"
+      }
+    ],
+    "value_oracle": {
+      "sha256": "168c9521fcb9084418e4f1b02fd74b0b3960729c53eca08d05b4c65fd8d32640",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture/jvm-value-oracle.txt"
+    },
+    "api": 26,
+    "sources": [
+      {
+        "sha256": "00914a0a4175a44ad8a0cb1e23bc3bb592c55d053a17653cbf89ae558205d8c5",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\LifecycleListOracle.java"
+      },
+      {
+        "sha256": "2fc3080058ba84385cef66870ac717edd8f189e39f0774ae7da84fd8818d998a",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\LifecycleProbe.java"
+      },
+      {
+        "sha256": "f3554837522000d683eb384f2dcb64bc5b3c423412e27f58a6968de97fe332c1",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\LifecycleProof.java"
+      },
+      {
+        "sha256": "22b6bfe67ebee4410fbed4f16e30c6d47eded383a0f86d5a90b28eb3c74aa23b",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\LifecycleProofActivity.java"
+      },
+      {
+        "sha256": "a8887dea44ebb34aa38fbc7b2a8699200fb352878b1cd8d3cccd63723d4e1ed1",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\LifecycleValueOracle.java"
+      },
+      {
+        "sha256": "1a56ea9576331134449a752490641a8a0e2063f5c674393f583b95e1c85104bb",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\ObservedActivity.java"
+      },
+      {
+        "sha256": "fcf3e94b7f5335cd79abab7f114804b030f929cbf0cc0dcd8b5d4efa52945842",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\ObserverApplication.java"
+      },
+      {
+        "sha256": "2a591f6b8ce5bd329061cc228fa62c0b7d007081521d9e37f8a65b5339d23e57",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\build.ps1"
+      }
+    ],
+    "oracle": {
+      "sha256": "24e38356ce768ea8908e9e51a0dcb34a28ac11b2845426634f850ae42610cd57",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture/jvm-list-oracle.txt"
+    },
+    "schema_version": 1
+  },
+  "fixture_receipt": {
+    "path": "target/application-lifecycle-fixture/build-receipt.json",
+    "sha256": "48c402b436e26b00ca46857b0705765d0fd37952134b2ee7b688ed9610ddd573"
+  },
+  "fixture_apks": [
+    {
+      "bytes": 6618,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture\\lifecycle.apk",
+      "sha256": "6e4b0cf2db7713bb3273fda2e78753e8dd373b609b903bcd7127c4399210da95"
+    },
+    {
+      "bytes": 6622,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture\\renamed.apk",
+      "sha256": "0fb5873aeaa0f00e5b9c261417f0198d32ad57bb83560623e931e41032ce4f53"
+    },
+    {
+      "bytes": 6618,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture\\legacy-pause.apk",
+      "sha256": "bff142647d7a70152dd573f637f4c1ebda8134cbcae830c56598274b88e98e0e"
+    },
+    {
+      "bytes": 6614,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture\\lifecycle-proof.apk",
+      "sha256": "ee285a17b32662324fe556383a46f7641b880a07ff61cbbf5e89bd2387dcdb63"
+    }
+  ],
+  "sources": [
+    {
+      "path": "crates/as-framework/src/services/application_lifecycle.rs",
+      "sha256": "05926ed572de766ee6c2a9fe52ccb20737fd8c4db3dbd7b5ef87222d230743ff",
+      "snapshot": "local-artifacts\\m9\\application-lifecycle-host\\20261025\\frozen\\crates\\as-framework\\src\\services\\application_lifecycle.rs"
+    },
+    {
+      "path": "crates/as-framework/src/android.rs",
+      "sha256": "31e8ff40143097722199c37aef0b28f377ac47fe6303f081a1ae5fa4b85ec37b",
+      "snapshot": "local-artifacts\\m9\\application-lifecycle-host\\20261025\\frozen\\crates\\as-framework\\src\\android.rs"
+    },
+    {
+      "path": "crates/as-framework/src/lib.rs",
+      "sha256": "3a24c84a2b7dd65f419cc7c88262bcc284f0be95b78abd8c1a7d21a38877aea9",
+      "snapshot": "local-artifacts\\m9\\application-lifecycle-host\\20261025\\frozen\\crates\\as-framework\\src\\lib.rs"
+    },
+    {
+      "path": "crates/as-framework/src/services/mod.rs",
+      "sha256": "fe03cd6d7d7b5e15b5f6dcfa13515f319bb318186974d1c3349e0a2502ba0b62",
+      "snapshot": "local-artifacts\\m9\\application-lifecycle-host\\20261025\\frozen\\crates\\as-framework\\src\\services\\mod.rs"
+    },
+    {
+      "path": "crates/as-framework/src/services/executors.rs",
+      "sha256": "ee0bb4793ad408212544d5d18145feee58e324745dceae339442d6d3e275acb7",
+      "snapshot": "local-artifacts\\m9\\application-lifecycle-host\\20261025\\frozen\\crates\\as-framework\\src\\services\\executors.rs"
+    },
+    {
+      "path": "crates/as-framework/src/services/uncaught.rs",
+      "sha256": "ebae4cc1109e301f6447cfaa67a0e4641dc68f37695b319f12cb49848e221d4f",
+      "snapshot": "local-artifacts\\m9\\application-lifecycle-host\\20261025\\frozen\\crates\\as-framework\\src\\services\\uncaught.rs"
+    },
+    {
+      "path": "crates/as-framework/src/services/timer.rs",
+      "sha256": "b25efbf5a85cf46d59eca62a3f04bf0e9b3573e0f949da882dc66f50f7937a45",
+      "snapshot": "local-artifacts\\m9\\application-lifecycle-host\\20261025\\frozen\\crates\\as-framework\\src\\services\\timer.rs"
+    },
+    {
+      "path": "crates/as-framework/src/services/glsurface.rs",
+      "sha256": "088b8a8a747d7b5a986706684e915524aaa4099c9f8e9fd724ea36b920822d8f",
+      "snapshot": "local-artifacts\\m9\\application-lifecycle-host\\20261025\\frozen\\crates\\as-framework\\src\\services\\glsurface.rs"
+    },
+    {
+      "path": "crates/as-framework/Cargo.toml",
+      "sha256": "30ad2a361d10d9e6835c3126594d9cd42640b7d29eebe9c3b6c32da986c2c046",
+      "snapshot": "local-artifacts\\m9\\application-lifecycle-host\\20261025\\frozen\\crates\\as-framework\\Cargo.toml"
+    },
+    {
+      "path": "crates/as-framework/tests/application_lifecycle.rs",
+      "sha256": "557461b0342048681d85841e0fc44df42bf529a3b86082178141590b97be643b",
+      "snapshot": "local-artifacts\\m9\\application-lifecycle-host\\20261025\\frozen\\crates\\as-framework\\tests\\application_lifecycle.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "sha256": "00b3066e5ae1254cceb43449b73d6e1ecffd6a0cee81258fc2e3fb7173f1ae97",
+      "snapshot": "local-artifacts\\m9\\application-lifecycle-host\\20261025\\frozen\\crates\\rd-vm\\src\\classpath.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/engine.rs",
+      "sha256": "e5be8483f4ad07b2152809d5ec6f96f2b6e467070f5cba957f79eaeed6aeaf44",
+      "snapshot": "local-artifacts\\m9\\application-lifecycle-host\\20261025\\frozen\\crates\\rd-vm\\src\\engine.rs"
+    }
+  ],
+  "references": [
+    {
+      "url": "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/core/java/android/app/Activity.java",
+      "name": "Activity",
+      "sha256": "b0c8d7d7a157c654492b5a08a571c8a6c16ea220cd5016865c4817be9a4d2590",
+      "snapshot": "local-artifacts/m9/lifecycle-api26-Activity.java"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/core/java/android/app/Application.java",
+      "name": "Application",
+      "sha256": "d76996254b602ec5a559a4d2ac2a3ce5dab4030b3f87c5e77d68bf30dca538f7",
+      "snapshot": "local-artifacts/m9/lifecycle-api26-Application.java"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/core/java/android/app/ActivityThread.java",
+      "name": "ActivityThread",
+      "sha256": "fd3d668c82d0d1e326789712cd5a84a7926f970b4ba0c78b4dd1f782c819fef8",
+      "snapshot": "local-artifacts/m9/lifecycle-api26-ActivityThread.java"
+    },
+    {
+      "url": "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/lang/String.java",
+      "name": "String",
+      "sha256": "1ff23e9d3d577bcce919886abdff0edcb2b025f31b5a3dc194110d694abe1743",
+      "snapshot": "local-artifacts/m9/lifecycle-api26-String.java"
+    },
+    {
+      "url": "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/lang/Object.java",
+      "name": "Object",
+      "sha256": "a50643289a6b8242447cdfd03711ccfe4cbc4b107967f2525f56add5ff0ca118",
+      "snapshot": "local-artifacts/m9/lifecycle-api26-Object.java"
+    }
+  ],
+  "logs": [
+    {
+      "path": "local-artifacts/m9/application-lifecycle-host/20261025/tests-1.log",
+      "sha256": "4b91b6bf23698f770319340d23b6570d3581807b6721eb859d66e48834c4aec8"
+    },
+    {
+      "path": "local-artifacts/m9/application-lifecycle-host/20261025/tests-2.log",
+      "sha256": "6d0fb739cf1416c5515273ce91f5383e2627bf6916f9cc8a86d530f828915b22"
+    },
+    {
+      "path": "local-artifacts/m9/application-lifecycle-host/20261025/tests-3.log",
+      "sha256": "4da224b00f57a2cdf3c3b43bdcbfde267261a1d4bc247618a039cb4389202e36"
+    },
+    {
+      "path": "local-artifacts/m9/application-lifecycle-host/20261025/tests-4.log",
+      "sha256": "507307b388a96511d479f75d3ef5b299d1cd8b6853150084a78c79bc76e37aad"
+    },
+    {
+      "path": "local-artifacts/m9/application-lifecycle-host/20261025/clippy-1.log",
+      "sha256": "39a68aec2e16963b792896604ad9ca557ac9910a6a092a7c13f4b28fd198a108"
+    }
+  ],
+  "diagnostic_attempts": [
+    "tests-1: 4/9 passed; exposed incorrect SuperNotCalledException package in the implementation, missing inherited Object.equals, and unsupported proof String.endsWith.",
+    "tests-2: compilation rejected a private classpath helper; replaced with its public resolution result and interface/class flag check.",
+    "tests-3: 9/9 passed, but proof suffix call had temporarily been rewritten. Parent required retaining original endsWith and implementing that shared API. This intermediate fixture is not the final candidate.",
+    "tests-4: final original proof call restored; real String.endsWith and 18-case independent JVM value oracle added. 10/10 passed."
+  ]
+}

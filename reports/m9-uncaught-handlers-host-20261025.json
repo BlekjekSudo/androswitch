@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "kind": "portable_uncaught_exception_handler_host_contracts",
+  "recorded_at_utc": "2026-10-24T17:51:18.059493+00:00",
+  "git_head": "03259106412a5e4ac7399d42a1206be0c85b4cb4",
+  "working_tree_changes": true,
+  "trigger": {
+    "parent_observed_run": "2538cb9a51364bc383e8ef2859fd544d",
+    "operation": "Thread.getDefaultUncaughtExceptionHandler()Ljava/lang/Thread$UncaughtExceptionHandler;",
+    "scope": "general shared Android API implementation; no package-identity branches"
+  },
+  "status": {
+    "implementation": "bounded default/per-thread handler storage and real callback dispatch implemented",
+    "host": "9portable interpreter tests passed; focused Clippy passed",
+    "emulator": "not executed for this implementation in this receipt",
+    "physical_switch": "not executed"
+  },
+  "commands": [
+    {
+      "command": "./fixtures/m9/uncaught/build.ps1",
+      "exit_code": 0,
+      "result": "SDKjavac --release8, OpenJDK21 JVM reference with11 rows, d8 minAPI26, three normal APKs"
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p as-framework --features host --test uncaught -- --nocapture",
+      "exit_code": 0,
+      "tests": {
+        "passed": 9,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 0
+      },
+      "log": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/uncaught-tests-4.log",
+        "bytes": 1170,
+        "sha256": "5d62c7ab4035ae16d27a5ae1f0ecddb7c6494c3a0b7bb1f3f388a524ff318390"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo clippy -p as-framework --features host --lib --test uncaught -- -D warnings",
+      "exit_code": 0,
+      "log": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/uncaught-clippy-1.log",
+        "bytes": 372,
+        "sha256": "7d3966ec9da165fdfa5df7130c52f5328c528c12964e1818a5c130b68d6e77ec"
+      }
+    },
+    {
+      "command": "rustfmt --check --edition2021 --config skip_children=true [five handler-owned Rust files]",
+      "exit_code": 0,
+      "log": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/rustfmt-check.log",
+        "bytes": 53,
+        "sha256": "3926882a4a1f17868554c88979f13070faa8b42e27e1a52cb2971c7aaf57857e"
+      }
+    }
+  ],
+  "contracts": [
+    "Each test asserts rd_vm::PORTABLE_CORE and executes real DEX on the original portable Engine; worker identities/delivery and EGL provider are controlled host adapters, not OS scheduling/GPU evidence.",
+    "Initial default is null. Per-thread handler wins over the root delegation group; clearing restores group fallback. Thread exit clears handler; a later explicit handler follows API26 getter/setter semantics.",
+    "Automatic delivery invokes a real virtual getUncaughtExceptionHandler override, then the actual handler uncaughtException(Thread,Throwable) on the throwing worker before active/callback owner scope exits.",
+    "The original Throwable and handler failure remain distinct. VM-built exceptions use Engine materialization; an OOM/lookup/materialization/handler failure never replaces the original returned Java exception.",
+    "Root tickets preserve original local-only Throwable during GC inside an overridden getter, retain handler/Thread objects through mutation, GC and nested native-to-DEX reentry, and keep reports alive after guest static roots are removed.",
+    "Default and per-thread handlers survive GC without guest static references. Direct root ThreadGroup delegation invokes the actual default. A wrong-type setter throws ClassCastException and preserves the prior handler.",
+    "Caught Java exceptions and structured non-Java VmExit errors do not trigger handlers. Main lifecycle escape is delivered once; worker errors forwarded through the main pump are not delivered again.",
+    "Timer and GLSurface queue exception tests observe actual modeled throwing-owner Thread identity, original Throwable identity, and isAlive=true during the handler.",
+    "Latest128 diagnostic reports are retained. Main exception scopes use exact unique RAII tickets and no service RefCell borrow is held across DEX/native calls."
+  ],
+  "jvm_reference": {
+    "artifact": {
+      "path": "local-artifacts/m9/uncaught-host/20261025/oracle.tsv",
+      "bytes": 268,
+      "sha256": "6696ec6f4d2461f8e658049e5084443ae1ffa67f6f514b04782592d1258b9c39"
+    },
+    "rows": 11,
+    "matching_observations": "default/group fallback, fourworker handler-selection cases, caught exception exclusion, cleared terminated handler, clearing after termination, mutation+GC observations",
+    "source_derived_android26_difference": {
+      "operation": "Thread.setUncaughtExceptionHandler after termination followed by getter",
+      "openjdk21_observed": "false: getter does not return the newly supplied handler",
+      "android26_expected_and_portable_observed": "true: setter stores the handler and getter checks it before cleared group",
+      "basis": "pinned Thread.java getter/setter and exit implementation",
+      "android_reference_device_execution": false
+    }
+  },
+  "proof_apk": {
+    "artifact": {
+      "path": "local-artifacts/m9/uncaught-host/20261025/uncaught-proof.apk",
+      "bytes": 5649,
+      "sha256": "5cfe01ca9b0675380a2cb4c617a8c5fa7fcd961e8d4653637b91d1b2128a788e"
+    },
+    "package": "org.fixture.uncaughtproof",
+    "handler_output": "/sdcard/Download/androswitch-uncaught-proof.txt",
+    "success_marker": "UNCAUGHT_HANDLER_PROOF_PASS",
+    "checks": "same actual callback Thread, same Throwable, alive=true before worker teardown, payload271 after GC while default/perThread/static handler roots were cleared",
+    "expected_runtime_policy": "intentional uncaught worker exception remains a terminal runtime failure after its handler; a VFS handler proof is not a full app/game startup pass",
+    "execution_in_this_receipt": false
+  },
+  "fixture_artifacts": [
+    {
+      "path": "local-artifacts/m9/uncaught-host/20261025/uncaught.apk",
+      "bytes": 5641,
+      "sha256": "03277f45cacf415422fccd367950396a43a4d132fd041bec35be1fd13c05c7df"
+    },
+    {
+      "path": "local-artifacts/m9/uncaught-host/20261025/uncaught-main.apk",
+      "bytes": 5653,
+      "sha256": "15884c62bcd57a093765b32e073518aa12fefc8a3624d73f913e6f397497f638"
+    },
+    {
+      "path": "local-artifacts/m9/uncaught-host/20261025/uncaught-proof.apk",
+      "bytes": 5649,
+      "sha256": "5cfe01ca9b0675380a2cb4c617a8c5fa7fcd961e8d4653637b91d1b2128a788e"
+    },
+    {
+      "path": "local-artifacts/m9/uncaught-host/20261025/classes.dex",
+      "bytes": 9848,
+      "sha256": "44beeda8364f9db1b5b0eda814a694c16a5e7f6985b193d0a9a00e829757ff34"
+    },
+    {
+      "path": "local-artifacts/m9/uncaught-host/20261025/oracle.tsv",
+      "bytes": 268,
+      "sha256": "6696ec6f4d2461f8e658049e5084443ae1ffa67f6f514b04782592d1258b9c39"
+    },
+    {
+      "path": "local-artifacts/m9/uncaught-host/20261025/build-receipt.json",
+      "bytes": 2211,
+      "sha256": "ee14d9857fb213fae06d9173d5ade7ebaf68678d8a548a18d0ecff8e7fd47afb"
+    }
+  ],
+  "fixture_sources_at_verified_checkpoint": [
+    {
+      "path": "fixtures/m9/uncaught/build.ps1",
+      "bytes": 3067,
+      "sha256": "b768cd082e2025684b999468baff6dac9903ddb07235b0a5e200f9f9fc2a1aaf"
+    },
+    {
+      "path": "fixtures/m9/uncaught/java/org/androswitch/contracts/UncaughtActivity.java",
+      "bytes": 204,
+      "sha256": "e691240ea3cea0c4506897023e448b149340934c110562515607576c00a12032"
+    },
+    {
+      "path": "fixtures/m9/uncaught/java/org/androswitch/contracts/UncaughtCases.java",
+      "bytes": 6825,
+      "sha256": "c8141c220f4f4d1eb85c0959b1d0eee0926c772fc81cfd79d0c2a772af3f2883"
+    },
+    {
+      "path": "fixtures/m9/uncaught/java/org/androswitch/contracts/UncaughtMainActivity.java",
+      "bytes": 244,
+      "sha256": "f6a65926041a987115303bd19fc0547b38fb2dcadd2120b14be5933b4552c54f"
+    },
+    {
+      "path": "fixtures/m9/uncaught/java/org/androswitch/contracts/UncaughtProofActivity.java",
+      "bytes": 448,
+      "sha256": "e8566dcf088c54b9245e2abf61fad3c9e52dfa45a90bbad7db374ddbd301c2ef"
+    },
+    {
+      "path": "fixtures/m9/uncaught/java/org/androswitch/contracts/UncaughtValidation.java",
+      "bytes": 1928,
+      "sha256": "30724d6a8ea0ff0e1a99c2effe379c53c0a5f0194a078d22c5e02fdcf7834a1c"
+    }
+  ],
+  "owned_source_snapshots_at_verified_checkpoint": [
+    {
+      "source": "crates/as-framework/src/services/executors.rs",
+      "verified_snapshot": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/verified-source/crates/as-framework/src/services/executors.rs",
+        "bytes": 53811,
+        "sha256": "ee0bb4793ad408212544d5d18145feee58e324745dceae339442d6d3e275acb7"
+      }
+    },
+    {
+      "source": "crates/as-framework/src/services/uncaught.rs",
+      "verified_snapshot": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/verified-source/crates/as-framework/src/services/uncaught.rs",
+        "bytes": 14257,
+        "sha256": "ebae4cc1109e301f6447cfaa67a0e4641dc68f37695b319f12cb49848e221d4f"
+      }
+    },
+    {
+      "source": "crates/as-framework/src/services/timer.rs",
+      "verified_snapshot": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/verified-source/crates/as-framework/src/services/timer.rs",
+        "bytes": 21783,
+        "sha256": "b25efbf5a85cf46d59eca62a3f04bf0e9b3573e0f949da882dc66f50f7937a45"
+      }
+    },
+    {
+      "source": "crates/as-framework/src/services/glsurface.rs",
+      "verified_snapshot": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/verified-source/crates/as-framework/src/services/glsurface.rs",
+        "bytes": 45798,
+        "sha256": "088b8a8a747d7b5a986706684e915524aaa4099c9f8e9fd724ea36b920822d8f"
+      }
+    },
+    {
+      "source": "crates/as-framework/tests/uncaught.rs",
+      "verified_snapshot": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/verified-source/crates/as-framework/tests/uncaught.rs",
+        "bytes": 16455,
+        "sha256": "c3e5864d919d3c5d66d07ffcca7c0fdc32eb586522873d737aaad73503c88fbd"
+      }
+    }
+  ],
+  "shared_integration_context": {
+    "unbound_files": [
+      "crates/as-framework/src/android.rs",
+      "crates/as-framework/src/lib.rs",
+      "crates/as-framework/src/services/mod.rs",
+      "crates/rd-vm/src/engine.rs",
+      "crates/rd-vm/src/classpath.rs"
+    ],
+    "reason": "shared glue/interface facts and public existing-behavior Throwable materialization were compiled by this focused run; lifecycle refinements continue afterward, so this receipt does not bind later whole-file content as the tested snapshot",
+    "required_final_verification": "root integrated required-check gate and separate NRO tests after all shared source freezes"
+  },
+  "references": [
+    {
+      "revision": "android-8.0.0_r1",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/lang/Thread.java",
+      "frozen_input": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/Thread.java",
+        "bytes": 85792,
+        "sha256": "e53214c5fd86f69fe1b1472d6dc88f795d2b377e9436059ce31bfa084452ecdb"
+      },
+      "use": "primary semantic reference only; no source implementation incorporated"
+    },
+    {
+      "revision": "android-8.0.0_r1",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/lang/ThreadGroup.java",
+      "frozen_input": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/ThreadGroup.java",
+        "bytes": 39798,
+        "sha256": "6793699822b18ce544034d902e44b2be26914860756a374dd6f725394bc94b36"
+      },
+      "use": "primary semantic reference only; no source implementation incorporated"
+    }
+  ],
+  "historical_attempts": [
+    {
+      "log": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/uncaught-tests-1.log",
+        "bytes": 3895,
+        "sha256": "bab490ea3aa352381bde0bee1696642670b48adb03ba4f88c7e522d67839a9ac"
+      },
+      "result": "clean compile;1of7 tests passed. Actual missing internal ThreadGroup attachment blocked default fallback; owned implementation corrected."
+    },
+    {
+      "log": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/uncaught-tests-2.log",
+        "bytes": 1780,
+        "sha256": "54f7b7aac7f582ff14af57c467d61cbb9f0acdbf2d07856b947b3880293db8fc"
+      },
+      "result": "6of7 passed; one test fixture had no EGL backend. D-drive executable startup appeared delayed; only identified owned Cargo was stopped after inspection, and its output subsequently showed this result."
+    },
+    {
+      "log": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/uncaught-tests-staged.log",
+        "bytes": 1472,
+        "sha256": "b2a7390427f48c88fdc0d90af0210258f84096f7955c6a4f0794721277381304"
+      },
+      "result": "exact SHA-matching executable staged in owned Ccache reproduced6of7 in2seconds; no unrelated process/window changes; original unbound-EGL fixture failure retained",
+      "staging_hash_log": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/staged-test-exe.log",
+        "bytes": 73,
+        "sha256": "f41ba425eb0b92a4a8be7dabb44560e7b56c6316f06a135afdc4cd2211079ff2"
+      }
+    },
+    {
+      "log": {
+        "path": "local-artifacts/m9/uncaught-host/20261025/uncaught-tests-3.log",
+        "bytes": 1667,
+        "sha256": "6ab8b3307611db6b37681d86b339b241e141f78b96ee3dfece9eb575c810f952"
+      },
+      "result": "7of8 passed; remaining fixture bound display caps after first rendering, correctly rejected DISPLAY_ACTIVE. Fixture now binds recording caps/backend before launch."
+    }
+  ],
+  "limits": [
+    "No custom ThreadGroup hierarchy or unrelated group APIs are implemented or advertised. The actual bounded root group delegates to a default handler.",
+    "A null default uses existing runtime diagnostics. Direct group diagnostic printing without a default requires an unavailable System.err/stack-trace sink; no fake platform logging/kill hook is installed.",
+    "Hidden Android uncaught-exception pre-handler APIs are not implemented/advertised.",
+    "Current worker-stop policy remains terminal for the app after original uncaught failure even when the handler returns. ThreadPoolExecutor replacement-worker and arbitrary JVM process-exit behavior are not claimed.",
+    "Handler invocation for OOM depends on successful real Throwable/Thread materialization; failure is retained as separate diagnostics, not fake successful delivery. Forced allocator-failure execution is not part of these nine tests.",
+    "The GL case covers queue delivery using a recording-only provider, not EGLconfig-chooser/render draw failure on an actual GPU. Those call points are implemented but need separate device execution.",
+    "No emulator, physical Switch, Candy Crush/Mekorama first-screen, gameplay, or full security-review claim follows from these host tests."
+  ]
+}

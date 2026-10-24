@@ -18,6 +18,7 @@ pub mod device_native;
 #[cfg(target_os = "horizon")]
 mod device_workers;
 pub mod jni_constructor;
+pub mod jni_objects;
 #[cfg(target_os = "horizon")]
 mod launcher;
 pub mod native_probe;

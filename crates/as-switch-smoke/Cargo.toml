@@ -88,3 +88,8 @@ required-features = ["portable-tests"]
 name = "jni_method_metadata"
 path = "tests/jni_method_metadata.rs"
 required-features = ["portable-tests", "host-cli"]
+
+[[test]]
+name = "jni_objects"
+path = "tests/jni_objects.rs"
+required-features = ["portable-tests", "host-cli"]
