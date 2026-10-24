@@ -335,15 +335,15 @@ key_apis = ["android.widget.TextView.setText", "android.widget.Button.setOnClick
 id = "android-webkit"
 prefix = "android.webkit"
 domain = "view-ui"
-status = "stub"
+status = "partial"
 domain_module = "fd-ui"
-module = "rd-vm/classpath"
-code = ["crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/platform_base.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/platform_base.rs"]
 milestone = "M11"
-notes = "WebView/WebSettings hierarchy placeholders may let class loading proceed, but there is no Chromium/WebView renderer, JS engine or network page loading in this runtime path."
-evidence = ["docs/compat-matrix.md"]
+notes = "WebSettings persisted state/defaults and WebView in-memory URL, navigation-history, progress, pause/resume and destroy state execute host-side. loadUrl records a navigation only; there is no Chromium renderer, network fetch, DOM, JavaScript execution, or WebViewClient callback delivery."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-webkit-renderer"
-key_apis = ["android.webkit.WebView.loadUrl", "android.webkit.WebSettings.setJavaScriptEnabled"]
+key_apis = ["android.webkit.WebView.loadUrl", "android.webkit.WebView.goBack", "android.webkit.WebSettings.setJavaScriptEnabled", "android.webkit.WebSettings.getTextZoom"]
 
 # ===================== Graphics =====================
 [[surface]]
@@ -637,15 +637,15 @@ key_apis = ["android.database.sqlite.SQLiteOpenHelper.getWritableDatabase", "and
 id = "android-provider"
 prefix = "android.provider"
 domain = "database"
-status = "stub"
+status = "partial"
 domain_module = "fd-content"
-module = "rd-vm/content"
-code = ["crates/rd-vm/src/content.rs", "crates/rd-vm/src/classpath.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/content.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "M8+"
-notes = "Settings is the supported exception below. Contacts, MediaStore, Calendar, CallLog, Telephony, Downloads and Documents providers are constants/hierarchy or NOT_IMPLEMENTED, not backed by device provider data."
-evidence = ["docs/compat-matrix.md"]
+notes = "Settings remains the separate supported subset. DocumentsContract document/tree/root URI builders and extractors, URI predicates for a profile with no installed DocumentsProvider, query-argument helpers, and DocumentsContract.Path execute over the VM Uri model. Contacts, MediaStore, Calendar, CallLog, Telephony, Downloads, and actual DocumentsProvider/ContentResolver data are still not backed by device data."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-provider-data"
-key_apis = ["android.provider.ContactsContract.Contacts", "android.provider.MediaStore.Images.Media", "android.provider.CalendarContract.Events", "android.provider.DocumentsContract.Document"]
+key_apis = ["android.provider.DocumentsContract.buildDocumentUri", "android.provider.DocumentsContract.getDocumentId", "android.provider.DocumentsContract.buildDocumentUriUsingTree", "android.provider.DocumentsContract.Path.getRootId"]
 
 [[surface]]
 id = "android-provider-settings"
@@ -862,29 +862,29 @@ key_apis = ["android.media.midi.MidiManager.getDevices"]
 id = "android-hardware-camera2"
 prefix = "android.hardware.camera2"
 domain = "camera"
-status = "stub"
+status = "partial"
 domain_module = "fd-hardware"
-module = "rd-vm/classpath"
-code = ["crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/android_util.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/android_util.rs"]
 milestone = "M10"
-notes = "Camera2 value/hierarchy references may resolve, but there is no camera device, capture session, stream configuration or image reader pipeline."
-evidence = ["docs/compat-matrix.md"]
+notes = "Explicit-data CameraMetadataNative keys/containers, CameraCharacteristics, CaptureRequest/Builder, CaptureResult/TotalCaptureResult, CameraAccessException, and a no-camera CameraManager profile execute host-side. There is no camera HAL/device/session/capture pipeline, generated framework key catalogue, native serialized metadata, or camera callback delivery."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-hardware-camera2"
-key_apis = ["android.hardware.camera2.CameraManager.getCameraIdList", "android.hardware.camera2.CameraManager.openCamera", "android.hardware.camera2.CameraCaptureSession.capture"]
+key_apis = ["android.hardware.camera2.CameraManager.getCameraIdList", "android.hardware.camera2.CameraManager.openCamera", "android.hardware.camera2.CaptureRequest.Builder.build", "android.hardware.camera2.impl.CameraMetadataNative.set"]
 
 [[surface]]
 id = "android-hardware-camera2-params"
 prefix = "android.hardware.camera2.params"
 domain = "camera"
-status = "stub"
+status = "partial"
 domain_module = "fd-hardware"
-module = "rd-vm/android-util"
-code = ["crates/rd-vm/src/android_util.rs", "crates/rd-vm/src/classpath.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/android_util.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "M10"
-notes = "StreamConfigurationMap-adjacent Size/Range values can be represented by android.util value support; camera characteristics are not backed by a virtual camera."
-evidence = ["docs/compat-matrix.md"]
+notes = "MeteringRectangle, BlackLevelPattern, RggbChannelVector, ColorSpaceTransform, stream/high-speed/reprocess configuration values, and StreamConfigurationMap format/size/duration calculations execute over caller-supplied configurations. The values do not come from a virtual camera or camera HAL."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-hardware-camera2-params"
-key_apis = ["android.hardware.camera2.params.StreamConfigurationMap.getOutputSizes"]
+key_apis = ["android.hardware.camera2.params.StreamConfigurationMap.getOutputSizes", "android.hardware.camera2.params.StreamConfigurationMap.getOutputFormats", "android.hardware.camera2.params.StreamConfigurationMap.getHighResolutionOutputSizes", "android.hardware.camera2.params.ReprocessFormatsMap.getOutputs"]
 
 [[surface]]
 id = "android-hardware-camera-legacy"
@@ -1217,15 +1217,15 @@ key_apis = ["android.companion.CompanionDeviceManager.associate"]
 id = "android-security"
 prefix = "android.security"
 domain = "security"
-status = "stub"
+status = "partial"
 domain_module = "fd-system-services"
-module = "rd-vm/jsecurity"
-code = ["crates/rd-vm/src/jsecurity.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-framework/src/fd_permissions.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/jsecurity.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-framework/src/fd_permissions.rs"]
 milestone = "M10"
-notes = "Java security primitives exist separately; android.security network-security/key-chain/platform attestation APIs are not a hardware-backed Android security model. Appendix B permission decisions are data-backed but are not android.security."
-evidence = ["docs/compat-matrix.md"]
+notes = "Libcore-style no-key NetworkSecurityPolicy defaults and KeyChain algorithm checks, null no-service key/certificate lookups, install Intent, and null-alias callback behavior execute host-side. There is no Android Keystore/KeyChain service, certificate-selection UI, hardware-backed key, or platform attestation model; Appendix B permission decisions remain separate data."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-security-platform"
-key_apis = ["android.security.NetworkSecurityPolicy.isCleartextTrafficPermitted", "android.security.KeyChain.choosePrivateKeyAlias"]
+key_apis = ["android.security.NetworkSecurityPolicy.isCleartextTrafficPermitted", "android.security.KeyChain.choosePrivateKeyAlias", "android.security.KeyChain.isKeyAlgorithmSupported", "android.security.KeyChain.getPrivateKey"]
 
 [[surface]]
 id = "android-security-keystore"
@@ -1330,15 +1330,15 @@ key_apis = ["android.service.voice.VoiceInteractionService.onReady"]
 id = "android-view-textclassifier"
 prefix = "android.view.textclassifier"
 domain = "speech-ml"
-status = "stub"
+status = "partial"
 domain_module = "fd-ui"
-module = "rd-vm/classpath"
-code = ["crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/android_text.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/android_text.rs"]
 milestone = "future"
-notes = "TextClassifier types may resolve for editor integration, but no ML text classification model is run."
-evidence = ["docs/compat-matrix.md"]
+notes = "TextSelection/TextClassification/TextLanguage/TextLinks and conversation value builders, EntityConfidence normalization, EntityConfig resolution, a ULocale subset, TextClassificationManager, and the exact NO_OP/default-classifier empty-result behavior execute host-side. No ML model or system text-classification service runs, and non-empty TextLinks span application remains outside this slice."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-view-textclassifier-model"
-key_apis = ["android.view.textclassifier.TextClassifier.classifyText", "android.view.textclassifier.TextClassificationManager.getTextClassifier"]
+key_apis = ["android.view.textclassifier.TextClassificationManager.getTextClassifier", "android.view.textclassifier.TextClassifier.suggestSelection", "android.view.textclassifier.TextClassifier.classifyText", "android.view.textclassifier.TextSelection.Builder.build"]
 
 # ===================== Services ext =====================
 [[surface]]

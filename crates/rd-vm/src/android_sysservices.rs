@@ -60,26 +60,26 @@ const INTERPOLATORS: &[&str] = &[
     "Landroid/view/animation/CycleInterpolator;",
 ];
 
-fn throw(class: &str, msg: impl Into<String>) -> VmExit {
+pub(crate) fn throw(class: &str, msg: impl Into<String>) -> VmExit {
     VmExit::Exception(Throwable::new(class, msg))
 }
-fn npe(what: &str) -> VmExit {
+pub(crate) fn npe(what: &str) -> VmExit {
     throw("Ljava/lang/NullPointerException;", what.to_string())
 }
-fn iae(msg: impl Into<String>) -> VmExit {
+pub(crate) fn iae(msg: impl Into<String>) -> VmExit {
     throw("Ljava/lang/IllegalArgumentException;", msg)
 }
 
-fn jstr(vm: &mut Engine, s: impl Into<String>) -> Result<Value, VmExit> {
+pub(crate) fn jstr(vm: &mut Engine, s: impl Into<String>) -> Result<Value, VmExit> {
     Ok(Value::Obj(crate::intrinsics::alloc_string(vm, s.into())?))
 }
-fn opt_str(vm: &Engine, v: Option<&Value>) -> Option<String> {
+pub(crate) fn opt_str(vm: &Engine, v: Option<&Value>) -> Option<String> {
     match v {
         Some(Value::Obj(r)) => vm.heap.as_str(*r).ok().map(str::to_string),
         _ => None,
     }
 }
-fn charseq(vm: &mut Engine, v: Option<&Value>) -> Result<Option<String>, VmExit> {
+pub(crate) fn charseq(vm: &mut Engine, v: Option<&Value>) -> Result<Option<String>, VmExit> {
     match v {
         Some(Value::Obj(r)) => {
             if let Ok(s) = vm.heap.as_str(*r) {
@@ -94,43 +94,52 @@ fn charseq(vm: &mut Engine, v: Option<&Value>) -> Result<Option<String>, VmExit>
 fn req_charseq(vm: &mut Engine, args: &[Value], i: usize, what: &str) -> Result<String, VmExit> {
     charseq(vm, args.get(i))?.ok_or_else(|| npe(what))
 }
-fn oarg(args: &[Value], i: usize) -> Option<ObjRef> {
+pub(crate) fn oarg(args: &[Value], i: usize) -> Option<ObjRef> {
     match args.get(i) {
         Some(Value::Obj(r)) => Some(*r),
         _ => None,
     }
 }
-fn iarg(args: &[Value], i: usize) -> i32 {
+pub(crate) fn iarg(args: &[Value], i: usize) -> i32 {
     args.get(i).and_then(|v| v.as_int().ok()).unwrap_or(0)
 }
-fn larg(args: &[Value], i: usize) -> i64 {
+pub(crate) fn larg(args: &[Value], i: usize) -> i64 {
     args.get(i).and_then(|v| v.as_long().ok()).unwrap_or(0)
 }
-fn farg(args: &[Value], i: usize) -> f32 {
+pub(crate) fn farg(args: &[Value], i: usize) -> f32 {
     args.get(i).and_then(|v| v.as_float().ok()).unwrap_or(0.0)
 }
-fn put(vm: &mut Engine, r: ObjRef, f: &str, v: Value) -> Result<(), VmExit> {
+pub(crate) fn put(vm: &mut Engine, r: ObjRef, f: &str, v: Value) -> Result<(), VmExit> {
     crate::err::put_field_result(vm.heap.put_field(r, f, v))
 }
-fn get(vm: &Engine, r: ObjRef, f: &str) -> Value {
+pub(crate) fn get(vm: &Engine, r: ObjRef, f: &str) -> Value {
     vm.heap.get_field(r, f).unwrap_or(Value::Null)
 }
-fn field_str(vm: &Engine, r: ObjRef, f: &str) -> Option<String> {
+pub(crate) fn field_str(vm: &Engine, r: ObjRef, f: &str) -> Option<String> {
     opt_str(vm, Some(&get(vm, r, f)))
 }
-fn put_opt_str(vm: &mut Engine, r: ObjRef, f: &str, s: Option<String>) -> Result<(), VmExit> {
+pub(crate) fn put_opt_str(
+    vm: &mut Engine,
+    r: ObjRef,
+    f: &str,
+    s: Option<String>,
+) -> Result<(), VmExit> {
     let v = match s {
         Some(s) => jstr(vm, s)?,
         None => Value::Null,
     };
     put(vm, r, f, v)
 }
-fn alloc_obj(vm: &mut Engine, class: &str, fields: Vec<(String, Value)>) -> Result<ObjRef, VmExit> {
+pub(crate) fn alloc_obj(
+    vm: &mut Engine,
+    class: &str,
+    fields: Vec<(String, Value)>,
+) -> Result<ObjRef, VmExit> {
     vm.heap
         .alloc_instance(class.to_string(), fields)
         .map_err(crate::err::oom_throwable)
 }
-fn obj_array(vm: &mut Engine, desc: &str, elems: Vec<Value>) -> Result<Value, VmExit> {
+pub(crate) fn obj_array(vm: &mut Engine, desc: &str, elems: Vec<Value>) -> Result<Value, VmExit> {
     crate::arrays::new_array(vm, desc, ElemKind::Obj, elems)
 }
 fn char_array(vm: &mut Engine, chars: &[u16]) -> Result<Value, VmExit> {
@@ -141,14 +150,14 @@ fn char_array(vm: &mut Engine, chars: &[u16]) -> Result<Value, VmExit> {
         chars.iter().map(|c| Value::Int(*c as i32)).collect(),
     )
 }
-fn java_string_hash(s: &str) -> i32 {
+pub(crate) fn java_string_hash(s: &str) -> i32 {
     let mut h: i32 = 0;
     for u in s.encode_utf16() {
         h = h.wrapping_mul(31).wrapping_add(u as i32);
     }
     h
 }
-fn bool_value(b: bool) -> Value {
+pub(crate) fn bool_value(b: bool) -> Value {
     Value::Int(b as i32)
 }
 
@@ -1715,12 +1724,12 @@ fn darg(args: &[Value], i: usize) -> f64 {
         _ => 0.0,
     }
 }
-fn new_list(vm: &mut Engine, elems: Vec<Value>) -> Result<ObjRef, VmExit> {
+pub(crate) fn new_list(vm: &mut Engine, elems: Vec<Value>) -> Result<ObjRef, VmExit> {
     let list = alloc_obj(vm, "Ljava/util/ArrayList;", Vec::new())?;
     vm.fw.objects.insert(list, HostObj::List { elems });
     Ok(list)
 }
-fn list_elems(vm: &Engine, list: Option<ObjRef>) -> Vec<Value> {
+pub(crate) fn list_elems(vm: &Engine, list: Option<ObjRef>) -> Vec<Value> {
     let Some(list) = list else {
         return Vec::new();
     };

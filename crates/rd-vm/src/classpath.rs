@@ -1406,6 +1406,78 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             Some(&["Ljava/lang/ref/Reference;", "Ljava/lang/Object;"])
         }
         "Ljava/lang/ref/ReferenceQueue;" => Some(OBJECT),
+        // Appendix C stub surfaces promoted to bounded partial slices.
+        "Landroid/webkit/WebSettings;"
+        | "Landroid/provider/DocumentsContract;"
+        | "Landroid/provider/DocumentsContract$Path;"
+        | "Landroid/security/NetworkSecurityPolicy;"
+        | "Landroid/security/KeyChain;"
+        | "Landroid/hardware/camera2/CameraManager;"
+        | "Landroid/hardware/camera2/CameraMetadata;"
+        | "Landroid/hardware/camera2/impl/CameraMetadataNative;"
+        | "Landroid/hardware/camera2/impl/CameraMetadataNative$Key;"
+        | "Landroid/hardware/camera2/utils/TypeReference;"
+        | "Landroid/hardware/camera2/utils/HashCodeHelpers;"
+        | "Landroid/hardware/camera2/CameraCharacteristics$Key;"
+        | "Landroid/hardware/camera2/CaptureRequest$Key;"
+        | "Landroid/hardware/camera2/CaptureRequest$Builder;"
+        | "Landroid/hardware/camera2/CaptureResult$Key;"
+        | "Landroid/hardware/camera2/params/StreamConfiguration;"
+        | "Landroid/hardware/camera2/params/StreamConfigurationDuration;"
+        | "Landroid/hardware/camera2/params/StreamConfigurationMap;"
+        | "Landroid/hardware/camera2/params/HighSpeedVideoConfiguration;"
+        | "Landroid/hardware/camera2/params/ReprocessFormatsMap;"
+        | "Landroid/hardware/camera2/params/MeteringRectangle;"
+        | "Landroid/hardware/camera2/params/RggbChannelVector;"
+        | "Landroid/hardware/camera2/params/BlackLevelPattern;"
+        | "Landroid/hardware/camera2/params/ColorSpaceTransform;"
+        | "Landroid/view/textclassifier/TextClassifier;"
+        | "Landroid/view/textclassifier/TextClassifier$EntityConfig;"
+        | "Landroid/view/textclassifier/TextClassifier$EntityConfig$Builder;"
+        | "Landroid/view/textclassifier/TextClassification;"
+        | "Landroid/view/textclassifier/TextClassification$Builder;"
+        | "Landroid/view/textclassifier/TextClassification$Request;"
+        | "Landroid/view/textclassifier/TextClassification$Request$Builder;"
+        | "Landroid/view/textclassifier/TextSelection;"
+        | "Landroid/view/textclassifier/TextSelection$Builder;"
+        | "Landroid/view/textclassifier/TextSelection$Request;"
+        | "Landroid/view/textclassifier/TextSelection$Request$Builder;"
+        | "Landroid/view/textclassifier/TextLanguage;"
+        | "Landroid/view/textclassifier/TextLanguage$Builder;"
+        | "Landroid/view/textclassifier/TextLanguage$Request;"
+        | "Landroid/view/textclassifier/TextLanguage$Request$Builder;"
+        | "Landroid/view/textclassifier/TextLinks;"
+        | "Landroid/view/textclassifier/TextLinks$Builder;"
+        | "Landroid/view/textclassifier/TextLinks$TextLink;"
+        | "Landroid/view/textclassifier/TextLinks$Request;"
+        | "Landroid/view/textclassifier/TextLinks$Request$Builder;"
+        | "Landroid/view/textclassifier/ConversationActions;"
+        | "Landroid/view/textclassifier/ConversationAction;"
+        | "Landroid/view/textclassifier/ConversationAction$Builder;"
+        | "Landroid/view/textclassifier/ConversationActions$Message;"
+        | "Landroid/view/textclassifier/ConversationActions$Message$Builder;"
+        | "Landroid/view/textclassifier/ConversationActions$Request;"
+        | "Landroid/view/textclassifier/ConversationActions$Request$Builder;"
+        | "Landroid/view/textclassifier/TextClassificationManager;"
+        | "Landroid/icu/util/ULocale;"
+        | "Landroid/view/textclassifier/EntityConfidence;" => Some(OBJECT),
+        "Landroid/hardware/camera2/CameraCharacteristics;"
+        | "Landroid/hardware/camera2/CaptureRequest;"
+        | "Landroid/hardware/camera2/CaptureResult;" => Some(&[
+            "Landroid/hardware/camera2/CameraMetadata;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/hardware/camera2/TotalCaptureResult;" => Some(&[
+            "Landroid/hardware/camera2/CaptureResult;",
+            "Landroid/hardware/camera2/CameraMetadata;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/hardware/camera2/CameraAccessException;" => Some(&[
+            "Landroid/util/AndroidException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
         _ => None,
     }
 }
@@ -1740,6 +1812,29 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         }
         "Ljava/lang/Enum;" => Some(&["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
         "Ljava/lang/Thread;" => Some(&["Ljava/lang/Runnable;"]),
+        // Parcelable value types in the bounded Camera2/TextClassifier slices.
+        "Landroid/hardware/camera2/impl/CameraMetadataNative;"
+        | "Landroid/hardware/camera2/CaptureRequest;"
+        | "Landroid/view/textclassifier/TextClassifier$EntityConfig;"
+        | "Landroid/view/textclassifier/TextClassification;"
+        | "Landroid/view/textclassifier/TextClassification$Request;"
+        | "Landroid/view/textclassifier/TextSelection;"
+        | "Landroid/view/textclassifier/TextSelection$Request;"
+        | "Landroid/view/textclassifier/TextLanguage;"
+        | "Landroid/view/textclassifier/TextLanguage$Request;"
+        | "Landroid/view/textclassifier/TextLinks;"
+        | "Landroid/view/textclassifier/TextLinks$TextLink;"
+        | "Landroid/view/textclassifier/TextLinks$Request;"
+        | "Landroid/view/textclassifier/ConversationActions;"
+        | "Landroid/view/textclassifier/ConversationAction;"
+        | "Landroid/view/textclassifier/ConversationActions$Message;"
+        | "Landroid/view/textclassifier/ConversationActions$Request;"
+        | "Landroid/view/textclassifier/EntityConfidence;" => Some(&["Landroid/os/Parcelable;"]),
+        "Landroid/icu/util/ULocale;" => Some(&[
+            "Ljava/lang/Cloneable;",
+            "Ljava/io/Serializable;",
+            "Ljava/lang/Comparable;",
+        ]),
         _ => None,
     }
 }

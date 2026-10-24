@@ -733,7 +733,7 @@ mod tests {
         // textclassifier belongs to Speech/ML even though it is nested under android.view.
         let c = table.classify("android.view.textclassifier.TextClassifier");
         assert_eq!(c.domain.as_deref(), Some("speech-ml"));
-        assert_eq!(c.status, "stub");
+        assert_eq!(c.status, "partial");
         let c = table.classify("android.database.sqlite.SQLiteDatabase");
         assert_eq!(c.status, "partial");
         assert_eq!(
