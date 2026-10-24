@@ -2,7 +2,7 @@
 
 <!-- GERADO por `cargo xtask api-coverage-report` a partir de `data/api-coverage.toml` — não editar à mão. -->
 
-Fonte: `RustyDroid.md Appendix C`. Janela: API 26–36. Superfícies registradas: **106** em **17** domínios (supported 4, partial 43, stub 2, not_implemented 57).
+Fonte: `RustyDroid.md Appendix C`. Janela: API 26–36. Superfícies registradas: **106** em **17** domínios (supported 4, partial 44, stub 1, not_implemented 57).
 
 **Semântica honesta:** `supported` significa modelo host com estado para o subconjunto documentado em `notes`/`key_apis`, não o pacote AOSP inteiro. `partial` executa um subconjunto real; `stub` é hierarquia/fallback; `not_implemented` não tem modelo host. Presença em DEX ou numa hierarquia stub não é cobertura de execução — para execução use MCP `get_coverage`.
 
@@ -26,7 +26,7 @@ Fonte: `RustyDroid.md Appendix C`. Janela: API 26–36. Superfícies registradas
 | Speech/ML | `android.service.voice`, `android.speech`, `android.speech.tts`, `android.view.textclassifier` | partial 1 · not_implemented 3 | `none`, `rd-vm/android-stub-surfaces` |
 | Services ext | `android.service.autofill`, `android.service.carrier`, `android.service.chooser`, `android.service.dreams`, `android.service.media`, `android.service.notification`, `android.service.quicksettings`, `android.service.textservice`, `android.service.wallpaper` | partial 2 · not_implemented 7 | `none`, `rd-vm/android-stub-surfaces`, `rd-vm/m9` |
 | System UI | `android.accessibilityservice`, `android.app.usage`, `android.appwidget`, `android.inputmethodservice`, `android.print` | partial 3 · not_implemented 2 | `none`, `rd-vm/m9` |
-| Misc | `android.accounts`, `android.animation`, `android.gesture`, `android.icu`, `android.mtp`, `android.preference`, `android.system`, `android.transition` | partial 5 · stub 2 · not_implemented 1 | `none`, `rd-vm/android-stub-surfaces`, `rd-vm/android-sysservices`, `rd-vm/classpath`, `rd-vm/framework`, `rd-vm/intrinsics` |
+| Misc | `android.accounts`, `android.animation`, `android.gesture`, `android.icu`, `android.mtp`, `android.preference`, `android.system`, `android.transition` | partial 6 · stub 1 · not_implemented 1 | `none`, `rd-vm/android-stub-surfaces`, `rd-vm/android-sysservices`, `rd-vm/framework`, `rd-vm/intrinsics` |
 
 ## Superfícies
 
@@ -137,7 +137,7 @@ Fonte: `RustyDroid.md Appendix C`. Janela: API 26–36. Superfícies registradas
 | `android.mtp` | misc | not_implemented | `none` (`fd-hardware`) | future | gap-android-mtp | MTP device/database APIs are not modelled. |
 | `android.preference` | misc | partial | `rd-vm/framework` (`fd-content`) | M8+Literal-R3 | gap-android-preference-ui | PreferenceManager default SharedPreferences access now resolves the per-package default XML file and persists it in app-private storage. Legacy PreferenceActivity/PreferenceFragment XML screens, Preference default-value inflation and the complete settings UI framework are not complete. |
 | `android.system` | misc | stub | `rd-vm/intrinsics` (`fd-os`) | M8+ | gap-android-system-os | Java file/IO backends exist, but android.system.Os direct syscall/StructStat semantics are only fallback-level; no guest kernel or raw host syscall passthrough is provided. |
-| `android.transition` | misc | stub | `rd-vm/classpath` (`fd-ui`) | future | gap-android-transition-stub | Scene/Transition types are hierarchy/fallback only; shared-element and window transitions are not rendered. |
+| `android.transition` | misc | partial | `rd-vm/android-stub-surfaces` (`fd-ui`) | M8+ | gap-android-transition-window-overlay-xml | Transition, Visibility/Fade, TransitionSet/AutoTransition, Scene and TransitionManager model AOSP configuration, target/exclusion and match-order rules, TransitionValues hierarchy capture/matching, start/end/cancel/pause/resume listeners, delayed and scene transitions on the virtual Choreographer clock, Fade transition-alpha animation, and a bounded linear ChangeBounds layout/resize-clip animator. XML transition/attribute inflation, shared-element and window/activity transitions, disappearing-view overlay snapshots, ChangeBounds cross-parent reparenting and PathMotion playback, and real window rendering are not claimed. |
 
 ## Como atualizar
 

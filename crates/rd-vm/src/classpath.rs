@@ -1568,6 +1568,60 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Throwable;",
             "Ljava/lang/Object;",
         ]),
+        "Landroid/transition/Transition;"
+        | "Landroid/transition/Transition$TransitionListener;"
+        | "Landroid/transition/Transition$EpicenterCallback;"
+        | "Landroid/transition/Transition$AnimationInfo;"
+        | "Landroid/transition/TransitionValues;"
+        | "Landroid/transition/TransitionValuesMaps;"
+        | "Landroid/transition/TransitionManager;"
+        | "Landroid/transition/TransitionManager$MultiListener;"
+        | "Landroid/transition/Scene;"
+        | "Landroid/transition/TransitionPropagation;"
+        | "Landroid/transition/PathMotion;"
+        | "Landroid/transition/TransitionListenerAdapter;" => Some(OBJECT),
+        "Landroid/transition/Visibility;" => {
+            Some(&["Landroid/transition/Transition;", "Ljava/lang/Object;"])
+        }
+        "Landroid/transition/Fade;" => Some(&[
+            "Landroid/transition/Visibility;",
+            "Landroid/transition/Transition;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/transition/ChangeBounds;" => {
+            Some(&["Landroid/transition/Transition;", "Ljava/lang/Object;"])
+        }
+        "Landroid/transition/TransitionSet;" => {
+            Some(&["Landroid/transition/Transition;", "Ljava/lang/Object;"])
+        }
+        "Landroid/transition/AutoTransition;" => Some(&[
+            "Landroid/transition/TransitionSet;",
+            "Landroid/transition/Transition;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/transition/Transition$1;" => {
+            Some(&["Landroid/transition/PathMotion;", "Ljava/lang/Object;"])
+        }
+        "Landroid/transition/Transition$2;" | "Landroid/transition/Transition$3;" => Some(&[
+            "Landroid/animation/AnimatorListenerAdapter;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/transition/Fade$FadeAnimatorListener;" => Some(&[
+            "Landroid/animation/AnimatorListenerAdapter;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/transition/Fade$1;"
+        | "Landroid/transition/TransitionSet$TransitionSetListener;"
+        | "Landroid/transition/TransitionSet$1;"
+        | "Landroid/transition/TransitionManager$1;"
+        | "Landroid/transition/Visibility$DisappearListener;"
+        | "Landroid/transition/Visibility$1;" => Some(&[
+            "Landroid/transition/TransitionListenerAdapter;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/transition/ChangeBounds$1;" | "Landroid/transition/ChangeBounds$ViewBounds;" => {
+            Some(OBJECT)
+        }
         _ => None,
     }
 }
@@ -1981,6 +2035,27 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Landroid/service/autofill/Sanitizer;",
             "Landroid/os/Parcelable;",
         ]),
+        "Landroid/transition/Transition;" => Some(&["Ljava/lang/Cloneable;"]),
+        "Landroid/transition/TransitionListenerAdapter;"
+        | "Landroid/transition/Fade$1;"
+        | "Landroid/transition/TransitionSet$TransitionSetListener;"
+        | "Landroid/transition/TransitionSet$1;"
+        | "Landroid/transition/TransitionManager$1;"
+        | "Landroid/transition/Visibility$1;" => {
+            Some(&["Landroid/transition/Transition$TransitionListener;"])
+        }
+        "Landroid/transition/Visibility$DisappearListener;" => Some(&[
+            "Landroid/transition/Transition$TransitionListener;",
+            "Landroid/animation/Animator$AnimatorListener;",
+            "Landroid/animation/Animator$AnimatorPauseListener;",
+        ]),
+        "Landroid/transition/TransitionManager$MultiListener;" => Some(&[
+            "Landroid/view/ViewTreeObserver$OnPreDrawListener;",
+            "Landroid/view/View$OnAttachStateChangeListener;",
+        ]),
+        "Landroid/transition/ChangeBounds$1;" => {
+            Some(&["Landroid/animation/ValueAnimator$AnimatorUpdateListener;"])
+        }
         _ => None,
     }
 }

@@ -1618,15 +1618,15 @@ key_apis = ["android.animation.ValueAnimator.start", "android.animation.ObjectAn
 id = "android-transition"
 prefix = "android.transition"
 domain = "misc"
-status = "stub"
+status = "partial"
 domain_module = "fd-ui"
-module = "rd-vm/classpath"
-code = ["crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/framework.rs"]
-milestone = "future"
-notes = "Scene/Transition types are hierarchy/fallback only; shared-element and window transitions are not rendered."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-transition-stub"
-key_apis = ["android.transition.TransitionManager.beginDelayedTransition", "android.transition.Fade"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/choreographer.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/view_props.rs"]
+milestone = "M8+"
+notes = "Transition, Visibility/Fade, TransitionSet/AutoTransition, Scene and TransitionManager model AOSP configuration, target/exclusion and match-order rules, TransitionValues hierarchy capture/matching, start/end/cancel/pause/resume listeners, delayed and scene transitions on the virtual Choreographer clock, Fade transition-alpha animation, and a bounded linear ChangeBounds layout/resize-clip animator. XML transition/attribute inflation, shared-element and window/activity transitions, disappearing-view overlay snapshots, ChangeBounds cross-parent reparenting and PathMotion playback, and real window rendering are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-transition-window-overlay-xml"
+key_apis = ["android.transition.TransitionManager.beginDelayedTransition", "android.transition.Fade.createAnimator", "android.transition.TransitionSet.addTransition", "android.transition.Scene.enter", "android.transition.TransitionManager.getDefaultTransition", "android.transition.ChangeBounds.createAnimator"]
 
 [[surface]]
 id = "android-icu"

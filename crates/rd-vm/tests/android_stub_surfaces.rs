@@ -3414,3 +3414,574 @@ fn autofill_requests_callbacks_classifications_and_service_base_are_visible() {
         binder
     );
 }
+
+const TRANSITION: &str = "Landroid/transition/Transition;";
+const TRANSITION_SET: &str = "Landroid/transition/TransitionSet;";
+const TRANSITION_AUTO: &str = "Landroid/transition/AutoTransition;";
+const TRANSITION_VISIBILITY: &str = "Landroid/transition/Visibility;";
+const TRANSITION_FADE: &str = "Landroid/transition/Fade;";
+const TRANSITION_CHANGE_BOUNDS: &str = "Landroid/transition/ChangeBounds;";
+const TRANSITION_VALUES: &str = "Landroid/transition/TransitionValues;";
+const TRANSITION_SCENE: &str = "Landroid/transition/Scene;";
+const TRANSITION_MANAGER: &str = "Landroid/transition/TransitionManager;";
+
+fn transition_new(engine: &mut Engine, class: &str, sig: &str, args: &[Value]) -> ObjRef {
+    let transition = instance(engine, class);
+    call(engine, transition, "<init>", sig, args);
+    transition
+}
+fn transition_host_view(engine: &mut Engine, class: &str) -> ObjRef {
+    let context = instance(engine, CONTEXT);
+    let view = instance(engine, class);
+    engine.attach_host_state(class, view).unwrap();
+    call(
+        engine,
+        view,
+        "<init>",
+        "(Landroid/content/Context;)V",
+        &[Value::Obj(context)],
+    );
+    view
+}
+fn transition_layout(engine: &mut Engine, view: ObjRef, bounds: [i32; 4]) {
+    call(
+        engine,
+        view,
+        "layout",
+        "(IIII)V",
+        &[
+            Value::Int(bounds[0]),
+            Value::Int(bounds[1]),
+            Value::Int(bounds[2]),
+            Value::Int(bounds[3]),
+        ],
+    );
+}
+fn transition_linear(engine: &mut Engine, transition: ObjRef) {
+    let linear = instance(engine, "Landroid/view/animation/LinearInterpolator;");
+    call(engine, linear, "<init>", "()V", &[]);
+    call(
+        engine,
+        transition,
+        "setInterpolator",
+        "(Landroid/animation/TimeInterpolator;)Landroid/transition/Transition;",
+        &[Value::Obj(linear)],
+    );
+}
+
+#[test]
+fn transition_configuration_sets_and_values_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let fade = transition_new(&mut engine, TRANSITION_FADE, "()V", &[]);
+    assert_eq!(
+        call(&mut engine, fade, "getDuration", "()J", &[]),
+        Value::Long(-1)
+    );
+    assert_eq!(
+        call(&mut engine, fade, "getStartDelay", "()J", &[]),
+        Value::Long(-1)
+    );
+    assert_eq!(
+        call(&mut engine, fade, "getMode", "()I", &[]),
+        Value::Int(3)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            fade,
+            "setDuration",
+            "(J)Landroid/transition/Transition;",
+            &[Value::Long(250)]
+        ),
+        Value::Obj(fade)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            fade,
+            "setMode",
+            "(I)Landroid/transition/Visibility;",
+            &[Value::Int(1)]
+        ),
+        Value::Obj(fade)
+    );
+    assert_throws(
+        engine.invoke_instance(
+            fade,
+            "setMode",
+            "(I)Landroid/transition/Visibility;",
+            &[Value::Int(4)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let invalid_fade = instance(&mut engine, TRANSITION_FADE);
+    assert_throws(
+        engine.invoke_instance(invalid_fade, "<init>", "(I)V", &[Value::Int(4)]),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    call(
+        &mut engine,
+        fade,
+        "addTarget",
+        "(I)Landroid/transition/Transition;",
+        &[Value::Int(0)],
+    );
+    call(
+        &mut engine,
+        fade,
+        "addTarget",
+        "(I)Landroid/transition/Transition;",
+        &[Value::Int(77)],
+    );
+    let target_ids = call(&mut engine, fade, "getTargetIds", "()Ljava/util/List;", &[]);
+    assert_eq!(list_size(&mut engine, target_ids), 1);
+    let target_name = text(&mut engine, "hero");
+    call(
+        &mut engine,
+        fade,
+        "addTarget",
+        "(Ljava/lang/String;)Landroid/transition/Transition;",
+        &[target_name],
+    );
+    let target_names = call(
+        &mut engine,
+        fade,
+        "getTargetNames",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(list_size(&mut engine, target_names), 1);
+
+    let duplicate_order = int_array(&mut engine, &[1, 1]);
+    assert_throws(
+        engine.invoke_instance(fade, "setMatchOrder", "([I)V", &[duplicate_order]),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let invalid_order = int_array(&mut engine, &[9]);
+    assert_throws(
+        engine.invoke_instance(fade, "setMatchOrder", "([I)V", &[invalid_order]),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let property_array = call(
+        &mut engine,
+        fade,
+        "getTransitionProperties",
+        "()[Ljava/lang/String;",
+        &[],
+    );
+    let properties = array_values(&engine, &property_array);
+    assert_eq!(
+        properties
+            .iter()
+            .map(|value| text_of(&engine, value))
+            .collect::<Vec<_>>(),
+        ["android:visibility:visibility", "android:visibility:parent"]
+    );
+
+    let set = transition_new(&mut engine, TRANSITION_SET, "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            set,
+            "setOrdering",
+            "(I)Landroid/transition/TransitionSet;",
+            &[Value::Int(9)],
+        ),
+        "Landroid/util/AndroidRuntimeException;",
+    );
+    call(
+        &mut engine,
+        set,
+        "setOrdering",
+        "(I)Landroid/transition/TransitionSet;",
+        &[Value::Int(1)],
+    );
+    let child_fade = transition_new(&mut engine, TRANSITION_FADE, "()V", &[]);
+    let change_bounds = transition_new(&mut engine, TRANSITION_CHANGE_BOUNDS, "()V", &[]);
+    for child in [child_fade, change_bounds] {
+        call(
+            &mut engine,
+            set,
+            "addTransition",
+            "(Landroid/transition/Transition;)Landroid/transition/TransitionSet;",
+            &[Value::Obj(child)],
+        );
+    }
+    call(
+        &mut engine,
+        set,
+        "setDuration",
+        "(J)Landroid/transition/TransitionSet;",
+        &[Value::Long(123)],
+    );
+    assert_eq!(
+        call(&mut engine, child_fade, "getDuration", "()J", &[]),
+        Value::Long(123),
+        "TransitionSet duration propagates to already-added children"
+    );
+    assert_eq!(
+        call(&mut engine, set, "getTransitionCount", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            set,
+            "getTransitionAt",
+            "(I)Landroid/transition/Transition;",
+            &[Value::Int(1)]
+        ),
+        Value::Obj(change_bounds)
+    );
+    call(
+        &mut engine,
+        set,
+        "removeTransition",
+        "(Landroid/transition/Transition;)Landroid/transition/TransitionSet;",
+        &[Value::Obj(change_bounds)],
+    );
+    assert_eq!(
+        call(&mut engine, set, "getTransitionCount", "()I", &[]),
+        Value::Int(1)
+    );
+
+    let auto = transition_new(&mut engine, TRANSITION_AUTO, "()V", &[]);
+    assert_eq!(
+        call(&mut engine, auto, "getOrdering", "()I", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, auto, "getTransitionCount", "()I", &[]),
+        Value::Int(3)
+    );
+    let first = object(call(
+        &mut engine,
+        auto,
+        "getTransitionAt",
+        "(I)Landroid/transition/Transition;",
+        &[Value::Int(0)],
+    ));
+    let second = object(call(
+        &mut engine,
+        auto,
+        "getTransitionAt",
+        "(I)Landroid/transition/Transition;",
+        &[Value::Int(1)],
+    ));
+    let third = object(call(
+        &mut engine,
+        auto,
+        "getTransitionAt",
+        "(I)Landroid/transition/Transition;",
+        &[Value::Int(2)],
+    ));
+    assert_eq!(engine.heap.class_of(first).unwrap(), TRANSITION_FADE);
+    assert_eq!(
+        engine.heap.class_of(second).unwrap(),
+        TRANSITION_CHANGE_BOUNDS
+    );
+    assert_eq!(engine.heap.class_of(third).unwrap(), TRANSITION_FADE);
+    assert_eq!(
+        call(&mut engine, first, "getMode", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(
+        call(&mut engine, third, "getMode", "()I", &[]),
+        Value::Int(1)
+    );
+
+    let clone = object(call(
+        &mut engine,
+        fade,
+        "clone",
+        "()Landroid/transition/Transition;",
+        &[],
+    ));
+    assert_ne!(clone, fade);
+    assert_eq!(
+        call(&mut engine, clone, "getDuration", "()J", &[]),
+        Value::Long(250)
+    );
+    assert_eq!(
+        call(&mut engine, clone, "getMode", "()I", &[]),
+        Value::Int(1)
+    );
+}
+
+#[test]
+fn transition_values_scenes_and_manager_mappings_are_modeled() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let root = transition_host_view(&mut engine, "Landroid/widget/FrameLayout;");
+    let child = transition_host_view(&mut engine, "Landroid/view/View;");
+    call(
+        &mut engine,
+        root,
+        "addView",
+        "(Landroid/view/View;)V",
+        &[Value::Obj(child)],
+    );
+
+    let first_values = transition_new(
+        &mut engine,
+        TRANSITION_VALUES,
+        "(Landroid/view/View;)V",
+        &[Value::Obj(child)],
+    );
+    let equal_values = transition_new(
+        &mut engine,
+        TRANSITION_VALUES,
+        "(Landroid/view/View;)V",
+        &[Value::Obj(child)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            first_values,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(equal_values)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, first_values, "hashCode", "()I", &[]),
+        call(&mut engine, equal_values, "hashCode", "()I", &[])
+    );
+    assert!(call_text(
+        &mut engine,
+        first_values,
+        "toString",
+        "()Ljava/lang/String;",
+        &[]
+    )
+    .contains("TransitionValues@"));
+
+    let scene = transition_new(
+        &mut engine,
+        TRANSITION_SCENE,
+        "(Landroid/view/ViewGroup;)V",
+        &[Value::Obj(root)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            scene,
+            "getSceneRoot",
+            "()Landroid/view/ViewGroup;",
+            &[]
+        ),
+        Value::Obj(root)
+    );
+    call(&mut engine, scene, "enter", "()V", &[]);
+    assert_eq!(
+        call_static(
+            &mut engine,
+            TRANSITION_SCENE,
+            "getCurrentScene",
+            "(Landroid/view/ViewGroup;)Landroid/transition/Scene;",
+            &[Value::Obj(root)],
+        ),
+        Value::Obj(scene)
+    );
+
+    let default_transition = object(call_static(
+        &mut engine,
+        TRANSITION_MANAGER,
+        "getDefaultTransition",
+        "()Landroid/transition/Transition;",
+        &[],
+    ));
+    assert_eq!(
+        engine.heap.class_of(default_transition).unwrap(),
+        TRANSITION_AUTO
+    );
+    let manager = transition_new(&mut engine, TRANSITION_MANAGER, "()V", &[]);
+    let fade = transition_new(&mut engine, TRANSITION_FADE, "()V", &[]);
+    call(
+        &mut engine,
+        manager,
+        "setTransition",
+        "(Landroid/transition/Scene;Landroid/transition/Transition;)V",
+        &[Value::Obj(scene), Value::Obj(fade)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getTransition",
+            "(Landroid/transition/Scene;)Landroid/transition/Transition;",
+            &[Value::Obj(scene)]
+        ),
+        Value::Obj(fade)
+    );
+
+    assert!(engine.cp.is_subtype(TRANSITION_FADE, TRANSITION_VISIBILITY));
+    assert!(engine.cp.is_subtype(TRANSITION_VISIBILITY, TRANSITION));
+    assert!(engine.cp.is_subtype(TRANSITION_AUTO, TRANSITION_SET));
+    assert!(engine.cp.is_subtype(TRANSITION_SET, TRANSITION));
+    assert!(engine.cp.is_subtype(
+        "Landroid/transition/TransitionListenerAdapter;",
+        "Landroid/transition/Transition$TransitionListener;"
+    ));
+}
+
+#[test]
+fn delayed_fade_transition_animates_transition_alpha_on_virtual_frames() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let root = transition_host_view(&mut engine, "Landroid/widget/FrameLayout;");
+    let child = transition_host_view(&mut engine, "Landroid/view/View;");
+    call(
+        &mut engine,
+        root,
+        "addView",
+        "(Landroid/view/View;)V",
+        &[Value::Obj(child)],
+    );
+    transition_layout(&mut engine, root, [0, 0, 200, 200]);
+    transition_layout(&mut engine, child, [0, 0, 50, 50]);
+    call(
+        &mut engine,
+        child,
+        "setVisibility",
+        "(I)V",
+        &[Value::Int(8)],
+    );
+
+    let fade = transition_new(&mut engine, TRANSITION_FADE, "()V", &[]);
+    call(
+        &mut engine,
+        fade,
+        "setDuration",
+        "(J)Landroid/transition/Transition;",
+        &[Value::Long(160)],
+    );
+    transition_linear(&mut engine, fade);
+    let listener = transition_new(
+        &mut engine,
+        "Landroid/transition/TransitionListenerAdapter;",
+        "()V",
+        &[],
+    );
+    call(
+        &mut engine,
+        fade,
+        "addListener",
+        "(Landroid/transition/Transition$TransitionListener;)Landroid/transition/Transition;",
+        &[Value::Obj(listener)],
+    );
+    call_static(
+        &mut engine,
+        TRANSITION_MANAGER,
+        "beginDelayedTransition",
+        "(Landroid/view/ViewGroup;Landroid/transition/Transition;)V",
+        &[Value::Obj(root), Value::Obj(fade)],
+    );
+    call(
+        &mut engine,
+        child,
+        "setVisibility",
+        "(I)V",
+        &[Value::Int(0)],
+    );
+
+    engine.advance_clock(16).unwrap();
+    assert_eq!(
+        call(&mut engine, child, "getTransitionAlpha", "()F", &[]),
+        Value::Float(0.0)
+    );
+    engine.advance_clock(80).unwrap();
+    let halfway = call(&mut engine, child, "getTransitionAlpha", "()F", &[]);
+    assert!(
+        matches!(halfway, Value::Float(value) if (value - 0.5).abs() < 0.001),
+        "expected halfway transition alpha, got {halfway:?}"
+    );
+    engine.advance_clock(80).unwrap();
+    assert_eq!(
+        call(&mut engine, child, "getTransitionAlpha", "()F", &[]),
+        Value::Float(1.0),
+        "Fade restores transition alpha at the end"
+    );
+    assert_eq!(
+        field(&engine, listener, "rd_on_transition_start_count"),
+        Value::Int(1)
+    );
+    assert_eq!(
+        field(&engine, listener, "rd_on_transition_end_count"),
+        Value::Int(1)
+    );
+}
+
+#[test]
+fn change_bounds_interpolates_captured_view_bounds_linearly() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let root = transition_host_view(&mut engine, "Landroid/widget/FrameLayout;");
+    let child = transition_host_view(&mut engine, "Landroid/view/View;");
+    call(
+        &mut engine,
+        root,
+        "addView",
+        "(Landroid/view/View;)V",
+        &[Value::Obj(child)],
+    );
+    transition_layout(&mut engine, root, [0, 0, 200, 200]);
+    transition_layout(&mut engine, child, [0, 10, 40, 60]);
+
+    let change_bounds = transition_new(&mut engine, TRANSITION_CHANGE_BOUNDS, "()V", &[]);
+    let start = transition_new(
+        &mut engine,
+        TRANSITION_VALUES,
+        "(Landroid/view/View;)V",
+        &[Value::Obj(child)],
+    );
+    call(
+        &mut engine,
+        change_bounds,
+        "captureStartValues",
+        "(Landroid/transition/TransitionValues;)V",
+        &[Value::Obj(start)],
+    );
+    transition_layout(&mut engine, child, [80, 30, 160, 110]);
+    let end = transition_new(
+        &mut engine,
+        TRANSITION_VALUES,
+        "(Landroid/view/View;)V",
+        &[Value::Obj(child)],
+    );
+    call(
+        &mut engine,
+        change_bounds,
+        "captureEndValues",
+        "(Landroid/transition/TransitionValues;)V",
+        &[Value::Obj(end)],
+    );
+    let animator = object(call(
+        &mut engine,
+        change_bounds,
+        "createAnimator",
+        "(Landroid/view/ViewGroup;Landroid/transition/TransitionValues;Landroid/transition/TransitionValues;)Landroid/animation/Animator;",
+        &[Value::Obj(root), Value::Obj(start), Value::Obj(end)],
+    ));
+    call(
+        &mut engine,
+        animator,
+        "setCurrentFraction",
+        "(F)V",
+        &[Value::Float(0.5)],
+    );
+    assert_eq!(
+        call(&mut engine, child, "getLeft", "()I", &[]),
+        Value::Int(40)
+    );
+    assert_eq!(
+        call(&mut engine, child, "getTop", "()I", &[]),
+        Value::Int(20)
+    );
+    assert_eq!(
+        call(&mut engine, child, "getRight", "()I", &[]),
+        Value::Int(100)
+    );
+    assert_eq!(
+        call(&mut engine, child, "getBottom", "()I", &[]),
+        Value::Int(85)
+    );
+}

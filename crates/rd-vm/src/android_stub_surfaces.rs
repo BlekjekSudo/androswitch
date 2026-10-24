@@ -22,6 +22,10 @@
 //!   objects, validators/sanitizers, requests, and one-shot callbacks. There
 //!   is no AutofillManager session, AssistStructure capture, credential UI,
 //!   or cross-process service binding in this slice.
+//! * `android.transition` capture/matching plus `Visibility`, `Fade`,
+//!   `ChangeBounds`, `TransitionSet`, `Scene`, and delayed transitions on
+//!   the deterministic frame clock. Overlay snapshot copies, shared-element
+//!   window handoff, explode/slide/arc motions, and XML inflation are out.
 //! * `android.animation` `ValueAnimator`/`ObjectAnimator` timing on the
 //!   deterministic virtual Choreographer clock, with keyframes, evaluators,
 //!   listeners and JavaBeans/Property application. AnimatorSet, Path and
@@ -165,6 +169,35 @@ const AF_FIELD_CLASSIFICATION: &str = "Landroid/service/autofill/FieldClassifica
 const AF_FIELD_CLASSIFICATION_MATCH: &str = "Landroid/service/autofill/FieldClassification$Match;";
 const AF_SAVED_DATASETS_INFO: &str = "Landroid/service/autofill/SavedDatasetsInfo;";
 const AF_SAVED_DATASETS_CALLBACK: &str = "Landroid/service/autofill/SavedDatasetsInfoCallback;";
+
+const TRANSITION: &str = "Landroid/transition/Transition;";
+const TRANSITION_LISTENER: &str = "Landroid/transition/Transition$TransitionListener;";
+const TRANSITION_EPICENTER_CALLBACK: &str = "Landroid/transition/Transition$EpicenterCallback;";
+const TRANSITION_ANIMATION_INFO: &str = "Landroid/transition/Transition$AnimationInfo;";
+const TRANSITION_VALUES: &str = "Landroid/transition/TransitionValues;";
+const TRANSITION_VALUES_MAPS: &str = "Landroid/transition/TransitionValuesMaps;";
+const TRANSITION_VISIBILITY: &str = "Landroid/transition/Visibility;";
+const TRANSITION_FADE: &str = "Landroid/transition/Fade;";
+const TRANSITION_CHANGE_BOUNDS: &str = "Landroid/transition/ChangeBounds;";
+const TRANSITION_SET: &str = "Landroid/transition/TransitionSet;";
+const TRANSITION_AUTO: &str = "Landroid/transition/AutoTransition;";
+const TRANSITION_MANAGER: &str = "Landroid/transition/TransitionManager;";
+const TRANSITION_SCENE: &str = "Landroid/transition/Scene;";
+const TRANSITION_PROPAGATION: &str = "Landroid/transition/TransitionPropagation;";
+const TRANSITION_PATH_MOTION: &str = "Landroid/transition/PathMotion;";
+const TRANSITION_LISTENER_ADAPTER: &str = "Landroid/transition/TransitionListenerAdapter;";
+const TRANSITION_STRAIGHT_PATH: &str = "Landroid/transition/Transition$1;";
+const TRANSITION_RUN_LISTENER: &str = "Landroid/transition/Transition$2;";
+const TRANSITION_ANIMATE_LISTENER: &str = "Landroid/transition/Transition$3;";
+const TRANSITION_SET_LISTENER: &str = "Landroid/transition/TransitionSet$TransitionSetListener;";
+const TRANSITION_SET_NEXT_LISTENER: &str = "Landroid/transition/TransitionSet$1;";
+const TRANSITION_MANAGER_MULTI: &str = "Landroid/transition/TransitionManager$MultiListener;";
+const TRANSITION_MANAGER_END_LISTENER: &str = "Landroid/transition/TransitionManager$1;";
+const TRANSITION_FADE_LISTENER: &str = "Landroid/transition/Fade$1;";
+const TRANSITION_FADE_ANIM_LISTENER: &str = "Landroid/transition/Fade$FadeAnimatorListener;";
+const TRANSITION_DISAPPEAR_LISTENER: &str = "Landroid/transition/Visibility$DisappearListener;";
+const TRANSITION_VISIBILITY_OVERLAY_LISTENER: &str = "Landroid/transition/Visibility$1;";
+const TRANSITION_CHANGE_BOUNDS_LISTENER: &str = "Landroid/transition/ChangeBounds$1;";
 
 fn ise(msg: impl Into<String>) -> VmExit {
     throw("Ljava/lang/IllegalStateException;", msg)
@@ -470,6 +503,16 @@ pub(crate) fn host_static(
         (AF_SAVED_DATASETS_CALLBACK, "ERROR_OTHER") => Value::Int(0),
         (AF_SAVED_DATASETS_CALLBACK, "ERROR_UNSUPPORTED") => Value::Int(1),
         (AF_SAVED_DATASETS_CALLBACK, "ERROR_NEEDS_USER_ACTION") => Value::Int(2),
+        (TRANSITION, "MATCH_INSTANCE") => Value::Int(0x1),
+        (TRANSITION, "MATCH_NAME") => Value::Int(0x2),
+        (TRANSITION, "MATCH_ID") => Value::Int(0x3),
+        (TRANSITION, "MATCH_ITEM_ID") => Value::Int(0x4),
+        (TRANSITION_VISIBILITY, "MODE_IN") => Value::Int(0x1),
+        (TRANSITION_VISIBILITY, "MODE_OUT") => Value::Int(0x2),
+        (TRANSITION_FADE, "IN") => Value::Int(0x1),
+        (TRANSITION_FADE, "OUT") => Value::Int(0x2),
+        (TRANSITION_SET, "ORDERING_TOGETHER") => Value::Int(0),
+        (TRANSITION_SET, "ORDERING_SEQUENTIAL") => Value::Int(1),
         (TEXT_CLASSIFICATION, "EMPTY") => return empty_text_classification(vm).map(Some),
         (TEXT_LANGUAGE, "EMPTY") => return empty_text_language(vm).map(Some),
         _ => return Ok(None),
@@ -516,6 +559,8 @@ pub(crate) fn static_intrinsic(
         AF_FILL_RESPONSE if name == "shallowCopy" => {
             af_fill_response_copy_static(vm, args).map(Some)
         }
+        TRANSITION_MANAGER => transition_manager_static(vm, name, sig, args),
+        TRANSITION_SCENE => transition_scene_static(vm, name, sig, args),
         WEBVIEW => webview_static(vm, name, sig, args),
         WEB_SETTINGS if name == "getDefaultUserAgent" => {
             // A deterministic user agent for the no-renderer profile.  Callers
@@ -682,6 +727,35 @@ pub(crate) fn instance_intrinsic(
         }
         AF_SAVED_DATASETS_INFO => af_saved_datasets_info_instance(vm, name, sig, recv, args),
         AUTOFILL_SERVICE => af_autofill_service_instance(vm, name, sig, recv, args),
+        TRANSITION
+        | TRANSITION_VISIBILITY
+        | TRANSITION_FADE
+        | TRANSITION_CHANGE_BOUNDS
+        | TRANSITION_SET
+        | TRANSITION_AUTO => transition_instance(vm, name, sig, recv, args),
+        TRANSITION_VALUES => transition_values_instance(vm, name, sig, recv, args),
+        TRANSITION_ANIMATION_INFO => transition_animation_info_instance(vm, name, sig, recv, args),
+        TRANSITION_MANAGER => transition_manager_instance(vm, name, sig, recv, args),
+        TRANSITION_SCENE => transition_scene_instance(vm, name, sig, recv, args),
+        TRANSITION_LISTENER_ADAPTER
+        | TRANSITION_EPICENTER_CALLBACK
+        | TRANSITION_PROPAGATION
+        | TRANSITION_PATH_MOTION
+        | TRANSITION_STRAIGHT_PATH
+        | TRANSITION_RUN_LISTENER
+        | TRANSITION_ANIMATE_LISTENER
+        | TRANSITION_SET_LISTENER
+        | TRANSITION_SET_NEXT_LISTENER
+        | TRANSITION_LISTENER
+        | TRANSITION_MANAGER_MULTI
+        | TRANSITION_MANAGER_END_LISTENER
+        | TRANSITION_FADE_LISTENER
+        | TRANSITION_FADE_ANIM_LISTENER
+        | TRANSITION_DISAPPEAR_LISTENER
+        | TRANSITION_VISIBILITY_OVERLAY_LISTENER
+        | TRANSITION_CHANGE_BOUNDS_LISTENER => {
+            transition_callback_instance(vm, class, name, sig, recv, args)
+        }
         _ => Ok(None),
     }
 }
@@ -793,6 +867,34 @@ fn is_stub_class(c: &str) -> bool {
             | AF_FIELD_CLASSIFICATION
             | AF_FIELD_CLASSIFICATION_MATCH
             | AF_SAVED_DATASETS_INFO
+            | TRANSITION
+            | TRANSITION_LISTENER
+            | TRANSITION_EPICENTER_CALLBACK
+            | TRANSITION_ANIMATION_INFO
+            | TRANSITION_VALUES
+            | TRANSITION_VALUES_MAPS
+            | TRANSITION_VISIBILITY
+            | TRANSITION_FADE
+            | TRANSITION_CHANGE_BOUNDS
+            | TRANSITION_SET
+            | TRANSITION_AUTO
+            | TRANSITION_MANAGER
+            | TRANSITION_SCENE
+            | TRANSITION_PROPAGATION
+            | TRANSITION_PATH_MOTION
+            | TRANSITION_LISTENER_ADAPTER
+            | TRANSITION_STRAIGHT_PATH
+            | TRANSITION_RUN_LISTENER
+            | TRANSITION_ANIMATE_LISTENER
+            | TRANSITION_SET_LISTENER
+            | TRANSITION_SET_NEXT_LISTENER
+            | TRANSITION_MANAGER_MULTI
+            | TRANSITION_MANAGER_END_LISTENER
+            | TRANSITION_FADE_LISTENER
+            | TRANSITION_FADE_ANIM_LISTENER
+            | TRANSITION_DISAPPEAR_LISTENER
+            | TRANSITION_VISIBILITY_OVERLAY_LISTENER
+            | TRANSITION_CHANGE_BOUNDS_LISTENER
     )
 }
 
@@ -14288,4 +14390,4553 @@ fn af_autofill_service_instance(
         _ => return Ok(None),
     };
     Ok(Some(v))
+}
+
+// ---------------------------------------------------------------------------
+// android.transition: deterministic capture/match/play model
+// ---------------------------------------------------------------------------
+
+const TR_PROP_VISIBILITY: &str = "android:visibility:visibility";
+const TR_PROP_VISIBILITY_PARENT: &str = "android:visibility:parent";
+const TR_PROP_VISIBILITY_SCREEN: &str = "android:visibility:screenLocation";
+const TR_PROP_FADE_ALPHA: &str = "android:fade:transitionAlpha";
+const TR_PROP_BOUNDS: &str = "android:changeBounds:bounds";
+const TR_PROP_CLIP: &str = "android:changeBounds:clip";
+const TR_PROP_BOUNDS_PARENT: &str = "android:changeBounds:parent";
+const TR_PROP_WINDOW_X: &str = "android:changeBounds:windowX";
+const TR_PROP_WINDOW_Y: &str = "android:changeBounds:windowY";
+
+fn tr_new_list(vm: &mut Engine, items: Vec<Value>) -> Result<ObjRef, VmExit> {
+    new_collection(vm, "Ljava/util/ArrayList;", items)
+}
+fn tr_new_map(vm: &mut Engine) -> Result<ObjRef, VmExit> {
+    af_new_array_map(vm)
+}
+fn tr_list_value(items: Vec<Value>, vm: &mut Engine) -> Result<Value, VmExit> {
+    Ok(Value::Obj(tr_new_list(vm, items)?))
+}
+fn tr_items(vm: &Engine, value: &Value) -> Vec<Value> {
+    collection_items(vm, Some(value))
+}
+fn tr_field_items(vm: &Engine, r: ObjRef, field: &str) -> Vec<Value> {
+    tr_items(vm, &get(vm, r, field))
+}
+fn tr_set_field_list(
+    vm: &mut Engine,
+    r: ObjRef,
+    field: &str,
+    items: Vec<Value>,
+) -> Result<Value, VmExit> {
+    let value = tr_list_value(items, vm)?;
+    put(vm, r, field, value.clone())?;
+    Ok(value)
+}
+fn tr_append_field_list(
+    vm: &mut Engine,
+    r: ObjRef,
+    field: &str,
+    item: Value,
+) -> Result<(), VmExit> {
+    let mut items = tr_field_items(vm, r, field);
+    items.push(item);
+    tr_set_field_list(vm, r, field, items)?;
+    Ok(())
+}
+fn tr_remove_field_list(
+    vm: &mut Engine,
+    r: ObjRef,
+    field: &str,
+    item: &Value,
+) -> Result<bool, VmExit> {
+    let mut items = tr_field_items(vm, r, field);
+    let mut found = None;
+    for (index, existing) in items.iter().enumerate() {
+        if crate::intrinsics::values_equal(&vm.heap, existing, item)? {
+            found = Some(index);
+            break;
+        }
+    }
+    if let Some(index) = found {
+        items.remove(index);
+        tr_set_field_list(vm, r, field, items)?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+fn tr_list_contains(vm: &Engine, value: &Value, item: &Value) -> Result<bool, VmExit> {
+    for existing in tr_items(vm, value) {
+        if crate::intrinsics::values_equal(&vm.heap, &existing, item)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+fn tr_map_put(vm: &mut Engine, map: ObjRef, key: Value, value: Value) -> Result<Value, VmExit> {
+    let mut entries = match vm.fw.objects.get(&map) {
+        Some(HostObj::Map { entries }) => entries.clone(),
+        _ => Vec::new(),
+    };
+    let mut old = Value::Null;
+    let mut replaced = false;
+    for entry in &mut entries {
+        if crate::intrinsics::values_equal(&vm.heap, &entry.0, &key)? {
+            old = entry.1.clone();
+            entry.1 = value.clone();
+            replaced = true;
+            break;
+        }
+    }
+    if !replaced {
+        entries.push((key, value));
+    }
+    vm.fw.objects.insert(map, HostObj::Map { entries });
+    Ok(old)
+}
+fn tr_map_get(vm: &Engine, map_value: &Value, key: &Value) -> Option<Value> {
+    let Value::Obj(map) = map_value else {
+        return None;
+    };
+    match vm.fw.objects.get(map) {
+        Some(HostObj::Map { entries }) => entries
+            .iter()
+            .find(|(existing, _)| {
+                crate::intrinsics::values_equal(&vm.heap, existing, key).unwrap_or(false)
+            })
+            .map(|(_, value)| value.clone()),
+        _ => None,
+    }
+}
+fn tr_map_contains(vm: &Engine, map_value: &Value, key: &Value) -> bool {
+    let Value::Obj(map) = map_value else {
+        return false;
+    };
+    match vm.fw.objects.get(map) {
+        Some(HostObj::Map { entries }) => entries.iter().any(|(existing, _)| {
+            crate::intrinsics::values_equal(&vm.heap, existing, key).unwrap_or(false)
+        }),
+        _ => false,
+    }
+}
+fn tr_map_remove(vm: &mut Engine, map: ObjRef, key: &Value) -> Result<Value, VmExit> {
+    let mut entries = match vm.fw.objects.get(&map) {
+        Some(HostObj::Map { entries }) => entries.clone(),
+        _ => Vec::new(),
+    };
+    let mut old = Value::Null;
+    let mut removed = false;
+    let mut retained = Vec::with_capacity(entries.len());
+    for entry in entries.drain(..) {
+        if !removed && crate::intrinsics::values_equal(&vm.heap, &entry.0, key)? {
+            old = entry.1;
+            removed = true;
+        } else {
+            retained.push(entry);
+        }
+    }
+    vm.fw
+        .objects
+        .insert(map, HostObj::Map { entries: retained });
+    Ok(old)
+}
+fn tr_map_entries(vm: &Engine, map_value: &Value) -> Vec<(Value, Value)> {
+    map_entries(vm, Some(map_value))
+}
+fn tr_box_int(vm: &mut Engine, value: i32) -> Result<Value, VmExit> {
+    Ok(Value::Obj(crate::boxes::box_value(
+        vm,
+        "Ljava/lang/Integer;",
+        Value::Int(value),
+    )?))
+}
+fn tr_box_float(vm: &mut Engine, value: f32) -> Result<Value, VmExit> {
+    Ok(Value::Obj(crate::boxes::box_value(
+        vm,
+        "Ljava/lang/Float;",
+        Value::Float(value),
+    )?))
+}
+fn tr_unbox_int(vm: &Engine, value: &Value) -> Option<i32> {
+    anim_number_int(vm, value)
+}
+fn tr_unbox_float(vm: &Engine, value: &Value) -> Option<f32> {
+    anim_number_float(vm, value)
+}
+fn tr_static_get(vm: &Engine, owner: &str, field: &str) -> Value {
+    vm.statics
+        .get(&(owner.to_string(), field.to_string()))
+        .cloned()
+        .unwrap_or(Value::Null)
+}
+fn tr_static_set(vm: &mut Engine, owner: &str, field: &str, value: Value) {
+    vm.statics
+        .insert((owner.to_string(), field.to_string()), value);
+}
+fn tr_binary_name(descriptor: &str) -> String {
+    descriptor
+        .trim_start_matches('L')
+        .trim_end_matches(';')
+        .replace('/', ".")
+}
+fn tr_simple_name(descriptor: &str) -> String {
+    let binary = tr_binary_name(descriptor);
+    let class = binary.rsplit('.').next().unwrap_or(&binary);
+    class.rsplit('$').next().unwrap_or(class).to_string()
+}
+fn tr_new_values_maps(vm: &mut Engine) -> Result<Value, VmExit> {
+    let maps = alloc_obj(vm, TRANSITION_VALUES_MAPS, Vec::new())?;
+    let view_values = tr_new_map(vm)?;
+    put(vm, maps, "viewValues", Value::Obj(view_values))?;
+    let id_values = tr_new_map(vm)?;
+    put(vm, maps, "idValues", Value::Obj(id_values))?;
+    let item_values = tr_new_map(vm)?;
+    put(vm, maps, "itemIdValues", Value::Obj(item_values))?;
+    let name_values = tr_new_map(vm)?;
+    put(vm, maps, "nameValues", Value::Obj(name_values))?;
+    Ok(Value::Obj(maps))
+}
+fn tr_ensure_transition(vm: &mut Engine, r: ObjRef) -> Result<(), VmExit> {
+    if field_bool(vm, r, "rdTransitionInit") {
+        return Ok(());
+    }
+    let class = class_of(vm, r);
+    let name = tr_binary_name(&class);
+    put(vm, r, "rdTransitionInit", Value::Int(1))?;
+    let name_value = jstr(vm, name)?;
+    put(vm, r, "mName", name_value)?;
+    put(vm, r, "mStartDelay", Value::Long(-1))?;
+    put(vm, r, "mDuration", Value::Long(-1))?;
+    put(vm, r, "mInterpolator", Value::Null)?;
+    let target_ids = Value::Obj(tr_new_list(vm, Vec::new())?);
+    put(vm, r, "mTargetIds", target_ids)?;
+    let targets = Value::Obj(tr_new_list(vm, Vec::new())?);
+    put(vm, r, "mTargets", targets)?;
+    for field in [
+        "mTargetNames",
+        "mTargetTypes",
+        "mTargetIdExcludes",
+        "mTargetExcludes",
+        "mTargetTypeExcludes",
+        "mTargetNameExcludes",
+        "mTargetIdChildExcludes",
+        "mTargetChildExcludes",
+        "mTargetTypeChildExcludes",
+        "mParent",
+        "mStartValuesList",
+        "mEndValuesList",
+        "mSceneRoot",
+        "mListeners",
+        "mPropagation",
+        "mEpicenterCallback",
+        "mNameOverrides",
+    ] {
+        put(vm, r, field, Value::Null)?;
+    }
+    let start_maps = tr_new_values_maps(vm)?;
+    put(vm, r, "mStartValues", start_maps)?;
+    let end_maps = tr_new_values_maps(vm)?;
+    put(vm, r, "mEndValues", end_maps)?;
+    let order = new_int_array(vm, &[2, 1, 3, 4])?;
+    put(vm, r, "mMatchOrder", order)?;
+    put(vm, r, "mCanRemoveViews", Value::Int(0))?;
+    let current = Value::Obj(tr_new_list(vm, Vec::new())?);
+    put(vm, r, "mCurrentAnimators", current)?;
+    put(vm, r, "mNumInstances", Value::Int(0))?;
+    put(vm, r, "mPaused", Value::Int(0))?;
+    put(vm, r, "mEnded", Value::Int(0))?;
+    let animators = Value::Obj(tr_new_list(vm, Vec::new())?);
+    put(vm, r, "mAnimators", animators)?;
+    let path = alloc_obj(vm, TRANSITION_STRAIGHT_PATH, Vec::new())?;
+    put(vm, r, "mPathMotion", Value::Obj(path))?;
+    if vm.cp.is_subtype(&class, TRANSITION_VISIBILITY) {
+        put(vm, r, "mMode", Value::Int(3))?;
+        put(vm, r, "mSuppressLayout", Value::Int(1))?;
+    }
+    if vm.cp.is_subtype(&class, TRANSITION_SET) {
+        let children = Value::Obj(tr_new_list(vm, Vec::new())?);
+        put(vm, r, "mTransitions", children)?;
+        put(vm, r, "mPlayTogether", Value::Int(1))?;
+        put(vm, r, "mCurrentListeners", Value::Int(0))?;
+        put(vm, r, "mStarted", Value::Int(0))?;
+        put(vm, r, "mChangeFlags", Value::Int(0))?;
+    }
+    if class == TRANSITION_CHANGE_BOUNDS || vm.cp.is_subtype(&class, TRANSITION_CHANGE_BOUNDS) {
+        put(vm, r, "mResizeClip", Value::Int(0))?;
+        put(vm, r, "mReparent", Value::Int(0))?;
+    }
+    Ok(())
+}
+fn tr_ensure_values(vm: &mut Engine, r: ObjRef) -> Result<(), VmExit> {
+    if field_bool(vm, r, "rdValuesInit") {
+        return Ok(());
+    }
+    put(vm, r, "rdValuesInit", Value::Int(1))?;
+    put(vm, r, "view", Value::Null)?;
+    let values = tr_new_map(vm)?;
+    put(vm, r, "values", Value::Obj(values))?;
+    let targeted = tr_new_list(vm, Vec::new())?;
+    put(vm, r, "targetedTransitions", Value::Obj(targeted))
+}
+fn tr_new_transition_values(vm: &mut Engine, view: Option<ObjRef>) -> Result<ObjRef, VmExit> {
+    let values = alloc_obj(vm, TRANSITION_VALUES, Vec::new())?;
+    tr_ensure_values(vm, values)?;
+    put(vm, values, "view", view.map_or(Value::Null, Value::Obj))?;
+    Ok(values)
+}
+fn tr_values_view(vm: &Engine, values: ObjRef) -> Option<ObjRef> {
+    field_obj(vm, values, "view")
+}
+fn tr_values_map(vm: &Engine, values: ObjRef) -> Value {
+    get(vm, values, "values")
+}
+fn tr_values_get_with_key(vm: &Engine, values: Option<ObjRef>, key_value: &Value) -> Option<Value> {
+    tr_map_get(vm, &tr_values_map(vm, values?), key_value)
+}
+fn tr_values_put(vm: &mut Engine, values: ObjRef, key: &str, value: Value) -> Result<(), VmExit> {
+    let map = field_obj(vm, values, "values").ok_or_else(|| npe("values"))?;
+    let key = jstr(vm, key)?;
+    tr_map_put(vm, map, key, value)?;
+    Ok(())
+}
+fn tr_values_map_equal(vm: &mut Engine, left: &Value, right: &Value) -> Result<bool, VmExit> {
+    let left_entries = tr_map_entries(vm, left);
+    let right_entries = tr_map_entries(vm, right);
+    if left_entries.len() != right_entries.len() {
+        return Ok(false);
+    }
+    for (key, value) in left_entries {
+        if !tr_map_contains(vm, right, &key) {
+            return Ok(false);
+        }
+        let other = tr_map_get(vm, right, &key).unwrap_or(Value::Null);
+        if crate::intrinsics::values_equal(&vm.heap, &value, &other)? {
+            continue;
+        }
+        if let Value::Obj(a) = value {
+            let equal = vm.invoke_instance(
+                a,
+                "equals",
+                "(Ljava/lang/Object;)Z",
+                std::slice::from_ref(&other),
+            )?;
+            if equal != Value::Int(1) {
+                return Ok(false);
+            }
+        } else {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+fn tr_map_hash(vm: &mut Engine, map_value: &Value) -> Result<i32, VmExit> {
+    let mut hash = 0i32;
+    for (key, value) in tr_map_entries(vm, map_value) {
+        hash = hash.wrapping_add(object_hash_code(vm, &key)? ^ object_hash_code(vm, &value)?);
+    }
+    Ok(hash)
+}
+
+fn transition_values_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            tr_ensure_values(vm, recv)?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/view/View;)V") => {
+            tr_ensure_values(vm, recv)?;
+            put(
+                vm,
+                recv,
+                "view",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            tr_ensure_values(vm, recv)?;
+            let Some(other) = obj(args.first()) else {
+                return Ok(Some(Value::Int(0)));
+            };
+            if !vm.cp.is_subtype(&class_of(vm, other), TRANSITION_VALUES) {
+                return Ok(Some(Value::Int(0)));
+            }
+            tr_ensure_values(vm, other)?;
+            if get(vm, recv, "view") != get(vm, other, "view") {
+                return Ok(Some(Value::Int(0)));
+            }
+            let left = tr_values_map(vm, recv);
+            let right = tr_values_map(vm, other);
+            Value::Int(tr_values_map_equal(vm, &left, &right)? as i32)
+        }
+        ("hashCode", "()I") => {
+            tr_ensure_values(vm, recv)?;
+            let view = get(vm, recv, "view");
+            let view_hash = object_hash_code(vm, &view)?;
+            let map = tr_values_map(vm, recv);
+            Value::Int(
+                view_hash
+                    .wrapping_mul(31)
+                    .wrapping_add(tr_map_hash(vm, &map)?),
+            )
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            tr_ensure_values(vm, recv)?;
+            let view = get(vm, recv, "view");
+            let view_hash = object_hash_code(vm, &view)?;
+            let map = tr_values_map(vm, recv);
+            let hash = view_hash
+                .wrapping_mul(31)
+                .wrapping_add(tr_map_hash(vm, &map)?);
+            let mut out = format!(
+                "TransitionValues@{:x}:\n    view = {}\n    values:",
+                hash as u32,
+                value_string(vm, &view)?
+            );
+            for (key, value) in tr_map_entries(vm, &map) {
+                out.push_str(&format!(
+                    "    {}: {}\n",
+                    value_string(vm, &key)?,
+                    value_string(vm, &value)?
+                ));
+            }
+            jstr(vm, out)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn transition_animation_info_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if name != "<init>"
+        || sig != "(Landroid/view/View;Ljava/lang/String;Landroid/transition/Transition;Landroid/view/WindowId;Landroid/transition/TransitionValues;)V"
+    {
+        return Ok(None);
+    }
+    put(
+        vm,
+        recv,
+        "view",
+        args.first().cloned().unwrap_or(Value::Null),
+    )?;
+    put(
+        vm,
+        recv,
+        "name",
+        args.get(1).cloned().unwrap_or(Value::Null),
+    )?;
+    put(
+        vm,
+        recv,
+        "transition",
+        args.get(2).cloned().unwrap_or(Value::Null),
+    )?;
+    put(
+        vm,
+        recv,
+        "windowId",
+        args.get(3).cloned().unwrap_or(Value::Null),
+    )?;
+    put(
+        vm,
+        recv,
+        "values",
+        args.get(4).cloned().unwrap_or(Value::Null),
+    )?;
+    Ok(Some(Value::Null))
+}
+
+fn tr_invoke(
+    vm: &mut Engine,
+    recv: ObjRef,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Value, VmExit> {
+    vm.invoke_instance(recv, name, sig, args)
+}
+fn tr_view_id(vm: &mut Engine, view: ObjRef) -> Result<i32, VmExit> {
+    Ok(match tr_invoke(vm, view, "getId", "()I", &[])? {
+        Value::Int(v) => v,
+        _ => -1,
+    })
+}
+fn tr_view_parent(vm: &mut Engine, view: ObjRef) -> Result<Value, VmExit> {
+    tr_invoke(vm, view, "getParent", "()Landroid/view/ViewParent;", &[])
+}
+fn tr_view_transition_name(vm: &mut Engine, view: ObjRef) -> Result<Value, VmExit> {
+    match tr_invoke(vm, view, "getTransitionName", "()Ljava/lang/String;", &[]) {
+        Ok(v) => Ok(v),
+        Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => Ok(Value::Null),
+        Err(error) => Err(error),
+    }
+}
+fn tr_class_is_instance(
+    vm: &mut Engine,
+    class_value: &Value,
+    target: ObjRef,
+) -> Result<bool, VmExit> {
+    let Some(class_obj) = obj(Some(class_value)) else {
+        return Ok(false);
+    };
+    match vm.invoke_instance(
+        class_obj,
+        "isInstance",
+        "(Ljava/lang/Object;)Z",
+        &[Value::Obj(target)],
+    ) {
+        Ok(Value::Int(v)) => Ok(v != 0),
+        Ok(_) => Ok(false),
+        Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+fn tr_ensure_field_list(vm: &mut Engine, r: ObjRef, field: &str) -> Result<Vec<Value>, VmExit> {
+    if field_obj(vm, r, field).is_none() {
+        tr_set_field_list(vm, r, field, Vec::new())?;
+    }
+    Ok(tr_field_items(vm, r, field))
+}
+fn tr_is_valid_target(
+    vm: &mut Engine,
+    transition: ObjRef,
+    view: Option<ObjRef>,
+) -> Result<bool, VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    let Some(view) = view else {
+        return Ok(false);
+    };
+    let id = tr_view_id(vm, view)?;
+    let boxed_id = tr_box_int(vm, id)?;
+    if tr_list_contains(vm, &get(vm, transition, "mTargetIdExcludes"), &boxed_id)? {
+        return Ok(false);
+    }
+    if tr_list_contains(
+        vm,
+        &get(vm, transition, "mTargetExcludes"),
+        &Value::Obj(view),
+    )? {
+        return Ok(false);
+    }
+    for class_value in tr_field_items(vm, transition, "mTargetTypeExcludes") {
+        if tr_class_is_instance(vm, &class_value, view)? {
+            return Ok(false);
+        }
+    }
+    let name_value = tr_view_transition_name(vm, view)?;
+    if !matches!(name_value, Value::Null)
+        && tr_list_contains(vm, &get(vm, transition, "mTargetNameExcludes"), &name_value)?
+    {
+        return Ok(false);
+    }
+    let target_ids = tr_field_items(vm, transition, "mTargetIds");
+    let targets = tr_field_items(vm, transition, "mTargets");
+    let target_names = tr_field_items(vm, transition, "mTargetNames");
+    let target_types = tr_field_items(vm, transition, "mTargetTypes");
+    if target_ids.is_empty()
+        && targets.is_empty()
+        && target_names.is_empty()
+        && target_types.is_empty()
+    {
+        return Ok(true);
+    }
+    if tr_list_contains(vm, &get(vm, transition, "mTargetIds"), &boxed_id)?
+        || tr_list_contains(vm, &get(vm, transition, "mTargets"), &Value::Obj(view))?
+    {
+        return Ok(true);
+    }
+    if !matches!(name_value, Value::Null)
+        && tr_list_contains(vm, &get(vm, transition, "mTargetNames"), &name_value)?
+    {
+        return Ok(true);
+    }
+    for class_value in target_types {
+        if tr_class_is_instance(vm, &class_value, view)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+fn tr_maps_obj(vm: &Engine, transition: ObjRef, start: bool) -> Option<ObjRef> {
+    field_obj(
+        vm,
+        transition,
+        if start { "mStartValues" } else { "mEndValues" },
+    )
+}
+fn tr_maps_field(vm: &Engine, maps: ObjRef, field: &str) -> Option<ObjRef> {
+    field_obj(vm, maps, field)
+}
+fn tr_clear_values(vm: &mut Engine, transition: ObjRef, start: bool) -> Result<(), VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    let maps = tr_new_values_maps(vm)?;
+    put(
+        vm,
+        transition,
+        if start { "mStartValues" } else { "mEndValues" },
+        maps,
+    )?;
+    put(
+        vm,
+        transition,
+        if start {
+            "mStartValuesList"
+        } else {
+            "mEndValuesList"
+        },
+        Value::Null,
+    )
+}
+fn tr_capture_propagation_values(
+    vm: &mut Engine,
+    transition: ObjRef,
+    values: ObjRef,
+) -> Result<(), VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    let is_set = {
+        let class = class_of(vm, transition);
+        vm.cp.is_subtype(&class, TRANSITION_SET)
+    };
+    if let Some(propagation) = field_obj(vm, transition, "mPropagation") {
+        let map = tr_values_map(vm, values);
+        if !tr_map_entries(vm, &map).is_empty() {
+            let properties = tr_invoke(
+                vm,
+                propagation,
+                "getPropagationProperties",
+                "()[Ljava/lang/String;",
+                &[],
+            )?;
+            if matches!(properties, Value::Obj(_)) {
+                let mut contains_all = true;
+                for property in array_elems(vm, Some(&properties)) {
+                    if !tr_map_contains(vm, &map, &property) {
+                        contains_all = false;
+                        break;
+                    }
+                }
+                if !contains_all {
+                    tr_invoke(
+                        vm,
+                        propagation,
+                        "captureValues",
+                        "(Landroid/transition/TransitionValues;)V",
+                        &[Value::Obj(values)],
+                    )?;
+                }
+            }
+        }
+    }
+    if is_set {
+        for child in tr_field_items(vm, transition, "mTransitions")
+            .iter()
+            .filter_map(|value| obj(Some(value)))
+        {
+            tr_capture_propagation_values(vm, child, values)?;
+        }
+    }
+    Ok(())
+}
+fn tr_add_view_values(
+    vm: &mut Engine,
+    maps: ObjRef,
+    view: ObjRef,
+    values: ObjRef,
+) -> Result<(), VmExit> {
+    let view_values = tr_maps_field(vm, maps, "viewValues").ok_or_else(|| npe("viewValues"))?;
+    tr_map_put(vm, view_values, Value::Obj(view), Value::Obj(values))?;
+    let id = tr_view_id(vm, view)?;
+    if id >= 0 {
+        let id_values = tr_maps_field(vm, maps, "idValues").ok_or_else(|| npe("idValues"))?;
+        let key = tr_box_int(vm, id)?;
+        let value = if tr_map_contains(vm, &Value::Obj(id_values), &key) {
+            Value::Null
+        } else {
+            Value::Obj(view)
+        };
+        tr_map_put(vm, id_values, key, value)?;
+    }
+    let name = tr_view_transition_name(vm, view)?;
+    if !matches!(name, Value::Null) {
+        let name_values = tr_maps_field(vm, maps, "nameValues").ok_or_else(|| npe("nameValues"))?;
+        let value = if tr_map_contains(vm, &Value::Obj(name_values), &name) {
+            Value::Null
+        } else {
+            Value::Obj(view)
+        };
+        tr_map_put(vm, name_values, name, value)?;
+    }
+    Ok(())
+}
+fn tr_capture_one(
+    vm: &mut Engine,
+    transition: ObjRef,
+    view: ObjRef,
+    start: bool,
+    maps: ObjRef,
+) -> Result<(), VmExit> {
+    let values = tr_new_transition_values(vm, Some(view))?;
+    tr_invoke(
+        vm,
+        transition,
+        if start {
+            "captureStartValues"
+        } else {
+            "captureEndValues"
+        },
+        "(Landroid/transition/TransitionValues;)V",
+        &[Value::Obj(values)],
+    )?;
+    tr_append_field_list(vm, values, "targetedTransitions", Value::Obj(transition))?;
+    tr_capture_propagation_values(vm, transition, values)?;
+    tr_add_view_values(vm, maps, view, values)
+}
+fn tr_capture_hierarchy(
+    vm: &mut Engine,
+    transition: ObjRef,
+    view: ObjRef,
+    start: bool,
+    maps: ObjRef,
+    depth: usize,
+) -> Result<(), VmExit> {
+    if depth > 256 {
+        return Ok(());
+    }
+    let id = tr_view_id(vm, view)?;
+    let boxed_id = tr_box_int(vm, id)?;
+    if tr_list_contains(vm, &get(vm, transition, "mTargetIdExcludes"), &boxed_id)?
+        || tr_list_contains(
+            vm,
+            &get(vm, transition, "mTargetExcludes"),
+            &Value::Obj(view),
+        )?
+    {
+        return Ok(());
+    }
+    for class_value in tr_field_items(vm, transition, "mTargetTypeExcludes") {
+        if tr_class_is_instance(vm, &class_value, view)? {
+            return Ok(());
+        }
+    }
+    let parent = tr_view_parent(vm, view)?;
+    if let Some(parent_ref) = obj(Some(&parent)) {
+        let parent_class = class_of(vm, parent_ref);
+        if vm.cp.is_subtype(&parent_class, "Landroid/view/ViewGroup;") {
+            tr_capture_one(vm, transition, view, start, maps)?;
+        }
+    }
+    let view_class = class_of(vm, view);
+    if vm.cp.is_subtype(&view_class, "Landroid/view/ViewGroup;") {
+        if tr_list_contains(
+            vm,
+            &get(vm, transition, "mTargetIdChildExcludes"),
+            &boxed_id,
+        )? || tr_list_contains(
+            vm,
+            &get(vm, transition, "mTargetChildExcludes"),
+            &Value::Obj(view),
+        )? {
+            return Ok(());
+        }
+        for class_value in tr_field_items(vm, transition, "mTargetTypeChildExcludes") {
+            if tr_class_is_instance(vm, &class_value, view)? {
+                return Ok(());
+            }
+        }
+        let count = match tr_invoke(vm, view, "getChildCount", "()I", &[])? {
+            Value::Int(v) => v.max(0),
+            _ => 0,
+        };
+        for index in 0..count {
+            let child = tr_invoke(
+                vm,
+                view,
+                "getChildAt",
+                "(I)Landroid/view/View;",
+                &[Value::Int(index)],
+            )?;
+            if let Some(child) = obj(Some(&child)) {
+                tr_capture_hierarchy(vm, transition, child, start, maps, depth + 1)?;
+            }
+        }
+    }
+    Ok(())
+}
+fn tr_capture_values(
+    vm: &mut Engine,
+    transition: ObjRef,
+    scene_root: ObjRef,
+    start: bool,
+) -> Result<(), VmExit> {
+    tr_clear_values(vm, transition, start)?;
+    let maps = tr_maps_obj(vm, transition, start).ok_or_else(|| npe("transition values"))?;
+    let target_ids = tr_field_items(vm, transition, "mTargetIds");
+    let targets = tr_field_items(vm, transition, "mTargets");
+    let has_names_or_types = !tr_field_items(vm, transition, "mTargetNames").is_empty()
+        || !tr_field_items(vm, transition, "mTargetTypes").is_empty();
+    if (!target_ids.is_empty() || !targets.is_empty()) && !has_names_or_types {
+        for id_value in target_ids {
+            let Some(id) = tr_unbox_int(vm, &id_value) else {
+                continue;
+            };
+            let view = tr_invoke(
+                vm,
+                scene_root,
+                "findViewById",
+                "(I)Landroid/view/View;",
+                &[Value::Int(id)],
+            )?;
+            if let Some(view) = obj(Some(&view)) {
+                tr_capture_one(vm, transition, view, start, maps)?;
+            }
+        }
+        for target in targets.iter().filter_map(|value| obj(Some(value))) {
+            tr_capture_one(vm, transition, target, start, maps)?;
+        }
+    } else {
+        tr_capture_hierarchy(vm, transition, scene_root, start, maps, 0)?;
+    }
+    if !start {
+        let overrides = get(vm, transition, "mNameOverrides");
+        if matches!(overrides, Value::Obj(_)) {
+            let start_maps =
+                tr_maps_obj(vm, transition, true).ok_or_else(|| npe("start values"))?;
+            let name_values =
+                tr_maps_field(vm, start_maps, "nameValues").ok_or_else(|| npe("nameValues"))?;
+            let entries = tr_map_entries(vm, &overrides);
+            let mut removed = Vec::new();
+            for (from, _) in &entries {
+                removed.push(tr_map_remove(vm, name_values, from)?);
+            }
+            for ((_, to), view) in entries.into_iter().zip(removed) {
+                if !matches!(view, Value::Null) {
+                    tr_map_put(vm, name_values, to, view)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+fn tr_view_values_entries(vm: &Engine, maps: ObjRef) -> Vec<(ObjRef, ObjRef)> {
+    let Some(view_values) = tr_maps_field(vm, maps, "viewValues") else {
+        return Vec::new();
+    };
+    tr_map_entries(vm, &Value::Obj(view_values))
+        .into_iter()
+        .filter_map(|(view, values)| Some((obj(Some(&view))?, obj(Some(&values))?)))
+        .collect()
+}
+fn tr_match_start_and_end(vm: &mut Engine, transition: ObjRef) -> Result<(), VmExit> {
+    let start_maps = tr_maps_obj(vm, transition, true).ok_or_else(|| npe("start values"))?;
+    let end_maps = tr_maps_obj(vm, transition, false).ok_or_else(|| npe("end values"))?;
+    let mut unmatched_start = tr_view_values_entries(vm, start_maps);
+    let mut unmatched_end = tr_view_values_entries(vm, end_maps);
+    let mut pairs: Vec<(Option<ObjRef>, Option<ObjRef>)> = Vec::new();
+    let order = int_values(vm, Some(&get(vm, transition, "mMatchOrder")));
+    let order = if order.is_empty() {
+        vec![2, 1, 3, 4]
+    } else {
+        order
+    };
+    for kind in order {
+        match kind {
+            1 => {
+                let mut index = unmatched_start.len();
+                while index > 0 {
+                    index -= 1;
+                    let (view, _) = unmatched_start[index];
+                    if !tr_is_valid_target(vm, transition, Some(view))? {
+                        continue;
+                    }
+                    if let Some(end_index) = unmatched_end
+                        .iter()
+                        .position(|(candidate, _)| *candidate == view)
+                    {
+                        let (end_view, end_values) = unmatched_end[end_index];
+                        if tr_is_valid_target(vm, transition, Some(end_view))? {
+                            let (_, start_values) = unmatched_start.remove(index);
+                            unmatched_end.remove(end_index);
+                            pairs.push((Some(start_values), Some(end_values)));
+                        }
+                    }
+                }
+            }
+            2..=4 => {
+                let field = match kind {
+                    2 => "nameValues",
+                    3 => "idValues",
+                    _ => "itemIdValues",
+                };
+                let Some(start_map) = tr_maps_field(vm, start_maps, field) else {
+                    continue;
+                };
+                let Some(end_map) = tr_maps_field(vm, end_maps, field) else {
+                    continue;
+                };
+                for (key, start_view_value) in tr_map_entries(vm, &Value::Obj(start_map)) {
+                    let Some(start_view) = obj(Some(&start_view_value)) else {
+                        continue;
+                    };
+                    if !tr_is_valid_target(vm, transition, Some(start_view))? {
+                        continue;
+                    }
+                    let Some(end_view_value) = tr_map_get(vm, &Value::Obj(end_map), &key) else {
+                        continue;
+                    };
+                    let Some(end_view) = obj(Some(&end_view_value)) else {
+                        continue;
+                    };
+                    if !tr_is_valid_target(vm, transition, Some(end_view))? {
+                        continue;
+                    }
+                    let Some(start_index) = unmatched_start
+                        .iter()
+                        .position(|(view, _)| *view == start_view)
+                    else {
+                        continue;
+                    };
+                    let Some(end_index) =
+                        unmatched_end.iter().position(|(view, _)| *view == end_view)
+                    else {
+                        continue;
+                    };
+                    let (_, start_values) = unmatched_start.remove(start_index);
+                    let (_, end_values) = unmatched_end.remove(end_index);
+                    pairs.push((Some(start_values), Some(end_values)));
+                }
+            }
+            _ => {}
+        }
+    }
+    for (view, values) in unmatched_start {
+        if tr_is_valid_target(vm, transition, Some(view))? {
+            pairs.push((Some(values), None));
+        }
+    }
+    for (view, values) in unmatched_end {
+        if tr_is_valid_target(vm, transition, Some(view))? {
+            pairs.push((None, Some(values)));
+        }
+    }
+    let starts = pairs
+        .iter()
+        .map(|(start, _)| start.map_or(Value::Null, Value::Obj))
+        .collect();
+    let ends = pairs
+        .iter()
+        .map(|(_, end)| end.map_or(Value::Null, Value::Obj))
+        .collect();
+    tr_set_field_list(vm, transition, "mStartValuesList", starts)?;
+    tr_set_field_list(vm, transition, "mEndValuesList", ends)?;
+    Ok(())
+}
+fn tr_get_transition_values(
+    vm: &mut Engine,
+    transition: ObjRef,
+    view: Option<ObjRef>,
+    start: bool,
+) -> Result<Value, VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    if let Some(parent) = field_obj(vm, transition, "mParent") {
+        return tr_get_transition_values(vm, parent, view, start);
+    }
+    let Some(view) = view else {
+        return Ok(Value::Null);
+    };
+    let Some(maps) = tr_maps_obj(vm, transition, start) else {
+        return Ok(Value::Null);
+    };
+    let Some(view_values) = tr_maps_field(vm, maps, "viewValues") else {
+        return Ok(Value::Null);
+    };
+    Ok(tr_map_get(vm, &Value::Obj(view_values), &Value::Obj(view)).unwrap_or(Value::Null))
+}
+fn tr_get_matched_transition_values(
+    vm: &mut Engine,
+    transition: ObjRef,
+    view: Option<ObjRef>,
+    view_in_start: bool,
+) -> Result<Value, VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    if let Some(parent) = field_obj(vm, transition, "mParent") {
+        return tr_get_matched_transition_values(vm, parent, view, view_in_start);
+    }
+    let look_field = if view_in_start {
+        "mStartValuesList"
+    } else {
+        "mEndValuesList"
+    };
+    if field_obj(vm, transition, look_field).is_none() {
+        return Ok(Value::Null);
+    }
+    let look = tr_field_items(vm, transition, look_field);
+    let mut found = None;
+    for (index, value) in look.iter().enumerate() {
+        let Some(values) = obj(Some(value)) else {
+            return Ok(Value::Null);
+        };
+        if tr_values_view(vm, values) == view && view.is_some() {
+            found = Some(index);
+            break;
+        }
+    }
+    let Some(index) = found else {
+        return Ok(Value::Null);
+    };
+    let match_field = if view_in_start {
+        "mEndValuesList"
+    } else {
+        "mStartValuesList"
+    };
+    Ok(tr_field_items(vm, transition, match_field)
+        .get(index)
+        .cloned()
+        .unwrap_or(Value::Null))
+}
+
+fn tr_running_animators(vm: &mut Engine) -> Result<ObjRef, VmExit> {
+    if let Value::Obj(map) = tr_static_get(vm, TRANSITION, "rdRunningAnimators") {
+        return Ok(map);
+    }
+    let map = tr_new_map(vm)?;
+    tr_static_set(vm, TRANSITION, "rdRunningAnimators", Value::Obj(map));
+    Ok(map)
+}
+fn tr_notify_listeners(vm: &mut Engine, transition: ObjRef, method: &str) -> Result<(), VmExit> {
+    let listeners = tr_field_items(vm, transition, "mListeners");
+    for listener in listeners.iter().filter_map(|value| obj(Some(value))) {
+        tr_invoke(
+            vm,
+            listener,
+            method,
+            "(Landroid/transition/Transition;)V",
+            &[Value::Obj(transition)],
+        )?;
+    }
+    Ok(())
+}
+fn tr_start(vm: &mut Engine, transition: ObjRef) -> Result<(), VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    let count = field_int(vm, transition, "mNumInstances");
+    if count == 0 {
+        tr_notify_listeners(vm, transition, "onTransitionStart")?;
+        put(vm, transition, "mEnded", Value::Int(0))?;
+    }
+    put(
+        vm,
+        transition,
+        "mNumInstances",
+        Value::Int(count.wrapping_add(1)),
+    )
+}
+fn tr_end(vm: &mut Engine, transition: ObjRef) -> Result<(), VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    let count = field_int(vm, transition, "mNumInstances").wrapping_sub(1);
+    put(vm, transition, "mNumInstances", Value::Int(count))?;
+    if count == 0 {
+        tr_notify_listeners(vm, transition, "onTransitionEnd")?;
+        put(vm, transition, "mEnded", Value::Int(1))?;
+    }
+    Ok(())
+}
+fn tr_animator_set_duration(
+    vm: &mut Engine,
+    animator: ObjRef,
+    duration: i64,
+) -> Result<(), VmExit> {
+    let class = class_of(vm, animator);
+    if vm.cp.is_subtype(&class, VALUE_ANIMATOR) {
+        if duration < 0 {
+            return Err(iae(format!(
+                "Animators cannot have negative duration: {duration}"
+            )));
+        }
+        put(vm, animator, "rd_duration", Value::Long(duration))?;
+        return Ok(());
+    }
+    let sig = if vm.cp.is_subtype(&class, OBJECT_ANIMATOR) {
+        "(J)Landroid/animation/ObjectAnimator;"
+    } else {
+        "(J)Landroid/animation/Animator;"
+    };
+    tr_invoke(vm, animator, "setDuration", sig, &[Value::Long(duration)])?;
+    Ok(())
+}
+fn tr_animator_get_start_delay(vm: &mut Engine, animator: ObjRef) -> Result<i64, VmExit> {
+    let class = class_of(vm, animator);
+    if vm.cp.is_subtype(&class, VALUE_ANIMATOR) {
+        return Ok(anim_long_or(vm, animator, "rd_start_delay", 0));
+    }
+    Ok(
+        match tr_invoke(vm, animator, "getStartDelay", "()J", &[])? {
+            Value::Long(v) => v,
+            Value::Int(v) => v as i64,
+            _ => 0,
+        },
+    )
+}
+fn tr_animator_set_start_delay(
+    vm: &mut Engine,
+    animator: ObjRef,
+    delay: i64,
+) -> Result<(), VmExit> {
+    let class = class_of(vm, animator);
+    if vm.cp.is_subtype(&class, VALUE_ANIMATOR) {
+        put(vm, animator, "rd_start_delay", Value::Long(delay.max(0)))?;
+        return Ok(());
+    }
+    tr_invoke(vm, animator, "setStartDelay", "(J)V", &[Value::Long(delay)])?;
+    Ok(())
+}
+fn tr_animator_set_interpolator(
+    vm: &mut Engine,
+    animator: ObjRef,
+    interpolator: Value,
+) -> Result<(), VmExit> {
+    let class = class_of(vm, animator);
+    if vm.cp.is_subtype(&class, VALUE_ANIMATOR) {
+        put(vm, animator, "rd_interpolator", interpolator)?;
+        return Ok(());
+    }
+    tr_invoke(
+        vm,
+        animator,
+        "setInterpolator",
+        "(Landroid/animation/TimeInterpolator;)V",
+        &[interpolator],
+    )?;
+    Ok(())
+}
+fn tr_animator_add_listener(
+    vm: &mut Engine,
+    animator: ObjRef,
+    listener: ObjRef,
+    pause: bool,
+) -> Result<(), VmExit> {
+    if pause {
+        tr_invoke(
+            vm,
+            animator,
+            "addPauseListener",
+            "(Landroid/animation/Animator$AnimatorPauseListener;)V",
+            &[Value::Obj(listener)],
+        )?;
+    } else {
+        tr_invoke(
+            vm,
+            animator,
+            "addListener",
+            "(Landroid/animation/Animator$AnimatorListener;)V",
+            &[Value::Obj(listener)],
+        )?;
+    }
+    Ok(())
+}
+fn tr_animator_bool(vm: &mut Engine, animator: ObjRef, method: &str) -> Result<bool, VmExit> {
+    Ok(tr_invoke(vm, animator, method, "()Z", &[])? == Value::Int(1))
+}
+fn tr_animate(vm: &mut Engine, transition: ObjRef, animator: Option<ObjRef>) -> Result<(), VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    let Some(animator) = animator else {
+        return tr_end(vm, transition);
+    };
+    let duration = field_long(vm, transition, "mDuration");
+    if duration >= 0 {
+        tr_animator_set_duration(vm, animator, duration)?;
+    }
+    let delay = field_long(vm, transition, "mStartDelay");
+    if delay >= 0 {
+        let existing = tr_animator_get_start_delay(vm, animator)?;
+        tr_animator_set_start_delay(vm, animator, delay.saturating_add(existing))?;
+    }
+    let interpolator = get(vm, transition, "mInterpolator");
+    if !matches!(interpolator, Value::Null) {
+        tr_animator_set_interpolator(vm, animator, interpolator)?;
+    }
+    let listener = alloc_obj(vm, TRANSITION_ANIMATE_LISTENER, Vec::new())?;
+    put(vm, listener, "this$0", Value::Obj(transition))?;
+    tr_animator_add_listener(vm, animator, listener, false)?;
+    tr_invoke(vm, animator, "start", "()V", &[])?;
+    Ok(())
+}
+fn tr_run_animator(vm: &mut Engine, transition: ObjRef, animator: ObjRef) -> Result<(), VmExit> {
+    let running = tr_running_animators(vm)?;
+    let listener = alloc_obj(vm, TRANSITION_RUN_LISTENER, Vec::new())?;
+    put(vm, listener, "this$0", Value::Obj(transition))?;
+    put(vm, listener, "val$runningAnimators", Value::Obj(running))?;
+    tr_animator_add_listener(vm, animator, listener, false)?;
+    tr_animate(vm, transition, Some(animator))
+}
+fn tr_set_children(vm: &Engine, transition: ObjRef) -> Vec<ObjRef> {
+    tr_field_items(vm, transition, "mTransitions")
+        .iter()
+        .filter_map(|value| obj(Some(value)))
+        .collect()
+}
+fn tr_is_set(vm: &Engine, transition: ObjRef) -> bool {
+    let class = class_of(vm, transition);
+    vm.cp.is_subtype(&class, TRANSITION_SET)
+}
+fn tr_run_animators(vm: &mut Engine, transition: ObjRef) -> Result<(), VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    if tr_is_set(vm, transition) {
+        let children = tr_set_children(vm, transition);
+        if children.is_empty() {
+            tr_start(vm, transition)?;
+            return tr_end(vm, transition);
+        }
+        let listener = alloc_obj(vm, TRANSITION_SET_LISTENER, Vec::new())?;
+        put(vm, listener, "mTransitionSet", Value::Obj(transition))?;
+        for child in &children {
+            tr_invoke(
+                vm,
+                *child,
+                "addListener",
+                "(Landroid/transition/Transition$TransitionListener;)Landroid/transition/Transition;",
+                &[Value::Obj(listener)],
+            )?;
+        }
+        put(
+            vm,
+            transition,
+            "mCurrentListeners",
+            Value::Int(children.len() as i32),
+        )?;
+        if !field_bool(vm, transition, "mPlayTogether") {
+            for pair in children.windows(2) {
+                let next_listener = alloc_obj(vm, TRANSITION_SET_NEXT_LISTENER, Vec::new())?;
+                put(vm, next_listener, "this$0", Value::Obj(transition))?;
+                put(vm, next_listener, "val$nextTransition", Value::Obj(pair[1]))?;
+                tr_invoke(
+                    vm,
+                    pair[0],
+                    "addListener",
+                    "(Landroid/transition/Transition$TransitionListener;)Landroid/transition/Transition;",
+                    &[Value::Obj(next_listener)],
+                )?;
+            }
+            if let Some(first) = children.first() {
+                tr_invoke(vm, *first, "runAnimators", "()V", &[])?;
+            }
+        } else {
+            for child in children {
+                tr_invoke(vm, child, "runAnimators", "()V", &[])?;
+            }
+        }
+        return Ok(());
+    }
+    tr_start(vm, transition)?;
+    let running = tr_running_animators(vm)?;
+    let animators = tr_field_items(vm, transition, "mAnimators")
+        .iter()
+        .filter_map(|value| obj(Some(value)))
+        .collect::<Vec<_>>();
+    for animator in animators {
+        if tr_map_contains(vm, &Value::Obj(running), &Value::Obj(animator)) {
+            tr_start(vm, transition)?;
+            tr_run_animator(vm, transition, animator)?;
+        }
+    }
+    let empty = Value::Obj(tr_new_list(vm, Vec::new())?);
+    put(vm, transition, "mAnimators", empty)?;
+    tr_end(vm, transition)
+}
+fn tr_transition_properties_value(vm: &mut Engine, transition: ObjRef) -> Result<Value, VmExit> {
+    tr_invoke(
+        vm,
+        transition,
+        "getTransitionProperties",
+        "()[Ljava/lang/String;",
+        &[],
+    )
+}
+fn tr_transition_properties(vm: &mut Engine, transition: ObjRef) -> Result<Vec<Value>, VmExit> {
+    let properties = tr_transition_properties_value(vm, transition)?;
+    Ok(array_elems(vm, Some(&properties)))
+}
+fn tr_is_transition_required(
+    vm: &mut Engine,
+    transition: ObjRef,
+    start: Option<ObjRef>,
+    end: Option<ObjRef>,
+) -> Result<bool, VmExit> {
+    let class = class_of(vm, transition);
+    if vm.cp.is_subtype(&class, TRANSITION_VISIBILITY) && !tr_is_set(vm, transition) {
+        return tr_visibility_is_required(vm, start, end);
+    }
+    let (Some(start), Some(end)) = (start, end) else {
+        return Ok(false);
+    };
+    let properties = tr_transition_properties_value(vm, transition)?;
+    let keys = if matches!(properties, Value::Null) {
+        tr_map_entries(vm, &tr_values_map(vm, start))
+            .into_iter()
+            .map(|(key, _)| key)
+            .collect::<Vec<_>>()
+    } else {
+        array_elems(vm, Some(&properties))
+    };
+    for key in keys {
+        if tr_value_changed(vm, start, end, &key)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+fn tr_call_is_transition_required(
+    vm: &mut Engine,
+    transition: ObjRef,
+    start: Option<ObjRef>,
+    end: Option<ObjRef>,
+) -> Result<bool, VmExit> {
+    Ok(tr_invoke(
+        vm,
+        transition,
+        "isTransitionRequired",
+        "(Landroid/transition/TransitionValues;Landroid/transition/TransitionValues;)Z",
+        &[
+            start.map_or(Value::Null, Value::Obj),
+            end.map_or(Value::Null, Value::Obj),
+        ],
+    )? == Value::Int(1))
+}
+fn tr_value_changed(
+    vm: &mut Engine,
+    start: ObjRef,
+    end: ObjRef,
+    key: &Value,
+) -> Result<bool, VmExit> {
+    let start_map = tr_values_map(vm, start);
+    let end_map = tr_values_map(vm, end);
+    if tr_map_contains(vm, &start_map, key) != tr_map_contains(vm, &end_map, key) {
+        return Ok(false);
+    }
+    let old = tr_map_get(vm, &start_map, key).unwrap_or(Value::Null);
+    let new = tr_map_get(vm, &end_map, key).unwrap_or(Value::Null);
+    if old == Value::Null || new == Value::Null {
+        return Ok(old != new);
+    }
+    if crate::intrinsics::values_equal(&vm.heap, &old, &new)? {
+        return Ok(false);
+    }
+    if let Value::Obj(old_ref) = old {
+        let equal = vm.invoke_instance(
+            old_ref,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            std::slice::from_ref(&new),
+        )?;
+        return Ok(equal != Value::Int(1));
+    }
+    Ok(old != new)
+}
+fn tr_create_animators(
+    vm: &mut Engine,
+    transition: ObjRef,
+    scene_root: ObjRef,
+    start_maps: ObjRef,
+    end_maps: ObjRef,
+    start_list: Value,
+    end_list: Value,
+) -> Result<(), VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    if tr_is_set(vm, transition) {
+        let delay = field_long(vm, transition, "mStartDelay");
+        let play_together = field_bool(vm, transition, "mPlayTogether");
+        for (index, child) in tr_set_children(vm, transition).into_iter().enumerate() {
+            if delay > 0 && (play_together || index == 0) {
+                let child_delay = match tr_invoke(vm, child, "getStartDelay", "()J", &[])? {
+                    Value::Long(v) => v,
+                    _ => -1,
+                };
+                let combined = if child_delay > 0 {
+                    delay + child_delay
+                } else {
+                    delay
+                };
+                tr_invoke(
+                    vm,
+                    child,
+                    "setStartDelay",
+                    "(J)Landroid/transition/Transition;",
+                    &[Value::Long(combined)],
+                )?;
+            }
+            tr_invoke(
+                vm,
+                child,
+                "createAnimators",
+                "(Landroid/view/ViewGroup;Landroid/transition/TransitionValuesMaps;Landroid/transition/TransitionValuesMaps;Ljava/util/ArrayList;Ljava/util/ArrayList;)V",
+                &[
+                    Value::Obj(scene_root),
+                    Value::Obj(start_maps),
+                    Value::Obj(end_maps),
+                    start_list.clone(),
+                    end_list.clone(),
+                ],
+            )?;
+        }
+        return Ok(());
+    }
+    let starts = tr_items(vm, &start_list);
+    let ends = tr_items(vm, &end_list);
+    let running = tr_running_animators(vm)?;
+    let mut delays: Vec<(usize, i64)> = Vec::new();
+    let mut min_delay = i64::MAX;
+    for index in 0..starts.len().min(ends.len()) {
+        let mut start = obj(starts.get(index));
+        let mut end = obj(ends.get(index));
+        if let Some(values) = start {
+            let targeted = get(vm, values, "targetedTransitions");
+            if !tr_list_contains(vm, &targeted, &Value::Obj(transition))? {
+                start = None;
+            }
+        }
+        if let Some(values) = end {
+            let targeted = get(vm, values, "targetedTransitions");
+            if !tr_list_contains(vm, &targeted, &Value::Obj(transition))? {
+                end = None;
+            }
+        }
+        if start.is_none() && end.is_none() {
+            continue;
+        }
+        let changed = start.is_none()
+            || end.is_none()
+            || tr_call_is_transition_required(vm, transition, start, end)?;
+        if !changed {
+            continue;
+        }
+        let animator_value = tr_invoke(
+            vm,
+            transition,
+            "createAnimator",
+            "(Landroid/view/ViewGroup;Landroid/transition/TransitionValues;Landroid/transition/TransitionValues;)Landroid/animation/Animator;",
+            &[
+                Value::Obj(scene_root),
+                start.map_or(Value::Null, Value::Obj),
+                end.map_or(Value::Null, Value::Obj),
+            ],
+        )?;
+        let Some(mut animator) = obj(Some(&animator_value)) else {
+            continue;
+        };
+        let mut view = None;
+        let mut info_values = Value::Null;
+        if let Some(end_values) = end {
+            view = tr_values_view(vm, end_values);
+            let properties = tr_transition_properties(vm, transition)?;
+            if !properties.is_empty() {
+                if let Some(view_ref) = view {
+                    let info = tr_new_transition_values(vm, Some(view_ref))?;
+                    let current = tr_map_get(
+                        vm,
+                        &Value::Obj(
+                            tr_maps_field(vm, end_maps, "viewValues")
+                                .ok_or_else(|| npe("viewValues"))?,
+                        ),
+                        &Value::Obj(view_ref),
+                    )
+                    .and_then(|value| obj(Some(&value)));
+                    if let Some(current) = current {
+                        let info_map =
+                            field_obj(vm, info, "values").ok_or_else(|| npe("values"))?;
+                        for property in properties {
+                            let value = tr_values_get_with_key(vm, Some(current), &property)
+                                .unwrap_or(Value::Null);
+                            tr_map_put(vm, info_map, property, value)?;
+                        }
+                    }
+                    info_values = Value::Obj(info);
+                    let name = get(vm, transition, "mName");
+                    for (existing_animator, existing_info) in
+                        tr_map_entries(vm, &Value::Obj(running))
+                    {
+                        let Some(existing_ref) = obj(Some(&existing_info)) else {
+                            continue;
+                        };
+                        let _ = existing_animator;
+                        if get(vm, existing_ref, "view") == Value::Obj(view_ref)
+                            && get(vm, existing_ref, "name") == name
+                        {
+                            let existing_values = get(vm, existing_ref, "values");
+                            if let Some(existing_values_ref) = obj(Some(&existing_values)) {
+                                let equal = tr_invoke(
+                                    vm,
+                                    existing_values_ref,
+                                    "equals",
+                                    "(Ljava/lang/Object;)Z",
+                                    &[info_values.clone()],
+                                )?;
+                                if equal == Value::Int(1) {
+                                    animator = 0;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if animator == 0 {
+                        continue;
+                    }
+                }
+            }
+        } else if let Some(start_values) = start {
+            view = tr_values_view(vm, start_values);
+        }
+        if let Some(propagation) = field_obj(vm, transition, "mPropagation") {
+            let delay = match tr_invoke(
+                vm,
+                propagation,
+                "getStartDelay",
+                "(Landroid/view/ViewGroup;Landroid/transition/Transition;Landroid/transition/TransitionValues;Landroid/transition/TransitionValues;)J",
+                &[
+                    Value::Obj(scene_root),
+                    Value::Obj(transition),
+                    start.map_or(Value::Null, Value::Obj),
+                    end.map_or(Value::Null, Value::Obj),
+                ],
+            )? {
+                Value::Long(v) => v,
+                Value::Int(v) => v as i64,
+                _ => 0,
+            };
+            let animator_index = tr_field_items(vm, transition, "mAnimators").len();
+            delays.push((animator_index, delay));
+            min_delay = min_delay.min(delay);
+        }
+        let info = alloc_obj(vm, TRANSITION_ANIMATION_INFO, Vec::new())?;
+        put(vm, info, "view", view.map_or(Value::Null, Value::Obj))?;
+        put(vm, info, "name", get(vm, transition, "mName"))?;
+        put(vm, info, "transition", Value::Obj(transition))?;
+        put(vm, info, "windowId", Value::Null)?;
+        put(vm, info, "values", info_values)?;
+        put(vm, info, "rdSceneRoot", Value::Obj(scene_root))?;
+        tr_map_put(vm, running, Value::Obj(animator), Value::Obj(info))?;
+        tr_append_field_list(vm, transition, "mAnimators", Value::Obj(animator))?;
+    }
+    if !delays.is_empty() && min_delay != i64::MAX {
+        let animators = tr_field_items(vm, transition, "mAnimators");
+        for (index, delay) in delays {
+            if let Some(animator) = animators.get(index).and_then(|value| obj(Some(value))) {
+                let existing = tr_animator_get_start_delay(vm, animator)?;
+                tr_animator_set_start_delay(
+                    vm,
+                    animator,
+                    delay.saturating_sub(min_delay).saturating_add(existing),
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+fn tr_play_transition(
+    vm: &mut Engine,
+    transition: ObjRef,
+    scene_root: ObjRef,
+) -> Result<(), VmExit> {
+    tr_match_start_and_end(vm, transition)?;
+    let running = tr_running_animators(vm)?;
+    let entries = tr_map_entries(vm, &Value::Obj(running));
+    for (animator_value, info_value) in entries.into_iter().rev() {
+        let Some(animator) = obj(Some(&animator_value)) else {
+            continue;
+        };
+        let Some(info) = obj(Some(&info_value)) else {
+            continue;
+        };
+        if get(vm, info, "rdSceneRoot") != Value::Obj(scene_root) {
+            continue;
+        }
+        let Some(old_view) = field_obj(vm, info, "view") else {
+            continue;
+        };
+        let old_values = field_obj(vm, info, "values");
+        let start_values = tr_get_transition_values(vm, transition, Some(old_view), true)?;
+        let mut end_values =
+            tr_get_matched_transition_values(vm, transition, Some(old_view), true)?;
+        if matches!(start_values, Value::Null) && matches!(end_values, Value::Null) {
+            if let Some(maps) = tr_maps_obj(vm, transition, false) {
+                if let Some(view_values) = tr_maps_field(vm, maps, "viewValues") {
+                    end_values = tr_map_get(vm, &Value::Obj(view_values), &Value::Obj(old_view))
+                        .unwrap_or(Value::Null);
+                }
+            }
+        }
+        let Some(old_transition) = field_obj(vm, info, "transition") else {
+            continue;
+        };
+        let cancel = (!matches!(start_values, Value::Null) || !matches!(end_values, Value::Null))
+            && tr_call_is_transition_required(
+                vm,
+                old_transition,
+                old_values,
+                obj(Some(&end_values)),
+            )?;
+        if cancel {
+            if tr_animator_bool(vm, animator, "isRunning")?
+                || tr_animator_bool(vm, animator, "isStarted")?
+            {
+                tr_invoke(vm, animator, "cancel", "()V", &[])?;
+            } else {
+                tr_map_remove(vm, running, &Value::Obj(animator))?;
+            }
+        }
+    }
+    let start_maps = tr_maps_obj(vm, transition, true).ok_or_else(|| npe("start values"))?;
+    let end_maps = tr_maps_obj(vm, transition, false).ok_or_else(|| npe("end values"))?;
+    let start_list = get(vm, transition, "mStartValuesList");
+    let end_list = get(vm, transition, "mEndValuesList");
+    tr_invoke(
+        vm,
+        transition,
+        "createAnimators",
+        "(Landroid/view/ViewGroup;Landroid/transition/TransitionValuesMaps;Landroid/transition/TransitionValuesMaps;Ljava/util/ArrayList;Ljava/util/ArrayList;)V",
+        &[
+            Value::Obj(scene_root),
+            Value::Obj(start_maps),
+            Value::Obj(end_maps),
+            start_list,
+            end_list,
+        ],
+    )?;
+    tr_invoke(vm, transition, "runAnimators", "()V", &[])?;
+    Ok(())
+}
+fn tr_force_to_end(
+    vm: &mut Engine,
+    transition: ObjRef,
+    scene_root: Option<ObjRef>,
+) -> Result<(), VmExit> {
+    let Some(scene_root) = scene_root else {
+        return Ok(());
+    };
+    let running = tr_running_animators(vm)?;
+    let entries = tr_map_entries(vm, &Value::Obj(running));
+    let mut animators = Vec::new();
+    for (animator, info) in &entries {
+        if let (Some(animator), Some(info)) = (obj(Some(animator)), obj(Some(info))) {
+            if get(vm, info, "rdSceneRoot") == Value::Obj(scene_root) {
+                animators.push(animator);
+            }
+        }
+    }
+    for animator in &animators {
+        tr_map_remove(vm, running, &Value::Obj(*animator))?;
+    }
+    for animator in animators.into_iter().rev() {
+        tr_invoke(vm, animator, "end", "()V", &[])?;
+    }
+    if tr_is_set(vm, transition) {
+        for child in tr_set_children(vm, transition) {
+            tr_invoke(
+                vm,
+                child,
+                "forceToEnd",
+                "(Landroid/view/ViewGroup;)V",
+                &[Value::Obj(scene_root)],
+            )?;
+        }
+    }
+    Ok(())
+}
+fn tr_pause(vm: &mut Engine, transition: ObjRef, scene_root: Option<ObjRef>) -> Result<(), VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    if !field_bool(vm, transition, "mEnded") {
+        if let Some(root) = scene_root {
+            let running = tr_running_animators(vm)?;
+            for (animator, info) in tr_map_entries(vm, &Value::Obj(running)).into_iter().rev() {
+                if let (Some(animator), Some(info)) = (obj(Some(&animator)), obj(Some(&info))) {
+                    if field_obj(vm, info, "view").is_some()
+                        && get(vm, info, "rdSceneRoot") == Value::Obj(root)
+                    {
+                        tr_invoke(vm, animator, "pause", "()V", &[])?;
+                    }
+                }
+            }
+        }
+        tr_notify_listeners(vm, transition, "onTransitionPause")?;
+        put(vm, transition, "mPaused", Value::Int(1))?;
+    }
+    if tr_is_set(vm, transition) {
+        for child in tr_set_children(vm, transition) {
+            tr_invoke(
+                vm,
+                child,
+                "pause",
+                "(Landroid/view/View;)V",
+                &[scene_root.map_or(Value::Null, Value::Obj)],
+            )?;
+        }
+    }
+    Ok(())
+}
+fn tr_resume(
+    vm: &mut Engine,
+    transition: ObjRef,
+    scene_root: Option<ObjRef>,
+) -> Result<(), VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    if field_bool(vm, transition, "mPaused") {
+        if !field_bool(vm, transition, "mEnded") {
+            let root = scene_root.ok_or_else(|| npe("sceneRoot"))?;
+            let running = tr_running_animators(vm)?;
+            for (animator, info) in tr_map_entries(vm, &Value::Obj(running)).into_iter().rev() {
+                if let (Some(animator), Some(info)) = (obj(Some(&animator)), obj(Some(&info))) {
+                    if field_obj(vm, info, "view").is_some()
+                        && get(vm, info, "rdSceneRoot") == Value::Obj(root)
+                    {
+                        tr_invoke(vm, animator, "resume", "()V", &[])?;
+                    }
+                }
+            }
+            tr_notify_listeners(vm, transition, "onTransitionResume")?;
+        }
+        put(vm, transition, "mPaused", Value::Int(0))?;
+    }
+    if tr_is_set(vm, transition) {
+        for child in tr_set_children(vm, transition) {
+            tr_invoke(
+                vm,
+                child,
+                "resume",
+                "(Landroid/view/View;)V",
+                &[scene_root.map_or(Value::Null, Value::Obj)],
+            )?;
+        }
+    }
+    Ok(())
+}
+fn tr_cancel(vm: &mut Engine, transition: ObjRef) -> Result<(), VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    let animators = tr_field_items(vm, transition, "mCurrentAnimators")
+        .iter()
+        .filter_map(|value| obj(Some(value)))
+        .collect::<Vec<_>>();
+    for animator in animators.into_iter().rev() {
+        tr_invoke(vm, animator, "cancel", "()V", &[])?;
+    }
+    tr_notify_listeners(vm, transition, "onTransitionCancel")?;
+    if tr_is_set(vm, transition) {
+        for child in tr_set_children(vm, transition) {
+            tr_invoke(vm, child, "cancel", "()V", &[])?;
+        }
+    }
+    Ok(())
+}
+fn tr_clone_transition(vm: &mut Engine, transition: ObjRef) -> Result<ObjRef, VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    let (class, fields) = {
+        let (class, fields) = vm
+            .heap
+            .as_instance(transition)
+            .map_err(|message| crate::err::vm_error("INVALID_FORMAT", message))?;
+        (class, fields)
+    };
+    let class = class.to_string();
+    let fields = fields.to_vec();
+    let clone = alloc_obj(vm, &class, fields)?;
+    let animators = Value::Obj(tr_new_list(vm, Vec::new())?);
+    put(vm, clone, "mAnimators", animators)?;
+    let current = Value::Obj(tr_new_list(vm, Vec::new())?);
+    put(vm, clone, "mCurrentAnimators", current)?;
+    let start_maps = tr_new_values_maps(vm)?;
+    put(vm, clone, "mStartValues", start_maps)?;
+    let end_maps = tr_new_values_maps(vm)?;
+    put(vm, clone, "mEndValues", end_maps)?;
+    put(vm, clone, "mStartValuesList", Value::Null)?;
+    put(vm, clone, "mEndValuesList", Value::Null)?;
+    put(vm, clone, "mNumInstances", Value::Int(0))?;
+    put(vm, clone, "mEnded", Value::Int(0))?;
+    if tr_is_set(vm, transition) {
+        let empty = Value::Obj(tr_new_list(vm, Vec::new())?);
+        put(vm, clone, "mTransitions", empty)?;
+        for child in tr_set_children(vm, transition) {
+            let child_clone = tr_clone_transition(vm, child)?;
+            put(vm, child_clone, "mParent", Value::Obj(clone))?;
+            tr_append_field_list(vm, clone, "mTransitions", Value::Obj(child_clone))?;
+        }
+    }
+    Ok(clone)
+}
+
+fn tr_values_get_key(
+    vm: &mut Engine,
+    values: Option<ObjRef>,
+    key: &str,
+) -> Result<Option<Value>, VmExit> {
+    let Some(values) = values else {
+        return Ok(None);
+    };
+    let key = jstr(vm, key)?;
+    Ok(tr_values_get_with_key(vm, Some(values), &key))
+}
+fn tr_values_contains_key(
+    vm: &mut Engine,
+    values: Option<ObjRef>,
+    key: &str,
+) -> Result<bool, VmExit> {
+    let Some(values) = values else {
+        return Ok(false);
+    };
+    let key = jstr(vm, key)?;
+    Ok(tr_map_contains(vm, &tr_values_map(vm, values), &key))
+}
+#[derive(Clone, Copy)]
+struct TrVisibilityInfo {
+    changed: bool,
+    fade_in: bool,
+    start_visibility: i32,
+    end_visibility: i32,
+    start_parent: Option<ObjRef>,
+    end_parent: Option<ObjRef>,
+}
+fn tr_visibility_info(
+    vm: &mut Engine,
+    start: Option<ObjRef>,
+    end: Option<ObjRef>,
+) -> Result<TrVisibilityInfo, VmExit> {
+    let mut info = TrVisibilityInfo {
+        changed: false,
+        fade_in: false,
+        start_visibility: -1,
+        end_visibility: -1,
+        start_parent: None,
+        end_parent: None,
+    };
+    if tr_values_contains_key(vm, start, TR_PROP_VISIBILITY)? {
+        info.start_visibility = tr_values_get_key(vm, start, TR_PROP_VISIBILITY)?
+            .and_then(|value| tr_unbox_int(vm, &value))
+            .ok_or_else(|| npe("visibility"))?;
+        info.start_parent = tr_values_get_key(vm, start, TR_PROP_VISIBILITY_PARENT)?
+            .and_then(|value| obj(Some(&value)));
+    }
+    if tr_values_contains_key(vm, end, TR_PROP_VISIBILITY)? {
+        info.end_visibility = tr_values_get_key(vm, end, TR_PROP_VISIBILITY)?
+            .and_then(|value| tr_unbox_int(vm, &value))
+            .ok_or_else(|| npe("visibility"))?;
+        info.end_parent = tr_values_get_key(vm, end, TR_PROP_VISIBILITY_PARENT)?
+            .and_then(|value| obj(Some(&value)));
+    }
+    if start.is_some() && end.is_some() {
+        if info.start_visibility == info.end_visibility && info.start_parent == info.end_parent {
+            return Ok(info);
+        }
+        if info.start_visibility != info.end_visibility {
+            if info.start_visibility == 0 {
+                info.changed = true;
+            } else if info.end_visibility == 0 {
+                info.fade_in = true;
+                info.changed = true;
+            }
+        } else if info.start_parent != info.end_parent {
+            if info.end_parent.is_none() {
+                info.changed = true;
+            } else if info.start_parent.is_none() {
+                info.fade_in = true;
+                info.changed = true;
+            }
+        }
+    } else if start.is_none() && info.end_visibility == 0 {
+        info.fade_in = true;
+        info.changed = true;
+    } else if end.is_none() && info.start_visibility == 0 {
+        info.changed = true;
+    }
+    Ok(info)
+}
+fn tr_visibility_is_required(
+    vm: &mut Engine,
+    start: Option<ObjRef>,
+    end: Option<ObjRef>,
+) -> Result<bool, VmExit> {
+    if start.is_none() && end.is_none() {
+        return Ok(false);
+    }
+    if start.is_some() && end.is_some() {
+        let start_has = tr_values_contains_key(vm, start, TR_PROP_VISIBILITY)?;
+        let end_has = tr_values_contains_key(vm, end, TR_PROP_VISIBILITY)?;
+        if start_has != end_has {
+            return Ok(false);
+        }
+    }
+    let info = tr_visibility_info(vm, start, end)?;
+    Ok(info.changed && (info.start_visibility == 0 || info.end_visibility == 0))
+}
+fn tr_capture_visibility_values(vm: &mut Engine, values: ObjRef) -> Result<(), VmExit> {
+    let view = tr_values_view(vm, values).ok_or_else(|| npe("view"))?;
+    let visibility = match tr_invoke(vm, view, "getVisibility", "()I", &[])? {
+        Value::Int(v) => v,
+        _ => 0,
+    };
+    let boxed = tr_box_int(vm, visibility)?;
+    tr_values_put(vm, values, TR_PROP_VISIBILITY, boxed)?;
+    let parent = tr_view_parent(vm, view)?;
+    tr_values_put(vm, values, TR_PROP_VISIBILITY_PARENT, parent)?;
+    let location = new_int_array(vm, &[0, 0])?;
+    match tr_invoke(
+        vm,
+        view,
+        "getLocationOnScreen",
+        "([I)V",
+        std::slice::from_ref(&location),
+    ) {
+        Ok(_) => {}
+        Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => {}
+        Err(error) => return Err(error),
+    }
+    tr_values_put(vm, values, TR_PROP_VISIBILITY_SCREEN, location)
+}
+fn tr_visibility_on_appear5(
+    vm: &mut Engine,
+    transition: ObjRef,
+    scene_root: ObjRef,
+    start: Option<ObjRef>,
+    end: Option<ObjRef>,
+) -> Result<Value, VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    if field_int(vm, transition, "mMode") & 1 == 0 {
+        return Ok(Value::Null);
+    }
+    let Some(end) = end else {
+        return Ok(Value::Null);
+    };
+    if start.is_none() {
+        let end_view = tr_values_view(vm, end).ok_or_else(|| npe("view"))?;
+        let parent = tr_view_parent(vm, end_view)?;
+        let parent_ref = obj(Some(&parent));
+        let start_parent_values =
+            tr_get_matched_transition_values(vm, transition, parent_ref, false)?;
+        let end_parent_values = tr_get_transition_values(vm, transition, parent_ref, false)?;
+        let info = tr_visibility_info(
+            vm,
+            obj(Some(&start_parent_values)),
+            obj(Some(&end_parent_values)),
+        )?;
+        if info.changed {
+            return Ok(Value::Null);
+        }
+    }
+    let view = tr_values_view(vm, end).ok_or_else(|| npe("view"))?;
+    tr_invoke(
+        vm,
+        transition,
+        "onAppear",
+        "(Landroid/view/ViewGroup;Landroid/view/View;Landroid/transition/TransitionValues;Landroid/transition/TransitionValues;)Landroid/animation/Animator;",
+        &[
+            Value::Obj(scene_root),
+            Value::Obj(view),
+            start.map_or(Value::Null, Value::Obj),
+            Value::Obj(end),
+        ],
+    )
+}
+fn tr_set_transition_visibility(
+    vm: &mut Engine,
+    view: ObjRef,
+    visibility: i32,
+) -> Result<(), VmExit> {
+    match tr_invoke(
+        vm,
+        view,
+        "setTransitionVisibility",
+        "(I)V",
+        &[Value::Int(visibility)],
+    ) {
+        Ok(_) => Ok(()),
+        Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+fn tr_visibility_on_disappear5(
+    vm: &mut Engine,
+    transition: ObjRef,
+    scene_root: ObjRef,
+    start: Option<ObjRef>,
+    start_visibility: i32,
+    end: Option<ObjRef>,
+    end_visibility: i32,
+) -> Result<Value, VmExit> {
+    let _ = start_visibility;
+    tr_ensure_transition(vm, transition)?;
+    if field_int(vm, transition, "mMode") & 2 == 0 {
+        return Ok(Value::Null);
+    }
+    let Some(start) = start else {
+        return Ok(Value::Null);
+    };
+    let start_view = tr_values_view(vm, start).ok_or_else(|| npe("view"))?;
+    let end_view = end.and_then(|values| tr_values_view(vm, values));
+    let mut view_to_keep = None;
+    let mut direct_view = None;
+    if let Some(end_view_ref) = end_view {
+        let parent = tr_view_parent(vm, end_view_ref)?;
+        if matches!(parent, Value::Obj(_)) {
+            if end_visibility == 4 || start_view == end_view_ref {
+                view_to_keep = Some(end_view_ref);
+            }
+        } else {
+            direct_view = Some(end_view_ref);
+        }
+    } else if matches!(tr_view_parent(vm, start_view)?, Value::Null) {
+        direct_view = Some(start_view);
+    }
+    if let Some(view) = direct_view {
+        return tr_invoke(
+            vm,
+            transition,
+            "onDisappear",
+            "(Landroid/view/ViewGroup;Landroid/view/View;Landroid/transition/TransitionValues;Landroid/transition/TransitionValues;)Landroid/animation/Animator;",
+            &[
+                Value::Obj(scene_root),
+                Value::Obj(view),
+                Value::Obj(start),
+                end.map_or(Value::Null, Value::Obj),
+            ],
+        );
+    }
+    let Some(view) = view_to_keep else {
+        // Snapshot/overlay copies for removed, still-parented hierarchies are
+        // outside this bounded slice.
+        return Ok(Value::Null);
+    };
+    let original = match tr_invoke(vm, view, "getVisibility", "()I", &[])? {
+        Value::Int(v) => v,
+        _ => end_visibility,
+    };
+    tr_set_transition_visibility(vm, view, 0)?;
+    let animator = tr_invoke(
+        vm,
+        transition,
+        "onDisappear",
+        "(Landroid/view/ViewGroup;Landroid/view/View;Landroid/transition/TransitionValues;Landroid/transition/TransitionValues;)Landroid/animation/Animator;",
+        &[
+            Value::Obj(scene_root),
+            Value::Obj(view),
+            Value::Obj(start),
+            end.map_or(Value::Null, Value::Obj),
+        ],
+    )?;
+    if let Some(animator_ref) = obj(Some(&animator)) {
+        let listener = alloc_obj(vm, TRANSITION_DISAPPEAR_LISTENER, Vec::new())?;
+        tr_invoke(
+            vm,
+            listener,
+            "<init>",
+            "(Landroid/view/View;IZ)V",
+            &[
+                Value::Obj(view),
+                Value::Int(end_visibility),
+                bool_value(field_bool(vm, transition, "mSuppressLayout")),
+            ],
+        )?;
+        tr_animator_add_listener(vm, animator_ref, listener, false)?;
+        tr_animator_add_listener(vm, animator_ref, listener, true)?;
+        tr_invoke(
+            vm,
+            transition,
+            "addListener",
+            "(Landroid/transition/Transition$TransitionListener;)Landroid/transition/Transition;",
+            &[Value::Obj(listener)],
+        )?;
+    } else {
+        tr_set_transition_visibility(vm, view, original)?;
+    }
+    Ok(animator)
+}
+fn tr_fade_start_alpha(
+    vm: &mut Engine,
+    start: Option<ObjRef>,
+    fallback: f32,
+) -> Result<f32, VmExit> {
+    Ok(tr_values_get_key(vm, start, TR_PROP_FADE_ALPHA)?
+        .and_then(|value| tr_unbox_float(vm, &value))
+        .unwrap_or(fallback))
+}
+fn tr_fade_create_animation(
+    vm: &mut Engine,
+    transition: ObjRef,
+    view: ObjRef,
+    start_alpha: f32,
+    end_alpha: f32,
+) -> Result<Value, VmExit> {
+    if start_alpha == end_alpha {
+        return Ok(Value::Null);
+    }
+    tr_invoke(
+        vm,
+        view,
+        "setTransitionAlpha",
+        "(F)V",
+        &[Value::Float(start_alpha)],
+    )?;
+    let animator = anim_new_object_animator(
+        vm,
+        Value::Obj(view),
+        Some("transitionAlpha".to_string()),
+        Value::Null,
+    )?;
+    anim_animator_set_float_values(vm, animator, &[end_alpha], true)?;
+    let listener = alloc_obj(vm, TRANSITION_FADE_ANIM_LISTENER, Vec::new())?;
+    put(vm, listener, "mView", Value::Obj(view))?;
+    put(vm, listener, "mLayerTypeChanged", Value::Int(0))?;
+    tr_animator_add_listener(vm, animator, listener, false)?;
+    let transition_listener = alloc_obj(vm, TRANSITION_FADE_LISTENER, Vec::new())?;
+    put(vm, transition_listener, "this$0", Value::Obj(transition))?;
+    put(vm, transition_listener, "val$view", Value::Obj(view))?;
+    tr_invoke(
+        vm,
+        transition,
+        "addListener",
+        "(Landroid/transition/Transition$TransitionListener;)Landroid/transition/Transition;",
+        &[Value::Obj(transition_listener)],
+    )?;
+    Ok(Value::Obj(animator))
+}
+fn tr_new_rect(vm: &mut Engine, bounds: [i32; 4]) -> Result<Value, VmExit> {
+    let rect = alloc_obj(vm, "Landroid/graphics/Rect;", Vec::new())?;
+    put(vm, rect, "left", Value::Int(bounds[0]))?;
+    put(vm, rect, "top", Value::Int(bounds[1]))?;
+    put(vm, rect, "right", Value::Int(bounds[2]))?;
+    put(vm, rect, "bottom", Value::Int(bounds[3]))?;
+    Ok(Value::Obj(rect))
+}
+fn tr_rect_values(vm: &Engine, value: &Value) -> Option<[i32; 4]> {
+    let rect = obj(Some(value))?;
+    if !vm
+        .cp
+        .is_subtype(&class_of(vm, rect), "Landroid/graphics/Rect;")
+    {
+        return None;
+    }
+    Some([
+        field_int(vm, rect, "left"),
+        field_int(vm, rect, "top"),
+        field_int(vm, rect, "right"),
+        field_int(vm, rect, "bottom"),
+    ])
+}
+fn tr_view_int(vm: &mut Engine, view: ObjRef, method: &str) -> Result<i32, VmExit> {
+    Ok(match tr_invoke(vm, view, method, "()I", &[])? {
+        Value::Int(v) => v,
+        _ => 0,
+    })
+}
+fn tr_capture_change_bounds_values(
+    vm: &mut Engine,
+    transition: ObjRef,
+    values: ObjRef,
+) -> Result<(), VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    let view = tr_values_view(vm, values).ok_or_else(|| npe("view"))?;
+    let laid_out = tr_invoke(vm, view, "isLaidOut", "()Z", &[])? == Value::Int(1);
+    let width = tr_view_int(vm, view, "getWidth")?;
+    let height = tr_view_int(vm, view, "getHeight")?;
+    if laid_out || width != 0 || height != 0 {
+        let left = tr_view_int(vm, view, "getLeft")?;
+        let top = tr_view_int(vm, view, "getTop")?;
+        let right = tr_view_int(vm, view, "getRight")?;
+        let bottom = tr_view_int(vm, view, "getBottom")?;
+        let bounds = tr_new_rect(vm, [left, top, right, bottom])?;
+        tr_values_put(vm, values, TR_PROP_BOUNDS, bounds)?;
+        let parent = tr_view_parent(vm, view)?;
+        tr_values_put(vm, values, TR_PROP_BOUNDS_PARENT, parent)?;
+        if field_bool(vm, transition, "mReparent") {
+            let location = new_int_array(vm, &[0, 0])?;
+            match tr_invoke(
+                vm,
+                view,
+                "getLocationInWindow",
+                "([I)V",
+                std::slice::from_ref(&location),
+            ) {
+                Ok(_) => {}
+                Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => {}
+                Err(error) => return Err(error),
+            }
+            let coords = int_values(vm, Some(&location));
+            let x = tr_box_int(vm, coords.first().copied().unwrap_or(0))?;
+            tr_values_put(vm, values, TR_PROP_WINDOW_X, x)?;
+            let y = tr_box_int(vm, coords.get(1).copied().unwrap_or(0))?;
+            tr_values_put(vm, values, TR_PROP_WINDOW_Y, y)?;
+        }
+        if field_bool(vm, transition, "mResizeClip") {
+            let clip = match tr_invoke(vm, view, "getClipBounds", "()Landroid/graphics/Rect;", &[])
+            {
+                Ok(v) => v,
+                Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => Value::Null,
+                Err(error) => return Err(error),
+            };
+            tr_values_put(vm, values, TR_PROP_CLIP, clip)?;
+        }
+    }
+    Ok(())
+}
+fn tr_view_layout(vm: &mut Engine, view: ObjRef, bounds: [i32; 4]) -> Result<(), VmExit> {
+    tr_invoke(
+        vm,
+        view,
+        "layout",
+        "(IIII)V",
+        &[
+            Value::Int(bounds[0]),
+            Value::Int(bounds[1]),
+            Value::Int(bounds[2]),
+            Value::Int(bounds[3]),
+        ],
+    )?;
+    Ok(())
+}
+fn tr_change_bounds_create_animator(
+    vm: &mut Engine,
+    transition: ObjRef,
+    start: Option<ObjRef>,
+    end: Option<ObjRef>,
+) -> Result<Value, VmExit> {
+    tr_ensure_transition(vm, transition)?;
+    let (Some(start), Some(end)) = (start, end) else {
+        return Ok(Value::Null);
+    };
+    let start_parent = tr_values_get_key(vm, Some(start), TR_PROP_BOUNDS_PARENT)?
+        .and_then(|value| obj(Some(&value)));
+    let end_parent = tr_values_get_key(vm, Some(end), TR_PROP_BOUNDS_PARENT)?
+        .and_then(|value| obj(Some(&value)));
+    let (Some(start_parent), Some(end_parent)) = (start_parent, end_parent) else {
+        return Ok(Value::Null);
+    };
+    if field_bool(vm, transition, "mReparent") {
+        let matched = tr_get_matched_transition_values(vm, transition, Some(start_parent), true)?;
+        let matches = if matches!(matched, Value::Null) {
+            start_parent == end_parent
+        } else {
+            obj(Some(&matched)).and_then(|values| tr_values_view(vm, values)) == Some(end_parent)
+        };
+        if !matches {
+            // Cross-parent overlay rendering is outside this bounded slice.
+            return Ok(Value::Null);
+        }
+    }
+    let start_bounds = tr_values_get_key(vm, Some(start), TR_PROP_BOUNDS)?
+        .and_then(|value| tr_rect_values(vm, &value))
+        .ok_or_else(|| npe("startBounds"))?;
+    let end_bounds = tr_values_get_key(vm, Some(end), TR_PROP_BOUNDS)?
+        .and_then(|value| tr_rect_values(vm, &value))
+        .ok_or_else(|| npe("endBounds"))?;
+    let start_clip_value = tr_values_get_key(vm, Some(start), TR_PROP_CLIP)?.unwrap_or(Value::Null);
+    let end_clip_value = tr_values_get_key(vm, Some(end), TR_PROP_CLIP)?.unwrap_or(Value::Null);
+    let start_clip = tr_rect_values(vm, &start_clip_value);
+    let end_clip = tr_rect_values(vm, &end_clip_value);
+    let start_width = start_bounds[2] - start_bounds[0];
+    let start_height = start_bounds[3] - start_bounds[1];
+    let end_width = end_bounds[2] - end_bounds[0];
+    let end_height = end_bounds[3] - end_bounds[1];
+    let mut changes = 0;
+    if (start_width != 0 && start_height != 0) || (end_width != 0 && end_height != 0) {
+        if start_bounds[0] != end_bounds[0] || start_bounds[1] != end_bounds[1] {
+            changes += 1;
+        }
+        if start_bounds[2] != end_bounds[2] || start_bounds[3] != end_bounds[3] {
+            changes += 1;
+        }
+    }
+    if start_clip != end_clip {
+        changes += 1;
+    }
+    if changes == 0 {
+        return Ok(Value::Null);
+    }
+    let view = tr_values_view(vm, end).ok_or_else(|| npe("view"))?;
+    let resize_clip = field_bool(vm, transition, "mResizeClip");
+    let max_width = start_width.max(end_width);
+    let max_height = start_height.max(end_height);
+    let effective_start_clip = start_clip.unwrap_or([0, 0, start_width, start_height]);
+    let effective_end_clip = end_clip.unwrap_or([0, 0, end_width, end_height]);
+    if resize_clip {
+        tr_view_layout(
+            vm,
+            view,
+            [
+                start_bounds[0],
+                start_bounds[1],
+                start_bounds[0] + max_width,
+                start_bounds[1] + max_height,
+            ],
+        )?;
+        if effective_start_clip != effective_end_clip {
+            let clip = tr_new_rect(vm, effective_start_clip)?;
+            tr_invoke(
+                vm,
+                view,
+                "setClipBounds",
+                "(Landroid/graphics/Rect;)V",
+                &[clip],
+            )?;
+        }
+    } else {
+        tr_view_layout(vm, view, start_bounds)?;
+    }
+    let animator = anim_new_animator(vm, VALUE_ANIMATOR)?;
+    anim_animator_set_float_values(vm, animator, &[0.0, 1.0], false)?;
+    let listener = alloc_obj(vm, TRANSITION_CHANGE_BOUNDS_LISTENER, Vec::new())?;
+    put(vm, listener, "mView", Value::Obj(view))?;
+    put(vm, listener, "mResizeClip", bool_value(resize_clip))?;
+    put(vm, listener, "mMaxWidth", Value::Int(max_width))?;
+    put(vm, listener, "mMaxHeight", Value::Int(max_height))?;
+    for (field, value) in [
+        ("mStartLeft", start_bounds[0]),
+        ("mStartTop", start_bounds[1]),
+        ("mStartRight", start_bounds[2]),
+        ("mStartBottom", start_bounds[3]),
+        ("mEndLeft", end_bounds[0]),
+        ("mEndTop", end_bounds[1]),
+        ("mEndRight", end_bounds[2]),
+        ("mEndBottom", end_bounds[3]),
+        ("mStartClipLeft", effective_start_clip[0]),
+        ("mStartClipTop", effective_start_clip[1]),
+        ("mStartClipRight", effective_start_clip[2]),
+        ("mStartClipBottom", effective_start_clip[3]),
+        ("mEndClipLeft", effective_end_clip[0]),
+        ("mEndClipTop", effective_end_clip[1]),
+        ("mEndClipRight", effective_end_clip[2]),
+        ("mEndClipBottom", effective_end_clip[3]),
+    ] {
+        put(vm, listener, field, Value::Int(value))?;
+    }
+    put(vm, listener, "mFinalClip", end_clip_value)?;
+    tr_invoke(
+        vm,
+        animator,
+        "addUpdateListener",
+        "(Landroid/animation/ValueAnimator$AnimatorUpdateListener;)V",
+        &[Value::Obj(listener)],
+    )?;
+    Ok(Value::Obj(animator))
+}
+fn tr_interpolate_int(start: i32, end: i32, fraction: f32) -> i32 {
+    (start as f32 + (end - start) as f32 * fraction).round() as i32
+}
+fn tr_change_bounds_update(
+    vm: &mut Engine,
+    listener: ObjRef,
+    animator: ObjRef,
+) -> Result<(), VmExit> {
+    let fraction = match tr_invoke(vm, animator, "getAnimatedFraction", "()F", &[])? {
+        Value::Float(v) => v.clamp(0.0, 1.0),
+        _ => 0.0,
+    };
+    let view = field_obj(vm, listener, "mView").ok_or_else(|| npe("view"))?;
+    let left = tr_interpolate_int(
+        field_int(vm, listener, "mStartLeft"),
+        field_int(vm, listener, "mEndLeft"),
+        fraction,
+    );
+    let top = tr_interpolate_int(
+        field_int(vm, listener, "mStartTop"),
+        field_int(vm, listener, "mEndTop"),
+        fraction,
+    );
+    let right = tr_interpolate_int(
+        field_int(vm, listener, "mStartRight"),
+        field_int(vm, listener, "mEndRight"),
+        fraction,
+    );
+    let bottom = tr_interpolate_int(
+        field_int(vm, listener, "mStartBottom"),
+        field_int(vm, listener, "mEndBottom"),
+        fraction,
+    );
+    if field_bool(vm, listener, "mResizeClip") {
+        if fraction >= 1.0 {
+            let clip = get(vm, listener, "mFinalClip");
+            tr_invoke(
+                vm,
+                view,
+                "setClipBounds",
+                "(Landroid/graphics/Rect;)V",
+                &[clip],
+            )?;
+            tr_view_layout(vm, view, [left, top, right, bottom])?;
+        } else {
+            tr_view_layout(
+                vm,
+                view,
+                [
+                    left,
+                    top,
+                    left + field_int(vm, listener, "mMaxWidth"),
+                    top + field_int(vm, listener, "mMaxHeight"),
+                ],
+            )?;
+            let clip = tr_new_rect(
+                vm,
+                [
+                    tr_interpolate_int(
+                        field_int(vm, listener, "mStartClipLeft"),
+                        field_int(vm, listener, "mEndClipLeft"),
+                        fraction,
+                    ),
+                    tr_interpolate_int(
+                        field_int(vm, listener, "mStartClipTop"),
+                        field_int(vm, listener, "mEndClipTop"),
+                        fraction,
+                    ),
+                    tr_interpolate_int(
+                        field_int(vm, listener, "mStartClipRight"),
+                        field_int(vm, listener, "mEndClipRight"),
+                        fraction,
+                    ),
+                    tr_interpolate_int(
+                        field_int(vm, listener, "mStartClipBottom"),
+                        field_int(vm, listener, "mEndClipBottom"),
+                        fraction,
+                    ),
+                ],
+            )?;
+            tr_invoke(
+                vm,
+                view,
+                "setClipBounds",
+                "(Landroid/graphics/Rect;)V",
+                &[clip],
+            )?;
+        }
+    } else {
+        tr_view_layout(vm, view, [left, top, right, bottom])?;
+    }
+    Ok(())
+}
+
+fn tr_record_transition_listener(
+    vm: &mut Engine,
+    listener: ObjRef,
+    method: &str,
+    transition: ObjRef,
+) -> Result<(), VmExit> {
+    let field = match method {
+        "onTransitionStart" => "rd_on_transition_start_count",
+        "onTransitionEnd" => "rd_on_transition_end_count",
+        "onTransitionCancel" => "rd_on_transition_cancel_count",
+        "onTransitionPause" => "rd_on_transition_pause_count",
+        "onTransitionResume" => "rd_on_transition_resume_count",
+        _ => return Ok(()),
+    };
+    let count = field_int(vm, listener, field).wrapping_add(1);
+    put(vm, listener, field, Value::Int(count))?;
+    put(vm, listener, "rd_last_transition", Value::Obj(transition))
+}
+fn tr_remove_transition_listener(
+    vm: &mut Engine,
+    transition: ObjRef,
+    listener: ObjRef,
+) -> Result<(), VmExit> {
+    tr_invoke(
+        vm,
+        transition,
+        "removeListener",
+        "(Landroid/transition/Transition$TransitionListener;)Landroid/transition/Transition;",
+        &[Value::Obj(listener)],
+    )?;
+    Ok(())
+}
+fn tr_disappear_suppress(vm: &mut Engine, listener: ObjRef, suppress: bool) -> Result<(), VmExit> {
+    if field_bool(vm, listener, "mSuppressLayout")
+        && field_bool(vm, listener, "mLayoutSuppressed") != suppress
+    {
+        if let Some(parent) = field_obj(vm, listener, "mParent") {
+            put(vm, listener, "mLayoutSuppressed", bool_value(suppress))?;
+            match tr_invoke(
+                vm,
+                parent,
+                "suppressLayout",
+                "(Z)V",
+                &[bool_value(suppress)],
+            ) {
+                Ok(_) => {}
+                Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => {}
+                Err(error) => return Err(error),
+            }
+        }
+    }
+    Ok(())
+}
+fn tr_disappear_hide(vm: &mut Engine, listener: ObjRef) -> Result<(), VmExit> {
+    if !field_bool(vm, listener, "mCanceled") {
+        let view = field_obj(vm, listener, "mView").ok_or_else(|| npe("view"))?;
+        tr_set_transition_visibility(vm, view, field_int(vm, listener, "mFinalVisibility"))?;
+        if let Some(parent) = field_obj(vm, listener, "mParent") {
+            match tr_invoke(vm, parent, "invalidate", "()V", &[]) {
+                Ok(_) => {}
+                Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => {}
+                Err(error) => return Err(error),
+            }
+        }
+    }
+    tr_disappear_suppress(vm, listener, false)
+}
+
+fn transition_callback_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if name == "<init>" {
+        match class {
+            TRANSITION_RUN_LISTENER | TRANSITION_ANIMATE_LISTENER if !args.is_empty() => {
+                put(
+                    vm,
+                    recv,
+                    "this$0",
+                    args.first().cloned().unwrap_or(Value::Null),
+                )?;
+                if let Some(map) = args.get(1) {
+                    put(vm, recv, "val$runningAnimators", map.clone())?;
+                }
+            }
+            TRANSITION_SET_LISTENER => {
+                put(
+                    vm,
+                    recv,
+                    "mTransitionSet",
+                    args.first().cloned().unwrap_or(Value::Null),
+                )?;
+            }
+            TRANSITION_SET_NEXT_LISTENER => {
+                put(
+                    vm,
+                    recv,
+                    "this$0",
+                    args.first().cloned().unwrap_or(Value::Null),
+                )?;
+                put(
+                    vm,
+                    recv,
+                    "val$nextTransition",
+                    args.get(1).cloned().unwrap_or(Value::Null),
+                )?;
+            }
+            TRANSITION_MANAGER_MULTI => {
+                put(
+                    vm,
+                    recv,
+                    "mTransition",
+                    args.first().cloned().unwrap_or(Value::Null),
+                )?;
+                let root = args.get(1).cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mSceneRoot", root.clone())?;
+                if let Some(root_ref) = obj(Some(&root)) {
+                    let observer = match tr_invoke(
+                        vm,
+                        root_ref,
+                        "getViewTreeObserver",
+                        "()Landroid/view/ViewTreeObserver;",
+                        &[],
+                    ) {
+                        Ok(v) => v,
+                        Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => Value::Null,
+                        Err(error) => return Err(error),
+                    };
+                    put(vm, recv, "mViewTreeObserver", observer)?;
+                }
+            }
+            TRANSITION_MANAGER_END_LISTENER => {
+                put(
+                    vm,
+                    recv,
+                    "val$sceneRoot",
+                    args.first().cloned().unwrap_or(Value::Null),
+                )?;
+                put(
+                    vm,
+                    recv,
+                    "val$runningTransitions",
+                    args.get(1).cloned().unwrap_or(Value::Null),
+                )?;
+            }
+            TRANSITION_FADE_LISTENER => {
+                put(
+                    vm,
+                    recv,
+                    "this$0",
+                    args.first().cloned().unwrap_or(Value::Null),
+                )?;
+                put(
+                    vm,
+                    recv,
+                    "val$view",
+                    args.get(1).cloned().unwrap_or(Value::Null),
+                )?;
+            }
+            TRANSITION_FADE_ANIM_LISTENER => {
+                put(
+                    vm,
+                    recv,
+                    "mView",
+                    args.first().cloned().unwrap_or(Value::Null),
+                )?;
+                put(vm, recv, "mLayerTypeChanged", Value::Int(0))?;
+            }
+            TRANSITION_DISAPPEAR_LISTENER => {
+                let view = req_obj(args, 0, "view")?;
+                put(vm, recv, "mView", Value::Obj(view))?;
+                put(vm, recv, "mFinalVisibility", Value::Int(iarg(args, 1)))?;
+                let parent = tr_view_parent(vm, view)?;
+                put(vm, recv, "mParent", parent)?;
+                put(
+                    vm,
+                    recv,
+                    "mSuppressLayout",
+                    Value::Int(i32::from(iarg(args, 2) != 0)),
+                )?;
+                put(vm, recv, "mLayoutSuppressed", Value::Int(0))?;
+                put(vm, recv, "mCanceled", Value::Int(0))?;
+                tr_disappear_suppress(vm, recv, true)?;
+            }
+            _ => {}
+        }
+        return Ok(Some(Value::Null));
+    }
+    match class {
+        TRANSITION_STRAIGHT_PATH if name == "getPath" && sig == "(FFFF)Landroid/graphics/Path;" => {
+            let path = alloc_obj(vm, "Landroid/graphics/Path;", Vec::new())?;
+            let _ = tr_invoke(vm, path, "<init>", "()V", &[]);
+            tr_invoke(
+                vm,
+                path,
+                "moveTo",
+                "(FF)V",
+                &[Value::Float(farg(args, 0)), Value::Float(farg(args, 1))],
+            )?;
+            tr_invoke(
+                vm,
+                path,
+                "lineTo",
+                "(FF)V",
+                &[Value::Float(farg(args, 2)), Value::Float(farg(args, 3))],
+            )?;
+            Ok(Some(Value::Obj(path)))
+        }
+        TRANSITION_PATH_MOTION if name == "getPath" => Ok(Some(Value::Null)),
+        TRANSITION_EPICENTER_CALLBACK if name == "onGetEpicenter" => Ok(Some(Value::Null)),
+        TRANSITION_PROPAGATION => Ok(Some(match name {
+            "getStartDelay" => Value::Long(0),
+            "getPropagationProperties" => Value::Null,
+            _ => Value::Null,
+        })),
+        TRANSITION_RUN_LISTENER => {
+            let Some(transition) = field_obj(vm, recv, "this$0") else {
+                return Ok(Some(Value::Null));
+            };
+            let animator = args.first().cloned().unwrap_or(Value::Null);
+            match name {
+                "onAnimationStart" => {
+                    tr_append_field_list(vm, transition, "mCurrentAnimators", animator)?;
+                }
+                "onAnimationEnd" => {
+                    if let Some(map) = field_obj(vm, recv, "val$runningAnimators") {
+                        tr_map_remove(vm, map, &animator)?;
+                    }
+                    tr_remove_field_list(vm, transition, "mCurrentAnimators", &animator)?;
+                }
+                _ => {}
+            }
+            Ok(Some(Value::Null))
+        }
+        TRANSITION_ANIMATE_LISTENER => {
+            if name == "onAnimationEnd" {
+                let transition = field_obj(vm, recv, "this$0").ok_or_else(|| npe("transition"))?;
+                tr_end(vm, transition)?;
+                if let Some(animator) = obj(args.first()) {
+                    tr_invoke(
+                        vm,
+                        animator,
+                        "removeListener",
+                        "(Landroid/animation/Animator$AnimatorListener;)V",
+                        &[Value::Obj(recv)],
+                    )?;
+                }
+            }
+            Ok(Some(Value::Null))
+        }
+        TRANSITION_SET_LISTENER => {
+            let set = field_obj(vm, recv, "mTransitionSet").ok_or_else(|| npe("transitionSet"))?;
+            match name {
+                "onTransitionStart" => {
+                    if !field_bool(vm, set, "mStarted") {
+                        tr_start(vm, set)?;
+                        put(vm, set, "mStarted", Value::Int(1))?;
+                    }
+                }
+                "onTransitionEnd" => {
+                    let count = field_int(vm, set, "mCurrentListeners").saturating_sub(1);
+                    put(vm, set, "mCurrentListeners", Value::Int(count))?;
+                    if count == 0 {
+                        put(vm, set, "mStarted", Value::Int(0))?;
+                        tr_end(vm, set)?;
+                    }
+                    if let Some(child) = obj(args.first()) {
+                        tr_remove_transition_listener(vm, child, recv)?;
+                    }
+                }
+                _ => {}
+            }
+            Ok(Some(Value::Null))
+        }
+        TRANSITION_SET_NEXT_LISTENER => {
+            if name == "onTransitionEnd" {
+                let next = field_obj(vm, recv, "val$nextTransition")
+                    .ok_or_else(|| npe("nextTransition"))?;
+                tr_invoke(vm, next, "runAnimators", "()V", &[])?;
+                if let Some(previous) = obj(args.first()) {
+                    tr_remove_transition_listener(vm, previous, recv)?;
+                }
+            }
+            Ok(Some(Value::Null))
+        }
+        TRANSITION_MANAGER_MULTI => match (name, sig) {
+            ("onPreDraw", "()Z") => tr_manager_on_pre_draw(vm, recv).map(Some),
+            ("onViewDetachedFromWindow", "(Landroid/view/View;)V") => {
+                tr_manager_on_detached(vm, recv)?;
+                Ok(Some(Value::Null))
+            }
+            ("onViewAttachedToWindow", "(Landroid/view/View;)V") | ("removeListeners", "()V") => {
+                Ok(Some(Value::Null))
+            }
+            _ => Ok(None),
+        },
+        TRANSITION_MANAGER_END_LISTENER => {
+            if name == "onTransitionEnd" {
+                if let (Some(root), Some(transition)) =
+                    (field_obj(vm, recv, "val$sceneRoot"), obj(args.first()))
+                {
+                    let running = tr_manager_running_transitions(vm)?;
+                    if let Some(list_value) =
+                        tr_map_get(vm, &Value::Obj(running), &Value::Obj(root))
+                    {
+                        if let Some(list) = obj(Some(&list_value)) {
+                            let mut items = tr_items(vm, &list_value);
+                            if let Some(index) = items
+                                .iter()
+                                .position(|value| *value == Value::Obj(transition))
+                            {
+                                items.remove(index);
+                            }
+                            if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&list) {
+                                *elems = items;
+                            }
+                        }
+                    }
+                    tr_remove_transition_listener(vm, transition, recv)?;
+                }
+            }
+            Ok(Some(Value::Null))
+        }
+        TRANSITION_FADE_LISTENER => {
+            if name == "onTransitionEnd" {
+                if let Some(view) = field_obj(vm, recv, "val$view") {
+                    tr_invoke(vm, view, "setTransitionAlpha", "(F)V", &[Value::Float(1.0)])?;
+                }
+                if let Some(transition) = obj(args.first()) {
+                    tr_remove_transition_listener(vm, transition, recv)?;
+                }
+            }
+            Ok(Some(Value::Null))
+        }
+        TRANSITION_FADE_ANIM_LISTENER => {
+            let view = field_obj(vm, recv, "mView").ok_or_else(|| npe("view"))?;
+            match name {
+                "onAnimationStart" => {
+                    let overlapping = tr_invoke(vm, view, "hasOverlappingRendering", "()Z", &[])?
+                        == Value::Int(1);
+                    let layer = tr_view_int(vm, view, "getLayerType")?;
+                    if overlapping && layer == 0 {
+                        put(vm, recv, "mLayerTypeChanged", Value::Int(1))?;
+                        tr_invoke(
+                            vm,
+                            view,
+                            "setLayerType",
+                            "(ILandroid/graphics/Paint;)V",
+                            &[Value::Int(2), Value::Null],
+                        )?;
+                    }
+                }
+                "onAnimationEnd" => {
+                    tr_invoke(vm, view, "setTransitionAlpha", "(F)V", &[Value::Float(1.0)])?;
+                    if field_bool(vm, recv, "mLayerTypeChanged") {
+                        tr_invoke(
+                            vm,
+                            view,
+                            "setLayerType",
+                            "(ILandroid/graphics/Paint;)V",
+                            &[Value::Int(0), Value::Null],
+                        )?;
+                    }
+                }
+                _ => {}
+            }
+            Ok(Some(Value::Null))
+        }
+        TRANSITION_DISAPPEAR_LISTENER => {
+            match name {
+                "onAnimationPause" => {
+                    if !field_bool(vm, recv, "mCanceled") {
+                        let view = field_obj(vm, recv, "mView").ok_or_else(|| npe("view"))?;
+                        tr_set_transition_visibility(
+                            vm,
+                            view,
+                            field_int(vm, recv, "mFinalVisibility"),
+                        )?;
+                    }
+                }
+                "onAnimationResume" => {
+                    if !field_bool(vm, recv, "mCanceled") {
+                        let view = field_obj(vm, recv, "mView").ok_or_else(|| npe("view"))?;
+                        tr_set_transition_visibility(vm, view, 0)?;
+                    }
+                }
+                "onAnimationCancel" => put(vm, recv, "mCanceled", Value::Int(1))?,
+                "onAnimationEnd" => tr_disappear_hide(vm, recv)?,
+                "onTransitionEnd" => {
+                    tr_disappear_hide(vm, recv)?;
+                    if let Some(transition) = obj(args.first()) {
+                        tr_remove_transition_listener(vm, transition, recv)?;
+                    }
+                }
+                "onTransitionPause" => tr_disappear_suppress(vm, recv, false)?,
+                "onTransitionResume" => tr_disappear_suppress(vm, recv, true)?,
+                _ => {}
+            }
+            Ok(Some(Value::Null))
+        }
+        TRANSITION_CHANGE_BOUNDS_LISTENER => {
+            if name == "onAnimationUpdate" {
+                let animator = req_obj(args, 0, "animation")?;
+                tr_change_bounds_update(vm, recv, animator)?;
+            }
+            Ok(Some(Value::Null))
+        }
+        TRANSITION_LISTENER | TRANSITION_LISTENER_ADAPTER => {
+            if sig == "(Landroid/transition/Transition;)V" {
+                if let Some(transition) = obj(args.first()) {
+                    tr_record_transition_listener(vm, recv, name, transition)?;
+                }
+            }
+            Ok(Some(Value::Null))
+        }
+        TRANSITION_VISIBILITY_OVERLAY_LISTENER => Ok(Some(Value::Null)),
+        _ => Ok(None),
+    }
+}
+
+fn tr_scene_ensure(vm: &mut Engine, scene: ObjRef) -> Result<(), VmExit> {
+    if field_bool(vm, scene, "rdSceneInit") {
+        return Ok(());
+    }
+    put(vm, scene, "rdSceneInit", Value::Int(1))?;
+    put(vm, scene, "mContext", Value::Null)?;
+    put(vm, scene, "mLayoutId", Value::Int(-1))?;
+    put(vm, scene, "mSceneRoot", Value::Null)?;
+    put(vm, scene, "mLayout", Value::Null)?;
+    put(vm, scene, "mEnterAction", Value::Null)?;
+    put(vm, scene, "mExitAction", Value::Null)
+}
+fn tr_scene_current(vm: &Engine, root: ObjRef) -> Value {
+    get(vm, root, "rdCurrentScene")
+}
+fn tr_scene_set_current(vm: &mut Engine, root: ObjRef, scene: Value) -> Result<(), VmExit> {
+    put(vm, root, "rdCurrentScene", scene)
+}
+fn tr_scene_enter(vm: &mut Engine, scene: ObjRef) -> Result<(), VmExit> {
+    tr_scene_ensure(vm, scene)?;
+    let root = field_obj(vm, scene, "mSceneRoot").ok_or_else(|| npe("sceneRoot"))?;
+    let layout_id = field_int(vm, scene, "mLayoutId");
+    let layout = get(vm, scene, "mLayout");
+    if layout_id > 0 || !matches!(layout, Value::Null) {
+        tr_invoke(vm, root, "removeAllViews", "()V", &[])?;
+        if layout_id > 0 {
+            let context = get(vm, scene, "mContext");
+            let inflater = vm.invoke_static(
+                "Landroid/view/LayoutInflater;",
+                "from",
+                "(Landroid/content/Context;)Landroid/view/LayoutInflater;",
+                &[context],
+            )?;
+            let inflater_ref = obj(Some(&inflater)).ok_or_else(|| npe("LayoutInflater"))?;
+            tr_invoke(
+                vm,
+                inflater_ref,
+                "inflate",
+                "(ILandroid/view/ViewGroup;)Landroid/view/View;",
+                &[Value::Int(layout_id), Value::Obj(root)],
+            )?;
+        } else {
+            tr_invoke(vm, root, "addView", "(Landroid/view/View;)V", &[layout])?;
+        }
+    }
+    if let Some(action) = field_obj(vm, scene, "mEnterAction") {
+        tr_invoke(vm, action, "run", "()V", &[])?;
+    }
+    tr_scene_set_current(vm, root, Value::Obj(scene))
+}
+fn tr_scene_exit(vm: &mut Engine, scene: ObjRef) -> Result<(), VmExit> {
+    tr_scene_ensure(vm, scene)?;
+    let root = field_obj(vm, scene, "mSceneRoot").ok_or_else(|| npe("sceneRoot"))?;
+    if tr_scene_current(vm, root) == Value::Obj(scene) {
+        if let Some(action) = field_obj(vm, scene, "mExitAction") {
+            tr_invoke(vm, action, "run", "()V", &[])?;
+        }
+    }
+    Ok(())
+}
+
+fn transition_scene_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/view/ViewGroup;)V") => {
+            tr_scene_ensure(vm, recv)?;
+            put(
+                vm,
+                recv,
+                "mSceneRoot",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/view/ViewGroup;Landroid/view/View;)V")
+        | ("<init>", "(Landroid/view/ViewGroup;Landroid/view/ViewGroup;)V") => {
+            tr_scene_ensure(vm, recv)?;
+            put(
+                vm,
+                recv,
+                "mSceneRoot",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            put(
+                vm,
+                recv,
+                "mLayout",
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/view/ViewGroup;ILandroid/content/Context;)V") => {
+            tr_scene_ensure(vm, recv)?;
+            put(
+                vm,
+                recv,
+                "mContext",
+                args.get(2).cloned().unwrap_or(Value::Null),
+            )?;
+            put(
+                vm,
+                recv,
+                "mSceneRoot",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            put(vm, recv, "mLayoutId", Value::Int(iarg(args, 1)))?;
+            Value::Null
+        }
+        ("getSceneRoot", "()Landroid/view/ViewGroup;") => {
+            tr_scene_ensure(vm, recv)?;
+            get(vm, recv, "mSceneRoot")
+        }
+        ("enter", "()V") => {
+            tr_scene_enter(vm, recv)?;
+            Value::Null
+        }
+        ("exit", "()V") => {
+            tr_scene_exit(vm, recv)?;
+            Value::Null
+        }
+        ("setEnterAction", "(Ljava/lang/Runnable;)V") => {
+            tr_scene_ensure(vm, recv)?;
+            put(
+                vm,
+                recv,
+                "mEnterAction",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("setExitAction", "(Ljava/lang/Runnable;)V") => {
+            tr_scene_ensure(vm, recv)?;
+            put(
+                vm,
+                recv,
+                "mExitAction",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("isCreatedFromLayoutResource", "()Z") => {
+            tr_scene_ensure(vm, recv)?;
+            bool_value(field_int(vm, recv, "mLayoutId") > 0)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+fn transition_scene_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        (
+            "getSceneForLayout",
+            "(Landroid/view/ViewGroup;ILandroid/content/Context;)Landroid/transition/Scene;",
+        ) => {
+            let root = req_obj(args, 0, "sceneRoot")?;
+            let cache = match field_obj(vm, root, "rdSceneLayoutCache") {
+                Some(cache) => cache,
+                None => {
+                    let cache = tr_new_map(vm)?;
+                    put(vm, root, "rdSceneLayoutCache", Value::Obj(cache))?;
+                    cache
+                }
+            };
+            let key = tr_box_int(vm, iarg(args, 1))?;
+            if let Some(existing) = tr_map_get(vm, &Value::Obj(cache), &key) {
+                if !matches!(existing, Value::Null) {
+                    return Ok(Some(existing));
+                }
+            }
+            let scene = alloc_obj(vm, TRANSITION_SCENE, Vec::new())?;
+            tr_invoke(
+                vm,
+                scene,
+                "<init>",
+                "(Landroid/view/ViewGroup;ILandroid/content/Context;)V",
+                &[
+                    Value::Obj(root),
+                    Value::Int(iarg(args, 1)),
+                    args.get(2).cloned().unwrap_or(Value::Null),
+                ],
+            )?;
+            tr_map_put(vm, cache, key, Value::Obj(scene))?;
+            Value::Obj(scene)
+        }
+        ("getCurrentScene", "(Landroid/view/ViewGroup;)Landroid/transition/Scene;") => {
+            let root = req_obj(args, 0, "sceneRoot")?;
+            tr_scene_current(vm, root)
+        }
+        ("setCurrentScene", "(Landroid/view/ViewGroup;Landroid/transition/Scene;)V") => {
+            let root = req_obj(args, 0, "sceneRoot")?;
+            tr_scene_set_current(vm, root, args.get(1).cloned().unwrap_or(Value::Null))?;
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn tr_manager_ensure(vm: &mut Engine, manager: ObjRef) -> Result<(), VmExit> {
+    if field_bool(vm, manager, "rdManagerInit") {
+        return Ok(());
+    }
+    put(vm, manager, "rdManagerInit", Value::Int(1))?;
+    let scenes = tr_new_map(vm)?;
+    put(vm, manager, "mSceneTransitions", Value::Obj(scenes))?;
+    let pairs = tr_new_map(vm)?;
+    put(vm, manager, "mScenePairTransitions", Value::Obj(pairs))
+}
+fn tr_manager_default_transition(vm: &mut Engine) -> Result<Value, VmExit> {
+    let key = (
+        TRANSITION_MANAGER.to_string(),
+        "sDefaultTransition".to_string(),
+    );
+    if let Some(value) = vm.statics.get(&key).cloned() {
+        return Ok(value);
+    }
+    let auto = alloc_obj(vm, TRANSITION_AUTO, Vec::new())?;
+    tr_invoke(vm, auto, "<init>", "()V", &[])?;
+    let value = Value::Obj(auto);
+    vm.statics.insert(key, value.clone());
+    Ok(value)
+}
+fn tr_manager_pending(vm: &mut Engine) -> Result<ObjRef, VmExit> {
+    if let Value::Obj(list) = tr_static_get(vm, TRANSITION_MANAGER, "sPendingTransitions") {
+        return Ok(list);
+    }
+    let list = tr_new_list(vm, Vec::new())?;
+    tr_static_set(
+        vm,
+        TRANSITION_MANAGER,
+        "sPendingTransitions",
+        Value::Obj(list),
+    );
+    Ok(list)
+}
+fn tr_manager_running_transitions(vm: &mut Engine) -> Result<ObjRef, VmExit> {
+    if let Value::Obj(map) = tr_static_get(vm, TRANSITION_MANAGER, "rdRunningTransitions") {
+        return Ok(map);
+    }
+    let map = tr_new_map(vm)?;
+    tr_static_set(
+        vm,
+        TRANSITION_MANAGER,
+        "rdRunningTransitions",
+        Value::Obj(map),
+    );
+    Ok(map)
+}
+fn tr_manager_pending_contains(vm: &mut Engine, root_value: &Value) -> Result<bool, VmExit> {
+    let pending = tr_manager_pending(vm)?;
+    tr_list_contains(vm, &Value::Obj(pending), root_value)
+}
+fn tr_manager_pending_add(vm: &mut Engine, root: ObjRef) -> Result<(), VmExit> {
+    let pending = tr_manager_pending(vm)?;
+    let items = tr_items(vm, &Value::Obj(pending));
+    let mut items = items;
+    items.push(Value::Obj(root));
+    if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&pending) {
+        *elems = items;
+    }
+    Ok(())
+}
+fn tr_manager_pending_remove(vm: &mut Engine, root_value: &Value) -> Result<bool, VmExit> {
+    let pending = tr_manager_pending(vm)?;
+    let mut items = tr_items(vm, &Value::Obj(pending));
+    let mut found = None;
+    for (index, existing) in items.iter().enumerate() {
+        if crate::intrinsics::values_equal(&vm.heap, existing, root_value)? {
+            found = Some(index);
+            break;
+        }
+    }
+    if let Some(index) = found {
+        items.remove(index);
+        if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&pending) {
+            *elems = items;
+        }
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+fn tr_manager_running_list(
+    vm: &mut Engine,
+    root: ObjRef,
+    create: bool,
+) -> Result<Option<Value>, VmExit> {
+    let map = tr_manager_running_transitions(vm)?;
+    if let Some(list) = tr_map_get(vm, &Value::Obj(map), &Value::Obj(root)) {
+        return Ok(Some(list));
+    }
+    if create {
+        let list = Value::Obj(tr_new_list(vm, Vec::new())?);
+        tr_map_put(vm, map, Value::Obj(root), list.clone())?;
+        Ok(Some(list))
+    } else {
+        Ok(None)
+    }
+}
+fn tr_manager_setup(
+    vm: &mut Engine,
+    root: ObjRef,
+    transition: Option<ObjRef>,
+) -> Result<(), VmExit> {
+    if let Some(list) = tr_manager_running_list(vm, root, false)? {
+        for running in tr_items(vm, &list)
+            .iter()
+            .filter_map(|value| obj(Some(value)))
+        {
+            tr_invoke(
+                vm,
+                running,
+                "pause",
+                "(Landroid/view/View;)V",
+                &[Value::Obj(root)],
+            )?;
+        }
+    }
+    if let Some(transition) = transition {
+        tr_invoke(
+            vm,
+            transition,
+            "captureValues",
+            "(Landroid/view/ViewGroup;Z)V",
+            &[Value::Obj(root), Value::Int(1)],
+        )?;
+    }
+    if let Some(previous) = obj(Some(&tr_scene_current(vm, root))) {
+        tr_invoke(vm, previous, "exit", "()V", &[])?;
+    }
+    Ok(())
+}
+fn tr_manager_schedule(vm: &mut Engine, root: ObjRef, transition: ObjRef) -> Result<(), VmExit> {
+    let listener = alloc_obj(vm, TRANSITION_MANAGER_MULTI, Vec::new())?;
+    tr_invoke(
+        vm,
+        listener,
+        "<init>",
+        "(Landroid/transition/Transition;Landroid/view/ViewGroup;)V",
+        &[Value::Obj(transition), Value::Obj(root)],
+    )?;
+    let _ = tr_invoke(
+        vm,
+        root,
+        "addOnAttachStateChangeListener",
+        "(Landroid/view/View$OnAttachStateChangeListener;)V",
+        &[Value::Obj(listener)],
+    );
+    if let Ok(observer) = tr_invoke(
+        vm,
+        root,
+        "getViewTreeObserver",
+        "()Landroid/view/ViewTreeObserver;",
+        &[],
+    ) {
+        if let Some(observer) = obj(Some(&observer)) {
+            let _ = tr_invoke(
+                vm,
+                observer,
+                "addOnPreDrawListener",
+                "(Landroid/view/ViewTreeObserver$OnPreDrawListener;)V",
+                &[Value::Obj(listener)],
+            );
+        }
+    }
+    let now = vm.fw.clock();
+    vm.frames.callbacks.push((listener, now));
+    Ok(())
+}
+fn tr_manager_change_scene(
+    vm: &mut Engine,
+    scene_value: Value,
+    transition_value: Value,
+) -> Result<(), VmExit> {
+    let scene = obj(Some(&scene_value)).ok_or_else(|| npe("scene"))?;
+    let root_value = tr_invoke(vm, scene, "getSceneRoot", "()Landroid/view/ViewGroup;", &[])?;
+    let root = obj(Some(&root_value)).ok_or_else(|| npe("sceneRoot"))?;
+    if tr_manager_pending_contains(vm, &Value::Obj(root))? {
+        return Ok(());
+    }
+    let old_scene = tr_scene_current(vm, root);
+    if matches!(transition_value, Value::Null) {
+        if let Some(old) = obj(Some(&old_scene)) {
+            tr_invoke(vm, old, "exit", "()V", &[])?;
+        }
+        tr_invoke(vm, scene, "enter", "()V", &[])?;
+        return Ok(());
+    }
+    tr_manager_pending_add(vm, root)?;
+    let transition = obj(Some(&transition_value)).ok_or_else(|| npe("transition"))?;
+    let clone_value = tr_invoke(
+        vm,
+        transition,
+        "clone",
+        "()Landroid/transition/Transition;",
+        &[],
+    )?;
+    let clone = obj(Some(&clone_value)).ok_or_else(|| npe("transition clone"))?;
+    tr_invoke(
+        vm,
+        clone,
+        "setSceneRoot",
+        "(Landroid/view/ViewGroup;)Landroid/transition/Transition;",
+        &[Value::Obj(root)],
+    )?;
+    if let Some(old) = obj(Some(&old_scene)) {
+        let from_layout = tr_invoke(vm, old, "isCreatedFromLayoutResource", "()Z", &[])?;
+        if from_layout == Value::Int(1) {
+            tr_invoke(vm, clone, "setCanRemoveViews", "(Z)V", &[Value::Int(1)])?;
+        }
+    }
+    tr_manager_setup(vm, root, Some(clone))?;
+    tr_invoke(vm, scene, "enter", "()V", &[])?;
+    tr_manager_schedule(vm, root, clone)
+}
+fn tr_manager_begin_delayed(
+    vm: &mut Engine,
+    root_value: Value,
+    transition_value: Value,
+) -> Result<(), VmExit> {
+    let root = obj(Some(&root_value)).ok_or_else(|| npe("sceneRoot"))?;
+    if tr_manager_pending_contains(vm, &Value::Obj(root))? {
+        return Ok(());
+    }
+    if tr_invoke(vm, root, "isLaidOut", "()Z", &[])? != Value::Int(1) {
+        return Ok(());
+    }
+    tr_manager_pending_add(vm, root)?;
+    let transition_value = if matches!(transition_value, Value::Null) {
+        tr_manager_default_transition(vm)?
+    } else {
+        transition_value
+    };
+    let transition = obj(Some(&transition_value)).ok_or_else(|| npe("transition"))?;
+    let clone_value = tr_invoke(
+        vm,
+        transition,
+        "clone",
+        "()Landroid/transition/Transition;",
+        &[],
+    )?;
+    let clone = obj(Some(&clone_value)).ok_or_else(|| npe("transition clone"))?;
+    tr_manager_setup(vm, root, Some(clone))?;
+    tr_scene_set_current(vm, root, Value::Null)?;
+    tr_manager_schedule(vm, root, clone)
+}
+fn tr_manager_on_pre_draw(vm: &mut Engine, listener: ObjRef) -> Result<Value, VmExit> {
+    let root = field_obj(vm, listener, "mSceneRoot").ok_or_else(|| npe("sceneRoot"))?;
+    let transition = field_obj(vm, listener, "mTransition").ok_or_else(|| npe("transition"))?;
+    if !tr_manager_pending_remove(vm, &Value::Obj(root))? {
+        return Ok(Value::Int(1));
+    }
+    let current_list = tr_manager_running_list(vm, root, true)?.ok_or_else(|| npe("running"))?;
+    let previous_items = tr_items(vm, &current_list);
+    let previous = if previous_items.is_empty() {
+        Vec::new()
+    } else {
+        previous_items
+    };
+    if let Some(list_ref) = obj(Some(&current_list)) {
+        if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&list_ref) {
+            elems.push(Value::Obj(transition));
+        }
+    }
+    let end_listener = alloc_obj(vm, TRANSITION_MANAGER_END_LISTENER, Vec::new())?;
+    put(vm, end_listener, "val$sceneRoot", Value::Obj(root))?;
+    let running_map = tr_manager_running_transitions(vm)?;
+    put(
+        vm,
+        end_listener,
+        "val$runningTransitions",
+        Value::Obj(running_map),
+    )?;
+    tr_invoke(
+        vm,
+        transition,
+        "addListener",
+        "(Landroid/transition/Transition$TransitionListener;)Landroid/transition/Transition;",
+        &[Value::Obj(end_listener)],
+    )?;
+    tr_invoke(
+        vm,
+        transition,
+        "captureValues",
+        "(Landroid/view/ViewGroup;Z)V",
+        &[Value::Obj(root), Value::Int(0)],
+    )?;
+    for running in previous.iter().filter_map(|value| obj(Some(value))) {
+        tr_invoke(
+            vm,
+            running,
+            "resume",
+            "(Landroid/view/View;)V",
+            &[Value::Obj(root)],
+        )?;
+    }
+    tr_invoke(
+        vm,
+        transition,
+        "playTransition",
+        "(Landroid/view/ViewGroup;)V",
+        &[Value::Obj(root)],
+    )?;
+    Ok(Value::Int(1))
+}
+fn tr_manager_on_detached(vm: &mut Engine, listener: ObjRef) -> Result<(), VmExit> {
+    let root = field_obj(vm, listener, "mSceneRoot").ok_or_else(|| npe("sceneRoot"))?;
+    tr_manager_pending_remove(vm, &Value::Obj(root))?;
+    if let Some(list) = tr_manager_running_list(vm, root, false)? {
+        for running in tr_items(vm, &list)
+            .iter()
+            .filter_map(|value| obj(Some(value)))
+        {
+            tr_invoke(
+                vm,
+                running,
+                "resume",
+                "(Landroid/view/View;)V",
+                &[Value::Obj(root)],
+            )?;
+        }
+    }
+    let transition = field_obj(vm, listener, "mTransition").ok_or_else(|| npe("transition"))?;
+    tr_invoke(vm, transition, "clearValues", "(Z)V", &[Value::Int(1)])?;
+    Ok(())
+}
+fn tr_manager_get_transition(
+    vm: &mut Engine,
+    manager: ObjRef,
+    scene: ObjRef,
+) -> Result<Value, VmExit> {
+    tr_manager_ensure(vm, manager)?;
+    let root_value = tr_invoke(vm, scene, "getSceneRoot", "()Landroid/view/ViewGroup;", &[])?;
+    if let Some(root) = obj(Some(&root_value)) {
+        let current = tr_scene_current(vm, root);
+        if !matches!(current, Value::Null) {
+            let pair_map_value = get(vm, manager, "mScenePairTransitions");
+            if let Some(scene_map) = tr_map_get(vm, &pair_map_value, &Value::Obj(scene)) {
+                if let Some(transition) = tr_map_get(vm, &scene_map, &current) {
+                    if !matches!(transition, Value::Null) {
+                        return Ok(transition);
+                    }
+                }
+            }
+        }
+    }
+    let scenes = get(vm, manager, "mSceneTransitions");
+    let transition = tr_map_get(vm, &scenes, &Value::Obj(scene)).unwrap_or(Value::Null);
+    if matches!(transition, Value::Null) {
+        tr_manager_default_transition(vm)
+    } else {
+        Ok(transition)
+    }
+}
+
+fn transition_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            tr_manager_ensure(vm, recv)?;
+            Value::Null
+        }
+        ("setDefaultTransition", "(Landroid/transition/Transition;)V") => {
+            tr_static_set(
+                vm,
+                TRANSITION_MANAGER,
+                "sDefaultTransition",
+                args.first().cloned().unwrap_or(Value::Null),
+            );
+            Value::Null
+        }
+        (
+            "setTransition",
+            "(Landroid/transition/Scene;Landroid/transition/Transition;)V",
+        ) => {
+            tr_manager_ensure(vm, recv)?;
+            let map = field_obj(vm, recv, "mSceneTransitions").ok_or_else(|| npe("map"))?;
+            tr_map_put(
+                vm,
+                map,
+                args.first().cloned().unwrap_or(Value::Null),
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        (
+            "setTransition",
+            "(Landroid/transition/Scene;Landroid/transition/Scene;Landroid/transition/Transition;)V",
+        ) => {
+            tr_manager_ensure(vm, recv)?;
+            let pair_map = field_obj(vm, recv, "mScenePairTransitions")
+                .ok_or_else(|| npe("map"))?;
+            let to_scene = args.get(1).cloned().unwrap_or(Value::Null);
+            let inner = match tr_map_get(vm, &Value::Obj(pair_map), &to_scene)
+                .and_then(|value| obj(Some(&value)))
+            {
+                Some(inner) => inner,
+                None => {
+                    let inner = tr_new_map(vm)?;
+                    tr_map_put(vm, pair_map, to_scene, Value::Obj(inner))?;
+                    inner
+                }
+            };
+            tr_map_put(
+                vm,
+                inner,
+                args.first().cloned().unwrap_or(Value::Null),
+                args.get(2).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        (
+            "getTransition",
+            "(Landroid/transition/Scene;)Landroid/transition/Transition;",
+        ) => {
+            let scene = req_obj(args, 0, "scene")?;
+            tr_manager_get_transition(vm, recv, scene)?
+        }
+        ("transitionTo", "(Landroid/transition/Scene;)V") => {
+            let scene = req_obj(args, 0, "scene")?;
+            let transition = tr_manager_get_transition(vm, recv, scene)?;
+            tr_manager_change_scene(vm, Value::Obj(scene), transition)?;
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+fn transition_manager_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("getDefaultTransition", "()Landroid/transition/Transition;") => {
+            tr_manager_default_transition(vm)?
+        }
+        ("go", "(Landroid/transition/Scene;)V") => {
+            let transition = tr_manager_default_transition(vm)?;
+            tr_manager_change_scene(vm, args.first().cloned().unwrap_or(Value::Null), transition)?;
+            Value::Null
+        }
+        ("go", "(Landroid/transition/Scene;Landroid/transition/Transition;)V") => {
+            tr_manager_change_scene(
+                vm,
+                args.first().cloned().unwrap_or(Value::Null),
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("beginDelayedTransition", "(Landroid/view/ViewGroup;)V") => {
+            tr_manager_begin_delayed(
+                vm,
+                args.first().cloned().unwrap_or(Value::Null),
+                Value::Null,
+            )?;
+            Value::Null
+        }
+        (
+            "beginDelayedTransition",
+            "(Landroid/view/ViewGroup;Landroid/transition/Transition;)V",
+        ) => {
+            tr_manager_begin_delayed(
+                vm,
+                args.first().cloned().unwrap_or(Value::Null),
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("endTransitions", "(Landroid/view/ViewGroup;)V") => {
+            let root = obj(args.first());
+            if let Some(root_ref) = root {
+                tr_manager_pending_remove(vm, &Value::Obj(root_ref))?;
+                if let Some(list) = tr_manager_running_list(vm, root_ref, false)? {
+                    let transitions = tr_items(vm, &list)
+                        .iter()
+                        .filter_map(|value| obj(Some(value)))
+                        .collect::<Vec<_>>();
+                    for transition in transitions.into_iter().rev() {
+                        tr_invoke(
+                            vm,
+                            transition,
+                            "forceToEnd",
+                            "(Landroid/view/ViewGroup;)V",
+                            &[Value::Obj(root_ref)],
+                        )?;
+                    }
+                }
+            } else {
+                tr_manager_pending_remove(vm, &Value::Null)?;
+            }
+            Value::Null
+        }
+        ("changeScene", "(Landroid/transition/Scene;Landroid/transition/Transition;)V") => {
+            tr_manager_change_scene(
+                vm,
+                args.first().cloned().unwrap_or(Value::Null),
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("sceneChangeSetup", "(Landroid/view/ViewGroup;Landroid/transition/Transition;)V") => {
+            let root = req_obj(args, 0, "sceneRoot")?;
+            tr_manager_setup(vm, root, obj(args.get(1)))?;
+            Value::Null
+        }
+        (
+            "sceneChangeRunTransition",
+            "(Landroid/view/ViewGroup;Landroid/transition/Transition;)V",
+        ) => {
+            if let (Some(root), Some(transition)) = (obj(args.first()), obj(args.get(1))) {
+                tr_manager_schedule(vm, root, transition)?;
+            }
+            Value::Null
+        }
+        ("getRunningTransitions", "()Landroid/util/ArrayMap;") => {
+            Value::Obj(tr_manager_running_transitions(vm)?)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn tr_string_array(vm: &mut Engine, values: &[&str]) -> Result<Value, VmExit> {
+    let mut items = Vec::new();
+    for value in values {
+        items.push(jstr(vm, *value)?);
+    }
+    obj_array(vm, "[Ljava/lang/String;", items)
+}
+fn tr_auto_init(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    if field_bool(vm, recv, "rdAutoInit") {
+        return Ok(());
+    }
+    put(vm, recv, "rdAutoInit", Value::Int(1))?;
+    put(vm, recv, "mPlayTogether", Value::Int(0))?;
+    for (class, mode) in [
+        (TRANSITION_FADE, Some(2)),
+        (TRANSITION_CHANGE_BOUNDS, None),
+        (TRANSITION_FADE, Some(1)),
+    ] {
+        let child = alloc_obj(vm, class, Vec::new())?;
+        if let Some(mode) = mode {
+            tr_invoke(vm, child, "<init>", "(I)V", &[Value::Int(mode)])?;
+        } else {
+            tr_invoke(vm, child, "<init>", "()V", &[])?;
+        }
+        tr_invoke(
+            vm,
+            recv,
+            "addTransition",
+            "(Landroid/transition/Transition;)Landroid/transition/TransitionSet;",
+            &[Value::Obj(child)],
+        )?;
+    }
+    Ok(())
+}
+
+fn transition_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    tr_ensure_transition(vm, recv)?;
+    let class = class_of(vm, recv);
+    let is_set = vm.cp.is_subtype(&class, TRANSITION_SET);
+    let is_visibility = vm.cp.is_subtype(&class, TRANSITION_VISIBILITY);
+    let is_fade = vm.cp.is_subtype(&class, TRANSITION_FADE);
+    let is_change_bounds = vm.cp.is_subtype(&class, TRANSITION_CHANGE_BOUNDS);
+    if is_set
+        && matches!(
+            name,
+            "addTarget" | "removeTarget" | "excludeTarget" | "excludeChildren"
+        )
+    {
+        let base_sig = sig.replace(
+            "Landroid/transition/TransitionSet;",
+            "Landroid/transition/Transition;",
+        );
+        for child in tr_set_children(vm, recv) {
+            tr_invoke(vm, child, name, &base_sig, args)?;
+        }
+    }
+    let self_value = Value::Obj(recv);
+    let value = match (name, sig) {
+        ("<init>", "()V") | ("<init>", "(Landroid/content/Context;Landroid/util/AttributeSet;)V") => {
+            if class == TRANSITION_AUTO || vm.cp.is_subtype(&class, TRANSITION_AUTO) {
+                tr_auto_init(vm, recv)?;
+            }
+            Value::Null
+        }
+        ("<init>", "(I)V") if is_fade => {
+            let mode = iarg(args, 0);
+            if mode & !3 != 0 {
+                return Err(iae("Only MODE_IN and MODE_OUT flags are allowed"));
+            }
+            put(vm, recv, "mMode", Value::Int(mode))?;
+            Value::Null
+        }
+        ("setDuration", "(J)Landroid/transition/Transition;")
+        | ("setDuration", "(J)Landroid/transition/TransitionSet;") => {
+            put(vm, recv, "mDuration", Value::Long(larg(args, 0)))?;
+            if is_set && larg(args, 0) >= 0 {
+                for child in tr_set_children(vm, recv) {
+                    tr_invoke(
+                        vm,
+                        child,
+                        "setDuration",
+                        "(J)Landroid/transition/Transition;",
+                        &[Value::Long(larg(args, 0))],
+                    )?;
+                }
+            }
+            self_value.clone()
+        }
+        ("getDuration", "()J") => Value::Long(field_long(vm, recv, "mDuration")),
+        ("setStartDelay", "(J)Landroid/transition/Transition;")
+        | ("setStartDelay", "(J)Landroid/transition/TransitionSet;") => {
+            put(vm, recv, "mStartDelay", Value::Long(larg(args, 0)))?;
+            self_value.clone()
+        }
+        ("getStartDelay", "()J") => Value::Long(field_long(vm, recv, "mStartDelay")),
+        (
+            "setInterpolator",
+            "(Landroid/animation/TimeInterpolator;)Landroid/transition/Transition;",
+        )
+        | (
+            "setInterpolator",
+            "(Landroid/animation/TimeInterpolator;)Landroid/transition/TransitionSet;",
+        ) => {
+            let interpolator = args.first().cloned().unwrap_or(Value::Null);
+            if is_set {
+                let flags = field_int(vm, recv, "mChangeFlags") | 1;
+                put(vm, recv, "mChangeFlags", Value::Int(flags))?;
+                for child in tr_set_children(vm, recv) {
+                    tr_invoke(
+                        vm,
+                        child,
+                        "setInterpolator",
+                        "(Landroid/animation/TimeInterpolator;)Landroid/transition/Transition;",
+                        std::slice::from_ref(&interpolator),
+                    )?;
+                }
+            }
+            put(vm, recv, "mInterpolator", interpolator)?;
+            self_value.clone()
+        }
+        ("getInterpolator", "()Landroid/animation/TimeInterpolator;") => {
+            get(vm, recv, "mInterpolator")
+        }
+        ("getTransitionProperties", "()[Ljava/lang/String;") => {
+            if is_change_bounds {
+                tr_string_array(
+                    vm,
+                    &[
+                        TR_PROP_BOUNDS,
+                        TR_PROP_CLIP,
+                        TR_PROP_BOUNDS_PARENT,
+                        TR_PROP_WINDOW_X,
+                        TR_PROP_WINDOW_Y,
+                    ],
+                )?
+            } else if is_visibility {
+                tr_string_array(vm, &[TR_PROP_VISIBILITY, TR_PROP_VISIBILITY_PARENT])?
+            } else {
+                Value::Null
+            }
+        }
+        (
+            "createAnimator",
+            "(Landroid/view/ViewGroup;Landroid/transition/TransitionValues;Landroid/transition/TransitionValues;)Landroid/animation/Animator;",
+        ) => {
+            let scene_root = req_obj(args, 0, "sceneRoot")?;
+            let start = obj(args.get(1));
+            let end = obj(args.get(2));
+            if is_change_bounds {
+                tr_change_bounds_create_animator(vm, recv, start, end)?
+            } else if is_visibility {
+                let info = tr_visibility_info(vm, start, end)?;
+                if info.changed && (info.start_parent.is_some() || info.end_parent.is_some()) {
+                    if info.fade_in {
+                        tr_invoke(
+                            vm,
+                            recv,
+                            "onAppear",
+                            "(Landroid/view/ViewGroup;Landroid/transition/TransitionValues;ILandroid/transition/TransitionValues;I)Landroid/animation/Animator;",
+                            &[
+                                Value::Obj(scene_root),
+                                start.map_or(Value::Null, Value::Obj),
+                                Value::Int(info.start_visibility),
+                                end.map_or(Value::Null, Value::Obj),
+                                Value::Int(info.end_visibility),
+                            ],
+                        )?
+                    } else {
+                        tr_invoke(
+                            vm,
+                            recv,
+                            "onDisappear",
+                            "(Landroid/view/ViewGroup;Landroid/transition/TransitionValues;ILandroid/transition/TransitionValues;I)Landroid/animation/Animator;",
+                            &[
+                                Value::Obj(scene_root),
+                                start.map_or(Value::Null, Value::Obj),
+                                Value::Int(info.start_visibility),
+                                end.map_or(Value::Null, Value::Obj),
+                                Value::Int(info.end_visibility),
+                            ],
+                        )?
+                    }
+                } else {
+                    Value::Null
+                }
+            } else {
+                Value::Null
+            }
+        }
+        ("setMatchOrder", "([I)V") => {
+            let matches = int_values(vm, args.first());
+            if matches!(args.first(), None | Some(Value::Null)) || matches.is_empty() {
+                let order = new_int_array(vm, &[2, 1, 3, 4])?;
+                put(vm, recv, "mMatchOrder", order)?;
+            } else {
+                for (index, value) in matches.iter().enumerate() {
+                    if !(1..=4).contains(value) {
+                        return Err(iae("matches contains invalid value"));
+                    }
+                    if matches[..index].contains(value) {
+                        return Err(iae("matches contains a duplicate value"));
+                    }
+                }
+                let order = new_int_array(vm, &matches)?;
+                put(vm, recv, "mMatchOrder", order)?;
+            }
+            Value::Null
+        }
+        ("isValidTarget", "(Landroid/view/View;)Z") => {
+            bool_value(tr_is_valid_target(vm, recv, obj(args.first()))?)
+        }
+        ("captureStartValues", "(Landroid/transition/TransitionValues;)V")
+        | ("captureEndValues", "(Landroid/transition/TransitionValues;)V") => {
+            let start = name == "captureStartValues";
+            let values = req_obj(args, 0, "transitionValues")?;
+            tr_ensure_values(vm, values)?;
+            if is_set {
+                let view = tr_values_view(vm, values);
+                if tr_is_valid_target(vm, recv, view)? {
+                    for child in tr_set_children(vm, recv) {
+                        if tr_is_valid_target(vm, child, view)? {
+                            tr_invoke(vm, child, name, sig, &[Value::Obj(values)])?;
+                            tr_append_field_list(
+                                vm,
+                                values,
+                                "targetedTransitions",
+                                Value::Obj(child),
+                            )?;
+                        }
+                    }
+                }
+            } else if is_change_bounds {
+                tr_capture_change_bounds_values(vm, recv, values)?;
+            } else if is_visibility {
+                tr_capture_visibility_values(vm, values)?;
+                if is_fade && start {
+                    let view = tr_values_view(vm, values).ok_or_else(|| npe("view"))?;
+                    let alpha = match tr_invoke(vm, view, "getTransitionAlpha", "()F", &[])? {
+                        Value::Float(v) => v,
+                        _ => 1.0,
+                    };
+                    let boxed = tr_box_float(vm, alpha)?;
+                    tr_values_put(vm, values, TR_PROP_FADE_ALPHA, boxed)?;
+                }
+            }
+            Value::Null
+        }
+        ("captureValues", "(Landroid/view/ViewGroup;Z)V") => {
+            let root = req_obj(args, 0, "sceneRoot")?;
+            tr_capture_values(vm, recv, root, iarg(args, 1) != 0)?;
+            Value::Null
+        }
+        ("clearValues", "(Z)V") => {
+            tr_clear_values(vm, recv, iarg(args, 0) != 0)?;
+            Value::Null
+        }
+        (
+            "createAnimators",
+            "(Landroid/view/ViewGroup;Landroid/transition/TransitionValuesMaps;Landroid/transition/TransitionValuesMaps;Ljava/util/ArrayList;Ljava/util/ArrayList;)V",
+        ) => {
+            tr_create_animators(
+                vm,
+                recv,
+                req_obj(args, 0, "sceneRoot")?,
+                req_obj(args, 1, "startValues")?,
+                req_obj(args, 2, "endValues")?,
+                args.get(3).cloned().unwrap_or(Value::Null),
+                args.get(4).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("runAnimators", "()V") => {
+            tr_run_animators(vm, recv)?;
+            Value::Null
+        }
+        ("playTransition", "(Landroid/view/ViewGroup;)V") => {
+            tr_play_transition(vm, recv, req_obj(args, 0, "sceneRoot")?)?;
+            Value::Null
+        }
+        (
+            "getTransitionValues",
+            "(Landroid/view/View;Z)Landroid/transition/TransitionValues;",
+        ) => tr_get_transition_values(vm, recv, obj(args.first()), iarg(args, 1) != 0)?,
+        (
+            "getMatchedTransitionValues",
+            "(Landroid/view/View;Z)Landroid/transition/TransitionValues;",
+        ) => {
+            tr_get_matched_transition_values(vm, recv, obj(args.first()), iarg(args, 1) != 0)?
+        }
+        (
+            "isTransitionRequired",
+            "(Landroid/transition/TransitionValues;Landroid/transition/TransitionValues;)Z",
+        ) => bool_value(tr_is_transition_required(
+            vm,
+            recv,
+            obj(args.first()),
+            obj(args.get(1)),
+        )?),
+        ("animate", "(Landroid/animation/Animator;)V") => {
+            tr_animate(vm, recv, obj(args.first()))?;
+            Value::Null
+        }
+        ("start", "()V") => {
+            tr_start(vm, recv)?;
+            Value::Null
+        }
+        ("end", "()V") => {
+            tr_end(vm, recv)?;
+            Value::Null
+        }
+        ("cancel", "()V") => {
+            tr_cancel(vm, recv)?;
+            Value::Null
+        }
+        ("pause", "(Landroid/view/View;)V") => {
+            tr_pause(vm, recv, obj(args.first()))?;
+            Value::Null
+        }
+        ("resume", "(Landroid/view/View;)V") => {
+            tr_resume(vm, recv, obj(args.first()))?;
+            Value::Null
+        }
+        ("forceToEnd", "(Landroid/view/ViewGroup;)V") => {
+            tr_force_to_end(vm, recv, obj(args.first()))?;
+            Value::Null
+        }
+        (
+            "addListener",
+            "(Landroid/transition/Transition$TransitionListener;)Landroid/transition/Transition;",
+        )
+        | (
+            "addListener",
+            "(Landroid/transition/Transition$TransitionListener;)Landroid/transition/TransitionSet;",
+        ) => {
+            tr_ensure_field_list(vm, recv, "mListeners")?;
+            tr_append_field_list(
+                vm,
+                recv,
+                "mListeners",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            self_value.clone()
+        }
+        (
+            "removeListener",
+            "(Landroid/transition/Transition$TransitionListener;)Landroid/transition/Transition;",
+        )
+        | (
+            "removeListener",
+            "(Landroid/transition/Transition$TransitionListener;)Landroid/transition/TransitionSet;",
+        ) => {
+            if field_obj(vm, recv, "mListeners").is_some() {
+                tr_remove_field_list(
+                    vm,
+                    recv,
+                    "mListeners",
+                    &args.first().cloned().unwrap_or(Value::Null),
+                )?;
+                if tr_field_items(vm, recv, "mListeners").is_empty() {
+                    put(vm, recv, "mListeners", Value::Null)?;
+                }
+            }
+            self_value.clone()
+        }
+        (
+            "setEpicenterCallback",
+            "(Landroid/transition/Transition$EpicenterCallback;)V",
+        ) => {
+            let callback = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mEpicenterCallback", callback.clone())?;
+            if is_set {
+                let flags = field_int(vm, recv, "mChangeFlags") | 8;
+                put(vm, recv, "mChangeFlags", Value::Int(flags))?;
+                for child in tr_set_children(vm, recv) {
+                    tr_invoke(
+                        vm,
+                        child,
+                        "setEpicenterCallback",
+                        "(Landroid/transition/Transition$EpicenterCallback;)V",
+                        std::slice::from_ref(&callback),
+                    )?;
+                }
+            }
+            Value::Null
+        }
+        (
+            "getEpicenterCallback",
+            "()Landroid/transition/Transition$EpicenterCallback;",
+        ) => get(vm, recv, "mEpicenterCallback"),
+        ("getEpicenter", "()Landroid/graphics/Rect;") => {
+            if let Some(callback) = field_obj(vm, recv, "mEpicenterCallback") {
+                tr_invoke(
+                    vm,
+                    callback,
+                    "onGetEpicenter",
+                    "(Landroid/transition/Transition;)Landroid/graphics/Rect;",
+                    std::slice::from_ref(&self_value),
+                )?
+            } else {
+                Value::Null
+            }
+        }
+        ("setPathMotion", "(Landroid/transition/PathMotion;)V") => {
+            let original = args.first().cloned().unwrap_or(Value::Null);
+            let stored = if matches!(original, Value::Null) {
+                Value::Obj(alloc_obj(vm, TRANSITION_STRAIGHT_PATH, Vec::new())?)
+            } else {
+                original.clone()
+            };
+            put(vm, recv, "mPathMotion", stored)?;
+            if is_set {
+                let flags = field_int(vm, recv, "mChangeFlags") | 4;
+                put(vm, recv, "mChangeFlags", Value::Int(flags))?;
+                for child in tr_set_children(vm, recv) {
+                    tr_invoke(
+                        vm,
+                        child,
+                        "setPathMotion",
+                        "(Landroid/transition/PathMotion;)V",
+                        std::slice::from_ref(&original),
+                    )?;
+                }
+            }
+            Value::Null
+        }
+        ("getPathMotion", "()Landroid/transition/PathMotion;") => get(vm, recv, "mPathMotion"),
+        (
+            "setPropagation",
+            "(Landroid/transition/TransitionPropagation;)V",
+        ) => {
+            let propagation = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mPropagation", propagation.clone())?;
+            if is_set {
+                let flags = field_int(vm, recv, "mChangeFlags") | 2;
+                put(vm, recv, "mChangeFlags", Value::Int(flags))?;
+                for child in tr_set_children(vm, recv) {
+                    tr_invoke(
+                        vm,
+                        child,
+                        "setPropagation",
+                        "(Landroid/transition/TransitionPropagation;)V",
+                        std::slice::from_ref(&propagation),
+                    )?;
+                }
+            }
+            Value::Null
+        }
+        (
+            "getPropagation",
+            "()Landroid/transition/TransitionPropagation;",
+        ) => get(vm, recv, "mPropagation"),
+        ("capturePropagationValues", "(Landroid/transition/TransitionValues;)V") => {
+            let values = req_obj(args, 0, "transitionValues")?;
+            tr_capture_propagation_values(vm, recv, values)?;
+            Value::Null
+        }
+        (
+            "setSceneRoot",
+            "(Landroid/view/ViewGroup;)Landroid/transition/Transition;",
+        )
+        | (
+            "setSceneRoot",
+            "(Landroid/view/ViewGroup;)Landroid/transition/TransitionSet;",
+        ) => {
+            let root = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mSceneRoot", root.clone())?;
+            if is_set {
+                for child in tr_set_children(vm, recv) {
+                    tr_invoke(
+                        vm,
+                        child,
+                        "setSceneRoot",
+                        "(Landroid/view/ViewGroup;)Landroid/transition/Transition;",
+                        std::slice::from_ref(&root),
+                    )?;
+                }
+            }
+            self_value.clone()
+        }
+        ("setCanRemoveViews", "(Z)V") => {
+            put(vm, recv, "mCanRemoveViews", Value::Int(i32::from(iarg(args, 0) != 0)))?;
+            if is_set {
+                for child in tr_set_children(vm, recv) {
+                    tr_invoke(vm, child, "setCanRemoveViews", "(Z)V", &[Value::Int(iarg(args, 0))])?;
+                }
+            }
+            Value::Null
+        }
+        ("canRemoveViews", "()Z") => bool_value(field_bool(vm, recv, "mCanRemoveViews")),
+        ("setNameOverrides", "(Landroid/util/ArrayMap;)V") => {
+            put(
+                vm,
+                recv,
+                "mNameOverrides",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("getNameOverrides", "()Landroid/util/ArrayMap;") => get(vm, recv, "mNameOverrides"),
+        ("getName", "()Ljava/lang/String;") => get(vm, recv, "mName"),
+        ("clone", "()Landroid/transition/Transition;")
+        | ("clone", "()Landroid/transition/TransitionSet;")
+        | ("clone", "()Ljava/lang/Object;") => Value::Obj(tr_clone_transition(vm, recv)?),
+        ("toString", "()Ljava/lang/String;") => {
+            let mut out = format!(
+                "{}@{:x}: ",
+                tr_simple_name(&class),
+                identity_hash(recv) as u32
+            );
+            let duration = field_long(vm, recv, "mDuration");
+            if duration != -1 {
+                out.push_str(&format!("dur({duration}) "));
+            }
+            let delay = field_long(vm, recv, "mStartDelay");
+            if delay != -1 {
+                out.push_str(&format!("dly({delay}) "));
+            }
+            let interpolator = get(vm, recv, "mInterpolator");
+            if !matches!(interpolator, Value::Null) {
+                out.push_str(&format!("interp({}) ", value_string(vm, &interpolator)?));
+            }
+            let ids = tr_field_items(vm, recv, "mTargetIds");
+            let targets = tr_field_items(vm, recv, "mTargets");
+            if !ids.is_empty() || !targets.is_empty() {
+                out.push_str("tgts(");
+                let mut rendered = Vec::new();
+                for id in &ids {
+                    rendered.push(tr_unbox_int(vm, id).unwrap_or(0).to_string());
+                }
+                for target in &targets {
+                    rendered.push(value_string(vm, target)?);
+                }
+                out.push_str(&rendered.join(", "));
+                out.push(')');
+            }
+            if is_set {
+                for child in tr_set_children(vm, recv) {
+                    let child_text = tr_invoke(vm, child, "toString", "()Ljava/lang/String;", &[])?;
+                    out.push_str(&format!("\n  {}", value_string(vm, &child_text)?));
+                }
+            }
+            jstr(vm, out)?
+        }
+        _ => return tr_transition_specific_instance(vm, &class, name, sig, recv, args),
+    };
+    Ok(Some(value))
+}
+
+#[allow(clippy::too_many_lines)]
+fn tr_transition_specific_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let is_set = vm.cp.is_subtype(class, TRANSITION_SET);
+    let is_visibility = vm.cp.is_subtype(class, TRANSITION_VISIBILITY);
+    let is_fade = vm.cp.is_subtype(class, TRANSITION_FADE);
+    let self_value = Value::Obj(recv);
+    let value = match (name, sig) {
+        ("addTarget", "(I)Landroid/transition/Transition;")
+        | ("addTarget", "(I)Landroid/transition/TransitionSet;") => {
+            if iarg(args, 0) > 0 {
+                let boxed = tr_box_int(vm, iarg(args, 0))?;
+                tr_append_field_list(vm, recv, "mTargetIds", boxed)?;
+            }
+            self_value
+        }
+        ("addTarget", "(Ljava/lang/String;)Landroid/transition/Transition;")
+        | ("addTarget", "(Ljava/lang/String;)Landroid/transition/TransitionSet;") => {
+            if let Some(target) = obj(args.first()) {
+                tr_ensure_field_list(vm, recv, "mTargetNames")?;
+                tr_append_field_list(vm, recv, "mTargetNames", Value::Obj(target))?;
+            }
+            self_value
+        }
+        ("addTarget", "(Ljava/lang/Class;)Landroid/transition/Transition;")
+        | ("addTarget", "(Ljava/lang/Class;)Landroid/transition/TransitionSet;") => {
+            if let Some(target) = obj(args.first()) {
+                tr_ensure_field_list(vm, recv, "mTargetTypes")?;
+                tr_append_field_list(vm, recv, "mTargetTypes", Value::Obj(target))?;
+            }
+            self_value
+        }
+        ("addTarget", "(Landroid/view/View;)Landroid/transition/Transition;")
+        | ("addTarget", "(Landroid/view/View;)Landroid/transition/TransitionSet;") => {
+            tr_append_field_list(
+                vm,
+                recv,
+                "mTargets",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            self_value
+        }
+        ("removeTarget", "(I)Landroid/transition/Transition;")
+        | ("removeTarget", "(I)Landroid/transition/TransitionSet;") => {
+            if iarg(args, 0) > 0 {
+                let boxed = tr_box_int(vm, iarg(args, 0))?;
+                tr_remove_field_list(vm, recv, "mTargetIds", &boxed)?;
+            }
+            self_value
+        }
+        ("removeTarget", "(Ljava/lang/String;)Landroid/transition/Transition;")
+        | ("removeTarget", "(Ljava/lang/String;)Landroid/transition/TransitionSet;") => {
+            if let Some(target) = obj(args.first()) {
+                if field_obj(vm, recv, "mTargetNames").is_some() {
+                    tr_remove_field_list(vm, recv, "mTargetNames", &Value::Obj(target))?;
+                }
+            }
+            self_value
+        }
+        ("removeTarget", "(Ljava/lang/Class;)Landroid/transition/Transition;")
+        | ("removeTarget", "(Ljava/lang/Class;)Landroid/transition/TransitionSet;") => {
+            if let Some(target) = obj(args.first()) {
+                if field_obj(vm, recv, "mTargetTypes").is_none() {
+                    return Err(npe("target types"));
+                }
+                tr_remove_field_list(vm, recv, "mTargetTypes", &Value::Obj(target))?;
+            }
+            self_value
+        }
+        ("removeTarget", "(Landroid/view/View;)Landroid/transition/Transition;")
+        | ("removeTarget", "(Landroid/view/View;)Landroid/transition/TransitionSet;") => {
+            if let Some(target) = obj(args.first()) {
+                tr_remove_field_list(vm, recv, "mTargets", &Value::Obj(target))?;
+            }
+            self_value
+        }
+        ("getTargets", "()Ljava/util/List;") => get(vm, recv, "mTargets"),
+        ("getTargetIds", "()Ljava/util/List;") => get(vm, recv, "mTargetIds"),
+        ("getTargetNames", "()Ljava/util/List;") => get(vm, recv, "mTargetNames"),
+        ("getTargetTypes", "()Ljava/util/List;") => get(vm, recv, "mTargetTypes"),
+        ("excludeTarget", "(IZ)Landroid/transition/Transition;") => {
+            if iarg(args, 0) >= 0 {
+                let boxed = tr_box_int(vm, iarg(args, 0))?;
+                if iarg(args, 1) != 0 {
+                    tr_ensure_field_list(vm, recv, "mTargetIdExcludes")?;
+                    tr_append_field_list(vm, recv, "mTargetIdExcludes", boxed)?;
+                } else if field_obj(vm, recv, "mTargetIdExcludes").is_some() {
+                    tr_remove_field_list(vm, recv, "mTargetIdExcludes", &boxed)?;
+                }
+            }
+            self_value
+        }
+        ("excludeTarget", "(Ljava/lang/String;Z)Landroid/transition/Transition;") => {
+            if let Some(target) = obj(args.first()) {
+                if iarg(args, 1) != 0 {
+                    tr_ensure_field_list(vm, recv, "mTargetNameExcludes")?;
+                    tr_append_field_list(vm, recv, "mTargetNameExcludes", Value::Obj(target))?;
+                } else if field_obj(vm, recv, "mTargetNameExcludes").is_some() {
+                    tr_remove_field_list(vm, recv, "mTargetNameExcludes", &Value::Obj(target))?;
+                }
+            }
+            self_value
+        }
+        ("excludeTarget", "(Ljava/lang/Class;Z)Landroid/transition/Transition;") => {
+            if let Some(target) = obj(args.first()) {
+                if iarg(args, 1) != 0 {
+                    tr_ensure_field_list(vm, recv, "mTargetTypeExcludes")?;
+                    tr_append_field_list(vm, recv, "mTargetTypeExcludes", Value::Obj(target))?;
+                } else if field_obj(vm, recv, "mTargetTypeExcludes").is_some() {
+                    tr_remove_field_list(vm, recv, "mTargetTypeExcludes", &Value::Obj(target))?;
+                }
+            }
+            self_value
+        }
+        ("excludeTarget", "(Landroid/view/View;Z)Landroid/transition/Transition;") => {
+            if let Some(target) = obj(args.first()) {
+                if iarg(args, 1) != 0 {
+                    tr_ensure_field_list(vm, recv, "mTargetExcludes")?;
+                    tr_append_field_list(vm, recv, "mTargetExcludes", Value::Obj(target))?;
+                } else if field_obj(vm, recv, "mTargetExcludes").is_some() {
+                    tr_remove_field_list(vm, recv, "mTargetExcludes", &Value::Obj(target))?;
+                }
+            }
+            self_value
+        }
+        ("excludeChildren", "(IZ)Landroid/transition/Transition;") => {
+            if iarg(args, 0) >= 0 {
+                let boxed = tr_box_int(vm, iarg(args, 0))?;
+                if iarg(args, 1) != 0 {
+                    tr_ensure_field_list(vm, recv, "mTargetIdChildExcludes")?;
+                    tr_append_field_list(vm, recv, "mTargetIdChildExcludes", boxed)?;
+                } else if field_obj(vm, recv, "mTargetIdChildExcludes").is_some() {
+                    tr_remove_field_list(vm, recv, "mTargetIdChildExcludes", &boxed)?;
+                }
+            }
+            self_value
+        }
+        ("excludeChildren", "(Ljava/lang/Class;Z)Landroid/transition/Transition;") => {
+            if let Some(target) = obj(args.first()) {
+                if iarg(args, 1) != 0 {
+                    tr_ensure_field_list(vm, recv, "mTargetTypeChildExcludes")?;
+                    tr_append_field_list(
+                        vm,
+                        recv,
+                        "mTargetTypeChildExcludes",
+                        Value::Obj(target),
+                    )?;
+                } else if field_obj(vm, recv, "mTargetTypeChildExcludes").is_some() {
+                    tr_remove_field_list(
+                        vm,
+                        recv,
+                        "mTargetTypeChildExcludes",
+                        &Value::Obj(target),
+                    )?;
+                }
+            }
+            self_value
+        }
+        ("excludeChildren", "(Landroid/view/View;Z)Landroid/transition/Transition;") => {
+            if let Some(target) = obj(args.first()) {
+                if iarg(args, 1) != 0 {
+                    tr_ensure_field_list(vm, recv, "mTargetChildExcludes")?;
+                    tr_append_field_list(vm, recv, "mTargetChildExcludes", Value::Obj(target))?;
+                } else if field_obj(vm, recv, "mTargetChildExcludes").is_some() {
+                    tr_remove_field_list(vm, recv, "mTargetChildExcludes", &Value::Obj(target))?;
+                }
+            }
+            self_value
+        }
+        ("setOrdering", "(I)Landroid/transition/TransitionSet;") if is_set => {
+            match iarg(args, 0) {
+                0 => put(vm, recv, "mPlayTogether", Value::Int(1))?,
+                1 => put(vm, recv, "mPlayTogether", Value::Int(0))?,
+                _ => {
+                    return Err(throw(
+                        "Landroid/util/AndroidRuntimeException;",
+                        format!("Invalid parameter for TransitionSet ordering: {}", iarg(args, 0)),
+                    ))
+                }
+            }
+            self_value
+        }
+        ("getOrdering", "()I") if is_set => {
+            Value::Int(if field_bool(vm, recv, "mPlayTogether") {
+                0
+            } else {
+                1
+            })
+        }
+        (
+            "addTransition",
+            "(Landroid/transition/Transition;)Landroid/transition/TransitionSet;",
+        ) if is_set => {
+            if let Some(child) = obj(args.first()) {
+                tr_append_field_list(vm, recv, "mTransitions", Value::Obj(child))?;
+                put(vm, child, "mParent", self_value.clone())?;
+                let duration = field_long(vm, recv, "mDuration");
+                if duration >= 0 {
+                    tr_invoke(
+                        vm,
+                        child,
+                        "setDuration",
+                        "(J)Landroid/transition/Transition;",
+                        &[Value::Long(duration)],
+                    )?;
+                }
+                let flags = field_int(vm, recv, "mChangeFlags");
+                if flags & 1 != 0 {
+                    let interpolator = get(vm, recv, "mInterpolator");
+                    tr_invoke(
+                        vm,
+                        child,
+                        "setInterpolator",
+                        "(Landroid/animation/TimeInterpolator;)Landroid/transition/Transition;",
+                        std::slice::from_ref(&interpolator),
+                    )?;
+                }
+                if flags & 2 != 0 {
+                    let propagation = get(vm, recv, "mPropagation");
+                    tr_invoke(
+                        vm,
+                        child,
+                        "setPropagation",
+                        "(Landroid/transition/TransitionPropagation;)V",
+                        std::slice::from_ref(&propagation),
+                    )?;
+                }
+                if flags & 4 != 0 {
+                    let path_motion = get(vm, recv, "mPathMotion");
+                    tr_invoke(
+                        vm,
+                        child,
+                        "setPathMotion",
+                        "(Landroid/transition/PathMotion;)V",
+                        std::slice::from_ref(&path_motion),
+                    )?;
+                }
+                if flags & 8 != 0 {
+                    let callback = get(vm, recv, "mEpicenterCallback");
+                    tr_invoke(
+                        vm,
+                        child,
+                        "setEpicenterCallback",
+                        "(Landroid/transition/Transition$EpicenterCallback;)V",
+                        std::slice::from_ref(&callback),
+                    )?;
+                }
+            }
+            self_value
+        }
+        ("addTransitionInternal", "(Landroid/transition/Transition;)V") if is_set => {
+            let child = req_obj(args, 0, "transition")?;
+            tr_append_field_list(vm, recv, "mTransitions", Value::Obj(child))?;
+            put(vm, child, "mParent", self_value.clone())?;
+            Value::Null
+        }
+        ("getTransitionCount", "()I") if is_set => {
+            Value::Int(tr_field_items(vm, recv, "mTransitions").len() as i32)
+        }
+        ("getTransitionAt", "(I)Landroid/transition/Transition;") if is_set => {
+            let index = iarg(args, 0);
+            let children = tr_field_items(vm, recv, "mTransitions");
+            children
+                .get(index as usize)
+                .cloned()
+                .ok_or_else(|| idx_oob(format!("Index {index} out of bounds for length {}", children.len())))?
+        }
+        (
+            "removeTransition",
+            "(Landroid/transition/Transition;)Landroid/transition/TransitionSet;",
+        ) if is_set => {
+            let child_value = args.first().cloned().unwrap_or(Value::Null);
+            tr_remove_field_list(vm, recv, "mTransitions", &child_value)?;
+            let child = req_obj(args, 0, "transition")?;
+            put(vm, child, "mParent", Value::Null)?;
+            self_value
+        }
+        ("setupStartEndListeners", "()V") if is_set => {
+            let listener = alloc_obj(vm, TRANSITION_SET_LISTENER, Vec::new())?;
+            put(vm, listener, "mTransitionSet", self_value)?;
+            let children = tr_set_children(vm, recv);
+            for child in &children {
+                tr_invoke(
+                    vm,
+                    *child,
+                    "addListener",
+                    "(Landroid/transition/Transition$TransitionListener;)Landroid/transition/Transition;",
+                    &[Value::Obj(listener)],
+                )?;
+            }
+            put(
+                vm,
+                recv,
+                "mCurrentListeners",
+                Value::Int(children.len() as i32),
+            )?;
+            Value::Null
+        }
+        ("setMode", "(I)Landroid/transition/Visibility;") if is_visibility => {
+            let mode = iarg(args, 0);
+            if mode & !3 != 0 {
+                return Err(iae("Only MODE_IN and MODE_OUT flags are allowed"));
+            }
+            put(vm, recv, "mMode", Value::Int(mode))?;
+            self_value
+        }
+        ("getMode", "()I") if is_visibility => Value::Int(field_int(vm, recv, "mMode")),
+        ("setSuppressLayout", "(Z)V") if is_visibility => {
+            put(
+                vm,
+                recv,
+                "mSuppressLayout",
+                Value::Int(i32::from(iarg(args, 0) != 0)),
+            )?;
+            Value::Null
+        }
+        ("isVisible", "(Landroid/transition/TransitionValues;)Z") if is_visibility => {
+            let Some(values) = obj(args.first()) else {
+                return Ok(Some(Value::Int(0)));
+            };
+            let visibility = tr_values_get_key(vm, Some(values), TR_PROP_VISIBILITY)?
+                .and_then(|value| tr_unbox_int(vm, &value))
+                .ok_or_else(|| npe("visibility"))?;
+            bool_value(visibility == 0)
+        }
+        (
+            "onAppear",
+            "(Landroid/view/ViewGroup;Landroid/transition/TransitionValues;ILandroid/transition/TransitionValues;I)Landroid/animation/Animator;",
+        ) if is_visibility => tr_visibility_on_appear5(
+            vm,
+            recv,
+            req_obj(args, 0, "sceneRoot")?,
+            obj(args.get(1)),
+            obj(args.get(3)),
+        )?,
+        (
+            "onDisappear",
+            "(Landroid/view/ViewGroup;Landroid/transition/TransitionValues;ILandroid/transition/TransitionValues;I)Landroid/animation/Animator;",
+        ) if is_visibility => tr_visibility_on_disappear5(
+            vm,
+            recv,
+            req_obj(args, 0, "sceneRoot")?,
+            obj(args.get(1)),
+            iarg(args, 2),
+            obj(args.get(3)),
+            iarg(args, 4),
+        )?,
+        (
+            "onAppear",
+            "(Landroid/view/ViewGroup;Landroid/view/View;Landroid/transition/TransitionValues;Landroid/transition/TransitionValues;)Landroid/animation/Animator;",
+        ) if is_visibility => {
+            if is_fade {
+                let view = req_obj(args, 1, "view")?;
+                {
+                    let captured_alpha = tr_fade_start_alpha(vm, obj(args.get(2)), 0.0)?;
+                    let start_alpha = if captured_alpha == 1.0 { 0.0 } else { captured_alpha };
+                    tr_fade_create_animation(vm, recv, view, start_alpha, 1.0)?
+                }
+            } else {
+                Value::Null
+            }
+        }
+        (
+            "onDisappear",
+            "(Landroid/view/ViewGroup;Landroid/view/View;Landroid/transition/TransitionValues;Landroid/transition/TransitionValues;)Landroid/animation/Animator;",
+        ) if is_visibility => {
+            if is_fade {
+                let view = req_obj(args, 1, "view")?;
+                {
+                    let start_alpha = tr_fade_start_alpha(vm, obj(args.get(2)), 1.0)?;
+                    tr_fade_create_animation(vm, recv, view, start_alpha, 0.0)?
+                }
+            } else {
+                Value::Null
+            }
+        }
+        ("setResizeClip", "(Z)V") if vm.cp.is_subtype(class, TRANSITION_CHANGE_BOUNDS) => {
+            put(
+                vm,
+                recv,
+                "mResizeClip",
+                Value::Int(i32::from(iarg(args, 0) != 0)),
+            )?;
+            Value::Null
+        }
+        ("getResizeClip", "()Z") if vm.cp.is_subtype(class, TRANSITION_CHANGE_BOUNDS) => {
+            bool_value(field_bool(vm, recv, "mResizeClip"))
+        }
+        ("setReparent", "(Z)V") if vm.cp.is_subtype(class, TRANSITION_CHANGE_BOUNDS) => {
+            put(
+                vm,
+                recv,
+                "mReparent",
+                Value::Int(i32::from(iarg(args, 0) != 0)),
+            )?;
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
 }

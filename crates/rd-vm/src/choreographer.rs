@@ -127,6 +127,10 @@ pub(crate) fn run_frame(vm: &mut Engine) -> Result<usize, VmExit> {
                 &m,
                 vec![Value::Obj(*cb), Value::Long(nanos), Value::WideHi],
             )?;
+        } else if class == "Landroid/transition/TransitionManager$MultiListener;" {
+            // TransitionManager schedules its pre-draw work on the next
+            // deterministic frame, matching ViewRootImpl's traversal point.
+            vm.invoke_instance(*cb, "onPreDraw", "()Z", &[])?;
         } else if class == "Landroid/animation/AnimationHandler;" {
             // The host AnimationHandler is itself posted as the frame
             // callback (AOSP uses an anonymous FrameCallback field). Its
