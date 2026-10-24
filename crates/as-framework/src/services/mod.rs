@@ -37,6 +37,7 @@ impl Services {
         executors::Executors::metadata(class, name, sig)
             .or_else(|| package::PackageService::metadata(class, name, sig))
             .or_else(|| reflection::metadata(class, name, sig))
+            .or_else(|| collections::Collections::metadata(class, name, sig))
             .or_else(|| application_lifecycle::Observers::metadata(class, name, sig))
             .or_else(|| {
                 matches!(

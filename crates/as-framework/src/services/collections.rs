@@ -1,4 +1,6 @@
 use super::*;
+#[path = "copy_on_write.rs"]
+mod copy_on_write;
 #[derive(Clone)]
 enum Container {
     List(Vec<Value>),
@@ -12,6 +14,7 @@ enum Container {
 }
 #[derive(Default)]
 pub(super) struct Collections {
+    cow: RefCell<copy_on_write::Copies>,
     objects: RefCell<BTreeMap<ObjRef, Container>>,
     changes: RefCell<BTreeMap<ObjRef, u64>>,
     boxes: RefCell<BTreeMap<(String, i64), ObjRef>>,
@@ -82,6 +85,24 @@ fn equals(vm: &mut Engine, left: &Value, right: &Value) -> Result<bool> {
         != 0)
 }
 impl Collections {
+    pub(super) fn metadata(
+        class: &str,
+        name: &str,
+        sig: &str,
+    ) -> Option<rd_vm::framework_host::HostMethodKind> {
+        copy_on_write::metadata(class, name, sig)
+    }
+    fn regular_slots(&self) -> usize {
+        self.objects
+            .borrow()
+            .values()
+            .map(|c| match c {
+                Container::List(v) | Container::Set(v) => v.len(),
+                Container::Map(v) => v.len() * 2,
+                Container::Iterator { .. } => 1,
+            })
+            .sum()
+    }
     fn budget(&self, extra: usize) -> Result<()> {
         let objects = self.objects.borrow();
         let slots = objects
@@ -92,10 +113,13 @@ impl Collections {
                 Container::Iterator { .. } => 1,
             })
             .sum::<usize>();
-        if objects.len() >= 8192
+        let mut cow = self.cow.borrow_mut();
+        let cow_bytes = cow.bytes();
+        if objects.len() + cow.objects() >= 8192
             || slots
                 .saturating_add(extra)
                 .saturating_mul(core::mem::size_of::<Value>())
+                .saturating_add(cow_bytes)
                 > 8 << 20
         {
             return Err(error(
@@ -106,6 +130,9 @@ impl Collections {
         Ok(())
     }
     pub(super) fn attach(&self, vm: &Engine, class: &str, r: ObjRef) -> Result<bool> {
+        if self.cow_attach(vm, class, r)? {
+            return Ok(true);
+        }
         let Some(kind) = kind(vm, class) else {
             return Ok(false);
         };
@@ -179,6 +206,9 @@ impl Collections {
         Ok(Value::Obj(r))
     }
     pub(super) fn items(&self, r: ObjRef) -> Result<Vec<Value>> {
+        if let Some(items) = self.cow_items(r) {
+            return Ok(items);
+        }
         match self.objects.borrow().get(&r) {
             Some(Container::List(v) | Container::Set(v)) => Ok(v.clone()),
             _ => Err(error("API_UNAVAILABLE", "collection kind")),
@@ -214,6 +244,9 @@ impl Collections {
         r: ObjRef,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        if let Some(value) = self.cow_call(vm, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
         let actual = vm.heap.class_of(r)?.to_string();
         if primitive(&actual).is_some() {
             if name == "<init>" && primitive(&actual).is_some_and(|p| sig == format!("({p})V")) {
@@ -521,6 +554,9 @@ impl Collections {
         Ok(Some(value))
     }
     pub(super) fn references(&self, r: ObjRef) -> Vec<ObjRef> {
+        if let Some(roots) = self.cow.borrow().references(r) {
+            return roots;
+        }
         let values = match self.objects.borrow().get(&r) {
             Some(Container::List(v) | Container::Set(v)) => v.clone(),
             Some(Container::Map(v)) => v.iter().flat_map(|(a, b)| [a.clone(), b.clone()]).collect(),
@@ -539,9 +575,12 @@ impl Collections {
             .collect()
     }
     pub(super) fn roots(&self) -> Vec<ObjRef> {
-        self.boxes.borrow().values().copied().collect()
+        let mut roots: Vec<_> = self.boxes.borrow().values().copied().collect();
+        roots.extend(self.cow.borrow().roots());
+        roots
     }
     pub(super) fn collect(&self, marked: &[bool]) {
+        self.cow.borrow_mut().collect(marked);
         self.objects
             .borrow_mut()
             .retain(|r, _| marked.get(*r as usize).copied().unwrap_or(false));

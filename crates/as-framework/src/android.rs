@@ -2101,7 +2101,25 @@ impl Android {
                     Value::Null
                 }
                 "append" if args.len() == 1 => {
-                    let s = display(vm, &args[0])?;
+                    // DEX stores char, boolean and int arguments in the same
+                    // register kind; the method descriptor selects their Java
+                    // textual representation.
+                    let s = match sig {
+                        "(C)Ljava/lang/StringBuilder;" | "(C)Ljava/lang/StringBuffer;" => {
+                            char::from_u32(int(args, 0)? as u16 as u32)
+                                .ok_or_else(|| {
+                                    error(
+                                        "API_UNAVAILABLE",
+                                        "builder append of an isolated UTF-16 surrogate",
+                                    )
+                                })?
+                                .to_string()
+                        }
+                        "(Z)Ljava/lang/StringBuilder;" | "(Z)Ljava/lang/StringBuffer;" => {
+                            (int(args, 0)? != 0).to_string()
+                        }
+                        _ => display(vm, &args[0])?,
+                    };
                     self.state
                         .borrow_mut()
                         .builders

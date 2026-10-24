@@ -1577,6 +1577,7 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         ]),
         // CopyOnWrite*: na JDK real NÃO estendem Abstract* (implementam direto)
         "Ljava/util/concurrent/CopyOnWriteArrayList;" => Some(OBJECT),
+        "Ljava/util/concurrent/CopyOnWriteArrayList$COWIterator;" => Some(OBJECT),
         "Ljava/util/concurrent/LinkedBlockingQueue;" => Some(&[
             "Ljava/util/AbstractQueue;",
             "Ljava/util/AbstractCollection;",
@@ -1952,6 +1953,9 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",
         ]),
+        "Ljava/util/concurrent/CopyOnWriteArrayList$COWIterator;" => {
+            Some(&["Ljava/util/ListIterator;", "Ljava/util/Iterator;"])
+        }
         "Ljava/util/concurrent/CopyOnWriteArrayList;" => Some(&[
             "Ljava/util/List;",
             "Ljava/util/Collection;",
@@ -2337,6 +2341,12 @@ mod tests {
         let cp = Classpath::new(Vec::new());
         // Kotlin EmptyIterator implements ListIterator and is cast to Iterator.
         assert!(cp.is_subtype("Ljava/util/ListIterator;", "Ljava/util/Iterator;"));
+        for interface in ["Ljava/util/ListIterator;", "Ljava/util/Iterator;"] {
+            assert!(cp.is_subtype(
+                "Ljava/util/concurrent/CopyOnWriteArrayList$COWIterator;",
+                interface
+            ));
+        }
         // Set concorrente <: Set <: Collection <: Iterable <: Object
         assert!(cp.is_subtype(
             "Ljava/util/concurrent/CopyOnWriteArraySet;",

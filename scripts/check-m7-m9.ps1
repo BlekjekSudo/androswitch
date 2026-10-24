@@ -57,6 +57,7 @@ try{
     @{id='uncaught-fixture';script='fixtures/m9/uncaught/build.ps1'},
     @{id='thread-local-fixture';script='fixtures/m9/thread-local/build.ps1'},
     @{id='package-info-fixture';script='fixtures/m9/package-info/build.ps1'},
+    @{id='copy-on-write-fixture';script='fixtures/m9/copy-on-write/build.ps1'},
     @{id='framework';args=@('test','-p','as-framework','--features','host','--lib','--tests','--locked','--','--include-ignored','--test-threads=1')},
     @{id='m1-fixture';script='scripts/build-m1-fixture.ps1'},
     @{id='portable-core';args=@('test','-p','as-switch-smoke','--features','host-cli,portable-tests','--test','portable_core','--locked','--','--include-ignored')},

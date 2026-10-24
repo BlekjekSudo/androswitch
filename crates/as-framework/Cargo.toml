@@ -106,3 +106,8 @@ required-features = ["host"]
 name = "thread_local"
 path = "tests/thread_local.rs"
 required-features = ["host"]
+
+[[test]]
+name = "copy_on_write"
+path = "tests/copy_on_write.rs"
+required-features = ["host"]
