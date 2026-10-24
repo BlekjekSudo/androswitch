@@ -16,6 +16,8 @@ pub mod device_jni;
 #[cfg(target_os = "horizon")]
 pub mod device_native;
 #[cfg(target_os = "horizon")]
+mod device_resources;
+#[cfg(target_os = "horizon")]
 mod device_workers;
 pub mod jni_constructor;
 pub mod jni_objects;

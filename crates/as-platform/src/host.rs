@@ -1,5 +1,5 @@
 //! Real host services; these are never linked into a device-only build.
-use crate::{Clock, PlatformError, Storage};
+use crate::{Clock, PlatformError, RuntimeResources, Storage};
 use std::{
     fs::File,
     io::Read,
@@ -33,6 +33,21 @@ impl Clock for HostPlatform {
             cause: "host epoch time exceeds signed milliseconds".into(),
         })?;
         Ok(if negative { -value } else { value })
+    }
+}
+
+impl RuntimeResources for HostPlatform {
+    fn available_processors(&self) -> Result<u32, PlatformError> {
+        let actual = std::thread::available_parallelism().map_err(|failure| PlatformError {
+            code: "HOST_RESOURCE_ERROR",
+            operation: "available_processors",
+            cause: failure.to_string(),
+        })?;
+        u32::try_from(actual.get()).map_err(|_| PlatformError {
+            code: "RESOURCE_INFO_RANGE",
+            operation: "available_processors",
+            cause: "host available processor count exceeds u32".into(),
+        })
     }
 }
 
@@ -70,6 +85,14 @@ impl Storage for HostPlatform {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resource_provider_reads_actual_host_parallelism() {
+        let actual = HostPlatform::default().available_processors().unwrap();
+        assert!(actual > 0);
+        let reference = std::thread::available_parallelism().unwrap().get();
+        assert_eq!(actual as usize, reference);
+    }
 
     #[test]
     fn wall_clock_requires_provider_and_host_reports_actual_epoch() {

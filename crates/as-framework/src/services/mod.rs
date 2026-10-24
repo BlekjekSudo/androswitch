@@ -12,6 +12,7 @@ mod permissions;
 mod preferences;
 mod reflection;
 mod resource_names;
+pub(super) mod runtime;
 mod text_utils;
 pub(super) mod timer;
 pub(super) struct Services {
@@ -24,6 +25,7 @@ pub(super) struct Services {
     pub(super) glsurface: glsurface::GlSurfaces,
     pub(super) timers: timer::Timers,
     pub(super) executors: executors::Executors,
+    pub(super) runtime: runtime::Runtime,
     package_metadata: package::PackageService,
     reflection_fields: reflection::Fields,
     package: String,
@@ -36,6 +38,7 @@ impl Services {
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
         executors::Executors::metadata(class, name, sig)
+            .or_else(|| runtime::Runtime::metadata(class, name, sig))
             .or_else(|| package::PackageService::metadata(class, name, sig))
             .or_else(|| reflection::metadata(class, name, sig))
             .or_else(|| collections::Collections::metadata(class, name, sig))
@@ -62,6 +65,7 @@ impl Services {
             glsurface: Default::default(),
             timers: Default::default(),
             executors: Default::default(),
+            runtime: Default::default(),
             package_metadata: Default::default(),
             reflection_fields: Default::default(),
             package: apk.manifest.package.clone(),
@@ -160,6 +164,9 @@ impl Services {
         if let Some(value) = text_utils::call_static(vm, class, name, sig, args)? {
             return Ok(Some(value));
         }
+        if let Some(value) = self.runtime.call_static(vm, class, name, sig, args)? {
+            return Ok(Some(value));
+        }
         if let Some(value) = self
             .executors
             .call_static(android, vm, class, name, sig, args)?
@@ -246,6 +253,9 @@ impl Services {
         r: ObjRef,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        if let Some(value) = self.runtime.call(vm, class, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
         if let Some(value) = self.lifecycle_observers.call(vm, name, sig, r, args)? {
             return Ok(Some(value));
         }
@@ -309,6 +319,7 @@ impl Services {
         roots.extend(self.communication.roots());
         roots.extend(self.timers.roots());
         roots.extend(self.executors.roots());
+        roots.extend(self.runtime.roots());
         roots
     }
     pub(super) fn references(&self, r: ObjRef) -> Vec<ObjRef> {

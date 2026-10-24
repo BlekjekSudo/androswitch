@@ -109,6 +109,9 @@ pub struct View {
     pub touch_listener: Option<ObjRef>,
     pub click_method: Option<String>,
     pub input_type: Option<i32>,
+    /// The actual Context passed to the supported View constructor.
+    #[serde(skip)]
+    pub context: Option<ObjRef>,
 }
 impl View {
     fn new(object: ObjRef, class: &str) -> Self {
@@ -136,6 +139,7 @@ impl View {
             touch_listener: None,
             click_method: None,
             input_type: (class == "Landroid/widget/EditText;").then_some(1),
+            context: None,
         }
     }
 }
@@ -235,6 +239,10 @@ impl Android {
     }
     pub fn now(&self) -> u64 {
         self.clock.monotonic_micros() / 1000
+    }
+    /// Bind the actual process resource provider used by java.lang.Runtime.
+    pub fn bind_runtime_resources(&self, provider: Rc<dyn as_platform::RuntimeResources>) {
+        self.services.runtime.bind(provider);
     }
     pub fn begin_main_exception_scope(&self, vm: &Engine) -> Result<MainExceptionScope> {
         self.services.executors.begin_main_exception_scope(vm)
@@ -1279,6 +1287,37 @@ impl Android {
     fn is_view(vm: &Engine, class: &str) -> bool {
         vm.cp.is_subtype(class, "Landroid/view/View;")
     }
+    fn validate_input_target(&self, vm: &Engine, view: ObjRef) -> Result<()> {
+        if Self::is_view(vm, vm.heap.class_of(view)?)
+            && self.state.borrow().views.contains_key(&view)
+        {
+            Ok(())
+        } else {
+            Err(error(
+                "INVALID_VIEW",
+                "input target has no registered View state",
+            ))
+        }
+    }
+    fn bind_view_context(&self, vm: &Engine, view: ObjRef, context: ObjRef) -> Result<()> {
+        self.validate_input_target(vm, view)?;
+        if !vm
+            .cp
+            .is_subtype(vm.heap.class_of(context)?, "Landroid/content/Context;")
+        {
+            return Err(error(
+                "INVALID_CONTEXT",
+                "View constructor requires a Context",
+            ));
+        }
+        self.state
+            .borrow_mut()
+            .views
+            .get_mut(&view)
+            .unwrap()
+            .context = Some(context);
+        Ok(())
+    }
     fn content_activity(&self, context: ObjRef) -> Result<usize> {
         self.state
             .borrow()
@@ -1379,6 +1418,7 @@ impl FrameworkHost for Android {
         let s = self.state.borrow();
         let mut refs = vec![];
         if let Some(v) = s.views.get(&r) {
+            refs.extend(v.context);
             refs.extend(v.children.iter().copied());
             refs.extend(v.listener);
             refs.extend(v.touch_listener);
@@ -1790,6 +1830,15 @@ impl FrameworkHost for Android {
             ("close", "()V") if self.state.borrow().asset_streams.contains_key(&r) => {
                 let id = self.state.borrow_mut().asset_streams.remove(&r).unwrap();
                 self.asset_close(id);
+                Value::Null
+            }
+            (
+                "<init>",
+                "(Landroid/content/Context;)V"
+                | "(Landroid/content/Context;Landroid/util/AttributeSet;)V",
+            ) if Self::is_view(vm, &platform) => {
+                let context = obj(&args[0])?;
+                self.bind_view_context(vm, r, context)?;
                 Value::Null
             }
             (
@@ -2263,6 +2312,11 @@ impl Android {
             return Ok(None);
         }
         let value = match (name, sig) {
+            ("getContext", "()Landroid/content/Context;") => Value::Obj(
+                self.state.borrow().views[&r]
+                    .context
+                    .ok_or_else(|| error("API_UNAVAILABLE", "View Context is not initialized"))?,
+            ),
             ("setId", "(I)V") => {
                 self.state.borrow_mut().views.get_mut(&r).unwrap().id = int(args, 0)?;
                 Value::Null

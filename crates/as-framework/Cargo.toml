@@ -121,3 +121,8 @@ required-features = ["host"]
 name = "time_unit"
 path = "tests/time_unit.rs"
 required-features = ["host"]
+
+[[test]]
+name = "runtime_resources"
+path = "tests/runtime_resources.rs"
+required-features = ["host"]

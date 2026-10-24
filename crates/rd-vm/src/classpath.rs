@@ -1293,10 +1293,7 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroid/appwidget/AppWidgetProvider;" => {
             Some(&["Landroid/content/BroadcastReceiver;", "Ljava/lang/Object;"])
         }
-        "Landroid/view/inputmethod/BaseInputConnection;" => Some(&[
-            "Landroid/view/inputmethod/InputConnection;",
-            "Ljava/lang/Object;",
-        ]),
+        "Landroid/view/inputmethod/BaseInputConnection;" | "Ljava/lang/Runtime;" => Some(OBJECT),
         // M8: FragmentManager legacy (29º gap real) — objeto simples do host.
         "Landroid/app/FragmentManager;" => Some(OBJECT),
         // M8: FragmentTransaction legacy (31º gap real) — ops até o commit.
@@ -1759,6 +1756,9 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
     match class {
         // A modeled root interface is itself a known type even though it
         // extends no interfaces; Thread/TimerTask execute this real contract.
+        "Landroid/view/inputmethod/BaseInputConnection;" => {
+            Some(&["Landroid/view/inputmethod/InputConnection;"])
+        }
         "Ljava/lang/Runnable;" => Some(&[]),
         "Ljava/lang/ThreadGroup;" => Some(&["Ljava/lang/Thread$UncaughtExceptionHandler;"]),
         "Ljava/lang/String;" => Some(STRING_IFACES),
@@ -2083,7 +2083,9 @@ pub fn host_class_known(desc: &str) -> bool {
 /// STATIC modifier. These facts do not implement arbitrary interface methods.
 pub fn host_interface_modifiers(desc: &str) -> Option<u32> {
     match desc {
-        "Ljava/lang/reflect/Member;" | "Ljava/lang/reflect/AnnotatedElement;" => Some(0x0601),
+        "Ljava/lang/reflect/Member;"
+        | "Ljava/lang/reflect/AnnotatedElement;"
+        | "Landroid/view/inputmethod/InputConnection;" => Some(0x0601),
         "Landroid/view/View$OnClickListener;"
         | "Landroid/app/Application$ActivityLifecycleCallbacks;"
         | "Ljava/lang/Thread$UncaughtExceptionHandler;"

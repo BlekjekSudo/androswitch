@@ -645,6 +645,15 @@ impl GlSurfaces {
         args: &[Value],
     ) -> Result<Option<Value>> {
         if self.views.borrow().contains_key(&r) {
+            if name == "<init>"
+                && matches!(
+                    sig,
+                    "(Landroid/content/Context;)V"
+                        | "(Landroid/content/Context;Landroid/util/AttributeSet;)V"
+                )
+            {
+                android.bind_view_context(vm, r, obj(&args[0])?)?;
+            }
             if let Some(value) = self.view_call(vm, name, sig, r, args)? {
                 return Ok(Some(value));
             }

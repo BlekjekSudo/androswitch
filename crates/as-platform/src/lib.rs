@@ -48,6 +48,14 @@ pub trait Clock {
     }
 }
 
+/// Resources actually available to the executing runtime. Missing providers
+/// must report unavailable; machine-wide specifications are not process limits.
+pub trait RuntimeResources {
+    /// Positive count of processors available to this process/VM. Query on
+    /// each call because platform affinity/resource restrictions may change.
+    fn available_processors(&self) -> Result<u32, PlatformError>;
+}
+
 /// One real, dedicated serial callback thread per positive opaque token.
 /// The caller keeps callback owners and VM roots alive until platform joins
 /// prove quiescence. Successful start creates the thread immediately; wake

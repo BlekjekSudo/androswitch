@@ -264,6 +264,7 @@ fn open() -> Result<Running, String> {
         serde_json::json!({"schema_version":1,"status":"vm_ready","session_id":request.session_id,"package":record.package,"revision":record.revision,"allocator_available_before_load":load_budget,"raw_dex_bytes":app.memory.raw_dex_bytes,"estimated_parser_bytes":app.memory.estimated_parser_bytes,"parser_budget_bytes":app.memory.parser_budget_bytes,"allocator_available_after_load":available_memory(),"scope":"parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots"}),
     );
     app.android.bind_audio(Rc::new(HorizonAudio));
+    crate::device_resources::bind(&app.android);
     crate::device_graphics::bind(&app.android).map_err(|e| e.to_string())?;
     // Java-only applications can own background VM callbacks too. Every device
     // application therefore has a real JNI/thread session, even before loading
