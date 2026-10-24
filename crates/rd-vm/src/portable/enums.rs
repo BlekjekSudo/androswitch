@@ -27,13 +27,25 @@ fn state(vm: &Engine, receiver: ObjRef, field: &str) -> Result<Value, VmExit> {
         .into()
     })
 }
+fn superclass(vm: &Engine, class: &str) -> Option<alloc::string::String> {
+    // DEX declarations are authoritative, including a declaration with no
+    // superclass. Framework-owned enum classes use the same explicit builtin
+    // ancestry as check-cast/instanceof; do not infer a parent from a name.
+    if vm.cp.find_class(class).is_some() {
+        vm.cp.superclass_of(class)
+    } else {
+        crate::classpath::builtin_hierarchy(class)
+            .and_then(|parents| parents.first())
+            .map(|parent| (*parent).to_string())
+    }
+}
 fn declaring_class(vm: &Engine, receiver: ObjRef) -> Result<alloc::string::String, VmExit> {
     let class = vm.heap.class_of(receiver)?;
-    if vm.cp.superclass_of(class).as_deref() == Some(ENUM) {
+    if superclass(vm, class).as_deref() == Some(ENUM) {
         return Ok(class.to_string());
     }
-    if let Some(parent) = vm.cp.superclass_of(class) {
-        if vm.cp.superclass_of(&parent).as_deref() == Some(ENUM) {
+    if let Some(parent) = superclass(vm, class) {
+        if superclass(vm, &parent).as_deref() == Some(ENUM) {
             return Ok(parent);
         }
     }
@@ -60,11 +72,18 @@ pub(crate) fn call_static(
     let desc_object = object(&vm.heap.get_field(class_object, "class_name")?)?;
     let desc = vm.heap.as_str(desc_object)?.to_string();
     let wanted = vm.heap.as_str(object(&args[1])?)?.to_string();
-    if vm.cp.superclass_of(&desc).as_deref() != Some(ENUM) {
+    if superclass(vm, &desc).as_deref() != Some(ENUM) {
         return Err(exception(
             "Ljava/lang/IllegalArgumentException;",
             format!("{desc} is not an enum class"),
         ));
+    }
+    if vm.cp.find_class(&desc).is_none() {
+        return Err(err::vm_error(
+            "API_UNAVAILABLE",
+            "Enum.valueOf requires an implemented host enum constant registry",
+        )
+        .into());
     }
     vm.ensure_initialized(&desc)?;
     for (owner, field, ty, flags, is_static) in vm.cp.declared_fields_info(&desc) {

@@ -112,7 +112,7 @@ two native barriers and local-only Java objects. Building or passing a host
 model alone does not establish corrected device behavior; the exact same APK
 must execute before and after the NRO change.
 
-Run the six host ownership contracts with
+Run the portable host ownership contracts with
 `cargo test -p as-switch-smoke --features host-cli,portable-tests --test portable_execution`.
 Each test asserts the portable core and exercises the original VM/Heap code;
 the opt-in `portable-test-support` feature is absent from the device build.
@@ -142,3 +142,11 @@ successful resource reset/return. The capture-time session report still says
 completed launcher report, not to later global logs from the second APK.
 This qualifies the stated two-worker lifetime regression on the emulator.
 Physical Switch validation and the external-game targets remain separate.
+
+The later [portable execution contract](PORTABLE_EXECUTION.md) adds captured
+native-temporary scopes and owner-aware class initialization. Its separate
+[host receipt](../reports/portable-execution-initialization-host-20261025.json)
+records twelve execution tests, including the original six. Foreign class
+initialization currently returns explicit unavailable instead of Android's
+waiting behavior. These added host cases do not extend the earlier emulator
+receipt to untested device scenarios.

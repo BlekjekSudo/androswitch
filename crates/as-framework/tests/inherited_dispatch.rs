@@ -181,6 +181,9 @@ struct NativeResources {
     calls: Cell<u32>,
 }
 impl NativeHost for NativeResources {
+    fn current_thread_id(&self) -> Option<u64> {
+        Some(1) // Controlled single-threaded host provider, not a device ID.
+    }
     fn load(&self, _vm: &mut Engine, _name: &str, _absolute: bool) -> Result<(), VmExit> {
         unreachable!()
     }

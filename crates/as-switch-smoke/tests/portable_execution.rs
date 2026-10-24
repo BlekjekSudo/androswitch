@@ -42,3 +42,104 @@ fn guest_allocations_do_not_inherit_another_owners_host_pins() {
     portable();
     contracts::guest_allocations_do_not_leak_into_another_owners_host_scope();
 }
+
+fn fixture(variant: &str) -> rd_dex::Dex {
+    rd_dex::Dex::parse(
+        std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../target/portable-execution-fixture")
+                .join(variant)
+                .join("dex/classes.dex"),
+        )
+        .expect("run crates/rd-vm/tests/fixtures/portable-execution/build.ps1"),
+    )
+    .unwrap()
+}
+const VARIANTS: [(&str, &str); 2] = [
+    ("original", "org/androswitch/vm/execution"),
+    ("renamed", "org/compat/renamed/execution"),
+];
+
+#[test]
+fn native_local_returns_and_errors_survive_real_dex_callback_gc_then_release() {
+    portable();
+    for (variant, prefix) in VARIANTS {
+        contracts::native_host_allocations_survive_callback_gc_then_release(
+            fixture(variant),
+            prefix,
+        );
+    }
+}
+
+#[test]
+fn class_initialization_rejects_another_owners_partial_statics_and_preserves_recursion() {
+    portable();
+    for (variant, prefix) in VARIANTS {
+        contracts::cross_owner_initialization_rejects_partial_reads_without_poisoning_owner(
+            fixture(variant),
+            prefix,
+        );
+    }
+}
+
+#[test]
+fn unknown_initializer_owner_cannot_mutate_defaults_and_valid_owner_can_retry() {
+    portable();
+    for (variant, prefix) in VARIANTS {
+        contracts::initialization_identity_failure_leaves_unstarted_class_retryable(
+            fixture(variant),
+            prefix,
+        );
+    }
+}
+
+#[test]
+fn started_initializer_runtime_failure_preserves_code_and_is_not_retried() {
+    portable();
+    for (variant, prefix) in VARIANTS {
+        contracts::initializer_infrastructure_failure_stays_typed_and_cleans_running_owner(
+            fixture(variant),
+            prefix,
+        );
+    }
+}
+
+#[test]
+fn captured_native_scope_return_is_owner_exact_and_stops_at_guest_boundary() {
+    portable();
+    contracts::captured_scope_return_never_pins_into_another_owner_or_guest();
+}
+
+#[test]
+fn ordinary_jvm_class_initialization_rows_match_original_and_renamed_dex() {
+    portable();
+    use rd_vm::{Engine, Value, VmConfig};
+    for (variant, prefix) in VARIANTS {
+        let oracle = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../target/portable-execution-fixture")
+                .join(variant)
+                .join("jvm-oracle.txt"),
+        )
+        .unwrap();
+        assert_eq!(oracle.lines().count(), 4);
+        for _ in 0..2 {
+            let mut vm = Engine::new(vec![fixture(variant)], VmConfig::default());
+            for row in oracle.lines() {
+                let (index, expected) = row.split_once('\t').unwrap();
+                assert_eq!(
+                    vm.invoke_static(
+                        &format!("L{prefix}/ExecutionFixture;"),
+                        "run",
+                        "(I)I",
+                        &[Value::Int(index.parse().unwrap())]
+                    )
+                    .unwrap(),
+                    Value::Int(expected.parse().unwrap()),
+                    "{variant}: {row}",
+                );
+                vm.gc();
+            }
+        }
+    }
+}

@@ -63,7 +63,10 @@ fn own(vm: &mut Engine, class: &str) -> Result<Vec<Definition>> {
     if let Some(fields) = vm.cp.declared_fields_info_checked(class)? {
         return Ok(fields);
     }
-    if class.len() == 1 || class.starts_with('[') || class == "Ljava/lang/Object;" {
+    if matches!(class, "V" | "Z" | "B" | "C" | "S" | "I" | "J" | "F" | "D")
+        || class.starts_with('[')
+        || class == "Ljava/lang/Object;"
+    {
         return Ok(Vec::new());
     }
     Err(unavailable(format!("declared field catalog: {class}")))
@@ -160,6 +163,19 @@ fn value(
 ) -> Result<Value> {
     let (owner, name, ty, _, is_static) = &entry.definition;
     let receiver = if *is_static {
+        // DEX/JVM can declare the same name with distinct descriptors. The
+        // existing VM static map omits the descriptor, so admission must fail
+        // before an initializer can alias those distinct storage locations.
+        if own(vm, owner)?
+            .iter()
+            .filter(|field| field.4 && field.1 == *name)
+            .count()
+            > 1
+        {
+            return Err(unavailable(
+                "same-name static fields require descriptor-qualified static storage",
+            ));
+        }
         // API26 ART does receiver/static-initialization before access checking.
         super::class_for_name::initialize_class(vm, owner)?;
         None
@@ -365,6 +381,11 @@ impl Fields {
                     component,
                     super::super::package::LoaderScope::Application,
                 )?;
+            } else if !matches!(component, "Z" | "B" | "C" | "S" | "I" | "J" | "F" | "D") {
+                return Err(error(
+                    "INVALID_CLASS_METADATA",
+                    "invalid reflected field primitive descriptor",
+                ));
             }
             let owner_class = vm.device_class_object(&definition.0)?;
             let type_class = vm.device_class_object(&definition.2)?;

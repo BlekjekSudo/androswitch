@@ -69,7 +69,12 @@ pub struct Engine {
     /// (classe, campo) → valor
     pub statics: HashMap<(String, String), Value>,
     clinit_done: HashSet<String>,
+    #[cfg(feature = "std")]
     clinit_running: HashSet<String>,
+    /// Only the actual initializing owner may recursively observe its class.
+    /// Entries are removed on every completed/failed initialization.
+    #[cfg(not(feature = "std"))]
+    clinit_running: HashMap<String, u64>,
     /// classes cujo `<clinit>` falhou — JLS 12.4.2: acessos seguintes levantam
     /// NoClassDefFoundError (issue #37)
     clinit_failed: HashSet<String>,
@@ -202,7 +207,7 @@ impl Engine {
             config,
             statics: HashMap::new(),
             clinit_done: HashSet::new(),
-            clinit_running: HashSet::new(),
+            clinit_running: Default::default(),
             clinit_failed: HashSet::new(),
             #[cfg(feature = "std")]
             fw: Default::default(),
@@ -639,6 +644,7 @@ impl Engine {
                 }
                 #[cfg(not(feature = "std"))]
                 if let Some(backend) = self.native_host() {
+                    let owner = self.heap.checked_execution_owner()?;
                     let r = self.cp.method_ref(dex_idx, m.method_idx)?;
                     let declaring_class = self.cp.type_str(dex_idx, def.class_idx);
                     let roots = ins
@@ -649,11 +655,16 @@ impl Engine {
                         })
                         .collect();
                     let frame = self.execution_frames.enter(
-                        self.heap.execution_owner(),
+                        owner,
                         self.method_label(dex_idx, m),
                         declaring_class,
                         roots,
                     )?;
+                    let scope = self.heap.gc_scope_depth();
+                    // A native diagnostic frame makes callbacks non-outermost.
+                    // Pin this invocation's fresh host allocations explicitly;
+                    // do not keep unrelated existing heap objects alive.
+                    self.heap.gc_host_enter(false);
                     let result = backend.invoke(
                         self,
                         &r.class,
@@ -663,6 +674,8 @@ impl Engine {
                         &ins,
                     );
                     self.execution_frames.leave(frame);
+                    self.heap
+                        .gc_scope_restore_return(scope, returned_object(&result));
                     return result;
                 }
                 #[cfg(not(feature = "native"))]
@@ -743,9 +756,14 @@ impl Engine {
         self.gc_frames.pop();
         #[cfg(not(feature = "std"))]
         self.execution_frames.leave(frame);
+        #[cfg(not(feature = "std"))]
+        self.heap
+            .gc_scope_restore_return(scope_depth, returned_object(&ret));
+        #[cfg(feature = "std")]
         self.heap.gc_scope_restore(scope_depth);
         // A guest allocation returned into a Rust host temporary must survive
         // the host's next guest callback, even before it is stored in a table.
+        #[cfg(feature = "std")]
         match &ret {
             Ok(Value::Obj(r)) => self.heap.gc_pin_return(*r),
             Err(VmExit::Exception(t)) => {
@@ -908,7 +926,11 @@ impl Engine {
     /// `ExceptionInInitializerError` no primeiro acesso e vira
     /// `NoClassDefFoundError` permanente nos acessos seguintes.
     pub fn ensure_initialized(&mut self, class: &str) -> Result<(), VmExit> {
-        if self.clinit_done.contains(class) || self.clinit_running.contains(class) {
+        if self.clinit_done.contains(class) {
+            return Ok(());
+        }
+        #[cfg(feature = "std")]
+        if self.clinit_running.contains(class) {
             return Ok(());
         }
         if self.clinit_failed.contains(class) {
@@ -917,6 +939,22 @@ impl Engine {
                 format!("{class} falhou na inicialização anterior (JLS 12.4.2)"),
             )));
         }
+        #[cfg(not(feature = "std"))]
+        {
+            let owner = self.heap.checked_execution_owner()?;
+            if let Some(initializing_owner) = self.clinit_running.get(class) {
+                return if *initializing_owner == owner {
+                    Ok(())
+                } else {
+                    Err(crate::err::vm_error(
+                        "API_UNAVAILABLE",
+                        format!("class initialization of {class} is in progress on another execution owner; waiting is not implemented"),
+                    ).into())
+                };
+            }
+            self.clinit_running.insert(class.to_string(), owner);
+        }
+        #[cfg(feature = "std")]
         self.clinit_running.insert(class.to_string());
         let result = self.initialize_class(class);
         self.clinit_running.remove(class);
@@ -927,6 +965,14 @@ impl Engine {
             }
             Err(e) => {
                 self.clinit_failed.insert(class.to_string());
+                // Infrastructure failures are not Java throwables. Preserve
+                // their precise code/cause while preventing a partial <clinit>
+                // from being retried. A contended class rejected above was
+                // never entered and is not poisoned by another owner's call.
+                #[cfg(not(feature = "std"))]
+                if matches!(&e, VmExit::Error(_)) {
+                    return Err(e);
+                }
                 // issue #41 (JLS 12.4.2): se a falha VEIO da superclasse (o erro
                 // já está embrulhado em EIIE/NCDFE), propaga o erro ORIGINAL —
                 // duplo-wrap divergia da JVM e mentia na message
@@ -1226,6 +1272,15 @@ pub fn parse_param_types(sig: &str) -> Option<Vec<String>> {
         out.push(params[start..i].to_string());
     }
     Some(out)
+}
+
+#[cfg(not(feature = "std"))]
+fn returned_object(result: &Result<Value, VmExit>) -> Option<ObjRef> {
+    match result {
+        Ok(Value::Obj(object)) => Some(*object),
+        Err(VmExit::Exception(throwable)) => throwable.obj,
+        _ => None,
+    }
 }
 
 /// `RD_TRACE_METHOD=<substring>`: log every guest method entry whose label

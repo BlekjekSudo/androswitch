@@ -158,6 +158,10 @@ impl Heap {
     pub(crate) fn execution_owner(&self) -> u64 {
         self.execution_identity.owner()
     }
+    #[cfg(not(feature = "std"))]
+    pub(crate) fn checked_execution_owner(&self) -> Result<u64, crate::VmExit> {
+        self.execution_identity.checked_owner()
+    }
     #[cfg(feature = "std")]
     pub(crate) fn gc_scope_depth(&self) -> usize {
         self.gc_scopes.len()
@@ -208,9 +212,17 @@ impl Heap {
         self.gc_scopes.truncate(depth);
         self.existing_cutoffs.retain(|(d, _)| *d < depth);
     }
-    #[cfg(not(feature = "std"))]
+    #[cfg(all(not(feature = "std"), any(test, feature = "portable-test-support")))]
     pub(crate) fn gc_scope_restore(&mut self, mark: crate::portable::execution::ScopeMark) {
         self.owned_scopes.restore(mark);
+    }
+    #[cfg(not(feature = "std"))]
+    pub(crate) fn gc_scope_restore_return(
+        &mut self,
+        mark: crate::portable::execution::ScopeMark,
+        object: Option<ObjRef>,
+    ) {
+        self.owned_scopes.restore_return(mark, object);
     }
     pub(crate) fn gc_pinned_roots(&self) -> impl Iterator<Item = ObjRef> + '_ {
         #[cfg(feature = "std")]
@@ -238,6 +250,7 @@ impl Heap {
                 )
         )
     }
+    #[cfg(feature = "std")]
     pub(crate) fn gc_pin_return(&mut self, r: ObjRef) {
         self.pin_allocation(r);
     }

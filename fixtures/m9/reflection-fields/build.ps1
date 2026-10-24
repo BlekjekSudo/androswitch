@@ -17,6 +17,7 @@ foreach($spec in @(@('reflection-fields','org.fixture.fields','org.androswitch.f
   $sources=@(Get-ChildItem "$variant/java" -Recurse -Filter '*.java' -File | ForEach-Object FullName)
   & javac --release 8 -g:none -cp $androidJar -d "$variant/classes" @sources
   if($LASTEXITCODE){throw 'Field reflection Java compilation failed'}
+  & "$PSScriptRoot/alias-class.ps1" -Path "$variant/classes/$($namespace.Replace('.','/'))/StaticAlias.class"
   & java -cp "$variant/classes" "$namespace.FieldCases" | Set-Content "$variant/jvm-oracle.txt" -Encoding utf8NoBOM
   if($LASTEXITCODE){throw 'Field reflection JVM oracle failed'}
   $classes=@(Get-ChildItem "$variant/classes" -Recurse -Filter '*.class' -File | ForEach-Object FullName)
@@ -29,5 +30,5 @@ foreach($spec in @(@('reflection-fields','org.fixture.fields','org.androswitch.f
   try{[IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip,"$variant/dex/classes.dex",'classes.dex',[IO.Compression.CompressionLevel]::Optimal)|Out-Null}finally{$zip.Dispose()}
   $receipts+=@{name=$name;namespace=$namespace;path="$output/$name.apk";sha256=(Get-FileHash "$output/$name.apk").Hash.ToLowerInvariant();oracle=@{path="$variant/jvm-oracle.txt";sha256=(Get-FileHash "$variant/jvm-oracle.txt").Hash.ToLowerInvariant()}}
 }
-@{schema_version=1;api=26;build_tools='35.0.0';java_release=8;sources=@(@(Get-ChildItem "$PSScriptRoot/java" -Recurse -File)+@(Get-Item $PSCommandPath)|ForEach-Object{@{path=$_.FullName;sha256=(Get-FileHash $_.FullName).Hash.ToLowerInvariant()}});fixtures=$receipts} | ConvertTo-Json -Depth 8 | Set-Content "$output/build-receipt.json" -Encoding utf8NoBOM
+@{schema_version=1;api=26;build_tools='35.0.0';java_release=8;class_file_transform='StaticAlias: omega -> alpha UTF8 field name only; I/J descriptors and values unchanged';sources=@(@(Get-ChildItem "$PSScriptRoot/java" -Recurse -File)+@(Get-Item $PSCommandPath,"$PSScriptRoot/alias-class.ps1")|ForEach-Object{@{path=$_.FullName;sha256=(Get-FileHash $_.FullName).Hash.ToLowerInvariant()}});fixtures=$receipts} | ConvertTo-Json -Depth 8 | Set-Content "$output/build-receipt.json" -Encoding utf8NoBOM
 Write-Output "$output/build-receipt.json"

@@ -102,7 +102,7 @@ fn sdk_getters_metadata_access_initialization_and_failures_match_jvm_in_two_name
         let (mut app, root) = app(variant);
         let oracle =
             std::fs::read_to_string(output().join(variant).join("jvm-oracle.txt")).unwrap();
-        assert_eq!(oracle.lines().count(), 119);
+        assert_eq!(oracle.lines().count(), 120);
         for line in oracle.lines().take(54) {
             let (index, expected) = line.split_once('\t').unwrap();
             let value = app
@@ -328,6 +328,39 @@ fn unsupported_storage_platform_fields_forgery_and_writes_fail_explicitly() {
         ),
         None
     );
+}
+#[test]
+fn legal_same_name_static_fields_are_rejected_before_initialization_in_both_namespaces() {
+    for variant in ["reflection-fields", "renamed"] {
+        let (mut app, _) = app(variant);
+        let oracle =
+            std::fs::read_to_string(output().join(variant).join("jvm-oracle.txt")).unwrap();
+        assert!(oracle
+            .lines()
+            .any(|line| line == "static-alias\tint:41,long:97"));
+        let alias = format!("L{}/StaticAlias;", namespace(variant));
+        let declarations = app
+            .vm
+            .cp
+            .declared_fields_info_checked(&alias)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            declarations
+                .iter()
+                .filter(|field| field.1 == "alpha" && field.4)
+                .count(),
+            2
+        );
+        assert!(declarations.iter().any(|field| field.2 == "I"));
+        assert!(declarations.iter().any(|field| field.2 == "J"));
+        let field = lookup(&mut app, variant, &alias, "alpha", false);
+        assert!(!app.vm.device_class_is_initialized(&alias));
+        assert!(
+            matches!(invoke(&mut app,field,"get","(Ljava/lang/Object;)Ljava/lang/Object;",Value::Null),Err(VmExit::Error(ref error)) if error.code=="API_UNAVAILABLE")
+        );
+        assert!(!app.vm.device_class_is_initialized(&alias));
+    }
 }
 #[test]
 fn access_override_is_per_field_and_does_not_bypass_receiver_or_conversion_checks() {

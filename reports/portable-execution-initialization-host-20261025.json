@@ -1,0 +1,350 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T19:41:24.294429+00:00",
+  "local_evidence_date": "2026-10-25",
+  "scope": "Portable execution-owner class initialization and native allocation scope regression contracts",
+  "base_commit": "1296b4b1199dbb024d67455ae5104e11faef3af5",
+  "source_binding": "Uncommitted tested source snapshots; base commit alone does not contain this patch. Snapshot hashes bind only the listed files, not a complete transitive source/environment snapshot.",
+  "status": {
+    "implementation": "implemented_bounded",
+    "host": "passed",
+    "android_execution": "not_run",
+    "ryujinx": "not_run_for_these_new_cases",
+    "physical_switch": "not_run_for_these_new_cases",
+    "external_game_compatibility": "not_established"
+  },
+  "toolchain": {
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: x86_64-pc-windows-gnu\nrelease: 1.97.1\nLLVM version: 22.1.6",
+    "java": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+    "javac": "javac 21.0.12.1",
+    "android_sdk": "C:/Users/Administrator/AppData/Local/Android/Sdk",
+    "android_build_tools": "35.0.0",
+    "dex_min_api": 26,
+    "compile_library_platform": 35,
+    "cargo_environment": {
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_BUILD_JOBS": "1",
+      "CARGO_PROFILE_TEST_DEBUG": "0"
+    }
+  },
+  "commands": [
+    {
+      "command": "pwsh -NoProfile -File crates/rd-vm/tests/fixtures/portable-execution/build.ps1",
+      "exit_code": 0,
+      "result": "Original and renamed ordinary Java sources compiled; JVM oracle and DEX produced. Java 8 obsolete-options warnings are retained."
+    },
+    {
+      "command": "cargo test -p as-switch-smoke --features host-cli,portable-tests --test portable_execution --test portable_throwable -- --nocapture",
+      "exit_code": 0,
+      "execution_tests": 12,
+      "throwable_tests": 5,
+      "portable_core_asserted": true,
+      "log": "target/evidence/portable-execution-20261025-tests-final.log"
+    },
+    {
+      "command": "cargo test -p as-framework --features host --test inherited_dispatch -- --nocapture",
+      "exit_code": 0,
+      "tests": 4,
+      "log": "target/evidence/portable-execution-20261025-dispatch-2.log"
+    },
+    {
+      "command": "cargo clippy -p as-switch-smoke --features host-cli,portable-tests --lib --test portable_execution --test portable_throwable -- -D warnings",
+      "exit_code": 0,
+      "log": "target/evidence/portable-execution-20261025-clippy-final.log"
+    },
+    {
+      "command": "cargo clippy -p as-framework --features host --lib --test inherited_dispatch -- -D warnings",
+      "exit_code": 0,
+      "log": "target/evidence/portable-execution-20261025-dispatch-clippy.log"
+    }
+  ],
+  "prior_attempts": [
+    {
+      "command": "cargo test -p as-framework --test inherited_dispatch -- --nocapture",
+      "exit_code": 101,
+      "classification": "Test-target feature configuration rejected before execution; corrected by adding --features host.",
+      "log": "target/evidence/portable-execution-20261025-dispatch.log"
+    },
+    {
+      "classification": "First inherited_dispatch compile warned that plain no_std gc_scope_restore was unused after production switched to captured return restoration. That plain helper is now test/support-only; final test and both Clippy commands passed. No lint suppression or runtime semantics change."
+    }
+  ],
+  "contracts": {
+    "execution_test_count": 12,
+    "previous_owner_contracts": 6,
+    "new_execution_contracts": 6,
+    "jvm_comparison_count": 16,
+    "jvm_rows_per_namespace": [
+      701,
+      1,
+      2,
+      42
+    ],
+    "jvm_comparison_detail": "4 sequential initialization rows x 2 namespaces x 2 fresh VM passes, with GC after each row; same-owner recursion, first Java initialization failure, permanent subsequent failure, superclass-before-subclass success.",
+    "native_allocation_cases": "4 native return modes x 2 namespaces: returned Obj, materialized Throwable with payload, structured VM error, and throwing DEX callback followed by another GC callback. Only local host references hold native payload/scratch; NativeHost.roots is empty. Unrelated preexisting garbage is collected inside the callback. Returned references survive the enclosing host scope, scratch is collectible on native return, and returned objects are collectible after that host scope exits.",
+    "initialization_cases": "Actual DEX native initializer suspensions allow same-owner intermediate values, reject foreign/unknown owner partial reads, preserve the original initializer and allow later completed reads from another owner. Dependent initialization that started then hit a foreign in-progress superclass remains failed, while the original superclass completes. Unknown/zero identity cannot publish defaults and valid identity can retry an initializer never started. A started initializer transport failure remains exact API_UNAVAILABLE and is not retried.",
+    "scope_return_case": "Captured owner restoration/pinning preserves another newer owner scope and does not promote return objects across an intervening Java guest scope.",
+    "actual_native_declaring_class": "Backend callbacks assert active_declaring_class equals the actual declaring fixture class; prior reflection caller metadata is retained.",
+    "provider_identity": "Controlled opaque identities on a single host thread model owner interleavings. No real native machine code or concurrent OS scheduling is claimed by these new tests."
+  },
+  "implementation": {
+    "portable_initialization": "class -> actual owner map, pruned on completion/failure; same-owner recursion allowed; other owner/unknown identity denied before partial read",
+    "foreign_initialization_limit": "Android waits. This runtime explicitly returns API_UNAVAILABLE because class-initialization waiting is not implemented.",
+    "infrastructure_error_policy": "A class whose initialization actually began is marked failed after a non-Java runtime error; original VmExit::Error is propagated. Later use raises NoClassDefFoundError. An unstarted contended target is not poisoned.",
+    "native_scope": "Fresh allocation pins only; no new global/conservative existing-object cutoff. Restore and returned Obj/Throwable pin use captured entry owner, and stop at an intervening guest scope.",
+    "identity": "No native provider uses original single-interpreter owner zero; a bound native provider must supply a stable nonzero actual identity for native invocation and unfinished class initialization.",
+    "legacy_std": "Initializer HashSet route/Java-error wrapping preserved by cfg. Legacy std execution was not rerun in this focused receipt.",
+    "host_test_probe_changes": "Only NativeResources and Failure single-thread host providers gained explicit Some(1) opaque identity. Assertions and intentional NoIdentity negative tests were not weakened."
+  },
+  "limitations": [
+    "Class-initialization waiting is explicitly unavailable; no claim of complete JLS thread blocking/scheduling.",
+    "The new native callback tests run the real portable Engine/GC but a controlled Rust NativeHost, not JNI machine code on Switch.",
+    "Collection/metadata/register/cache allocation and fragmentation limitations remain; no full security or memory-exhaustion review.",
+    "No arbitrary raw native object reference is retained after its owning scopes end; real JNI/framework owners remain necessary.",
+    "No game-specific code, package-name checks, proprietary APK modifications or external game first-screen claim."
+  ],
+  "primary_references": [
+    {
+      "url": "https://android.googlesource.com/platform/art/+/android-8.0.0_r1/runtime/class_linker.cc",
+      "revision": "android-8.0.0_r1",
+      "lines": "4658-4705",
+      "relevance": "Actual initializing thread identity, same-owner recursion, foreign waiting, and superclass dependency. Source inspected only; no source implementation copied.",
+      "workspace_path": "local-artifacts/reference/android26-initialization/class_linker.cc",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/reference/local-artifacts/reference/android26-initialization/class_linker.cc",
+      "sha256": "39dd9b5fb3178ee204b75f4e28c004f71fd8310e0cbcfbaa50766b0e5025ae3a",
+      "bytes": 408611
+    },
+    {
+      "url": "https://docs.oracle.com/javase/specs/jls/se8/html/jls-12.html#jls-12.4.2",
+      "relevance": "Detailed initialization procedure and recursive/foreign owner distinction; source/specification-derived comparison, not Android execution."
+    },
+    {
+      "url": "https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/design.html#global_and_local_references",
+      "relevance": "Local-reference lifetime and scope; these VM host pins complement actual JNI reference ownership."
+    }
+  ],
+  "sources": [
+    {
+      "workspace_path": "crates/rd-vm/src/engine.rs",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/rd-vm/src/engine.rs",
+      "sha256": "7a0d0d44b9b4a23434ad88108993027048a6786ddbd9648f2273e00ffda5b854",
+      "bytes": 52630
+    },
+    {
+      "workspace_path": "crates/rd-vm/src/heap.rs",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/rd-vm/src/heap.rs",
+      "sha256": "ba5654b8e1094441549049b3821c65c914f2dbc2bcc38ee1b347663be6ebfc07",
+      "bytes": 23839
+    },
+    {
+      "workspace_path": "crates/rd-vm/src/native_host.rs",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/rd-vm/src/native_host.rs",
+      "sha256": "199b756c5cc3880efe85f725e0440f95e12a611a461400b520cb4e757a510883",
+      "bytes": 1249
+    },
+    {
+      "workspace_path": "crates/rd-vm/src/portable/execution.rs",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/rd-vm/src/portable/execution.rs",
+      "sha256": "1f90fde37b8c0a8ce7d6fe398893019cd66ba76a58ec69d5da9329b62f146588",
+      "bytes": 15995
+    },
+    {
+      "workspace_path": "crates/rd-vm/src/portable/execution_contracts.rs",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/rd-vm/src/portable/execution_contracts.rs",
+      "sha256": "a065322f525323bb82f140c47722fc9aee690d80be690190f10ab22644870fe8",
+      "bytes": 13144
+    },
+    {
+      "workspace_path": "crates/rd-vm/src/portable/gc.rs",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/rd-vm/src/portable/gc.rs",
+      "sha256": "c86e6405779bb39acbec32f9474cf19a6aad11695e484f157646d6cd67d7db35",
+      "bytes": 3912
+    },
+    {
+      "workspace_path": "crates/rd-vm/src/interp.rs",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/rd-vm/src/interp.rs",
+      "sha256": "a7f372b60279e6f3232aaa2ad8e5c77b5b931314c04cb2c90f49fbd752237619",
+      "bytes": 86398
+    },
+    {
+      "workspace_path": "crates/rd-vm/src/classpath.rs",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/rd-vm/src/classpath.rs",
+      "sha256": "8e33ba81b289a761a68dc150a6f0eb9f1d399ea8202bb357243a053bf0369426",
+      "bytes": 109072
+    },
+    {
+      "workspace_path": "crates/rd-vm/src/lib.rs",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/rd-vm/src/lib.rs",
+      "sha256": "e1ea9a94616700b92a57c9a52cbb3c9ee34a6f9c0068d0e48565c3318378ce4b",
+      "bytes": 12244
+    },
+    {
+      "workspace_path": "crates/rd-vm/Cargo.toml",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/rd-vm/Cargo.toml",
+      "sha256": "3dd8a5c1bdd6091d7196114defc2c53f622534c2bc3e2d6cb35307fc8d8617a7",
+      "bytes": 1614
+    },
+    {
+      "workspace_path": "crates/as-switch-smoke/Cargo.toml",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/as-switch-smoke/Cargo.toml",
+      "sha256": "395ea2be97a06441b4068b503b7726891f42bd5bbe10eb470b0f29f60c79982e",
+      "bytes": 2462
+    },
+    {
+      "workspace_path": "crates/as-framework/Cargo.toml",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/as-framework/Cargo.toml",
+      "sha256": "4e869d02e4c59a1107d51e76d3511c8d49d0f6d0769d741e1373d968efcf84ec",
+      "bytes": 2744
+    },
+    {
+      "workspace_path": "Cargo.lock",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/Cargo.lock",
+      "sha256": "f7f174e7534072a9e1f337c8847c2d330c9cc9b9c55095cba12437b62642ef3e",
+      "bytes": 28670
+    },
+    {
+      "workspace_path": "crates/as-switch-smoke/tests/portable_execution.rs",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/as-switch-smoke/tests/portable_execution.rs",
+      "sha256": "2b64a86e296ef31338a27e8ab841aa1bd66078bf90ebbf2a682d4cbe19c8bbf2",
+      "bytes": 4468
+    },
+    {
+      "workspace_path": "crates/as-switch-smoke/tests/portable_throwable.rs",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/as-switch-smoke/tests/portable_throwable.rs",
+      "sha256": "ff63bea026ecbbc9ebec87b4c19e0dcdc5e4ae09df50524a11d9cf2c373b96dd",
+      "bytes": 7508
+    },
+    {
+      "workspace_path": "crates/as-framework/tests/inherited_dispatch.rs",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/as-framework/tests/inherited_dispatch.rs",
+      "sha256": "48a5ce9ee3c9db9bcaa36f35a03a79988def2eec61ba5a97545d5447738e9c9d",
+      "bytes": 9519
+    },
+    {
+      "workspace_path": "crates/rd-vm/tests/fixtures/portable-execution/ExecutionFixture.java",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/rd-vm/tests/fixtures/portable-execution/ExecutionFixture.java",
+      "sha256": "5b9c86fd4e4a6a65866bc94aac57853a4ae6fbdaa70f2cdc086d8f37eb875aa5",
+      "bytes": 2645
+    },
+    {
+      "workspace_path": "crates/rd-vm/tests/fixtures/portable-execution/build.ps1",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/source/crates/rd-vm/tests/fixtures/portable-execution/build.ps1",
+      "sha256": "29163b30180e32a4db096893f0cecb92239398d833e9a5fd72e2a5b4ff14a4e2",
+      "bytes": 2113
+    }
+  ],
+  "raw_logs": [
+    {
+      "workspace_path": "target/evidence/portable-execution-fixture-20261025.log",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/raw-logs/target/evidence/portable-execution-fixture-20261025.log",
+      "sha256": "11979ead767d53e85d7041530a9cfb2153c850774cd348173c99afffdd53c7aa",
+      "bytes": 590
+    },
+    {
+      "workspace_path": "target/evidence/portable-execution-20261025-tests-1.log",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/raw-logs/target/evidence/portable-execution-20261025-tests-1.log",
+      "sha256": "c8c998b51538e53d9fc451369e82e4ec8ddde6fe80147c3e7bcb7553ce77d660",
+      "bytes": 1500
+    },
+    {
+      "workspace_path": "target/evidence/portable-execution-20261025-tests-final.log",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/raw-logs/target/evidence/portable-execution-20261025-tests-final.log",
+      "sha256": "7cf041ce318b5af6bcb82e3627b2036a8ec303514fd208010df081ec4d6e4ec3",
+      "bytes": 2135
+    },
+    {
+      "workspace_path": "target/evidence/portable-execution-20261025-throwable.log",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/raw-logs/target/evidence/portable-execution-20261025-throwable.log",
+      "sha256": "eea94440cef3a339ac0ccbb8ec1df8218396dbc959d42dfe4980cc0b52b3e396",
+      "bytes": 785
+    },
+    {
+      "workspace_path": "target/evidence/portable-execution-20261025-dispatch.log",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/raw-logs/target/evidence/portable-execution-20261025-dispatch.log",
+      "sha256": "6f5aa93039232bda14f6318b035a303f05e84a99489e75f1d84c6a182cdc6c56",
+      "bytes": 154
+    },
+    {
+      "workspace_path": "target/evidence/portable-execution-20261025-dispatch-2.log",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/raw-logs/target/evidence/portable-execution-20261025-dispatch-2.log",
+      "sha256": "38f1517d8a80bad434be4b688786394e71495a6dcf4209d92f5937dac49fcdb6",
+      "bytes": 1266
+    },
+    {
+      "workspace_path": "target/evidence/portable-execution-20261025-clippy.log",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/raw-logs/target/evidence/portable-execution-20261025-clippy.log",
+      "sha256": "72ccf002a7388f2e5f716329b09649e67a7a58d203617ca567f09755490a1322",
+      "bytes": 539
+    },
+    {
+      "workspace_path": "target/evidence/portable-execution-20261025-clippy-final.log",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/raw-logs/target/evidence/portable-execution-20261025-clippy-final.log",
+      "sha256": "cd089dfef4ec469d166f54808a5ce42eae38de8ca04e0c043fcce27328dd2857",
+      "bytes": 391
+    },
+    {
+      "workspace_path": "target/evidence/portable-execution-20261025-dispatch-clippy.log",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/raw-logs/target/evidence/portable-execution-20261025-dispatch-clippy.log",
+      "sha256": "fbf4c708bde06266a56b12fa262f0643d5e2238b98ae68a7de85a3d7861535f4",
+      "bytes": 223
+    }
+  ],
+  "tested_artifacts": [
+    {
+      "workspace_path": "target/portable-execution-fixture/build-receipt.json",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/tested-artifacts/target/portable-execution-fixture/build-receipt.json",
+      "sha256": "8511dddd785c0c1f2a12148408144451b37d364dc918255f7e5584c1e549adc6",
+      "bytes": 1351
+    },
+    {
+      "workspace_path": "target/portable-execution-fixture/original/dex/classes.dex",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/tested-artifacts/target/portable-execution-fixture/original/dex/classes.dex",
+      "sha256": "4e596541a055356352c4da82302e7129e63b2abc61259baaa261d94796a7dfc3",
+      "bytes": 4596
+    },
+    {
+      "workspace_path": "target/portable-execution-fixture/original/jvm-oracle.txt",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/tested-artifacts/target/portable-execution-fixture/original/jvm-oracle.txt",
+      "sha256": "e8e1d039a9acce9c5eeed0b9c7fa8d46361b8ba4d064d6fb8fda5355570d1a1d",
+      "bytes": 23
+    },
+    {
+      "workspace_path": "target/portable-execution-fixture/original/source/ExecutionFixture.java",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/tested-artifacts/target/portable-execution-fixture/original/source/ExecutionFixture.java",
+      "sha256": "d5c8a7ca2a3f129ac44b6d13102ea94913473311b486511632be212cd68a49e0",
+      "bytes": 2647
+    },
+    {
+      "workspace_path": "target/portable-execution-fixture/renamed/dex/classes.dex",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/tested-artifacts/target/portable-execution-fixture/renamed/dex/classes.dex",
+      "sha256": "2c0a5560f448765cb8162ecafd60ba8ee9cbbedd6af59aa1c8dc1e1766b776b4",
+      "bytes": 4596
+    },
+    {
+      "workspace_path": "target/portable-execution-fixture/renamed/jvm-oracle.txt",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/tested-artifacts/target/portable-execution-fixture/renamed/jvm-oracle.txt",
+      "sha256": "e8e1d039a9acce9c5eeed0b9c7fa8d46361b8ba4d064d6fb8fda5355570d1a1d",
+      "bytes": 23
+    },
+    {
+      "workspace_path": "target/portable-execution-fixture/renamed/source/ExecutionFixture.java",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/tested-artifacts/target/portable-execution-fixture/renamed/source/ExecutionFixture.java",
+      "sha256": "207443284679194a44ca9285a214fce36f455555fe085a74e728b5bf21e2e791",
+      "bytes": 2647
+    }
+  ],
+  "documentation_snapshot": [
+    {
+      "workspace_path": "docs/PORTABLE_EXECUTION.md",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/documentation/docs/PORTABLE_EXECUTION.md",
+      "sha256": "735ac02ba5326efb700cc8ff178a60f190566c2630606a6c43a0b65ad107538d",
+      "bytes": 5036
+    },
+    {
+      "workspace_path": "docs/HORIZON_WORKERS.md",
+      "snapshot_path": "local-artifacts/m9/portable-execution-host/20261025/documentation/docs/HORIZON_WORKERS.md",
+      "sha256": "964dc5737b660268e72fe2e5e789921c181291942de18646846d7e5e43cbc06e",
+      "bytes": 10252
+    }
+  ]
+}

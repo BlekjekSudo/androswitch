@@ -31,7 +31,14 @@ host read of a nonpublic field.
 
 The portable instance heap currently keys slots by name. Hidden same-name
 instance fields are therefore explicit unsupported operations, rather than
-confusing base and subclass values. Field writes, platform field catalogs,
+confusing base and subclass values. Static slots currently omit the descriptor;
+multiple same-name static declarations are also rejected before initialization.
+The builder demonstrates this legal JVM/DEX shape by changing only a field-name
+UTF8 constant in the original `StaticAlias` class file, preserving its distinct
+int/long descriptors and values. JVM reference rows for these ambiguous storage
+cases are recorded separately from supported comparisons.
+
+Field writes, platform field catalogs,
 annotations/generic signatures and volatile memory ordering outside the VM
 lease are outside this subset. Unknown platform catalogs fail explicitly;
 known empty primitive/array/Object declarations can throw NoSuchFieldException.

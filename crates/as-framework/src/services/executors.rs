@@ -10,6 +10,8 @@ mod uncaught;
 pub use uncaught::{MainExceptionScope, UncaughtExceptionReport};
 #[path = "thread_local.rs"]
 mod thread_local;
+#[path = "time_unit.rs"]
+mod time_unit;
 
 pub(in crate::android) const TOKEN_BIT: u64 = 1 << 62;
 const THREAD: &str = "Ljava/lang/Thread;";
@@ -87,13 +89,13 @@ struct State {
     factories: BTreeMap<ObjRef, Factory>,
     wrappers: BTreeMap<ObjRef, ObjRef>,
     workers: BTreeMap<ObjRef, ObjRef>,
-    seconds: Option<ObjRef>,
     errors: VecDeque<VmExit>,
 }
 #[derive(Default)]
 pub(in crate::android) struct Executors {
     uncaught: uncaught::Handlers,
     locals: RefCell<thread_local::Locals>,
+    units: time_unit::TimeUnits,
     state: RefCell<State>,
     backend: RefCell<Option<Rc<dyn BackgroundWorkers>>>,
     serial: Cell<u64>,
@@ -209,6 +211,9 @@ impl Executors {
             return Some(method);
         }
         if let Some(method) = Self::thread_local_metadata(class, name, sig) {
+            return Some(method);
+        }
+        if let Some(method) = time_unit::TimeUnits::metadata(class, name, sig) {
             return Some(method);
         }
         use HostMethodKind::{Constructor, Instance, Static};
@@ -471,33 +476,9 @@ impl Executors {
         vm: &mut Engine,
         class: &str,
         name: &str,
-        _sig: &str,
+        sig: &str,
     ) -> Result<Option<Value>> {
-        if class != UNIT {
-            return Ok(None);
-        }
-        if name != "SECONDS" {
-            return Err(unavailable(
-                "TimeUnit constant outside supported SECONDS contract",
-            ));
-        }
-        if let Some(r) = self.state.borrow().seconds {
-            return Ok(Some(Value::Obj(r)));
-        }
-        let r = shell(vm, UNIT)?;
-        let label = vm.heap.alloc_string("SECONDS".into())?;
-        rd_vm::intrinsics::call_instance_intrinsic_mref(
-            vm,
-            UNIT,
-            "Ljava/lang/Enum;",
-            "<init>",
-            "(Ljava/lang/String;I)V",
-            r,
-            &[Value::Obj(label), Value::Int(3)],
-        )?
-        .ok_or_else(|| unavailable("TimeUnit Enum initialization"))?;
-        self.state.borrow_mut().seconds = Some(r);
-        Ok(Some(Value::Obj(r)))
+        self.units.static_field(vm, class, name, sig)
     }
     pub(super) fn call_static(
         &self,
@@ -508,6 +489,9 @@ impl Executors {
         sig: &str,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        if let Some(value) = self.units.call_static(vm, class, name, sig, args)? {
+            return Ok(Some(value));
+        }
         if let Some(value) = self.uncaught_call_static(vm, class, name, sig, args)? {
             return Ok(Some(value));
         }
@@ -779,6 +763,9 @@ impl Executors {
         args: &[Value],
     ) -> Result<Option<Value>> {
         let actual = vm.heap.class_of(r)?.to_string();
+        if let Some(value) = self.units.call(vm, &actual, r, name, sig, args)? {
+            return Ok(Some(value));
+        }
         if let Some(value) = self.thread_local_call(android, vm, &actual, name, sig, r, args)? {
             return Ok(Some(value));
         }
@@ -1029,7 +1016,7 @@ impl Executors {
                 ));
             }
             let state = self.state.borrow();
-            if state.seconds != Some(unit) {
+            if !self.units.is_seconds(unit) {
                 return Err(unavailable("Pool keep-alive TimeUnit outside SECONDS"));
             }
             if !state.queues.get(&queue).is_some_and(|q| q.initialized) {
@@ -1330,7 +1317,7 @@ impl Executors {
         let state = self.state.borrow();
         let mut roots: Vec<_> = state.tokens.values().copied().collect();
         roots.extend(state.adopted.values().copied());
-        roots.extend(state.seconds);
+        roots.extend(self.units.roots());
         roots.extend(state.pools.values().filter_map(|p| p.running));
         roots.extend(state.errors.iter().filter_map(|e| match e {
             VmExit::Exception(e) => e.obj,

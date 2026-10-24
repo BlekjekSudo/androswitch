@@ -7,6 +7,10 @@ use core::fmt;
 
 const MAX_OWNERS: usize = 1024;
 
+#[cfg(any(test, feature = "portable-test-support"))]
+#[path = "execution_contracts.rs"]
+mod invocation_contracts;
+
 /// No native provider means the original single interpreter. A multithreaded
 /// provider must return its actual stable, nonzero platform thread identity.
 #[derive(Clone, Default)]
@@ -21,6 +25,19 @@ impl Identity {
             .and_then(|provider| provider.current_thread_id())
             .filter(|owner| *owner != 0)
             .unwrap_or(0)
+    }
+    /// Class initialization/native scopes must never let an unidentified
+    /// platform thread impersonate the original single interpreter.
+    pub(crate) fn checked_owner(&self) -> Result<u64, VmExit> {
+        match &self.0 {
+            None => Ok(0),
+            Some(provider) => provider
+                .current_thread_id()
+                .filter(|owner| *owner != 0)
+                .ok_or_else(|| {
+                    err::vm_error("API_UNAVAILABLE", "actual execution thread identity").into()
+                }),
+        }
     }
 }
 impl fmt::Debug for Identity {
@@ -167,6 +184,15 @@ impl OwnerScopes {
             }
         }
     }
+    /// Restore exactly the captured owner's scope, then retain only the
+    /// returned reference in that owner's enclosing host callback. Other
+    /// native temporaries end here; an intervening guest scope is a boundary.
+    pub(crate) fn restore_return(&mut self, mark: ScopeMark, object: Option<ObjRef>) {
+        self.restore(mark);
+        if let Some(object) = object {
+            self.pin(mark.owner, object);
+        }
+    }
     pub(crate) fn pin(&mut self, owner: u64, object: ObjRef) {
         if let Some(Some(roots)) = self
             .owners
@@ -197,6 +223,7 @@ impl OwnerScopes {
 
 #[cfg(any(test, feature = "portable-test-support"))]
 pub(crate) mod contracts {
+    pub use super::invocation_contracts::*;
     use super::*;
     use alloc::{vec, vec::Vec};
     use core::cell::Cell;

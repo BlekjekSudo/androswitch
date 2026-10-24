@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-25",
+  "scope": "General API 26 TimeUnit shared runtime contract; original fixtures; no application identity branches",
+  "base_commit": "1296b4b1199dbb024d67455ae5104e11faef3af5",
+  "source_binding": "Working tree files frozen with hashes; final integration commit and NRO validation are assigned by the parent task",
+  "implementation": [
+    "Seven distinct per-App canonical constants initialized through the real Enum heap state; exact static field descriptors",
+    "TimeUnit.values returns a fresh mutable seven-element array; TimeUnit.valueOf validates exact names and null",
+    "convert and all seven to* methods use integral unit ratios, Java signed truncation and signed saturation, without intermediate nanosecond overflow",
+    "Explicit bounded GC roots retain canonical constants; forged/noncanonical unit objects fail",
+    "Shared Enum ancestry uses DEX declarations first and existing builtin direct parents only if DEX is absent",
+    "Generic Enum.valueOf on host enums without a constant registry returns API_UNAVAILABLE instead of falsely claiming an existing constant is absent",
+    "ThreadPoolExecutor keeps its existing canonical-SECONDS-only contract"
+  ],
+  "primary_sources": [
+    "https://developer.android.com/reference/java/util/concurrent/TimeUnit",
+    "https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/TimeUnit.html"
+  ],
+  "provenance": "Independently written from documented unit ratios and conversion/Enum contracts; no upstream implementation or external APK code copied",
+  "verification": {
+    "host": {
+      "no_std_vm_lib_clippy": "passed -D warnings",
+      "format": "passed",
+      "executor_regressions": 10,
+      "framework_clippy": "passed -D warnings",
+      "scoped_diff": "passed",
+      "portable_enum_regressions": 3,
+      "jvm_row_comparisons": 3990,
+      "jvm_oracle_rows": 1995,
+      "status": "passed",
+      "manifest_identities": 2,
+      "time_unit_tests": 3
+    },
+    "device_build": "not_run_by_this_subagent",
+    "emulator": "not_run_for_this_source",
+    "physical_device": "not_run",
+    "commands": [
+      "pwsh -File fixtures/m9/time-unit/build.ps1",
+      "cargo test -p as-framework --features host --test time_unit --test executors -- --test-threads=1",
+      "cargo test -p as-switch-smoke --features portable-tests,host-cli --test portable_enum -- --test-threads=1",
+      "cargo clippy -p as-framework --features host --lib --test time_unit --test executors -- -D warnings",
+      "cargo clippy -p rd-vm --no-default-features --lib -- -D warnings"
+    ],
+    "environment": {
+      "cargo_build_jobs": 1,
+      "cargo_incremental": 0,
+      "cargo_profile_dev_debug": 0,
+      "jvm": "Microsoft OpenJDK 21.0.12.1, --release 8 fixtures",
+      "api_reference": 26,
+      "sdk_build_tools": "35.0.0"
+    },
+    "initial_failure": {
+      "scope": "First TimeUnit run: one test passed, two failed at inherited Enum declaring-class validation; Executors10 passed. This failure prompted the general DEX/builtin ancestry correction. The original failed log is preserved.",
+      "log": {
+        "bytes": 3412,
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\time-unit-host\\20261025\\logs\\m9-time-unit-focused-20261025.log",
+        "sha256": "aeb930a38ba0b0fc44e894db2d713dd60ff638b2b9a778760c68890bb7ead54d"
+      }
+    }
+  },
+  "sdk_proof": {
+    "sd_relative": "switch/androswitch/Download/androswitch-timeunit-proof.txt",
+    "vfs": "/sdcard/Download/androswitch-timeunit-proof.txt",
+    "numeric_digest": -1249919511,
+    "validation": "Compare the entire VFS file, installation identity, error/status and clean return; review the actual capture separately. Host proof is not Horizon evidence.",
+    "expected_lf_text": "units=7 names=NANOSECONDS,MICROSECONDS,MILLISECONDS,SECONDS,MINUTES,HOURS,DAYS\nvectors=833 digest=-1249919511\nTIME_UNIT_PROOF_PASS\n",
+    "numeric_vectors": 833
+  },
+  "limits": [
+    "No generic Enum.valueOf(Class,String) host constant discovery; fails explicitly API_UNAVAILABLE",
+    "No constant-specific anonymous TimeUnit implementation classes or full Class/Enum reflection compatibility claim",
+    "No sleep/timedWait/timedJoin, interruption or Duration overloads",
+    "ThreadPoolExecutor remains restricted to canonical SECONDS",
+    "This extends an inferred next shared call from bounded APK static evidence; no claim that either external game has opened on this source"
+  ],
+  "sources": [
+    {
+      "bytes": 54242,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\as-framework\\src\\services\\executors.rs",
+      "sha256": "6f5e912e5dd31c5127bc6fa707849d7018c04155439e86527135607809433570"
+    },
+    {
+      "bytes": 7418,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\as-framework\\src\\services\\time_unit.rs",
+      "sha256": "aa7e0eeb1f81ad27da0f920f6f5ca2cfec1251ecf206fbc8e1fe3bba5e1a7e47"
+    },
+    {
+      "bytes": 9597,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\as-framework\\tests\\time_unit.rs",
+      "sha256": "7ec38cd3a553ccb91411a19278a018cdd5ac5d9d74c8a70c19761ad85f9597f6"
+    },
+    {
+      "bytes": 7648,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\rd-vm\\src\\portable\\enums.rs",
+      "sha256": "598e5bf822f15b04205243a103f6e6e61eb563968002b33d9ace149b6894dd55"
+    },
+    {
+      "bytes": 2744,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\as-framework\\Cargo.toml",
+      "sha256": "4e869d02e4c59a1107d51e76d3511c8d49d0f6d0769d741e1373d968efcf84ec"
+    },
+    {
+      "bytes": 3355,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\time-unit\\build.ps1",
+      "sha256": "b44e1ccc357687f607480359708f1ec15fe82e722ffa6db2efe6b5962875e377"
+    },
+    {
+      "bytes": 1879,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\time-unit\\README.md",
+      "sha256": "072400ed423205a5e482cf0f688d9d11957e8e829f9cf605e19df91a75a02d07"
+    },
+    {
+      "bytes": 6339,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\time-unit\\java\\org\\androswitch\\timeunits\\TimeUnitCases.java",
+      "sha256": "548e730f951c6da11fdf21237bbcbdd202789311c135d80f1330c1223ebee8ea"
+    },
+    {
+      "bytes": 920,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\time-unit\\java\\org\\androswitch\\timeunits\\TimeUnitActivity.java",
+      "sha256": "ea97270eb24591fa5a7b39185a1216d534b5735fe3f37c663986c7cf5e5d7e4c"
+    }
+  ],
+  "frozen_artifacts": [
+    {
+      "bytes": 2175,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\time-unit-host\\20261025\\artifacts\\build-receipt.json",
+      "sha256": "fc568e5befdab0b99e64a966e349e445fffc8ce1d515625527ead110cc6cc8e4"
+    },
+    {
+      "bytes": 7452,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\time-unit-host\\20261025\\artifacts\\classes.dex",
+      "sha256": "22c0c826a3266c3848d98d5185594fa04f18b130d0f1b04a6c701194262e4b4a"
+    },
+    {
+      "bytes": 60383,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\time-unit-host\\20261025\\artifacts\\oracle.tsv",
+      "sha256": "d1809eeeb2371665b3139e39da682f1d40bfc31c627afd086d89211816384ad6"
+    },
+    {
+      "bytes": 131,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\time-unit-host\\20261025\\artifacts\\proof.txt",
+      "sha256": "596ba98648bbe436e6340d7fcec876524e4a3bc9f24a926b0f808e70b7059d9c"
+    },
+    {
+      "bytes": 5046,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\time-unit-host\\20261025\\artifacts\\renamed.apk",
+      "sha256": "b9b818c91fbbf21116d33e17dfff966566cb42b7a73e57057ff6168ac707ab21"
+    },
+    {
+      "bytes": 5038,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\time-unit-host\\20261025\\artifacts\\time-unit.apk",
+      "sha256": "447a6e82c86d2e2f7c202224b0e950608e104f8ef7e12e6c312b5613c279fd74"
+    }
+  ],
+  "logs": [
+    {
+      "bytes": 143,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\time-unit-host\\20261025\\logs\\m9-time-unit-clippy-20261025.log",
+      "sha256": "c1ee48669a731c692027cc701f3ea695fee7d111f72d333740b8e6a6882bcf16"
+    },
+    {
+      "bytes": 199,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\time-unit-host\\20261025\\logs\\m9-time-unit-enum-clippy-20261025.log",
+      "sha256": "db7d2b9379ecdf4fb408743652767b53e3e49a629409fcea6aa926d8e6a26f2d"
+    },
+    {
+      "bytes": 1665,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\time-unit-host\\20261025\\logs\\m9-time-unit-focused-20261025-2.log",
+      "sha256": "9c092431b5038a8af42e887abc2ea04334f52ed0f805bd544a055317e2ebfdee"
+    },
+    {
+      "bytes": 3412,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\time-unit-host\\20261025\\logs\\m9-time-unit-focused-20261025.log",
+      "sha256": "aeb930a38ba0b0fc44e894db2d713dd60ff638b2b9a778760c68890bb7ead54d"
+    },
+    {
+      "bytes": 746,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\time-unit-host\\20261025\\logs\\m9-time-unit-portable-enum-20261025.log",
+      "sha256": "a45c29452628e295515a763c7c34ab228943f00a00606a2972ff5d4ae3f90b49"
+    }
+  ]
+}

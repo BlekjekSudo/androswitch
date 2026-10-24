@@ -116,3 +116,8 @@ required-features = ["host"]
 name = "reflection_fields"
 path = "tests/reflection_fields.rs"
 required-features = ["host"]
+
+[[test]]
+name = "time_unit"
+path = "tests/time_unit.rs"
+required-features = ["host"]

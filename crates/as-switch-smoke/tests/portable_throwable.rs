@@ -123,6 +123,9 @@ fn dex_constructors_shadow_fields_and_gc_do_not_alias_private_throwable_state() 
 
 struct Failure;
 impl NativeHost for Failure {
+    fn current_thread_id(&self) -> Option<u64> {
+        Some(1) // Controlled single-threaded host provider, not a device ID.
+    }
     fn load(&self, _vm: &mut Engine, _name: &str, _absolute: bool) -> Result<(), VmExit> {
         unreachable!()
     }

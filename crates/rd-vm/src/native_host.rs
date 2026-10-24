@@ -4,8 +4,9 @@ use crate::{Engine, ObjRef, Value, VmExit};
 use alloc::{rc::Rc, vec::Vec};
 pub trait NativeHost {
     /// Stable, nonzero identity of the actual executing platform thread.
-    /// A backend that cannot provide this must not impersonate the single
-    /// interpreter thread when guest code acquires a Java monitor.
+    /// Required by portable native invocation/allocation root scopes, class
+    /// initialization and Java monitors. A backend that cannot provide this
+    /// returns unavailable instead of impersonating the single interpreter.
     fn current_thread_id(&self) -> Option<u64> {
         None
     }

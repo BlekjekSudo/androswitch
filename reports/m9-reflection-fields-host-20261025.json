@@ -1,0 +1,308 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T19:43:08.5446831Z",
+  "implementation_commit": null,
+  "source_binding": {
+    "snapshot": {
+      "sha256": "a592594343a8e71037056728ccea5c86c5ebe91820488afec1d4a0e163a90c48",
+      "path": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/source-hashes.json",
+      "bytes": 5698
+    },
+    "base_commit": "1296b4b1199dbb024d67455ae5104e11faef3af5",
+    "description": "Tested working-tree source after initial field implementation and reviewed static-storage/native-scope/class-initialization corrections. Exact relevant bytes are frozen and hashed; a later final source commit is bound separately by the parent candidate collector."
+  },
+  "scope": "General portable no_std+alloc DEX Field discovery, metadata, access and typed getters. Shared static/instance storage ambiguities fail explicitly. No package branches, fabricated fields or external-game compatibility claim.",
+  "status": "host_passed_emulator_pending",
+  "portable_core_asserted": true,
+  "supplements": {
+    "sha256": "bf636f1ee9bcda123e3ae5b9dc1fef6d6c7ddc758df2155d5b1c83e3ea65df5b",
+    "path": "reports/m9-reflection-fields-host-initial-20261025.json",
+    "bytes": 13406
+  },
+  "observed_blocker": {
+    "returned_to_launcher": true,
+    "first_screen": "not_visually_verified",
+    "nro_sha256": "2064ea7b5ec461b7857adae9c3bae745a8546b3a1ede53ca7d6cc2e5ecb2a790",
+    "operation": "java.lang.Class.getDeclaredField(String)",
+    "sd_restore": "restored",
+    "external_apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+    "run": "local-artifacts/m9/external-runs/e5b65838267841158e96409c1512a43c",
+    "verification": {
+      "path": "local-artifacts/m9/external-runs/e5b65838267841158e96409c1512a43c/verification.json",
+      "bytes": 19398,
+      "sha256": "509d4797166e420f9f88a2305830e284b0ba3fe8647f9271e1e536019473948d"
+    }
+  },
+  "review_corrections": [
+    {
+      "correction": "Count actual same-name static declarations before active use. More than one fails API_UNAVAILABLE before initializing the owner; no aliased value is returned.",
+      "finding": "Same-name static fields with distinct descriptors can alias the existing owner/name static map.",
+      "proof": "An original javac class file changes only omega to alpha in a UTF8 constant. JVM and d8 accept identical same-name int/long fields; JVM observes int:41,long:97. Both Android DEX namespaces expose both declarations and reject the read without marking the owner initialized."
+    },
+    {
+      "correction": "A peer added actual owner admission, independent native/backend and callback-local allocation scopes, return/exception pinning and explicit unavailable foreign initialization waits. Field tests are rerun on those exact corrected sources.",
+      "finding": "Real native DEX frames require owner-specific backend allocation scopes and must not borrow another owner class-initialization state.",
+      "validation": "This receipt does not relabel peer commands as locally executed; see the linked source-bound receipt for its 12 execution, 5 Throwable and 4 dispatch tests and Clippy.",
+      "evidence": {
+        "sha256": "947b5e7684246b2828907806392d97ab54e1eb45a81ad40e726690af33caa6c6",
+        "path": "reports/portable-execution-initialization-host-20261025.json",
+        "bytes": 21173
+      }
+    }
+  ],
+  "commands": [
+    {
+      "reference_only_unsupported_storage_rows": 4,
+      "apks": 2,
+      "log": {
+        "sha256": "870562c588d637dde35cd57456f173ae7febf0dcddafb48fcb508e5d860320c0",
+        "path": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/logs/build-post-review.log",
+        "bytes": 623
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "supported_jvm_comparisons": 236,
+      "oracle_rows_per_variant": 120,
+      "command": "fixtures/m9/reflection-fields/build.ps1"
+    },
+    {
+      "status": "passed",
+      "seconds": {
+        "class_forname": 1.66,
+        "reflection_fields": 3.85
+      },
+      "log": {
+        "sha256": "4bb2386878ce3d13e0119182313878e16cf5781c0aa1ddeefc143a5751e405f5",
+        "path": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/logs/tests-post-review.log",
+        "bytes": 1734
+      },
+      "test_targets": {
+        "class_forname": 5,
+        "reflection_fields": 7
+      },
+      "command": "CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 CARGO_PROFILE_TEST_DEBUG=0 cargo test -p as-framework --features host --test reflection_fields --test class_forname --locked -- --test-threads=1",
+      "exit_code": 0,
+      "compile_seconds": 18.38
+    },
+    {
+      "seconds": 3.65,
+      "status": "passed",
+      "command": "CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 cargo clippy -p as-framework --features host --lib --test reflection_fields --locked -- -D warnings",
+      "exit_code": 0,
+      "log": {
+        "sha256": "c5223916ac117ab673a65898a01fbb224c01627bac043bf5e03d1ce307aaf9b9",
+        "path": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/logs/clippy-post-review.log",
+        "bytes": 211
+      }
+    }
+  ],
+  "contract": [
+    "Only actual declared DEX class-data fields establish reflected declarations. Bytecode field_id references do not manufacture fields; malformed declarations propagate typed parser/metadata errors.",
+    "Class.getDeclaredField searches own instance then static declarations; getField searches own public declarations, direct interfaces recursively, then superclass. Null names and missing fields throw real typed exceptions.",
+    "Field metadata exposes actual name, declaring Class, resolved type Class, low 16 access flags and independent accessibility override. Canonical Class and service-owned Field provenance is validated.",
+    "Generic get returns real references/null or exact primitive wrapper objects; typed getters use Java widening only. Instance reads validate null and assignability, then return real stored values or genuine unwritten defaults.",
+    "Static reads initialize the actual declaring owner; inherited reads do not initialize the requesting subclass. Existing Class.forName default-interface admission is reused, so unsupported required initialization is not skipped.",
+    "Access checks use actual DEX declaring class for the current real NativeHost owner; no backend means the single interpreter. No active caller for a nonpublic host read and unknown backend identity fail explicitly. Portable native DEX frames carry real ClassDef metadata and restore it after returns and exceptions; legacy std route is unchanged.",
+    "ART 26 receiver/static initialization precedes access/conversion checking. An initializer may reenter setAccessible on the same Field before access is checked; a GC/reentrancy test verifies the updated override and live metadata.",
+    "Field metadata is weak and bounded at 4096 records / 4 MiB estimated payload; active reads retain independent ticketed roots (64 scopes). Retained Fields exhaust the budget, and unreachable Field GC reclaims it."
+  ],
+  "api": {
+    "fields": "Real ClassData definitions with checked owner/type/storage flags. Referenced field IDs do not become declarations.",
+    "field": [
+      "getName()Ljava/lang/String;",
+      "getDeclaringClass()Ljava/lang/Class;",
+      "getType()Ljava/lang/Class;",
+      "getModifiers()I",
+      "setAccessible(Z)V",
+      "isAccessible()Z",
+      "get(Ljava/lang/Object;)Ljava/lang/Object;",
+      "getBoolean(Ljava/lang/Object;)Z",
+      "getByte(Ljava/lang/Object;)B",
+      "getShort(Ljava/lang/Object;)S",
+      "getChar(Ljava/lang/Object;)C",
+      "getInt(Ljava/lang/Object;)I",
+      "getLong(Ljava/lang/Object;)J",
+      "getFloat(Ljava/lang/Object;)F",
+      "getDouble(Ljava/lang/Object;)D"
+    ],
+    "catalog": "Only exact implemented instance descriptors are cataloged; inherited Member metadata and AccessibleObject access methods route to real Field state. Setters are not cataloged.",
+    "class": [
+      "getDeclaredField(Ljava/lang/String;)Ljava/lang/reflect/Field;",
+      "getField(Ljava/lang/String;)Ljava/lang/reflect/Field;"
+    ]
+  },
+  "budgets": {
+    "lookup_classes": 128,
+    "active_read_scopes": 64,
+    "estimated_metadata_payload_bytes": 4194304,
+    "field_objects": 4096
+  },
+  "test_scenarios": [
+    "Two different Java namespaces and manifest identities share the same runtime contracts, with 236 JVM comparisons and all 64 primitive widening pairs per namespace.",
+    "Real public static final String/int values, declaring class/type/name/modifier metadata, public interface/superclass discovery, no declared inheritance and no field_id-only fake definition.",
+    "Actual default/reference instance values, exact primitive wrappers and Float/Double values, reference identity and real typed null/wrong receiver/access/conversion failures.",
+    "Discovery does not initialize an owner; active static reads initialize once and failed initializers remain failed. Default-bearing-interface scheduling remains explicit unsupported.",
+    "Private actual-Dex-caller access, per-Field suppression, protected cross-package receiver checks and access-state reentry from clinit with GC.",
+    "Service-owned provenance, weak records, metadata budget exhaustion/reclaim, in-flight read roots and actual Class references across collection.",
+    "Real NativeHost DEX-frame declaring class and frame restoration after normal return or propagated exception; legacy std execution is unchanged.",
+    "Legal same-name static fields are present with distinct I/J descriptors in both DEX fixtures; reads are rejected before initialization. Hidden instance storage and unknown platform fields remain explicit unsupported."
+  ],
+  "limitations": [
+    "Field writes, platform field catalogs, annotations/generic signatures and full reflection ecosystem are not implemented.",
+    "Hidden same-name instance fields and duplicate-name static fields require richer storage keys and are deliberately unavailable.",
+    "A public field read can proceed without a Java caller; nonpublic access with no actual caller or unknown native identity cannot silently succeed. Custom classloader provenance is not implemented by this layer.",
+    "Foreign class initialization waits are explicitly unavailable; the implementation does not pretend another thread completed its initializer.",
+    "Volatile ordering outside the VM lease, a production AArch64 JNI Field roundtrip, Android reference-device execution and Switch hardware were not established by these tests.",
+    "The old 17 production JNI / 6 GC regressions are retained in the initial receipt; current native-scope/owner checks are separately source-bound by the peer receipt.",
+    "No unchanged external game first screen is claimed."
+  ],
+  "toolchain": {
+    "compile_android_api": 35,
+    "d8_min_api": 26,
+    "javac": "21.0.12.1 --release 8",
+    "build_tools": "35.0.0",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+  },
+  "artifacts": {
+    "renamed": {
+      "sha256": "6ea3f71cd7351bd877590755476a67f970a11e97db7fc57a60e584475bdef657",
+      "path": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/fixtures/renamed.apk",
+      "bytes": 7208
+    },
+    "renamed_oracle": {
+      "sha256": "47c34c71d0c5f4b184eb35c671f21fd1a8d59b580bad136a6cd40afe235739bc",
+      "path": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/fixtures/renamed-jvm-oracle.txt",
+      "bytes": 3269
+    },
+    "fixture_build_receipt": {
+      "sha256": "fcccdd2d57d6272c36cb3ee959e5b4822472c07b2ce958a5d77495dacf34b782",
+      "path": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/fixtures/build-receipt.json",
+      "bytes": 2577
+    },
+    "test_executable": {
+      "sha256": "2921e95f53a28a68f5686820ab2fb4a6cbf8033d1ab807deec40ead525ad5763",
+      "path": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/reflection_fields.exe",
+      "bytes": 16683454
+    },
+    "proof": {
+      "sha256": "e0f1018035cc4ce8e29f0f0c62ac57e954f96977a2270fe63b35992dbcb3004a",
+      "path": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/fixtures/reflection-fields.apk",
+      "bytes": 7201
+    },
+    "jvm_oracle": {
+      "sha256": "c52c69383c026c4996835d1c4b08bf5dcf4903e3718ffcb18912189d8b3dea91",
+      "path": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/fixtures/jvm-oracle.txt",
+      "bytes": 3257
+    }
+  },
+  "source_hashes": [
+    {
+      "sha256": "318fc3ea48136ab640195fa7c2811554cd31aa281470f7240bcf2dfc24facd1e",
+      "path": "crates/as-framework/src/services/reflection.rs",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/crates/as-framework/src/services/reflection.rs"
+    },
+    {
+      "sha256": "88d07a7a0e5cbb90cabe4a44e6ae8ec8ad666e270ed411661f456a6500236ca8",
+      "path": "crates/as-framework/src/services/reflection/class_for_name.rs",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/crates/as-framework/src/services/reflection/class_for_name.rs"
+    },
+    {
+      "sha256": "17ae13c19d84787074c35db3f6dfb234c9265c1df441cfd862726dbe1f679e56",
+      "path": "crates/as-framework/src/services/reflection/fields.rs",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/crates/as-framework/src/services/reflection/fields.rs"
+    },
+    {
+      "sha256": "3cc1d7afd971e18136dc139df762e5a2cca6c908b90f8521490c5a15f8554817",
+      "path": "crates/as-framework/src/services/mod.rs",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/crates/as-framework/src/services/mod.rs"
+    },
+    {
+      "sha256": "e4682d1c1b4b9de67213575a613d815b30584054ebb2d5f79aa43dd0d93669f4",
+      "path": "crates/as-framework/tests/reflection_fields.rs",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/crates/as-framework/tests/reflection_fields.rs"
+    },
+    {
+      "sha256": "4e869d02e4c59a1107d51e76d3511c8d49d0f6d0769d741e1373d968efcf84ec",
+      "path": "crates/as-framework/Cargo.toml",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/crates/as-framework/Cargo.toml"
+    },
+    {
+      "sha256": "7a0d0d44b9b4a23434ad88108993027048a6786ddbd9648f2273e00ffda5b854",
+      "path": "crates/rd-vm/src/engine.rs",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/crates/rd-vm/src/engine.rs"
+    },
+    {
+      "sha256": "ba5654b8e1094441549049b3821c65c914f2dbc2bcc38ee1b347663be6ebfc07",
+      "path": "crates/rd-vm/src/heap.rs",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/crates/rd-vm/src/heap.rs"
+    },
+    {
+      "sha256": "1f90fde37b8c0a8ce7d6fe398893019cd66ba76a58ec69d5da9329b62f146588",
+      "path": "crates/rd-vm/src/portable/execution.rs",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/crates/rd-vm/src/portable/execution.rs"
+    },
+    {
+      "sha256": "c86e6405779bb39acbec32f9474cf19a6aad11695e484f157646d6cd67d7db35",
+      "path": "crates/rd-vm/src/portable/gc.rs",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/crates/rd-vm/src/portable/gc.rs"
+    },
+    {
+      "sha256": "e3b26dc181ceba8610006165002d2d43d2ba98f9dff5590a3af23b90f253e0ba",
+      "path": "crates/rd-vm/src/portable/mod.rs",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/crates/rd-vm/src/portable/mod.rs"
+    },
+    {
+      "sha256": "598e5bf822f15b04205243a103f6e6e61eb563968002b33d9ace149b6894dd55",
+      "path": "crates/rd-vm/src/portable/enums.rs",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/crates/rd-vm/src/portable/enums.rs"
+    },
+    {
+      "sha256": "8e33ba81b289a761a68dc150a6f0eb9f1d399ea8202bb357243a053bf0369426",
+      "path": "crates/rd-vm/src/classpath.rs",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/crates/rd-vm/src/classpath.rs"
+    },
+    {
+      "sha256": "323c13d3b0e73f8af93fa597d8dba69709d62695bb9361c08c3ab8ba68940a71",
+      "path": "fixtures/m9/reflection-fields/build.ps1",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/fixtures/m9/reflection-fields/build.ps1"
+    },
+    {
+      "sha256": "4fe50a19d7ef53d6a912b71d747ef0ee4cf796b4e05406ac5b62612b7b8ef557",
+      "path": "fixtures/m9/reflection-fields/alias-class.ps1",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/fixtures/m9/reflection-fields/alias-class.ps1"
+    },
+    {
+      "sha256": "99946660e229679973b4cd318b9c876009c7928a08b27770cee04f1856673801",
+      "path": "fixtures/m9/reflection-fields/java/org/androswitch/fields/FieldActivity.java",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/fixtures/m9/reflection-fields/java/org/androswitch/fields/FieldActivity.java"
+    },
+    {
+      "sha256": "23211db29481afc200314a38d3cea3213cf08ba3dee5807d45e1621b0ccf5d72",
+      "path": "fixtures/m9/reflection-fields/java/org/androswitch/fields/FieldCases.java",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/fixtures/m9/reflection-fields/java/org/androswitch/fields/FieldCases.java"
+    },
+    {
+      "sha256": "addd9360ddfaa5858005a353094357e9cbd558e286d1951964a51878cac95526",
+      "path": "fixtures/m9/reflection-fields/java/org/androswitch/fields/StaticAlias.java",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/fixtures/m9/reflection-fields/java/org/androswitch/fields/StaticAlias.java"
+    },
+    {
+      "sha256": "c1d37dafdbd34e5df17294befbc2878e2a3c0093c35160a2371573af49ab23c0",
+      "path": "fixtures/m9/reflection-fields/java/org/androswitch/fields/other/ProtectedReader.java",
+      "frozen": "local-artifacts/m9/reflection-fields-host/20261025/frozen-post-review/sources/fixtures/m9/reflection-fields/java/org/androswitch/fields/other/ProtectedReader.java"
+    }
+  ],
+  "primary_sources": [
+    "https://android.googlesource.com/platform/art/+/android-8.0.0_r1/runtime/native/java_lang_Class.cc",
+    "https://android.googlesource.com/platform/art/+/android-8.0.0_r1/runtime/native/java_lang_reflect_Field.cc",
+    "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/lang/reflect/Field.java",
+    "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/lang/reflect/AccessibleObject.java"
+  ],
+  "verification": {
+    "host": "passed",
+    "horizon_emulator": "pending_new_candidate",
+    "physical_switch": "not_run",
+    "external_games": "no_first_screen_claim"
+  }
+}

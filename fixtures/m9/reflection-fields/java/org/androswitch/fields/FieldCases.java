@@ -72,6 +72,15 @@ public final class FieldCases {
   public static int callerRead() throws Exception { return Data.readOwn(); }
   public static Object gcRead(Field field) throws Exception { return field.get(null); }
   public static int collision() throws Exception { return HiddenBase.class.getField("same").getInt(new HiddenChild()); }
+  public static String staticCollision() throws Exception {
+    String small="",wide="";
+    for(Field field:StaticAlias.class.getDeclaredFields()){
+      if(!"alpha".equals(field.getName()))throw new IllegalStateException("unpatched alias");
+      if(field.getType()==Integer.TYPE)small="int:"+field.get(null);
+      if(field.getType()==Long.TYPE)wide="long:"+field.get(null);
+    }
+    return small+","+wide;
+  }
   public static int defaultBearingRead() throws Exception {return DefaultBearing.class.getField("number").getInt(null);}
   public static int reentrantRead() throws Exception {
     Field field=Reentrant.class.getDeclaredField("number");reentrantField=field;
@@ -166,5 +175,6 @@ public final class FieldCases {
     for(int i=0;i<54;i++)System.out.println(i+"\t"+evaluate(i));
     for(int i=0;i<8;i++)for(int j=0;j<8;j++)System.out.println("widen:"+i+":"+j+"\t"+widening(i,j));
     System.out.println("collision\t"+collision());
+    System.out.println("static-alias\t"+staticCollision());
   }
 }
