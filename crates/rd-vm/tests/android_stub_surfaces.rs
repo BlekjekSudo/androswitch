@@ -1667,3 +1667,525 @@ fn drafted_stub_surface_classpath_subtypes_are_visible() {
         .cp
         .is_subtype("Landroid/icu/util/ULocale;", "Ljava/lang/Comparable;"));
 }
+
+const ANIMATOR: &str = "Landroid/animation/Animator;";
+const VALUE_ANIMATOR: &str = "Landroid/animation/ValueAnimator;";
+const OBJECT_ANIMATOR: &str = "Landroid/animation/ObjectAnimator;";
+const PROPERTY_VALUES_HOLDER: &str = "Landroid/animation/PropertyValuesHolder;";
+const KEYFRAME: &str = "Landroid/animation/Keyframe;";
+
+fn float_value_array(engine: &mut Engine, values: &[f32]) -> Value {
+    let array = engine
+        .heap
+        .alloc_array_zeroed(ElemKind::Float, values.len(), "[F")
+        .unwrap();
+    *engine.heap.array_elems_mut(array).unwrap() =
+        values.iter().copied().map(Value::Float).collect();
+    Value::Obj(array)
+}
+fn boxed_float(engine: &mut Engine, value: f32) -> Value {
+    let boxed = instance(engine, "Ljava/lang/Float;");
+    engine
+        .heap
+        .put_field(boxed, "value", Value::Float(value))
+        .unwrap();
+    Value::Obj(boxed)
+}
+fn boxed_int_value(engine: &Engine, value: &Value) -> i32 {
+    match field(engine, object(value.clone()), "value") {
+        Value::Int(v) => v,
+        other => panic!("expected boxed int value, got {other:?}"),
+    }
+}
+fn boxed_float_value(engine: &Engine, value: &Value) -> f32 {
+    match field(engine, object(value.clone()), "value") {
+        Value::Float(v) => v,
+        other => panic!("expected boxed float value, got {other:?}"),
+    }
+}
+fn set_linear_interpolator(engine: &mut Engine, animator: ObjRef) {
+    let linear = instance(engine, "Landroid/view/animation/LinearInterpolator;");
+    call(engine, linear, "<init>", "()V", &[]);
+    call(
+        engine,
+        animator,
+        "setInterpolator",
+        "(Landroid/animation/TimeInterpolator;)V",
+        &[Value::Obj(linear)],
+    );
+}
+
+#[test]
+fn value_animator_runs_on_virtual_clock_and_seeks_with_repeats() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let values = int_array(&mut engine, &[0, 100]);
+    let animator = object(call_static(
+        &mut engine,
+        VALUE_ANIMATOR,
+        "ofInt",
+        "([I)Landroid/animation/ValueAnimator;",
+        std::slice::from_ref(&values),
+    ));
+    assert_eq!(
+        call(&mut engine, animator, "getDuration", "()J", &[]),
+        Value::Long(300)
+    );
+    assert_throws(
+        engine.invoke_instance(
+            animator,
+            "setDuration",
+            "(J)Landroid/animation/ValueAnimator;",
+            &[Value::Long(-1)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            animator,
+            "setDuration",
+            "(J)Landroid/animation/ValueAnimator;",
+            &[Value::Long(160)]
+        ),
+        Value::Obj(animator)
+    );
+    set_linear_interpolator(&mut engine, animator);
+    let listener = instance(&mut engine, "Landroid/animation/AnimatorListenerAdapter;");
+    call(&mut engine, listener, "<init>", "()V", &[]);
+    call(
+        &mut engine,
+        animator,
+        "addListener",
+        "(Landroid/animation/Animator$AnimatorListener;)V",
+        &[Value::Obj(listener)],
+    );
+    let update_listener = instance(
+        &mut engine,
+        "Landroid/animation/ValueAnimator$AnimatorUpdateListener;",
+    );
+    call(
+        &mut engine,
+        animator,
+        "addUpdateListener",
+        "(Landroid/animation/ValueAnimator$AnimatorUpdateListener;)V",
+        &[Value::Obj(update_listener)],
+    );
+    call(&mut engine, animator, "start", "()V", &[]);
+    assert_eq!(
+        call(&mut engine, animator, "isStarted", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, animator, "isRunning", "()Z", &[]),
+        Value::Int(1)
+    );
+    let initial = call(
+        &mut engine,
+        animator,
+        "getAnimatedValue",
+        "()Ljava/lang/Object;",
+        &[],
+    );
+    assert_eq!(boxed_int_value(&engine, &initial), 0);
+
+    // The first Choreographer pulse establishes the AOSP start time.
+    engine.advance_clock(16).unwrap();
+    engine.advance_clock(80).unwrap();
+    let halfway = call(
+        &mut engine,
+        animator,
+        "getAnimatedValue",
+        "()Ljava/lang/Object;",
+        &[],
+    );
+    assert_eq!(boxed_int_value(&engine, &halfway), 50);
+    assert_eq!(
+        call(&mut engine, animator, "getAnimatedFraction", "()F", &[]),
+        Value::Float(0.5)
+    );
+    engine.advance_clock(80).unwrap();
+    let finished = call(
+        &mut engine,
+        animator,
+        "getAnimatedValue",
+        "()Ljava/lang/Object;",
+        &[],
+    );
+    assert_eq!(boxed_int_value(&engine, &finished), 100);
+    assert_eq!(
+        call(&mut engine, animator, "isRunning", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(field(&engine, listener, "rd_on_start_count"), Value::Int(1));
+    assert_eq!(field(&engine, listener, "rd_on_end_count"), Value::Int(1));
+    assert!(matches!(
+        field(&engine, update_listener, "rd_on_update_count"),
+        Value::Int(n) if n > 0
+    ));
+
+    let float_values = float_value_array(&mut engine, &[0.0, 10.0]);
+    let repeating = object(call_static(
+        &mut engine,
+        VALUE_ANIMATOR,
+        "ofFloat",
+        "([F)Landroid/animation/ValueAnimator;",
+        std::slice::from_ref(&float_values),
+    ));
+    call(
+        &mut engine,
+        repeating,
+        "setDuration",
+        "(J)Landroid/animation/ValueAnimator;",
+        &[Value::Long(100)],
+    );
+    set_linear_interpolator(&mut engine, repeating);
+    call(
+        &mut engine,
+        repeating,
+        "setRepeatCount",
+        "(I)V",
+        &[Value::Int(1)],
+    );
+    call(
+        &mut engine,
+        repeating,
+        "setRepeatMode",
+        "(I)V",
+        &[Value::Int(2)],
+    );
+    assert_eq!(
+        call(&mut engine, repeating, "getTotalDuration", "()J", &[]),
+        Value::Long(200)
+    );
+    call(
+        &mut engine,
+        repeating,
+        "setCurrentFraction",
+        "(F)V",
+        &[Value::Float(1.25)],
+    );
+    let reversed = call(
+        &mut engine,
+        repeating,
+        "getAnimatedValue",
+        "()Ljava/lang/Object;",
+        &[],
+    );
+    assert_eq!(boxed_float_value(&engine, &reversed), 7.5);
+    assert_eq!(
+        call(&mut engine, repeating, "getCurrentPlayTime", "()J", &[]),
+        Value::Long(125)
+    );
+    call(
+        &mut engine,
+        repeating,
+        "setCurrentPlayTime",
+        "(J)V",
+        &[Value::Long(50)],
+    );
+    let sought = call(
+        &mut engine,
+        repeating,
+        "getAnimatedValue",
+        "()Ljava/lang/Object;",
+        &[],
+    );
+    assert_eq!(boxed_float_value(&engine, &sought), 5.0);
+
+    let clone = object(call(
+        &mut engine,
+        repeating,
+        "clone",
+        "()Landroid/animation/ValueAnimator;",
+        &[],
+    ));
+    assert_ne!(clone, repeating);
+    assert_eq!(
+        call(&mut engine, clone, "getRepeatCount", "()I", &[]),
+        Value::Int(1)
+    );
+    call(
+        &mut engine,
+        clone,
+        "setCurrentFraction",
+        "(F)V",
+        &[Value::Float(0.25)],
+    );
+    let cloned_value = call(
+        &mut engine,
+        clone,
+        "getAnimatedValue",
+        "()Ljava/lang/Object;",
+        &[],
+    );
+    assert_eq!(boxed_float_value(&engine, &cloned_value), 2.5);
+}
+
+#[test]
+fn keyframes_property_holders_and_evaluators_compute_values() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let first = call_static(
+        &mut engine,
+        KEYFRAME,
+        "ofFloat",
+        "(FF)Landroid/animation/Keyframe;",
+        &[Value::Float(0.0), Value::Float(0.0)],
+    );
+    let middle = call_static(
+        &mut engine,
+        KEYFRAME,
+        "ofFloat",
+        "(FF)Landroid/animation/Keyframe;",
+        &[Value::Float(0.5), Value::Float(100.0)],
+    );
+    let last = call_static(
+        &mut engine,
+        KEYFRAME,
+        "ofFloat",
+        "(FF)Landroid/animation/Keyframe;",
+        &[Value::Float(1.0), Value::Float(0.0)],
+    );
+    let keyframes = object_array(
+        &mut engine,
+        "[Landroid/animation/Keyframe;",
+        vec![first, middle, last],
+    );
+    let property_name = text(&mut engine, "value");
+    let holder = object(call_static(
+        &mut engine,
+        PROPERTY_VALUES_HOLDER,
+        "ofKeyframe",
+        "(Ljava/lang/String;[Landroid/animation/Keyframe;)Landroid/animation/PropertyValuesHolder;",
+        &[property_name, keyframes],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            holder,
+            "getPropertyName",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "value"
+    );
+    let holders = object_array(
+        &mut engine,
+        "[Landroid/animation/PropertyValuesHolder;",
+        vec![Value::Obj(holder)],
+    );
+    let animator = object(call_static(
+        &mut engine,
+        VALUE_ANIMATOR,
+        "ofPropertyValuesHolder",
+        "([Landroid/animation/PropertyValuesHolder;)Landroid/animation/ValueAnimator;",
+        std::slice::from_ref(&holders),
+    ));
+    set_linear_interpolator(&mut engine, animator);
+    call(
+        &mut engine,
+        animator,
+        "setCurrentFraction",
+        "(F)V",
+        &[Value::Float(0.25)],
+    );
+    let name = text(&mut engine, "value");
+    let value = call(
+        &mut engine,
+        animator,
+        "getAnimatedValue",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+        std::slice::from_ref(&name),
+    );
+    assert_eq!(boxed_float_value(&engine, &value), 50.0);
+    let returned_holders = call(
+        &mut engine,
+        animator,
+        "getValues",
+        "()[Landroid/animation/PropertyValuesHolder;",
+        &[],
+    );
+    assert_eq!(array_values(&engine, &returned_holders).len(), 1);
+
+    let int_evaluator = instance(&mut engine, "Landroid/animation/IntEvaluator;");
+    call(&mut engine, int_evaluator, "<init>", "()V", &[]);
+    let start = boxed_int(&mut engine, 10);
+    let end = boxed_int(&mut engine, 20);
+    let evaluated = call(
+        &mut engine,
+        int_evaluator,
+        "evaluate",
+        "(FLjava/lang/Integer;Ljava/lang/Integer;)Ljava/lang/Integer;",
+        &[Value::Float(0.25), start, end],
+    );
+    assert_eq!(boxed_int_value(&engine, &evaluated), 12);
+
+    let float_evaluator = instance(&mut engine, "Landroid/animation/FloatEvaluator;");
+    call(&mut engine, float_evaluator, "<init>", "()V", &[]);
+    let start = boxed_float(&mut engine, 2.0);
+    let end = boxed_float(&mut engine, 6.0);
+    let evaluated = call(
+        &mut engine,
+        float_evaluator,
+        "evaluate",
+        "(FLjava/lang/Number;Ljava/lang/Number;)Ljava/lang/Float;",
+        &[Value::Float(0.5), start, end],
+    );
+    assert_eq!(boxed_float_value(&engine, &evaluated), 4.0);
+
+    let argb = object(call_static(
+        &mut engine,
+        "Landroid/animation/ArgbEvaluator;",
+        "getInstance",
+        "()Landroid/animation/ArgbEvaluator;",
+        &[],
+    ));
+    let again = call_static(
+        &mut engine,
+        "Landroid/animation/ArgbEvaluator;",
+        "getInstance",
+        "()Landroid/animation/ArgbEvaluator;",
+        &[],
+    );
+    assert_eq!(again, Value::Obj(argb));
+    let black = boxed_int(&mut engine, -16_777_216);
+    let white = boxed_int(&mut engine, -1);
+    let color = call(
+        &mut engine,
+        argb,
+        "evaluate",
+        "(FLjava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+        &[Value::Float(0.5), black, white],
+    );
+    assert_eq!(boxed_int_value(&engine, &color), -4_539_718);
+}
+
+#[test]
+fn object_animator_applies_values_and_pauses_resumes_on_virtual_frames() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, CONTEXT);
+    let view = instance(&mut engine, "Landroid/view/View;");
+    engine
+        .attach_host_state("Landroid/view/View;", view)
+        .unwrap();
+    call(
+        &mut engine,
+        view,
+        "<init>",
+        "(Landroid/content/Context;)V",
+        &[Value::Obj(context)],
+    );
+    call(&mut engine, view, "setAlpha", "(F)V", &[Value::Float(0.25)]);
+    let property = text(&mut engine, "alpha");
+    let values = float_value_array(&mut engine, &[0.75]);
+    let animator = object(call_static(
+        &mut engine,
+        OBJECT_ANIMATOR,
+        "ofFloat",
+        "(Ljava/lang/Object;Ljava/lang/String;[F)Landroid/animation/ObjectAnimator;",
+        &[Value::Obj(view), property, values],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            animator,
+            "getTarget",
+            "()Ljava/lang/Object;",
+            &[]
+        ),
+        Value::Obj(view)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            animator,
+            "getPropertyName",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "alpha"
+    );
+    call(
+        &mut engine,
+        animator,
+        "setDuration",
+        "(J)Landroid/animation/ObjectAnimator;",
+        &[Value::Long(160)],
+    );
+    set_linear_interpolator(&mut engine, animator);
+    call(&mut engine, animator, "start", "()V", &[]);
+    assert_eq!(
+        call(&mut engine, view, "getAlpha", "()F", &[]),
+        Value::Float(0.25),
+        "the single-value start is read from the target getter"
+    );
+    engine.advance_clock(16).unwrap();
+    engine.advance_clock(80).unwrap();
+    assert_eq!(
+        call(&mut engine, view, "getAlpha", "()F", &[]),
+        Value::Float(0.5)
+    );
+    engine.advance_clock(80).unwrap();
+    assert_eq!(
+        call(&mut engine, view, "getAlpha", "()F", &[]),
+        Value::Float(0.75)
+    );
+    assert_eq!(
+        call(&mut engine, animator, "isStarted", "()Z", &[]),
+        Value::Int(0)
+    );
+
+    let property = text(&mut engine, "translationX");
+    let values = float_value_array(&mut engine, &[0.0, 40.0]);
+    let pausing = object(call_static(
+        &mut engine,
+        OBJECT_ANIMATOR,
+        "ofFloat",
+        "(Ljava/lang/Object;Ljava/lang/String;[F)Landroid/animation/ObjectAnimator;",
+        &[Value::Obj(view), property, values],
+    ));
+    call(
+        &mut engine,
+        pausing,
+        "setDuration",
+        "(J)Landroid/animation/ObjectAnimator;",
+        &[Value::Long(160)],
+    );
+    set_linear_interpolator(&mut engine, pausing);
+    call(&mut engine, pausing, "start", "()V", &[]);
+    engine.advance_clock(16).unwrap();
+    engine.advance_clock(80).unwrap();
+    assert_eq!(
+        call(&mut engine, view, "getTranslationX", "()F", &[]),
+        Value::Float(20.0)
+    );
+    call(&mut engine, pausing, "pause", "()V", &[]);
+    assert_eq!(
+        call(&mut engine, pausing, "isPaused", "()Z", &[]),
+        Value::Int(1)
+    );
+    engine.advance_clock(160).unwrap();
+    assert_eq!(
+        call(&mut engine, view, "getTranslationX", "()F", &[]),
+        Value::Float(20.0)
+    );
+    call(&mut engine, pausing, "resume", "()V", &[]);
+    engine.advance_clock(80).unwrap();
+    assert_eq!(
+        call(&mut engine, view, "getTranslationX", "()F", &[]),
+        Value::Float(40.0)
+    );
+
+    assert!(engine.cp.is_subtype(OBJECT_ANIMATOR, VALUE_ANIMATOR));
+    assert!(engine.cp.is_subtype(VALUE_ANIMATOR, ANIMATOR));
+    assert!(engine
+        .cp
+        .is_subtype("Landroid/animation/Keyframe$FloatKeyframe;", KEYFRAME));
+    assert!(engine.cp.is_subtype(
+        "Landroid/animation/ArgbEvaluator;",
+        "Landroid/animation/TypeEvaluator;"
+    ));
+    assert!(engine.cp.is_subtype(
+        "Landroid/animation/AnimatorListenerAdapter;",
+        "Landroid/animation/Animator$AnimatorListener;"
+    ));
+}

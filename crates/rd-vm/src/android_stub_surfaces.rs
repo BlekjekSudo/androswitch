@@ -18,6 +18,10 @@
 //!   `KeyChain` behavior, without a Keystore/KeyChain service.
 //! * `android.view.textclassifier` value builders/results and the exact
 //!   `TextClassifier.NO_OP` default behavior, without an ML model.
+//! * `android.animation` `ValueAnimator`/`ObjectAnimator` timing on the
+//!   deterministic virtual Choreographer clock, with keyframes, evaluators,
+//!   listeners and JavaBeans/Property application. AnimatorSet, Path and
+//!   multi-parameter holders are outside this slice.
 
 use crate::android_sysservices::*;
 use crate::engine::Engine;
@@ -99,6 +103,28 @@ const TEXT_CLASSIFICATION_MANAGER: &str = "Landroid/view/textclassifier/TextClas
 const ULOCALE: &str = "Landroid/icu/util/ULocale;";
 const SYSTEM_TEXT_CLASSIFIER: &str = TEXT_CLASSIFIER;
 const ENTITY_CONFIDENCE: &str = "Landroid/view/textclassifier/EntityConfidence;";
+
+const ANIMATOR: &str = "Landroid/animation/Animator;";
+const VALUE_ANIMATOR: &str = "Landroid/animation/ValueAnimator;";
+const OBJECT_ANIMATOR: &str = "Landroid/animation/ObjectAnimator;";
+const PROPERTY_VALUES_HOLDER: &str = "Landroid/animation/PropertyValuesHolder;";
+const KEYFRAME: &str = "Landroid/animation/Keyframe;";
+const KEYFRAME_OBJECT: &str = "Landroid/animation/Keyframe$ObjectKeyframe;";
+const KEYFRAME_INT: &str = "Landroid/animation/Keyframe$IntKeyframe;";
+const KEYFRAME_FLOAT: &str = "Landroid/animation/Keyframe$FloatKeyframe;";
+const ANIMATION_HANDLER: &str = "Landroid/animation/AnimationHandler;";
+const INT_EVALUATOR: &str = "Landroid/animation/IntEvaluator;";
+const FLOAT_EVALUATOR: &str = "Landroid/animation/FloatEvaluator;";
+const ARGB_EVALUATOR: &str = "Landroid/animation/ArgbEvaluator;";
+const ANIMATOR_LISTENER: &str = "Landroid/animation/Animator$AnimatorListener;";
+const ANIMATOR_PAUSE_LISTENER: &str = "Landroid/animation/Animator$AnimatorPauseListener;";
+const ANIMATOR_UPDATE_LISTENER: &str = "Landroid/animation/ValueAnimator$AnimatorUpdateListener;";
+const DURATION_SCALE_LISTENER: &str =
+    "Landroid/animation/ValueAnimator$DurationScaleChangeListener;";
+const ANIMATOR_LISTENER_ADAPTER: &str = "Landroid/animation/AnimatorListenerAdapter;";
+const ANDROID_PROPERTY: &str = "Landroid/util/Property;";
+const ANDROID_INT_PROPERTY: &str = "Landroid/util/IntProperty;";
+const ANDROID_FLOAT_PROPERTY: &str = "Landroid/util/FloatProperty;";
 
 fn ise(msg: impl Into<String>) -> VmExit {
     throw("Ljava/lang/IllegalStateException;", msg)
@@ -348,6 +374,10 @@ pub(crate) fn host_static(
             return jstr(vm, "android.view.textclassifier.extra.FROM_TEXT_CLASSIFIER").map(Some)
         }
         (TEXT_CLASSIFIER, "NO_OP") => return text_no_op(vm).map(Some),
+        (ANIMATOR | VALUE_ANIMATOR | OBJECT_ANIMATOR, "DURATION_INFINITE") => Value::Long(-1),
+        (VALUE_ANIMATOR | OBJECT_ANIMATOR, "INFINITE") => Value::Int(-1),
+        (VALUE_ANIMATOR | OBJECT_ANIMATOR, "RESTART") => Value::Int(1),
+        (VALUE_ANIMATOR | OBJECT_ANIMATOR, "REVERSE") => Value::Int(2),
         (TEXT_CLASSIFICATION, "EMPTY") => return empty_text_classification(vm).map(Some),
         (TEXT_LANGUAGE, "EMPTY") => return empty_text_language(vm).map(Some),
         _ => return Ok(None),
@@ -379,6 +409,12 @@ pub(crate) fn static_intrinsic(
         TYPE_REFERENCE => type_reference_static(vm, name, sig, args),
         TEXT_CLASSIFIER_ENTITY_CONFIG => entity_config_static(vm, name, sig, args),
         TEXT_CLASSIFICATION => text_classification_static(vm, name, sig, args),
+        VALUE_ANIMATOR => value_animator_static(vm, name, sig, args),
+        OBJECT_ANIMATOR => object_animator_static(vm, name, sig, args),
+        PROPERTY_VALUES_HOLDER => property_values_holder_static(vm, name, sig, args),
+        KEYFRAME => keyframe_static(vm, name, sig, args),
+        ANIMATION_HANDLER => animation_handler_static(vm, name, sig, args),
+        ARGB_EVALUATOR if name == "getInstance" => argb_evaluator_instance(vm).map(Some),
         WEBVIEW => webview_static(vm, name, sig, args),
         WEB_SETTINGS if name == "getDefaultUserAgent" => {
             // A deterministic user agent for the no-renderer profile.  Callers
@@ -497,6 +533,20 @@ pub(crate) fn instance_intrinsic(
         }
         ULOCALE => ulocale_instance(vm, name, sig, recv, args),
         ENTITY_CONFIDENCE => entity_confidence_instance(vm, name, sig, recv, args),
+        ANIMATOR => animator_base_instance(vm, name, sig, recv, args),
+        VALUE_ANIMATOR => value_animator_instance(vm, name, sig, recv, args),
+        OBJECT_ANIMATOR => object_animator_instance(vm, name, sig, recv, args),
+        PROPERTY_VALUES_HOLDER => property_values_holder_instance(vm, name, sig, recv, args),
+        KEYFRAME | KEYFRAME_OBJECT | KEYFRAME_INT | KEYFRAME_FLOAT => {
+            keyframe_instance(vm, class, name, sig, recv, args)
+        }
+        ANIMATION_HANDLER => animation_handler_instance(vm, name, sig, recv, args),
+        INT_EVALUATOR | FLOAT_EVALUATOR | ARGB_EVALUATOR => {
+            animation_evaluator_instance(vm, class, name, sig, recv, args)
+        }
+        ANDROID_PROPERTY | ANDROID_INT_PROPERTY | ANDROID_FLOAT_PROPERTY => {
+            android_property_instance(vm, class, name, sig, recv, args)
+        }
         _ => Ok(None),
     }
 }
@@ -560,6 +610,21 @@ fn is_stub_class(c: &str) -> bool {
             | TEXT_CLASSIFICATION_MANAGER
             | ULOCALE
             | ENTITY_CONFIDENCE
+            | ANIMATOR
+            | VALUE_ANIMATOR
+            | OBJECT_ANIMATOR
+            | PROPERTY_VALUES_HOLDER
+            | KEYFRAME
+            | KEYFRAME_OBJECT
+            | KEYFRAME_INT
+            | KEYFRAME_FLOAT
+            | ANIMATION_HANDLER
+            | INT_EVALUATOR
+            | FLOAT_EVALUATOR
+            | ARGB_EVALUATOR
+            | ANDROID_PROPERTY
+            | ANDROID_INT_PROPERTY
+            | ANDROID_FLOAT_PROPERTY
     )
 }
 
@@ -6733,4 +6798,3573 @@ fn camera_manager_instance(
         }
         _ => return Ok(None),
     }))
+}
+
+// ---------------------------------------------------------------------------
+// android.animation: ValueAnimator/ObjectAnimator on the virtual frame clock
+// ---------------------------------------------------------------------------
+
+const ANIM_KIND_INT: i32 = 1;
+const ANIM_KIND_FLOAT: i32 = 2;
+const ANIM_KIND_OBJECT: i32 = 3;
+
+fn anim_class_cast(msg: impl Into<String>) -> VmExit {
+    throw("Ljava/lang/ClassCastException;", msg)
+}
+fn anim_put_bool(vm: &mut Engine, r: ObjRef, field: &str, value: bool) -> Result<(), VmExit> {
+    put(vm, r, field, bool_value(value))
+}
+fn anim_list_items(vm: &Engine, r: ObjRef, field: &str) -> Vec<Value> {
+    collection_items(vm, Some(&get(vm, r, field)))
+}
+fn anim_set_list_items(
+    vm: &mut Engine,
+    r: ObjRef,
+    field: &str,
+    items: Vec<Value>,
+) -> Result<(), VmExit> {
+    if let Some(list) = field_obj(vm, r, field) {
+        if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&list) {
+            *elems = items;
+            return Ok(());
+        }
+    }
+    let list = new_collection(vm, "Ljava/util/ArrayList;", items)?;
+    put(vm, r, field, Value::Obj(list))
+}
+fn anim_append_listener(
+    vm: &mut Engine,
+    r: ObjRef,
+    field: &str,
+    listener: Value,
+) -> Result<(), VmExit> {
+    let mut items = anim_list_items(vm, r, field);
+    items.push(listener);
+    anim_set_list_items(vm, r, field, items)
+}
+fn anim_remove_listener(
+    vm: &mut Engine,
+    r: ObjRef,
+    field: &str,
+    listener: &Value,
+) -> Result<(), VmExit> {
+    if field_obj(vm, r, field).is_none() {
+        return Ok(());
+    }
+    let mut items = anim_list_items(vm, r, field);
+    if let Some(pos) = items.iter().position(|v| v == listener) {
+        items.remove(pos);
+    }
+    if items.is_empty() {
+        put(vm, r, field, Value::Null)
+    } else {
+        anim_set_list_items(vm, r, field, items)
+    }
+}
+fn anim_copy_list_field(
+    vm: &mut Engine,
+    source: ObjRef,
+    dest: ObjRef,
+    field: &str,
+) -> Result<(), VmExit> {
+    if field_obj(vm, source, field).is_some() {
+        let items = anim_list_items(vm, source, field);
+        let list = new_collection(vm, "Ljava/util/ArrayList;", items)?;
+        put(vm, dest, field, Value::Obj(list))
+    } else {
+        put(vm, dest, field, Value::Null)
+    }
+}
+fn anim_number_int(vm: &Engine, value: &Value) -> Option<i32> {
+    match value {
+        Value::Int(v) => Some(*v),
+        Value::Long(v) => Some(*v as i32),
+        Value::Float(v) => Some(*v as i32),
+        Value::Double(v) => Some(*v as i32),
+        Value::Obj(r) => match get(vm, *r, "value") {
+            Value::Int(v) => Some(v),
+            Value::Long(v) => Some(v as i32),
+            Value::Float(v) => Some(v as i32),
+            Value::Double(v) => Some(v as i32),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+fn anim_number_float(vm: &Engine, value: &Value) -> Option<f32> {
+    match value {
+        Value::Int(v) => Some(*v as f32),
+        Value::Long(v) => Some(*v as f32),
+        Value::Float(v) => Some(*v),
+        Value::Double(v) => Some(*v as f32),
+        Value::Obj(r) => match get(vm, *r, "value") {
+            Value::Int(v) => Some(v as f32),
+            Value::Long(v) => Some(v as f32),
+            Value::Float(v) => Some(v),
+            Value::Double(v) => Some(v as f32),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+fn anim_boxed(vm: &mut Engine, kind: i32, value: &Value) -> Result<Value, VmExit> {
+    match value {
+        Value::Obj(_) | Value::Null => Ok(value.clone()),
+        Value::Int(v) => Ok(Value::Obj(crate::boxes::box_value(
+            vm,
+            "Ljava/lang/Integer;",
+            Value::Int(*v),
+        )?)),
+        Value::Float(v) => Ok(Value::Obj(crate::boxes::box_value(
+            vm,
+            "Ljava/lang/Float;",
+            Value::Float(*v),
+        )?)),
+        Value::Long(v) => Ok(Value::Obj(crate::boxes::box_value(
+            vm,
+            "Ljava/lang/Long;",
+            Value::Long(*v),
+        )?)),
+        Value::Double(v) => Ok(Value::Obj(crate::boxes::box_value(
+            vm,
+            "Ljava/lang/Double;",
+            Value::Double(*v),
+        )?)),
+        _ => {
+            let _ = kind;
+            Ok(Value::Null)
+        }
+    }
+}
+fn anim_internal_from_object(vm: &Engine, kind: i32, value: &Value) -> Result<Value, VmExit> {
+    match kind {
+        ANIM_KIND_INT => anim_number_int(vm, value)
+            .map(Value::Int)
+            .ok_or_else(|| anim_class_cast("value is not an Integer")),
+        ANIM_KIND_FLOAT => anim_number_float(vm, value)
+            .map(Value::Float)
+            .ok_or_else(|| anim_class_cast("value is not a Float")),
+        _ => Ok(value.clone()),
+    }
+}
+fn anim_type_desc(vm: &Engine, value: &Value) -> String {
+    match value {
+        Value::Int(_) => "I".to_string(),
+        Value::Float(_) => "F".to_string(),
+        Value::Long(_) => "J".to_string(),
+        Value::Double(_) => "D".to_string(),
+        Value::Obj(r) => class_of(vm, *r),
+        _ => "Ljava/lang/Object;".to_string(),
+    }
+}
+fn anim_class_value(vm: &mut Engine, desc: &str) -> Result<Value, VmExit> {
+    Ok(Value::Obj(vm.class_object_for(desc)?))
+}
+fn anim_property_name(vm: &mut Engine, property: &Value) -> Option<String> {
+    let Value::Obj(r) = property else {
+        return None;
+    };
+    for field in ["rd_name", "mName", "name"] {
+        if let Some(s) = field_str(vm, *r, field) {
+            return Some(s);
+        }
+    }
+    match vm.invoke_instance(*r, "getName", "()Ljava/lang/String;", &[]) {
+        Ok(v) => opt_str(vm, Some(&v)),
+        Err(_) => None,
+    }
+}
+
+fn anim_new_keyframe(
+    vm: &mut Engine,
+    kind: i32,
+    fraction: f32,
+    value: Value,
+    has_value: bool,
+    value_type: &str,
+) -> Result<ObjRef, VmExit> {
+    let class = match kind {
+        ANIM_KIND_INT => KEYFRAME_INT,
+        ANIM_KIND_FLOAT => KEYFRAME_FLOAT,
+        _ => KEYFRAME_OBJECT,
+    };
+    let r = alloc_obj(vm, class, Vec::new())?;
+    put(vm, r, "rd_kind", Value::Int(kind))?;
+    put(vm, r, "rd_fraction", Value::Float(fraction))?;
+    put(vm, r, "rd_value", value)?;
+    anim_put_bool(vm, r, "rd_has_value", has_value)?;
+    anim_put_bool(vm, r, "rd_value_set_on_start", false)?;
+    put(vm, r, "rd_interpolator", Value::Null)?;
+    let type_name = jstr(vm, value_type)?;
+    put(vm, r, "rd_value_type", type_name)?;
+    Ok(r)
+}
+fn anim_keyframes_from_ints(vm: &mut Engine, values: &[i32]) -> Result<Vec<ObjRef>, VmExit> {
+    let mut out = Vec::new();
+    if values.len() == 1 {
+        out.push(anim_new_keyframe(
+            vm,
+            ANIM_KIND_INT,
+            0.0,
+            Value::Int(0),
+            false,
+            "I",
+        )?);
+        out.push(anim_new_keyframe(
+            vm,
+            ANIM_KIND_INT,
+            1.0,
+            Value::Int(values[0]),
+            true,
+            "I",
+        )?);
+    } else {
+        for (i, v) in values.iter().enumerate() {
+            let fraction = if values.len() <= 1 {
+                0.0
+            } else {
+                i as f32 / (values.len() - 1) as f32
+            };
+            out.push(anim_new_keyframe(
+                vm,
+                ANIM_KIND_INT,
+                fraction,
+                Value::Int(*v),
+                true,
+                "I",
+            )?);
+        }
+    }
+    Ok(out)
+}
+fn anim_keyframes_from_floats(vm: &mut Engine, values: &[f32]) -> Result<Vec<ObjRef>, VmExit> {
+    let mut out = Vec::new();
+    if values.len() == 1 {
+        out.push(anim_new_keyframe(
+            vm,
+            ANIM_KIND_FLOAT,
+            0.0,
+            Value::Float(0.0),
+            false,
+            "F",
+        )?);
+        out.push(anim_new_keyframe(
+            vm,
+            ANIM_KIND_FLOAT,
+            1.0,
+            Value::Float(values[0]),
+            true,
+            "F",
+        )?);
+    } else {
+        for (i, v) in values.iter().enumerate() {
+            let fraction = if values.len() <= 1 {
+                0.0
+            } else {
+                i as f32 / (values.len() - 1) as f32
+            };
+            out.push(anim_new_keyframe(
+                vm,
+                ANIM_KIND_FLOAT,
+                fraction,
+                Value::Float(*v),
+                true,
+                "F",
+            )?);
+        }
+    }
+    Ok(out)
+}
+fn anim_keyframes_from_objects(vm: &mut Engine, values: &[Value]) -> Result<Vec<ObjRef>, VmExit> {
+    let mut out = Vec::new();
+    if values.len() == 1 {
+        let value_type = anim_type_desc(vm, &values[0]);
+        out.push(anim_new_keyframe(
+            vm,
+            ANIM_KIND_OBJECT,
+            0.0,
+            Value::Null,
+            false,
+            "Ljava/lang/Object;",
+        )?);
+        out.push(anim_new_keyframe(
+            vm,
+            ANIM_KIND_OBJECT,
+            1.0,
+            values[0].clone(),
+            !matches!(values[0], Value::Null),
+            &value_type,
+        )?);
+    } else {
+        for (i, v) in values.iter().enumerate() {
+            let fraction = if values.len() <= 1 {
+                0.0
+            } else {
+                i as f32 / (values.len() - 1) as f32
+            };
+            let value_type = anim_type_desc(vm, v);
+            out.push(anim_new_keyframe(
+                vm,
+                ANIM_KIND_OBJECT,
+                fraction,
+                v.clone(),
+                !matches!(v, Value::Null),
+                &value_type,
+            )?);
+        }
+    }
+    Ok(out)
+}
+fn anim_keyframe_kind(vm: &Engine, kf: ObjRef) -> i32 {
+    let kind = field_int(vm, kf, "rd_kind");
+    if kind != 0 {
+        return kind;
+    }
+    match class_of(vm, kf).as_str() {
+        KEYFRAME_INT => ANIM_KIND_INT,
+        KEYFRAME_FLOAT => ANIM_KIND_FLOAT,
+        _ => ANIM_KIND_OBJECT,
+    }
+}
+fn anim_keyframe_internal(vm: &Engine, kf: ObjRef) -> Value {
+    match anim_keyframe_kind(vm, kf) {
+        ANIM_KIND_INT => Value::Int(field_int(vm, kf, "rd_value")),
+        ANIM_KIND_FLOAT => Value::Float(field_float(vm, kf, "rd_value")),
+        _ => get(vm, kf, "rd_value"),
+    }
+}
+fn anim_clone_keyframe(vm: &mut Engine, kf: ObjRef) -> Result<ObjRef, VmExit> {
+    let kind = anim_keyframe_kind(vm, kf);
+    let has = field_bool(vm, kf, "rd_has_value");
+    let value = if has {
+        anim_keyframe_internal(vm, kf)
+    } else {
+        match kind {
+            ANIM_KIND_INT => Value::Int(0),
+            ANIM_KIND_FLOAT => Value::Float(0.0),
+            _ => Value::Null,
+        }
+    };
+    let value_type =
+        field_str(vm, kf, "rd_value_type").unwrap_or_else(|| anim_type_desc(vm, &value));
+    let clone = anim_new_keyframe(
+        vm,
+        kind,
+        field_float(vm, kf, "rd_fraction"),
+        value,
+        has,
+        &value_type,
+    )?;
+    let interpolator = get(vm, kf, "rd_interpolator");
+    put(vm, clone, "rd_interpolator", interpolator)?;
+    anim_put_bool(
+        vm,
+        clone,
+        "rd_value_set_on_start",
+        field_bool(vm, kf, "rd_value_set_on_start"),
+    )?;
+    Ok(clone)
+}
+fn anim_set_keyframe_internal(
+    vm: &mut Engine,
+    kf: ObjRef,
+    value: &Value,
+    mark_set_on_start: bool,
+) -> Result<(), VmExit> {
+    let kind = anim_keyframe_kind(vm, kf);
+    let internal = anim_internal_from_object(vm, kind, value)?;
+    put(vm, kf, "rd_value", internal)?;
+    let has = kind == ANIM_KIND_OBJECT && matches!(value, Value::Null);
+    anim_put_bool(vm, kf, "rd_has_value", !has)?;
+    if mark_set_on_start {
+        anim_put_bool(vm, kf, "rd_value_set_on_start", true)?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)] // one argument per persisted holder field
+fn anim_new_pvh(
+    vm: &mut Engine,
+    property_name: Option<String>,
+    property: Value,
+    kind: i32,
+    keyframes: Vec<ObjRef>,
+    evaluator: Value,
+    converter: Value,
+    value_type: &str,
+    generic_keyframes: bool,
+) -> Result<ObjRef, VmExit> {
+    let r = alloc_obj(vm, PROPERTY_VALUES_HOLDER, Vec::new())?;
+    put_opt_str(vm, r, "rd_property_name", property_name)?;
+    put(vm, r, "rd_property", property)?;
+    put(vm, r, "rd_kind", Value::Int(kind))?;
+    put(vm, r, "rd_evaluator", evaluator)?;
+    put(vm, r, "rd_converter", converter)?;
+    let type_name = jstr(vm, value_type)?;
+    put(vm, r, "rd_value_type", type_name)?;
+    anim_put_bool(vm, r, "rd_generic_keyframes", generic_keyframes)?;
+    let animated = match kind {
+        ANIM_KIND_INT => Value::Int(0),
+        ANIM_KIND_FLOAT => Value::Float(0.0),
+        _ => Value::Null,
+    };
+    put(vm, r, "rd_animated", animated)?;
+    let items = keyframes.into_iter().map(Value::Obj).collect();
+    anim_set_list_items(vm, r, "rd_keyframes", items)?;
+    Ok(r)
+}
+fn anim_pvh_keyframes(vm: &Engine, holder: ObjRef) -> Vec<ObjRef> {
+    anim_list_items(vm, holder, "rd_keyframes")
+        .iter()
+        .filter_map(|v| obj(Some(v)))
+        .collect()
+}
+fn anim_pvh_replace_keyframes(
+    vm: &mut Engine,
+    holder: ObjRef,
+    kind: i32,
+    keyframes: Vec<ObjRef>,
+    value_type: &str,
+    generic_keyframes: bool,
+) -> Result<(), VmExit> {
+    put(vm, holder, "rd_kind", Value::Int(kind))?;
+    let type_name = jstr(vm, value_type)?;
+    put(vm, holder, "rd_value_type", type_name)?;
+    anim_put_bool(vm, holder, "rd_generic_keyframes", generic_keyframes)?;
+    let items = keyframes.into_iter().map(Value::Obj).collect();
+    anim_set_list_items(vm, holder, "rd_keyframes", items)
+}
+fn anim_pvh_set_int_values(vm: &mut Engine, holder: ObjRef, values: &[i32]) -> Result<(), VmExit> {
+    let keyframes = anim_keyframes_from_ints(vm, values)?;
+    anim_pvh_replace_keyframes(vm, holder, ANIM_KIND_INT, keyframes, "I", false)
+}
+fn anim_pvh_set_float_values(
+    vm: &mut Engine,
+    holder: ObjRef,
+    values: &[f32],
+) -> Result<(), VmExit> {
+    let keyframes = anim_keyframes_from_floats(vm, values)?;
+    anim_pvh_replace_keyframes(vm, holder, ANIM_KIND_FLOAT, keyframes, "F", false)
+}
+fn anim_pvh_set_object_values(
+    vm: &mut Engine,
+    holder: ObjRef,
+    values: &[Value],
+) -> Result<(), VmExit> {
+    let first = values.first().ok_or_else(|| oob("0"))?;
+    if matches!(first, Value::Null) {
+        return Err(npe("values[0]"));
+    }
+    let value_type = anim_type_desc(vm, first);
+    let keyframes = anim_keyframes_from_objects(vm, values)?;
+    anim_pvh_replace_keyframes(vm, holder, ANIM_KIND_OBJECT, keyframes, &value_type, false)
+}
+fn anim_pvh_kind_from_keyframes(vm: &Engine, keyframes: &[ObjRef]) -> i32 {
+    let mut has_int = false;
+    let mut has_float = false;
+    let mut has_object = false;
+    for kf in keyframes {
+        match anim_keyframe_kind(vm, *kf) {
+            ANIM_KIND_INT => has_int = true,
+            ANIM_KIND_FLOAT => has_float = true,
+            _ => has_object = true,
+        }
+    }
+    if has_int && !has_float && !has_object {
+        ANIM_KIND_INT
+    } else if has_float && !has_int && !has_object {
+        ANIM_KIND_FLOAT
+    } else {
+        ANIM_KIND_OBJECT
+    }
+}
+fn anim_clone_pvh(vm: &mut Engine, holder: ObjRef) -> Result<ObjRef, VmExit> {
+    let mut keyframes = Vec::new();
+    for kf in anim_pvh_keyframes(vm, holder) {
+        keyframes.push(anim_clone_keyframe(vm, kf)?);
+    }
+    let clone = anim_new_pvh(
+        vm,
+        field_str(vm, holder, "rd_property_name"),
+        get(vm, holder, "rd_property"),
+        field_int(vm, holder, "rd_kind"),
+        keyframes,
+        get(vm, holder, "rd_evaluator"),
+        get(vm, holder, "rd_converter"),
+        &field_str(vm, holder, "rd_value_type").unwrap_or_else(|| "Ljava/lang/Object;".to_string()),
+        field_bool(vm, holder, "rd_generic_keyframes"),
+    )?;
+    let animated = get(vm, holder, "rd_animated");
+    put(vm, clone, "rd_animated", animated)?;
+    Ok(clone)
+}
+fn anim_pvh_animated_value(vm: &mut Engine, holder: ObjRef) -> Result<Value, VmExit> {
+    let kind = field_int(vm, holder, "rd_kind");
+    let value = get(vm, holder, "rd_animated");
+    anim_boxed(vm, kind, &value)
+}
+fn anim_int_lerp(fraction: f32, start: i32, end: i32) -> i32 {
+    start.wrapping_add((fraction * end.wrapping_sub(start) as f32) as i32)
+}
+fn anim_float_lerp(fraction: f32, start: f32, end: f32) -> f32 {
+    start + fraction * (end - start)
+}
+fn anim_java_round(value: f32) -> i32 {
+    if value.is_nan() {
+        0
+    } else if value >= i32::MAX as f32 {
+        i32::MAX
+    } else if value <= i32::MIN as f32 {
+        i32::MIN
+    } else {
+        (value + 0.5).floor() as i32
+    }
+}
+fn anim_argb_evaluate(fraction: f32, start: i32, end: i32) -> i32 {
+    let channel = |v: i32, shift: u32| ((v >> shift) & 0xff) as f32 / 255.0;
+    let start_a = channel(start, 24);
+    let end_a = channel(end, 24);
+    let start_r = channel(start, 16).powf(2.2);
+    let start_g = channel(start, 8).powf(2.2);
+    let start_b = channel(start, 0).powf(2.2);
+    let end_r = channel(end, 16).powf(2.2);
+    let end_g = channel(end, 8).powf(2.2);
+    let end_b = channel(end, 0).powf(2.2);
+    let a = anim_float_lerp(fraction, start_a, end_a) * 255.0;
+    let r = anim_float_lerp(fraction, start_r, end_r).powf(1.0 / 2.2) * 255.0;
+    let g = anim_float_lerp(fraction, start_g, end_g).powf(1.0 / 2.2) * 255.0;
+    let b = anim_float_lerp(fraction, start_b, end_b).powf(1.0 / 2.2) * 255.0;
+    (((anim_java_round(a) as u32) << 24)
+        | ((anim_java_round(r) as u32) << 16)
+        | ((anim_java_round(g) as u32) << 8)
+        | (anim_java_round(b) as u32)) as i32
+}
+fn anim_evaluate_interval(
+    vm: &mut Engine,
+    holder: ObjRef,
+    fraction: f32,
+    start: &Value,
+    end: &Value,
+) -> Result<Value, VmExit> {
+    let kind = field_int(vm, holder, "rd_kind");
+    let evaluator = get(vm, holder, "rd_evaluator");
+    if let Value::Obj(evaluator_ref) = evaluator {
+        let evaluator_class = class_of(vm, evaluator_ref);
+        let result = match evaluator_class.as_str() {
+            INT_EVALUATOR => {
+                let s = anim_number_int(vm, start)
+                    .ok_or_else(|| anim_class_cast("startValue is not an Integer"))?;
+                let e = anim_number_int(vm, end)
+                    .ok_or_else(|| anim_class_cast("endValue is not an Integer"))?;
+                Value::Int(anim_int_lerp(fraction, s, e))
+            }
+            FLOAT_EVALUATOR => {
+                let s = anim_number_float(vm, start)
+                    .ok_or_else(|| anim_class_cast("startValue is not a Number"))?;
+                let e = anim_number_float(vm, end)
+                    .ok_or_else(|| anim_class_cast("endValue is not a Number"))?;
+                Value::Float(anim_float_lerp(fraction, s, e))
+            }
+            ARGB_EVALUATOR => {
+                let s = anim_number_int(vm, start)
+                    .ok_or_else(|| anim_class_cast("startValue is not an Integer"))?;
+                let e = anim_number_int(vm, end)
+                    .ok_or_else(|| anim_class_cast("endValue is not an Integer"))?;
+                Value::Int(anim_argb_evaluate(fraction, s, e))
+            }
+            _ => {
+                let start_boxed = anim_boxed(vm, kind, start)?;
+                let end_boxed = anim_boxed(vm, kind, end)?;
+                let evaluated = vm.invoke_instance(
+                    evaluator_ref,
+                    "evaluate",
+                    "(FLjava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+                    &[Value::Float(fraction), start_boxed, end_boxed],
+                )?;
+                return anim_internal_from_object(vm, kind, &evaluated)
+                    .or_else(|_| anim_boxed(vm, kind, &evaluated));
+            }
+        };
+        return anim_internal_from_object(vm, kind, &result)
+            .or_else(|_| anim_boxed(vm, kind, &result));
+    }
+    match kind {
+        ANIM_KIND_INT => {
+            let s = anim_number_int(vm, start).unwrap_or(0);
+            let e = anim_number_int(vm, end).unwrap_or(0);
+            Ok(Value::Int(anim_int_lerp(fraction, s, e)))
+        }
+        ANIM_KIND_FLOAT => {
+            let s = anim_number_float(vm, start).unwrap_or(0.0);
+            let e = anim_number_float(vm, end).unwrap_or(0.0);
+            Ok(Value::Float(anim_float_lerp(fraction, s, e)))
+        }
+        _ => {
+            // PropertyValuesHolder.init() supplies Int/Float evaluators for
+            // Integer/Float object values. Other object types without an
+            // evaluator dereference a null evaluator in AOSP.
+            let start_class = anim_type_desc(vm, start);
+            let end_class = anim_type_desc(vm, end);
+            if start_class == "Ljava/lang/Integer;" && end_class == "Ljava/lang/Integer;" {
+                let s = anim_number_int(vm, start).unwrap_or(0);
+                let e = anim_number_int(vm, end).unwrap_or(0);
+                anim_boxed(
+                    vm,
+                    ANIM_KIND_INT,
+                    &Value::Int(anim_int_lerp(fraction, s, e)),
+                )
+            } else if matches!(
+                start_class.as_str(),
+                "Ljava/lang/Float;" | "Ljava/lang/Double;"
+            ) && matches!(
+                end_class.as_str(),
+                "Ljava/lang/Float;" | "Ljava/lang/Double;"
+            ) {
+                let s = anim_number_float(vm, start).unwrap_or(0.0);
+                let e = anim_number_float(vm, end).unwrap_or(0.0);
+                anim_boxed(
+                    vm,
+                    ANIM_KIND_FLOAT,
+                    &Value::Float(anim_float_lerp(fraction, s, e)),
+                )
+            } else {
+                Err(npe("mEvaluator"))
+            }
+        }
+    }
+}
+fn anim_pvh_calculate(vm: &mut Engine, holder: ObjRef, fraction: f32) -> Result<Value, VmExit> {
+    let keyframes = anim_pvh_keyframes(vm, holder);
+    if keyframes.is_empty() {
+        return Ok(Value::Null);
+    }
+    let mut data = Vec::with_capacity(keyframes.len());
+    for kf in keyframes {
+        data.push((
+            field_float(vm, kf, "rd_fraction"),
+            anim_keyframe_internal(vm, kf),
+            get(vm, kf, "rd_interpolator"),
+        ));
+    }
+    let result = if data.len() == 1 {
+        data[0].1.clone()
+    } else if field_bool(vm, holder, "rd_generic_keyframes") && data.len() == 2 {
+        let f = anim_apply_interpolator(vm, &data[1].2, fraction)?;
+        anim_evaluate_interval(vm, holder, f, &data[0].1, &data[1].1)?
+    } else {
+        let (prev_idx, next_idx, whole_fraction) = if fraction <= 0.0 {
+            (0, 1, true)
+        } else if fraction >= 1.0 {
+            (data.len() - 2, data.len() - 1, true)
+        } else {
+            let mut found = None;
+            for (i, keyframe) in data.iter().enumerate().skip(1) {
+                if fraction < keyframe.0 {
+                    found = Some((i - 1, i, false));
+                    break;
+                }
+            }
+            match found {
+                Some(v) => v,
+                None => {
+                    let last = data.last().map(|d| d.1.clone()).unwrap_or(Value::Null);
+                    put(vm, holder, "rd_animated", last.clone())?;
+                    return Ok(last);
+                }
+            }
+        };
+        let f = if whole_fraction {
+            anim_apply_interpolator(vm, &data[next_idx].2, fraction)?
+        } else {
+            fraction
+        };
+        let mut interval = (f - data[prev_idx].0) / (data[next_idx].0 - data[prev_idx].0);
+        if !whole_fraction {
+            interval = anim_apply_interpolator(vm, &data[next_idx].2, interval)?;
+        }
+        anim_evaluate_interval(vm, holder, interval, &data[prev_idx].1, &data[next_idx].1)?
+    };
+    let kind = field_int(vm, holder, "rd_kind");
+    let converter = get(vm, holder, "rd_converter");
+    let result = if kind == ANIM_KIND_OBJECT {
+        if let Value::Obj(converter_ref) = converter {
+            let input = anim_boxed(vm, kind, &result)?;
+            vm.invoke_instance(
+                converter_ref,
+                "convert",
+                "(Ljava/lang/Object;)Ljava/lang/Object;",
+                &[input],
+            )?
+        } else {
+            result
+        }
+    } else {
+        result
+    };
+    put(vm, holder, "rd_animated", result.clone())?;
+    Ok(result)
+}
+
+fn anim_apply_interpolator(
+    vm: &mut Engine,
+    interpolator: &Value,
+    fraction: f32,
+) -> Result<f32, VmExit> {
+    let Value::Obj(r) = interpolator else {
+        return Ok(fraction);
+    };
+    let value = vm.invoke_instance(*r, "getInterpolation", "(F)F", &[Value::Float(fraction)])?;
+    value.as_float().map_err(VmExit::from)
+}
+fn anim_global_duration_scale(vm: &Engine) -> f32 {
+    match vm
+        .statics
+        .get(&(VALUE_ANIMATOR.to_string(), "rd_duration_scale".to_string()))
+    {
+        Some(Value::Float(v)) => *v,
+        _ => 1.0,
+    }
+}
+fn anim_set_global_duration_scale(vm: &mut Engine, scale: f32) {
+    vm.statics.insert(
+        (VALUE_ANIMATOR.to_string(), "rd_duration_scale".to_string()),
+        Value::Float(scale),
+    );
+}
+fn anim_frame_delay(vm: &Engine) -> i64 {
+    match vm
+        .statics
+        .get(&(VALUE_ANIMATOR.to_string(), "rd_frame_delay".to_string()))
+    {
+        Some(Value::Long(v)) => *v,
+        _ => 10,
+    }
+}
+fn anim_set_frame_delay(vm: &mut Engine, delay: i64) {
+    vm.statics.insert(
+        (VALUE_ANIMATOR.to_string(), "rd_frame_delay".to_string()),
+        Value::Long(delay),
+    );
+}
+fn anim_handler_instance(vm: &mut Engine) -> Result<ObjRef, VmExit> {
+    if let Some(handler) = vm.frames.animation_handler {
+        return Ok(handler);
+    }
+    let handler = alloc_obj(vm, ANIMATION_HANDLER, Vec::new())?;
+    vm.frames.animation_handler = Some(handler);
+    Ok(handler)
+}
+fn anim_ensure_handler_posted(vm: &mut Engine) -> Result<(), VmExit> {
+    let handler = anim_handler_instance(vm)?;
+    if !vm
+        .frames
+        .callbacks
+        .iter()
+        .any(|(callback, _)| *callback == handler)
+    {
+        let now = vm.fw.clock();
+        vm.frames.callbacks.push((handler, now));
+    }
+    Ok(())
+}
+fn anim_register_callback(vm: &mut Engine, callback: ObjRef, delay: i64) -> Result<(), VmExit> {
+    let due = if delay > 0 {
+        Some(vm.fw.clock().saturating_add(delay as u64))
+    } else {
+        None
+    };
+    if let Some(entry) = vm
+        .frames
+        .animation_callbacks
+        .iter_mut()
+        .find(|(callback_ref, _)| *callback_ref == callback)
+    {
+        if due.is_some() {
+            entry.1 = due;
+        }
+    } else {
+        vm.frames.animation_callbacks.push((callback, due));
+    }
+    anim_ensure_handler_posted(vm)
+}
+fn anim_unregister_callback(vm: &mut Engine, callback: ObjRef) {
+    vm.frames
+        .animation_callbacks
+        .retain(|(callback_ref, _)| *callback_ref != callback);
+}
+fn anim_handler_process(vm: &mut Engine, frame_time_ms: i64) -> Result<(), VmExit> {
+    let snapshot = vm.frames.animation_callbacks.clone();
+    for (callback, due) in snapshot {
+        if !vm
+            .frames
+            .animation_callbacks
+            .iter()
+            .any(|(callback_ref, _)| *callback_ref == callback)
+        {
+            continue;
+        }
+        if let Some(due_ms) = due {
+            if due_ms < frame_time_ms.max(0) as u64 {
+                if let Some(entry) = vm
+                    .frames
+                    .animation_callbacks
+                    .iter_mut()
+                    .find(|(callback_ref, _)| *callback_ref == callback)
+                {
+                    entry.1 = None;
+                }
+            } else {
+                continue;
+            }
+        }
+        let callback_class = class_of(vm, callback);
+        if vm.cp.is_subtype(&callback_class, VALUE_ANIMATOR) {
+            // ValueAnimator.doAnimationFrame is final. Calling the host
+            // state machine directly also works for DEX subclasses, whose
+            // runtime class is not itself a platform stub class.
+            anim_do_animation_frame(vm, callback, frame_time_ms)?;
+        } else {
+            vm.invoke_instance(
+                callback,
+                "doAnimationFrame",
+                "(J)Z",
+                &[Value::Long(frame_time_ms)],
+            )?;
+        }
+    }
+    if !vm.frames.animation_callbacks.is_empty() {
+        anim_ensure_handler_posted(vm)?;
+    }
+    Ok(())
+}
+
+fn anim_record_listener(
+    vm: &mut Engine,
+    listener: ObjRef,
+    method: &str,
+    animator: ObjRef,
+    reverse: Option<bool>,
+) -> Result<(), VmExit> {
+    let (count_field, reverse_field) = match method {
+        "onAnimationStart" => ("rd_on_start_count", Some("rd_last_start_reverse")),
+        "onAnimationEnd" => ("rd_on_end_count", Some("rd_last_end_reverse")),
+        "onAnimationCancel" => ("rd_on_cancel_count", None),
+        "onAnimationRepeat" => ("rd_on_repeat_count", None),
+        "onAnimationPause" => ("rd_on_pause_count", None),
+        "onAnimationResume" => ("rd_on_resume_count", None),
+        "onAnimationUpdate" => ("rd_on_update_count", None),
+        "onChanged" => ("rd_on_changed_count", None),
+        _ => return Ok(()),
+    };
+    let count = field_int(vm, listener, count_field).wrapping_add(1);
+    put(vm, listener, count_field, Value::Int(count))?;
+    put(vm, listener, "rd_last_animation", Value::Obj(animator))?;
+    if let (Some(field), Some(is_reverse)) = (reverse_field, reverse) {
+        anim_put_bool(vm, listener, field, is_reverse)?;
+    }
+    Ok(())
+}
+fn anim_invoke_lifecycle_listener(
+    vm: &mut Engine,
+    listener: ObjRef,
+    method: &str,
+    animator: ObjRef,
+    reverse: Option<bool>,
+) -> Result<(), VmExit> {
+    let class = class_of(vm, listener);
+    if matches!(
+        class.as_str(),
+        ANIMATOR_LISTENER | ANIMATOR_PAUSE_LISTENER | ANIMATOR_LISTENER_ADAPTER
+    ) {
+        return anim_record_listener(vm, listener, method, animator, reverse);
+    }
+    if let Some(is_reverse) = reverse {
+        if vm
+            .cp
+            .resolve_method(&class, method, "(Landroid/animation/Animator;Z)V")
+            .is_some()
+        {
+            vm.invoke_instance(
+                listener,
+                method,
+                "(Landroid/animation/Animator;Z)V",
+                &[Value::Obj(animator), bool_value(is_reverse)],
+            )?;
+            return Ok(());
+        }
+    }
+    match vm.invoke_instance(
+        listener,
+        method,
+        "(Landroid/animation/Animator;)V",
+        &[Value::Obj(animator)],
+    ) {
+        Ok(_) => Ok(()),
+        Err(VmExit::Error(error))
+            if error.code == "NOT_FOUND" && vm.cp.is_subtype(&class, ANIMATOR_LISTENER_ADAPTER) =>
+        {
+            Ok(())
+        }
+        Err(error) => Err(error),
+    }
+}
+fn anim_notify_listener_field(
+    vm: &mut Engine,
+    animator: ObjRef,
+    field: &str,
+    method: &str,
+    reverse: Option<bool>,
+) -> Result<(), VmExit> {
+    let listeners = anim_list_items(vm, animator, field);
+    for listener in listeners.iter().filter_map(|value| obj(Some(value))) {
+        anim_invoke_lifecycle_listener(vm, listener, method, animator, reverse)?;
+    }
+    Ok(())
+}
+fn anim_notify_start_listeners(
+    vm: &mut Engine,
+    animator: ObjRef,
+    reverse: bool,
+) -> Result<(), VmExit> {
+    let was_called = field_bool(vm, animator, "rd_start_listeners_called");
+    anim_put_bool(vm, animator, "rd_start_listeners_called", true)?;
+    if !was_called && field_obj(vm, animator, "rd_listeners").is_some() {
+        anim_notify_listener_field(
+            vm,
+            animator,
+            "rd_listeners",
+            "onAnimationStart",
+            Some(reverse),
+        )?;
+    }
+    Ok(())
+}
+fn anim_notify_end_listeners(
+    vm: &mut Engine,
+    animator: ObjRef,
+    reverse: bool,
+) -> Result<(), VmExit> {
+    let was_called = field_bool(vm, animator, "rd_start_listeners_called");
+    anim_put_bool(vm, animator, "rd_start_listeners_called", false)?;
+    if was_called && field_obj(vm, animator, "rd_listeners").is_some() {
+        anim_notify_listener_field(
+            vm,
+            animator,
+            "rd_listeners",
+            "onAnimationEnd",
+            Some(reverse),
+        )?;
+    }
+    Ok(())
+}
+fn anim_notify_update_listeners(vm: &mut Engine, animator: ObjRef) -> Result<(), VmExit> {
+    let listeners = anim_list_items(vm, animator, "rd_update_listeners");
+    for listener in listeners.iter().filter_map(|value| obj(Some(value))) {
+        if class_of(vm, listener) == ANIMATOR_UPDATE_LISTENER {
+            anim_record_listener(vm, listener, "onAnimationUpdate", animator, None)?;
+        } else {
+            vm.invoke_instance(
+                listener,
+                "onAnimationUpdate",
+                "(Landroid/animation/ValueAnimator;)V",
+                &[Value::Obj(animator)],
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn anim_long_or(vm: &Engine, r: ObjRef, field: &str, default: i64) -> i64 {
+    match get(vm, r, field) {
+        Value::Long(v) => v,
+        Value::Int(v) => v as i64,
+        _ => default,
+    }
+}
+fn anim_float_or(vm: &Engine, r: ObjRef, field: &str, default: f32) -> f32 {
+    match get(vm, r, field) {
+        Value::Float(v) => v,
+        Value::Double(v) => v as f32,
+        _ => default,
+    }
+}
+fn anim_duration(vm: &Engine, r: ObjRef) -> i64 {
+    anim_long_or(vm, r, "rd_duration", 300)
+}
+fn anim_resolve_duration_scale(vm: &Engine, r: ObjRef) -> f32 {
+    let override_scale = anim_float_or(vm, r, "rd_duration_scale", -1.0);
+    if override_scale >= 0.0 {
+        override_scale
+    } else {
+        anim_global_duration_scale(vm)
+    }
+}
+fn anim_scaled_duration(vm: &Engine, r: ObjRef) -> i64 {
+    (anim_duration(vm, r) as f32 * anim_resolve_duration_scale(vm, r)) as i64
+}
+fn anim_values(vm: &Engine, r: ObjRef) -> Vec<ObjRef> {
+    collection_items(vm, Some(&get(vm, r, "rd_values")))
+        .iter()
+        .filter_map(|value| obj(Some(value)))
+        .collect()
+}
+fn anim_set_values(vm: &mut Engine, animator: ObjRef, holders: Vec<ObjRef>) -> Result<(), VmExit> {
+    let values = holders.into_iter().map(Value::Obj).collect();
+    let array = obj_array(vm, "[Landroid/animation/PropertyValuesHolder;", values)?;
+    put(vm, animator, "rd_values", array)?;
+    anim_put_bool(vm, animator, "rd_initialized", false)
+}
+fn anim_init_animator(vm: &mut Engine, r: ObjRef) -> Result<(), VmExit> {
+    let interpolator = alloc_obj(
+        vm,
+        "Landroid/view/animation/AccelerateDecelerateInterpolator;",
+        Vec::new(),
+    )?;
+    put(vm, r, "rd_duration", Value::Long(300))?;
+    put(vm, r, "rd_start_delay", Value::Long(0))?;
+    put(vm, r, "rd_repeat_count", Value::Int(0))?;
+    put(vm, r, "rd_repeat_mode", Value::Int(1))?;
+    put(vm, r, "rd_duration_scale", Value::Float(-1.0))?;
+    put(vm, r, "rd_interpolator", Value::Obj(interpolator))?;
+    put(vm, r, "rd_values", Value::Null)?;
+    put(vm, r, "rd_listeners", Value::Null)?;
+    put(vm, r, "rd_pause_listeners", Value::Null)?;
+    put(vm, r, "rd_update_listeners", Value::Null)?;
+    put(vm, r, "rd_changing_configurations", Value::Int(0))?;
+    put(vm, r, "rd_seek_fraction", Value::Float(-1.0))?;
+    put(vm, r, "rd_overall_fraction", Value::Float(0.0))?;
+    put(vm, r, "rd_current_fraction", Value::Float(0.0))?;
+    put(vm, r, "rd_start_time", Value::Long(-1))?;
+    put(vm, r, "rd_last_frame_time", Value::Long(-1))?;
+    put(vm, r, "rd_first_frame_time", Value::Long(-1))?;
+    put(vm, r, "rd_pause_time", Value::Long(-1))?;
+    anim_put_bool(vm, r, "rd_started", false)?;
+    anim_put_bool(vm, r, "rd_running", false)?;
+    anim_put_bool(vm, r, "rd_paused", false)?;
+    anim_put_bool(vm, r, "rd_resumed", false)?;
+    anim_put_bool(vm, r, "rd_reversing", false)?;
+    anim_put_bool(vm, r, "rd_initialized", false)?;
+    anim_put_bool(vm, r, "rd_start_listeners_called", false)?;
+    anim_put_bool(vm, r, "rd_animation_end_requested", false)?;
+    anim_put_bool(vm, r, "rd_start_time_committed", false)?;
+    anim_put_bool(vm, r, "rd_self_pulse", true)?;
+    anim_put_bool(vm, r, "rd_suppress_self_pulse", false)?;
+    put(vm, r, "rd_target", Value::Null)?;
+    put(vm, r, "rd_property_name", Value::Null)?;
+    put(vm, r, "rd_property", Value::Null)?;
+    anim_put_bool(vm, r, "rd_auto_cancel", false)
+}
+fn anim_is_object_animator(vm: &Engine, r: ObjRef) -> bool {
+    let class = class_of(vm, r);
+    class == OBJECT_ANIMATOR || vm.cp.is_subtype(&class, OBJECT_ANIMATOR)
+}
+fn anim_method_name(prefix: &str, property_name: &str) -> Option<String> {
+    let mut chars = property_name.chars();
+    let first = chars.next()?;
+    let mut out = prefix.to_string();
+    out.extend(first.to_uppercase());
+    out.push_str(chars.as_str());
+    Some(out)
+}
+fn anim_property_get(
+    vm: &mut Engine,
+    property: ObjRef,
+    target: ObjRef,
+    kind: i32,
+) -> Result<Value, VmExit> {
+    let _ = kind;
+    // IntProperty/FloatProperty optimize only the setter; their getter is
+    // still Property.get(T) returning Integer/Float.
+    vm.invoke_instance(
+        property,
+        "get",
+        "(Ljava/lang/Object;)Ljava/lang/Object;",
+        &[Value::Obj(target)],
+    )
+}
+
+fn anim_convert_back(vm: &mut Engine, holder: ObjRef, value: Value) -> Result<Value, VmExit> {
+    let converter = get(vm, holder, "rd_converter");
+    let Value::Obj(converter_ref) = converter else {
+        return Ok(value);
+    };
+    let kind = field_int(vm, holder, "rd_kind");
+    let boxed = anim_boxed(vm, kind, &value)?;
+    match vm.invoke_instance(
+        converter_ref,
+        "convertBack",
+        "(Ljava/lang/Object;)Ljava/lang/Object;",
+        &[boxed],
+    ) {
+        Ok(value) => Ok(value),
+        Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => {
+            let class = class_of(vm, converter_ref)
+                .trim_start_matches('L')
+                .trim_end_matches(';')
+                .replace('/', ".");
+            Err(iae(format!(
+                "Converter {class} must be a BidirectionalTypeConverter"
+            )))
+        }
+        Err(error) => Err(error),
+    }
+}
+fn anim_target_getter_value(
+    vm: &mut Engine,
+    holder: ObjRef,
+    target: ObjRef,
+) -> Result<Option<Value>, VmExit> {
+    let Some(property_name) = field_str(vm, holder, "rd_property_name") else {
+        return Ok(None);
+    };
+    let Some(method) = anim_method_name("get", &property_name) else {
+        return Ok(None);
+    };
+    let kind = field_int(vm, holder, "rd_kind");
+    let value_type =
+        field_str(vm, holder, "rd_value_type").unwrap_or_else(|| "Ljava/lang/Object;".to_string());
+    let mut signatures: Vec<String> = match kind {
+        ANIM_KIND_INT => vec!["()I".to_string(), "()Ljava/lang/Integer;".to_string()],
+        ANIM_KIND_FLOAT => vec!["()F".to_string(), "()Ljava/lang/Float;".to_string()],
+        _ => {
+            let mut values = Vec::new();
+            if value_type.starts_with('L') || value_type.starts_with('[') {
+                values.push(format!("(){value_type}"));
+            }
+            values.push("()Ljava/lang/Object;".to_string());
+            values.push("()Ljava/lang/Integer;".to_string());
+            values.push("()Ljava/lang/Float;".to_string());
+            values.push("()I".to_string());
+            values.push("()F".to_string());
+            values
+        }
+    };
+    signatures.dedup();
+    for sig in signatures {
+        match vm.invoke_instance(target, &method, &sig, &[]) {
+            Ok(value) => return Ok(Some(value)),
+            Err(VmExit::Exception(_)) => return Ok(None),
+            Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(None)
+}
+fn anim_pvh_setup_value(
+    vm: &mut Engine,
+    holder: ObjRef,
+    target: ObjRef,
+    keyframe: ObjRef,
+    mark_set_on_start: bool,
+) -> Result<(), VmExit> {
+    let kind = field_int(vm, holder, "rd_kind");
+    let property = get(vm, holder, "rd_property");
+    let value = if let Value::Obj(property_ref) = property {
+        match anim_property_get(vm, property_ref, target, kind) {
+            Ok(value) => Some(value),
+            Err(VmExit::Exception(_)) => None,
+            Err(error) => return Err(error),
+        }
+    } else {
+        anim_target_getter_value(vm, holder, target)?
+    };
+    if let Some(value) = value {
+        let value = anim_convert_back(vm, holder, value)?;
+        anim_set_keyframe_internal(vm, keyframe, &value, mark_set_on_start)?;
+    }
+    Ok(())
+}
+fn anim_pvh_setup_setter_and_getter(
+    vm: &mut Engine,
+    holder: ObjRef,
+    target: ObjRef,
+) -> Result<(), VmExit> {
+    for keyframe in anim_pvh_keyframes(vm, holder) {
+        if !field_bool(vm, keyframe, "rd_has_value")
+            || field_bool(vm, keyframe, "rd_value_set_on_start")
+        {
+            anim_pvh_setup_value(vm, holder, target, keyframe, true)?;
+        }
+    }
+    Ok(())
+}
+fn anim_try_setter_candidates(
+    vm: &mut Engine,
+    target: ObjRef,
+    method: &str,
+    candidates: Vec<(String, Value)>,
+) -> Result<bool, VmExit> {
+    for (sig, value) in candidates {
+        match vm.invoke_instance(target, method, &sig, &[value]) {
+            Ok(_) => return Ok(true),
+            // Reflection invokes a resolved setter and logs an exception
+            // thrown by it; it does not make the animation frame fail.
+            Err(VmExit::Exception(_)) => return Ok(true),
+            Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(false)
+}
+fn anim_pvh_apply(vm: &mut Engine, holder: ObjRef, target: ObjRef) -> Result<(), VmExit> {
+    let kind = field_int(vm, holder, "rd_kind");
+    let animated = get(vm, holder, "rd_animated");
+    let property = get(vm, holder, "rd_property");
+    if let Value::Obj(property_ref) = property {
+        let class = class_of(vm, property_ref);
+        if kind == ANIM_KIND_INT && vm.cp.is_subtype(&class, ANDROID_INT_PROPERTY) {
+            if let Some(value) = anim_number_int(vm, &animated) {
+                match vm.invoke_instance(
+                    property_ref,
+                    "setValue",
+                    "(Ljava/lang/Object;I)V",
+                    &[Value::Obj(target), Value::Int(value)],
+                ) {
+                    Ok(_) => return Ok(()),
+                    Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => {}
+                    Err(error) => return Err(error),
+                }
+            }
+        }
+        if kind == ANIM_KIND_FLOAT && vm.cp.is_subtype(&class, ANDROID_FLOAT_PROPERTY) {
+            if let Some(value) = anim_number_float(vm, &animated) {
+                match vm.invoke_instance(
+                    property_ref,
+                    "setValue",
+                    "(Ljava/lang/Object;F)V",
+                    &[Value::Obj(target), Value::Float(value)],
+                ) {
+                    Ok(_) => return Ok(()),
+                    Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => {}
+                    Err(error) => return Err(error),
+                }
+            }
+        }
+        let boxed = anim_boxed(vm, kind, &animated)?;
+        vm.invoke_instance(
+            property_ref,
+            "set",
+            "(Ljava/lang/Object;Ljava/lang/Object;)V",
+            &[Value::Obj(target), boxed],
+        )?;
+        return Ok(());
+    }
+    let Some(property_name) = field_str(vm, holder, "rd_property_name") else {
+        return Ok(());
+    };
+    let Some(method) = anim_method_name("set", &property_name) else {
+        return Ok(());
+    };
+    let mut candidates: Vec<(String, Value)> = Vec::new();
+    match kind {
+        ANIM_KIND_INT => {
+            if let Some(value) = anim_number_int(vm, &animated) {
+                candidates.push(("(I)V".to_string(), Value::Int(value)));
+            }
+        }
+        ANIM_KIND_FLOAT => {
+            if let Some(value) = anim_number_float(vm, &animated) {
+                candidates.push(("(F)V".to_string(), Value::Float(value)));
+            }
+        }
+        _ => {
+            let boxed = anim_boxed(vm, kind, &animated)?;
+            let actual_type = anim_type_desc(vm, &boxed);
+            if actual_type.starts_with('L') || actual_type.starts_with('[') {
+                candidates.push((format!("({actual_type})V"), boxed.clone()));
+            }
+            if let Some(value) = anim_number_int(vm, &animated) {
+                candidates.push(("(I)V".to_string(), Value::Int(value)));
+            }
+            if let Some(value) = anim_number_float(vm, &animated) {
+                candidates.push(("(F)V".to_string(), Value::Float(value)));
+                candidates.push(("(D)V".to_string(), Value::Double(value as f64)));
+            }
+            candidates.push(("(Ljava/lang/Object;)V".to_string(), boxed));
+        }
+    }
+    candidates.dedup_by(|a, b| a.0 == b.0);
+    anim_try_setter_candidates(vm, target, &method, candidates)?;
+    Ok(())
+}
+
+fn anim_init_animation(vm: &mut Engine, animator: ObjRef) -> Result<(), VmExit> {
+    if field_bool(vm, animator, "rd_initialized") {
+        return Ok(());
+    }
+    if anim_is_object_animator(vm, animator) {
+        if let Some(target) = field_obj(vm, animator, "rd_target") {
+            for holder in anim_values(vm, animator) {
+                anim_pvh_setup_setter_and_getter(vm, holder, target)?;
+            }
+        }
+    }
+    anim_put_bool(vm, animator, "rd_initialized", true)
+}
+fn anim_clamp_fraction(vm: &Engine, animator: ObjRef, fraction: f32) -> f32 {
+    if fraction < 0.0 {
+        0.0
+    } else {
+        let repeat = field_int(vm, animator, "rd_repeat_count");
+        if repeat == -1 {
+            fraction
+        } else {
+            let max = repeat.wrapping_add(1) as f32;
+            if fraction > max {
+                max
+            } else {
+                fraction
+            }
+        }
+    }
+}
+fn anim_current_iteration(vm: &Engine, animator: ObjRef, fraction: f32) -> i32 {
+    let fraction = anim_clamp_fraction(vm, animator, fraction);
+    let mut iteration = fraction.floor();
+    if fraction == iteration && fraction > 0.0 {
+        iteration -= 1.0;
+    }
+    iteration as i32
+}
+fn anim_should_play_backward(
+    vm: &Engine,
+    animator: ObjRef,
+    iteration: i32,
+    reversing: bool,
+) -> bool {
+    let repeat = field_int(vm, animator, "rd_repeat_count");
+    let mode = field_int(vm, animator, "rd_repeat_mode");
+    if iteration > 0 && mode == 2 && (iteration < repeat.wrapping_add(1) || repeat == -1) {
+        if reversing {
+            iteration % 2 == 0
+        } else {
+            iteration % 2 != 0
+        }
+    } else {
+        reversing
+    }
+}
+fn anim_current_iteration_fraction(
+    vm: &Engine,
+    animator: ObjRef,
+    fraction: f32,
+    reversing: bool,
+) -> f32 {
+    let fraction = anim_clamp_fraction(vm, animator, fraction);
+    let iteration = anim_current_iteration(vm, animator, fraction);
+    let current = fraction - iteration as f32;
+    if anim_should_play_backward(vm, animator, iteration, reversing) {
+        1.0 - current
+    } else {
+        current
+    }
+}
+fn anim_animate_value(vm: &mut Engine, animator: ObjRef, fraction: f32) -> Result<(), VmExit> {
+    if matches!(get(vm, animator, "rd_values"), Value::Null) {
+        return Ok(());
+    }
+    let holders = anim_values(vm, animator);
+    let target = if anim_is_object_animator(vm, animator) {
+        field_obj(vm, animator, "rd_target")
+    } else {
+        None
+    };
+    let mut interpolator = get(vm, animator, "rd_interpolator");
+    if !matches!(interpolator, Value::Obj(_)) {
+        let default = alloc_obj(
+            vm,
+            "Landroid/view/animation/AccelerateDecelerateInterpolator;",
+            Vec::new(),
+        )?;
+        interpolator = Value::Obj(default);
+        put(vm, animator, "rd_interpolator", interpolator.clone())?;
+    }
+    let interpolated = anim_apply_interpolator(vm, &interpolator, fraction)?;
+    put(
+        vm,
+        animator,
+        "rd_current_fraction",
+        Value::Float(interpolated),
+    )?;
+    for holder in &holders {
+        anim_pvh_calculate(vm, *holder, interpolated)?;
+    }
+    if anim_float_or(vm, animator, "rd_seek_fraction", -1.0) >= 0.0
+        || field_bool(vm, animator, "rd_start_listeners_called")
+    {
+        anim_notify_update_listeners(vm, animator)?;
+    }
+    if let Some(target) = target {
+        for holder in holders {
+            anim_pvh_apply(vm, holder, target)?;
+        }
+    }
+    Ok(())
+}
+fn anim_start_animation(vm: &mut Engine, animator: ObjRef) -> Result<(), VmExit> {
+    anim_put_bool(vm, animator, "rd_animation_end_requested", false)?;
+    anim_init_animation(vm, animator)?;
+    anim_put_bool(vm, animator, "rd_running", true)?;
+    let seek = anim_float_or(vm, animator, "rd_seek_fraction", -1.0);
+    let overall = if seek >= 0.0 { seek } else { 0.0 };
+    put(vm, animator, "rd_overall_fraction", Value::Float(overall))?;
+    let reversing = field_bool(vm, animator, "rd_reversing");
+    anim_notify_start_listeners(vm, animator, reversing)
+}
+fn anim_end_animation(vm: &mut Engine, animator: ObjRef) -> Result<(), VmExit> {
+    if field_bool(vm, animator, "rd_animation_end_requested") {
+        return Ok(());
+    }
+    if field_bool(vm, animator, "rd_self_pulse") {
+        anim_unregister_callback(vm, animator);
+    }
+    anim_put_bool(vm, animator, "rd_animation_end_requested", true)?;
+    anim_put_bool(vm, animator, "rd_paused", false)?;
+    let notify = (field_bool(vm, animator, "rd_started") || field_bool(vm, animator, "rd_running"))
+        && field_obj(vm, animator, "rd_listeners").is_some();
+    let reversing = field_bool(vm, animator, "rd_reversing");
+    if notify && !field_bool(vm, animator, "rd_running") {
+        anim_notify_start_listeners(vm, animator, reversing)?;
+    }
+    put(vm, animator, "rd_last_frame_time", Value::Long(-1))?;
+    put(vm, animator, "rd_first_frame_time", Value::Long(-1))?;
+    put(vm, animator, "rd_start_time", Value::Long(-1))?;
+    anim_put_bool(vm, animator, "rd_running", false)?;
+    anim_put_bool(vm, animator, "rd_started", false)?;
+    anim_notify_end_listeners(vm, animator, reversing)?;
+    anim_put_bool(vm, animator, "rd_reversing", false)
+}
+fn anim_animate_based_on_time(
+    vm: &mut Engine,
+    animator: ObjRef,
+    current_time: i64,
+) -> Result<bool, VmExit> {
+    if !field_bool(vm, animator, "rd_running") {
+        return Ok(false);
+    }
+    let scaled_duration = anim_scaled_duration(vm, animator);
+    let start_time = anim_long_or(vm, animator, "rd_start_time", -1);
+    let fraction = if scaled_duration > 0 {
+        (current_time - start_time) as f32 / scaled_duration as f32
+    } else {
+        1.0
+    };
+    let last_fraction = anim_float_or(vm, animator, "rd_overall_fraction", 0.0);
+    let repeat = field_int(vm, animator, "rd_repeat_count");
+    let new_iteration = fraction as i32 > last_fraction as i32;
+    let last_iteration_finished = fraction >= repeat.wrapping_add(1) as f32 && repeat != -1;
+    let mut done = false;
+    if scaled_duration == 0 {
+        done = true;
+    } else if new_iteration && !last_iteration_finished {
+        anim_notify_listener_field(vm, animator, "rd_listeners", "onAnimationRepeat", None)?;
+    } else if last_iteration_finished {
+        done = true;
+    }
+    let overall = anim_clamp_fraction(vm, animator, fraction);
+    put(vm, animator, "rd_overall_fraction", Value::Float(overall))?;
+    let reversing = field_bool(vm, animator, "rd_reversing");
+    let current = anim_current_iteration_fraction(vm, animator, overall, reversing);
+    anim_animate_value(vm, animator, current)?;
+    Ok(done)
+}
+fn anim_do_animation_frame(
+    vm: &mut Engine,
+    animator: ObjRef,
+    frame_time: i64,
+) -> Result<bool, VmExit> {
+    let mut start_time = anim_long_or(vm, animator, "rd_start_time", -1);
+    if start_time < 0 {
+        start_time = if field_bool(vm, animator, "rd_reversing") {
+            frame_time
+        } else {
+            frame_time
+                + (anim_long_or(vm, animator, "rd_start_delay", 0) as f32
+                    * anim_resolve_duration_scale(vm, animator)) as i64
+        };
+        put(vm, animator, "rd_start_time", Value::Long(start_time))?;
+    }
+    if field_bool(vm, animator, "rd_paused") {
+        put(vm, animator, "rd_pause_time", Value::Long(frame_time))?;
+        if field_bool(vm, animator, "rd_self_pulse") {
+            anim_unregister_callback(vm, animator);
+        }
+        return Ok(false);
+    } else if field_bool(vm, animator, "rd_resumed") {
+        anim_put_bool(vm, animator, "rd_resumed", false)?;
+        let pause_time = anim_long_or(vm, animator, "rd_pause_time", -1);
+        if pause_time > 0 {
+            start_time += frame_time - pause_time;
+            put(vm, animator, "rd_start_time", Value::Long(start_time))?;
+        }
+    }
+    if !field_bool(vm, animator, "rd_running") {
+        let seek = anim_float_or(vm, animator, "rd_seek_fraction", -1.0);
+        if start_time > frame_time && seek == -1.0 {
+            return Ok(false);
+        }
+        anim_put_bool(vm, animator, "rd_running", true)?;
+        anim_start_animation(vm, animator)?;
+    }
+    if anim_long_or(vm, animator, "rd_last_frame_time", -1) < 0 {
+        let seek = anim_float_or(vm, animator, "rd_seek_fraction", -1.0);
+        if seek >= 0.0 {
+            let seek_time = (anim_scaled_duration(vm, animator) as f32 * seek) as i64;
+            start_time = frame_time - seek_time;
+            put(vm, animator, "rd_start_time", Value::Long(start_time))?;
+            put(vm, animator, "rd_seek_fraction", Value::Float(-1.0))?;
+        }
+        anim_put_bool(vm, animator, "rd_start_time_committed", false)?;
+    }
+    put(vm, animator, "rd_last_frame_time", Value::Long(frame_time))?;
+    let current_time = frame_time.max(start_time);
+    let finished = anim_animate_based_on_time(vm, animator, current_time)?;
+    if finished {
+        anim_end_animation(vm, animator)?;
+    }
+    Ok(finished)
+}
+fn anim_set_current_fraction(
+    vm: &mut Engine,
+    animator: ObjRef,
+    fraction: f32,
+) -> Result<(), VmExit> {
+    anim_init_animation(vm, animator)?;
+    let fraction = anim_clamp_fraction(vm, animator, fraction);
+    anim_put_bool(vm, animator, "rd_start_time_committed", true)?;
+    if anim_long_or(vm, animator, "rd_last_frame_time", -1) >= 0 {
+        let seek_time = (anim_scaled_duration(vm, animator) as f32 * fraction) as i64;
+        let now = vm.fw.clock() as i64;
+        put(vm, animator, "rd_start_time", Value::Long(now - seek_time))?;
+    } else {
+        put(vm, animator, "rd_seek_fraction", Value::Float(fraction))?;
+    }
+    put(vm, animator, "rd_overall_fraction", Value::Float(fraction))?;
+    let reversing = field_bool(vm, animator, "rd_reversing");
+    let current = anim_current_iteration_fraction(vm, animator, fraction, reversing);
+    anim_animate_value(vm, animator, current)
+}
+fn anim_start(vm: &mut Engine, animator: ObjRef, backwards: bool) -> Result<(), VmExit> {
+    anim_put_bool(vm, animator, "rd_reversing", backwards)?;
+    let suppress = field_bool(vm, animator, "rd_suppress_self_pulse");
+    anim_put_bool(vm, animator, "rd_self_pulse", !suppress)?;
+    let mut seek = anim_float_or(vm, animator, "rd_seek_fraction", -1.0);
+    if backwards && seek != -1.0 && seek != 0.0 {
+        let repeat = field_int(vm, animator, "rd_repeat_count");
+        seek = if repeat == -1 {
+            1.0 - (seek - seek.floor())
+        } else {
+            1.0 + repeat as f32 - seek
+        };
+        put(vm, animator, "rd_seek_fraction", Value::Float(seek))?;
+    }
+    anim_put_bool(vm, animator, "rd_started", true)?;
+    anim_put_bool(vm, animator, "rd_paused", false)?;
+    anim_put_bool(vm, animator, "rd_running", false)?;
+    anim_put_bool(vm, animator, "rd_animation_end_requested", false)?;
+    put(vm, animator, "rd_last_frame_time", Value::Long(-1))?;
+    put(vm, animator, "rd_first_frame_time", Value::Long(-1))?;
+    put(vm, animator, "rd_start_time", Value::Long(-1))?;
+    if !suppress {
+        anim_register_callback(vm, animator, 0)?;
+    }
+    if anim_long_or(vm, animator, "rd_start_delay", 0) == 0 || seek >= 0.0 || backwards {
+        anim_start_animation(vm, animator)?;
+        if anim_float_or(vm, animator, "rd_seek_fraction", -1.0) == -1.0 {
+            let fraction = if anim_duration(vm, animator) > 0 {
+                0.0
+            } else {
+                1.0
+            };
+            anim_set_current_fraction(vm, animator, fraction)?;
+        } else {
+            let seek_now = anim_float_or(vm, animator, "rd_seek_fraction", -1.0);
+            anim_set_current_fraction(vm, animator, seek_now)?;
+        }
+    }
+    Ok(())
+}
+fn anim_cancel(vm: &mut Engine, animator: ObjRef) -> Result<(), VmExit> {
+    if field_bool(vm, animator, "rd_animation_end_requested") {
+        return Ok(());
+    }
+    let should_notify = (field_bool(vm, animator, "rd_started")
+        || field_bool(vm, animator, "rd_running")
+        || field_bool(vm, animator, "rd_start_listeners_called"))
+        && field_obj(vm, animator, "rd_listeners").is_some();
+    if should_notify {
+        if !field_bool(vm, animator, "rd_running") {
+            let reversing = field_bool(vm, animator, "rd_reversing");
+            anim_notify_start_listeners(vm, animator, reversing)?;
+        }
+        anim_notify_listener_field(vm, animator, "rd_listeners", "onAnimationCancel", None)?;
+    }
+    anim_end_animation(vm, animator)
+}
+fn anim_end(vm: &mut Engine, animator: ObjRef) -> Result<(), VmExit> {
+    if !field_bool(vm, animator, "rd_running") {
+        anim_start_animation(vm, animator)?;
+        anim_put_bool(vm, animator, "rd_started", true)?;
+    } else if !field_bool(vm, animator, "rd_initialized") {
+        anim_init_animation(vm, animator)?;
+    }
+    let repeat = field_int(vm, animator, "rd_repeat_count");
+    let reversing = field_bool(vm, animator, "rd_reversing");
+    let fraction = if anim_should_play_backward(vm, animator, repeat, reversing) {
+        0.0
+    } else {
+        1.0
+    };
+    anim_animate_value(vm, animator, fraction)?;
+    anim_end_animation(vm, animator)
+}
+fn anim_pause(vm: &mut Engine, animator: ObjRef) -> Result<(), VmExit> {
+    let previously_paused = field_bool(vm, animator, "rd_paused");
+    if (field_bool(vm, animator, "rd_started")
+        || field_bool(vm, animator, "rd_start_listeners_called"))
+        && !previously_paused
+    {
+        anim_put_bool(vm, animator, "rd_paused", true)?;
+        anim_notify_listener_field(vm, animator, "rd_pause_listeners", "onAnimationPause", None)?;
+    }
+    if !previously_paused && field_bool(vm, animator, "rd_paused") {
+        put(vm, animator, "rd_pause_time", Value::Long(-1))?;
+        anim_put_bool(vm, animator, "rd_resumed", false)?;
+    }
+    Ok(())
+}
+fn anim_resume(vm: &mut Engine, animator: ObjRef) -> Result<(), VmExit> {
+    if field_bool(vm, animator, "rd_paused") && !field_bool(vm, animator, "rd_resumed") {
+        anim_put_bool(vm, animator, "rd_resumed", true)?;
+        if anim_long_or(vm, animator, "rd_pause_time", -1) > 0
+            && field_bool(vm, animator, "rd_self_pulse")
+        {
+            anim_register_callback(vm, animator, 0)?;
+        }
+    }
+    if field_bool(vm, animator, "rd_paused") {
+        anim_put_bool(vm, animator, "rd_paused", false)?;
+        anim_notify_listener_field(
+            vm,
+            animator,
+            "rd_pause_listeners",
+            "onAnimationResume",
+            None,
+        )?;
+    }
+    Ok(())
+}
+fn anim_same_target_and_properties(vm: &Engine, left: ObjRef, right: ObjRef) -> bool {
+    if get(vm, left, "rd_target") != get(vm, right, "rd_target") {
+        return false;
+    }
+    let left_values = anim_values(vm, left);
+    let right_values = anim_values(vm, right);
+    if left_values.len() != right_values.len() {
+        return false;
+    }
+    left_values.iter().zip(right_values.iter()).all(|(a, b)| {
+        let left_name = field_str(vm, *a, "rd_property_name");
+        left_name.is_some() && left_name == field_str(vm, *b, "rd_property_name")
+    })
+}
+fn anim_auto_cancel_based_on(vm: &mut Engine, animator: ObjRef) -> Result<(), VmExit> {
+    let callbacks: Vec<ObjRef> = vm
+        .frames
+        .animation_callbacks
+        .iter()
+        .map(|(callback, _)| *callback)
+        .collect();
+    for callback in callbacks.into_iter().rev() {
+        if callback != animator
+            && anim_is_object_animator(vm, callback)
+            && field_bool(vm, callback, "rd_auto_cancel")
+            && anim_same_target_and_properties(vm, animator, callback)
+        {
+            vm.invoke_instance(callback, "cancel", "()V", &[])?;
+        }
+    }
+    Ok(())
+}
+fn anim_clone_animator(vm: &mut Engine, animator: ObjRef) -> Result<ObjRef, VmExit> {
+    let class = class_of(vm, animator);
+    let clone = alloc_obj(vm, &class, Vec::new())?;
+    anim_init_animator(vm, clone)?;
+    for field in [
+        "rd_duration",
+        "rd_start_delay",
+        "rd_repeat_count",
+        "rd_repeat_mode",
+        "rd_duration_scale",
+        "rd_interpolator",
+        "rd_changing_configurations",
+        "rd_target",
+        "rd_property_name",
+        "rd_property",
+        "rd_auto_cancel",
+    ] {
+        let value = get(vm, animator, field);
+        put(vm, clone, field, value)?;
+    }
+    anim_copy_list_field(vm, animator, clone, "rd_listeners")?;
+    anim_copy_list_field(vm, animator, clone, "rd_pause_listeners")?;
+    anim_copy_list_field(vm, animator, clone, "rd_update_listeners")?;
+    if matches!(get(vm, animator, "rd_values"), Value::Null) {
+        put(vm, clone, "rd_values", Value::Null)?;
+    } else {
+        let mut holders = Vec::new();
+        for holder in anim_values(vm, animator) {
+            holders.push(anim_clone_pvh(vm, holder)?);
+        }
+        anim_set_values(vm, clone, holders)?;
+    }
+    put(vm, clone, "rd_seek_fraction", Value::Float(-1.0))?;
+    put(vm, clone, "rd_overall_fraction", Value::Float(0.0))?;
+    put(vm, clone, "rd_current_fraction", Value::Float(0.0))?;
+    put(vm, clone, "rd_start_time", Value::Long(-1))?;
+    put(vm, clone, "rd_last_frame_time", Value::Long(-1))?;
+    put(vm, clone, "rd_first_frame_time", Value::Long(-1))?;
+    put(vm, clone, "rd_pause_time", Value::Long(-1))?;
+    anim_put_bool(vm, clone, "rd_reversing", false)?;
+    anim_put_bool(vm, clone, "rd_initialized", false)?;
+    anim_put_bool(vm, clone, "rd_started", false)?;
+    anim_put_bool(vm, clone, "rd_running", false)?;
+    anim_put_bool(vm, clone, "rd_paused", false)?;
+    anim_put_bool(vm, clone, "rd_resumed", false)?;
+    anim_put_bool(vm, clone, "rd_animation_end_requested", false)?;
+    anim_put_bool(vm, clone, "rd_start_time_committed", false)?;
+    anim_put_bool(vm, clone, "rd_start_listeners_called", false)?;
+    anim_put_bool(vm, clone, "rd_self_pulse", true)?;
+    anim_put_bool(vm, clone, "rd_suppress_self_pulse", false)?;
+    Ok(clone)
+}
+
+fn anim_new_animator(vm: &mut Engine, class: &str) -> Result<ObjRef, VmExit> {
+    let animator = alloc_obj(vm, class, Vec::new())?;
+    anim_init_animator(vm, animator)?;
+    Ok(animator)
+}
+fn anim_make_int_pvh(
+    vm: &mut Engine,
+    property_name: Option<String>,
+    property: Value,
+    values: &[i32],
+) -> Result<ObjRef, VmExit> {
+    let property_name = if property_name.is_none() {
+        anim_property_name(vm, &property)
+    } else {
+        property_name
+    };
+    let keyframes = anim_keyframes_from_ints(vm, values)?;
+    anim_new_pvh(
+        vm,
+        property_name,
+        property,
+        ANIM_KIND_INT,
+        keyframes,
+        Value::Null,
+        Value::Null,
+        "I",
+        false,
+    )
+}
+fn anim_make_float_pvh(
+    vm: &mut Engine,
+    property_name: Option<String>,
+    property: Value,
+    values: &[f32],
+) -> Result<ObjRef, VmExit> {
+    let property_name = if property_name.is_none() {
+        anim_property_name(vm, &property)
+    } else {
+        property_name
+    };
+    let keyframes = anim_keyframes_from_floats(vm, values)?;
+    anim_new_pvh(
+        vm,
+        property_name,
+        property,
+        ANIM_KIND_FLOAT,
+        keyframes,
+        Value::Null,
+        Value::Null,
+        "F",
+        false,
+    )
+}
+fn anim_make_object_pvh(
+    vm: &mut Engine,
+    property_name: Option<String>,
+    property: Value,
+    evaluator: Value,
+    converter: Value,
+    values: &[Value],
+) -> Result<ObjRef, VmExit> {
+    let property_name = if property_name.is_none() {
+        anim_property_name(vm, &property)
+    } else {
+        property_name
+    };
+    let holder = anim_new_pvh(
+        vm,
+        property_name,
+        property,
+        ANIM_KIND_OBJECT,
+        Vec::new(),
+        evaluator,
+        converter,
+        "Ljava/lang/Object;",
+        false,
+    )?;
+    anim_pvh_set_object_values(vm, holder, values)?;
+    Ok(holder)
+}
+fn anim_make_keyframe_pvh(
+    vm: &mut Engine,
+    property_name: Option<String>,
+    property: Value,
+    keyframes: Vec<ObjRef>,
+) -> Result<ObjRef, VmExit> {
+    let property_name = if property_name.is_none() {
+        anim_property_name(vm, &property)
+    } else {
+        property_name
+    };
+    let kind = anim_pvh_kind_from_keyframes(vm, &keyframes);
+    let value_type = keyframes
+        .first()
+        .and_then(|kf| field_str(vm, *kf, "rd_value_type"))
+        .unwrap_or_else(|| "Ljava/lang/Object;".to_string());
+    anim_new_pvh(
+        vm,
+        property_name,
+        property,
+        kind,
+        keyframes,
+        Value::Null,
+        Value::Null,
+        &value_type,
+        false,
+    )
+}
+fn anim_animator_set_int_values(
+    vm: &mut Engine,
+    animator: ObjRef,
+    values: &[i32],
+    object_animator: bool,
+) -> Result<(), VmExit> {
+    if values.is_empty() {
+        return Ok(());
+    }
+    let holders = anim_values(vm, animator);
+    if holders.is_empty() {
+        let holder = if object_animator {
+            let property = get(vm, animator, "rd_property");
+            if matches!(property, Value::Obj(_)) {
+                anim_make_int_pvh(vm, None, property, values)?
+            } else {
+                anim_make_int_pvh(
+                    vm,
+                    field_str(vm, animator, "rd_property_name"),
+                    Value::Null,
+                    values,
+                )?
+            }
+        } else {
+            anim_make_int_pvh(vm, Some(String::new()), Value::Null, values)?
+        };
+        anim_set_values(vm, animator, vec![holder])
+    } else {
+        anim_pvh_set_int_values(vm, holders[0], values)?;
+        anim_put_bool(vm, animator, "rd_initialized", false)
+    }
+}
+fn anim_animator_set_float_values(
+    vm: &mut Engine,
+    animator: ObjRef,
+    values: &[f32],
+    object_animator: bool,
+) -> Result<(), VmExit> {
+    if values.is_empty() {
+        return Ok(());
+    }
+    let holders = anim_values(vm, animator);
+    if holders.is_empty() {
+        let holder = if object_animator {
+            let property = get(vm, animator, "rd_property");
+            if matches!(property, Value::Obj(_)) {
+                anim_make_float_pvh(vm, None, property, values)?
+            } else {
+                anim_make_float_pvh(
+                    vm,
+                    field_str(vm, animator, "rd_property_name"),
+                    Value::Null,
+                    values,
+                )?
+            }
+        } else {
+            anim_make_float_pvh(vm, Some(String::new()), Value::Null, values)?
+        };
+        anim_set_values(vm, animator, vec![holder])
+    } else {
+        anim_pvh_set_float_values(vm, holders[0], values)?;
+        anim_put_bool(vm, animator, "rd_initialized", false)
+    }
+}
+fn anim_animator_set_object_values(
+    vm: &mut Engine,
+    animator: ObjRef,
+    values: &[Value],
+    object_animator: bool,
+) -> Result<(), VmExit> {
+    if values.is_empty() {
+        return Ok(());
+    }
+    let holders = anim_values(vm, animator);
+    if holders.is_empty() {
+        let holder = if object_animator {
+            let property = get(vm, animator, "rd_property");
+            if matches!(property, Value::Obj(_)) {
+                anim_make_object_pvh(vm, None, property, Value::Null, Value::Null, values)?
+            } else {
+                anim_make_object_pvh(
+                    vm,
+                    field_str(vm, animator, "rd_property_name"),
+                    Value::Null,
+                    Value::Null,
+                    Value::Null,
+                    values,
+                )?
+            }
+        } else {
+            anim_make_object_pvh(
+                vm,
+                Some(String::new()),
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                values,
+            )?
+        };
+        anim_set_values(vm, animator, vec![holder])
+    } else {
+        anim_pvh_set_object_values(vm, holders[0], values)?;
+        anim_put_bool(vm, animator, "rd_initialized", false)
+    }
+}
+fn anim_animator_set_evaluator(
+    vm: &mut Engine,
+    animator: ObjRef,
+    evaluator: Value,
+) -> Result<(), VmExit> {
+    if matches!(evaluator, Value::Obj(_)) {
+        if let Some(holder) = anim_values(vm, animator).first().copied() {
+            put(vm, holder, "rd_evaluator", evaluator)?;
+        }
+    }
+    Ok(())
+}
+fn argb_evaluator_instance(vm: &mut Engine) -> Result<Value, VmExit> {
+    let key = (ARGB_EVALUATOR.to_string(), "sInstance".to_string());
+    if let Some(value) = vm.statics.get(&key) {
+        return Ok(value.clone());
+    }
+    let evaluator = alloc_obj(vm, ARGB_EVALUATOR, Vec::new())?;
+    let value = Value::Obj(evaluator);
+    vm.statics.insert(key, value.clone());
+    Ok(value)
+}
+fn anim_duration_scale_listeners(vm: &Engine) -> Vec<Value> {
+    match vm.statics.get(&(
+        VALUE_ANIMATOR.to_string(),
+        "rd_duration_scale_listeners".to_string(),
+    )) {
+        Some(value) => collection_items(vm, Some(value)),
+        None => Vec::new(),
+    }
+}
+fn anim_set_duration_scale_listeners(vm: &mut Engine, listeners: Vec<Value>) -> Result<(), VmExit> {
+    let key = (
+        VALUE_ANIMATOR.to_string(),
+        "rd_duration_scale_listeners".to_string(),
+    );
+    if let Some(Value::Obj(list)) = vm.statics.get(&key).cloned() {
+        if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&list) {
+            *elems = listeners;
+            return Ok(());
+        }
+    }
+    let list = new_collection(vm, "Ljava/util/ArrayList;", listeners)?;
+    vm.statics.insert(key, Value::Obj(list));
+    Ok(())
+}
+
+fn value_animator_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("ofInt" | "ofArgb", "([I)Landroid/animation/ValueAnimator;") => {
+            let animator = anim_new_animator(vm, VALUE_ANIMATOR)?;
+            let values = int_values(vm, args.first());
+            anim_animator_set_int_values(vm, animator, &values, false)?;
+            if name == "ofArgb" {
+                let evaluator = argb_evaluator_instance(vm)?;
+                anim_animator_set_evaluator(vm, animator, evaluator)?;
+            }
+            Value::Obj(animator)
+        }
+        ("ofFloat", "([F)Landroid/animation/ValueAnimator;") => {
+            let animator = anim_new_animator(vm, VALUE_ANIMATOR)?;
+            let values = float_values(vm, args.first());
+            anim_animator_set_float_values(vm, animator, &values, false)?;
+            Value::Obj(animator)
+        }
+        (
+            "ofPropertyValuesHolder",
+            "([Landroid/animation/PropertyValuesHolder;)Landroid/animation/ValueAnimator;",
+        ) => {
+            let animator = anim_new_animator(vm, VALUE_ANIMATOR)?;
+            let values = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, animator, "rd_values", values)?;
+            anim_put_bool(vm, animator, "rd_initialized", false)?;
+            Value::Obj(animator)
+        }
+        (
+            "ofObject",
+            "(Landroid/animation/TypeEvaluator;[Ljava/lang/Object;)Landroid/animation/ValueAnimator;",
+        ) => {
+            let animator = anim_new_animator(vm, VALUE_ANIMATOR)?;
+            let values = array_elems(vm, args.get(1));
+            anim_animator_set_object_values(vm, animator, &values, false)?;
+            let evaluator = args.first().cloned().unwrap_or(Value::Null);
+            anim_animator_set_evaluator(vm, animator, evaluator)?;
+            Value::Obj(animator)
+        }
+        ("setDurationScale", "(F)V") => {
+            let scale = farg(args, 0);
+            anim_set_global_duration_scale(vm, scale);
+            for listener in anim_duration_scale_listeners(vm)
+                .iter()
+                .filter_map(|value| obj(Some(value)))
+            {
+                if class_of(vm, listener) == DURATION_SCALE_LISTENER {
+                    let count = field_int(vm, listener, "rd_on_changed_count").wrapping_add(1);
+                    put(vm, listener, "rd_on_changed_count", Value::Int(count))?;
+                    put(
+                        vm,
+                        listener,
+                        "rd_last_duration_scale",
+                        Value::Float(scale),
+                    )?;
+                } else {
+                    vm.invoke_instance(listener, "onChanged", "(F)V", &[Value::Float(scale)])?;
+                }
+            }
+            Value::Null
+        }
+        ("getDurationScale", "()F") => Value::Float(anim_global_duration_scale(vm)),
+        (
+            "registerDurationScaleChangeListener",
+            "(Landroid/animation/ValueAnimator$DurationScaleChangeListener;)Z",
+        ) => {
+            let listener = args.first().cloned().unwrap_or(Value::Null);
+            let mut listeners = anim_duration_scale_listeners(vm);
+            if listeners.contains(&listener) {
+                Value::Int(0)
+            } else {
+                listeners.push(listener);
+                anim_set_duration_scale_listeners(vm, listeners)?;
+                Value::Int(1)
+            }
+        }
+        (
+            "unregisterDurationScaleChangeListener",
+            "(Landroid/animation/ValueAnimator$DurationScaleChangeListener;)Z",
+        ) => {
+            let listener = args.first().cloned().unwrap_or(Value::Null);
+            let mut listeners = anim_duration_scale_listeners(vm);
+            let before = listeners.len();
+            listeners.retain(|value| value != &listener);
+            let removed = listeners.len() != before;
+            anim_set_duration_scale_listeners(vm, listeners)?;
+            bool_value(removed)
+        }
+        ("areAnimatorsEnabled", "()Z") => bool_value(anim_global_duration_scale(vm) != 0.0),
+        ("getFrameDelay", "()J") => Value::Long(anim_frame_delay(vm)),
+        ("setFrameDelay", "(J)V") => {
+            anim_set_frame_delay(vm, larg(args, 0));
+            Value::Null
+        }
+        ("getCurrentAnimationsCount", "()I") => {
+            Value::Int(vm.frames.animation_callbacks.len() as i32)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn anim_new_object_animator(
+    vm: &mut Engine,
+    target: Value,
+    property_name: Option<String>,
+    property: Value,
+) -> Result<ObjRef, VmExit> {
+    let animator = anim_new_animator(vm, OBJECT_ANIMATOR)?;
+    put(vm, animator, "rd_target", target)?;
+    put(vm, animator, "rd_property", property)?;
+    put_opt_str(vm, animator, "rd_property_name", property_name)?;
+    Ok(animator)
+}
+fn object_animator_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if matches!(
+        name,
+        "setDurationScale"
+            | "getDurationScale"
+            | "registerDurationScaleChangeListener"
+            | "unregisterDurationScaleChangeListener"
+            | "areAnimatorsEnabled"
+            | "getFrameDelay"
+            | "setFrameDelay"
+            | "getCurrentAnimationsCount"
+    ) {
+        return value_animator_static(vm, name, sig, args);
+    }
+    let value = match (name, sig) {
+        (
+            "ofInt" | "ofArgb",
+            "(Ljava/lang/Object;Ljava/lang/String;[I)Landroid/animation/ObjectAnimator;",
+        )
+        | (
+            "ofInt" | "ofArgb",
+            "(Ljava/lang/Object;Landroid/util/Property;[I)Landroid/animation/ObjectAnimator;",
+        ) => {
+            let by_property = sig.contains("Landroid/util/Property;");
+            let animator = if by_property {
+                anim_new_object_animator(
+                    vm,
+                    args.first().cloned().unwrap_or(Value::Null),
+                    None,
+                    args.get(1).cloned().unwrap_or(Value::Null),
+                )?
+            } else {
+                anim_new_object_animator(
+                    vm,
+                    args.first().cloned().unwrap_or(Value::Null),
+                    opt_str_arg(vm, args, 1),
+                    Value::Null,
+                )?
+            };
+            let values = int_values(vm, args.get(2));
+            anim_animator_set_int_values(vm, animator, &values, true)?;
+            if name == "ofArgb" {
+                let evaluator = argb_evaluator_instance(vm)?;
+                anim_animator_set_evaluator(vm, animator, evaluator)?;
+            }
+            Value::Obj(animator)
+        }
+        (
+            "ofFloat",
+            "(Ljava/lang/Object;Ljava/lang/String;[F)Landroid/animation/ObjectAnimator;",
+        )
+        | (
+            "ofFloat",
+            "(Ljava/lang/Object;Landroid/util/Property;[F)Landroid/animation/ObjectAnimator;",
+        ) => {
+            let by_property = sig.contains("Landroid/util/Property;");
+            let animator = if by_property {
+                anim_new_object_animator(
+                    vm,
+                    args.first().cloned().unwrap_or(Value::Null),
+                    None,
+                    args.get(1).cloned().unwrap_or(Value::Null),
+                )?
+            } else {
+                anim_new_object_animator(
+                    vm,
+                    args.first().cloned().unwrap_or(Value::Null),
+                    opt_str_arg(vm, args, 1),
+                    Value::Null,
+                )?
+            };
+            let values = float_values(vm, args.get(2));
+            anim_animator_set_float_values(vm, animator, &values, true)?;
+            Value::Obj(animator)
+        }
+        (
+            "ofObject",
+            "(Ljava/lang/Object;Ljava/lang/String;Landroid/animation/TypeEvaluator;[Ljava/lang/Object;)Landroid/animation/ObjectAnimator;",
+        )
+        | (
+            "ofObject",
+            "(Ljava/lang/Object;Landroid/util/Property;Landroid/animation/TypeEvaluator;[Ljava/lang/Object;)Landroid/animation/ObjectAnimator;",
+        ) => {
+            let by_property = sig.contains("Landroid/util/Property;");
+            let animator = if by_property {
+                anim_new_object_animator(
+                    vm,
+                    args.first().cloned().unwrap_or(Value::Null),
+                    None,
+                    args.get(1).cloned().unwrap_or(Value::Null),
+                )?
+            } else {
+                anim_new_object_animator(
+                    vm,
+                    args.first().cloned().unwrap_or(Value::Null),
+                    opt_str_arg(vm, args, 1),
+                    Value::Null,
+                )?
+            };
+            let values = array_elems(vm, args.get(3));
+            anim_animator_set_object_values(vm, animator, &values, true)?;
+            let evaluator = args.get(2).cloned().unwrap_or(Value::Null);
+            anim_animator_set_evaluator(vm, animator, evaluator)?;
+            Value::Obj(animator)
+        }
+        (
+            "ofObject",
+            "(Ljava/lang/Object;Landroid/util/Property;Landroid/animation/TypeConverter;Landroid/animation/TypeEvaluator;[Ljava/lang/Object;)Landroid/animation/ObjectAnimator;",
+        ) => {
+            let animator = anim_new_animator(vm, OBJECT_ANIMATOR)?;
+            put(
+                vm,
+                animator,
+                "rd_target",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            let values = array_elems(vm, args.get(4));
+            let holder = anim_make_object_pvh(
+                vm,
+                None,
+                args.get(1).cloned().unwrap_or(Value::Null),
+                args.get(3).cloned().unwrap_or(Value::Null),
+                args.get(2).cloned().unwrap_or(Value::Null),
+                &values,
+            )?;
+            anim_set_values(vm, animator, vec![holder])?;
+            Value::Obj(animator)
+        }
+        (
+            "ofPropertyValuesHolder",
+            "(Ljava/lang/Object;[Landroid/animation/PropertyValuesHolder;)Landroid/animation/ObjectAnimator;",
+        ) => {
+            let animator = anim_new_animator(vm, OBJECT_ANIMATOR)?;
+            put(
+                vm,
+                animator,
+                "rd_target",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            put(
+                vm,
+                animator,
+                "rd_values",
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
+            anim_put_bool(vm, animator, "rd_initialized", false)?;
+            Value::Obj(animator)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn property_values_holder_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        (
+            "ofInt",
+            "(Ljava/lang/String;[I)Landroid/animation/PropertyValuesHolder;",
+        ) => {
+            let values = int_values(vm, args.get(1));
+            Value::Obj(anim_make_int_pvh(
+                vm,
+                opt_str_arg(vm, args, 0),
+                Value::Null,
+                &values,
+            )?)
+        }
+        (
+            "ofInt",
+            "(Landroid/util/Property;[I)Landroid/animation/PropertyValuesHolder;",
+        ) => {
+            let values = int_values(vm, args.get(1));
+            Value::Obj(anim_make_int_pvh(
+                vm,
+                None,
+                args.first().cloned().unwrap_or(Value::Null),
+                &values,
+            )?)
+        }
+        (
+            "ofFloat",
+            "(Ljava/lang/String;[F)Landroid/animation/PropertyValuesHolder;",
+        ) => {
+            let values = float_values(vm, args.get(1));
+            Value::Obj(anim_make_float_pvh(
+                vm,
+                opt_str_arg(vm, args, 0),
+                Value::Null,
+                &values,
+            )?)
+        }
+        (
+            "ofFloat",
+            "(Landroid/util/Property;[F)Landroid/animation/PropertyValuesHolder;",
+        ) => {
+            let values = float_values(vm, args.get(1));
+            Value::Obj(anim_make_float_pvh(
+                vm,
+                None,
+                args.first().cloned().unwrap_or(Value::Null),
+                &values,
+            )?)
+        }
+        (
+            "ofObject",
+            "(Ljava/lang/String;Landroid/animation/TypeEvaluator;[Ljava/lang/Object;)Landroid/animation/PropertyValuesHolder;",
+        ) => {
+            let values = array_elems(vm, args.get(2));
+            Value::Obj(anim_make_object_pvh(
+                vm,
+                opt_str_arg(vm, args, 0),
+                Value::Null,
+                args.get(1).cloned().unwrap_or(Value::Null),
+                Value::Null,
+                &values,
+            )?)
+        }
+        (
+            "ofObject",
+            "(Landroid/util/Property;Landroid/animation/TypeEvaluator;[Ljava/lang/Object;)Landroid/animation/PropertyValuesHolder;",
+        ) => {
+            let values = array_elems(vm, args.get(2));
+            Value::Obj(anim_make_object_pvh(
+                vm,
+                None,
+                args.first().cloned().unwrap_or(Value::Null),
+                args.get(1).cloned().unwrap_or(Value::Null),
+                Value::Null,
+                &values,
+            )?)
+        }
+        (
+            "ofObject",
+            "(Landroid/util/Property;Landroid/animation/TypeConverter;Landroid/animation/TypeEvaluator;[Ljava/lang/Object;)Landroid/animation/PropertyValuesHolder;",
+        ) => {
+            let values = array_elems(vm, args.get(3));
+            Value::Obj(anim_make_object_pvh(
+                vm,
+                None,
+                args.first().cloned().unwrap_or(Value::Null),
+                args.get(2).cloned().unwrap_or(Value::Null),
+                args.get(1).cloned().unwrap_or(Value::Null),
+                &values,
+            )?)
+        }
+        (
+            "ofKeyframe",
+            "(Ljava/lang/String;[Landroid/animation/Keyframe;)Landroid/animation/PropertyValuesHolder;",
+        ) => {
+            let keyframes = array_elems(vm, args.get(1))
+                .iter()
+                .filter_map(|value| obj(Some(value)))
+                .collect();
+            Value::Obj(anim_make_keyframe_pvh(
+                vm,
+                opt_str_arg(vm, args, 0),
+                Value::Null,
+                keyframes,
+            )?)
+        }
+        (
+            "ofKeyframe",
+            "(Landroid/util/Property;[Landroid/animation/Keyframe;)Landroid/animation/PropertyValuesHolder;",
+        ) => {
+            let keyframes = array_elems(vm, args.get(1))
+                .iter()
+                .filter_map(|value| obj(Some(value)))
+                .collect();
+            Value::Obj(anim_make_keyframe_pvh(
+                vm,
+                None,
+                args.first().cloned().unwrap_or(Value::Null),
+                keyframes,
+            )?)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn keyframe_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("ofInt", "(FI)Landroid/animation/Keyframe;") => Value::Obj(anim_new_keyframe(
+            vm,
+            ANIM_KIND_INT,
+            farg(args, 0),
+            Value::Int(iarg(args, 1)),
+            true,
+            "I",
+        )?),
+        ("ofInt", "(F)Landroid/animation/Keyframe;") => Value::Obj(anim_new_keyframe(
+            vm,
+            ANIM_KIND_INT,
+            farg(args, 0),
+            Value::Int(0),
+            false,
+            "I",
+        )?),
+        ("ofFloat", "(FF)Landroid/animation/Keyframe;") => Value::Obj(anim_new_keyframe(
+            vm,
+            ANIM_KIND_FLOAT,
+            farg(args, 0),
+            Value::Float(farg(args, 1)),
+            true,
+            "F",
+        )?),
+        ("ofFloat", "(F)Landroid/animation/Keyframe;") => Value::Obj(anim_new_keyframe(
+            vm,
+            ANIM_KIND_FLOAT,
+            farg(args, 0),
+            Value::Float(0.0),
+            false,
+            "F",
+        )?),
+        ("ofObject", "(FLjava/lang/Object;)Landroid/animation/Keyframe;") => {
+            let object_value = args.get(1).cloned().unwrap_or(Value::Null);
+            let value_type = anim_type_desc(vm, &object_value);
+            Value::Obj(anim_new_keyframe(
+                vm,
+                ANIM_KIND_OBJECT,
+                farg(args, 0),
+                object_value.clone(),
+                !matches!(object_value, Value::Null),
+                &value_type,
+            )?)
+        }
+        ("ofObject", "(F)Landroid/animation/Keyframe;") => Value::Obj(anim_new_keyframe(
+            vm,
+            ANIM_KIND_OBJECT,
+            farg(args, 0),
+            Value::Null,
+            false,
+            "Ljava/lang/Object;",
+        )?),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn animation_handler_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("getInstance", "()Landroid/animation/AnimationHandler;") => {
+            Value::Obj(anim_handler_instance(vm)?)
+        }
+        ("getAnimationCount", "()I") => Value::Int(vm.frames.animation_callbacks.len() as i32),
+        ("getFrameDelay", "()J") => Value::Long(anim_frame_delay(vm)),
+        ("setFrameDelay", "(J)V") => {
+            anim_set_frame_delay(vm, larg(args, 0));
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn property_values_holder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Ljava/lang/String;)V") => {
+            put_opt_str(vm, recv, "rd_property_name", opt_str_arg(vm, args, 0))?;
+            put(vm, recv, "rd_property", Value::Null)?;
+            put(vm, recv, "rd_kind", Value::Int(ANIM_KIND_OBJECT))?;
+            put(vm, recv, "rd_evaluator", Value::Null)?;
+            put(vm, recv, "rd_converter", Value::Null)?;
+            let type_name = jstr(vm, "Ljava/lang/Object;")?;
+            put(vm, recv, "rd_value_type", type_name)?;
+            put(vm, recv, "rd_animated", Value::Null)?;
+            anim_set_list_items(vm, recv, "rd_keyframes", Vec::new())?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/util/Property;)V") => {
+            let property = args.first().cloned().unwrap_or(Value::Null);
+            let property_name = anim_property_name(vm, &property);
+            put_opt_str(vm, recv, "rd_property_name", property_name)?;
+            put(vm, recv, "rd_property", property)?;
+            put(vm, recv, "rd_kind", Value::Int(ANIM_KIND_OBJECT))?;
+            put(vm, recv, "rd_evaluator", Value::Null)?;
+            put(vm, recv, "rd_converter", Value::Null)?;
+            let type_name = jstr(vm, "Ljava/lang/Object;")?;
+            put(vm, recv, "rd_value_type", type_name)?;
+            put(vm, recv, "rd_animated", Value::Null)?;
+            anim_set_list_items(vm, recv, "rd_keyframes", Vec::new())?;
+            Value::Null
+        }
+        ("setIntValues", "([I)V") => {
+            let values = int_values(vm, args.first());
+            anim_pvh_set_int_values(vm, recv, &values)?;
+            Value::Null
+        }
+        ("setFloatValues", "([F)V") => {
+            let values = float_values(vm, args.first());
+            anim_pvh_set_float_values(vm, recv, &values)?;
+            Value::Null
+        }
+        ("setObjectValues", "([Ljava/lang/Object;)V") => {
+            let values = array_elems(vm, args.first());
+            anim_pvh_set_object_values(vm, recv, &values)?;
+            Value::Null
+        }
+        ("setKeyframes", "([Landroid/animation/Keyframe;)V") => {
+            let keyframes: Vec<ObjRef> = array_elems(vm, args.first())
+                .iter()
+                .filter_map(|value| obj(Some(value)))
+                .collect();
+            let first = keyframes.first().copied().ok_or_else(|| oob("0"))?;
+            let value_type = field_str(vm, first, "rd_value_type")
+                .unwrap_or_else(|| "Ljava/lang/Object;".to_string());
+            let kind = anim_pvh_kind_from_keyframes(vm, &keyframes);
+            anim_pvh_replace_keyframes(vm, recv, kind, keyframes, &value_type, true)?;
+            Value::Null
+        }
+        ("setEvaluator", "(Landroid/animation/TypeEvaluator;)V") => {
+            put(
+                vm,
+                recv,
+                "rd_evaluator",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("setConverter", "(Landroid/animation/TypeConverter;)V") => {
+            put(
+                vm,
+                recv,
+                "rd_converter",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("setPropertyName", "(Ljava/lang/String;)V") => {
+            put_opt_str(vm, recv, "rd_property_name", opt_str_arg(vm, args, 0))?;
+            Value::Null
+        }
+        ("getPropertyName", "()Ljava/lang/String;") => get(vm, recv, "rd_property_name"),
+        ("setProperty", "(Landroid/util/Property;)V") => {
+            put(
+                vm,
+                recv,
+                "rd_property",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("getValueType", "()Ljava/lang/Class;") => {
+            let desc = field_str(vm, recv, "rd_value_type")
+                .unwrap_or_else(|| "Ljava/lang/Object;".to_string());
+            anim_class_value(vm, &desc)?
+        }
+        ("clone", "()Landroid/animation/PropertyValuesHolder;")
+        | ("clone", "()Ljava/lang/Object;") => Value::Obj(anim_clone_pvh(vm, recv)?),
+        ("toString", "()Ljava/lang/String;") => {
+            let property_name =
+                field_str(vm, recv, "rd_property_name").unwrap_or_else(|| "null".to_string());
+            let mut out = format!("{property_name}: ");
+            for keyframe in anim_pvh_keyframes(vm, recv) {
+                let internal = anim_keyframe_internal(vm, keyframe);
+                let boxed = anim_boxed(vm, anim_keyframe_kind(vm, keyframe), &internal)?;
+                out.push_str(&value_string(vm, &boxed)?);
+                out.push_str("  ");
+            }
+            jstr(vm, out)?
+        }
+        ("calculateValue", "(F)V") => {
+            anim_pvh_calculate(vm, recv, farg(args, 0))?;
+            Value::Null
+        }
+        ("getAnimatedValue", "()Ljava/lang/Object;") => anim_pvh_animated_value(vm, recv)?,
+        ("setAnimatedValue", "(Ljava/lang/Object;)V") => {
+            if let Some(target) = oarg(args, 0) {
+                anim_pvh_apply(vm, recv, target)?;
+            }
+            Value::Null
+        }
+        ("setupSetterAndGetter", "(Ljava/lang/Object;)V") => {
+            let target = req_obj(args, 0, "target")?;
+            anim_pvh_setup_setter_and_getter(vm, recv, target)?;
+            Value::Null
+        }
+        ("setupStartValue", "(Ljava/lang/Object;)V") => {
+            let target = req_obj(args, 0, "target")?;
+            if let Some(keyframe) = anim_pvh_keyframes(vm, recv).first().copied() {
+                anim_pvh_setup_value(vm, recv, target, keyframe, false)?;
+            }
+            Value::Null
+        }
+        ("setupEndValue", "(Ljava/lang/Object;)V") => {
+            let target = req_obj(args, 0, "target")?;
+            if let Some(keyframe) = anim_pvh_keyframes(vm, recv).last().copied() {
+                anim_pvh_setup_value(vm, recv, target, keyframe, false)?;
+            }
+            Value::Null
+        }
+        ("init", "()V") => Value::Null,
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn keyframe_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(FI)V") if class == KEYFRAME_INT => {
+            put(vm, recv, "rd_kind", Value::Int(ANIM_KIND_INT))?;
+            put(vm, recv, "rd_fraction", Value::Float(farg(args, 0)))?;
+            put(vm, recv, "rd_value", Value::Int(iarg(args, 1)))?;
+            anim_put_bool(vm, recv, "rd_has_value", true)?;
+            let type_name = jstr(vm, "I")?;
+            put(vm, recv, "rd_value_type", type_name)?;
+            Value::Null
+        }
+        ("<init>", "(FF)V") if class == KEYFRAME_FLOAT => {
+            put(vm, recv, "rd_kind", Value::Int(ANIM_KIND_FLOAT))?;
+            put(vm, recv, "rd_fraction", Value::Float(farg(args, 0)))?;
+            put(vm, recv, "rd_value", Value::Float(farg(args, 1)))?;
+            anim_put_bool(vm, recv, "rd_has_value", true)?;
+            let type_name = jstr(vm, "F")?;
+            put(vm, recv, "rd_value_type", type_name)?;
+            Value::Null
+        }
+        ("<init>", "(FLjava/lang/Object;)V") if class == KEYFRAME_OBJECT => {
+            let object_value = args.get(1).cloned().unwrap_or(Value::Null);
+            let value_type = anim_type_desc(vm, &object_value);
+            put(vm, recv, "rd_kind", Value::Int(ANIM_KIND_OBJECT))?;
+            put(vm, recv, "rd_fraction", Value::Float(farg(args, 0)))?;
+            anim_put_bool(
+                vm,
+                recv,
+                "rd_has_value",
+                !matches!(object_value, Value::Null),
+            )?;
+            put(vm, recv, "rd_value", object_value)?;
+            let type_name = jstr(vm, value_type)?;
+            put(vm, recv, "rd_value_type", type_name)?;
+            Value::Null
+        }
+        ("<init>", "(F)V") => {
+            let kind = match class {
+                KEYFRAME_INT => ANIM_KIND_INT,
+                KEYFRAME_FLOAT => ANIM_KIND_FLOAT,
+                _ => ANIM_KIND_OBJECT,
+            };
+            put(vm, recv, "rd_kind", Value::Int(kind))?;
+            put(vm, recv, "rd_fraction", Value::Float(farg(args, 0)))?;
+            anim_put_bool(vm, recv, "rd_has_value", false)?;
+            Value::Null
+        }
+        ("hasValue", "()Z") => bool_value(field_bool(vm, recv, "rd_has_value")),
+        ("valueWasSetOnStart", "()Z") => bool_value(field_bool(vm, recv, "rd_value_set_on_start")),
+        ("setValueWasSetOnStart", "(Z)V") => {
+            anim_put_bool(vm, recv, "rd_value_set_on_start", iarg(args, 0) != 0)?;
+            Value::Null
+        }
+        ("getValue", "()Ljava/lang/Object;") => {
+            let internal = anim_keyframe_internal(vm, recv);
+            anim_boxed(vm, anim_keyframe_kind(vm, recv), &internal)?
+        }
+        ("setValue", "(Ljava/lang/Object;)V") => {
+            let new_value = args.first().cloned().unwrap_or(Value::Null);
+            match anim_keyframe_kind(vm, recv) {
+                ANIM_KIND_INT => {
+                    let valid = matches!(&new_value, Value::Int(_))
+                        || matches!(&new_value, Value::Obj(r) if class_of(vm, *r) == "Ljava/lang/Integer;");
+                    if valid {
+                        if let Some(v) = anim_number_int(vm, &new_value) {
+                            put(vm, recv, "rd_value", Value::Int(v))?;
+                            anim_put_bool(vm, recv, "rd_has_value", true)?;
+                        }
+                    }
+                }
+                ANIM_KIND_FLOAT => {
+                    let valid = matches!(&new_value, Value::Float(_))
+                        || matches!(&new_value, Value::Obj(r) if class_of(vm, *r) == "Ljava/lang/Float;");
+                    if valid {
+                        if let Some(v) = anim_number_float(vm, &new_value) {
+                            put(vm, recv, "rd_value", Value::Float(v))?;
+                            anim_put_bool(vm, recv, "rd_has_value", true)?;
+                        }
+                    }
+                }
+                _ => {
+                    anim_put_bool(vm, recv, "rd_has_value", !matches!(new_value, Value::Null))?;
+                    put(vm, recv, "rd_value", new_value)?;
+                }
+            }
+            Value::Null
+        }
+        ("getFraction", "()F") => Value::Float(field_float(vm, recv, "rd_fraction")),
+        ("setFraction", "(F)V") => {
+            put(vm, recv, "rd_fraction", Value::Float(farg(args, 0)))?;
+            Value::Null
+        }
+        ("getInterpolator", "()Landroid/view/animation/Interpolator;")
+        | ("getInterpolator", "()Landroid/animation/TimeInterpolator;") => {
+            get(vm, recv, "rd_interpolator")
+        }
+        ("setInterpolator", "(Landroid/view/animation/Interpolator;)V")
+        | ("setInterpolator", "(Landroid/animation/TimeInterpolator;)V") => {
+            put(
+                vm,
+                recv,
+                "rd_interpolator",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("getType", "()Ljava/lang/Class;") => {
+            let desc = field_str(vm, recv, "rd_value_type").unwrap_or_else(|| {
+                match anim_keyframe_kind(vm, recv) {
+                    ANIM_KIND_INT => "I".to_string(),
+                    ANIM_KIND_FLOAT => "F".to_string(),
+                    _ => "Ljava/lang/Object;".to_string(),
+                }
+            });
+            anim_class_value(vm, &desc)?
+        }
+        ("getIntValue", "()I") => Value::Int(field_int(vm, recv, "rd_value")),
+        ("getFloatValue", "()F") => Value::Float(field_float(vm, recv, "rd_value")),
+        ("clone", "()Landroid/animation/Keyframe;") | ("clone", "()Ljava/lang/Object;") => {
+            Value::Obj(anim_clone_keyframe(vm, recv)?)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn animation_evaluator_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    _sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let _ = recv;
+    let value = match name {
+        "<init>" => Value::Null,
+        "evaluate" => {
+            let fraction = farg(args, 0);
+            let start = args.get(1).cloned().unwrap_or(Value::Null);
+            let end = args.get(2).cloned().unwrap_or(Value::Null);
+            match class {
+                INT_EVALUATOR => {
+                    let s = anim_number_int(vm, &start)
+                        .ok_or_else(|| anim_class_cast("startValue is not an Integer"))?;
+                    let e = anim_number_int(vm, &end)
+                        .ok_or_else(|| anim_class_cast("endValue is not an Integer"))?;
+                    anim_boxed(
+                        vm,
+                        ANIM_KIND_INT,
+                        &Value::Int(anim_int_lerp(fraction, s, e)),
+                    )?
+                }
+                FLOAT_EVALUATOR => {
+                    let s = anim_number_float(vm, &start)
+                        .ok_or_else(|| anim_class_cast("startValue is not a Number"))?;
+                    let e = anim_number_float(vm, &end)
+                        .ok_or_else(|| anim_class_cast("endValue is not a Number"))?;
+                    anim_boxed(
+                        vm,
+                        ANIM_KIND_FLOAT,
+                        &Value::Float(anim_float_lerp(fraction, s, e)),
+                    )?
+                }
+                ARGB_EVALUATOR => {
+                    let s = anim_number_int(vm, &start)
+                        .ok_or_else(|| anim_class_cast("startValue is not an Integer"))?;
+                    let e = anim_number_int(vm, &end)
+                        .ok_or_else(|| anim_class_cast("endValue is not an Integer"))?;
+                    anim_boxed(
+                        vm,
+                        ANIM_KIND_INT,
+                        &Value::Int(anim_argb_evaluate(fraction, s, e)),
+                    )?
+                }
+                _ => return Ok(None),
+            }
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn android_property_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Ljava/lang/Class;Ljava/lang/String;)V") => {
+            put(
+                vm,
+                recv,
+                "rd_type",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            put(
+                vm,
+                recv,
+                "rd_name",
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("<init>", "(Ljava/lang/String;)V") if class == ANDROID_INT_PROPERTY => {
+            let type_value = anim_class_value(vm, "Ljava/lang/Integer;")?;
+            put(vm, recv, "rd_type", type_value)?;
+            put(
+                vm,
+                recv,
+                "rd_name",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("<init>", "(Ljava/lang/String;)V") if class == ANDROID_FLOAT_PROPERTY => {
+            let type_value = anim_class_value(vm, "Ljava/lang/Float;")?;
+            put(vm, recv, "rd_type", type_value)?;
+            put(
+                vm,
+                recv,
+                "rd_name",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("getName", "()Ljava/lang/String;") => get(vm, recv, "rd_name"),
+        ("getType", "()Ljava/lang/Class;") => get(vm, recv, "rd_type"),
+        ("isReadOnly", "()Z") => Value::Int(0),
+        ("set", "(Ljava/lang/Object;Ljava/lang/Object;)V") => {
+            let runtime_class = class_of(vm, recv);
+            let target = args.first().cloned().unwrap_or(Value::Null);
+            let new_value = args.get(1).cloned().unwrap_or(Value::Null);
+            if vm.cp.is_subtype(&runtime_class, ANDROID_INT_PROPERTY) {
+                let value = anim_number_int(vm, &new_value).ok_or_else(|| npe("value"))?;
+                vm.invoke_instance(
+                    recv,
+                    "setValue",
+                    "(Ljava/lang/Object;I)V",
+                    &[target, Value::Int(value)],
+                )?;
+            } else if vm.cp.is_subtype(&runtime_class, ANDROID_FLOAT_PROPERTY) {
+                let value = anim_number_float(vm, &new_value).ok_or_else(|| npe("value"))?;
+                vm.invoke_instance(
+                    recv,
+                    "setValue",
+                    "(Ljava/lang/Object;F)V",
+                    &[target, Value::Float(value)],
+                )?;
+            } else {
+                let property_name =
+                    field_str(vm, recv, "rd_name").unwrap_or_else(|| "null".to_string());
+                return Err(throw(
+                    "Ljava/lang/UnsupportedOperationException;",
+                    format!("Property {property_name} is read-only"),
+                ));
+            }
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn animation_handler_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        ("doFrame", "(J)V") => {
+            let _ = recv;
+            let frame_time = vm.fw.clock() as i64;
+            anim_handler_process(vm, frame_time)?;
+            Value::Null
+        }
+        ("doAnimationFrame", "(J)V") => {
+            anim_handler_process(vm, larg(args, 0))?;
+            Value::Null
+        }
+        (
+            "addAnimationFrameCallback",
+            "(Landroid/animation/AnimationHandler$AnimationFrameCallback;J)V",
+        ) => {
+            let callback = req_obj(args, 0, "callback")?;
+            anim_register_callback(vm, callback, larg(args, 1))?;
+            Value::Null
+        }
+        ("removeCallback", "(Landroid/animation/AnimationHandler$AnimationFrameCallback;)V") => {
+            if let Some(callback) = oarg(args, 0) {
+                anim_unregister_callback(vm, callback);
+            }
+            Value::Null
+        }
+        ("getFrameDelay", "()J") => Value::Long(anim_frame_delay(vm)),
+        ("setFrameDelay", "(J)V") => {
+            anim_set_frame_delay(vm, larg(args, 0));
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn animator_base_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            if matches!(get(vm, recv, "rd_duration"), Value::Null) {
+                anim_init_animator(vm, recv)?;
+            }
+            Value::Null
+        }
+        ("addListener", "(Landroid/animation/Animator$AnimatorListener;)V") => {
+            anim_append_listener(
+                vm,
+                recv,
+                "rd_listeners",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("removeListener", "(Landroid/animation/Animator$AnimatorListener;)V") => {
+            let listener = args.first().cloned().unwrap_or(Value::Null);
+            anim_remove_listener(vm, recv, "rd_listeners", &listener)?;
+            Value::Null
+        }
+        ("getListeners", "()Ljava/util/ArrayList;") => get(vm, recv, "rd_listeners"),
+        ("addPauseListener", "(Landroid/animation/Animator$AnimatorPauseListener;)V") => {
+            anim_append_listener(
+                vm,
+                recv,
+                "rd_pause_listeners",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("removePauseListener", "(Landroid/animation/Animator$AnimatorPauseListener;)V") => {
+            let listener = args.first().cloned().unwrap_or(Value::Null);
+            anim_remove_listener(vm, recv, "rd_pause_listeners", &listener)?;
+            Value::Null
+        }
+        ("removeAllListeners", "()V") => {
+            put(vm, recv, "rd_listeners", Value::Null)?;
+            put(vm, recv, "rd_pause_listeners", Value::Null)?;
+            Value::Null
+        }
+        ("isPaused", "()Z") => bool_value(field_bool(vm, recv, "rd_paused")),
+        ("pause", "()V") => {
+            anim_pause(vm, recv)?;
+            Value::Null
+        }
+        ("resume", "()V") => {
+            anim_resume(vm, recv)?;
+            Value::Null
+        }
+        ("getChangingConfigurations", "()I") => {
+            Value::Int(field_int(vm, recv, "rd_changing_configurations"))
+        }
+        ("setChangingConfigurations", "(I)V") => {
+            put(
+                vm,
+                recv,
+                "rd_changing_configurations",
+                Value::Int(iarg(args, 0)),
+            )?;
+            Value::Null
+        }
+        ("appendChangingConfigurations", "(I)V") => {
+            let value = field_int(vm, recv, "rd_changing_configurations") | iarg(args, 0);
+            put(vm, recv, "rd_changing_configurations", Value::Int(value))?;
+            Value::Null
+        }
+        ("start" | "cancel" | "end" | "setupStartValues" | "setupEndValues", "()V") => Value::Null,
+        ("setTarget", "(Ljava/lang/Object;)V") => Value::Null,
+        ("canReverse", "()Z") => Value::Int(0),
+        ("reverse", "()V") => return Err(ise("Reverse is not supported")),
+        ("isStarted", "()Z") => vm.invoke_instance(recv, "isRunning", "()Z", &[])?,
+        ("getTotalDuration", "()J") => {
+            let duration = vm
+                .invoke_instance(recv, "getDuration", "()J", &[])?
+                .as_long()?;
+            if duration == -1 {
+                Value::Long(-1)
+            } else {
+                let delay = vm
+                    .invoke_instance(recv, "getStartDelay", "()J", &[])?
+                    .as_long()?;
+                Value::Long(delay.wrapping_add(duration))
+            }
+        }
+        ("getInterpolator", "()Landroid/animation/TimeInterpolator;")
+        | ("getInterpolator", "()Landroid/view/animation/Interpolator;") => Value::Null,
+        ("clone", "()Landroid/animation/Animator;") | ("clone", "()Ljava/lang/Object;") => {
+            Value::Obj(anim_clone_animator(vm, recv)?)
+        }
+        ("setAllowRunningAsynchronously", "(Z)V") => Value::Null,
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn value_animator_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            anim_init_animator(vm, recv)?;
+            Value::Null
+        }
+        ("setIntValues", "([I)V") => {
+            let values = int_values(vm, args.first());
+            anim_animator_set_int_values(vm, recv, &values, false)?;
+            Value::Null
+        }
+        ("setFloatValues", "([F)V") => {
+            let values = float_values(vm, args.first());
+            anim_animator_set_float_values(vm, recv, &values, false)?;
+            Value::Null
+        }
+        ("setObjectValues", "([Ljava/lang/Object;)V") => {
+            let values = array_elems(vm, args.first());
+            anim_animator_set_object_values(vm, recv, &values, false)?;
+            Value::Null
+        }
+        ("setValues", "([Landroid/animation/PropertyValuesHolder;)V") => {
+            let values = args.first().cloned().unwrap_or(Value::Null);
+            if matches!(values, Value::Null) {
+                return Err(npe("values"));
+            }
+            put(vm, recv, "rd_values", values)?;
+            anim_put_bool(vm, recv, "rd_initialized", false)?;
+            Value::Null
+        }
+        ("getValues", "()[Landroid/animation/PropertyValuesHolder;") => get(vm, recv, "rd_values"),
+        ("setDuration", "(J)Landroid/animation/ValueAnimator;") => {
+            let duration = larg(args, 0);
+            if duration < 0 {
+                return Err(iae(format!(
+                    "Animators cannot have negative duration: {duration}"
+                )));
+            }
+            put(vm, recv, "rd_duration", Value::Long(duration))?;
+            Value::Obj(recv)
+        }
+        ("getDuration", "()J") => Value::Long(anim_duration(vm, recv)),
+        ("getTotalDuration", "()J") => {
+            let repeat = field_int(vm, recv, "rd_repeat_count");
+            if repeat == -1 {
+                Value::Long(-1)
+            } else {
+                let total = anim_duration(vm, recv).wrapping_mul(repeat.wrapping_add(1) as i64);
+                Value::Long(anim_long_or(vm, recv, "rd_start_delay", 0).wrapping_add(total))
+            }
+        }
+        ("overrideDurationScale", "(F)V") => {
+            put(vm, recv, "rd_duration_scale", Value::Float(farg(args, 0)))?;
+            Value::Null
+        }
+        ("setCurrentPlayTime", "(J)V") => {
+            let duration = anim_duration(vm, recv);
+            let fraction = if duration > 0 {
+                larg(args, 0) as f32 / duration as f32
+            } else {
+                1.0
+            };
+            anim_set_current_fraction(vm, recv, fraction)?;
+            Value::Null
+        }
+        ("setCurrentFraction", "(F)V") => {
+            anim_set_current_fraction(vm, recv, farg(args, 0))?;
+            Value::Null
+        }
+        ("getCurrentPlayTime", "()J") => {
+            let seek = anim_float_or(vm, recv, "rd_seek_fraction", -1.0);
+            if !field_bool(vm, recv, "rd_initialized")
+                || (!field_bool(vm, recv, "rd_started") && seek < 0.0)
+            {
+                Value::Long(0)
+            } else if seek >= 0.0 {
+                Value::Long((anim_duration(vm, recv) as f32 * seek) as i64)
+            } else {
+                let mut scale = anim_resolve_duration_scale(vm, recv);
+                if scale == 0.0 {
+                    scale = 1.0;
+                }
+                let elapsed = vm.fw.clock() as i64 - anim_long_or(vm, recv, "rd_start_time", -1);
+                Value::Long((elapsed as f32 / scale) as i64)
+            }
+        }
+        ("getStartDelay", "()J") => Value::Long(anim_long_or(vm, recv, "rd_start_delay", 0)),
+        ("setStartDelay", "(J)V") => {
+            put(
+                vm,
+                recv,
+                "rd_start_delay",
+                Value::Long(larg(args, 0).max(0)),
+            )?;
+            Value::Null
+        }
+        ("getAnimatedValue", "()Ljava/lang/Object;") => {
+            if let Some(holder) = anim_values(vm, recv).first().copied() {
+                anim_pvh_animated_value(vm, holder)?
+            } else {
+                Value::Null
+            }
+        }
+        ("getAnimatedValue", "(Ljava/lang/String;)Ljava/lang/Object;") => {
+            let property_name = opt_str_arg(vm, args, 0);
+            let mut out = Value::Null;
+            for holder in anim_values(vm, recv) {
+                if field_str(vm, holder, "rd_property_name") == property_name {
+                    out = anim_pvh_animated_value(vm, holder)?;
+                    break;
+                }
+            }
+            out
+        }
+        ("setRepeatCount", "(I)V") => {
+            put(vm, recv, "rd_repeat_count", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("getRepeatCount", "()I") => Value::Int(field_int(vm, recv, "rd_repeat_count")),
+        ("setRepeatMode", "(I)V") => {
+            put(vm, recv, "rd_repeat_mode", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("getRepeatMode", "()I") => {
+            let mode = field_int(vm, recv, "rd_repeat_mode");
+            Value::Int(if mode == 0 { 1 } else { mode })
+        }
+        ("addUpdateListener", "(Landroid/animation/ValueAnimator$AnimatorUpdateListener;)V") => {
+            anim_append_listener(
+                vm,
+                recv,
+                "rd_update_listeners",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("removeUpdateListener", "(Landroid/animation/ValueAnimator$AnimatorUpdateListener;)V") => {
+            let listener = args.first().cloned().unwrap_or(Value::Null);
+            anim_remove_listener(vm, recv, "rd_update_listeners", &listener)?;
+            Value::Null
+        }
+        ("removeAllUpdateListeners", "()V") => {
+            put(vm, recv, "rd_update_listeners", Value::Null)?;
+            Value::Null
+        }
+        ("setInterpolator", "(Landroid/animation/TimeInterpolator;)V")
+        | ("setInterpolator", "(Landroid/view/animation/Interpolator;)V") => {
+            let interpolator = match args.first() {
+                Some(Value::Obj(_)) => args.first().cloned().unwrap_or(Value::Null),
+                _ => {
+                    let linear = alloc_obj(
+                        vm,
+                        "Landroid/view/animation/LinearInterpolator;",
+                        Vec::new(),
+                    )?;
+                    Value::Obj(linear)
+                }
+            };
+            put(vm, recv, "rd_interpolator", interpolator)?;
+            Value::Null
+        }
+        ("getInterpolator", "()Landroid/animation/TimeInterpolator;")
+        | ("getInterpolator", "()Landroid/view/animation/Interpolator;") => {
+            let current = get(vm, recv, "rd_interpolator");
+            if matches!(current, Value::Obj(_)) {
+                current
+            } else {
+                let default = alloc_obj(
+                    vm,
+                    "Landroid/view/animation/AccelerateDecelerateInterpolator;",
+                    Vec::new(),
+                )?;
+                put(vm, recv, "rd_interpolator", Value::Obj(default))?;
+                Value::Obj(default)
+            }
+        }
+        ("setEvaluator", "(Landroid/animation/TypeEvaluator;)V") => {
+            let evaluator = args.first().cloned().unwrap_or(Value::Null);
+            anim_animator_set_evaluator(vm, recv, evaluator)?;
+            Value::Null
+        }
+        ("start", "()V") => {
+            anim_start(vm, recv, false)?;
+            Value::Null
+        }
+        ("start", "(Z)V") => {
+            anim_start(vm, recv, iarg(args, 0) != 0)?;
+            Value::Null
+        }
+        ("startWithoutPulsing", "(Z)V") => {
+            anim_put_bool(vm, recv, "rd_suppress_self_pulse", true)?;
+            let result = if iarg(args, 0) != 0 {
+                // ValueAnimator.reverse() delegates to start(true) when it
+                // has not started; the already-pulsing branch cannot occur
+                // for an animator being started without pulsing.
+                anim_start(vm, recv, true)
+            } else {
+                anim_start(vm, recv, false)
+            };
+            anim_put_bool(vm, recv, "rd_suppress_self_pulse", false)?;
+            result?;
+            Value::Null
+        }
+        ("cancel", "()V") => {
+            anim_cancel(vm, recv)?;
+            Value::Null
+        }
+        ("end", "()V") => {
+            anim_end(vm, recv)?;
+            Value::Null
+        }
+        ("pause", "()V") => {
+            anim_pause(vm, recv)?;
+            Value::Null
+        }
+        ("resume", "()V") => {
+            anim_resume(vm, recv)?;
+            Value::Null
+        }
+        ("isRunning", "()Z") => bool_value(field_bool(vm, recv, "rd_running")),
+        ("isStarted", "()Z") => bool_value(field_bool(vm, recv, "rd_started")),
+        ("reverse", "()V") => {
+            if anim_long_or(vm, recv, "rd_last_frame_time", -1) >= 0 {
+                let now = vm.fw.clock() as i64;
+                let start_time = anim_long_or(vm, recv, "rd_start_time", -1);
+                let current_play_time = now - start_time;
+                let time_left = anim_scaled_duration(vm, recv) - current_play_time;
+                put(vm, recv, "rd_start_time", Value::Long(now - time_left))?;
+                anim_put_bool(vm, recv, "rd_start_time_committed", true)?;
+                let reversing = field_bool(vm, recv, "rd_reversing");
+                anim_put_bool(vm, recv, "rd_reversing", !reversing)?;
+            } else if field_bool(vm, recv, "rd_started") {
+                let reversing = field_bool(vm, recv, "rd_reversing");
+                anim_put_bool(vm, recv, "rd_reversing", !reversing)?;
+                anim_end(vm, recv)?;
+            } else {
+                anim_start(vm, recv, true)?;
+            }
+            Value::Null
+        }
+        ("canReverse", "()Z") => Value::Int(1),
+        ("getAnimatedFraction", "()F") => {
+            Value::Float(anim_float_or(vm, recv, "rd_current_fraction", 0.0))
+        }
+        ("doAnimationFrame", "(J)Z") => {
+            bool_value(anim_do_animation_frame(vm, recv, larg(args, 0))?)
+        }
+        ("pulseAnimationFrame", "(J)Z") => {
+            if field_bool(vm, recv, "rd_self_pulse") {
+                Value::Int(0)
+            } else {
+                bool_value(anim_do_animation_frame(vm, recv, larg(args, 0))?)
+            }
+        }
+        ("commitAnimationFrame", "(J)V") => {
+            if !field_bool(vm, recv, "rd_start_time_committed") {
+                anim_put_bool(vm, recv, "rd_start_time_committed", true)?;
+                let adjustment = larg(args, 0) - anim_long_or(vm, recv, "rd_last_frame_time", -1);
+                if adjustment > 0 {
+                    let start = anim_long_or(vm, recv, "rd_start_time", -1) + adjustment;
+                    put(vm, recv, "rd_start_time", Value::Long(start))?;
+                }
+            }
+            Value::Null
+        }
+        ("animateBasedOnTime", "(J)Z") => {
+            bool_value(anim_animate_based_on_time(vm, recv, larg(args, 0))?)
+        }
+        ("animateValue", "(F)V") => {
+            anim_animate_value(vm, recv, farg(args, 0))?;
+            Value::Null
+        }
+        ("initAnimation", "()V") => {
+            anim_init_animation(vm, recv)?;
+            Value::Null
+        }
+        ("isInitialized", "()Z") => bool_value(field_bool(vm, recv, "rd_initialized")),
+        ("skipToEndValue", "(Z)V") => {
+            anim_init_animation(vm, recv)?;
+            let repeat = field_int(vm, recv, "rd_repeat_count");
+            let mode = field_int(vm, recv, "rd_repeat_mode");
+            let mut fraction = if iarg(args, 0) != 0 { 0.0 } else { 1.0 };
+            if repeat % 2 == 1 && mode == 2 {
+                fraction = 0.0;
+            }
+            anim_animate_value(vm, recv, fraction)?;
+            Value::Null
+        }
+        ("clone", "()Landroid/animation/ValueAnimator;")
+        | ("clone", "()Landroid/animation/Animator;")
+        | ("clone", "()Ljava/lang/Object;") => Value::Obj(anim_clone_animator(vm, recv)?),
+        ("toString", "()Ljava/lang/String;") => {
+            let mut out = format!("ValueAnimator@{recv:x}");
+            if !matches!(get(vm, recv, "rd_values"), Value::Null) {
+                for holder in anim_values(vm, recv) {
+                    let text =
+                        vm.invoke_instance(holder, "toString", "()Ljava/lang/String;", &[])?;
+                    out.push_str("\n    ");
+                    out.push_str(&opt_str(vm, Some(&text)).unwrap_or_default());
+                }
+            }
+            jstr(vm, out)?
+        }
+        _ => return animator_base_instance(vm, name, sig, recv, args),
+    };
+    Ok(Some(value))
+}
+
+fn object_animator_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            anim_init_animator(vm, recv)?;
+            Value::Null
+        }
+        ("<init>", "(Ljava/lang/Object;Ljava/lang/String;)V") => {
+            anim_init_animator(vm, recv)?;
+            put(
+                vm,
+                recv,
+                "rd_target",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            put_opt_str(vm, recv, "rd_property_name", opt_str_arg(vm, args, 1))?;
+            Value::Null
+        }
+        ("<init>", "(Ljava/lang/Object;Landroid/util/Property;)V") => {
+            anim_init_animator(vm, recv)?;
+            put(
+                vm,
+                recv,
+                "rd_target",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            put(
+                vm,
+                recv,
+                "rd_property",
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("setIntValues", "([I)V") => {
+            let values = int_values(vm, args.first());
+            anim_animator_set_int_values(vm, recv, &values, true)?;
+            Value::Null
+        }
+        ("setFloatValues", "([F)V") => {
+            let values = float_values(vm, args.first());
+            anim_animator_set_float_values(vm, recv, &values, true)?;
+            Value::Null
+        }
+        ("setObjectValues", "([Ljava/lang/Object;)V") => {
+            let values = array_elems(vm, args.first());
+            anim_animator_set_object_values(vm, recv, &values, true)?;
+            Value::Null
+        }
+        ("setDuration", "(J)Landroid/animation/ObjectAnimator;") => {
+            let duration = larg(args, 0);
+            if duration < 0 {
+                return Err(iae(format!(
+                    "Animators cannot have negative duration: {duration}"
+                )));
+            }
+            put(vm, recv, "rd_duration", Value::Long(duration))?;
+            Value::Obj(recv)
+        }
+        ("setPropertyName", "(Ljava/lang/String;)V") => {
+            let property_name = opt_str_arg(vm, args, 0);
+            if !matches!(get(vm, recv, "rd_values"), Value::Null) {
+                if let Some(holder) = anim_values(vm, recv).first().copied() {
+                    put_opt_str(vm, holder, "rd_property_name", property_name.clone())?;
+                }
+            }
+            put_opt_str(vm, recv, "rd_property_name", property_name)?;
+            anim_put_bool(vm, recv, "rd_initialized", false)?;
+            Value::Null
+        }
+        ("setProperty", "(Landroid/util/Property;)V") => {
+            let property = args.first().cloned().unwrap_or(Value::Null);
+            if !matches!(get(vm, recv, "rd_values"), Value::Null) {
+                if let Some(holder) = anim_values(vm, recv).first().copied() {
+                    put(vm, holder, "rd_property", property.clone())?;
+                }
+            }
+            if matches!(get(vm, recv, "rd_property"), Value::Obj(_)) {
+                let property_name = anim_property_name(vm, &property);
+                put_opt_str(vm, recv, "rd_property_name", property_name)?;
+            }
+            put(vm, recv, "rd_property", property)?;
+            anim_put_bool(vm, recv, "rd_initialized", false)?;
+            Value::Null
+        }
+        ("getPropertyName", "()Ljava/lang/String;") => {
+            if let Some(property_name) = field_str(vm, recv, "rd_property_name") {
+                jstr(vm, property_name)?
+            } else if matches!(get(vm, recv, "rd_property"), Value::Obj(_)) {
+                let property = get(vm, recv, "rd_property");
+                match anim_property_name(vm, &property) {
+                    Some(name) => jstr(vm, name)?,
+                    None => Value::Null,
+                }
+            } else if !matches!(get(vm, recv, "rd_values"), Value::Null) {
+                let holders = anim_values(vm, recv);
+                if holders.is_empty() {
+                    Value::Null
+                } else {
+                    let names: Vec<String> = holders
+                        .iter()
+                        .map(|holder| {
+                            field_str(vm, *holder, "rd_property_name")
+                                .unwrap_or_else(|| "null".to_string())
+                        })
+                        .collect();
+                    jstr(vm, names.join(","))?
+                }
+            } else {
+                Value::Null
+            }
+        }
+        ("getTarget", "()Ljava/lang/Object;") => get(vm, recv, "rd_target"),
+        ("setTarget", "(Ljava/lang/Object;)V") => {
+            let target = args.first().cloned().unwrap_or(Value::Null);
+            if get(vm, recv, "rd_target") != target {
+                if field_bool(vm, recv, "rd_started") {
+                    anim_cancel(vm, recv)?;
+                }
+                put(vm, recv, "rd_target", target)?;
+                anim_put_bool(vm, recv, "rd_initialized", false)?;
+            }
+            Value::Null
+        }
+        ("setAutoCancel", "(Z)V") => {
+            anim_put_bool(vm, recv, "rd_auto_cancel", iarg(args, 0) != 0)?;
+            Value::Null
+        }
+        ("shouldAutoCancel", "(Landroid/animation/AnimationHandler$AnimationFrameCallback;)Z") => {
+            let other = oarg(args, 0);
+            bool_value(match other {
+                Some(other_ref) => {
+                    anim_is_object_animator(vm, other_ref)
+                        && field_bool(vm, other_ref, "rd_auto_cancel")
+                        && anim_same_target_and_properties(vm, recv, other_ref)
+                }
+                None => false,
+            })
+        }
+        ("start", "()V") => {
+            anim_auto_cancel_based_on(vm, recv)?;
+            anim_start(vm, recv, false)?;
+            Value::Null
+        }
+        ("setupStartValues", "()V") => {
+            anim_init_animation(vm, recv)?;
+            if let Some(target) = field_obj(vm, recv, "rd_target") {
+                for holder in anim_values(vm, recv) {
+                    if let Some(keyframe) = anim_pvh_keyframes(vm, holder).first().copied() {
+                        anim_pvh_setup_value(vm, holder, target, keyframe, false)?;
+                    }
+                }
+            }
+            Value::Null
+        }
+        ("setupEndValues", "()V") => {
+            anim_init_animation(vm, recv)?;
+            if let Some(target) = field_obj(vm, recv, "rd_target") {
+                for holder in anim_values(vm, recv) {
+                    if let Some(keyframe) = anim_pvh_keyframes(vm, holder).last().copied() {
+                        anim_pvh_setup_value(vm, holder, target, keyframe, false)?;
+                    }
+                }
+            }
+            Value::Null
+        }
+        ("clone", "()Landroid/animation/ObjectAnimator;")
+        | ("clone", "()Landroid/animation/ValueAnimator;")
+        | ("clone", "()Landroid/animation/Animator;")
+        | ("clone", "()Ljava/lang/Object;") => Value::Obj(anim_clone_animator(vm, recv)?),
+        ("toString", "()Ljava/lang/String;") => {
+            let target = get(vm, recv, "rd_target");
+            let target_text = value_string(vm, &target)?;
+            let mut out = format!("ObjectAnimator@{recv:x}, target {target_text}");
+            if !matches!(get(vm, recv, "rd_values"), Value::Null) {
+                for holder in anim_values(vm, recv) {
+                    let text =
+                        vm.invoke_instance(holder, "toString", "()Ljava/lang/String;", &[])?;
+                    out.push_str("\n    ");
+                    out.push_str(&opt_str(vm, Some(&text)).unwrap_or_default());
+                }
+            }
+            jstr(vm, out)?
+        }
+        _ => return value_animator_instance(vm, name, sig, recv, args),
+    };
+    Ok(Some(value))
 }

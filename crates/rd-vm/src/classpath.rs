@@ -1461,6 +1461,39 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         | "Landroid/view/textclassifier/TextClassificationManager;"
         | "Landroid/icu/util/ULocale;"
         | "Landroid/view/textclassifier/EntityConfidence;" => Some(OBJECT),
+        "Landroid/animation/Animator;"
+        | "Landroid/animation/Animator$AnimatorListener;"
+        | "Landroid/animation/Animator$AnimatorPauseListener;"
+        | "Landroid/animation/ValueAnimator$AnimatorUpdateListener;"
+        | "Landroid/animation/ValueAnimator$DurationScaleChangeListener;"
+        | "Landroid/animation/AnimationHandler;"
+        | "Landroid/animation/AnimationHandler$AnimationFrameCallback;"
+        | "Landroid/animation/PropertyValuesHolder;"
+        | "Landroid/animation/Keyframe;"
+        | "Landroid/animation/TypeEvaluator;"
+        | "Landroid/animation/TypeConverter;"
+        | "Landroid/animation/BidirectionalTypeConverter;"
+        | "Landroid/animation/IntEvaluator;"
+        | "Landroid/animation/FloatEvaluator;"
+        | "Landroid/animation/ArgbEvaluator;"
+        | "Landroid/animation/AnimatorListenerAdapter;"
+        | "Landroid/util/Property;" => Some(OBJECT),
+        "Landroid/util/IntProperty;" | "Landroid/util/FloatProperty;" => {
+            Some(&["Landroid/util/Property;", "Ljava/lang/Object;"])
+        }
+        "Landroid/animation/ValueAnimator;" => {
+            Some(&["Landroid/animation/Animator;", "Ljava/lang/Object;"])
+        }
+        "Landroid/animation/ObjectAnimator;" => Some(&[
+            "Landroid/animation/ValueAnimator;",
+            "Landroid/animation/Animator;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/animation/Keyframe$ObjectKeyframe;"
+        | "Landroid/animation/Keyframe$IntKeyframe;"
+        | "Landroid/animation/Keyframe$FloatKeyframe;" => {
+            Some(&["Landroid/animation/Keyframe;", "Ljava/lang/Object;"])
+        }
         "Landroid/hardware/camera2/CameraCharacteristics;"
         | "Landroid/hardware/camera2/CaptureRequest;"
         | "Landroid/hardware/camera2/CaptureResult;" => Some(&[
@@ -1812,6 +1845,30 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         }
         "Ljava/lang/Enum;" => Some(&["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
         "Ljava/lang/Thread;" => Some(&["Ljava/lang/Runnable;"]),
+        "Landroid/animation/Animator;"
+        | "Landroid/animation/PropertyValuesHolder;"
+        | "Landroid/animation/Keyframe;"
+        | "Landroid/animation/Keyframe$ObjectKeyframe;"
+        | "Landroid/animation/Keyframe$IntKeyframe;"
+        | "Landroid/animation/Keyframe$FloatKeyframe;" => Some(&["Ljava/lang/Cloneable;"]),
+        "Landroid/animation/ValueAnimator;" => Some(&[
+            "Ljava/lang/Cloneable;",
+            "Landroid/animation/AnimationHandler$AnimationFrameCallback;",
+        ]),
+        "Landroid/animation/ObjectAnimator;" => Some(&[
+            "Ljava/lang/Cloneable;",
+            "Landroid/animation/AnimationHandler$AnimationFrameCallback;",
+        ]),
+        "Landroid/animation/IntEvaluator;"
+        | "Landroid/animation/FloatEvaluator;"
+        | "Landroid/animation/ArgbEvaluator;" => Some(&["Landroid/animation/TypeEvaluator;"]),
+        "Landroid/animation/BidirectionalTypeConverter;" => {
+            Some(&["Landroid/animation/TypeConverter;"])
+        }
+        "Landroid/animation/AnimatorListenerAdapter;" => Some(&[
+            "Landroid/animation/Animator$AnimatorListener;",
+            "Landroid/animation/Animator$AnimatorPauseListener;",
+        ]),
         // Parcelable value types in the bounded Camera2/TextClassifier slices.
         "Landroid/hardware/camera2/impl/CameraMetadataNative;"
         | "Landroid/hardware/camera2/CaptureRequest;"

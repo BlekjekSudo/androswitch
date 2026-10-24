@@ -2,7 +2,7 @@
 
 <!-- GERADO por `cargo xtask api-coverage-report` a partir de `data/api-coverage.toml` — não editar à mão. -->
 
-Fonte: `RustyDroid.md Appendix C`. Janela: API 26–36. Superfícies registradas: **106** em **17** domínios (supported 4, partial 41, stub 4, not_implemented 57).
+Fonte: `RustyDroid.md Appendix C`. Janela: API 26–36. Superfícies registradas: **106** em **17** domínios (supported 4, partial 42, stub 3, not_implemented 57).
 
 **Semântica honesta:** `supported` significa modelo host com estado para o subconjunto documentado em `notes`/`key_apis`, não o pacote AOSP inteiro. `partial` executa um subconjunto real; `stub` é hierarquia/fallback; `not_implemented` não tem modelo host. Presença em DEX ou numa hierarquia stub não é cobertura de execução — para execução use MCP `get_coverage`.
 
@@ -26,7 +26,7 @@ Fonte: `RustyDroid.md Appendix C`. Janela: API 26–36. Superfícies registradas
 | Speech/ML | `android.service.voice`, `android.speech`, `android.speech.tts`, `android.view.textclassifier` | partial 1 · not_implemented 3 | `none`, `rd-vm/android-stub-surfaces` |
 | Services ext | `android.service.autofill`, `android.service.carrier`, `android.service.chooser`, `android.service.dreams`, `android.service.media`, `android.service.notification`, `android.service.quicksettings`, `android.service.textservice`, `android.service.wallpaper` | partial 1 · stub 1 · not_implemented 7 | `none`, `rd-vm/classpath`, `rd-vm/m9` |
 | System UI | `android.accessibilityservice`, `android.app.usage`, `android.appwidget`, `android.inputmethodservice`, `android.print` | partial 3 · not_implemented 2 | `none`, `rd-vm/m9` |
-| Misc | `android.accounts`, `android.animation`, `android.gesture`, `android.icu`, `android.mtp`, `android.preference`, `android.system`, `android.transition` | partial 4 · stub 3 · not_implemented 1 | `none`, `rd-vm/android-sysservices`, `rd-vm/classpath`, `rd-vm/framework`, `rd-vm/intrinsics` |
+| Misc | `android.accounts`, `android.animation`, `android.gesture`, `android.icu`, `android.mtp`, `android.preference`, `android.system`, `android.transition` | partial 5 · stub 2 · not_implemented 1 | `none`, `rd-vm/android-stub-surfaces`, `rd-vm/android-sysservices`, `rd-vm/classpath`, `rd-vm/framework`, `rd-vm/intrinsics` |
 
 ## Superfícies
 
@@ -131,7 +131,7 @@ Fonte: `RustyDroid.md Appendix C`. Janela: API 26–36. Superfícies registradas
 | `android.inputmethodservice` | system-ui | partial | `rd-vm/m9` (`fd-ui`) | M9 | gap-android-inputmethodservice-partial | Declared IME services can be enabled and connected to the focused editor in-session. Full subtype switching, handwriting, voice IME and external IME process isolation are not complete. |
 | `android.print` | system-ui | not_implemented | `none` (`fd-system-services`) | future | gap-android-print | PrintManager/print services/document adapters are not modelled. PDF graphics are also tracked under android.graphics.pdf. |
 | `android.accounts` | misc | partial | `rd-vm/android-sysservices` (`fd-system-services`) | M10/AA1 | gap-android-accounts-partial | Account value semantics plus an in-memory AccountManager explicit-account database cover getAccounts/getAccountsByType, passwords, user data and cached auth tokens. Authenticator flows, AccountManagerFuture operations, account visibility/permissions and sync adapters are not implemented. |
-| `android.animation` | misc | stub | `rd-vm/framework` (`fd-ui`) | M8+ | gap-android-animation-stub | Property animation types/timing hooks have fallback behaviour; frame-accurate ValueAnimator/ObjectAnimator interpolation is not claimed. |
+| `android.animation` | misc | partial | `rd-vm/android-stub-surfaces` (`fd-ui`) | M8+ | gap-android-animation-sets-paths-rendering | ValueAnimator and ObjectAnimator run on the deterministic virtual Choreographer clock with int/float/object values, PropertyValuesHolder and Keyframe evaluation, Int/Float/Argb evaluators, repeat/reverse, seek, pause/resume, cancel/end, lifecycle/update listeners, and JavaBeans or android.util.Property target application. AnimatorSet and AnimatorInflater, Path/PathKeyframes, multi-parameter holders, LayoutTransition and StateListAnimator, custom AnimationHandler providers and background pausing, RenderNode execution, Looper-thread confinement, and weak target clearing are not claimed. |
 | `android.gesture` | misc | partial | `rd-vm/android-sysservices` (`fd-ui`) | M10/AA6 | gap-android-gesture-legacy-partial | GesturePoint, GestureStroke, Gesture and OrientedBoundingBox implement AOSP point capture, stroke length/bounding-box geometry, clones, deterministic gesture IDs, total-length truncation and GestureUtils centroid/covariance PCA oriented bounding boxes. GestureLibrary/GestureStore loading, Learner prediction, gesture serialization files, GestureOverlayView and Path/Bitmap rendering are not implemented. |
 | `android.icu` | misc | partial | `rd-vm/intrinsics` (`fd-os`) | M8 | gap-android-icu-partial | Nearby Java/ICU-like break iteration, normalization and date/number helpers are implemented for common paths. The complete android.icu API and locale data fidelity are not claimed. |
 | `android.mtp` | misc | not_implemented | `none` (`fd-hardware`) | future | gap-android-mtp | MTP device/database APIs are not modelled. |
