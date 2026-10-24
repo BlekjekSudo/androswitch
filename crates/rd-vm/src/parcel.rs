@@ -574,6 +574,104 @@ fn read_strong_interface_with(
     )
 }
 
+// Reply-header exception codes (AOSP `Parcel` EX_* constants, in sync with
+// libbinder's binder/Status.h).
+const EX_SECURITY: i32 = -1;
+const EX_BAD_PARCELABLE: i32 = -2;
+const EX_ILLEGAL_ARGUMENT: i32 = -3;
+const EX_NULL_POINTER: i32 = -4;
+const EX_ILLEGAL_STATE: i32 = -5;
+const EX_NETWORK_MAIN_THREAD: i32 = -6;
+const EX_UNSUPPORTED_OPERATION: i32 = -7;
+const EX_SERVICE_SPECIFIC: i32 = -8;
+const EX_PARCELABLE: i32 = -9;
+const EX_HAS_STRICTMODE_REPLY_HEADER: i32 = -128;
+
+/// AOSP `Parcel.readExceptionCode`: consume any fat reply header and return
+/// the real exception code (0 = no exception). The StrictMode header's
+/// payload is skipped by its declared size (violations are not modeled);
+/// AppOps noted-op headers are never produced locally.
+fn read_exception_code(vm: &mut Engine, parcel: ObjRef) -> Result<i32, VmExit> {
+    let mut st = load(vm, parcel);
+    let mut code = st.read_i32()?;
+    if code == EX_HAS_STRICTMODE_REPLY_HEADER {
+        let header_size = st.read_i32()?;
+        if header_size > 4 {
+            let skip = (header_size - 4) as usize;
+            if st.pos + skip > st.data.len() {
+                return Err(bad("Parcel under-run reading StrictMode reply header"));
+            }
+            st.pos += skip;
+        }
+        code = 0;
+    }
+    store(vm, parcel, st);
+    Ok(code)
+}
+
+/// AOSP `Parcel.readException`: rethrow the exception written by
+/// `writeException` (code, message, remote-stack-trace header, then any
+/// code-specific payload).
+fn read_exception(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
+    let code = read_exception_code(vm, parcel)?;
+    if code == 0 {
+        return Ok(Value::Null);
+    }
+    let msg = read_string_from(vm, parcel)?.unwrap_or_default();
+    {
+        let mut st = load(vm, parcel);
+        let stack_payload_size = st.read_i32()?;
+        if stack_payload_size > 0 {
+            // Remote stack trace string: consumed (AOSP attaches it as a
+            // RemoteException cause; the thrown type/message are what
+            // guest catch blocks observe).
+            let _ = st.read_string()?;
+        }
+        store(vm, parcel, st);
+    }
+    let class = match code {
+        EX_SECURITY => "Ljava/lang/SecurityException;",
+        EX_BAD_PARCELABLE => "Landroid/os/BadParcelableException;",
+        EX_ILLEGAL_ARGUMENT => "Ljava/lang/IllegalArgumentException;",
+        EX_NULL_POINTER => "Ljava/lang/NullPointerException;",
+        EX_ILLEGAL_STATE => "Ljava/lang/IllegalStateException;",
+        EX_NETWORK_MAIN_THREAD => "Landroid/os/NetworkOnMainThreadException;",
+        EX_UNSUPPORTED_OPERATION => "Ljava/lang/UnsupportedOperationException;",
+        EX_SERVICE_SPECIFIC => {
+            let _error_code = read_i32_from(vm, parcel)?;
+            "Landroid/os/ServiceSpecificException;"
+        }
+        EX_PARCELABLE => {
+            let size = read_i32_from(vm, parcel)?;
+            if size > 0 {
+                if let Value::Obj(e) = read_parcelable(vm, parcel)? {
+                    let class = vm.heap.class_of(e)?.to_string();
+                    let detail = match vm.heap.get_field(e, "detailMessage") {
+                        Ok(Value::Obj(s)) => {
+                            vm.heap.as_str(s).ok().map(str::to_string).unwrap_or(msg)
+                        }
+                        _ => msg,
+                    };
+                    return Err(Throwable::new(&class, detail).into());
+                }
+            }
+            return Err(Throwable::new(
+                "Ljava/lang/RuntimeException;",
+                format!("{msg} [missing Parcelable]"),
+            )
+            .into());
+        }
+        _ => {
+            return Err(Throwable::new(
+                "Ljava/lang/RuntimeException;",
+                format!("Unknown exception code: {code} msg {msg}"),
+            )
+            .into());
+        }
+    };
+    Err(Throwable::new(class, msg).into())
+}
+
 fn write_string_to(vm: &mut Engine, parcel: ObjRef, s: Option<&str>) {
     let mut st = load(vm, parcel);
     st.write_string(s);
@@ -2195,52 +2293,62 @@ fn parcel_instance(
             store(vm, recv, st);
             return some(Value::Null);
         }
+        ("readExceptionCode", "()I") => {
+            return some(Value::Int(read_exception_code(vm, recv)?));
+        }
         ("readException", "()V") => {
-            let mut st = load(vm, recv);
-            let code = st.read_i32()?;
-            let msg = if code != 0 { st.read_string()? } else { None };
-            store(vm, recv, st);
-            if code != 0 {
-                let class = match code {
-                    -1 => "Ljava/lang/SecurityException;",
-                    -3 => "Ljava/lang/IllegalArgumentException;",
-                    -4 => "Ljava/lang/NullPointerException;",
-                    -5 => "Ljava/lang/IllegalStateException;",
-                    -7 => "Landroid/os/BadParcelableException;",
-                    _ => "Ljava/lang/RuntimeException;",
-                };
-                return Err(Throwable::new(
-                    class,
-                    msg.unwrap_or_else(|| format!("remote exception code {code}")),
-                )
-                .into());
-            }
-            return some(Value::Null);
+            return some(read_exception(vm, recv)?);
         }
         ("writeException", "(Ljava/lang/Exception;)V") => {
-            let (code, msg) = match obj_arg(args, 0) {
-                Some(e) => {
-                    let class = vm.heap.class_of(e)?.to_string();
-                    let code = match class.as_str() {
-                        "Ljava/lang/SecurityException;" => -1,
-                        "Landroid/os/BadParcelableException;" => -7,
-                        "Ljava/lang/IllegalArgumentException;" => -3,
-                        "Ljava/lang/NullPointerException;" => -4,
-                        "Ljava/lang/IllegalStateException;" => -5,
-                        _ => -128,
-                    };
-                    let msg = match vm.heap.get_field(e, "detailMessage") {
-                        Ok(Value::Obj(s)) => vm.heap.as_str(s).ok().map(str::to_string),
-                        _ => None,
-                    };
-                    (code, msg)
-                }
-                None => (0, None),
+            let Some(e) = obj_arg(args, 0) else {
+                let mut st = load(vm, recv);
+                st.write_i32(0);
+                store(vm, recv, st);
+                return some(Value::Null);
+            };
+            let class = vm.heap.class_of(e)?.to_string();
+            // AOSP `getExceptionCode` (instanceof order matters):
+            // Parcelable-boot exceptions first, then by exception class.
+            let is = |target: &str| class == target || vm.cp.is_subtype(&class, target);
+            let code = if is("Ljava/lang/SecurityException;") {
+                EX_SECURITY
+            } else if is("Landroid/os/BadParcelableException;") {
+                EX_BAD_PARCELABLE
+            } else if is("Ljava/lang/IllegalArgumentException;") {
+                EX_ILLEGAL_ARGUMENT
+            } else if is("Ljava/lang/NullPointerException;") {
+                EX_NULL_POINTER
+            } else if is("Ljava/lang/IllegalStateException;") {
+                EX_ILLEGAL_STATE
+            } else if is("Landroid/os/NetworkOnMainThreadException;") {
+                EX_NETWORK_MAIN_THREAD
+            } else if is("Ljava/lang/UnsupportedOperationException;") {
+                EX_UNSUPPORTED_OPERATION
+            } else if is("Landroid/os/ServiceSpecificException;") {
+                EX_SERVICE_SPECIFIC
+            } else {
+                0
+            };
+            let msg = match vm.heap.get_field(e, "detailMessage") {
+                Ok(Value::Obj(s)) => vm.heap.as_str(s).ok().map(str::to_string),
+                _ => None,
             };
             let mut st = load(vm, recv);
             st.write_i32(code);
-            if code != 0 {
-                st.write_string(msg.as_deref());
+            if code == 0 {
+                // AOSP writes the 0 code and then rethrows exceptions it
+                // has no code for instead of marshalling them.
+                store(vm, recv, st);
+                return Err(Throwable::new(&class, msg.unwrap_or_default()).into());
+            }
+            st.write_string(msg.as_deref());
+            st.write_i32(0); // no remote stack-trace payload
+            if code == EX_SERVICE_SPECIFIC {
+                let error_code = match vm.heap.get_field(e, "errorCode") {
+                    Ok(v) => v.as_int().unwrap_or(0),
+                    Err(_) => 0,
+                };
+                st.write_i32(error_code);
             }
             store(vm, recv, st);
             return some(Value::Null);
@@ -3688,6 +3796,10 @@ fn binder_instance(
             Some(jstring(vm, binder_descriptor(vm, recv))?)
         }
         ("isBinderAlive", "()Z") | ("pingBinder", "()Z") => Some(Value::Int(1)),
+        // AOSP's local `Binder.linkToDeath` is documented as a no-op (a
+        // local object cannot die), and `unlinkToDeath` returns true.
+        ("linkToDeath", "(Landroid/os/IBinder$DeathRecipient;I)V") => Some(Value::Null),
+        ("unlinkToDeath", "(Landroid/os/IBinder$DeathRecipient;I)Z") => Some(Value::Int(1)),
         ("transact", "(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z") => {
             let code = int_arg(args, 0);
             if code == INTERFACE_TRANSACTION {
@@ -4614,6 +4726,62 @@ mod tests {
             ),
             Value::Null
         );
+    }
+
+    #[test]
+    fn exception_codes_match_aosp_status_table() {
+        let mut vm = engine();
+        for (class, code) in [
+            ("Ljava/lang/SecurityException;", EX_SECURITY),
+            ("Landroid/os/BadParcelableException;", EX_BAD_PARCELABLE),
+            ("Ljava/lang/IllegalArgumentException;", EX_ILLEGAL_ARGUMENT),
+            ("Ljava/lang/NullPointerException;", EX_NULL_POINTER),
+            ("Ljava/lang/IllegalStateException;", EX_ILLEGAL_STATE),
+            (
+                "Ljava/lang/UnsupportedOperationException;",
+                EX_UNSUPPORTED_OPERATION,
+            ),
+        ] {
+            let p = obj(new_parcel(&mut vm).unwrap());
+            let e = vm
+                .heap
+                .alloc_instance(class.to_string(), Vec::new())
+                .unwrap();
+            let message = s(&mut vm, "boom");
+            vm.heap.put_field(e, "detailMessage", message).unwrap();
+            callp(
+                &mut vm,
+                p,
+                "writeException",
+                "(Ljava/lang/Exception;)V",
+                &[Value::Obj(e)],
+            );
+            let st = load(&vm, p);
+            assert_eq!(
+                i32::from_le_bytes(st.data[0..4].try_into().unwrap()),
+                code,
+                "{class} must use its AOSP status code"
+            );
+            // Full frame: code, message string, zero stack-trace header.
+            callp(&mut vm, p, "setDataPosition", "(I)V", &[Value::Int(0)]);
+            assert_eq!(
+                callp(&mut vm, p, "readExceptionCode", "()I", &[]),
+                Value::Int(code)
+            );
+            callp(&mut vm, p, "setDataPosition", "(I)V", &[Value::Int(0)]);
+            match call_instance_intrinsic(&mut vm, PARCEL, "readException", "()V", p, &[]) {
+                Err(VmExit::Exception(t)) => {
+                    assert_eq!(t.class, class);
+                    assert_eq!(t.message.as_deref(), Some("boom"));
+                }
+                other => panic!("readException: {other:?}"),
+            }
+            assert_eq!(
+                load(&vm, p).pos,
+                load(&vm, p).data.len(),
+                "exception frame must be fully consumed"
+            );
+        }
     }
 
     #[test]
