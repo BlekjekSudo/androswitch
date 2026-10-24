@@ -18,6 +18,10 @@
 //!   `KeyChain` behavior, without a Keystore/KeyChain service.
 //! * `android.view.textclassifier` value builders/results and the exact
 //!   `TextClassifier.NO_OP` default behavior, without an ML model.
+//! * `android.service.autofill` Dataset/FillResponse/SaveInfo/UserData value
+//!   objects, validators/sanitizers, requests, and one-shot callbacks. There
+//!   is no AutofillManager session, AssistStructure capture, credential UI,
+//!   or cross-process service binding in this slice.
 //! * `android.animation` `ValueAnimator`/`ObjectAnimator` timing on the
 //!   deterministic virtual Choreographer clock, with keyframes, evaluators,
 //!   listeners and JavaBeans/Property application. AnimatorSet, Path and
@@ -125,6 +129,42 @@ const ANIMATOR_LISTENER_ADAPTER: &str = "Landroid/animation/AnimatorListenerAdap
 const ANDROID_PROPERTY: &str = "Landroid/util/Property;";
 const ANDROID_INT_PROPERTY: &str = "Landroid/util/IntProperty;";
 const ANDROID_FLOAT_PROPERTY: &str = "Landroid/util/FloatProperty;";
+
+const AUTOFILL_ID: &str = "Landroid/view/autofill/AutofillId;";
+const AUTOFILL_VALUE: &str = "Landroid/view/autofill/AutofillValue;";
+const AUTOFILL_SERVICE: &str = "Landroid/service/autofill/AutofillService;";
+const AF_DATASET: &str = "Landroid/service/autofill/Dataset;";
+const AF_DATASET_BUILDER: &str = "Landroid/service/autofill/Dataset$Builder;";
+const AF_DATASET_FILTER: &str = "Landroid/service/autofill/Dataset$DatasetFieldFilter;";
+const AF_FIELD: &str = "Landroid/service/autofill/Field;";
+const AF_FIELD_BUILDER: &str = "Landroid/service/autofill/Field$Builder;";
+const AF_PRESENTATIONS: &str = "Landroid/service/autofill/Presentations;";
+const AF_PRESENTATIONS_BUILDER: &str = "Landroid/service/autofill/Presentations$Builder;";
+const AF_INLINE_PRESENTATION: &str = "Landroid/service/autofill/InlinePresentation;";
+const AF_FILL_RESPONSE: &str = "Landroid/service/autofill/FillResponse;";
+const AF_FILL_RESPONSE_BUILDER: &str = "Landroid/service/autofill/FillResponse$Builder;";
+const AF_SAVE_INFO: &str = "Landroid/service/autofill/SaveInfo;";
+const AF_SAVE_INFO_BUILDER: &str = "Landroid/service/autofill/SaveInfo$Builder;";
+const AF_USER_DATA: &str = "Landroid/service/autofill/UserData;";
+const AF_USER_DATA_BUILDER: &str = "Landroid/service/autofill/UserData$Builder;";
+const AF_VALIDATORS: &str = "Landroid/service/autofill/Validators;";
+const AF_INTERNAL_VALIDATOR: &str = "Landroid/service/autofill/InternalValidator;";
+const AF_REGEX_VALIDATOR: &str = "Landroid/service/autofill/RegexValidator;";
+const AF_REQUIRED_VALIDATORS: &str = "Landroid/service/autofill/RequiredValidators;";
+const AF_OPTIONAL_VALIDATORS: &str = "Landroid/service/autofill/OptionalValidators;";
+const AF_NEGATION_VALIDATOR: &str = "Landroid/service/autofill/NegationValidator;";
+const AF_INTERNAL_SANITIZER: &str = "Landroid/service/autofill/InternalSanitizer;";
+const AF_TEXT_SANITIZER: &str = "Landroid/service/autofill/TextValueSanitizer;";
+const AF_DATE_SANITIZER: &str = "Landroid/service/autofill/DateValueSanitizer;";
+const AF_FILL_REQUEST: &str = "Landroid/service/autofill/FillRequest;";
+const AF_SAVE_REQUEST: &str = "Landroid/service/autofill/SaveRequest;";
+const AF_FILL_CONTEXT: &str = "Landroid/service/autofill/FillContext;";
+const AF_FILL_CALLBACK: &str = "Landroid/service/autofill/FillCallback;";
+const AF_SAVE_CALLBACK: &str = "Landroid/service/autofill/SaveCallback;";
+const AF_FIELD_CLASSIFICATION: &str = "Landroid/service/autofill/FieldClassification;";
+const AF_FIELD_CLASSIFICATION_MATCH: &str = "Landroid/service/autofill/FieldClassification$Match;";
+const AF_SAVED_DATASETS_INFO: &str = "Landroid/service/autofill/SavedDatasetsInfo;";
+const AF_SAVED_DATASETS_CALLBACK: &str = "Landroid/service/autofill/SavedDatasetsInfoCallback;";
 
 fn ise(msg: impl Into<String>) -> VmExit {
     throw("Ljava/lang/IllegalStateException;", msg)
@@ -378,6 +418,58 @@ pub(crate) fn host_static(
         (VALUE_ANIMATOR | OBJECT_ANIMATOR, "INFINITE") => Value::Int(-1),
         (VALUE_ANIMATOR | OBJECT_ANIMATOR, "RESTART") => Value::Int(1),
         (VALUE_ANIMATOR | OBJECT_ANIMATOR, "REVERSE") => Value::Int(2),
+        (AUTOFILL_ID, "NO_SESSION") => Value::Int(0),
+        (AUTOFILL_ID, "NO_AUTOFILL_ID") => return af_no_autofill_id(vm).map(Some),
+        (AF_DATASET, "PICK_REASON_UNKNOWN") => Value::Int(0),
+        (AF_DATASET, "PICK_REASON_NO_PCC") => Value::Int(1),
+        (AF_DATASET, "PICK_REASON_PROVIDER_DETECTION_ONLY") => Value::Int(2),
+        (AF_DATASET, "PICK_REASON_PROVIDER_DETECTION_PREFERRED_WITH_PCC") => Value::Int(3),
+        (AF_DATASET, "PICK_REASON_PCC_DETECTION_ONLY") => Value::Int(4),
+        (AF_DATASET, "PICK_REASON_PCC_DETECTION_PREFERRED_WITH_PROVIDER") => Value::Int(5),
+        (AF_FILL_RESPONSE, "FLAG_TRACK_CONTEXT_COMMITED") => Value::Int(0x1),
+        (AF_FILL_RESPONSE, "FLAG_DISABLE_ACTIVITY_ONLY") => Value::Int(0x2),
+        (AF_FILL_RESPONSE, "FLAG_DELAY_FILL") => Value::Int(0x4),
+        (AF_SAVE_INFO, "SAVE_DATA_TYPE_GENERIC") => Value::Int(0),
+        (AF_SAVE_INFO, "SAVE_DATA_TYPE_PASSWORD") => Value::Int(0x01),
+        (AF_SAVE_INFO, "SAVE_DATA_TYPE_ADDRESS") => Value::Int(0x02),
+        (AF_SAVE_INFO, "SAVE_DATA_TYPE_CREDIT_CARD") => Value::Int(0x04),
+        (AF_SAVE_INFO, "SAVE_DATA_TYPE_USERNAME") => Value::Int(0x08),
+        (AF_SAVE_INFO, "SAVE_DATA_TYPE_EMAIL_ADDRESS") => Value::Int(0x10),
+        (AF_SAVE_INFO, "SAVE_DATA_TYPE_DEBIT_CARD") => Value::Int(0x20),
+        (AF_SAVE_INFO, "SAVE_DATA_TYPE_PAYMENT_CARD") => Value::Int(0x40),
+        (AF_SAVE_INFO, "SAVE_DATA_TYPE_GENERIC_CARD") => Value::Int(0x80),
+        (AF_SAVE_INFO, "NEGATIVE_BUTTON_STYLE_CANCEL") => Value::Int(0),
+        (AF_SAVE_INFO, "NEGATIVE_BUTTON_STYLE_REJECT") => Value::Int(1),
+        (AF_SAVE_INFO, "NEGATIVE_BUTTON_STYLE_NEVER") => Value::Int(2),
+        (AF_SAVE_INFO, "POSITIVE_BUTTON_STYLE_SAVE") => Value::Int(0),
+        (AF_SAVE_INFO, "POSITIVE_BUTTON_STYLE_CONTINUE") => Value::Int(1),
+        (AF_SAVE_INFO, "FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE") => Value::Int(0x1),
+        (AF_SAVE_INFO, "FLAG_DONT_SAVE_ON_FINISH") => Value::Int(0x2),
+        (AF_SAVE_INFO, "FLAG_DELAY_SAVE") => Value::Int(0x4),
+        (AF_FILL_REQUEST, "FLAG_MANUAL_REQUEST") => Value::Int(0x1),
+        (AF_FILL_REQUEST, "FLAG_COMPATIBILITY_MODE_REQUEST") => Value::Int(0x2),
+        (AF_FILL_REQUEST, "FLAG_PASSWORD_INPUT_TYPE") => Value::Int(0x4),
+        (AF_FILL_REQUEST, "FLAG_VIEW_NOT_FOCUSED") => Value::Int(0x10),
+        (AF_FILL_REQUEST, "FLAG_SUPPORTS_FILL_DIALOG") => Value::Int(0x40),
+        (AF_FILL_REQUEST, "FLAG_IME_SHOWING") => Value::Int(0x80),
+        (AF_FILL_REQUEST, "FLAG_RESET_FILL_DIALOG_STATE") => Value::Int(0x100),
+        (AF_FILL_REQUEST, "FLAG_PCC_DETECTION") => Value::Int(0x200),
+        (AF_FILL_REQUEST, "FLAG_SCREEN_HAS_CREDMAN_FIELD") => Value::Int(0x400),
+        (AF_FILL_REQUEST, "INVALID_REQUEST_ID") => Value::Int(i32::MIN),
+        (AUTOFILL_SERVICE, "SERVICE_INTERFACE") => {
+            return jstr(vm, "android.service.autofill.AutofillService").map(Some)
+        }
+        (AUTOFILL_SERVICE, "SERVICE_META_DATA") => return jstr(vm, "android.autofill").map(Some),
+        (AUTOFILL_SERVICE, "EXTRA_FILL_RESPONSE") => {
+            return jstr(vm, "android.service.autofill.extra.FILL_RESPONSE").map(Some)
+        }
+        (AUTOFILL_SERVICE, "EXTRA_RESULT") => return jstr(vm, "result").map(Some),
+        (AUTOFILL_SERVICE, "EXTRA_ERROR") => return jstr(vm, "error").map(Some),
+        (AF_SAVED_DATASETS_INFO, "TYPE_OTHER") => return jstr(vm, "other").map(Some),
+        (AF_SAVED_DATASETS_INFO, "TYPE_PASSWORDS") => return jstr(vm, "passwords").map(Some),
+        (AF_SAVED_DATASETS_CALLBACK, "ERROR_OTHER") => Value::Int(0),
+        (AF_SAVED_DATASETS_CALLBACK, "ERROR_UNSUPPORTED") => Value::Int(1),
+        (AF_SAVED_DATASETS_CALLBACK, "ERROR_NEEDS_USER_ACTION") => Value::Int(2),
         (TEXT_CLASSIFICATION, "EMPTY") => return empty_text_classification(vm).map(Some),
         (TEXT_LANGUAGE, "EMPTY") => return empty_text_language(vm).map(Some),
         _ => return Ok(None),
@@ -415,6 +507,15 @@ pub(crate) fn static_intrinsic(
         KEYFRAME => keyframe_static(vm, name, sig, args),
         ANIMATION_HANDLER => animation_handler_static(vm, name, sig, args),
         ARGB_EVALUATOR if name == "getInstance" => argb_evaluator_instance(vm).map(Some),
+        AUTOFILL_ID => autofill_id_static(vm, name, sig, args),
+        AUTOFILL_VALUE => autofill_value_static(vm, name, sig, args),
+        AF_VALIDATORS => af_validators_static(vm, name, sig, args),
+        AF_INLINE_PRESENTATION => af_inline_presentation_static(vm, name, sig, args),
+        AF_USER_DATA => af_user_data_static(vm, name, sig, args),
+        AF_SAVE_INFO if name == "copy" => af_save_info_copy_static(vm, args).map(Some),
+        AF_FILL_RESPONSE if name == "shallowCopy" => {
+            af_fill_response_copy_static(vm, args).map(Some)
+        }
         WEBVIEW => webview_static(vm, name, sig, args),
         WEB_SETTINGS if name == "getDefaultUserAgent" => {
             // A deterministic user agent for the no-renderer profile.  Callers
@@ -547,6 +648,40 @@ pub(crate) fn instance_intrinsic(
         ANDROID_PROPERTY | ANDROID_INT_PROPERTY | ANDROID_FLOAT_PROPERTY => {
             android_property_instance(vm, class, name, sig, recv, args)
         }
+        AUTOFILL_ID => autofill_id_instance(vm, name, sig, recv, args),
+        AUTOFILL_VALUE => autofill_value_instance(vm, name, sig, recv, args),
+        AF_DATASET => af_dataset_instance(vm, name, sig, recv, args),
+        AF_DATASET_BUILDER => af_dataset_builder_instance(vm, name, sig, recv, args),
+        AF_DATASET_FILTER => af_dataset_filter_instance(vm, name, sig, recv, args),
+        AF_FIELD => af_field_instance(vm, name, sig, recv, args),
+        AF_FIELD_BUILDER => af_field_builder_instance(vm, name, sig, recv, args),
+        AF_PRESENTATIONS => af_presentations_instance(vm, name, sig, recv, args),
+        AF_PRESENTATIONS_BUILDER => af_presentations_builder_instance(vm, name, sig, recv, args),
+        AF_INLINE_PRESENTATION => af_inline_presentation_instance(vm, name, sig, recv, args),
+        AF_FILL_RESPONSE => af_fill_response_instance(vm, name, sig, recv, args),
+        AF_FILL_RESPONSE_BUILDER => af_fill_response_builder_instance(vm, name, sig, recv, args),
+        AF_SAVE_INFO => af_save_info_instance(vm, name, sig, recv, args),
+        AF_SAVE_INFO_BUILDER => af_save_info_builder_instance(vm, name, sig, recv, args),
+        AF_USER_DATA => af_user_data_instance(vm, name, sig, recv, args),
+        AF_USER_DATA_BUILDER => af_user_data_builder_instance(vm, name, sig, recv, args),
+        AF_REGEX_VALIDATOR
+        | AF_REQUIRED_VALIDATORS
+        | AF_OPTIONAL_VALIDATORS
+        | AF_NEGATION_VALIDATOR => af_validator_instance(vm, class, name, sig, recv, args),
+        AF_TEXT_SANITIZER | AF_DATE_SANITIZER => {
+            af_sanitizer_instance(vm, class, name, sig, recv, args)
+        }
+        AF_FILL_REQUEST => af_fill_request_instance(vm, name, sig, recv, args),
+        AF_SAVE_REQUEST => af_save_request_instance(vm, name, sig, recv, args),
+        AF_FILL_CONTEXT => af_fill_context_instance(vm, name, sig, recv, args),
+        AF_FILL_CALLBACK => af_fill_callback_instance(vm, name, sig, recv, args),
+        AF_SAVE_CALLBACK => af_save_callback_instance(vm, name, sig, recv, args),
+        AF_FIELD_CLASSIFICATION => af_field_classification_instance(vm, name, sig, recv, args),
+        AF_FIELD_CLASSIFICATION_MATCH => {
+            af_field_classification_match_instance(vm, name, sig, recv, args)
+        }
+        AF_SAVED_DATASETS_INFO => af_saved_datasets_info_instance(vm, name, sig, recv, args),
+        AUTOFILL_SERVICE => af_autofill_service_instance(vm, name, sig, recv, args),
         _ => Ok(None),
     }
 }
@@ -625,6 +760,39 @@ fn is_stub_class(c: &str) -> bool {
             | ANDROID_PROPERTY
             | ANDROID_INT_PROPERTY
             | ANDROID_FLOAT_PROPERTY
+            | AUTOFILL_ID
+            | AUTOFILL_VALUE
+            | AUTOFILL_SERVICE
+            | AF_DATASET
+            | AF_DATASET_BUILDER
+            | AF_DATASET_FILTER
+            | AF_FIELD
+            | AF_FIELD_BUILDER
+            | AF_PRESENTATIONS
+            | AF_PRESENTATIONS_BUILDER
+            | AF_INLINE_PRESENTATION
+            | AF_FILL_RESPONSE
+            | AF_FILL_RESPONSE_BUILDER
+            | AF_SAVE_INFO
+            | AF_SAVE_INFO_BUILDER
+            | AF_USER_DATA
+            | AF_USER_DATA_BUILDER
+            | AF_INTERNAL_VALIDATOR
+            | AF_REGEX_VALIDATOR
+            | AF_REQUIRED_VALIDATORS
+            | AF_OPTIONAL_VALIDATORS
+            | AF_NEGATION_VALIDATOR
+            | AF_INTERNAL_SANITIZER
+            | AF_TEXT_SANITIZER
+            | AF_DATE_SANITIZER
+            | AF_FILL_REQUEST
+            | AF_SAVE_REQUEST
+            | AF_FILL_CONTEXT
+            | AF_FILL_CALLBACK
+            | AF_SAVE_CALLBACK
+            | AF_FIELD_CLASSIFICATION
+            | AF_FIELD_CLASSIFICATION_MATCH
+            | AF_SAVED_DATASETS_INFO
     )
 }
 
@@ -10367,4 +10535,3757 @@ fn object_animator_instance(
         _ => return value_animator_instance(vm, name, sig, recv, args),
     };
     Ok(Some(value))
+}
+
+// ---------------------------------------------------------------------------
+// android.service.autofill: service-side value objects and callbacks
+// ---------------------------------------------------------------------------
+
+const AF_TYPE_TEXT: i32 = 1;
+const AF_TYPE_TOGGLE: i32 = 2;
+const AF_TYPE_LIST: i32 = 3;
+const AF_TYPE_DATE: i32 = 4;
+const AF_ID_FLAG_VIRTUAL_INT: i32 = 0x1;
+const AF_ID_FLAG_VIRTUAL_LONG: i32 = 0x2;
+const AF_ID_FLAG_HAS_SESSION: i32 = 0x4;
+
+fn af_destroyed(vm: &Engine, r: ObjRef) -> bool {
+    field_bool(vm, r, "destroyed")
+}
+fn af_throw_if_destroyed(vm: &Engine, r: ObjRef) -> Result<(), VmExit> {
+    if af_destroyed(vm, r) {
+        Err(ise("Already called #build()"))
+    } else {
+        Ok(())
+    }
+}
+fn af_check_not_used(vm: &Engine, r: ObjRef) -> Result<(), VmExit> {
+    if af_destroyed(vm, r) {
+        Err(ise(
+            "This Builder should not be reused. Use a new Builder instance instead",
+        ))
+    } else {
+        Ok(())
+    }
+}
+fn af_check_flags(value: i32, valid: i32) -> Result<i32, VmExit> {
+    if value & !valid != 0 {
+        Err(iae(format!(
+            "Requested flags 0x{value:x}, but only 0x{valid:x} are allowed"
+        )))
+    } else {
+        Ok(value)
+    }
+}
+fn af_check_range(value: i32, min: i32, max: i32, name: &str) -> Result<i32, VmExit> {
+    if value < min || value > max {
+        Err(iae(format!("{name} is out of range [{min}, {max}]")))
+    } else {
+        Ok(value)
+    }
+}
+fn af_arg_value(args: &[Value], i: usize) -> Value {
+    args.get(i).cloned().unwrap_or(Value::Null)
+}
+fn af_req_arg_obj(args: &[Value], i: usize, what: &str) -> Result<ObjRef, VmExit> {
+    oarg(args, i).ok_or_else(|| npe(what))
+}
+fn af_new_list(vm: &mut Engine, items: Vec<Value>) -> Result<ObjRef, VmExit> {
+    new_collection(vm, "Ljava/util/ArrayList;", items)
+}
+fn af_ensure_list_field(vm: &mut Engine, r: ObjRef, field: &str) -> Result<ObjRef, VmExit> {
+    if let Some(list) = field_obj(vm, r, field) {
+        if matches!(vm.fw.objects.get(&list), Some(HostObj::List { .. })) {
+            return Ok(list);
+        }
+        // A list supplied through an explicit constructor may be represented
+        // by another host collection; normalize its visible items once.
+        let items = collection_items(vm, Some(&Value::Obj(list)));
+        let normalized = af_new_list(vm, items)?;
+        put(vm, r, field, Value::Obj(normalized))?;
+        return Ok(normalized);
+    }
+    let list = af_new_list(vm, Vec::new())?;
+    put(vm, r, field, Value::Obj(list))?;
+    Ok(list)
+}
+fn af_field_items(vm: &mut Engine, r: ObjRef, field: &str) -> Result<Vec<Value>, VmExit> {
+    let list = af_ensure_list_field(vm, r, field)?;
+    Ok(match vm.fw.objects.get(&list) {
+        Some(HostObj::List { elems }) => elems.clone(),
+        _ => Vec::new(),
+    })
+}
+fn af_set_field_items(
+    vm: &mut Engine,
+    r: ObjRef,
+    field: &str,
+    items: Vec<Value>,
+) -> Result<(), VmExit> {
+    let list = af_ensure_list_field(vm, r, field)?;
+    if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&list) {
+        *elems = items;
+    }
+    Ok(())
+}
+fn af_existing_field_items(vm: &Engine, r: ObjRef, field: &str) -> Vec<Value> {
+    collection_items(vm, Some(&get(vm, r, field)))
+}
+fn af_init_empty_list(vm: &mut Engine, r: ObjRef, field: &str) -> Result<(), VmExit> {
+    let list = af_new_list(vm, Vec::new())?;
+    put(vm, r, field, Value::Obj(list))
+}
+fn af_list_at(items: &[Value], index: i32) -> Result<Value, VmExit> {
+    if index < 0 || index as usize >= items.len() {
+        Err(idx_oob(format!(
+            "Index {index} out of bounds for length {}",
+            items.len()
+        )))
+    } else {
+        Ok(items[index as usize].clone())
+    }
+}
+fn af_assert_valid_ids(vm: &Engine, value: &Value) -> Result<Value, VmExit> {
+    let Some(array_ref) = (match value {
+        Value::Obj(r) => Some(*r),
+        _ => None,
+    }) else {
+        return Err(iae("must have at least one id"));
+    };
+    let Ok((items, _)) = vm.heap.as_array_elems(array_ref) else {
+        return Err(iae("must have at least one id"));
+    };
+    let items = items.to_vec();
+    if items.is_empty() {
+        return Err(iae("must have at least one id"));
+    }
+    for (i, item) in items.iter().enumerate() {
+        if matches!(item, Value::Null) {
+            return Err(iae(format!("ids[{i}] must not be null")));
+        }
+    }
+    Ok(value.clone())
+}
+fn af_check_array_elements_not_null(
+    vm: &Engine,
+    value: &Value,
+    name: &str,
+) -> Result<Vec<Value>, VmExit> {
+    let Some(array_ref) = (match value {
+        Value::Obj(r) => Some(*r),
+        _ => None,
+    }) else {
+        return Err(npe(&format!("{name} is null")));
+    };
+    let Ok((items, _)) = vm.heap.as_array_elems(array_ref) else {
+        return Err(npe(&format!("{name} is null")));
+    };
+    let items = items.to_vec();
+    for item in &items {
+        if matches!(item, Value::Null) {
+            return Err(npe(&format!("{name} has null element")));
+        }
+    }
+    Ok(items)
+}
+fn af_objects_equal(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, VmExit> {
+    match (a, b) {
+        (Value::Null, Value::Null) => Ok(true),
+        (Value::Obj(x), Value::Obj(y)) => {
+            if x == y {
+                return Ok(true);
+            }
+            if let (Ok(s), Ok(t)) = (vm.heap.as_str(*x), vm.heap.as_str(*y)) {
+                return Ok(s == t);
+            }
+            let result = vm.invoke_instance(
+                *x,
+                "equals",
+                "(Ljava/lang/Object;)Z",
+                std::slice::from_ref(b),
+            )?;
+            Ok(result.as_int().unwrap_or(0) != 0)
+        }
+        _ => Ok(a == b),
+    }
+}
+fn af_objects_hash(vm: &mut Engine, value: &Value) -> Result<i32, VmExit> {
+    if matches!(value, Value::Null) {
+        Ok(0)
+    } else {
+        object_hash_code(vm, value)
+    }
+}
+fn af_string_array(vm: &mut Engine, items: Vec<Value>) -> Result<Value, VmExit> {
+    obj_array(vm, "[Ljava/lang/String;", items)
+}
+fn af_id_set(
+    vm: &mut Engine,
+    r: ObjRef,
+    flags: i32,
+    view_id: i32,
+    virtual_child: i64,
+    session_id: i32,
+) -> Result<(), VmExit> {
+    put(vm, r, "flags", Value::Int(flags))?;
+    put(vm, r, "viewId", Value::Int(view_id))?;
+    put(
+        vm,
+        r,
+        "virtualIntId",
+        Value::Int(if flags & AF_ID_FLAG_VIRTUAL_INT != 0 {
+            virtual_child as i32
+        } else {
+            -1
+        }),
+    )?;
+    put(
+        vm,
+        r,
+        "virtualLongId",
+        Value::Long(if flags & AF_ID_FLAG_VIRTUAL_LONG != 0 {
+            virtual_child
+        } else {
+            -1
+        }),
+    )?;
+    put(vm, r, "sessionId", Value::Int(session_id))
+}
+fn af_id_new(
+    vm: &mut Engine,
+    flags: i32,
+    view_id: i32,
+    virtual_child: i64,
+    session_id: i32,
+) -> Result<ObjRef, VmExit> {
+    let r = alloc_obj(vm, AUTOFILL_ID, Vec::new())?;
+    af_id_set(vm, r, flags, view_id, virtual_child, session_id)?;
+    Ok(r)
+}
+fn af_no_autofill_id(vm: &mut Engine) -> Result<Value, VmExit> {
+    let key = (AUTOFILL_ID.to_string(), "NO_AUTOFILL_ID".to_string());
+    if let Some(value) = vm.statics.get(&key) {
+        return Ok(value.clone());
+    }
+    let value = Value::Obj(af_id_new(vm, 0, 0, -1, 0)?);
+    vm.statics.insert(key, value.clone());
+    Ok(value)
+}
+fn af_id_equals(vm: &Engine, a: ObjRef, b: ObjRef, ignore_session: bool) -> bool {
+    field_int(vm, a, "viewId") == field_int(vm, b, "viewId")
+        && field_int(vm, a, "virtualIntId") == field_int(vm, b, "virtualIntId")
+        && field_long(vm, a, "virtualLongId") == field_long(vm, b, "virtualLongId")
+        && (ignore_session || field_int(vm, a, "sessionId") == field_int(vm, b, "sessionId"))
+}
+
+fn autofill_id_static(
+    vm: &mut Engine,
+    name: &str,
+    _sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match name {
+        "create" => {
+            let host = af_req_arg_obj(args, 0, "host")?;
+            let host_id_value = vm.invoke_instance(
+                host,
+                "getAutofillId",
+                "()Landroid/view/autofill/AutofillId;",
+                &[],
+            )?;
+            let host_id = match host_id_value {
+                Value::Obj(r) => r,
+                _ => return Err(npe("host.getAutofillId()")),
+            };
+            Value::Obj(af_id_new(
+                vm,
+                AF_ID_FLAG_VIRTUAL_INT,
+                field_int(vm, host_id, "viewId"),
+                iarg(args, 1) as i64,
+                0,
+            )?)
+        }
+        "withoutSession" => {
+            let id = af_req_arg_obj(args, 0, "id")?;
+            let old_flags = field_int(vm, id, "flags");
+            let child = if old_flags & AF_ID_FLAG_VIRTUAL_LONG != 0 {
+                field_long(vm, id, "virtualLongId")
+            } else {
+                field_int(vm, id, "virtualIntId") as i64
+            };
+            Value::Obj(af_id_new(
+                vm,
+                old_flags & !AF_ID_FLAG_HAS_SESSION,
+                field_int(vm, id, "viewId"),
+                child,
+                0,
+            )?)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn autofill_id_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(I)V") => {
+            af_id_set(vm, recv, 0, iarg(args, 0), -1, 0)?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/view/autofill/AutofillId;I)V") => {
+            let host = af_req_arg_obj(args, 0, "hostId")?;
+            af_id_set(
+                vm,
+                recv,
+                AF_ID_FLAG_VIRTUAL_INT,
+                field_int(vm, host, "viewId"),
+                iarg(args, 1) as i64,
+                0,
+            )?;
+            Value::Null
+        }
+        ("<init>", "(II)V") => {
+            af_id_set(
+                vm,
+                recv,
+                AF_ID_FLAG_VIRTUAL_INT,
+                iarg(args, 0),
+                iarg(args, 1) as i64,
+                0,
+            )?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/view/autofill/AutofillId;JI)V") => {
+            let host = af_req_arg_obj(args, 0, "hostId")?;
+            af_id_set(
+                vm,
+                recv,
+                AF_ID_FLAG_VIRTUAL_LONG | AF_ID_FLAG_HAS_SESSION,
+                field_int(vm, host, "viewId"),
+                larg(args, 1),
+                iarg(args, 2),
+            )?;
+            Value::Null
+        }
+        ("<init>", "(IIJI)V") => {
+            af_id_set(
+                vm,
+                recv,
+                iarg(args, 0),
+                iarg(args, 1),
+                larg(args, 2),
+                iarg(args, 3),
+            )?;
+            Value::Null
+        }
+        ("getViewId", "()I") => Value::Int(field_int(vm, recv, "viewId")),
+        ("getVirtualChildIntId", "()I") => Value::Int(field_int(vm, recv, "virtualIntId")),
+        ("getVirtualChildLongId", "()J") => Value::Long(field_long(vm, recv, "virtualLongId")),
+        ("isVirtualInt", "()Z") => {
+            bool_value(field_int(vm, recv, "flags") & AF_ID_FLAG_VIRTUAL_INT != 0)
+        }
+        ("isVirtualLong", "()Z") => {
+            bool_value(field_int(vm, recv, "flags") & AF_ID_FLAG_VIRTUAL_LONG != 0)
+        }
+        ("isNonVirtual", "()Z") => {
+            let flags = field_int(vm, recv, "flags");
+            bool_value(flags & (AF_ID_FLAG_VIRTUAL_INT | AF_ID_FLAG_VIRTUAL_LONG) == 0)
+        }
+        ("hasSession", "()Z") => {
+            bool_value(field_int(vm, recv, "flags") & AF_ID_FLAG_HAS_SESSION != 0)
+        }
+        ("getSessionId", "()I") => Value::Int(field_int(vm, recv, "sessionId")),
+        ("setSessionId", "(I)V") => {
+            let flags = field_int(vm, recv, "flags") | AF_ID_FLAG_HAS_SESSION;
+            put(vm, recv, "flags", Value::Int(flags))?;
+            put(vm, recv, "sessionId", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("resetSessionId", "()V") => {
+            let flags = field_int(vm, recv, "flags") & !AF_ID_FLAG_HAS_SESSION;
+            put(vm, recv, "flags", Value::Int(flags))?;
+            put(vm, recv, "sessionId", Value::Int(0))?;
+            Value::Null
+        }
+        ("equalsIgnoreSession", "(Landroid/view/autofill/AutofillId;)Z") => {
+            bool_value(match oarg(args, 0) {
+                Some(other) => other == recv || af_id_equals(vm, recv, other, true),
+                None => false,
+            })
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => bool_value(match oarg(args, 0) {
+            Some(other) => {
+                other == recv
+                    || (class_of(vm, other) == AUTOFILL_ID && af_id_equals(vm, recv, other, false))
+            }
+            None => false,
+        }),
+        ("hashCode", "()I") => {
+            let virtual_long = field_long(vm, recv, "virtualLongId") as u64;
+            let long_hash = (virtual_long ^ (virtual_long >> 32)) as i32;
+            let mut result: i32 = 1;
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "viewId"));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "virtualIntId"));
+            result = result.wrapping_mul(31).wrapping_add(long_hash);
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "sessionId"));
+            Value::Int(result)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let flags = field_int(vm, recv, "flags");
+            let mut text = field_int(vm, recv, "viewId").to_string();
+            if flags & AF_ID_FLAG_VIRTUAL_INT != 0 {
+                text.push(':');
+                text.push_str(&field_int(vm, recv, "virtualIntId").to_string());
+            } else if flags & AF_ID_FLAG_VIRTUAL_LONG != 0 {
+                text.push(':');
+                text.push_str(&field_long(vm, recv, "virtualLongId").to_string());
+            }
+            if flags & AF_ID_FLAG_HAS_SESSION != 0 {
+                text.push('@');
+                text.push_str(&field_int(vm, recv, "sessionId").to_string());
+            }
+            jstr(vm, text)?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn af_value_new(vm: &mut Engine, kind: i32, value: Value) -> Result<Value, VmExit> {
+    let r = alloc_obj(vm, AUTOFILL_VALUE, Vec::new())?;
+    put(vm, r, "type", Value::Int(kind))?;
+    put(vm, r, "value", value)?;
+    Ok(Value::Obj(r))
+}
+
+fn autofill_value_static(
+    vm: &mut Engine,
+    name: &str,
+    _sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match name {
+        "forText" => {
+            if oarg(args, 0).is_none() {
+                Value::Null
+            } else {
+                af_value_new(vm, AF_TYPE_TEXT, af_arg_value(args, 0))?
+            }
+        }
+        "forToggle" => {
+            let boxed =
+                crate::boxes::box_value(vm, "Ljava/lang/Boolean;", Value::Int(iarg(args, 0)))?;
+            af_value_new(vm, AF_TYPE_TOGGLE, Value::Obj(boxed))?
+        }
+        "forList" => {
+            let boxed =
+                crate::boxes::box_value(vm, "Ljava/lang/Integer;", Value::Int(iarg(args, 0)))?;
+            af_value_new(vm, AF_TYPE_LIST, Value::Obj(boxed))?
+        }
+        "forDate" => {
+            let boxed =
+                crate::boxes::box_value(vm, "Ljava/lang/Long;", Value::Long(larg(args, 0)))?;
+            af_value_new(vm, AF_TYPE_DATE, Value::Obj(boxed))?
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn af_value_check(vm: &Engine, r: ObjRef, expected: i32, label: &str) -> Result<Value, VmExit> {
+    let kind = field_int(vm, r, "type");
+    if kind != expected {
+        Err(ise(format!(
+            "value must be a {label} value, not type={kind}"
+        )))
+    } else {
+        Ok(get(vm, r, "value"))
+    }
+}
+fn af_value_unbox(vm: &Engine, value: &Value) -> Value {
+    match value {
+        Value::Obj(r) => match get(vm, *r, "value") {
+            Value::Null => value.clone(),
+            primitive => primitive,
+        },
+        _ => value.clone(),
+    }
+}
+
+fn autofill_value_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let kind = field_int(vm, recv, "type");
+    let v = match (name, sig) {
+        ("<init>", "(ILjava/lang/Object;)V") => {
+            put(vm, recv, "type", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "value", af_arg_value(args, 1))?;
+            Value::Null
+        }
+        ("getTextValue", "()Ljava/lang/CharSequence;") => {
+            af_value_check(vm, recv, AF_TYPE_TEXT, "text")?
+        }
+        ("isText", "()Z") => bool_value(kind == AF_TYPE_TEXT),
+        ("getToggleValue", "()Z") => {
+            let value = af_value_check(vm, recv, AF_TYPE_TOGGLE, "toggle")?;
+            bool_value(af_value_unbox(vm, &value).as_int().unwrap_or(0) != 0)
+        }
+        ("isToggle", "()Z") => bool_value(kind == AF_TYPE_TOGGLE),
+        ("getListValue", "()I") => {
+            let value = af_value_check(vm, recv, AF_TYPE_LIST, "list")?;
+            Value::Int(af_value_unbox(vm, &value).as_int().unwrap_or(0))
+        }
+        ("isList", "()Z") => bool_value(kind == AF_TYPE_LIST),
+        ("getDateValue", "()J") => {
+            let value = af_value_check(vm, recv, AF_TYPE_DATE, "date")?;
+            Value::Long(af_value_unbox(vm, &value).as_long().unwrap_or(0))
+        }
+        ("isDate", "()Z") => bool_value(kind == AF_TYPE_DATE),
+        ("isEmpty", "()Z") => {
+            if kind != AF_TYPE_TEXT {
+                Value::Int(0)
+            } else {
+                let value = get(vm, recv, "value");
+                let text = charseq(vm, Some(&value))?.ok_or_else(|| npe("text value"))?;
+                bool_value(text.encode_utf16().count() == 0)
+            }
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let result = match oarg(args, 0) {
+                Some(other) if other == recv => true,
+                Some(other)
+                    if class_of(vm, other) == AUTOFILL_VALUE
+                        && field_int(vm, other, "type") == kind =>
+                {
+                    let left = get(vm, recv, "value");
+                    let right = get(vm, other, "value");
+                    if kind == AF_TYPE_TEXT {
+                        value_string(vm, &left)? == value_string(vm, &right)?
+                    } else {
+                        af_objects_equal(vm, &left, &right)?
+                    }
+                }
+                _ => false,
+            };
+            bool_value(result)
+        }
+        ("hashCode", "()I") => {
+            let value = get(vm, recv, "value");
+            if matches!(value, Value::Null) {
+                return Err(npe("mValue.hashCode()"));
+            }
+            Value::Int(kind.wrapping_add(af_objects_hash(vm, &value)?))
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn af_new_dataset_filter(vm: &mut Engine, pattern: Value) -> Result<Value, VmExit> {
+    let r = alloc_obj(vm, AF_DATASET_FILTER, Vec::new())?;
+    put(vm, r, "pattern", pattern)?;
+    Ok(Value::Obj(r))
+}
+
+fn af_dataset_filter_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/util/regex/Pattern;)V") => {
+            put(vm, recv, "pattern", af_arg_value(args, 0))?;
+            Value::Null
+        }
+        ("getPattern", "()Ljava/util/regex/Pattern;") => get(vm, recv, "pattern"),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn af_field_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        (
+            "<init>",
+            "(Landroid/view/autofill/AutofillValue;Landroid/service/autofill/Dataset$DatasetFieldFilter;Landroid/service/autofill/Presentations;)V",
+        ) => {
+            put(vm, recv, "value", af_arg_value(args, 0))?;
+            put(vm, recv, "filter", af_arg_value(args, 1))?;
+            put(vm, recv, "presentations", af_arg_value(args, 2))?;
+            Value::Null
+        }
+        ("getValue", "()Landroid/view/autofill/AutofillValue;") => get(vm, recv, "value"),
+        (
+            "getDatasetFieldFilter",
+            "()Landroid/service/autofill/Dataset$DatasetFieldFilter;",
+        ) => get(vm, recv, "filter"),
+        ("getFilter", "()Ljava/util/regex/Pattern;") => {
+            match field_obj(vm, recv, "filter") {
+                Some(filter) => get(vm, filter, "pattern"),
+                None => Value::Null,
+            }
+        }
+        ("getPresentations", "()Landroid/service/autofill/Presentations;") => {
+            get(vm, recv, "presentations")
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn af_field_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => {
+            put(vm, recv, "destroyed", Value::Int(0))?;
+            put(vm, recv, "value", Value::Null)?;
+            put(vm, recv, "filter", Value::Null)?;
+            put(vm, recv, "presentations", Value::Null)?;
+            Value::Null
+        }
+        (
+            "setValue",
+            "(Landroid/view/autofill/AutofillValue;)Landroid/service/autofill/Field$Builder;",
+        ) => {
+            af_check_not_used(vm, recv)?;
+            put(vm, recv, "value", af_arg_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("setFilter", "(Ljava/util/regex/Pattern;)Landroid/service/autofill/Field$Builder;") => {
+            af_check_not_used(vm, recv)?;
+            let filter = af_new_dataset_filter(vm, af_arg_value(args, 0))?;
+            put(vm, recv, "filter", filter)?;
+            Value::Obj(recv)
+        }
+        (
+            "setPresentations",
+            "(Landroid/service/autofill/Presentations;)Landroid/service/autofill/Field$Builder;",
+        ) => {
+            af_check_not_used(vm, recv)?;
+            put(vm, recv, "presentations", af_arg_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/service/autofill/Field;") => {
+            af_check_not_used(vm, recv)?;
+            put(vm, recv, "destroyed", Value::Int(1))?;
+            let field = alloc_obj(vm, AF_FIELD, Vec::new())?;
+            put(vm, field, "value", get(vm, recv, "value"))?;
+            put(vm, field, "filter", get(vm, recv, "filter"))?;
+            put(vm, field, "presentations", get(vm, recv, "presentations"))?;
+            Value::Obj(field)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn af_presentations_validate(
+    menu: &Value,
+    inline: &Value,
+    dialog: &Value,
+    tooltip: &Value,
+) -> Result<(), VmExit> {
+    if matches!(menu, Value::Null) && matches!(inline, Value::Null) && matches!(dialog, Value::Null)
+    {
+        return Err(ise("All presentations are null."));
+    }
+    if !matches!(tooltip, Value::Null) && matches!(inline, Value::Null) {
+        return Err(ise(
+            "The inline presentation is required for mInlineTooltipPresentation.",
+        ));
+    }
+    Ok(())
+}
+
+fn af_presentations_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        (
+            "<init>",
+            "(Landroid/widget/RemoteViews;Landroid/service/autofill/InlinePresentation;Landroid/widget/RemoteViews;Landroid/service/autofill/InlinePresentation;)V",
+        ) => {
+            let menu = af_arg_value(args, 0);
+            let inline = af_arg_value(args, 1);
+            let dialog = af_arg_value(args, 2);
+            let tooltip = af_arg_value(args, 3);
+            af_presentations_validate(&menu, &inline, &dialog, &tooltip)?;
+            put(vm, recv, "menuPresentation", menu)?;
+            put(vm, recv, "inlinePresentation", inline)?;
+            put(vm, recv, "dialogPresentation", dialog)?;
+            put(vm, recv, "inlineTooltipPresentation", tooltip)?;
+            Value::Null
+        }
+        ("getMenuPresentation", "()Landroid/widget/RemoteViews;") => {
+            get(vm, recv, "menuPresentation")
+        }
+        (
+            "getInlinePresentation",
+            "()Landroid/service/autofill/InlinePresentation;",
+        ) => get(vm, recv, "inlinePresentation"),
+        ("getDialogPresentation", "()Landroid/widget/RemoteViews;") => {
+            get(vm, recv, "dialogPresentation")
+        }
+        (
+            "getInlineTooltipPresentation",
+            "()Landroid/service/autofill/InlinePresentation;",
+        ) => get(vm, recv, "inlineTooltipPresentation"),
+        _ => return Ok(None),
+    }))
+}
+
+fn af_presentations_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => {
+            put(vm, recv, "destroyed", Value::Int(0))?;
+            for field in [
+                "menuPresentation",
+                "inlinePresentation",
+                "dialogPresentation",
+                "inlineTooltipPresentation",
+            ] {
+                put(vm, recv, field, Value::Null)?;
+            }
+            Value::Null
+        }
+        (
+            "setMenuPresentation",
+            "(Landroid/widget/RemoteViews;)Landroid/service/autofill/Presentations$Builder;",
+        ) => {
+            af_check_not_used(vm, recv)?;
+            put(vm, recv, "menuPresentation", af_arg_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        (
+            "setInlinePresentation",
+            "(Landroid/service/autofill/InlinePresentation;)Landroid/service/autofill/Presentations$Builder;",
+        ) => {
+            af_check_not_used(vm, recv)?;
+            put(vm, recv, "inlinePresentation", af_arg_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        (
+            "setDialogPresentation",
+            "(Landroid/widget/RemoteViews;)Landroid/service/autofill/Presentations$Builder;",
+        ) => {
+            af_check_not_used(vm, recv)?;
+            put(vm, recv, "dialogPresentation", af_arg_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        (
+            "setInlineTooltipPresentation",
+            "(Landroid/service/autofill/InlinePresentation;)Landroid/service/autofill/Presentations$Builder;",
+        ) => {
+            af_check_not_used(vm, recv)?;
+            put(vm, recv, "inlineTooltipPresentation", af_arg_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/service/autofill/Presentations;") => {
+            af_check_not_used(vm, recv)?;
+            // DataClass marks the builder used before invoking the
+            // Presentations constructor, including when validation fails.
+            put(vm, recv, "destroyed", Value::Int(1))?;
+            let menu = get(vm, recv, "menuPresentation");
+            let inline = get(vm, recv, "inlinePresentation");
+            let dialog = get(vm, recv, "dialogPresentation");
+            let tooltip = get(vm, recv, "inlineTooltipPresentation");
+            af_presentations_validate(&menu, &inline, &dialog, &tooltip)?;
+            let presentations = alloc_obj(vm, AF_PRESENTATIONS, Vec::new())?;
+            put(vm, presentations, "menuPresentation", menu)?;
+            put(vm, presentations, "inlinePresentation", inline)?;
+            put(vm, presentations, "dialogPresentation", dialog)?;
+            put(vm, presentations, "inlineTooltipPresentation", tooltip)?;
+            Value::Obj(presentations)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn af_inline_new(
+    vm: &mut Engine,
+    slice: Value,
+    spec: Value,
+    pinned: bool,
+) -> Result<Value, VmExit> {
+    if matches!(slice, Value::Null) {
+        return Err(npe("slice must not be null"));
+    }
+    if matches!(spec, Value::Null) {
+        return Err(npe("inlinePresentationSpec must not be null"));
+    }
+    let r = alloc_obj(vm, AF_INLINE_PRESENTATION, Vec::new())?;
+    put(vm, r, "slice", slice)?;
+    put(vm, r, "inlinePresentationSpec", spec)?;
+    put(vm, r, "pinned", bool_value(pinned))?;
+    Ok(Value::Obj(r))
+}
+
+fn af_inline_presentation_static(
+    vm: &mut Engine,
+    name: &str,
+    _sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match name {
+        "createTooltipPresentation" => {
+            af_inline_new(vm, af_arg_value(args, 0), af_arg_value(args, 1), false)?
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn af_inline_presentation_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        (
+            "<init>",
+            "(Landroid/app/slice/Slice;Landroid/widget/inline/InlinePresentationSpec;Z)V",
+        ) => {
+            let slice = af_arg_value(args, 0);
+            let spec = af_arg_value(args, 1);
+            if matches!(slice, Value::Null) {
+                return Err(npe("slice must not be null"));
+            }
+            if matches!(spec, Value::Null) {
+                return Err(npe("inlinePresentationSpec must not be null"));
+            }
+            put(vm, recv, "slice", slice)?;
+            put(vm, recv, "inlinePresentationSpec", spec)?;
+            put(vm, recv, "pinned", bool_value(iarg(args, 2) != 0))?;
+            Value::Null
+        }
+        ("getSlice", "()Landroid/app/slice/Slice;") => get(vm, recv, "slice"),
+        ("getInlinePresentationSpec", "()Landroid/widget/inline/InlinePresentationSpec;") => {
+            get(vm, recv, "inlinePresentationSpec")
+        }
+        ("isPinned", "()Z") => bool_value(field_bool(vm, recv, "pinned")),
+        ("getAutofillHints", "()[Ljava/lang/String;") => {
+            let slice = field_obj(vm, recv, "slice").ok_or_else(|| npe("slice"))?;
+            let hints = vm.invoke_instance(slice, "getHints", "()Ljava/util/List;", &[])?;
+            if matches!(hints, Value::Null) {
+                return Err(npe("slice.getHints()"));
+            }
+            af_string_array(vm, collection_items(vm, Some(&hints)))?
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let result = match oarg(args, 0) {
+                Some(other) if other == recv => true,
+                Some(other) if class_of(vm, other) == AF_INLINE_PRESENTATION => {
+                    af_objects_equal(vm, &get(vm, recv, "slice"), &get(vm, other, "slice"))?
+                        && af_objects_equal(
+                            vm,
+                            &get(vm, recv, "inlinePresentationSpec"),
+                            &get(vm, other, "inlinePresentationSpec"),
+                        )?
+                        && field_bool(vm, recv, "pinned") == field_bool(vm, other, "pinned")
+                }
+                _ => false,
+            };
+            bool_value(result)
+        }
+        ("hashCode", "()I") => {
+            let mut hash: i32 = 1;
+            hash = hash
+                .wrapping_mul(31)
+                .wrapping_add(af_objects_hash(vm, &get(vm, recv, "slice"))?);
+            hash = hash.wrapping_mul(31).wrapping_add(af_objects_hash(
+                vm,
+                &get(vm, recv, "inlinePresentationSpec"),
+            )?);
+            hash = hash
+                .wrapping_mul(31)
+                .wrapping_add(if field_bool(vm, recv, "pinned") {
+                    1231
+                } else {
+                    1237
+                });
+            Value::Int(hash)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let slice = value_string(vm, &get(vm, recv, "slice"))?;
+            let spec = value_string(vm, &get(vm, recv, "inlinePresentationSpec"))?;
+            jstr(
+                vm,
+                format!(
+                    "InlinePresentation {{ slice = {slice}, inlinePresentationSpec = {spec}, pinned = {} }}",
+                    field_bool(vm, recv, "pinned")
+                ),
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+#[derive(Default)]
+struct AfDatasetLists {
+    ids: Vec<Value>,
+    values: Vec<Value>,
+    presentations: Vec<Value>,
+    dialog_presentations: Vec<Value>,
+    inline_presentations: Vec<Value>,
+    inline_tooltips: Vec<Value>,
+    filters: Vec<Value>,
+    datatypes: Vec<Value>,
+}
+
+const AF_DATASET_LIST_FIELDS: [&str; 8] = [
+    "fieldIds",
+    "fieldValues",
+    "fieldPresentations",
+    "fieldDialogPresentations",
+    "fieldInlinePresentations",
+    "fieldInlineTooltipPresentations",
+    "fieldFilters",
+    "autofillDatatypes",
+];
+
+fn af_dataset_load_lists(vm: &mut Engine, r: ObjRef) -> Result<AfDatasetLists, VmExit> {
+    Ok(AfDatasetLists {
+        ids: af_field_items(vm, r, "fieldIds")?,
+        values: af_field_items(vm, r, "fieldValues")?,
+        presentations: af_field_items(vm, r, "fieldPresentations")?,
+        dialog_presentations: af_field_items(vm, r, "fieldDialogPresentations")?,
+        inline_presentations: af_field_items(vm, r, "fieldInlinePresentations")?,
+        inline_tooltips: af_field_items(vm, r, "fieldInlineTooltipPresentations")?,
+        filters: af_field_items(vm, r, "fieldFilters")?,
+        datatypes: af_field_items(vm, r, "autofillDatatypes")?,
+    })
+}
+fn af_dataset_store_lists(vm: &mut Engine, r: ObjRef, lists: AfDatasetLists) -> Result<(), VmExit> {
+    af_set_field_items(vm, r, "fieldIds", lists.ids)?;
+    af_set_field_items(vm, r, "fieldValues", lists.values)?;
+    af_set_field_items(vm, r, "fieldPresentations", lists.presentations)?;
+    af_set_field_items(
+        vm,
+        r,
+        "fieldDialogPresentations",
+        lists.dialog_presentations,
+    )?;
+    af_set_field_items(
+        vm,
+        r,
+        "fieldInlinePresentations",
+        lists.inline_presentations,
+    )?;
+    af_set_field_items(
+        vm,
+        r,
+        "fieldInlineTooltipPresentations",
+        lists.inline_tooltips,
+    )?;
+    af_set_field_items(vm, r, "fieldFilters", lists.filters)?;
+    af_set_field_items(vm, r, "autofillDatatypes", lists.datatypes)
+}
+fn af_dataset_set_at(items: &mut Vec<Value>, index: usize, value: Value) {
+    if index >= items.len() {
+        items.resize(index + 1, Value::Null);
+    }
+    items[index] = value;
+}
+#[allow(clippy::too_many_arguments)]
+fn af_dataset_set_id(
+    vm: &mut Engine,
+    builder: ObjRef,
+    id: Value,
+    value: Value,
+    presentation: Value,
+    inline: Value,
+    tooltip: Value,
+    filter: Value,
+    dialog: Value,
+) -> Result<usize, VmExit> {
+    let id_ref = match id {
+        Value::Obj(r) => r,
+        _ => return Err(npe("id cannot be null")),
+    };
+    let mut lists = af_dataset_load_lists(vm, builder)?;
+    let existing = lists.ids.iter().position(|candidate| match candidate {
+        Value::Obj(other) => {
+            class_of(vm, *other) == AUTOFILL_ID
+                && class_of(vm, id_ref) == AUTOFILL_ID
+                && af_id_equals(vm, id_ref, *other, false)
+        }
+        _ => false,
+    });
+    if let Some(index) = existing {
+        af_dataset_set_at(&mut lists.values, index, value);
+        af_dataset_set_at(&mut lists.presentations, index, presentation);
+        af_dataset_set_at(&mut lists.dialog_presentations, index, dialog);
+        af_dataset_set_at(&mut lists.inline_presentations, index, inline);
+        af_dataset_set_at(&mut lists.inline_tooltips, index, tooltip);
+        af_dataset_set_at(&mut lists.filters, index, filter);
+        af_dataset_store_lists(vm, builder, lists)?;
+        return Ok(index);
+    }
+    lists.ids.push(Value::Obj(id_ref));
+    lists.datatypes.push(Value::Null);
+    lists.values.push(value);
+    lists.presentations.push(presentation);
+    lists.dialog_presentations.push(dialog);
+    lists.inline_presentations.push(inline);
+    lists.inline_tooltips.push(tooltip);
+    lists.filters.push(filter);
+    let index = lists.ids.len() - 1;
+    af_dataset_store_lists(vm, builder, lists)?;
+    Ok(index)
+}
+#[allow(clippy::too_many_arguments)]
+fn af_dataset_set_datatype(
+    vm: &mut Engine,
+    builder: ObjRef,
+    datatype: Value,
+    value: Value,
+    presentation: Value,
+    inline: Value,
+    tooltip: Value,
+    filter: Value,
+    dialog: Value,
+) -> Result<usize, VmExit> {
+    let datatype_text =
+        opt_str(vm, Some(&datatype)).ok_or_else(|| npe("datatype cannot be null"))?;
+    let mut lists = af_dataset_load_lists(vm, builder)?;
+    let existing = lists
+        .datatypes
+        .iter()
+        .position(|candidate| opt_str(vm, Some(candidate)).as_deref() == Some(&datatype_text));
+    if let Some(index) = existing {
+        // AOSP appends the duplicate datatype rather than replacing it in
+        // this branch. Preserve that observable list-length quirk.
+        lists.datatypes.push(datatype);
+        af_dataset_set_at(&mut lists.values, index, value);
+        af_dataset_set_at(&mut lists.presentations, index, presentation);
+        af_dataset_set_at(&mut lists.dialog_presentations, index, dialog);
+        af_dataset_set_at(&mut lists.inline_presentations, index, inline);
+        af_dataset_set_at(&mut lists.inline_tooltips, index, tooltip);
+        af_dataset_set_at(&mut lists.filters, index, filter);
+        af_dataset_store_lists(vm, builder, lists)?;
+        return Ok(index);
+    }
+    lists.ids.push(Value::Null);
+    lists.datatypes.push(datatype);
+    lists.values.push(value);
+    lists.presentations.push(presentation);
+    lists.dialog_presentations.push(dialog);
+    lists.inline_presentations.push(inline);
+    lists.inline_tooltips.push(tooltip);
+    lists.filters.push(filter);
+    let index = lists.ids.len() - 1;
+    af_dataset_store_lists(vm, builder, lists)?;
+    Ok(index)
+}
+fn af_dataset_field_index(
+    vm: &mut Engine,
+    builder: ObjRef,
+    field: &Value,
+) -> Result<Option<usize>, VmExit> {
+    let keys = af_field_items(vm, builder, "fieldMapKeys")?;
+    let indexes = af_field_items(vm, builder, "fieldMapIndexes")?;
+    Ok(keys.iter().position(|key| key == field).and_then(|pos| {
+        indexes
+            .get(pos)
+            .and_then(|value| value.as_int().ok())
+            .map(|index| index as usize)
+    }))
+}
+fn af_dataset_put_field_index(
+    vm: &mut Engine,
+    builder: ObjRef,
+    field: Value,
+    index: usize,
+) -> Result<(), VmExit> {
+    let mut keys = af_field_items(vm, builder, "fieldMapKeys")?;
+    let mut indexes = af_field_items(vm, builder, "fieldMapIndexes")?;
+    if let Some(pos) = keys.iter().position(|key| key == &field) {
+        af_dataset_set_at(&mut indexes, pos, Value::Int(index as i32));
+    } else {
+        keys.push(field);
+        indexes.push(Value::Int(index as i32));
+    }
+    af_set_field_items(vm, builder, "fieldMapKeys", keys)?;
+    af_set_field_items(vm, builder, "fieldMapIndexes", indexes)
+}
+fn af_dataset_builder_init(vm: &mut Engine, r: ObjRef) -> Result<(), VmExit> {
+    put(vm, r, "destroyed", Value::Int(0))?;
+    for field in AF_DATASET_LIST_FIELDS {
+        af_init_empty_list(vm, r, field)?;
+    }
+    af_init_empty_list(vm, r, "fieldMapKeys")?;
+    af_init_empty_list(vm, r, "fieldMapIndexes")?;
+    for field in [
+        "fieldContent",
+        "presentation",
+        "dialogPresentation",
+        "inlinePresentation",
+        "inlineTooltipPresentation",
+        "authentication",
+        "id",
+    ] {
+        put(vm, r, field, Value::Null)?;
+    }
+    Ok(())
+}
+fn af_dataset_from_builder(vm: &mut Engine, builder: ObjRef) -> Result<Value, VmExit> {
+    let dataset = alloc_obj(vm, AF_DATASET, Vec::new())?;
+    for field in AF_DATASET_LIST_FIELDS {
+        put(vm, dataset, field, get(vm, builder, field))?;
+    }
+    for field in [
+        "fieldContent",
+        "presentation",
+        "dialogPresentation",
+        "inlinePresentation",
+        "inlineTooltipPresentation",
+        "authentication",
+        "id",
+    ] {
+        put(vm, dataset, field, get(vm, builder, field))?;
+    }
+    put(vm, dataset, "eligibleReason", Value::Int(0))?;
+    Ok(Value::Obj(dataset))
+}
+fn af_dataset_copy_fields(
+    vm: &mut Engine,
+    dataset: ObjRef,
+    source: ObjRef,
+    include_ids: bool,
+) -> Result<(), VmExit> {
+    for field in AF_DATASET_LIST_FIELDS {
+        if field == "fieldIds" && !include_ids {
+            continue;
+        }
+        put(vm, dataset, field, get(vm, source, field))?;
+    }
+    for field in [
+        "fieldContent",
+        "presentation",
+        "dialogPresentation",
+        "inlinePresentation",
+        "inlineTooltipPresentation",
+        "authentication",
+        "id",
+    ] {
+        put(vm, dataset, field, get(vm, source, field))?;
+    }
+    Ok(())
+}
+fn af_dataset_indexed(
+    vm: &Engine,
+    dataset: ObjRef,
+    field: &str,
+    fallback_field: Option<&str>,
+    index: i32,
+) -> Result<Value, VmExit> {
+    if field_obj(vm, dataset, field).is_none() {
+        return Err(npe(&format!("{field}.get()")));
+    }
+    let items = af_existing_field_items(vm, dataset, field);
+    let value = af_list_at(&items, index)?;
+    if matches!(value, Value::Null) {
+        if let Some(fallback) = fallback_field {
+            return Ok(get(vm, dataset, fallback));
+        }
+    }
+    Ok(value)
+}
+
+fn af_dataset_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Landroid/service/autofill/Dataset$Builder;)V") => {
+            let builder = af_req_arg_obj(args, 0, "builder")?;
+            af_dataset_copy_fields(vm, recv, builder, true)?;
+            put(vm, recv, "eligibleReason", Value::Int(0))?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/service/autofill/Dataset;Ljava/util/ArrayList;)V") => {
+            let source = af_req_arg_obj(args, 0, "dataset")?;
+            af_dataset_copy_fields(vm, recv, source, false)?;
+            put(vm, recv, "fieldIds", af_arg_value(args, 1))?;
+            put(vm, recv, "eligibleReason", Value::Int(0))?;
+            Value::Null
+        }
+        (
+            "<init>",
+            "(Ljava/util/ArrayList;Ljava/util/ArrayList;Ljava/util/ArrayList;Ljava/util/ArrayList;Ljava/util/ArrayList;Ljava/util/ArrayList;Ljava/util/ArrayList;Ljava/util/ArrayList;Landroid/content/ClipData;Landroid/widget/RemoteViews;Landroid/widget/RemoteViews;Landroid/service/autofill/InlinePresentation;Landroid/service/autofill/InlinePresentation;Ljava/lang/String;Landroid/content/IntentSender;)V",
+        ) => {
+            let list_fields = [
+                "fieldIds",
+                "fieldValues",
+                "fieldPresentations",
+                "fieldDialogPresentations",
+                "fieldInlinePresentations",
+                "fieldInlineTooltipPresentations",
+                "fieldFilters",
+                "autofillDatatypes",
+            ];
+            for (i, field) in list_fields.iter().enumerate() {
+                put(vm, recv, field, af_arg_value(args, i))?;
+            }
+            put(vm, recv, "fieldContent", af_arg_value(args, 8))?;
+            put(vm, recv, "presentation", af_arg_value(args, 9))?;
+            put(vm, recv, "dialogPresentation", af_arg_value(args, 10))?;
+            put(vm, recv, "inlinePresentation", af_arg_value(args, 11))?;
+            put(vm, recv, "inlineTooltipPresentation", af_arg_value(args, 12))?;
+            put(vm, recv, "id", af_arg_value(args, 13))?;
+            put(vm, recv, "authentication", af_arg_value(args, 14))?;
+            put(vm, recv, "eligibleReason", Value::Int(0))?;
+            Value::Null
+        }
+        ("getAutofillDatatypes", "()Ljava/util/ArrayList;") => {
+            get(vm, recv, "autofillDatatypes")
+        }
+        ("getFieldIds", "()Ljava/util/ArrayList;") => get(vm, recv, "fieldIds"),
+        ("getFieldValues", "()Ljava/util/ArrayList;") => get(vm, recv, "fieldValues"),
+        ("getFieldPresentation", "(I)Landroid/widget/RemoteViews;") => {
+            af_dataset_indexed(vm, recv, "fieldPresentations", Some("presentation"), iarg(args, 0))?
+        }
+        ("getFieldDialogPresentation", "(I)Landroid/widget/RemoteViews;") => af_dataset_indexed(
+            vm,
+            recv,
+            "fieldDialogPresentations",
+            Some("dialogPresentation"),
+            iarg(args, 0),
+        )?,
+        (
+            "getFieldInlinePresentation",
+            "(I)Landroid/service/autofill/InlinePresentation;",
+        ) => af_dataset_indexed(
+            vm,
+            recv,
+            "fieldInlinePresentations",
+            Some("inlinePresentation"),
+            iarg(args, 0),
+        )?,
+        (
+            "getFieldInlineTooltipPresentation",
+            "(I)Landroid/service/autofill/InlinePresentation;",
+        ) => af_dataset_indexed(
+            vm,
+            recv,
+            "fieldInlineTooltipPresentations",
+            Some("inlineTooltipPresentation"),
+            iarg(args, 0),
+        )?,
+        (
+            "getFilter",
+            "(I)Landroid/service/autofill/Dataset$DatasetFieldFilter;",
+        ) => af_dataset_indexed(vm, recv, "fieldFilters", None, iarg(args, 0))?,
+        ("getFieldContent", "()Landroid/content/ClipData;") => get(vm, recv, "fieldContent"),
+        ("getAuthentication", "()Landroid/content/IntentSender;") => {
+            get(vm, recv, "authentication")
+        }
+        ("isEmpty", "()Z") => bool_value(
+            field_obj(vm, recv, "fieldIds").is_none()
+                || af_existing_field_items(vm, recv, "fieldIds").is_empty(),
+        ),
+        ("getId", "()Ljava/lang/String;") => get(vm, recv, "id"),
+        ("setEligibleReasonReason", "(I)V") => {
+            put(vm, recv, "eligibleReason", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("getEligibleReason", "()I") => Value::Int(field_int(vm, recv, "eligibleReason")),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn af_dataset_set_field_by_id(
+    vm: &mut Engine,
+    builder: ObjRef,
+    id: Value,
+    field: Value,
+) -> Result<(), VmExit> {
+    if let Some(index) = af_dataset_field_index(vm, builder, &field)? {
+        let mut ids = af_field_items(vm, builder, "fieldIds")?;
+        if matches!(af_list_at(&ids, index as i32)?, Value::Null) {
+            af_dataset_set_at(&mut ids, index, id);
+            af_set_field_items(vm, builder, "fieldIds", ids)?;
+            return Ok(());
+        }
+    }
+    let index = if matches!(field, Value::Null) {
+        af_dataset_set_id(
+            vm,
+            builder,
+            id,
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            Value::Null,
+        )?
+    } else {
+        let field_ref = match field {
+            Value::Obj(r) => r,
+            _ => return Err(npe("field")),
+        };
+        let value = get(vm, field_ref, "value");
+        let filter = get(vm, field_ref, "filter");
+        match field_obj(vm, field_ref, "presentations") {
+            None => af_dataset_set_id(
+                vm,
+                builder,
+                id,
+                value,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                filter,
+                Value::Null,
+            )?,
+            Some(presentations) => af_dataset_set_id(
+                vm,
+                builder,
+                id,
+                value,
+                get(vm, presentations, "menuPresentation"),
+                get(vm, presentations, "inlinePresentation"),
+                get(vm, presentations, "inlineTooltipPresentation"),
+                filter,
+                get(vm, presentations, "dialogPresentation"),
+            )?,
+        }
+    };
+    af_dataset_put_field_index(vm, builder, field, index)
+}
+fn af_dataset_set_field_by_hint(
+    vm: &mut Engine,
+    builder: ObjRef,
+    hint: Value,
+    field: Value,
+) -> Result<(), VmExit> {
+    if let Some(index) = af_dataset_field_index(vm, builder, &field)? {
+        let mut datatypes = af_field_items(vm, builder, "autofillDatatypes")?;
+        if matches!(af_list_at(&datatypes, index as i32)?, Value::Null) {
+            af_dataset_set_at(&mut datatypes, index, hint);
+            af_set_field_items(vm, builder, "autofillDatatypes", datatypes)?;
+            return Ok(());
+        }
+    }
+    let field_ref = match field {
+        Value::Obj(r) => r,
+        _ => return Err(npe("field.getDatasetFieldFilter()")),
+    };
+    let value = get(vm, field_ref, "value");
+    let filter = get(vm, field_ref, "filter");
+    let index = match field_obj(vm, field_ref, "presentations") {
+        None => af_dataset_set_datatype(
+            vm,
+            builder,
+            hint,
+            value,
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            filter,
+            Value::Null,
+        )?,
+        Some(presentations) => af_dataset_set_datatype(
+            vm,
+            builder,
+            hint,
+            value,
+            get(vm, presentations, "menuPresentation"),
+            get(vm, presentations, "inlinePresentation"),
+            get(vm, presentations, "inlineTooltipPresentation"),
+            filter,
+            get(vm, presentations, "dialogPresentation"),
+        )?,
+    };
+    af_dataset_put_field_index(vm, builder, Value::Obj(field_ref), index)
+}
+
+fn af_dataset_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let builder_ret = Value::Obj(recv);
+    let v = match (name, sig) {
+        ("<init>", "()V") => {
+            af_dataset_builder_init(vm, recv)?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/widget/RemoteViews;)V") => {
+            let presentation = af_arg_value(args, 0);
+            if matches!(presentation, Value::Null) {
+                return Err(npe("presentation must be non-null"));
+            }
+            af_dataset_builder_init(vm, recv)?;
+            put(vm, recv, "presentation", presentation)?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/service/autofill/InlinePresentation;)V") => {
+            let inline = af_arg_value(args, 0);
+            if matches!(inline, Value::Null) {
+                return Err(npe("inlinePresentation must be non-null"));
+            }
+            af_dataset_builder_init(vm, recv)?;
+            put(vm, recv, "inlinePresentation", inline)?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/service/autofill/Presentations;)V") => {
+            let presentations = af_req_arg_obj(args, 0, "presentations must be non-null")?;
+            af_dataset_builder_init(vm, recv)?;
+            put(
+                vm,
+                recv,
+                "presentation",
+                get(vm, presentations, "menuPresentation"),
+            )?;
+            put(
+                vm,
+                recv,
+                "inlinePresentation",
+                get(vm, presentations, "inlinePresentation"),
+            )?;
+            put(
+                vm,
+                recv,
+                "inlineTooltipPresentation",
+                get(vm, presentations, "inlineTooltipPresentation"),
+            )?;
+            put(
+                vm,
+                recv,
+                "dialogPresentation",
+                get(vm, presentations, "dialogPresentation"),
+            )?;
+            Value::Null
+        }
+        (
+            "setInlinePresentation",
+            "(Landroid/service/autofill/InlinePresentation;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let inline = af_arg_value(args, 0);
+            if matches!(inline, Value::Null) {
+                return Err(npe("inlinePresentation must be non-null"));
+            }
+            put(vm, recv, "inlinePresentation", inline)?;
+            builder_ret
+        }
+        (
+            "setInlinePresentation",
+            "(Landroid/service/autofill/InlinePresentation;Landroid/service/autofill/InlinePresentation;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let inline = af_arg_value(args, 0);
+            let tooltip = af_arg_value(args, 1);
+            if matches!(inline, Value::Null) {
+                return Err(npe("inlinePresentation must be non-null"));
+            }
+            if matches!(tooltip, Value::Null) {
+                return Err(npe("inlineTooltipPresentation must be non-null"));
+            }
+            put(vm, recv, "inlinePresentation", inline)?;
+            put(vm, recv, "inlineTooltipPresentation", tooltip)?;
+            builder_ret
+        }
+        (
+            "setAuthentication",
+            "(Landroid/content/IntentSender;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            put(vm, recv, "authentication", af_arg_value(args, 0))?;
+            builder_ret
+        }
+        ("setId", "(Ljava/lang/String;)Landroid/service/autofill/Dataset$Builder;") => {
+            af_throw_if_destroyed(vm, recv)?;
+            put(vm, recv, "id", af_arg_value(args, 0))?;
+            builder_ret
+        }
+        (
+            "setContent",
+            "(Landroid/view/autofill/AutofillId;Landroid/content/ClipData;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let content_value = af_arg_value(args, 1);
+            if let Value::Obj(content) = content_value {
+                let count = vm
+                    .invoke_instance(content, "getItemCount", "()I", &[])?
+                    .as_int()
+                    .unwrap_or(0);
+                for i in 0..count {
+                    let item_value = vm.invoke_instance(
+                        content,
+                        "getItemAt",
+                        "(I)Landroid/content/ClipData$Item;",
+                        &[Value::Int(i)],
+                    )?;
+                    let item = match item_value {
+                        Value::Obj(r) => r,
+                        _ => return Err(npe("content.getItemAt().getIntent()")),
+                    };
+                    let intent = vm.invoke_instance(
+                        item,
+                        "getIntent",
+                        "()Landroid/content/Intent;",
+                        &[],
+                    )?;
+                    if !matches!(intent, Value::Null) {
+                        let content_text = value_string(vm, &Value::Obj(content))?;
+                        return Err(iae(format!(
+                            "Content items cannot contain an Intent: content={content_text}"
+                        )));
+                    }
+                }
+            }
+            af_dataset_set_id(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+            )?;
+            put(vm, recv, "fieldContent", content_value)?;
+            builder_ret
+        }
+        (
+            "setValue",
+            "(Landroid/view/autofill/AutofillId;Landroid/view/autofill/AutofillValue;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            af_dataset_set_id(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+            )?;
+            builder_ret
+        }
+        (
+            "setValue",
+            "(Landroid/view/autofill/AutofillId;Landroid/view/autofill/AutofillValue;Landroid/widget/RemoteViews;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let presentation = af_arg_value(args, 2);
+            if matches!(presentation, Value::Null) {
+                return Err(npe("presentation cannot be null"));
+            }
+            af_dataset_set_id(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+                presentation,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+            )?;
+            builder_ret
+        }
+        (
+            "setValue",
+            "(Landroid/view/autofill/AutofillId;Landroid/view/autofill/AutofillValue;Ljava/util/regex/Pattern;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            if field_obj(vm, recv, "presentation").is_none() {
+                return Err(ise("Dataset presentation not set on constructor"));
+            }
+            let filter = af_new_dataset_filter(vm, af_arg_value(args, 2))?;
+            af_dataset_set_id(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                filter,
+                Value::Null,
+            )?;
+            builder_ret
+        }
+        (
+            "setValue",
+            "(Landroid/view/autofill/AutofillId;Landroid/view/autofill/AutofillValue;Ljava/util/regex/Pattern;Landroid/widget/RemoteViews;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let presentation = af_arg_value(args, 3);
+            if matches!(presentation, Value::Null) {
+                return Err(npe("presentation cannot be null"));
+            }
+            let filter = af_new_dataset_filter(vm, af_arg_value(args, 2))?;
+            af_dataset_set_id(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+                presentation,
+                Value::Null,
+                Value::Null,
+                filter,
+                Value::Null,
+            )?;
+            builder_ret
+        }
+        (
+            "setValue",
+            "(Landroid/view/autofill/AutofillId;Landroid/view/autofill/AutofillValue;Landroid/widget/RemoteViews;Landroid/service/autofill/InlinePresentation;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let presentation = af_arg_value(args, 2);
+            let inline = af_arg_value(args, 3);
+            if matches!(presentation, Value::Null) {
+                return Err(npe("presentation cannot be null"));
+            }
+            if matches!(inline, Value::Null) {
+                return Err(npe("inlinePresentation cannot be null"));
+            }
+            af_dataset_set_id(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+                presentation,
+                inline,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+            )?;
+            builder_ret
+        }
+        (
+            "setValue",
+            "(Landroid/view/autofill/AutofillId;Landroid/view/autofill/AutofillValue;Landroid/widget/RemoteViews;Landroid/service/autofill/InlinePresentation;Landroid/service/autofill/InlinePresentation;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let presentation = af_arg_value(args, 2);
+            let inline = af_arg_value(args, 3);
+            let tooltip = af_arg_value(args, 4);
+            if matches!(presentation, Value::Null) {
+                return Err(npe("presentation cannot be null"));
+            }
+            if matches!(inline, Value::Null) {
+                return Err(npe("inlinePresentation cannot be null"));
+            }
+            if matches!(tooltip, Value::Null) {
+                return Err(npe("inlineTooltipPresentation cannot be null"));
+            }
+            af_dataset_set_id(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+                presentation,
+                inline,
+                tooltip,
+                Value::Null,
+                Value::Null,
+            )?;
+            builder_ret
+        }
+        (
+            "setValue",
+            "(Landroid/view/autofill/AutofillId;Landroid/view/autofill/AutofillValue;Ljava/util/regex/Pattern;Landroid/widget/RemoteViews;Landroid/service/autofill/InlinePresentation;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let presentation = af_arg_value(args, 3);
+            let inline = af_arg_value(args, 4);
+            if matches!(presentation, Value::Null) {
+                return Err(npe("presentation cannot be null"));
+            }
+            if matches!(inline, Value::Null) {
+                return Err(npe("inlinePresentation cannot be null"));
+            }
+            let filter = af_new_dataset_filter(vm, af_arg_value(args, 2))?;
+            af_dataset_set_id(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+                presentation,
+                inline,
+                Value::Null,
+                filter,
+                Value::Null,
+            )?;
+            builder_ret
+        }
+        (
+            "setValue",
+            "(Landroid/view/autofill/AutofillId;Landroid/view/autofill/AutofillValue;Ljava/util/regex/Pattern;Landroid/widget/RemoteViews;Landroid/service/autofill/InlinePresentation;Landroid/service/autofill/InlinePresentation;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let presentation = af_arg_value(args, 3);
+            let inline = af_arg_value(args, 4);
+            let tooltip = af_arg_value(args, 5);
+            if matches!(presentation, Value::Null) {
+                return Err(npe("presentation cannot be null"));
+            }
+            if matches!(inline, Value::Null) {
+                return Err(npe("inlinePresentation cannot be null"));
+            }
+            if matches!(tooltip, Value::Null) {
+                return Err(npe("inlineTooltipPresentation cannot be null"));
+            }
+            let filter = af_new_dataset_filter(vm, af_arg_value(args, 2))?;
+            af_dataset_set_id(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+                presentation,
+                inline,
+                tooltip,
+                filter,
+                Value::Null,
+            )?;
+            builder_ret
+        }
+        (
+            "setField",
+            "(Landroid/view/autofill/AutofillId;Landroid/service/autofill/Field;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            af_dataset_set_field_by_id(vm, recv, af_arg_value(args, 0), af_arg_value(args, 1))?;
+            builder_ret
+        }
+        (
+            "setField",
+            "(Ljava/lang/String;Landroid/service/autofill/Field;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            af_dataset_set_field_by_hint(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+            )?;
+            builder_ret
+        }
+        (
+            "setFieldForAllHints",
+            "(Landroid/service/autofill/Field;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let any = jstr(vm, "any")?;
+            af_dataset_set_field_by_hint(vm, recv, any, af_arg_value(args, 0))?;
+            builder_ret
+        }
+        (
+            "setFieldInlinePresentation",
+            "(Landroid/view/autofill/AutofillId;Landroid/view/autofill/AutofillValue;Ljava/util/regex/Pattern;Landroid/service/autofill/InlinePresentation;)Landroid/service/autofill/Dataset$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let inline = af_arg_value(args, 3);
+            if matches!(inline, Value::Null) {
+                return Err(npe("inlinePresentation cannot be null"));
+            }
+            let filter = af_new_dataset_filter(vm, af_arg_value(args, 2))?;
+            af_dataset_set_id(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+                Value::Null,
+                inline,
+                Value::Null,
+                filter,
+                Value::Null,
+            )?;
+            builder_ret
+        }
+        ("build", "()Landroid/service/autofill/Dataset;") => {
+            af_throw_if_destroyed(vm, recv)?;
+            put(vm, recv, "destroyed", Value::Int(1))?;
+            let lists = af_dataset_load_lists(vm, recv)?;
+            if lists.ids.is_empty() && lists.datatypes.is_empty() {
+                return Err(ise("at least one of field or datatype must be set"));
+            }
+            if field_obj(vm, recv, "fieldContent").is_some() {
+                if lists.ids.len() > 1 {
+                    return Err(ise("when filling content, only one field can be filled"));
+                }
+                let first_value = af_list_at(&lists.values, 0)?;
+                if !matches!(first_value, Value::Null) {
+                    return Err(ise("cannot fill both content and values"));
+                }
+            }
+            af_dataset_from_builder(vm, recv)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+const AF_FILL_RESPONSE_FIELDS: [&str; 27] = [
+    "datasets",
+    "saveInfo",
+    "clientState",
+    "presentation",
+    "inlinePresentation",
+    "inlineTooltipPresentation",
+    "dialogPresentation",
+    "dialogHeader",
+    "header",
+    "footer",
+    "authentication",
+    "authenticationIds",
+    "ignoredIds",
+    "fillDialogTriggerIds",
+    "disableDuration",
+    "fieldClassificationIds",
+    "flags",
+    "requestId",
+    "userData",
+    "cancelIds",
+    "supportsInlineSuggestions",
+    "iconResourceId",
+    "serviceDisplayNameResourceId",
+    "showFillDialogIcon",
+    "showSaveDialogIcon",
+    "detectedFieldTypes",
+    "destroyed",
+];
+
+fn af_fill_response_from_builder(vm: &mut Engine, builder: ObjRef) -> Result<Value, VmExit> {
+    let response = alloc_obj(vm, AF_FILL_RESPONSE, Vec::new())?;
+    for field in AF_FILL_RESPONSE_FIELDS {
+        if field == "destroyed" {
+            continue;
+        }
+        let value = if field == "requestId" {
+            Value::Int(i32::MIN)
+        } else {
+            get(vm, builder, field)
+        };
+        put(vm, response, field, value)?;
+    }
+    Ok(Value::Obj(response))
+}
+fn af_fill_response_copy_static(vm: &mut Engine, args: &[Value]) -> Result<Value, VmExit> {
+    let source = af_req_arg_obj(args, 0, "response")?;
+    let response = alloc_obj(vm, AF_FILL_RESPONSE, Vec::new())?;
+    for field in AF_FILL_RESPONSE_FIELDS {
+        if field == "destroyed" {
+            continue;
+        }
+        let value = match field {
+            "datasets" => af_arg_value(args, 1),
+            "saveInfo" => af_arg_value(args, 2),
+            _ => get(vm, source, field),
+        };
+        put(vm, response, field, value)?;
+    }
+    Ok(Value::Obj(response))
+}
+fn af_fill_response_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Landroid/service/autofill/FillResponse$Builder;)V") => {
+            let builder = af_req_arg_obj(args, 0, "builder")?;
+            for field in AF_FILL_RESPONSE_FIELDS {
+                if field == "destroyed" {
+                    continue;
+                }
+                let value = if field == "requestId" {
+                    Value::Int(i32::MIN)
+                } else {
+                    get(vm, builder, field)
+                };
+                put(vm, recv, field, value)?;
+            }
+            Value::Null
+        }
+        ("getDetectedFieldClassifications", "()Ljava/util/Set;") => {
+            let detected = get(vm, recv, "detectedFieldTypes");
+            let items = af_check_array_elements_not_null(vm, &detected, "elements")?;
+            let mut unique: Vec<Value> = Vec::new();
+            for item in items {
+                let mut duplicate = false;
+                for existing in &unique {
+                    if af_objects_equal(vm, existing, &item)? {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if duplicate {
+                    return Err(iae("duplicate element"));
+                }
+                unique.push(item);
+            }
+            Value::Obj(new_collection(vm, "Ljava/util/HashSet;", unique)?)
+        }
+        ("getClientState", "()Landroid/os/Bundle;") => get(vm, recv, "clientState"),
+        ("getDatasets", "()Ljava/util/List;") => get(vm, recv, "datasets"),
+        ("getSaveInfo", "()Landroid/service/autofill/SaveInfo;") => get(vm, recv, "saveInfo"),
+        ("getPresentation", "()Landroid/widget/RemoteViews;") => get(vm, recv, "presentation"),
+        ("getInlinePresentation", "()Landroid/service/autofill/InlinePresentation;") => {
+            get(vm, recv, "inlinePresentation")
+        }
+        ("getInlineTooltipPresentation", "()Landroid/service/autofill/InlinePresentation;") => {
+            get(vm, recv, "inlineTooltipPresentation")
+        }
+        ("getDialogPresentation", "()Landroid/widget/RemoteViews;") => {
+            get(vm, recv, "dialogPresentation")
+        }
+        ("getDialogHeader", "()Landroid/widget/RemoteViews;") => get(vm, recv, "dialogHeader"),
+        ("getHeader", "()Landroid/widget/RemoteViews;") => get(vm, recv, "header"),
+        ("getFooter", "()Landroid/widget/RemoteViews;") => get(vm, recv, "footer"),
+        ("getAuthentication", "()Landroid/content/IntentSender;") => {
+            get(vm, recv, "authentication")
+        }
+        ("getAuthenticationIds", "()[Landroid/view/autofill/AutofillId;") => {
+            get(vm, recv, "authenticationIds")
+        }
+        ("getFillDialogTriggerIds", "()[Landroid/view/autofill/AutofillId;") => {
+            get(vm, recv, "fillDialogTriggerIds")
+        }
+        ("getIgnoredIds", "()[Landroid/view/autofill/AutofillId;") => get(vm, recv, "ignoredIds"),
+        ("getDisableDuration", "()J") => Value::Long(field_long(vm, recv, "disableDuration")),
+        ("getFieldClassificationIds", "()[Landroid/view/autofill/AutofillId;") => {
+            get(vm, recv, "fieldClassificationIds")
+        }
+        ("getUserData", "()Landroid/service/autofill/UserData;") => get(vm, recv, "userData"),
+        ("getIconResourceId", "()I") => Value::Int(field_int(vm, recv, "iconResourceId")),
+        ("getServiceDisplayNameResourceId", "()I") => {
+            Value::Int(field_int(vm, recv, "serviceDisplayNameResourceId"))
+        }
+        ("getShowFillDialogIcon", "()Z") => bool_value(field_bool(vm, recv, "showFillDialogIcon")),
+        ("getShowSaveDialogIcon", "()Z") => bool_value(field_bool(vm, recv, "showSaveDialogIcon")),
+        ("getFlags", "()I") => Value::Int(field_int(vm, recv, "flags")),
+        ("setRequestId", "(I)V") => {
+            put(vm, recv, "requestId", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("getRequestId", "()I") => Value::Int(field_int(vm, recv, "requestId")),
+        ("getCancelIds", "()[I") => get(vm, recv, "cancelIds"),
+        ("supportsInlineSuggestions", "()Z") => {
+            bool_value(field_bool(vm, recv, "supportsInlineSuggestions"))
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+fn af_fill_response_builder_init(vm: &mut Engine, r: ObjRef) -> Result<(), VmExit> {
+    for field in AF_FILL_RESPONSE_FIELDS {
+        let value = match field {
+            "showFillDialogIcon" | "showSaveDialogIcon" => Value::Int(1),
+            "disableDuration" => Value::Long(0),
+            "flags"
+            | "iconResourceId"
+            | "serviceDisplayNameResourceId"
+            | "supportsInlineSuggestions"
+            | "destroyed" => Value::Int(0),
+            "requestId" => Value::Int(i32::MIN),
+            _ => Value::Null,
+        };
+        put(vm, r, field, value)?;
+    }
+    Ok(())
+}
+fn af_fill_response_throw_if_disabled(vm: &Engine, r: ObjRef) -> Result<(), VmExit> {
+    if field_long(vm, r, "disableDuration") > 0 {
+        Err(ise("Already called #disableAutofill()"))
+    } else {
+        Ok(())
+    }
+}
+fn af_fill_response_throw_if_authentication(vm: &Engine, r: ObjRef) -> Result<(), VmExit> {
+    if field_obj(vm, r, "authentication").is_some() {
+        Err(ise("Already called #setAuthentication()"))
+    } else {
+        Ok(())
+    }
+}
+#[allow(clippy::too_many_arguments)]
+fn af_fill_response_set_authentication(
+    vm: &mut Engine,
+    builder: ObjRef,
+    ids: Value,
+    authentication: Value,
+    presentation: Value,
+    inline: Value,
+    tooltip: Value,
+    dialog: Value,
+    dropdown_or_inline: bool,
+) -> Result<(), VmExit> {
+    af_throw_if_destroyed(vm, builder)?;
+    af_fill_response_throw_if_disabled(vm, builder)?;
+    if field_obj(vm, builder, "header").is_some() || field_obj(vm, builder, "footer").is_some() {
+        return Err(ise("Already called #setHeader() or #setFooter()"));
+    }
+    let no_presentation = if dropdown_or_inline {
+        matches!(presentation, Value::Null) && matches!(inline, Value::Null)
+    } else {
+        matches!(presentation, Value::Null)
+    };
+    if matches!(authentication, Value::Null) ^ no_presentation {
+        return Err(iae(if dropdown_or_inline {
+            "authentication and presentation (dropdown or inline), must be both non-null or null"
+        } else {
+            "authentication and presentation must be both non-null or null"
+        }));
+    }
+    put(vm, builder, "authentication", authentication)?;
+    put(vm, builder, "presentation", presentation)?;
+    if dropdown_or_inline {
+        put(vm, builder, "inlinePresentation", inline)?;
+        put(vm, builder, "inlineTooltipPresentation", tooltip)?;
+        put(vm, builder, "dialogPresentation", dialog)?;
+    }
+    let valid_ids = af_assert_valid_ids(vm, &ids)?;
+    put(vm, builder, "authenticationIds", valid_ids)
+}
+
+fn af_fill_response_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let ret = Value::Obj(recv);
+    let v = match (name, sig) {
+        ("<init>", "()V") => {
+            af_fill_response_builder_init(vm, recv)?;
+            Value::Null
+        }
+        (
+            "setDetectedFieldClassifications",
+            "(Ljava/util/Set;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            af_fill_response_throw_if_disabled(vm, recv)?;
+            if oarg(args, 0).is_none() {
+                return Err(npe("fieldInfos.toArray()"));
+            }
+            let items = collection_items(vm, args.first());
+            let array = obj_array(
+                vm,
+                "[Landroid/service/autofill/FieldClassification;",
+                items,
+            )?;
+            put(vm, recv, "detectedFieldTypes", array)?;
+            ret
+        }
+        (
+            "setAuthentication",
+            "([Landroid/view/autofill/AutofillId;Landroid/content/IntentSender;Landroid/widget/RemoteViews;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_fill_response_set_authentication(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+                af_arg_value(args, 2),
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                false,
+            )?;
+            ret
+        }
+        (
+            "setAuthentication",
+            "([Landroid/view/autofill/AutofillId;Landroid/content/IntentSender;Landroid/widget/RemoteViews;Landroid/service/autofill/InlinePresentation;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_fill_response_set_authentication(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+                af_arg_value(args, 2),
+                af_arg_value(args, 3),
+                Value::Null,
+                Value::Null,
+                true,
+            )?;
+            ret
+        }
+        (
+            "setAuthentication",
+            "([Landroid/view/autofill/AutofillId;Landroid/content/IntentSender;Landroid/widget/RemoteViews;Landroid/service/autofill/InlinePresentation;Landroid/service/autofill/InlinePresentation;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_fill_response_set_authentication(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+                af_arg_value(args, 2),
+                af_arg_value(args, 3),
+                af_arg_value(args, 4),
+                Value::Null,
+                true,
+            )?;
+            ret
+        }
+        (
+            "setAuthentication",
+            "([Landroid/view/autofill/AutofillId;Landroid/content/IntentSender;Landroid/service/autofill/Presentations;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            af_fill_response_throw_if_disabled(vm, recv)?;
+            let (menu, inline, tooltip, dialog) = match oarg(args, 2) {
+                Some(presentations) => (
+                    get(vm, presentations, "menuPresentation"),
+                    get(vm, presentations, "inlinePresentation"),
+                    get(vm, presentations, "inlineTooltipPresentation"),
+                    get(vm, presentations, "dialogPresentation"),
+                ),
+                None => (Value::Null, Value::Null, Value::Null, Value::Null),
+            };
+            af_fill_response_set_authentication(
+                vm,
+                recv,
+                af_arg_value(args, 0),
+                af_arg_value(args, 1),
+                menu,
+                inline,
+                tooltip,
+                dialog,
+                true,
+            )?;
+            ret
+        }
+        (
+            "setIgnoredIds",
+            "([Landroid/view/autofill/AutofillId;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            put(vm, recv, "ignoredIds", af_arg_value(args, 0))?;
+            ret
+        }
+        (
+            "addDataset",
+            "(Landroid/service/autofill/Dataset;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            af_fill_response_throw_if_disabled(vm, recv)?;
+            if oarg(args, 0).is_some() {
+                let mut datasets = if field_obj(vm, recv, "datasets").is_some() {
+                    af_field_items(vm, recv, "datasets")?
+                } else {
+                    Vec::new()
+                };
+                datasets.push(af_arg_value(args, 0));
+                af_set_field_items(vm, recv, "datasets", datasets)?;
+            }
+            ret
+        }
+        (
+            "setDatasets",
+            "(Ljava/util/ArrayList;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            // AOSP deliberately performs neither destroyed nor disable check
+            // in this hidden setter.
+            put(vm, recv, "datasets", af_arg_value(args, 0))?;
+            ret
+        }
+        (
+            "setSaveInfo",
+            "(Landroid/service/autofill/SaveInfo;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            af_fill_response_throw_if_disabled(vm, recv)?;
+            put(vm, recv, "saveInfo", af_arg_value(args, 0))?;
+            ret
+        }
+        (
+            "setClientState",
+            "(Landroid/os/Bundle;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            af_fill_response_throw_if_disabled(vm, recv)?;
+            put(vm, recv, "clientState", af_arg_value(args, 0))?;
+            ret
+        }
+        (
+            "setFieldClassificationIds",
+            "([Landroid/view/autofill/AutofillId;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            af_fill_response_throw_if_disabled(vm, recv)?;
+            let ids = af_check_array_elements_not_null(vm, &af_arg_value(args, 0), "ids")?;
+            af_check_range(ids.len() as i32, 1, 10, "ids length")?;
+            put(vm, recv, "fieldClassificationIds", af_arg_value(args, 0))?;
+            let flags = field_int(vm, recv, "flags") | 0x1;
+            put(vm, recv, "flags", Value::Int(flags))?;
+            ret
+        }
+        ("setFlags", "(I)Landroid/service/autofill/FillResponse$Builder;") => {
+            af_throw_if_destroyed(vm, recv)?;
+            let flags = af_check_flags(iarg(args, 0), 0x1 | 0x2 | 0x4)?;
+            put(vm, recv, "flags", Value::Int(flags))?;
+            ret
+        }
+        ("disableAutofill", "(J)Landroid/service/autofill/FillResponse$Builder;") => {
+            af_throw_if_destroyed(vm, recv)?;
+            let duration = larg(args, 0);
+            if duration <= 0 {
+                return Err(iae("duration must be greater than 0"));
+            }
+            if field_obj(vm, recv, "authentication").is_some()
+                || field_obj(vm, recv, "datasets").is_some()
+                || field_obj(vm, recv, "saveInfo").is_some()
+                || field_obj(vm, recv, "fieldClassificationIds").is_some()
+                || field_obj(vm, recv, "clientState").is_some()
+            {
+                return Err(ise("disableAutofill() must be the only method called"));
+            }
+            put(vm, recv, "disableDuration", Value::Long(duration))?;
+            ret
+        }
+        ("setIconResourceId", "(I)Landroid/service/autofill/FillResponse$Builder;") => {
+            af_throw_if_destroyed(vm, recv)?;
+            put(vm, recv, "iconResourceId", Value::Int(iarg(args, 0)))?;
+            ret
+        }
+        (
+            "setServiceDisplayNameResourceId",
+            "(I)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            put(
+                vm,
+                recv,
+                "serviceDisplayNameResourceId",
+                Value::Int(iarg(args, 0)),
+            )?;
+            ret
+        }
+        ("setShowFillDialogIcon", "(Z)Landroid/service/autofill/FillResponse$Builder;") => {
+            af_throw_if_destroyed(vm, recv)?;
+            put(
+                vm,
+                recv,
+                "showFillDialogIcon",
+                bool_value(iarg(args, 0) != 0),
+            )?;
+            ret
+        }
+        ("setShowSaveDialogIcon", "(Z)Landroid/service/autofill/FillResponse$Builder;") => {
+            af_throw_if_destroyed(vm, recv)?;
+            put(
+                vm,
+                recv,
+                "showSaveDialogIcon",
+                bool_value(iarg(args, 0) != 0),
+            )?;
+            ret
+        }
+        (
+            "setHeader",
+            "(Landroid/widget/RemoteViews;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            af_fill_response_throw_if_authentication(vm, recv)?;
+            let header = af_req_arg_obj(args, 0, "header")?;
+            put(vm, recv, "header", Value::Obj(header))?;
+            ret
+        }
+        (
+            "setFooter",
+            "(Landroid/widget/RemoteViews;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            af_fill_response_throw_if_authentication(vm, recv)?;
+            let footer = af_req_arg_obj(args, 0, "footer")?;
+            put(vm, recv, "footer", Value::Obj(footer))?;
+            ret
+        }
+        (
+            "setUserData",
+            "(Landroid/service/autofill/UserData;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            af_fill_response_throw_if_authentication(vm, recv)?;
+            let user_data = af_req_arg_obj(args, 0, "userData")?;
+            put(vm, recv, "userData", Value::Obj(user_data))?;
+            ret
+        }
+        (
+            "setPresentationCancelIds",
+            "([I)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            put(vm, recv, "cancelIds", af_arg_value(args, 0))?;
+            ret
+        }
+        (
+            "setDialogHeader",
+            "(Landroid/widget/RemoteViews;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let header = af_req_arg_obj(args, 0, "header")?;
+            put(vm, recv, "dialogHeader", Value::Obj(header))?;
+            ret
+        }
+        (
+            "setFillDialogTriggerIds",
+            "([Landroid/view/autofill/AutofillId;)Landroid/service/autofill/FillResponse$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            af_check_array_elements_not_null(vm, &af_arg_value(args, 0), "ids")?;
+            put(vm, recv, "fillDialogTriggerIds", af_arg_value(args, 0))?;
+            ret
+        }
+        ("build", "()Landroid/service/autofill/FillResponse;") => {
+            af_throw_if_destroyed(vm, recv)?;
+            if field_obj(vm, recv, "authentication").is_none()
+                && field_obj(vm, recv, "datasets").is_none()
+                && field_obj(vm, recv, "saveInfo").is_none()
+                && field_long(vm, recv, "disableDuration") == 0
+                && field_obj(vm, recv, "fieldClassificationIds").is_none()
+                && field_obj(vm, recv, "clientState").is_none()
+            {
+                return Err(ise(
+                    "need to provide: at least one DataSet, or a SaveInfo, or an authentication with a presentation, or a FieldsDetection, or a client state, or disable autofill",
+                ));
+            }
+            if field_obj(vm, recv, "datasets").is_none()
+                && (field_obj(vm, recv, "header").is_some()
+                    || field_obj(vm, recv, "footer").is_some())
+            {
+                return Err(ise("must add at least 1 dataset when using header or footer"));
+            }
+            let supports_inline = if field_obj(vm, recv, "datasets").is_some() {
+                let datasets = af_existing_field_items(vm, recv, "datasets");
+                let mut supported = false;
+                for dataset in datasets {
+                    if let Value::Obj(dataset_ref) = dataset {
+                        let inline = vm.invoke_instance(
+                            dataset_ref,
+                            "getFieldInlinePresentation",
+                            "(I)Landroid/service/autofill/InlinePresentation;",
+                            &[Value::Int(0)],
+                        )?;
+                        if !matches!(inline, Value::Null) {
+                            supported = true;
+                            break;
+                        }
+                    }
+                }
+                supported
+            } else {
+                field_obj(vm, recv, "inlinePresentation").is_some()
+            };
+            put(
+                vm,
+                recv,
+                "supportsInlineSuggestions",
+                bool_value(supports_inline),
+            )?;
+            put(vm, recv, "destroyed", Value::Int(1))?;
+            af_fill_response_from_builder(vm, recv)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn af_is_subtype(vm: &Engine, value: &Value, expected: &str) -> bool {
+    match value {
+        Value::Obj(r) => vm.cp.is_subtype(&class_of(vm, *r), expected),
+        _ => false,
+    }
+}
+fn af_save_info_from_builder(vm: &mut Engine, builder: ObjRef) -> Result<Value, VmExit> {
+    let info = alloc_obj(vm, AF_SAVE_INFO, Vec::new())?;
+    for field in [
+        "type",
+        "negativeButtonStyle",
+        "positiveButtonStyle",
+        "negativeActionListener",
+        "requiredIds",
+        "optionalIds",
+        "description",
+        "flags",
+        "customDescription",
+        "validator",
+        "triggerId",
+    ] {
+        put(vm, info, field, get(vm, builder, field))?;
+    }
+    if field_obj(vm, builder, "sanitizerKeyList").is_none() {
+        put(vm, info, "sanitizerKeys", Value::Null)?;
+        put(vm, info, "sanitizerValues", Value::Null)?;
+    } else {
+        let keys = af_existing_field_items(vm, builder, "sanitizerKeyList");
+        let values = af_existing_field_items(vm, builder, "sanitizerValueList");
+        let key_array = obj_array(vm, "[Landroid/service/autofill/InternalSanitizer;", keys)?;
+        put(vm, info, "sanitizerKeys", key_array)?;
+        let value_array = obj_array(vm, "[[Landroid/view/autofill/AutofillId;", values)?;
+        put(vm, info, "sanitizerValues", value_array)?;
+    }
+    Ok(Value::Obj(info))
+}
+fn af_save_info_copy_static(vm: &mut Engine, args: &[Value]) -> Result<Value, VmExit> {
+    let source = af_req_arg_obj(args, 0, "saveInfo")?;
+    let optional = af_assert_valid_ids(vm, &af_arg_value(args, 1))?;
+    let info = alloc_obj(vm, AF_SAVE_INFO, Vec::new())?;
+    for field in [
+        "type",
+        "negativeButtonStyle",
+        "positiveButtonStyle",
+        "negativeActionListener",
+        "requiredIds",
+        "description",
+        "flags",
+        "customDescription",
+        "validator",
+        "sanitizerKeys",
+        "sanitizerValues",
+        "triggerId",
+    ] {
+        put(vm, info, field, get(vm, source, field))?;
+    }
+    put(vm, info, "optionalIds", optional)?;
+    Ok(Value::Obj(info))
+}
+fn af_save_info_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Landroid/service/autofill/SaveInfo$Builder;)V") => {
+            let builder = af_req_arg_obj(args, 0, "builder")?;
+            let built = match af_save_info_from_builder(vm, builder)? {
+                Value::Obj(r) => r,
+                _ => return Err(ise("SaveInfo construction failed")),
+            };
+            for field in [
+                "type",
+                "negativeButtonStyle",
+                "positiveButtonStyle",
+                "negativeActionListener",
+                "requiredIds",
+                "optionalIds",
+                "description",
+                "flags",
+                "customDescription",
+                "validator",
+                "sanitizerKeys",
+                "sanitizerValues",
+                "triggerId",
+            ] {
+                put(vm, recv, field, get(vm, built, field))?;
+            }
+            Value::Null
+        }
+        ("getNegativeActionStyle", "()I") => Value::Int(field_int(vm, recv, "negativeButtonStyle")),
+        ("getNegativeActionListener", "()Landroid/content/IntentSender;") => {
+            get(vm, recv, "negativeActionListener")
+        }
+        ("getPositiveActionStyle", "()I") => Value::Int(field_int(vm, recv, "positiveButtonStyle")),
+        ("getRequiredIds", "()[Landroid/view/autofill/AutofillId;") => get(vm, recv, "requiredIds"),
+        ("getOptionalIds", "()[Landroid/view/autofill/AutofillId;") => get(vm, recv, "optionalIds"),
+        ("getType", "()I") => Value::Int(field_int(vm, recv, "type")),
+        ("getFlags", "()I") => Value::Int(field_int(vm, recv, "flags")),
+        ("getDescription", "()Ljava/lang/CharSequence;") => get(vm, recv, "description"),
+        ("getCustomDescription", "()Landroid/service/autofill/CustomDescription;") => {
+            get(vm, recv, "customDescription")
+        }
+        ("getValidator", "()Landroid/service/autofill/InternalValidator;") => {
+            get(vm, recv, "validator")
+        }
+        ("getSanitizerKeys", "()[Landroid/service/autofill/InternalSanitizer;") => {
+            get(vm, recv, "sanitizerKeys")
+        }
+        ("getSanitizerValues", "()[[Landroid/view/autofill/AutofillId;") => {
+            get(vm, recv, "sanitizerValues")
+        }
+        ("getTriggerId", "()Landroid/view/autofill/AutofillId;") => get(vm, recv, "triggerId"),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+fn af_save_info_builder_init(
+    vm: &mut Engine,
+    r: ObjRef,
+    kind: i32,
+    required_ids: Value,
+) -> Result<(), VmExit> {
+    put(vm, r, "type", Value::Int(kind))?;
+    put(vm, r, "negativeButtonStyle", Value::Int(0))?;
+    put(vm, r, "positiveButtonStyle", Value::Int(0))?;
+    put(vm, r, "negativeActionListener", Value::Null)?;
+    put(vm, r, "requiredIds", required_ids)?;
+    put(vm, r, "optionalIds", Value::Null)?;
+    put(vm, r, "description", Value::Null)?;
+    put(vm, r, "destroyed", Value::Int(0))?;
+    put(vm, r, "flags", Value::Int(0))?;
+    put(vm, r, "customDescription", Value::Null)?;
+    put(vm, r, "validator", Value::Null)?;
+    put(vm, r, "sanitizerKeyList", Value::Null)?;
+    put(vm, r, "sanitizerValueList", Value::Null)?;
+    put(vm, r, "sanitizerIdList", Value::Null)?;
+    put(vm, r, "triggerId", Value::Null)
+}
+fn af_save_info_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let ret = Value::Obj(recv);
+    let v = match (name, sig) {
+        ("<init>", "(I[Landroid/view/autofill/AutofillId;)V") => {
+            let required = af_assert_valid_ids(vm, &af_arg_value(args, 1))?;
+            af_save_info_builder_init(vm, recv, iarg(args, 0), required)?;
+            Value::Null
+        }
+        ("<init>", "(I)V") => {
+            af_save_info_builder_init(vm, recv, iarg(args, 0), Value::Null)?;
+            Value::Null
+        }
+        ("setFlags", "(I)Landroid/service/autofill/SaveInfo$Builder;") => {
+            af_throw_if_destroyed(vm, recv)?;
+            let flags = af_check_flags(iarg(args, 0), 0x1 | 0x2 | 0x4)?;
+            put(vm, recv, "flags", Value::Int(flags))?;
+            ret
+        }
+        (
+            "setOptionalIds",
+            "([Landroid/view/autofill/AutofillId;)Landroid/service/autofill/SaveInfo$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let ids = af_assert_valid_ids(vm, &af_arg_value(args, 0))?;
+            put(vm, recv, "optionalIds", ids)?;
+            ret
+        }
+        (
+            "setDescription",
+            "(Ljava/lang/CharSequence;)Landroid/service/autofill/SaveInfo$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            if field_obj(vm, recv, "customDescription").is_some() {
+                return Err(ise(
+                    "Can call setDescription() or setCustomDescription(), but not both",
+                ));
+            }
+            put(vm, recv, "description", af_arg_value(args, 0))?;
+            ret
+        }
+        (
+            "setCustomDescription",
+            "(Landroid/service/autofill/CustomDescription;)Landroid/service/autofill/SaveInfo$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            if field_obj(vm, recv, "description").is_some() {
+                return Err(ise(
+                    "Can call setDescription() or setCustomDescription(), but not both",
+                ));
+            }
+            put(vm, recv, "customDescription", af_arg_value(args, 0))?;
+            ret
+        }
+        (
+            "setNegativeAction",
+            "(ILandroid/content/IntentSender;)Landroid/service/autofill/SaveInfo$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let style = af_check_range(iarg(args, 0), 0, 2, "style")?;
+            put(vm, recv, "negativeButtonStyle", Value::Int(style))?;
+            put(vm, recv, "negativeActionListener", af_arg_value(args, 1))?;
+            ret
+        }
+        ("setPositiveAction", "(I)Landroid/service/autofill/SaveInfo$Builder;") => {
+            af_throw_if_destroyed(vm, recv)?;
+            let style = af_check_range(iarg(args, 0), 0, 1, "style")?;
+            put(vm, recv, "positiveButtonStyle", Value::Int(style))?;
+            ret
+        }
+        (
+            "setValidator",
+            "(Landroid/service/autofill/Validator;)Landroid/service/autofill/SaveInfo$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let validator = af_arg_value(args, 0);
+            if !af_is_subtype(vm, &validator, AF_INTERNAL_VALIDATOR) {
+                let text = value_string(vm, &validator)?;
+                return Err(iae(format!("not provided by Android System: {text}")));
+            }
+            put(vm, recv, "validator", validator)?;
+            ret
+        }
+        (
+            "addSanitizer",
+            "(Landroid/service/autofill/Sanitizer;[Landroid/view/autofill/AutofillId;)Landroid/service/autofill/SaveInfo$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let ids_value = af_arg_value(args, 1);
+            let ids = array_elems(vm, Some(&ids_value));
+            if ids.is_empty() {
+                return Err(iae("ids cannot be empty or null"));
+            }
+            let sanitizer = af_arg_value(args, 0);
+            if !af_is_subtype(vm, &sanitizer, AF_INTERNAL_SANITIZER) {
+                let text = value_string(vm, &sanitizer)?;
+                return Err(iae(format!("not provided by Android System: {text}")));
+            }
+            if field_obj(vm, recv, "sanitizerKeyList").is_none() {
+                af_init_empty_list(vm, recv, "sanitizerKeyList")?;
+                af_init_empty_list(vm, recv, "sanitizerValueList")?;
+                af_init_empty_list(vm, recv, "sanitizerIdList")?;
+            }
+            for id in &ids {
+                let mut seen = af_field_items(vm, recv, "sanitizerIdList")?;
+                let duplicate = match id {
+                    Value::Obj(candidate) if class_of(vm, *candidate) == AUTOFILL_ID => {
+                        seen.iter().any(|existing| match existing {
+                            Value::Obj(other) if class_of(vm, *other) == AUTOFILL_ID => {
+                                af_id_equals(vm, *candidate, *other, false)
+                            }
+                            _ => false,
+                        })
+                    }
+                    _ => seen.contains(id),
+                };
+                if duplicate {
+                    let text = value_string(vm, id)?;
+                    return Err(iae(format!("already added {text}")));
+                }
+                seen.push(id.clone());
+                af_set_field_items(vm, recv, "sanitizerIdList", seen)?;
+            }
+            let mut keys = af_field_items(vm, recv, "sanitizerKeyList")?;
+            let mut values = af_field_items(vm, recv, "sanitizerValueList")?;
+            if let Some(pos) = keys.iter().position(|key| key == &sanitizer) {
+                af_dataset_set_at(&mut values, pos, ids_value);
+            } else {
+                keys.push(sanitizer);
+                values.push(ids_value);
+            }
+            af_set_field_items(vm, recv, "sanitizerKeyList", keys)?;
+            af_set_field_items(vm, recv, "sanitizerValueList", values)?;
+            ret
+        }
+        (
+            "setTriggerId",
+            "(Landroid/view/autofill/AutofillId;)Landroid/service/autofill/SaveInfo$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let id = af_req_arg_obj(args, 0, "id")?;
+            put(vm, recv, "triggerId", Value::Obj(id))?;
+            ret
+        }
+        ("build", "()Landroid/service/autofill/SaveInfo;") => {
+            af_throw_if_destroyed(vm, recv)?;
+            put(vm, recv, "destroyed", Value::Int(1))?;
+            af_save_info_from_builder(vm, recv)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn af_new_array_map(vm: &mut Engine) -> Result<ObjRef, VmExit> {
+    let r = alloc_obj(vm, "Landroid/util/ArrayMap;", Vec::new())?;
+    vm.fw.objects.insert(
+        r,
+        HostObj::Map {
+            entries: Vec::new(),
+        },
+    );
+    Ok(r)
+}
+fn af_map_put(
+    vm: &mut Engine,
+    owner: ObjRef,
+    field: &str,
+    key: Value,
+    value: Value,
+) -> Result<(), VmExit> {
+    let map = match field_obj(vm, owner, field) {
+        Some(map) => map,
+        None => {
+            let map = af_new_array_map(vm)?;
+            put(vm, owner, field, Value::Obj(map))?;
+            map
+        }
+    };
+    let mut entries = match vm.fw.objects.get(&map) {
+        Some(HostObj::Map { entries }) => entries.clone(),
+        _ => Vec::new(),
+    };
+    if let Some(pos) = entries
+        .iter()
+        .position(|(existing, _)| objects_equal(vm, existing, &key))
+    {
+        entries[pos].1 = value;
+    } else {
+        entries.push((key, value));
+    }
+    vm.fw.objects.insert(map, HostObj::Map { entries });
+    Ok(())
+}
+fn af_map_get(vm: &Engine, map_value: &Value, key: &Value) -> Option<Value> {
+    let map = match map_value {
+        Value::Obj(r) => *r,
+        _ => return None,
+    };
+    match vm.fw.objects.get(&map) {
+        Some(HostObj::Map { entries }) => entries
+            .iter()
+            .find(|(existing, _)| objects_equal(vm, existing, key))
+            .map(|(_, value)| value.clone()),
+        _ => None,
+    }
+}
+fn af_user_data_check_not_empty(
+    vm: &Engine,
+    value: Option<&Value>,
+    name: &str,
+) -> Result<(Value, String), VmExit> {
+    let value = value.cloned().unwrap_or(Value::Null);
+    let text = opt_str(vm, Some(&value)).ok_or_else(|| npe(name))?;
+    if text.is_empty() {
+        return Err(iae(format!("{name} cannot be empty")));
+    }
+    Ok((value, text))
+}
+fn af_user_data_check_value(vm: &Engine, value: Option<&Value>) -> Result<(Value, String), VmExit> {
+    let value = value.cloned().unwrap_or(Value::Null);
+    let text = opt_str(vm, Some(&value)).ok_or_else(|| npe("value"))?;
+    let length = text.encode_utf16().count() as i32;
+    af_check_range(length, 3, 100, &format!("value length ({length})"))?;
+    Ok((value, text))
+}
+fn af_user_data_add_mapping(
+    vm: &mut Engine,
+    builder: ObjRef,
+    value: Value,
+    value_text: &str,
+    category: Value,
+    category_text: &str,
+) -> Result<(), VmExit> {
+    let pair = format!("{value_text}:{category_text}");
+    let pairs = af_field_items(vm, builder, "uniqueValueCategoryPairs")?;
+    if pairs
+        .iter()
+        .any(|existing| opt_str(vm, Some(existing)).as_deref() == Some(&pair))
+    {
+        return Ok(());
+    }
+    let mut categories = af_field_items(vm, builder, "categoryIds")?;
+    categories.push(category);
+    af_set_field_items(vm, builder, "categoryIds", categories)?;
+    let mut values = af_field_items(vm, builder, "values")?;
+    values.push(value);
+    af_set_field_items(vm, builder, "values", values)?;
+    let mut unique_categories = af_field_items(vm, builder, "uniqueCategoryIds")?;
+    if !unique_categories
+        .iter()
+        .any(|existing| opt_str(vm, Some(existing)).as_deref() == Some(category_text))
+    {
+        let category_value = jstr(vm, category_text.to_string())?;
+        unique_categories.push(category_value);
+        af_set_field_items(vm, builder, "uniqueCategoryIds", unique_categories)?;
+    }
+    let mut unique_pairs = pairs;
+    unique_pairs.push(jstr(vm, pair)?);
+    af_set_field_items(vm, builder, "uniqueValueCategoryPairs", unique_pairs)
+}
+fn af_user_data_from_builder(vm: &mut Engine, builder: ObjRef) -> Result<Value, VmExit> {
+    let user_data = alloc_obj(vm, AF_USER_DATA, Vec::new())?;
+    put(vm, user_data, "id", get(vm, builder, "id"))?;
+    let categories = af_existing_field_items(vm, builder, "categoryIds");
+    let values = af_existing_field_items(vm, builder, "values");
+    let category_array = af_string_array(vm, categories)?;
+    put(vm, user_data, "categoryIds", category_array)?;
+    let value_array = af_string_array(vm, values)?;
+    put(vm, user_data, "values", value_array)?;
+    put(
+        vm,
+        user_data,
+        "defaultAlgorithm",
+        get(vm, builder, "defaultAlgorithm"),
+    )?;
+    put(
+        vm,
+        user_data,
+        "defaultArgs",
+        get(vm, builder, "defaultArgs"),
+    )?;
+    put(
+        vm,
+        user_data,
+        "categoryAlgorithms",
+        get(vm, builder, "categoryAlgorithms"),
+    )?;
+    put(
+        vm,
+        user_data,
+        "categoryArgs",
+        get(vm, builder, "categoryArgs"),
+    )?;
+    Ok(Value::Obj(user_data))
+}
+fn af_user_data_static(
+    _vm: &mut Engine,
+    name: &str,
+    _sig: &str,
+    _args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(Value::Int(match name {
+        "getMaxUserDataSize" => 50,
+        "getMaxFieldClassificationIdsSize" => 10,
+        "getMaxCategoryCount" => 10,
+        "getMinValueLength" => 3,
+        "getMaxValueLength" => 100,
+        _ => return Ok(None),
+    })))
+}
+fn af_user_data_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Landroid/service/autofill/UserData$Builder;)V") => {
+            let builder = af_req_arg_obj(args, 0, "builder")?;
+            let built = match af_user_data_from_builder(vm, builder)? {
+                Value::Obj(r) => r,
+                _ => return Err(ise("UserData construction failed")),
+            };
+            for field in [
+                "id",
+                "categoryIds",
+                "values",
+                "defaultAlgorithm",
+                "defaultArgs",
+                "categoryAlgorithms",
+                "categoryArgs",
+            ] {
+                put(vm, recv, field, get(vm, built, field))?;
+            }
+            Value::Null
+        }
+        ("getFieldClassificationAlgorithm", "()Ljava/lang/String;") => {
+            get(vm, recv, "defaultAlgorithm")
+        }
+        ("getDefaultFieldClassificationArgs", "()Landroid/os/Bundle;") => {
+            get(vm, recv, "defaultArgs")
+        }
+        (
+            "getFieldClassificationAlgorithmForCategory",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+        ) => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("categoryId"));
+            }
+            af_map_get(
+                vm,
+                &get(vm, recv, "categoryAlgorithms"),
+                &af_arg_value(args, 0),
+            )
+            .unwrap_or(Value::Null)
+        }
+        ("getId", "()Ljava/lang/String;") => get(vm, recv, "id"),
+        ("getCategoryIds", "()[Ljava/lang/String;") => get(vm, recv, "categoryIds"),
+        ("getValues", "()[Ljava/lang/String;") => get(vm, recv, "values"),
+        ("getFieldClassificationAlgorithms", "()Landroid/util/ArrayMap;") => {
+            get(vm, recv, "categoryAlgorithms")
+        }
+        ("getFieldClassificationArgs", "()Landroid/util/ArrayMap;") => {
+            get(vm, recv, "categoryArgs")
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+fn af_user_data_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let ret = Value::Obj(recv);
+    let v = match (name, sig) {
+        (
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+        ) => {
+            let (id, _id_text) = af_user_data_check_not_empty(vm, args.first(), "id")?;
+            let (category, category_text) =
+                af_user_data_check_not_empty(vm, args.get(2), "categoryId")?;
+            let (value, value_text) = af_user_data_check_value(vm, args.get(1))?;
+            put(vm, recv, "id", id)?;
+            put(vm, recv, "destroyed", Value::Int(0))?;
+            put(vm, recv, "defaultAlgorithm", Value::Null)?;
+            put(vm, recv, "defaultArgs", Value::Null)?;
+            put(vm, recv, "categoryAlgorithms", Value::Null)?;
+            put(vm, recv, "categoryArgs", Value::Null)?;
+            for field in [
+                "categoryIds",
+                "values",
+                "uniqueCategoryIds",
+                "uniqueValueCategoryPairs",
+            ] {
+                af_init_empty_list(vm, recv, field)?;
+            }
+            af_user_data_add_mapping(vm, recv, value, &value_text, category, &category_text)?;
+            Value::Null
+        }
+        (
+            "setFieldClassificationAlgorithm",
+            "(Ljava/lang/String;Landroid/os/Bundle;)Landroid/service/autofill/UserData$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            put(vm, recv, "defaultAlgorithm", af_arg_value(args, 0))?;
+            put(vm, recv, "defaultArgs", af_arg_value(args, 1))?;
+            ret
+        }
+        (
+            "setFieldClassificationAlgorithmForCategory",
+            "(Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Landroid/service/autofill/UserData$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            if oarg(args, 0).is_none() {
+                return Err(npe("categoryId"));
+            }
+            let category = af_arg_value(args, 0);
+            af_map_put(
+                vm,
+                recv,
+                "categoryAlgorithms",
+                category.clone(),
+                af_arg_value(args, 1),
+            )?;
+            af_map_put(vm, recv, "categoryArgs", category, af_arg_value(args, 2))?;
+            ret
+        }
+        (
+            "add",
+            "(Ljava/lang/String;Ljava/lang/String;)Landroid/service/autofill/UserData$Builder;",
+        ) => {
+            af_throw_if_destroyed(vm, recv)?;
+            let (category, category_text) =
+                af_user_data_check_not_empty(vm, args.get(1), "categoryId")?;
+            let (value, value_text) = af_user_data_check_value(vm, args.first())?;
+            let unique_categories = af_field_items(vm, recv, "uniqueCategoryIds")?;
+            if !unique_categories
+                .iter()
+                .any(|existing| opt_str(vm, Some(existing)).as_deref() == Some(&category_text))
+                && unique_categories.len() >= 10
+            {
+                return Err(ise(format!(
+                    "already added {} unique category ids",
+                    unique_categories.len()
+                )));
+            }
+            let values = af_field_items(vm, recv, "values")?;
+            if values.len() >= 50 {
+                return Err(ise(format!("already added {} elements", values.len())));
+            }
+            af_user_data_add_mapping(vm, recv, value, &value_text, category, &category_text)?;
+            ret
+        }
+        ("build", "()Landroid/service/autofill/UserData;") => {
+            af_throw_if_destroyed(vm, recv)?;
+            put(vm, recv, "destroyed", Value::Int(1))?;
+            af_user_data_from_builder(vm, recv)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn af_validators_static(
+    vm: &mut Engine,
+    name: &str,
+    _sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match name {
+        "and" | "or" => {
+            let validators =
+                af_check_array_elements_not_null(vm, &af_arg_value(args, 0), "validators")?;
+            for (i, validator) in validators.iter().enumerate() {
+                if !af_is_subtype(vm, validator, AF_INTERNAL_VALIDATOR) {
+                    let text = value_string(vm, validator)?;
+                    return Err(iae(format!(
+                        "element {i} not provided by Android System: {text}"
+                    )));
+                }
+            }
+            let class = if name == "and" {
+                AF_REQUIRED_VALIDATORS
+            } else {
+                AF_OPTIONAL_VALIDATORS
+            };
+            let r = alloc_obj(vm, class, Vec::new())?;
+            put(vm, r, "validators", af_arg_value(args, 0))?;
+            Value::Obj(r)
+        }
+        "not" => {
+            let validator = af_arg_value(args, 0);
+            if !af_is_subtype(vm, &validator, AF_INTERNAL_VALIDATOR) {
+                let text = value_string(vm, &validator)?;
+                return Err(iae(format!(
+                    "validator not provided by Android System: {text}"
+                )));
+            }
+            let r = alloc_obj(vm, AF_NEGATION_VALIDATOR, Vec::new())?;
+            put(vm, r, "validator", validator)?;
+            Value::Obj(r)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+fn af_finder_find(vm: &mut Engine, finder: ObjRef, id: Value) -> Result<Option<String>, VmExit> {
+    match vm.invoke_instance(
+        finder,
+        "findByAutofillId",
+        "(Landroid/view/autofill/AutofillId;)Ljava/lang/String;",
+        std::slice::from_ref(&id),
+    ) {
+        Ok(value) => Ok(opt_str(vm, Some(&value))),
+        Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => {
+            let raw = vm.invoke_instance(
+                finder,
+                "findRawValueByAutofillId",
+                "(Landroid/view/autofill/AutofillId;)Landroid/view/autofill/AutofillValue;",
+                &[id],
+            )?;
+            match raw {
+                Value::Obj(value_ref) if field_int(vm, value_ref, "type") == AF_TYPE_TEXT => {
+                    charseq(vm, Some(&get(vm, value_ref, "value")))
+                }
+                _ => Ok(None),
+            }
+        }
+        Err(error) => Err(error),
+    }
+}
+fn af_pattern_matches(vm: &mut Engine, pattern: ObjRef, text: &str) -> Result<bool, VmExit> {
+    let text_value = jstr(vm, text.to_string())?;
+    let matcher = vm.invoke_instance(
+        pattern,
+        "matcher",
+        "(Ljava/lang/CharSequence;)Ljava/util/regex/Matcher;",
+        &[text_value],
+    )?;
+    let matcher = match matcher {
+        Value::Obj(r) => r,
+        _ => return Err(npe("pattern.matcher()")),
+    };
+    Ok(vm
+        .invoke_instance(matcher, "matches", "()Z", &[])?
+        .as_int()
+        .unwrap_or(0)
+        != 0)
+}
+fn af_validator_is_valid(
+    vm: &mut Engine,
+    class: &str,
+    recv: ObjRef,
+    finder_value: Value,
+) -> Result<bool, VmExit> {
+    match class {
+        AF_REGEX_VALIDATOR => {
+            let finder = match finder_value {
+                Value::Obj(r) => r,
+                _ => return Err(npe("finder.findByAutofillId()")),
+            };
+            let Some(text) = af_finder_find(vm, finder, get(vm, recv, "id"))? else {
+                return Ok(false);
+            };
+            let pattern = field_obj(vm, recv, "regex").ok_or_else(|| npe("regex"))?;
+            af_pattern_matches(vm, pattern, &text)
+        }
+        AF_REQUIRED_VALIDATORS => {
+            for validator in array_elems(vm, Some(&get(vm, recv, "validators"))) {
+                let validator_ref = match validator {
+                    Value::Obj(r) => r,
+                    _ => return Err(npe("validator.isValid()")),
+                };
+                let valid = vm.invoke_instance(
+                    validator_ref,
+                    "isValid",
+                    "(Landroid/service/autofill/ValueFinder;)Z",
+                    std::slice::from_ref(&finder_value),
+                )?;
+                if valid.as_int().unwrap_or(0) == 0 {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
+        AF_OPTIONAL_VALIDATORS => {
+            for validator in array_elems(vm, Some(&get(vm, recv, "validators"))) {
+                let validator_ref = match validator {
+                    Value::Obj(r) => r,
+                    _ => return Err(npe("validator.isValid()")),
+                };
+                let valid = vm.invoke_instance(
+                    validator_ref,
+                    "isValid",
+                    "(Landroid/service/autofill/ValueFinder;)Z",
+                    std::slice::from_ref(&finder_value),
+                )?;
+                if valid.as_int().unwrap_or(0) != 0 {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
+        AF_NEGATION_VALIDATOR => {
+            let validator = field_obj(vm, recv, "validator").ok_or_else(|| npe("validator"))?;
+            let valid = vm.invoke_instance(
+                validator,
+                "isValid",
+                "(Landroid/service/autofill/ValueFinder;)Z",
+                &[finder_value],
+            )?;
+            Ok(valid.as_int().unwrap_or(0) == 0)
+        }
+        _ => Ok(false),
+    }
+}
+fn af_validator_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (class, name, sig) {
+        (
+            AF_REGEX_VALIDATOR,
+            "<init>",
+            "(Landroid/view/autofill/AutofillId;Ljava/util/regex/Pattern;)V",
+        ) => {
+            let id = af_req_arg_obj(args, 0, "id")?;
+            let regex = af_req_arg_obj(args, 1, "regex")?;
+            put(vm, recv, "id", Value::Obj(id))?;
+            put(vm, recv, "regex", Value::Obj(regex))?;
+            Value::Null
+        }
+        (
+            AF_REQUIRED_VALIDATORS | AF_OPTIONAL_VALIDATORS,
+            "<init>",
+            "([Landroid/service/autofill/InternalValidator;)V",
+        ) => {
+            af_check_array_elements_not_null(vm, &af_arg_value(args, 0), "validators")?;
+            put(vm, recv, "validators", af_arg_value(args, 0))?;
+            Value::Null
+        }
+        (AF_NEGATION_VALIDATOR, "<init>", "(Landroid/service/autofill/InternalValidator;)V") => {
+            let validator = af_req_arg_obj(args, 0, "validator")?;
+            put(vm, recv, "validator", Value::Obj(validator))?;
+            Value::Null
+        }
+        (_, "isValid", "(Landroid/service/autofill/ValueFinder;)Z") => bool_value(
+            af_validator_is_valid(vm, class, recv, af_arg_value(args, 0))?,
+        ),
+        (_, "describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn af_sanitizer_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (class, name, sig) {
+        (AF_TEXT_SANITIZER, "<init>", "(Ljava/util/regex/Pattern;Ljava/lang/String;)V") => {
+            let regex = af_req_arg_obj(args, 0, "regex")?;
+            let subst = af_req_arg_obj(args, 1, "subst")?;
+            put(vm, recv, "regex", Value::Obj(regex))?;
+            put(vm, recv, "subst", Value::Obj(subst))?;
+            Value::Null
+        }
+        (AF_DATE_SANITIZER, "<init>", "(Landroid/icu/text/DateFormat;)V") => {
+            let format = af_req_arg_obj(args, 0, "dateFormat")?;
+            put(vm, recv, "dateFormat", Value::Obj(format))?;
+            Value::Null
+        }
+        (
+            AF_TEXT_SANITIZER,
+            "sanitize",
+            "(Landroid/view/autofill/AutofillValue;)Landroid/view/autofill/AutofillValue;",
+        ) => {
+            let Some(value_ref) = oarg(args, 0) else {
+                return Ok(Some(Value::Null));
+            };
+            if class_of(vm, value_ref) != AUTOFILL_VALUE
+                || field_int(vm, value_ref, "type") != AF_TYPE_TEXT
+            {
+                return Ok(Some(Value::Null));
+            }
+            let Some(text) = charseq(vm, Some(&get(vm, value_ref, "value")))? else {
+                return Ok(Some(Value::Null));
+            };
+            let Some(pattern) = field_obj(vm, recv, "regex") else {
+                return Ok(Some(Value::Null));
+            };
+            let subst = get(vm, recv, "subst");
+            let result = (|| -> Result<Value, VmExit> {
+                let text_value = jstr(vm, text.clone())?;
+                let matcher_value = vm.invoke_instance(
+                    pattern,
+                    "matcher",
+                    "(Ljava/lang/CharSequence;)Ljava/util/regex/Matcher;",
+                    &[text_value],
+                )?;
+                let matcher = match matcher_value {
+                    Value::Obj(r) => r,
+                    _ => return Ok(Value::Null),
+                };
+                if vm
+                    .invoke_instance(matcher, "matches", "()Z", &[])?
+                    .as_int()
+                    .unwrap_or(0)
+                    == 0
+                {
+                    return Ok(Value::Null);
+                }
+                let sanitized = vm.invoke_instance(
+                    matcher,
+                    "replaceAll",
+                    "(Ljava/lang/String;)Ljava/lang/String;",
+                    &[subst],
+                )?;
+                if matches!(sanitized, Value::Null) {
+                    Ok(Value::Null)
+                } else {
+                    af_value_new(vm, AF_TYPE_TEXT, sanitized)
+                }
+            })();
+            match result {
+                Ok(value) => value,
+                Err(VmExit::Exception(_)) => Value::Null,
+                Err(error) => return Err(error),
+            }
+        }
+        (
+            AF_DATE_SANITIZER,
+            "sanitize",
+            "(Landroid/view/autofill/AutofillValue;)Landroid/view/autofill/AutofillValue;",
+        ) => {
+            let Some(value_ref) = oarg(args, 0) else {
+                return Ok(Some(Value::Null));
+            };
+            if class_of(vm, value_ref) != AUTOFILL_VALUE
+                || field_int(vm, value_ref, "type") != AF_TYPE_DATE
+            {
+                return Ok(Some(Value::Null));
+            }
+            let Some(format) = field_obj(vm, recv, "dateFormat") else {
+                return Ok(Some(Value::Null));
+            };
+            let millis = af_value_unbox(vm, &get(vm, value_ref, "value"))
+                .as_long()
+                .unwrap_or(0);
+            let result = (|| -> Result<Value, VmExit> {
+                let date = alloc_obj(vm, "Ljava/util/Date;", Vec::new())?;
+                vm.invoke_instance(date, "<init>", "(J)V", &[Value::Long(millis)])?;
+                let converted = vm.invoke_instance(
+                    format,
+                    "format",
+                    "(Ljava/util/Date;)Ljava/lang/String;",
+                    &[Value::Obj(date)],
+                )?;
+                let parsed_value = vm.invoke_instance(
+                    format,
+                    "parse",
+                    "(Ljava/lang/String;)Ljava/util/Date;",
+                    &[converted],
+                )?;
+                let parsed = match parsed_value {
+                    Value::Obj(r) => r,
+                    _ => return Err(npe("dateFormat.parse()")),
+                };
+                let sanitized = vm
+                    .invoke_instance(parsed, "getTime", "()J", &[])?
+                    .as_long()
+                    .unwrap_or(0);
+                let boxed =
+                    crate::boxes::box_value(vm, "Ljava/lang/Long;", Value::Long(sanitized))?;
+                af_value_new(vm, AF_TYPE_DATE, Value::Obj(boxed))
+            })();
+            match result {
+                Ok(value) => value,
+                Err(VmExit::Exception(_)) => Value::Null,
+                Err(error) => return Err(error),
+            }
+        }
+        (_, "describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn af_fill_request_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        (
+            "<init>",
+            "(ILjava/util/List;Ljava/util/List;Landroid/os/Bundle;ILandroid/view/inputmethod/InlineSuggestionsRequest;Landroid/content/IntentSender;)V",
+        ) => {
+            if oarg(args, 1).is_none() {
+                return Err(npe("fillContexts must not be null"));
+            }
+            if oarg(args, 2).is_none() {
+                return Err(npe("hints must not be null"));
+            }
+            let flags = af_check_flags(
+                iarg(args, 4),
+                0x1 | 0x2 | 0x4 | 0x10 | 0x40 | 0x80 | 0x100 | 0x200 | 0x400,
+            )?;
+            put(vm, recv, "id", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "fillContexts", af_arg_value(args, 1))?;
+            put(vm, recv, "hints", af_arg_value(args, 2))?;
+            put(vm, recv, "clientState", af_arg_value(args, 3))?;
+            put(vm, recv, "flags", Value::Int(flags))?;
+            put(vm, recv, "inlineSuggestionsRequest", af_arg_value(args, 5))?;
+            put(vm, recv, "delayedFillIntentSender", af_arg_value(args, 6))?;
+            Value::Null
+        }
+        ("getId", "()I") => Value::Int(field_int(vm, recv, "id")),
+        ("getFillContexts", "()Ljava/util/List;") => get(vm, recv, "fillContexts"),
+        ("getHints", "()Ljava/util/List;") => get(vm, recv, "hints"),
+        ("getClientState", "()Landroid/os/Bundle;") => get(vm, recv, "clientState"),
+        ("getFlags", "()I") => Value::Int(field_int(vm, recv, "flags")),
+        (
+            "getInlineSuggestionsRequest",
+            "()Landroid/view/inputmethod/InlineSuggestionsRequest;",
+        ) => get(vm, recv, "inlineSuggestionsRequest"),
+        ("getDelayedFillIntentSender", "()Landroid/content/IntentSender;") => {
+            get(vm, recv, "delayedFillIntentSender")
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+fn af_save_request_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Ljava/util/ArrayList;Landroid/os/Bundle;Ljava/util/ArrayList;)V") => {
+            let contexts = af_req_arg_obj(args, 0, "fillContexts")?;
+            put(vm, recv, "fillContexts", Value::Obj(contexts))?;
+            put(vm, recv, "clientState", af_arg_value(args, 1))?;
+            put(vm, recv, "datasetIds", af_arg_value(args, 2))?;
+            Value::Null
+        }
+        ("getFillContexts", "()Ljava/util/List;") => get(vm, recv, "fillContexts"),
+        ("getClientState", "()Landroid/os/Bundle;") => get(vm, recv, "clientState"),
+        ("getDatasetIds", "()Ljava/util/List;") => get(vm, recv, "datasetIds"),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+fn af_fill_context_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        (
+            "<init>",
+            "(ILandroid/app/assist/AssistStructure;Landroid/view/autofill/AutofillId;)V",
+        ) => {
+            if oarg(args, 1).is_none() {
+                return Err(npe("structure must not be null"));
+            }
+            if oarg(args, 2).is_none() {
+                return Err(npe("focusedId must not be null"));
+            }
+            put(vm, recv, "requestId", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "structure", af_arg_value(args, 1))?;
+            put(vm, recv, "focusedId", af_arg_value(args, 2))?;
+            Value::Null
+        }
+        ("getRequestId", "()I") => Value::Int(field_int(vm, recv, "requestId")),
+        ("getStructure", "()Landroid/app/assist/AssistStructure;") => get(vm, recv, "structure"),
+        ("getFocusedId", "()Landroid/view/autofill/AutofillId;") => get(vm, recv, "focusedId"),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+fn af_callback_assert_not_called(vm: &mut Engine, r: ObjRef) -> Result<(), VmExit> {
+    if field_bool(vm, r, "called") {
+        return Err(ise("Already called"));
+    }
+    put(vm, r, "called", Value::Int(1))
+}
+fn af_fill_callback_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Landroid/service/autofill/IFillCallback;I)V") => {
+            put(vm, recv, "callback", af_arg_value(args, 0))?;
+            put(vm, recv, "requestId", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "called", Value::Int(0))?;
+            put(vm, recv, "response", Value::Null)?;
+            put(vm, recv, "failure", Value::Null)?;
+            Value::Null
+        }
+        ("onSuccess", "(Landroid/service/autofill/FillResponse;)V") => {
+            af_callback_assert_not_called(vm, recv)?;
+            let response = af_arg_value(args, 0);
+            if let Value::Obj(response_ref) = response {
+                put(
+                    vm,
+                    response_ref,
+                    "requestId",
+                    Value::Int(field_int(vm, recv, "requestId")),
+                )?;
+            }
+            put(vm, recv, "response", response.clone())?;
+            if let Some(callback) = field_obj(vm, recv, "callback") {
+                vm.invoke_instance(
+                    callback,
+                    "onSuccess",
+                    "(Landroid/service/autofill/FillResponse;)V",
+                    &[response],
+                )?;
+            }
+            Value::Null
+        }
+        ("onFailure", "(Ljava/lang/CharSequence;)V") => {
+            af_callback_assert_not_called(vm, recv)?;
+            let message = af_arg_value(args, 0);
+            put(vm, recv, "failure", message.clone())?;
+            if let Some(callback) = field_obj(vm, recv, "callback") {
+                vm.invoke_instance(
+                    callback,
+                    "onFailure",
+                    "(ILjava/lang/CharSequence;)V",
+                    &[Value::Int(field_int(vm, recv, "requestId")), message],
+                )?;
+            }
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+fn af_save_callback_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Landroid/service/autofill/ISaveCallback;)V") => {
+            put(vm, recv, "callback", af_arg_value(args, 0))?;
+            put(vm, recv, "called", Value::Int(0))?;
+            put(vm, recv, "intentSender", Value::Null)?;
+            put(vm, recv, "failure", Value::Null)?;
+            Value::Null
+        }
+        ("onSuccess", "()V") => {
+            af_callback_assert_not_called(vm, recv)?;
+            if let Some(callback) = field_obj(vm, recv, "callback") {
+                vm.invoke_instance(
+                    callback,
+                    "onSuccess",
+                    "(Landroid/content/IntentSender;)V",
+                    &[Value::Null],
+                )?;
+            }
+            Value::Null
+        }
+        ("onSuccess", "(Landroid/content/IntentSender;)V") => {
+            // AOSP evaluates Objects.requireNonNull before the one-shot check.
+            let sender = af_req_arg_obj(args, 0, "intentSender")?;
+            af_callback_assert_not_called(vm, recv)?;
+            put(vm, recv, "intentSender", Value::Obj(sender))?;
+            if let Some(callback) = field_obj(vm, recv, "callback") {
+                vm.invoke_instance(
+                    callback,
+                    "onSuccess",
+                    "(Landroid/content/IntentSender;)V",
+                    &[Value::Obj(sender)],
+                )?;
+            }
+            Value::Null
+        }
+        ("onFailure", "(Ljava/lang/CharSequence;)V") => {
+            af_callback_assert_not_called(vm, recv)?;
+            let message = af_arg_value(args, 0);
+            put(vm, recv, "failure", message.clone())?;
+            if let Some(callback) = field_obj(vm, recv, "callback") {
+                vm.invoke_instance(
+                    callback,
+                    "onFailure",
+                    "(Ljava/lang/CharSequence;)V",
+                    &[message],
+                )?;
+            }
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+fn af_field_classification_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Ljava/util/ArrayList;)V") => {
+            let matches_value = af_arg_value(args, 0);
+            let matches_ref = af_req_arg_obj(args, 0, "matches")?;
+            let mut matches = collection_items(vm, Some(&matches_value));
+            matches.sort_by(|a, b| {
+                let score = |value: &Value| match value {
+                    Value::Obj(r) => field_float(vm, *r, "score"),
+                    _ => 0.0,
+                };
+                score(b)
+                    .partial_cmp(&score(a))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&matches_ref) {
+                *elems = matches;
+            }
+            put(vm, recv, "matches", matches_value)?;
+            Value::Null
+        }
+        ("getMatches", "()Ljava/util/List;") => get(vm, recv, "matches"),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+fn af_field_classification_match_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Ljava/lang/String;F)V") => {
+            let category = af_req_arg_obj(args, 0, "categoryId")?;
+            put(vm, recv, "categoryId", Value::Obj(category))?;
+            put(vm, recv, "score", Value::Float(farg(args, 1)))?;
+            Value::Null
+        }
+        ("getCategoryId", "()Ljava/lang/String;") => get(vm, recv, "categoryId"),
+        ("getScore", "()F") => Value::Float(field_float(vm, recv, "score")),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+fn af_saved_datasets_info_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Ljava/lang/String;I)V") => {
+            let kind = opt_str(vm, args.first());
+            if kind.as_deref() != Some("other") && kind.as_deref() != Some("passwords") {
+                return Err(iae(format!(
+                    "type was {} but must be one of: TYPE_OTHER(other), TYPE_PASSWORDS(passwords)",
+                    kind.as_deref().unwrap_or("null")
+                )));
+            }
+            let count = iarg(args, 1);
+            if count < 0 {
+                return Err(iae("count must be at least 0"));
+            }
+            put(vm, recv, "type", af_arg_value(args, 0))?;
+            put(vm, recv, "count", Value::Int(count))?;
+            Value::Null
+        }
+        ("getType", "()Ljava/lang/String;") => get(vm, recv, "type"),
+        ("getCount", "()I") => Value::Int(field_int(vm, recv, "count")),
+        ("equals", "(Ljava/lang/Object;)Z") => bool_value(match oarg(args, 0) {
+            Some(other) if other == recv => true,
+            Some(other) if class_of(vm, other) == AF_SAVED_DATASETS_INFO => {
+                objects_equal(vm, &get(vm, recv, "type"), &get(vm, other, "type"))
+                    && field_int(vm, recv, "count") == field_int(vm, other, "count")
+            }
+            _ => false,
+        }),
+        ("hashCode", "()I") => {
+            let mut hash: i32 = 1;
+            hash = hash
+                .wrapping_mul(31)
+                .wrapping_add(af_objects_hash(vm, &get(vm, recv, "type"))?);
+            hash = hash
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "count"));
+            Value::Int(hash)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let kind = field_str(vm, recv, "type").unwrap_or_else(|| "null".to_string());
+            jstr(
+                vm,
+                format!(
+                    "SavedDatasetsInfo {{ type = {kind}, count = {} }}",
+                    field_int(vm, recv, "count")
+                ),
+            )?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+fn af_autofill_service_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        ("onCreate", "()V") | ("onConnected", "()V") | ("onDisconnected", "()V") => Value::Null,
+        ("onBind", "(Landroid/content/Intent;)Landroid/os/IBinder;") => {
+            let intent = af_req_arg_obj(args, 0, "intent.getAction()")?;
+            let action_value = vm.invoke_instance(
+                intent,
+                "getAction",
+                "()Ljava/lang/String;",
+                &[],
+            )?;
+            if opt_str(vm, Some(&action_value)).as_deref()
+                == Some("android.service.autofill.AutofillService")
+            {
+                if let Some(existing) = field_obj(vm, recv, "binder") {
+                    Value::Obj(existing)
+                } else {
+                    let binder = alloc_obj(vm, "Landroid/os/Binder;", Vec::new())?;
+                    put(vm, recv, "binder", Value::Obj(binder))?;
+                    Value::Obj(binder)
+                }
+            } else {
+                Value::Null
+            }
+        }
+        (
+            "onFillRequest",
+            "(Landroid/service/autofill/FillRequest;Landroid/os/CancellationSignal;Landroid/service/autofill/FillCallback;)V",
+        )
+        | (
+            "onSaveRequest",
+            "(Landroid/service/autofill/SaveRequest;Landroid/service/autofill/SaveCallback;)V",
+        ) => {
+            return Err(throw(
+                "Ljava/lang/AbstractMethodError;",
+                "AutofillService request callback",
+            ));
+        }
+        (
+            "onSavedDatasetsInfoRequest",
+            "(Landroid/service/autofill/SavedDatasetsInfoCallback;)V",
+        ) => {
+            let callback = af_req_arg_obj(args, 0, "callback.onError()")?;
+            vm.invoke_instance(callback, "onError", "(I)V", &[Value::Int(1)])?;
+            Value::Null
+        }
+        ("getFillEventHistory", "()Landroid/service/autofill/FillEventHistory;") => {
+            // The headless profile has no AutofillManager session/history.
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
 }

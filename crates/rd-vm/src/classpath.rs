@@ -1494,6 +1494,63 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         | "Landroid/animation/Keyframe$FloatKeyframe;" => {
             Some(&["Landroid/animation/Keyframe;", "Ljava/lang/Object;"])
         }
+        "Landroid/service/autofill/AutofillService;" => Some(&[
+            "Landroid/app/Service;",
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/service/autofill/RegexValidator;"
+        | "Landroid/service/autofill/RequiredValidators;"
+        | "Landroid/service/autofill/OptionalValidators;"
+        | "Landroid/service/autofill/NegationValidator;" => Some(&[
+            "Landroid/service/autofill/InternalValidator;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/service/autofill/TextValueSanitizer;"
+        | "Landroid/service/autofill/DateValueSanitizer;" => Some(&[
+            "Landroid/service/autofill/InternalSanitizer;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/view/autofill/AutofillId;"
+        | "Landroid/view/autofill/AutofillValue;"
+        | "Landroid/service/autofill/Dataset;"
+        | "Landroid/service/autofill/Dataset$Builder;"
+        | "Landroid/service/autofill/Dataset$DatasetFieldFilter;"
+        | "Landroid/service/autofill/Field;"
+        | "Landroid/service/autofill/Field$Builder;"
+        | "Landroid/service/autofill/Presentations;"
+        | "Landroid/service/autofill/Presentations$Builder;"
+        | "Landroid/service/autofill/InlinePresentation;"
+        | "Landroid/service/autofill/FillResponse;"
+        | "Landroid/service/autofill/FillResponse$Builder;"
+        | "Landroid/service/autofill/SaveInfo;"
+        | "Landroid/service/autofill/SaveInfo$Builder;"
+        | "Landroid/service/autofill/UserData;"
+        | "Landroid/service/autofill/UserData$Builder;"
+        | "Landroid/service/autofill/InternalValidator;"
+        | "Landroid/service/autofill/InternalSanitizer;"
+        | "Landroid/service/autofill/Validator;"
+        | "Landroid/service/autofill/Sanitizer;"
+        | "Landroid/service/autofill/ValueFinder;"
+        | "Landroid/service/autofill/Validators;"
+        | "Landroid/service/autofill/FillRequest;"
+        | "Landroid/service/autofill/SaveRequest;"
+        | "Landroid/service/autofill/FillContext;"
+        | "Landroid/service/autofill/FillCallback;"
+        | "Landroid/service/autofill/SaveCallback;"
+        | "Landroid/service/autofill/IFillCallback;"
+        | "Landroid/service/autofill/ISaveCallback;"
+        | "Landroid/service/autofill/FieldClassification;"
+        | "Landroid/service/autofill/FieldClassification$Match;"
+        | "Landroid/service/autofill/FieldClassificationUserData;"
+        | "Landroid/service/autofill/CustomDescription;"
+        | "Landroid/service/autofill/CustomDescription$Builder;"
+        | "Landroid/service/autofill/SavedDatasetsInfo;"
+        | "Landroid/service/autofill/SavedDatasetsInfoCallback;"
+        | "Landroid/app/assist/AssistStructure;"
+        | "Landroid/app/slice/Slice;"
+        | "Landroid/widget/inline/InlinePresentationSpec;" => Some(OBJECT),
         "Landroid/hardware/camera2/CameraCharacteristics;"
         | "Landroid/hardware/camera2/CaptureRequest;"
         | "Landroid/hardware/camera2/CaptureResult;" => Some(&[
@@ -1891,6 +1948,38 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",
             "Ljava/lang/Comparable;",
+        ]),
+        "Landroid/view/autofill/AutofillId;"
+        | "Landroid/view/autofill/AutofillValue;"
+        | "Landroid/service/autofill/Dataset;"
+        | "Landroid/service/autofill/Dataset$DatasetFieldFilter;"
+        | "Landroid/service/autofill/InlinePresentation;"
+        | "Landroid/service/autofill/FillResponse;"
+        | "Landroid/service/autofill/SaveInfo;"
+        | "Landroid/service/autofill/FillRequest;"
+        | "Landroid/service/autofill/SaveRequest;"
+        | "Landroid/service/autofill/FillContext;"
+        | "Landroid/service/autofill/CustomDescription;"
+        | "Landroid/app/assist/AssistStructure;"
+        | "Landroid/app/slice/Slice;"
+        | "Landroid/widget/inline/InlinePresentationSpec;" => Some(&["Landroid/os/Parcelable;"]),
+        "Landroid/service/autofill/UserData;" => Some(&[
+            "Landroid/os/Parcelable;",
+            "Landroid/service/autofill/FieldClassificationUserData;",
+        ]),
+        "Landroid/service/autofill/InternalValidator;"
+        | "Landroid/service/autofill/RegexValidator;"
+        | "Landroid/service/autofill/RequiredValidators;"
+        | "Landroid/service/autofill/OptionalValidators;"
+        | "Landroid/service/autofill/NegationValidator;" => Some(&[
+            "Landroid/service/autofill/Validator;",
+            "Landroid/os/Parcelable;",
+        ]),
+        "Landroid/service/autofill/InternalSanitizer;"
+        | "Landroid/service/autofill/TextValueSanitizer;"
+        | "Landroid/service/autofill/DateValueSanitizer;" => Some(&[
+            "Landroid/service/autofill/Sanitizer;",
+            "Landroid/os/Parcelable;",
         ]),
         _ => None,
     }

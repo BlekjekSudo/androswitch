@@ -1666,6 +1666,36 @@ fn drafted_stub_surface_classpath_subtypes_are_visible() {
     assert!(engine
         .cp
         .is_subtype("Landroid/icu/util/ULocale;", "Ljava/lang/Comparable;"));
+    assert!(engine.cp.is_subtype(
+        "Landroid/service/autofill/AutofillService;",
+        "Landroid/app/Service;"
+    ));
+    assert!(engine.cp.is_subtype(
+        "Landroid/service/autofill/AutofillService;",
+        "Landroid/content/ContextWrapper;"
+    ));
+    assert!(engine
+        .cp
+        .is_subtype("Landroid/service/autofill/Dataset;", parcelable));
+    assert!(engine.cp.is_subtype(
+        "Landroid/service/autofill/RegexValidator;",
+        "Landroid/service/autofill/InternalValidator;"
+    ));
+    assert!(engine.cp.is_subtype(
+        "Landroid/service/autofill/RegexValidator;",
+        "Landroid/service/autofill/Validator;"
+    ));
+    assert!(engine.cp.is_subtype(
+        "Landroid/service/autofill/TextValueSanitizer;",
+        "Landroid/service/autofill/InternalSanitizer;"
+    ));
+    assert!(engine.cp.is_subtype(
+        "Landroid/service/autofill/UserData;",
+        "Landroid/service/autofill/FieldClassificationUserData;"
+    ));
+    assert!(engine
+        .cp
+        .is_subtype("Landroid/view/autofill/AutofillValue;", parcelable));
 }
 
 const ANIMATOR: &str = "Landroid/animation/Animator;";
@@ -2188,4 +2218,1199 @@ fn object_animator_applies_values_and_pauses_resumes_on_virtual_frames() {
         "Landroid/animation/AnimatorListenerAdapter;",
         "Landroid/animation/Animator$AnimatorListener;"
     ));
+}
+
+const AF_ID: &str = "Landroid/view/autofill/AutofillId;";
+const AF_VALUE: &str = "Landroid/view/autofill/AutofillValue;";
+const AF_DATASET_BUILDER: &str = "Landroid/service/autofill/Dataset$Builder;";
+const AF_FIELD_BUILDER: &str = "Landroid/service/autofill/Field$Builder;";
+const AF_PRESENTATIONS_BUILDER: &str = "Landroid/service/autofill/Presentations$Builder;";
+const AF_FILL_RESPONSE_BUILDER: &str = "Landroid/service/autofill/FillResponse$Builder;";
+const AF_SAVE_INFO_BUILDER: &str = "Landroid/service/autofill/SaveInfo$Builder;";
+const AF_USER_DATA: &str = "Landroid/service/autofill/UserData;";
+const AF_USER_DATA_BUILDER: &str = "Landroid/service/autofill/UserData$Builder;";
+const AF_REGEX_VALIDATOR: &str = "Landroid/service/autofill/RegexValidator;";
+const AF_TEXT_SANITIZER: &str = "Landroid/service/autofill/TextValueSanitizer;";
+const AF_FILL_REQUEST: &str = "Landroid/service/autofill/FillRequest;";
+const AF_SAVE_REQUEST: &str = "Landroid/service/autofill/SaveRequest;";
+const AF_FILL_CONTEXT: &str = "Landroid/service/autofill/FillContext;";
+const AF_FILL_CALLBACK: &str = "Landroid/service/autofill/FillCallback;";
+const AF_SAVE_CALLBACK: &str = "Landroid/service/autofill/SaveCallback;";
+const AF_FIELD_CLASSIFICATION: &str = "Landroid/service/autofill/FieldClassification;";
+const AF_FIELD_CLASSIFICATION_MATCH: &str = "Landroid/service/autofill/FieldClassification$Match;";
+const AF_SAVED_DATASETS_INFO: &str = "Landroid/service/autofill/SavedDatasetsInfo;";
+
+fn af_id(engine: &mut Engine, id: i32) -> ObjRef {
+    let value = instance(engine, AF_ID);
+    call(engine, value, "<init>", "(I)V", &[Value::Int(id)]);
+    value
+}
+fn af_pattern(engine: &mut Engine, regex: &str) -> Value {
+    let regex = text(engine, regex);
+    call_static(
+        engine,
+        "Ljava/util/regex/Pattern;",
+        "compile",
+        "(Ljava/lang/String;)Ljava/util/regex/Pattern;",
+        &[regex],
+    )
+}
+fn af_text_value(engine: &mut Engine, value: &str) -> Value {
+    let value = text(engine, value);
+    call_static(
+        engine,
+        AF_VALUE,
+        "forText",
+        "(Ljava/lang/CharSequence;)Landroid/view/autofill/AutofillValue;",
+        &[value],
+    )
+}
+fn af_remote_views(engine: &mut Engine) -> ObjRef {
+    let views = instance(engine, "Landroid/widget/RemoteViews;");
+    let package = text(engine, "test.autofill");
+    call(
+        engine,
+        views,
+        "<init>",
+        "(Ljava/lang/String;I)V",
+        &[package, Value::Int(7)],
+    );
+    views
+}
+fn af_list_get(engine: &mut Engine, list: Value, index: i32) -> Value {
+    call(
+        engine,
+        object(list),
+        "get",
+        "(I)Ljava/lang/Object;",
+        &[Value::Int(index)],
+    )
+}
+
+#[test]
+fn autofill_ids_and_values_have_aosp_value_semantics() {
+    let mut engine = engine_of(&DexBuilder::new());
+
+    let host = af_id(&mut engine, 42);
+    let child = instance(&mut engine, AF_ID);
+    call(
+        &mut engine,
+        child,
+        "<init>",
+        "(Landroid/view/autofill/AutofillId;I)V",
+        &[Value::Obj(host), Value::Int(7)],
+    );
+    assert_eq!(
+        call_text(&mut engine, child, "toString", "()Ljava/lang/String;", &[]),
+        "42:7"
+    );
+    assert_eq!(
+        call(&mut engine, child, "getViewId", "()I", &[]),
+        Value::Int(42)
+    );
+    assert_eq!(
+        call(&mut engine, child, "getVirtualChildIntId", "()I", &[]),
+        Value::Int(7)
+    );
+    assert_eq!(
+        call(&mut engine, child, "isVirtualInt", "()Z", &[]),
+        Value::Int(1)
+    );
+
+    let child_copy = instance(&mut engine, AF_ID);
+    call(
+        &mut engine,
+        child_copy,
+        "<init>",
+        "(II)V",
+        &[Value::Int(42), Value::Int(7)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            child,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(child_copy)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, child, "hashCode", "()I", &[]),
+        call(&mut engine, child_copy, "hashCode", "()I", &[])
+    );
+
+    let session_id = instance(&mut engine, AF_ID);
+    call(
+        &mut engine,
+        session_id,
+        "<init>",
+        "(Landroid/view/autofill/AutofillId;JI)V",
+        &[Value::Obj(host), Value::Long(99), Value::Int(5)],
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            session_id,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "42:99@5"
+    );
+    let without_session = object(call_static(
+        &mut engine,
+        AF_ID,
+        "withoutSession",
+        "(Landroid/view/autofill/AutofillId;)Landroid/view/autofill/AutofillId;",
+        &[Value::Obj(session_id)],
+    ));
+    assert_eq!(
+        call(&mut engine, without_session, "hasSession", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            without_session,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "42:99"
+    );
+
+    assert_eq!(
+        call_static(
+            &mut engine,
+            AF_VALUE,
+            "forText",
+            "(Ljava/lang/CharSequence;)Landroid/view/autofill/AutofillValue;",
+            &[Value::Null]
+        ),
+        Value::Null
+    );
+    let text_value = object(af_text_value(&mut engine, "ada"));
+    assert_eq!(
+        call(&mut engine, text_value, "isText", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            text_value,
+            "getTextValue",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        "ada"
+    );
+    assert_throws(
+        engine.invoke_instance(text_value, "getListValue", "()I", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    let same_text = object(af_text_value(&mut engine, "ada"));
+    assert_eq!(
+        call(
+            &mut engine,
+            text_value,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(same_text)]
+        ),
+        Value::Int(1)
+    );
+
+    let toggle = object(call_static(
+        &mut engine,
+        AF_VALUE,
+        "forToggle",
+        "(Z)Landroid/view/autofill/AutofillValue;",
+        &[Value::Int(1)],
+    ));
+    assert_eq!(
+        call(&mut engine, toggle, "getToggleValue", "()Z", &[]),
+        Value::Int(1)
+    );
+    let list = object(call_static(
+        &mut engine,
+        AF_VALUE,
+        "forList",
+        "(I)Landroid/view/autofill/AutofillValue;",
+        &[Value::Int(3)],
+    ));
+    assert_eq!(
+        call(&mut engine, list, "getListValue", "()I", &[]),
+        Value::Int(3)
+    );
+    let date = object(call_static(
+        &mut engine,
+        AF_VALUE,
+        "forDate",
+        "(J)Landroid/view/autofill/AutofillValue;",
+        &[Value::Long(123_456)],
+    ));
+    assert_eq!(
+        call(&mut engine, date, "getDateValue", "()J", &[]),
+        Value::Long(123_456)
+    );
+}
+
+#[test]
+fn autofill_dataset_builder_replaces_ids_and_enforces_build_contract() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let presentation = af_remote_views(&mut engine);
+
+    let empty_builder = instance(&mut engine, AF_DATASET_BUILDER);
+    call(
+        &mut engine,
+        empty_builder,
+        "<init>",
+        "(Landroid/widget/RemoteViews;)V",
+        &[Value::Obj(presentation)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            empty_builder,
+            "build",
+            "()Landroid/service/autofill/Dataset;",
+            &[],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    let builder = instance(&mut engine, AF_DATASET_BUILDER);
+    call(
+        &mut engine,
+        builder,
+        "<init>",
+        "(Landroid/widget/RemoteViews;)V",
+        &[Value::Obj(presentation)],
+    );
+    let dataset_id = text(&mut engine, "cred-1");
+    call(
+        &mut engine,
+        builder,
+        "setId",
+        "(Ljava/lang/String;)Landroid/service/autofill/Dataset$Builder;",
+        &[dataset_id],
+    );
+    let user_id = af_id(&mut engine, 10);
+    let first_value = af_text_value(&mut engine, "old-user");
+    call(
+        &mut engine,
+        builder,
+        "setValue",
+        "(Landroid/view/autofill/AutofillId;Landroid/view/autofill/AutofillValue;)Landroid/service/autofill/Dataset$Builder;",
+        &[Value::Obj(user_id), first_value],
+    );
+    let replacement_id = af_id(&mut engine, 10);
+    let replacement = af_text_value(&mut engine, "ada");
+    call(
+        &mut engine,
+        builder,
+        "setValue",
+        "(Landroid/view/autofill/AutofillId;Landroid/view/autofill/AutofillValue;)Landroid/service/autofill/Dataset$Builder;",
+        &[Value::Obj(replacement_id), replacement],
+    );
+    let password_id = af_id(&mut engine, 11);
+    let password = af_text_value(&mut engine, "secret");
+    let pattern = af_pattern(&mut engine, "[a-z]+");
+    call(
+        &mut engine,
+        builder,
+        "setValue",
+        "(Landroid/view/autofill/AutofillId;Landroid/view/autofill/AutofillValue;Ljava/util/regex/Pattern;)Landroid/service/autofill/Dataset$Builder;",
+        &[Value::Obj(password_id), password, pattern.clone()],
+    );
+    let dataset = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/service/autofill/Dataset;",
+        &[],
+    ));
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "build",
+            "()Landroid/service/autofill/Dataset;",
+            &[],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    let ids = call(
+        &mut engine,
+        dataset,
+        "getFieldIds",
+        "()Ljava/util/ArrayList;",
+        &[],
+    );
+    assert_eq!(list_size(&mut engine, ids), 2);
+    let values = call(
+        &mut engine,
+        dataset,
+        "getFieldValues",
+        "()Ljava/util/ArrayList;",
+        &[],
+    );
+    let first = object(af_list_get(&mut engine, values.clone(), 0));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            first,
+            "getTextValue",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        "ada"
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            dataset,
+            "getFieldPresentation",
+            "(I)Landroid/widget/RemoteViews;",
+            &[Value::Int(0)]
+        ),
+        Value::Obj(presentation)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            dataset,
+            "getFilter",
+            "(I)Landroid/service/autofill/Dataset$DatasetFieldFilter;",
+            &[Value::Int(0)]
+        ),
+        Value::Null
+    );
+    let filter = object(call(
+        &mut engine,
+        dataset,
+        "getFilter",
+        "(I)Landroid/service/autofill/Dataset$DatasetFieldFilter;",
+        &[Value::Int(1)],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            filter,
+            "getPattern",
+            "()Ljava/util/regex/Pattern;",
+            &[]
+        ),
+        pattern
+    );
+    assert_eq!(
+        call_text(&mut engine, dataset, "getId", "()Ljava/lang/String;", &[]),
+        "cred-1"
+    );
+
+    let empty_presentations = instance(&mut engine, AF_PRESENTATIONS_BUILDER);
+    call(&mut engine, empty_presentations, "<init>", "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            empty_presentations,
+            "build",
+            "()Landroid/service/autofill/Presentations;",
+            &[],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+    let presentations_builder = instance(&mut engine, AF_PRESENTATIONS_BUILDER);
+    call(&mut engine, presentations_builder, "<init>", "()V", &[]);
+    call(
+        &mut engine,
+        presentations_builder,
+        "setMenuPresentation",
+        "(Landroid/widget/RemoteViews;)Landroid/service/autofill/Presentations$Builder;",
+        &[Value::Obj(presentation)],
+    );
+    let presentations = call(
+        &mut engine,
+        presentations_builder,
+        "build",
+        "()Landroid/service/autofill/Presentations;",
+        &[],
+    );
+
+    let field_builder = instance(&mut engine, AF_FIELD_BUILDER);
+    call(&mut engine, field_builder, "<init>", "()V", &[]);
+    let field_value = af_text_value(&mut engine, "grace");
+    call(
+        &mut engine,
+        field_builder,
+        "setValue",
+        "(Landroid/view/autofill/AutofillValue;)Landroid/service/autofill/Field$Builder;",
+        &[field_value],
+    );
+    call(
+        &mut engine,
+        field_builder,
+        "setFilter",
+        "(Ljava/util/regex/Pattern;)Landroid/service/autofill/Field$Builder;",
+        &[Value::Null],
+    );
+    call(
+        &mut engine,
+        field_builder,
+        "setPresentations",
+        "(Landroid/service/autofill/Presentations;)Landroid/service/autofill/Field$Builder;",
+        &[presentations],
+    );
+    let field = call(
+        &mut engine,
+        field_builder,
+        "build",
+        "()Landroid/service/autofill/Field;",
+        &[],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            field_builder,
+            "build",
+            "()Landroid/service/autofill/Field;",
+            &[],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    let typed_builder = instance(&mut engine, AF_DATASET_BUILDER);
+    call(&mut engine, typed_builder, "<init>", "()V", &[]);
+    let typed_id = af_id(&mut engine, 12);
+    call(
+        &mut engine,
+        typed_builder,
+        "setField",
+        "(Landroid/view/autofill/AutofillId;Landroid/service/autofill/Field;)Landroid/service/autofill/Dataset$Builder;",
+        &[Value::Obj(typed_id), field.clone()],
+    );
+    let hint = text(&mut engine, "username");
+    call(
+        &mut engine,
+        typed_builder,
+        "setField",
+        "(Ljava/lang/String;Landroid/service/autofill/Field;)Landroid/service/autofill/Dataset$Builder;",
+        &[hint, field],
+    );
+    let typed_dataset = object(call(
+        &mut engine,
+        typed_builder,
+        "build",
+        "()Landroid/service/autofill/Dataset;",
+        &[],
+    ));
+    let datatypes = call(
+        &mut engine,
+        typed_dataset,
+        "getAutofillDatatypes",
+        "()Ljava/util/ArrayList;",
+        &[],
+    );
+    assert_eq!(list_size(&mut engine, datatypes.clone()), 1);
+    let datatype = af_list_get(&mut engine, datatypes, 0);
+    assert_eq!(text_of(&engine, &datatype), "username");
+    assert_eq!(
+        call(
+            &mut engine,
+            typed_dataset,
+            "getFieldPresentation",
+            "(I)Landroid/widget/RemoteViews;",
+            &[Value::Int(0)]
+        ),
+        Value::Obj(presentation)
+    );
+}
+
+#[test]
+fn autofill_response_saveinfo_and_user_data_builders_validate_state() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let required_id = af_id(&mut engine, 20);
+    let optional_id = af_id(&mut engine, 21);
+
+    let invalid_user = instance(&mut engine, AF_USER_DATA_BUILDER);
+    let invalid_args = [
+        text(&mut engine, "data"),
+        text(&mut engine, "ab"),
+        text(&mut engine, "email"),
+    ];
+    assert_throws(
+        engine.invoke_instance(
+            invalid_user,
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+            &invalid_args,
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let user_builder = instance(&mut engine, AF_USER_DATA_BUILDER);
+    let user_id = text(&mut engine, "data");
+    let user_value = text(&mut engine, "alice@example.test");
+    let email_category = text(&mut engine, "email");
+    call(
+        &mut engine,
+        user_builder,
+        "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+        &[user_id, user_value.clone(), email_category.clone()],
+    );
+    call(
+        &mut engine,
+        user_builder,
+        "add",
+        "(Ljava/lang/String;Ljava/lang/String;)Landroid/service/autofill/UserData$Builder;",
+        &[user_value, email_category],
+    );
+    let phone_value = text(&mut engine, "555-0100");
+    let phone_category = text(&mut engine, "phone");
+    call(
+        &mut engine,
+        user_builder,
+        "add",
+        "(Ljava/lang/String;Ljava/lang/String;)Landroid/service/autofill/UserData$Builder;",
+        &[phone_value, phone_category],
+    );
+    let algorithm = text(&mut engine, "Levenshtein");
+    let category = text(&mut engine, "email");
+    call(
+        &mut engine,
+        user_builder,
+        "setFieldClassificationAlgorithmForCategory",
+        "(Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Landroid/service/autofill/UserData$Builder;",
+        &[category, algorithm, Value::Null],
+    );
+    let user_data = object(call(
+        &mut engine,
+        user_builder,
+        "build",
+        "()Landroid/service/autofill/UserData;",
+        &[],
+    ));
+    let categories = call(
+        &mut engine,
+        user_data,
+        "getCategoryIds",
+        "()[Ljava/lang/String;",
+        &[],
+    );
+    assert_eq!(
+        array_values(&engine, &categories)
+            .iter()
+            .map(|value| text_of(&engine, value))
+            .collect::<Vec<_>>(),
+        ["email", "phone"]
+    );
+    let category = text(&mut engine, "email");
+    assert_eq!(
+        call_text(
+            &mut engine,
+            user_data,
+            "getFieldClassificationAlgorithmForCategory",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            &[category]
+        ),
+        "Levenshtein"
+    );
+    let post_build_args = [
+        text(&mut engine, "another-value"),
+        text(&mut engine, "other"),
+    ];
+    assert_throws(
+        engine.invoke_instance(
+            user_builder,
+            "add",
+            "(Ljava/lang/String;Ljava/lang/String;)Landroid/service/autofill/UserData$Builder;",
+            &post_build_args,
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+    assert_eq!(
+        call_static(&mut engine, AF_USER_DATA, "getMaxUserDataSize", "()I", &[]),
+        Value::Int(50)
+    );
+
+    let validator_pattern = af_pattern(&mut engine, ".{4,}");
+    let validator = instance(&mut engine, AF_REGEX_VALIDATOR);
+    call(
+        &mut engine,
+        validator,
+        "<init>",
+        "(Landroid/view/autofill/AutofillId;Ljava/util/regex/Pattern;)V",
+        &[Value::Obj(required_id), validator_pattern],
+    );
+    let sanitizer_pattern = af_pattern(&mut engine, r"^(\d{4})\s(\d{4})$");
+    let sanitizer_subst = text(&mut engine, "$1$2");
+    let sanitizer = instance(&mut engine, AF_TEXT_SANITIZER);
+    call(
+        &mut engine,
+        sanitizer,
+        "<init>",
+        "(Ljava/util/regex/Pattern;Ljava/lang/String;)V",
+        &[sanitizer_pattern, sanitizer_subst],
+    );
+    let raw_card = af_text_value(&mut engine, "1234 5678");
+    let sanitized = object(call(
+        &mut engine,
+        sanitizer,
+        "sanitize",
+        "(Landroid/view/autofill/AutofillValue;)Landroid/view/autofill/AutofillValue;",
+        &[raw_card],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            sanitized,
+            "getTextValue",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        "12345678"
+    );
+
+    let save_builder = instance(&mut engine, AF_SAVE_INFO_BUILDER);
+    let required_ids = object_array(
+        &mut engine,
+        "[Landroid/view/autofill/AutofillId;",
+        vec![Value::Obj(required_id)],
+    );
+    call(
+        &mut engine,
+        save_builder,
+        "<init>",
+        "(I[Landroid/view/autofill/AutofillId;)V",
+        &[Value::Int(0x1 | 0x8), required_ids.clone()],
+    );
+    let optional_ids = object_array(
+        &mut engine,
+        "[Landroid/view/autofill/AutofillId;",
+        vec![Value::Obj(optional_id)],
+    );
+    call(
+        &mut engine,
+        save_builder,
+        "setOptionalIds",
+        "([Landroid/view/autofill/AutofillId;)Landroid/service/autofill/SaveInfo$Builder;",
+        &[optional_ids],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            save_builder,
+            "setFlags",
+            "(I)Landroid/service/autofill/SaveInfo$Builder;",
+            &[Value::Int(8)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    call(
+        &mut engine,
+        save_builder,
+        "setFlags",
+        "(I)Landroid/service/autofill/SaveInfo$Builder;",
+        &[Value::Int(1)],
+    );
+    let description = text(&mut engine, "Save login?");
+    call(
+        &mut engine,
+        save_builder,
+        "setDescription",
+        "(Ljava/lang/CharSequence;)Landroid/service/autofill/SaveInfo$Builder;",
+        &[description],
+    );
+    let custom_description = instance(&mut engine, "Landroid/service/autofill/CustomDescription;");
+    assert_throws(
+        engine.invoke_instance(
+            save_builder,
+            "setCustomDescription",
+            "(Landroid/service/autofill/CustomDescription;)Landroid/service/autofill/SaveInfo$Builder;",
+            &[Value::Obj(custom_description)],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            save_builder,
+            "setNegativeAction",
+            "(ILandroid/content/IntentSender;)Landroid/service/autofill/SaveInfo$Builder;",
+            &[Value::Int(3), Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    call(
+        &mut engine,
+        save_builder,
+        "setNegativeAction",
+        "(ILandroid/content/IntentSender;)Landroid/service/autofill/SaveInfo$Builder;",
+        &[Value::Int(2), Value::Null],
+    );
+    call(
+        &mut engine,
+        save_builder,
+        "setValidator",
+        "(Landroid/service/autofill/Validator;)Landroid/service/autofill/SaveInfo$Builder;",
+        &[Value::Obj(validator)],
+    );
+    call(
+        &mut engine,
+        save_builder,
+        "addSanitizer",
+        "(Landroid/service/autofill/Sanitizer;[Landroid/view/autofill/AutofillId;)Landroid/service/autofill/SaveInfo$Builder;",
+        &[Value::Obj(sanitizer), required_ids.clone()],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            save_builder,
+            "addSanitizer",
+            "(Landroid/service/autofill/Sanitizer;[Landroid/view/autofill/AutofillId;)Landroid/service/autofill/SaveInfo$Builder;",
+            &[Value::Obj(sanitizer), required_ids.clone()],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let save_info = object(call(
+        &mut engine,
+        save_builder,
+        "build",
+        "()Landroid/service/autofill/SaveInfo;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, save_info, "getType", "()I", &[]),
+        Value::Int(9)
+    );
+    assert_eq!(
+        call(&mut engine, save_info, "getFlags", "()I", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, save_info, "getNegativeActionStyle", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            save_info,
+            "getValidator",
+            "()Landroid/service/autofill/InternalValidator;",
+            &[]
+        ),
+        Value::Obj(validator)
+    );
+    let sanitizer_keys = call(
+        &mut engine,
+        save_info,
+        "getSanitizerKeys",
+        "()[Landroid/service/autofill/InternalSanitizer;",
+        &[],
+    );
+    assert_eq!(
+        array_values(&engine, &sanitizer_keys),
+        [Value::Obj(sanitizer)]
+    );
+
+    let presentation = af_remote_views(&mut engine);
+    let dataset_builder = instance(&mut engine, AF_DATASET_BUILDER);
+    call(
+        &mut engine,
+        dataset_builder,
+        "<init>",
+        "(Landroid/widget/RemoteViews;)V",
+        &[Value::Obj(presentation)],
+    );
+    let value = af_text_value(&mut engine, "alice@example.test");
+    call(
+        &mut engine,
+        dataset_builder,
+        "setValue",
+        "(Landroid/view/autofill/AutofillId;Landroid/view/autofill/AutofillValue;)Landroid/service/autofill/Dataset$Builder;",
+        &[Value::Obj(required_id), value],
+    );
+    let dataset = call(
+        &mut engine,
+        dataset_builder,
+        "build",
+        "()Landroid/service/autofill/Dataset;",
+        &[],
+    );
+
+    let empty_response_builder = instance(&mut engine, AF_FILL_RESPONSE_BUILDER);
+    call(&mut engine, empty_response_builder, "<init>", "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            empty_response_builder,
+            "build",
+            "()Landroid/service/autofill/FillResponse;",
+            &[],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+    let response_builder = instance(&mut engine, AF_FILL_RESPONSE_BUILDER);
+    call(&mut engine, response_builder, "<init>", "()V", &[]);
+    call(
+        &mut engine,
+        response_builder,
+        "addDataset",
+        "(Landroid/service/autofill/Dataset;)Landroid/service/autofill/FillResponse$Builder;",
+        &[Value::Null],
+    );
+    call(
+        &mut engine,
+        response_builder,
+        "addDataset",
+        "(Landroid/service/autofill/Dataset;)Landroid/service/autofill/FillResponse$Builder;",
+        std::slice::from_ref(&dataset),
+    );
+    call(
+        &mut engine,
+        response_builder,
+        "setSaveInfo",
+        "(Landroid/service/autofill/SaveInfo;)Landroid/service/autofill/FillResponse$Builder;",
+        &[Value::Obj(save_info)],
+    );
+    call(
+        &mut engine,
+        response_builder,
+        "setUserData",
+        "(Landroid/service/autofill/UserData;)Landroid/service/autofill/FillResponse$Builder;",
+        &[Value::Obj(user_data)],
+    );
+    call(
+        &mut engine,
+        response_builder,
+        "setFlags",
+        "(I)Landroid/service/autofill/FillResponse$Builder;",
+        &[Value::Int(2)],
+    );
+    let classification_ids = object_array(
+        &mut engine,
+        "[Landroid/view/autofill/AutofillId;",
+        vec![Value::Obj(required_id)],
+    );
+    call(
+        &mut engine,
+        response_builder,
+        "setFieldClassificationIds",
+        "([Landroid/view/autofill/AutofillId;)Landroid/service/autofill/FillResponse$Builder;",
+        &[classification_ids],
+    );
+    let response = object(call(
+        &mut engine,
+        response_builder,
+        "build",
+        "()Landroid/service/autofill/FillResponse;",
+        &[],
+    ));
+    let datasets = call(
+        &mut engine,
+        response,
+        "getDatasets",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(list_size(&mut engine, datasets), 1);
+    assert_eq!(
+        call(
+            &mut engine,
+            response,
+            "getSaveInfo",
+            "()Landroid/service/autofill/SaveInfo;",
+            &[]
+        ),
+        Value::Obj(save_info)
+    );
+    assert_eq!(
+        call(&mut engine, response, "getFlags", "()I", &[]),
+        Value::Int(3)
+    );
+    assert_eq!(
+        call(&mut engine, response, "getRequestId", "()I", &[]),
+        Value::Int(i32::MIN)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            response,
+            "supportsInlineSuggestions",
+            "()Z",
+            &[]
+        ),
+        Value::Int(0)
+    );
+
+    let callback = instance(&mut engine, AF_FILL_CALLBACK);
+    call(
+        &mut engine,
+        callback,
+        "<init>",
+        "(Landroid/service/autofill/IFillCallback;I)V",
+        &[Value::Null, Value::Int(77)],
+    );
+    call(
+        &mut engine,
+        callback,
+        "onSuccess",
+        "(Landroid/service/autofill/FillResponse;)V",
+        &[Value::Obj(response)],
+    );
+    assert_eq!(
+        call(&mut engine, response, "getRequestId", "()I", &[]),
+        Value::Int(77)
+    );
+    assert_throws(
+        engine.invoke_instance(
+            callback,
+            "onFailure",
+            "(Ljava/lang/CharSequence;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+}
+
+#[test]
+fn autofill_requests_callbacks_classifications_and_service_base_are_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let focused = af_id(&mut engine, 30);
+    let structure = instance(&mut engine, "Landroid/app/assist/AssistStructure;");
+    let context = instance(&mut engine, AF_FILL_CONTEXT);
+    call(
+        &mut engine,
+        context,
+        "<init>",
+        "(ILandroid/app/assist/AssistStructure;Landroid/view/autofill/AutofillId;)V",
+        &[Value::Int(9), Value::Obj(structure), Value::Obj(focused)],
+    );
+    assert_eq!(
+        call(&mut engine, context, "getRequestId", "()I", &[]),
+        Value::Int(9)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            context,
+            "getFocusedId",
+            "()Landroid/view/autofill/AutofillId;",
+            &[]
+        ),
+        Value::Obj(focused)
+    );
+
+    let contexts = Value::Obj(list_of(&mut engine, &[Value::Obj(context)]));
+    let username_hint = text(&mut engine, "username");
+    let hints = Value::Obj(list_of(&mut engine, std::slice::from_ref(&username_hint)));
+    let invalid_request = instance(&mut engine, AF_FILL_REQUEST);
+    assert_throws(
+        engine.invoke_instance(
+            invalid_request,
+            "<init>",
+            "(ILjava/util/List;Ljava/util/List;Landroid/os/Bundle;ILandroid/view/inputmethod/InlineSuggestionsRequest;Landroid/content/IntentSender;)V",
+            &[
+                Value::Int(9),
+                contexts.clone(),
+                hints.clone(),
+                Value::Null,
+                Value::Int(8),
+                Value::Null,
+                Value::Null,
+            ],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let request = instance(&mut engine, AF_FILL_REQUEST);
+    call(
+        &mut engine,
+        request,
+        "<init>",
+        "(ILjava/util/List;Ljava/util/List;Landroid/os/Bundle;ILandroid/view/inputmethod/InlineSuggestionsRequest;Landroid/content/IntentSender;)V",
+        &[
+            Value::Int(9),
+            contexts.clone(),
+            hints.clone(),
+            Value::Null,
+            Value::Int(1),
+            Value::Null,
+            Value::Null,
+        ],
+    );
+    assert_eq!(
+        call(&mut engine, request, "getId", "()I", &[]),
+        Value::Int(9)
+    );
+    assert_eq!(
+        call(&mut engine, request, "getHints", "()Ljava/util/List;", &[]),
+        hints
+    );
+
+    let context_list = match contexts {
+        Value::Obj(list) => Value::Obj(list),
+        other => panic!("context list: {other:?}"),
+    };
+    let dataset_id = text(&mut engine, "cred-1");
+    let dataset_ids = Value::Obj(list_of(&mut engine, std::slice::from_ref(&dataset_id)));
+    let save_request = instance(&mut engine, AF_SAVE_REQUEST);
+    call(
+        &mut engine,
+        save_request,
+        "<init>",
+        "(Ljava/util/ArrayList;Landroid/os/Bundle;Ljava/util/ArrayList;)V",
+        &[context_list, Value::Null, dataset_ids.clone()],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            save_request,
+            "getDatasetIds",
+            "()Ljava/util/List;",
+            &[]
+        ),
+        dataset_ids
+    );
+
+    let save_callback = instance(&mut engine, AF_SAVE_CALLBACK);
+    call(
+        &mut engine,
+        save_callback,
+        "<init>",
+        "(Landroid/service/autofill/ISaveCallback;)V",
+        &[Value::Null],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            save_callback,
+            "onSuccess",
+            "(Landroid/content/IntentSender;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    call(&mut engine, save_callback, "onSuccess", "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            save_callback,
+            "onFailure",
+            "(Ljava/lang/CharSequence;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    let low_category = text(&mut engine, "low");
+    let low = instance(&mut engine, AF_FIELD_CLASSIFICATION_MATCH);
+    call(
+        &mut engine,
+        low,
+        "<init>",
+        "(Ljava/lang/String;F)V",
+        &[low_category, Value::Float(0.25)],
+    );
+    let high_category = text(&mut engine, "high");
+    let high = instance(&mut engine, AF_FIELD_CLASSIFICATION_MATCH);
+    call(
+        &mut engine,
+        high,
+        "<init>",
+        "(Ljava/lang/String;F)V",
+        &[high_category, Value::Float(0.75)],
+    );
+    let matches = Value::Obj(list_of(&mut engine, &[Value::Obj(low), Value::Obj(high)]));
+    let classification = instance(&mut engine, AF_FIELD_CLASSIFICATION);
+    call(
+        &mut engine,
+        classification,
+        "<init>",
+        "(Ljava/util/ArrayList;)V",
+        std::slice::from_ref(&matches),
+    );
+    let sorted = call(
+        &mut engine,
+        classification,
+        "getMatches",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(af_list_get(&mut engine, sorted, 0), Value::Obj(high));
+
+    let passwords_type = text(&mut engine, "passwords");
+    let saved = instance(&mut engine, AF_SAVED_DATASETS_INFO);
+    call(
+        &mut engine,
+        saved,
+        "<init>",
+        "(Ljava/lang/String;I)V",
+        &[passwords_type, Value::Int(4)],
+    );
+    assert_eq!(
+        call_text(&mut engine, saved, "toString", "()Ljava/lang/String;", &[]),
+        "SavedDatasetsInfo { type = passwords, count = 4 }"
+    );
+    let invalid_saved_type = text(&mut engine, "cards");
+    let invalid_saved = instance(&mut engine, AF_SAVED_DATASETS_INFO);
+    assert_throws(
+        engine.invoke_instance(
+            invalid_saved,
+            "<init>",
+            "(Ljava/lang/String;I)V",
+            &[invalid_saved_type, Value::Int(1)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    let service = instance(&mut engine, "Landroid/service/autofill/AutofillService;");
+    call(&mut engine, service, "<init>", "()V", &[]);
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "getFillEventHistory",
+            "()Landroid/service/autofill/FillEventHistory;",
+            &[]
+        ),
+        Value::Null
+    );
+    let wrong_action = text(&mut engine, "example.WRONG");
+    let wrong_intent = instance(&mut engine, "Landroid/content/Intent;");
+    call(
+        &mut engine,
+        wrong_intent,
+        "<init>",
+        "(Ljava/lang/String;)V",
+        &[wrong_action],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Obj(wrong_intent)]
+        ),
+        Value::Null
+    );
+    let service_action = text(&mut engine, "android.service.autofill.AutofillService");
+    let intent = instance(&mut engine, "Landroid/content/Intent;");
+    call(
+        &mut engine,
+        intent,
+        "<init>",
+        "(Ljava/lang/String;)V",
+        &[service_action],
+    );
+    let binder = call(
+        &mut engine,
+        service,
+        "onBind",
+        "(Landroid/content/Intent;)Landroid/os/IBinder;",
+        &[Value::Obj(intent)],
+    );
+    assert!(!matches!(binder, Value::Null));
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Obj(intent)]
+        ),
+        binder
+    );
 }

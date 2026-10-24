@@ -1345,15 +1345,15 @@ key_apis = ["android.view.textclassifier.TextClassificationManager.getTextClassi
 id = "android-service-autofill"
 prefix = "android.service.autofill"
 domain = "services-ext"
-status = "stub"
+status = "partial"
 domain_module = "fd-system-services"
-module = "rd-vm/classpath"
-code = ["crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/view_props.rs"]
-milestone = "future"
-notes = "Autofill hints/fields on views may be recorded, but AutofillService session/dataset flows are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-service-autofill"
-key_apis = ["android.service.autofill.AutofillService.onFillRequest"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/platform_base.rs", "crates/rd-vm/src/view_props.rs"]
+milestone = "M11"
+notes = "Service-side Dataset/Field/Presentations, FillResponse, SaveInfo, UserData, validators and sanitizers execute with AOSP builder state/validation; FillRequest, SaveRequest, FillContext, FieldClassification, SavedDatasetsInfo, one-shot FillCallback/SaveCallback, and the AutofillService base binding are modeled host-side. A DEX subclass can implement onFillRequest/onSaveRequest against those objects, but no AutofillManager session initiates or binds a service; AssistStructure capture/traversal, credential/dataset UI, authentication activities, CustomDescription transformations, FillEventHistory, inline IME rendering, and Parcel marshalling are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-service-autofill-session"
+key_apis = ["android.service.autofill.Dataset.Builder.build", "android.service.autofill.FillResponse.Builder.build", "android.service.autofill.SaveInfo.Builder.build", "android.service.autofill.UserData.Builder.build", "android.service.autofill.FillCallback.onSuccess", "android.service.autofill.AutofillService.onBind"]
 
 [[surface]]
 id = "android-service-quicksettings"
