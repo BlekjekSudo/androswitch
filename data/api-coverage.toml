@@ -392,15 +392,15 @@ key_apis = ["android.graphics.pdf.PdfDocument.startPage", "android.graphics.pdf.
 id = "android-opengl"
 prefix = "android.opengl"
 domain = "graphics"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-ui"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "M10/M11"
-notes = "GLSurfaceView/EGL/GLES Java bindings are not a RustyDroid renderer yet. Native EGL/GLES symbols are a separate NDK surface."
-evidence = ["docs/compat-matrix.md"]
+notes = "The complete deterministic android.opengl.Matrix float-array API is modelled with AOSP multiplication, transpose, Cramer's-rule inversion, identity/scale/translate/rotate operations, orthographic/frustum/perspective projections, Euler conversions (including the deprecated Y-axis behavior), look-at construction, offset handling, and its distinct explicit versus implicit array/argument validation. GLSurfaceView, EGL/GLES bindings, GLUtils, contexts, and rendering are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-opengl"
-key_apis = ["android.opengl.GLSurfaceView.setRenderer", "android.opengl.EGLDisplay"]
+key_apis = ["android.opengl.Matrix.multiplyMM", "android.opengl.Matrix.multiplyMV", "android.opengl.Matrix.invertM", "android.opengl.Matrix.setIdentityM", "android.opengl.Matrix.setRotateEulerM2", "android.opengl.Matrix.setLookAtM"]
 
 [[surface]]
 id = "android-renderscript"
@@ -1245,15 +1245,15 @@ key_apis = ["android.security.keystore.KeyGenParameterSpec.Builder.build", "andr
 id = "android-security-identity"
 prefix = "android.security.identity"
 domain = "security"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "Identity Credential/mdoc APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "IdentityCredentialStore is modelled in AOSP's documented no-credstore profile: with no android.security.identity binder, both default and direct-access factories return null (including before any Context dereference), the supported ciphersuite constant is exposed, and the public base createPresentationSession implementation retains its UnsupportedOperationException. Credstore connections, hardware-backed credentials, document provisioning, presentation sessions, and mdoc protocols are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-security-identity"
-key_apis = ["android.security.identity.IdentityCredentialStore.getInstance"]
+key_apis = ["android.security.identity.IdentityCredentialStore.getInstance", "android.security.identity.IdentityCredentialStore.getDirectAccessInstance", "android.security.identity.IdentityCredentialStore.createPresentationSession"]
 
 [[surface]]
 id = "android-se-omapi"

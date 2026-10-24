@@ -437,6 +437,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial35e_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36a_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -593,6 +596,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial35e_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36a_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -680,6 +686,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial35e_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial36a_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -40174,4 +40183,900 @@ pub(crate) fn partial35e_host_static(
         _ => None,
     };
     Ok(int_value.map(Value::Int))
+}
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 36-A: android.opengl + android.security.identity.
+// `android.opengl.Matrix` is the complete deterministic AOSP float-array
+// implementation. Identity Credential is the documented no-credstore
+// service profile: AOSP returns null from both store factories when
+// `ServiceManager.getService("android.security.identity")` has no binder.
+// There is no GL/EGL surface, credential hardware, or presentation session.
+// ---------------------------------------------------------------------------
+
+const P36A_MATRIX: &str = "Landroid/opengl/Matrix;";
+const P36A_IDENTITY_STORE: &str = "Landroid/security/identity/IdentityCredentialStore;";
+const P36A_CREDSTORE: &str = "Landroid/security/identity/CredstoreIdentityCredentialStore;";
+
+fn p36a_class(c: &str) -> bool {
+    matches!(c, P36A_MATRIX | P36A_IDENTITY_STORE | P36A_CREDSTORE)
+}
+
+fn p36a_value(args: &[Value], i: usize) -> Value {
+    args.get(i).cloned().unwrap_or(Value::Null)
+}
+
+#[allow(clippy::too_many_arguments)] // AOSP names each distinct array fault
+fn p36a_array_bounds(
+    vm: &Engine,
+    value: &Value,
+    offset: i32,
+    len: usize,
+    null_msg: &str,
+    negative_msg: &str,
+    length_msg: &str,
+    explicit: bool,
+) -> Result<ObjRef, VmExit> {
+    let Some(array) = obj(Some(value)) else {
+        return Err(if explicit { iae(null_msg) } else { npe("") });
+    };
+    if offset < 0 {
+        return Err(if explicit {
+            iae(negative_msg)
+        } else {
+            oob(negative_msg)
+        });
+    }
+    if offset as i64 + len as i64 > array_elems(vm, Some(value)).len() as i64 {
+        return Err(if explicit {
+            iae(length_msg)
+        } else {
+            oob(length_msg)
+        });
+    }
+    Ok(array)
+}
+
+#[allow(clippy::too_many_arguments)] // AOSP names each distinct array fault
+fn p36a_read_floats(
+    vm: &Engine,
+    value: &Value,
+    offset: i32,
+    len: usize,
+    null_msg: &str,
+    negative_msg: &str,
+    length_msg: &str,
+    explicit: bool,
+) -> Result<Vec<f32>, VmExit> {
+    p36a_array_bounds(
+        vm,
+        value,
+        offset,
+        len,
+        null_msg,
+        negative_msg,
+        length_msg,
+        explicit,
+    )?;
+    let values = float_values(vm, Some(value));
+    let start = offset as usize;
+    Ok(values[start..start + len].to_vec())
+}
+
+#[allow(clippy::too_many_arguments)] // AOSP names each distinct array fault
+fn p36a_write_floats(
+    vm: &mut Engine,
+    value: &Value,
+    offset: i32,
+    output: &[f32],
+    null_msg: &str,
+    negative_msg: &str,
+    length_msg: &str,
+    explicit: bool,
+) -> Result<(), VmExit> {
+    let array = p36a_array_bounds(
+        vm,
+        value,
+        offset,
+        output.len(),
+        null_msg,
+        negative_msg,
+        length_msg,
+        explicit,
+    )?;
+    let elems = vm.heap.array_elems_mut(array)?;
+    for (i, value) in output.iter().enumerate() {
+        elems[offset as usize + i] = Value::Float(*value);
+    }
+    Ok(())
+}
+
+fn p36a_read_matrix(
+    vm: &Engine,
+    value: &Value,
+    offset: i32,
+    null_msg: &str,
+    negative_msg: &str,
+    length_msg: &str,
+    explicit: bool,
+) -> Result<[f32; 16], VmExit> {
+    let values = p36a_read_floats(
+        vm,
+        value,
+        offset,
+        16,
+        null_msg,
+        negative_msg,
+        length_msg,
+        explicit,
+    )?;
+    let mut out = [0.0f32; 16];
+    out.copy_from_slice(&values);
+    Ok(out)
+}
+
+fn p36a_read_vec4(
+    vm: &Engine,
+    value: &Value,
+    offset: i32,
+    null_msg: &str,
+    negative_msg: &str,
+    length_msg: &str,
+    explicit: bool,
+) -> Result<[f32; 4], VmExit> {
+    let values = p36a_read_floats(
+        vm,
+        value,
+        offset,
+        4,
+        null_msg,
+        negative_msg,
+        length_msg,
+        explicit,
+    )?;
+    Ok([values[0], values[1], values[2], values[3]])
+}
+
+fn p36a_write_matrix_implicit(
+    vm: &mut Engine,
+    value: &Value,
+    offset: i32,
+    output: &[f32; 16],
+) -> Result<Value, VmExit> {
+    p36a_write_floats(vm, value, offset, output, "", "", "", false)?;
+    Ok(Value::Null)
+}
+
+fn p36a_identity() -> [f32; 16] {
+    let mut out = [0.0f32; 16];
+    out[0] = 1.0;
+    out[5] = 1.0;
+    out[10] = 1.0;
+    out[15] = 1.0;
+    out
+}
+
+fn p36a_multiply_mm(lhs: &[f32; 16], rhs: &[f32; 16]) -> [f32; 16] {
+    let mut out = [0.0f32; 16];
+    for col in 0..4 {
+        for row in 0..4 {
+            let mut sum = lhs[row] * rhs[col * 4];
+            for k in 1..4 {
+                sum += lhs[k * 4 + row] * rhs[col * 4 + k];
+            }
+            out[col * 4 + row] = sum;
+        }
+    }
+    out
+}
+
+fn p36a_multiply_mv(lhs: &[f32; 16], rhs: &[f32; 4]) -> [f32; 4] {
+    let mut out = [0.0f32; 4];
+    for (row, item) in out.iter_mut().enumerate() {
+        *item = lhs[row] * rhs[0]
+            + lhs[row + 4] * rhs[1]
+            + lhs[row + 8] * rhs[2]
+            + lhs[row + 12] * rhs[3];
+    }
+    out
+}
+
+fn p36a_transpose(m: &[f32; 16]) -> [f32; 16] {
+    let mut out = [0.0f32; 16];
+    for i in 0..4 {
+        out[i] = m[i * 4];
+        out[i + 4] = m[i * 4 + 1];
+        out[i + 8] = m[i * 4 + 2];
+        out[i + 12] = m[i * 4 + 3];
+    }
+    out
+}
+
+fn p36a_invert(m: &[f32; 16]) -> Option<[f32; 16]> {
+    // AOSP Matrix.invertM, including its transposed source naming.
+    let src0 = m[0];
+    let src4 = m[1];
+    let src8 = m[2];
+    let src12 = m[3];
+    let src1 = m[4];
+    let src5 = m[5];
+    let src9 = m[6];
+    let src13 = m[7];
+    let src2 = m[8];
+    let src6 = m[9];
+    let src10 = m[10];
+    let src14 = m[11];
+    let src3 = m[12];
+    let src7 = m[13];
+    let src11 = m[14];
+    let src15 = m[15];
+
+    let atmp0 = src10 * src15;
+    let atmp1 = src11 * src14;
+    let atmp2 = src9 * src15;
+    let atmp3 = src11 * src13;
+    let atmp4 = src9 * src14;
+    let atmp5 = src10 * src13;
+    let atmp6 = src8 * src15;
+    let atmp7 = src11 * src12;
+    let atmp8 = src8 * src14;
+    let atmp9 = src10 * src12;
+    let atmp10 = src8 * src13;
+    let atmp11 = src9 * src12;
+
+    let dst0 =
+        (atmp0 * src5 + atmp3 * src6 + atmp4 * src7) - (atmp1 * src5 + atmp2 * src6 + atmp5 * src7);
+    let dst1 =
+        (atmp1 * src4 + atmp6 * src6 + atmp9 * src7) - (atmp0 * src4 + atmp7 * src6 + atmp8 * src7);
+    let dst2 = (atmp2 * src4 + atmp7 * src5 + atmp10 * src7)
+        - (atmp3 * src4 + atmp6 * src5 + atmp11 * src7);
+    let dst3 = (atmp5 * src4 + atmp8 * src5 + atmp11 * src6)
+        - (atmp4 * src4 + atmp9 * src5 + atmp10 * src6);
+    let dst4 =
+        (atmp1 * src1 + atmp2 * src2 + atmp5 * src3) - (atmp0 * src1 + atmp3 * src2 + atmp4 * src3);
+    let dst5 =
+        (atmp0 * src0 + atmp7 * src2 + atmp8 * src3) - (atmp1 * src0 + atmp6 * src2 + atmp9 * src3);
+    let dst6 = (atmp3 * src0 + atmp6 * src1 + atmp11 * src3)
+        - (atmp2 * src0 + atmp7 * src1 + atmp10 * src3);
+    let dst7 = (atmp4 * src0 + atmp9 * src1 + atmp10 * src2)
+        - (atmp5 * src0 + atmp8 * src1 + atmp11 * src2);
+
+    let btmp0 = src2 * src7;
+    let btmp1 = src3 * src6;
+    let btmp2 = src1 * src7;
+    let btmp3 = src3 * src5;
+    let btmp4 = src1 * src6;
+    let btmp5 = src2 * src5;
+    let btmp6 = src0 * src7;
+    let btmp7 = src3 * src4;
+    let btmp8 = src0 * src6;
+    let btmp9 = src2 * src4;
+    let btmp10 = src0 * src5;
+    let btmp11 = src1 * src4;
+
+    let dst8 = (btmp0 * src13 + btmp3 * src14 + btmp4 * src15)
+        - (btmp1 * src13 + btmp2 * src14 + btmp5 * src15);
+    let dst9 = (btmp1 * src12 + btmp6 * src14 + btmp9 * src15)
+        - (btmp0 * src12 + btmp7 * src14 + btmp8 * src15);
+    let dst10 = (btmp2 * src12 + btmp7 * src13 + btmp10 * src15)
+        - (btmp3 * src12 + btmp6 * src13 + btmp11 * src15);
+    let dst11 = (btmp5 * src12 + btmp8 * src13 + btmp11 * src14)
+        - (btmp4 * src12 + btmp9 * src13 + btmp10 * src14);
+    let dst12 = (btmp2 * src10 + btmp5 * src11 + btmp1 * src9)
+        - (btmp4 * src11 + btmp0 * src9 + btmp3 * src10);
+    let dst13 = (btmp8 * src11 + btmp0 * src8 + btmp7 * src10)
+        - (btmp6 * src10 + btmp9 * src11 + btmp1 * src8);
+    let dst14 = (btmp6 * src9 + btmp11 * src11 + btmp3 * src8)
+        - (btmp10 * src11 + btmp2 * src8 + btmp7 * src9);
+    let dst15 = (btmp10 * src10 + btmp4 * src8 + btmp9 * src9)
+        - (btmp8 * src9 + btmp11 * src10 + btmp5 * src8);
+
+    let det = src0 * dst0 + src1 * dst1 + src2 * dst2 + src3 * dst3;
+    if det == 0.0 {
+        return None;
+    }
+    let invdet = 1.0 / det;
+    Some([
+        dst0 * invdet,
+        dst1 * invdet,
+        dst2 * invdet,
+        dst3 * invdet,
+        dst4 * invdet,
+        dst5 * invdet,
+        dst6 * invdet,
+        dst7 * invdet,
+        dst8 * invdet,
+        dst9 * invdet,
+        dst10 * invdet,
+        dst11 * invdet,
+        dst12 * invdet,
+        dst13 * invdet,
+        dst14 * invdet,
+        dst15 * invdet,
+    ])
+}
+
+fn p36a_scale(m: &[f32; 16], x: f32, y: f32, z: f32) -> [f32; 16] {
+    let mut out = *m;
+    for i in 0..4 {
+        out[i] = m[i] * x;
+        out[4 + i] = m[4 + i] * y;
+        out[8 + i] = m[8 + i] * z;
+        out[12 + i] = m[12 + i];
+    }
+    out
+}
+
+fn p36a_translate(m: &[f32; 16], x: f32, y: f32, z: f32) -> [f32; 16] {
+    let mut out = *m;
+    for i in 0..4 {
+        out[12 + i] = m[i] * x + m[4 + i] * y + m[8 + i] * z + m[12 + i];
+    }
+    out
+}
+
+fn p36a_length(x: f32, y: f32, z: f32) -> f32 {
+    ((x * x + y * y + z * z) as f64).sqrt() as f32
+}
+
+fn p36a_set_rotate(a: f32, mut x: f32, mut y: f32, mut z: f32) -> [f32; 16] {
+    let mut out = [0.0f32; 16];
+    out[15] = 1.0;
+    let radians = a * (std::f32::consts::PI / 180.0f32);
+    let s = (radians as f64).sin() as f32;
+    let c = (radians as f64).cos() as f32;
+    if 1.0 == x && 0.0 == y && 0.0 == z {
+        out[5] = c;
+        out[10] = c;
+        out[6] = s;
+        out[9] = -s;
+        out[0] = 1.0;
+    } else if 0.0 == x && 1.0 == y && 0.0 == z {
+        out[0] = c;
+        out[10] = c;
+        out[8] = s;
+        out[2] = -s;
+        out[5] = 1.0;
+    } else if 0.0 == x && 0.0 == y && 1.0 == z {
+        out[0] = c;
+        out[5] = c;
+        out[1] = s;
+        out[4] = -s;
+        out[10] = 1.0;
+    } else {
+        let len = p36a_length(x, y, z);
+        if 1.0 != len {
+            let recip_len = 1.0 / len;
+            x *= recip_len;
+            y *= recip_len;
+            z *= recip_len;
+        }
+        let nc = 1.0 - c;
+        let xy = x * y;
+        let yz = y * z;
+        let zx = z * x;
+        let xs = x * s;
+        let ys = y * s;
+        let zs = z * s;
+        out[0] = x * x * nc + c;
+        out[4] = xy * nc - zs;
+        out[8] = zx * nc + ys;
+        out[1] = xy * nc + zs;
+        out[5] = y * y * nc + c;
+        out[9] = yz * nc - xs;
+        out[2] = zx * nc - ys;
+        out[6] = yz * nc + xs;
+        out[10] = z * z * nc + c;
+    }
+    out
+}
+
+fn p36a_set_rotate_euler(x: f32, y: f32, z: f32, corrected: bool) -> [f32; 16] {
+    let factor = std::f32::consts::PI / 180.0f32;
+    let x = x * factor;
+    let y = y * factor;
+    let z = z * factor;
+    let cx = (x as f64).cos() as f32;
+    let sx = (x as f64).sin() as f32;
+    let cy = (y as f64).cos() as f32;
+    let sy = (y as f64).sin() as f32;
+    let cz = (z as f64).cos() as f32;
+    let sz = (z as f64).sin() as f32;
+    let cxsy = cx * sy;
+    let sxsy = sx * sy;
+    let mut out = [0.0f32; 16];
+    out[0] = cy * cz;
+    out[1] = -cy * sz;
+    out[2] = sy;
+    if corrected {
+        out[4] = sxsy * cz + cx * sz;
+        out[5] = -sxsy * sz + cx * cz;
+        out[8] = -cxsy * cz + sx * sz;
+        out[9] = cxsy * sz + sx * cz;
+    } else {
+        // Preserve AOSP's deprecated, incorrect-around-Y implementation.
+        out[4] = cxsy * cz + cx * sz;
+        out[5] = -cxsy * sz + cx * cz;
+        out[8] = -sxsy * cz + sx * sz;
+        out[9] = sxsy * sz + sx * cz;
+    }
+    out[6] = -sx * cy;
+    out[10] = cx * cy;
+    out[15] = 1.0;
+    out
+}
+
+fn p36a_set_look_at(eye: [f32; 3], center: [f32; 3], up: [f32; 3]) -> [f32; 16] {
+    let mut f = [center[0] - eye[0], center[1] - eye[1], center[2] - eye[2]];
+    let rlf = 1.0 / p36a_length(f[0], f[1], f[2]);
+    f = [f[0] * rlf, f[1] * rlf, f[2] * rlf];
+    let mut s = [
+        f[1] * up[2] - f[2] * up[1],
+        f[2] * up[0] - f[0] * up[2],
+        f[0] * up[1] - f[1] * up[0],
+    ];
+    let rls = 1.0 / p36a_length(s[0], s[1], s[2]);
+    s = [s[0] * rls, s[1] * rls, s[2] * rls];
+    let u = [
+        s[1] * f[2] - s[2] * f[1],
+        s[2] * f[0] - s[0] * f[2],
+        s[0] * f[1] - s[1] * f[0],
+    ];
+    let mut out = [0.0f32; 16];
+    out[0] = s[0];
+    out[1] = u[0];
+    out[2] = -f[0];
+    out[4] = s[1];
+    out[5] = u[1];
+    out[6] = -f[1];
+    out[8] = s[2];
+    out[9] = u[2];
+    out[10] = -f[2];
+    out[15] = 1.0;
+    p36a_translate(&out, -eye[0], -eye[1], -eye[2])
+}
+
+fn p36a_matrix_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("multiplyMM", "([FI[FI[FI)V") => {
+            let result = p36a_value(args, 0);
+            let lhs_value = p36a_value(args, 2);
+            let rhs_value = p36a_value(args, 4);
+            let result_offset = iarg(args, 1);
+            // AOSP validates `result` before either operand.
+            p36a_array_bounds(
+                vm,
+                &result,
+                result_offset,
+                16,
+                "result == null",
+                "resultOffset < 0",
+                "result.length < resultOffset + 16",
+                true,
+            )?;
+            let lhs = p36a_read_matrix(
+                vm,
+                &lhs_value,
+                iarg(args, 3),
+                "lhs == null",
+                "lhsOffset < 0",
+                "lhs.length < lhsOffset + 16",
+                true,
+            )?;
+            let rhs = p36a_read_matrix(
+                vm,
+                &rhs_value,
+                iarg(args, 5),
+                "rhs == null",
+                "rhsOffset < 0",
+                "rhs.length < rhsOffset + 16",
+                true,
+            )?;
+            let output = p36a_multiply_mm(&lhs, &rhs);
+            p36a_write_floats(
+                vm,
+                &result,
+                result_offset,
+                &output,
+                "result == null",
+                "resultOffset < 0",
+                "result.length < resultOffset + 16",
+                true,
+            )?;
+            Value::Null
+        }
+        ("multiplyMV", "([FI[FI[FI)V") => {
+            let result = p36a_value(args, 0);
+            let lhs_value = p36a_value(args, 2);
+            let rhs_value = p36a_value(args, 4);
+            let result_offset = iarg(args, 1);
+            p36a_array_bounds(
+                vm,
+                &result,
+                result_offset,
+                4,
+                "resultVec == null",
+                "resultVecOffset < 0",
+                "resultVec.length < resultVecOffset + 4",
+                true,
+            )?;
+            let lhs = p36a_read_matrix(
+                vm,
+                &lhs_value,
+                iarg(args, 3),
+                "lhsMat == null",
+                "lhsMatOffset < 0",
+                "lhsMat.length < lhsMatOffset + 16",
+                true,
+            )?;
+            let rhs = p36a_read_vec4(
+                vm,
+                &rhs_value,
+                iarg(args, 5),
+                "rhsVec == null",
+                "rhsVecOffset < 0",
+                "rhsVec.length < rhsVecOffset + 4",
+                true,
+            )?;
+            let output = p36a_multiply_mv(&lhs, &rhs);
+            p36a_write_floats(
+                vm,
+                &result,
+                result_offset,
+                &output,
+                "resultVec == null",
+                "resultVecOffset < 0",
+                "resultVec.length < resultVecOffset + 4",
+                true,
+            )?;
+            Value::Null
+        }
+        ("transposeM", "([FI[FI)V") => {
+            let result = p36a_value(args, 0);
+            let source = p36a_value(args, 2);
+            let input = p36a_read_matrix(vm, &source, iarg(args, 3), "", "", "", false)?;
+            let output = p36a_transpose(&input);
+            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?
+        }
+        ("invertM", "([FI[FI)Z") => {
+            let result = p36a_value(args, 0);
+            let source = p36a_value(args, 2);
+            let input = p36a_read_matrix(vm, &source, iarg(args, 3), "", "", "", false)?;
+            let Some(output) = p36a_invert(&input) else {
+                return Ok(Some(Value::Int(0)));
+            };
+            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?;
+            Value::Int(1)
+        }
+        ("orthoM", "([FIFFFFFF)V") => {
+            let (left, right, bottom, top, near, far) = (
+                farg(args, 2),
+                farg(args, 3),
+                farg(args, 4),
+                farg(args, 5),
+                farg(args, 6),
+                farg(args, 7),
+            );
+            if left == right {
+                return Err(iae("left == right"));
+            }
+            if bottom == top {
+                return Err(iae("bottom == top"));
+            }
+            if near == far {
+                return Err(iae("near == far"));
+            }
+            let r_width = 1.0 / (right - left);
+            let r_height = 1.0 / (top - bottom);
+            let r_depth = 1.0 / (far - near);
+            let mut output = [0.0f32; 16];
+            output[0] = 2.0 * r_width;
+            output[5] = 2.0 * r_height;
+            output[10] = -2.0 * r_depth;
+            output[12] = -(right + left) * r_width;
+            output[13] = -(top + bottom) * r_height;
+            output[14] = -(far + near) * r_depth;
+            output[15] = 1.0;
+            let result = p36a_value(args, 0);
+            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?
+        }
+        ("frustumM", "([FIFFFFFF)V") => {
+            let (left, right, bottom, top, near, far) = (
+                farg(args, 2),
+                farg(args, 3),
+                farg(args, 4),
+                farg(args, 5),
+                farg(args, 6),
+                farg(args, 7),
+            );
+            if left == right {
+                return Err(iae("left == right"));
+            }
+            if top == bottom {
+                return Err(iae("top == bottom"));
+            }
+            if near == far {
+                return Err(iae("near == far"));
+            }
+            if near <= 0.0 {
+                return Err(iae("near <= 0.0f"));
+            }
+            if far <= 0.0 {
+                return Err(iae("far <= 0.0f"));
+            }
+            let r_width = 1.0 / (right - left);
+            let r_height = 1.0 / (top - bottom);
+            let r_depth = 1.0 / (near - far);
+            let mut output = [0.0f32; 16];
+            output[0] = 2.0 * (near * r_width);
+            output[5] = 2.0 * (near * r_height);
+            output[8] = (right + left) * r_width;
+            output[9] = (top + bottom) * r_height;
+            output[10] = (far + near) * r_depth;
+            output[14] = 2.0 * (far * near * r_depth);
+            output[11] = -1.0;
+            let result = p36a_value(args, 0);
+            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?
+        }
+        ("perspectiveM", "([FIFFFF)V") => {
+            let fovy = farg(args, 2);
+            let aspect = farg(args, 3);
+            let z_near = farg(args, 4);
+            let z_far = farg(args, 5);
+            let f = (1.0f64 / (fovy as f64 * (std::f64::consts::PI / 360.0)).tan()) as f32;
+            let range_reciprocal = 1.0 / (z_near - z_far);
+            let mut output = [0.0f32; 16];
+            output[0] = f / aspect;
+            output[5] = f;
+            output[10] = (z_far + z_near) * range_reciprocal;
+            output[11] = -1.0;
+            output[14] = 2.0 * z_far * z_near * range_reciprocal;
+            let result = p36a_value(args, 0);
+            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?
+        }
+        ("length", "(FFF)F") => {
+            Value::Float(p36a_length(farg(args, 0), farg(args, 1), farg(args, 2)))
+        }
+        ("setIdentityM", "([FI)V") => {
+            let result = p36a_value(args, 0);
+            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &p36a_identity())?
+        }
+        ("scaleM", "([FI[FIFFF)V") => {
+            let result = p36a_value(args, 0);
+            let source = p36a_value(args, 2);
+            let input = p36a_read_matrix(vm, &source, iarg(args, 3), "", "", "", false)?;
+            let output = p36a_scale(&input, farg(args, 4), farg(args, 5), farg(args, 6));
+            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?
+        }
+        ("scaleM", "([FIFFF)V") => {
+            let result = p36a_value(args, 0);
+            let input = p36a_read_matrix(vm, &result, iarg(args, 1), "", "", "", false)?;
+            let output = p36a_scale(&input, farg(args, 2), farg(args, 3), farg(args, 4));
+            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?
+        }
+        ("translateM", "([FI[FIFFF)V") => {
+            let result = p36a_value(args, 0);
+            let source = p36a_value(args, 2);
+            let input = p36a_read_matrix(vm, &source, iarg(args, 3), "", "", "", false)?;
+            let output = p36a_translate(&input, farg(args, 4), farg(args, 5), farg(args, 6));
+            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?
+        }
+        ("translateM", "([FIFFF)V") => {
+            let result = p36a_value(args, 0);
+            let input = p36a_read_matrix(vm, &result, iarg(args, 1), "", "", "", false)?;
+            let output = p36a_translate(&input, farg(args, 2), farg(args, 3), farg(args, 4));
+            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?
+        }
+        ("rotateM", "([FI[FIFFFF)V") => {
+            let result = p36a_value(args, 0);
+            let source = p36a_value(args, 2);
+            let result_offset = iarg(args, 1);
+            // AOSP delegates to multiplyMM after building a temp rotation.
+            p36a_array_bounds(
+                vm,
+                &result,
+                result_offset,
+                16,
+                "result == null",
+                "resultOffset < 0",
+                "result.length < resultOffset + 16",
+                true,
+            )?;
+            let input = p36a_read_matrix(
+                vm,
+                &source,
+                iarg(args, 3),
+                "lhs == null",
+                "lhsOffset < 0",
+                "lhs.length < lhsOffset + 16",
+                true,
+            )?;
+            let rotation =
+                p36a_set_rotate(farg(args, 4), farg(args, 5), farg(args, 6), farg(args, 7));
+            let output = p36a_multiply_mm(&input, &rotation);
+            p36a_write_floats(
+                vm,
+                &result,
+                result_offset,
+                &output,
+                "result == null",
+                "resultOffset < 0",
+                "result.length < resultOffset + 16",
+                true,
+            )?;
+            Value::Null
+        }
+        ("rotateM", "([FIFFFF)V") => {
+            let result = p36a_value(args, 0);
+            let input = p36a_read_matrix(
+                vm,
+                &result,
+                iarg(args, 1),
+                "lhs == null",
+                "lhsOffset < 0",
+                "lhs.length < lhsOffset + 16",
+                true,
+            )?;
+            let rotation =
+                p36a_set_rotate(farg(args, 2), farg(args, 3), farg(args, 4), farg(args, 5));
+            let output = p36a_multiply_mm(&input, &rotation);
+            p36a_write_floats(
+                vm,
+                &result,
+                iarg(args, 1),
+                &output,
+                "result == null",
+                "resultOffset < 0",
+                "result.length < resultOffset + 16",
+                true,
+            )?;
+            Value::Null
+        }
+        ("setRotateM", "([FIFFFF)V") => {
+            let result = p36a_value(args, 0);
+            let output =
+                p36a_set_rotate(farg(args, 2), farg(args, 3), farg(args, 4), farg(args, 5));
+            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?
+        }
+        ("setRotateEulerM", "([FIFFF)V") => {
+            let result = p36a_value(args, 0);
+            let output = p36a_set_rotate_euler(farg(args, 2), farg(args, 3), farg(args, 4), false);
+            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?
+        }
+        ("setRotateEulerM2", "([FIFFF)V") => {
+            let result = p36a_value(args, 0);
+            let output = p36a_set_rotate_euler(farg(args, 2), farg(args, 3), farg(args, 4), true);
+            p36a_write_floats(
+                vm,
+                &result,
+                iarg(args, 1),
+                &output,
+                "rm == null",
+                "rmOffset < 0",
+                "rm.length < rmOffset + 16",
+                true,
+            )?;
+            Value::Null
+        }
+        ("setLookAtM", "([FIFFFFFFFFF)V") => {
+            let result = p36a_value(args, 0);
+            let output = p36a_set_look_at(
+                [farg(args, 2), farg(args, 3), farg(args, 4)],
+                [farg(args, 5), farg(args, 6), farg(args, 7)],
+                [farg(args, 8), farg(args, 9), farg(args, 10)],
+            );
+            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36a_identity_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    _args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        ("createPresentationSession", "(I)Landroid/security/identity/PresentationSession;") => {
+            // The public base implementation always does this. Exact-class
+            // routing avoids shadowing a DEX subclass override.
+            if class_of(vm, recv) != P36A_IDENTITY_STORE {
+                return Ok(None);
+            }
+            return Err(throw("Ljava/lang/UnsupportedOperationException;", ""));
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn partial36a_instance_for_class(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P36A_MATRIX if name == "<init>" && sig == "()V" => Ok(Some(Value::Null)),
+        P36A_IDENTITY_STORE => p36a_identity_instance(vm, name, sig, recv, args),
+        _ => Ok(None),
+    }
+}
+
+pub(crate) fn partial36a_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    for class in [recv_class, mref_class] {
+        if p36a_class(class) {
+            let value = partial36a_instance_for_class(vm, class, name, sig, recv, args)?;
+            if value.is_some() {
+                return Ok(value);
+            }
+        }
+    }
+    let actual = class_of(vm, recv);
+    if actual != recv_class && actual != mref_class && p36a_class(&actual) {
+        return partial36a_instance_for_class(vm, &actual, name, sig, recv, args);
+    }
+    Ok(None)
+}
+
+pub(crate) fn partial36a_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P36A_MATRIX {
+        return p36a_matrix_static(vm, name, sig, args);
+    }
+    if class == P36A_IDENTITY_STORE || class == P36A_CREDSTORE {
+        // No binder is published under "android.security.identity" in this
+        // profile. CredstoreIdentityCredentialStore.getInstanceForType then
+        // returns null without dereferencing the Context.
+        if matches!(
+            (name, sig),
+            (
+                "getInstance",
+                "(Landroid/content/Context;)Landroid/security/identity/IdentityCredentialStore;"
+            ) | (
+                "getDirectAccessInstance",
+                "(Landroid/content/Context;)Landroid/security/identity/IdentityCredentialStore;"
+            )
+        ) {
+            return Ok(Some(Value::Null));
+        }
+    }
+    Ok(None)
+}
+
+pub(crate) fn partial36a_host_static(
+    _vm: &mut Engine,
+    class: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    Ok(match (class, field) {
+        (P36A_IDENTITY_STORE, "CIPHERSUITE_ECDHE_HKDF_ECDSA_WITH_AES_256_GCM_SHA256") => {
+            Some(Value::Int(1))
+        }
+        _ => None,
+    })
 }

@@ -14336,3 +14336,475 @@ fn omapi_without_a_secure_element_service_is_guest_visible() {
         Value::Int(0)
     );
 }
+
+// ---- Appendix C Batch 36-A: android.opengl + android.security.identity ----
+
+const P36A_MATRIX: &str = "Landroid/opengl/Matrix;";
+const P36A_IDENTITY_STORE: &str = "Landroid/security/identity/IdentityCredentialStore;";
+
+fn p36a_float_values(engine: &Engine, value: &Value) -> Vec<f32> {
+    array_values(engine, value)
+        .iter()
+        .map(|value| match value {
+            Value::Float(f) => *f,
+            other => panic!("expected float array element, got {other:?}"),
+        })
+        .collect()
+}
+
+fn p36a_assert_near(actual: &[f32], expected: &[f32]) {
+    assert_eq!(actual.len(), expected.len());
+    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
+        assert!(
+            (actual - expected).abs() < 0.00001,
+            "index {index}: {actual} != {expected} in {actual:?}"
+        );
+    }
+}
+
+#[test]
+fn opengl_matrix_math_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    assert!(engine.cp.is_subtype(P36A_MATRIX, "Ljava/lang/Object;"));
+
+    // Identity can be written at an offset without disturbing neighbors.
+    let offset_result = float_value_array(&mut engine, &[7.0; 20]);
+    call_static(
+        &mut engine,
+        P36A_MATRIX,
+        "setIdentityM",
+        "([FI)V",
+        &[offset_result.clone(), Value::Int(2)],
+    );
+    p36a_assert_near(
+        &p36a_float_values(&engine, &offset_result),
+        &[
+            7.0, 7.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+            1.0, 7.0, 7.0,
+        ],
+    );
+
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36A_MATRIX,
+            "length",
+            "(FFF)F",
+            &[Value::Float(3.0), Value::Float(4.0), Value::Float(12.0)],
+        ),
+        Value::Float(13.0)
+    );
+
+    let translation = float_value_array(
+        &mut engine,
+        &[
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 2.0, 3.0, 1.0,
+        ],
+    );
+    let scale = float_value_array(
+        &mut engine,
+        &[
+            2.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ],
+    );
+    let product = float_array(&mut engine, 16);
+    call_static(
+        &mut engine,
+        P36A_MATRIX,
+        "multiplyMM",
+        "([FI[FI[FI)V",
+        &[
+            product.clone(),
+            Value::Int(0),
+            translation,
+            Value::Int(0),
+            scale.clone(),
+            Value::Int(0),
+        ],
+    );
+    p36a_assert_near(
+        &p36a_float_values(&engine, &product),
+        &[
+            2.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 1.0, 2.0, 3.0, 1.0,
+        ],
+    );
+
+    let vector = float_value_array(&mut engine, &[1.0, 1.0, 1.0, 1.0]);
+    let transformed = float_array(&mut engine, 4);
+    call_static(
+        &mut engine,
+        P36A_MATRIX,
+        "multiplyMV",
+        "([FI[FI[FI)V",
+        &[
+            transformed.clone(),
+            Value::Int(0),
+            product.clone(),
+            Value::Int(0),
+            vector,
+            Value::Int(0),
+        ],
+    );
+    p36a_assert_near(
+        &p36a_float_values(&engine, &transformed),
+        &[3.0, 5.0, 7.0, 1.0],
+    );
+
+    // The inverse undoes both scale and translation.
+    let inverse = float_array(&mut engine, 16);
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36A_MATRIX,
+            "invertM",
+            "([FI[FI)Z",
+            &[
+                inverse.clone(),
+                Value::Int(0),
+                product.clone(),
+                Value::Int(0)
+            ],
+        ),
+        Value::Int(1)
+    );
+    p36a_assert_near(
+        &p36a_float_values(&engine, &inverse),
+        &[
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0 / 3.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.25,
+            0.0,
+            -0.5,
+            -2.0 / 3.0,
+            -0.75,
+            1.0,
+        ],
+    );
+    let singular = float_array(&mut engine, 16);
+    let untouched = float_value_array(&mut engine, &[9.0; 16]);
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36A_MATRIX,
+            "invertM",
+            "([FI[FI)Z",
+            &[untouched.clone(), Value::Int(0), singular, Value::Int(0)],
+        ),
+        Value::Int(0)
+    );
+    p36a_assert_near(&p36a_float_values(&engine, &untouched), &[9.0; 16]);
+
+    let sequence: Vec<f32> = (0..16).map(|i| i as f32).collect();
+    let sequence_array = float_value_array(&mut engine, &sequence);
+    let transposed = float_array(&mut engine, 16);
+    call_static(
+        &mut engine,
+        P36A_MATRIX,
+        "transposeM",
+        "([FI[FI)V",
+        &[
+            transposed.clone(),
+            Value::Int(0),
+            sequence_array,
+            Value::Int(0),
+        ],
+    );
+    p36a_assert_near(
+        &p36a_float_values(&engine, &transposed),
+        &[
+            0.0, 4.0, 8.0, 12.0, 1.0, 5.0, 9.0, 13.0, 2.0, 6.0, 10.0, 14.0, 3.0, 7.0, 11.0, 15.0,
+        ],
+    );
+
+    // Out-of-place translation reads the source columns before adding
+    // the scaled translation column.
+    let translated = float_array(&mut engine, 16);
+    call_static(
+        &mut engine,
+        P36A_MATRIX,
+        "translateM",
+        "([FI[FIFFF)V",
+        &[
+            translated.clone(),
+            Value::Int(0),
+            scale,
+            Value::Int(0),
+            Value::Float(1.0),
+            Value::Float(1.0),
+            Value::Float(1.0),
+        ],
+    );
+    p36a_assert_near(
+        &p36a_float_values(&engine, &translated),
+        &[
+            2.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 2.0, 3.0, 4.0, 1.0,
+        ],
+    );
+
+    let ortho = float_array(&mut engine, 16);
+    call_static(
+        &mut engine,
+        P36A_MATRIX,
+        "orthoM",
+        "([FIFFFFFF)V",
+        &[
+            ortho.clone(),
+            Value::Int(0),
+            Value::Float(-1.0),
+            Value::Float(1.0),
+            Value::Float(-2.0),
+            Value::Float(2.0),
+            Value::Float(1.0),
+            Value::Float(3.0),
+        ],
+    );
+    p36a_assert_near(
+        &p36a_float_values(&engine, &ortho),
+        &[
+            1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, -2.0, 1.0,
+        ],
+    );
+
+    let perspective = float_array(&mut engine, 16);
+    call_static(
+        &mut engine,
+        P36A_MATRIX,
+        "perspectiveM",
+        "([FIFFFF)V",
+        &[
+            perspective.clone(),
+            Value::Int(0),
+            Value::Float(90.0),
+            Value::Float(2.0),
+            Value::Float(1.0),
+            Value::Float(3.0),
+        ],
+    );
+    p36a_assert_near(
+        &p36a_float_values(&engine, &perspective),
+        &[
+            0.5, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, -2.0, -1.0, 0.0, 0.0, -3.0, 0.0,
+        ],
+    );
+
+    let rotation = float_array(&mut engine, 16);
+    call_static(
+        &mut engine,
+        P36A_MATRIX,
+        "setRotateM",
+        "([FIFFFF)V",
+        &[
+            rotation.clone(),
+            Value::Int(0),
+            Value::Float(90.0),
+            Value::Float(0.0),
+            Value::Float(0.0),
+            Value::Float(1.0),
+        ],
+    );
+    p36a_assert_near(
+        &p36a_float_values(&engine, &rotation),
+        &[
+            0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ],
+    );
+
+    // Deprecated and corrected Euler conversions intentionally differ
+    // around Y, exactly as in AOSP.
+    let deprecated = float_array(&mut engine, 16);
+    call_static(
+        &mut engine,
+        P36A_MATRIX,
+        "setRotateEulerM",
+        "([FIFFF)V",
+        &[
+            deprecated.clone(),
+            Value::Int(0),
+            Value::Float(0.0),
+            Value::Float(90.0),
+            Value::Float(0.0),
+        ],
+    );
+    let corrected = float_array(&mut engine, 16);
+    call_static(
+        &mut engine,
+        P36A_MATRIX,
+        "setRotateEulerM2",
+        "([FIFFF)V",
+        &[
+            corrected.clone(),
+            Value::Int(0),
+            Value::Float(0.0),
+            Value::Float(90.0),
+            Value::Float(0.0),
+        ],
+    );
+    let deprecated = p36a_float_values(&engine, &deprecated);
+    let corrected = p36a_float_values(&engine, &corrected);
+    assert!((deprecated[4] - 1.0).abs() < 0.00001);
+    assert!(deprecated[8].abs() < 0.00001);
+    assert!(corrected[4].abs() < 0.00001);
+    assert!((corrected[8] + 1.0).abs() < 0.00001);
+
+    let look_at = float_array(&mut engine, 16);
+    call_static(
+        &mut engine,
+        P36A_MATRIX,
+        "setLookAtM",
+        "([FIFFFFFFFFF)V",
+        &[
+            look_at.clone(),
+            Value::Int(0),
+            Value::Float(0.0),
+            Value::Float(0.0),
+            Value::Float(5.0),
+            Value::Float(0.0),
+            Value::Float(0.0),
+            Value::Float(0.0),
+            Value::Float(0.0),
+            Value::Float(1.0),
+            Value::Float(0.0),
+        ],
+    );
+    p36a_assert_near(
+        &p36a_float_values(&engine, &look_at),
+        &[
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -5.0, 1.0,
+        ],
+    );
+
+    // Explicit and implicit AOSP argument validation remains distinct.
+    let valid = float_array(&mut engine, 16);
+    assert_throws(
+        engine.invoke_static(
+            P36A_MATRIX,
+            "multiplyMM",
+            "([FI[FI[FI)V",
+            &[
+                Value::Null,
+                Value::Int(0),
+                valid.clone(),
+                Value::Int(0),
+                valid.clone(),
+                Value::Int(0),
+            ],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36A_MATRIX,
+            "transposeM",
+            "([FI[FI)V",
+            &[valid.clone(), Value::Int(0), Value::Null, Value::Int(0)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36A_MATRIX,
+            "orthoM",
+            "([FIFFFFFF)V",
+            &[
+                valid.clone(),
+                Value::Int(0),
+                Value::Float(1.0),
+                Value::Float(1.0),
+                Value::Float(-1.0),
+                Value::Float(1.0),
+                Value::Float(1.0),
+                Value::Float(2.0),
+            ],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36A_MATRIX,
+            "setRotateEulerM2",
+            "([FIFFF)V",
+            &[
+                Value::Null,
+                Value::Int(0),
+                Value::Float(0.0),
+                Value::Float(0.0),
+                Value::Float(0.0),
+            ],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36A_MATRIX,
+            "frustumM",
+            "([FIFFFFFF)V",
+            &[
+                valid,
+                Value::Int(0),
+                Value::Float(-1.0),
+                Value::Float(1.0),
+                Value::Float(-1.0),
+                Value::Float(1.0),
+                Value::Float(0.0),
+                Value::Float(2.0),
+            ],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+}
+
+#[test]
+fn identity_without_credstore_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    assert!(engine.cp.is_subtype(
+        "Landroid/security/identity/CredstoreIdentityCredentialStore;",
+        P36A_IDENTITY_STORE,
+    ));
+    let context = instance(&mut engine, CONTEXT);
+    for method in ["getInstance", "getDirectAccessInstance"] {
+        assert_eq!(
+            call_static(
+                &mut engine,
+                P36A_IDENTITY_STORE,
+                method,
+                "(Landroid/content/Context;)Landroid/security/identity/IdentityCredentialStore;",
+                &[Value::Obj(context)],
+            ),
+            Value::Null
+        );
+    }
+    // AOSP looks up the missing binder before it ever dereferences the
+    // Context, so even a null Context returns the documented null.
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36A_IDENTITY_STORE,
+            "getInstance",
+            "(Landroid/content/Context;)Landroid/security/identity/IdentityCredentialStore;",
+            &[Value::Null],
+        ),
+        Value::Null
+    );
+
+    // The public base-class presentation-session implementation is the
+    // documented UnsupportedOperationException.
+    let store = instance(&mut engine, P36A_IDENTITY_STORE);
+    call(&mut engine, store, "<init>", "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            store,
+            "createPresentationSession",
+            "(I)Landroid/security/identity/PresentationSession;",
+            &[Value::Int(1)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+}

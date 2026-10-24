@@ -1962,6 +1962,15 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroid/se/omapi/ISecureElementListener$Stub;" => {
             Some(&["Landroid/os/Binder;", "Ljava/lang/Object;"])
         }
+        // Appendix C Batch 36-A bounded android.opengl /
+        // android.security.identity slices.
+        "Landroid/opengl/Matrix;" | "Landroid/security/identity/IdentityCredentialStore;" => {
+            Some(OBJECT)
+        }
+        "Landroid/security/identity/CredstoreIdentityCredentialStore;" => Some(&[
+            "Landroid/security/identity/IdentityCredentialStore;",
+            "Ljava/lang/Object;",
+        ]),
         _ => None,
     }
 }
