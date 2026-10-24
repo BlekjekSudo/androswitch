@@ -1088,6 +1088,44 @@ fn boxed(vm: &mut Engine, class: &str, v: Value) -> Result<Value, VmExit> {
     Ok(Value::Obj(crate::boxes::box_value(vm, class, v)?))
 }
 
+/// The length-prefixed value tags (AOSP `Parcel.isLengthPrefixed`):
+/// `writeValue` writes tag, a placeholder length, the payload, then
+/// backpatches the payload byte count — letting readers (notably lazy
+/// Bundle values) skip a value without parsing it.
+fn is_length_prefixed(tag: i32) -> bool {
+    matches!(
+        tag,
+        VAL_MAP
+            | VAL_PARCELABLE
+            | VAL_LIST
+            | VAL_SPARSEARRAY
+            | VAL_PARCELABLEARRAY
+            | VAL_OBJECTARRAY
+            | VAL_SERIALIZABLE
+    )
+}
+
+/// Write the `-1` length placeholder after a length-prefixed tag and
+/// return its absolute position for `backpatch_value_length`.
+fn write_length_placeholder(vm: &mut Engine, parcel: ObjRef) -> usize {
+    let mut st = load(vm, parcel);
+    st.pos = align4(st.pos);
+    let length_pos = st.pos;
+    st.write_i32(-1);
+    store(vm, parcel, st);
+    length_pos
+}
+
+/// Backpatch a length placeholder with the payload byte count written
+/// since (AOSP `writeValue` performs the same seek-and-patch).
+fn backpatch_value_length(vm: &mut Engine, parcel: ObjRef, length_pos: usize) {
+    let mut st = load(vm, parcel);
+    let end = st.pos;
+    st.patch_i32(length_pos, (end - (length_pos + 4)) as i32);
+    st.pos = end;
+    store(vm, parcel, st);
+}
+
 fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit> {
     // Raw primitive Values can arrive from host-stored Bundles.
     match v {
@@ -1228,7 +1266,10 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
         let mut st = load(vm, parcel);
         st.write_i32(VAL_SPARSEARRAY);
         store(vm, parcel, st);
-        return write_sparse_array(vm, parcel, Some(r));
+        let length_pos = write_length_placeholder(vm, parcel);
+        write_sparse_array(vm, parcel, Some(r))?;
+        backpatch_value_length(vm, parcel, length_pos);
+        return Ok(());
     }
     if class.starts_with('[') {
         let elems = vm.heap.as_array_elems(r)?.0.to_vec();
@@ -1326,21 +1367,26 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
                 let parcelable_array = component.starts_with('L')
                     && (component == "Landroid/os/Parcelable;"
                         || vm.cp.is_subtype(component, "Landroid/os/Parcelable;"));
+                st.write_i32(if parcelable_array {
+                    VAL_PARCELABLEARRAY
+                } else {
+                    VAL_OBJECTARRAY
+                });
+                store(vm, parcel, st);
+                let length_pos = write_length_placeholder(vm, parcel);
+                let mut st = load(vm, parcel);
+                st.write_i32(elems.len() as i32);
+                store(vm, parcel, st);
                 if parcelable_array {
-                    st.write_i32(VAL_PARCELABLEARRAY);
-                    st.write_i32(elems.len() as i32);
-                    store(vm, parcel, st);
                     for e in &elems {
                         write_parcelable(vm, parcel, e, 0)?;
                     }
                 } else {
-                    st.write_i32(VAL_OBJECTARRAY);
-                    st.write_i32(elems.len() as i32);
-                    store(vm, parcel, st);
                     for e in &elems {
                         write_value(vm, parcel, e)?;
                     }
                 }
+                backpatch_value_length(vm, parcel, length_pos);
                 return Ok(());
             }
         }
@@ -1353,22 +1399,30 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
     } {
         let mut st = load(vm, parcel);
         st.write_i32(VAL_MAP);
+        store(vm, parcel, st);
+        let length_pos = write_length_placeholder(vm, parcel);
+        let mut st = load(vm, parcel);
         st.write_i32(entries.len() as i32);
         store(vm, parcel, st);
         for (k, val) in &entries {
             write_value(vm, parcel, k)?;
             write_value(vm, parcel, val)?;
         }
+        backpatch_value_length(vm, parcel, length_pos);
         return Ok(());
     }
     if let Some(elems) = list_values(vm, v)? {
         let mut st = load(vm, parcel);
         st.write_i32(VAL_LIST);
+        store(vm, parcel, st);
+        let length_pos = write_length_placeholder(vm, parcel);
+        let mut st = load(vm, parcel);
         st.write_i32(elems.len() as i32);
         store(vm, parcel, st);
         for e in &elems {
             write_value(vm, parcel, e)?;
         }
+        backpatch_value_length(vm, parcel, length_pos);
         return Ok(());
     }
     if class == BINDER || vm.cp.is_subtype(&class, BINDER) || vm.cp.is_subtype(&class, IBINDER) {
@@ -1391,7 +1445,10 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
         let mut st = load(vm, parcel);
         st.write_i32(VAL_PARCELABLE);
         store(vm, parcel, st);
-        return write_parcelable(vm, parcel, v, 0);
+        let length_pos = write_length_placeholder(vm, parcel);
+        write_parcelable(vm, parcel, v, 0)?;
+        backpatch_value_length(vm, parcel, length_pos);
+        return Ok(());
     }
     Err(bad(format!(
         "Parcel.writeValue: unsupported value class {class}"
@@ -1466,6 +1523,20 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
     let mut st = load(vm, parcel);
     let tag = st.read_i32()?;
     store(vm, parcel, st);
+    if is_length_prefixed(tag) {
+        // Consume the backpatched payload length. AOSP only logs (wtf) if
+        // the parser does not consume exactly that many bytes and leaves
+        // the cursor where parsing stopped; we keep the same cursor
+        // behavior but reject a length that runs past the parcel here.
+        let mut st = load(vm, parcel);
+        let length = st.read_i32()?;
+        if length < 0 || st.pos + length as usize > st.data.len() {
+            return Err(bad(format!(
+                "Parcel.readValue: invalid length-prefixed size {length} for tag {tag}"
+            )));
+        }
+        store(vm, parcel, st);
+    }
     Ok(match tag {
         VAL_NULL => Value::Null,
         VAL_STRING | VAL_CHARSEQUENCE => {
@@ -3716,6 +3787,37 @@ mod tests {
         let got = obj(got);
         assert_eq!(vm.heap.get_field(got, "rd_w").unwrap(), Value::Int(3));
         assert_eq!(vm.heap.get_field(got, "rd_h").unwrap(), Value::Int(4));
+    }
+
+    #[test]
+    fn length_prefixed_values_backpatch_payload_length() {
+        let mut vm = engine();
+        let p = obj(new_parcel(&mut vm).unwrap());
+        let item = s(&mut vm, "inside");
+        let list = new_list(&mut vm, vec![item]).unwrap();
+        write_value(&mut vm, p, &list).unwrap();
+        let st = load(&vm, p);
+        assert_eq!(i32::from_le_bytes(st.data[0..4].try_into().unwrap()), VAL_LIST);
+        assert_eq!(
+            i32::from_le_bytes(st.data[4..8].try_into().unwrap()) as usize,
+            st.data.len() - 8,
+            "length covers only the payload after tag+length"
+        );
+        assert_eq!(i32::from_le_bytes(st.data[8..12].try_into().unwrap()), 1);
+
+        // And it reads back through the same length-prefixed form.
+        let mut reset = load(&vm, p);
+        reset.pos = 0;
+        store(&mut vm, p, reset);
+        let got = obj(read_value(&mut vm, p).unwrap());
+        match vm.fw.get(got) {
+            Some(HostObj::List { elems }) => {
+                assert_eq!(elems.len(), 1);
+                assert_eq!(vm.heap.as_str(obj(elems[0].clone())).unwrap(), "inside");
+            }
+            _ => panic!("list value did not roundtrip"),
+        }
+        assert_eq!(load(&vm, p).pos, st.data.len());
     }
 
     #[test]
