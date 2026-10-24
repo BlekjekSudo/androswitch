@@ -1,0 +1,446 @@
+{
+  "physical_device": "not_run",
+  "schema_version": 1,
+  "checks": [
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\memory-policy-compile.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "id": "memory-policy-compile",
+      "command": [
+        "C:\\w64devkit\\bin\\gcc.exe",
+        "-std=c11",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "platform/androswitch/tests/memory_policy.c",
+        "-o",
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\memory-policy.exe"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\memory-policy.log",
+      "log_sha256": "e6f9047a30e0a937ef6264a071e18e89a33cceed526d4112204227589eba477d",
+      "id": "memory-policy",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\memory-policy.exe"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\pcm-volume-compile.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "id": "pcm-volume-compile",
+      "command": [
+        "C:\\w64devkit\\bin\\gcc.exe",
+        "-std=c11",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "platform/androswitch/tests/pcm_volume.c",
+        "-lm",
+        "-o",
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\pcm-volume.exe"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\pcm-volume.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "id": "pcm-volume",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\pcm-volume.exe"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\media-format-compile.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "id": "media-format-compile",
+      "command": [
+        "C:\\w64devkit\\bin\\gcc.exe",
+        "-std=c11",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "platform/androswitch/tests/media_format.c",
+        "platform/androswitch/media_format.c",
+        "-o",
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\media-format.exe"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\media-format.log",
+      "log_sha256": "a3f03daec9f3fb4551c9171d43b2852f5ba1623d8ef3b026d51687f20096329c",
+      "id": "media-format",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\media-format.exe"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-compile.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "id": "glsurface-worker-compile",
+      "command": [
+        "C:\\w64devkit\\bin\\gcc.exe",
+        "-std=c11",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "platform/androswitch/tests/glsurface_worker.c",
+        "platform/androswitch/glsurface.c",
+        "-pthread",
+        "-Iplatform/androswitch/tests/fake-switch",
+        "-Iplatform/switch-smoke",
+        "-o",
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-invalid.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "id": "glsurface-worker-invalid",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "invalid"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-create-failure.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "id": "glsurface-worker-create-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "create-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-start-failure.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "id": "glsurface-worker-start-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "start-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-start-close-failure.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "id": "glsurface-worker-start-close-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "start-close-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-normal.log",
+      "log_sha256": "6aa36a08f8f038e942c61eba7138de1c789601e44182934afca8cca6b8a52516",
+      "id": "glsurface-worker-normal",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "normal"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-pause-preserve.log",
+      "log_sha256": "60d874465b7da5b64e360dd1b2ba0ee251d59b2ef3eddd06b8e3c5edd6d406ba",
+      "id": "glsurface-worker-pause-preserve",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "pause-preserve"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-pause-recreate.log",
+      "log_sha256": "9786616823c7a5f7f45bb63f6228a69406cfaf56149c4554be3f06054d050118",
+      "id": "glsurface-worker-pause-recreate",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "pause-recreate"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-pause-exit.log",
+      "log_sha256": "01732fb068f50a3b59b1ebb6f2006258d02d0d4470e0e31f47ae55b574d1e360",
+      "id": "glsurface-worker-pause-exit",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "pause-exit"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-pause-before-create.log",
+      "log_sha256": "56b8fc0b26e2749d5ddbfb06f23f1e2d4d0ebcdd1e62e68de9821adde75a54e7",
+      "id": "glsurface-worker-pause-before-create",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "pause-before-create"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-pause-preserve-exit.log",
+      "log_sha256": "d253f934cd2cf12b12f8079402f716b17f9c0a2f7fb3c77c7b45134514716fea",
+      "id": "glsurface-worker-pause-preserve-exit",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "pause-preserve-exit"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-pause-toggle-discard.log",
+      "log_sha256": "2f5515849129b9c996185ac67b9f82b4bffbaac3c1c266ffb97a080109e54a89",
+      "id": "glsurface-worker-pause-toggle-discard",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "pause-toggle-discard"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-suspend-failure.log",
+      "log_sha256": "ca2fad6baefb2ee32046182f4e9cc27044f5da04604e375e93fcd3b8f504e339",
+      "id": "glsurface-worker-suspend-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "suspend-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-resume-failure.log",
+      "log_sha256": "77ae76c83ec70556c9e3e0ebe713bde5d4ae6ea1602fce82622d7bcf22f980fc",
+      "id": "glsurface-worker-resume-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "resume-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-queue-before-context.log",
+      "log_sha256": "cc695c55f7dbfacc4462022076f22d567e4e907e27742367b998322bec88f1c0",
+      "id": "glsurface-worker-queue-before-context",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "queue-before-context"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-initialize-failure.log",
+      "log_sha256": "5e8d45f84a7458dc01d55151959915ffa3c6fcaa2e9e84ae4f2cf5f5aaf323dd",
+      "id": "glsurface-worker-initialize-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "initialize-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-choose-failure.log",
+      "log_sha256": "b4262fa63a4d8c96d21b0c6d33e5af736217da841a98dc24294a0eaa2e52d0f3",
+      "id": "glsurface-worker-choose-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "choose-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-egl-create-failure.log",
+      "log_sha256": "15059ac0c454cb55289df10a9c4de535a1a269f980268d7f361be6d3f276c551",
+      "id": "glsurface-worker-egl-create-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "egl-create-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-attach-failure.log",
+      "log_sha256": "b6adfe842c0e63d1fcb26e60abdfc94f66c42941256ddf43e209721864ee4d01",
+      "id": "glsurface-worker-attach-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "attach-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-callback-failure.log",
+      "log_sha256": "3455ab5bdeae6a36f320cd9ab2925c8c07280fbeecab410560a15694410c8685",
+      "id": "glsurface-worker-callback-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "callback-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-queue-failure.log",
+      "log_sha256": "1e3809882a7003a6b07c057ce149fec0a51cc86ab1c48adee1235e67d5e4b528",
+      "id": "glsurface-worker-queue-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "queue-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-poll-failure.log",
+      "log_sha256": "b6f3465882235cd72f6852ceff4f1ebed0d506b2ae8402da8693f046e3bcde01",
+      "id": "glsurface-worker-poll-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "poll-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-close-failure.log",
+      "log_sha256": "2c5c5ac048f8cc1ccab65b8fa387f87337e0c013363b09d292fe61f4a7739ad9",
+      "id": "glsurface-worker-close-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "close-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-self-join.log",
+      "log_sha256": "4f1415b7c971ea2525777ae7970f69ed35bfb33ac827171f325027c58ac0144c",
+      "id": "glsurface-worker-self-join",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "self-join"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-wait-failure.log",
+      "log_sha256": "2809d35cc2c51a6c7ee37a00a7058d8406730e3fa09f8c537b62af621fdd5bbd",
+      "id": "glsurface-worker-wait-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "wait-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-thread-close-failure.log",
+      "log_sha256": "ae4c927fca7ae2746d7ec4e454d0ee5404f731b50b7d25fead94707e8335c796",
+      "id": "glsurface-worker-thread-close-failure",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "thread-close-failure"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-timeout.log",
+      "log_sha256": "99c09e8385ecd3a4a088f6c9c629f12028b621d25eb3f1e1c242cf988e59a210",
+      "id": "glsurface-worker-timeout",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "timeout"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker-concurrent-join.log",
+      "log_sha256": "04492b0465de4cce18447c785f293a76bc9e69062f78b895568f28d1ae43e13b",
+      "id": "glsurface-worker-concurrent-join",
+      "command": [
+        "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\media-contracts\\92faef887b2b4c37ab0b1affb86cc301\\glsurface-worker.exe",
+        "concurrent-join"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "scope": "Production portable C helpers and real host threads with fake EGL/libnx/VM boundaries; not Horizon rendering or application execution",
+  "source_files": [
+    {
+      "path": "platform/androswitch/glsurface.c",
+      "sha256": "b5b71277d370cc120e7d4df5daa70f1e9a4955a1a95b612f5da7b7f139a76522"
+    },
+    {
+      "path": "platform/androswitch/glsurface.h",
+      "sha256": "6e70700a421a9a675b9418fd40fdadb0cb792265b1f1bf288d0ff01d24de080b"
+    },
+    {
+      "path": "platform/androswitch/media_format.c",
+      "sha256": "4a24c93012d99f351e2dd4318562d4b4f87f4e91b2a819b08643d4ed67fda307"
+    },
+    {
+      "path": "platform/androswitch/media_format.h",
+      "sha256": "df8825ec36945100229aa240b5e7ff30ab88f4a58418b97a2b22a25f8fded62c"
+    },
+    {
+      "path": "platform/androswitch/media.h",
+      "sha256": "498a9ce71c5f18e2076a93df354d4d7d27abcca10e36effdaf5b371289f46d34"
+    },
+    {
+      "path": "platform/androswitch/memory_policy.h",
+      "sha256": "fef208063c81d398f8b475013539bca85db6be2224640b8b22a71e8640f5205f"
+    },
+    {
+      "path": "platform/androswitch/pcm_volume.h",
+      "sha256": "82e4200f0b59735e13786741076955df1dae0fed3e2cbd1484138d2bf113476c"
+    },
+    {
+      "path": "platform/androswitch/tests/fake-switch/switch.h",
+      "sha256": "e99a17f4c8c5d7322beec6acccc00ac67b8ff4c19e51ebabe142978d3857ba18"
+    },
+    {
+      "path": "platform/androswitch/tests/glsurface_worker.c",
+      "sha256": "40a564097ce57cde24da21bb6c2d80f0039ca149d686d7ffe61218d2caae45cd"
+    },
+    {
+      "path": "platform/androswitch/tests/media_format.c",
+      "sha256": "78afd5c392c1a65f422f75f344847c5b856a790fd802e3d89eea97d9224c8aab"
+    },
+    {
+      "path": "platform/androswitch/tests/memory_policy.c",
+      "sha256": "5b3fb1ff3258a885286b47cbf7cb4d6b9650701a1fa103f0cc9fa254c84585ec"
+    },
+    {
+      "path": "platform/androswitch/tests/pcm_volume.c",
+      "sha256": "9323a1bb28fb3cb708fe982bf54be9bf2762b8b5cb38c4f96717b748b6219d75"
+    },
+    {
+      "path": "platform/switch-smoke/native.h",
+      "sha256": "e4cc4b945568b4e9f31c31bdfd487ef71e599fc003ec3f94861188ddb33e1c45"
+    }
+  ],
+  "desktop_emulator": "not_started",
+  "compiler": "C:\\w64devkit\\bin\\gcc.exe",
+  "status": "passed_host_contracts",
+  "recorded_on": "2026-10-24",
+  "source_base_commit": "dd06ba65922f56aa6d99d7da19729f2e22dd5f29",
+  "additional_checks": [
+    {
+      "command": "WSL cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer platform/androswitch/tests/media_format.c platform/androswitch/media_format.c -o local-artifacts/m9/media-format-asan; execute resulting program",
+      "status": "passed",
+      "scope": "Host AMediaFormat public import contracts under AddressSanitizer and UndefinedBehaviorSanitizer; not ARM64 execution"
+    }
+  ],
+  "horizon_emulator": "not_run",
+  "m9_external_first_screen_gate": "incomplete"
+}

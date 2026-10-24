@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "frozen_on": "2026-10-24",
+  "purpose": "Unmodified external APK first-screen evaluation; no execution compatibility claim",
+  "redistributed": false,
+  "fixtures": [
+    {
+      "id": "mekorama-1.7.2-user",
+      "source": "User-provided local APK; download and source-build provenance unverified",
+      "local_file": "mekorama-1-7-2.apk",
+      "package": "com.martinmagni.mekorama",
+      "version_name": "1.7.2",
+      "version_code": 44,
+      "min_sdk": 21,
+      "target_sdk": 33,
+      "bytes": 13099584,
+      "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+      "dex_count": 2,
+      "combined_raw_dex_bytes": 14703020,
+      "execution_status": "pending_horizon_verification"
+    },
+    {
+      "id": "candy-crush-1.332.1.1-user",
+      "source": "User-provided local APK; download and source-build provenance unverified",
+      "local_file": "candycrush.apk",
+      "package": "com.king.candycrushsaga",
+      "version_name": "1.332.1.1",
+      "min_sdk": 23,
+      "target_sdk": 36,
+      "bytes": 163371628,
+      "sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+      "dex_count": 4,
+      "combined_raw_dex_bytes": 34874388,
+      "largest_arm64_library": {"entry": "lib/arm64-v8a/libcandycrushsaga.so", "bytes": 89417880},
+      "execution_status": "pending_horizon_verification"
+    }
+  ]
+}

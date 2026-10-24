@@ -4,6 +4,7 @@
 #define SL_API_DEPRECATED(level)
 #include "../../third_party/android/opensles/OpenSLES_Android.h"
 #include "media.h"
+#include "pcm_volume.h"
 #include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -17,16 +18,20 @@ static const struct SLInterfaceID_ queue_id = {
     0x198e4940, 0xc5d7, 0x11df, 0xa2a6, {0, 2, 0xa5, 0xd5, 0xc5, 0x1b}};
 static const struct SLInterfaceID_ buffer_id = {
     0x2bc99cc0, 0xddd4, 0x11db, 0x8d99, {0, 2, 0xa5, 0xd5, 0xc5, 0x1b}};
+static const struct SLInterfaceID_ volume_id = {
+    0x09e8ede0, 0xddde, 0x11db, 0xb4f6, {0, 2, 0xa5, 0xd5, 0xc5, 0x1b}};
 const SLInterfaceID SL_IID_ENGINE = &engine_id, SL_IID_PLAY = &play_id,
                     SL_IID_ANDROIDSIMPLEBUFFERQUEUE = &queue_id,
-                    SL_IID_BUFFERQUEUE = &buffer_id;
+                    SL_IID_BUFFERQUEUE = &buffer_id, SL_IID_VOLUME = &volume_id;
 typedef struct Object Object;
 typedef struct {
   uint64_t *table;
   Object *owner;
 } Interface;
 struct Object {
-  Interface object, engine, play, queue;
+  Interface object, engine, play, queue, volume;
+  SLmillibel volume_level;
+  SLboolean muted;
   int kind, realized, state, started, stopping, inflight;
   uint64_t audio, callback, context, completed, played;
   void *session;
@@ -44,7 +49,8 @@ static Object *objects;
 static uint64_t object_table[sizeof(struct SLObjectItf_) / 8],
     engine_table[sizeof(struct SLEngineItf_) / 8],
     play_table[sizeof(struct SLPlayItf_) / 8],
-    queue_table[sizeof(struct SLAndroidSimpleBufferQueueItf_) / 8];
+    queue_table[sizeof(struct SLAndroidSimpleBufferQueueItf_) / 8],
+    volume_table[sizeof(struct SLVolumeItf_) / 8];
 static int tables_initialized;
 static Object *object(const void *self) {
   return ((const Interface *)self)->owner;
@@ -68,8 +74,11 @@ static void worker(void *arg) {
     unsigned at = o->read % 4;
     void *data = o->buffers[at].data;
     size_t bytes = o->buffers[at].bytes;
+    SLmillibel level = o->volume_level;
+    SLboolean muted = o->muted;
     o->inflight = 1;
     mutexUnlock(&o->mutex);
+    as_pcm16_volume(data, bytes / 4, level, muted != SL_BOOLEAN_FALSE);
     int64_t played = as_audio_write(o->audio, data, bytes / 4, 1000000000);
     mutexLock(&o->mutex);
     free(data);
@@ -138,6 +147,8 @@ static SLresult get_interface(SLObjectItf self, SLInterfaceID id,
     *(void **)result = &o->engine;
   else if (o->kind == 3 && equal(id, SL_IID_PLAY))
     *(void **)result = &o->play;
+  else if (o->kind == 3 && equal(id, SL_IID_VOLUME))
+    *(void **)result = &o->volume;
   else if (o->kind == 3 && (equal(id, SL_IID_ANDROIDSIMPLEBUFFERQUEUE) ||
                             equal(id, SL_IID_BUFFERQUEUE)))
     *(void **)result = &o->queue;
@@ -172,6 +183,49 @@ static SLresult get_position(SLPlayItf self, SLmillisecond *position) {
   Object *o = object(self);
   mutexLock(&o->mutex);
   *position = (SLmillisecond)(o->played * 1000 / 48000);
+  mutexUnlock(&o->mutex);
+  return SL_RESULT_SUCCESS;
+}
+static SLresult set_volume(SLVolumeItf self, SLmillibel level) {
+  if (level > 0)
+    return SL_RESULT_PARAMETER_INVALID;
+  Object *o = object(self);
+  mutexLock(&o->mutex);
+  o->volume_level = level;
+  mutexUnlock(&o->mutex);
+  return SL_RESULT_SUCCESS;
+}
+static SLresult get_volume(SLVolumeItf self, SLmillibel *level) {
+  if (!level)
+    return SL_RESULT_PARAMETER_INVALID;
+  Object *o = object(self);
+  mutexLock(&o->mutex);
+  *level = o->volume_level;
+  mutexUnlock(&o->mutex);
+  return SL_RESULT_SUCCESS;
+}
+static SLresult max_volume(SLVolumeItf self, SLmillibel *level) {
+  (void)self;
+  if (!level)
+    return SL_RESULT_PARAMETER_INVALID;
+  *level = 0;
+  return SL_RESULT_SUCCESS;
+}
+static SLresult set_mute(SLVolumeItf self, SLboolean mute) {
+  if (mute != SL_BOOLEAN_FALSE && mute != SL_BOOLEAN_TRUE)
+    return SL_RESULT_PARAMETER_INVALID;
+  Object *o = object(self);
+  mutexLock(&o->mutex);
+  o->muted = mute;
+  mutexUnlock(&o->mutex);
+  return SL_RESULT_SUCCESS;
+}
+static SLresult get_mute(SLVolumeItf self, SLboolean *mute) {
+  if (!mute)
+    return SL_RESULT_PARAMETER_INVALID;
+  Object *o = object(self);
+  mutexLock(&o->mutex);
+  *mute = o->muted;
   mutexUnlock(&o->mutex);
   return SL_RESULT_SUCCESS;
 }
@@ -288,6 +342,7 @@ static Object *new_object(int kind, Object *parent) {
   o->engine = (Interface){engine_table, o};
   o->play = (Interface){play_table, o};
   o->queue = (Interface){queue_table, o};
+  o->volume = (Interface){volume_table, o};
   o->session = as_native_session();
   o->next = objects;
   objects = o;
@@ -299,9 +354,10 @@ static int required_ok(unsigned count, const SLInterfaceID *ids,
     return 0;
   for (unsigned i = 0; i < count; i++)
     if (required[i] &&
-        !(player && (equal(ids[i], SL_IID_PLAY) ||
-                     equal(ids[i], SL_IID_ANDROIDSIMPLEBUFFERQUEUE) ||
-                     equal(ids[i], SL_IID_BUFFERQUEUE))))
+        !(player &&
+          (equal(ids[i], SL_IID_PLAY) || equal(ids[i], SL_IID_VOLUME) ||
+           equal(ids[i], SL_IID_ANDROIDSIMPLEBUFFERQUEUE) ||
+           equal(ids[i], SL_IID_BUFFERQUEUE))))
       return 0;
   return 1;
 }
@@ -368,6 +424,8 @@ static void initialize_tables(void) {
     play_table[i] = missing;
   for (size_t i = 0; i < sizeof(queue_table) / 8; i++)
     queue_table[i] = missing;
+  for (size_t i = 0; i < sizeof(volume_table) / 8; i++)
+    volume_table[i] = missing;
   SET(object_table, SLObjectItf_, Realize, realize);
   SET(object_table, SLObjectItf_, GetState, get_state);
   SET(object_table, SLObjectItf_, GetInterface, get_interface);
@@ -377,6 +435,11 @@ static void initialize_tables(void) {
   SET(play_table, SLPlayItf_, SetPlayState, set_play);
   SET(play_table, SLPlayItf_, GetPlayState, get_play);
   SET(play_table, SLPlayItf_, GetPosition, get_position);
+  SET(volume_table, SLVolumeItf_, SetVolumeLevel, set_volume);
+  SET(volume_table, SLVolumeItf_, GetVolumeLevel, get_volume);
+  SET(volume_table, SLVolumeItf_, GetMaxVolumeLevel, max_volume);
+  SET(volume_table, SLVolumeItf_, SetMute, set_mute);
+  SET(volume_table, SLVolumeItf_, GetMute, get_mute);
   SET(queue_table, SLAndroidSimpleBufferQueueItf_, Enqueue, enqueue);
   SET(queue_table, SLAndroidSimpleBufferQueueItf_, Clear, clear_queue);
   SET(queue_table, SLAndroidSimpleBufferQueueItf_, GetState, queue_state);
@@ -423,5 +486,7 @@ uint64_t as_sl_import(const char *name) {
     return (uint64_t)&SL_IID_ANDROIDSIMPLEBUFFERQUEUE;
   if (!strcmp(name, "SL_IID_BUFFERQUEUE"))
     return (uint64_t)&SL_IID_BUFFERQUEUE;
+  if (!strcmp(name, "SL_IID_VOLUME"))
+    return (uint64_t)&SL_IID_VOLUME;
   return 0;
 }

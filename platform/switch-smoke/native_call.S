@@ -52,15 +52,50 @@ as_native_import_bridge:
     str x30,[x14,x15,lsl#3]
     add x14,x17,#1048
     str x19,[x14,x15,lsl#3]
+    add x14,x17,#2584
+    str x18,[x14,x15,lsl#3]
     add x15,x15,#1
     str x15,[x17,#16]
     mov x19,x17
     ldr x14,[x17]
     msr tpidr_el0,x14
+    // Convert thread-local errno without changing the argument ABI. Restore
+    // SP before the imported call so stack and variadic arguments are intact.
+    sub sp,sp,#208
+    stp x0,x1,[sp]
+    stp x2,x3,[sp,#16]
+    stp x4,x5,[sp,#32]
+    stp x6,x7,[sp,#48]
+    stp x8,x16,[sp,#64]
+    stp q0,q1,[sp,#80]
+    stp q2,q3,[sp,#112]
+    stp q4,q5,[sp,#144]
+    stp q6,q7,[sp,#176]
+    mov x0,x19
+    bl as_native_errno_enter
+    ldp q0,q1,[sp,#80]
+    ldp q2,q3,[sp,#112]
+    ldp q4,q5,[sp,#144]
+    ldp q6,q7,[sp,#176]
+    ldp x0,x1,[sp]
+    ldp x2,x3,[sp,#16]
+    ldp x4,x5,[sp,#32]
+    ldp x6,x7,[sp,#48]
+    ldp x8,x16,[sp,#64]
+    add sp,sp,#208
     adr x30,2f
-    // Preserve SP exactly: the host sees every original stack argument.
     br x16
-2:  mov x17,x19
+2:  sub sp,sp,#80
+    stp x0,x1,[sp]
+    stp q0,q1,[sp,#16]
+    stp q2,q3,[sp,#48]
+    mov x0,x19
+    bl as_native_errno_leave
+    ldp x0,x1,[sp]
+    ldp q0,q1,[sp,#16]
+    ldp q2,q3,[sp,#48]
+    add sp,sp,#80
+    mov x17,x19
     ldr x15,[x17,#16]
     sub x15,x15,#1
     str x15,[x17,#16]
@@ -68,6 +103,8 @@ as_native_import_bridge:
     ldr x30,[x14,x15,lsl#3]
     add x14,x17,#1048
     ldr x19,[x14,x15,lsl#3]
+    add x14,x17,#2584
+    ldr x18,[x14,x15,lsl#3]
     ldr x16,[x17,#8]
     msr tpidr_el0,x16
     ret

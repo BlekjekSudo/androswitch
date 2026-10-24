@@ -1,0 +1,165 @@
+{
+  "physical_device": {
+    "status": "not_run_for_these_source_hashes",
+    "scope": "Prior direct user confirmations apply to earlier candidates only."
+  },
+  "emulator": {
+    "status": "not_run",
+    "reason": "Desktop emulator explicitly opt-in after user reported disappearing windows; this task ran no emulator."
+  },
+  "limitations": [
+    "Host worker tests do not prove EGL rendering, actual JNI/GC references or a recognizable game screen.",
+    "Preserve-context pause currently retains the EGL surface too; AOSP releases the surface while optionally retaining context.",
+    "Allocator free is an aggregate estimate, not a largest contiguous block or an atomic reservation.",
+    "M9 external game startup and safe return remain incomplete until separately executed and reviewed."
+  ],
+  "host": {
+    "glsurface_worker": {
+      "scenario_count": 22,
+      "log_sha256": "9b9f7db61b6375caa435eff40cb6c265c9e6110cd8512ef52e68eb87564401cd",
+      "scope": "Production worker and real pthread concurrency; fake libnx/EGL/VM boundary only. No guest APK or real graphics driver executed.",
+      "scenarios": [
+        "invalid",
+        "create-failure",
+        "start-failure",
+        "start-close-failure",
+        "normal",
+        "pause-preserve",
+        "pause-recreate",
+        "pause-exit",
+        "queue-before-context",
+        "initialize-failure",
+        "choose-failure",
+        "egl-create-failure",
+        "attach-failure",
+        "callback-failure",
+        "queue-failure",
+        "poll-failure",
+        "close-failure",
+        "self-join",
+        "wait-failure",
+        "thread-close-failure",
+        "timeout",
+        "concurrent-join"
+      ],
+      "run_pattern": [
+        "local-artifacts/reference/autorun/test-glsurface-worker.exe",
+        "<each scenario>"
+      ],
+      "log": "local-artifacts/reference/autorun/glsurface-host-tests.log",
+      "all_exit_codes": 0,
+      "compile": [
+        "gcc",
+        "-std=c11",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-Iplatform/androswitch/tests/fake-switch",
+        "-Iplatform/switch-smoke",
+        "platform/androswitch/tests/glsurface_worker.c",
+        "platform/androswitch/glsurface.c",
+        "-o",
+        "local-artifacts/reference/autorun/test-glsurface-worker.exe"
+      ],
+      "status": "passed"
+    },
+    "memory_policy": {
+      "status": "passed",
+      "log": "local-artifacts/reference/autorun/memory-policy-test.log",
+      "run": [
+        "local-artifacts/reference/autorun/test-memory-policy.exe"
+      ],
+      "exit_code": 0,
+      "compile": [
+        "gcc",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "platform/androswitch/tests/memory_policy.c",
+        "-o",
+        "local-artifacts/reference/autorun/test-memory-policy.exe"
+      ],
+      "log_sha256": "e6f9047a30e0a937ef6264a071e18e89a33cceed526d4112204227589eba477d",
+      "assertions": 20
+    },
+    "compiler": "C:/w64devkit/bin/gcc.exe (GCC) 16.2.0"
+  },
+  "source_base_commit": "dd06ba65922f56aa6d99d7da19729f2e22dd5f29",
+  "horizon_cross_compile": {
+    "status": "passed",
+    "warnings_as_errors": true,
+    "exit_code": 0,
+    "execution": false,
+    "command": [
+      "wsl",
+      "-d",
+      "Ubuntu",
+      "--",
+      "make",
+      "-C",
+      "/mnt/d/Dev/Switch/AndroSwitch/platform/androswitch",
+      "/mnt/d/Dev/Switch/AndroSwitch/local-artifacts/reference/autorun/glsurface.o",
+      "OUTPUT_DIR=/mnt/d/Dev/Switch/AndroSwitch/local-artifacts/reference/autorun"
+    ],
+    "object_sha256": "beee10828046cb05e310a949337d71805edf0f2fca838cfa31a47c60a7272651",
+    "compiler": "WSL Ubuntu /opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc 16.1.0"
+  },
+  "doc_link_check": {
+    "status": "passed",
+    "command": [
+      "python",
+      "-X",
+      "utf8",
+      "scripts/check_md_links.py"
+    ],
+    "links_checked": 252,
+    "exit_code": 0,
+    "files_scanned": 64
+  },
+  "references": {
+    "glsurface_reference": "https://github.com/aosp-mirror/platform_frameworks_base/blob/android-8.0.0_r1/opengl/java/android/opengl/GLSurfaceView.java",
+    "autorun_commit": "1ac9b6cf37b90f2d5783dd7ef389bebbe1c68877",
+    "libnx_tag": "v4.12.0",
+    "wine_allocator_copied": false
+  },
+  "source_state": "working_tree_frozen_by_file_hashes",
+  "source_files": [
+    {
+      "sha256": "4deaa40da2f04ec52fdd301d192f46c8071c0beaa3b19e9a82706640d652470d",
+      "path": "platform/androswitch/memory.c"
+    },
+    {
+      "sha256": "688077331e06cad89a37a8ef7d0b3883d839ee0befebd5d02a22d5ce8240a5ca",
+      "path": "platform/androswitch/memory.h"
+    },
+    {
+      "sha256": "fef208063c81d398f8b475013539bca85db6be2224640b8b22a71e8640f5205f",
+      "path": "platform/androswitch/memory_policy.h"
+    },
+    {
+      "sha256": "5b3fb1ff3258a885286b47cbf7cb4d6b9650701a1fa103f0cc9fa254c84585ec",
+      "path": "platform/androswitch/tests/memory_policy.c"
+    },
+    {
+      "sha256": "1b65095efc24f420b2f600c6d79e4217973621203a89f8b2b1ff87b8b01e25e5",
+      "path": "platform/androswitch/glsurface.c"
+    },
+    {
+      "sha256": "0ec24f62d8b8c490d0c9207b58dda28f1c9ea4ff3edd11944e59a9466e37b296",
+      "path": "platform/androswitch/glsurface.h"
+    },
+    {
+      "sha256": "a67ccd8caa6315ce568965e11478f557ba5ddcb5ba2ca70b1d508dc6a57a3547",
+      "path": "platform/androswitch/tests/glsurface_worker.c"
+    },
+    {
+      "sha256": "e99a17f4c8c5d7322beec6acccc00ac67b8ff4c19e51ebabe142978d3857ba18",
+      "path": "platform/androswitch/tests/fake-switch/switch.h"
+    }
+  ],
+  "schema_version": 1,
+  "date": "2026-10-24"
+}

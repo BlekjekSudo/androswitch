@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T08:51:58.6159717Z",
+  "git_commit": "dd06ba65922f56aa6d99d7da19729f2e22dd5f29",
+  "working_tree_changes_included": true,
+  "status": "passed_host_contracts",
+  "environment": {
+    "test_profile": {
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "portable_vm": "rd-vm default-features=false",
+      "CARGO_BUILD_JOBS": "1"
+    },
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+  },
+  "source_hashes": [
+    {
+      "path": "crates/as-framework/src/android.rs",
+      "sha256": "80cee20eb85909b1e91580e22fa63207e417f08b0bc215dec5ed99f1d1c4a25e"
+    },
+    {
+      "path": "crates/as-framework/src/services/mod.rs",
+      "sha256": "0f095570b6e08f5c560082d27841a0baef717b9d9963fee418130a576ab196f1"
+    },
+    {
+      "path": "crates/as-framework/src/services/package.rs",
+      "sha256": "a6aad00168b3cc79144b026dfcd27df29ca0380fda7510247913759edb3e7915"
+    },
+    {
+      "path": "crates/as-framework/src/services/glsurface.rs",
+      "sha256": "ee6bc69c45fd09146dda0fa7675ca80a058afdc5690ce7a89c70e2198a196f0d"
+    },
+    {
+      "path": "crates/as-framework/src/bin/as-ui-probe.rs",
+      "sha256": "515ab9469f57cd585b3e6b8710df71467b18089b2da64d17613d8be355ff6ac7"
+    },
+    {
+      "path": "crates/as-framework/Cargo.toml",
+      "sha256": "598296eff0086be3551d10dafc0196e951e919804728b05e2d27e71d619d223f"
+    },
+    {
+      "path": "crates/as-framework/tests/lifecycle.rs",
+      "sha256": "2a9a3ecab3a766cf9040f0d447587bfcf9fd0f0249291d17e2a720f966156268"
+    },
+    {
+      "path": "crates/as-framework/tests/glsurface.rs",
+      "sha256": "506090f7ff4380af77854a876308eb4fc4686716c29afdf71b829b65c5d68a4a"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "sha256": "fa822d14a01d8016ffb98d8698f01ce484c739a3347079fc4f6b74f3159a6403"
+    },
+    {
+      "path": "fixtures/m9/glsurface/java/org/androswitch/graphics/SurfaceActivity.java",
+      "sha256": "76c3770aeeae07e71b4b41c08d98af80c84a26b2f581a6e3435f39ca32b5378a"
+    },
+    {
+      "path": "scripts/build-glsurface-fixture.ps1",
+      "sha256": "7a5746446c682cddc34cdad0ca65014e6de7890ba765c2b24926d31ae8bf44c6"
+    },
+    {
+      "path": "crates/as-framework/src/lib.rs",
+      "sha256": "3e5a8776ba728dfc7a711bef6fb4c3095786a71e51cae73971c6718358b08f57"
+    },
+    {
+      "path": "crates/as-framework/tests/m8_contracts.rs",
+      "sha256": "93adc1652d64faea3a76cb6098065492d7e6b12ccc2014cc99a47c04b267aa81"
+    },
+    {
+      "path": "crates/as-platform/src/vfs.rs",
+      "sha256": "bbb9adaccf9071b1e68c8c2cc550a0366d1eddf5f9c3003b7a9ea663b0bc49dc"
+    }
+  ],
+  "checks": [
+    {
+      "status": "passed",
+      "exit_code": 0,
+      "id": "glsurface-fixture-build",
+      "command": "pwsh -File scripts/build-glsurface-fixture.ps1"
+    },
+    {
+      "status": "passed",
+      "id": "format",
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "log": "target/evidence/m9-format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "status": "passed",
+      "exit_code": 0,
+      "id": "diff-whitespace",
+      "command": "git diff --check -- crates/as-framework crates/rd-vm/src/classpath.rs"
+    },
+    {
+      "status": "cancelled_waiting_for_lock_replaced_by_consolidated_suite",
+      "id": "framework-host-contracts",
+      "session_id": 86205,
+      "command": "cargo test -p as-framework --features host --test lifecycle --test m8_contracts --test glsurface --locked -- --ignored --skip large_file_backed --nocapture",
+      "replacement": "framework-host-contracts-consolidated (passed)"
+    },
+    {
+      "status": "passed",
+      "previous_result": "New fixture test manual-range-pattern warning corrected; final consolidated parent suite is queued.",
+      "id": "framework-clippy",
+      "command": "cargo clippy -p as-framework --features host --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "log": "target/evidence/m9-framework-clippy.log",
+      "log_sha256": "8eff718e7c88fcd5830fe52155ba1de4fefe23c91029980b86cc77a794f697bc"
+    },
+    {
+      "command": "cargo test -p as-framework --features host --test glsurface --locked -- --ignored --nocapture",
+      "scope": "Final stable sources, including malformed EGL descriptor guards and BootClassLoader correction.",
+      "id": "framework-glsurface",
+      "status": "passed",
+      "failed": 0,
+      "exit_code": 0,
+      "duration_seconds": 3.28,
+      "passed": 3
+    },
+    {
+      "exit_code": 0,
+      "failed": 0,
+      "log": "target/evidence/m9-framework.log",
+      "source": "Verified parent consolidated check entry and corresponding actual test log.",
+      "passed": 14,
+      "command": "cargo test -p as-framework --features host --tests --locked -- --include-ignored",
+      "id": "framework-host-contracts-consolidated",
+      "suites": {
+        "lifecycle": 8,
+        "m8_contracts": 2,
+        "unit": 1,
+        "glsurface": 3
+      },
+      "includes_large_apk_fixture": true,
+      "log_sha256": "f211adc0000e2c7e44b8cb3eeaea6a0d1578d90131842c6b6d9aaa799a7f4d1a",
+      "status": "passed"
+    }
+  ],
+  "fixture": {
+    "build_tools": "35.0.0",
+    "build_receipt_sha256": "c3edfc9e8e324309502fb8e06e5e63a17b007a03bc97a4f9f65967de03b692af",
+    "api": 26,
+    "build_receipt": "local-artifacts/m9/glsurface-fixture/build-receipt.json",
+    "apks": [
+      {
+        "file": "renamed.apk",
+        "package": "net.example.rendercontract",
+        "sha256": "30574923228c51bd43a0ce0d8518c948ae430d0eb1b2b34b66ba8bb00bb76201"
+      },
+      {
+        "file": "surface.apk",
+        "package": "org.fixture.glsurface",
+        "sha256": "3efd4adac84822cf6ffeef508a9940bdf15f56f49ab84888b2451738d3eaf4e2"
+      }
+    ]
+  },
+  "contracts": [
+    "Actual installed APK sourceDir/publicSourceDir through the same read-only VFS alias used by native and Java",
+    "Context private directories and canonical application class loader using actual filesystem and DEX metadata",
+    "API26 canonical distinct BootClassLoader for nonprimitive platform classes and primitive arrays; primitive Class returns null; boot loader does not resolve APK classes",
+    "GLSurfaceView config-before-renderer ordering, custom DEX EGL config chooser backed by actual provider queries, opaque per-display EGL tokens",
+    "Real DEX Renderer callbacks and queued Runnable execution, references rooted across GC, dirty mode, pause/recreate transitions",
+    "Physical GL dimensions and single-pointer MotionEvent routing through View listener and Activity fallback",
+    "Unsupported Java GL10 methods and render Java thread identity produce structured errors"
+  ],
+  "references": {
+    "class_getClassLoader_api26": "https://android.googlesource.com/platform/libcore/+/refs/tags/android-8.0.0_r4/ojluni/src/main/java/java/lang/Class.java?format=TEXT",
+    "glsurfaceview_api26": "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/opengl/java/android/opengl/GLSurfaceView.java"
+  },
+  "scope": {
+    "emulator": "not_run",
+    "composition": "One direct full-screen GLSurfaceView; mixed software overlays fail explicitly.",
+    "touch": "Single pointer; fullscreen physical coordinates; Activity fallback and View.OnTouchListener modeled.",
+    "physical_device": "not_run_for_these_changes",
+    "host": "Recording EGL provider verifies DEX API scheduling and actual callback execution, not a GPU or ARM64 native execution.",
+    "external_games": "Original external host probes are blocked at System.loadLibrary because the x86 host has no ARM64 backend; no visible game-screen compatibility claim.",
+    "gles": "Client version2; Java GL10 methods are unavailable. Native GLES executes only through a platform active context."
+  },
+  "prior_observations": {
+    "m5": "6/7 passed in a mixed mid-edit build. BootClassLoader test linked an older framework library; superseded by stable-source retest, not final evidence.",
+    "glsurface": "3/3 passed before final malformed-descriptor and BootClassLoader corrections; final retest pending.",
+    "m8": "Not reached by the mixed run because the preceding lifecycle suite failed."
+  },
+  "final_source_hashes_verified": true,
+  "result": "Final stable-source framework unit1/1, GLSurfaceView3/3, lifecycle8/8 and M8contracts2/2 passed; framework clippy passed with -D warnings. No emulator or physical-device execution performed for these changes."
+}

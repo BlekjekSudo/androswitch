@@ -35,3 +35,8 @@ required-features = ["host"]
 name = "lifecycle"
 path = "tests/lifecycle.rs"
 required-features = ["host"]
+
+[[test]]
+name = "glsurface"
+path = "tests/glsurface.rs"
+required-features = ["host"]

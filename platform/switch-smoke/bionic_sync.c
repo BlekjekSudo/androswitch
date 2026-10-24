@@ -1,6 +1,7 @@
 /* Opaque Android pthread mutex/cond addresses map to owned libnx objects.
  * Never reinterpret Bionic pthread layouts as newlib layouts.
  * AndroSwitch contributors, MIT OR Apache-2.0. */
+#include "bionic_errno.h"
 #include "native.h"
 #include <errno.h>
 #include <stdint.h>
@@ -49,7 +50,7 @@ static int mutex_init(void *key, const int *attr) {
   if (!key)
     return EINVAL;
   if (attr && (*attr < 0 || *attr > 2))
-    return ENOTSUP;
+    return as_errno_to_android(ENOTSUP);
   mutexLock(&registry);
   *(uint32_t *)key = 0;
   Sync *s = get(key, 0);
@@ -75,7 +76,7 @@ static int mutex_lock(void *key) {
     }
     if (s->type == 2) {
       mutexUnlock(&registry);
-      return EDEADLK;
+      return as_errno_to_android(EDEADLK);
     }
   }
   s->users++;
@@ -162,7 +163,7 @@ static int cond_init(void *key, const int *attr) {
   if (!key)
     return EINVAL;
   if (attr && (*attr < 0 || *attr > 1))
-    return ENOTSUP;
+    return as_errno_to_android(ENOTSUP);
   mutexLock(&registry);
   *(uint32_t *)key = 0;
   Sync *s = get(key, 1);
@@ -214,7 +215,7 @@ static int cond_wait_internal(void *key, void *mutex,
     int64_t seconds = (int64_t)deadline->tv_sec - now.tv_sec;
     if (seconds > INT64_MAX / 1000000000) {
       mutexUnlock(&registry);
-      return EOVERFLOW;
+      return as_errno_to_android(EOVERFLOW);
     }
     int64_t delta = seconds * 1000000000 + deadline->tv_nsec - now.tv_nsec;
     timeout = delta > 0 ? (uint64_t)delta : 0;
@@ -229,9 +230,10 @@ static int cond_wait_internal(void *key, void *mutex,
   m->owner = threadGetCurHandle();
   m->depth = 1;
   mutexUnlock(&registry);
-  return R_SUCCEEDED(rc)                             ? 0
-         : R_DESCRIPTION(rc) == KernelError_TimedOut ? ETIMEDOUT
-                                                     : EINVAL;
+  return R_SUCCEEDED(rc) ? 0
+         : R_DESCRIPTION(rc) == KernelError_TimedOut
+             ? as_errno_to_android(ETIMEDOUT)
+             : EINVAL;
 }
 static int cond_wait(void *c, void *m) {
   return cond_wait_internal(c, m, NULL);

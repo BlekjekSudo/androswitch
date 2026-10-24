@@ -40,6 +40,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     pm.initialize()?;
     let mut results = Vec::<Value>::new();
     let mut passed = true;
+    let required_cases = cases.iter().filter(|case| case.expected == "run").count();
     for (index, case) in cases.iter().enumerate() {
         if !matches!(case.expected.as_str(), "run" | "evaluate") {
             return Err("unknown corpus expectation".into());
@@ -57,17 +58,25 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         };
         let mut sessions = vec![];
         let mut failure = None;
+        let mut admission = None;
         for cycle in 0..if case.expected == "run" { cycles } else { 1 } {
             let started = Instant::now();
             let apk = pm.load_apk(&record.package, None)?.1;
             let opened = Instant::now();
-            let app = App::new(
+            let app = App::new_with_options(
                 apk,
                 fs.clone(),
                 Rc::new(HostPlatform::default()),
                 640,
                 360,
                 None,
+                as_framework::AppOptions {
+                    source_apk: Some(format!(
+                        "installed/{}/{:020}/package.apk",
+                        record.package, record.revision
+                    )),
+                    ..Default::default()
+                },
             );
             let mut app = match app {
                 Ok(app) => app,
@@ -76,6 +85,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     break;
                 }
             };
+            admission = Some(
+                json!({"raw_dex_bytes":app.memory.raw_dex_bytes,"estimated_parser_bytes":app.memory.estimated_parser_bytes,"parser_budget_bytes":app.memory.parser_budget_bytes}),
+            );
             if let Err(e) = app.launch() {
                 let _ = app.android.abort_startup();
                 failure = Some(e.to_string());
@@ -102,15 +114,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             app.vm.gc();
             app.draw().map_err(|e| e.to_string())?;
-            sessions.push(json!({"cycle":cycle,"load_apk_ms":opened.duration_since(started).as_secs_f64()*1e3,"vm_startup_ms":launched.duration_since(opened).as_secs_f64()*1e3,"frame_us":frame_us,"managed_heap_bytes_after_gc":app.vm.heap.used(),"frame_hash":format!("{:016x}",app.frame.checksum()),"labels":labels}));
+            sessions.push(json!({"cycle":cycle,"load_apk_ms":opened.duration_since(started).as_secs_f64()*1e3,"vm_startup_ms":launched.duration_since(opened).as_secs_f64()*1e3,"frame_us":frame_us,"managed_heap_bytes_after_gc":app.vm.heap.used(),"parser_memory_admission":{"raw_dex_bytes":app.memory.raw_dex_bytes,"estimated_parser_bytes":app.memory.estimated_parser_bytes,"parser_budget_bytes":app.memory.parser_budget_bytes},"frame_hash":format!("{:016x}",app.frame.checksum()),"labels":labels}));
             app.android.stop(&mut app.vm).map_err(|e| e.to_string())?;
         }
         if failure.is_some() && case.expected == "run" {
             passed = false;
         }
-        results.push(json!({"id":case.id,"package":record.package,"apk_sha256":record.apk_sha256,"expected":case.expected,"status":if failure.is_some(){"blocked_execution"}else{"passed_host_execution"},"error":failure,"sessions":sessions}));
+        results.push(json!({"id":case.id,"package":record.package,"apk_sha256":record.apk_sha256,"expected":case.expected,"status":if failure.is_some(){"blocked_execution"}else{"passed_host_execution"},"error":failure,"parser_memory_admission":admission,"sessions":sessions}));
     }
-    let report = json!({"schema_version":1,"backend":"portable-host","architecture":std::env::consts::ARCH,"os":std::env::consts::OS,"viewport":[640,360],"cycles":cycles,"status":if passed{"passed_required_host_cases"}else{"failed_required_host_cases"},"measurement_scope":"CPU software UI and managed VM heap only; excludes native Horizon GPU/audio and host side-table/C allocations; host timings are not Switch FPS","cases":results});
+    let report = json!({"schema_version":1,"backend":"portable-host","architecture":std::env::consts::ARCH,"os":std::env::consts::OS,"viewport":[640,360],"cycles":cycles,"required_cases":required_cases,"status":if required_cases==0{"evaluation_only"}else if passed{"passed_required_host_cases"}else{"failed_required_host_cases"},"measurement_scope":"CPU software UI and managed VM heap only; excludes native Horizon GPU/audio and host side-table/C allocations; host timings are not Switch FPS","cases":results});
     std::fs::write(&args[2], serde_json::to_vec_pretty(&report)?)?;
     if !passed {
         return Err("required corpus case failed; inspect output JSON".into());

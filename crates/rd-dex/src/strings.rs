@@ -77,7 +77,7 @@ impl Strings {
 }
 
 /// Lê um string_data_item: `uleb128 utf16_len` + bytes MUTF-8 + terminador 0x00.
-fn read_string_data(data: &[u8], off: usize) -> RdResult<String> {
+pub(crate) fn encoded_string_data(data: &[u8], off: usize) -> RdResult<&[u8]> {
     let mut r = Reader::at(data, off)?;
     // utf16_len é lido só para avançar o cursor (uleb128 bounds-checked); o
     // valor declarado NÃO é confiável em arquivos corrompidos — ver política
@@ -101,7 +101,11 @@ fn read_string_data(data: &[u8], off: usize) -> RdResult<String> {
             "string: excede 1 MiB sem terminador NUL (stream malformada)",
         ));
     }
-    let s = mutf8::decode(&data[start..end]);
+    Ok(&data[start..end])
+}
+
+fn read_string_data(data: &[u8], off: usize) -> RdResult<String> {
+    let s = mutf8::decode(encoded_string_data(data, off)?);
     // spec: utf16_len é o comprimento em unidades de código UTF-16. Um
     // desacerto indica corrupção — mas o decode é LOSSY POR DESIGN (mutf8.rs:
     // "strings malformadas não podem derrubar o parser", Lei 1) e TODA

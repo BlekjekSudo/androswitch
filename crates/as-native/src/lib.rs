@@ -13,7 +13,8 @@ use alloc::{
     vec,
     vec::Vec,
 };
-use rd_ndk::elf::{Abi, Elf};
+use rd_ndk::elf::Abi;
+pub use rd_ndk::elf::Elf;
 use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 pub struct Error {
@@ -40,18 +41,40 @@ pub struct Allocation {
     pub token: u64,
     pub length: usize,
 }
+#[derive(Debug, Clone, Serialize)]
+pub struct DeferredImport {
+    pub library: String,
+    pub symbol: String,
+}
 pub trait NativeBackend {
     fn system_library(&self, name: &str) -> bool {
         matches!(
             name,
-            "libc.so" | "libm.so" | "libdl.so" | "liblog.so" | "libandroid.so"
+            "libc.so" | "libm.so" | "libdl.so" | "liblog.so" | "libandroid.so" | "libstdc++.so"
         )
     }
     fn allocate(&mut self, length: usize) -> Result<Allocation>;
     fn write(&mut self, memory: Allocation, offset: usize, bytes: &[u8]) -> Result<()>;
     fn finalize(&mut self, memory: Allocation, executable_pages: &[u8]) -> Result<()>;
     fn release(&mut self, memory: Allocation);
-    fn import(&mut self, library: &str, symbol: &str) -> Result<Option<u64>>;
+    /// Publish owned loader metadata after a successful mapping, before running
+    /// constructors. Backends with dynamic introspection retain a snapshot.
+    fn register_module(&mut self, _name: &str, _elf: &Elf, _memory: Allocation) -> Result<()> {
+        Ok(())
+    }
+    /// ELF STT_* distinguishes addresses of data objects from callable imports.
+    /// STT_NOTYPE (0) may require an explicit backend data-symbol lookup.
+    fn import(&mut self, library: &str, symbol: &str, kind: u8) -> Result<Option<u64>>;
+    /// Optional lazy function binding. A returned address must terminate with
+    /// a named error on first call; it must never fabricate an API result.
+    /// Loader never calls this for weak, object, TLS or ambiguous data imports.
+    fn defer_function(&mut self, _library: &str, _symbol: &str) -> Result<Option<u64>> {
+        Ok(None)
+    }
+    fn deferred_imports(&self) -> Vec<DeferredImport> {
+        Vec::new()
+    }
+
     fn tls(&mut self, module: usize, template: &[u8], size: usize, alignment: usize)
         -> Result<u64>;
     fn tls_descriptor(&mut self, offset: u64) -> Result<(u64, u64)>;
@@ -62,6 +85,8 @@ pub struct Module {
     pub elf: Elf,
     pub memory: Allocation,
     pub constructors: Vec<u64>,
+    pub destructors: Vec<u64>,
+    pub finalized: bool,
     pub tls_offset: Option<u64>,
     pub initialized: bool,
 }
@@ -153,12 +178,21 @@ impl<B: NativeBackend> Loader<B> {
             }
             let length = (elf.memory_size as usize + 4095) & !4095;
             let memory = self.backend.allocate(length)?;
+            let image = match zero_bytes(length, "relocation image", name) {
+                Ok(image) => image,
+                Err(error) => {
+                    self.backend.release(memory);
+                    return Err(error);
+                }
+            };
             let mut module = Module {
                 name: name.to_string(),
-                image: vec![0; length],
+                image,
                 elf,
                 memory,
                 constructors: Vec::new(),
+                destructors: Vec::new(),
+                finalized: false,
                 tls_offset: None,
                 initialized: false,
             };
@@ -176,7 +210,7 @@ impl<B: NativeBackend> Loader<B> {
         result
     }
     fn relocate(&mut self, m: &mut Module) -> Result<()> {
-        let mut pages = vec![0; m.image.len() / 4096];
+        let mut pages = zero_bytes(m.image.len() / 4096, "page permissions", &m.name)?;
         for s in &m.elf.segments {
             m.image[s.address as usize..s.address as usize + s.bytes.len()]
                 .copy_from_slice(&s.bytes);
@@ -184,7 +218,13 @@ impl<B: NativeBackend> Loader<B> {
                 // Linux SVC instructions cannot be allowed to become Horizon SVCs.
                 for (i, chunk) in s.bytes.chunks_exact(4).enumerate() {
                     let instruction = u32::from_le_bytes(chunk.try_into().unwrap());
-                    if instruction & 0xffe0001f == 0xd4000001 {
+                    let address = s.address + i as u64 * 4;
+                    let is_code = m.elf.code_ranges.as_ref().is_none_or(|ranges| {
+                        ranges
+                            .iter()
+                            .any(|(start, end)| address >= *start && address < *end)
+                    });
+                    if is_code && instruction & 0xffe0001f == 0xd4000001 {
                         return Err(error(
                             "LINUX_SYSCALL_UNSUPPORTED",
                             "validate_code",
@@ -238,10 +278,14 @@ impl<B: NativeBackend> Loader<B> {
                     m.memory.address + s.value
                 } else if let Some(v) = self.symbol(&s.name) {
                     v
-                } else if let Some(v) = self.backend.import(&m.name, &s.name)? {
+                } else if let Some(v) = self.backend.import(&m.name, &s.name, s.kind)? {
                     v
                 } else if s.weak {
                     0
+                } else if s.kind == 2 || s.kind == 0 && relocation.kind == 1026 {
+                    self.backend
+                        .defer_function(&m.name, &s.name)?
+                        .ok_or_else(|| error("SYMBOL_NOT_FOUND", "resolve", &m.name, &s.name))?
                 } else {
                     return Err(error("SYMBOL_NOT_FOUND", "resolve", &m.name, &s.name));
                 }
@@ -295,9 +339,45 @@ impl<B: NativeBackend> Loader<B> {
                 }
             }
         }
+        if let Some((at, count)) = m.elf.fini_array {
+            for i in (0..count).rev() {
+                let at = at as usize + i * 8;
+                let bytes = m.image.get(at..at + 8).ok_or_else(|| {
+                    error("INVALID_ELF", "fini_array", &m.name, "mapped fini array")
+                })?;
+                let function = u64::from_le_bytes(bytes.try_into().unwrap());
+                if function != 0 && function != u64::MAX {
+                    m.destructors.push(function);
+                }
+            }
+        }
+        if let Some(fini) = m.elf.fini {
+            m.destructors.push(m.memory.address + fini);
+        }
         self.backend.write(m.memory, 0, &m.image)?;
-        self.backend.finalize(m.memory, &pages)
+        self.backend.finalize(m.memory, &pages)?;
+        self.backend.register_module(&m.name, &m.elf, m.memory)?;
+        // Once mapped, relocation staging and PT_LOAD copies have no runtime
+        // purpose. Keep symbol/dependency/TLS metadata, not duplicate images.
+        m.image = Vec::new();
+        for segment in &mut m.elf.segments {
+            segment.bytes = Vec::new();
+        }
+        Ok(())
     }
+}
+fn zero_bytes(length: usize, operation: &str, library: &str) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(length).map_err(|_| {
+        error(
+            "NATIVE_MEMORY_BUDGET",
+            operation,
+            library,
+            format!("{length} bytes of native staging memory"),
+        )
+    })?;
+    bytes.resize(length, 0);
+    Ok(bytes)
 }
 fn put(bytes: &mut [u8], offset: usize, value: u64, name: &str) -> Result<()> {
     let slot = bytes.get_mut(offset..offset + 8).ok_or_else(|| {
@@ -368,5 +448,17 @@ impl CallFrame {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod staging_tests {
+    use alloc::string::ToString;
+    #[test]
+    fn oversized_staging_returns_required_bytes_instead_of_aborting() {
+        let error = super::zero_bytes(usize::MAX, "relocation image", "libany.so").unwrap_err();
+        assert_eq!(error.code, "NATIVE_MEMORY_BUDGET");
+        assert_eq!(error.library, "libany.so");
+        assert!(error.required.contains(&usize::MAX.to_string()));
     }
 }

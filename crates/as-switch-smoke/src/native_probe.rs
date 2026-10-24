@@ -33,8 +33,32 @@ impl as_native::LibrarySource for ApkLibraries {
             .entries
             .get(name)
             .ok_or_else(|| error("LIBRARY_NOT_FOUND", "load", name, "APK ARM64 entry"))?;
+        let bytes = self
+            .zip
+            .find(path)
+            .map_or(u64::MAX, |entry| entry.uncompressed_size);
+        let limit = 128u64 << 20;
+        #[cfg(target_os = "horizon")]
+        let limit = {
+            #[allow(unsafe_code)]
+            extern "C" {
+                fn as_host_memory_available() -> u64;
+                fn as_memory_stage(stage: *const core::ffi::c_char);
+            }
+            // SAFETY: scalar allocator snapshot; checkpoint is a static C string.
+            #[allow(unsafe_code)]
+            let free = unsafe {
+                as_memory_stage(c"native_extract_begin".as_ptr());
+                as_host_memory_available()
+            };
+            // Input, parsed segments and relocation image coexist temporarily.
+            limit.min(free.saturating_sub(128 << 20) / 3)
+        };
+        if bytes > limit {
+            return Err(error("NATIVE_MEMORY_BUDGET", "extract", name, alloc::format!("native entry needs {bytes} bytes; extraction budget {limit} bytes (128 MiB cap, allocator reserve and staging costs)")));
+        }
         self.zip
-            .read(path)
+            .read_bounded(path, limit)
             .map_err(|e| error(&e.code, "extract", name, e.cause))
     }
 }

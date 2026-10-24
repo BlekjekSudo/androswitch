@@ -4,6 +4,8 @@ use alloc::{collections::BTreeMap, format, string::String, vec::Vec};
 use serde::{Deserialize, Serialize};
 const MAX_IMAGE: u64 = 128 * 1024 * 1024;
 const MAX_ENTRIES: usize = 1_000_000;
+const MAX_NAME: usize = 64 << 10;
+const MAX_STRING_METADATA: usize = 64 << 20;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Abi {
     X86_64,
@@ -66,7 +68,14 @@ pub struct Elf {
     pub needed: Vec<String>,
     pub init: Option<u64>,
     pub init_array: Option<(u64, usize)>,
+    pub fini: Option<u64>,
+    pub fini_array: Option<(u64, usize)>,
     pub memory_size: u64,
+    /// Validated executable section ranges, when section headers are present.
+    /// Sectionless ELF continues to use conservative executable PT_LOAD ranges.
+    pub code_ranges: Option<Vec<(u64, u64)>>,
+    /// Canonical ELF program-header records for dl_iterate_phdr.
+    pub program_headers: Vec<u8>,
 }
 fn bad(s: impl Into<String>) -> RdError {
     RdError::new("INVALID_ELF", s)
@@ -78,20 +87,50 @@ fn bytes(d: &[u8], off: u64, n: u64) -> Result<&[u8]> {
     }
     Ok(&d[off as usize..end as usize])
 }
+fn owned_bytes(d: &[u8], offset: u64, length: u64) -> Result<Vec<u8>> {
+    let source = bytes(d, offset, length)?;
+    let mut output = Vec::new();
+    output.try_reserve_exact(source.len()).map_err(|_| {
+        RdError::new(
+            "NATIVE_MEMORY_BUDGET",
+            format!("{length} bytes for ELF segment/TLS staging"),
+        )
+    })?;
+    output.extend_from_slice(source);
+    Ok(output)
+}
 fn num(d: &[u8], off: u64, n: usize) -> Result<u64> {
     let b = bytes(d, off, n as u64)?;
     Ok(b.iter()
         .enumerate()
         .fold(0u64, |v, (i, b)| v | (u64::from(*b) << (i * 8))))
 }
-fn cstr(d: &[u8], off: u64) -> Result<String> {
-    let b = bytes(d, off, d.len() as u64 - off.min(d.len() as u64))?;
-    let end = b
-        .iter()
-        .position(|b| *b == 0)
-        .ok_or_else(|| bad("unterminated ELF string"))?;
-    String::from_utf8(b[..end].to_vec()).map_err(|_| bad("ELF symbol not UTF-8"))
+fn cstr(d: &[u8], off: u64, retained: &mut usize) -> Result<String> {
+    let tail = bytes(d, off, d.len() as u64 - off.min(d.len() as u64))?;
+    let bounded = &tail[..tail.len().min(MAX_NAME + 1)];
+    let end = bounded.iter().position(|byte| *byte == 0).ok_or_else(|| {
+        if tail.len() > MAX_NAME {
+            RdError::new(
+                "NATIVE_MEMORY_BUDGET",
+                "ELF symbol/library name exceeds 64 KiB",
+            )
+        } else {
+            bad("unterminated ELF string")
+        }
+    })?;
+    let total = retained
+        .checked_add(end)
+        .filter(|total| *total <= MAX_STRING_METADATA)
+        .ok_or_else(|| RdError::new("NATIVE_MEMORY_BUDGET", "ELF decoded names exceed 64 MiB"))?;
+    let text = core::str::from_utf8(&bounded[..end]).map_err(|_| bad("ELF symbol not UTF-8"))?;
+    let mut name = String::new();
+    name.try_reserve_exact(end)
+        .map_err(|_| RdError::new("NATIVE_MEMORY_BUDGET", format!("{end} bytes for ELF name")))?;
+    name.push_str(text);
+    *retained = total;
+    Ok(name)
 }
+
 impl Elf {
     pub fn parse(d: &[u8]) -> Result<Self> {
         if d.len() as u64 > MAX_IMAGE {
@@ -175,7 +214,7 @@ impl Elf {
                     address: va,
                     memory_size: memsz,
                     flags,
-                    bytes: bytes(d, off, filesz)?.to_vec(),
+                    bytes: owned_bytes(d, off, filesz)?,
                 });
             } else if ty == 2 {
                 dynamic = Some((off, filesz));
@@ -189,7 +228,7 @@ impl Elf {
                     return Err(bad("invalid PT_TLS"));
                 }
                 tls = Some(Tls {
-                    bytes: bytes(d, off, filesz)?.to_vec(),
+                    bytes: owned_bytes(d, off, filesz)?,
                     memory_size: memsz,
                     alignment,
                 });
@@ -261,9 +300,10 @@ impl Elf {
         } else {
             &[]
         };
+        let mut string_metadata = 0;
         let mut needed = Vec::new();
         for n in need {
-            needed.push(cstr(strings, n)?);
+            needed.push(cstr(strings, n, &mut string_metadata)?);
         }
         let mut relocations = Vec::new();
         let mut add_rels = |addr: u64, size: u64, rela: bool, entsize: u64| -> Result<()> {
@@ -274,6 +314,16 @@ impl Elf {
             if entsize != expected || size % entsize != 0 || size / entsize > MAX_ENTRIES as u64 {
                 return Err(bad("invalid relocation table size"));
             }
+            let count = (size / entsize) as usize;
+            if relocations.len().saturating_add(count) > MAX_ENTRIES {
+                return Err(bad("too many combined relocations"));
+            }
+            relocations.try_reserve_exact(count).map_err(|_| {
+                RdError::new(
+                    "NATIVE_MEMORY_BUDGET",
+                    format!("{count} ELF relocation records"),
+                )
+            })?;
             let off = vaoff(addr, size)?;
             for i in 0..size / entsize {
                 let o = off + i * entsize;
@@ -341,6 +391,20 @@ impl Elf {
             let mut address = 0u64;
             for i in 0..get(35) / word as u64 {
                 let entry = num(d, off + i * word as u64, word)?;
+                let additional = if entry & 1 == 0 {
+                    1
+                } else {
+                    (entry >> 1).count_ones() as usize
+                };
+                if relocations.len().saturating_add(additional) > MAX_ENTRIES {
+                    return Err(bad("too many combined relocations"));
+                }
+                relocations.try_reserve(additional).map_err(|_| {
+                    RdError::new(
+                        "NATIVE_MEMORY_BUDGET",
+                        format!("{additional} additional RELR records"),
+                    )
+                })?;
                 if entry & 1 == 0 {
                     address = entry;
                     relocations.push(Relocation {
@@ -429,6 +493,12 @@ impl Elf {
             return Err(bad("symbol count exceeds budget"));
         }
         let mut symbols = Vec::new();
+        symbols.try_reserve_exact(count).map_err(|_| {
+            RdError::new(
+                "NATIVE_MEMORY_BUDGET",
+                format!("{count} ELF symbol records"),
+            )
+        })?;
         if count > 0 {
             let entry = if wide { 24 } else { 16 };
             if get(11) != entry {
@@ -437,7 +507,7 @@ impl Elf {
             let off = vaoff(get(6), count as u64 * entry)?;
             for i in 0..count {
                 let p = off + i as u64 * entry;
-                let name = cstr(strings, num(d, p, 4)?)?;
+                let name = cstr(strings, num(d, p, 4)?, &mut string_metadata)?;
                 let info = num(d, p + if wide { 4 } else { 12 }, 1)?;
                 let defined = num(d, p + if wide { 6 } else { 14 }, 2)? != 0;
                 symbols.push(Symbol {
@@ -470,6 +540,102 @@ impl Elf {
         } else {
             None
         };
+        let fini_array = if get(26) != 0 {
+            if get(28) % (word as u64) != 0 || get(28) > MAX_IMAGE {
+                return Err(bad("invalid fini_array"));
+            }
+            Some((get(26), (get(28) / word as u64) as usize))
+        } else {
+            None
+        };
+        // Some Android linkers combine code, read-only constants and unwind
+        // tables in one PF_X segment. Section metadata can distinguish literal
+        // SVC-shaped data from instructions; never require it for stripped ELF.
+        let section_offset = num(d, if wide { 40 } else { 32 }, word)?;
+        let section_stride = num(d, if wide { 58 } else { 46 }, 2)?;
+        let section_count = num(d, if wide { 60 } else { 48 }, 2)?;
+        let code_ranges = if section_offset == 0 && section_count == 0 {
+            None
+        } else {
+            if section_offset == 0
+                || section_count == 0
+                || section_count > 65535
+                || section_stride < if wide { 64 } else { 40 }
+            {
+                return Err(bad("invalid section header table"));
+            }
+            bytes(
+                d,
+                section_offset,
+                section_stride
+                    .checked_mul(section_count)
+                    .ok_or_else(|| bad("section table overflow"))?,
+            )?;
+            let mut ranges = Vec::new();
+            for i in 0..section_count {
+                let at = section_offset + i * section_stride;
+                let kind = num(d, at + 4, 4)?;
+                let flags = num(d, at + 8, word)?;
+                if flags & 6 != 6 {
+                    continue;
+                }
+                let address = num(d, at + if wide { 16 } else { 12 }, word)?;
+                let offset = num(d, at + if wide { 24 } else { 16 }, word)?;
+                let size = num(d, at + if wide { 32 } else { 20 }, word)?;
+                let end = address
+                    .checked_add(size)
+                    .ok_or_else(|| bad("code section overflow"))?;
+                if kind != 1
+                    || address & 3 != 0
+                    || size & 3 != 0
+                    || !segments.iter().any(|segment| {
+                        segment.flags & 1 != 0
+                            && address >= segment.address
+                            && end <= segment.address + segment.bytes.len() as u64
+                    })
+                {
+                    return Err(bad(
+                        "executable section outside file-backed executable segment",
+                    ));
+                }
+                let section_bytes = bytes(d, offset, size)?;
+                let matched = segments.iter().any(|segment| {
+                    if address < segment.address {
+                        return false;
+                    }
+                    let start = (address - segment.address) as usize;
+                    segment
+                        .bytes
+                        .get(start..start.saturating_add(size as usize))
+                        .is_some_and(|content| content == section_bytes)
+                });
+                if !matched {
+                    return Err(bad(
+                        "executable section bytes disagree with program headers",
+                    ));
+                }
+                if size != 0 {
+                    ranges.push((address, end));
+                }
+            }
+            if ranges.is_empty() {
+                None
+            } else {
+                Some(ranges)
+            }
+        };
+        let canonical_stride = if wide { 56 } else { 32 };
+        let mut program_headers = Vec::new();
+        program_headers
+            .try_reserve_exact(phcount as usize * canonical_stride)
+            .map_err(|_| RdError::new("NATIVE_MEMORY_BUDGET", "ELF program-header registry"))?;
+        for i in 0..phcount {
+            program_headers.extend_from_slice(bytes(
+                d,
+                phoff + i * phsize,
+                canonical_stride as u64,
+            )?);
+        }
         Ok(Self {
             tls,
             abi,
@@ -479,6 +645,10 @@ impl Elf {
             needed,
             init: if get(12) == 0 { None } else { Some(get(12)) },
             init_array,
+            fini: if get(13) == 0 { None } else { Some(get(13)) },
+            fini_array,
+            code_ranges,
+            program_headers,
             memory_size: (end + 4095) & !4095,
         })
     }
@@ -499,6 +669,24 @@ pub fn relative_kind(abi: Abi) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
+    #[test]
+    fn decoded_names_have_single_and_cumulative_budgets() {
+        let mut retained = MAX_STRING_METADATA - 3;
+        assert_eq!(cstr(b"abc\0", 0, &mut retained).unwrap(), "abc");
+        assert_eq!(retained, MAX_STRING_METADATA);
+        assert_eq!(
+            cstr(b"x\0", 0, &mut retained).unwrap_err().code,
+            "NATIVE_MEMORY_BUDGET"
+        );
+        let mut large = vec![b'a'; MAX_NAME + 2];
+        large[MAX_NAME + 1] = 0;
+        assert_eq!(
+            cstr(&large, 0, &mut 0).unwrap_err().code,
+            "NATIVE_MEMORY_BUDGET"
+        );
+        assert!(cstr(&[0xff, 0], 0, &mut 0).is_err());
+    }
     #[test]
     fn rejects_truncated_and_overflow_without_panics() {
         for n in 0..256 {

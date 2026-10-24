@@ -1,0 +1,51 @@
+{
+  "architecture": "x86_64",
+  "backend": "portable-host",
+  "cases": [
+    {
+      "apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+      "error": "exception java.lang.ExceptionInInitializerError: System.loadLibrary requires native backend [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 26419, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/martinmagni/mekorama/Mekorama;-><clinit>()V",
+      "expected": "evaluate",
+      "id": "mekorama-1.7.2",
+      "package": "com.martinmagni.mekorama",
+      "parser_memory_admission": {
+        "estimated_parser_bytes": 54122782,
+        "parser_budget_bytes": 268435456,
+        "raw_dex_bytes": 14703020
+      },
+      "sessions": [],
+      "status": "blocked_execution"
+    },
+    {
+      "apk_sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+      "error": "exception java.lang.ExceptionInInitializerError: System.loadLibrary requires native backend [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 52079, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><clinit>()V",
+      "expected": "evaluate",
+      "id": "candy-crush-1.332.1.1",
+      "package": "com.king.candycrushsaga",
+      "parser_memory_admission": {
+        "estimated_parser_bytes": 120862904,
+        "parser_budget_bytes": 268435456,
+        "raw_dex_bytes": 34874388
+      },
+      "sessions": [],
+      "status": "blocked_execution"
+    }
+  ],
+  "cycles": 1,
+  "measurement_scope": "CPU software UI and managed VM heap only; excludes native Horizon GPU/audio and host side-table/C allocations; host timings are not Switch FPS",
+  "os": "windows",
+  "required_cases": 0,
+  "schema_version": 1,
+  "status": "evaluation_only",
+  "viewport": [
+    640,
+    360
+  ],
+  "scope": "Original unmodified APK install/DEX parsing/entry class initialization on portable host; no ARM64 guest execution, no first-screen pass",
+  "fixture_lock": "fixtures/m9/startup-apks.lock.json",
+  "fixture_lock_sha256": "8c2b0f827b6de22ffb32323ebc05d05ab49f6b5dc36c791abf7822604069526d",
+  "host_tool_sha256": "bee0b7e9ff38494e4e99dcea3ce33748d798edf0b5962012e41bda17a318c53e",
+  "host_tool_command": "as-corpus local-artifacts/m9/final-external-corpus.json <fresh storage> <output> 1",
+  "horizon_emulator": "not_run; user selected physical Switch test first",
+  "physical_device": "not_run_for_this_build"
+}

@@ -16,7 +16,8 @@ the packaged credits, license notices and source link when redistributing it.
 1. Extract `switch/` from the ZIP to your SD card. Keep an existing `userdata/`,
    `Android/`, `installed/` and `logs/` directory when updating the runtime.
 2. Start `switch/androswitch/androswitch.nro` with application/title override.
-   This build uses a 256 MiB homebrew heap; applet mode is not the tested target.
+   The runtime measures loader/process heap capacity and requires title mode;
+   see [Horizon memory policy](HORIZON_MEMORY.md).
 3. Press R for APKs, select a sample and press A to install. The console selects
    that app in Installed immediately; press A again to launch it.
    Plus requests a return to the console.
@@ -71,7 +72,10 @@ are not included in the normal ZIP.
 
 This alpha supports the explicitly tested framework/NDK subset, not all API 26
 classes. Device APK containers are file-backed and capped at **512 MiB**.
-Materialized entries are capped at 64 MiB; combined raw DEX at 32 MiB. A larger
+Materialized metadata/resource entries are capped at 64 MiB. Native extraction
+has a separate budget up to 128 MiB; DEX admission accounts for raw and decoded
+metadata with an adaptive parser ceiling up to 256 MiB. See [current startup
+contracts](M9_EXTERNAL_APPS.md) for exact limits and pending verification. A larger
 container can still exceed decoded memory or require missing APIs. Assets/OBB
 use positioned, bounded reads. Native libraries must be ARM64; DEX-only APKs
 need no native ABI. M8 SQLite is limited to 8 MiB per database and does not
@@ -100,7 +104,7 @@ Failed initialization also owns its VM/JNI state until bounded cleanup finishes.
 Missing native dependencies can return to the console with their original error;
 an initializer that leaves a live worker still requires process exit. This does
 not make the rejected APK compatible. See [startup failures](STARTUP_FAILURES.md)
-for the Mekorama diagnosis and the reason for the 64 MiB container budget.
+for the earlier Mekorama diagnosis and the historical 64 MiB container budget.
 
 Interactive launches write a `running` session report before executing the APK.
 Shutdown flushes each phase to `logs/teardown.log` before that operation, including

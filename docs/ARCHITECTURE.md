@@ -73,10 +73,17 @@ up to 512 MiB using an owned positional reader through the shared ZIP parser.
 Installation, registry verification, icons and execution avoid whole-container
 reads. Materialized entries, total DEX input and directory/signing metadata have
 separate budgets; see [storage improvements](M7_STORAGE_E2E.md).
-The 256 MiB product heap must also hold decoded DEX, VM objects, native source
-images/mappings and platform/media allocations. Expanding these budgets requires
-measuring decoded and native allocations independently
-of container size. Streamed OBBs and file-backed APKs use the same persistent root.
+The process heap is shared by decoded DEX, VM objects, native source
+images/mappings and platform/media allocations. Its actual capacity comes from
+the loader's heap override when supplied. The previous `__nx_heap_size = 256 MiB`
+setting was a default for the non-override path, not a fixed cap on hbloader
+sessions. The current non-override path derives a bounded heap from the process
+memory limit, retaining service/kernel headroom. Allocation snapshots and
+separate parser/native admission limits prevent container size from being
+mistaken for available runtime memory; see [Horizon memory policy and
+provenance](HORIZON_MEMORY.md). Streamed OBBs and file-backed APKs use the same
+persistent root. These changes require new execution evidence and do not
+complete M9's external-application compatibility gate.
 
 ## Lifecycle (M7)
 

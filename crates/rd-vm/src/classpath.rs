@@ -1250,6 +1250,24 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroid/os/Handler;" => Some(OBJECT),
         "Landroid/os/Looper;" => Some(OBJECT),
         "Landroid/view/Window;" => Some(OBJECT),
+        "Landroid/view/SurfaceView;" => Some(&["Landroid/view/View;", "Ljava/lang/Object;"]),
+        "Landroid/opengl/GLSurfaceView;" => Some(&[
+            "Landroid/view/SurfaceView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/opengl/GLSurfaceView$Renderer;"
+        | "Landroid/opengl/GLSurfaceView$EGLConfigChooser;"
+        | "Ljavax/microedition/khronos/egl/EGL10;"
+        | "Ljavax/microedition/khronos/egl/EGLDisplay;"
+        | "Ljavax/microedition/khronos/egl/EGLConfig;"
+        | "Ljavax/microedition/khronos/opengles/GL;"
+        | "Ljavax/microedition/khronos/opengles/GL10;"
+        | "Landroid/view/WindowManager;"
+        | "Landroid/util/DisplayMetrics;"
+        | "Landroid/app/ActivityManager;"
+        | "Landroid/content/pm/ConfigurationInfo;" => Some(OBJECT),
+        "Landroid/media/AudioManager;" | "Landroid/view/View$OnTouchListener;" => Some(OBJECT),
         "Landroid/view/ViewGroup$LayoutParams;" => Some(VIEWGROUP_LAYOUT_PARAMS),
         "Landroid/view/ViewGroup$MarginLayoutParams;" => Some(MARGIN_LAYOUT_PARAMS),
         "Landroid/widget/LinearLayout$LayoutParams;" => Some(LINEAR_LAYOUT_PARAMS),
@@ -1389,6 +1407,7 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         }
         "Ljava/lang/Class;" | "Lorg/androswitch/runtime/CollectionIterator;" => Some(OBJECT),
         "Ljava/lang/ClassLoader;" => Some(OBJECT),
+        "Ljava/lang/BootClassLoader;" => Some(&["Ljava/lang/ClassLoader;", "Ljava/lang/Object;"]),
         // M8: ServiceLoader host é um Iterable vazio enquanto a descoberta
         // `META-INF/services` do APK permanece fora do runtime.
         "Ljava/util/ServiceLoader;" => Some(OBJECT),
@@ -1426,6 +1445,9 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
 /// Interfaces de plataforma conhecidas sem DEX (issue #26: check-cast /
 /// instanceof para CharSequence/Comparable/… sobre String/StringBuilder).
 fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
+    if class == "Ljavax/microedition/khronos/opengles/GL10;" {
+        return Some(&["Ljavax/microedition/khronos/opengles/GL;"]);
+    }
     const STRING_IFACES: &[&str] = &[
         "Ljava/lang/CharSequence;",
         "Ljava/lang/Comparable;",

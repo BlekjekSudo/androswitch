@@ -14,7 +14,7 @@ Implementation and verification are independent. `pending` is not a pass.
 | M6 | NativeActivity/assets/window/input/threading/EGL/GLES2/PCM audio | supported proof subset implemented | passed shared contracts; Android reference pending | passed native/mixed media corpus | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
 | M7 | Console launcher/verified session teardown; scan/install/launch/return/update/uninstall; one copy-ready folder | implemented for the alpha corpus; failed-startup cleanup added | passed package workflow | console workflow / ten completed sessions; startup and boundary evidence in reports | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
 | M8 | SharedPreferences/native SQLite/reflection/collections/permissions; independent APK integration | bounded shared contracts implemented; wider integration ongoing | contract/JVM/persistence/fault tests; see candidate report | pending for new build | SQLite readable / SharedPreferences working — user reported 2026-10-24; detailed scenario results not recorded |
-| M9 | Offline v0.1 corpus/lifecycle stress/benchmarks/copy-ready package/evidence matrix | validation candidate tooling/package; release gate incomplete | repeated corpus/measurements in candidate report | prepared 24-session scenario; not run | candidate tested — user reported 2026-10-24; Candy Crush installs but launch blocked by 32 MiB DEX guard; full gate incomplete |
+| M9 | Offline v0.1 corpus/lifecycle stress/benchmarks/copy-ready package/evidence matrix; independent first-screen gate | general DEX/memory/native/GLSurfaceView startup improvements in progress; release gate incomplete | repeated candidate corpus; both frozen game APKs reach native-backend boundary on host | prepared scenarios; current source not executed | previous candidate tested — user reported 2026-10-24; new implementation not yet tested; full gate incomplete |
 | M10 | DNS/socket/TLS/HTTP(S), Java/native networking and split APKs | planned | pending | pending | pending |
 | M11 | Higher API/GLES3/engine ecosystem; separate ARM32/x86 research | planned | pending | pending | pending |
 | M12 | Physical Switch stability, suspend/resume, handheld/docked, migrations, v1.0 | planned | pending | pending | pending |
@@ -46,8 +46,12 @@ corpus, original AOSP sample, external Vector Pinball evaluation, measurements,
 and a copy-ready candidate. The user now confirms working SQLite and
 SharedPreferences on Switch, with no detailed scenario/binary identity supplied.
 **M9 is not marked complete:** full regression evidence and broader independent
-compatibility remain open. Candy Crush launch is blocked before execution by the
-32 MiB combined raw DEX guard. See [hardware feedback](HARDWARE_FEEDBACK.md) and
+compatibility remain open. The tested candidate blocked Candy Crush before
+execution at its 32 MiB raw DEX guard. Current source replaces that guard with
+decoded admission accounting and adds shared native/GL startup contracts.
+The immediate additional M9 gate is a recognizable first screen and safe Plus
+return for both frozen Mekorama and Candy Crush APKs; it is still pending.
+See [independent-app status](M9_EXTERNAL_APPS.md), [hardware feedback](HARDWARE_FEEDBACK.md) and
 [M8/M9 contracts, exact limits and reproduction](M8_M9_E2E.md).
 
 M0's nine verification commands passed (144 test executions across feature,

@@ -330,6 +330,32 @@ impl Zip {
         self.read_entry(entry)
     }
 
+    /// Explicit caller-owned materialization budget, for large native images.
+    /// Default metadata/resource reads retain the archive's smaller entry cap.
+    pub fn read_bounded(&self, name: &str, limit: u64) -> RdResult<Vec<u8>> {
+        let entry = self
+            .find(name)
+            .ok_or_else(|| RdError::missing_entry(name))?;
+        if entry.uncompressed_size > limit {
+            return Err(RdError::new(
+                "ZIP_ENTRY_MEMORY_BUDGET",
+                alloc::format!(
+                    "{} needs {} bytes; explicit extraction budget is {} bytes",
+                    name,
+                    entry.uncompressed_size,
+                    limit
+                ),
+                crate::MODULE_ID,
+            ));
+        }
+        if entry.method == METHOD_STORED && entry.compressed_size != entry.uncompressed_size {
+            return Err(RdError::invalid_format(
+                "stored entry size mismatch before allocation",
+            ));
+        }
+        self.read_entry_limited(entry, limit)
+    }
+
     /// A bounded reader over shared APK bytes. DEFLATE keeps a 32 KiB dictionary;
     /// seeking backwards restarts inflation instead of materializing the asset.
     pub fn stream(&self, name: &str) -> RdResult<ZipStream> {
@@ -380,7 +406,10 @@ impl Zip {
     }
 
     pub fn read_entry(&self, entry: &ZipEntry) -> RdResult<Vec<u8>> {
-        if self.is_file_backed() && entry.uncompressed_size > self.max_entry_bytes {
+        self.read_entry_limited(entry, self.max_entry_bytes)
+    }
+    fn read_entry_limited(&self, entry: &ZipEntry, limit: u64) -> RdResult<Vec<u8>> {
+        if self.is_file_backed() && entry.uncompressed_size > limit {
             return Err(RdError::invalid_format(
                 "zip: entry exceeds materialization budget; use streaming",
             ));
@@ -943,6 +972,29 @@ mod tests {
         let err = zip.read("f.txt").unwrap_err();
         assert_eq!(err.code, "INVALID_FORMAT");
         assert!(err.cause.contains("CRC"));
+    }
+
+    #[test]
+    fn explicit_entry_budget_is_enforced_before_read_and_preserves_crc_validation() {
+        let content = b"an entry read under a caller-owned allocation budget";
+        let bytes = handcrafted_zip(content, "lib.so");
+        let zip = Zip::parse(bytes.clone()).unwrap();
+        let err = zip
+            .read_bounded("lib.so", content.len() as u64 - 1)
+            .unwrap_err();
+        assert_eq!(err.code, "ZIP_ENTRY_MEMORY_BUDGET");
+        assert_eq!(
+            zip.read_bounded("lib.so", content.len() as u64).unwrap(),
+            content
+        );
+        let mut corrupt = bytes;
+        corrupt[30 + "lib.so".len()] ^= 1;
+        let zip = Zip::parse(corrupt).unwrap();
+        assert!(zip
+            .read_bounded("lib.so", content.len() as u64)
+            .unwrap_err()
+            .cause
+            .contains("CRC"));
     }
 
     #[test]

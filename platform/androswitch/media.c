@@ -3,6 +3,9 @@
  * derived from AOSP NDK r28c (Apache-2.0). No APK identity is consulted. */
 #include "media.h"
 #include "../../third_party/android/jni.h"
+#include "bionic_errno.h"
+#include "glsurface.h"
+#include "media_format.h"
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <errno.h>
@@ -23,10 +26,12 @@ static int window_token, assets_token, queue_token;
 static AsActivity *active_activity;
 static void *owner;
 static int failure(int code) {
-  media_failure = code;
+  __atomic_store_n(&media_failure, code, __ATOMIC_RELEASE);
   return code;
 }
-int as_media_error(void) { return media_failure; }
+int as_media_error(void) {
+  return __atomic_load_n(&media_failure, __ATOMIC_ACQUIRE);
+}
 int as_media_finished(void) { return finish_requested; }
 uint64_t as_media_frames(void) {
   return __atomic_load_n(&submitted_frames, __ATOMIC_ACQUIRE);
@@ -49,7 +54,7 @@ static int64_t asset_op(uint32_t op, uint64_t id, const char *name,
   int64_t rc = as_guest_asset(op, id, name, offset, origin, data, length);
   as_jni_vm_unlock();
   if (rc < 0)
-    errno = (int)-rc;
+    errno = as_errno_from_android((int)-rc);
   return rc;
 }
 static Asset *asset_open(void *manager, const char *name, int mode) {
@@ -59,7 +64,6 @@ static Asset *asset_open(void *manager, const char *name, int mode) {
   }
   int64_t id = asset_op(0, 0, name, 0, 0, NULL, 0);
   if (id < 0) {
-    errno = (int)-id;
     return NULL;
   }
   Asset *a = calloc(1, sizeof(*a));
@@ -484,6 +488,132 @@ static EGLBoolean guest_terminate(EGLDisplay d) {
   return ok;
 }
 static uint64_t media_lookup(const char *name);
+int as_media_egl_initialize(AsEglSurface *s) {
+  memset(s, 0, sizeof(*s));
+  EGLDisplay d = guest_display(EGL_DEFAULT_DISPLAY);
+  if (d == EGL_NO_DISPLAY)
+    return -2310;
+  s->display = (uint64_t)d;
+  return eglInitialize(d, NULL, NULL) && eglBindAPI(EGL_OPENGL_ES_API) ? 0
+                                                                       : -2310;
+}
+int as_media_egl_create(AsEglSurface *s, uint64_t selected, int version) {
+  if (!s->display || !selected || version != 2)
+    return -EINVAL;
+  EGLDisplay d = (EGLDisplay)s->display;
+  EGLConfig config = (EGLConfig)selected;
+  s->config = selected;
+  EGLint a[] = {EGL_CONTEXT_CLIENT_VERSION, version, EGL_NONE};
+  s->surface = (uint64_t)guest_surface(d, config, &window_token, NULL);
+  if (!s->surface)
+    return -2311;
+  s->context = (uint64_t)guest_context(d, config, EGL_NO_CONTEXT, a);
+  if (!s->context ||
+      !guest_make_current(d, (EGLSurface)s->surface, (EGLSurface)s->surface,
+                          (EGLContext)s->context))
+    return -2312;
+  if (!eglQuerySurface(d, (EGLSurface)s->surface, EGL_WIDTH, &s->width) ||
+      !eglQuerySurface(d, (EGLSurface)s->surface, EGL_HEIGHT, &s->height))
+    return -2313;
+  glViewport(0, 0, s->width, s->height);
+  return 0;
+}
+int as_media_egl_swap(AsEglSurface *s) {
+  return guest_swap((EGLDisplay)s->display, (EGLSurface)s->surface) ? 0 : -2314;
+}
+int as_media_egl_suspend(AsEglSurface *s) {
+  EGLDisplay d = (EGLDisplay)s->display;
+  if (!d || !s->context)
+    return -EINVAL;
+  if (bound_context &&
+      !guest_make_current(d, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT))
+    return -2315;
+  if (s->surface) {
+    if (!guest_destroy_surface(d, (EGLSurface)s->surface))
+      return -2317;
+    s->surface = 0;
+  }
+  return 0;
+}
+int as_media_egl_resume(AsEglSurface *s) {
+  if (!s->display || !s->context || !s->config || s->surface)
+    return -EINVAL;
+  EGLDisplay d = (EGLDisplay)s->display;
+  s->surface =
+      (uint64_t)guest_surface(d, (EGLConfig)s->config, &window_token, NULL);
+  if (!s->surface)
+    return -2311;
+  if (!guest_make_current(d, (EGLSurface)s->surface, (EGLSurface)s->surface,
+                          (EGLContext)s->context))
+    return -2312;
+  if (!eglQuerySurface(d, (EGLSurface)s->surface, EGL_WIDTH, &s->width) ||
+      !eglQuerySurface(d, (EGLSurface)s->surface, EGL_HEIGHT, &s->height))
+    return -2313;
+  glViewport(0, 0, s->width, s->height);
+  return 0;
+}
+int as_media_egl_close(AsEglSurface *s) {
+  EGLDisplay d = (EGLDisplay)s->display;
+  if (!d)
+    return 0;
+  int error = 0;
+  // A failed unbind leaves GPU ownership unproved; never destroy live
+  // resources.
+  if (bound_context &&
+      !guest_make_current(d, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT))
+    return -2315;
+  if (s->context) {
+    if (!guest_destroy_context(d, (EGLContext)s->context))
+      error = -2316;
+    else
+      s->context = 0;
+  }
+  if (s->surface) {
+    if (!guest_destroy_surface(d, (EGLSurface)s->surface))
+      error = -2317;
+    else
+      s->surface = 0;
+  }
+  if (!error && !guest_terminate(d))
+    error = -2318;
+  if (!error)
+    memset(s, 0, sizeof(*s));
+  return error;
+}
+int as_media_egl_choose(uint64_t d, const int32_t *a, size_t n,
+                        uint64_t *configs, size_t capacity, int32_t *count) {
+  if ((EGLDisplay)d != display || !a || !n || n > 129 || !(n & 1) ||
+      a[n - 1] != EGL_NONE || capacity > 64 || (capacity && !configs) || !count)
+    return -EINVAL;
+  for (size_t i = 0; i + 1 < n; i += 2)
+    if (a[i] == EGL_NONE)
+      return -EINVAL;
+  EGLConfig found[64];
+  EGLint total = 0;
+  if (!eglChooseConfig((EGLDisplay)d, a, capacity ? found : NULL, capacity,
+                       &total))
+    return -2319;
+  if (total < 0 || (capacity && (size_t)total > capacity))
+    return -EIO;
+  if (capacity)
+    for (int i = 0; i < total; i++)
+      configs[i] = (uint64_t)found[i];
+  *count = total;
+  return 0;
+}
+int as_media_egl_attrib(uint64_t d, uint64_t c, int32_t attribute,
+                        int32_t *value) {
+  if ((EGLDisplay)d != display || !c || !value)
+    return -EINVAL;
+  return eglGetConfigAttrib((EGLDisplay)d, (EGLConfig)c, attribute, value)
+             ? 0
+             : -2320;
+}
+int as_media_keep_screen_on(int enabled) {
+  appletSetAutoSleepDisabled(enabled != 0);
+  return 0;
+}
+void as_media_gl_fail(int code) { failure(code); }
 static void *guest_proc(const char *name) {
   uint64_t fn = media_lookup(name);
   return fn ? (void *)as_native_veneer(fn) : NULL;
@@ -829,6 +959,8 @@ int as_media_reset(void) {
   as_sl_reset();
   if (current_bindings || window_refs || looper_refs > 1)
     return -EBUSY;
+  as_media_format_reset();
+  appletSetAutoSleepDisabled(false);
   if (audio.id && as_audio_close(audio.id))
     return -EIO;
   while (streams) {
@@ -868,10 +1000,14 @@ int as_media_reset(void) {
 }
 int as_media_library(const char *name) {
   return !strcmp(name, "libEGL.so") || !strcmp(name, "libGLESv2.so") ||
-         !strcmp(name, "libaaudio.so") || !strcmp(name, "libOpenSLES.so");
+         !strcmp(name, "libmediandk.so") || !strcmp(name, "libaaudio.so") ||
+         !strcmp(name, "libOpenSLES.so");
 }
 int as_media_quiesce(void) {
   extern int as_sl_quiesce(void);
+  int gl = as_glsurface_quiesce();
+  if (gl)
+    return gl;
   return as_sl_quiesce();
 }
 #define API(n, f)                                                              \
@@ -971,5 +1107,7 @@ static uint64_t media_lookup(const char *name) {
 uint64_t as_media_import(const char *name) {
   extern uint64_t as_sl_import(const char *);
   uint64_t address = media_lookup(name);
+  if (!address)
+    address = as_media_format_import(name);
   return address ? address : as_sl_import(name);
 }

@@ -15,6 +15,7 @@
 extern crate alloc;
 
 pub mod annotations;
+pub mod budget;
 pub mod classes;
 pub mod code;
 pub mod debug;

@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "cross_compile": {
+    "command": [
+      "wsl",
+      "-d",
+      "Ubuntu",
+      "--",
+      "make",
+      "-C",
+      "/mnt/d/Dev/Switch/AndroSwitch/platform/androswitch",
+      "/mnt/d/Dev/Switch/AndroSwitch/local-artifacts/reference/autorun/glsurface.o",
+      "OUTPUT_DIR=/mnt/d/Dev/Switch/AndroSwitch/local-artifacts/reference/autorun"
+    ],
+    "compiler": "WSL Ubuntu /opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc 16.1.0",
+    "additional_windows_compiler": "devkitA64 15.2.0 -Wall -Wextra -Werror passed",
+    "status": "passed_translation_unit_compile",
+    "object_sha256": "2f10b6776e90f4f3aca2f547e8c58060959e3253b6bd4d41a4768b0df7772328",
+    "exit_code": 0,
+    "warnings_as_errors": true
+  },
+  "source_base_commit": "dd06ba65922f56aa6d99d7da19729f2e22dd5f29",
+  "source_state": "working_tree_frozen_by_file_hashes",
+  "verification_scope": {
+    "worker": "production C source",
+    "egl": "fake EGL ownership functions",
+    "physical_device": "not_run_for_these_source_hashes",
+    "horizon_graphics": "not_executed",
+    "ryujinx": "not_run",
+    "m9_status": "incomplete_external_game_execution_gate",
+    "platform": "fake libnx boundary",
+    "threads": "actual host pthreads",
+    "full_product_link": "tracked_separately_by_build_receipt",
+    "vm_jni": "fake callbacks; no real VM, GC or JNI objects"
+  },
+  "changes": [
+    "Restore live session for JNI detach after guest TLS cleanup clears the native TLS context.",
+    "Pair framework destroy notifications once per successfully closed context generation.",
+    "Serialize join ownership; retain VM/session owners on timeout or join/thread-close errors.",
+    "Latch uncertain EGL close/suspend ownership failures until process exit.",
+    "Pause preserving context releases only the EGL surface; resume emits Changed without Created."
+  ],
+  "date": "2026-10-24",
+  "references": {
+    "libnx": "https://github.com/switchbrew/libnx/blob/v4.12.0/nx/source/kernel/thread.c",
+    "android": "https://github.com/aosp-mirror/platform_frameworks_base/blob/android-8.0.0_r1/opengl/java/android/opengl/GLSurfaceView.java"
+  },
+  "follows": "reports/horizon-memory-glsurface-host-20261024.json",
+  "source_files": [
+    {
+      "sha256": "b5b71277d370cc120e7d4df5daa70f1e9a4955a1a95b612f5da7b7f139a76522",
+      "path": "platform/androswitch/glsurface.c"
+    },
+    {
+      "sha256": "6e70700a421a9a675b9418fd40fdadb0cb792265b1f1bf288d0ff01d24de080b",
+      "path": "platform/androswitch/glsurface.h"
+    },
+    {
+      "sha256": "40a564097ce57cde24da21bb6c2d80f0039ca149d686d7ffe61218d2caae45cd",
+      "path": "platform/androswitch/tests/glsurface_worker.c"
+    },
+    {
+      "sha256": "e99a17f4c8c5d7322beec6acccc00ac67b8ff4c19e51ebabe142978d3857ba18",
+      "path": "platform/androswitch/tests/fake-switch/switch.h"
+    }
+  ],
+  "host": {
+    "status": "passed_contract_tests",
+    "log": "local-artifacts/reference/autorun/glsurface-host-tests-v2.log",
+    "compiler": "C:/w64devkit/bin/gcc.exe (GCC) 16.2.0",
+    "compile": [
+      "gcc",
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-pthread",
+      "-Iplatform/androswitch/tests/fake-switch",
+      "-Iplatform/switch-smoke",
+      "platform/androswitch/tests/glsurface_worker.c",
+      "platform/androswitch/glsurface.c",
+      "-o",
+      "local-artifacts/reference/autorun/test-glsurface-worker.exe"
+    ],
+    "scenarios": [
+      "invalid",
+      "create-failure",
+      "start-failure",
+      "start-close-failure",
+      "normal",
+      "pause-preserve",
+      "pause-recreate",
+      "pause-exit",
+      "pause-before-create",
+      "pause-preserve-exit",
+      "pause-toggle-discard",
+      "suspend-failure",
+      "resume-failure",
+      "queue-before-context",
+      "initialize-failure",
+      "choose-failure",
+      "egl-create-failure",
+      "attach-failure",
+      "callback-failure",
+      "queue-failure",
+      "poll-failure",
+      "close-failure",
+      "self-join",
+      "wait-failure",
+      "thread-close-failure",
+      "timeout",
+      "concurrent-join"
+    ],
+    "run_pattern": [
+      "local-artifacts/reference/autorun/test-glsurface-worker.exe",
+      "<each scenario>"
+    ],
+    "all_exit_codes": 0,
+    "log_sha256": "9b604fd6e1bb11310e1118972c8bb196088fde64e8491bb9e565390aee022a18",
+    "scenario_count": 27
+  }
+}

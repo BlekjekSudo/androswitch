@@ -1,7 +1,9 @@
 # AndroSwitch: mulai dari satu NRO
 
 Ini kandidat validasi M9. Baseline M1–M7 sudah dikonfirmasi diuji di Switch asli.
-Build baru dengan storage/M8/M9 belum diuji ulang di Ryujinx atau Switch.
+Kandidat sebelumnya juga mendapat laporan bahwa instalasi APK besar, SQLite,
+dan SharedPreferences berjalan. Perubahan memori/native/GLSurfaceView yang baru
+belum diuji di Switch; kedua game belum memiliki bukti layar pertama.
 Pengguna sebelumnya
 melaporkan empat contoh bisa dibuka di Switch asli, termasuk animasi dan beep;
 pengguna kemudian mengonfirmasi perbaikan display menyelesaikan crash Plus dan
@@ -34,14 +36,22 @@ Kandidat ini menyertakan tujuh contoh: empat contoh sebelumnya, preferences,
 catatan SQLite, dan HelloActivity asli AOSP. Buka preferences/catatan beberapa
 kali untuk memeriksa data tetap tersimpan, lalu periksa kembali tombol Plus.
 
-Batas 64 MiB pada alpha lama sudah diganti pembacaan APK bertahap. Batas container
-kini 512 MiB; entry yang dimuat utuh tetap maksimal 64 MiB, total DEX mentah
-32 MiB, database SQLite 8 MiB. Heap runtime 256 MiB juga dipakai VM, library
-dan media, sehingga APK lebih besar belum tentu bisa berjalan. OBB dibaca bertahap.
-Mekorama 1.7.2 berukuran sekitar 12,5 MiB, tetapi gagal karena dependency native
-`libstdc++.so` belum tersedia. Runtime sekarang membersihkan startup gagal sebelum
-kembali ke console bila aman; ini belum berarti Mekorama bisa dimainkan.
+Batas container kini 512 MiB dengan pembacaan bertahap. Metadata/resource yang
+dimuat utuh tetap dibatasi 64 MiB; native memakai anggaran terpisah hingga
+128 MiB. DEX diperiksa berdasarkan estimasi raw dan decoded metadata, dengan
+batas parser hingga 256 MiB serta cadangan allocator. Heap mengikuti loader
+atau kapasitas proses yang diukur; 256 MiB adalah default lama, bukan kapasitas
+yang selalu dipakai. Database SQLite tetap 8 MiB; OBB dibaca bertahap.
+ABI C++ bersama dan GLSurfaceView baru menambah jalur startup untuk evaluasi
+Mekorama/Candy Crush; ini belum berarti kedua game sudah terbukti terbuka.
 Lihat [diagnosis dan pengujian startup](https://github.com/BlekjekSudo/androswitch/blob/main/docs/STARTUP_FAILURES.md).
+
+Untuk tes kandidat ini, pertahankan data lama, lalu coba Mekorama dan Candy
+Crush dari APK milikmu. Keduanya tidak dibundel. Setelah setiap percobaan,
+salin folder `logs/` sebelum mencoba game berikutnya agar laporan sesi tidak
+tertimpa. Catat layar terakhir yang terlihat dan hasil tombol Plus.
+`memory.log`, `memory-admission.json`, `native-compatibility.json` dan
+`session-report.json` membantu memisahkan batas memori dari API yang belum ada.
 
 Jika worker native tidak mau berhenti, runtime mencatat alasan lalu menutup
 proses Horizon. Buka ulang homebrew untuk melihat pemberitahuan gangguan.

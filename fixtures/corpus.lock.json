@@ -3,6 +3,13 @@
   "frozen_on": "2026-10-23",
   "fixtures": [
     {
+      "id": "m9-independent-first-screen",
+      "source_lock": "fixtures/m9/startup-apks.lock.json",
+      "state": "user_apks_frozen_execution_pending",
+      "milestone": "M9",
+      "note": "Mekorama and Candy Crush original local APK evaluation; proprietary binaries are not redistributed."
+    },
+    {
       "id": "fdroid-inspect",
       "role": "real APK inspection; not an execution compatibility claim",
       "source_url": "https://f-droid.org/repo/org.fdroid.fdroid_2000052.apk",

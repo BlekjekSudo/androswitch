@@ -14,7 +14,7 @@ all: $(OUTPUT_DIR)/androswitch-smoke.nro
 $(OUTPUT_DIR):
 	mkdir -p "$@"
 
-$(OUTPUT_DIR)/main.o: main.c | $(OUTPUT_DIR)
+$(OUTPUT_DIR)/main.o: main.c ../androswitch/memory_policy.h | $(OUTPUT_DIR)
 	$(CC) $(ARCH) -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -c "$<" -o "$@"
 
 $(OUTPUT_DIR)/fs.o: fs.c | $(OUTPUT_DIR)
@@ -35,8 +35,28 @@ $(OUTPUT_DIR)/bionic_io.o: bionic_io.c native.h | $(OUTPUT_DIR)
 $(OUTPUT_DIR)/bionic_sync.o: bionic_sync.c native.h | $(OUTPUT_DIR)
 	$(CC) $(ARCH) -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -c "$<" -o "$@"
 
-$(OUTPUT_DIR)/androswitch-smoke.elf: $(OUTPUT_DIR)/main.o $(OUTPUT_DIR)/fs.o $(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/native_call.o $(OUTPUT_DIR)/jni.o $(OUTPUT_DIR)/bionic_io.o $(OUTPUT_DIR)/bionic_sync.o $(RUST_LIBRARY) Makefile
-	$(CC) $(ARCH) -specs=$(LIBNX)/switch.specs -L$(LIBNX)/lib $(OUTPUT_DIR)/main.o $(OUTPUT_DIR)/fs.o $(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/native_call.o $(OUTPUT_DIR)/jni.o $(OUTPUT_DIR)/bionic_io.o $(OUTPUT_DIR)/bionic_sync.o -Wl,--start-group "$(RUST_LIBRARY)" -lnx -lm -Wl,--end-group -o "$@"
+$(OUTPUT_DIR)/bionic_cxx.o: bionic_cxx.c bionic_cxx.h | $(OUTPUT_DIR)
+	$(CC) $(ARCH) -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -c "$<" -o "$@"
+
+$(OUTPUT_DIR)/bionic_libc.o: bionic_libc.c native.h | $(OUTPUT_DIR)
+	$(CC) $(ARCH) -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -c "$<" -o "$@"
+
+$(OUTPUT_DIR)/bionic_keys.o: bionic_keys.c bionic_cxx.h | $(OUTPUT_DIR)
+	$(CC) $(ARCH) -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -c "$<" -o "$@"
+
+$(OUTPUT_DIR)/bionic_log.o: bionic_log.c bionic_cxx.h native.h | $(OUTPUT_DIR)
+	$(CC) $(ARCH) -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -c "$<" -o "$@"
+
+$(OUTPUT_DIR)/bionic_vfs.o: bionic_vfs.c bionic_vfs.h bionic_cxx.h native.h | $(OUTPUT_DIR)
+	$(CC) $(ARCH) -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -c "$<" -o "$@"
+
+$(addprefix $(OUTPUT_DIR)/,native.o bionic_io.o bionic_cxx.o bionic_keys.o bionic_libc.o bionic_log.o bionic_vfs.o bionic_sync.o): bionic_cxx.h bionic_errno.h bionic_vfs.h
+
+$(OUTPUT_DIR)/missing_import.o: missing_import.c bionic_cxx.h native.h | $(OUTPUT_DIR)
+	$(CC) $(ARCH) -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -c "$<" -o "$@"
+
+$(OUTPUT_DIR)/androswitch-smoke.elf: $(OUTPUT_DIR)/main.o $(OUTPUT_DIR)/fs.o $(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/native_call.o $(OUTPUT_DIR)/jni.o $(OUTPUT_DIR)/bionic_io.o $(OUTPUT_DIR)/bionic_sync.o $(OUTPUT_DIR)/bionic_cxx.o $(OUTPUT_DIR)/bionic_libc.o $(OUTPUT_DIR)/bionic_keys.o $(OUTPUT_DIR)/bionic_log.o $(OUTPUT_DIR)/bionic_vfs.o $(OUTPUT_DIR)/missing_import.o $(RUST_LIBRARY) Makefile
+	$(CC) $(ARCH) -specs=$(LIBNX)/switch.specs -L$(LIBNX)/lib $(OUTPUT_DIR)/main.o $(OUTPUT_DIR)/fs.o $(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/native_call.o $(OUTPUT_DIR)/jni.o $(OUTPUT_DIR)/bionic_io.o $(OUTPUT_DIR)/bionic_sync.o $(OUTPUT_DIR)/bionic_cxx.o $(OUTPUT_DIR)/bionic_libc.o $(OUTPUT_DIR)/bionic_keys.o $(OUTPUT_DIR)/bionic_log.o $(OUTPUT_DIR)/bionic_vfs.o $(OUTPUT_DIR)/missing_import.o -Wl,--start-group "$(RUST_LIBRARY)" -lnx -lm -Wl,--end-group -o "$@"
 
 $(OUTPUT_DIR)/androswitch-smoke.nacp: Makefile | $(OUTPUT_DIR)
 	$(TOOLS)/nacptool --create "AndroSwitch Runtime Proof" "AndroSwitch" "0.1.0" "$@"

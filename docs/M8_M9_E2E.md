@@ -1,5 +1,11 @@
 # M8 contracts and M9 validation candidate
 
+This document describes the recorded candidate before the external-app startup
+work. Its fixed 32 MiB DEX and 256 MiB default heap descriptions below are
+historical. The current source policy, frozen game inputs and pending execution
+gate are documented in [M9 external applications](M9_EXTERNAL_APPS.md) and
+[Horizon memory](HORIZON_MEMORY.md). Existing candidate reports stay immutable.
+
 This candidate extends the history-preserving **RustyDroid** fork with shared
 storage/framework contracts and a repeatable corpus. It is **not a completed
 v0.1 release gate**. On 2026-10-24 the user confirmed testing the later candidate
@@ -131,7 +137,8 @@ The exact APK version/hash and combined DEX byte count were not supplied.
 The current parser retains each complete raw DEX plus decoded strings,
 tables and indexes. Method bodies already have an on-demand code cache.
 The VM's 64 MiB managed heap budget is separate from those allocations; the
-product NRO configures a 256 MiB homebrew heap shared with other runtime costs.
+recorded candidate set a 256 MiB default heap. libnx can instead honor an
+hbloader-supplied heap override, so actual physical capacity was not established.
 Neither number is a measurement of free RAM or sufficient headroom for this APK.
 
 The next compatibility work should measure load/parse/index/VM/native/media

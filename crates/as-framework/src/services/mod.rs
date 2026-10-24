@@ -1,6 +1,8 @@
 use super::*;
 mod collections;
 mod database;
+pub(super) mod glsurface;
+mod package;
 mod permissions;
 mod preferences;
 mod reflection;
@@ -8,6 +10,8 @@ pub(super) struct Services {
     collections: collections::Collections,
     preferences: preferences::PreferenceService,
     database: database::DatabaseService,
+    pub(super) glsurface: glsurface::GlSurfaces,
+    package_metadata: package::PackageService,
     package: String,
     fs: Rc<dyn as_platform::fs::FileSystem>,
 }
@@ -19,6 +23,8 @@ impl Services {
             collections: Default::default(),
             preferences: preferences::PreferenceService::new(store.clone()),
             database: database::DatabaseService::new(store),
+            glsurface: Default::default(),
+            package_metadata: Default::default(),
             package: apk.manifest.package.clone(),
             fs,
         })
@@ -26,7 +32,13 @@ impl Services {
     pub(super) fn flush(&self) -> Result<()> {
         self.preferences.flush()
     }
-    pub(super) fn attach(&self, vm: &Engine, class: &str, r: ObjRef) -> Result<bool> {
+    pub(super) fn bind_package_source(&self, package: &str, path: String) -> Result<()> {
+        self.package_metadata.bind_source(package, path)
+    }
+    pub(super) fn attach(&self, vm: &mut Engine, class: &str, r: ObjRef) -> Result<bool> {
+        if self.glsurface.attach(vm, class, r)? {
+            return Ok(true);
+        }
         if self.database.attach(vm, class, r) {
             return Ok(true);
         }
@@ -63,6 +75,13 @@ impl Services {
         sig: &str,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        if self.glsurface.in_callback() && class == "Ljava/lang/Thread;" && name == "currentThread"
+        {
+            return Err(error(
+                "API_UNAVAILABLE",
+                "Java Thread identity for the platform GL worker",
+            ));
+        }
         if let Some(value) = reflection::call_static(vm, class, name, sig, args)? {
             return Ok(Some(value));
         }
@@ -128,6 +147,15 @@ impl Services {
         if let Some(value) = reflection::call(self, vm, class, name, sig, r, args)? {
             return Ok(Some(value));
         }
+        if let Some(value) = self.glsurface.call(android, vm, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
+        if let Some(value) = self
+            .package_metadata
+            .call(self, android, vm, name, sig, r, args)?
+        {
+            return Ok(Some(value));
+        }
         if let Some(value) = permissions::call(android, vm, name, sig, r, args)? {
             return Ok(Some(value));
         }
@@ -145,6 +173,8 @@ impl Services {
     pub(super) fn roots(&self) -> Vec<ObjRef> {
         let mut roots = self.preferences.roots();
         roots.extend(self.collections.roots());
+        roots.extend(self.package_metadata.roots());
+        roots.extend(self.glsurface.roots());
         roots
     }
     pub(super) fn references(&self, r: ObjRef) -> Vec<ObjRef> {
@@ -154,6 +184,7 @@ impl Services {
         refs
     }
     pub(super) fn collect(&self, marked: &[bool]) {
+        self.glsurface.collect(marked);
         self.collections.collect(marked);
         self.preferences.collect(marked);
         self.database.collect(marked);

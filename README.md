@@ -23,8 +23,10 @@ Plus crash and startup stall. This is sample-level user feedback; see
 [hardware feedback](docs/HARDWARE_FEEDBACK.md).
 The user has also confirmed M1–M7 testing on physical Switch. In a later M7–M9
 candidate test, an APK larger than 65 MB installs, SQLite is readable and
-SharedPreferences works. Candy Crush launch is blocked by the separate 32 MiB
-combined raw DEX guard. This is scoped user feedback; full candidate regression
+SharedPreferences works. That tested build blocked Candy Crush at its separate
+32 MiB raw DEX guard. The current source adds measured heap/admission policy,
+general native ABI work and a shared GLSurfaceView path; new Horizon execution
+is pending. See [M9 independent-app work](docs/M9_EXTERNAL_APPS.md). Full candidate regression
 and independent compatibility gates remain open.
 M8 adds persistent XML SharedPreferences, native SQLite, boxed collections and
 DEX method reflection. M9 adds a repeated host corpus, external APK evaluation
@@ -54,15 +56,20 @@ require missing Android APIs. The M7 improvement source accepts file-backed APKs
 on device, API 26 or lower minimum SDK, and ARM64 native libraries. A 128 MiB
 container passes host install/launch/restart tests. Large APK installation is
 also user-reported on Switch; full device/emulator scenarios remain open.
-Combined raw DEX is separately capped at **32 MiB**. DEX, native mappings and media retain
-separate budgets within the current 256 MiB heap. OBB files stream separately.
+DEX admission now accounts for raw and decoded metadata under a load-dependent
+parser budget (up to 256 MiB), with a separate raw ceiling up to 128 MiB. The
+heap honors loader-provided bounds or measured process capacity; 256 MiB was
+the previous default, not a guaranteed hardware heap size. Native materialization
+has its own budget. See [memory policy](docs/HORIZON_MEMORY.md). OBBs stream separately.
 Network, Google Play Services, split APKs, WebView and modern
 engine compatibility are not established. There is no per-game configuration.
 Inherited RustyDroid capabilities are not automatically Switch capabilities.
 Read the [compatibility inventory](docs/ANDROSWITCH_COMPATIBILITY.md) and
 [M2–M4 implementation and evidence guide](docs/M2_M4_E2E.md) for the exact scope.
-Mekorama 1.7.2 currently fails during class initialization on an unavailable
-`libstdc++.so` dependency. Installation is not a compatibility guarantee; see
+The earlier Mekorama 1.7.2 build failed during class initialization on an
+unavailable `libstdc++.so` dependency. Shared C++ ABI support is now being
+validated; neither Mekorama nor Candy Crush has a new first-screen pass yet.
+Installation is not a compatibility guarantee; see
 [startup-failure diagnosis and recovery](docs/STARTUP_FAILURES.md).
 See [M7 storage improvements](docs/M7_STORAGE_E2E.md) for the new I/O path and limits.
 

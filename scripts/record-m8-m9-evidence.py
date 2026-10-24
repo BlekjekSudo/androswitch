@@ -1,5 +1,6 @@
 """Record measured candidate evidence; missing Horizon gates remain missing."""
 import datetime
+import argparse
 import hashlib
 import json
 import os
@@ -9,6 +10,15 @@ import statistics
 import subprocess
 
 root = Path(__file__).resolve().parent.parent
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--output", default="reports/m8-m9-candidate.json", help="New report path relative to repository root")
+parser.add_argument("--physical-test-first", action="store_true", help="Record an explicit request to test this candidate on physical Switch next")
+args = parser.parse_args()
+output = (root / args.output).resolve()
+if not output.is_relative_to(root):
+    parser.error("output must stay inside the repository")
+if args.output != "reports/m8-m9-candidate.json" and output.exists():
+    parser.error("choose a fresh report path; existing observations will not be replaced")
 git = os.environ.get("GIT_EXECUTABLE", "C:/Program Files/Git/cmd/git.exe" if os.name == "nt" else "git")
 def command(*args):
     return subprocess.check_output([git, *args], cwd=root).decode().strip()
@@ -95,5 +105,6 @@ report = {
     "source_inputs": [{"path":path,"sha256":sha(path)} for path in sources],
     "open_gates": ["Execute new NRO Horizon regression: workflow, startup, quiescence and m9 24-session corpus", "Record Horizon startup/frame/total-memory measurements", "Test new preferences/database/large-container/return behavior on physical Switch", "Independent NDK sample integration and wider Android-reference semantics", "Resolve Vector Pinball's observed API blocker and any subsequent failures before claiming gameplay"],
 }
-(root / "reports/m8-m9-candidate.json").write_text(json.dumps(report, indent=2, ensure_ascii=False)+"\n", encoding="utf-8")
-print("reports/m8-m9-candidate.json")
+report["external_first_screen_gate"] = {"state":"not_verified", "fixture_lock":"fixtures/m9/startup-apks.lock.json", "required":["Mekorama recognizable first screen and safe Plus return", "Candy Crush recognizable first screen and safe Plus return"], "emulator":"not_run_by_this_host_evidence_collector", "requested_next_backend":"physical_switch" if args.physical_test_first else None}
+output.write_text(json.dumps(report, indent=2, ensure_ascii=False)+"\n", encoding="utf-8")
+print(output.relative_to(root).as_posix())

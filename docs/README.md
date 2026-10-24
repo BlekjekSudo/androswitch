@@ -1,5 +1,9 @@
 # AndroSwitch documentation
 
+Current M9 work: [independent application startup](M9_EXTERNAL_APPS.md) and
+[Horizon memory policy / Autorun reference](HORIZON_MEMORY.md). New host contract
+results are separate from pending external-game emulator/hardware execution.
+
 - [M2–M4 persistent storage and native JNI proof](M2_M4_E2E.md)
 - [Immutable package revisions ADR](adr/013-persistent-package-revisions.md)
 - [Horizon native/JNI boundary ADR](adr/014-native-horizon-jni.md)

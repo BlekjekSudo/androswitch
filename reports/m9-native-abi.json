@@ -1,0 +1,217 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T08:45:51.0216239Z",
+  "base_commit": "dd06ba65922f56aa6d99d7da19729f2e22dd5f29",
+  "source_state": "working_tree_with_source_hashes",
+  "status": "host_contracts_and_switch_c_compile_passed",
+  "implementation": [
+    "ELF symbol-kind-aware data/function imports, bounded decoded metadata, fallible staging allocations and release of duplicate PT_LOAD images",
+    "Validated optional code sections distinguish instruction-shaped unwind data from real Linux SVC; sectionless binaries retain conservative scan",
+    "Real legacy C++ allocation, guards, DSO/TLS destructors, pthread keys/once, stdio identity, fortify and shared VFS operations",
+    "Production AArch64 bridge preserves argument banks, stack arguments, x18, nested TLS context and four-vector aggregate return registers; Android/newlib errno translation",
+    "Opt-in Horizon deferred unresolved strong function binding with named nonreturning failure, strict weak/data/default backends and explicit compatibility report"
+  ],
+  "checks": [
+    {
+      "name": "portable_c_abi_contracts",
+      "command": "./scripts/test-native-abi.ps1 (C contract stage)",
+      "status": "passed",
+      "scope": "Actual C helpers with pthread hooks and modeled VM filesystem/log/callback adapters; named trap handler called on host, ARM veneer bytes verified",
+      "cases": [
+        "DSO selective/reentrant LIFO",
+        "TLS and pthread-key destructor rounds",
+        "concurrent guards and once",
+        "allocation and fortify failure",
+        "legacy and modern stdio identity/reopen",
+        "VFS stat/access/scandir/rename",
+        "Android/syslog routing",
+        "deferred import names owned and nonreturning failure"
+      ]
+    },
+    {
+      "name": "arm64_cpu_bridge_and_errno",
+      "command": "python -X utf8 scripts/test-native-bridge.py --errno-object local-artifacts/m9/native-abi/errno-oracle.o",
+      "status": "passed",
+      "scope": "Production native_call.S with modeled host callback clobbers; optional pure errno conversion code compiled against actual Switch/newlib. Not libnx/emulator/device execution.",
+      "cases": [
+        {
+          "case": "import_registers_stack_hfa_return",
+          "status": "passed",
+          "errno_helper_calls": [
+            [
+              "enter",
+              1
+            ],
+            [
+              "leave",
+              1
+            ]
+          ]
+        },
+        {
+          "case": "nested_callback",
+          "status": "passed",
+          "errno_helper_calls": [
+            [
+              "enter",
+              1
+            ],
+            [
+              "enter",
+              2
+            ],
+            [
+              "leave",
+              2
+            ],
+            [
+              "leave",
+              1
+            ]
+          ]
+        },
+        {
+          "case": "actual_switch_newlib_errno_translation",
+          "status": "passed",
+          "host_codes": [
+            88,
+            45,
+            134,
+            116,
+            139,
+            92,
+            11,
+            12,
+            22,
+            5
+          ],
+          "android_codes": [
+            38,
+            35,
+            95,
+            110,
+            75,
+            40,
+            11,
+            12,
+            22,
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "name": "switch_c_objects",
+      "command": "wsl.exe -d Ubuntu -- bash -lc \"cd /mnt/d/Dev/Switch/AndroSwitch && make -C platform/androswitch ../../local-artifacts/product/native.o ../../local-artifacts/product/native_call.o ../../local-artifacts/product/bionic_cxx.o ../../local-artifacts/product/bionic_libc.o ../../local-artifacts/product/bionic_io.o ../../local-artifacts/product/bionic_keys.o ../../local-artifacts/product/bionic_log.o ../../local-artifacts/product/bionic_vfs.o ../../local-artifacts/product/bionic_sync.o ../../local-artifacts/product/missing_import.o\"",
+      "status": "passed",
+      "scope": "devkitA64/libnx compile with -Wall -Wextra -Werror; native_call.o and unchanged helper objects may be up to date; no link or device execution claim"
+    },
+    {
+      "name": "native_loader",
+      "command": "cargo test -p as-native --locked -- --include-ignored",
+      "status": "passed",
+      "tests_passed": 8,
+      "scope": "2 unit tests plus 6 loader tests; all ignored NDK fixture tests included, including strict/deferred/weak/data symbol binding, section metadata, destructor order and released staging"
+    },
+    {
+      "name": "no_std_elf_parser",
+      "command": "cargo test -p rd-ndk --no-default-features --lib --locked",
+      "status": "passed",
+      "tests_passed": 3,
+      "scope": "no_std+alloc ELF parser: individual/cumulative decoded-name budgets, malformed/truncated/overflow rejection, fuzz prefixes"
+    },
+    {
+      "name": "shared_vfs",
+      "command": "cargo test -p as-platform --locked",
+      "status": "passed",
+      "tests_passed": 2
+    },
+    {
+      "name": "focused_clippy",
+      "command": "cargo clippy -p as-native -p as-platform -p rd-ndk --lib --tests --locked -- -D warnings",
+      "status": "passed"
+    },
+    {
+      "name": "format",
+      "command": "cargo fmt --check -p as-native -p rd-ndk -p as-platform -p as-switch-smoke",
+      "status": "passed"
+    },
+    {
+      "name": "diff_whitespace",
+      "command": "git diff --check -- crates/as-native crates/as-platform/src/vfs.rs crates/rd-ndk/src/elf.rs crates/as-switch-smoke/src/device_native.rs crates/as-switch-smoke/src/device_jni.rs crates/as-switch-smoke/src/application.rs platform/switch-smoke platform/androswitch/Makefile",
+      "status": "passed"
+    }
+  ],
+  "verification": {
+    "host": "passed",
+    "horizon_build": "C_objects_passed_full_link_separate",
+    "physical_switch": "not_run",
+    "real_apk_launch": "not_verified",
+    "ryujinx": "not_run",
+    "unicorn_cpu": "passed"
+  },
+  "limits": [
+    "Deferred imports remain unimplemented and terminate with exact library/symbol on first invocation; mapping is not API compatibility",
+    "Unresolved weak references remain zero; unresolved objects/TLS/ambiguous non-PLT names stay load errors; default backend remains strict",
+    "Unknown dependency libraries remain load errors; no fabricated library providers or successful decoder results",
+    "Direct Linux syscalls are not executed on Horizon; code-section validation is not a native security sandbox",
+    "C++ exception unwinding, SCS execution and direct guest FILE layout access remain unsupported/unverified",
+    "VFS timestamps currently use epoch; utime and atomic replacement of an existing destination explicitly fail with ENOSYS",
+    "New checks cover contracts and CPU semantics, not full APK/game behavior or physical Switch validation"
+  ],
+  "source_sha256": {
+    "crates/as-native/src/lib.rs": "a16ddcb57f53c32584729b0122eefc84a0012698f343ddd63a6b51b511d10322",
+    "crates/as-native/src/oracle.rs": "f4197fd5f63b9e2d8725ccfb6dfa8ca09fbf80182476537100bd860d560cd501",
+    "crates/as-native/tests/loader.rs": "12d21a48197d1d2f2e06ba552bd60c2bc0b13d889ce9b3383d31fb85948049c4",
+    "crates/rd-ndk/src/elf.rs": "6ec80b8a708a9eb63be4f5cb0b38455afef4289e6d3fe578bbed7a5511d1cbaa",
+    "crates/as-platform/src/vfs.rs": "bbb9adaccf9071b1e68c8c2cc550a0366d1eddf5f9c3003b7a9ea663b0bc49dc",
+    "crates/as-switch-smoke/src/device_native.rs": "ac037e9b780b6b114a1d2aa7257ee450526bc268881e517a97457f38ace892e2",
+    "crates/as-switch-smoke/src/device_jni.rs": "f93611c5d3a146a221c760ed420985fcf89a6b678060c7d3078c7afef47244e2",
+    "crates/as-switch-smoke/src/application.rs": "ecc23c5a33b0053d6ac25b8a617ca5ff8c10cd342726e8ccc8085f166e2aa7dd",
+    "platform/switch-smoke/native.c": "0c0ec1e3320e6eca41625f708a152de994659f5cbac52fae43ac2b61a50ea2ea",
+    "platform/switch-smoke/native_call.S": "e03f715b48d10e20b738f1a5c0b18f41b49b68be537c0b31705afdc5f58cc0a7",
+    "platform/switch-smoke/native.h": "e4cc4b945568b4e9f31c31bdfd487ef71e599fc003ec3f94861188ddb33e1c45",
+    "platform/switch-smoke/bionic_cxx.c": "3c502b7861c03e66c3793163c8b27eef549fd08ffbb5d8a9a44d429fd35d7ab1",
+    "platform/switch-smoke/bionic_cxx.h": "f1eb7d91c7814ead90e9ffd80ef6b13e27c694093c34324f4255032449600ba8",
+    "platform/switch-smoke/bionic_errno.h": "90e38d62b19d5620798088fc5cb90182ada8db662d1aef1f491217ce541acaa8",
+    "platform/switch-smoke/bionic_io.c": "3da25c2ae1507ae18c9bfa0514888398c48844d566bde4d6b1078a1021ea818f",
+    "platform/switch-smoke/bionic_keys.c": "b2cd45bcd618857e7cd17fb4a41321b33282f6f005f25b2d94149842e5f8d013",
+    "platform/switch-smoke/bionic_libc.c": "181d3ec34cc85d7ba11f9a0067daa1fd13c5adc22dd9190bd30080d020176fb2",
+    "platform/switch-smoke/bionic_log.c": "482751931c109e9568e729e4feed381da6ca78b9917e03397cee37548f3b65cd",
+    "platform/switch-smoke/bionic_vfs.c": "70f38081218037dc3b44dfac3a095fed11766b7b4bdd7a6742ea8d8bd9fbf834",
+    "platform/switch-smoke/bionic_vfs.h": "b9459f022f76b5c702f31cd282ccc3092d7ae5f10cada7b0b22c4bdae6c46db2",
+    "platform/switch-smoke/bionic_sync.c": "6d0bf287e476f535a49fc7dd76ff922785a038e653fb77dbe403894405e83aa7",
+    "platform/switch-smoke/missing_import.c": "10ba3b123332d5e2b39cff9562b58192d7cc055a81304f11447738ef0a22ea0b",
+    "platform/switch-smoke/Makefile": "4d9d93cd7cd4f2ca1caa9848ad8ee2eb2d6483716735754fa5932745c70b4c1d",
+    "platform/androswitch/Makefile": "8abd37206046d5f07fdbf41b11ee5e5a10741ad1e762099161824df9627f4abf",
+    "scripts/test-native-abi.ps1": "a663fb740c3634f2f7696b7c74f337055650706a7617cd1cdc7dd130099b05d8",
+    "scripts/test-native-bridge.py": "bda89bcf32410821e4bf72c6f87f380b971975eb0309a7e3225178b80d9f8c70",
+    "fixtures/m9/native-abi/contracts.c": "ec73b18b77203a02b9ed2eb43204c8576c59f0099481de65bc94d8db5ff8032c",
+    "fixtures/m9/native-abi/bridge_probe.S": "b9bd65f2353860f0a6ae6961b9aebd44cfd3b814a711d8b920fb114ca3b227b3",
+    "fixtures/m9/native-abi/errno_probe.c": "3be753fd3e5cda05234d5b1af7b1c1d6d76a9f76f05fbc43d349a6d0996769d2",
+    "fixtures/m9/native-abi/elf_data.c": "5403a561ac516d67b34e8044b3a9b36b1018e864fa54dee43a219fcb6ee4213e"
+  },
+  "prerequisites": [
+    "Android NDK 28.2.13676358 API26 clang",
+    "WSL Ubuntu cc with pthreads and devkitA64/libnx",
+    "Python3 Unicorn2.1.4",
+    "Existing stripped libraries from scripts/build-m3-fixture.ps1 for prior loader regressions"
+  ],
+  "fixture_or_test_artifact_sha256": {
+    "local-artifacts/m3/fixture/libarithmetic.so": "75496a32436a27349ccc29b6be15bf0287488b93da27e314d701ca53802e6feb",
+    "local-artifacts/m3/fixture/libcalculation.so": "0a8da74ef79350d8bece2d432dfe7a6f50be91ade726457ccfc99908ef4f1e30",
+    "local-artifacts/m3/fixture/libthreadstate.so": "c71005beecd4979e3541a155078582005a11c2145ee209350113f7b3cce21624",
+    "local-artifacts/m9/native-abi/libliteral.so": "966964ff0e253ed7a2a1409aa840c87fbf6264776c52677956e9ae5096d3ab84",
+    "local-artifacts/m9/native-abi/libsyscall.so": "613404da5e776a2b29296e503a4a812a3aea05604de384375d68d2896d3062ec",
+    "local-artifacts/m9/native-abi/errno-oracle.o": "041bdfded2e6a3391933738888c1db681411b856c94c3a98de27e0d71c7de51c",
+    "local-artifacts/m9/native-abi/bridge-oracle.elf": "9605cd021a1df0bbb7079e9b12acf33eecc2e2ef84e54ae02b630425398aade2",
+    "local-artifacts/m9/native-abi/contracts": "7e2d5afd6c42bfd3726f6534c4896532fab99a149c5f26d28ae6c9cf178fac11"
+  },
+  "toolchain": {
+    "switch_c_compiler": "/opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc",
+    "android_ndk": "28.2.13676358",
+    "cpu_oracle": "Unicorn 2.1.4 on Python3.12",
+    "android_api": 26,
+    "host_rust": "1.97.1-x86_64-pc-windows-gnu"
+  }
+}

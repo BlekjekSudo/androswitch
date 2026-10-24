@@ -10,6 +10,8 @@ mod application;
 #[cfg(target_os = "horizon")]
 pub mod device_fs;
 #[cfg(target_os = "horizon")]
+mod device_graphics;
+#[cfg(target_os = "horizon")]
 pub mod device_jni;
 #[cfg(target_os = "horizon")]
 pub mod device_native;

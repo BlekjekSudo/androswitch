@@ -1,5 +1,7 @@
 #include "framebuffer_copy.h"
+#include "glsurface.h"
 #include "media.h"
+#include "memory.h"
 #include <inttypes.h>
 #include <malloc.h>
 #include <stdint.h>
@@ -7,7 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <switch.h>
-size_t __nx_heap_size = 256 * 1024 * 1024;
 static u32 pinned_map_fd, pinned_fence_fd;
 static unsigned display_generation, display_frames;
 static bool display_monitor;
@@ -253,11 +254,34 @@ static int close_application(uint64_t app) {
 int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
+  as_memory_log("process_start");
+  if (!as_memory_runtime_ready()) {
+    as_memory_log("application_override_required");
+    consoleInit(NULL);
+    printf("AndroSwitch: MEMORY_LAUNCH_MODE\n\n"
+           "Use application/title override to launch AndroSwitch.\n"
+           "The runtime requires an application process and at least 256 MiB "
+           "of heap.\n"
+           "Current heap capacity: %" PRIu64 " MiB.\n\nPress + to exit.\n",
+           as_host_heap_capacity() / UINT64_C(1048576));
+    padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+    PadState error_pad;
+    padInitializeDefault(&error_pad);
+    while (appletMainLoop()) {
+      padUpdate(&error_pad);
+      if (padGetButtonsDown(&error_pad) & HidNpadButton_Plus)
+        break;
+      consoleUpdate(NULL);
+    }
+    consoleExit(NULL);
+    return 1;
+  }
   FILE *request = fopen("sdmc:/switch/androswitch/runtime/launch.json", "rb");
   bool direct = request != NULL;
   if (request)
     fclose(request);
   uint64_t shell = direct ? 0 : as_shell_open(), app = 0;
+  as_memory_log("launcher_open");
   if (!direct && !shell)
     return 1;
   unsigned display_services __attribute__((cleanup(close_display_services))) =
@@ -291,12 +315,15 @@ int main(int argc, char **argv) {
         framebufferClose(&fb);
         framebuffer_open = false;
       }
+      as_memory_log("application_open_begin");
       app = as_runtime_open();
+      as_memory_log("application_open_end");
       launch = false;
       if (app && as_runtime_failed(app)) {
         if (close_application(app))
           svcExitProcess();
         app = 0;
+        as_memory_log("application_start_failed_closed");
       }
       if (!app) {
         if (as_native_session())
@@ -319,7 +346,7 @@ int main(int argc, char **argv) {
             break;
           as_shell_returned(shell, 0);
         }
-      } else {
+      } else if (!as_glsurface_running()) {
         if (open_framebuffer(&fb)) {
           close_application(app);
           app = 0;
@@ -338,7 +365,7 @@ int main(int argc, char **argv) {
     bool stop = app && (state < 0 || state == 1 || (!direct && state == 2) ||
                         (down & HidNpadButton_Plus));
     if (stop) {
-      bool from_egl = native != NULL;
+      bool from_egl = native != NULL || as_glsurface_running();
       if (framebuffer_open) {
         framebufferClose(&fb);
         framebuffer_open = false;
@@ -347,6 +374,7 @@ int main(int argc, char **argv) {
         svcExitProcess();
       app = 0;
       native = NULL;
+      as_memory_log("application_closed");
       if (direct)
         break;
       display_monitor = from_egl;
@@ -403,7 +431,7 @@ int main(int argc, char **argv) {
       touching = false;
     }
     uint64_t checksum;
-    if (native) {
+    if (native || (app && as_glsurface_running())) {
       checksum = as_media_frames();
       svcSleepThread(1000000);
     } else if (!present(&fb,
@@ -431,5 +459,6 @@ int main(int argc, char **argv) {
     svcExitProcess();
   if (shell)
     as_shell_close(shell);
+  as_memory_log("process_exit");
   return 0;
 }

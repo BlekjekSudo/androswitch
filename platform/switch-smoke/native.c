@@ -4,6 +4,8 @@
  * implemented in Rust, without game hooks. Remaining AndroSwitch code: MIT OR
  * Apache-2.0. */
 #include "native.h"
+#include "bionic_cxx.h"
+#include "bionic_errno.h"
 #include <errno.h>
 #include <malloc.h>
 #include <math.h>
@@ -12,6 +14,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <switch.h>
+extern uint64_t as_bionic_keys_import(const char *);
+extern int as_bionic_keys_thread_finalize(void);
+extern int as_bionic_keys_reset(void);
+extern void as_native_record_worker_error(int error);
 
 typedef struct Mapping {
   void *backing, *address;
@@ -19,6 +25,9 @@ typedef struct Mapping {
   VirtmemReservation *reservation;
   int mapped;
   uint8_t *executable;
+  char *library_name;
+  void *program_headers;
+  size_t program_header_count;
   struct Mapping *next;
 } Mapping;
 static Handle own_process;
@@ -31,12 +40,13 @@ typedef struct GuestAllocation {
   struct GuestAllocation *next;
 } GuestAllocation;
 static GuestAllocation *guest_allocations;
-static void *guest_malloc(size_t size) {
+static void *guest_aligned_allocate(size_t alignment, size_t size) {
   if (size > (128u << 20)) {
     errno = ENOMEM;
     return NULL;
   }
-  void *p = malloc(size ? size : 1);
+  void *p = alignment > 16 ? memalign(alignment, size ? size : 1)
+                           : malloc(size ? size : 1);
   if (!p)
     return NULL;
   GuestAllocation *entry = malloc(sizeof(*entry));
@@ -51,6 +61,20 @@ static void *guest_malloc(size_t size) {
   guest_allocations = entry;
   mutexUnlock(&resource_mutex);
   return p;
+}
+static void *guest_malloc(size_t size) {
+  return guest_aligned_allocate(16, size);
+}
+static int guest_posix_memalign(void **output, size_t alignment, size_t size) {
+  if (!output || alignment < sizeof(void *) || (alignment & (alignment - 1)))
+    return EINVAL;
+  int saved = errno;
+  void *pointer = guest_aligned_allocate(alignment, size);
+  errno = saved;
+  if (!pointer)
+    return ENOMEM;
+  *output = pointer;
+  return 0;
 }
 static void guest_free(void *p) {
   if (!p)
@@ -279,9 +303,82 @@ void as_native_release(uint64_t token) {
   mutexUnlock(&resource_mutex);
   free(m->backing);
   free(m->executable);
+  free(m->library_name);
+  free(m->program_headers);
   free(m);
 }
 
+int as_native_register_module(uint64_t token, const char *name,
+                              const uint8_t *headers, size_t length) {
+  Mapping *mapping = (void *)token;
+  if (!mapping || !mapping->mapped || !length || length % 56 ||
+      length / 56 > 4096 || mapping->library_name || strlen(name) > 65536)
+    return -EINVAL;
+  char *owned_name = strdup(name);
+  void *owned_headers = malloc(length);
+  if (!owned_name || !owned_headers) {
+    free(owned_name);
+    free(owned_headers);
+    return -ENOMEM;
+  }
+  memcpy(owned_headers, headers, length);
+  mutexLock(&resource_mutex);
+  mapping->library_name = owned_name;
+  mapping->program_headers = owned_headers;
+  mapping->program_header_count = length / 56;
+  mutexUnlock(&resource_mutex);
+  return 0;
+}
+typedef struct {
+  uint64_t address;
+  const char *name;
+  const void *headers;
+  uint16_t header_count;
+} GuestPhdrInfo;
+_Static_assert(sizeof(GuestPhdrInfo) == 32, "Android API 26 dl_phdr_info ABI");
+static int guest_iterate_phdr(uint64_t callback, uint64_t argument) {
+  if (!callback) {
+    errno = EINVAL;
+    return -1;
+  }
+  mutexLock(&resource_mutex);
+  size_t count = 0;
+  for (Mapping *m = mappings; m; m = m->next)
+    if (m->library_name)
+      ++count;
+  GuestPhdrInfo *snapshot = calloc(count ? count : 1, sizeof(*snapshot));
+  if (!snapshot) {
+    mutexUnlock(&resource_mutex);
+    errno = ENOMEM;
+    return -1;
+  }
+  size_t at = 0;
+  for (Mapping *m = mappings; m; m = m->next)
+    if (m->library_name)
+      snapshot[at++] =
+          (GuestPhdrInfo){(uint64_t)m->address, m->library_name,
+                          m->program_headers, m->program_header_count};
+  mutexUnlock(&resource_mutex);
+  int result = 0;
+  for (size_t i = 0; i < count; ++i) {
+    AsNativeCall frame = {0};
+    frame.function = callback;
+    frame.integer[0] = (uint64_t)&snapshot[i];
+    frame.integer[1] = sizeof(GuestPhdrInfo);
+    frame.integer[2] = argument;
+    int rc = as_native_call(&frame);
+    if (rc) {
+      free(snapshot);
+      as_native_trap(rc);
+      return -1;
+    }
+    result = (int)frame.result_integer[0];
+    if (result)
+      break;
+  }
+  free(snapshot);
+  return result;
+}
 extern void as_native_import_bridge(void);
 extern void as_native_tlsdesc(void);
 extern void as_native_call_asm(AsNativeCall *);
@@ -290,7 +387,7 @@ extern void as_native_call_asm(AsNativeCall *);
 typedef struct Context {
   void *session;
   uint8_t *guest;
-  int error;
+  int error, android_errno;
   jmp_buf *escape;
   uint64_t thread_identity;
   struct EmulatedTls *emulated;
@@ -302,8 +399,29 @@ static __thread Context context;
  */
 typedef struct {
   uint64_t host_tp, guest_tp, depth, returns[128], saved_x19[128];
+  int saved_errno[128];
+  uint64_t saved_x18[128];
 } ImportBridge;
 _Static_assert(sizeof(ImportBridge) < 4096 - 32, "bridge prefix capacity");
+_Static_assert(offsetof(ImportBridge, returns) == 24,
+               "assembly bridge returns");
+_Static_assert(offsetof(ImportBridge, saved_x19) == 1048,
+               "assembly bridge x19");
+_Static_assert(offsetof(ImportBridge, saved_errno) == 2072,
+               "assembly bridge errno");
+_Static_assert(offsetof(ImportBridge, saved_x18) == 2584,
+               "assembly bridge x18");
+_Static_assert(offsetof(AsNativeCall, function) == 416,
+               "assembly function ABI");
+_Static_assert(offsetof(AsNativeCall, guest_tls) == 424, "assembly TLS ABI");
+void as_native_errno_enter(ImportBridge *bridge) {
+  bridge->saved_errno[bridge->depth - 1] = errno;
+  errno = as_errno_from_android(context.android_errno);
+}
+void as_native_errno_leave(ImportBridge *bridge) {
+  context.android_errno = as_errno_to_android(errno);
+  errno = bridge->saved_errno[bridge->depth - 1];
+}
 static uint8_t tls_template[65536];
 static size_t tls_used = 256;
 typedef struct EmulatedTls {
@@ -349,6 +467,13 @@ static void *guest_tls_address(const uint64_t *index) {
   return (void *)(as_native_guest_tls() + tls_modules[index[0]] + index[1]);
 }
 void as_native_thread_cleanup(void) {
+  int cxx_error = as_bionic_cxx_thread_finalize();
+  if (!cxx_error)
+    cxx_error = as_bionic_keys_thread_finalize();
+  if (cxx_error) {
+    as_native_fail(cxx_error);
+    as_native_record_worker_error(cxx_error);
+  }
   while (context.emulated) {
     EmulatedTls *entry = context.emulated;
     context.emulated = entry->next;
@@ -373,8 +498,17 @@ static void guest_thread_main(void *argument) {
   AsNativeCall call = {0};
   call.function = thread->function;
   call.integer[0] = thread->argument;
-  as_native_call(&call);
+  int call_error = as_native_call(&call);
+  if (call_error)
+    as_native_record_worker_error(call_error);
   thread->result = call.result_integer[0];
+  int cxx_error = as_bionic_cxx_thread_finalize();
+  if (!cxx_error)
+    cxx_error = as_bionic_keys_thread_finalize();
+  if (cxx_error) {
+    as_native_fail(cxx_error);
+    as_native_record_worker_error(cxx_error);
+  }
   while (context.emulated) {
     EmulatedTls *entry = context.emulated;
     context.emulated = entry->next;
@@ -387,7 +521,7 @@ static void guest_thread_main(void *argument) {
 static int guest_pthread_create(uint64_t *out, const void *attributes,
                                 void *(*function)(void *), void *argument) {
   if (attributes) {
-    return ENOTSUP;
+    return as_errno_to_android(ENOTSUP);
   }
   GuestThread *thread = calloc(1, sizeof(*thread));
   if (!thread)
@@ -426,7 +560,7 @@ static int guest_pthread_join(uint64_t handle, void **result) {
   }
   if (handle == context.thread_identity) {
     mutexUnlock(&resource_mutex);
-    return EDEADLK;
+    return as_errno_to_android(EDEADLK);
   }
   found->joining = 1;
   mutexUnlock(&resource_mutex);
@@ -452,6 +586,33 @@ static uint64_t guest_pthread_self(void) {
   return context.thread_identity ? context.thread_identity
                                  : (uint64_t)threadGetCurHandle();
 }
+/* C++ ABI registry synchronization uses host TLS, including when waiting on
+ * another guest thread's static initialization. */
+static Mutex cxx_mutex;
+static CondVar cxx_condition;
+void as_cxx_lock(void) { mutexLock(&cxx_mutex); }
+void as_cxx_unlock(void) { mutexUnlock(&cxx_mutex); }
+void as_cxx_wait(void) { condvarWait(&cxx_condition, &cxx_mutex); }
+void as_cxx_wake(void) { condvarWakeAll(&cxx_condition); }
+uint64_t as_cxx_thread(void) { return guest_pthread_self(); }
+void *as_cxx_allocate(size_t size) { return guest_malloc(size); }
+void as_cxx_deallocate(void *pointer) { guest_free(pointer); }
+void as_cxx_trap(int error) { as_native_trap(error); }
+int as_cxx_invoke(uint64_t function, uint64_t argument) {
+  AsNativeCall frame = {0};
+  frame.function = function;
+  frame.integer[0] = argument;
+  int rc = as_native_call(&frame);
+  errno = as_errno_from_android(context.android_errno);
+  return rc;
+}
+int as_native_finalize_thread_callbacks(void) {
+  int rc = as_bionic_cxx_thread_finalize();
+  if (!rc)
+    rc = as_bionic_keys_thread_finalize();
+  return rc;
+}
+int as_native_finalize_callbacks(void) { return as_bionic_cxx_finalize(); }
 static uint64_t guard = 0x6173577463684a4e;
 uint64_t as_native_guest_tls(void) {
   if (!context.guest) {
@@ -493,6 +654,7 @@ uint64_t as_native_tls(size_t module, const uint8_t *bytes, size_t length,
 }
 uint64_t as_native_tlsdesc_address(void) { return (uint64_t)as_native_tlsdesc; }
 int as_native_call(AsNativeCall *frame) {
+  int host_errno = errno;
   frame->guest_tls = as_native_guest_tls();
   if (!frame->guest_tls)
     return -ENOMEM;
@@ -506,6 +668,7 @@ int as_native_call(AsNativeCall *frame) {
     as_native_call_asm(frame);
   context.escape = previous;
   bridge->depth = bridge_depth;
+  errno = host_errno;
   return context.error;
 }
 
@@ -535,13 +698,40 @@ static void stack_fail(void) {
   as_native_fail(-1001);
   abort();
 }
-static int *guest_errno(void) { return &errno; }
+static int guest_getpid(void) {
+  u64 id;
+  if (R_FAILED(svcGetProcessId(&id, CUR_PROCESS_HANDLE)) || id > INT32_MAX) {
+    errno = EOVERFLOW;
+    return -1;
+  }
+  return (int)id;
+}
+static int guest_gettid(void) {
+  u64 id;
+  if (R_FAILED(svcGetThreadId(&id, CUR_THREAD_HANDLE)) || id > INT32_MAX) {
+    errno = EOVERFLOW;
+    return -1;
+  }
+  return (int)id;
+}
+static long guest_syscall(long number, ...) {
+  if (number == 172)
+    return guest_getpid();
+  if (number == 178)
+    return guest_gettid();
+  /* All other Linux calls require explicit adapters. Never issue a Horizon
+   * SVC with Linux's syscall number or pretend an unsupported call succeeded.
+   */
+  errno = ENOSYS;
+  return -1;
+}
+static int *guest_errno(void) { return &context.android_errno; }
 extern uint64_t as_bionic_io_import(const char *name);
 extern uint64_t as_media_import(const char *name) __attribute__((weak));
 extern int as_media_library(const char *name) __attribute__((weak));
 int as_native_library(const char *name) {
-  const char *base[] = {"libc.so", "libm.so", "libdl.so", "liblog.so",
-                        "libandroid.so"};
+  const char *base[] = {"libc.so",   "libm.so",       "libdl.so",
+                        "liblog.so", "libandroid.so", "libstdc++.so"};
   for (size_t i = 0; i < sizeof(base) / sizeof(base[0]); i++)
     if (!strcmp(name, base[i]))
       return 1;
@@ -588,7 +778,7 @@ int as_native_quiesce(uint64_t timeout_ns) {
 }
 int as_native_reset(void) {
   as_teardown_phase("native_resource_reset");
-  if (guest_threads)
+  if (guest_threads || as_bionic_cxx_reset() || as_bionic_keys_reset())
     return -EBUSY;
   extern int as_bionic_sync_reset(void);
   if (as_bionic_sync_reset())
@@ -605,6 +795,12 @@ int as_native_reset(void) {
     guest_free(guest_allocations->pointer);
   extern void as_bionic_io_reset(void);
   as_bionic_io_reset();
+  extern void as_native_missing_reset(void);
+  as_native_missing_reset();
+  extern void as_bionic_libc_reset(void);
+  as_bionic_libc_reset();
+  extern void as_bionic_log_reset(void);
+  as_bionic_log_reset();
   as_teardown_phase("native_tls_reset");
   while (context.emulated) {
     EmulatedTls *e = context.emulated;
@@ -625,13 +821,17 @@ int as_native_reset(void) {
   return 0;
 }
 uint64_t as_native_import(const char *name) {
-  if (!strcmp(name, "__stack_chk_guard"))
-    return (uint64_t)&guard;
+
   struct {
     const char *name;
     void *function;
   } imports[] = {{"malloc", guest_malloc},
                  {"calloc", guest_calloc},
+                 {"posix_memalign", guest_posix_memalign},
+                 {"dl_iterate_phdr", guest_iterate_phdr},
+                 {"getpid", guest_getpid},
+                 {"gettid", guest_gettid},
+                 {"syscall", guest_syscall},
                  {"realloc", guest_realloc},
                  {"free", guest_free},
                  {"strdup", guest_strdup},
@@ -661,9 +861,36 @@ uint64_t as_native_import(const char *name) {
   for (size_t i = 0; i < sizeof(imports) / sizeof(imports[0]); i++)
     if (!strcmp(name, imports[i].name))
       return (uint64_t)imports[i].function;
-  uint64_t address = as_bionic_io_import(name);
+  extern uint64_t as_bionic_vfs_import(const char *);
+  extern uint64_t as_bionic_log_import(const char *);
+  extern uint64_t as_bionic_libc_import(const char *);
+  uint64_t address = as_bionic_libc_import(name);
+  if (!address)
+    address = as_bionic_vfs_import(name);
+  if (!address)
+    address = as_bionic_log_import(name);
+  if (!address)
+    address = as_bionic_cxx_import(name);
+  if (!address)
+    address = as_bionic_io_import(name);
   extern uint64_t as_bionic_sync_import(const char *);
   if (!address)
     address = as_bionic_sync_import(name);
+  if (!address)
+    address = as_bionic_keys_import(name);
   return address ? address : (as_media_import ? as_media_import(name) : 0);
+}
+
+/* Data symbols never receive function veneers: their address is the value used
+ * by ELF relocations, not a callable import bridge. */
+uint64_t as_native_data_import(const char *name) {
+  if (!strcmp(name, "__stack_chk_guard"))
+    return (uint64_t)&guard;
+  uint64_t address = as_bionic_cxx_data(name);
+  extern uint64_t as_bionic_io_data(const char *);
+  if (!address)
+    address = as_bionic_io_data(name);
+  if (!address && as_media_import && !strncmp(name, "SL_IID_", 7))
+    address = as_media_import(name);
+  return address;
 }

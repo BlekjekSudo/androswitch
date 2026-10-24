@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <malloc.h>
 #include <inttypes.h>
+#include "../androswitch/memory_policy.h"
 
 // This parser smoke needs a bounded heap, not all application RAM.
 size_t __nx_heap_size = 256 * 1024 * 1024;
@@ -62,6 +63,27 @@ void *as_host_alloc(size_t alignment, size_t size) {
 }
 void as_host_free(void *memory) { free(memory); }
 void as_host_panic(void) { fprintf(stderr, "AS_SMOKE Rust panic\n"); abort(); }
+
+/* The smoke keeps libnx's ordinary heap setup and its loader override. These
+ * snapshots describe the actual supplied bounds, not __nx_heap_size. */
+uint64_t as_host_heap_capacity(void) {
+    extern char *fake_heap_start, *fake_heap_end;
+    uintptr_t begin = (uintptr_t)fake_heap_start, end = (uintptr_t)fake_heap_end;
+    return end > begin ? end - begin : 0;
+}
+uint64_t as_host_memory_available(void) {
+    struct mallinfo info = mallinfo();
+    return as_heap_free_estimate(as_host_heap_capacity(), info.arena, info.fordblks);
+}
+void as_memory_stage(const char *stage) {
+    struct mallinfo info = mallinfo();
+    uint64_t capacity = as_host_heap_capacity();
+    printf("AS_SMOKE memory stage=%s capacity=%" PRIu64
+           " arena=%zu used=%zu free_estimate=%" PRIu64 "\n",
+           stage, capacity, info.arena, info.uordblks,
+           as_heap_free_estimate(capacity, info.arena, info.fordblks));
+    fflush(stdout);
+}
 
 int main(int argc, char **argv) {
     consoleInit(NULL);

@@ -32,6 +32,8 @@ extern "C" {
     fn as_native_set_session(session: *const c_void);
     fn as_native_session() -> *const c_void;
     fn as_native_fail(code: i32);
+    fn as_native_finalize_callbacks() -> i32;
+    fn as_native_finalize_thread_callbacks() -> i32;
     fn as_jni_vm_lock();
     fn as_jni_vm_unlock();
     fn as_jni_vm_release() -> u32;
@@ -132,6 +134,78 @@ impl Session {
         self.foreign(vm, &mut frame)?;
         Ok(frame.result_integer[0])
     }
+    /// Caller holds the VM lease and has quiesced guest/platform workers.
+    /// Never retain a loader/VM borrow across a guest destructor callback.
+    pub fn finalize_libraries(&self, vm: &mut Engine) -> Result<()> {
+        self.finalize_callback_registry(vm, true)?;
+        for _ in 0..4096 {
+            let functions = {
+                let mut loader = self.loader.borrow_mut();
+                let module = loader
+                    .modules
+                    .iter_mut()
+                    .rev()
+                    .find(|module| module.initialized && !module.finalized);
+                module.map(|module| {
+                    module.finalized = true;
+                    module.destructors.clone()
+                })
+            };
+            let Some(functions) = functions else {
+                return self.finalize_callback_registry(vm, false);
+            };
+            for function in functions {
+                self.native_call(vm, function, &[])?;
+            }
+        }
+        Err(error(
+            "NATIVE_FINALIZE_LIMIT",
+            "too many libraries during finalization",
+        ))
+    }
+    fn finalize_callback_registry(&self, vm: &mut Engine, thread_local: bool) -> Result<()> {
+        let previous = self.vm.replace(vm as *mut Engine);
+        // SAFETY: callback registry is owned by the current application. Release
+        // the reentrant lease so a destructor can create/join a JNI thread.
+        #[allow(unsafe_code)]
+        let depth = unsafe { as_jni_vm_release() };
+        #[allow(unsafe_code)]
+        let result = unsafe {
+            if thread_local {
+                as_native_finalize_thread_callbacks()
+            } else {
+                as_native_finalize_callbacks()
+            }
+        };
+        #[allow(unsafe_code)]
+        unsafe {
+            as_jni_vm_acquire(depth)
+        };
+        self.vm.set(previous);
+        if let Some(error) = self.fatal.borrow_mut().take() {
+            return Err(error);
+        }
+        device_native::platform_result("finalize_callbacks", result).map_err(jni)
+    }
+    /// Platform render/media worker calls these under the reentrant VM lease.
+    /// C++/pthread TLS destructors must finish before detaching its JNI roots.
+    pub fn attach_runtime_thread(&self) {
+        self.refs.borrow_mut().attach(thread());
+        self.threads.borrow_mut().entry(thread()).or_default();
+    }
+    pub fn detach_runtime_thread(&self) {
+        self.refs.borrow_mut().detach(thread());
+        self.threads.borrow_mut().remove(&thread());
+    }
+    pub fn record_runtime_error(&self, error: VmExit) {
+        let mut fatal = self.fatal.borrow_mut();
+        if fatal.is_none() {
+            *fatal = Some(error);
+        }
+    }
+    pub fn runtime_error(&self) -> Option<String> {
+        self.fatal.borrow().as_ref().map(ToString::to_string)
+    }
     pub fn activity_reference(&self, object: ObjRef) -> Result<u64> {
         let local = self.local(Handle::Object(object))?;
         let global = self
@@ -230,6 +304,10 @@ impl Session {
             return Err(error);
         }
         result
+    }
+    pub fn deferred_imports(&self) -> Vec<as_native::DeferredImport> {
+        use as_native::NativeBackend;
+        self.loader.borrow().backend.deferred_imports()
     }
     pub fn statistics(&self) -> (u64, u64, u64) {
         (self.loads.get(), self.calls.get(), self.callbacks.get())
@@ -965,11 +1043,156 @@ pub unsafe extern "C" fn as_guest_fs(
                 .map_err(|e| error(e.code, e.to_string()))?
                 .map(|m| m.length as i64)
                 .unwrap_or(-2)),
+            104 => {
+                if length < 24 || buffer.is_null() {
+                    return Ok(-22);
+                }
+                let Some(meta) = fs.stat(&path).map_err(|e| error(e.code, e.to_string()))? else {
+                    return Ok(-2);
+                };
+                let resolved = match fs.resolve(&path) {
+                    Ok(resolved) => resolved,
+                    Err(_) if meta.directory && path.starts_with("/data/app") => path.clone(),
+                    Err(error) => return Err(self::error(error.code, error.to_string())),
+                };
+                let readonly =
+                    resolved.starts_with("installed/") || resolved.starts_with("/data/app");
+                let inode = resolved
+                    .bytes()
+                    .fold(14695981039346656037u64, |hash, byte| {
+                        (hash ^ u64::from(byte)).wrapping_mul(1099511628211)
+                    });
+                let output = unsafe { core::slice::from_raw_parts_mut(buffer, 24) };
+                output[..8].copy_from_slice(&meta.length.to_le_bytes());
+                let flags = u64::from(meta.directory) | (u64::from(readonly) << 1);
+                output[8..16].copy_from_slice(&flags.to_le_bytes());
+                output[16..24].copy_from_slice(&inode.max(1).to_le_bytes());
+                Ok(0)
+            }
+            105 => {
+                let Some(meta) = fs.stat(&path).map_err(|e| error(e.code, e.to_string()))? else {
+                    return Ok(-2);
+                };
+                if meta.directory
+                    && !fs
+                        .list(&path)
+                        .map_err(|e| error(e.code, e.to_string()))?
+                        .is_empty()
+                {
+                    return Ok(-39);
+                }
+                fs.remove(&path)
+                    .map(|_| 0)
+                    .map_err(|e| error(e.code, e.to_string()))
+            }
+            106 => {
+                if length < 257 || buffer.is_null() || flags > 4096 {
+                    return Ok(-22);
+                }
+                let entries = fs.list(&path).map_err(|e| error(e.code, e.to_string()))?;
+                if entries.len() > 4096 {
+                    return Ok(-75);
+                }
+                let Some(entry) = entries.get(flags as usize) else {
+                    return Ok(0);
+                };
+                if entry.name.len() > 255 {
+                    return Ok(-36);
+                }
+                let output = unsafe { core::slice::from_raw_parts_mut(buffer, 257) };
+                output.fill(0);
+                output[..entry.name.len()].copy_from_slice(entry.name.as_bytes());
+                output[256] = u8::from(entry.directory);
+                Ok(1)
+            }
+            107 => {
+                if buffer.is_null() || length > 65536 {
+                    return Ok(-22);
+                }
+                let destination = cstr(buffer as u64)?;
+                fs.rename_new(&path, &destination)
+                    .map(|_| 0)
+                    .map_err(|e| error(e.code, e.to_string()))
+            }
             _ => Ok(-38),
         }
     })();
     match result {
         Ok(value) => value,
+        Err(VmExit::Error(error)) => match error.code.as_str() {
+            "NOT_FOUND" => -2,
+            "ACCESS_DENIED" | "UNMAPPED_PATH" => -13,
+            "READ_ONLY_FILESYSTEM" => -30,
+            "API_UNAVAILABLE" => -38,
+            "ALREADY_EXISTS" => -17,
+            "INVALID_PATH" => -22,
+            "NOT_DIRECTORY" => -20,
+            "DIRECTORY_NOT_EMPTY" => -39,
+            _ => -5,
+        },
         Err(_) => -5,
+    }
+}
+
+/// Synchronous native log bridge. C holds the VM lease; strings are live and
+/// bounded NUL-terminated input. Native and Java logging share one service.
+#[allow(unsafe_code)]
+#[no_mangle]
+pub unsafe extern "C" fn as_guest_log(
+    priority: i32,
+    tag: *const c_char,
+    message: *const c_char,
+) -> i32 {
+    let pointer = unsafe { as_native_session() }.cast::<Session>();
+    if pointer.is_null() {
+        return -38;
+    }
+    let session = unsafe { &*pointer };
+    let vm = session.vm.get();
+    if vm.is_null() {
+        return -38;
+    }
+    let result = (|| -> Result<i32> {
+        let tag = cstr(tag as u64)?;
+        let message = cstr(message as u64)?;
+        let method = match priority {
+            2 => "v",
+            3 => "d",
+            5 => "w",
+            6 => "e",
+            7 => "wtf",
+            _ => "i",
+        };
+        let result = unsafe { &mut *vm }.invoke_static(
+            "Landroid/util/Log;",
+            method,
+            "(Ljava/lang/String;Ljava/lang/String;)I",
+            &[Value::StrPlaceholder(tag), Value::StrPlaceholder(message)],
+        )?;
+        Ok(result.as_int()?)
+    })();
+    match result {
+        Ok(length) => length,
+        Err(error) => {
+            *session.fatal.borrow_mut() = Some(error);
+            unsafe { as_native_fail(-1002) };
+            -5
+        }
+    }
+}
+
+/// Preserve native worker errors before its host/guest TLS is released. C calls
+/// this with host TLS; the VM lease serializes access to Session's fatal state.
+#[allow(unsafe_code)]
+#[no_mangle]
+pub unsafe extern "C" fn as_native_record_worker_error(code: i32) {
+    let pointer = unsafe { as_native_session() }.cast::<Session>();
+    if pointer.is_null() {
+        return;
+    }
+    if let Err(error) = device_native::platform_result("native worker", code) {
+        lock();
+        unsafe { &*pointer }.record_runtime_error(device_native::vm_error(error));
+        unlock();
     }
 }

@@ -49,7 +49,12 @@ passing AndroSwitch checks and failing immutable-upstream reference tests.
 
 M6/M7's exact subset and negative boundary tests are in [M6/M7](M6_M7_E2E.md).
 Device APK containers now use file-backed reads and a 512 MiB cap. Materialized
-entries remain capped at 64 MiB and combined raw DEX at 32 MiB. The 128 MiB
+metadata/resource entries remain capped at 64 MiB; native extraction has a
+separate adaptive ceiling up to 128 MiB. Current source replaces the fixed
+32 MiB raw DEX guard with decoded-memory admission accounting (parser ceiling
+up to 256 MiB, raw ceiling up to 128 MiB) and live allocator reserve checks.
+New memory/native/GLSurfaceView implementation awaits Horizon execution; see
+[independent-app work and remaining limits](M9_EXTERNAL_APPS.md). The 128 MiB
 container proof is host-tested. The user reports installation of a Candy Crush
 APK larger than 65 MB on Switch; detailed file-backed scenarios remain unrecorded.
 Assets/OBBs use bounded reads. Audio is one 48 kHz stereo PCM16 output. Full native_app_glue FD support,
@@ -57,10 +62,13 @@ AAudio callback/low-latency modes, audio input/effects, arbitrary applications,
 Compose/WebView/modern engines and external NDK samples remain unverified.
 Only bounded RGB/RGBA PNG icons decode; other icon formats use a visible fallback.
 
-Mekorama 1.7.2 is **not compatible**: the supplied ARM64 APK fails during class
-initialization because `libBarcodeScannerLib.so` requires unavailable
-`libstdc++.so`. No gameplay was reached. The alpha's startup recovery reports
-this error after cleanup; it does not fabricate the missing ABI. See
+Mekorama 1.7.2 has **no compatibility pass**. Its earlier ARM64 run failed during
+class initialization because `libBarcodeScannerLib.so` required unavailable
+`libstdc++.so`. Current source adds shared C++ ABI functions and a real EGL-backed
+GLSurfaceView path; a new first screen has not been verified. Candy Crush's
+frozen APK also reaches the native backend boundary on host after DEX admission;
+no actual native game startup is implied. The alpha reports unavailable behavior
+after bounded cleanup; it does not fabricate the missing ABI. See
 [diagnosis and evidence](STARTUP_FAILURES.md).
 
 M8/M9 results are scoped by scenario, not an APK-wide compatibility badge:
@@ -70,8 +78,9 @@ M8/M9 results are scoped by scenario, not an APK-wide compatibility badge:
 | Preferences / renamed preferences, restart and GC | Contract tests passed | not run in emulator | SharedPreferences works (user report); individual renamed/restart/GC results not recorded |
 | Native SQLite notes / renamed notes, transaction/cursor/reflection | Contract tests passed | not run in emulator | SQLite readable (user report); individual transaction/renamed/reflection results not recorded |
 | AOSP HelloActivity original source/layout | Recorded in candidate corpus; static rendering only | not run | individual result not recorded |
-| Vector Pinball 1.16.0, unmodified F-Droid APK | Blocked at Context.getApplicationInfo; no gameplay | not run | individual result not recorded |
-| Candy Crush Saga, version/hash not supplied | not run | not run in emulator | Installation passed (user report); launch blocked before DEX execution by combined raw DEX >32 MiB |
+| Vector Pinball 1.16.0, unmodified F-Droid APK | Shared metadata/source access advances startup; now blocked at portable monitor-enter/exit in MultiDex.doInstallation; no gameplay | not run | individual result not recorded |
+| Mekorama 1.7.2, hash frozen in startup lock | DEX admitted; blocked at System.loadLibrary without host native backend | current source not run | Earlier candidate native dependency failure; new implementation unrun |
+| Candy Crush Saga 1.332.1.1, hash frozen in startup lock | 34,874,388 raw DEX bytes admitted; blocked at System.loadLibrary without host native backend | current source not run | Earlier APK installation passed (user report), old launch blocked by raw DEX >32 MiB; new implementation unrun |
 | External NDK hello-jni/native-activity | Build/integration pending | pending | pending |
 
 The [candidate report](../reports/m8-m9-candidate.json) records exact fixture

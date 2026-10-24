@@ -129,7 +129,9 @@ struct Running {
     reported: bool,
     presents: u64,
     native_activity: u64,
+    gl_surface: bool,
     startup_error: Option<String>,
+    runtime_error: Option<String>,
 }
 fn save_error(message: &str) {
     if let Ok(fs) = LibnxFileSystem::new("sdmc:/switch/androswitch") {
@@ -150,6 +152,30 @@ fn phase(name: &core::ffi::CStr) {
     #[allow(unsafe_code)]
     unsafe {
         as_teardown_phase(name.as_ptr());
+    }
+}
+fn available_memory() -> usize {
+    #[allow(unsafe_code)]
+    extern "C" {
+        fn as_host_memory_available() -> u64;
+    }
+    // SAFETY: scalar aggregate allocator snapshot, no pointers retained.
+    #[allow(unsafe_code)]
+    unsafe {
+        as_host_memory_available() as usize
+    }
+}
+fn memory_stage(stage: &'static str) {
+    #[allow(unsafe_code)]
+    extern "C" {
+        fn as_memory_stage(stage: *const core::ffi::c_char);
+    }
+    if let Ok(name) = alloc::ffi::CString::new(stage) {
+        // SAFETY: the live NUL-terminated label is consumed synchronously.
+        #[allow(unsafe_code)]
+        unsafe {
+            as_memory_stage(name.as_ptr());
+        }
     }
 }
 fn open() -> Result<Running, String> {
@@ -184,16 +210,45 @@ fn open() -> Result<Running, String> {
     let (record, apk) = pm
         .load_apk(&request.package, Some(request.revision))
         .map_err(|e| e.to_string())?;
-    let mut app = App::new(
+    let load_budget = available_memory();
+    let write_memory = |details: serde_json::Value| {
+        if let Ok(bytes) = serde_json::to_vec(&details) {
+            let _ = fs::write_all(fs.as_ref(), "logs/memory-admission.json", &bytes);
+        }
+    };
+    write_memory(
+        serde_json::json!({"schema_version":1,"status":"loading","session_id":request.session_id,"package":record.package,"revision":record.revision,"allocator_available_before_load":load_budget}),
+    );
+    let mut app = App::new_with_options(
         apk,
         fs.clone(),
         Rc::new(HorizonClock),
         640,
         360,
         record.entry_activity.as_deref(),
+        as_framework::AppOptions {
+            source_apk: Some(alloc::format!(
+                "installed/{}/{:020}/package.apk",
+                record.package,
+                record.revision
+            )),
+            memory: as_framework::memory::LoadMemory {
+                budget: load_budget,
+                available: Some(available_memory),
+                checkpoint: Some(memory_stage),
+            },
+        },
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| {
+        let cause = e.to_string();
+        write_memory(serde_json::json!({"schema_version":1,"status":"failed","session_id":request.session_id,"package":record.package,"revision":record.revision,"allocator_available_before_load":load_budget,"error":cause}));
+        cause
+    })?;
+    write_memory(
+        serde_json::json!({"schema_version":1,"status":"vm_ready","session_id":request.session_id,"package":record.package,"revision":record.revision,"allocator_available_before_load":load_budget,"raw_dex_bytes":app.memory.raw_dex_bytes,"estimated_parser_bytes":app.memory.estimated_parser_bytes,"parser_budget_bytes":app.memory.parser_budget_bytes,"allocator_available_after_load":available_memory(),"scope":"parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots"}),
+    );
     app.android.bind_audio(Rc::new(HorizonAudio));
+    crate::device_graphics::bind(&app.android).map_err(|e| e.to_string())?;
     let native = if app.android.apk.native_libs.is_empty() {
         None
     } else {
@@ -215,9 +270,13 @@ fn open() -> Result<Running, String> {
         reported: false,
         presents: 0,
         native_activity: 0,
+        gl_surface: false,
         startup_error: None,
+        runtime_error: None,
     };
-    if let Err(error) = running.start() {
+    let started = running.start();
+    running.record_native_compatibility();
+    if let Err(error) = started {
         save_error(&error);
         running.startup_error = Some(error);
     }
@@ -285,7 +344,41 @@ impl Running {
             device_jni::unlock();
             created?;
         }
+        let requests = self.app.android.gl_requests().map_err(|e| e.to_string())?;
+        if !requests.is_empty() {
+            if self.native_activity != 0 {
+                return Err("GL_COMPOSITION_UNAVAILABLE: NativeActivity and GLSurfaceView share one display".into());
+            }
+            if self.native.is_none() {
+                let session =
+                    device_jni::Session::new(&self.app.android.apk).map_err(|e| e.to_string())?;
+                session.bind_vm(&mut self.app.vm);
+                self.app.vm.bind_native(session.clone());
+                self.native = Some(session);
+            }
+            self.gl_surface = crate::device_graphics::start(
+                &mut self.app,
+                self.native.as_ref().ok_or("JNI_SESSION_MISSING")?,
+            )?;
+        }
         Ok(())
+    }
+    fn record_native_compatibility(&self) {
+        device_jni::lock();
+        let deferred = self
+            .native
+            .as_ref()
+            .map(|native| native.deferred_imports())
+            .unwrap_or_default();
+        device_jni::unlock();
+        let report = serde_json::json!({"schema_version":1,"session_id":self.request.session_id,
+            "package":self.request.package,"revision":self.request.revision,
+            "binding_policy":"unimplemented strong function imports trap with library/symbol on first invocation",
+            "deferred_imports":deferred,
+            "scope":"listed functions remain unimplemented; mapping an APK does not certify their API behavior"});
+        if let Ok(bytes) = serde_json::to_vec(&report) {
+            let _ = fs::write_all(self.fs.as_ref(), "logs/native-compatibility.json", &bytes);
+        }
     }
     fn cleanup_error(&self, message: &str) {
         if let Some(cause) = &self.startup_error {
@@ -308,7 +401,12 @@ impl Running {
             return Ok(());
         }
         let result = match event {
-            Event::Touch { action, x, y } => self.app.android.touch(&mut self.app.vm, action, x, y),
+            Event::Touch { action, x, y } => self.app.android.touch(
+                &mut self.app.vm,
+                action,
+                if self.gl_surface { x * 2. } else { x },
+                if self.gl_surface { y * 2. } else { y },
+            ),
             Event::Key { code } => self.app.android.key(&mut self.app.vm, code),
             Event::Gc => {
                 self.app.vm.gc();
@@ -317,13 +415,31 @@ impl Running {
             Event::Frame | Event::Wait { .. } | Event::ReturnToLauncher => Ok(()),
         };
         result.map_err(|e| e.to_string())?;
-        self.app.draw().map_err(|e| e.to_string())
+        self.draw()
+    }
+    fn draw(&mut self) -> Result<(), String> {
+        if self.gl_surface {
+            self.app.android.tick(&mut self.app.vm)
+        } else {
+            self.app.draw()
+        }
+        .map_err(|e| e.to_string())
     }
     fn poll(&mut self) -> Result<i32, String> {
+        if let Some(error) = &self.runtime_error {
+            return Err(error.clone());
+        }
+        if let Some(error) = self
+            .native
+            .as_ref()
+            .and_then(|native| native.runtime_error())
+        {
+            return Err(error);
+        }
         // SAFETY: reads atomic media counters; guest activity lifetime is owned here.
         #[allow(unsafe_code)]
         unsafe {
-            if self.native_activity != 0 && as_media_error() != 0 {
+            if (self.native_activity != 0 || self.gl_surface) && as_media_error() != 0 {
                 return Err(alloc::format!("NATIVE_MEDIA_ERROR: {}", as_media_error()));
             }
         }
@@ -351,7 +467,7 @@ impl Running {
                     .deadline
                     .get_or_insert(self.app.android.now() + ms.min(30000));
                 if self.app.android.now() < due {
-                    self.app.draw().map_err(|e| e.to_string())?;
+                    self.draw()?;
                     return Ok(0);
                 }
                 self.deadline = None;
@@ -360,7 +476,7 @@ impl Running {
             self.cursor += 1;
             self.pending = Some(self.cursor);
         } else {
-            self.app.draw().map_err(|e| e.to_string())?;
+            self.draw()?;
         }
         #[allow(unsafe_code)]
         let native_finished = unsafe { self.native_activity != 0 && as_media_finished() != 0 };
@@ -426,15 +542,21 @@ pub unsafe extern "C" fn as_runtime_native(token: u64) -> u64 {
     unsafe { &*(token as *const Running) }.native_activity
 }
 /// # Safety
-/// `token` is live; called once after an actual framebufferEnd submission.
+/// `token` is live; C reports a CPU submission or its observed GPU frame count.
 #[allow(unsafe_code)]
 #[no_mangle]
 pub unsafe extern "C" fn as_runtime_presented(token: u64, checksum: u64) {
+    device_jni::lock();
     let running = unsafe { &mut *(token as *mut Running) };
-    running.presents += 1;
+    if running.native_activity != 0 || running.gl_surface {
+        running.presents = checksum;
+    } else {
+        running.presents += 1;
+    }
     if let Some(step) = running.pending.take() {
         running.snapshots.push(serde_json::json!({"step":step,"frame_hash":alloc::format!("{:016x}",running.app.frame.checksum()),"presented_hash":alloc::format!("{checksum:016x}"),"views":running.app.android.views(),"lifecycle":running.app.android.lifecycle(),"finished":running.app.android.finished(),"native_frames":unsafe {as_media_frames()},"audio_frames":unsafe{as_media_audio_frames()}}));
     }
+    device_jni::unlock();
 }
 /// # Safety
 /// `token` is live. Only the test driver's final frame requests a capture.
@@ -463,6 +585,9 @@ pub unsafe extern "C" fn as_runtime_input(token: u64, kind: i32, a: f32, b: f32)
             y: b,
         }
     });
+    if let Err(error) = &result {
+        running.runtime_error = Some(error.clone());
+    }
     device_jni::unlock();
     match result {
         Ok(()) => 0,
@@ -521,6 +646,30 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
         core::mem::forget(running);
         return -1;
     }
+    // Static/thread-local C++ destructors may call Java, files, or media.
+    // Execute them while both the VM session and all mapped code are alive.
+    phase(c"native_destructors");
+    device_jni::lock();
+    let finalized = if let Some(native) = &running.native {
+        native.finalize_libraries(&mut running.app.vm)
+    } else {
+        Ok(())
+    };
+    device_jni::unlock();
+    if let Err(finalized) = finalized {
+        running.cleanup_error(&alloc::format!("NATIVE_FINALIZE_FAILED: {finalized}"));
+        core::mem::forget(running);
+        return -1;
+    }
+    // A callback may create another guest/platform worker. Prove quiescence
+    // again before releasing any JNI roots or executable memory.
+    let media_threads = unsafe { as_media_quiesce() };
+    let native_threads = unsafe { as_native_quiesce(2_000_000_000) };
+    if media_threads != 0 || native_threads != 0 {
+        running.cleanup_error("DESTRUCTOR_NOT_QUIESCENT: reopen homebrew");
+        core::mem::forget(running);
+        return -1;
+    }
     device_jni::lock();
     let media = unsafe { as_media_reset() };
     if media != 0 {
@@ -554,6 +703,7 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
     } else {
         None
     };
+    running.record_native_compatibility();
     phase(c"runtime_drop");
     drop(running);
     device_jni::unlock();

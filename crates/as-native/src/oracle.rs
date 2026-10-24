@@ -62,7 +62,7 @@ impl NativeBackend for Oracle {
         Ok(())
     } // Unicorn maps RWX; Horizon separately enforces code permissions.
     fn release(&mut self, _: Allocation) {} // Worker process owns and releases the address space.
-    fn import(&mut self, _: &str, name: &str) -> Result<Option<u64>> {
+    fn import(&mut self, _: &str, name: &str, _kind: u8) -> Result<Option<u64>> {
         self.runtime.bind_import(name).map(Some).map_err(convert)
     }
     fn tls(&mut self, _: usize, bytes: &[u8], size: usize, alignment: usize) -> Result<u64> {

@@ -8,6 +8,7 @@ try{
   $checks=@(
     @{id='format';args=@('fmt','--all','--','--check')},
     @{id='parser';args=@('test','-p','rd-apk','--lib','--no-default-features','--locked')},
+    @{id='dex-memory';args=@('test','-p','rd-dex','--test','memory_budget','--no-default-features','--locked')},
     @{id='platform';args=@('test','-p','as-platform','--features','std','--locked')},
     @{id='packages';args=@('test','-p','as-package','--locked')},
     @{id='persistent';args=@('test','-p','as-storage','-p','as-sqlite','--locked')},

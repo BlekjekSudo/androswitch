@@ -39,15 +39,21 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let storage = Rc::new(HostFileSystem::new(&args[2])?);
     let pm = as_package::PackageManager::new(storage.clone());
     let installed = pm.install(fs::read(&args[0])?, true, None)?;
-    let apk = rd_apk::Apk::from_bytes(pm.load(&installed.package, Some(installed.revision))?.1)
-        .map_err(|e| e.to_string())?;
-    let mut app = App::new(
+    let apk = pm.load_apk(&installed.package, Some(installed.revision))?.1;
+    let mut app = App::new_with_options(
         apk,
         storage as Rc<dyn FileSystem>,
         Rc::new(HostPlatform::default()),
         640,
         360,
         None,
+        as_framework::AppOptions {
+            source_apk: Some(format!(
+                "installed/{}/{:020}/package.apk",
+                installed.package, installed.revision
+            )),
+            ..Default::default()
+        },
     )
     .map_err(|e| e.to_string())?;
     app.launch().map_err(|e| e.to_string())?;

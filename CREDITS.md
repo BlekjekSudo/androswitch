@@ -74,6 +74,7 @@ that APK is not bundled in the AndroSwitch distribution.
 | --- | --- |
 | [Rust](https://github.com/rust-lang/rust) and its contributors | Language, compiler, `core` and `alloc` |
 | [libnx](https://github.com/switchbrew/libnx) / switchbrew contributors | Horizon services and the homebrew C platform boundary |
+| [Autorun](https://github.com/autorunhq/autorun) / autorunhq contributors | Reference for loader-owned heaps, process allowance and allocator telemetry; independently implemented adapter, no Wine allocator source copied; [pinned provenance](docs/HORIZON_MEMORY.md) |
 | [devkitPro](https://devkitpro.org/) / devkitA64 contributors | ARM64 C toolchain and Switch packaging tools |
 | [Android Open Source Project](https://source.android.com/) and [R8/D8](https://r8.googlesource.com/r8/) contributors | Android build tooling and DEX fixture compilation |
 | OpenJDK and JDK distribution contributors | Java compilation and the JVM reference execution |

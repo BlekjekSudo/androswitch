@@ -20,6 +20,9 @@ use rd_vm::{framework_host::FrameworkHost, Engine, ObjRef, Throwable, Value, VmE
 #[path = "services/mod.rs"]
 mod services;
 use serde::Serialize;
+pub use services::glsurface::{
+    EglConfigBackend, EglConfigs, GlEvent, GlSurfaceRequest, GraphicsCaps,
+};
 type Result<T> = core::result::Result<T, VmExit>;
 fn error(code: &str, cause: impl Into<String>) -> VmExit {
     rd_vm::err::vm_error(code, cause).into()
@@ -102,6 +105,7 @@ pub struct View {
     pub height: i32,
     pub orientation: i32,
     pub listener: Option<ObjRef>,
+    pub touch_listener: Option<ObjRef>,
     pub click_method: Option<String>,
     pub input_type: Option<i32>,
 }
@@ -128,6 +132,7 @@ impl View {
             height: -2,
             orientation: 0,
             listener: None,
+            touch_listener: None,
             click_method: None,
             input_type: (class == "Landroid/widget/EditText;").then_some(1),
         }
@@ -179,7 +184,7 @@ struct State {
     builders: BTreeMap<ObjRef, String>,
     paints: BTreeMap<ObjRef, (u32, f32)>,
     canvases: BTreeMap<ObjRef, Vec<Draw>>,
-    motion: BTreeMap<ObjRef, (i32, f32, f32)>,
+    motion: BTreeMap<ObjRef, (i32, f32, f32, f32, f32, u64)>,
     lifecycle: Vec<Lifecycle>,
     focus: usize,
     pressed: Option<ObjRef>,
@@ -222,6 +227,28 @@ impl Android {
     }
     pub fn now(&self) -> u64 {
         self.clock.monotonic_micros() / 1000
+    }
+    /// Bind the readable guest APK alias installed by the runtime's VFS.
+    /// Call before launching: package metadata must not advertise an APK path
+    /// that the application cannot actually open.
+    pub fn bind_package_source(&self, guest_path: String) -> Result<()> {
+        self.services
+            .bind_package_source(&self.apk.manifest.package, guest_path)
+    }
+    pub fn bind_graphics_caps(&self, caps: GraphicsCaps) -> Result<()> {
+        self.services.glsurface.bind_caps(caps)
+    }
+    pub fn bind_egl_backend(&self, backend: Rc<dyn EglConfigBackend>) {
+        self.services.glsurface.bind_backend(backend);
+    }
+    pub fn gl_requests(&self) -> Result<Vec<GlSurfaceRequest>> {
+        self.services.glsurface.requests(self)
+    }
+    pub fn gl_choose_config(&self, vm: &mut Engine, view: ObjRef, display: u64) -> Result<u64> {
+        self.services.glsurface.choose_config(vm, view, display)
+    }
+    pub fn gl_callback(&self, vm: &mut Engine, view: ObjRef, event: GlEvent) -> Result<()> {
+        self.services.glsurface.callback(vm, view, event)
     }
     pub fn bind_audio(&self, audio: Rc<dyn crate::PcmOutput>) {
         *self.audio.borrow_mut() = Some(audio);
@@ -501,7 +528,13 @@ impl Android {
         if action == 0 {
             self.state.borrow_mut().pressed = hit;
         }
-        if let Some(r) = hit {
+        let target = if action == 0 {
+            hit
+        } else {
+            self.state.borrow().pressed.or(hit)
+        };
+        let mut consumed = false;
+        if let Some(r) = target {
             let custom = vm
                 .cp
                 .resolve_method(
@@ -510,26 +543,90 @@ impl Android {
                     "(Landroid/view/MotionEvent;)Z",
                 )
                 .is_some();
-            if custom {
+            let listener = self.state.borrow().views[&r].touch_listener;
+            if custom || listener.is_some() {
                 let bounds = self.state.borrow().views[&r].bounds;
                 let event = shell(vm, "Landroid/view/MotionEvent;")?;
-                self.state
-                    .borrow_mut()
-                    .motion
-                    .insert(event, (action, x - bounds[0] as f32, y - bounds[1] as f32));
-                self.state.borrow_mut().roots.push(event);
-                let result = self.callback(
-                    vm,
-                    r,
-                    "onTouchEvent",
-                    "(Landroid/view/MotionEvent;)Z",
-                    &[Value::Obj(event)],
+                self.state.borrow_mut().motion.insert(
+                    event,
+                    (
+                        action,
+                        x - bounds[0] as f32,
+                        y - bounds[1] as f32,
+                        x,
+                        y,
+                        self.now(),
+                    ),
                 );
+                self.state.borrow_mut().roots.push(event);
+                let result = (|| -> Result<bool> {
+                    vm.reset_fuel_window();
+                    if let Some(listener) = listener {
+                        if vm
+                            .invoke_instance(
+                                listener,
+                                "onTouch",
+                                "(Landroid/view/View;Landroid/view/MotionEvent;)Z",
+                                &[Value::Obj(r), Value::Obj(event)],
+                            )?
+                            .as_int()?
+                            != 0
+                        {
+                            return Ok(true);
+                        }
+                    }
+                    if custom {
+                        return Ok(vm
+                            .invoke_instance(
+                                r,
+                                "onTouchEvent",
+                                "(Landroid/view/MotionEvent;)Z",
+                                &[Value::Obj(event)],
+                            )?
+                            .as_int()?
+                            != 0);
+                    }
+                    Ok(false)
+                })();
                 self.state.borrow_mut().roots.retain(|v| *v != event);
                 self.state.borrow_mut().motion.remove(&event);
-                result?;
-            } else if action == 1 && self.state.borrow().pressed == hit {
-                self.click(vm, r)?;
+                consumed = result?;
+            }
+            if !consumed && self.state.borrow().views[&r].clickable {
+                if action == 1 && self.state.borrow().pressed == hit {
+                    self.click(vm, r)?;
+                }
+                consumed = true;
+            }
+        }
+        if !consumed {
+            if let Some(activity) = self.activity_object() {
+                if vm
+                    .cp
+                    .resolve_method(
+                        vm.heap.class_of(activity)?,
+                        "onTouchEvent",
+                        "(Landroid/view/MotionEvent;)Z",
+                    )
+                    .is_some()
+                {
+                    let event = shell(vm, "Landroid/view/MotionEvent;")?;
+                    self.state
+                        .borrow_mut()
+                        .motion
+                        .insert(event, (action, x, y, x, y, self.now()));
+                    self.state.borrow_mut().roots.push(event);
+                    let result = self.callback(
+                        vm,
+                        activity,
+                        "onTouchEvent",
+                        "(Landroid/view/MotionEvent;)Z",
+                        &[Value::Obj(event)],
+                    );
+                    self.state.borrow_mut().roots.retain(|r| *r != event);
+                    self.state.borrow_mut().motion.remove(&event);
+                    result?;
+                }
             }
         }
         if action == 1 || action == 3 {
@@ -587,7 +684,12 @@ impl Android {
     }
     fn layout(&self) {
         if let Some(root) = self.active_root() {
-            self.layout_node(root, 0, 0, self.width, self.height, 0);
+            let (width, height) = self
+                .services
+                .glsurface
+                .dimensions(root)
+                .unwrap_or((self.width, self.height));
+            self.layout_node(root, 0, 0, width, height, 0);
         }
     }
     fn preferred(&self, r: ObjRef, vertical: bool, depth: usize) -> i32 {
@@ -692,6 +794,11 @@ impl Android {
     }
     pub fn render(&self, vm: &mut Engine, frame: &mut Frame) -> Result<()> {
         self.layout();
+        // The platform EGL thread owns this surface. A successful event pump
+        // is not a claim that the software rasterizer produced a GL frame.
+        if !self.gl_requests()?.is_empty() {
+            return Ok(());
+        }
         frame.clear(0xff101419);
         if let Some(root) = self.active_root() {
             self.draw_view(vm, frame, root, 0)?;
@@ -970,7 +1077,12 @@ impl Android {
                     | "Landroid/app/Application;"
                     | "Landroid/content/Context;"
                     | "Landroid/content/ContextWrapper;"
+                    | "Landroid/content/pm/ApplicationInfo;"
+                    | "Ljava/lang/ClassLoader;"
+                    | "Ljava/lang/BootClassLoader;"
                     | "Landroid/view/View;"
+                    | "Landroid/opengl/GLSurfaceView;"
+                    | "Landroid/view/SurfaceView;"
                     | "Landroid/view/ViewGroup;"
                     | "Landroid/widget/TextView;"
                     | "Landroid/widget/EditText;"
@@ -1088,6 +1200,7 @@ impl FrameworkHost for Android {
         if let Some(v) = s.views.get(&r) {
             refs.extend(v.children.iter().copied());
             refs.extend(v.listener);
+            refs.extend(v.touch_listener);
         }
         if let Some(bundle) = s.bundles.get(&r) {
             refs.extend(bundle.values().filter_map(|v| v.as_ref().ok().flatten()));
@@ -1204,6 +1317,9 @@ impl FrameworkHost for Android {
                 Value::Null
             }
             ("Landroid/os/Looper;", "getMainLooper" | "myLooper", "()Landroid/os/Looper;") => {
+                if name == "myLooper" && self.services.glsurface.in_callback() {
+                    return Ok(Some(Value::Null));
+                }
                 let existing = self.state.borrow().looper;
                 Value::Obj(if let Some(r) = existing {
                     r
@@ -1243,6 +1359,17 @@ impl FrameworkHost for Android {
     ) -> Result<Option<Value>> {
         let arguments = typed_args(sig, args)?;
         let args = arguments.as_slice();
+        if class == "Landroid/os/Handler;"
+            && name == "<init>"
+            && sig == "()V"
+            && self.services.glsurface.in_callback()
+        {
+            return Err(Throwable::new(
+                "Ljava/lang/RuntimeException;",
+                "Cannot create Handler: platform GL worker has no prepared Looper",
+            )
+            .into());
+        }
         if let Some(value) = self.services.call(self, vm, class, name, sig, r, args)? {
             return Ok(Some(value));
         }
@@ -1468,19 +1595,6 @@ impl FrameworkHost for Android {
             ("getString", "(I)Ljava/lang/String;") | ("getText", "(I)Ljava/lang/CharSequence;") => {
                 string(vm, self.resource_string(int(args, 0)? as u32)?)?
             }
-            ("getFilesDir", "()Ljava/io/File;") => {
-                let file = shell(vm, "Ljava/io/File;")?;
-                vm.invoke_instance(
-                    file,
-                    "<init>",
-                    "(Ljava/lang/String;)V",
-                    &[Value::StrPlaceholder(format!(
-                        "/data/user/0/{}/files",
-                        self.apk.manifest.package
-                    ))],
-                )?;
-                Value::Obj(file)
-            }
             ("getLayoutInflater", "()Landroid/view/LayoutInflater;")
                 if vm
                     .cp
@@ -1627,6 +1741,7 @@ impl FrameworkHost for Android {
                     roots.push(r);
                     if let Some(v) = s.views.get(&r) {
                         roots.extend(v.listener);
+                        roots.extend(v.touch_listener);
                         nodes.extend(v.children.iter().copied())
                     }
                 }
@@ -1728,7 +1843,7 @@ impl Android {
             };
         }
         if platform == "Landroid/view/MotionEvent;" {
-            let (action, x, y) = self
+            let (action, x, y, raw_x, raw_y, time) = self
                 .state
                 .borrow()
                 .motion
@@ -1739,6 +1854,21 @@ impl Android {
                 ("getAction" | "getActionMasked", "()I") => Some(Value::Int(action)),
                 ("getX", "()F") => Some(Value::Float(x)),
                 ("getY", "()F") => Some(Value::Float(y)),
+                ("getRawX", "()F") => Some(Value::Float(raw_x)),
+                ("getRawY", "()F") => Some(Value::Float(raw_y)),
+                ("getPointerCount", "()I") => Some(Value::Int(1)),
+                ("getActionIndex", "()I") => Some(Value::Int(0)),
+                ("getEventTime", "()J") => Some(Value::Long(time as i64)),
+                ("getPointerId", "(I)I") if int(args, 0)? == 0 => Some(Value::Int(0)),
+                ("getX", "(I)F") if int(args, 0)? == 0 => Some(Value::Float(x)),
+                ("getY", "(I)F") if int(args, 0)? == 0 => Some(Value::Float(y)),
+                ("getPointerId", "(I)I") | ("getX" | "getY", "(I)F") => {
+                    return Err(Throwable::new(
+                        "Ljava/lang/IllegalArgumentException;",
+                        "single-pointer MotionEvent index",
+                    )
+                    .into())
+                }
                 _ => None,
             });
         }
@@ -1920,6 +2050,15 @@ impl Android {
                 let v = s.views.get_mut(&r).unwrap();
                 v.listener = listener;
                 v.clickable = listener.is_some();
+                Value::Null
+            }
+            ("setOnTouchListener", "(Landroid/view/View$OnTouchListener;)V") => {
+                self.state
+                    .borrow_mut()
+                    .views
+                    .get_mut(&r)
+                    .unwrap()
+                    .touch_listener = args[0].as_ref()?;
                 Value::Null
             }
             ("setClickable" | "setEnabled", "(Z)V") => {

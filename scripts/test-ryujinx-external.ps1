@@ -1,0 +1,291 @@
+# An external-APK first-screen candidate, never an automatic gameplay pass.
+# PrepareOnly writes to local-artifacts and leaves the emulator/SD untouched.
+param(
+    [Parameter(Mandatory)][ValidateCount(1,16)][string[]]$ApkPaths,
+    [string]$Nro='',
+    [string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',
+    [string]$RyujinxProfile="$env:APPDATA/Ryujinx",
+    [ValidateRange(1000,30000)][int]$StartupWaitMilliseconds=10000,
+    [ValidateRange(30,1800)][int]$TimeoutSeconds=300,
+    [switch]$PrepareOnly,
+    [switch]$AllowDesktopEmulator
+)
+$ErrorActionPreference='Stop'
+if(-not $PrepareOnly -and -not $AllowDesktopEmulator){
+    throw 'Desktop Ryujinx E2E requires -AllowDesktopEmulator after the reported disappearance of other app windows. Use -PrepareOnly to create the request and artifact without opening Ryujinx or changing its SD folder.'
+}
+$projectRoot=Split-Path -Parent $PSScriptRoot
+if(-not $Nro){$Nro=Join-Path $projectRoot 'local-artifacts/product/androswitch.nro'}
+$nroSource=(Get-Item -LiteralPath $Nro).FullName
+$emulator=(Get-Item -LiteralPath $Ryujinx).FullName
+$profile=[IO.Path]::GetFullPath($RyujinxProfile)
+$files=@($ApkPaths | ForEach-Object {
+    $file=Get-Item -LiteralPath $_
+    if($file.PSIsContainer -or $file.Extension -ine '.apk'){throw "Expected an APK file: $($_)"}
+    $file
+} | Sort-Object FullName)
+$id=[guid]::NewGuid().ToString('N')
+$run=Join-Path $projectRoot "local-artifacts/m9/external-runs/$id"
+$switchRoot=[IO.Path]::GetFullPath((Join-Path $profile 'sdcard/switch'))
+$sdRoot=Join-Path $switchRoot 'androswitch'
+$backup=Join-Path $switchRoot "androswitch-external-backup-$id"
+$sdResult=Join-Path $switchRoot "androswitch-external-result-$id"
+$lockPath=Join-Path $switchRoot 'androswitch-launcher-e2e.lock'
+function Assert-SdChild([string]$Path){
+    $full=[IO.Path]::GetFullPath($Path)
+    if(-not $full.StartsWith($switchRoot+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){
+        throw "SD path escaped its designated switch directory: $full"
+    }
+    if(Test-Path -LiteralPath $full){
+        $item=Get-Item -LiteralPath $full -Force
+        if($item.Attributes -band [IO.FileAttributes]::ReparsePoint){throw "Refusing to move a linked SD path: $full"}
+    }
+}
+foreach($path in @($sdRoot,$backup,$sdResult,$lockPath)){Assert-SdChild $path}
+New-Item -ItemType Directory -Path $run | Out-Null
+$artifact=Join-Path $run 'androswitch.nro'
+$nroHash=(Get-FileHash -LiteralPath $nroSource).Hash.ToLowerInvariant()
+Copy-Item -LiteralPath $nroSource -Destination $artifact
+if((Get-FileHash -LiteralPath $artifact).Hash.ToLowerInvariant() -ne $nroHash -or
+   (Get-FileHash -LiteralPath $nroSource).Hash.ToLowerInvariant() -ne $nroHash){throw 'NRO changed while the candidate was being prepared; retry after its build completes.'}
+$stream=[IO.File]::OpenRead($artifact)
+try{
+    $stream.Position=16;$magic=[byte[]]::new(4)
+    if($stream.Read($magic,0,4) -ne 4 -or [Text.Encoding]::ASCII.GetString($magic) -cne 'NRO0'){
+        throw 'Candidate artifact is not an NRO.'
+    }
+}finally{$stream.Dispose()}
+$commands=[Collections.Generic.List[object]]::new()
+$inputs=[Collections.Generic.List[object]]::new()
+$commands.Add(@{kind='frame'})
+for($index=0;$index -lt $files.Count;$index++){
+    $commands.Add(@{kind='key';key='right'})
+    for($row=0;$row -lt $index;$row++){$commands.Add(@{kind='key';key='down'})}
+    $commands.Add(@{kind='key';key='accept'})
+    $installStep=$commands.Count
+    $events=@(@{kind='wait';ms=$StartupWaitMilliseconds},@{kind='frame'},@{kind='return_to_launcher'})
+    $commands.Add(@{kind='open';events=$events})
+    $commands.Add(@{kind='frames';count=60})
+    $inputs.Add(@{
+        index=$index;source=$files[$index].FullName;staged_name=('{0:D4}-external.apk' -f $index)
+        bytes=$files[$index].Length;sha256=(Get-FileHash -LiteralPath $files[$index].FullName).Hash.ToLowerInvariant()
+        install_snapshot_step=$installStep;expected_session_id="$id-$($index+1)"
+    })
+}
+if($commands.Count -gt 256){throw 'Request exceeds the launcher command limit.'}
+$request=@{schema_version=1;session_id=$id;commands=@($commands.ToArray())}
+$request|ConvertTo-Json -Depth 20|Set-Content (Join-Path $run 'launcher-test.json') -Encoding utf8NoBOM
+$receipt=@{
+    schema_version=1;session_id=$id;backend='ryujinx';physical_device='not_run'
+    status='prepared_not_run';execution_attempted=$false;visual_review='not_run'
+    first_screen_contract='Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.'
+    artifact=$artifact;nro_sha256=$nroHash;emulator_path=$emulator;ryujinx_profile=$profile
+    emulator_sha256=(Get-FileHash -LiteralPath $emulator).Hash.ToLowerInvariant()
+    emulator_version=(Get-Item -LiteralPath $emulator).VersionInfo.ProductVersion
+    sd_result=$sdResult;sd_backup=$backup;inputs=@($inputs.ToArray());commands=$commands.Count
+    startup_wait_ms=$StartupWaitMilliseconds;cases=@();sd_original_restore='not_modified'
+}
+function Save-Receipt {
+    $receipt|ConvertTo-Json -Depth 32|Set-Content (Join-Path $run 'verification.json') -Encoding utf8NoBOM
+}
+Save-Receipt
+if($PrepareOnly){Write-Output "Prepared, not executed: $run/verification.json";return}
+
+# Only the explicit execution branch can create an SD lock, rename the existing
+# application folder or start a process. It never clones the emulator profile,
+# changes its configuration, or manipulates any desktop windows.
+$owned=[Collections.Generic.Dictionary[int,DateTime]]::new()
+$process=$null;$lock=$null;$backupMoved=$false;$stageCreated=$false
+$runStarted=[DateTime]::UtcNow
+$sdNro=Join-Path $sdRoot 'androswitch.nro'
+$exeName=[IO.Path]::GetFileName($emulator)
+function Get-EmulatorProcesses {
+    @(Get-CimInstance Win32_Process -Filter "Name='$($exeName.Replace("'","''"))'" | Where-Object {
+        $_.ExecutablePath -and [IO.Path]::GetFullPath($_.ExecutablePath) -ieq $emulator -and
+        (Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue)
+    })
+}
+function Update-OwnedProcesses {
+    $candidates=@(Get-EmulatorProcesses)
+    do{
+        $added=$false
+        foreach($candidate in $candidates){
+            $pidValue=[int]$candidate.ProcessId
+            if(-not $owned.ContainsKey($pidValue) -and $owned.ContainsKey([int]$candidate.ParentProcessId) -and
+               $candidate.CreationDate.ToUniversalTime() -ge $runStarted -and $candidate.CommandLine -and
+               $candidate.CommandLine.Replace('/','\').Contains($sdNro.Replace('/','\'))){
+                $owned.Add($pidValue,$candidate.CreationDate.ToUniversalTime());$added=$true
+            }
+        }
+    }while($added)
+    @($candidates|Where-Object {
+        $owned.ContainsKey([int]$_.ProcessId) -and
+        $_.CreationDate.ToUniversalTime() -eq $owned[[int]$_.ProcessId]
+    })
+}
+function Stop-OwnedProcesses {
+    # Revalidate identity and creation time on every stop; PID reuse and another
+    # already-open emulator can never become cleanup targets.
+    if(-not $owned.Count){return}
+    for($attempt=0;$attempt -lt 3;$attempt++){
+        $live=@(Update-OwnedProcesses)
+        if(-not $live.Count){return}
+        foreach($candidate in ($live|Sort-Object {if($process -and $_.ProcessId -eq $process.Id){1}else{0}})){
+            $target=Get-Process -Id $candidate.ProcessId -ErrorAction SilentlyContinue
+            if($target){$target.Kill();$null=$target.WaitForExit(10000)}
+        }
+    }
+    if(@(Update-OwnedProcesses).Count){throw 'An owned emulator process did not stop; SD backup must remain preserved.'}
+}
+function Capture-Session([object]$Session,[DateTime]$SeenAt){
+    $destination=Join-Path $run "sessions/$($Session.session_id)"
+    New-Item -ItemType Directory -Path $destination -Force | Out-Null
+    $Session|ConvertTo-Json -Depth 28|Set-Content (Join-Path $destination 'session-report.json') -Encoding utf8NoBOM
+    $images=[Collections.Generic.List[object]]::new()
+    foreach($imageFile in @(Get-ChildItem -LiteralPath (Join-Path $sdRoot 'logs') -File -Filter '*.ppm')){
+        # Shared capture names are overwritten by later sessions. Only images
+        # written after this session was observed running can belong to it.
+        if($imageFile.LastWriteTimeUtc -lt $SeenAt){continue}
+        $target=Join-Path $destination $imageFile.Name
+        Copy-Item -LiteralPath $imageFile.FullName -Destination $target
+        $data=[IO.File]::ReadAllBytes($target)
+        $header=[Text.Encoding]::ASCII.GetString($data,0,[Math]::Min(128,$data.Length))
+        $match=[regex]::Match($header,'\AP6\s+(\d+)\s+(\d+)\s+255\s')
+        $valid=$false;$nonuniform=$false;$width=0;$height=0
+        if($match.Success){
+            $width=[int]$match.Groups[1].Value;$height=[int]$match.Groups[2].Value
+            $pixelCount=[long]$width*$height;$offset=$match.Length
+            $valid=$width -gt 0 -and $height -gt 0 -and $pixelCount -le 4000000 -and
+                   $data.Length -eq $offset+3*$pixelCount
+            if($valid){
+                for($sample=1;$sample -lt 4096;$sample++){
+                    $at=$offset+3*[long]([Math]::Floor(($pixelCount-1)*($sample/4095.0)))
+                    if($data[$at] -ne $data[$offset] -or $data[$at+1] -ne $data[$offset+1] -or $data[$at+2] -ne $data[$offset+2]){
+                        $nonuniform=$true;break
+                    }
+                }
+            }
+        }
+        $images.Add(@{file=$target;sha256=(Get-FileHash -LiteralPath $target).Hash.ToLowerInvariant();valid_ppm=$valid;width=$width;height=$height;sampled_nonuniform=$nonuniform;recognizable_app_screen='requires_visual_review'})
+    }
+    return @($images.ToArray())
+}
+try{
+    if(@(Get-EmulatorProcesses).Count){throw 'Close the existing Ryujinx session before executing this isolated test.'}
+    New-Item -ItemType Directory -Path $switchRoot -Force | Out-Null
+    if((Get-Item -LiteralPath $switchRoot -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Refusing an SD switch directory that is a link.'}
+    $lock=[IO.File]::Open($lockPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+    foreach($path in @($sdRoot,$backup,$sdResult)){Assert-SdChild $path}
+    if(Test-Path -LiteralPath $backup){throw 'Backup destination already exists.'}
+    if(Test-Path -LiteralPath $sdResult){throw 'Result destination already exists.'}
+    if(Test-Path -LiteralPath $sdRoot){
+        if(Test-Path -LiteralPath (Join-Path $sdRoot 'e2e.lock')){throw 'Another test holds the AndroSwitch SD folder.'}
+        Move-Item -LiteralPath $sdRoot -Destination $backup;$backupMoved=$true
+    }
+    New-Item -ItemType Directory -Path $sdRoot | Out-Null;$stageCreated=$true
+    foreach($name in @('apks','runtime','logs')){New-Item -ItemType Directory -Path (Join-Path $sdRoot $name)|Out-Null}
+    foreach($inputFile in $inputs){
+        if((Get-FileHash -LiteralPath $inputFile.source).Hash.ToLowerInvariant() -ne $inputFile.sha256){throw 'An input APK changed after preparation.'}
+        Copy-Item -LiteralPath $inputFile.source -Destination (Join-Path $sdRoot "apks/$($inputFile.staged_name)")
+    }
+    Copy-Item -LiteralPath $artifact -Destination $sdNro
+    Copy-Item -LiteralPath (Join-Path $run 'launcher-test.json') -Destination (Join-Path $sdRoot 'runtime/launcher-test.json')
+    $receipt.execution_attempted=$true;$receipt.status='attempted';Save-Receipt
+    # Explicit profile selection prevents reading one profile's SD while the
+    # emulator runs another. No fullscreen, monitor or window-position flags.
+    $arguments=@('--root-data-dir',('"'+$profile+'"'),('"'+$sdNro+'"'))
+    $process=Start-Process -FilePath $emulator -ArgumentList $arguments -WorkingDirectory (Split-Path -Parent $emulator) -WindowStyle Hidden -RedirectStandardOutput (Join-Path $run 'ryujinx.stdout.log') -RedirectStandardError (Join-Path $run 'ryujinx.stderr.log') -PassThru
+    $owned.Add($process.Id,$runStarted)
+    $rootIdentity=Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)"
+    # Retain the root PID as an ancestry anchor even if Ryujinx restarts before
+    # CIM can read it. A stale PID alone is never sufficient to stop a process.
+    $rootCreation=if($rootIdentity){$rootIdentity.CreationDate.ToUniversalTime()}else{$runStarted}
+    $owned[$process.Id]=$rootCreation
+    $receipt.pid=$process.Id
+    $seen=@{};$captured=@{};$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds);$result=$null
+    do{
+        $sessionFile=Join-Path $sdRoot 'logs/session-report.json'
+        if(Test-Path -LiteralPath $sessionFile){
+            try{
+                $session=Get-Content -LiteralPath $sessionFile -Raw|ConvertFrom-Json
+                if($session.session_id -like "$id-*"){
+                    if($session.status -eq 'running' -and -not $seen.ContainsKey($session.session_id)){$seen[$session.session_id]=[DateTime]::UtcNow}
+                    if($session.status -in @('passed_execution','failed') -and -not $captured.ContainsKey($session.session_id)){
+                        $fresh=if($seen.ContainsKey($session.session_id)){$seen[$session.session_id]}else{[DateTime]::MaxValue}
+                        $captured[$session.session_id]=@(Capture-Session $session $fresh)
+                    }
+                }
+            }catch{# Retry partial in-progress JSON writes; final evidence validation is strict.
+            }
+        }
+        $launcherFile=Join-Path $sdRoot 'logs/launcher-report.json'
+        if(Test-Path -LiteralPath $launcherFile){
+            try{$candidate=Get-Content -LiteralPath $launcherFile -Raw|ConvertFrom-Json;if($candidate.session_id -eq $id){$result=$candidate;break}}catch{}
+        }
+        if(-not @(Update-OwnedProcesses).Count){throw 'The owned emulator exited before the launcher workflow completed.'}
+        Start-Sleep -Milliseconds 500
+    }while([DateTime]::UtcNow -lt $deadline)
+    if(-not $result -or $result.status -ne 'passed_execution'){throw 'No fresh completed launcher report before the timeout.'}
+    Copy-Item -LiteralPath (Join-Path $sdRoot 'logs/launcher-report.json') -Destination (Join-Path $run 'emulator.json')
+    if($result.snapshots.Count -ne $commands.Count+1){throw 'Launcher snapshot count does not match the prepared command count.'}
+    foreach($snapshot in $result.snapshots){if($snapshot.presented_hash -cne $snapshot.shell.frame_hash){throw "Launcher submission mismatch at step $($snapshot.step)."}}
+    $cases=[Collections.Generic.List[object]]::new()
+    foreach($inputFile in $inputs){
+        $session=@($result.sessions|Where-Object session_id -eq $inputFile.expected_session_id)|Select-Object -First 1
+        $installed=@($result.snapshots|Where-Object step -eq $inputFile.install_snapshot_step)|Select-Object -First 1
+        $selected=if($installed){$installed.shell.installed[$installed.shell.selected]}else{$null}
+        $identity=$selected -and $selected.apk_sha256 -eq $inputFile.sha256 -and $session -and
+                  $selected.package -eq $session.package -and $selected.revision -eq $session.revision
+        $frames=@($session.snapshots|Where-Object {$_.native_frames -gt 0 -or ($_.presented_hash -and $_.presented_hash -ceq $_.frame_hash)})
+        $images=if($captured.ContainsKey($inputFile.expected_session_id)){@($captured[$inputFile.expected_session_id])}else{@()}
+        $freshNonblank=@($images|Where-Object {$_.valid_ppm -and $_.sampled_nonuniform})
+        $phases=@($session.teardown|ForEach-Object phase)
+        $returned='runtime_closed' -in $phases
+        $execution=$identity -and $session.status -eq 'passed_execution' -and -not $session.error -and
+                   $session.presented_frames -gt 0 -and $frames.Count -gt 0 -and $returned
+        $state=if(-not $execution){'blocked_or_unreported'}elseif(-not $freshNonblank.Count){'execution_observed_render_unconfirmed'}else{'execution_verified_visual_review_required'}
+        $cases.Add(@{input=$inputFile;status=$state;installed_identity_matches=[bool]$identity;runtime_status=$session.status;error=$session.error;teardown_phases=$phases;returned_to_launcher=$returned;presented_frames=$session.presented_frames;snapshots=@($session.snapshots);captures=$images;first_screen='not_visually_verified'})
+    }
+    $receipt.cases=@($cases.ToArray())
+    $receipt.visual_review='required'
+    $receipt.status=if(@($cases|Where-Object status -eq 'blocked_or_unreported').Count){'blocked_runtime'}elseif(@($cases|Where-Object status -eq 'execution_observed_render_unconfirmed').Count){'attempted_render_unconfirmed'}else{'execution_verified_visual_review_required'}
+    if(Test-Path -LiteralPath (Join-Path $sdRoot 'logs/display-error.json')){$receipt.status='failed_display';$receipt.display_error=Get-Content -LiteralPath (Join-Path $sdRoot 'logs/display-error.json') -Raw|ConvertFrom-Json}
+    $receipt.completed_sessions=@($result.sessions).Count
+}catch{
+    $receipt.status=if($receipt.execution_attempted){'attempted_failed'}else{'preflight_failed'}
+    $receipt.error=$_.Exception.Message
+}finally{
+    # A native process fault can prevent the final launcher report entirely.
+    # Preserve the actual last status/error/phases, including a still-running
+    # marker, instead of describing that attempt as a completed app session.
+    if($stageCreated){
+        try{
+            $sessionPath=Join-Path $sdRoot 'logs/session-report.json'
+            if(Test-Path -LiteralPath $sessionPath){
+                $last=Get-Content -LiteralPath $sessionPath -Raw|ConvertFrom-Json
+                if($last.session_id -like "$id-*"){$receipt.latest_session_report=$last}
+            }
+            $phasePath=Join-Path $sdRoot 'logs/teardown.log'
+            if(Test-Path -LiteralPath $phasePath){$receipt.latest_teardown=@(Get-Content -LiteralPath $phasePath|Where-Object {$_}|ForEach-Object {$_|ConvertFrom-Json})}
+            $admissionPath=Join-Path $sdRoot 'logs/memory-admission.json'
+            if(Test-Path -LiteralPath $admissionPath){$receipt.latest_memory_admission=Get-Content -LiteralPath $admissionPath -Raw|ConvertFrom-Json}
+        }catch{$receipt.evidence_capture_error=$_.Exception.Message}
+    }
+    try{
+        Stop-OwnedProcesses
+        if($stageCreated -and (Test-Path -LiteralPath $sdRoot)){
+            foreach($path in @($sdRoot,$sdResult)){Assert-SdChild $path}
+            Move-Item -LiteralPath $sdRoot -Destination $sdResult
+        }
+        if($backupMoved -and (Test-Path -LiteralPath $backup)){
+            foreach($path in @($backup,$sdRoot)){Assert-SdChild $path}
+            if(Test-Path -LiteralPath $sdRoot){throw "SD restore destination is occupied. Original data remains at $backup"}
+            Move-Item -LiteralPath $backup -Destination $sdRoot
+        }
+        $receipt.sd_original_restore=if($stageCreated -or $backupMoved){'restored'}else{'not_modified'}
+    }catch{$receipt.restore_error=$_.Exception.Message;$receipt.sd_original_restore='manual_recovery_required';$receipt.status='cleanup_failed'}
+    if($lock){$lock.Dispose();Remove-Item -LiteralPath $lockPath -ErrorAction SilentlyContinue}
+    Save-Receipt
+}
+Write-Output "External-APK evidence ($($receipt.status)): $run/verification.json"
+if($receipt.status -ne 'execution_verified_visual_review_required'){throw "External launch was not proved: $($receipt.status). See the verification report and preserved SD result."}
