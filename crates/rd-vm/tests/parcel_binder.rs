@@ -656,11 +656,7 @@ fn dex_interface_containers_use_function_callbacks() {
 
     let source_array = e
         .heap
-        .alloc_array_zeroed(
-            rd_vm::heap::ElemKind::Obj,
-            2,
-            "[Landroid/os/IInterface;",
-        )
+        .alloc_array_zeroed(rd_vm::heap::ElemKind::Obj, 2, "[Landroid/os/IInterface;")
         .unwrap();
     e.heap
         .array_elems_mut(source_array)
@@ -695,11 +691,7 @@ fn dex_interface_containers_use_function_callbacks() {
 
     let dest_array = e
         .heap
-        .alloc_array_zeroed(
-            rd_vm::heap::ElemKind::Obj,
-            2,
-            "[Landroid/os/IInterface;",
-        )
+        .alloc_array_zeroed(rd_vm::heap::ElemKind::Obj, 2, "[Landroid/os/IInterface;")
         .unwrap();
     e.invoke_instance(p, "setDataPosition", "(I)V", &[Value::Int(0)])
         .unwrap();
@@ -840,8 +832,14 @@ fn dex_bundle_dump_debug_and_dump_stats_use_guest_writers() {
         &[Value::Obj(proto), Value::Long(777)],
     )
     .unwrap();
-    assert_eq!(e.heap.get_field(proto, "startField").unwrap(), Value::Long(777));
-    assert_eq!(e.heap.get_field(proto, "startCount").unwrap(), Value::Int(1));
+    assert_eq!(
+        e.heap.get_field(proto, "startField").unwrap(),
+        Value::Long(777)
+    );
+    assert_eq!(
+        e.heap.get_field(proto, "startCount").unwrap(),
+        Value::Int(1)
+    );
     assert_eq!(e.heap.get_field(proto, "hasInt").unwrap(), Value::Int(0));
     assert_eq!(e.heap.get_field(proto, "hasString").unwrap(), Value::Int(1));
     assert_eq!(
@@ -851,7 +849,10 @@ fn dex_bundle_dump_debug_and_dump_stats_use_guest_writers() {
     let map_text = text_of(&e, e.heap.get_field(proto, "stringValue").unwrap());
     assert!(map_text.contains("name=Rusty"), "map text: {map_text}");
     assert!(map_text.contains("count=3"), "map text: {map_text}");
-    assert_eq!(e.heap.get_field(proto, "endToken").unwrap(), Value::Long(99));
+    assert_eq!(
+        e.heap.get_field(proto, "endToken").unwrap(),
+        Value::Long(99)
+    );
     assert_eq!(e.heap.get_field(proto, "endCount").unwrap(), Value::Int(1));
 
     // Parcelled Bundle: dumpDebug writes only the retained data size and
@@ -867,8 +868,13 @@ fn dex_bundle_dump_debug_and_dump_stats_use_guest_writers() {
     )
     .unwrap();
     let p = parcel(&mut e);
-    e.invoke_instance(p, "writeBundle", "(Landroid/os/Bundle;)V", &[Value::Obj(source)])
-        .unwrap();
+    e.invoke_instance(
+        p,
+        "writeBundle",
+        "(Landroid/os/Bundle;)V",
+        &[Value::Obj(source)],
+    )
+    .unwrap();
     let frame_size = match e.invoke_instance(p, "dataSize", "()I", &[]).unwrap() {
         Value::Int(n) => n,
         other => panic!("dataSize: {other:?}"),
@@ -884,7 +890,8 @@ fn dex_bundle_dump_debug_and_dump_stats_use_guest_writers() {
         )
         .unwrap());
     assert_eq!(
-        e.invoke_instance(parcelled, "isParcelled", "()Z", &[]).unwrap(),
+        e.invoke_instance(parcelled, "isParcelled", "()Z", &[])
+            .unwrap(),
         Value::Int(1)
     );
     let proto2 = e.new_instance(RECORDING_PROTO).unwrap();
@@ -896,7 +903,10 @@ fn dex_bundle_dump_debug_and_dump_stats_use_guest_writers() {
         &[Value::Obj(proto2), Value::Long(888)],
     )
     .unwrap();
-    assert_eq!(e.heap.get_field(proto2, "hasString").unwrap(), Value::Int(0));
+    assert_eq!(
+        e.heap.get_field(proto2, "hasString").unwrap(),
+        Value::Int(0)
+    );
     assert_eq!(e.heap.get_field(proto2, "hasInt").unwrap(), Value::Int(1));
     assert_eq!(
         e.heap.get_field(proto2, "intField").unwrap(),
@@ -907,9 +917,13 @@ fn dex_bundle_dump_debug_and_dump_stats_use_guest_writers() {
         Value::Int(frame_size - 8),
         "retained ArrayMap payload excludes the Bundle frame length+magic"
     );
-    assert_eq!(e.heap.get_field(proto2, "endToken").unwrap(), Value::Long(55));
     assert_eq!(
-        e.invoke_instance(parcelled, "isParcelled", "()Z", &[]).unwrap(),
+        e.heap.get_field(proto2, "endToken").unwrap(),
+        Value::Long(55)
+    );
+    assert_eq!(
+        e.invoke_instance(parcelled, "isParcelled", "()Z", &[])
+            .unwrap(),
         Value::Int(1),
         "dumpDebug must not materialize a parcelled Bundle"
     );
@@ -946,10 +960,19 @@ fn dex_bundle_dump_debug_and_dump_stats_use_guest_writers() {
         &[Value::Obj(writer), Value::Obj(stats_bundle)],
     )
     .unwrap();
-    assert_eq!(e.heap.get_field(writer, "increases").unwrap(), Value::Int(1));
-    assert_eq!(e.heap.get_field(writer, "decreases").unwrap(), Value::Int(1));
+    assert_eq!(
+        e.heap.get_field(writer, "increases").unwrap(),
+        Value::Int(1)
+    );
+    assert_eq!(
+        e.heap.get_field(writer, "decreases").unwrap(),
+        Value::Int(1)
+    );
     assert_eq!(e.heap.get_field(writer, "indent").unwrap(), Value::Int(0));
-    assert_eq!(e.heap.get_field(writer, "lineCount").unwrap(), Value::Int(1));
+    assert_eq!(
+        e.heap.get_field(writer, "lineCount").unwrap(),
+        Value::Int(1)
+    );
     let line = text_of(&e, e.heap.get_field(writer, "lastLine").unwrap());
     assert!(line.starts_with("big [size="), "stats line: {line}");
     let reported_size: usize = line
@@ -969,10 +992,16 @@ fn dex_bundle_dump_debug_and_dump_stats_use_guest_writers() {
         &[Value::Obj(null_writer), Value::Null],
     )
     .unwrap();
-    assert_eq!(e.heap.get_field(null_writer, "lineCount").unwrap(), Value::Int(1));
+    assert_eq!(
+        e.heap.get_field(null_writer, "lineCount").unwrap(),
+        Value::Int(1)
+    );
     assert_eq!(
         text_of(&e, e.heap.get_field(null_writer, "lastLine").unwrap()),
         "[null]"
     );
-    assert_eq!(e.heap.get_field(null_writer, "indent").unwrap(), Value::Int(0));
+    assert_eq!(
+        e.heap.get_field(null_writer, "indent").unwrap(),
+        Value::Int(0)
+    );
 }

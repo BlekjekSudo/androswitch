@@ -506,7 +506,10 @@ fn class_cookies(vm: &mut Engine, parcel: ObjRef, create: bool) -> Result<Option
             entries: Vec::new(),
         },
     );
-    crate::err::put_field_result(vm.heap.put_field(parcel, CLASS_COOKIES_FIELD, Value::Obj(r)))?;
+    crate::err::put_field_result(
+        vm.heap
+            .put_field(parcel, CLASS_COOKIES_FIELD, Value::Obj(r)),
+    )?;
     Ok(Some(r))
 }
 
@@ -822,9 +825,10 @@ pub(crate) fn write_bundle_map(
     if let Some(payload) = parcelled_payload(vm, bundle) {
         let mut st = load(vm, parcel);
         st.pos = align4(st.pos);
-        st.write_i32(i32::try_from(payload.len()).map_err(|_| {
-            bad("Parcel: Bundle exceeds the maximum parcelable size")
-        })?);
+        st.write_i32(
+            i32::try_from(payload.len())
+                .map_err(|_| bad("Parcel: Bundle exceeds the maximum parcelable size"))?,
+        );
         st.write_i32(BUNDLE_MAGIC);
         st.write_raw(&payload);
         store(vm, parcel, st);
@@ -977,14 +981,12 @@ fn read_bundle_frame_after_length(
 /// `BaseBundle.readFromParcelInner`, which replaces the map state with the
 /// retained Parcel.
 fn set_parcelled_data(vm: &mut Engine, bundle: ObjRef, retained: ObjRef) -> Result<(), VmExit> {
-    vm.fw.objects.insert(
-        bundle,
-        HostObj::Bundle {
-            map: Vec::new(),
-        },
-    );
+    vm.fw
+        .objects
+        .insert(bundle, HostObj::Bundle { map: Vec::new() });
     crate::err::put_field_result(
-        vm.heap.put_field(bundle, PARCELLED_FIELD, Value::Obj(retained)),
+        vm.heap
+            .put_field(bundle, PARCELLED_FIELD, Value::Obj(retained)),
     )
 }
 
@@ -1135,7 +1137,9 @@ fn sparse_int_entries(vm: &mut Engine, sparse: ObjRef) -> Result<Vec<(i32, i32)>
             .iter()
             .map(|(key, value)| {
                 let key = i32::try_from(*key).map_err(|_| {
-                    bad(format!("Parcel: SparseIntArray key {key} is outside int range"))
+                    bad(format!(
+                        "Parcel: SparseIntArray key {key} is outside int range"
+                    ))
                 })?;
                 Ok((key, value.as_int().unwrap_or(0)))
             })
@@ -4293,7 +4297,10 @@ mod tests {
         let list = new_list(&mut vm, vec![item]).unwrap();
         write_value(&mut vm, p, &list).unwrap();
         let st = load(&vm, p);
-        assert_eq!(i32::from_le_bytes(st.data[0..4].try_into().unwrap()), VAL_LIST);
+        assert_eq!(
+            i32::from_le_bytes(st.data[0..4].try_into().unwrap()),
+            VAL_LIST
+        );
         assert_eq!(
             i32::from_le_bytes(st.data[4..8].try_into().unwrap()) as usize,
             st.data.len() - 8,
@@ -4493,9 +4500,12 @@ mod tests {
             .heap
             .alloc_instance("Landroid/util/ArrayMap;".to_string(), Vec::new())
             .unwrap();
-        vm.fw
-            .objects
-            .insert(dest, HostObj::Map { entries: Vec::new() });
+        vm.fw.objects.insert(
+            dest,
+            HostObj::Map {
+                entries: Vec::new(),
+            },
+        );
         callp(
             &mut vm,
             p,
@@ -4511,7 +4521,9 @@ mod tests {
         assert_eq!(entries.len(), 2);
         assert_eq!(vm.heap.as_str(obj(entries[0].0.clone())).unwrap(), "a");
         assert_eq!(
-            vm.heap.get_field(obj(entries[0].1.clone()), "value").unwrap(),
+            vm.heap
+                .get_field(obj(entries[0].1.clone()), "value")
+                .unwrap(),
             Value::Int(1)
         );
         assert_eq!(vm.heap.as_str(obj(entries[1].0.clone())).unwrap(), "b");
@@ -4523,7 +4535,10 @@ mod tests {
             "(Ljava/lang/ClassLoader;)Landroid/util/ArraySet;",
             &[Value::Null],
         ));
-        assert_eq!(vm.heap.class_of(got_set).unwrap(), "Landroid/util/ArraySet;");
+        assert_eq!(
+            vm.heap.class_of(got_set).unwrap(),
+            "Landroid/util/ArraySet;"
+        );
         let elems = match vm.fw.get(got_set) {
             Some(HostObj::List { elems }) => elems.clone(),
             _ => panic!("read ArraySet has no host state"),
@@ -4587,15 +4602,9 @@ mod tests {
 
         // enforceNoDataAvail: unread bytes remain until consumed.
         callp(&mut vm, p, "setDataPosition", "(I)V", &[Value::Int(0)]);
-        assert!(call_instance_intrinsic(
-            &mut vm,
-            PARCEL,
-            "enforceNoDataAvail",
-            "()V",
-            p,
-            &[],
-        )
-        .is_err());
+        assert!(
+            call_instance_intrinsic(&mut vm, PARCEL, "enforceNoDataAvail", "()V", p, &[],).is_err()
+        );
         assert_eq!(callp(&mut vm, p, "readInt", "()I", &[]), Value::Int(7));
         callp(&mut vm, p, "enforceNoDataAvail", "()V", &[]);
 
@@ -4707,7 +4716,13 @@ mod tests {
             ),
             cookie
         );
-        let copy = obj(callp(&mut vm, p, "copyClassCookies", "()Ljava/util/Map;", &[]));
+        let copy = obj(callp(
+            &mut vm,
+            p,
+            "copyClassCookies",
+            "()Ljava/util/Map;",
+            &[],
+        ));
         assert_eq!(vm.heap.class_of(copy).unwrap(), "Landroid/util/ArrayMap;");
         callp(
             &mut vm,
