@@ -1302,29 +1302,29 @@ key_apis = ["android.speech.SpeechRecognizer.createSpeechRecognizer", "android.s
 id = "android-speech-tts"
 prefix = "android.speech.tts"
 domain = "speech-ml"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
-milestone = "future"
-notes = "TextToSpeech engine/service APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-speech-tts"
-key_apis = ["android.speech.tts.TextToSpeech.speak"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "TextToSpeech follows AOSP when no android.intent.action.TTS_SERVICE engine is installed (the installed-engine set is queried from the real PackageManager): construction fires OnInitListener.onInit(ERROR) exactly once (delivered inline in the deterministic model), getEngines is empty, getDefaultEngine/getCurrentEngine are null, and every connection-backed call returns its AOSP no-connection result (speak/playEarcon/playSilentUtterance/stop/synthesizeToFile-to-ParcelFileDescriptor ERROR, setLanguage/isLanguageAvailable/setVoice LANG_NOT_SUPPORTED, language/voice/feature getters null, isSpeaking false). Local bookkeeping works: addSpeech/addEarcon map text to URIs and return SUCCESS, setSpeechRate/setPitch apply the AOSP scaled-int validation into the params bundle (rate 150 for 1.5f), setAudioAttributes stores non-null attributes, listener setters return SUCCESS, areDefaultsEnforced is false and getMaxSpeechInputLength is 4000. Voice (fields, getters, Eclipse-style equals/hashCode, toString dereferencing features), TextToSpeech.EngineInfo, SynthesisRequest (defensive Bundle copy, language/voice/rate/pitch/caller setters), UtteranceProgressListener base defaults (coded onError delegating to onError(String), onRangeStart delegating to onUtteranceRangeStart), and TextToSpeechService onBind (one stable binder) plus the empty default onGetFeaturesForLanguage are implemented. No engine binding/discovery of installed engines, synthesis, audio output, file-creating synthesizeToFile variants, TextToSpeechService synthesis queue/default voice enumeration, or Parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-speech-tts-engine-synthesis"
+key_apis = ["android.speech.tts.TextToSpeech.speak", "android.speech.tts.TextToSpeech.getEngines", "android.speech.tts.TextToSpeech.setSpeechRate", "android.speech.tts.TextToSpeech.addSpeech", "android.speech.tts.Voice.getName", "android.speech.tts.SynthesisRequest.getParams"]
 
 [[surface]]
 id = "android-service-voice"
 prefix = "android.service.voice"
 domain = "speech-ml"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "VoiceInteractionService/AlwaysOnHotwordDetector are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-service-voice"
-key_apis = ["android.service.voice.VoiceInteractionService.onReady"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "VoiceInteractionService models the state where the voice interaction manager service does not exist: onBind returns the service binder only for the android.service.voice.VoiceInteractionService action, onReady() fails on the missing manager (NullPointerException), and the pre-ready guards behave as in AOSP (showSession and all hotword/visual-query detector factories and createKeyphraseModelManager throw IllegalStateException 'Not available until onReady() is called' after their overload-specific null checks, show-context accessors and non-null setUiHints dereference the absent manager, setUiHints(null) is an IllegalArgumentException, enrollment info is null, keyphrase support is false, supported voice actions are empty, and the static isActiveService reads Settings.Secure.voice_interaction_service). VoiceInteractionSession is modelled unattached (window-context fallback in the constructor, token-guarded show/hide/startVoiceActivity/startAssistantActivity/setKeepAwake/closeSystemDialogs/finish/registerVisibleActivityCallback throwing IllegalStateException 'Can't call before onCreate()', show-context accessors throwing NullPointerException, no-op lifecycle/request callbacks, onHandleAssist(AssistState) dispatching to the focused/secondary callbacks, key events unhandled, onBackPressed/onCloseSystemDialogs/onLockscreenShown/onTaskFinished delegating to hide(), all-false onGetSupportedCommands, null onCreateContentView) with its AssistState and ActivityId value types. HotwordDetectedResult and HotwordRejectedResult implement their DataClass builders, defaults, defensive audio-stream copies, proximity mapping into extras, buildUpon, equals/hashCode/toString and the AOSP range validation, except the native AudioRecord hotword-duration limit and the system-resource extras parcel-size limit, which are not enforced. No voice interaction manager/session attach, session window/UI, hotword detection, sound-trigger hardware, keyphrase enrollment, or Parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-service-voice-interaction-manager"
+key_apis = ["android.service.voice.VoiceInteractionService.onReady", "android.service.voice.VoiceInteractionService.createAlwaysOnHotwordDetector", "android.service.voice.VoiceInteractionService.isActiveService", "android.service.voice.VoiceInteractionSession.show", "android.service.voice.VoiceInteractionSession.onHandleAssist", "android.service.voice.HotwordDetectedResult.Builder.build"]
 
 [[surface]]
 id = "android-view-textclassifier"

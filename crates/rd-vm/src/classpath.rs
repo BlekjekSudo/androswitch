@@ -1887,6 +1887,36 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Landroid/os/Binder;",
             "Ljava/lang/Object;",
         ]),
+        // Appendix C Batch 35-B bounded android.speech.tts /
+        // android.service.voice slices.
+        "Landroid/speech/tts/TextToSpeechService;"
+        | "Landroid/service/voice/VoiceInteractionService;" => Some(&[
+            "Landroid/app/Service;",
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/speech/tts/TextToSpeech;"
+        | "Landroid/speech/tts/TextToSpeech$Engine;"
+        | "Landroid/speech/tts/TextToSpeech$EngineInfo;"
+        | "Landroid/speech/tts/Voice;"
+        | "Landroid/speech/tts/SynthesisRequest;"
+        | "Landroid/speech/tts/UtteranceProgressListener;"
+        | "Landroid/service/voice/VoiceInteractionSession;"
+        | "Landroid/service/voice/VoiceInteractionSession$AssistState;"
+        | "Landroid/service/voice/VoiceInteractionSession$ActivityId;"
+        | "Landroid/service/voice/HotwordDetectedResult;"
+        | "Landroid/service/voice/HotwordDetectedResult$BaseBuilder;"
+        | "Landroid/service/voice/HotwordRejectedResult;"
+        | "Landroid/service/voice/HotwordRejectedResult$Builder;" => Some(OBJECT),
+        "Landroid/service/voice/HotwordDetectedResult$Builder;" => Some(&[
+            "Landroid/service/voice/HotwordDetectedResult$BaseBuilder;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/speech/tts/ITextToSpeechService$Stub;"
+        | "Landroid/service/voice/IVoiceInteractionService$Stub;" => {
+            Some(&["Landroid/os/Binder;", "Ljava/lang/Object;"])
+        }
         _ => None,
     }
 }
@@ -2440,6 +2470,26 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         "Landroid/service/textservice/SpellCheckerService$SpellCheckerServiceBinder;"
         | "Lcom/android/internal/textservice/ISpellCheckerService$Stub;" => Some(&[
             "Lcom/android/internal/textservice/ISpellCheckerService;",
+            "Landroid/os/IBinder;",
+            "Landroid/os/IInterface;",
+        ]),
+        // Interfaces in the Batch 35-B bounded slices.
+        "Landroid/speech/tts/Voice;"
+        | "Landroid/speech/tts/TextToSpeech$EngineInfo;"
+        | "Landroid/service/voice/HotwordDetectedResult;"
+        | "Landroid/service/voice/HotwordRejectedResult;" => Some(&["Landroid/os/Parcelable;"]),
+        "Landroid/service/voice/VoiceInteractionSession;" => Some(&[
+            "Landroid/view/KeyEvent$Callback;",
+            "Landroid/content/ComponentCallbacks2;",
+            "Landroid/content/ComponentCallbacks;",
+        ]),
+        "Landroid/speech/tts/ITextToSpeechService$Stub;" => Some(&[
+            "Landroid/speech/tts/ITextToSpeechService;",
+            "Landroid/os/IBinder;",
+            "Landroid/os/IInterface;",
+        ]),
+        "Landroid/service/voice/IVoiceInteractionService$Stub;" => Some(&[
+            "Landroid/service/voice/IVoiceInteractionService;",
             "Landroid/os/IBinder;",
             "Landroid/os/IInterface;",
         ]),
