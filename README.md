@@ -75,9 +75,11 @@ Bitmap, JNI constructor and Thread identity blockers. Independent SDK APKs
 verify actual workers, native-suspended GC roots, PNG pixels and JVM-matching
 JNI constructor/thread/context results. Independent SDK APKs also verify
 installed package metadata and actual worker ThreadLocal isolation in Horizon.
-Candy Crush now reports unavailable CopyOnWriteArrayList; Mekorama reports
-Class.getDeclaredField. Both return to the launcher, and neither game has a
-first-screen pass yet.
+The next SDK proofs verify COW snapshots, DEX field reflection and TimeUnit
+conversions on one NRO. Original Candy Crush now requires BaseInputConnection;
+Mekorama reaches a surface-created callback and requires Runtime.getRuntime.
+Both return to the launcher, and neither game has a first-screen pass yet.
+See [the exact game observations](reports/m9-input-runtime-startup-ryujinx-20261025.json).
 Installation is not a compatibility guarantee; see
 [startup-failure diagnosis and recovery](docs/STARTUP_FAILURES.md).
 See [M7 storage improvements](docs/M7_STORAGE_E2E.md) for the new I/O path and limits.

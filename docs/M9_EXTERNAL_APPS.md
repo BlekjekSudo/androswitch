@@ -453,3 +453,12 @@ Collect `session-report.json`, `native-compatibility.json`,
 `memory-admission.json`, `memory.log`, `teardown.log`, Android logs and fresh
 frame captures. Retain the exact NRO/APK hashes. Failed startup is evidence of
 a remaining API/ABI gap; it must not be converted into a compatibility pass.
+
+
+The [NRO19 original-game run](../reports/m9-input-runtime-startup-ryujinx-20261025.json)
+passes the prior Field/COW startup boundaries. Candy Crush next requires the
+shared BaseInputConnection state in a DEX subclass. Mekorama reaches a
+surface-created callback, then billing initialization requests Runtime.getRuntime.
+Neither produces a verified game screen. Both installed identities match the
+original frozen APK hashes and both return to the launcher; the test SD folder
+is restored normally. Missing contracts remain failures, not no-op successes.
