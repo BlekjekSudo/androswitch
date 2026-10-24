@@ -473,11 +473,59 @@ fn binder_for_handle(vm: &Engine, h: i32) -> Result<Value, VmExit> {
 }
 
 /// Write one strong Binder handle (the body of `writeStrongBinder`).
+/// The binder is also recorded in the parcel's object table, mirroring the
+/// native flat-binder-object list that `hasBinders` inspects.
 fn write_strong_binder_to(vm: &mut Engine, parcel: ObjRef, v: &Value) {
     let h = binder_handle(vm, v);
     let mut st = load(vm, parcel);
     st.write_i32(h);
+    if matches!(v, Value::Obj(_)) {
+        st.objects.push(v.clone());
+    }
     store(vm, parcel, st);
+}
+
+/// Heap field holding a Parcel's class-cookie `ArrayMap<Class, Object>`
+/// (AOSP `Parcel.mClassCookies`, created lazily by `setClassCookie`).
+const CLASS_COOKIES_FIELD: &str = "rd$class_cookies";
+
+fn class_cookies(vm: &mut Engine, parcel: ObjRef, create: bool) -> Result<Option<ObjRef>, VmExit> {
+    if let Ok(Value::Obj(r)) = vm.heap.get_field(parcel, CLASS_COOKIES_FIELD) {
+        return Ok(Some(r));
+    }
+    if !create {
+        return Ok(None);
+    }
+    let r = vm
+        .heap
+        .alloc_instance("Landroid/util/ArrayMap;".to_string(), Vec::new())
+        .map_err(crate::err::oom_throwable)?;
+    vm.fw.objects.insert(
+        r,
+        HostObj::Map {
+            entries: Vec::new(),
+        },
+    );
+    crate::err::put_field_result(vm.heap.put_field(parcel, CLASS_COOKIES_FIELD, Value::Obj(r)))?;
+    Ok(Some(r))
+}
+
+fn cookie_entries(vm: &Engine, cookies: ObjRef) -> Vec<(Value, Value)> {
+    match vm.fw.get(cookies) {
+        Some(HostObj::Map { entries }) => entries.clone(),
+        _ => Vec::new(),
+    }
+}
+
+/// libbinder `Parcel::compareData` ordering over two byte ranges:
+/// lexicographic `memcmp` over the common prefix, then length.
+fn compare_ranges(a: &[u8], b: &[u8]) -> i32 {
+    for (x, y) in a.iter().zip(b.iter()) {
+        if x != y {
+            return *x as i32 - *y as i32;
+        }
+    }
+    a.len() as i32 - b.len() as i32
 }
 
 /// Read one strong Binder handle (the body of `readStrongBinder`).
@@ -979,6 +1027,38 @@ fn new_sparse(vm: &mut Engine, class: &str, entries: Vec<(i32, Value)>) -> Resul
             .collect(),
     );
     Ok(Value::Obj(r))
+}
+
+/// Entries of a `SparseIntArray`: the host sparse map when present, else
+/// the guest `size()/keyAt()/valueAt()` surface (Parcel's own algorithm).
+fn sparse_int_entries(vm: &mut Engine, sparse: ObjRef) -> Result<Vec<(i32, i32)>, VmExit> {
+    if let Some(entries) = vm.sparse.get(&sparse) {
+        return entries
+            .iter()
+            .map(|(key, value)| {
+                let key = i32::try_from(*key).map_err(|_| {
+                    bad(format!("Parcel: SparseIntArray key {key} is outside int range"))
+                })?;
+                Ok((key, value.as_int().unwrap_or(0)))
+            })
+            .collect();
+    }
+    let n = match vm.invoke_instance(sparse, "size", "()I", &[])? {
+        Value::Int(n) if n >= 0 => n as usize,
+        _ => return Err(bad("Parcel: SparseIntArray.size() did not return a count")),
+    };
+    let mut entries = Vec::with_capacity(n.min(1_000_000));
+    for i in 0..n {
+        let index = Value::Int(i as i32);
+        let key = vm
+            .invoke_instance(sparse, "keyAt", "(I)I", std::slice::from_ref(&index))?
+            .as_int()?;
+        let value = vm
+            .invoke_instance(sparse, "valueAt", "(I)I", std::slice::from_ref(&index))?
+            .as_int()?;
+        entries.push((key, value));
+    }
+    Ok(entries)
 }
 
 fn write_sparse_array(
@@ -1905,7 +1985,184 @@ fn parcel_instance(
             store(vm, recv, st);
             return some(Value::Null);
         }
-        ("hasFileDescriptors", "()Z") => return some(Value::Int(0)),
+        ("hasFileDescriptors", "()Z") | ("hasFileDescriptors", "(II)Z") => {
+            // No file-descriptor object can ever be written into a host
+            // parcel (FD forms are typed-unsupported), so this is exact.
+            return some(Value::Int(0));
+        }
+        ("setClassCookie", "(Ljava/lang/Class;Ljava/lang/Object;)V") => {
+            let Some(cookies) = class_cookies(vm, recv, true)? else {
+                return some(Value::Null);
+            };
+            let key = args.first().cloned().unwrap_or(Value::Null);
+            let value = args.get(1).cloned().unwrap_or(Value::Null);
+            let mut entries = cookie_entries(vm, cookies);
+            if let Some(e) = entries.iter_mut().find(|(k, _)| *k == key) {
+                e.1 = value;
+            } else {
+                entries.push((key, value));
+            }
+            vm.fw.objects.insert(cookies, HostObj::Map { entries });
+            return some(Value::Null);
+        }
+        ("getClassCookie", "(Ljava/lang/Class;)Ljava/lang/Object;") => {
+            let found = match class_cookies(vm, recv, false)? {
+                Some(cookies) => cookie_entries(vm, cookies)
+                    .into_iter()
+                    .find(|(k, _)| Some(k) == args.first())
+                    .map(|(_, v)| v),
+                None => None,
+            };
+            return some(found.unwrap_or(Value::Null));
+        }
+        ("hasClassCookie", "(Ljava/lang/Class;)Z") => {
+            let found = match class_cookies(vm, recv, false)? {
+                Some(cookies) => cookie_entries(vm, cookies)
+                    .iter()
+                    .any(|(k, _)| Some(k) == args.first()),
+                None => false,
+            };
+            return some(Value::Int(found as i32));
+        }
+        ("removeClassCookie", "(Ljava/lang/Class;Ljava/lang/Object;)V") => {
+            if let Some(cookies) = class_cookies(vm, recv, false)? {
+                let mut entries = cookie_entries(vm, cookies);
+                entries.retain(|(k, _)| Some(k) != args.first());
+                vm.fw.objects.insert(cookies, HostObj::Map { entries });
+            }
+            return some(Value::Null);
+        }
+        ("adoptClassCookies", "(Landroid/os/Parcel;)V") => {
+            // AOSP adopts the source's cookie map reference itself.
+            let Some(from) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.adoptClassCookies: source is null"));
+            };
+            let adopted = vm
+                .heap
+                .get_field(from, CLASS_COOKIES_FIELD)
+                .unwrap_or(Value::Null);
+            crate::err::put_field_result(vm.heap.put_field(recv, CLASS_COOKIES_FIELD, adopted))?;
+            return some(Value::Null);
+        }
+        ("copyClassCookies", "()Ljava/util/Map;") => {
+            // AOSP `new ArrayMap<>(mClassCookies)` — a copy even when the
+            // parcel has no cookies (empty map, tolerating null).
+            let entries = match class_cookies(vm, recv, false)? {
+                Some(cookies) => cookie_entries(vm, cookies),
+                None => Vec::new(),
+            };
+            let copy = vm
+                .heap
+                .alloc_instance("Landroid/util/ArrayMap;".to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            vm.fw.objects.insert(copy, HostObj::Map { entries });
+            return some(Value::Obj(copy));
+        }
+        ("putClassCookies", "(Ljava/util/Map;)V") => {
+            if let Some(Value::Obj(source)) = args.first() {
+                if let Some(entries) = match vm.fw.get(*source) {
+                    Some(HostObj::Map { entries }) => Some(entries.clone()),
+                    _ => None,
+                } {
+                    if let Some(cookies) = class_cookies(vm, recv, true)? {
+                        let mut mine = cookie_entries(vm, cookies);
+                        for (k, v) in entries {
+                            if let Some(e) = mine.iter_mut().find(|(ek, _)| *ek == k) {
+                                e.1 = v;
+                            } else {
+                                mine.push((k, v));
+                            }
+                        }
+                        vm.fw.objects.insert(cookies, HostObj::Map { entries: mine });
+                    }
+                }
+            }
+            return some(Value::Null);
+        }
+        ("hasBinders", "()Z") => {
+            let st = load(vm, recv);
+            return some(Value::Int(
+                st.objects.iter().any(|o| matches!(o, Value::Obj(_))) as i32,
+            ));
+        }
+        ("enforceNoDataAvail", "()V") => {
+            let st = load(vm, recv);
+            let unread = st.data.len().saturating_sub(st.pos);
+            if unread > 0 {
+                return Err(bad(format!(
+                    "Parcel data not fully consumed, unread size: {unread}"
+                )));
+            }
+            return some(Value::Null);
+        }
+        ("compareData", "(Landroid/os/Parcel;)I") => {
+            let Some(other) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.compareData: other is null"));
+            };
+            let a = load(vm, recv).data;
+            let b = load(vm, other).data;
+            return some(Value::Int(compare_ranges(&a, &b)));
+        }
+        ("writeSize", "(Landroid/util/Size;)V") => {
+            let Some(r) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.writeSize: size is null"));
+            };
+            let w = vm.heap.get_field(r, "rd_w").unwrap_or(Value::Null);
+            let h = vm.heap.get_field(r, "rd_h").unwrap_or(Value::Null);
+            let mut st = load(vm, recv);
+            st.write_i32(w.as_int().unwrap_or(0));
+            st.write_i32(h.as_int().unwrap_or(0));
+            store(vm, recv, st);
+            return some(Value::Null);
+        }
+        ("readSize", "()Landroid/util/Size;") => {
+            let (w, h) = {
+                let mut st = load(vm, recv);
+                let pair = (st.read_i32()?, st.read_i32()?);
+                store(vm, recv, st);
+                pair
+            };
+            let r = vm
+                .heap
+                .alloc_instance("Landroid/util/Size;".to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            crate::err::put_field_result(vm.heap.put_field(r, "rd_w", Value::Int(w)))?;
+            crate::err::put_field_result(vm.heap.put_field(r, "rd_h", Value::Int(h)))?;
+            return some(Value::Obj(r));
+        }
+        ("writeSizeF", "(Landroid/util/SizeF;)V") => {
+            let Some(r) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.writeSizeF: size is null"));
+            };
+            let w = vm.heap.get_field(r, "rd_w").unwrap_or(Value::Null);
+            let h = vm.heap.get_field(r, "rd_h").unwrap_or(Value::Null);
+            let mut st = load(vm, recv);
+            st.write_i32(w.as_float().unwrap_or(0.0).to_bits() as i32);
+            st.write_i32(h.as_float().unwrap_or(0.0).to_bits() as i32);
+            store(vm, recv, st);
+            return some(Value::Null);
+        }
+        ("readSizeF", "()Landroid/util/SizeF;") => {
+            let (w, h) = {
+                let mut st = load(vm, recv);
+                let pair = (st.read_i32()?, st.read_i32()?);
+                store(vm, recv, st);
+                pair
+            };
+            // `SizeF`'s constructor rejects NaN/infinite dimensions; the
+            // same check applies when unmarshalling one.
+            let (wf, hf) = (f32::from_bits(w as u32), f32::from_bits(h as u32));
+            if !wf.is_finite() || !hf.is_finite() {
+                return Err(iae("Parcel.readSizeF: non-finite dimension"));
+            }
+            let r = vm
+                .heap
+                .alloc_instance("Landroid/util/SizeF;".to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            crate::err::put_field_result(vm.heap.put_field(r, "rd_w", Value::Float(wf)))?;
+            crate::err::put_field_result(vm.heap.put_field(r, "rd_h", Value::Float(hf)))?;
+            return some(Value::Obj(r));
+        }
         ("writeInterfaceToken", "(Ljava/lang/String;)V") => {
             let token = str_of(vm, args.first())?;
             let mut st = load(vm, recv);
@@ -2214,6 +2471,42 @@ fn parcel_instance(
         ("readSparseArray", "(Ljava/lang/ClassLoader;)Landroid/util/SparseArray;")
         | ("readSparseArray", "(Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/Object;") => {
             return some(read_sparse_array(vm, recv)?);
+        }
+        ("writeSparseIntArray", "(Landroid/util/SparseIntArray;)V") => {
+            // AOSP: -1 for null, else count then key/value int pairs in
+            // ascending-key order.
+            match obj_arg(args, 0) {
+                None => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(-1);
+                    store(vm, recv, st);
+                }
+                Some(sparse) => {
+                    let entries = sparse_int_entries(vm, sparse)?;
+                    let mut st = load(vm, recv);
+                    st.write_i32(entries.len() as i32);
+                    for (key, value) in entries {
+                        st.write_i32(key);
+                        st.write_i32(value);
+                    }
+                    store(vm, recv, st);
+                }
+            }
+            return some(Value::Null);
+        }
+        ("readSparseIntArray", "()Landroid/util/SparseIntArray;") => {
+            let Some(n) = read_typed_len(vm, recv, "SparseIntArray")? else {
+                return some(Value::Null);
+            };
+            let mut entries = Vec::with_capacity(n.min(1_000_000));
+            let mut st = load(vm, recv);
+            for _ in 0..n {
+                let key = st.read_i32()?;
+                let value = st.read_i32()?;
+                entries.push((key, Value::Int(value)));
+            }
+            store(vm, recv, st);
+            return some(new_sparse(vm, "Landroid/util/SparseIntArray;", entries)?);
         }
         ("writeSparseBooleanArray", "(Landroid/util/SparseBooleanArray;)V") => {
             write_sparse_boolean_array(vm, recv, obj_arg(args, 0))?;
@@ -2848,6 +3141,7 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("writeStringArray", "([Ljava/lang/String;)V")
+        | ("writeString16Array", "([Ljava/lang/String;)V")
         | ("writeCharSequenceArray", "([Ljava/lang/CharSequence;)V") => {
             match array_elems(vm, args.first())? {
                 None => {
@@ -2868,6 +3162,7 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("createStringArray", "()[Ljava/lang/String;")
+        | ("createString16Array", "()[Ljava/lang/String;")
         | ("createCharSequenceArray", "()[Ljava/lang/CharSequence;") => {
             let Some(n) = read_typed_len(vm, recv, "string array")? else {
                 return some(Value::Null);
@@ -2891,6 +3186,7 @@ fn parcel_instance(
             )?);
         }
         ("readStringArray", "([Ljava/lang/String;)V")
+        | ("readString16Array", "([Ljava/lang/String;)V")
         | ("readCharSequenceArray", "([Ljava/lang/CharSequence;)V") => {
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readStringArray: destination is null"));
@@ -2908,6 +3204,73 @@ fn parcel_instance(
             let slot = vm.heap.array_elems_mut(dest)?;
             if slot.len() != vals.len() {
                 return Err(bad("Parcel.readStringArray: destination length mismatch"));
+            }
+            slot.clone_from(&vals);
+            return some(Value::Null);
+        }
+        ("writeString8Array", "([Ljava/lang/String;)V") => {
+            match array_elems(vm, args.first())? {
+                None => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(-1);
+                    store(vm, recv, st);
+                }
+                Some(elems) => {
+                    let mut strings = Vec::with_capacity(elems.len());
+                    for e in &elems {
+                        strings.push(str_of(vm, Some(e))?);
+                    }
+                    let mut st = load(vm, recv);
+                    st.write_i32(strings.len() as i32);
+                    for s in &strings {
+                        st.write_string8(s.as_deref());
+                    }
+                    store(vm, recv, st);
+                }
+            }
+            return some(Value::Null);
+        }
+        ("createString8Array", "()[Ljava/lang/String;") => {
+            let Some(n) = read_typed_len(vm, recv, "string8 array")? else {
+                return some(Value::Null);
+            };
+            let mut vals = Vec::with_capacity(n);
+            let mut st = load(vm, recv);
+            for _ in 0..n {
+                vals.push(st.read_string8()?);
+            }
+            store(vm, recv, st);
+            let mut out = Vec::with_capacity(n);
+            for s in vals {
+                out.push(jstring(vm, s)?);
+            }
+            return some(crate::arrays::new_array(
+                vm,
+                "[Ljava/lang/String;",
+                ElemKind::Obj,
+                out,
+            )?);
+        }
+        ("readString8Array", "([Ljava/lang/String;)V") => {
+            let Some(dest) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.readString8Array: destination is null"));
+            };
+            let Some(n) = read_typed_len(vm, recv, "string8 array")? else {
+                return some(Value::Null);
+            };
+            let mut strs = Vec::with_capacity(n);
+            let mut st = load(vm, recv);
+            for _ in 0..n {
+                strs.push(st.read_string8()?);
+            }
+            store(vm, recv, st);
+            let mut vals = Vec::with_capacity(n);
+            for s in strs {
+                vals.push(jstring(vm, s)?);
+            }
+            let slot = vm.heap.array_elems_mut(dest)?;
+            if slot.len() != vals.len() {
+                return Err(bad("Parcel.readString8Array: destination length mismatch"));
             }
             slot.clone_from(&vals);
             return some(Value::Null);
@@ -3398,6 +3761,27 @@ pub(crate) fn static_intrinsic(
 ) -> Result<Option<Value>, VmExit> {
     Ok(match (class, name, sig) {
         (PARCEL, "obtain", "()Landroid/os/Parcel;") => Some(new_parcel(vm)?),
+        (PARCEL, "compareData", "(Landroid/os/Parcel;ILandroid/os/Parcel;II)Z") => {
+            let (Some(a), Some(b)) = (obj_arg(args, 0), obj_arg(args, 2)) else {
+                return Err(npe("Parcel.compareData: parcel is null"));
+            };
+            let (off_a, off_b, len) = (int_arg(args, 1), int_arg(args, 3), int_arg(args, 4));
+            let da = load(vm, a).data;
+            let db = load(vm, b).data;
+            let slice = |d: &Vec<u8>, off: i32| -> Option<Vec<u8>> {
+                if off < 0 || len < 0 {
+                    return None;
+                }
+                let (off, len) = (off as usize, len as usize);
+                let end = off.checked_add(len)?;
+                d.get(off..end).map(<[u8]>::to_vec)
+            };
+            let equal = match (slice(&da, off_a), slice(&db, off_b)) {
+                (Some(x), Some(y)) => x == y,
+                _ => false,
+            };
+            Some(Value::Int(equal as i32))
+        }
         (BINDER, "getCallingPid", "()I") => Some(Value::Int(10000)),
         (BINDER, "getCallingUid", "()I") => Some(Value::Int(10000)),
         (BINDER, "getCallingUidOrThrow", "()I") => Some(Value::Int(10000)),
@@ -4039,6 +4423,197 @@ mod tests {
             "Integer 9 (hash 9) precedes \"x\" (hash 120)"
         );
         assert_eq!(vm.heap.as_str(obj(elems[1].clone())).unwrap(), "x");
+    }
+
+    #[test]
+    fn parcel_compare_enforce_binders_sparse_int_and_string8() {
+        let mut vm = engine();
+        let p = obj(new_parcel(&mut vm).unwrap());
+        let q = obj(new_parcel(&mut vm).unwrap());
+        for parcel in [p, q] {
+            callp(&mut vm, parcel, "writeInt", "(I)V", &[Value::Int(7)]);
+        }
+        assert_eq!(
+            callp(
+                &mut vm,
+                p,
+                "compareData",
+                "(Landroid/os/Parcel;)I",
+                &[Value::Obj(q)],
+            ),
+            Value::Int(0)
+        );
+        callp(&mut vm, q, "writeInt", "(I)V", &[Value::Int(1)]);
+        assert!(
+            callp(
+                &mut vm,
+                p,
+                "compareData",
+                "(Landroid/os/Parcel;)I",
+                &[Value::Obj(q)],
+            )
+            .as_int()
+            .unwrap()
+                < 0
+        );
+        assert_eq!(
+            vm.invoke_static(
+                PARCEL,
+                "compareData",
+                "(Landroid/os/Parcel;ILandroid/os/Parcel;II)Z",
+                &[
+                    Value::Obj(p),
+                    Value::Int(0),
+                    Value::Obj(q),
+                    Value::Int(0),
+                    Value::Int(4),
+                ],
+            )
+            .unwrap(),
+            Value::Int(1)
+        );
+
+        // enforceNoDataAvail: unread bytes remain until consumed.
+        callp(&mut vm, p, "setDataPosition", "(I)V", &[Value::Int(0)]);
+        assert!(call_instance_intrinsic(
+            &mut vm,
+            PARCEL,
+            "enforceNoDataAvail",
+            "()V",
+            p,
+            &[],
+        )
+        .is_err());
+        assert_eq!(callp(&mut vm, p, "readInt", "()I", &[]), Value::Int(7));
+        callp(&mut vm, p, "enforceNoDataAvail", "()V", &[]);
+
+        // hasBinders tracks strong-binder writes through the object table.
+        assert_eq!(callp(&mut vm, p, "hasBinders", "()Z", &[]), Value::Int(0));
+        let binder = vm
+            .heap
+            .alloc_instance(BINDER.to_string(), Vec::new())
+            .unwrap();
+        callp(
+            &mut vm,
+            p,
+            "writeStrongBinder",
+            "(Landroid/os/IBinder;)V",
+            &[Value::Obj(binder)],
+        );
+        assert_eq!(callp(&mut vm, p, "hasBinders", "()Z", &[]), Value::Int(1));
+
+        // SparseIntArray form: count then ascending key/value int pairs.
+        let sp = obj(new_parcel(&mut vm).unwrap());
+        let sia = vm
+            .heap
+            .alloc_instance("Landroid/util/SparseIntArray;".to_string(), Vec::new())
+            .unwrap();
+        vm.sparse.insert(
+            sia,
+            [(2i64, Value::Int(20)), (1i64, Value::Int(10))]
+                .into_iter()
+                .collect(),
+        );
+        callp(
+            &mut vm,
+            sp,
+            "writeSparseIntArray",
+            "(Landroid/util/SparseIntArray;)V",
+            &[Value::Obj(sia)],
+        );
+        callp(&mut vm, sp, "setDataPosition", "(I)V", &[Value::Int(0)]);
+        let got = obj(callp(
+            &mut vm,
+            sp,
+            "readSparseIntArray",
+            "()Landroid/util/SparseIntArray;",
+            &[],
+        ));
+        assert_eq!(
+            vm.sparse.get(&got).cloned().unwrap_or_default(),
+            [(1i64, Value::Int(10)), (2i64, Value::Int(20))]
+                .into_iter()
+                .collect()
+        );
+
+        // String8 array form uses the UTF-8 codec, not UTF-16.
+        let hello = s(&mut vm, "hé");
+        let arr = crate::arrays::new_array(
+            &mut vm,
+            "[Ljava/lang/String;",
+            ElemKind::Obj,
+            vec![hello, Value::Null],
+        )
+        .unwrap();
+        let sp8 = obj(new_parcel(&mut vm).unwrap());
+        callp(
+            &mut vm,
+            sp8,
+            "writeString8Array",
+            "([Ljava/lang/String;)V",
+            std::slice::from_ref(&arr),
+        );
+        callp(&mut vm, sp8, "setDataPosition", "(I)V", &[Value::Int(0)]);
+        let got = obj(callp(
+            &mut vm,
+            sp8,
+            "createString8Array",
+            "()[Ljava/lang/String;",
+            &[],
+        ));
+        let elems = vm.heap.as_array_elems(got).unwrap().0.to_vec();
+        assert_eq!(vm.heap.as_str(obj(elems[0].clone())).unwrap(), "hé");
+        assert_eq!(elems[1], Value::Null);
+
+        // Class cookies live in a lazily-created host ArrayMap.
+        let cookie = s(&mut vm, "cookie");
+        let clazz = s(&mut vm, "not-a-class-but-a-key");
+        callp(
+            &mut vm,
+            p,
+            "setClassCookie",
+            "(Ljava/lang/Class;Ljava/lang/Object;)V",
+            &[clazz.clone(), cookie.clone()],
+        );
+        assert_eq!(
+            callp(
+                &mut vm,
+                p,
+                "hasClassCookie",
+                "(Ljava/lang/Class;)Z",
+                std::slice::from_ref(&clazz),
+            ),
+            Value::Int(1)
+        );
+        assert_eq!(
+            callp(
+                &mut vm,
+                p,
+                "getClassCookie",
+                "(Ljava/lang/Class;)Ljava/lang/Object;",
+                std::slice::from_ref(&clazz),
+            ),
+            cookie
+        );
+        let copy = obj(callp(&mut vm, p, "copyClassCookies", "()Ljava/util/Map;", &[]));
+        assert_eq!(vm.heap.class_of(copy).unwrap(), "Landroid/util/ArrayMap;");
+        callp(
+            &mut vm,
+            p,
+            "removeClassCookie",
+            "(Ljava/lang/Class;Ljava/lang/Object;)V",
+            &[clazz.clone(), cookie],
+        );
+        assert_eq!(
+            callp(
+                &mut vm,
+                p,
+                "getClassCookie",
+                "(Ljava/lang/Class;)Ljava/lang/Object;",
+                std::slice::from_ref(&clazz),
+            ),
+            Value::Null
+        );
     }
 
     #[test]
