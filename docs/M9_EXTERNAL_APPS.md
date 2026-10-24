@@ -28,20 +28,33 @@ Static inventory identifies imports and DEX calls; it cannot establish that a
 path executes or that a game renders. The runtime does not select behavior
 using the package/library names in this documentation.
 
-The [latest shared-API startup run](../reports/m9-lifecycle-threadlocal-startup-ryujinx-20261025.json)
-use the same NRO and unmodified APK hashes. Mekorama passes monitor operations,
+The [latest shared-API startup run](../reports/m9-field-cow-startup-ryujinx-20261025.json)
+uses the same NRO and unmodified APK hashes. Mekorama passes monitor operations,
 Executor construction, resource-name lookup, TextUtils and resource identifier
-lookup, loader-aware `Class.forName` and Application lifecycle registration.
-Its Executor next rejects unavailable `ThreadLocal` construction during
-`DynamiteModule` initialization.
+lookup, loader-aware `Class.forName`, Application lifecycle registration and
+ThreadLocal initialization. Its Executor next reports unavailable
+`Class.getDeclaredField` during `DynamiteModule.getLocalVersion`.
 Candy Crush passes Timer, inherited `getResources`, Bitmap decoding, native
-constructors, `Thread.currentThread` and context loader lookup, then reports
-unavailable `PackageManager.getPackageInfo(String,int)` while its exception
-writer reads the package version during `onCreate`.
+constructors, `Thread.currentThread`, context loader and installed package
+version lookup, then reports unavailable `CopyOnWriteArrayList` construction
+in `ActivityHelper` during `onCreate`.
 Both complete worker/native resource closure and return to the launcher.
 Mekorama's original execution error and later `onPause` error remain recorded;
 resource closure does not imply that every Java lifecycle callback succeeded.
 Neither game has a verified first screen.
+
+The [NRO18 SDK proofs](../reports/m9-package-threadlocal-horizon-20261025.json)
+verify real Java Thread identity and separate main/worker ThreadLocal values
+101/202, including stored null and collection, followed by a main Handler
+callback and exact VFS transcript. The installed package proof reads the actual
+version and mounted APK header, and catches typed unknown/null package errors.
+Both present frames and return safely; the isolated emulator stops and restores
+its original SD state. TextView multiline rendering still substitutes newline
+glyphs and clips the metadata proof after its recognizable PASS label; the
+complete facts are checked independently through the file transcript.
+See [ThreadLocal contracts](JAVA_THREAD_LOCAL.md),
+[installed metadata contracts](../fixtures/m9/package-info/README.md), and their
+[host metadata receipt](../reports/m9-package-info-host-20261025.json).
 
 Independent SDK/NDK proof APKs establish [Timer execution](../reports/horizon-timer-ryujinx-20261024.json),
 [Executor execution](../reports/m9-executors-horizon-proof-20261024.json),

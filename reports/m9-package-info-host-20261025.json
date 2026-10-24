@@ -1,0 +1,435 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T18:53:28.7581010Z",
+  "implementation_commit": "928a9fa",
+  "scope": "General installed PackageManager.getPackageInfo(String,int) metadata from committed immutable APK revisions; portable no_std+alloc implementation, original SDK proof, no package-specific runtime branches.",
+  "status": "host_passed_emulator_pending",
+  "portable_core_asserted": true,
+  "observed_blocker": {
+    "error": "NOT_FOUND [rd-vm]: método Landroid/content/pm/PackageManager;->getPackageInfo(Ljava/lang/String;I)Landroid/content/pm/PackageInfo; não resolvido [pc 0xb: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 3, idx: 253, regs: [0, 2, 1, 0, 0] } }]\n  at Lcom/king/core/AndroidCallstackUtils;->getPackageVersionName(Landroid/content/Context;)Ljava/lang/String;\n  at Lcom/king/core/UncaughtExceptionWriter;-><init>(Landroid/content/Context;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V — a classe pode depender de plataforma fora do escopo M2",
+    "run": "local-artifacts/m9/external-runs/04d4356d373d4d878f5cec1fb20a29b1",
+    "nro_sha256": "79cf988d8a4fb646d4d5a71e9fd009885eb6d92eda76040a416c8762170438ed",
+    "returned_to_launcher": true,
+    "external_apk_sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+    "first_screen": "not_visually_verified",
+    "sd_restore": "restored"
+  },
+  "contract": [
+    "flags=0 resolves only a currently installed committed record. A merely parsed/loaded APK is not package existence. Requested record publication/identity is validated by existing registry code.",
+    "A bounded file-backed ZIP reader reads the central directory and AndroidManifest.xml only; it does not extract DEX/resources/native libraries or scan other APK payloads. APK length and manifest package/version fields must agree with the requested record.",
+    "PackageInfo snapshots contain actual packageName, low API26 int versionCode, nullable literal versionName, and fresh ApplicationInfo. Missing versionCode defaults to 0; missing versionName is null.",
+    "ApplicationInfo exposes proven package/class names, data directory, SDK values, label/icon/theme IDs and nonlocalized label. Unproven flags/UID/nativeLibraryDir/process metadata remain unavailable.",
+    "Own sourceDir/publicSourceDir is emitted only when captured running installation revision/hash/size matches the requested record. A newer installed revision cannot reuse the running old alias. Cross-package source APK mounts are unavailable.",
+    "Unknown, uninstalled, malformed and case-mismatched names throw real NameNotFoundException. Null with flags=0 throws that exception with an actual null Java message. The exception is materialized before transport diagnostic frames can change the Java-observable message.",
+    "Registration of the checked NameNotFoundException hierarchy uses AndroidException -> Exception -> Throwable -> Object. SDK catches validate that ancestry.",
+    "Returned metadata is a mutable snapshot; mutating it does not change registry values. GC follows real field edges to ApplicationInfo and strings, then reclaims discarded snapshots without a permanent service cache.",
+    "Nonzero flags, unproven fields, and resource-valued versionName fail explicitly rather than returning invented times/signatures/flags/versions. A resource-valued application boolean does not reject unrelated proven PackageInfo fields.",
+    "Shared SDK parser default targetSdk now uses the effective child minSdk. Normal SDK fixtures prove min-only26->target26 and empty/absent uses-sdk -> min1,target1."
+  ],
+  "api": {
+    "conditional_application_info_fields": [
+      "sourceDir",
+      "publicSourceDir"
+    ],
+    "application_info_fields": [
+      "packageName",
+      "name",
+      "className",
+      "dataDir",
+      "minSdkVersion",
+      "targetSdkVersion",
+      "labelRes",
+      "icon",
+      "theme",
+      "nonLocalizedLabel"
+    ],
+    "instance": "Landroid/content/pm/PackageManager;->getPackageInfo(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;",
+    "supported_flags": 0,
+    "package_info_fields": [
+      "packageName",
+      "versionCode",
+      "versionName",
+      "applicationInfo"
+    ],
+    "catalog": [
+      "Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;",
+      "Landroid/content/pm/PackageManager;->getPackageInfo(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;"
+    ]
+  },
+  "budgets": {
+    "cross_package_test_asserted_read_bytes_less_than": 262144,
+    "per_read_chunk_bytes": 65536,
+    "manifest_bytes": 4194304,
+    "cross_package_fixture_stored_padding_bytes": 2097152,
+    "central_directory_entries": 32768,
+    "central_directory_bytes": 4194304,
+    "container_bytes": 536870912,
+    "input_package_name_bytes": 4096
+  },
+  "commands": [
+    {
+      "status": "passed",
+      "exit_code": 0,
+      "apks": 10,
+      "command": "fixtures/m9/package-info/build.ps1",
+      "toolchain": "javac --release 8, Android build-tools35.0.0, d8 --min-api26, Android35 compile definitions"
+    },
+    {
+      "exit_code": 0,
+      "failed": 0,
+      "seconds": 4.8,
+      "compile_seconds": 23.47,
+      "status": "passed",
+      "log": "local-artifacts/m9/package-info-host/20261025/tests-5.log",
+      "passed": 8,
+      "ignored": 0,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-framework --features host --test package_info --locked -- --test-threads=1"
+    },
+    {
+      "seconds": 0.12,
+      "filtered": 7,
+      "log": "local-artifacts/m9/package-info-host/20261025/lifecycle-2.log",
+      "passed": 1,
+      "status": "passed",
+      "compile_seconds": 2.16,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-framework --features host --test lifecycle package_context_directories_and_class_loader_use_real_storage_and_vm_metadata --locked -- --include-ignored --test-threads=1",
+      "exit_code": 0
+    },
+    {
+      "status": "passed",
+      "exit_code": 0,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1 cargo clippy -p as-framework --features host --lib --test package_info --locked -- -D warnings",
+      "seconds": 10.01,
+      "log": "local-artifacts/m9/package-info-host/20261025/clippy-3.log"
+    }
+  ],
+  "root_parser_verification": {
+    "failed": 0,
+    "seconds": 1.27,
+    "status": "passed",
+    "log": "target/evidence/m9-sdk-default-parser.log",
+    "passed": 29,
+    "owner": "root",
+    "ignored": 0,
+    "scope": "Shared uses-sdk defaults correction plus six-case regression",
+    "sha256": "6a2d3548eadebe362769cddaa956ea9dc16578d4d6d9b260421a1c37a1cd6b74"
+  },
+  "tests": [
+    "normal_sdk_device_proof_reads_own_versions_real_apk_and_typed_failures_in_both_identities",
+    "cross_package_metadata_is_committed_and_file_backed_without_extracting_large_assets",
+    "nullable_default_versions_fresh_mutable_snapshots_and_gc_follow_actual_field_edges",
+    "updated_versions_do_not_reuse_running_old_source_alias_and_uninstalled_packages_are_missing",
+    "missing_null_invalid_and_case_mismatched_names_do_not_create_package_existence",
+    "unsupported_flags_fields_and_resource_metadata_fail_instead_of_inventing_values",
+    "mismatched_installed_manifest_is_corruption_not_fabricated_metadata",
+    "min_only_empty_and_absent_uses_sdk_use_actual_android_manifest_defaults"
+  ],
+  "device_proof": {
+    "file": "/sdcard/Download/androswitch-package-info-proof.txt",
+    "uses_native_test_hooks": false,
+    "hardware": "not_run_for_this_source",
+    "host": "passed_both_manifest_identities",
+    "visible_first_label": "PACKAGE INFO PASS",
+    "fields": "actual installed packageName/versionCode/versionName, actual mounted APK header PK, exact unknown/null NameNotFoundException Java messages",
+    "horizon_emulator": "pending_for_this_source",
+    "apk": "local-artifacts/m9/package-info-host/20261025/frozen-fixtures-after-sdk-default/package-info.apk",
+    "sha256": "af82806704ac35b13586257f15d1002787e2dd59c5ee0c8b8aff55a8965a5eec",
+    "bytes": 4347,
+    "renamed_sha256": "1aa53d9a2b1ecc49d948f3bd4ad81e7443555ff799ba72bfb1835d602c395f15"
+  },
+  "limits": [
+    "The independent SDK fixture executes actual Android API DEX on the portable host runtime. Android reference-device PackageManager behavior is grounded in primary API26 source, not claimed from a desktop JVM stub.",
+    "No collection of signature/component/permission/time metadata is claimed. Nonzero query flags and unbound fields are explicit unavailable operations.",
+    "The preexisting Context.getApplicationInfo flags bitset is a separate incomplete legacy subset. It is not copied into fresh PackageInfo ApplicationInfo and is not validated as a full API26 bitset by this receipt.",
+    "Resource-valued versionName and nonliteral SDK/application class-name values remain explicit unsupported inputs; locale/resource resolution is not fabricated.",
+    "Metadata queries do not repeat full APK hashing/signature verification performed by the execution load path. They validate committed record consistency, container size, and actual manifest identity/version.",
+    "Only the already mounted running APK can expose sourceDir. Cross-package readonly APK mounts and updated-running-process remounting remain unavailable.",
+    "Typed NameNotFoundException delivery/message semantics are tested. Public Java constructors, stack traces, causes, and the complete exception ecosystem are not newly advertised.",
+    "Latest original external APKs have not yet been rerun with this implementation. No Candy Crush/Mekorama first screen, gameplay, or physical Switch compatibility claim is made by this host receipt.",
+    "The earlier frozen-fixtures directory contains pre-SDK-default historical bytes. The final tested artifacts for E2E are exclusively frozen-fixtures-after-sdk-default."
+  ],
+  "fixture_receipt": {
+    "sha256": "ad3b318a89b42937353c11b9dc853f759a66b3e517024ee57623dd57bfa9b49f",
+    "path": "local-artifacts/m9/package-info-host/20261025/frozen-fixtures-after-sdk-default/build-receipt.json"
+  },
+  "fixture_build": {
+    "build_tools": "35.0.0",
+    "sources": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\package-info\\java\\org\\androswitch\\contracts\\PackageMetadataActivity.java",
+        "sha256": "174057d65ac11f5cee7e01558c0d80a6635df3d985d6f8edd858a511c8f51e39"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\package-info\\java\\org\\androswitch\\contracts\\PackageMetadataProbe.java",
+        "sha256": "afbeb8eb10b30605cd317ae9c11464747f11810b088a886b15f0d169949b83af"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\package-info\\res\\values\\metadata.xml",
+        "sha256": "74d60cfa2ac08cf7650e9b308240147f7492969b11ad1bae20b44878850b3b12"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\package-info\\build.ps1",
+        "sha256": "f13a09eeb5693462bb1c69aff515ac342dbe68a70f290d825d57954218b39917"
+      }
+    ],
+    "api": 26,
+    "schema_version": 1,
+    "apks": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\package-info-fixture\\package-info.apk",
+        "bytes": 4347,
+        "sha256": "af82806704ac35b13586257f15d1002787e2dd59c5ee0c8b8aff55a8965a5eec"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\package-info-fixture\\renamed.apk",
+        "bytes": 4351,
+        "sha256": "1aa53d9a2b1ecc49d948f3bd4ad81e7443555ff799ba72bfb1835d602c395f15"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\package-info-fixture\\companion.apk",
+        "bytes": 2101433,
+        "sha256": "35f045319b12eaaa20cf7c0ba6970e2c2aafa2369a5628ee679a0a536e47b75a"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\package-info-fixture\\defaults.apk",
+        "bytes": 4107,
+        "sha256": "49b4a06accfb8ab9e08bc2e2e7138c902faa1bd7ab171b40c6ba978b359f9cf0"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\package-info-fixture\\updated.apk",
+        "bytes": 4151,
+        "sha256": "6c7ef8dc67f34646c861634555dca61cba22a222e8df2e66f8848048ae8fcd69"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\package-info-fixture\\resource-version.apk",
+        "bytes": 4139,
+        "sha256": "72d6e908389e93523e5eb72d05016d7db59cc134f8e106a099b6ed3a65203f35"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\package-info-fixture\\resource-boolean.apk",
+        "bytes": 4171,
+        "sha256": "21c7941f55c111a0fe13e3a55ea0cb570d00ef572b9d1bb9f2dc4da03525aa68"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\package-info-fixture\\min-only.apk",
+        "bytes": 4103,
+        "sha256": "40cbdc9115197f93f5a5812ae36afaf167973955e06cee87b7283fb4ec16b850"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\package-info-fixture\\empty-sdk.apk",
+        "bytes": 4067,
+        "sha256": "9e5e5bd798349673af0355f053644d1f0b288d49fe5676169f9b990a3afb26ec"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\package-info-fixture\\no-sdk.apk",
+        "bytes": 4039,
+        "sha256": "9c563d9bc2d6426e804a593a6c65021be3d92f24275a68978bcf8a4677af2962"
+      }
+    ]
+  },
+  "fixture_apks": [
+    {
+      "path": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-fixtures-after-sdk-default\\package-info.apk",
+      "bytes": 4347,
+      "name": "package-info.apk",
+      "sha256": "af82806704ac35b13586257f15d1002787e2dd59c5ee0c8b8aff55a8965a5eec"
+    },
+    {
+      "path": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-fixtures-after-sdk-default\\renamed.apk",
+      "bytes": 4351,
+      "name": "renamed.apk",
+      "sha256": "1aa53d9a2b1ecc49d948f3bd4ad81e7443555ff799ba72bfb1835d602c395f15"
+    },
+    {
+      "path": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-fixtures-after-sdk-default\\companion.apk",
+      "bytes": 2101433,
+      "name": "companion.apk",
+      "sha256": "35f045319b12eaaa20cf7c0ba6970e2c2aafa2369a5628ee679a0a536e47b75a"
+    },
+    {
+      "path": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-fixtures-after-sdk-default\\defaults.apk",
+      "bytes": 4107,
+      "name": "defaults.apk",
+      "sha256": "49b4a06accfb8ab9e08bc2e2e7138c902faa1bd7ab171b40c6ba978b359f9cf0"
+    },
+    {
+      "path": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-fixtures-after-sdk-default\\updated.apk",
+      "bytes": 4151,
+      "name": "updated.apk",
+      "sha256": "6c7ef8dc67f34646c861634555dca61cba22a222e8df2e66f8848048ae8fcd69"
+    },
+    {
+      "path": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-fixtures-after-sdk-default\\resource-version.apk",
+      "bytes": 4139,
+      "name": "resource-version.apk",
+      "sha256": "72d6e908389e93523e5eb72d05016d7db59cc134f8e106a099b6ed3a65203f35"
+    },
+    {
+      "path": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-fixtures-after-sdk-default\\resource-boolean.apk",
+      "bytes": 4171,
+      "name": "resource-boolean.apk",
+      "sha256": "21c7941f55c111a0fe13e3a55ea0cb570d00ef572b9d1bb9f2dc4da03525aa68"
+    },
+    {
+      "path": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-fixtures-after-sdk-default\\min-only.apk",
+      "bytes": 4103,
+      "name": "min-only.apk",
+      "sha256": "40cbdc9115197f93f5a5812ae36afaf167973955e06cee87b7283fb4ec16b850"
+    },
+    {
+      "path": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-fixtures-after-sdk-default\\empty-sdk.apk",
+      "bytes": 4067,
+      "name": "empty-sdk.apk",
+      "sha256": "9e5e5bd798349673af0355f053644d1f0b288d49fe5676169f9b990a3afb26ec"
+    },
+    {
+      "path": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-fixtures-after-sdk-default\\no-sdk.apk",
+      "bytes": 4039,
+      "name": "no-sdk.apk",
+      "sha256": "9c563d9bc2d6426e804a593a6c65021be3d92f24275a68978bcf8a4677af2962"
+    }
+  ],
+  "sources": [
+    {
+      "sha256": "a4b92a09970c80795ad2b85f4ae3a70b4a86bfa1ba95d11b420b8b869a72e3f7",
+      "path": "crates/as-framework/src/services/package.rs",
+      "snapshot": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-sources-after-sdk-default\\crates\\as-framework\\src\\services\\package.rs"
+    },
+    {
+      "sha256": "e357fde0330e66a5ddfb19d132ba36c19cabf3f964d557d64dbc545d905aad58",
+      "path": "crates/as-framework/src/services/package/installed.rs",
+      "snapshot": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-sources-after-sdk-default\\crates\\as-framework\\src\\services\\package\\installed.rs"
+    },
+    {
+      "sha256": "40c803be4336f3a1ddfac6acfe98a3fdecf9250c4dace9bfe4ecd489a616b7d6",
+      "path": "crates/as-framework/src/services/mod.rs",
+      "snapshot": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-sources-after-sdk-default\\crates\\as-framework\\src\\services\\mod.rs"
+    },
+    {
+      "sha256": "9cd5d4890e1be42c9c6c77957c465aba965bcdc33954ca4be1cc885995400ecd",
+      "path": "crates/as-framework/src/android.rs",
+      "snapshot": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-sources-after-sdk-default\\crates\\as-framework\\src\\android.rs"
+    },
+    {
+      "sha256": "a3762e4b51921d9251b1a81f781ce9592427d873191688dcd758c46ad7c636c3",
+      "path": "crates/as-framework/src/lib.rs",
+      "snapshot": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-sources-after-sdk-default\\crates\\as-framework\\src\\lib.rs"
+    },
+    {
+      "sha256": "e7d51f7c747afc65ba8eae4708478bf2725178099316c9c027fcc1da19a9b11c",
+      "path": "crates/as-framework/Cargo.toml",
+      "snapshot": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-sources-after-sdk-default\\crates\\as-framework\\Cargo.toml"
+    },
+    {
+      "sha256": "da148ab354f02e3b7150055572b8c1196c625df46e7d9f7e99f7e986f4bd211b",
+      "path": "crates/as-framework/tests/package_info.rs",
+      "snapshot": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-sources-after-sdk-default\\crates\\as-framework\\tests\\package_info.rs"
+    },
+    {
+      "sha256": "0a612cae1b7c22da6be64f36e1530a11e2ffc35a50b9ba5090ad27a09fc6ee7d",
+      "path": "crates/rd-apk/src/manifest.rs",
+      "snapshot": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-sources-after-sdk-default\\crates\\rd-apk\\src\\manifest.rs"
+    },
+    {
+      "sha256": "28a21e48b5306bc05cd44648e9606a54d39c9b94a50b142b23c8659ca383e7e6",
+      "path": "crates/rd-vm/src/classpath.rs",
+      "snapshot": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-sources-after-sdk-default\\crates\\rd-vm\\src\\classpath.rs"
+    },
+    {
+      "sha256": "e5be8483f4ad07b2152809d5ec6f96f2b6e467070f5cba957f79eaeed6aeaf44",
+      "path": "crates/rd-vm/src/engine.rs",
+      "snapshot": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-sources-after-sdk-default\\crates\\rd-vm\\src\\engine.rs"
+    },
+    {
+      "sha256": "af8bcee569ba59e3346e858efcda06844cdac69e11cb4a3c44025169e4316276",
+      "path": "crates/rd-vm/src/portable/throwables.rs",
+      "snapshot": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-sources-after-sdk-default\\crates\\rd-vm\\src\\portable\\throwables.rs"
+    },
+    {
+      "sha256": "bbb9adaccf9071b1e68c8c2cc550a0366d1eddf5f9c3003b7a9ea663b0bc49dc",
+      "path": "crates/as-platform/src/vfs.rs",
+      "snapshot": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-sources-after-sdk-default\\crates\\as-platform\\src\\vfs.rs"
+    },
+    {
+      "sha256": "9d33bb3c1fbd3fb963235c3c23d48c37ceda7f81ae15479868c0061d4a9e810d",
+      "path": "crates/as-package/src/lib.rs",
+      "snapshot": "local-artifacts\\m9\\package-info-host\\20261025\\frozen-sources-after-sdk-default\\crates\\as-package\\src\\lib.rs"
+    }
+  ],
+  "references": [
+    {
+      "url": "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/core/java/android/app/ApplicationPackageManager.java",
+      "sha256": "76e289978d2b0c6f16116979614fc33822dccd3ac8fa63b202801d37ca8e07a8",
+      "snapshot": "local-artifacts/m9/packageinfo-api26-ApplicationPackageManager.java",
+      "name": "ApplicationPackageManager"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/core/java/android/content/pm/PackageInfo.java",
+      "sha256": "b84163f857f039a3ed25e11c3e776114158005e2b6a70a90c3f4a39f3c527f50",
+      "snapshot": "local-artifacts/m9/packageinfo-api26-PackageInfo.java",
+      "name": "PackageInfo"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/core/java/android/content/pm/PackageParser.java",
+      "sha256": "f604577c153fb83dda244f3ec44e88cfbba8850f9ae546cdcf2af45d284df1c5",
+      "snapshot": "local-artifacts/m9/packageinfo-api26-PackageParser.java",
+      "name": "PackageParser"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/services/core/java/com/android/server/pm/PackageManagerService.java",
+      "sha256": "aff2b9017b81118b97beed39cc3091842095474c7d4ce1d928ce57a9b748de2e",
+      "snapshot": "local-artifacts/m9/packageinfo-api26-PackageManagerService.java",
+      "name": "PackageManagerService"
+    },
+    {
+      "url": "https://developer.android.com/guide/topics/manifest/uses-sdk-element",
+      "name": "uses-sdk default targetSdk",
+      "scope": "Primary Android documentation confirms default targetSdk is the effective minSdk; root added shared-parser regression."
+    }
+  ],
+  "logs": [
+    {
+      "sha256": "64dea7ffa51e3f1344aa6f389de08035b0eb3d63574c11c879c73412822d3665",
+      "path": "local-artifacts/m9/package-info-host/20261025/tests-1.log"
+    },
+    {
+      "sha256": "1ab59c0924e9b7e5aef5bf05c79ab99ab9e00f28ebca32271652b7ad28d284d1",
+      "path": "local-artifacts/m9/package-info-host/20261025/tests-2.log"
+    },
+    {
+      "sha256": "617d494d70e0ba587cd7349b1df6ab0e12d3cbe5b0027fdb0ec2b1f415847d22",
+      "path": "local-artifacts/m9/package-info-host/20261025/tests-3.log"
+    },
+    {
+      "sha256": "b97574f82dccb4086ad896dc239591cb59e10c9caff66d94924f4a09ef1da14b",
+      "path": "local-artifacts/m9/package-info-host/20261025/tests-4.log"
+    },
+    {
+      "sha256": "fc95e3bcf36db42a30dc05f26fce8f2b6ef71a629c68123a05ed2488e53663ce",
+      "path": "local-artifacts/m9/package-info-host/20261025/tests-5.log"
+    },
+    {
+      "sha256": "1cab57b2105e27c703b5a266758b09efcf4a8de7c06a1150bf415a12a478f5be",
+      "path": "local-artifacts/m9/package-info-host/20261025/lifecycle-2.log"
+    },
+    {
+      "sha256": "cee602da3bb478f13feb32e8a7d668e3a40a9381f52c95ed100e7df303a4b7cf",
+      "path": "local-artifacts/m9/package-info-host/20261025/clippy-1.log"
+    },
+    {
+      "sha256": "2a0c20b10cb21ea12fa893f5173e8ab3232a0b6f45a55a8b2ca8ff204598205b",
+      "path": "local-artifacts/m9/package-info-host/20261025/clippy-2.log"
+    },
+    {
+      "sha256": "c32710f564b7014d93354863261a422a950711a1d6ecc9f9db9e0dd24a36ca26",
+      "path": "local-artifacts/m9/package-info-host/20261025/clippy-3.log"
+    }
+  ],
+  "diagnostic_attempts": [
+    "Initial fixture packaging used an AAPT overlay switch for ordinary resources; the builder was corrected to link its actual resource table as an ordinary input.",
+    "tests-1: a trait-object filesystem reference was not a PackageManager FileSystem implementor; binding now passes the existing Rc FileSystem adapter.",
+    "tests-2: SDK proof found lazy Throwable materialization exposing appended transport diagnostic frames in NameNotFoundException.getMessage. The service now materializes the real nullable private message before propagation; original exact SDK message assertions remain.",
+    "tests-3 and tests-4: seven tests passed before the shared SDK default review. A test-only single-element loop was simplified for Clippy.",
+    "Reviewer found the shared parser defaulting targetSdk before effective child minSdk. Root fixed the parser and passed29 no-default-feature unit tests. The final builder added min-only/empty/absent SDK APKs; tests-5 passed all8 cases and the focused regression/Clippy passed on the final source."
+  ]
+}
