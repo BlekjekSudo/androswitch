@@ -13960,3 +13960,379 @@ fn gsm_cell_location_values_are_guest_visible() {
         &[],
     );
 }
+
+// ---- Appendix C Batch 35-E: android.net.http + android.se.omapi ----
+
+const P35E_SSL_ERROR: &str = "Landroid/net/http/SslError;";
+const P35E_SSL_CERTIFICATE: &str = "Landroid/net/http/SslCertificate;";
+const P35E_SE_SERVICE: &str = "Landroid/se/omapi/SEService;";
+const P35E_READER: &str = "Landroid/se/omapi/Reader;";
+
+#[test]
+fn ssl_certificate_and_error_values_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let millis = 1_704_067_200_000i64; // whole seconds: format keeps s precision
+    let not_before = p49_new(
+        &mut engine,
+        "Ljava/util/Date;",
+        "(J)V",
+        &[Value::Long(millis)],
+    );
+    let not_after = p49_new(
+        &mut engine,
+        "Ljava/util/Date;",
+        "(J)V",
+        &[Value::Long(millis + 86_400_000)],
+    );
+    let issued_to = text(&mut engine, "CN=example.com, O=Example Inc, OU=IT, C=US");
+    let issued_by = text(&mut engine, "CN=Doe\\, John, O=Root CA");
+    let cert = p49_new(
+        &mut engine,
+        P35E_SSL_CERTIFICATE,
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/util/Date;Ljava/util/Date;)V",
+        &[
+            issued_to,
+            issued_by,
+            Value::Obj(not_before),
+            Value::Obj(not_after),
+        ],
+    );
+    let to = object(call(
+        &mut engine,
+        cert,
+        "getIssuedTo",
+        "()Landroid/net/http/SslCertificate$DName;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(&mut engine, to, "getDName", "()Ljava/lang/String;", &[]),
+        "CN=example.com, O=Example Inc, OU=IT, C=US"
+    );
+    assert_eq!(
+        call_text(&mut engine, to, "getCName", "()Ljava/lang/String;", &[]),
+        "example.com"
+    );
+    assert_eq!(
+        call_text(&mut engine, to, "getOName", "()Ljava/lang/String;", &[]),
+        "Example Inc"
+    );
+    assert_eq!(
+        call_text(&mut engine, to, "getUName", "()Ljava/lang/String;", &[]),
+        "IT"
+    );
+    let by = object(call(
+        &mut engine,
+        cert,
+        "getIssuedBy",
+        "()Landroid/net/http/SslCertificate$DName;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(&mut engine, by, "getCName", "()Ljava/lang/String;", &[]),
+        "Doe, John"
+    );
+    assert_eq!(
+        call_text(&mut engine, by, "getUName", "()Ljava/lang/String;", &[]),
+        ""
+    );
+    // Date getters clone: same time, different object.
+    let before_date = object(call(
+        &mut engine,
+        cert,
+        "getValidNotBeforeDate",
+        "()Ljava/util/Date;",
+        &[],
+    ));
+    assert_ne!(before_date, not_before);
+    assert_eq!(
+        call(&mut engine, before_date, "getTime", "()J", &[]),
+        Value::Long(millis)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            cert,
+            "getX509Certificate",
+            "()Ljava/security/cert/X509Certificate;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call_text(&mut engine, cert, "toString", "()Ljava/lang/String;", &[]),
+        "Issued to: CN=example.com, O=Example Inc, OU=IT, C=US;\nIssued by: CN=Doe\\, John, O=Root CA;\n"
+    );
+    // saveState/restoreState round trip preserves names and date millis.
+    let bundle = object(call_static(
+        &mut engine,
+        P35E_SSL_CERTIFICATE,
+        "saveState",
+        "(Landroid/net/http/SslCertificate;)Landroid/os/Bundle;",
+        &[Value::Obj(cert)],
+    ));
+    let key = text(&mut engine, "issued-to");
+    assert_eq!(
+        call_text(
+            &mut engine,
+            bundle,
+            "getString",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            &[key]
+        ),
+        "CN=example.com, O=Example Inc, OU=IT, C=US"
+    );
+    let restored = object(call_static(
+        &mut engine,
+        P35E_SSL_CERTIFICATE,
+        "restoreState",
+        "(Landroid/os/Bundle;)Landroid/net/http/SslCertificate;",
+        &[Value::Obj(bundle)],
+    ));
+    let restored_before = object(call(
+        &mut engine,
+        restored,
+        "getValidNotBeforeDate",
+        "()Ljava/util/Date;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, restored_before, "getTime", "()J", &[]),
+        Value::Long(millis)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P35E_SSL_CERTIFICATE,
+            "saveState",
+            "(Landroid/net/http/SslCertificate;)Landroid/os/Bundle;",
+            &[Value::Null],
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P35E_SSL_CERTIFICATE,
+            "restoreState",
+            "(Landroid/os/Bundle;)Landroid/net/http/SslCertificate;",
+            &[Value::Null],
+        ),
+        Value::Null
+    );
+    // Unparseable date strings degrade to null dates ("" formatted).
+    let bad_to = text(&mut engine, "CN=x");
+    let bad_by = text(&mut engine, "CN=y");
+    let bad_date = text(&mut engine, "not a date");
+    let bad_date2 = text(&mut engine, "also bad");
+    let bad = p49_new(
+        &mut engine,
+        P35E_SSL_CERTIFICATE,
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+        &[bad_to, bad_by, bad_date, bad_date2],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            bad,
+            "getValidNotBeforeDate",
+            "()Ljava/util/Date;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            bad,
+            "getValidNotBefore",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        ""
+    );
+
+    // SslError bitmask semantics.
+    let url = text(&mut engine, "https://example.com/");
+    let error = p49_new(
+        &mut engine,
+        P35E_SSL_ERROR,
+        "(ILandroid/net/http/SslCertificate;Ljava/lang/String;)V",
+        &[Value::Int(1), Value::Obj(cert), url],
+    );
+    assert_eq!(
+        call(&mut engine, error, "getPrimaryError", "()I", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, error, "hasError", "(I)Z", &[Value::Int(1)]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, error, "hasError", "(I)Z", &[Value::Int(3)]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, error, "addError", "(I)Z", &[Value::Int(3)]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, error, "getPrimaryError", "()I", &[]),
+        Value::Int(3)
+    );
+    assert_eq!(
+        call(&mut engine, error, "addError", "(I)Z", &[Value::Int(6)]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, error, "hasError", "(I)Z", &[Value::Int(-1)]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            error,
+            "getCertificate",
+            "()Landroid/net/http/SslCertificate;",
+            &[]
+        ),
+        Value::Obj(cert)
+    );
+    let shown = call_text(&mut engine, error, "toString", "()Ljava/lang/String;", &[]);
+    assert!(
+        shown.starts_with("primary error: 3 certificate: Issued to: CN=example.com"),
+        "{shown}"
+    );
+    assert!(shown.ends_with("on URL: https://example.com/"), "{shown}");
+    let chromium_url = text(&mut engine, "https://example.com/");
+    let chromium = object(call_static(
+        &mut engine,
+        P35E_SSL_ERROR,
+        "SslErrorFromChromiumErrorCode",
+        "(ILandroid/net/http/SslCertificate;Ljava/lang/String;)Landroid/net/http/SslError;",
+        &[Value::Int(-200), Value::Obj(cert), chromium_url],
+    ));
+    assert_eq!(
+        call(&mut engine, chromium, "getPrimaryError", "()I", &[]),
+        Value::Int(2)
+    );
+}
+
+#[test]
+fn omapi_without_a_secure_element_service_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, "Landroid/content/ContextWrapper;");
+    let executor = instance(&mut engine, "Ljava/util/concurrent/Executor;");
+    let listener = instance(
+        &mut engine,
+        "Landroid/se/omapi/SEService$OnConnectedListener;",
+    );
+    // Null arguments are rejected before any binding attempt.
+    let rejected = instance(&mut engine, P35E_SE_SERVICE);
+    assert_throws(
+        engine.invoke_instance(
+            rejected,
+            "<init>",
+            "(Landroid/content/Context;Ljava/util/concurrent/Executor;Landroid/se/omapi/SEService$OnConnectedListener;)V",
+            &[Value::Null, Value::Obj(executor), Value::Obj(listener)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let service = p49_new(
+        &mut engine,
+        P35E_SE_SERVICE,
+        "(Landroid/content/Context;Ljava/util/concurrent/Executor;Landroid/se/omapi/SEService$OnConnectedListener;)V",
+        &[Value::Obj(context), Value::Obj(executor), Value::Obj(listener)],
+    );
+    assert_eq!(
+        call(&mut engine, service, "isConnected", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            service,
+            "getVersion",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "3.3"
+    );
+    // The connected callback never fires without the SE service.
+    assert_eq!(
+        p49_field_or_null(&engine, listener, "rd_count"),
+        Value::Null
+    );
+    assert_throws(
+        engine.invoke_instance(service, "getReaders", "()[Landroid/se/omapi/Reader;", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            service,
+            "getUiccReader",
+            "(I)Landroid/se/omapi/Reader;",
+            &[Value::Int(0)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            service,
+            "getUiccReader",
+            "(I)Landroid/se/omapi/Reader;",
+            &[Value::Int(1)],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+    // Reader obeys its disconnected-service contract.
+    let reader_iface = instance(&mut engine, "Landroid/se/omapi/ISecureElementReader;");
+    let reader_name = text(&mut engine, "SIM1");
+    let rejected_reader = instance(&mut engine, P35E_READER);
+    assert_throws(
+        engine.invoke_instance(
+            rejected_reader,
+            "<init>",
+            "(Landroid/se/omapi/SEService;Ljava/lang/String;Landroid/se/omapi/ISecureElementReader;)V",
+            &[Value::Obj(service), Value::Null, Value::Obj(reader_iface)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let reader = p49_new(
+        &mut engine,
+        P35E_READER,
+        "(Landroid/se/omapi/SEService;Ljava/lang/String;Landroid/se/omapi/ISecureElementReader;)V",
+        &[Value::Obj(service), reader_name, Value::Obj(reader_iface)],
+    );
+    assert_eq!(
+        call_text(&mut engine, reader, "getName", "()Ljava/lang/String;", &[]),
+        "SIM1"
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            reader,
+            "getSEService",
+            "()Landroid/se/omapi/SEService;",
+            &[]
+        ),
+        Value::Obj(service)
+    );
+    assert_throws(
+        engine.invoke_instance(reader, "openSession", "()Landroid/se/omapi/Session;", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    assert_throws(
+        engine.invoke_instance(reader, "isSecureElementPresent", "()Z", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    assert_eq!(
+        call(&mut engine, reader, "reset", "()Z", &[]),
+        Value::Int(0)
+    );
+    call(&mut engine, reader, "closeSessions", "()V", &[]);
+    call(&mut engine, service, "shutdown", "()V", &[]);
+    assert_eq!(
+        call(&mut engine, service, "isConnected", "()Z", &[]),
+        Value::Int(0)
+    );
+}

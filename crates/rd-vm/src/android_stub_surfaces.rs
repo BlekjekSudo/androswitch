@@ -434,6 +434,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial35d_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial35e_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -587,6 +590,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial35d_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial35e_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -671,6 +677,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial35d_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial35e_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -39205,6 +39214,963 @@ pub(crate) fn partial35d_host_static(
         (P35D_BACKUP_AGENT, "FLAG_CLIENT_SIDE_ENCRYPTION_ENABLED") => Some(1),
         (P35D_BACKUP_AGENT, "FLAG_DEVICE_TO_DEVICE_TRANSFER") => Some(2),
         (P35D_BACKUP_AGENT, "FLAG_FAKE_CLIENT_SIDE_ENCRYPTION_ENABLED") => Some(1i32 << 31),
+        _ => None,
+    };
+    Ok(int_value.map(Value::Int))
+}
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 35-E: android.net.http + android.se.omapi.
+// SslError/SslCertificate are deterministic values (the single fixed
+// "yyyy-MM-dd HH:mm:ssZ" pattern is formatted/parsed host-side in the
+// VM's UTC date model; DName component extraction covers RFC 2253
+// names). OMAPI profile: the SecureElementService package does not
+// exist, so SEService never connects.
+// ---------------------------------------------------------------------------
+
+const P35E_SSL_ERROR: &str = "Landroid/net/http/SslError;";
+const P35E_SSL_CERTIFICATE: &str = "Landroid/net/http/SslCertificate;";
+const P35E_DNAME: &str = "Landroid/net/http/SslCertificate$DName;";
+const P35E_SE_SERVICE: &str = "Landroid/se/omapi/SEService;";
+const P35E_SE_LISTENER: &str = "Landroid/se/omapi/SEService$OnConnectedListener;";
+const P35E_READER: &str = "Landroid/se/omapi/Reader;";
+
+fn p35e_class(c: &str) -> bool {
+    matches!(
+        c,
+        P35E_SSL_ERROR
+            | P35E_SSL_CERTIFICATE
+            | P35E_DNAME
+            | P35E_SE_SERVICE
+            | P35E_SE_LISTENER
+            | P35E_READER
+    )
+}
+
+fn p35e_ssl_error_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(ILandroid/net/http/SslCertificate;)V") => {
+            let empty = jstr(vm, "")?;
+            vm.invoke_instance(
+                recv,
+                "<init>",
+                "(ILandroid/net/http/SslCertificate;Ljava/lang/String;)V",
+                &[Value::Int(iarg(args, 0)), p35_arg(args, 1), empty],
+            )?
+        }
+        ("<init>", "(ILandroid/net/http/SslCertificate;Ljava/lang/String;)V") => {
+            put(vm, recv, "mCertificate", p35_arg(args, 1))?;
+            put(vm, recv, "mUrl", p35_arg(args, 2))?;
+            put(vm, recv, "mErrors", Value::Int(0))?;
+            vm.invoke_instance(recv, "addError", "(I)Z", &[Value::Int(iarg(args, 0))])?
+        }
+        ("<init>", "(ILjava/security/cert/X509Certificate;)V") => {
+            let empty = jstr(vm, "")?;
+            vm.invoke_instance(
+                recv,
+                "<init>",
+                "(ILjava/security/cert/X509Certificate;Ljava/lang/String;)V",
+                &[Value::Int(iarg(args, 0)), p35_arg(args, 1), empty],
+            )?
+        }
+        ("<init>", "(ILjava/security/cert/X509Certificate;Ljava/lang/String;)V") => {
+            let Some(x509) = oarg(args, 1) else {
+                return Err(npe(""));
+            };
+            let certificate = alloc_obj(vm, P35E_SSL_CERTIFICATE, Vec::new())?;
+            vm.invoke_instance(
+                certificate,
+                "<init>",
+                "(Ljava/security/cert/X509Certificate;)V",
+                &[Value::Obj(x509)],
+            )?;
+            vm.invoke_instance(
+                recv,
+                "<init>",
+                "(ILandroid/net/http/SslCertificate;Ljava/lang/String;)V",
+                &[
+                    Value::Int(iarg(args, 0)),
+                    Value::Obj(certificate),
+                    p35_arg(args, 2),
+                ],
+            )?
+        }
+        ("getCertificate", "()Landroid/net/http/SslCertificate;") => get(vm, recv, "mCertificate"),
+        ("getUrl", "()Ljava/lang/String;") => get(vm, recv, "mUrl"),
+        ("addError", "(I)Z") => {
+            let error = iarg(args, 0);
+            if !(0..6).contains(&error) {
+                return Ok(Some(Value::Int(0)));
+            }
+            let errors = field_int(vm, recv, "mErrors") | (1 << error);
+            put(vm, recv, "mErrors", Value::Int(errors))?;
+            Value::Int(1)
+        }
+        ("hasError", "(I)Z") => {
+            let error = iarg(args, 0);
+            Value::Int(
+                ((0..6).contains(&error) && field_int(vm, recv, "mErrors") & (1 << error) != 0)
+                    as i32,
+            )
+        }
+        ("getPrimaryError", "()I") => {
+            let errors = field_int(vm, recv, "mErrors");
+            let mut primary = -1;
+            if errors != 0 {
+                for error in (0..6).rev() {
+                    if errors & (1 << error) != 0 {
+                        primary = error;
+                        break;
+                    }
+                }
+            }
+            Value::Int(primary)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let primary = vm.invoke_instance(recv, "getPrimaryError", "()I", &[])?;
+            let certificate = value_string(vm, &get(vm, recv, "mCertificate"))?;
+            let url = value_string(vm, &get(vm, recv, "mUrl"))?;
+            jstr(
+                vm,
+                format!(
+                    "primary error: {} certificate: {certificate} on URL: {url}",
+                    primary.as_int().unwrap_or(-1)
+                ),
+            )?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+/// Days from civil date (Howard Hinnant algorithm), epoch 1970-01-01.
+/// Out-of-range fields roll over, matching SimpleDateFormat leniency.
+fn p35e_days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let mp = (m + 9).rem_euclid(12);
+    let doy = (153 * mp + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
+fn p35e_civil_from_days(z: i64) -> (i64, i64, i64) {
+    let z = z + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    (if m <= 2 { y + 1 } else { y }, m, d)
+}
+
+/// Parses SslCertificate's fixed "yyyy-MM-dd HH:mm:ssZ" pattern.
+/// Returns epoch milliseconds, or None where SimpleDateFormat would
+/// throw ParseException (AOSP then keeps the date null).
+fn p35e_parse_date_text(text: &str) -> Option<i64> {
+    let chars: Vec<char> = text.chars().collect();
+    let mut i = 0usize;
+    let number = |chars: &[char], i: &mut usize| -> Option<i64> {
+        let start = *i;
+        let mut value: i64 = 0;
+        while *i < chars.len() && chars[*i].is_ascii_digit() {
+            value = value
+                .checked_mul(10)?
+                .checked_add(chars[*i].to_digit(10)? as i64)?;
+            *i += 1;
+        }
+        if *i == start {
+            None
+        } else {
+            Some(value)
+        }
+    };
+    let literal = |chars: &[char], i: &mut usize, expected: char| -> bool {
+        if chars.get(*i) == Some(&expected) {
+            *i += 1;
+            true
+        } else {
+            false
+        }
+    };
+    let year = number(&chars, &mut i)?;
+    if !literal(&chars, &mut i, '-') {
+        return None;
+    }
+    let month = number(&chars, &mut i)?;
+    if !literal(&chars, &mut i, '-') {
+        return None;
+    }
+    let day = number(&chars, &mut i)?;
+    if !literal(&chars, &mut i, ' ') {
+        return None;
+    }
+    let hour = number(&chars, &mut i)?;
+    if !literal(&chars, &mut i, ':') {
+        return None;
+    }
+    let minute = number(&chars, &mut i)?;
+    if !literal(&chars, &mut i, ':') {
+        return None;
+    }
+    let second = number(&chars, &mut i)?;
+    // Zone: 'Z', "GMT" prefix, or +/-HHmm (optional colon).
+    let rest: String = chars[i..].iter().collect();
+    let rest = rest.strip_prefix("GMT").unwrap_or(&rest);
+    let offset_minutes: i64 = if rest.starts_with('Z') {
+        0
+    } else {
+        let mut zone = rest.chars();
+        let sign = match zone.next()? {
+            '+' => 1,
+            '-' => -1,
+            _ => return None,
+        };
+        let digits: String = zone
+            .take_while(|c| c.is_ascii_digit() || *c == ':')
+            .filter(|c| c.is_ascii_digit())
+            .collect();
+        if digits.len() != 4 {
+            return None;
+        }
+        let zh: i64 = digits[..2].parse().ok()?;
+        let zm: i64 = digits[2..].parse().ok()?;
+        sign * (zh * 60 + zm)
+    };
+    let days = p35e_days_from_civil(year, month, day);
+    let local_seconds = ((days * 24 + hour) * 60 + minute) * 60 + second;
+    Some((local_seconds - offset_minutes * 60) * 1000)
+}
+
+fn p35e_format_date_text(millis: i64) -> String {
+    let days = millis.div_euclid(86_400_000);
+    let rem = millis.rem_euclid(86_400_000);
+    let (year, month, day) = p35e_civil_from_days(days);
+    format!(
+        "{year:04}-{month:02}-{day:02} {:02}:{:02}:{:02}+0000",
+        rem / 3_600_000,
+        rem / 60_000 % 60,
+        rem / 1000 % 60
+    )
+}
+
+fn p35e_clone_date(vm: &mut Engine, date: Value) -> Result<Value, VmExit> {
+    let Value::Obj(date) = date else {
+        return Ok(Value::Null);
+    };
+    let time = vm.invoke_instance(date, "getTime", "()J", &[])?;
+    let copy = alloc_obj(vm, "Ljava/util/Date;", Vec::new())?;
+    vm.invoke_instance(copy, "<init>", "(J)V", &[time])?;
+    Ok(Value::Obj(copy))
+}
+
+fn p35e_parse_date(vm: &mut Engine, text: Value) -> Result<Value, VmExit> {
+    let Some(text) = opt_str(vm, Some(&text)) else {
+        // SimpleDateFormat.parse(null) throws NullPointerException,
+        // which parseDate does not catch.
+        return Err(npe(""));
+    };
+    let Some(millis) = p35e_parse_date_text(&text) else {
+        return Ok(Value::Null);
+    };
+    let date = alloc_obj(vm, "Ljava/util/Date;", Vec::new())?;
+    vm.invoke_instance(date, "<init>", "(J)V", &[Value::Long(millis)])?;
+    Ok(Value::Obj(date))
+}
+
+fn p35e_format_date(vm: &mut Engine, date: Value) -> Result<Value, VmExit> {
+    let Value::Obj(date) = date else {
+        return jstr(vm, "");
+    };
+    let time = vm.invoke_instance(date, "getTime", "()J", &[])?;
+    let millis = time.as_long().unwrap_or(0);
+    jstr(vm, p35e_format_date_text(millis))
+}
+
+fn p35e_new_dname(vm: &mut Engine, certificate: ObjRef, name: Value) -> Result<ObjRef, VmExit> {
+    let dname = alloc_obj(vm, P35E_DNAME, Vec::new())?;
+    vm.invoke_instance(
+        dname,
+        "<init>",
+        "(Landroid/net/http/SslCertificate;Ljava/lang/String;)V",
+        &[Value::Obj(certificate), name],
+    )?;
+    Ok(dname)
+}
+
+fn p35e_ssl_certificate_init(
+    vm: &mut Engine,
+    recv: ObjRef,
+    issued_to: Value,
+    issued_by: Value,
+    not_before: Value,
+    not_after: Value,
+    x509: Value,
+) -> Result<Value, VmExit> {
+    let to = p35e_new_dname(vm, recv, issued_to)?;
+    let by = p35e_new_dname(vm, recv, issued_by)?;
+    let not_before = p35e_clone_date(vm, not_before)?;
+    let not_after = p35e_clone_date(vm, not_after)?;
+    put(vm, recv, "mIssuedTo", Value::Obj(to))?;
+    put(vm, recv, "mIssuedBy", Value::Obj(by))?;
+    put(vm, recv, "mValidNotBefore", not_before)?;
+    put(vm, recv, "mValidNotAfter", not_after)?;
+    put(vm, recv, "mX509Certificate", x509)?;
+    Ok(Value::Null)
+}
+
+fn p35e_ssl_certificate_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        (
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+        ) => {
+            let not_before = p35e_parse_date(vm, p35_arg(args, 2))?;
+            let not_after = p35e_parse_date(vm, p35_arg(args, 3))?;
+            p35e_ssl_certificate_init(
+                vm,
+                recv,
+                p35_arg(args, 0),
+                p35_arg(args, 1),
+                not_before,
+                not_after,
+                Value::Null,
+            )?
+        }
+        (
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/util/Date;Ljava/util/Date;)V"
+            | "(Ljava/lang/String;Ljava/lang/String;Ljava/util/Date;Ljava/util/Date;Ljava/security/cert/X509Certificate;)V",
+        ) => p35e_ssl_certificate_init(
+            vm,
+            recv,
+            p35_arg(args, 0),
+            p35_arg(args, 1),
+            p35_arg(args, 2),
+            p35_arg(args, 3),
+            p35_arg(args, 4),
+        )?,
+        ("<init>", "(Ljava/security/cert/X509Certificate;)V") => {
+            let Some(x509) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            let subject = vm.invoke_instance(
+                x509,
+                "getSubjectDN",
+                "()Ljava/security/Principal;",
+                &[],
+            )?;
+            let Value::Obj(subject) = subject else {
+                return Err(npe(""));
+            };
+            let issued_to = vm.invoke_instance(subject, "getName", "()Ljava/lang/String;", &[])?;
+            let issuer = vm.invoke_instance(
+                x509,
+                "getIssuerDN",
+                "()Ljava/security/Principal;",
+                &[],
+            )?;
+            let Value::Obj(issuer) = issuer else {
+                return Err(npe(""));
+            };
+            let issued_by = vm.invoke_instance(issuer, "getName", "()Ljava/lang/String;", &[])?;
+            let not_before = vm.invoke_instance(x509, "getNotBefore", "()Ljava/util/Date;", &[])?;
+            let not_after = vm.invoke_instance(x509, "getNotAfter", "()Ljava/util/Date;", &[])?;
+            p35e_ssl_certificate_init(vm, recv, issued_to, issued_by, not_before, not_after, Value::Obj(x509))?
+        }
+        ("getValidNotBeforeDate", "()Ljava/util/Date;") => {
+            p35e_clone_date(vm, get(vm, recv, "mValidNotBefore"))?
+        }
+        ("getValidNotAfterDate", "()Ljava/util/Date;") => {
+            p35e_clone_date(vm, get(vm, recv, "mValidNotAfter"))?
+        }
+        ("getValidNotBefore", "()Ljava/lang/String;") => {
+            p35e_format_date(vm, get(vm, recv, "mValidNotBefore"))?
+        }
+        ("getValidNotAfter", "()Ljava/lang/String;") => {
+            p35e_format_date(vm, get(vm, recv, "mValidNotAfter"))?
+        }
+        ("getIssuedTo", "()Landroid/net/http/SslCertificate$DName;") => get(vm, recv, "mIssuedTo"),
+        ("getIssuedBy", "()Landroid/net/http/SslCertificate$DName;") => get(vm, recv, "mIssuedBy"),
+        ("getX509Certificate", "()Ljava/security/cert/X509Certificate;") => {
+            get(vm, recv, "mX509Certificate")
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let Some(to) = field_obj(vm, recv, "mIssuedTo") else {
+                return Err(npe(""));
+            };
+            let Some(by) = field_obj(vm, recv, "mIssuedBy") else {
+                return Err(npe(""));
+            };
+            let to_name = vm.invoke_instance(to, "getDName", "()Ljava/lang/String;", &[])?;
+            let by_name = vm.invoke_instance(by, "getDName", "()Ljava/lang/String;", &[])?;
+            let to_text = value_string(vm, &to_name)?;
+            let by_text = value_string(vm, &by_name)?;
+            jstr(vm, format!("Issued to: {to_text};\nIssued by: {by_text};\n"))?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+/// Splits an RFC 2253 name into (type, value) components following the
+/// BouncyCastle `X509Name` tokenizer: ',' and '+' separate components
+/// outside quotes, backslash escapes the next character and `\HH` hex
+/// pairs decode bytes. Returns None for a malformed name (AOSP keeps
+/// every extracted field empty in that case).
+fn p35e_parse_dn(input: &str) -> Option<Vec<(String, String)>> {
+    let chars: Vec<char> = input.chars().collect();
+    let mut components = Vec::new();
+    let mut buffer = String::new();
+    let mut in_quotes = false;
+    let mut index = 0;
+    let mut hex_buffer: Vec<u8> = Vec::new();
+    let flush_hex = |buffer: &mut String, hex_buffer: &mut Vec<u8>| {
+        if !hex_buffer.is_empty() {
+            buffer.push_str(&String::from_utf8_lossy(hex_buffer));
+            hex_buffer.clear();
+        }
+    };
+    let push_component = |raw: &str, components: &mut Vec<(String, String)>| -> bool {
+        let Some(eq) = raw.find('=') else {
+            return false;
+        };
+        let kind = raw[..eq].trim().to_ascii_uppercase();
+        let mut value = raw[eq + 1..].trim();
+        if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
+            value = &value[1..value.len() - 1];
+        }
+        if kind.is_empty() {
+            return false;
+        }
+        components.push((kind, value.to_string()));
+        true
+    };
+    while index < chars.len() {
+        let c = chars[index];
+        index += 1;
+        match c {
+            '\\' => {
+                // Hex pair (\HH) if the next two chars are hex digits.
+                let hex = if index + 1 < chars.len() {
+                    let pair: String = chars[index..index + 2].iter().collect();
+                    u8::from_str_radix(&pair, 16).ok()
+                } else {
+                    None
+                };
+                if let Some(byte) = hex {
+                    hex_buffer.push(byte);
+                    index += 2;
+                } else if index < chars.len() {
+                    flush_hex(&mut buffer, &mut hex_buffer);
+                    buffer.push(chars[index]);
+                    index += 1;
+                } else {
+                    return None;
+                }
+            }
+            '"' => {
+                flush_hex(&mut buffer, &mut hex_buffer);
+                in_quotes = !in_quotes;
+                buffer.push(c);
+            }
+            ',' | '+' if !in_quotes => {
+                flush_hex(&mut buffer, &mut hex_buffer);
+                let raw = std::mem::take(&mut buffer);
+                if raw.trim().is_empty() || !push_component(&raw, &mut components) {
+                    return None;
+                }
+            }
+            _ => {
+                flush_hex(&mut buffer, &mut hex_buffer);
+                buffer.push(c);
+            }
+        }
+    }
+    flush_hex(&mut buffer, &mut hex_buffer);
+    if in_quotes {
+        return None;
+    }
+    if !buffer.trim().is_empty() && !push_component(&buffer, &mut components) {
+        return None;
+    }
+    Some(components)
+}
+
+fn p35e_dname_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/net/http/SslCertificate;Ljava/lang/String;)V") => {
+            put(vm, recv, "mDName", p35_arg(args, 1))?;
+            if let Some(dn) = opt_str(vm, args.get(1)) {
+                if let Some(components) = p35e_parse_dn(&dn) {
+                    for (kind, val) in components {
+                        let field = match kind.as_str() {
+                            "CN" | "2.5.4.3" => "mCName",
+                            "O" | "2.5.4.10" => "mOName",
+                            "OU" | "2.5.4.11" => "mUName",
+                            _ => continue,
+                        };
+                        if !matches!(get(vm, recv, field), Value::Obj(_)) {
+                            let value = jstr(vm, val)?;
+                            put(vm, recv, field, value)?;
+                        }
+                    }
+                }
+            }
+            Value::Null
+        }
+        ("getDName", "()Ljava/lang/String;") => match get(vm, recv, "mDName") {
+            Value::Obj(r) => Value::Obj(r),
+            _ => jstr(vm, "")?,
+        },
+        ("getCName", "()Ljava/lang/String;") => match get(vm, recv, "mCName") {
+            Value::Obj(r) => Value::Obj(r),
+            _ => jstr(vm, "")?,
+        },
+        ("getOName", "()Ljava/lang/String;") => match get(vm, recv, "mOName") {
+            Value::Obj(r) => Value::Obj(r),
+            _ => jstr(vm, "")?,
+        },
+        ("getUName", "()Ljava/lang/String;") => match get(vm, recv, "mUName") {
+            Value::Obj(r) => Value::Obj(r),
+            _ => jstr(vm, "")?,
+        },
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35e_se_service_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        (
+            "<init>",
+            "(Landroid/content/Context;Ljava/util/concurrent/Executor;Landroid/se/omapi/SEService$OnConnectedListener;)V",
+        ) => {
+            if oarg(args, 0).is_none() || oarg(args, 1).is_none() || oarg(args, 2).is_none() {
+                return Err(npe("Arguments must not be null"));
+            }
+            let context = oarg(args, 0).unwrap();
+            put(vm, recv, "mContext", Value::Obj(context))?;
+            let listener = alloc_obj(
+                vm,
+                "Landroid/se/omapi/SEService$SEListener;",
+                vec![
+                    ("mListener".to_string(), p35_arg(args, 2)),
+                    ("mExecutor".to_string(), p35_arg(args, 1)),
+                ],
+            )?;
+            put(vm, recv, "mSEListener", Value::Obj(listener))?;
+            let connection = alloc_obj(
+                vm,
+                "Landroid/se/omapi/SEService$1;",
+                vec![("rd_service".to_string(), Value::Obj(recv))],
+            )?;
+            put(vm, recv, "mConnection", Value::Obj(connection))?;
+            // Bind to com.android.se.SecureElementService. No such
+            // package exists in this profile, so the service never
+            // connects: mSecureElementService stays null forever.
+            let action = jstr(vm, "android.se.omapi.ISecureElementService")?;
+            let intent = alloc_obj(vm, "Landroid/content/Intent;", Vec::new())?;
+            vm.invoke_instance(intent, "<init>", "(Ljava/lang/String;)V", &[action])?;
+            let package = jstr(vm, "com.android.se")?;
+            let class = jstr(vm, "com.android.se.SecureElementService")?;
+            vm.invoke_instance(
+                intent,
+                "setClassName",
+                "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;",
+                &[package, class],
+            )?;
+            // Context.BIND_AUTO_CREATE = 1. A binding failure is not an
+            // exception in AOSP, and without the package it can never
+            // result in a connection.
+            let _ = vm.invoke_instance(
+                context,
+                "bindService",
+                "(Landroid/content/Intent;Landroid/content/ServiceConnection;I)Z",
+                &[Value::Obj(intent), Value::Obj(connection), Value::Int(1)],
+            );
+            Value::Null
+        }
+        ("isConnected", "()Z") => {
+            Value::Int(matches!(get(vm, recv, "mSecureElementService"), Value::Obj(_)) as i32)
+        }
+        ("getReaders", "()[Landroid/se/omapi/Reader;") => {
+            return Err(ise("service not connected to system"));
+        }
+        ("getUiccReader", "(I)Landroid/se/omapi/Reader;") => {
+            if iarg(args, 0) < 1 {
+                return Err(iae("slotNumber should be larger than 0"));
+            }
+            return Err(ise("service not connected to system"));
+        }
+        ("shutdown", "()V") => {
+            if let (Some(context), Some(connection)) = (
+                field_obj(vm, recv, "mContext"),
+                field_obj(vm, recv, "mConnection"),
+            ) {
+                // AOSP fails silently when the binding never succeeded.
+                let _ = vm.invoke_instance(
+                    context,
+                    "unbindService",
+                    "(Landroid/content/ServiceConnection;)V",
+                    &[Value::Obj(connection)],
+                );
+            }
+            put(vm, recv, "mSecureElementService", Value::Null)?;
+            Value::Null
+        }
+        ("getVersion", "()Ljava/lang/String;") => jstr(vm, "3.3")?,
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35e_reader_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        (
+            "<init>",
+            "(Landroid/se/omapi/SEService;Ljava/lang/String;Landroid/se/omapi/ISecureElementReader;)V",
+        ) => {
+            if oarg(args, 0).is_none() || oarg(args, 1).is_none() || oarg(args, 2).is_none() {
+                return Err(iae("Parameters cannot be null"));
+            }
+            put(vm, recv, "mService", p35_arg(args, 0))?;
+            put(vm, recv, "mName", p35_arg(args, 1))?;
+            put(vm, recv, "mReader", p35_arg(args, 2))?;
+            Value::Null
+        }
+        ("getName", "()Ljava/lang/String;") => get(vm, recv, "mName"),
+        ("getSEService", "()Landroid/se/omapi/SEService;") => get(vm, recv, "mService"),
+        ("openSession", "()Landroid/se/omapi/Session;")
+        | ("isSecureElementPresent", "()Z") => {
+            let Some(service) = field_obj(vm, recv, "mService") else {
+                return Err(npe(""));
+            };
+            let connected = vm.invoke_instance(service, "isConnected", "()Z", &[])?;
+            if connected.as_int().unwrap_or(0) == 0 {
+                return Err(ise("service is not connected"));
+            }
+            return Ok(None);
+        }
+        ("closeSessions", "()V") => {
+            let Some(service) = field_obj(vm, recv, "mService") else {
+                return Err(npe(""));
+            };
+            let connected = vm.invoke_instance(service, "isConnected", "()Z", &[])?;
+            if connected.as_int().unwrap_or(0) != 0 {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("reset", "()Z") => {
+            let Some(service) = field_obj(vm, recv, "mService") else {
+                return Err(npe(""));
+            };
+            let connected = vm.invoke_instance(service, "isConnected", "()Z", &[])?;
+            if connected.as_int().unwrap_or(0) != 0 {
+                return Ok(None);
+            }
+            Value::Int(0)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+/// Exact-runtime-class recorder for OnConnectedListener (never fired
+/// while disconnected, but keeps host-created listeners observable).
+fn p35e_connected_listener_recorder(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    _args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class_of(vm, recv) != P35E_SE_LISTENER {
+        return Ok(None);
+    }
+    if (name, sig) != ("onConnected", "()V") {
+        return Ok(None);
+    }
+    let last = jstr(vm, "onConnected")?;
+    put(vm, recv, "rd_last", last)?;
+    let count = field_int(vm, recv, "rd_count") + 1;
+    put(vm, recv, "rd_count", Value::Int(count))?;
+    Ok(Some(Value::Null))
+}
+
+fn partial35e_instance_for_class(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P35E_SSL_ERROR => p35e_ssl_error_instance(vm, name, sig, recv, args),
+        P35E_SSL_CERTIFICATE => p35e_ssl_certificate_instance(vm, name, sig, recv, args),
+        P35E_DNAME => p35e_dname_instance(vm, name, sig, recv, args),
+        P35E_SE_SERVICE => p35e_se_service_instance(vm, name, sig, recv, args),
+        P35E_READER => p35e_reader_instance(vm, name, sig, recv, args),
+        P35E_SE_LISTENER => p35e_connected_listener_recorder(vm, name, sig, recv, args),
+        _ => Ok(None),
+    }
+}
+
+pub(crate) fn partial35e_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    for class in [recv_class, mref_class] {
+        if p35e_class(class) {
+            let value = partial35e_instance_for_class(vm, class, name, sig, recv, args)?;
+            if value.is_some() {
+                return Ok(value);
+            }
+        }
+    }
+    let actual = class_of(vm, recv);
+    if actual != recv_class && actual != mref_class && p35e_class(&actual) {
+        return partial35e_instance_for_class(vm, &actual, name, sig, recv, args);
+    }
+    Ok(None)
+}
+
+fn p35e_bundle_get_string(vm: &mut Engine, bundle: ObjRef, key: &str) -> Result<Value, VmExit> {
+    let key = jstr(vm, key)?;
+    vm.invoke_instance(
+        bundle,
+        "getString",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+        &[key],
+    )
+}
+
+fn p35e_bundle_put_string(
+    vm: &mut Engine,
+    bundle: ObjRef,
+    key: &str,
+    value: Value,
+) -> Result<(), VmExit> {
+    let key = jstr(vm, key)?;
+    vm.invoke_instance(
+        bundle,
+        "putString",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+        &[key, value],
+    )?;
+    Ok(())
+}
+
+pub(crate) fn partial35e_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (class, name, sig) {
+        (
+            P35E_SSL_ERROR,
+            "SslErrorFromChromiumErrorCode",
+            "(ILandroid/net/http/SslCertificate;Ljava/lang/String;)Landroid/net/http/SslError;",
+        ) => {
+            let mapped = match iarg(args, 0) {
+                -200 => 2, // SSL_IDMISMATCH
+                -201 => 4, // SSL_DATE_INVALID
+                -202 => 3, // SSL_UNTRUSTED
+                _ => 5,    // SSL_INVALID
+            };
+            let error = alloc_obj(vm, P35E_SSL_ERROR, Vec::new())?;
+            vm.invoke_instance(
+                error,
+                "<init>",
+                "(ILandroid/net/http/SslCertificate;Ljava/lang/String;)V",
+                &[Value::Int(mapped), p35_arg(args, 1), p35_arg(args, 2)],
+            )?;
+            Value::Obj(error)
+        }
+        (
+            P35E_SSL_CERTIFICATE,
+            "saveState",
+            "(Landroid/net/http/SslCertificate;)Landroid/os/Bundle;",
+        ) => {
+            let Some(certificate) = oarg(args, 0) else {
+                return Ok(Some(Value::Null));
+            };
+            let bundle = alloc_obj(vm, "Landroid/os/Bundle;", Vec::new())?;
+            vm.invoke_instance(bundle, "<init>", "()V", &[])?;
+            let to = vm.invoke_instance(
+                certificate,
+                "getIssuedTo",
+                "()Landroid/net/http/SslCertificate$DName;",
+                &[],
+            )?;
+            let Value::Obj(to) = to else {
+                return Err(npe(""));
+            };
+            let to_name = vm.invoke_instance(to, "getDName", "()Ljava/lang/String;", &[])?;
+            p35e_bundle_put_string(vm, bundle, "issued-to", to_name)?;
+            let by = vm.invoke_instance(
+                certificate,
+                "getIssuedBy",
+                "()Landroid/net/http/SslCertificate$DName;",
+                &[],
+            )?;
+            let Value::Obj(by) = by else {
+                return Err(npe(""));
+            };
+            let by_name = vm.invoke_instance(by, "getDName", "()Ljava/lang/String;", &[])?;
+            p35e_bundle_put_string(vm, bundle, "issued-by", by_name)?;
+            let not_before = vm.invoke_instance(
+                certificate,
+                "getValidNotBefore",
+                "()Ljava/lang/String;",
+                &[],
+            )?;
+            p35e_bundle_put_string(vm, bundle, "valid-not-before", not_before)?;
+            let not_after =
+                vm.invoke_instance(certificate, "getValidNotAfter", "()Ljava/lang/String;", &[])?;
+            p35e_bundle_put_string(vm, bundle, "valid-not-after", not_after)?;
+            if let Some(x509) = field_obj(vm, certificate, "mX509Certificate") {
+                if let Ok(encoded) = vm.invoke_instance(x509, "getEncoded", "()[B", &[]) {
+                    let key = jstr(vm, "x509-certificate")?;
+                    vm.invoke_instance(
+                        bundle,
+                        "putByteArray",
+                        "(Ljava/lang/String;[B)V",
+                        &[key, encoded],
+                    )?;
+                }
+            }
+            Value::Obj(bundle)
+        }
+        (
+            P35E_SSL_CERTIFICATE,
+            "restoreState",
+            "(Landroid/os/Bundle;)Landroid/net/http/SslCertificate;",
+        ) => {
+            let Some(bundle) = oarg(args, 0) else {
+                return Ok(Some(Value::Null));
+            };
+            let key = jstr(vm, "x509-certificate")?;
+            let bytes =
+                vm.invoke_instance(bundle, "getByteArray", "(Ljava/lang/String;)[B", &[key])?;
+            let mut x509 = Value::Null;
+            if let Value::Obj(bytes) = bytes {
+                let attempt = (|| -> Result<Value, VmExit> {
+                    let kind = jstr(vm, "X.509")?;
+                    let factory = vm.invoke_static(
+                        "Ljava/security/cert/CertificateFactory;",
+                        "getInstance",
+                        "(Ljava/lang/String;)Ljava/security/cert/CertificateFactory;",
+                        &[kind],
+                    )?;
+                    let Value::Obj(factory) = factory else {
+                        return Ok(Value::Null);
+                    };
+                    let stream = alloc_obj(vm, "Ljava/io/ByteArrayInputStream;", Vec::new())?;
+                    vm.invoke_instance(stream, "<init>", "([B)V", &[Value::Obj(bytes)])?;
+                    vm.invoke_instance(
+                        factory,
+                        "generateCertificate",
+                        "(Ljava/io/InputStream;)Ljava/security/cert/Certificate;",
+                        &[Value::Obj(stream)],
+                    )
+                })();
+                if let Ok(Value::Obj(cert)) = attempt {
+                    x509 = Value::Obj(cert);
+                }
+            }
+            let issued_to = p35e_bundle_get_string(vm, bundle, "issued-to")?;
+            let issued_by = p35e_bundle_get_string(vm, bundle, "issued-by")?;
+            let not_before_text = p35e_bundle_get_string(vm, bundle, "valid-not-before")?;
+            let not_after_text = p35e_bundle_get_string(vm, bundle, "valid-not-after")?;
+            let not_before = p35e_parse_date(vm, not_before_text)?;
+            let not_after = p35e_parse_date(vm, not_after_text)?;
+            let certificate = alloc_obj(vm, P35E_SSL_CERTIFICATE, Vec::new())?;
+            p35e_ssl_certificate_init(
+                vm,
+                certificate,
+                issued_to,
+                issued_by,
+                not_before,
+                not_after,
+                x509,
+            )?;
+            Value::Obj(certificate)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+pub(crate) fn partial35e_host_static(
+    vm: &mut Engine,
+    class: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    let text = match (class, field) {
+        (P35E_SE_SERVICE, "ACTION_SECURE_ELEMENT_STATE_CHANGED") => {
+            Some("android.se.omapi.action.SECURE_ELEMENT_STATE_CHANGED")
+        }
+        (P35E_SE_SERVICE, "EXTRA_READER_NAME") => Some("android.se.omapi.extra.READER_NAME"),
+        (P35E_SE_SERVICE, "EXTRA_READER_STATE") => Some("android.se.omapi.extra.READER_STATE"),
+        _ => None,
+    };
+    if let Some(text) = text {
+        return jstr(vm, text).map(Some);
+    }
+    let int_value = match (class, field) {
+        (P35E_SSL_ERROR, "SSL_NOTYETVALID") => Some(0),
+        (P35E_SSL_ERROR, "SSL_EXPIRED") => Some(1),
+        (P35E_SSL_ERROR, "SSL_IDMISMATCH") => Some(2),
+        (P35E_SSL_ERROR, "SSL_UNTRUSTED") => Some(3),
+        (P35E_SSL_ERROR, "SSL_DATE_INVALID") => Some(4),
+        (P35E_SSL_ERROR, "SSL_INVALID") => Some(5),
+        (P35E_SSL_ERROR, "SSL_MAX_ERROR") => Some(6),
+        (P35E_SE_SERVICE, "IO_ERROR") => Some(1),
+        (P35E_SE_SERVICE, "NO_SUCH_ELEMENT_ERROR") => Some(2),
         _ => None,
     };
     Ok(int_value.map(Value::Int))

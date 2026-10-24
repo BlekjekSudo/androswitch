@@ -692,15 +692,15 @@ key_apis = ["android.net.Uri.parse", "android.net.Uri.getQueryParameter", "andro
 id = "android-net-http"
 prefix = "android.net.http"
 domain = "net"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-net"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "legacy"
-notes = "Legacy AndroidHttpClient/SslError platform package is not modelled; Java/OkHttp paths are separate surfaces."
-evidence = ["docs/compat-matrix.md"]
+notes = "SslError and SslCertificate are fully modelled as deterministic values: the SSL error bitmask with addError/hasError bounds, most-severe primary error, Chromium error-code mapping, certificate issued-to/issued-by DNames with RFC 2253 CN/O/OU extraction, cloned validity dates formatted and parsed in the fixed yyyy-MM-dd HH:mm:ssZ pattern, Bundle saveState/restoreState round trips, and AOSP toString forms. The legacy AndroidHttpClient/HttpResponseCache runtime, certificate view inflation, and any actual TLS/HTTP transport are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-net-http-legacy"
-key_apis = ["android.net.http.AndroidHttpClient.newInstance"]
+key_apis = ["android.net.http.SslError.getPrimaryError", "android.net.http.SslError.addError", "android.net.http.SslCertificate.getIssuedTo", "android.net.http.SslCertificate.saveState", "android.net.http.SslCertificate.restoreState"]
 
 [[surface]]
 id = "android-net-wifi"
@@ -1259,15 +1259,15 @@ key_apis = ["android.security.identity.IdentityCredentialStore.getInstance"]
 id = "android-se-omapi"
 prefix = "android.se.omapi"
 domain = "security"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "Open Mobile API secure-element sessions/channels are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "SEService and Reader are modelled in a no-secure-element-service profile mirroring a device without com.android.se.SecureElementService: constructor argument null checks, the real bind attempt that never connects, isConnected staying false, getVersion reporting 3.3, getReaders/getUiccReader failing as disconnected (with slot-number validation), silent shutdown unbinding, and Reader name/service accessors plus its disconnected openSession/isSecureElementPresent/closeSessions/reset contract. Secure-element readers, sessions, channels, and APDU transport are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-se-omapi"
-key_apis = ["android.se.omapi.SEService.getReaders"]
+key_apis = ["android.se.omapi.SEService.isConnected", "android.se.omapi.SEService.getReaders", "android.se.omapi.SEService.getUiccReader", "android.se.omapi.Reader.openSession", "android.se.omapi.Reader.isSecureElementPresent"]
 
 [[surface]]
 id = "android-service-credentials"

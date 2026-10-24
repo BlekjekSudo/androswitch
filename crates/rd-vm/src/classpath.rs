@@ -1946,6 +1946,22 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Object;",
         ]),
         "Landroid/app/IBackupAgent$Stub;" => Some(&["Landroid/os/Binder;", "Ljava/lang/Object;"]),
+        // Appendix C Batch 35-E bounded android.net.http /
+        // android.se.omapi slices.
+        "Landroid/net/http/SslError;"
+        | "Landroid/net/http/SslCertificate;"
+        | "Landroid/net/http/SslCertificate$DName;"
+        | "Landroid/se/omapi/SEService;"
+        | "Landroid/se/omapi/Reader;"
+        | "Landroid/se/omapi/SEService$1;" => Some(OBJECT),
+        "Landroid/se/omapi/SEService$SEListener;" => Some(&[
+            "Landroid/se/omapi/ISecureElementListener$Stub;",
+            "Landroid/os/Binder;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/se/omapi/ISecureElementListener$Stub;" => {
+            Some(&["Landroid/os/Binder;", "Ljava/lang/Object;"])
+        }
         _ => None,
     }
 }
@@ -2531,6 +2547,14 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         "Landroid/app/backup/BackupAgent$BackupServiceBinder;"
         | "Landroid/app/IBackupAgent$Stub;" => Some(&[
             "Landroid/app/IBackupAgent;",
+            "Landroid/os/IBinder;",
+            "Landroid/os/IInterface;",
+        ]),
+        // Interfaces in the Batch 35-E bounded slices.
+        "Landroid/se/omapi/SEService$1;" => Some(&["Landroid/content/ServiceConnection;"]),
+        "Landroid/se/omapi/SEService$SEListener;"
+        | "Landroid/se/omapi/ISecureElementListener$Stub;" => Some(&[
+            "Landroid/se/omapi/ISecureElementListener;",
             "Landroid/os/IBinder;",
             "Landroid/os/IInterface;",
         ]),
