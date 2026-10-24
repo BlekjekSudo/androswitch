@@ -45,6 +45,8 @@ const BUNDLE_MAGIC: i32 = 0x4c44_4e42;
 /// exactly `isParcelled()`.
 pub(crate) const PARCELLED_FIELD: &str = "rd$parcelled_data";
 
+// `Parcel` value type tags, exactly as AOSP `Parcel.java` defines them
+// (kept in sync with libbinder's ParcelValTypes.h).
 const VAL_NULL: i32 = -1;
 const VAL_STRING: i32 = 0;
 const VAL_INTEGER: i32 = 1;
@@ -62,15 +64,23 @@ const VAL_SPARSEARRAY: i32 = 12;
 const VAL_BYTEARRAY: i32 = 13;
 const VAL_STRINGARRAY: i32 = 14;
 const VAL_IBINDER: i32 = 15;
-const VAL_OBJECTARRAY: i32 = 16;
-const VAL_INTARRAY: i32 = 17;
-const VAL_LONGARRAY: i32 = 18;
-const VAL_BYTE: i32 = 19;
+const VAL_PARCELABLEARRAY: i32 = 16;
+const VAL_OBJECTARRAY: i32 = 17;
+const VAL_INTARRAY: i32 = 18;
+const VAL_LONGARRAY: i32 = 19;
+const VAL_BYTE: i32 = 20;
+const VAL_SERIALIZABLE: i32 = 21;
 const VAL_SPARSEBOOLEANARRAY: i32 = 22;
 const VAL_BOOLEANARRAY: i32 = 23;
-const VAL_CHARARRAY: i32 = 24;
-const VAL_DOUBLEARRAY: i32 = 25;
-const VAL_FLOATARRAY: i32 = 27;
+const VAL_CHARSEQUENCEARRAY: i32 = 24;
+const VAL_PERSISTABLEBUNDLE: i32 = 25;
+const VAL_SIZE: i32 = 26;
+const VAL_SIZEF: i32 = 27;
+const VAL_DOUBLEARRAY: i32 = 28;
+const VAL_CHAR: i32 = 29;
+const VAL_SHORTARRAY: i32 = 30;
+const VAL_CHARARRAY: i32 = 31;
+const VAL_FLOATARRAY: i32 = 32;
 
 fn bad(msg: impl Into<String>) -> VmExit {
     Throwable::new("Landroid/os/BadParcelableException;", msg).into()
@@ -1152,9 +1162,10 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
                 st.write_i32(inner.as_int().unwrap_or(0));
             }
             'C' => {
-                st.write_i32(VAL_CHARSEQUENCE);
-                let c = char::from_u32(inner.as_int().unwrap_or(0) as u32).unwrap_or('\0');
-                st.write_string(Some(&c.to_string()));
+                // AOSP writes Character as VAL_CHAR + writeInt(char), not
+                // as a one-character CharSequence.
+                st.write_i32(VAL_CHAR);
+                st.write_i32(inner.as_int().unwrap_or(0));
             }
             'I' => {
                 st.write_i32(VAL_INTEGER);
@@ -1178,10 +1189,34 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
         return Ok(());
     }
     if class == BUNDLE || class == PERSISTABLE_BUNDLE {
+        // Distinct value tags in AOSP: a PersistableBundle must not decode
+        // back as a plain Bundle.
         let mut st = load(vm, parcel);
-        st.write_i32(VAL_BUNDLE);
+        st.write_i32(if class == BUNDLE {
+            VAL_BUNDLE
+        } else {
+            VAL_PERSISTABLEBUNDLE
+        });
         store(vm, parcel, st);
         return write_bundle_map(vm, parcel, r);
+    }
+    if class == "Landroid/util/Size;" || class == "Landroid/util/SizeF;" {
+        // `writeSize` writes two ints, `writeSizeF` two floats; the host
+        // representation keeps them in the `rd_w`/`rd_h` fields.
+        let w = vm.heap.get_field(r, "rd_w").unwrap_or(Value::Null);
+        let h = vm.heap.get_field(r, "rd_h").unwrap_or(Value::Null);
+        let mut st = load(vm, parcel);
+        if class == "Landroid/util/Size;" {
+            st.write_i32(VAL_SIZE);
+            st.write_i32(w.as_int().unwrap_or(0));
+            st.write_i32(h.as_int().unwrap_or(0));
+        } else {
+            st.write_i32(VAL_SIZEF);
+            st.write_i32(w.as_float().unwrap_or(0.0).to_bits() as i32);
+            st.write_i32(h.as_float().unwrap_or(0.0).to_bits() as i32);
+        }
+        store(vm, parcel, st);
+        return Ok(());
     }
     if class == SPARSE_BOOLEAN_ARRAY {
         let mut st = load(vm, parcel);
@@ -1208,7 +1243,13 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
                 st.write_byte_blob(Some(&bytes));
             }
             "[I" | "[S" => {
-                st.write_i32(VAL_INTARRAY);
+                // short[] has its own tag in AOSP (same int-per-element
+                // encoding as int[]); it must not decode back as int[].
+                st.write_i32(if class == "[S" {
+                    VAL_SHORTARRAY
+                } else {
+                    VAL_INTARRAY
+                });
                 st.write_i32(elems.len() as i32);
                 for e in &elems {
                     st.write_i32(e.as_int().unwrap_or(0));
@@ -1217,11 +1258,9 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
             "[Z" => {
                 st.write_i32(VAL_BOOLEANARRAY);
                 st.write_i32(elems.len() as i32);
-                let bytes: Vec<u8> = elems
-                    .iter()
-                    .map(|e| (e.as_int().unwrap_or(0) != 0) as u8)
-                    .collect();
-                st.write_padded(&bytes);
+                for e in &elems {
+                    st.write_i32((e.as_int().unwrap_or(0) != 0) as i32);
+                }
             }
             "[C" => {
                 st.write_i32(VAL_CHARARRAY);
@@ -1264,12 +1303,43 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
                 }
                 return Ok(());
             }
-            _ => {
-                st.write_i32(VAL_OBJECTARRAY);
+            "[Ljava/lang/CharSequence;" => {
+                drop(st);
+                let mut st = load(vm, parcel);
+                st.write_i32(VAL_CHARSEQUENCEARRAY);
                 st.write_i32(elems.len() as i32);
                 store(vm, parcel, st);
                 for e in &elems {
-                    write_value(vm, parcel, e)?;
+                    let s = char_seq_of(vm, Some(e))?;
+                    write_string_to(vm, parcel, s.as_deref());
+                }
+                return Ok(());
+            }
+            _ => {
+                // A Parcelable[] uses the dedicated VAL_PARCELABLEARRAY
+                // form (count, then one writeParcelable per element, a
+                // null class name marking a null element). Any other
+                // object array keeps the Object[] value form; AOSP only
+                // writes pure Object[] this way and serializes the rest,
+                // which remains an Appendix C gap.
+                let component = class.trim_start_matches('[');
+                let parcelable_array = component.starts_with('L')
+                    && (component == "Landroid/os/Parcelable;"
+                        || vm.cp.is_subtype(component, "Landroid/os/Parcelable;"));
+                if parcelable_array {
+                    st.write_i32(VAL_PARCELABLEARRAY);
+                    st.write_i32(elems.len() as i32);
+                    store(vm, parcel, st);
+                    for e in &elems {
+                        write_parcelable(vm, parcel, e, 0)?;
+                    }
+                } else {
+                    st.write_i32(VAL_OBJECTARRAY);
+                    st.write_i32(elems.len() as i32);
+                    store(vm, parcel, st);
+                    for e in &elems {
+                        write_value(vm, parcel, e)?;
+                    }
                 }
                 return Ok(());
             }
@@ -1326,6 +1396,35 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
     Err(bad(format!(
         "Parcel.writeValue: unsupported value class {class}"
     )))
+}
+
+/// AOSP boolean arrays are one int per element (`writeBooleanArray`
+/// loops `writeInt(v ? 1 : 0)`), like short/char arrays — not one byte.
+fn write_bool_array_to(vm: &mut Engine, parcel: ObjRef, elems: Option<&[Value]>) {
+    let mut st = load(vm, parcel);
+    match elems {
+        None => st.write_i32(-1),
+        Some(es) => {
+            st.write_i32(es.len() as i32);
+            for e in es {
+                st.write_i32((e.as_int().unwrap_or(0) != 0) as i32);
+            }
+        }
+    }
+    store(vm, parcel, st);
+}
+
+fn read_bool_array_from(vm: &mut Engine, parcel: ObjRef) -> Result<Option<Vec<Value>>, VmExit> {
+    let Some(n) = read_typed_len(vm, parcel, "boolean array")? else {
+        return Ok(None);
+    };
+    let mut vals = Vec::with_capacity(n);
+    let mut st = load(vm, parcel);
+    for _ in 0..n {
+        vals.push(Value::Int((st.read_i32()? != 0) as i32));
+    }
+    store(vm, parcel, st);
+    Ok(Some(vals))
 }
 
 fn read_typed_len(vm: &mut Engine, parcel: ObjRef, what: &str) -> Result<Option<usize>, VmExit> {
@@ -1385,6 +1484,35 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             let v = read_i32_from(vm, parcel)?;
             boxed(vm, "Ljava/lang/Byte;", Value::Int(v))?
         }
+        VAL_CHAR => {
+            let v = read_i32_from(vm, parcel)?;
+            boxed(vm, "Ljava/lang/Character;", Value::Int(v))?
+        }
+        VAL_SIZE | VAL_SIZEF => {
+            let (w, h) = {
+                let mut st = load(vm, parcel);
+                let w = st.read_i32()?;
+                let h = st.read_i32()?;
+                store(vm, parcel, st);
+                (w, h)
+            };
+            let (class, w, h) = if tag == VAL_SIZE {
+                ("Landroid/util/Size;", Value::Int(w), Value::Int(h))
+            } else {
+                (
+                    "Landroid/util/SizeF;",
+                    Value::Float(f32::from_bits(w as u32)),
+                    Value::Float(f32::from_bits(h as u32)),
+                )
+            };
+            let r = vm
+                .heap
+                .alloc_instance(class.to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            crate::err::put_field_result(vm.heap.put_field(r, "rd_w", w))?;
+            crate::err::put_field_result(vm.heap.put_field(r, "rd_h", h))?;
+            Value::Obj(r)
+        }
         VAL_BOOLEAN => {
             let v = read_i32_from(vm, parcel)?;
             boxed(vm, "Ljava/lang/Boolean;", Value::Int((v != 0) as i32))?
@@ -1413,7 +1541,7 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             Some(b) => crate::jlstring::byte_array(vm, &b)?,
             None => Value::Null,
         },
-        VAL_INTARRAY | VAL_CHARARRAY => {
+        VAL_INTARRAY | VAL_SHORTARRAY | VAL_CHARARRAY => {
             let Some(n) = read_typed_len(vm, parcel, "int array")? else {
                 return Ok(Value::Null);
             };
@@ -1425,7 +1553,11 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             store(vm, parcel, st);
             crate::arrays::new_array(
                 vm,
-                if tag == VAL_CHARARRAY { "[C" } else { "[I" },
+                match tag {
+                    VAL_CHARARRAY => "[C",
+                    VAL_SHORTARRAY => "[S",
+                    _ => "[I",
+                },
                 ElemKind::Int,
                 vals,
             )?
@@ -1466,20 +1598,11 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             store(vm, parcel, st);
             crate::arrays::new_array(vm, "[D", ElemKind::Double, vals)?
         }
-        VAL_BOOLEANARRAY => {
-            let Some(n) = read_typed_len(vm, parcel, "boolean array")? else {
-                return Ok(Value::Null);
-            };
-            let mut st = load(vm, parcel);
-            let bytes = st.read_padded(n, "boolean array")?;
-            store(vm, parcel, st);
-            let vals = bytes
-                .into_iter()
-                .map(|b| Value::Int((b != 0) as i32))
-                .collect();
-            crate::arrays::new_array(vm, "[Z", ElemKind::Int, vals)?
-        }
-        VAL_STRINGARRAY => {
+        VAL_BOOLEANARRAY => match read_bool_array_from(vm, parcel)? {
+            Some(vals) => crate::arrays::new_array(vm, "[Z", ElemKind::Int, vals)?,
+            None => Value::Null,
+        },
+        VAL_STRINGARRAY | VAL_CHARSEQUENCEARRAY => {
             let Some(n) = read_typed_len(vm, parcel, "string array")? else {
                 return Ok(Value::Null);
             };
@@ -1490,7 +1613,26 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
                 store(vm, parcel, st);
                 vals.push(jstring(vm, s)?);
             }
-            crate::arrays::new_array(vm, "[Ljava/lang/String;", ElemKind::Obj, vals)?
+            crate::arrays::new_array(
+                vm,
+                if tag == VAL_CHARSEQUENCEARRAY {
+                    "[Ljava/lang/CharSequence;"
+                } else {
+                    "[Ljava/lang/String;"
+                },
+                ElemKind::Obj,
+                vals,
+            )?
+        }
+        VAL_PARCELABLEARRAY => {
+            let Some(n) = read_typed_len(vm, parcel, "parcelable array")? else {
+                return Ok(Value::Null);
+            };
+            let mut vals = Vec::with_capacity(n);
+            for _ in 0..n {
+                vals.push(read_parcelable(vm, parcel)?);
+            }
+            crate::arrays::new_array(vm, "[Landroid/os/Parcelable;", ElemKind::Obj, vals)?
         }
         VAL_OBJECTARRAY => {
             let Some(n) = read_typed_len(vm, parcel, "object array")? else {
@@ -1525,6 +1667,7 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             new_map(vm, entries)?
         }
         VAL_BUNDLE => new_lazy_bundle(vm, BUNDLE, parcel)?,
+        VAL_PERSISTABLEBUNDLE => new_lazy_bundle(vm, PERSISTABLE_BUNDLE, parcel)?,
         VAL_SPARSEARRAY => read_sparse_array(vm, parcel)?,
         VAL_SPARSEBOOLEANARRAY => read_sparse_boolean_array(vm, parcel)?,
         VAL_IBINDER => {
@@ -1534,6 +1677,11 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             binder_for_handle(vm, h)?
         }
         VAL_PARCELABLE => read_parcelable(vm, parcel)?,
+        VAL_SERIALIZABLE => {
+            return Err(bad(
+                "Parcel.readValue: Java-serialized values are not supported",
+            ))
+        }
         other => return Err(bad(format!("Parcel.readValue: unsupported tag {other}"))),
     })
 }
@@ -2251,7 +2399,7 @@ fn parcel_instance(
             slot.clone_from(&vals);
             return some(Value::Null);
         }
-        ("writeIntArray", "([I)V") | ("writeCharArray", "([C)V") => {
+        ("writeIntArray", "([I)V") | ("writeCharArray", "([C)V") | ("writeShortArray", "([S)V") => {
             let mut st = load(vm, recv);
             match array_elems(vm, args.first())? {
                 None => st.write_i32(-1),
@@ -2265,7 +2413,7 @@ fn parcel_instance(
             store(vm, recv, st);
             return some(Value::Null);
         }
-        ("createIntArray", "()[I") | ("createCharArray", "()[C") => {
+        ("createIntArray", "()[I") | ("createCharArray", "()[C") | ("createShortArray", "()[S") => {
             let Some(n) = read_typed_len(vm, recv, "int array")? else {
                 return some(Value::Null);
             };
@@ -2277,16 +2425,16 @@ fn parcel_instance(
             store(vm, recv, st);
             return some(crate::arrays::new_array(
                 vm,
-                if name == "createCharArray" {
-                    "[C"
-                } else {
-                    "[I"
+                match name {
+                    "createCharArray" => "[C",
+                    "createShortArray" => "[S",
+                    _ => "[I",
                 },
                 ElemKind::Int,
                 vals,
             )?);
         }
-        ("readIntArray", "([I)V") | ("readCharArray", "([C)V") => {
+        ("readIntArray", "([I)V") | ("readCharArray", "([C)V") | ("readShortArray", "([S)V") => {
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readIntArray: destination is null"));
             };
@@ -2445,48 +2593,23 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("writeBooleanArray", "([Z)V") => {
-            let mut st = load(vm, recv);
-            match array_elems(vm, args.first())? {
-                None => st.write_i32(-1),
-                Some(es) => {
-                    st.write_i32(es.len() as i32);
-                    let bytes: Vec<u8> = es
-                        .iter()
-                        .map(|e| (e.as_int().unwrap_or(0) != 0) as u8)
-                        .collect();
-                    st.write_padded(&bytes);
-                }
-            }
-            store(vm, recv, st);
+            let elems = array_elems(vm, args.first())?;
+            write_bool_array_to(vm, recv, elems.as_deref());
             return some(Value::Null);
         }
         ("createBooleanArray", "()[Z") => {
-            let Some(n) = read_typed_len(vm, recv, "boolean array")? else {
+            let Some(vals) = read_bool_array_from(vm, recv)? else {
                 return some(Value::Null);
             };
-            let mut st = load(vm, recv);
-            let bytes = st.read_padded(n, "boolean array")?;
-            store(vm, recv, st);
-            let vals = bytes
-                .into_iter()
-                .map(|b| Value::Int((b != 0) as i32))
-                .collect();
             return some(crate::arrays::new_array(vm, "[Z", ElemKind::Int, vals)?);
         }
         ("readBooleanArray", "([Z)V") => {
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readBooleanArray: destination is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "boolean array")? else {
+            let Some(vals) = read_bool_array_from(vm, recv)? else {
                 return some(Value::Null);
             };
-            let mut st = load(vm, recv);
-            let bytes = st.read_padded(n, "boolean array")?;
-            store(vm, recv, st);
-            let vals: Vec<Value> = bytes
-                .into_iter()
-                .map(|b| Value::Int((b != 0) as i32))
-                .collect();
             let slot = vm.heap.array_elems_mut(dest)?;
             if slot.len() != vals.len() {
                 return Err(bad("Parcel.readBooleanArray: destination length mismatch"));
@@ -3344,6 +3467,96 @@ mod tests {
             ),
             Value::Null
         );
+    }
+
+    #[test]
+    fn value_tags_and_primitive_array_forms_match_aosp() {
+        fn tag_of(st: &PState) -> i32 {
+            i32::from_le_bytes(st.data[0..4].try_into().unwrap())
+        }
+        fn roundtrip(vm: &mut Engine, v: &Value) -> (PState, Value) {
+            let p = obj(new_parcel(vm).unwrap());
+            write_value(vm, p, v).unwrap();
+            let st = load(vm, p);
+            let mut reset = st.clone();
+            reset.pos = 0;
+            store(vm, p, reset);
+            let got = read_value(vm, p).unwrap();
+            (st, got)
+        }
+        let mut vm = engine();
+
+        // Character: VAL_CHAR (29) + writeInt, not a CharSequence string.
+        let ch = Value::Obj(
+            crate::boxes::box_value(&mut vm, "Ljava/lang/Character;", Value::Int(120)).unwrap(),
+        );
+        let (st, got) = roundtrip(&mut vm, &ch);
+        assert_eq!(tag_of(&st), VAL_CHAR);
+        assert_eq!(i32::from_le_bytes(st.data[4..8].try_into().unwrap()), 120);
+        let got = obj(got);
+        assert_eq!(vm.heap.class_of(got).unwrap(), "Ljava/lang/Character;");
+        assert_eq!(vm.heap.get_field(got, "value").unwrap(), Value::Int(120));
+
+        // boolean[]: VAL_BOOLEANARRAY (23), count, then one int per element.
+        let bools = crate::arrays::new_array(
+            &mut vm,
+            "[Z",
+            ElemKind::Int,
+            vec![Value::Int(1), Value::Int(0), Value::Int(1)],
+        )
+        .unwrap();
+        let (st, got) = roundtrip(&mut vm, &bools);
+        assert_eq!(tag_of(&st), VAL_BOOLEANARRAY);
+        assert_eq!(st.data.len(), 4 + 4 + 3 * 4);
+        assert_eq!(i32::from_le_bytes(st.data[8..12].try_into().unwrap()), 1);
+        assert_eq!(i32::from_le_bytes(st.data[12..16].try_into().unwrap()), 0);
+        let got = obj(got);
+        assert_eq!(vm.heap.class_of(got).unwrap(), "[Z");
+        assert_eq!(
+            vm.heap.as_array_elems(got).unwrap().0,
+            &[Value::Int(1), Value::Int(0), Value::Int(1)]
+        );
+
+        // short[]: VAL_SHORTARRAY (30), decodes back as short[] not int[].
+        let shorts = crate::arrays::new_array(
+            &mut vm,
+            "[S",
+            ElemKind::Int,
+            vec![Value::Int(7), Value::Int(-2)],
+        )
+        .unwrap();
+        let (st, got) = roundtrip(&mut vm, &shorts);
+        assert_eq!(tag_of(&st), VAL_SHORTARRAY);
+        assert_eq!(vm.heap.class_of(obj(got)).unwrap(), "[S");
+
+        // PersistableBundle: VAL_PERSISTABLEBUNDLE (25), lazy on read.
+        let pb = vm
+            .heap
+            .alloc_instance(PERSISTABLE_BUNDLE.to_string(), Vec::new())
+            .unwrap();
+        vm.fw
+            .objects
+            .insert(pb, HostObj::Bundle { map: Vec::new() });
+        let (st, got) = roundtrip(&mut vm, &Value::Obj(pb));
+        assert_eq!(tag_of(&st), VAL_PERSISTABLEBUNDLE);
+        let got = obj(got);
+        assert_eq!(vm.heap.class_of(got).unwrap(), PERSISTABLE_BUNDLE);
+        assert!(parcelled_data(&vm, got).is_some());
+
+        // Size: VAL_SIZE (26) + two ints.
+        let size = vm
+            .heap
+            .alloc_instance("Landroid/util/Size;".to_string(), Vec::new())
+            .unwrap();
+        vm.heap.put_field(size, "rd_w", Value::Int(3)).unwrap();
+        vm.heap.put_field(size, "rd_h", Value::Int(4)).unwrap();
+        let (st, got) = roundtrip(&mut vm, &Value::Obj(size));
+        assert_eq!(tag_of(&st), VAL_SIZE);
+        assert_eq!(i32::from_le_bytes(st.data[4..8].try_into().unwrap()), 3);
+        assert_eq!(i32::from_le_bytes(st.data[8..12].try_into().unwrap()), 4);
+        let got = obj(got);
+        assert_eq!(vm.heap.get_field(got, "rd_w").unwrap(), Value::Int(3));
+        assert_eq!(vm.heap.get_field(got, "rd_h").unwrap(), Value::Int(4));
     }
 
     #[test]
