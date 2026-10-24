@@ -550,6 +550,22 @@ fn array_map(
             Value::Null
         }
         "ensureCapacity" => Value::Null,
+        "removeAll" | "retainAll" => {
+            // ArrayMap's collection bulk operations act on the keys.
+            let source = crate::jcollections::elems_of(vm, &arg(0))?;
+            let mut kept = Vec::with_capacity(entries_snapshot.len());
+            let mut changed = false;
+            for entry in entries_snapshot {
+                let inside = array_contains_linear(vm, &source, &entry.0)?;
+                if inside == (name == "retainAll") {
+                    kept.push(entry);
+                } else {
+                    changed = true;
+                }
+            }
+            array_map_store(vm, recv, kept);
+            Value::Int(changed as i32)
+        }
         "keySet" | "values" | "entrySet" => array_map_view(vm, recv, name, &entries_snapshot)?,
         "hashCode" => {
             let mut hash = 0i32;
@@ -565,7 +581,21 @@ fn array_map(
             if *other == recv {
                 Value::Int(1)
             } else {
-                let other_entries = array_map_entries(vm, *other);
+                // AOSP: equality is against any `java.util.Map`, not only
+                // another ArrayMap.
+                let other_class = vm.heap.class_of(*other)?.to_string();
+                let host_map = matches!(vm.fw.objects.get(other), Some(HostObj::Map { .. }));
+                if !host_map && !vm.cp.is_subtype(&other_class, "Ljava/util/Map;") {
+                    return Ok(Some(Value::Int(0)));
+                }
+                let other_entries = if host_map {
+                    array_map_entries(vm, *other)
+                } else {
+                    match array_map_source_entries(vm, args.first()) {
+                        Ok(entries) => entries,
+                        Err(_) => return Ok(Some(Value::Int(0))),
+                    }
+                };
                 if other_entries.len() != entries_snapshot.len() {
                     Value::Int(0)
                 } else {
@@ -643,6 +673,12 @@ fn array_set(
             "(Ljava/util/Collection;)V" | "(Landroid/util/ArraySet;)V"
         ) {
             crate::jcollections::elems_of(vm, &arg(0))?
+        } else if sig == "([Ljava/lang/Object;)V" {
+            // `ArraySet(T[] array)` tolerates a null array.
+            match args.first() {
+                Some(Value::Obj(array)) => vm.heap.as_array_elems(*array)?.0.to_vec(),
+                _ => Vec::new(),
+            }
         } else {
             Vec::new()
         };
@@ -766,6 +802,56 @@ fn array_set(
                 args.first()
             },
         )?,
+        "hashCode" => {
+            // AOSP ArraySet.hashCode sums the stored element hashes.
+            let mut hash = 0i32;
+            for value in &elems_snapshot {
+                hash = hash.wrapping_add(array_hash(vm, value)?);
+            }
+            Value::Int(hash)
+        }
+        "equals" => {
+            // AOSP: `other instanceof Set`, same size, every element
+            // contained. A non-Set (or an element source that cannot be
+            // read as one) is simply unequal.
+            let Some(Value::Obj(other)) = args.first() else {
+                return Ok(Some(Value::Int(0)));
+            };
+            if *other == recv {
+                Value::Int(1)
+            } else {
+                let other_class = vm.heap.class_of(*other)?.to_string();
+                if !vm.cp.is_subtype(&other_class, "Ljava/util/Set;") {
+                    Value::Int(0)
+                } else {
+                    match crate::jcollections::elems_of(vm, &Value::Obj(*other)) {
+                        Ok(other_elems) if other_elems.len() == elems_snapshot.len() => {
+                            let mut equal = true;
+                            for value in &elems_snapshot {
+                                if !array_contains_linear(vm, &other_elems, value)? {
+                                    equal = false;
+                                    break;
+                                }
+                            }
+                            Value::Int(equal as i32)
+                        }
+                        _ => Value::Int(0),
+                    }
+                }
+            }
+        }
+        "toString" => {
+            // AOSP ArraySet renders with braces, like a Map: `{a, b}`,
+            // `{}` when empty, and `(this Set)` for a self reference.
+            let mut parts = Vec::with_capacity(elems_snapshot.len());
+            for value in &elems_snapshot {
+                parts.push(array_value_string(vm, recv, "(this Set)", value)?);
+            }
+            Value::Obj(crate::intrinsics::alloc_string(
+                vm,
+                format!("{{{}}}", parts.join(", ")),
+            )?)
+        }
         _ => return Ok(None),
     }))
 }
@@ -1377,6 +1463,19 @@ pub(crate) fn host_static(
 ) -> Result<Option<Value>, VmExit> {
     if let Some(value) = crate::android_json::host_static(vm, class, name)? {
         return Ok(Some(value));
+    }
+    if class == ARRAY_MAP && name == "EMPTY" {
+        // `ArrayMap.EMPTY` is a canonical empty instance; the sget path
+        // caches this first materialization in the class statics, so its
+        // identity is stable across reads.
+        let r = vm.heap.alloc_instance(ARRAY_MAP.to_string(), Vec::new())?;
+        vm.fw.objects.insert(
+            r,
+            HostObj::Map {
+                entries: Vec::new(),
+            },
+        );
+        return Ok(Some(Value::Obj(r)));
     }
     if class != BASE64 {
         return Ok(None);
@@ -2377,6 +2476,87 @@ mod tests {
             .invoke_instance(iterator, "next", "()Ljava/lang/Object;", &[])
             .unwrap();
         assert_eq!(unboxed(&vm, &first), -1);
+    }
+
+    #[test]
+    fn array_set_object_forms_and_array_map_empty_follow_aosp() {
+        let mut vm = Engine::new(Vec::new(), crate::VmConfig::default());
+        let boxed = |vm: &mut Engine, value: i32| {
+            Value::Obj(
+                crate::boxes::box_value(vm, "Ljava/lang/Integer;", Value::Int(value)).unwrap(),
+            )
+        };
+        let set = vm
+            .heap
+            .alloc_instance(ARRAY_SET.to_string(), Vec::new())
+            .unwrap();
+        let call_set = |vm: &mut Engine, name: &str, sig: &str, args: &[Value]| {
+            instance_intrinsic(vm, ARRAY_SET, ARRAY_SET, name, sig, set, args)
+                .unwrap()
+                .unwrap()
+        };
+        call_set(&mut vm, "<init>", "()V", &[]);
+        assert_eq!(
+            match call_set(&mut vm, "toString", "()Ljava/lang/String;", &[]) {
+                Value::Obj(o) => vm.heap.as_str(o).unwrap().to_string(),
+                other => panic!("toString: {other:?}"),
+            },
+            "{}"
+        );
+        for value in [3, 1] {
+            let v = boxed(&mut vm, value);
+            call_set(
+                &mut vm,
+                "add",
+                "(Ljava/lang/Object;)Z",
+                std::slice::from_ref(&v),
+            );
+        }
+        // hashCode is the sum of element hashes (Integer hash is itself).
+        assert_eq!(call_set(&mut vm, "hashCode", "()I", &[]), Value::Int(4));
+        // toString uses AOSP braces in signed-hash order.
+        assert_eq!(
+            match call_set(&mut vm, "toString", "()Ljava/lang/String;", &[]) {
+                Value::Obj(o) => vm.heap.as_str(o).unwrap().to_string(),
+                other => panic!("toString: {other:?}"),
+            },
+            "{1, 3}"
+        );
+        // equals against any java.util.Set host state, order-insensitive.
+        let hash_set = vm
+            .heap
+            .alloc_instance("Ljava/util/HashSet;".to_string(), Vec::new())
+            .unwrap();
+        let three = boxed(&mut vm, 3);
+        let one = boxed(&mut vm, 1);
+        vm.fw.objects.insert(
+            hash_set,
+            HostObj::List {
+                elems: vec![three, one],
+            },
+        );
+        assert_eq!(
+            call_set(
+                &mut vm,
+                "equals",
+                "(Ljava/lang/Object;)Z",
+                &[Value::Obj(hash_set)],
+            ),
+            Value::Int(1)
+        );
+
+        // ArrayMap.EMPTY materializes an empty ArrayMap instance.
+        let empty = host_static(&mut vm, ARRAY_MAP, "EMPTY").unwrap().unwrap();
+        let Value::Obj(empty) = empty else {
+            panic!("EMPTY was not an object");
+        };
+        assert_eq!(vm.heap.class_of(empty).unwrap(), ARRAY_MAP);
+        assert_eq!(
+            instance_intrinsic(&mut vm, ARRAY_MAP, ARRAY_MAP, "size", "()I", empty, &[])
+                .unwrap()
+                .unwrap(),
+            Value::Int(0)
+        );
     }
 
     #[test]

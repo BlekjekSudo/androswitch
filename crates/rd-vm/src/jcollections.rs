@@ -334,11 +334,14 @@ pub(crate) fn instance_intrinsic(
         return Ok(None);
     }
     // `android.util.ArraySet` also stores its elements in HostObj::List,
-    // but in signed Java-hash order. Its `addAll` must therefore defer to
-    // android_util instead of appending through this insertion-order path,
-    // including when named through Collection/Set and inherited by a DEX
-    // subclass that does not override it.
-    if name == "addAll" && sig == "(Ljava/util/Collection;)Z" {
+    // but in signed Java-hash order. Its insertion operations (`add` and
+    // `addAll`) must therefore defer to android_util instead of appending
+    // through this insertion-order path, including when named through
+    // Collection/Set and inherited by a DEX subclass that does not
+    // override it. (Order-preserving removals/reads are safe here.)
+    if (name == "addAll" && sig == "(Ljava/util/Collection;)Z")
+        || (name == "add" && sig == "(Ljava/lang/Object;)Z")
+    {
         let recv_class = vm.heap.class_of(recv)?.to_string();
         const ARRAY_SET: &str = "Landroid/util/ArraySet;";
         if recv_class == ARRAY_SET
@@ -746,6 +749,12 @@ pub(crate) fn host_object_method(
             | ("hashCode", "()I")
             | ("toString", "()Ljava/lang/String;")
     ) {
+        return Ok(None);
+    }
+    // `android.util.ArraySet` uses the List representation but has its own
+    // AOSP object forms (`{a, b}` braces, "(this Set)"): defer to
+    // android_util rather than the generic List/Set rendering.
+    if recv_class == "Landroid/util/ArraySet;" {
         return Ok(None);
     }
     let items = match vm.fw.objects.get(&recv) {

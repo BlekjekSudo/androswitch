@@ -2353,6 +2353,165 @@ fn parcel_instance(
             }
             return some(Value::Null);
         }
+        ("writeArrayMap", "(Landroid/util/ArrayMap;)V") => {
+            // AOSP `writeArrayMapInternal`: -1 for null, else the entry
+            // count followed by String key / writeValue pairs in the map's
+            // (hash-sorted) iteration order.
+            match obj_arg(args, 0) {
+                None => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(-1);
+                    store(vm, recv, st);
+                }
+                Some(map) => {
+                    let entries = match vm.fw.get(map) {
+                        Some(HostObj::Map { entries }) => entries.clone(),
+                        _ => {
+                            return Err(bad(
+                                "Parcel.writeArrayMap: only host ArrayMap state can be written",
+                            ))
+                        }
+                    };
+                    let mut st = load(vm, recv);
+                    st.write_i32(entries.len() as i32);
+                    store(vm, recv, st);
+                    for (k, v) in &entries {
+                        let key = match k {
+                            Value::Obj(o) => vm.heap.as_str(*o).ok().map(str::to_string),
+                            _ => None,
+                        };
+                        write_string_to(vm, recv, key.as_deref());
+                        write_value(vm, recv, v)?;
+                    }
+                }
+            }
+            return some(Value::Null);
+        }
+        ("readArrayMap", "(Landroid/util/ArrayMap;Ljava/lang/ClassLoader;)V") => {
+            // AOSP appends the parcelled entries to the destination, in
+            // stream order (the producer wrote them hash-sorted).
+            let Some(dest) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.readArrayMap: destination is null"));
+            };
+            let Some(n) = read_typed_len(vm, recv, "ArrayMap")? else {
+                return some(Value::Null);
+            };
+            let mut pairs = Vec::with_capacity(n);
+            for _ in 0..n {
+                let key = read_string_from(vm, recv)?;
+                let value = read_value(vm, recv)?;
+                pairs.push((jstring(vm, key)?, value));
+            }
+            if matches!(vm.fw.get(dest), Some(HostObj::Map { .. }) | None) {
+                let mut entries = match vm.fw.get(dest) {
+                    Some(HostObj::Map { entries }) => entries.clone(),
+                    _ => Vec::new(),
+                };
+                entries.extend(pairs);
+                vm.fw.objects.insert(dest, HostObj::Map { entries });
+            } else {
+                for (k, v) in pairs {
+                    vm.invoke_instance(
+                        dest,
+                        "append",
+                        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+                        &[k, v],
+                    )?;
+                }
+            }
+            return some(Value::Null);
+        }
+        ("writeTypedArrayMap", "(Landroid/util/ArrayMap;I)V") => {
+            match obj_arg(args, 0) {
+                None => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(-1);
+                    store(vm, recv, st);
+                }
+                Some(map) => {
+                    let entries = match vm.fw.get(map) {
+                        Some(HostObj::Map { entries }) => entries.clone(),
+                        _ => {
+                            return Err(bad(
+                                "Parcel.writeTypedArrayMap: only host ArrayMap state can be written",
+                            ))
+                        }
+                    };
+                    let mut st = load(vm, recv);
+                    st.write_i32(entries.len() as i32);
+                    store(vm, recv, st);
+                    for (k, v) in &entries {
+                        let key = match k {
+                            Value::Obj(o) => vm.heap.as_str(*o).ok().map(str::to_string),
+                            _ => None,
+                        };
+                        write_string_to(vm, recv, key.as_deref());
+                        write_present_typed(vm, recv, std::slice::from_ref(v), int_arg(args, 1))?;
+                    }
+                }
+            }
+            return some(Value::Null);
+        }
+        (
+            "createTypedArrayMap",
+            "(Landroid/os/Parcelable$Creator;)Landroid/util/ArrayMap;",
+        ) => {
+            let Some(creator) = obj_arg(args, 0) else {
+                return Err(npe("Parcel.createTypedArrayMap: creator is null"));
+            };
+            let Some(n) = read_typed_len(vm, recv, "typed ArrayMap")? else {
+                return some(Value::Null);
+            };
+            let mut entries = Vec::with_capacity(n);
+            for _ in 0..n {
+                let key = read_string_from(vm, recv)?;
+                let mut value = read_present_typed(vm, recv, creator, 1)?;
+                entries.push((jstring(vm, key)?, value.pop().unwrap_or(Value::Null)));
+            }
+            let map = vm
+                .heap
+                .alloc_instance("Landroid/util/ArrayMap;".to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            vm.fw.objects.insert(map, HostObj::Map { entries });
+            return some(Value::Obj(map));
+        }
+        ("writeArraySet", "(Landroid/util/ArraySet;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            match list_values(vm, &v)? {
+                None => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(-1);
+                    store(vm, recv, st);
+                }
+                Some(elems) => {
+                    let mut st = load(vm, recv);
+                    st.write_i32(elems.len() as i32);
+                    store(vm, recv, st);
+                    for e in &elems {
+                        write_value(vm, recv, e)?;
+                    }
+                }
+            }
+            return some(Value::Null);
+        }
+        ("readArraySet", "(Ljava/lang/ClassLoader;)Landroid/util/ArraySet;") => {
+            // AOSP `readArraySet` appends in stream order; the producer
+            // wrote the set's hash-sorted order, which the host list
+            // representation preserves verbatim.
+            let Some(n) = read_typed_len(vm, recv, "ArraySet")? else {
+                return some(Value::Null);
+            };
+            let mut elems = Vec::with_capacity(n);
+            for _ in 0..n {
+                elems.push(read_value(vm, recv)?);
+            }
+            let set = vm
+                .heap
+                .alloc_instance("Landroid/util/ArraySet;".to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            vm.fw.objects.insert(set, HostObj::List { elems });
+            return some(Value::Obj(set));
+        }
         ("createTypedArray", "(Landroid/os/Parcelable$Creator;)[Ljava/lang/Object;") => {
             let Some(creator) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.createTypedArray: creator is null"));
@@ -3671,6 +3830,113 @@ mod tests {
         assert_eq!(map[0].0, "answer");
         let got = obj(map[0].1.clone());
         assert_eq!(vm.heap.get_field(got, "value").unwrap(), Value::Int(12));
+    }
+
+    #[test]
+    fn array_map_and_array_set_roundtrip_through_parcel() {
+        let mut vm = engine();
+        let p = obj(new_parcel(&mut vm).unwrap());
+
+        // ArrayMap<String, Integer> in the host's signed-hash order
+        // ("a" = 97 before "b" = 98).
+        let a = s(&mut vm, "a");
+        let one = Value::Obj(
+            crate::boxes::box_value(&mut vm, "Ljava/lang/Integer;", Value::Int(1)).unwrap(),
+        );
+        let b = s(&mut vm, "b");
+        let two = Value::Obj(
+            crate::boxes::box_value(&mut vm, "Ljava/lang/Integer;", Value::Int(2)).unwrap(),
+        );
+        let map = vm
+            .heap
+            .alloc_instance("Landroid/util/ArrayMap;".to_string(), Vec::new())
+            .unwrap();
+        vm.fw.objects.insert(
+            map,
+            HostObj::Map {
+                entries: vec![(a, one), (b, two)],
+            },
+        );
+        callp(
+            &mut vm,
+            p,
+            "writeArrayMap",
+            "(Landroid/util/ArrayMap;)V",
+            &[Value::Obj(map)],
+        );
+        let map_end = load(&vm, p).data.len();
+
+        // ArraySet with Integer 9 and "x": hash order is 9 (9) then "x"
+        // (120); the reader preserves the written stream order.
+        let nine = Value::Obj(
+            crate::boxes::box_value(&mut vm, "Ljava/lang/Integer;", Value::Int(9)).unwrap(),
+        );
+        let x = s(&mut vm, "x");
+        let set = vm
+            .heap
+            .alloc_instance("Landroid/util/ArraySet;".to_string(), Vec::new())
+            .unwrap();
+        vm.fw.objects.insert(
+            set,
+            HostObj::List {
+                elems: vec![nine, x],
+            },
+        );
+        callp(
+            &mut vm,
+            p,
+            "writeArraySet",
+            "(Landroid/util/ArraySet;)V",
+            &[Value::Obj(set)],
+        );
+
+        callp(&mut vm, p, "setDataPosition", "(I)V", &[Value::Int(0)]);
+        let dest = vm
+            .heap
+            .alloc_instance("Landroid/util/ArrayMap;".to_string(), Vec::new())
+            .unwrap();
+        vm.fw
+            .objects
+            .insert(dest, HostObj::Map { entries: Vec::new() });
+        callp(
+            &mut vm,
+            p,
+            "readArrayMap",
+            "(Landroid/util/ArrayMap;Ljava/lang/ClassLoader;)V",
+            &[Value::Obj(dest), Value::Null],
+        );
+        assert_eq!(load(&vm, p).pos, map_end);
+        let entries = match vm.fw.get(dest) {
+            Some(HostObj::Map { entries }) => entries.clone(),
+            _ => panic!("destination ArrayMap has no host state"),
+        };
+        assert_eq!(entries.len(), 2);
+        assert_eq!(vm.heap.as_str(obj(entries[0].0.clone())).unwrap(), "a");
+        assert_eq!(
+            vm.heap.get_field(obj(entries[0].1.clone()), "value").unwrap(),
+            Value::Int(1)
+        );
+        assert_eq!(vm.heap.as_str(obj(entries[1].0.clone())).unwrap(), "b");
+
+        let got_set = obj(callp(
+            &mut vm,
+            p,
+            "readArraySet",
+            "(Ljava/lang/ClassLoader;)Landroid/util/ArraySet;",
+            &[Value::Null],
+        ));
+        assert_eq!(vm.heap.class_of(got_set).unwrap(), "Landroid/util/ArraySet;");
+        let elems = match vm.fw.get(got_set) {
+            Some(HostObj::List { elems }) => elems.clone(),
+            _ => panic!("read ArraySet has no host state"),
+        };
+        assert_eq!(elems.len(), 2);
+        assert_eq!(
+            vm.heap.get_field(obj(elems[0].clone()), "value").unwrap(),
+            Value::Int(9),
+            "Integer 9 (hash 9) precedes \"x\" (hash 120)"
+        );
+        assert_eq!(vm.heap.as_str(obj(elems[1].clone())).unwrap(), "x");
     }
 
     #[test]
