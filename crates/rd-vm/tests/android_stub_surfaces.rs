@@ -15061,3 +15061,552 @@ fn nfc_without_nfc_feature_or_service_is_guest_visible() {
         "Ljava/lang/NullPointerException;",
     );
 }
+
+// ---- Appendix C Batch 36-C: android.net.nsd + android.net.sip ----
+
+const P36C_NSD_INFO: &str = "Landroid/net/nsd/NsdServiceInfo;";
+const P36C_NSD_MANAGER: &str = "Landroid/net/nsd/NsdManager;";
+const P36C_SIP_MANAGER: &str = "Landroid/net/sip/SipManager;";
+const P36C_SIP_EXCEPTION: &str = "Landroid/net/sip/SipException;";
+
+#[test]
+fn nsd_service_info_txt_records_and_unpublished_service_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, CONTEXT);
+    let service_name = text(&mut engine, "nsd");
+    assert_throws(
+        engine.invoke_instance(
+            context,
+            "getSystemService",
+            "(Ljava/lang/String;)Ljava/lang/Object;",
+            &[service_name],
+        ),
+        "Landroid/os/ServiceManager$ServiceNotFoundException;",
+    );
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P36C_NSD_MANAGER,
+            "nameOf",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(1)],
+        ),
+        "DISCOVER_SERVICES"
+    );
+    // AOSP's EVENT_NAMES map intentionally has no entry for code 30.
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P36C_NSD_MANAGER,
+            "nameOf",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(30)],
+        ),
+        "30"
+    );
+    assert!(engine
+        .cp
+        .is_subtype(P36C_NSD_INFO, "Landroid/os/Parcelable;"));
+
+    let info = p49_new(&mut engine, P36C_NSD_INFO, "()V", &[]);
+    let name = text(&mut engine, "Printer");
+    call(
+        &mut engine,
+        info,
+        "setServiceName",
+        "(Ljava/lang/String;)V",
+        &[name],
+    );
+    let service_type = text(&mut engine, "_ipp._tcp");
+    call(
+        &mut engine,
+        info,
+        "setServiceType",
+        "(Ljava/lang/String;)V",
+        &[service_type],
+    );
+    call(&mut engine, info, "setPort", "(I)V", &[Value::Int(631)]);
+    assert_eq!(
+        call_text(
+            &mut engine,
+            info,
+            "getServiceName",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "Printer"
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            info,
+            "getServiceType",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "_ipp._tcp"
+    );
+    assert_eq!(
+        call(&mut engine, info, "getPort", "()I", &[]),
+        Value::Int(631)
+    );
+
+    let address = instance(&mut engine, "Ljava/net/InetAddress;");
+    let addresses = list_of(&mut engine, &[Value::Obj(address)]);
+    call(
+        &mut engine,
+        info,
+        "setHostAddresses",
+        "(Ljava/util/List;)V",
+        &[Value::Obj(addresses)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            info,
+            "getHost",
+            "()Ljava/net/InetAddress;",
+            &[]
+        ),
+        Value::Obj(address)
+    );
+    let returned_addresses = object(call(
+        &mut engine,
+        info,
+        "getHostAddresses",
+        "()Ljava/util/List;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, returned_addresses, "size", "()I", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            returned_addresses,
+            "get",
+            "(I)Ljava/lang/Object;",
+            &[Value::Int(0)],
+        ),
+        Value::Obj(address)
+    );
+    let empty_addresses = list_of(&mut engine, &[]);
+    call(
+        &mut engine,
+        info,
+        "setHostAddresses",
+        "(Ljava/util/List;)V",
+        &[Value::Obj(empty_addresses)],
+    );
+
+    let path_key = text(&mut engine, "path");
+    let path_value = text(&mut engine, "/x");
+    call(
+        &mut engine,
+        info,
+        "setAttribute",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+        &[path_key, path_value],
+    );
+    let flag_key = text(&mut engine, "flag");
+    call(
+        &mut engine,
+        info,
+        "setAttribute",
+        "(Ljava/lang/String;[B)V",
+        &[flag_key, Value::Null],
+    );
+    let attributes = object(call(
+        &mut engine,
+        info,
+        "getAttributes",
+        "()Ljava/util/Map;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, attributes, "size", "()I", &[]),
+        Value::Int(2)
+    );
+    let path_lookup = text(&mut engine, "path");
+    let stored_path = call(
+        &mut engine,
+        attributes,
+        "get",
+        "(Ljava/lang/Object;)Ljava/lang/Object;",
+        &[path_lookup],
+    );
+    assert_eq!(byte_array_values(&engine, &stored_path), b"/x");
+    let txt_record = call(&mut engine, info, "getTxtRecord", "()[B", &[]);
+    assert_eq!(
+        byte_array_values(&engine, &txt_record),
+        vec![7, b'p', b'a', b't', b'h', b'=', b'/', b'x', 5, b'f', b'l', b'a', b'g', b'=']
+    );
+    let bad_key = text(&mut engine, "bad=key");
+    let bad_value = text(&mut engine, "x");
+    assert_throws(
+        engine.invoke_instance(
+            info,
+            "setAttribute",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[bad_key, bad_value],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    let parsed = p49_new(&mut engine, P36C_NSD_INFO, "()V", &[]);
+    let mut raw = Vec::new();
+    raw.extend([12]);
+    raw.extend(b"name=printer");
+    raw.extend([6]);
+    raw.extend(b"secure");
+    raw.extend([10]);
+    raw.extend(b"name=other");
+    raw.extend([0, 9]);
+    raw.extend(b"path=/ipp");
+    raw.extend([4, 1, b'x', b'=', b'v']);
+    let raw = byte_array(&mut engine, &raw);
+    call(&mut engine, parsed, "setTxtRecords", "([B)V", &[raw]);
+    let parsed_txt_record = call(&mut engine, parsed, "getTxtRecord", "()[B", &[]);
+    assert_eq!(
+        byte_array_values(&engine, &parsed_txt_record),
+        b"\x0cname=printer\x07secure=\x09path=/ipp".to_vec()
+    );
+    let secure = text(&mut engine, "secure");
+    call(
+        &mut engine,
+        parsed,
+        "removeAttribute",
+        "(Ljava/lang/String;)V",
+        &[secure],
+    );
+    let parsed_attributes = object(call(
+        &mut engine,
+        parsed,
+        "getAttributes",
+        "()Ljava/util/Map;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, parsed_attributes, "size", "()I", &[]),
+        Value::Int(2)
+    );
+
+    let shown = p49_new(&mut engine, P36C_NSD_INFO, "()V", &[]);
+    let shown_name = text(&mut engine, "Printer");
+    call(
+        &mut engine,
+        shown,
+        "setServiceName",
+        "(Ljava/lang/String;)V",
+        &[shown_name],
+    );
+    let shown_type = text(&mut engine, "_ipp._tcp");
+    call(
+        &mut engine,
+        shown,
+        "setServiceType",
+        "(Ljava/lang/String;)V",
+        &[shown_type],
+    );
+    call(&mut engine, shown, "setPort", "(I)V", &[Value::Int(631)]);
+    call(
+        &mut engine,
+        shown,
+        "setInterfaceIndex",
+        "(I)V",
+        &[Value::Int(7)],
+    );
+    assert_eq!(
+        call(&mut engine, shown, "getInterfaceIndex", "()I", &[]),
+        Value::Int(7)
+    );
+    assert_eq!(
+        call_text(&mut engine, shown, "toString", "()Ljava/lang/String;", &[]),
+        "name: Printer, type: _ipp._tcp, hostAddresses: , port: 631, network: null, txtRecord: "
+    );
+}
+
+#[test]
+fn nsd_manager_validation_and_listener_bookkeeping_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let manager = instance(&mut engine, P36C_NSD_MANAGER);
+    let listener = instance(
+        &mut engine,
+        "Landroid/net/nsd/NsdManager$DiscoveryListener;",
+    );
+    let empty_type = text(&mut engine, "");
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "discoverServices",
+            "(Ljava/lang/String;ILandroid/net/nsd/NsdManager$DiscoveryListener;)V",
+            &[empty_type, Value::Int(1), Value::Obj(listener)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let service_type = text(&mut engine, "_http._tcp");
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "discoverServices",
+            "(Ljava/lang/String;ILandroid/net/nsd/NsdManager$DiscoveryListener;)V",
+            &[service_type, Value::Int(9), Value::Obj(listener)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let service_type = text(&mut engine, "_http._tcp");
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "discoverServices",
+            "(Ljava/lang/String;ILandroid/net/nsd/NsdManager$DiscoveryListener;)V",
+            &[service_type, Value::Int(1), Value::Obj(listener)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    // putListener ran before the absent-connector dereference, so the
+    // same listener is now in use and can be found for stop requests.
+    let service_type = text(&mut engine, "_http._tcp");
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "discoverServices",
+            "(Ljava/lang/String;ILandroid/net/nsd/NsdManager$DiscoveryListener;)V",
+            &[service_type, Value::Int(1), Value::Obj(listener)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let other_listener = instance(
+        &mut engine,
+        "Landroid/net/nsd/NsdManager$DiscoveryListener;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "stopServiceDiscovery",
+            "(Landroid/net/nsd/NsdManager$DiscoveryListener;)V",
+            &[Value::Obj(other_listener)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "stopServiceDiscovery",
+            "(Landroid/net/nsd/NsdManager$DiscoveryListener;)V",
+            &[Value::Obj(listener)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+
+    let info = p49_new(&mut engine, P36C_NSD_INFO, "()V", &[]);
+    let registration_listener = instance(
+        &mut engine,
+        "Landroid/net/nsd/NsdManager$RegistrationListener;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "registerService",
+            "(Landroid/net/nsd/NsdServiceInfo;ILandroid/net/nsd/NsdManager$RegistrationListener;)V",
+            &[
+                Value::Obj(info),
+                Value::Int(1),
+                Value::Obj(registration_listener),
+            ],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let resolve_listener = instance(&mut engine, "Landroid/net/nsd/NsdManager$ResolveListener;");
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "resolveService",
+            "(Landroid/net/nsd/NsdServiceInfo;Landroid/net/nsd/NsdManager$ResolveListener;)V",
+            &[Value::Obj(info), Value::Obj(resolve_listener)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+}
+
+#[test]
+fn sip_without_sip_features_or_service_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, CONTEXT);
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36C_SIP_MANAGER,
+            "isApiSupported",
+            "(Landroid/content/Context;)Z",
+            &[Value::Obj(context)],
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36C_SIP_MANAGER,
+            "isVoipSupported",
+            "(Landroid/content/Context;)Z",
+            &[Value::Obj(context)],
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36C_SIP_MANAGER,
+            "newInstance",
+            "(Landroid/content/Context;)Landroid/net/sip/SipManager;",
+            &[Value::Obj(context)],
+        ),
+        Value::Null
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36C_SIP_MANAGER,
+            "isApiSupported",
+            "(Landroid/content/Context;)Z",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert!(engine
+        .cp
+        .is_subtype(P36C_SIP_EXCEPTION, "Ljava/lang/Exception;"));
+
+    let call_id = text(&mut engine, "call-17");
+    let offer = text(&mut engine, "v=0");
+    let intent = object(call_static(
+        &mut engine,
+        P36C_SIP_MANAGER,
+        "createIncomingCallBroadcast",
+        "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;",
+        &[call_id, offer],
+    ));
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P36C_SIP_MANAGER,
+            "getCallId",
+            "(Landroid/content/Intent;)Ljava/lang/String;",
+            &[Value::Obj(intent)],
+        ),
+        "call-17"
+    );
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P36C_SIP_MANAGER,
+            "getOfferSessionDescription",
+            "(Landroid/content/Intent;)Ljava/lang/String;",
+            &[Value::Obj(intent)],
+        ),
+        "v=0"
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36C_SIP_MANAGER,
+            "isIncomingCallIntent",
+            "(Landroid/content/Intent;)Z",
+            &[Value::Obj(intent)],
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36C_SIP_MANAGER,
+            "isIncomingCallIntent",
+            "(Landroid/content/Intent;)Z",
+            &[Value::Null],
+        ),
+        Value::Int(0)
+    );
+
+    let manager = p49_new(
+        &mut engine,
+        P36C_SIP_MANAGER,
+        "(Landroid/content/Context;)V",
+        &[Value::Obj(context)],
+    );
+    assert_eq!(field(&engine, manager, "mContext"), Value::Obj(context));
+    assert_eq!(field(&engine, manager, "mSipService"), Value::Null);
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "open",
+            "(Landroid/net/sip/SipProfile;)V",
+            &[Value::Null],
+        ),
+        P36C_SIP_EXCEPTION,
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "open",
+            "(Landroid/net/sip/SipProfile;Landroid/app/PendingIntent;Landroid/net/sip/SipRegistrationListener;)V",
+            &[Value::Null, Value::Null, Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let pending = instance(&mut engine, "Landroid/app/PendingIntent;");
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "open",
+            "(Landroid/net/sip/SipProfile;Landroid/app/PendingIntent;Landroid/net/sip/SipRegistrationListener;)V",
+            &[Value::Null, Value::Obj(pending), Value::Null],
+        ),
+        P36C_SIP_EXCEPTION,
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "makeAudioCall",
+            "(Ljava/lang/String;Ljava/lang/String;Landroid/net/sip/SipAudioCall$Listener;I)Landroid/net/sip/SipAudioCall;",
+            &[Value::Null, Value::Null, Value::Null, Value::Int(30)],
+        ),
+        P36C_SIP_EXCEPTION,
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "takeAudioCall",
+            "(Landroid/content/Intent;Landroid/net/sip/SipAudioCall$Listener;)Landroid/net/sip/SipAudioCall;",
+            &[Value::Null, Value::Null],
+        ),
+        P36C_SIP_EXCEPTION,
+    );
+    let empty_intent = p49_new(&mut engine, "Landroid/content/Intent;", "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "takeAudioCall",
+            "(Landroid/content/Intent;Landroid/net/sip/SipAudioCall$Listener;)Landroid/net/sip/SipAudioCall;",
+            &[Value::Obj(empty_intent), Value::Null],
+        ),
+        P36C_SIP_EXCEPTION,
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "takeAudioCall",
+            "(Landroid/content/Intent;Landroid/net/sip/SipAudioCall$Listener;)Landroid/net/sip/SipAudioCall;",
+            &[Value::Obj(intent), Value::Null],
+        ),
+        P36C_SIP_EXCEPTION,
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "getSessionFor",
+            "(Landroid/content/Intent;)Landroid/net/sip/SipSession;",
+            &[Value::Obj(intent)],
+        ),
+        P36C_SIP_EXCEPTION,
+    );
+}

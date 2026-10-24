@@ -1979,6 +1979,13 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         | "Landroid/hardware/Camera$Area;"
         | "Landroid/nfc/NfcAdapter;"
         | "Landroid/nfc/NfcManager;" => Some(OBJECT),
+        // Appendix C Batch 36-C bounded android.net.nsd /
+        // android.net.sip slices.
+        "Landroid/net/nsd/NsdServiceInfo;"
+        | "Landroid/net/nsd/NsdManager;"
+        | "Landroid/net/nsd/NsdManager$NsdCallbackImpl;"
+        | "Landroid/net/sip/SipManager;" => Some(OBJECT),
+        "Landroid/net/sip/SipException;" => Some(EXC),
         _ => None,
     }
 }
@@ -2575,6 +2582,8 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Landroid/os/IBinder;",
             "Landroid/os/IInterface;",
         ]),
+        // Interfaces in the Batch 36-C bounded slices.
+        "Landroid/net/nsd/NsdServiceInfo;" => Some(&["Landroid/os/Parcelable;"]),
         _ => None,
     }
 }

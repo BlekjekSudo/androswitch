@@ -443,6 +443,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial36b_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36c_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -605,6 +608,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial36b_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36c_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -698,6 +704,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial36b_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial36c_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -41509,4 +41518,1100 @@ pub(crate) fn partial36b_host_static(
         _ => None,
     };
     Ok(int_value.map(Value::Int))
+}
+
+// ---- Appendix C Batch 36-C: android.net.nsd + android.net.sip ----
+//
+// AOSP 14 sources:
+// * packages/modules/Connectivity/framework-t/src/android/net/nsd/
+//   {NsdManager,NsdServiceInfo}.java and ConnectivityFrameworkInitializer.
+//   NsdServiceInfo is a complete local value/TXT-record model. NSD is
+//   registered with ServiceManager.getServiceOrThrow("nsd"), and no
+//   "nsd" binder is published in this VM profile, so Context lookup throws
+//   ServiceNotFoundException (modelled in m8). A directly materialised
+//   NsdManager preserves AOSP argument/listener bookkeeping before the
+//   absent connector dereference.
+// * frameworks/opt/net/voip/src/java/android/net/sip/SipManager.java.
+//   The fixed PackageManager profile does not advertise FEATURE_SIP or
+//   FEATURE_SIP_VOIP, so newInstance returns null. The pure static Intent
+//   helpers are exact. A directly constructed manager has mSipService=null
+//   because ServiceManager has no "sip" binder; service operations retain
+//   AOSP's SipException path, with takeAudioCall's earlier Intent checks.
+
+const P36C_NSD_INFO: &str = "Landroid/net/nsd/NsdServiceInfo;";
+const P36C_NSD_MANAGER: &str = "Landroid/net/nsd/NsdManager;";
+const P36C_NSD_CALLBACK: &str = "Landroid/net/nsd/NsdManager$NsdCallbackImpl;";
+const P36C_SIP_MANAGER: &str = "Landroid/net/sip/SipManager;";
+const P36C_SIP_EXCEPTION: &str = "Landroid/net/sip/SipException;";
+
+fn p36c_object_string(vm: &mut Engine, value: &Value) -> Result<String, VmExit> {
+    match value {
+        Value::Obj(reference) => crate::intrinsics::object_to_string(vm, *reference),
+        _ => Ok("null".to_string()),
+    }
+}
+
+fn partial36c_host_static(
+    vm: &mut Engine,
+    owner: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    if owner == P36C_NSD_MANAGER {
+        let text = match field {
+            "ACTION_NSD_STATE_CHANGED" => Some("android.net.nsd.STATE_CHANGED"),
+            "EXTRA_NSD_STATE" => Some("nsd_state"),
+            _ => None,
+        };
+        if let Some(text) = text {
+            return Ok(Some(jstr(vm, text.to_string())?));
+        }
+        let value = match field {
+            "NSD_STATE_DISABLED" => Some(1),
+            "NSD_STATE_ENABLED" => Some(2),
+            "PROTOCOL_DNS_SD" => Some(1),
+            "FAILURE_INTERNAL_ERROR" => Some(0),
+            "FAILURE_ALREADY_ACTIVE" => Some(3),
+            "FAILURE_MAX_LIMIT" => Some(4),
+            "FAILURE_OPERATION_NOT_RUNNING" => Some(5),
+            "FAILURE_BAD_PARAMETERS" => Some(6),
+            "DISCOVER_SERVICES" => Some(1),
+            "DISCOVER_SERVICES_STARTED" => Some(2),
+            "DISCOVER_SERVICES_FAILED" => Some(3),
+            "SERVICE_FOUND" => Some(4),
+            "SERVICE_LOST" => Some(5),
+            "STOP_DISCOVERY" => Some(6),
+            "STOP_DISCOVERY_FAILED" => Some(7),
+            "STOP_DISCOVERY_SUCCEEDED" => Some(8),
+            "REGISTER_SERVICE" => Some(9),
+            "REGISTER_SERVICE_FAILED" => Some(10),
+            "REGISTER_SERVICE_SUCCEEDED" => Some(11),
+            "UNREGISTER_SERVICE" => Some(12),
+            "UNREGISTER_SERVICE_FAILED" => Some(13),
+            "UNREGISTER_SERVICE_SUCCEEDED" => Some(14),
+            "RESOLVE_SERVICE" => Some(15),
+            "RESOLVE_SERVICE_FAILED" => Some(16),
+            "RESOLVE_SERVICE_SUCCEEDED" => Some(17),
+            "DAEMON_CLEANUP" => Some(18),
+            "DAEMON_STARTUP" => Some(19),
+            "MDNS_SERVICE_EVENT" => Some(20),
+            "REGISTER_CLIENT" => Some(21),
+            "UNREGISTER_CLIENT" => Some(22),
+            "MDNS_DISCOVERY_MANAGER_EVENT" => Some(23),
+            "STOP_RESOLUTION" => Some(24),
+            "STOP_RESOLUTION_FAILED" => Some(25),
+            "STOP_RESOLUTION_SUCCEEDED" => Some(26),
+            "REGISTER_SERVICE_CALLBACK" => Some(27),
+            "REGISTER_SERVICE_CALLBACK_FAILED" => Some(28),
+            "SERVICE_UPDATED" => Some(29),
+            "SERVICE_UPDATED_LOST" => Some(30),
+            "UNREGISTER_SERVICE_CALLBACK" => Some(31),
+            "UNREGISTER_SERVICE_CALLBACK_SUCCEEDED" => Some(32),
+            _ => None,
+        };
+        return Ok(value.map(Value::Int));
+    }
+    if owner == P36C_SIP_MANAGER {
+        let text = match field {
+            "EXTRA_CALL_ID" => Some("android:sipCallID"),
+            "EXTRA_OFFER_SD" => Some("android:sipOfferSD"),
+            "ACTION_SIP_SERVICE_UP" => Some("android.net.sip.action.SIP_SERVICE_UP"),
+            "ACTION_SIP_INCOMING_CALL" => Some("android.net.sip.action.SIP_INCOMING_CALL"),
+            "ACTION_SIP_ADD_PHONE" => Some("com.android.phone.SIP_ADD_PHONE"),
+            "ACTION_SIP_REMOVE_PROFILE" => Some("android.net.sip.action.SIP_REMOVE_PROFILE"),
+            "ACTION_SIP_CALL_OPTION_CHANGED" => {
+                Some("android.net.sip.action.SIP_CALL_OPTION_CHANGED")
+            }
+            "ACTION_START_SIP" => Some("android.net.sip.action.START_SIP"),
+            "EXTRA_LOCAL_URI" => Some("android:localSipUri"),
+            _ => None,
+        };
+        if let Some(text) = text {
+            return Ok(Some(jstr(vm, text.to_string())?));
+        }
+        if field == "INCOMING_CALL_RESULT_CODE" {
+            return Ok(Some(Value::Int(101)));
+        }
+    }
+    Ok(None)
+}
+
+fn partial36c_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P36C_NSD_MANAGER && name == "nameOf" && sig == "(I)Ljava/lang/String;" {
+        let event = iarg(args, 0);
+        // EVENT_NAMES in AOSP omits SERVICE_UPDATED_LOST (30), so that
+        // code falls through to Integer.toString like every unknown code.
+        let name = match event {
+            1 => Some("DISCOVER_SERVICES"),
+            2 => Some("DISCOVER_SERVICES_STARTED"),
+            3 => Some("DISCOVER_SERVICES_FAILED"),
+            4 => Some("SERVICE_FOUND"),
+            5 => Some("SERVICE_LOST"),
+            6 => Some("STOP_DISCOVERY"),
+            7 => Some("STOP_DISCOVERY_FAILED"),
+            8 => Some("STOP_DISCOVERY_SUCCEEDED"),
+            9 => Some("REGISTER_SERVICE"),
+            10 => Some("REGISTER_SERVICE_FAILED"),
+            11 => Some("REGISTER_SERVICE_SUCCEEDED"),
+            12 => Some("UNREGISTER_SERVICE"),
+            13 => Some("UNREGISTER_SERVICE_FAILED"),
+            14 => Some("UNREGISTER_SERVICE_SUCCEEDED"),
+            15 => Some("RESOLVE_SERVICE"),
+            16 => Some("RESOLVE_SERVICE_FAILED"),
+            17 => Some("RESOLVE_SERVICE_SUCCEEDED"),
+            18 => Some("DAEMON_CLEANUP"),
+            19 => Some("DAEMON_STARTUP"),
+            20 => Some("MDNS_SERVICE_EVENT"),
+            21 => Some("REGISTER_CLIENT"),
+            22 => Some("UNREGISTER_CLIENT"),
+            23 => Some("MDNS_DISCOVERY_MANAGER_EVENT"),
+            24 => Some("STOP_RESOLUTION"),
+            25 => Some("STOP_RESOLUTION_FAILED"),
+            26 => Some("STOP_RESOLUTION_SUCCEEDED"),
+            27 => Some("REGISTER_SERVICE_CALLBACK"),
+            28 => Some("REGISTER_SERVICE_CALLBACK_FAILED"),
+            29 => Some("SERVICE_UPDATED"),
+            31 => Some("UNREGISTER_SERVICE_CALLBACK"),
+            32 => Some("UNREGISTER_SERVICE_CALLBACK_SUCCEEDED"),
+            _ => None,
+        };
+        let name = name
+            .map(str::to_string)
+            .unwrap_or_else(|| event.to_string());
+        return Ok(Some(jstr(vm, name)?));
+    }
+    if class == P36C_SIP_MANAGER {
+        return p36c_sip_static(vm, name, sig, args);
+    }
+    Ok(None)
+}
+
+fn partial36c_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    _mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if recv_class == P36C_NSD_INFO {
+        return p36c_nsd_info_instance(vm, name, sig, recv, args);
+    }
+    if recv_class == P36C_NSD_MANAGER {
+        return p36c_nsd_manager_instance(vm, name, sig, recv, args);
+    }
+    if recv_class == P36C_SIP_MANAGER {
+        return p36c_sip_instance(vm, name, sig, recv, args);
+    }
+    Ok(None)
+}
+
+fn p36c_string_value(vm: &Engine, value: &Value) -> Option<String> {
+    match value {
+        Value::Obj(r) => vm.heap.as_str(*r).ok().map(str::to_string),
+        _ => None,
+    }
+}
+
+fn p36c_txt_size(vm: &Engine, entries: &[(Value, Value)]) -> usize {
+    let mut size = 0usize;
+    for (key, value) in entries {
+        size += 2;
+        size += p36c_string_value(vm, key)
+            .map(|key| key.encode_utf16().count())
+            .unwrap_or(0);
+        if matches!(value, Value::Obj(_)) {
+            size += p49_byte_values(vm, value).len();
+        }
+    }
+    size
+}
+
+fn p36c_set_txt_attribute(
+    vm: &mut Engine,
+    recv: ObjRef,
+    key: Option<String>,
+    value: Value,
+) -> Result<(), VmExit> {
+    let key = match key {
+        Some(key) if !key.is_empty() => key,
+        _ => return Err(iae("Key cannot be empty")),
+    };
+    for character in key.chars() {
+        if !('\u{20}'..='\u{7e}').contains(&character) {
+            return Err(iae("Key strings must be printable US-ASCII"));
+        }
+        if character == '=' {
+            return Err(iae("Key strings must not include '='"));
+        }
+    }
+    let key_len = key.encode_utf16().count();
+    let value_len = if matches!(value, Value::Obj(_)) {
+        p49_byte_values(vm, &value).len()
+    } else {
+        0
+    };
+    if key_len + value_len >= 255 {
+        return Err(iae("Key length + value length must be < 255 bytes"));
+    }
+    let current = p57_map_entries(vm, recv, "mTxtRecord");
+    let future_size = p36c_txt_size(vm, &current) + key_len + value_len + 2;
+    if future_size > 1300 {
+        return Err(iae("Total length of attributes must be < 1300 bytes"));
+    }
+    p57_map_put_string(vm, recv, "mTxtRecord", key, value)
+}
+
+fn p36c_txt_record_bytes(vm: &mut Engine, recv: ObjRef) -> Vec<u8> {
+    let entries = p57_map_entries(vm, recv, "mTxtRecord");
+    if p36c_txt_size(vm, &entries) == 0 {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for (key, value) in entries {
+        let key = p36c_string_value(vm, &key).unwrap_or_default();
+        let value_bytes = if matches!(value, Value::Obj(_)) {
+            p49_byte_values(vm, &value)
+        } else {
+            Vec::new()
+        };
+        let has_value = matches!(value, Value::Obj(_));
+        let record_len = key.len() + if has_value { value_bytes.len() } else { 0 } + 1;
+        out.push(record_len as u8);
+        out.extend(key.bytes().map(|b| if b < 0x80 { b } else { b'?' }));
+        out.push(b'=');
+        if has_value {
+            out.extend(value_bytes);
+        }
+    }
+    out
+}
+
+fn p36c_decode_ascii(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .map(|b| {
+            if *b < 0x80 {
+                char::from(*b)
+            } else {
+                '\u{fffd}'
+            }
+        })
+        .collect()
+}
+
+fn p36c_set_txt_records(vm: &mut Engine, recv: ObjRef, bytes: &[u8]) -> Result<(), VmExit> {
+    let mut pos = 0usize;
+    while pos < bytes.len() {
+        let mut record_len = usize::from(bytes[pos]);
+        pos += 1;
+        if record_len != 0 {
+            if pos + record_len > bytes.len() {
+                record_len = bytes.len() - pos;
+            }
+            let record = &bytes[pos..pos + record_len];
+            let mut key = None;
+            let mut value = None;
+            for (index, byte) in record.iter().enumerate() {
+                if key.is_none() {
+                    if *byte == b'=' {
+                        key = Some(p36c_decode_ascii(&record[..index]));
+                    }
+                } else {
+                    value.get_or_insert_with(Vec::new).push(*byte);
+                }
+            }
+            let key = key.unwrap_or_else(|| p36c_decode_ascii(record));
+            if !key.is_empty() {
+                let existing = p57_map_entries(vm, recv, "mTxtRecord");
+                let duplicate = existing.iter().any(|(existing_key, _)| {
+                    p36c_string_value(vm, existing_key).as_deref() == Some(key.as_str())
+                });
+                if !duplicate {
+                    let stored = match value {
+                        Some(value) => p49_new_byte_array(vm, &value)?,
+                        None => Value::Null,
+                    };
+                    if let Err(error) = p36c_set_txt_attribute(vm, recv, Some(key), stored) {
+                        let logged_iae = matches!(
+                            &error,
+                            VmExit::Exception(t) if t.class == "Ljava/lang/IllegalArgumentException;"
+                        );
+                        if !logged_iae {
+                            return Err(error);
+                        }
+                    }
+                }
+            }
+        }
+        pos += record_len;
+    }
+    Ok(())
+}
+
+fn p36c_init_nsd_info(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    put(vm, recv, "mServiceName", Value::Null)?;
+    put(vm, recv, "mServiceType", Value::Null)?;
+    p57_ensure_map(vm, recv, "mTxtRecord")?;
+    let addresses = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+    put(vm, recv, "mHostAddresses", Value::Obj(addresses))?;
+    put(vm, recv, "mPort", Value::Int(0))?;
+    put(vm, recv, "mNetwork", Value::Null)?;
+    put(vm, recv, "mInterfaceIndex", Value::Int(0))?;
+    Ok(())
+}
+
+fn p36c_nsd_info_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            p36c_init_nsd_info(vm, recv)?;
+            Value::Null
+        }
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;)V") => {
+            p36c_init_nsd_info(vm, recv)?;
+            put(vm, recv, "mServiceName", p36a_value(args, 0))?;
+            put(vm, recv, "mServiceType", p36a_value(args, 1))?;
+            Value::Null
+        }
+        ("getServiceName", "()Ljava/lang/String;") => get(vm, recv, "mServiceName"),
+        ("setServiceName", "(Ljava/lang/String;)V") => {
+            put(vm, recv, "mServiceName", p36a_value(args, 0))?;
+            Value::Null
+        }
+        ("getServiceType", "()Ljava/lang/String;") => get(vm, recv, "mServiceType"),
+        ("setServiceType", "(Ljava/lang/String;)V") => {
+            put(vm, recv, "mServiceType", p36a_value(args, 0))?;
+            Value::Null
+        }
+        ("getHost", "()Ljava/net/InetAddress;") => {
+            let addresses = get(vm, recv, "mHostAddresses");
+            collection_items(vm, Some(&addresses))
+                .first()
+                .cloned()
+                .unwrap_or(Value::Null)
+        }
+        ("setHost", "(Ljava/net/InetAddress;)V") => {
+            let addresses = new_collection(vm, "Ljava/util/ArrayList;", vec![p36a_value(args, 0)])?;
+            put(vm, recv, "mHostAddresses", Value::Obj(addresses))?;
+            Value::Null
+        }
+        ("getPort", "()I") => Value::Int(get(vm, recv, "mPort").as_int().unwrap_or(0)),
+        ("setPort", "(I)V") => {
+            put(vm, recv, "mPort", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("getHostAddresses", "()Ljava/util/List;") => {
+            let addresses = get(vm, recv, "mHostAddresses");
+            let values = collection_items(vm, Some(&addresses));
+            Value::Obj(new_collection(vm, "Ljava/util/ArrayList;", values)?)
+        }
+        ("setHostAddresses", "(Ljava/util/List;)V") => {
+            let empty = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+            put(vm, recv, "mHostAddresses", Value::Obj(empty))?;
+            let Some(addresses) = args.first() else {
+                return Err(npe(""));
+            };
+            if matches!(addresses, Value::Null) {
+                return Err(npe(""));
+            }
+            let values = collection_items(vm, Some(addresses));
+            let addresses = new_collection(vm, "Ljava/util/ArrayList;", values)?;
+            put(vm, recv, "mHostAddresses", Value::Obj(addresses))?;
+            Value::Null
+        }
+        ("setAttribute", "(Ljava/lang/String;[B)V") => {
+            p36c_set_txt_attribute(vm, recv, opt_str_arg(vm, args, 0), p36a_value(args, 1))?;
+            Value::Null
+        }
+        ("setAttribute", "(Ljava/lang/String;Ljava/lang/String;)V") => {
+            let key = opt_str_arg(vm, args, 0);
+            let stored = match opt_str_arg(vm, args, 1) {
+                Some(value) => p49_new_byte_array(vm, value.as_bytes())?,
+                None => Value::Null,
+            };
+            p36c_set_txt_attribute(vm, recv, key, stored)?;
+            Value::Null
+        }
+        ("removeAttribute", "(Ljava/lang/String;)V") => {
+            if let Some(key) = opt_str_arg(vm, args, 0) {
+                let entries = p57_map_entries(vm, recv, "mTxtRecord")
+                    .into_iter()
+                    .filter(|(existing, _)| {
+                        p36c_string_value(vm, existing).as_deref() != Some(key.as_str())
+                    })
+                    .collect::<Vec<_>>();
+                let map = p57_ensure_map(vm, recv, "mTxtRecord")?;
+                vm.fw.objects.insert(map, HostObj::Map { entries });
+            }
+            Value::Null
+        }
+        ("getAttributes", "()Ljava/util/Map;") => {
+            let entries = p57_map_entries(vm, recv, "mTxtRecord");
+            p57_new_map(vm, entries)?
+        }
+        ("getTxtRecord", "()[B") => {
+            let bytes = p36c_txt_record_bytes(vm, recv);
+            p49_new_byte_array(vm, &bytes)?
+        }
+        ("setTxtRecords", "([B)V") => {
+            let Some(value) = args.first() else {
+                return Err(npe(""));
+            };
+            if matches!(value, Value::Null) {
+                return Err(npe(""));
+            }
+            let bytes = p49_byte_values(vm, value);
+            p36c_set_txt_records(vm, recv, &bytes)?;
+            Value::Null
+        }
+        ("getNetwork", "()Landroid/net/Network;") => get(vm, recv, "mNetwork"),
+        ("setNetwork", "(Landroid/net/Network;)V") => {
+            put(vm, recv, "mNetwork", p36a_value(args, 0))?;
+            Value::Null
+        }
+        ("getInterfaceIndex", "()I") => {
+            Value::Int(get(vm, recv, "mInterfaceIndex").as_int().unwrap_or(0))
+        }
+        ("setInterfaceIndex", "(I)V") => {
+            put(vm, recv, "mInterfaceIndex", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        ("toString", "()Ljava/lang/String;") => {
+            let service_name = get(vm, recv, "mServiceName");
+            let service_name = p36c_object_string(vm, &service_name)?;
+            let service_type = get(vm, recv, "mServiceType");
+            let service_type = p36c_object_string(vm, &service_type)?;
+            let addresses = get(vm, recv, "mHostAddresses");
+            let address_values = collection_items(vm, Some(&addresses));
+            let mut address_texts = Vec::with_capacity(address_values.len());
+            for address in &address_values {
+                address_texts.push(p36c_object_string(vm, address)?);
+            }
+            let network = get(vm, recv, "mNetwork");
+            let network = p36c_object_string(vm, &network)?;
+            let port = get(vm, recv, "mPort").as_int().unwrap_or(0);
+            let txt = p36c_txt_record_bytes(vm, recv);
+            let txt = String::from_utf8_lossy(&txt).into_owned();
+            let text = format!(
+                "name: {}, type: {}, hostAddresses: {}, port: {}, network: {}, txtRecord: {}",
+                service_name,
+                service_type,
+                address_texts.join(", "),
+                port,
+                network,
+                txt
+            );
+            jstr(vm, text)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36c_listener_arrays(vm: &Engine, recv: ObjRef) -> (Vec<i32>, Vec<Value>, Vec<Value>) {
+    let keys = get(vm, recv, "rd_listener_keys");
+    let keys = array_elems(vm, Some(&keys))
+        .iter()
+        .map(|value| value.as_int().unwrap_or(0))
+        .collect();
+    let listeners = get(vm, recv, "rd_listener_values");
+    let infos = get(vm, recv, "rd_listener_infos");
+    (
+        keys,
+        array_elems(vm, Some(&listeners)),
+        array_elems(vm, Some(&infos)),
+    )
+}
+
+fn p36c_store_listener_arrays(
+    vm: &mut Engine,
+    recv: ObjRef,
+    keys: Vec<i32>,
+    listeners: Vec<Value>,
+    infos: Vec<Value>,
+) -> Result<(), VmExit> {
+    let key_array = crate::arrays::new_array(
+        vm,
+        "[I",
+        ElemKind::Int,
+        keys.into_iter().map(Value::Int).collect(),
+    )?;
+    put(vm, recv, "rd_listener_keys", key_array)?;
+    let listener_array = obj_array(vm, "[Ljava/lang/Object;", listeners)?;
+    put(vm, recv, "rd_listener_values", listener_array)?;
+    let info_array = obj_array(vm, "[Ljava/lang/Object;", infos)?;
+    put(vm, recv, "rd_listener_infos", info_array)?;
+    Ok(())
+}
+
+fn p36c_same_listener(left: &Value, right: &Value) -> bool {
+    match (left, right) {
+        (Value::Obj(left), Value::Obj(right)) => left == right,
+        _ => false,
+    }
+}
+
+fn p36c_put_listener(
+    vm: &mut Engine,
+    recv: ObjRef,
+    listener: Value,
+    info: Value,
+) -> Result<i32, VmExit> {
+    if matches!(listener, Value::Null) {
+        return Err(npe("listener cannot be null"));
+    }
+    let (mut keys, mut listeners, mut infos) = p36c_listener_arrays(vm, recv);
+    if listeners
+        .iter()
+        .any(|existing| p36c_same_listener(existing, &listener))
+    {
+        return Err(iae("listener already in use"));
+    }
+    let current = get(vm, recv, "mListenerKey").as_int().unwrap_or(1);
+    let key = current.wrapping_add(1).max(1);
+    put(vm, recv, "mListenerKey", Value::Int(key))?;
+    keys.push(key);
+    listeners.push(listener);
+    infos.push(info);
+    p36c_store_listener_arrays(vm, recv, keys, listeners, infos)?;
+    Ok(key)
+}
+
+fn p36c_get_listener_key(vm: &mut Engine, recv: ObjRef, listener: &Value) -> Result<i32, VmExit> {
+    if matches!(listener, Value::Null) {
+        return Err(npe("listener cannot be null"));
+    }
+    let (keys, listeners, _) = p36c_listener_arrays(vm, recv);
+    for (index, existing) in listeners.iter().enumerate() {
+        if p36c_same_listener(existing, listener) {
+            return Ok(keys.get(index).copied().unwrap_or(0));
+        }
+    }
+    Err(iae("listener not registered"))
+}
+
+fn p36c_check_protocol(protocol: i32) -> Result<(), VmExit> {
+    if protocol != 1 {
+        return Err(iae("Unsupported protocol"));
+    }
+    Ok(())
+}
+
+fn p36c_check_service_info(vm: &mut Engine, info: &Value) -> Result<(), VmExit> {
+    let Value::Obj(info) = info else {
+        return Err(npe("NsdServiceInfo cannot be null"));
+    };
+    let name = vm.invoke_instance(*info, "getServiceName", "()Ljava/lang/String;", &[])?;
+    if p36c_string_value(vm, &name)
+        .map(|name| name.is_empty())
+        .unwrap_or(true)
+    {
+        return Err(iae("Service name cannot be empty"));
+    }
+    let service_type = vm.invoke_instance(*info, "getServiceType", "()Ljava/lang/String;", &[])?;
+    if p36c_string_value(vm, &service_type)
+        .map(|name| name.is_empty())
+        .unwrap_or(true)
+    {
+        return Err(iae("Service type cannot be empty"));
+    }
+    Ok(())
+}
+
+fn p36c_nsd_remote(
+    vm: &mut Engine,
+    recv: ObjRef,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Value, VmExit> {
+    let service = match get(vm, recv, "mService") {
+        Value::Obj(service) => service,
+        _ => return Err(npe("")),
+    };
+    match vm.invoke_instance(service, name, sig, args) {
+        Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => Err(throw(
+            "Ljava/lang/RuntimeException;",
+            t.message.unwrap_or_default(),
+        )),
+        other => other,
+    }
+}
+
+fn p36c_new_discovery_info(
+    vm: &mut Engine,
+    service_type: Value,
+    network: Value,
+) -> Result<Value, VmExit> {
+    let info = alloc_obj(vm, P36C_NSD_INFO, Vec::new())?;
+    vm.invoke_instance(info, "<init>", "()V", &[])?;
+    vm.invoke_instance(
+        info,
+        "setServiceType",
+        "(Ljava/lang/String;)V",
+        std::slice::from_ref(&service_type),
+    )?;
+    vm.invoke_instance(
+        info,
+        "setNetwork",
+        "(Landroid/net/Network;)V",
+        std::slice::from_ref(&network),
+    )?;
+    Ok(Value::Obj(info))
+}
+
+fn p36c_nsd_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/content/Context;Landroid/net/nsd/INsdManager;)V") => {
+            let service = match args.get(1) {
+                Some(Value::Obj(service)) => *service,
+                _ => return Err(npe( "")),
+            };
+            put(vm, recv, "mContext", p36a_value(args, 0))?;
+            put(vm, recv, "mListenerKey", Value::Int(1))?;
+            p36c_store_listener_arrays(vm, recv, Vec::new(), Vec::new(), Vec::new())?;
+            let callback = alloc_obj(vm, P36C_NSD_CALLBACK, Vec::new())?;
+            let connector = match vm.invoke_instance(
+                service,
+                "connect",
+                "(Landroid/net/nsd/INsdManagerCallback;Z)Landroid/net/nsd/INsdServiceConnector;",
+                &[Value::Obj(callback), Value::Int(0)],
+            ) {
+                Ok(value) => value,
+                Err(VmExit::Exception(t))
+                    if t.class == "Landroid/os/RemoteException;" =>
+                {
+                    return Err(throw(
+                        "Ljava/lang/RuntimeException;",
+                        "Failed to connect to NsdService",
+                    ));
+                }
+                Err(error) => return Err(error),
+            };
+            put(vm, recv, "mService", connector)?;
+            Value::Null
+        }
+        (
+            "registerService",
+            "(Landroid/net/nsd/NsdServiceInfo;ILandroid/net/nsd/NsdManager$RegistrationListener;)V",
+        )
+        | (
+            "registerService",
+            "(Landroid/net/nsd/NsdServiceInfo;ILjava/util/concurrent/Executor;Landroid/net/nsd/NsdManager$RegistrationListener;)V",
+        ) => {
+            let info = p36a_value(args, 0);
+            let Value::Obj(info_ref) = info else {
+                return Err(npe( ""));
+            };
+            let port = vm.invoke_instance(info_ref, "getPort", "()I", &[])?;
+            if port.as_int().unwrap_or(0) <= 0 {
+                return Err(iae( "Invalid port number"));
+            }
+            p36c_check_service_info(vm, &info)?;
+            p36c_check_protocol(iarg(args, 1))?;
+            let listener = p36a_value(args, args.len().saturating_sub(1));
+            let key = p36c_put_listener(vm, recv, listener, info.clone())?;
+            p36c_nsd_remote(
+                vm,
+                recv,
+                "registerService",
+                "(ILandroid/net/nsd/NsdServiceInfo;)V",
+                &[Value::Int(key), info],
+            )?;
+            Value::Null
+        }
+        ("unregisterService", "(Landroid/net/nsd/NsdManager$RegistrationListener;)V") => {
+            let listener = p36a_value(args, 0);
+            let key = p36c_get_listener_key(vm, recv, &listener)?;
+            p36c_nsd_remote(
+                vm,
+                recv,
+                "unregisterService",
+                "(I)V",
+                &[Value::Int(key)],
+            )?;
+            Value::Null
+        }
+        (
+            "discoverServices",
+            "(Ljava/lang/String;ILandroid/net/nsd/NsdManager$DiscoveryListener;)V",
+        )
+        | (
+            "discoverServices",
+            "(Ljava/lang/String;ILandroid/net/Network;Ljava/util/concurrent/Executor;Landroid/net/nsd/NsdManager$DiscoveryListener;)V",
+        ) => {
+            let service_type = opt_str_arg(vm, args, 0);
+            if service_type
+                .as_ref()
+                .map(|value| value.is_empty())
+                .unwrap_or(true)
+            {
+                return Err(iae( "Service type cannot be empty"));
+            }
+            p36c_check_protocol(iarg(args, 1))?;
+            let network = if args.len() == 5 {
+                p36a_value(args, 2)
+            } else {
+                Value::Null
+            };
+            let info = p36c_new_discovery_info(vm, p36a_value(args, 0), network)?;
+            let listener = p36a_value(args, args.len().saturating_sub(1));
+            let key = p36c_put_listener(vm, recv, listener, info.clone())?;
+            p36c_nsd_remote(
+                vm,
+                recv,
+                "discoverServices",
+                "(ILandroid/net/nsd/NsdServiceInfo;)V",
+                &[Value::Int(key), info],
+            )?;
+            Value::Null
+        }
+        ("stopServiceDiscovery", "(Landroid/net/nsd/NsdManager$DiscoveryListener;)V") => {
+            let listener = p36a_value(args, 0);
+            let key = p36c_get_listener_key(vm, recv, &listener)?;
+            p36c_nsd_remote(vm, recv, "stopDiscovery", "(I)V", &[Value::Int(key)])?;
+            Value::Null
+        }
+        (
+            "resolveService",
+            "(Landroid/net/nsd/NsdServiceInfo;Landroid/net/nsd/NsdManager$ResolveListener;)V",
+        )
+        | (
+            "resolveService",
+            "(Landroid/net/nsd/NsdServiceInfo;Ljava/util/concurrent/Executor;Landroid/net/nsd/NsdManager$ResolveListener;)V",
+        ) => {
+            let info = p36a_value(args, 0);
+            p36c_check_service_info(vm, &info)?;
+            let listener = p36a_value(args, args.len().saturating_sub(1));
+            let key = p36c_put_listener(vm, recv, listener, info.clone())?;
+            p36c_nsd_remote(
+                vm,
+                recv,
+                "resolveService",
+                "(ILandroid/net/nsd/NsdServiceInfo;)V",
+                &[Value::Int(key), info],
+            )?;
+            Value::Null
+        }
+        ("stopServiceResolution", "(Landroid/net/nsd/NsdManager$ResolveListener;)V") => {
+            let listener = p36a_value(args, 0);
+            let key = p36c_get_listener_key(vm, recv, &listener)?;
+            p36c_nsd_remote(
+                vm,
+                recv,
+                "stopResolution",
+                "(I)V",
+                &[Value::Int(key)],
+            )?;
+            Value::Null
+        }
+        (
+            "registerServiceInfoCallback",
+            "(Landroid/net/nsd/NsdServiceInfo;Ljava/util/concurrent/Executor;Landroid/net/nsd/NsdManager$ServiceInfoCallback;)V",
+        ) => {
+            let info = p36a_value(args, 0);
+            p36c_check_service_info(vm, &info)?;
+            let listener = p36a_value(args, 2);
+            let key = p36c_put_listener(vm, recv, listener, info.clone())?;
+            p36c_nsd_remote(
+                vm,
+                recv,
+                "registerServiceInfoCallback",
+                "(ILandroid/net/nsd/NsdServiceInfo;)V",
+                &[Value::Int(key), info],
+            )?;
+            Value::Null
+        }
+        (
+            "unregisterServiceInfoCallback",
+            "(Landroid/net/nsd/NsdManager$ServiceInfoCallback;)V",
+        ) => {
+            let listener = p36a_value(args, 0);
+            let key = p36c_get_listener_key(vm, recv, &listener)?;
+            p36c_nsd_remote(
+                vm,
+                recv,
+                "unregisterServiceInfoCallback",
+                "(I)V",
+                &[Value::Int(key)],
+            )?;
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36c_sip_dead() -> VmExit {
+    throw(
+        P36C_SIP_EXCEPTION,
+        "SipService is dead and is restarting...",
+    )
+}
+
+fn p36c_sip_feature(vm: &mut Engine, context: &Value, feature: &str) -> Result<bool, VmExit> {
+    let Value::Obj(context) = context else {
+        return Err(npe(""));
+    };
+    p36b_has_system_feature(vm, *context, feature)
+}
+
+fn p36c_sip_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("isApiSupported", "(Landroid/content/Context;)Z") => {
+            let context = p36a_value(args, 0);
+            Value::Int(i32::from(p36c_sip_feature(
+                vm,
+                &context,
+                "android.software.sip",
+            )?))
+        }
+        ("isVoipSupported", "(Landroid/content/Context;)Z") => {
+            let context = p36a_value(args, 0);
+            if !p36c_sip_feature(vm, &context, "android.software.sip.voip")? {
+                Value::Int(0)
+            } else {
+                vm.invoke_static(
+                    P36C_SIP_MANAGER,
+                    "isApiSupported",
+                    "(Landroid/content/Context;)Z",
+                    std::slice::from_ref(&context),
+                )?
+            }
+        }
+        ("newInstance", "(Landroid/content/Context;)Landroid/net/sip/SipManager;") => {
+            let context = p36a_value(args, 0);
+            let supported = vm.invoke_static(
+                P36C_SIP_MANAGER,
+                "isApiSupported",
+                "(Landroid/content/Context;)Z",
+                std::slice::from_ref(&context),
+            )?;
+            if supported.as_int().unwrap_or(0) == 0 {
+                Value::Null
+            } else {
+                let manager = alloc_obj(vm, P36C_SIP_MANAGER, Vec::new())?;
+                vm.invoke_instance(
+                    manager,
+                    "<init>",
+                    "(Landroid/content/Context;)V",
+                    std::slice::from_ref(&context),
+                )?;
+                Value::Obj(manager)
+            }
+        }
+        ("getCallId", "(Landroid/content/Intent;)Ljava/lang/String;") => {
+            let Value::Obj(intent) = p36a_value(args, 0) else {
+                return Err(npe(""));
+            };
+            let key = jstr(vm, "android:sipCallID".to_string())?;
+            vm.invoke_instance(
+                intent,
+                "getStringExtra",
+                "(Ljava/lang/String;)Ljava/lang/String;",
+                std::slice::from_ref(&key),
+            )?
+        }
+        ("getOfferSessionDescription", "(Landroid/content/Intent;)Ljava/lang/String;") => {
+            let Value::Obj(intent) = p36a_value(args, 0) else {
+                return Err(npe(""));
+            };
+            let key = jstr(vm, "android:sipOfferSD".to_string())?;
+            vm.invoke_instance(
+                intent,
+                "getStringExtra",
+                "(Ljava/lang/String;)Ljava/lang/String;",
+                std::slice::from_ref(&key),
+            )?
+        }
+        ("isIncomingCallIntent", "(Landroid/content/Intent;)Z") => {
+            let intent = p36a_value(args, 0);
+            if matches!(intent, Value::Null) {
+                Value::Int(0)
+            } else {
+                let call_id = vm.invoke_static(
+                    P36C_SIP_MANAGER,
+                    "getCallId",
+                    "(Landroid/content/Intent;)Ljava/lang/String;",
+                    std::slice::from_ref(&intent),
+                )?;
+                let offer = vm.invoke_static(
+                    P36C_SIP_MANAGER,
+                    "getOfferSessionDescription",
+                    "(Landroid/content/Intent;)Ljava/lang/String;",
+                    std::slice::from_ref(&intent),
+                )?;
+                Value::Int(i32::from(
+                    matches!(call_id, Value::Obj(_)) && matches!(offer, Value::Obj(_)),
+                ))
+            }
+        }
+        (
+            "createIncomingCallBroadcast",
+            "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;",
+        ) => {
+            let intent = alloc_obj(vm, "Landroid/content/Intent;", Vec::new())?;
+            vm.invoke_instance(intent, "<init>", "()V", &[])?;
+            let call_key = jstr(vm, "android:sipCallID".to_string())?;
+            let call_id = p36a_value(args, 0);
+            vm.invoke_instance(
+                intent,
+                "putExtra",
+                "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;",
+                &[call_key, call_id],
+            )?;
+            let offer_key = jstr(vm, "android:sipOfferSD".to_string())?;
+            let offer = p36a_value(args, 1);
+            vm.invoke_instance(
+                intent,
+                "putExtra",
+                "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;",
+                &[offer_key, offer],
+            )?;
+            Value::Obj(intent)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36c_sip_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/content/Context;)V") => {
+            put(vm, recv, "mContext", p36a_value(args, 0))?;
+            // ServiceManager.getService(Context.SIP_SERVICE) has no
+            // published binder in this profile; Stub.asInterface(null)
+            // therefore leaves mSipService null.
+            put(vm, recv, "mSipService", Value::Null)?;
+            Value::Null
+        }
+        ("open", "(Landroid/net/sip/SipProfile;)V")
+        | (
+            "setRegistrationListener",
+            "(Ljava/lang/String;Landroid/net/sip/SipRegistrationListener;)V",
+        )
+        | ("close", "(Ljava/lang/String;)V")
+        | ("isOpened", "(Ljava/lang/String;)Z")
+        | ("isRegistered", "(Ljava/lang/String;)Z")
+        | (
+            "register",
+            "(Landroid/net/sip/SipProfile;ILandroid/net/sip/SipRegistrationListener;)V",
+        )
+        | (
+            "unregister",
+            "(Landroid/net/sip/SipProfile;Landroid/net/sip/SipRegistrationListener;)V",
+        )
+        | (
+            "getSessionFor",
+            "(Landroid/content/Intent;)Landroid/net/sip/SipSession;",
+        )
+        | (
+            "createSipSession",
+            "(Landroid/net/sip/SipProfile;Landroid/net/sip/SipSession$Listener;)Landroid/net/sip/SipSession;",
+        )
+        | ("getProfiles", "()Ljava/util/List;") => return Err(p36c_sip_dead()),
+        (
+            "open",
+            "(Landroid/net/sip/SipProfile;Landroid/app/PendingIntent;Landroid/net/sip/SipRegistrationListener;)V",
+        ) => {
+            if matches!(p36a_value(args, 1), Value::Null) {
+                return Err(npe("incomingCallPendingIntent cannot be null"));
+            }
+            return Err(p36c_sip_dead());
+        }
+        (
+            "makeAudioCall",
+            "(Landroid/net/sip/SipProfile;Landroid/net/sip/SipProfile;Landroid/net/sip/SipAudioCall$Listener;I)Landroid/net/sip/SipAudioCall;",
+        )
+        | (
+            "makeAudioCall",
+            "(Ljava/lang/String;Ljava/lang/String;Landroid/net/sip/SipAudioCall$Listener;I)Landroid/net/sip/SipAudioCall;",
+        ) => {
+            let context = get(vm, recv, "mContext");
+            let supported = vm.invoke_static(
+                P36C_SIP_MANAGER,
+                "isVoipSupported",
+                "(Landroid/content/Context;)Z",
+                std::slice::from_ref(&context),
+            )?;
+            if supported.as_int().unwrap_or(0) == 0 {
+                return Err(throw(
+                    P36C_SIP_EXCEPTION,
+                    "VOIP API is not supported",
+                ));
+            }
+            return Err(p36c_sip_dead());
+        }
+        (
+            "takeAudioCall",
+            "(Landroid/content/Intent;Landroid/net/sip/SipAudioCall$Listener;)Landroid/net/sip/SipAudioCall;",
+        ) => {
+            let intent = p36a_value(args, 0);
+            if matches!(intent, Value::Null) {
+                return Err(throw(
+                    P36C_SIP_EXCEPTION,
+                    "Cannot retrieve session with null intent",
+                ));
+            }
+            let call_id = vm.invoke_static(
+                P36C_SIP_MANAGER,
+                "getCallId",
+                "(Landroid/content/Intent;)Ljava/lang/String;",
+                std::slice::from_ref(&intent),
+            )?;
+            if matches!(call_id, Value::Null) {
+                return Err(throw(
+                    P36C_SIP_EXCEPTION,
+                    "Call ID missing in incoming call intent",
+                ));
+            }
+            let offer = vm.invoke_static(
+                P36C_SIP_MANAGER,
+                "getOfferSessionDescription",
+                "(Landroid/content/Intent;)Ljava/lang/String;",
+                std::slice::from_ref(&intent),
+            )?;
+            if matches!(offer, Value::Null) {
+                return Err(throw(
+                    P36C_SIP_EXCEPTION,
+                    "Session description missing in incoming call intent",
+                ));
+            }
+            // AOSP catches Throwable from the dead-service check and
+            // rewraps it as SipException("takeAudioCall()", cause).
+            return Err(throw(P36C_SIP_EXCEPTION, "takeAudioCall()"));
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
 }

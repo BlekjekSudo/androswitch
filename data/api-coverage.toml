@@ -720,29 +720,29 @@ key_apis = ["android.net.wifi.WifiManager.getConnectionInfo", "android.net.wifi.
 id = "android-net-nsd"
 prefix = "android.net.nsd"
 domain = "net"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-net"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "future"
-notes = "Network service discovery (mDNS/NSD) is not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "NSD models NsdServiceInfo as a guest-visible AOSP value: service name/type, host addresses, port, network/interface fields, attribute validation and limits, canonical TXT-record encoding, tolerant TXT-record parsing with duplicate/invalid record skipping, and exact toString/event-name helpers. This profile publishes no nsd binder, so Context NSD_SERVICE retains ServiceManager.getServiceOrThrow failure; a directly materialised NsdManager retains argument validation and listener-in-use/not-registered bookkeeping before the absent connector. Live mDNS registration/discovery/resolution, daemon and network callbacks, the NetworkRequest discovery overload, and NsdServiceInfo parcel transfer are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-net-nsd"
-key_apis = ["android.net.nsd.NsdManager.discoverServices"]
+key_apis = ["android.net.nsd.NsdManager.discoverServices", "android.net.nsd.NsdServiceInfo.setAttribute", "android.net.nsd.NsdServiceInfo.getTxtRecord", "android.net.nsd.NsdServiceInfo.setTxtRecords", "android.net.nsd.NsdManager.nameOf"]
 
 [[surface]]
 id = "android-net-sip"
 prefix = "android.net.sip"
 domain = "net"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-net"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "legacy"
-notes = "Deprecated SIP APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Deprecated SIP follows AOSP on a device whose PackageManager profile advertises neither FEATURE_SIP nor FEATURE_SIP_VOIP: support probes and SipManager.newInstance return false/null with null-context failure retained, incoming-call Intent construction/extraction helpers are exact, and a directly constructed SipManager has no sip binder and retains AOSP dead-service SipExceptions after its PendingIntent, VoIP-support, and incoming-call Intent checks. SipProfile parsing/building, SipAudioCall/SipSession media or registration state, the SIP stack/service, and isSipWifiOnly's internal resource lookup are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-net-sip-legacy"
-key_apis = ["android.net.sip.SipManager.newInstance"]
+key_apis = ["android.net.sip.SipManager.newInstance", "android.net.sip.SipManager.isApiSupported", "android.net.sip.SipManager.isVoipSupported", "android.net.sip.SipManager.createIncomingCallBroadcast", "android.net.sip.SipManager.isIncomingCallIntent"]
 
 [[surface]]
 id = "android-net-ipsec-ike"

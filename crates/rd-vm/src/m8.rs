@@ -649,6 +649,15 @@ fn call_m8_instance_rooted(
         if class == "Ljava/lang/Object;" {
             return Ok(Some(Value::Null)); // unknown service name → null, as AOSP
         }
+        if class == "Landroid/net/nsd/NsdManager;" {
+            // SystemServiceRegistry registers NSD through
+            // ServiceManager.getServiceOrThrow("nsd"); no such binder is
+            // published in this profile.
+            return Err(VmExit::Exception(Throwable::new(
+                "Landroid/os/ServiceManager$ServiceNotFoundException;",
+                "No service published for: nsd",
+            )));
+        }
         let k = ("Lrd/SystemServices;".to_string(), class.clone());
         if let Some(v) = vm.statics.get(&k) {
             return Ok(Some(v.clone()));
@@ -2289,6 +2298,7 @@ const SERVICES: &[(&str, &str)] = &[
         "Landroid/companion/CompanionDeviceManager;",
     ),
     ("nfc", "Landroid/nfc/NfcManager;"),
+    ("nsd", "Landroid/net/nsd/NsdManager;"),
 ];
 
 fn system_service_class(key: &str) -> &'static str {
