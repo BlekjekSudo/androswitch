@@ -12567,3 +12567,1027 @@ fn hotword_result_builders_are_guest_visible() {
         Value::Int(1)
     );
 }
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 35-C: android.location + android.app.slice.
+// ---------------------------------------------------------------------------
+
+const P35C_LOCATION: &str = "Landroid/location/Location;";
+const P35C_CRITERIA: &str = "Landroid/location/Criteria;";
+const P35C_SLICE_BUILDER: &str = "Landroid/app/slice/Slice$Builder;";
+const P35C_SLICE_ITEM: &str = "Landroid/app/slice/SliceItem;";
+const P35C_SLICE_SPEC: &str = "Landroid/app/slice/SliceSpec;";
+const P35C_SLICE_MANAGER: &str = "Landroid/app/slice/SliceManager;";
+
+fn p35c_location_at(engine: &mut Engine, latitude: f64, longitude: f64) -> ObjRef {
+    let provider = text(engine, "gps");
+    let location = p49_new(engine, P35C_LOCATION, "(Ljava/lang/String;)V", &[provider]);
+    call(
+        engine,
+        location,
+        "setLatitude",
+        "(D)V",
+        &[Value::Double(latitude)],
+    );
+    call(
+        engine,
+        location,
+        "setLongitude",
+        "(D)V",
+        &[Value::Double(longitude)],
+    );
+    location
+}
+
+fn p35c_as_double(value: Value) -> f64 {
+    match value {
+        Value::Double(d) => d,
+        Value::Float(f) => f as f64,
+        other => panic!("expected floating value, got {other:?}"),
+    }
+}
+
+#[test]
+fn location_and_criteria_values_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let location = p35c_location_at(&mut engine, 37.4215, -122.084);
+    assert_eq!(
+        call_text(
+            &mut engine,
+            location,
+            "getProvider",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "gps"
+    );
+    assert_eq!(
+        call(&mut engine, location, "getLatitude", "()D", &[]),
+        Value::Double(37.4215)
+    );
+    assert_eq!(
+        call(&mut engine, location, "getLongitude", "()D", &[]),
+        Value::Double(-122.084)
+    );
+    assert_eq!(
+        call(&mut engine, location, "hasAccuracy", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, location, "isComplete", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, location, "isMock", "()Z", &[]),
+        Value::Int(0)
+    );
+
+    call(
+        &mut engine,
+        location,
+        "setAccuracy",
+        "(F)V",
+        &[Value::Float(5.0)],
+    );
+    assert_eq!(
+        call(&mut engine, location, "hasAccuracy", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, location, "getAccuracy", "()F", &[]),
+        Value::Float(5.0)
+    );
+    call(&mut engine, location, "removeAccuracy", "()V", &[]);
+    // Removing clears only the presence bit; the value is retained.
+    assert_eq!(
+        call(&mut engine, location, "hasAccuracy", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, location, "getAccuracy", "()F", &[]),
+        Value::Float(5.0)
+    );
+    call(
+        &mut engine,
+        location,
+        "setAccuracy",
+        "(F)V",
+        &[Value::Float(5.0)],
+    );
+
+    call(
+        &mut engine,
+        location,
+        "setBearing",
+        "(F)V",
+        &[Value::Float(370.0)],
+    );
+    assert_eq!(
+        call(&mut engine, location, "getBearing", "()F", &[]),
+        Value::Float(10.0)
+    );
+    call(
+        &mut engine,
+        location,
+        "setBearing",
+        "(F)V",
+        &[Value::Float(-10.0)],
+    );
+    assert_eq!(
+        call(&mut engine, location, "getBearing", "()F", &[]),
+        Value::Float(350.0)
+    );
+    assert_throws(
+        engine.invoke_instance(location, "setBearing", "(F)V", &[Value::Float(f32::NAN)]),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    call(
+        &mut engine,
+        location,
+        "setTime",
+        "(J)V",
+        &[Value::Long(123_456_789)],
+    );
+    assert_eq!(
+        call(&mut engine, location, "getTime", "()J", &[]),
+        Value::Long(123_456_789)
+    );
+    call(
+        &mut engine,
+        location,
+        "setElapsedRealtimeNanos",
+        "(J)V",
+        &[Value::Long(1_999_999)],
+    );
+    // NANOSECONDS.toMillis truncates.
+    assert_eq!(
+        call(
+            &mut engine,
+            location,
+            "getElapsedRealtimeMillis",
+            "()J",
+            &[]
+        ),
+        Value::Long(1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            location,
+            "getElapsedRealtimeAgeMillis",
+            "(J)J",
+            &[Value::Long(2000)],
+        ),
+        Value::Long(1999)
+    );
+    assert_eq!(
+        call(&mut engine, location, "isComplete", "()Z", &[]),
+        Value::Int(1)
+    );
+
+    // WGS84 distance/bearing: one degree of longitude at the equator.
+    let origin = p35c_location_at(&mut engine, 0.0, 0.0);
+    let east = p35c_location_at(&mut engine, 0.0, 1.0);
+    let distance = p35c_as_double(call(
+        &mut engine,
+        origin,
+        "distanceTo",
+        "(Landroid/location/Location;)F",
+        &[Value::Obj(east)],
+    ));
+    assert!(
+        (111_000.0..111_700.0).contains(&distance),
+        "distance={distance}"
+    );
+    let bearing = p35c_as_double(call(
+        &mut engine,
+        origin,
+        "bearingTo",
+        "(Landroid/location/Location;)F",
+        &[Value::Obj(east)],
+    ));
+    assert!((89.9..90.1).contains(&bearing), "bearing={bearing}");
+    assert_eq!(
+        call(
+            &mut engine,
+            origin,
+            "distanceTo",
+            "(Landroid/location/Location;)F",
+            &[Value::Obj(origin)],
+        ),
+        Value::Float(0.0)
+    );
+    let results = float_array(&mut engine, 3);
+    call_static(
+        &mut engine,
+        P35C_LOCATION,
+        "distanceBetween",
+        "(DDDD[F)V",
+        &[
+            Value::Double(0.0),
+            Value::Double(0.0),
+            Value::Double(0.0),
+            Value::Double(1.0),
+            results.clone(),
+        ],
+    );
+    let results_obj = object(results);
+    let (elems, _) = engine.heap.as_array_elems(results_obj).unwrap();
+    let elems = elems.to_vec();
+    assert!((111_000.0..111_700.0).contains(&p35c_as_double(elems[0].clone())));
+    assert!((89.9..90.1).contains(&p35c_as_double(elems[1].clone())));
+    assert!((89.9..90.1).contains(&p35c_as_double(elems[2].clone())));
+    assert_throws(
+        engine.invoke_static(
+            P35C_LOCATION,
+            "distanceBetween",
+            "(DDDD[F)V",
+            &[
+                Value::Double(0.0),
+                Value::Double(0.0),
+                Value::Double(0.0),
+                Value::Double(1.0),
+                Value::Null,
+            ],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    // Coordinate conversion both ways.
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P35C_LOCATION,
+            "convert",
+            "(DI)Ljava/lang/String;",
+            &[Value::Double(37.4215), Value::Int(0)],
+        ),
+        "37.4215"
+    );
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P35C_LOCATION,
+            "convert",
+            "(DI)Ljava/lang/String;",
+            &[Value::Double(-122.084), Value::Int(1)],
+        ),
+        "-122:5.04"
+    );
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P35C_LOCATION,
+            "convert",
+            "(DI)Ljava/lang/String;",
+            &[Value::Double(37.4215), Value::Int(2)],
+        ),
+        "37:25:17.4"
+    );
+    assert_throws(
+        engine.invoke_static(
+            P35C_LOCATION,
+            "convert",
+            "(DI)Ljava/lang/String;",
+            &[Value::Double(200.0), Value::Int(0)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P35C_LOCATION,
+            "convert",
+            "(DI)Ljava/lang/String;",
+            &[Value::Double(10.0), Value::Int(7)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let parsed = |engine: &mut Engine, input: &str| -> f64 {
+        let value = text(engine, input);
+        p35c_as_double(call_static(
+            engine,
+            P35C_LOCATION,
+            "convert",
+            "(Ljava/lang/String;)D",
+            &[value],
+        ))
+    };
+    assert!((parsed(&mut engine, "37.4215") - 37.4215).abs() < 1e-9);
+    assert!((parsed(&mut engine, "-122:5.04") + 122.084).abs() < 1e-9);
+    assert!((parsed(&mut engine, "37:25:17.4") - 37.4215).abs() < 1e-9);
+    assert!((parsed(&mut engine, "-180:0") + 180.0).abs() < 1e-12);
+    let empty = text(&mut engine, "");
+    assert_throws(
+        engine.invoke_static(P35C_LOCATION, "convert", "(Ljava/lang/String;)D", &[empty]),
+        "Ljava/lang/StringIndexOutOfBoundsException;",
+    );
+    let bad_degrees = text(&mut engine, "200:0");
+    assert_throws(
+        engine.invoke_static(
+            P35C_LOCATION,
+            "convert",
+            "(Ljava/lang/String;)D",
+            &[bad_degrees],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P35C_LOCATION,
+            "convert",
+            "(Ljava/lang/String;)D",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+
+    // Extras are defensively copied.
+    let extras = p41_bundle(&mut engine);
+    let satellites = text(&mut engine, "satellites");
+    call(
+        &mut engine,
+        extras,
+        "putInt",
+        "(Ljava/lang/String;I)V",
+        &[satellites.clone(), Value::Int(7)],
+    );
+    call(
+        &mut engine,
+        location,
+        "setExtras",
+        "(Landroid/os/Bundle;)V",
+        &[Value::Obj(extras)],
+    );
+    let stored = object(call(
+        &mut engine,
+        location,
+        "getExtras",
+        "()Landroid/os/Bundle;",
+        &[],
+    ));
+    assert_ne!(stored, extras);
+    let satellites_key = text(&mut engine, "satellites");
+    assert_eq!(
+        call(
+            &mut engine,
+            stored,
+            "getInt",
+            "(Ljava/lang/String;)I",
+            &[satellites_key]
+        ),
+        Value::Int(7)
+    );
+    call(
+        &mut engine,
+        extras,
+        "putInt",
+        "(Ljava/lang/String;I)V",
+        &[satellites, Value::Int(9)],
+    );
+    let satellites2 = text(&mut engine, "satellites");
+    assert_eq!(
+        call(
+            &mut engine,
+            stored,
+            "getInt",
+            "(Ljava/lang/String;)I",
+            &[satellites2]
+        ),
+        Value::Int(7)
+    );
+
+    // Copy semantics and equality.
+    let copy = p49_new(
+        &mut engine,
+        P35C_LOCATION,
+        "(Landroid/location/Location;)V",
+        &[Value::Obj(location)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            location,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(copy)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, location, "hashCode", "()I", &[]),
+        call(&mut engine, copy, "hashCode", "()I", &[])
+    );
+    call(&mut engine, copy, "removeBearing", "()V", &[]);
+    assert_eq!(
+        call(
+            &mut engine,
+            location,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(copy)]
+        ),
+        Value::Int(0)
+    );
+    call(&mut engine, copy, "reset", "()V", &[]);
+    assert_eq!(
+        call(
+            &mut engine,
+            copy,
+            "getProvider",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(&mut engine, copy, "getTime", "()J", &[]),
+        Value::Long(0)
+    );
+
+    // makeComplete fills provider and accuracy.
+    let incomplete = p35c_location_at(&mut engine, 1.0, 2.0);
+    call(
+        &mut engine,
+        incomplete,
+        "setProvider",
+        "(Ljava/lang/String;)V",
+        &[Value::Null],
+    );
+    call(
+        &mut engine,
+        incomplete,
+        "setTime",
+        "(J)V",
+        &[Value::Long(5)],
+    );
+    call(
+        &mut engine,
+        incomplete,
+        "setElapsedRealtimeNanos",
+        "(J)V",
+        &[Value::Long(5)],
+    );
+    call(&mut engine, incomplete, "makeComplete", "()V", &[]);
+    assert_eq!(
+        call_text(
+            &mut engine,
+            incomplete,
+            "getProvider",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        ""
+    );
+    assert_eq!(
+        call(&mut engine, incomplete, "getAccuracy", "()F", &[]),
+        Value::Float(100.0)
+    );
+    assert_eq!(
+        call(&mut engine, incomplete, "isComplete", "()Z", &[]),
+        Value::Int(1)
+    );
+    call(&mut engine, incomplete, "setMock", "(Z)V", &[Value::Int(1)]);
+    assert_eq!(
+        call(&mut engine, incomplete, "isMock", "()Z", &[]),
+        Value::Int(1)
+    );
+
+    // Criteria.
+    let criteria = p49_new(&mut engine, P35C_CRITERIA, "()V", &[]);
+    assert_eq!(
+        call(&mut engine, criteria, "getHorizontalAccuracy", "()I", &[]),
+        Value::Int(0)
+    );
+    // Less than ACCURACY_HIGH maps back to ACCURACY_COARSE.
+    assert_eq!(
+        call(&mut engine, criteria, "getAccuracy", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            criteria,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "Criteria[power=None, accuracy=None]"
+    );
+    call(
+        &mut engine,
+        criteria,
+        "setAccuracy",
+        "(I)V",
+        &[Value::Int(1)],
+    );
+    assert_eq!(
+        call(&mut engine, criteria, "getHorizontalAccuracy", "()I", &[]),
+        Value::Int(3)
+    );
+    assert_eq!(
+        call(&mut engine, criteria, "getAccuracy", "()I", &[]),
+        Value::Int(1)
+    );
+    assert_throws(
+        engine.invoke_instance(criteria, "setAccuracy", "(I)V", &[Value::Int(3)]),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_instance(criteria, "setHorizontalAccuracy", "(I)V", &[Value::Int(4)]),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    call(
+        &mut engine,
+        criteria,
+        "setPowerRequirement",
+        "(I)V",
+        &[Value::Int(1)],
+    );
+    call(
+        &mut engine,
+        criteria,
+        "setVerticalAccuracy",
+        "(I)V",
+        &[Value::Int(2)],
+    );
+    call(
+        &mut engine,
+        criteria,
+        "setAltitudeRequired",
+        "(Z)V",
+        &[Value::Int(1)],
+    );
+    call(
+        &mut engine,
+        criteria,
+        "setCostAllowed",
+        "(Z)V",
+        &[Value::Int(1)],
+    );
+    assert_eq!(
+        call_text(&mut engine, criteria, "toString", "()Ljava/lang/String;", &[]),
+        "Criteria[power=Low, accuracy=High, verticalAccuracy=Medium, required=[altitude], costAllowed]"
+    );
+    let criteria_copy = p49_new(
+        &mut engine,
+        P35C_CRITERIA,
+        "(Landroid/location/Criteria;)V",
+        &[Value::Obj(criteria)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            criteria_copy,
+            "getPowerRequirement",
+            "()I",
+            &[]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, criteria_copy, "isAltitudeRequired", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, criteria_copy, "isSpeedRequired", "()Z", &[]),
+        Value::Int(0)
+    );
+}
+
+#[test]
+fn slice_values_builder_and_missing_manager_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+
+    let spec_type = text(&mut engine, "list");
+    let spec_v2 = p49_new(
+        &mut engine,
+        P35C_SLICE_SPEC,
+        "(Ljava/lang/String;I)V",
+        &[spec_type, Value::Int(2)],
+    );
+    assert_eq!(
+        call_text(&mut engine, spec_v2, "getType", "()Ljava/lang/String;", &[]),
+        "list"
+    );
+    assert_eq!(
+        call(&mut engine, spec_v2, "getRevision", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            spec_v2,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "SliceSpec{list,2}"
+    );
+    let spec_type3 = text(&mut engine, "list");
+    let spec_v3 = p49_new(
+        &mut engine,
+        P35C_SLICE_SPEC,
+        "(Ljava/lang/String;I)V",
+        &[spec_type3, Value::Int(3)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            spec_v3,
+            "canRender",
+            "(Landroid/app/slice/SliceSpec;)Z",
+            &[Value::Obj(spec_v2)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            spec_v2,
+            "canRender",
+            "(Landroid/app/slice/SliceSpec;)Z",
+            &[Value::Obj(spec_v3)]
+        ),
+        Value::Int(0)
+    );
+    let spec_type2b = text(&mut engine, "list");
+    let spec_v2b = p49_new(
+        &mut engine,
+        P35C_SLICE_SPEC,
+        "(Ljava/lang/String;I)V",
+        &[spec_type2b, Value::Int(2)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            spec_v2,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(spec_v2b)]
+        ),
+        Value::Int(1)
+    );
+    assert_throws(
+        engine.invoke_instance(
+            spec_v2,
+            "canRender",
+            "(Landroid/app/slice/SliceSpec;)Z",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+
+    let uri_text = text(&mut engine, "content://com.example/slice");
+    let uri = call_static(
+        &mut engine,
+        "Landroid/net/Uri;",
+        "parse",
+        "(Ljava/lang/String;)Landroid/net/Uri;",
+        &[uri_text],
+    );
+    let builder = p49_new(
+        &mut engine,
+        P35C_SLICE_BUILDER,
+        "(Landroid/net/Uri;Landroid/app/slice/SliceSpec;)V",
+        &[uri.clone(), Value::Obj(spec_v2)],
+    );
+    let hello = text(&mut engine, "Hello");
+    let no_hints = p35_string_list(&mut engine, &[]);
+    let returned = call(
+        &mut engine,
+        builder,
+        "addText",
+        "(Ljava/lang/CharSequence;Ljava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;",
+        &[hello, Value::Null, no_hints],
+    );
+    assert_eq!(returned, Value::Obj(builder));
+    let ttl_hints = p35_string_list(&mut engine, &["ttl"]);
+    call(
+        &mut engine,
+        builder,
+        "addInt",
+        "(ILjava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;",
+        &[Value::Int(42), Value::Null, ttl_hints],
+    );
+    let long_hints = p35_string_list(&mut engine, &[]);
+    call(
+        &mut engine,
+        builder,
+        "addLong",
+        "(JLjava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;",
+        &[Value::Long(1234), Value::Null, long_hints],
+    );
+    call(
+        &mut engine,
+        builder,
+        "setCallerNeeded",
+        "(Z)Landroid/app/slice/Slice$Builder;",
+        &[Value::Int(1)],
+    );
+    let slice = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/app/slice/Slice;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, slice, "getUri", "()Landroid/net/Uri;", &[]),
+        uri
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            slice,
+            "getSpec",
+            "()Landroid/app/slice/SliceSpec;",
+            &[]
+        ),
+        Value::Obj(spec_v2)
+    );
+    assert_eq!(
+        call(&mut engine, slice, "isCallerNeeded", "()Z", &[]),
+        Value::Int(1)
+    );
+    let items = call(&mut engine, slice, "getItems", "()Ljava/util/List;", &[]);
+    assert_eq!(p57_collection_size(&mut engine, items.clone()), 3);
+    let items_obj = object(items);
+    let item0 = object(call(
+        &mut engine,
+        items_obj,
+        "get",
+        "(I)Ljava/lang/Object;",
+        &[Value::Int(0)],
+    ));
+    assert_eq!(
+        call_text(&mut engine, item0, "getFormat", "()Ljava/lang/String;", &[]),
+        "text"
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            item0,
+            "getText",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        "Hello"
+    );
+    let item1 = object(call(
+        &mut engine,
+        items_obj,
+        "get",
+        "(I)Ljava/lang/Object;",
+        &[Value::Int(1)],
+    ));
+    assert_eq!(
+        call(&mut engine, item1, "getInt", "()I", &[]),
+        Value::Int(42)
+    );
+    let ttl = text(&mut engine, "ttl");
+    assert_eq!(
+        call(
+            &mut engine,
+            item1,
+            "hasHint",
+            "(Ljava/lang/String;)Z",
+            &[ttl]
+        ),
+        Value::Int(1)
+    );
+    let item2 = object(call(
+        &mut engine,
+        items_obj,
+        "get",
+        "(I)Ljava/lang/Object;",
+        &[Value::Int(2)],
+    ));
+    assert_eq!(
+        call(&mut engine, item2, "getLong", "()J", &[]),
+        Value::Long(1234)
+    );
+    // Unboxing the wrong type is a ClassCastException.
+    assert_throws(
+        engine.invoke_instance(item0, "getInt", "()I", &[]),
+        "Ljava/lang/ClassCastException;",
+    );
+
+    // SliceItem constructor null-handling differs per hints overload.
+    let payload = text(&mut engine, "payload");
+    let format = text(&mut engine, "text");
+    let null_hints_item = instance(&mut engine, P35C_SLICE_ITEM);
+    assert_throws(
+        engine.invoke_instance(
+            null_hints_item,
+            "<init>",
+            "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V",
+            &[payload.clone(), format.clone(), Value::Null, Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let array_item = p49_new(
+        &mut engine,
+        P35C_SLICE_ITEM,
+        "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)V",
+        &[payload, format, Value::Null, Value::Null],
+    );
+    let any_hint = text(&mut engine, "anything");
+    assert_eq!(
+        call(
+            &mut engine,
+            array_item,
+            "hasHint",
+            "(Ljava/lang/String;)Z",
+            &[any_hint]
+        ),
+        Value::Int(0)
+    );
+    assert_throws(
+        engine.invoke_instance(array_item, "getHints", "()Ljava/util/List;", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+
+    // Sub-slices and actions.
+    let sub_builder = p49_new(
+        &mut engine,
+        P35C_SLICE_BUILDER,
+        "(Landroid/app/slice/Slice$Builder;)V",
+        &[Value::Obj(builder)],
+    );
+    let sub_slice = object(call(
+        &mut engine,
+        sub_builder,
+        "build",
+        "()Landroid/app/slice/Slice;",
+        &[],
+    ));
+    let sub_uri = object(call(
+        &mut engine,
+        sub_slice,
+        "getUri",
+        "()Landroid/net/Uri;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            sub_uri,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "content://com.example/slice/_gen/0"
+    );
+
+    let parent_uri_text = text(&mut engine, "content://com.example/parent");
+    let parent_uri = call_static(
+        &mut engine,
+        "Landroid/net/Uri;",
+        "parse",
+        "(Ljava/lang/String;)Landroid/net/Uri;",
+        &[parent_uri_text],
+    );
+    let parent_builder = p49_new(
+        &mut engine,
+        P35C_SLICE_BUILDER,
+        "(Landroid/net/Uri;Landroid/app/slice/SliceSpec;)V",
+        &[parent_uri, Value::Obj(spec_v2)],
+    );
+    call(
+        &mut engine,
+        parent_builder,
+        "addSubSlice",
+        "(Landroid/app/slice/Slice;Ljava/lang/String;)Landroid/app/slice/Slice$Builder;",
+        &[Value::Obj(sub_slice), Value::Null],
+    );
+    let action_slice = {
+        let uri_value = {
+            let t = text(&mut engine, "content://com.example/action");
+            call_static(
+                &mut engine,
+                "Landroid/net/Uri;",
+                "parse",
+                "(Ljava/lang/String;)Landroid/net/Uri;",
+                &[t],
+            )
+        };
+        let b = p49_new(
+            &mut engine,
+            P35C_SLICE_BUILDER,
+            "(Landroid/net/Uri;Landroid/app/slice/SliceSpec;)V",
+            &[uri_value, Value::Obj(spec_v2)],
+        );
+        object(call(
+            &mut engine,
+            b,
+            "build",
+            "()Landroid/app/slice/Slice;",
+            &[],
+        ))
+    };
+    let pending = p41_pending(&mut engine, "getActivity", 0);
+    call(
+        &mut engine,
+        parent_builder,
+        "addAction",
+        "(Landroid/app/PendingIntent;Landroid/app/slice/Slice;Ljava/lang/String;)Landroid/app/slice/Slice$Builder;",
+        &[pending.clone(), Value::Obj(action_slice), Value::Null],
+    );
+    // addAction clears the child slice's spec, as in AOSP.
+    assert_eq!(
+        call(
+            &mut engine,
+            action_slice,
+            "getSpec",
+            "()Landroid/app/slice/SliceSpec;",
+            &[]
+        ),
+        Value::Null
+    );
+    let parent = object(call(
+        &mut engine,
+        parent_builder,
+        "build",
+        "()Landroid/app/slice/Slice;",
+        &[],
+    ));
+    let parent_items = object(call(
+        &mut engine,
+        parent,
+        "getItems",
+        "()Ljava/util/List;",
+        &[],
+    ));
+    let sub_item = object(call(
+        &mut engine,
+        parent_items,
+        "get",
+        "(I)Ljava/lang/Object;",
+        &[Value::Int(0)],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            sub_item,
+            "getFormat",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "slice"
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            sub_item,
+            "getSlice",
+            "()Landroid/app/slice/Slice;",
+            &[]
+        ),
+        Value::Obj(sub_slice)
+    );
+    let action_item = object(call(
+        &mut engine,
+        parent_items,
+        "get",
+        "(I)Ljava/lang/Object;",
+        &[Value::Int(1)],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            action_item,
+            "getAction",
+            "()Landroid/app/PendingIntent;",
+            &[]
+        ),
+        pending
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            action_item,
+            "getSlice",
+            "()Landroid/app/slice/Slice;",
+            &[]
+        ),
+        Value::Obj(action_slice)
+    );
+
+    // There is no "slice" system service to construct a manager from.
+    let context = instance(&mut engine, CONTEXT);
+    let manager = instance(&mut engine, P35C_SLICE_MANAGER);
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "<init>",
+            "(Landroid/content/Context;Landroid/os/Handler;)V",
+            &[Value::Obj(context), Value::Null],
+        ),
+        "Landroid/os/ServiceManager$ServiceNotFoundException;",
+    );
+    assert_throws(
+        engine.invoke_instance(manager, "hasSliceAccess", "()Z", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+}

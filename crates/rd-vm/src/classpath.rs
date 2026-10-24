@@ -1917,6 +1917,14 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         | "Landroid/service/voice/IVoiceInteractionService$Stub;" => {
             Some(&["Landroid/os/Binder;", "Ljava/lang/Object;"])
         }
+        // Appendix C Batch 35-C bounded android.location /
+        // android.app.slice slices.
+        "Landroid/location/Location;"
+        | "Landroid/location/Criteria;"
+        | "Landroid/app/slice/Slice$Builder;"
+        | "Landroid/app/slice/SliceItem;"
+        | "Landroid/app/slice/SliceSpec;"
+        | "Landroid/app/slice/SliceManager;" => Some(OBJECT),
         _ => None,
     }
 }
@@ -2493,6 +2501,11 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Landroid/os/IBinder;",
             "Landroid/os/IInterface;",
         ]),
+        // Interfaces in the Batch 35-C bounded slices.
+        "Landroid/location/Location;"
+        | "Landroid/location/Criteria;"
+        | "Landroid/app/slice/SliceItem;"
+        | "Landroid/app/slice/SliceSpec;" => Some(&["Landroid/os/Parcelable;"]),
         _ => None,
     }
 }

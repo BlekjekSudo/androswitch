@@ -428,6 +428,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial35b_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial35c_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -575,6 +578,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial35b_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial35c_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -653,6 +659,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial35b_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial35c_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -37054,6 +37063,1642 @@ pub(crate) fn partial35b_host_static(
         (P35B_REJECTED, "CONFIDENCE_LEVEL_LOW") => Some(1),
         (P35B_REJECTED, "CONFIDENCE_LEVEL_MEDIUM") => Some(2),
         (P35B_REJECTED, "CONFIDENCE_LEVEL_HIGH") => Some(3),
+        _ => None,
+    };
+    Ok(int_value.map(Value::Int))
+}
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 35-C: android.location + android.app.slice.
+// Location/Criteria are modelled in full as deterministic values
+// (including the WGS84 inverse-formula distance/bearing math); the
+// location service/providers are not. Slice values and the builder are
+// modelled; there is no "slice" system service.
+// ---------------------------------------------------------------------------
+
+const P35C_LOCATION: &str = "Landroid/location/Location;";
+const P35C_CRITERIA: &str = "Landroid/location/Criteria;";
+const P35C_SLICE: &str = "Landroid/app/slice/Slice;";
+const P35C_SLICE_BUILDER: &str = "Landroid/app/slice/Slice$Builder;";
+const P35C_SLICE_ITEM: &str = "Landroid/app/slice/SliceItem;";
+const P35C_SLICE_SPEC: &str = "Landroid/app/slice/SliceSpec;";
+const P35C_SLICE_MANAGER: &str = "Landroid/app/slice/SliceManager;";
+
+fn p35c_class(c: &str) -> bool {
+    matches!(
+        c,
+        P35C_LOCATION
+            | P35C_CRITERIA
+            | P35C_SLICE
+            | P35C_SLICE_BUILDER
+            | P35C_SLICE_ITEM
+            | P35C_SLICE_SPEC
+            | P35C_SLICE_MANAGER
+    )
+}
+
+fn p35c_darg(args: &[Value], i: usize) -> f64 {
+    match args.get(i) {
+        Some(Value::Double(d)) => *d,
+        Some(Value::Float(f)) => *f as f64,
+        Some(Value::Int(v)) => *v as f64,
+        Some(Value::Long(v)) => *v as f64,
+        _ => 0.0,
+    }
+}
+
+fn p35c_field_double(vm: &Engine, recv: ObjRef, field: &str) -> f64 {
+    match get(vm, recv, field) {
+        Value::Double(d) => d,
+        Value::Float(f) => f as f64,
+        Value::Int(v) => v as f64,
+        Value::Long(v) => v as f64,
+        _ => 0.0,
+    }
+}
+
+fn p35c_larg(args: &[Value], i: usize) -> i64 {
+    args.get(i).map(|v| v.as_long().unwrap_or(0)).unwrap_or(0)
+}
+
+fn p35c_field_float_arg(args: &[Value]) -> f32 {
+    args.first()
+        .map(|v| v.as_float().unwrap_or(0.0))
+        .unwrap_or(0.0)
+}
+
+fn p35c_location_mask(vm: &Engine, recv: ObjRef) -> i32 {
+    field_int(vm, recv, "mFieldsMask")
+}
+
+fn p35c_location_set_mask(
+    vm: &mut Engine,
+    recv: ObjRef,
+    bit: i32,
+    present: bool,
+) -> Result<(), VmExit> {
+    let mask = p35c_location_mask(vm, recv);
+    let mask = if present { mask | bit } else { mask & !bit };
+    put(vm, recv, "mFieldsMask", Value::Int(mask))
+}
+
+/// Transliteration of AOSP `Location.computeDistanceAndBearing`
+/// (Vincenty inverse formula on the WGS84 ellipsoid). Returns
+/// (distance, initial bearing, final bearing).
+#[allow(clippy::too_many_arguments)]
+fn p35c_compute_distance_bearing(
+    lat1_deg: f64,
+    lon1_deg: f64,
+    lat2_deg: f64,
+    lon2_deg: f64,
+) -> (f32, f32, f32) {
+    use std::f64::consts::PI;
+    let lat1 = lat1_deg * PI / 180.0;
+    let lat2 = lat2_deg * PI / 180.0;
+    let lon1 = lon1_deg * PI / 180.0;
+    let lon2 = lon2_deg * PI / 180.0;
+
+    let a = 6378137.0;
+    let b = 6356752.3142;
+    let f = (a - b) / a;
+    let a_sq_minus_b_sq_over_b_sq = (a * a - b * b) / (b * b);
+
+    let l = lon2 - lon1;
+    let mut a_a = 0.0;
+    let u1 = ((1.0 - f) * lat1.tan()).atan();
+    let u2 = ((1.0 - f) * lat2.tan()).atan();
+
+    let cos_u1 = u1.cos();
+    let cos_u2 = u2.cos();
+    let sin_u1 = u1.sin();
+    let sin_u2 = u2.sin();
+    let cos_u1_cos_u2 = cos_u1 * cos_u2;
+    let sin_u1_sin_u2 = sin_u1 * sin_u2;
+
+    let mut sigma = 0.0;
+    let mut delta_sigma = 0.0;
+    let mut cos_sq_alpha;
+    let mut cos_2sm;
+    let mut cos_sigma;
+    let mut sin_sigma;
+    let mut cos_lambda = 0.0;
+    let mut sin_lambda = 0.0;
+
+    let mut lambda = l;
+    for _ in 0..20 {
+        let lambda_orig = lambda;
+        cos_lambda = lambda.cos();
+        sin_lambda = lambda.sin();
+        let t1 = cos_u2 * sin_lambda;
+        let t2 = cos_u1 * sin_u2 - sin_u1 * cos_u2 * cos_lambda;
+        let sin_sq_sigma = t1 * t1 + t2 * t2;
+        sin_sigma = sin_sq_sigma.sqrt();
+        cos_sigma = sin_u1_sin_u2 + cos_u1_cos_u2 * cos_lambda;
+        sigma = sin_sigma.atan2(cos_sigma);
+        let sin_alpha = if sin_sigma == 0.0 {
+            0.0
+        } else {
+            cos_u1_cos_u2 * sin_lambda / sin_sigma
+        };
+        cos_sq_alpha = 1.0 - sin_alpha * sin_alpha;
+        cos_2sm = if cos_sq_alpha == 0.0 {
+            0.0
+        } else {
+            cos_sigma - 2.0 * sin_u1_sin_u2 / cos_sq_alpha
+        };
+
+        let u_squared = cos_sq_alpha * a_sq_minus_b_sq_over_b_sq;
+        a_a = 1.0
+            + (u_squared / 16384.0)
+                * (4096.0 + u_squared * (-768.0 + u_squared * (320.0 - 175.0 * u_squared)));
+        let b_b = (u_squared / 1024.0)
+            * (256.0 + u_squared * (-128.0 + u_squared * (74.0 - 47.0 * u_squared)));
+        let c_c = (f / 16.0) * cos_sq_alpha * (4.0 + f * (4.0 - 3.0 * cos_sq_alpha));
+        let cos_2sm_sq = cos_2sm * cos_2sm;
+        delta_sigma = b_b
+            * sin_sigma
+            * (cos_2sm
+                + (b_b / 4.0)
+                    * (cos_sigma * (-1.0 + 2.0 * cos_2sm_sq)
+                        - (b_b / 6.0)
+                            * cos_2sm
+                            * (-3.0 + 4.0 * sin_sigma * sin_sigma)
+                            * (-3.0 + 4.0 * cos_2sm_sq)));
+
+        lambda = l
+            + (1.0 - c_c)
+                * f
+                * sin_alpha
+                * (sigma
+                    + c_c
+                        * sin_sigma
+                        * (cos_2sm + c_c * cos_sigma * (-1.0 + 2.0 * cos_2sm * cos_2sm)));
+
+        let delta = (lambda - lambda_orig) / lambda;
+        if delta.abs() < 1.0e-12 {
+            break;
+        }
+    }
+
+    let distance = (b * a_a * (sigma - delta_sigma)) as f32;
+    let initial = (cos_u2 * sin_lambda).atan2(cos_u1 * sin_u2 - sin_u1 * cos_u2 * cos_lambda);
+    let initial = (initial * (180.0 / PI)) as f32;
+    let r#final = (cos_u1 * sin_lambda).atan2(-sin_u1 * cos_u2 + cos_u1 * sin_u2 * cos_lambda);
+    let r#final = (r#final * (180.0 / PI)) as f32;
+    (distance, initial, r#final)
+}
+
+const P35C_LOCATION_FIELDS: [&str; 17] = [
+    "mFieldsMask",
+    "mProvider",
+    "mTimeMs",
+    "mElapsedRealtimeNs",
+    "mElapsedRealtimeUncertaintyNs",
+    "mLatitudeDegrees",
+    "mLongitudeDegrees",
+    "mHorizontalAccuracyMeters",
+    "mAltitudeMeters",
+    "mAltitudeAccuracyMeters",
+    "mSpeedMetersPerSecond",
+    "mSpeedAccuracyMetersPerSecond",
+    "mBearingDegrees",
+    "mBearingAccuracyDegrees",
+    "mMslAltitudeMeters",
+    "mMslAltitudeAccuracyMeters",
+    "mExtras",
+];
+
+fn p35c_location_copy_bundle(vm: &mut Engine, extras: Value) -> Result<Value, VmExit> {
+    let Value::Obj(bundle) = extras else {
+        return Ok(Value::Null);
+    };
+    let copy = alloc_obj(vm, "Landroid/os/Bundle;", Vec::new())?;
+    vm.invoke_instance(
+        copy,
+        "<init>",
+        "(Landroid/os/Bundle;)V",
+        &[Value::Obj(bundle)],
+    )?;
+    Ok(Value::Obj(copy))
+}
+
+fn p35c_location_set_from(vm: &mut Engine, recv: ObjRef, source: ObjRef) -> Result<Value, VmExit> {
+    for field in P35C_LOCATION_FIELDS {
+        if field == "mExtras" {
+            continue;
+        }
+        put(vm, recv, field, get(vm, source, field))?;
+    }
+    let extras = p35c_location_copy_bundle(vm, get(vm, source, "mExtras"))?;
+    put(vm, recv, "mExtras", extras)?;
+    Ok(Value::Null)
+}
+
+fn p35c_location_reset(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    put(vm, recv, "mProvider", Value::Null)?;
+    put(vm, recv, "mTimeMs", Value::Long(0))?;
+    put(vm, recv, "mElapsedRealtimeNs", Value::Long(0))?;
+    put(
+        vm,
+        recv,
+        "mElapsedRealtimeUncertaintyNs",
+        Value::Double(0.0),
+    )?;
+    put(vm, recv, "mFieldsMask", Value::Int(0))?;
+    put(vm, recv, "mLatitudeDegrees", Value::Double(0.0))?;
+    put(vm, recv, "mLongitudeDegrees", Value::Double(0.0))?;
+    put(vm, recv, "mAltitudeMeters", Value::Double(0.0))?;
+    put(vm, recv, "mSpeedMetersPerSecond", Value::Float(0.0))?;
+    put(vm, recv, "mBearingDegrees", Value::Float(0.0))?;
+    put(vm, recv, "mHorizontalAccuracyMeters", Value::Float(0.0))?;
+    put(vm, recv, "mAltitudeAccuracyMeters", Value::Float(0.0))?;
+    put(vm, recv, "mSpeedAccuracyMetersPerSecond", Value::Float(0.0))?;
+    put(vm, recv, "mBearingAccuracyDegrees", Value::Float(0.0))?;
+    put(vm, recv, "mMslAltitudeMeters", Value::Double(0.0))?;
+    put(vm, recv, "mMslAltitudeAccuracyMeters", Value::Float(0.0))?;
+    put(vm, recv, "mExtras", Value::Null)?;
+    Ok(())
+}
+
+/// (setter, sig, getter, sig, has, remove, field, mask bit, double-typed)
+type P35cLocationProp = (
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+    i32,
+    bool,
+);
+const P35C_LOCATION_PROPS: [P35cLocationProp; 9] = [
+    (
+        "setAccuracy",
+        "(F)V",
+        "getAccuracy",
+        "()F",
+        "hasAccuracy",
+        "removeAccuracy",
+        "mHorizontalAccuracyMeters",
+        1 << 3,
+        false,
+    ),
+    (
+        "setAltitude",
+        "(D)V",
+        "getAltitude",
+        "()D",
+        "hasAltitude",
+        "removeAltitude",
+        "mAltitudeMeters",
+        1 << 0,
+        true,
+    ),
+    (
+        "setVerticalAccuracyMeters",
+        "(F)V",
+        "getVerticalAccuracyMeters",
+        "()F",
+        "hasVerticalAccuracy",
+        "removeVerticalAccuracy",
+        "mAltitudeAccuracyMeters",
+        1 << 5,
+        false,
+    ),
+    (
+        "setSpeed",
+        "(F)V",
+        "getSpeed",
+        "()F",
+        "hasSpeed",
+        "removeSpeed",
+        "mSpeedMetersPerSecond",
+        1 << 1,
+        false,
+    ),
+    (
+        "setSpeedAccuracyMetersPerSecond",
+        "(F)V",
+        "getSpeedAccuracyMetersPerSecond",
+        "()F",
+        "hasSpeedAccuracy",
+        "removeSpeedAccuracy",
+        "mSpeedAccuracyMetersPerSecond",
+        1 << 6,
+        false,
+    ),
+    (
+        "setBearingAccuracyDegrees",
+        "(F)V",
+        "getBearingAccuracyDegrees",
+        "()F",
+        "hasBearingAccuracy",
+        "removeBearingAccuracy",
+        "mBearingAccuracyDegrees",
+        1 << 7,
+        false,
+    ),
+    (
+        "setMslAltitudeMeters",
+        "(D)V",
+        "getMslAltitudeMeters",
+        "()D",
+        "hasMslAltitude",
+        "removeMslAltitude",
+        "mMslAltitudeMeters",
+        1 << 9,
+        true,
+    ),
+    (
+        "setMslAltitudeAccuracyMeters",
+        "(F)V",
+        "getMslAltitudeAccuracyMeters",
+        "()F",
+        "hasMslAltitudeAccuracy",
+        "removeMslAltitudeAccuracy",
+        "mMslAltitudeAccuracyMeters",
+        1 << 10,
+        false,
+    ),
+    (
+        "setElapsedRealtimeUncertaintyNanos",
+        "(D)V",
+        "getElapsedRealtimeUncertaintyNanos",
+        "()D",
+        "hasElapsedRealtimeUncertaintyNanos",
+        "removeElapsedRealtimeUncertaintyNanos",
+        "mElapsedRealtimeUncertaintyNs",
+        1 << 8,
+        true,
+    ),
+];
+
+fn p35c_bundle_is_empty(vm: &mut Engine, value: &Value) -> bool {
+    match value {
+        Value::Obj(bundle) => vm
+            .invoke_instance(*bundle, "isEmpty", "()Z", &[])
+            .map(|v| v.as_int().unwrap_or(0) != 0)
+            .unwrap_or(false),
+        _ => true,
+    }
+}
+
+fn p35c_location_extras_equal(vm: &mut Engine, a: &Value, b: &Value) -> bool {
+    let a_empty = p35c_bundle_is_empty(vm, a);
+    let b_empty = p35c_bundle_is_empty(vm, b);
+    if a_empty && b_empty {
+        return true;
+    }
+    let (Value::Obj(x), Value::Obj(y)) = (a, b) else {
+        return false;
+    };
+    if x == y {
+        return true;
+    }
+    // BaseBundle.kindofEquals over the host bundle maps.
+    let (Some(left), Some(right)) = (bundle_entries(vm, Some(a)), bundle_entries(vm, Some(b)))
+    else {
+        return false;
+    };
+    if left.len() != right.len() {
+        return false;
+    }
+    left.iter().all(|(key, value)| {
+        right
+            .iter()
+            .find(|(other_key, _)| other_key == key)
+            .map(|(_, other_value)| af_objects_equal(vm, value, other_value).unwrap_or(false))
+            .unwrap_or(false)
+    })
+}
+
+fn p35c_double_hash(value: f64) -> i32 {
+    let bits = value.to_bits() as i64;
+    (bits ^ (bits >> 32)) as i32
+}
+
+fn p35c_location_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    for (setter, setter_sig, getter, getter_sig, has, remove, field, bit, is_double) in
+        P35C_LOCATION_PROPS
+    {
+        if name == setter && sig == setter_sig {
+            let value = if is_double {
+                Value::Double(p35c_darg(args, 0))
+            } else {
+                Value::Float(p35c_field_float_arg(args))
+            };
+            put(vm, recv, field, value)?;
+            p35c_location_set_mask(vm, recv, bit, true)?;
+            return Ok(Some(Value::Null));
+        }
+        if name == getter && sig == getter_sig {
+            let value = if is_double {
+                Value::Double(p35c_field_double(vm, recv, field))
+            } else {
+                Value::Float(field_float(vm, recv, field))
+            };
+            return Ok(Some(value));
+        }
+        if name == has && sig == "()Z" {
+            return Ok(Some(Value::Int(
+                (p35c_location_mask(vm, recv) & bit != 0) as i32,
+            )));
+        }
+        if name == remove && sig == "()V" {
+            p35c_location_set_mask(vm, recv, bit, false)?;
+            return Ok(Some(Value::Null));
+        }
+    }
+    let value = match (name, sig) {
+        ("<init>", "(Ljava/lang/String;)V") => {
+            p35c_location_reset(vm, recv)?;
+            put(vm, recv, "mProvider", p35_arg(args, 0))?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/location/Location;)V") => {
+            let Some(source) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            p35c_location_set_from(vm, recv, source)?
+        }
+        ("set", "(Landroid/location/Location;)V") => {
+            let Some(source) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            p35c_location_set_from(vm, recv, source)?
+        }
+        ("reset", "()V") => {
+            p35c_location_reset(vm, recv)?;
+            Value::Null
+        }
+        ("getProvider", "()Ljava/lang/String;") => get(vm, recv, "mProvider"),
+        ("setProvider", "(Ljava/lang/String;)V") => {
+            put(vm, recv, "mProvider", p35_arg(args, 0))?;
+            Value::Null
+        }
+        ("getTime", "()J") => Value::Long(field_long(vm, recv, "mTimeMs")),
+        ("setTime", "(J)V") => {
+            put(vm, recv, "mTimeMs", Value::Long(p35c_larg(args, 0)))?;
+            Value::Null
+        }
+        ("getElapsedRealtimeNanos", "()J") => {
+            Value::Long(field_long(vm, recv, "mElapsedRealtimeNs"))
+        }
+        ("setElapsedRealtimeNanos", "(J)V") => {
+            put(
+                vm,
+                recv,
+                "mElapsedRealtimeNs",
+                Value::Long(p35c_larg(args, 0)),
+            )?;
+            Value::Null
+        }
+        ("getElapsedRealtimeMillis", "()J") => {
+            // NANOSECONDS.toMillis truncates toward zero.
+            Value::Long(field_long(vm, recv, "mElapsedRealtimeNs") / 1_000_000)
+        }
+        ("getElapsedRealtimeAgeMillis", "()J") => {
+            let now =
+                vm.invoke_static("Landroid/os/SystemClock;", "elapsedRealtime", "()J", &[])?;
+            let now = match now {
+                Value::Long(v) => v,
+                _ => 0,
+            };
+            Value::Long(now - field_long(vm, recv, "mElapsedRealtimeNs") / 1_000_000)
+        }
+        ("getElapsedRealtimeAgeMillis", "(J)J") => {
+            Value::Long(p35c_larg(args, 0) - field_long(vm, recv, "mElapsedRealtimeNs") / 1_000_000)
+        }
+        ("getLatitude", "()D") => Value::Double(p35c_field_double(vm, recv, "mLatitudeDegrees")),
+        ("setLatitude", "(D)V") => {
+            put(
+                vm,
+                recv,
+                "mLatitudeDegrees",
+                Value::Double(p35c_darg(args, 0)),
+            )?;
+            Value::Null
+        }
+        ("getLongitude", "()D") => Value::Double(p35c_field_double(vm, recv, "mLongitudeDegrees")),
+        ("setLongitude", "(D)V") => {
+            put(
+                vm,
+                recv,
+                "mLongitudeDegrees",
+                Value::Double(p35c_darg(args, 0)),
+            )?;
+            Value::Null
+        }
+        ("setBearing", "(F)V") => {
+            let bearing = p35c_field_float_arg(args);
+            if !bearing.is_finite() {
+                return Err(iae(""));
+            }
+            // The +0f in AOSP erases -0.0 results; Rust's % and +0.0 do
+            // the same for -0.0 inputs.
+            let mut modulo = bearing % 360.0 + 0.0;
+            if modulo < 0.0 {
+                modulo += 360.0;
+            }
+            put(vm, recv, "mBearingDegrees", Value::Float(modulo))?;
+            p35c_location_set_mask(vm, recv, 1 << 2, true)?;
+            Value::Null
+        }
+        ("getBearing", "()F") => Value::Float(field_float(vm, recv, "mBearingDegrees")),
+        ("hasBearing", "()Z") => Value::Int((p35c_location_mask(vm, recv) & (1 << 2) != 0) as i32),
+        ("removeBearing", "()V") => {
+            p35c_location_set_mask(vm, recv, 1 << 2, false)?;
+            Value::Null
+        }
+        ("isMock", "()Z") => Value::Int((p35c_location_mask(vm, recv) & (1 << 4) != 0) as i32),
+        ("isFromMockProvider", "()Z") => vm.invoke_instance(recv, "isMock", "()Z", &[])?,
+        ("setMock", "(Z)V") => {
+            p35c_location_set_mask(vm, recv, 1 << 4, iarg(args, 0) != 0)?;
+            Value::Null
+        }
+        ("setIsFromMockProvider", "(Z)V") => {
+            vm.invoke_instance(recv, "setMock", "(Z)V", &[p35_arg(args, 0)])?
+        }
+        ("getExtras", "()Landroid/os/Bundle;") => get(vm, recv, "mExtras"),
+        ("setExtras", "(Landroid/os/Bundle;)V") => {
+            let extras = p35c_location_copy_bundle(vm, p35_arg(args, 0))?;
+            put(vm, recv, "mExtras", extras)?;
+            Value::Null
+        }
+        ("isComplete", "()Z") => {
+            let complete = matches!(get(vm, recv, "mProvider"), Value::Obj(_))
+                && p35c_location_mask(vm, recv) & (1 << 3) != 0
+                && field_long(vm, recv, "mTimeMs") != 0
+                && field_long(vm, recv, "mElapsedRealtimeNs") != 0;
+            Value::Int(complete as i32)
+        }
+        ("makeComplete", "()V") => {
+            if !matches!(get(vm, recv, "mProvider"), Value::Obj(_)) {
+                let empty = jstr(vm, "")?;
+                put(vm, recv, "mProvider", empty)?;
+            }
+            if p35c_location_mask(vm, recv) & (1 << 3) == 0 {
+                p35c_location_set_mask(vm, recv, 1 << 3, true)?;
+                put(vm, recv, "mHorizontalAccuracyMeters", Value::Float(100.0))?;
+            }
+            if field_long(vm, recv, "mTimeMs") == 0 {
+                let now =
+                    vm.invoke_static("Ljava/lang/System;", "currentTimeMillis", "()J", &[])?;
+                put(vm, recv, "mTimeMs", now)?;
+            }
+            if field_long(vm, recv, "mElapsedRealtimeNs") == 0 {
+                let now = vm.invoke_static(
+                    "Landroid/os/SystemClock;",
+                    "elapsedRealtimeNanos",
+                    "()J",
+                    &[],
+                )?;
+                put(vm, recv, "mElapsedRealtimeNs", now)?;
+            }
+            Value::Null
+        }
+        ("distanceTo", "(Landroid/location/Location;)F") => {
+            let Some(dest) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            let (distance, _, _) = p35c_compute_distance_bearing(
+                p35c_field_double(vm, recv, "mLatitudeDegrees"),
+                p35c_field_double(vm, recv, "mLongitudeDegrees"),
+                p35c_field_double(vm, dest, "mLatitudeDegrees"),
+                p35c_field_double(vm, dest, "mLongitudeDegrees"),
+            );
+            Value::Float(distance)
+        }
+        ("bearingTo", "(Landroid/location/Location;)F") => {
+            let Some(dest) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            let (_, initial, _) = p35c_compute_distance_bearing(
+                p35c_field_double(vm, recv, "mLatitudeDegrees"),
+                p35c_field_double(vm, recv, "mLongitudeDegrees"),
+                p35c_field_double(vm, dest, "mLatitudeDegrees"),
+                p35c_field_double(vm, dest, "mLongitudeDegrees"),
+            );
+            Value::Float(initial)
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        ("hashCode", "()I") => {
+            // Objects.hash(provider, elapsedRealtimeNs, latitude, longitude)
+            let mut h: i32 = 1;
+            h = p35_hash_mix(h, af_objects_hash(vm, &get(vm, recv, "mProvider"))?);
+            let elapsed = field_long(vm, recv, "mElapsedRealtimeNs");
+            h = p35_hash_mix(h, (elapsed ^ (elapsed >> 32)) as i32);
+            h = p35_hash_mix(
+                h,
+                p35c_double_hash(p35c_field_double(vm, recv, "mLatitudeDegrees")),
+            );
+            h = p35_hash_mix(
+                h,
+                p35c_double_hash(p35c_field_double(vm, recv, "mLongitudeDegrees")),
+            );
+            Value::Int(h)
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let Some(other) = oarg(args, 0) else {
+                return Ok(Some(Value::Int(0)));
+            };
+            if other == recv {
+                return Ok(Some(Value::Int(1)));
+            }
+            if !vm.cp.is_subtype(&class_of(vm, other), P35C_LOCATION) {
+                return Ok(Some(Value::Int(0)));
+            }
+            let mask = p35c_location_mask(vm, recv);
+            let other_mask = p35c_location_mask(vm, other);
+            let mut eq = field_long(vm, recv, "mTimeMs") == field_long(vm, other, "mTimeMs")
+                && field_long(vm, recv, "mElapsedRealtimeNs")
+                    == field_long(vm, other, "mElapsedRealtimeNs")
+                && p35c_field_double(vm, recv, "mLatitudeDegrees")
+                    == p35c_field_double(vm, other, "mLatitudeDegrees")
+                && p35c_field_double(vm, recv, "mLongitudeDegrees")
+                    == p35c_field_double(vm, other, "mLongitudeDegrees");
+            // Optional fields compare only when present on both sides;
+            // bearing uses its own row outside the props table.
+            let mut prop_rows: Vec<(&str, i32, bool)> = P35C_LOCATION_PROPS
+                .iter()
+                .map(|row| (row.6, row.7, row.8))
+                .collect();
+            prop_rows.push(("mBearingDegrees", 1 << 2, false));
+            for (field, bit, is_double) in prop_rows {
+                if !eq {
+                    break;
+                }
+                let has = mask & bit != 0;
+                let other_has = other_mask & bit != 0;
+                if has != other_has {
+                    eq = false;
+                } else if has {
+                    let same = if is_double {
+                        p35c_field_double(vm, recv, field) == p35c_field_double(vm, other, field)
+                    } else {
+                        field_float(vm, recv, field) == field_float(vm, other, field)
+                    };
+                    eq = same;
+                }
+            }
+            if eq {
+                eq = af_objects_equal(
+                    vm,
+                    &get(vm, recv, "mProvider"),
+                    &get(vm, other, "mProvider"),
+                )? && p35c_location_extras_equal(
+                    vm,
+                    &get(vm, recv, "mExtras"),
+                    &get(vm, other, "mExtras"),
+                );
+            }
+            Value::Int(eq as i32)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+/// `new DecimalFormat("###.#####").format(value)` for the non-negative
+/// values `Location.convert` feeds it: up to five fraction digits,
+/// trailing zeros stripped.
+fn p35c_format_decimal(value: f64) -> String {
+    let mut text = format!("{value:.5}");
+    if text.contains('.') {
+        while text.ends_with('0') {
+            text.pop();
+        }
+        if text.ends_with('.') {
+            text.pop();
+        }
+    }
+    text
+}
+
+fn p35c_location_convert_to_string(coordinate: f64, output_type: i32) -> Result<String, VmExit> {
+    if coordinate.is_nan() || !(-180.0..=180.0).contains(&coordinate) {
+        return Err(iae(format!(
+            "coordinate was {coordinate} but must be in range [-180.0, 180.0]"
+        )));
+    }
+    if !(0..=2).contains(&output_type) {
+        return Err(iae(format!("{output_type} is an unrecognized format")));
+    }
+    let mut result = String::new();
+    let mut coordinate = coordinate;
+    if coordinate < 0.0 {
+        result.push('-');
+        coordinate = -coordinate;
+    }
+    if output_type == 1 || output_type == 2 {
+        let degrees = coordinate.floor() as i32;
+        result.push_str(&degrees.to_string());
+        result.push(':');
+        coordinate -= degrees as f64;
+        coordinate *= 60.0;
+        if output_type == 2 {
+            let minutes = coordinate.floor() as i32;
+            result.push_str(&minutes.to_string());
+            result.push(':');
+            coordinate -= minutes as f64;
+            coordinate *= 60.0;
+        }
+    }
+    result.push_str(&p35c_format_decimal(coordinate));
+    Ok(result)
+}
+
+fn p35c_location_convert_from_string(input: &str) -> Result<f64, VmExit> {
+    let Some(first) = input.chars().next() else {
+        return Err(throw("Ljava/lang/StringIndexOutOfBoundsException;", ""));
+    };
+    let (negative, coordinate) = if first == '-' {
+        (true, &input[1..])
+    } else {
+        (false, input)
+    };
+    // StringTokenizer with ":" skips empty tokens.
+    let tokens: Vec<&str> = coordinate.split(':').filter(|t| !t.is_empty()).collect();
+    if tokens.is_empty() {
+        return Err(iae(format!("coordinate={coordinate}")));
+    }
+    let bad_number = |_: std::num::ParseFloatError| iae(format!("coordinate={coordinate}"));
+    let bad_int = |_: std::num::ParseIntError| iae(format!("coordinate={coordinate}"));
+    if tokens.len() == 1 {
+        let value: f64 = tokens[0].parse().map_err(bad_number)?;
+        return Ok(if negative { -value } else { value });
+    }
+    let deg: i32 = tokens[0].parse().map_err(bad_int)?;
+    let (minutes, seconds, sec_present) = if tokens.len() > 2 {
+        let minutes: i32 = tokens[1].parse().map_err(bad_int)?;
+        let seconds: f64 = tokens[2].parse().map_err(bad_number)?;
+        (minutes as f64, seconds, true)
+    } else {
+        let minutes: f64 = tokens[1].parse().map_err(bad_number)?;
+        (minutes, 0.0, false)
+    };
+    let is_negative_180 = negative && deg == 180 && minutes == 0.0 && seconds == 0.0;
+    if deg < 0 || (deg > 179 && !is_negative_180) {
+        return Err(iae(format!("coordinate={coordinate}")));
+    }
+    if minutes < 0.0 || minutes >= 60.0 || (sec_present && minutes > 59.0) {
+        return Err(iae(format!("coordinate={coordinate}")));
+    }
+    if !(0.0..60.0).contains(&seconds) {
+        return Err(iae(format!("coordinate={coordinate}")));
+    }
+    let value = (deg as f64 * 3600.0 + minutes * 60.0 + seconds) / 3600.0;
+    Ok(if negative { -value } else { value })
+}
+
+fn p35c_criteria_requirement_name(value: i32) -> &'static str {
+    match value {
+        0 => "None",
+        1 => "Low",
+        2 => "Medium",
+        3 => "High",
+        _ => "???",
+    }
+}
+
+fn p35c_criteria_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    /// (setter, getter, field, max) for the range-checked accuracies.
+    const ACCURACIES: [(&str, &str, &str); 4] = [
+        (
+            "setHorizontalAccuracy",
+            "getHorizontalAccuracy",
+            "mHorizontalAccuracy",
+        ),
+        (
+            "setVerticalAccuracy",
+            "getVerticalAccuracy",
+            "mVerticalAccuracy",
+        ),
+        ("setSpeedAccuracy", "getSpeedAccuracy", "mSpeedAccuracy"),
+        (
+            "setBearingAccuracy",
+            "getBearingAccuracy",
+            "mBearingAccuracy",
+        ),
+    ];
+    for (setter, getter, field) in ACCURACIES {
+        if name == setter && sig == "(I)V" {
+            p35b_check_range(iarg(args, 0), 0, 3, "accuracy")?;
+            put(vm, recv, field, Value::Int(iarg(args, 0)))?;
+            return Ok(Some(Value::Null));
+        }
+        if name == getter && sig == "()I" {
+            return Ok(Some(Value::Int(field_int(vm, recv, field))));
+        }
+    }
+    /// (setter, getter, field) for the boolean requirements.
+    const FLAGS: [(&str, &str, &str); 4] = [
+        ("setCostAllowed", "isCostAllowed", "mCostAllowed"),
+        (
+            "setAltitudeRequired",
+            "isAltitudeRequired",
+            "mAltitudeRequired",
+        ),
+        (
+            "setBearingRequired",
+            "isBearingRequired",
+            "mBearingRequired",
+        ),
+        ("setSpeedRequired", "isSpeedRequired", "mSpeedRequired"),
+    ];
+    for (setter, getter, field) in FLAGS {
+        if name == setter && sig == "(Z)V" {
+            put(vm, recv, field, Value::Int(iarg(args, 0)))?;
+            return Ok(Some(Value::Null));
+        }
+        if name == getter && sig == "()Z" {
+            return Ok(Some(Value::Int(field_int(vm, recv, field))));
+        }
+    }
+    const FIELDS: [&str; 9] = [
+        "mHorizontalAccuracy",
+        "mVerticalAccuracy",
+        "mSpeedAccuracy",
+        "mBearingAccuracy",
+        "mPowerRequirement",
+        "mAltitudeRequired",
+        "mBearingRequired",
+        "mSpeedRequired",
+        "mCostAllowed",
+    ];
+    let value = match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        ("<init>", "(Landroid/location/Criteria;)V") => {
+            let Some(source) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            for field in FIELDS {
+                put(vm, recv, field, get(vm, source, field))?;
+            }
+            Value::Null
+        }
+        ("setAccuracy", "(I)V") => {
+            p35b_check_range(iarg(args, 0), 0, 2, "accuracy")?;
+            let horizontal = match iarg(args, 0) {
+                1 => 3, // ACCURACY_FINE -> ACCURACY_HIGH
+                2 => 1, // ACCURACY_COARSE -> ACCURACY_LOW
+                _ => 0,
+            };
+            put(vm, recv, "mHorizontalAccuracy", Value::Int(horizontal))?;
+            Value::Null
+        }
+        ("getAccuracy", "()I") => Value::Int(if field_int(vm, recv, "mHorizontalAccuracy") >= 3 {
+            1
+        } else {
+            2
+        }),
+        ("setPowerRequirement", "(I)V") => {
+            p35b_check_range(iarg(args, 0), 0, 3, "powerRequirement")?;
+            put(vm, recv, "mPowerRequirement", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("getPowerRequirement", "()I") => Value::Int(field_int(vm, recv, "mPowerRequirement")),
+        ("describeContents", "()I") => Value::Int(0),
+        ("toString", "()Ljava/lang/String;") => {
+            let mut text = format!(
+                "Criteria[power={}, accuracy={}",
+                p35c_criteria_requirement_name(field_int(vm, recv, "mPowerRequirement")),
+                p35c_criteria_requirement_name(field_int(vm, recv, "mHorizontalAccuracy")),
+            );
+            for (label, field) in [
+                ("verticalAccuracy", "mVerticalAccuracy"),
+                ("speedAccuracy", "mSpeedAccuracy"),
+                ("bearingAccuracy", "mBearingAccuracy"),
+            ] {
+                let requirement = field_int(vm, recv, field);
+                if requirement != 0 {
+                    text.push_str(&format!(
+                        ", {label}={}",
+                        p35c_criteria_requirement_name(requirement)
+                    ));
+                }
+            }
+            let mut required: Vec<&str> = Vec::new();
+            if field_bool(vm, recv, "mAltitudeRequired") {
+                required.push("altitude");
+            }
+            if field_bool(vm, recv, "mBearingRequired") {
+                required.push("bearing");
+            }
+            if field_bool(vm, recv, "mSpeedRequired") {
+                required.push("speed");
+            }
+            if !required.is_empty() {
+                text.push_str(&format!(", required=[{}]", required.join(", ")));
+            }
+            if field_bool(vm, recv, "mCostAllowed") {
+                text.push_str(", costAllowed");
+            }
+            text.push(']');
+            jstr(vm, text)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35c_string_array(vm: &mut Engine, items: Vec<Value>) -> Result<Value, VmExit> {
+    obj_array(vm, "[Ljava/lang/String;", items)
+}
+
+fn p35c_list_copy_of_array(vm: &mut Engine, array: &Value) -> Result<Value, VmExit> {
+    Ok(Value::Obj(new_collection(
+        vm,
+        "Ljava/util/ArrayList;",
+        array_elems(vm, Some(array)),
+    )?))
+}
+
+fn p35c_hints_contains(vm: &Engine, hints: &Value, hint: &Value) -> bool {
+    // ArrayUtils.contains is null-safe for the array itself.
+    array_elems(vm, Some(hints))
+        .iter()
+        .any(|item| objects_equal(vm, item, hint))
+}
+
+fn p35c_slice_spec_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Ljava/lang/String;I)V") => {
+            put(vm, recv, "mType", p35_arg(args, 0))?;
+            put(vm, recv, "mRevision", Value::Int(iarg(args, 1)))?;
+            Value::Null
+        }
+        ("getType", "()Ljava/lang/String;") => get(vm, recv, "mType"),
+        ("getRevision", "()I") => Value::Int(field_int(vm, recv, "mRevision")),
+        ("describeContents", "()I") => Value::Int(0),
+        ("canRender", "(Landroid/app/slice/SliceSpec;)Z") => {
+            let Some(candidate) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            if !matches!(get(vm, recv, "mType"), Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            if !af_objects_equal(vm, &get(vm, recv, "mType"), &get(vm, candidate, "mType"))? {
+                return Ok(Some(Value::Int(0)));
+            }
+            Value::Int(
+                (field_int(vm, recv, "mRevision") >= field_int(vm, candidate, "mRevision")) as i32,
+            )
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let Some(other) = oarg(args, 0) else {
+                return Ok(Some(Value::Int(0)));
+            };
+            if !vm.cp.is_subtype(&class_of(vm, other), P35C_SLICE_SPEC) {
+                return Ok(Some(Value::Int(0)));
+            }
+            if !matches!(get(vm, recv, "mType"), Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            let eq = af_objects_equal(vm, &get(vm, recv, "mType"), &get(vm, other, "mType"))?
+                && field_int(vm, recv, "mRevision") == field_int(vm, other, "mRevision");
+            Value::Int(eq as i32)
+        }
+        ("hashCode", "()I") => {
+            // SliceSpec does not override hashCode in AOSP: identity.
+            return Ok(None);
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let spec_type = value_string(vm, &get(vm, recv, "mType"))?;
+            jstr(
+                vm,
+                format!(
+                    "SliceSpec{{{},{}}}",
+                    spec_type,
+                    field_int(vm, recv, "mRevision")
+                ),
+            )?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35c_slice_item_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V") => {
+            if oarg(args, 3).is_none() {
+                return Err(npe(""));
+            }
+            let hints = p35c_string_array(vm, collection_items(vm, args.get(3)))?;
+            put(vm, recv, "mHints", hints)?;
+            put(vm, recv, "mFormat", p35_arg(args, 1))?;
+            put(vm, recv, "mSubType", p35_arg(args, 2))?;
+            put(vm, recv, "mObj", p35_arg(args, 0))?;
+            Value::Null
+        }
+        ("<init>", "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)V") => {
+            put(vm, recv, "mHints", p35_arg(args, 3))?;
+            put(vm, recv, "mFormat", p35_arg(args, 1))?;
+            put(vm, recv, "mSubType", p35_arg(args, 2))?;
+            put(vm, recv, "mObj", p35_arg(args, 0))?;
+            Value::Null
+        }
+        (
+            "<init>",
+            "(Landroid/app/PendingIntent;Landroid/app/slice/Slice;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)V",
+        ) => {
+            put(vm, recv, "mHints", p35_arg(args, 4))?;
+            put(vm, recv, "mFormat", p35_arg(args, 2))?;
+            put(vm, recv, "mSubType", p35_arg(args, 3))?;
+            put(vm, recv, "mObj", p35_arg(args, 0))?;
+            put(vm, recv, "rd_slice", p35_arg(args, 1))?;
+            Value::Null
+        }
+        ("getHints", "()Ljava/util/List;") => {
+            let hints = get(vm, recv, "mHints");
+            if !matches!(hints, Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            p35c_list_copy_of_array(vm, &hints)?
+        }
+        ("getFormat", "()Ljava/lang/String;") => get(vm, recv, "mFormat"),
+        ("getSubType", "()Ljava/lang/String;") => get(vm, recv, "mSubType"),
+        ("getText", "()Ljava/lang/CharSequence;")
+        | ("getBundle", "()Landroid/os/Bundle;")
+        | ("getIcon", "()Landroid/graphics/drawable/Icon;")
+        | ("getAction", "()Landroid/app/PendingIntent;")
+        | ("getRemoteView", "()Landroid/widget/RemoteViews;")
+        | ("getRemoteInput", "()Landroid/app/RemoteInput;") => get(vm, recv, "mObj"),
+        ("getSlice", "()Landroid/app/slice/Slice;") => {
+            let format = get(vm, recv, "mFormat");
+            if opt_str(vm, Some(&format)).as_deref() == Some("action") {
+                get(vm, recv, "rd_slice")
+            } else {
+                get(vm, recv, "mObj")
+            }
+        }
+        ("getInt", "()I") => {
+            let Some(obj) = field_obj(vm, recv, "mObj") else {
+                return Err(npe(""));
+            };
+            if class_of(vm, obj) != "Ljava/lang/Integer;" {
+                return Err(throw("Ljava/lang/ClassCastException;", ""));
+            }
+            vm.invoke_instance(obj, "intValue", "()I", &[])?
+        }
+        ("getLong", "()J") | ("getTimestamp", "()J") => {
+            let Some(obj) = field_obj(vm, recv, "mObj") else {
+                return Err(npe(""));
+            };
+            if class_of(vm, obj) != "Ljava/lang/Long;" {
+                return Err(throw("Ljava/lang/ClassCastException;", ""));
+            }
+            vm.invoke_instance(obj, "longValue", "()J", &[])?
+        }
+        ("hasHint", "(Ljava/lang/String;)Z") => {
+            Value::Int(p35c_hints_contains(vm, &get(vm, recv, "mHints"), &p35_arg(args, 0)) as i32)
+        }
+        ("hasHints", "([Ljava/lang/String;)Z") => {
+            if oarg(args, 0).is_none() {
+                return Ok(Some(Value::Int(1)));
+            }
+            let hints = get(vm, recv, "mHints");
+            for hint in array_elems(vm, args.first()) {
+                let empty = match opt_str(vm, Some(&hint)) {
+                    Some(text) => text.is_empty(),
+                    None => true,
+                };
+                if !empty && !p35c_hints_contains(vm, &hints, &hint) {
+                    return Ok(Some(Value::Int(0)));
+                }
+            }
+            Value::Int(1)
+        }
+        ("hasAnyHints", "([Ljava/lang/String;)Z") => {
+            if oarg(args, 0).is_none() {
+                return Ok(Some(Value::Int(0)));
+            }
+            let hints = get(vm, recv, "mHints");
+            let any = array_elems(vm, args.first())
+                .iter()
+                .any(|hint| p35c_hints_contains(vm, &hints, hint));
+            Value::Int(any as i32)
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35c_slice_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        (
+            "<init>",
+            "(Ljava/util/ArrayList;[Ljava/lang/String;Landroid/net/Uri;Landroid/app/slice/SliceSpec;)V",
+        ) => {
+            if oarg(args, 0).is_none() {
+                return Err(npe(""));
+            }
+            let items = obj_array(
+                vm,
+                "[Landroid/app/slice/SliceItem;",
+                collection_items(vm, args.first()),
+            )?;
+            put(vm, recv, "mItems", items)?;
+            put(vm, recv, "mHints", p35_arg(args, 1))?;
+            put(vm, recv, "mUri", p35_arg(args, 2))?;
+            put(vm, recv, "mSpec", p35_arg(args, 3))?;
+            Value::Null
+        }
+        ("getSpec", "()Landroid/app/slice/SliceSpec;") => get(vm, recv, "mSpec"),
+        ("getUri", "()Landroid/net/Uri;") => get(vm, recv, "mUri"),
+        ("getItems", "()Ljava/util/List;") => {
+            let items = get(vm, recv, "mItems");
+            if !matches!(items, Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            p35c_list_copy_of_array(vm, &items)?
+        }
+        ("getHints", "()Ljava/util/List;") => {
+            let hints = get(vm, recv, "mHints");
+            if !matches!(hints, Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            p35c_list_copy_of_array(vm, &hints)?
+        }
+        ("hasHint", "(Ljava/lang/String;)Z") => {
+            Value::Int(p35c_hints_contains(vm, &get(vm, recv, "mHints"), &p35_arg(args, 0)) as i32)
+        }
+        ("isCallerNeeded", "()Z") => {
+            let needed = array_elems(vm, Some(&get(vm, recv, "mHints")))
+                .iter()
+                .any(|h| opt_str(vm, Some(h)).as_deref() == Some("caller_needed"));
+            Value::Int(needed as i32)
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35c_slice_builder_init(
+    vm: &mut Engine,
+    recv: ObjRef,
+    uri: Value,
+    spec: Value,
+) -> Result<(), VmExit> {
+    let items = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+    put(vm, recv, "mItems", Value::Obj(items))?;
+    let hints = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+    put(vm, recv, "mHints", Value::Obj(hints))?;
+    put(vm, recv, "mUri", uri)?;
+    put(vm, recv, "mSpec", spec)?;
+    Ok(())
+}
+
+fn p35c_builder_add(vm: &mut Engine, recv: ObjRef, item: ObjRef) -> Result<(), VmExit> {
+    let Some(items) = field_obj(vm, recv, "mItems") else {
+        return Err(npe(""));
+    };
+    vm.invoke_instance(items, "add", "(Ljava/lang/Object;)Z", &[Value::Obj(item)])?;
+    Ok(())
+}
+
+fn p35c_new_slice_item(
+    vm: &mut Engine,
+    obj: Value,
+    format: &str,
+    sub_type: Value,
+    hints: Value,
+    hints_are_array: bool,
+) -> Result<ObjRef, VmExit> {
+    let item = alloc_obj(vm, P35C_SLICE_ITEM, Vec::new())?;
+    let format = jstr(vm, format)?;
+    let sig = if hints_are_array {
+        "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)V"
+    } else {
+        "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V"
+    };
+    vm.invoke_instance(item, "<init>", sig, &[obj, format, sub_type, hints])?;
+    Ok(item)
+}
+
+fn p35c_slice_hints_array(vm: &mut Engine, slice: ObjRef) -> Result<Value, VmExit> {
+    let hints = vm.invoke_instance(slice, "getHints", "()Ljava/util/List;", &[])?;
+    p35c_string_array(vm, collection_items(vm, Some(&hints)))
+}
+
+fn p35c_slice_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/net/Uri;)V") => {
+            p35c_slice_builder_init(vm, recv, p35_arg(args, 0), Value::Null)?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/net/Uri;Landroid/app/slice/SliceSpec;)V") => {
+            p35c_slice_builder_init(vm, recv, p35_arg(args, 0), p35_arg(args, 1))?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/app/slice/Slice$Builder;)V") => {
+            let Some(parent) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            let Some(parent_uri) = field_obj(vm, parent, "mUri") else {
+                return Err(npe(""));
+            };
+            let builder = vm.invoke_instance(parent_uri, "buildUpon", "()Landroid/net/Uri$Builder;", &[])?;
+            let Value::Obj(builder) = builder else {
+                return Err(npe(""));
+            };
+            let segment = jstr(vm, "_gen")?;
+            vm.invoke_instance(
+                builder,
+                "appendPath",
+                "(Ljava/lang/String;)Landroid/net/Uri$Builder;",
+                &[segment],
+            )?;
+            // AOSP appends String.valueOf(mItems.size()) of the *new*
+            // builder's fresh list, which is always 0.
+            let segment = jstr(vm, "0")?;
+            vm.invoke_instance(
+                builder,
+                "appendPath",
+                "(Ljava/lang/String;)Landroid/net/Uri$Builder;",
+                &[segment],
+            )?;
+            let uri = vm.invoke_instance(builder, "build", "()Landroid/net/Uri;", &[])?;
+            p35c_slice_builder_init(vm, recv, uri, Value::Null)?;
+            Value::Null
+        }
+        ("setCallerNeeded", "(Z)Landroid/app/slice/Slice$Builder;") => {
+            let Some(hints) = field_obj(vm, recv, "mHints") else {
+                return Err(npe(""));
+            };
+            let hint = jstr(vm, "caller_needed")?;
+            if iarg(args, 0) != 0 {
+                vm.invoke_instance(hints, "add", "(Ljava/lang/Object;)Z", &[hint])?;
+            } else {
+                vm.invoke_instance(hints, "remove", "(Ljava/lang/Object;)Z", &[hint])?;
+            }
+            Value::Obj(recv)
+        }
+        ("addHints", "(Ljava/util/List;)Landroid/app/slice/Slice$Builder;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe(""));
+            }
+            let Some(hints) = field_obj(vm, recv, "mHints") else {
+                return Err(npe(""));
+            };
+            for hint in collection_items(vm, args.first()) {
+                vm.invoke_instance(hints, "add", "(Ljava/lang/Object;)Z", &[hint])?;
+            }
+            Value::Obj(recv)
+        }
+        ("setSpec", "(Landroid/app/slice/SliceSpec;)Landroid/app/slice/Slice$Builder;") => {
+            put(vm, recv, "mSpec", p35_arg(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("addSubSlice", "(Landroid/app/slice/Slice;Ljava/lang/String;)Landroid/app/slice/Slice$Builder;") => {
+            let Some(slice) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            let hints = p35c_slice_hints_array(vm, slice)?;
+            let item = p35c_new_slice_item(vm, Value::Obj(slice), "slice", p35_arg(args, 1), hints, true)?;
+            p35c_builder_add(vm, recv, item)?;
+            Value::Obj(recv)
+        }
+        (
+            "addAction",
+            "(Landroid/app/PendingIntent;Landroid/app/slice/Slice;Ljava/lang/String;)Landroid/app/slice/Slice$Builder;",
+        ) => {
+            let Some(action) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            let Some(slice) = oarg(args, 1) else {
+                return Err(npe(""));
+            };
+            let hints = p35c_slice_hints_array(vm, slice)?;
+            // AOSP detaches the sub-slice from its spec here.
+            put(vm, slice, "mSpec", Value::Null)?;
+            let item = alloc_obj(vm, P35C_SLICE_ITEM, Vec::new())?;
+            let format = jstr(vm, "action")?;
+            vm.invoke_instance(
+                item,
+                "<init>",
+                "(Landroid/app/PendingIntent;Landroid/app/slice/Slice;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)V",
+                &[Value::Obj(action), Value::Obj(slice), format, p35_arg(args, 2), hints],
+            )?;
+            p35c_builder_add(vm, recv, item)?;
+            Value::Obj(recv)
+        }
+        ("addText", "(Ljava/lang/CharSequence;Ljava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;") => {
+            let item = p35c_new_slice_item(vm, p35_arg(args, 0), "text", p35_arg(args, 1), p35_arg(args, 2), false)?;
+            p35c_builder_add(vm, recv, item)?;
+            Value::Obj(recv)
+        }
+        ("addIcon", "(Landroid/graphics/drawable/Icon;Ljava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe(""));
+            }
+            let item = p35c_new_slice_item(vm, p35_arg(args, 0), "image", p35_arg(args, 1), p35_arg(args, 2), false)?;
+            p35c_builder_add(vm, recv, item)?;
+            Value::Obj(recv)
+        }
+        ("addRemoteInput", "(Landroid/app/RemoteInput;Ljava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe(""));
+            }
+            let item = p35c_new_slice_item(vm, p35_arg(args, 0), "input", p35_arg(args, 1), p35_arg(args, 2), false)?;
+            p35c_builder_add(vm, recv, item)?;
+            Value::Obj(recv)
+        }
+        ("addInt", "(ILjava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;") => {
+            let boxed = vm.invoke_static(
+                "Ljava/lang/Integer;",
+                "valueOf",
+                "(I)Ljava/lang/Integer;",
+                &[Value::Int(iarg(args, 0))],
+            )?;
+            let item = p35c_new_slice_item(vm, boxed, "int", p35_arg(args, 1), p35_arg(args, 2), false)?;
+            p35c_builder_add(vm, recv, item)?;
+            Value::Obj(recv)
+        }
+        ("addLong", "(JLjava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;") => {
+            if oarg(args, 2).is_none() {
+                return Err(npe(""));
+            }
+            let hints = p35c_string_array(vm, collection_items(vm, args.get(2)))?;
+            let boxed = vm.invoke_static(
+                "Ljava/lang/Long;",
+                "valueOf",
+                "(J)Ljava/lang/Long;",
+                &[Value::Long(p35c_larg(args, 0))],
+            )?;
+            let item = p35c_new_slice_item(vm, boxed, "long", p35_arg(args, 1), hints, true)?;
+            p35c_builder_add(vm, recv, item)?;
+            Value::Obj(recv)
+        }
+        ("addTimestamp", "(JLjava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;") => {
+            vm.invoke_instance(
+                recv,
+                "addLong",
+                "(JLjava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;",
+                args,
+            )?
+        }
+        ("addBundle", "(Landroid/os/Bundle;Ljava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe(""));
+            }
+            let item = p35c_new_slice_item(vm, p35_arg(args, 0), "bundle", p35_arg(args, 1), p35_arg(args, 2), false)?;
+            p35c_builder_add(vm, recv, item)?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/app/slice/Slice;") => {
+            let hints = p35c_string_array(vm, collection_items(vm, Some(&get(vm, recv, "mHints"))))?;
+            let slice = alloc_obj(vm, P35C_SLICE, Vec::new())?;
+            vm.invoke_instance(
+                slice,
+                "<init>",
+                "(Ljava/util/ArrayList;[Ljava/lang/String;Landroid/net/Uri;Landroid/app/slice/SliceSpec;)V",
+                &[
+                    get(vm, recv, "mItems"),
+                    hints,
+                    get(vm, recv, "mUri"),
+                    get(vm, recv, "mSpec"),
+                ],
+            )?;
+            Value::Obj(slice)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35c_slice_manager_instance(
+    _vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    _recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // There is no "slice" system service in this profile, so
+    // ServiceManager.getServiceOrThrow(Context.SLICE_SERVICE) fails.
+    if (name, sig) == ("<init>", "(Landroid/content/Context;Landroid/os/Handler;)V") {
+        return Err(throw(
+            "Landroid/os/ServiceManager$ServiceNotFoundException;",
+            "No service published for: slice",
+        ));
+    }
+    // A SliceManager that somehow exists without the constructor (or
+    // whose service lookup yielded null) dereferences mContext/mService.
+    let _ = args;
+    match name {
+        "pinSlice"
+        | "unpinSlice"
+        | "hasSliceAccess"
+        | "getPinnedSpecs"
+        | "getPinnedSlices"
+        | "bindSlice"
+        | "mapIntentToUri"
+        | "getSliceDescendants"
+        | "checkSlicePermission"
+        | "grantSlicePermission"
+        | "revokeSlicePermission" => Err(npe("")),
+        _ => Ok(None),
+    }
+}
+
+fn partial35c_instance_for_class(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P35C_LOCATION => p35c_location_instance(vm, name, sig, recv, args),
+        P35C_CRITERIA => p35c_criteria_instance(vm, name, sig, recv, args),
+        P35C_SLICE_SPEC => p35c_slice_spec_instance(vm, name, sig, recv, args),
+        P35C_SLICE_ITEM => p35c_slice_item_instance(vm, name, sig, recv, args),
+        P35C_SLICE => p35c_slice_instance(vm, name, sig, recv, args),
+        P35C_SLICE_BUILDER => p35c_slice_builder_instance(vm, name, sig, recv, args),
+        P35C_SLICE_MANAGER => p35c_slice_manager_instance(vm, name, sig, recv, args),
+        _ => Ok(None),
+    }
+}
+
+pub(crate) fn partial35c_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    for class in [recv_class, mref_class] {
+        if p35c_class(class) {
+            let value = partial35c_instance_for_class(vm, class, name, sig, recv, args)?;
+            if value.is_some() {
+                return Ok(value);
+            }
+        }
+    }
+    let actual = class_of(vm, recv);
+    if actual != recv_class && actual != mref_class && p35c_class(&actual) {
+        return partial35c_instance_for_class(vm, &actual, name, sig, recv, args);
+    }
+    Ok(None)
+}
+
+pub(crate) fn partial35c_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class != P35C_LOCATION {
+        return Ok(None);
+    }
+    let value = match (name, sig) {
+        ("convert", "(DI)Ljava/lang/String;") => {
+            let text = p35c_location_convert_to_string(p35c_darg(args, 0), iarg(args, 1))?;
+            jstr(vm, text)?
+        }
+        ("convert", "(Ljava/lang/String;)D") => {
+            let Some(input) = opt_str(vm, args.first()) else {
+                return Err(npe(""));
+            };
+            Value::Double(p35c_location_convert_from_string(&input)?)
+        }
+        ("distanceBetween", "(DDDD[F)V") => {
+            let Some(results) = oarg(args, 4) else {
+                return Err(iae("results is null or has length < 1"));
+            };
+            if array_elems(vm, args.get(4)).is_empty() {
+                return Err(iae("results is null or has length < 1"));
+            }
+            let (distance, initial, r#final) = p35c_compute_distance_bearing(
+                p35c_darg(args, 0),
+                p35c_darg(args, 1),
+                p35c_darg(args, 2),
+                p35c_darg(args, 3),
+            );
+            let elems = vm.heap.array_elems_mut(results)?;
+            elems[0] = Value::Float(distance);
+            if elems.len() > 1 {
+                elems[1] = Value::Float(initial);
+                if elems.len() > 2 {
+                    elems[2] = Value::Float(r#final);
+                }
+            }
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+pub(crate) fn partial35c_host_static(
+    vm: &mut Engine,
+    class: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    let text = match (class, field) {
+        (P35C_LOCATION, "EXTRA_NO_GPS_LOCATION") => Some("noGPSLocation"),
+        (P35C_SLICE_ITEM, "FORMAT_SLICE") => Some("slice"),
+        (P35C_SLICE_ITEM, "FORMAT_TEXT") => Some("text"),
+        (P35C_SLICE_ITEM, "FORMAT_IMAGE") => Some("image"),
+        (P35C_SLICE_ITEM, "FORMAT_ACTION") => Some("action"),
+        (P35C_SLICE_ITEM, "FORMAT_INT") => Some("int"),
+        (P35C_SLICE_ITEM, "FORMAT_LONG") => Some("long"),
+        (P35C_SLICE_ITEM, "FORMAT_TIMESTAMP") => Some("long"),
+        (P35C_SLICE_ITEM, "FORMAT_REMOTE_INPUT") => Some("input"),
+        (P35C_SLICE_ITEM, "FORMAT_BUNDLE") => Some("bundle"),
+        (P35C_SLICE, "HINT_SHORTCUT") => Some("shortcut"),
+        (P35C_SLICE, "HINT_SUMMARY") => Some("summary"),
+        (P35C_SLICE, "HINT_TOGGLE") => Some("toggle"),
+        (P35C_SLICE, "HINT_HORIZONTAL") => Some("horizontal"),
+        (P35C_SLICE, "HINT_SEE_MORE") => Some("see_more"),
+        (P35C_SLICE, "HINT_CALLER_NEEDED") => Some("caller_needed"),
+        (P35C_SLICE, "HINT_KEYWORDS") => Some("keywords"),
+        (P35C_SLICE, "HINT_ERROR") => Some("error"),
+        (P35C_SLICE, "HINT_TTL") => Some("ttl"),
+        (P35C_SLICE, "HINT_LAST_UPDATED") => Some("last_updated"),
+        (P35C_SLICE, "HINT_PERMISSION_REQUEST") => Some("permission_request"),
+        (P35C_SLICE, "SUBTYPE_LAYOUT_DIRECTION") => Some("layout_direction"),
+        (P35C_SLICE, "EXTRA_TOGGLE_STATE") => Some("android.app.slice.extra.TOGGLE_STATE"),
+        (P35C_SLICE, "EXTRA_SLIDER_VALUE") => Some("android.app.slice.extra.SLIDER_VALUE"),
+        (P35C_SLICE, "EXTRA_RANGE_VALUE") => Some("android.app.slice.extra.RANGE_VALUE"),
+        (P35C_SLICE, "SUBTYPE_MESSAGE") => Some("message"),
+        (P35C_SLICE, "SUBTYPE_SOURCE") => Some("source"),
+        (P35C_SLICE, "SUBTYPE_COLOR") => Some("color"),
+        (P35C_SLICE, "SUBTYPE_SLIDER") => Some("slider"),
+        (P35C_SLICE, "SUBTYPE_RANGE") => Some("range"),
+        (P35C_SLICE, "SUBTYPE_MAX") => Some("max"),
+        (P35C_SLICE, "SUBTYPE_VALUE") => Some("value"),
+        (P35C_SLICE, "SUBTYPE_TOGGLE") => Some("toggle"),
+        (P35C_SLICE, "SUBTYPE_PRIORITY") => Some("priority"),
+        (P35C_SLICE, "SUBTYPE_CONTENT_DESCRIPTION") => Some("content_description"),
+        (P35C_SLICE, "SUBTYPE_MILLIS") => Some("millis"),
+        (P35C_SLICE_MANAGER, "ACTION_REQUEST_SLICE_PERMISSION") => {
+            Some("com.android.intent.action.REQUEST_SLICE_PERMISSION")
+        }
+        (P35C_SLICE_MANAGER, "CATEGORY_SLICE") => Some("android.app.slice.category.SLICE"),
+        (P35C_SLICE_MANAGER, "SLICE_METADATA_KEY") => Some("android.metadata.SLICE_URI"),
+        _ => None,
+    };
+    if let Some(text) = text {
+        return jstr(vm, text).map(Some);
+    }
+    let int_value = match (class, field) {
+        (P35C_LOCATION, "FORMAT_DEGREES") => Some(0),
+        (P35C_LOCATION, "FORMAT_MINUTES") => Some(1),
+        (P35C_LOCATION, "FORMAT_SECONDS") => Some(2),
+        (P35C_CRITERIA, "NO_REQUIREMENT") => Some(0),
+        (P35C_CRITERIA, "POWER_LOW") => Some(1),
+        (P35C_CRITERIA, "POWER_MEDIUM") => Some(2),
+        (P35C_CRITERIA, "POWER_HIGH") => Some(3),
+        (P35C_CRITERIA, "ACCURACY_FINE") => Some(1),
+        (P35C_CRITERIA, "ACCURACY_COARSE") => Some(2),
+        (P35C_CRITERIA, "ACCURACY_LOW") => Some(1),
+        (P35C_CRITERIA, "ACCURACY_MEDIUM") => Some(2),
+        (P35C_CRITERIA, "ACCURACY_HIGH") => Some(3),
         _ => None,
     };
     Ok(int_value.map(Value::Int))
