@@ -890,15 +890,15 @@ key_apis = ["android.hardware.camera2.params.StreamConfigurationMap.getOutputSiz
 id = "android-hardware-camera-legacy"
 prefix = "android.hardware.Camera"
 domain = "camera"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "legacy"
-notes = "Legacy android.hardware.Camera preview/capture is not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Legacy Camera is modelled for a profile with no legacy camera device or camera service: getNumberOfCameras returns zero, open() returns null, getCameraInfo and camera-ID construction retain AOSP/native RuntimeExceptions, openLegacy retains HAL-version validation before connection failure, checkInitErrors is exact, and CameraInfo defaults plus Size/Area public value equality are guest-visible. Connected Camera objects, Parameters flattening/capabilities, preview, capture, callbacks, and camera service access are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-hardware-camera-legacy"
-key_apis = ["android.hardware.Camera.open", "android.hardware.Camera.startPreview"]
+key_apis = ["android.hardware.Camera.getNumberOfCameras", "android.hardware.Camera.open", "android.hardware.Camera.getCameraInfo", "android.hardware.Camera.Size.equals", "android.hardware.Camera.Area.equals"]
 
 # ===================== Hardware =====================
 [[surface]]
@@ -1160,15 +1160,15 @@ key_apis = ["android.bluetooth.le.BluetoothLeScanner.startScan", "android.blueto
 id = "android-nfc"
 prefix = "android.nfc"
 domain = "connectivity"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "M10"
-notes = "NFC adapter, tag dispatch and NDEF reader/writer flows are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "NFC follows the AOSP factory chain on a device whose PackageManager profile advertises no NFC/card-emulation feature and has no NFC service manager: Context NFC_SERVICE yields NfcManager, its constructor resolves the application context and probes the relevant features before storing a null adapter, and NfcAdapter.getDefaultAdapter retains null-context validation before returning that null. Adapter state/control, tag discovery/dispatch, NDEF I/O, reader mode, and peer/handover flows are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-nfc"
-key_apis = ["android.nfc.NfcAdapter.getDefaultAdapter", "android.nfc.Tag"]
+key_apis = ["android.nfc.NfcAdapter.getDefaultAdapter", "android.nfc.NfcManager.getDefaultAdapter"]
 
 [[surface]]
 id = "android-nfc-cardemulation"

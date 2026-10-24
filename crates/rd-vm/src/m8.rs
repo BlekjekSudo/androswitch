@@ -2288,6 +2288,7 @@ const SERVICES: &[(&str, &str)] = &[
         "companiondevice",
         "Landroid/companion/CompanionDeviceManager;",
     ),
+    ("nfc", "Landroid/nfc/NfcManager;"),
 ];
 
 fn system_service_class(key: &str) -> &'static str {

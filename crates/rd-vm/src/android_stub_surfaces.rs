@@ -440,6 +440,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial36a_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36b_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -599,6 +602,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial36a_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36b_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -689,6 +695,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial36a_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial36b_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -41079,4 +41088,425 @@ pub(crate) fn partial36a_host_static(
         }
         _ => None,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 36-B: android.hardware.Camera + android.nfc.
+// The VM phone profile has no legacy camera device/service and does not
+// advertise NFC or card-emulation features. Camera therefore follows the
+// native no-camera enumeration/connect failures, while its public
+// Size/Area/CameraInfo values retain AOSP semantics. NFC follows the real
+// Context -> NfcManager -> NfcAdapter factory chain to the documented null.
+// ---------------------------------------------------------------------------
+
+const P36B_CAMERA: &str = "Landroid/hardware/Camera;";
+const P36B_CAMERA_INFO: &str = "Landroid/hardware/Camera$CameraInfo;";
+const P36B_CAMERA_SIZE: &str = "Landroid/hardware/Camera$Size;";
+const P36B_CAMERA_AREA: &str = "Landroid/hardware/Camera$Area;";
+const P36B_NFC_ADAPTER: &str = "Landroid/nfc/NfcAdapter;";
+const P36B_NFC_MANAGER: &str = "Landroid/nfc/NfcManager;";
+
+fn p36b_class(c: &str) -> bool {
+    matches!(
+        c,
+        P36B_CAMERA
+            | P36B_CAMERA_INFO
+            | P36B_CAMERA_SIZE
+            | P36B_CAMERA_AREA
+            | P36B_NFC_ADAPTER
+            | P36B_NFC_MANAGER
+    )
+}
+
+fn p36b_camera_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    _recv: ObjRef,
+    _args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        // Package-private empty constructor used by openUninitialized().
+        ("<init>", "()V") => Value::Null,
+        // Camera(int) calls native_setup. Without a camera service it
+        // returns -EACCES, which the constructor maps to this exception.
+        ("<init>", "(I)V") => {
+            return Err(throw(
+                "Ljava/lang/RuntimeException;",
+                "Fail to connect to camera service",
+            ));
+        }
+        _ => return Ok(None),
+    };
+    let _ = vm;
+    Ok(Some(value))
+}
+
+fn p36b_camera_info_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    _args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if (name, sig) != ("<init>", "()V") {
+        return Ok(None);
+    }
+    put(vm, recv, "facing", Value::Int(0))?;
+    put(vm, recv, "orientation", Value::Int(0))?;
+    put(vm, recv, "canDisableShutterSound", Value::Int(0))?;
+    Ok(Some(Value::Null))
+}
+
+fn p36b_camera_size_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/hardware/Camera;II)V") => {
+            put(vm, recv, "this$0", p36a_value(args, 0))?;
+            put(vm, recv, "width", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "height", Value::Int(iarg(args, 2)))?;
+            Value::Null
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let Some(other) = oarg(args, 0) else {
+                return Ok(Some(Value::Int(0)));
+            };
+            Value::Int(
+                (vm.cp.is_subtype(&class_of(vm, other), P36B_CAMERA_SIZE)
+                    && field_int(vm, recv, "width") == field_int(vm, other, "width")
+                    && field_int(vm, recv, "height") == field_int(vm, other, "height"))
+                    as i32,
+            )
+        }
+        ("hashCode", "()I") => Value::Int(
+            field_int(vm, recv, "width")
+                .wrapping_mul(32713)
+                .wrapping_add(field_int(vm, recv, "height")),
+        ),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36b_camera_area_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/graphics/Rect;I)V") => {
+            put(vm, recv, "rect", p36a_value(args, 0))?;
+            put(vm, recv, "weight", Value::Int(iarg(args, 1)))?;
+            Value::Null
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let Some(other) = oarg(args, 0) else {
+                return Ok(Some(Value::Int(0)));
+            };
+            if !vm.cp.is_subtype(&class_of(vm, other), P36B_CAMERA_AREA) {
+                return Ok(Some(Value::Int(0)));
+            }
+            let rect = get(vm, recv, "rect");
+            let other_rect = get(vm, other, "rect");
+            let rect_equal = match rect {
+                Value::Obj(rect) => {
+                    vm.invoke_instance(rect, "equals", "(Ljava/lang/Object;)Z", &[other_rect])?
+                        .as_int()
+                        .unwrap_or(0)
+                        != 0
+                }
+                _ => !matches!(other_rect, Value::Obj(_)),
+            };
+            Value::Int(
+                (rect_equal && field_int(vm, recv, "weight") == field_int(vm, other, "weight"))
+                    as i32,
+            )
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36b_application_context(vm: &mut Engine, context: ObjRef) -> Result<ObjRef, VmExit> {
+    let application = vm.invoke_instance(
+        context,
+        "getApplicationContext",
+        "()Landroid/content/Context;",
+        &[],
+    )?;
+    match application {
+        Value::Obj(reference) => Ok(reference),
+        _ => Err(iae(
+            "context not associated with any application (using a mock context?)",
+        )),
+    }
+}
+
+fn p36b_has_system_feature(
+    vm: &mut Engine,
+    context: ObjRef,
+    feature: &str,
+) -> Result<bool, VmExit> {
+    let pm = vm.invoke_instance(
+        context,
+        "getPackageManager",
+        "()Landroid/content/pm/PackageManager;",
+        &[],
+    )?;
+    let Value::Obj(pm) = pm else {
+        return Err(npe(""));
+    };
+    let feature = jstr(vm, feature)?;
+    Ok(vm
+        .invoke_instance(pm, "hasSystemFeature", "(Ljava/lang/String;)Z", &[feature])?
+        .as_int()
+        .unwrap_or(0)
+        != 0)
+}
+
+fn p36b_has_any_nfc_feature(vm: &mut Engine, context: ObjRef) -> Result<bool, VmExit> {
+    for feature in [
+        "android.hardware.nfc",
+        "android.hardware.nfc.hce",
+        "android.hardware.nfc.hcef",
+        "android.hardware.nfc.uicc",
+        "android.hardware.nfc.ese",
+    ] {
+        if p36b_has_system_feature(vm, context, feature)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn p36b_nfc_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/content/Context;)V") => {
+            let Some(context) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            let application = p36b_application_context(vm, context)?;
+            // NfcManager catches getNfcAdapter's
+            // UnsupportedOperationException for a device without NFC/CE
+            // features (and for a missing NFC service manager) and stores
+            // a null adapter.
+            let _has_feature = p36b_has_any_nfc_feature(vm, application)?;
+            put(vm, recv, "mAdapter", Value::Null)?;
+            Value::Null
+        }
+        ("getDefaultAdapter", "()Landroid/nfc/NfcAdapter;") => get(vm, recv, "mAdapter"),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36b_nfc_adapter_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    _args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("getContext", "()Landroid/content/Context;") => get(vm, recv, "mContext"),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn partial36b_instance_for_class(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P36B_CAMERA => p36b_camera_instance(vm, name, sig, recv, args),
+        P36B_CAMERA_INFO => p36b_camera_info_instance(vm, name, sig, recv, args),
+        P36B_CAMERA_SIZE => p36b_camera_size_instance(vm, name, sig, recv, args),
+        P36B_CAMERA_AREA => p36b_camera_area_instance(vm, name, sig, recv, args),
+        P36B_NFC_MANAGER => p36b_nfc_manager_instance(vm, name, sig, recv, args),
+        P36B_NFC_ADAPTER => p36b_nfc_adapter_instance(vm, name, sig, recv, args),
+        _ => Ok(None),
+    }
+}
+
+pub(crate) fn partial36b_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    for class in [recv_class, mref_class] {
+        if p36b_class(class) {
+            let value = partial36b_instance_for_class(vm, class, name, sig, recv, args)?;
+            if value.is_some() {
+                return Ok(value);
+            }
+        }
+    }
+    let actual = class_of(vm, recv);
+    if actual != recv_class && actual != mref_class && p36b_class(&actual) {
+        return partial36b_instance_for_class(vm, &actual, name, sig, recv, args);
+    }
+    Ok(None)
+}
+
+fn p36b_camera_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("getNumberOfCameras", "()I") => Value::Int(0),
+        ("getCameraInfo", "(ILandroid/hardware/Camera$CameraInfo;)V")
+        | ("_getCameraInfo", "(IZLandroid/hardware/Camera$CameraInfo;)V") => {
+            return Err(throw("Ljava/lang/RuntimeException;", "Unknown camera ID"));
+        }
+        ("open", "()Landroid/hardware/Camera;") => {
+            let count = vm.invoke_static(P36B_CAMERA, "getNumberOfCameras", "()I", &[])?;
+            if count.as_int().unwrap_or(0) != 0 {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("open", "(I)Landroid/hardware/Camera;") => {
+            let camera = alloc_obj(vm, P36B_CAMERA, Vec::new())?;
+            vm.invoke_instance(camera, "<init>", "(I)V", &[Value::Int(iarg(args, 0))])?
+        }
+        ("openLegacy", "(II)Landroid/hardware/Camera;") => {
+            let hal_version = iarg(args, 1);
+            if hal_version < 0x300 {
+                return Err(iae(format!("Unsupported HAL version {hal_version}")));
+            }
+            let camera = alloc_obj(vm, P36B_CAMERA, Vec::new())?;
+            vm.invoke_instance(camera, "<init>", "(I)V", &[Value::Int(iarg(args, 0))])?
+        }
+        ("openUninitialized", "()Landroid/hardware/Camera;") => {
+            let camera = alloc_obj(vm, P36B_CAMERA, Vec::new())?;
+            vm.invoke_instance(camera, "<init>", "()V", &[])?;
+            Value::Obj(camera)
+        }
+        ("checkInitErrors", "(I)Z") => Value::Int((iarg(args, 0) != 0) as i32),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36b_nfc_adapter_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if (name, sig)
+        != (
+            "getDefaultAdapter",
+            "(Landroid/content/Context;)Landroid/nfc/NfcAdapter;",
+        )
+    {
+        return Ok(None);
+    }
+    let Some(context) = oarg(args, 0) else {
+        return Err(iae("context cannot be null"));
+    };
+    let application = p36b_application_context(vm, context)?;
+    let service_name = jstr(vm, "nfc")?;
+    let manager = vm.invoke_instance(
+        application,
+        "getSystemService",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+        &[service_name],
+    )?;
+    let Value::Obj(manager) = manager else {
+        return Ok(Some(Value::Null));
+    };
+    vm.invoke_instance(
+        manager,
+        "getDefaultAdapter",
+        "()Landroid/nfc/NfcAdapter;",
+        &[],
+    )
+    .map(Some)
+}
+
+pub(crate) fn partial36b_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P36B_CAMERA => p36b_camera_static(vm, name, sig, args),
+        P36B_NFC_ADAPTER => p36b_nfc_adapter_static(vm, name, sig, args),
+        _ => Ok(None),
+    }
+}
+
+pub(crate) fn partial36b_host_static(
+    vm: &mut Engine,
+    class: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    let text = match (class, field) {
+        (P36B_CAMERA, "ACTION_NEW_PICTURE") => Some("android.hardware.action.NEW_PICTURE"),
+        (P36B_CAMERA, "ACTION_NEW_VIDEO") => Some("android.hardware.action.NEW_VIDEO"),
+        (P36B_NFC_ADAPTER, "ACTION_NDEF_DISCOVERED") => Some("android.nfc.action.NDEF_DISCOVERED"),
+        (P36B_NFC_ADAPTER, "ACTION_TECH_DISCOVERED") => Some("android.nfc.action.TECH_DISCOVERED"),
+        (P36B_NFC_ADAPTER, "ACTION_TAG_DISCOVERED") => Some("android.nfc.action.TAG_DISCOVERED"),
+        (P36B_NFC_ADAPTER, "ACTION_TRANSACTION_DETECTED") => {
+            Some("android.nfc.action.TRANSACTION_DETECTED")
+        }
+        (P36B_NFC_ADAPTER, "ACTION_PREFERRED_PAYMENT_CHANGED") => {
+            Some("android.nfc.action.PREFERRED_PAYMENT_CHANGED")
+        }
+        (P36B_NFC_ADAPTER, "ACTION_TAG_LEFT_FIELD") => Some("android.nfc.action.TAG_LOST"),
+        (P36B_NFC_ADAPTER, "ACTION_ADAPTER_STATE_CHANGED") => {
+            Some("android.nfc.action.ADAPTER_STATE_CHANGED")
+        }
+        (P36B_NFC_ADAPTER, "EXTRA_TAG") => Some("android.nfc.extra.TAG"),
+        (P36B_NFC_ADAPTER, "EXTRA_NDEF_MESSAGES") => Some("android.nfc.extra.NDEF_MESSAGES"),
+        (P36B_NFC_ADAPTER, "EXTRA_ID") => Some("android.nfc.extra.ID"),
+        (P36B_NFC_ADAPTER, "EXTRA_ADAPTER_STATE") => Some("android.nfc.extra.ADAPTER_STATE"),
+        _ => None,
+    };
+    if let Some(text) = text {
+        return jstr(vm, text).map(Some);
+    }
+    let int_value = match (class, field) {
+        (P36B_CAMERA, "CAMERA_HAL_API_VERSION_1_0") => Some(0x100),
+        (P36B_CAMERA, "CAMERA_HAL_API_VERSION_3_0") => Some(0x300),
+        (P36B_CAMERA, "CAMERA_ERROR_UNKNOWN") => Some(1),
+        (P36B_CAMERA, "CAMERA_ERROR_EVICTED") => Some(2),
+        (P36B_CAMERA, "CAMERA_ERROR_DISABLED") => Some(3),
+        (P36B_CAMERA, "CAMERA_ERROR_SERVER_DIED") => Some(100),
+        (P36B_CAMERA_INFO, "CAMERA_FACING_BACK") => Some(0),
+        (P36B_CAMERA_INFO, "CAMERA_FACING_FRONT") => Some(1),
+        (P36B_NFC_ADAPTER, "STATE_OFF") => Some(1),
+        (P36B_NFC_ADAPTER, "STATE_TURNING_ON") => Some(2),
+        (P36B_NFC_ADAPTER, "STATE_ON") => Some(3),
+        (P36B_NFC_ADAPTER, "STATE_TURNING_OFF") => Some(4),
+        _ => None,
+    };
+    Ok(int_value.map(Value::Int))
 }

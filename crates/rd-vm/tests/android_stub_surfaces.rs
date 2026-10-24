@@ -14808,3 +14808,256 @@ fn identity_without_credstore_is_guest_visible() {
         "Ljava/lang/UnsupportedOperationException;",
     );
 }
+
+// ---- Appendix C Batch 36-B: android.hardware.Camera + android.nfc ----
+
+const P36B_CAMERA: &str = "Landroid/hardware/Camera;";
+const P36B_CAMERA_INFO: &str = "Landroid/hardware/Camera$CameraInfo;";
+const P36B_CAMERA_SIZE: &str = "Landroid/hardware/Camera$Size;";
+const P36B_CAMERA_AREA: &str = "Landroid/hardware/Camera$Area;";
+const P36B_NFC_ADAPTER: &str = "Landroid/nfc/NfcAdapter;";
+const P36B_NFC_MANAGER: &str = "Landroid/nfc/NfcManager;";
+
+#[test]
+fn legacy_camera_without_a_camera_and_values_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    assert_eq!(
+        call_static(&mut engine, P36B_CAMERA, "getNumberOfCameras", "()I", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36B_CAMERA,
+            "open",
+            "()Landroid/hardware/Camera;",
+            &[],
+        ),
+        Value::Null
+    );
+
+    let info = p49_new(&mut engine, P36B_CAMERA_INFO, "()V", &[]);
+    assert_eq!(field(&engine, info, "facing"), Value::Int(0));
+    assert_eq!(field(&engine, info, "orientation"), Value::Int(0));
+    assert_eq!(
+        field(&engine, info, "canDisableShutterSound"),
+        Value::Int(0)
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36B_CAMERA,
+            "getCameraInfo",
+            "(ILandroid/hardware/Camera$CameraInfo;)V",
+            &[Value::Int(0), Value::Obj(info)],
+        ),
+        "Ljava/lang/RuntimeException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36B_CAMERA,
+            "open",
+            "(I)Landroid/hardware/Camera;",
+            &[Value::Int(0)],
+        ),
+        "Ljava/lang/RuntimeException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36B_CAMERA,
+            "openLegacy",
+            "(II)Landroid/hardware/Camera;",
+            &[Value::Int(0), Value::Int(0x100)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36B_CAMERA,
+            "openLegacy",
+            "(II)Landroid/hardware/Camera;",
+            &[Value::Int(0), Value::Int(0x300)],
+        ),
+        "Ljava/lang/RuntimeException;",
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36B_CAMERA,
+            "checkInitErrors",
+            "(I)Z",
+            &[Value::Int(0)],
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36B_CAMERA,
+            "checkInitErrors",
+            "(I)Z",
+            &[Value::Int(-13)],
+        ),
+        Value::Int(1)
+    );
+
+    // The hidden testing constructor does not connect to a device, but
+    // supplies the enclosing instance required by Camera.Size.
+    let camera = object(call_static(
+        &mut engine,
+        P36B_CAMERA,
+        "openUninitialized",
+        "()Landroid/hardware/Camera;",
+        &[],
+    ));
+    let size = p49_new(
+        &mut engine,
+        P36B_CAMERA_SIZE,
+        "(Landroid/hardware/Camera;II)V",
+        &[Value::Obj(camera), Value::Int(640), Value::Int(480)],
+    );
+    let same_size = p49_new(
+        &mut engine,
+        P36B_CAMERA_SIZE,
+        "(Landroid/hardware/Camera;II)V",
+        &[Value::Obj(camera), Value::Int(640), Value::Int(480)],
+    );
+    let other_size = p49_new(
+        &mut engine,
+        P36B_CAMERA_SIZE,
+        "(Landroid/hardware/Camera;II)V",
+        &[Value::Obj(camera), Value::Int(800), Value::Int(480)],
+    );
+    assert_eq!(field(&engine, size, "width"), Value::Int(640));
+    assert_eq!(field(&engine, size, "height"), Value::Int(480));
+    assert_eq!(
+        call(
+            &mut engine,
+            size,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(same_size)],
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            size,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(other_size)],
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            size,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Null],
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, size, "hashCode", "()I", &[]),
+        Value::Int(640 * 32713 + 480)
+    );
+
+    let area = p49_new(
+        &mut engine,
+        P36B_CAMERA_AREA,
+        "(Landroid/graphics/Rect;I)V",
+        &[Value::Null, Value::Int(37)],
+    );
+    let same_area = p49_new(
+        &mut engine,
+        P36B_CAMERA_AREA,
+        "(Landroid/graphics/Rect;I)V",
+        &[Value::Null, Value::Int(37)],
+    );
+    assert_eq!(field(&engine, area, "rect"), Value::Null);
+    assert_eq!(field(&engine, area, "weight"), Value::Int(37));
+    assert_eq!(
+        call(
+            &mut engine,
+            area,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(same_area)],
+        ),
+        Value::Int(1)
+    );
+}
+
+#[test]
+fn nfc_without_nfc_feature_or_service_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, CONTEXT);
+    let service_name = text(&mut engine, "nfc");
+    let service = object(call(
+        &mut engine,
+        context,
+        "getSystemService",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+        &[service_name],
+    ));
+    assert!(engine.cp.is_subtype(P36B_NFC_MANAGER, "Ljava/lang/Object;"));
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "getDefaultAdapter",
+            "()Landroid/nfc/NfcAdapter;",
+            &[],
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36B_NFC_ADAPTER,
+            "getDefaultAdapter",
+            "(Landroid/content/Context;)Landroid/nfc/NfcAdapter;",
+            &[Value::Obj(context)],
+        ),
+        Value::Null
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36B_NFC_ADAPTER,
+            "getDefaultAdapter",
+            "(Landroid/content/Context;)Landroid/nfc/NfcAdapter;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    let manager = p49_new(
+        &mut engine,
+        P36B_NFC_MANAGER,
+        "(Landroid/content/Context;)V",
+        &[Value::Obj(context)],
+    );
+    assert_eq!(field(&engine, manager, "mAdapter"), Value::Null);
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getDefaultAdapter",
+            "()Landroid/nfc/NfcAdapter;",
+            &[],
+        ),
+        Value::Null
+    );
+    let rejected = instance(&mut engine, P36B_NFC_MANAGER);
+    assert_throws(
+        engine.invoke_instance(
+            rejected,
+            "<init>",
+            "(Landroid/content/Context;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+}

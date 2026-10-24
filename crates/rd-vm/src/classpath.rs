@@ -1971,6 +1971,14 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Landroid/security/identity/IdentityCredentialStore;",
             "Ljava/lang/Object;",
         ]),
+        // Appendix C Batch 36-B bounded android.hardware.Camera /
+        // android.nfc slices.
+        "Landroid/hardware/Camera;"
+        | "Landroid/hardware/Camera$CameraInfo;"
+        | "Landroid/hardware/Camera$Size;"
+        | "Landroid/hardware/Camera$Area;"
+        | "Landroid/nfc/NfcAdapter;"
+        | "Landroid/nfc/NfcManager;" => Some(OBJECT),
         _ => None,
     }
 }
