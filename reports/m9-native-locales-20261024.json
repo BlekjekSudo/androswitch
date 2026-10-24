@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T11:23:17.376201+00:00",
+  "status": "focused_host_contracts_and_locale_arm64_compile_passed",
+  "scope": "Shared Android API26 C/POSIX/C.UTF-8 locale subset. No package branches, per-application symbol choices, or host global-locale mutation.",
+  "observed_blocker": {
+    "verification": "local-artifacts/m9/external-runs/0a1b83a592254a1a8a31ec5a8246d51f/verification.json",
+    "native_api": "newlocale",
+    "nro_sha256": "27e8a76e36f0cdb9bf2d8886832631433521db1dab0ec37581d5cfbf88061084",
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "backend": "isolated patched Ryujinx; stock result is separate",
+    "result": "The earlier NRO failed at newlocale and returned safely. This receipt verifies the new implementation through host contracts and ARM64 compilation only; product E2E is pending and must be read from a separate run bound to its exact NRO hash."
+  },
+  "abi": {
+    "reference": "AOSP android-8.0.0_r1",
+    "LC_ALL": 6,
+    "LC_ALL_MASK": "0x1fbf; bits0..12 excluding bit6",
+    "LC_GLOBAL_LOCALE": "(locale_t)-1",
+    "lconv_bytes": 96,
+    "lconv_final_field_offset": 93,
+    "tm_gmtoff_offset": 40,
+    "arm64_plain_char": "unsigned; unavailable lconv monetary bytes255",
+    "arm64_long_double": "16 bytes,113 mantissa bits; checked by target compiler assertion",
+    "handles": "Runtime-owned opaque registry entries; guest handles never passed to host libc",
+    "thread_selection": "Host TLS reached after native import bridge restores host TP; each guest worker retains an independent selection"
+  },
+  "behavior": {
+    "accepted_names": [
+      "C",
+      "POSIX",
+      "C.UTF-8",
+      "en_US.UTF-8",
+      ""
+    ],
+    "empty_name": "C.UTF-8; does not read host environment",
+    "canonical_names": [
+      "C",
+      "C.UTF-8"
+    ],
+    "initial_global": "C.UTF-8",
+    "mb_cur_max": {
+      "C": 1,
+      "C.UTF-8": 4
+    },
+    "newlocale_base": "API26 Bionic returns a distinct whole-locale object and ignores base/category selection after mask validation; valid base remains caller-owned. Mixed-category POSIX locales are not claimed.",
+    "invalid_masks_names": "EINVAL for invalid mask/null name; ENOENT for unavailable locale name",
+    "ownership": "duplocale snapshots state; uselocale query/swap preserves previous selection; invalid handles safely reject; freeing an active handle rejects with EBUSY instead of exposing freed host memory",
+    "thread_cleanup": "Actual native/GL worker exit releases selection after C++/pthread destructors; main selection survives global DSO destructors until post-quiescence native_reset",
+    "storage_cleanup": "Locale handles freed before generic guest allocation reset; private host locale objects freed only after worker quiescence",
+    "numeric_and_collation": "C decimal point, numeric parser/end-pointer/overflow semantics and identity collation; explicit private host C locale prevents ambient locale from selecting number syntax",
+    "wide_classification": "Uses real private host UTF-8 tables for Android wide-character functions; exact ICU binary-property and Unicode-version equivalence not established",
+    "time": "Converts Android tm layout; uses explicit guest offset/zone for %z/%Z, including percent escaping; no host timezone substitution for those fields",
+    "time_resource_limits": "Format <=65536 bytes; zone <=255 bytes; offset magnitude<86400 seconds; two-pass exact-size fallible temporary allocation",
+    "unavailable_time_extension": "%s returns0/ENOTSUP; not fabricated using host timezone"
+  },
+  "exports": [
+    "__ctype_get_mb_cur_max",
+    "duplocale",
+    "freelocale",
+    "isalnum_l",
+    "isalpha_l",
+    "isblank_l",
+    "iscntrl_l",
+    "isdigit_l",
+    "isgraph_l",
+    "islower_l",
+    "isprint_l",
+    "ispunct_l",
+    "isspace_l",
+    "isupper_l",
+    "iswalnum_l",
+    "iswalpha_l",
+    "iswblank_l",
+    "iswcntrl_l",
+    "iswdigit_l",
+    "iswgraph_l",
+    "iswlower_l",
+    "iswprint_l",
+    "iswpunct_l",
+    "iswspace_l",
+    "iswupper_l",
+    "iswxdigit_l",
+    "isxdigit_l",
+    "localeconv",
+    "newlocale",
+    "setlocale",
+    "strcoll",
+    "strcoll_l",
+    "strftime_l",
+    "strtod_l",
+    "strtof_l",
+    "strtol_l",
+    "strtold_l",
+    "strtoll_l",
+    "strtoul_l",
+    "strtoull_l",
+    "strxfrm_l",
+    "tolower_l",
+    "toupper_l",
+    "towlower_l",
+    "towupper_l",
+    "uselocale",
+    "wcscoll_l",
+    "wcsxfrm_l"
+  ],
+  "checks": [
+    {
+      "name": "native_locale_contracts",
+      "status": "passed",
+      "command": "wsl.exe -d Ubuntu -u root --exec /bin/bash -c \"cd /mnt/d/Dev/Switch/AndroSwitch && cc -pipe -std=gnu11 -O2 -Wall -Wextra -Werror -pthread -Iplatform/switch-smoke fixtures/m9/native-abi/locales.c platform/switch-smoke/bionic_locale.c -o local-artifacts/m9/native-abi/locales && local-artifacts/m9/native-abi/locales\"",
+      "assertions": [
+        "names/aliases/masks and unavailable names",
+        "base retained on failure, allocation failure, duplicate snapshot",
+        "Android lconv255-byte markers and LP64 layout",
+        "integer overflow/end pointers, float/long-double parsing and C decimal syntax",
+        "ASCII/EOF and accented/Greek Unicode cases",
+        "byte/wide collation and bounded transform",
+        "Android tm fields, positive/negative offsets and escaped zone percent",
+        "two real pthreads choose distinct locales, busy-free/reset protection, cleanup after exit"
+      ],
+      "binary_sha256": "8659919b90b6eb281e55ad6a0b73e088e3a1127e2596aeabf682dd1992021902"
+    },
+    {
+      "name": "existing_native_abi_regressions",
+      "status": "passed",
+      "command": "cc -pipe -std=gnu11 -O2 -Wall -Wextra -Werror -pthread -Iplatform/switch-smoke fixtures/m9/native-abi/contracts.c platform/switch-smoke/{bionic_cxx,bionic_libc,bionic_locale,bionic_io,bionic_keys,bionic_log,bionic_vfs,missing_import}.c -lm -o local-artifacts/m9/native-abi/contracts && local-artifacts/m9/native-abi/contracts (WSL Ubuntu root/non-login shell)",
+      "scope": "Existing C++ lifetimes, guards/once/keys, allocation, fortify, stdio/VFS, logging regressions with new locale object linked",
+      "binary_sha256": "1a3598a12c76f0f833c40f2890f765436a7f59743ea25417cd1b57ab789ef923"
+    },
+    {
+      "name": "strict_switch_locale_objects",
+      "status": "passed",
+      "command": "make -C platform/androswitch ../../local-artifacts/product/bionic_locale.o ../../local-artifacts/product/bionic_libc.o ../../local-artifacts/product/native.o",
+      "scope": "devkitA64/libnx -Wall -Wextra -Werror; locale/libc unchanged after compilation. One locale cleanup call was subsequently removed from generic callback finalization; final native.o/current product linking and E2E belong to parent build.",
+      "independent_windows_target_compile": "C:/devkitPro/devkitA64/bin/aarch64-none-elf-gcc.exe with product ARM64 flags compiled bionic_locale.c successfully, including LP64/quad assertions"
+    },
+    {
+      "name": "whitespace_and_format",
+      "status": "passed",
+      "command": "clang-format on new C/header/fixture; git diff --check on changed tracked files; trailing whitespace checked for new files"
+    }
+  ],
+  "primary_sources": [
+    {
+      "url": "https://raw.githubusercontent.com/aosp-mirror/platform_bionic/android-8.0.0_r1/libc/include/locale.h",
+      "contract": "Android category masks, global sentinel and lconv field layout"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/aosp-mirror/platform_bionic/android-8.0.0_r1/libc/bionic/locale.cpp",
+      "contract": "Supported names, whole-locale/base behavior, mb_cur_max, default UTF-8 and errno failures"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/aosp-mirror/platform_bionic/android-8.0.0_r1/libc/bionic/ctype.cpp",
+      "contract": "Byte _l classifications use shared C behavior"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/aosp-mirror/platform_bionic/android-8.0.0_r1/libc/bionic/wctype.cpp",
+      "contract": "Wide functions use Unicode classification independently of locale selection; exact ICU mapping remains a limit"
+    }
+  ],
+  "licensing": "Original implementation from ABI contracts; source references credit Android Open Source Project/Bionic. No copied implementation payload. RustyDroid attribution preserved in repository.",
+  "limits": [
+    "Only the named C/POSIX/UTF-8 subset; locale files, regional formatting and environment-derived locales are unavailable.",
+    "Exact Android ICU Unicode data/property parity and full multibyte conversion coverage are not claimed.",
+    "Host tests do not prove Horizon execution or full application startup.",
+    "Current complete NRO linking/emulator/physical-device evidence is recorded separately by parent.",
+    "No Rust/Cargo or emulator jobs run by this subtask."
+  ],
+  "source_sha256": {
+    "platform/switch-smoke/bionic_locale.c": "6449e515697c657181bea9a40cd8a4d5940c1aee1d64f25985939bac32eb567b",
+    "platform/switch-smoke/bionic_locale.h": "3832bf917a8e37127fac8c7664ff809e7498563b18f5601af891d97e1941c6e4",
+    "platform/switch-smoke/bionic_libc.c": "8638875dfa24c947055ecd6ce7a2d6d1aa5f671cdd063316a8fff710ff0476e9",
+    "platform/switch-smoke/native.c": "ad1b9bbc15a630de8593c2d266c15983b77c918e2c3053faedcfd8329ded3fe7",
+    "platform/switch-smoke/Makefile": "98d7f10279dc6cd2194b41281b6a58f778723e1085aebf453df52ed0200d7344",
+    "platform/androswitch/Makefile": "ef9eff6943805f5a78bf8a6dd3e3b08e8a2b6f73bf12d089eda6453267b55937",
+    "fixtures/m9/native-abi/locales.c": "6ee9443528dc0a93f55749d2cc40da8570bff99c73c58f56c9f9c8c8ffddf822",
+    "scripts/test-native-abi.ps1": "192024e64f792303ef3dcf2962c55e93373cdc850b7f63ab15e802a7ef25ef9b"
+  }
+}

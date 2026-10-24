@@ -3,6 +3,12 @@
 use crate::{Engine, ObjRef, Value, VmExit};
 use alloc::{rc::Rc, vec::Vec};
 pub trait NativeHost {
+    /// Stable, nonzero identity of the actual executing platform thread.
+    /// A backend that cannot provide this must not impersonate the single
+    /// interpreter thread when guest code acquires a Java monitor.
+    fn current_thread_id(&self) -> Option<u64> {
+        None
+    }
     fn load(&self, vm: &mut Engine, name: &str, absolute: bool) -> Result<(), VmExit>;
     fn invoke(
         &self,
@@ -17,6 +23,7 @@ pub trait NativeHost {
 }
 impl Engine {
     pub fn bind_native(&mut self, backend: Rc<dyn NativeHost>) {
+        self.heap.bind_execution_identity(backend.clone());
         self.portable.native = Some(backend);
     }
     pub fn native_host(&self) -> Option<Rc<dyn NativeHost>> {

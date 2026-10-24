@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-24",
+  "scope": "General native time ABI: valid empty timezone abbreviation",
+  "probe": {
+    "run": "local-artifacts/m9/external-runs/18ea0223b11f486589ba3efed59eda56",
+    "session": "18ea0223b11f486589ba3efed59eda56-1",
+    "nro_sha256": "ad5899a66112b54fed8a96e5581bc8732781f4621c4b516c4a2a90fcd746f45d",
+    "native_trace_sha256": "34f1e16dc893bdc7319ac3396e153526e7af5a23af9926a20de452d7ad2a7a6e",
+    "module_map_sha256": "e011f5455bc78115ac11786375eb1d7a389414483b5ac172b2c5f9f12a0b924d",
+    "status": "attempted_failed timeout; owned emulator stopped and SD restored",
+    "unmatched_native_call": 5,
+    "library": "libBarcodeScannerLib.so",
+    "measured_library_base": "0x9fcf23000",
+    "native_function": "0x9fcf864bc",
+    "measured_relative_function": "0x634bc",
+    "pending_jni_failures": "none recorded",
+    "localtime_r": {
+      "epoch": 1792843795,
+      "backend_success": true,
+      "backend_errno": 0,
+      "adapter_errno": 134,
+      "calendar": {
+        "year": 2026,
+        "month": 10,
+        "day": 24,
+        "hour": 12,
+        "minute": 9,
+        "second": 55,
+        "dst": 0
+      },
+      "numeric_offset_length": 5,
+      "numeric_offset": "+0000",
+      "abbreviation_length": 0,
+      "abbreviation": ""
+    },
+    "horizon": {
+      "api": "timeToCalendarTimeWithMyRule",
+      "result": 0,
+      "year": 2026,
+      "month": 10,
+      "day": 24,
+      "hour": 12,
+      "minute": 9,
+      "second": 55,
+      "offset_seconds": 0,
+      "dst": 0,
+      "zone": ""
+    }
+  },
+  "conclusion": {
+    "cause": "The adapter turned zero-length strftime %Z into NULL/ENOTSUP even though localtime_r and Horizon supplied valid calendar and offset. An empty abbreviation is valid metadata, not calendar failure.",
+    "confidence": "confirmed by actual failure probe and matching source branch",
+    "crash_fix_emulator": "Verified advancement past the actual previous failing localtime/Barcode registration call in corrected NRO run 3f09e2eb5b7646f2a64a7b675ed3f994; subsequent independent Bundle.putLong blocker remains.",
+    "hardware": "not run"
+  },
+  "implementation": {
+    "file": "platform/switch-smoke/bionic_libc.c",
+    "sha256": "fbae5821eebb31c1874c5e8df75769c6e92f556b741d21cfa414423948ab415b",
+    "behavior": [
+      "Clear previous thread-local zone text before formatting.",
+      "Accept the actual empty abbreviation with the valid host calendar and offset.",
+      "Retain failure for nonempty partial, unterminated, or oversized timezone output.",
+      "Retain existing strict length/sign/digit checks for numeric offset text."
+    ],
+    "invented_timezone": false,
+    "modified_clock_or_date": false,
+    "package_specific_branch": false
+  },
+  "regression": {
+    "fixture": "fixtures/m9/native-abi/timezones.c",
+    "command": "pwsh -File scripts/test-native-time.ps1",
+    "method": "Production as_bionic_libc_import calls with linker-wrapped strftime metadata and real host calendar conversion",
+    "status": "passed",
+    "cases": [
+      "Empty %Z after a populated TLS zone: localtime and localtime_r with unchanged calendar/offset/errno.",
+      "mktime actual normalization/epoch roundtrip with empty abbreviation.",
+      "gmtime and gmtime_r remain independent of zone formatter.",
+      "Actual non-UTC +05:45 and -03:30 calendars/offsets remain intact.",
+      "Eleven malformed %z inputs rejected across localtime/localtime_r/mktime.",
+      "Nonempty incomplete zone output rejected, then empty zone recovers."
+    ],
+    "exit_code": 0,
+    "observed_output": "native time contracts: empty zone / offset preservation / mktime normalization / UTC / 11 invalid offsets / partial zone passed",
+    "source_hashes": [
+      {
+        "sha256": "df3d6e2249ee12c6ec505cf4120997fb03dd67a6df75419bae661df29bf312ac",
+        "path": "fixtures/m9/native-abi/timezones.c"
+      },
+      {
+        "sha256": "96f80de3a4977466a298a1e7249975f45fecbd60e79e5085e1d8847e616f1898",
+        "path": "scripts/test-native-time.ps1"
+      }
+    ]
+  },
+  "primary_references": [
+    "https://sourceware.org/newlib/libc.html#strftime",
+    "https://github.com/switchbrew/libnx/blob/master/nx/include/switch/services/time.h"
+  ],
+  "limitations": [
+    "Host metadata injection tests do not claim Horizon GPU behavior or complete Android time compatibility.",
+    "The previous time/registration failure is passed; Mekorama first screen remains blocked by a later independent framework API.",
+    "No guest library or application byte was modified."
+  ],
+  "target_compile": {
+    "command": "wsl.exe -d Ubuntu -- bash -lc \"cd /mnt/d/Dev/Switch/AndroSwitch && /opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc -pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -I/opt/devkitpro/libnx/include -Iplatform/switch-smoke -c platform/switch-smoke/bionic_libc.c -o local-artifacts/m9/native-time/time-corrected.o\"",
+    "status": "passed",
+    "artifact": {
+      "sha256": "fca38cbf29866b45273779c37965ce023993e09216f10663d078d414a1980f08",
+      "path": "local-artifacts/m9/native-time/time-corrected.o"
+    },
+    "exit_code": 0
+  },
+  "corrected_emulator_observation": {
+    "call": 5,
+    "subsequent_observation": "Calls6-10 returned; renderer native call11 ended with JNI error -1002; saved final report contains missing Bundle.putLong under RendererWrapper.onSurfaceCreated and onPause.",
+    "nro_sha256": "27e2cc2c88cdc436b1180e26d311bc29806803857f25c3e796cf6fec800b345d",
+    "call_result": 0,
+    "first_screen": "not verified",
+    "registration_function": "0x9fcf864bc",
+    "measured_library_base": "0x9fcf23000",
+    "run": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994",
+    "hardware": "not run",
+    "returned_to_launcher": true,
+    "native_trace_sha256": "9f274ba06846cbff2a9e2f2f08b6796901e5f315a81f43b2e046cbff68127ecf"
+  }
+}

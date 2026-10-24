@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "scope": "General session identity, interrupted-report ownership, and fresh per-application evidence snapshots. This is host verification; it does not prove fixed behavior on Switch or emulator.",
+  "hardware_input_receipt": "reports/hardware-external-startup-20261024T2300.json",
+  "changes": [
+    "Interactive IDs include libnx randomGet64 boot nonce, monotonic system tick, and per-launch serial. Scripted ID prefix remains exact.",
+    "Report identity requires schema, session ID, package and installation revision; mismatches are reporting_error rather than an invented APK failure.",
+    "Interrupted snapshot embeds only the report matching its saved request; current mutable report is not treated as historical evidence.",
+    "Fresh application launch clears only known current-application snapshots. Display handoffs are cleared once per launcher boot; memory history, interrupted evidence and user saves remain.",
+    "Stop reporting changes running to stopping only when the full current request identity matches."
+  ],
+  "source_snapshots": [
+    {
+      "sha256": "f6ff599db167a5f6dadf2918499e16f2aa8b7598178dc80847b3c16c3a1e24e7",
+      "path": "crates/as-switch-smoke/src/session_report.rs"
+    },
+    {
+      "sha256": "a6de8f45a1f5fcb3baa45b80ee00753443b2e6a70f6451176e21814b5fd8ee70",
+      "path": "crates/as-switch-smoke/src/launcher.rs"
+    },
+    {
+      "sha256": "f3a6d571c63adba93ff1189af259df1be778101150adb807973ebd91f177036b",
+      "path": "crates/as-switch-smoke/src/application.rs"
+    },
+    {
+      "sha256": "9b643534bb33d6cd7ac6345960af1e8ecbf6f5c4fb41d9c5caa14e5805127cba",
+      "path": "crates/as-switch-smoke/src/lib.rs"
+    },
+    {
+      "sha256": "998b1963af9ed78ac0c686ecc62ab8ecb597eced496ac6fa82e51ee07f1266a0",
+      "path": "platform/switch-smoke/fs.c"
+    }
+  ],
+  "toolchains": {
+    "wsl_devkitA64": "16.1.0",
+    "windows_devkitA64": "15.2.0",
+    "rustc": "1.97.1 (8bab26f4f 2026-07-14)"
+  },
+  "checks": [
+    {
+      "failed": 0,
+      "name": "Focused crate helper tests",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p as-switch-smoke --lib session_report::tests --features host-cli,portable-tests --locked",
+      "filtered": 3,
+      "status": "passed",
+      "scope": "Uses command-scoped environment variables. No cache deletion or global configuration change. Compile duration included target-lock waiting.",
+      "passed": 4
+    },
+    {
+      "failed": 0,
+      "name": "Isolated production helper tests",
+      "command": "rustc --edition=2021 --test local-artifacts/reference/autorun/session-report-tests.rs -C debuginfo=0 -L dependency=target/debug/deps --extern as_platform=<compiled actual rlib> --extern serde_json=<compiled actual rlib> -o local-artifacts/reference/autorun/session-report-tests.exe; run test binary --nocapture",
+      "scope": "Includes production session_report.rs against actual as-platform and serde_json dependencies. Dependency paths and hashes are frozen in the local manifest.",
+      "status": "passed",
+      "passed": 4
+    },
+    {
+      "status": "passed",
+      "command": "C:/devkitPro/devkitA64/bin/aarch64-none-elf-gcc.exe -pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -IC:/devkitPro/libnx/include -c platform/switch-smoke/fs.c -o local-artifacts/reference/autorun/reporting-fs-win.o",
+      "name": "Windows ARM64 platform FFI compile"
+    },
+    {
+      "note": "Initial non-pipe invocation failed because its temporary /tmp assembler source disappeared; retry with -pipe passed without any C diagnostic.",
+      "status": "passed",
+      "command": "wsl -d Ubuntu -- /opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc -pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -I/opt/devkitpro/libnx/include -c /mnt/d/Dev/Switch/AndroSwitch/platform/switch-smoke/fs.c -o /mnt/d/Dev/Switch/AndroSwitch/local-artifacts/reference/autorun/reporting-fs.o",
+      "name": "WSL ARM64 platform FFI compile"
+    },
+    {
+      "status": "passed",
+      "command": "rustfmt --check --edition 2021 crates/as-switch-smoke/src/session_report.rs crates/as-switch-smoke/src/launcher.rs crates/as-switch-smoke/src/application.rs",
+      "name": "Formatting"
+    },
+    {
+      "status": "passed",
+      "command": "git diff --check -- crates/as-switch-smoke/src/session_report.rs crates/as-switch-smoke/src/launcher.rs crates/as-switch-smoke/src/application.rs crates/as-switch-smoke/src/lib.rs platform/switch-smoke/fs.c",
+      "name": "Patch whitespace"
+    }
+  ],
+  "test_coverage": [
+    "Boot and launch serial differentiation; exact script ID prefix; invalid and oversized session IDs.",
+    "Reused console serial cannot match another package or revision; invalid identities never match.",
+    "Interruption snapshot owns an independent copy and excludes mismatched reports.",
+    "Per-application versus process evidence lifetimes; historical evidence and saves retained."
+  ],
+  "local_artifacts": [
+    {
+      "bytes": 8419467,
+      "path": "local-artifacts/reference/autorun/session-report-tests.exe",
+      "sha256": "631cfc692dabb8074ce29f7d9040309e9bd7b59fdff3ebb3e7104ab306bc22ea"
+    },
+    {
+      "bytes": 530,
+      "path": "local-artifacts/reference/autorun/session-report-tests.log",
+      "sha256": "76e62ecbc3979e2c0e3ca6da66a2ae07f86a127feb6c9d1ed0b0cfacab5fe4f2"
+    },
+    {
+      "bytes": 427,
+      "path": "local-artifacts/reference/autorun/session-report-test-dependencies.json",
+      "sha256": "da57dffba667f59c3eda7c7960109bad2611420c6b27cf730454ae63835fe182"
+    },
+    {
+      "bytes": 8576,
+      "path": "local-artifacts/reference/autorun/reporting-fs.o",
+      "sha256": "49258d4ca9cb2b702b2d413a9cd0d8d5b7b53b57840ebd07baaf663688724259"
+    },
+    {
+      "bytes": 8664,
+      "path": "local-artifacts/reference/autorun/reporting-fs-win.o",
+      "sha256": "80180a5ab6e5477e6b53377bb7ba2e26a67342fad39b06459f5ce83446f1ff83"
+    }
+  ],
+  "limitations": [
+    "Randomness/tick FFI compiles on both toolchains; actual RNG behavior and launcher reporting still require the parent-owned device build and E2E run.",
+    "No emulator or physical-device execution was run by this subtask. Parent-owned results are separate.",
+    "Latest user hardware evidence shows clean Candy startup abort; it does not prove either external game renders. M9 remains incomplete.",
+    "Earlier Cargo attempt encountered the concurrent Enum visibility error before its fix; the later command above passed. A later incremental-enabled stall was canceled only by verified owned Cargo/rustc PIDs and retried with scoped incremental0."
+  ]
+}

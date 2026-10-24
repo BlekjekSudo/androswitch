@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T09:58:47.9446819Z",
+  "status": "focused_contracts_and_switch_c_compile_passed",
+  "operation": "__system_property_get",
+  "abi": "int __system_property_get(const char *name, char *value), caller supplies PROP_VALUE_MAX=92 bytes",
+  "known_properties": {
+    "ro.build.version.sdk": "26",
+    "ro.product.cpu.abi": "arm64-v8a",
+    "ro.product.cpu.abilist": "arm64-v8a",
+    "ro.product.cpu.abilist64": "arm64-v8a"
+  },
+  "shared_source": "platform/switch-smoke/runtime_properties.inc",
+  "java_consumer": "as-framework::services::Services::static_field: android.os.Build.VERSION.SDK_INT",
+  "behavior": {
+    "errno": "preserved for known and absent keys",
+    "known": "copies immutable value with terminator, returns byte length excluding NUL",
+    "absent": "returns 0 and writes only value[0]=NUL",
+    "host_environment": "not accessed",
+    "identity": "unprovided serial, fingerprint, hardware and OS release remain absent",
+    "value_limit": "compile-time C assertion and Rust manifest contract test reject values exceeding 91 bytes"
+  },
+  "tests": [
+    {
+      "status": "passed",
+      "command": "wsl.exe -d Ubuntu -- bash -lc \"cd /mnt/d/Dev/Switch/AndroSwitch && cc -pipe -std=gnu11 -O2 -Wall -Wextra -Werror -pthread -Iplatform/switch-smoke fixtures/m9/native-abi/contracts.c platform/switch-smoke/bionic_cxx.c platform/switch-smoke/bionic_libc.c platform/switch-smoke/bionic_io.c platform/switch-smoke/bionic_keys.c platform/switch-smoke/bionic_log.c platform/switch-smoke/bionic_vfs.c platform/switch-smoke/missing_import.c -lm -o local-artifacts/m9/native-abi/contracts && local-artifacts/m9/native-abi/contracts\"",
+      "scope": "Actual property import tested with 4 known values, 7 absent keys, unchanged errno and buffer canaries; existing native ABI regressions also ran"
+    },
+    {
+      "status": "passed",
+      "command": "rustc --edition 2021 --test crates/as-framework/src/properties.rs -o local-artifacts/m9/native-abi/properties-contracts.exe; local-artifacts/m9/native-abi/properties-contracts.exe",
+      "scope": "Standalone exact shared Rust source, 2 tests: manifest syntax/unique bounded ASCII values and SDK/ABI consistency with absence; no Cargo build lock used"
+    },
+    {
+      "status": "passed",
+      "command": "wsl.exe -d Ubuntu -- bash -lc \"cd /mnt/d/Dev/Switch/AndroSwitch && make -C platform/androswitch ../../local-artifacts/product/bionic_libc.o\"",
+      "scope": "devkitA64/libnx ARM64 object compile with -Wall -Wextra -Werror"
+    },
+    {
+      "status": "passed",
+      "command": "rustfmt --check --edition 2021 crates/as-framework/src/properties.rs crates/as-framework/src/services/mod.rs",
+      "scope": "Formatting for changed adapter source"
+    }
+  ],
+  "references": [
+    {
+      "url": "https://android.googlesource.com/platform/bionic/+/e61dc71/libc/bionic/system_properties.c",
+      "blob": "9fdb6f5e228332a304c7f048e0f16fc6d866af12",
+      "contract": "__system_property_get absent returns zero with empty value; known value return length and terminator"
+    },
+    {
+      "url": "https://android.googlesource.com/platform/bionic/+/master/libc/include/sys/system_properties.h",
+      "contract": "PROP_VALUE_MAX=92 and public getter prototype; checked against installed NDK 28.2.13676358 header"
+    }
+  ],
+  "observed_runtime_blocker": "local-artifacts/m9/external-runs/37b5fa1d8f464651b382ff6fe196ada6/verification.json",
+  "observed_property_names": "not captured; implementation does not depend on APK-specific queries",
+  "limits": [
+    "Read-only compatibility facts only; property writes, opaque prop_info lookup, serials/waits and callbacks remain unavailable",
+    "API26 is the selected compatibility reference, not a claim that every Android API is implemented",
+    "Java field adapter integration and full NRO linking/execution are verified separately by the parent task",
+    "No new physical Switch or Ryujinx execution is claimed by these focused tests"
+  ],
+  "source_sha256": {
+    "platform/switch-smoke/runtime_properties.inc": "ddc53a893bcfc30d6877f2e1d5e2aa82757d819f7bf27a194dfd789cd41043cc",
+    "platform/switch-smoke/bionic_properties.h": "5b46950099ad15a8b54c2a17f81ab76b8330b47c2be73749a607ae1ee6389c42",
+    "platform/switch-smoke/bionic_libc.c": "88143f2286318ffef5f4f5bb93e80b3b7bda708765a67c47a83c47741e311121",
+    "fixtures/m9/native-abi/contracts.c": "d3120dceeb2337c92e7bedd103fe11cd5b09acda2c1c9b87fd3e800292d2dd37",
+    "crates/as-framework/src/properties.rs": "66ce36effff6241c1ae04f0b87f7255f81a7698cf4b6b5fc188794a1bba11545",
+    "crates/as-framework/src/lib.rs": "adcf347027d8514590b0434213725bc79e5783dfff4781cf8ddc58513a3596ff",
+    "crates/as-framework/src/services/mod.rs": "798ec0597c68af23384bebc5c1aa463ff124652a20c2e51dcf72e11d9670980d"
+  }
+}

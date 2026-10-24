@@ -7,6 +7,8 @@ param(
     [string]$RyujinxProfile="$env:APPDATA/Ryujinx",
     [ValidateRange(1000,30000)][int]$StartupWaitMilliseconds=10000,
     [ValidateRange(30,1800)][int]$TimeoutSeconds=300,
+    [switch]$Headless,
+    [switch]$TraceNative,
     [switch]$PrepareOnly,
     [switch]$AllowDesktopEmulator
 )
@@ -63,7 +65,9 @@ for($index=0;$index -lt $files.Count;$index++){
     for($row=0;$row -lt $index;$row++){$commands.Add(@{kind='key';key='down'})}
     $commands.Add(@{kind='key';key='accept'})
     $installStep=$commands.Count
-    $events=@(@{kind='wait';ms=$StartupWaitMilliseconds},@{kind='frame'},@{kind='return_to_launcher'})
+    # Keep the explicit application frame visible to the polling recorder
+    # before the return path and next launch can clear shared capture names.
+    $events=@(@{kind='wait';ms=$StartupWaitMilliseconds},@{kind='frame'},@{kind='wait';ms=2000},@{kind='return_to_launcher'})
     $commands.Add(@{kind='open';events=$events})
     $commands.Add(@{kind='frames';count=60})
     $inputs.Add(@{
@@ -84,6 +88,9 @@ $receipt=@{
     emulator_version=(Get-Item -LiteralPath $emulator).VersionInfo.ProductVersion
     sd_result=$sdResult;sd_backup=$backup;inputs=@($inputs.ToArray());commands=$commands.Count
     startup_wait_ms=$StartupWaitMilliseconds;cases=@();sd_original_restore='not_modified'
+    emulator_frontend=if($Headless){'headless_sdl2'}else{'desktop'}
+    native_trace_requested=[bool]$TraceNative
+    capture_ownership_contract='Protocol1 runtime generation identity; matching pending request for CPU frames; identity rechecked after copy. Filesystem timestamps are not ownership evidence.'
 }
 function Save-Receipt {
     $receipt|ConvertTo-Json -Depth 32|Set-Content (Join-Path $run 'verification.json') -Encoding utf8NoBOM
@@ -127,6 +134,20 @@ function Stop-OwnedProcesses {
     # Revalidate identity and creation time on every stop; PID reuse and another
     # already-open emulator can never become cleanup targets.
     if(-not $owned.Count){return}
+    # The Process object is returned by our own Start-Process. Pin its kernel
+    # handle at creation so a delayed/incomplete CIM inventory is not confused
+    # with process exit, and PID reuse cannot select another application's PID.
+    if($process -and $receipt.root_handle_pinned){
+        try{
+            if(-not $process.HasExited){
+                $process.Kill()
+                if(-not $process.WaitForExit(10000)){throw 'The owned root process did not stop; preserve its SD backup.'}
+            }
+        }catch{
+            $receipt.root_stop_error=$_.Exception.Message
+            throw
+        }
+    }
     for($attempt=0;$attempt -lt 3;$attempt++){
         $live=@(Update-OwnedProcesses)
         if(-not $live.Count){return}
@@ -137,17 +158,74 @@ function Stop-OwnedProcesses {
     }
     if(@(Update-OwnedProcesses).Count){throw 'An owned emulator process did not stop; SD backup must remain preserved.'}
 }
-function Capture-Session([object]$Session,[DateTime]$SeenAt){
+$completeCapturePaths=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+$captureMetadata=@{}
+function Capture-Session([object]$Session){
+    if($Session.session_id -isnot [string] -or $Session.session_id -cnotmatch '^[A-Za-z0-9_.-]{1,128}$'){return @()}
+    $captureRoot=$sdRoot
+    $ownsCapture={
+        param([bool]$NeedsPending)
+        $names=@('capture-owner.json','session-report.json')
+        if($NeedsPending){$names+= 'pending-session.json'}
+        foreach($name in $names){
+            try{
+                $bound=Get-Content -LiteralPath (Join-Path $captureRoot "logs/$name") -Raw -ErrorAction Stop|ConvertFrom-Json -ErrorAction Stop
+                if($bound.schema_version -ne 1 -or $bound.session_id -cne $Session.session_id -or
+                   $bound.package -cne $Session.package -or $bound.revision -ne $Session.revision){return $false}
+                if($name -eq 'capture-owner.json' -and $bound.capture_protocol -ne 1){return $false}
+            }catch{return $false}
+        }
+        return $true
+    }.GetNewClosure()
     $destination=Join-Path $run "sessions/$($Session.session_id)"
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
     $Session|ConvertTo-Json -Depth 28|Set-Content (Join-Path $destination 'session-report.json') -Encoding utf8NoBOM
+    foreach($name in @('memory-admission.json','native-compatibility.json','capture-owner.json')){
+        $source=Join-Path $sdRoot "logs/$name"
+        if(-not (Test-Path -LiteralPath $source)){continue}
+        try{
+            $bound=Get-Content -LiteralPath $source -Raw|ConvertFrom-Json
+            if($bound.session_id -eq $Session.session_id -and $bound.package -eq $Session.package -and
+               $bound.revision -eq $Session.revision){
+                $bound|ConvertTo-Json -Depth 28|Set-Content (Join-Path $destination $name) -Encoding utf8NoBOM
+            }
+        }catch{# Optional diagnostic may still be writing; never bind stale data.
+        }
+    }
+    # The device truncates this trace for every new launch. Retain its raw
+    # operation/result/tick records alongside the already matched session.
+    $stopTrace=Join-Path $sdRoot 'logs/media-stop.log'
+    if(Test-Path -LiteralPath $stopTrace){
+        Copy-Item -LiteralPath $stopTrace -Destination (Join-Path $destination 'media-stop.log')
+    }
+    # Raw process traces aid diagnosis; they do not establish a session's
+    # completion or replace the identity-bound final launcher report.
+    foreach($name in @('teardown.log','memory.log','native-modules.log','native-calls.log','jni-failures.log')){
+        $trace=Join-Path $sdRoot "logs/$name"
+        if(Test-Path -LiteralPath $trace){
+            Copy-Item -LiteralPath $trace -Destination (Join-Path $destination $name)
+        }
+    }
     $images=[Collections.Generic.List[object]]::new()
     foreach($imageFile in @(Get-ChildItem -LiteralPath (Join-Path $sdRoot 'logs') -File -Filter '*.ppm')){
-        # Shared capture names are overwritten by later sessions. Only images
-        # written after this session was observed running can belong to it.
-        if($imageFile.LastWriteTimeUtc -lt $SeenAt){continue}
+        if($imageFile.Name -cnotin @('last-frame.ppm','gles-frame-2.ppm','gles-frame-30.ppm')){continue}
         $target=Join-Path $destination $imageFile.Name
-        Copy-Item -LiteralPath $imageFile.FullName -Destination $target
+        if($completeCapturePaths.Contains($target)){
+            $images.Add($captureMetadata[$target]);continue
+        }
+        # The runtime clears old images before publishing its generation owner.
+        # CPU launcher captures share last-frame.ppm, so require an active matching
+        # request too. Filesystem time may use a different guest clock offset.
+        $isCpu=$imageFile.Name -ceq 'last-frame.ppm'
+        if(-not (& $ownsCapture $isCpu)){continue}
+        # A completed capture is immutable for this session. An early partial
+        # copy can be retried while its writer finishes, without replacing a
+        # valid image during the next application's filename cleanup.
+        if(-not $completeCapturePaths.Contains($target)){
+            Copy-Item -LiteralPath $imageFile.FullName -Destination $target
+        }
+        # A later launch/return may have changed ownership during the copy.
+        if(-not (& $ownsCapture $isCpu)){continue}
         $data=[IO.File]::ReadAllBytes($target)
         $header=[Text.Encoding]::ASCII.GetString($data,0,[Math]::Min(128,$data.Length))
         $match=[regex]::Match($header,'\AP6\s+(\d+)\s+(\d+)\s+255\s')
@@ -166,7 +244,10 @@ function Capture-Session([object]$Session,[DateTime]$SeenAt){
                 }
             }
         }
-        $images.Add(@{file=$target;sha256=(Get-FileHash -LiteralPath $target).Hash.ToLowerInvariant();valid_ppm=$valid;width=$width;height=$height;sampled_nonuniform=$nonuniform;recognizable_app_screen='requires_visual_review'})
+        if($valid){$null=$completeCapturePaths.Add($target)}
+        $metadata=@{file=$target;sha256=(Get-FileHash -LiteralPath $target).Hash.ToLowerInvariant();valid_ppm=$valid;width=$width;height=$height;sampled_nonuniform=$nonuniform;recognizable_app_screen='requires_visual_review'}
+        if($valid){$captureMetadata[$target]=$metadata}
+        $images.Add($metadata)
     }
     return @($images.ToArray())
 }
@@ -184,6 +265,9 @@ try{
     }
     New-Item -ItemType Directory -Path $sdRoot | Out-Null;$stageCreated=$true
     foreach($name in @('apks','runtime','logs')){New-Item -ItemType Directory -Path (Join-Path $sdRoot $name)|Out-Null}
+    if($TraceNative){
+        [IO.File]::WriteAllText((Join-Path $sdRoot 'logs/native-trace.enabled'),"1`n")
+    }
     foreach($inputFile in $inputs){
         if((Get-FileHash -LiteralPath $inputFile.source).Hash.ToLowerInvariant() -ne $inputFile.sha256){throw 'An input APK changed after preparation.'}
         Copy-Item -LiteralPath $inputFile.source -Destination (Join-Path $sdRoot "apks/$($inputFile.staged_name)")
@@ -194,7 +278,9 @@ try{
     # Explicit profile selection prevents reading one profile's SD while the
     # emulator runs another. No fullscreen, monitor or window-position flags.
     $arguments=@('--root-data-dir',('"'+$profile+'"'),('"'+$sdNro+'"'))
+    if($Headless){$arguments=@('--no-gui')+$arguments}
     $process=Start-Process -FilePath $emulator -ArgumentList $arguments -WorkingDirectory (Split-Path -Parent $emulator) -WindowStyle Hidden -RedirectStandardOutput (Join-Path $run 'ryujinx.stdout.log') -RedirectStandardError (Join-Path $run 'ryujinx.stderr.log') -PassThru
+    try{$null=$process.Handle;$receipt.root_handle_pinned=$true}catch{$receipt.root_handle_pinned=$false}
     $owned.Add($process.Id,$runStarted)
     $rootIdentity=Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)"
     # Retain the root PID as an ancestry anchor even if Ryujinx restarts before
@@ -202,27 +288,54 @@ try{
     $rootCreation=if($rootIdentity){$rootIdentity.CreationDate.ToUniversalTime()}else{$runStarted}
     $owned[$process.Id]=$rootCreation
     $receipt.pid=$process.Id
-    $seen=@{};$captured=@{};$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds);$result=$null
+    Save-Receipt
+    $captured=@{};$settledCaptures=@{};$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds);$result=$null
     do{
+        $terminalRefusal=$null
         $sessionFile=Join-Path $sdRoot 'logs/session-report.json'
         if(Test-Path -LiteralPath $sessionFile){
             try{
                 $session=Get-Content -LiteralPath $sessionFile -Raw|ConvertFrom-Json
                 if($session.session_id -like "$id-*"){
-                    if($session.status -eq 'running' -and -not $seen.ContainsKey($session.session_id)){$seen[$session.session_id]=[DateTime]::UtcNow}
-                    if($session.status -in @('passed_execution','failed') -and -not $captured.ContainsKey($session.session_id)){
-                        $fresh=if($seen.ContainsKey($session.session_id)){$seen[$session.session_id]}else{[DateTime]::MaxValue}
-                        $captured[$session.session_id]=@(Capture-Session $session $fresh)
+                    if($session.status -in @('running','passed_execution','failed') -and -not $settledCaptures.ContainsKey($session.session_id)){
+                        $images=@(Capture-Session $session)
+                        if($images.Count -or -not $captured.ContainsKey($session.session_id)){
+                            $captured[$session.session_id]=$images
+                        }
+                        $complete=$images.Count -gt 0 -and @($images|Where-Object {-not $_.valid_ppm}).Count -eq 0
+                        $pending=Test-Path -LiteralPath (Join-Path $sdRoot 'logs/pending-session.json')
+                        if($session.status -ne 'running' -and -not $pending -and ($complete -or ($session.status -eq 'failed' -and -not $images.Count))){
+                            $settledCaptures[$session.session_id]=$true
+                        }
+                    }
+                    if($session.status -ceq 'failed' -and $session.error -match '; reopen homebrew$'){
+                        $phaseFile=Join-Path $sdRoot 'logs/teardown.log'
+                        if(Test-Path -LiteralPath $phaseFile){
+                            $lastPhase=Get-Content -LiteralPath $phaseFile -Tail 1|ConvertFrom-Json
+                            if($lastPhase.phase -ceq 'stop_failed'){$terminalRefusal=$session}
+                        }
                     }
                 }
             }catch{# Retry partial in-progress JSON writes; final evidence validation is strict.
             }
         }
+        if($terminalRefusal){
+            # The runtime explicitly requires process exit. Waiting cannot
+            # produce a completed launcher workflow; preserve it as a failure.
+            $receipt.terminal_runtime_refusal=$terminalRefusal
+            throw "Runtime cleanup refused; process exit required: $($terminalRefusal.error)"
+        }
         $launcherFile=Join-Path $sdRoot 'logs/launcher-report.json'
         if(Test-Path -LiteralPath $launcherFile){
             try{$candidate=Get-Content -LiteralPath $launcherFile -Raw|ConvertFrom-Json;if($candidate.session_id -eq $id){$result=$candidate;break}}catch{}
         }
-        if(-not @(Update-OwnedProcesses).Count){throw 'The owned emulator exited before the launcher workflow completed.'}
+        if(-not @(Update-OwnedProcesses).Count){
+            $exited=$false
+            try{$exited=$process.HasExited}catch{# Unknown identity waits for the bounded deadline.
+            }
+            if($exited){throw 'The owned emulator exited before the launcher workflow completed.'}
+            $receipt.root_alive_without_cim_match=$true
+        }
         Start-Sleep -Milliseconds 500
     }while([DateTime]::UtcNow -lt $deadline)
     if(-not $result -or $result.status -ne 'passed_execution'){throw 'No fresh completed launcher report before the timeout.'}
@@ -237,14 +350,14 @@ try{
         $identity=$selected -and $selected.apk_sha256 -eq $inputFile.sha256 -and $session -and
                   $selected.package -eq $session.package -and $selected.revision -eq $session.revision
         $frames=@($session.snapshots|Where-Object {$_.native_frames -gt 0 -or ($_.presented_hash -and $_.presented_hash -ceq $_.frame_hash)})
-        $images=if($captured.ContainsKey($inputFile.expected_session_id)){@($captured[$inputFile.expected_session_id])}else{@()}
+        $images=@(if($captured.ContainsKey($inputFile.expected_session_id)){$captured[$inputFile.expected_session_id]})
         $freshNonblank=@($images|Where-Object {$_.valid_ppm -and $_.sampled_nonuniform})
         $phases=@($session.teardown|ForEach-Object phase)
         $returned='runtime_closed' -in $phases
         $execution=$identity -and $session.status -eq 'passed_execution' -and -not $session.error -and
                    $session.presented_frames -gt 0 -and $frames.Count -gt 0 -and $returned
         $state=if(-not $execution){'blocked_or_unreported'}elseif(-not $freshNonblank.Count){'execution_observed_render_unconfirmed'}else{'execution_verified_visual_review_required'}
-        $cases.Add(@{input=$inputFile;status=$state;installed_identity_matches=[bool]$identity;runtime_status=$session.status;error=$session.error;teardown_phases=$phases;returned_to_launcher=$returned;presented_frames=$session.presented_frames;snapshots=@($session.snapshots);captures=$images;first_screen='not_visually_verified'})
+        $cases.Add(@{input=$inputFile;status=$state;installed_identity_matches=[bool]$identity;runtime_status=$session.status;error=$session.error;teardown_phases=$phases;returned_to_launcher=$returned;presented_frames=$session.presented_frames;snapshots=@($session.snapshots|Where-Object {$null -ne $_});captures=$images;first_screen='not_visually_verified'})
     }
     $receipt.cases=@($cases.ToArray())
     $receipt.visual_review='required'
@@ -255,6 +368,13 @@ try{
     $receipt.status=if($receipt.execution_attempted){'attempted_failed'}else{'preflight_failed'}
     $receipt.error=$_.Exception.Message
 }finally{
+    if($process){
+        try{
+            $process.Refresh()
+            if($process.HasExited){$receipt.emulator_exit_code_before_cleanup=$process.ExitCode}
+        }catch{# Process identity can disappear during a launcher/bootstrap exit.
+        }
+    }
     # A native process fault can prevent the final launcher report entirely.
     # Preserve the actual last status/error/phases, including a still-running
     # marker, instead of describing that attempt as a completed app session.
@@ -263,10 +383,16 @@ try{
             $sessionPath=Join-Path $sdRoot 'logs/session-report.json'
             if(Test-Path -LiteralPath $sessionPath){
                 $last=Get-Content -LiteralPath $sessionPath -Raw|ConvertFrom-Json
-                if($last.session_id -like "$id-*"){$receipt.latest_session_report=$last}
+                if($last.session_id -like "$id-*"){
+                    $receipt.latest_session_report=$last
+                    $lastImages=@(Capture-Session $last)
+                    if($lastImages.Count -or -not $captured.ContainsKey($last.session_id)){$captured[$last.session_id]=$lastImages}
+                }
             }
             $phasePath=Join-Path $sdRoot 'logs/teardown.log'
             if(Test-Path -LiteralPath $phasePath){$receipt.latest_teardown=@(Get-Content -LiteralPath $phasePath|Where-Object {$_}|ForEach-Object {$_|ConvertFrom-Json})}
+            $stopPath=Join-Path $sdRoot 'logs/media-stop.log'
+            if(Test-Path -LiteralPath $stopPath){$receipt.latest_media_stop=@(Get-Content -LiteralPath $stopPath|Where-Object {$_}|ForEach-Object {$_|ConvertFrom-Json})}
             $admissionPath=Join-Path $sdRoot 'logs/memory-admission.json'
             if(Test-Path -LiteralPath $admissionPath){$receipt.latest_memory_admission=Get-Content -LiteralPath $admissionPath -Raw|ConvertFrom-Json}
         }catch{$receipt.evidence_capture_error=$_.Exception.Message}
@@ -285,6 +411,23 @@ try{
         $receipt.sd_original_restore=if($stageCreated -or $backupMoved){'restored'}else{'not_modified'}
     }catch{$receipt.restore_error=$_.Exception.Message;$receipt.sd_original_restore='manual_recovery_required';$receipt.status='cleanup_failed'}
     if($lock){$lock.Dispose();Remove-Item -LiteralPath $lockPath -ErrorAction SilentlyContinue}
+    # A later native fault must not erase an earlier named rejection. These
+    # are observations, never invented completed cases or install identities.
+    $observations=@(foreach($inputFile in $inputs){
+        $path=Join-Path $run "sessions/$($inputFile.expected_session_id)/session-report.json"
+        if(Test-Path -LiteralPath $path){
+            try{
+                $observed=Get-Content -LiteralPath $path -Raw|ConvertFrom-Json
+                if($observed.session_id -ceq $inputFile.expected_session_id){
+                    @{session_id=$observed.session_id;package=$observed.package;revision=$observed.revision;
+                      runtime_status=$observed.status;error=$observed.error;report=$path;
+                      completed_case_verified=$false;scope='Diagnostic observation; final launcher result is required to verify completion and installation identity.'}
+                }
+            }catch{# Keep raw files; malformed evidence does not become a case.
+            }
+        }
+    })
+    $receipt.observed_sessions=$observations
     Save-Receipt
 }
 Write-Output "External-APK evidence ($($receipt.status)): $run/verification.json"

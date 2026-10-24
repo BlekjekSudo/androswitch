@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T11:16:31.4332810Z",
+  "status": "passed_portable_host_contracts",
+  "portable_core_asserted": true,
+  "source_hashes": [
+    {
+      "sha256": "c22acc713e4c66e19a0baf96173529fffef8ac73bf989ed9df42eee4af59aa2c",
+      "path": "crates/as-framework/src/services/communication.rs"
+    },
+    {
+      "sha256": "85b07eb6046b7cc83eaecf8975f5ee9d56752be40aff83ddc96826481230590a",
+      "path": "crates/as-framework/src/services/mod.rs"
+    },
+    {
+      "sha256": "8c16267d56c08752da9ad7d575810a6af6864a8dc613167864c5668e2f81057b",
+      "path": "crates/as-framework/src/android.rs"
+    },
+    {
+      "sha256": "f8a542f799ea584fe3568f3dd1d27dd41b9d3591780587ead975729f0e3a7c4d",
+      "path": "crates/as-framework/Cargo.toml"
+    },
+    {
+      "sha256": "067326b8451a4668debd03615255a31022290271f12c2a186f49a99ed2156d2f",
+      "path": "crates/as-framework/tests/communication.rs"
+    },
+    {
+      "sha256": "8472b6aa68badfb3b7bce2059963339f0b8d1e0b19b7c0c2b6cb2718639244ce",
+      "path": "crates/rd-vm/src/portable/mod.rs"
+    },
+    {
+      "sha256": "811165fc8085d906ef55ee569db975f29ccbaa307bcb8c608dc31c74d89d4bad",
+      "path": "crates/rd-vm/src/interp.rs"
+    },
+    {
+      "sha256": "014f561d66315c8131fb564d26829c2e9b3c444a55eabb446283960024b97ee4",
+      "path": "crates/rd-vm/src/classpath.rs"
+    },
+    {
+      "sha256": "a9af65331226e1ec04547fe90c2b0d9760f8309bbbc549fcc247351565f41d77",
+      "path": "fixtures/m9/communication/java/org/androswitch/contracts/CommunicationActivity.java"
+    },
+    {
+      "sha256": "8f60dde1e18466e6eb3284f06831a193edd8850c429f28fa95cd04fecf5cd2b5",
+      "path": "scripts/build-communication-fixture.ps1"
+    }
+  ],
+  "profile": {
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "1"
+  },
+  "checks": [
+    {
+      "status": "passed",
+      "exit_code": 0,
+      "receipt_sha256": "0cdf8f60e306bd78e5ab86be780ec8470c1970df301c3f623b57a1a224d9930d",
+      "command": "pwsh -File scripts/build-communication-fixture.ps1",
+      "apks": 3,
+      "receipt": "local-artifacts/m9/communication-fixture/build-receipt.json"
+    },
+    {
+      "passed": 4,
+      "exit_code": 0,
+      "command": "cargo test -p as-framework --features host --test communication --locked -- --include-ignored --nocapture",
+      "log_sha256": "e185fac117a67d2310fd91373b8aff1a3321f9f07607e4d708c4c9f40ffba344",
+      "ignored": 0,
+      "log": "target/evidence/m9-communication-focused.log",
+      "status": "passed",
+      "log_scope": "Final completion output captured from tool session75609; earlier compilation lines omitted."
+    },
+    {
+      "command": "rustfmt --edition 2021 --check (owned framework, portable field and fixture test sources)",
+      "status": "passed",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check (owned source and fixtures)",
+      "status": "passed",
+      "exit_code": 0
+    }
+  ],
+  "implemented": [
+    "BroadcastReceiver base construction and real DEX subclasses",
+    "Bounded dynamic receiver registry; copied action/category filters; queued main-pump onReceive with snapshot Intent/extras",
+    "GC roots, receiver deduplication, category exclusion, reentrant enqueue and unregister cancellation",
+    "Intent action/package/category and extras snapshot; default sticky query returns null because no producer exists",
+    "PackageManager.queryIntentServices reads actual immutable installed APK metadata and registry; disabled declarations omitted; selected unresolved resource attributes fail explicitly",
+    "Real ServiceInfo subset: packageName/name/enabled/exported/permission/processName and ResolveInfo.serviceInfo/priority",
+    "No Binder backend: bindService returns false with no connection callback; failed dispatcher reservation must be unbound once",
+    "Log.isLoggable uses shared Android default INFO threshold",
+    "Portable instance field reads preserve real declared DEX defaults and populated platform zero; unbound inherited platform field returns API_UNAVAILABLE; invalid heap receiver remains VM_TYPE_ERROR",
+    "Only explicit active-package dynamic broadcasts are admitted; implicit/external sends require an unavailable receiver broker",
+    "A matching enabled/potentially-enabled current-package manifest receiver causes rejection before any dynamic callback is queued",
+    "Negative routes tested across both package identities: source Intent remains unchanged, no partial delivery occurs, and a later corrected route yields exactly one snapshot callback"
+  ],
+  "bounds": [
+    "8 MiB intent/filter metadata",
+    "256 dynamic registrations/failed-binding dispatchers",
+    "4096 live Intent/IntentFilter objects and queued deliveries",
+    "64 actions/categories; 4096 bytes per action/package/category",
+    "64 installed packages,4096 components per package,256 matching services"
+  ],
+  "unsupported_explicit": [
+    "Binder IPC and service execution",
+    "Implicit/external/manifest broadcast delivery; ordered/sticky send and custom receiver scheduler/permissions",
+    "IntentFilter data matching and nonzero service query flags",
+    "Unbound ServiceInfo fields such as applicationInfo; no fabricated null",
+    "Resource-valued selected service enabled/exported/permission/process and application metadata not resolved by current model"
+  ],
+  "references": [
+    "https://developer.android.com/reference/android/content/Context",
+    "https://developer.android.com/reference/android/content/BroadcastReceiver",
+    "https://developer.android.com/reference/android/content/pm/PackageManager",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/core/java/android/app/ContextImpl.java"
+  ],
+  "std_legacy_field_behavior": "Unchanged under cfg(feature=std)",
+  "emulator": "pending_root_new_NRO",
+  "physical_device": "not_run",
+  "clippy": "pending_consolidated_parent_checks"
+}

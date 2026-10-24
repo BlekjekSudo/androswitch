@@ -48,9 +48,18 @@ pub fn call_static_intrinsic(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(value) = crate::portable::monitor::call_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     if class == "Ljava/lang/System;" && name == "gc" && sig == "()V" {
         vm.gc();
         return Ok(Some(Value::Null));
+    }
+    if let Some(value) = crate::portable::enums::call_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = crate::portable::format::call_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
     }
     if let Some(value) = crate::portable::file::call_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
@@ -63,13 +72,56 @@ pub fn call_static_intrinsic(
 #[allow(clippy::too_many_arguments)]
 pub fn call_instance_intrinsic_mref(
     vm: &mut Engine,
-    _receiver_class: &str,
+    receiver_class: &str,
     declaring_class: &str,
     name: &str,
     sig: &str,
     receiver: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(value) = crate::portable::throwables::call_instance(
+        vm,
+        receiver_class,
+        declaring_class,
+        name,
+        sig,
+        receiver,
+        args,
+    )? {
+        return Ok(Some(value));
+    }
+    if let Some(value) =
+        crate::portable::monitor::call_instance(vm, declaring_class, name, sig, receiver)?
+    {
+        return Ok(Some(value));
+    }
+    if let Some(value) = crate::portable::atomic::call_instance(
+        vm,
+        receiver_class,
+        declaring_class,
+        name,
+        sig,
+        receiver,
+        args,
+    )? {
+        return Ok(Some(value));
+    }
+    if let Some(value) =
+        crate::portable::classes::call_instance(vm, declaring_class, name, sig, receiver)?
+    {
+        return Ok(Some(value));
+    }
+    if let Some(value) = crate::portable::enums::call_instance(
+        vm,
+        receiver_class,
+        declaring_class,
+        name,
+        sig,
+        receiver,
+        args,
+    )? {
+        return Ok(Some(value));
+    }
     if let Some(value) =
         crate::portable::file::call(vm, declaring_class, name, sig, receiver, args)?
     {

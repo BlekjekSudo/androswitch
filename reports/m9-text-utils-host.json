@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T15:21:44.0889932Z",
+  "scope": "General API26 TextUtils.isEmpty with real virtual CharSequence.length dispatch on the portable no_std VM. Original SDK fixtures; no package-specific runtime behavior.",
+  "status": "host_passed_emulator_pending",
+  "portable_core_asserted": true,
+  "observed_blocker": {
+    "error": "NOT_FOUND [rd-vm]: método Landroid/text/TextUtils;->isEmpty(Ljava/lang/CharSequence;)Z não resolvido [pc 0x7: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 376, regs: [3, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/measurement/internal/zzid;->zzc(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Landroid/text/TextUtils;->isEmpty(Ljava/lang/CharSequence;)Z não resolvido [pc 0x7: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 376, regs: [3, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/measurement/internal/zzid;->zzc(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+    "nro_sha256": "11391da16ac936815be9a035443b104ff7e06e82a9f6a705397ba780031670a4",
+    "run": "local-artifacts/m9/external-runs/53b831f4f0f14c9ab188ace3301f8689",
+    "sd_restore": "restored",
+    "returned_to_launcher": true
+  },
+  "contract": [
+    "Null returns true, including DEX zero reference normalization",
+    "Non-null CharSequence invokes its actual length()I exactly once; no toString/charAt/trim shortcut",
+    "Real DEX inheritance/overrides/sideeffects/exceptions remain authoritative; negative custom length compares unequal to zero",
+    "StringBuilder and StringBuffer length reads actual stored content and counts UTF16 code units",
+    "Unsupported TextUtils descriptors/methods remain NOT_FOUND; wrong non-CharSequence objects return VM_TYPE_ERROR"
+  ],
+  "commands": [
+    {
+      "command": "pwsh -NoProfile -File fixtures/m9/text-utils/build.ps1",
+      "status": "passed",
+      "exit_code": 0
+    },
+    {
+      "jvm_comparisons": 38,
+      "ignored": 0,
+      "jvm_cases": 19,
+      "test_seconds": 0.55,
+      "passed": 3,
+      "manifest_identities": 2,
+      "status": "passed",
+      "exit_code": 0,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-framework --features host --test text_utils --locked -- --nocapture",
+      "failed": 0
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1 cargo clippy -p as-framework --features host --lib --test text_utils --locked -- -D warnings",
+      "seconds": 9.63,
+      "status": "passed",
+      "exit_code": 0
+    }
+  ],
+  "tests": [
+    "null_strings_builders_and_custom_virtual_lengths_match_jvm_in_both_packages",
+    "utf16_builder_and_buffer_content_is_counted_and_null_register_zero_is_normalized",
+    "callback_gc_keeps_sequence_payload_alive_and_wrong_types_or_unsupported_descriptors_fail"
+  ],
+  "fixture_build": {
+    "apks": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\text-utils-fixture\\text-utils.apk",
+        "sha256": "8757f70fa48c7dadf20b46595de8bfce0dec690296dd684fdb6daf8b03b965d7"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\text-utils-fixture\\renamed.apk",
+        "sha256": "b065f3f872cc155a163ce5ea28ae861689d2750175ac48d4b0f2f2d9ad2a058c"
+      }
+    ],
+    "sources": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\text-utils\\java\\org\\androswitch\\contracts\\TextCases.java",
+        "sha256": "8abc6aaa8851ecedf95db076b22d696842f843d85a39606379a303c0815d9820"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\text-utils\\java\\org\\androswitch\\contracts\\TextFixture.java",
+        "sha256": "66a359bf8c4c132995d3f37281ef8ebf3f559739955b3884a3185d35674bf249"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\text-utils\\java\\org\\androswitch\\contracts\\TextOracle.java",
+        "sha256": "eedaa097b6df2cbf86539ce4d1bb3ee95706451ad8838e1b7b76925c443151e5"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\text-utils\\java\\org\\androswitch\\contracts\\TextUtilsActivity.java",
+        "sha256": "1e08100682717247342288fae601bdb6cfebe7f6c731cea2dc7d3cd35a6ccb31"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\text-utils\\build.ps1",
+        "sha256": "b438da0ad367332c149d760a36cab900b90238dc3c5301547caede6610203ed8"
+      }
+    ],
+    "schema_version": 1,
+    "oracle": {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\text-utils-fixture/jvm-oracle.txt",
+      "sha256": "a818abf98197a6ef5d7ac9b62e308d8d37ee9fe2449ef192c3e9c5848485ae62"
+    },
+    "build_tools": "35.0.0",
+    "api": 26
+  },
+  "source_hashes_captured_after_test": [
+    {
+      "sha256": "3aa4c4ec69cbf4c5abece124102b326e5c7977ad23112109cc519c3bae909da1",
+      "path": "crates/as-framework/src/services/text_utils.rs"
+    },
+    {
+      "sha256": "8bb5c94db6f41aaa35df1d8ef222a84e466a4aaa2a500dca76d7c3e70f5492f8",
+      "path": "crates/as-framework/src/services/mod.rs"
+    },
+    {
+      "sha256": "a45345baba6cf7872cbea6caa4baee0c491707e0ecdb0158051b9d377a15f0bc",
+      "path": "crates/as-framework/src/android.rs"
+    },
+    {
+      "sha256": "14b2530e8549b9d036b5d091bb7149e9e46630055474faf3acd95d0b840490b9",
+      "path": "crates/as-framework/Cargo.toml"
+    },
+    {
+      "sha256": "e6228caf4048c4326bc9191d732d6f3c2469df47907d175d6ab26f63775b49b8",
+      "path": "crates/rd-vm/src/classpath.rs"
+    },
+    {
+      "sha256": "58c75e311ae60ddef3195dd3fd2e1eb05a4a727f6a8f72de1cf040909296d593",
+      "path": "crates/as-framework/tests/text_utils.rs"
+    }
+  ],
+  "primary_reference": "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/core/java/android/text/TextUtils.java",
+  "verification": {
+    "host": "Three tests passed on the actual portable Engine. 38 comparisons against the pure-Java null-or-length expression plus explicit UTF16/GC/negative checks.",
+    "hardware": "not run",
+    "gc_scope": "Test NativeHost injects collection during actual DEX length callback, with a checked actual Rust test-thread identity. This is host GC lifetime proof, not Horizon JNI/AArch64 execution.",
+    "exception_scope": "Uncaught VmExit diagnostic message preserves a stack suffix; a real DEX catch checks Throwable.getMessage separately and receives the original length failure message.",
+    "android_reference_device": "not run; the JVM oracle uses the identical API26 boolean expression and real JDK CharSequence implementations without an Android TextUtils stub",
+    "emulator": "corrected game and fixture NRO pending"
+  }
+}

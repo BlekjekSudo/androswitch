@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T09:33:14.9663964Z",
+  "status": "passed_portable_host",
+  "command": "cargo test -p as-switch-smoke --features portable-tests --test portable_enum --locked -- --nocapture",
+  "environment": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  },
+  "exit_code": 0,
+  "tests_passed": 3,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "jvm_differential_cases": 13,
+  "differential_passes": 2,
+  "asserts_portable_core": true,
+  "source_hashes": [
+    {
+      "path": "crates/rd-vm/src/portable/enums.rs",
+      "sha256": "bec094f27cc90debfecf44c62d36fb50e8d00dc177cbe9647173d2c846985852"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/mod.rs",
+      "sha256": "07587f090e622ce92ef04703327b09d9175bdcaa229b2af5c6676b56a3880dd0"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/intrinsics.rs",
+      "sha256": "4f06ef196198323b87c013c3d3ddcb9093d86132816803393426e7833bde007e"
+    },
+    {
+      "path": "crates/rd-vm/src/interp.rs",
+      "sha256": "1e08c9c6b682b39276863282906ac5630ad7dd235fcdd2fe1d5fad2416f0c8d1"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_enum.rs",
+      "sha256": "dcab414b2b2fbf941ce1ccb49c81c5040a8f1cd7df1414f10869a345a5d9d73d"
+    },
+    {
+      "path": "crates/as-switch-smoke/Cargo.toml",
+      "sha256": "cbdb2eb6b5d87f59202be1dfb3b3dd3a15b03df8660347d9236b8d98542ba27f"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-enum/EnumFixture.java",
+      "sha256": "177379a2e08b52e4c585dc857a7ce9b9989cbf1bb333dc4847e9aa8ee923b66f"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-enum/build.ps1",
+      "sha256": "3b966d527bc509ee6fb8e83d4badacecd4bc900ac50ee135e6812cac4171bbb9"
+    }
+  ],
+  "fixture_build_receipt": "target/portable-enum-fixture/build-receipt.json",
+  "fixture_build_receipt_sha256": "296ee3a32e223492a89c4e36779f2059841681980697bedd049e8b860dc892dd",
+  "format": "passed",
+  "diff_whitespace": "passed",
+  "android_reference": "https://android.googlesource.com/platform/libcore/+/refs/tags/android-8.0.0_r4/ojluni/src/main/java/java/lang/Enum.java?format=TEXT",
+  "scope": "Actual portable VM and unchanged independently compiled Java enum DEX compared to JVM. No external APK or device compatibility claim.",
+  "limitations": [
+    "EnumSet/EnumMap, serialization and reflection of private Enum fields are outside this change.",
+    "Private Enum VM state uses qualified internal heap slots to avoid app fields that shadow name/ordinal.",
+    "General Array.clone is shallow; object-array behavior is exercised by real generated enum.values()."
+  ]
+}

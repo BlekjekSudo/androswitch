@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T12:54:38.3196641Z",
+  "status": "host_callback_contracts_and_c_arm64_compile_passed_horizon_rust_e2e_pending",
+  "scope": "General pre-release coordination of real global/current-thread C++ and pthread-key callbacks; preserve worker quiescence, mapped code, native TLS, JNI roots and VM until callbacks settle. No package checks or reset-time owner clearing.",
+  "observed_run": {
+    "verification": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/verification.json",
+    "nro_sha256": "27e2cc2c88cdc436b1180e26d311bc29806803857f25c3e796cf6fec800b345d",
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "session_report": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/sessions/a456c026c5884ecf9596370135974ae1-1/session-report.json",
+    "session_report_sha256": "f9f0583bb2adb03022db9799176b848b135514cd9391081d096b49385d2bef43",
+    "teardown_log": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/sessions/a456c026c5884ecf9596370135974ae1-1/teardown.log",
+    "teardown_log_sha256": "cea897ad781d1981b8f9e9046ddd2651141f39c77a6af261f385e3694b65401b",
+    "error": "API_UNAVAILABLE [rd-vm]: new-instance Ljava/util/concurrent/atomic/AtomicBoolean;: platform state for Ljava/util/concurrent/atomic/AtomicBoolean; is unavailable [pc 0xd: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 9672) }]\n  at Lcom/king/main/EngineActivity;-><init>()V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><init>()V; cleanup: NATIVE_RESOURCE_RESET_FAILED: -16; reopen homebrew",
+    "established": "Reset logs native_reset_cxx_busy and native_reset_cxx_thread_destructors_pending, without the global-destructor pending phase. Current-thread destructor callbacks therefore remain after the previous finalization sequence.",
+    "inference": "The old sequence drains thread callbacks before module/global finalizers and lacks a post-global drain. A global finalizer registering a new TLS destructor reproduces the observed pending state. The exact registration instruction in the user APK was not captured."
+  },
+  "implementation": {
+    "runtime_c_coordinator": "Runs real provider finalizers, alternating globals and current-thread C++/pthread-key work until pending flags settle. Current-thread helper rechecks new C++ callbacks created by key destructors. Normal guest __cxa_finalize remains unchanged.",
+    "bounds": "64 coordination passes, retaining existing inner C++ callback limits and pthread-key four-round behavior. Runaway work returns -ELOOP; pending entries are retained.",
+    "rust_modules": "Session.finalize_libraries rechecks callbacks and modules loaded by finalizers rather than returning immediately after the global registry drain. No loader/VM RefCell borrow spans a guest callback.",
+    "quiescence": "Application keeps initial quiescence, repeats post-finalizer media/native worker quiescence, then checks new callback/module work under VmGate. Up to64 settling/join rounds, all before media reset, close_vm, release_root or drop.",
+    "ownership": "Any callback error, quiescence failure or settling limit preserves Running/session/mappings through the existing forget-and-reopen path. Busy reset checks are not weakened. No callback is invoked from reset after mappings drop.",
+    "gate": "Existing callback bridge releases/reacquires VmGate while the live Engine pointer is installed. Pending metadata inspection occurs under the gate; only a false result after worker joins permits release.",
+    "worker_scope": "Native worker error-cleanup behavior was not changed by this patch.",
+    "required_checks": "scripts/test-native-abi.ps1 now builds and executes the actual shared coordinator fixture and fails on its nonzero exit."
+  },
+  "primary_sources": [
+    "https://raw.githubusercontent.com/aosp-mirror/platform_bionic/f711b078b9656f7dbb52a046a7f992a450e8fa13/libc/bionic/pthread_exit.cpp",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_bionic/f711b078b9656f7dbb52a046a7f992a450e8fa13/libc/bionic/pthread_key.cpp",
+    "https://itanium-cxx-abi.github.io/cxx-abi/abi.html#dso-dtor-runtime-api"
+  ],
+  "reference_scope": "Primary sources support destructor order, real callback invocation and at-most-once removal. The bounded whole-session settling coordinator is an AndroSwitch lifecycle policy, not a claim to reproduce every Android process-exit detail.",
+  "checks": [
+    {
+      "name": "focused_shared_coordinator_host",
+      "status": "passed",
+      "command": "cc -pipe -std=gnu11 -O2 -Wall -Wextra -Werror -pthread -Iplatform/switch-smoke fixtures/m9/native-abi/finalization.c platform/switch-smoke/bionic_finalize.c platform/switch-smoke/bionic_cxx.c platform/switch-smoke/bionic_keys.c -o local-artifacts/m9/native-abi/finalization; execute binary",
+      "result": "native finalization contracts: PASS (late TLS, cross-registration, keys, reentrancy, errors, bounds)",
+      "coverage": [
+        "Old ordering reproduces pending TLS and -EBUSY without clearing ownership.",
+        "New shared coordinator actually invokes global-created TLS callbacks while test state remains live.",
+        "TLS-to-global and global-to-TLS chains settle; reentrant TLS registration preserves LIFO order.",
+        "Global-created key data and key-destructor-created TLS callbacks are invoked.",
+        "Nested finalization does not execute an entry twice.",
+        "An exact callback error stops immediately and retains uncalled entries.",
+        "Cross-registry runaway stops at declared limit, leaves pending work and busy reset; fixture resumes only after disabling its own generator."
+      ]
+    },
+    {
+      "name": "existing_native_abi_host",
+      "status": "passed",
+      "command": "Existing contracts.c with bionic_random/cxx/libc/locale/multibyte/io/keys/log/vfs/missing_import providers, GNU11 -O2 -Wall -Wextra -Werror -pthread -lm, output contracts-finalize; execute binary",
+      "result": "native ABI contracts: PASS (C++ lifetimes, guards/once/keys, allocation, fortify, stdio/VFS, logging)"
+    },
+    {
+      "name": "wsl_strict_arm64_objects",
+      "status": "passed",
+      "command": "make -C platform/androswitch OUTPUT_DIR=../../local-artifacts/m9/native-abi/finalize-target ../../local-artifacts/m9/native-abi/finalize-target/bionic_finalize.o ../../local-artifacts/m9/native-abi/finalize-target/bionic_keys.o ../../local-artifacts/m9/native-abi/finalize-target/native.o",
+      "result": "All three objects compiled through product Makefile with -Wall -Wextra -Werror."
+    },
+    {
+      "name": "windows_strict_arm64_objects",
+      "status": "passed",
+      "command": "C:/devkitPro/devkitA64/bin/aarch64-none-elf-gcc.exe with product ARM64/libnx flags, -D__SWITCH__ -O2 -Wall -Wextra -Werror; compile bionic_finalize.c, bionic_keys.c, native.c to isolated output objects",
+      "result": "All three objects compiled successfully."
+    },
+    {
+      "name": "rust_formatting",
+      "status": "passed",
+      "command": "rustfmt --edition 2021 crates/as-switch-smoke/src/device_jni.rs crates/as-switch-smoke/src/application.rs",
+      "tool": "rustfmt1.9.0-stable (8bab26f4f6 2026-07-14)",
+      "note": "Nightly rustfmt component was absent; no component was installed or global toolchain changed."
+    },
+    {
+      "name": "scoped_diff_check",
+      "status": "passed",
+      "command": "git diff --check changed Rust/native/Makefile/script paths"
+    }
+  ],
+  "source_files": [
+    {
+      "path": "platform/switch-smoke/bionic_finalize.c",
+      "sha256": "30072d5754001cb87651de4c447e112bede00bf2bc22dfc5d51af856942bc826"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_finalize.h",
+      "sha256": "77f8e10777fc6f156d89c07832926da8d7ff93df8dcdf26429964e44753c940a"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_keys.c",
+      "sha256": "f54ebf263e42feb73d97268569751b14aea9660978c1eaba2728db5ef39222e8"
+    },
+    {
+      "path": "platform/switch-smoke/native.c",
+      "sha256": "b0ecb601cf7c896ad3c2288dbf62d3375aa779e4a64e24cd817e63407264961d"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_jni.rs",
+      "sha256": "3d99820d6f704dc6b5108e29c239c38e65975d8a013818a03394db04aa7236b0"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/application.rs",
+      "sha256": "da91aa6efea0cf48464d0d89c15618854ecb172ce3d14add37332b6b1552fb95"
+    },
+    {
+      "path": "fixtures/m9/native-abi/finalization.c",
+      "sha256": "45c99514d4584bdcc89cb370c30e46703d3b9f91db39210dc15ed0d495a3c89a"
+    },
+    {
+      "path": "platform/androswitch/Makefile",
+      "sha256": "174d1d1ae8736deafe3b382c2ece96f514d00c583dbfa2f6fd239e3f0508b85d"
+    },
+    {
+      "path": "platform/switch-smoke/Makefile",
+      "sha256": "03beac5c92d6d1fb018e4cf9176ebeb1b26300a495572cbb89d1ee1f7563b98d"
+    },
+    {
+      "path": "scripts/test-native-abi.ps1",
+      "sha256": "a4256e3214e34a27fd29af3aef4264e3678e9a19d96d035c2ab98ee23980dcd7"
+    }
+  ],
+  "not_run": [
+    "Changed Horizon Rust source has not yet been target typechecked in this subtask; parent build9 is the independent verification owner.",
+    "No Cargo jobs launched by this agent.",
+    "No new NRO E2E or physical Switch execution is claimed in this receipt.",
+    "No separate host execution of the Horizon Rust late-module/worker-quiescence subcases; those paths are source-reviewed and await target/E2E evidence."
+  ],
+  "limitations": [
+    "Callback-count bounds cannot preempt an individual guest callback that never returns.",
+    "Coordination can repeat the existing four-round key-destructor operation if later C++ callbacks create new key state; this termination policy is explicitly bounded and is not an exact replay of Android kernel process exit.",
+    "Finalization errors retain the session; no unsafe automatic reset/retry is introduced after mappings are dropped."
+  ],
+  "environment_note": "WSL root systemd-user-session startup warning delayed command startup; test/build commands subsequently completed exit0. No WSL configuration was changed.",
+  "provenance": "Original AndroSwitch coordinator and fixture, MIT OR Apache-2.0. No upstream source payload copied; existing RustyDroid attribution retained."
+}

@@ -17,6 +17,9 @@ pub const RES_TABLE_TYPE_CHUNK: u16 = 0x0201;
 const FLAG_SPARSE: u8 = 0x01;
 const FLAG_OFFSET16: u8 = 0x02;
 const ENTRY_FLAG_COMPLEX: u16 = 0x0001;
+#[path = "arsc_identifier.rs"]
+mod identifier;
+pub use identifier::{identifier_name, identifier_number};
 
 #[inline]
 fn u16_at(d: &[u8], off: usize) -> RdResult<u16> {
@@ -39,6 +42,10 @@ pub struct ResConfigInfo {
     pub country: Option<String>,
     pub density: Option<u16>,
     pub api_level: Option<u16>,
+    /// Raw configuration contains qualifiers beyond locale, density and SDK.
+    /// Existing inspection selectors retain their behavior; consumers requiring
+    /// exact supported configuration matching can explicitly decline these.
+    pub unsupported_qualifiers: bool,
 }
 
 impl ResConfigInfo {
@@ -89,10 +96,20 @@ pub struct ResEntry {
 pub struct Package {
     pub id: u8,
     pub name: String,
+    /// Added to each on-disk type id; absent in legacy 284-byte headers.
+    pub type_id_offset: u8,
     pub type_strings: StringPool,
     pub key_strings: StringPool,
     /// resid completo → entradas por config.
     pub entries: BTreeMap<u32, Vec<ResEntry>>,
+}
+
+/// The identity of an entry in its owning table, independent of value/config.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResourceName<'a> {
+    pub package: &'a str,
+    pub resource_type: &'a str,
+    pub entry: &'a str,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -102,14 +119,35 @@ pub struct Arsc {
 }
 
 impl Package {
+    pub fn resource_name(&self, res_id: u32) -> Option<ResourceName<'_>> {
+        if self.id == 0 || (res_id >> 24) != u32::from(self.id) {
+            return None;
+        }
+        let raw_type = ((res_id >> 16) as u8)
+            .checked_sub(self.type_id_offset)?
+            .checked_sub(1)?;
+        let entries = self.entries.get(&res_id)?;
+        let first = entries.first()?;
+        // Configuration variants describe the same entry. Conflicting key
+        // indexes are malformed metadata, not a reason to guess an identity.
+        if entries.iter().any(|e| e.key_idx != first.key_idx) {
+            return None;
+        }
+        let resource_type = self.type_strings.get(u32::from(raw_type))?;
+        let entry = self.key_strings.get(first.key_idx)?;
+        if self.name.is_empty() || resource_type.is_empty() || entry.is_empty() {
+            return None;
+        }
+        Some(ResourceName {
+            package: &self.name,
+            resource_type,
+            entry,
+        })
+    }
     /// Nome qualificado `@type/key` de um resid (sem pacote).
     pub fn resolve_name(&self, res_id: u32) -> Option<String> {
-        let entries = self.entries.get(&res_id)?;
-        let key = entries.first()?;
-        let type_idx = ((res_id >> 16) & 0xFF) as usize; // 1-based
-        let type_name = self.type_strings.get((type_idx as u32).wrapping_sub(1))?;
-        let key_name = self.key_strings.get(key.key_idx)?;
-        Some(format!("@{type_name}/{key_name}"))
+        let name = self.resource_name(res_id)?;
+        Some(format!("@{}/{}", name.resource_type, name.entry))
     }
 }
 
@@ -246,8 +284,26 @@ impl Arsc {
 
     /// `@type/key` do recurso (primeiro pacote que o conhece).
     pub fn resolve_name(&self, res_id: u32) -> Option<String> {
-        let pkg = self.package_for(res_id)?;
-        pkg.resolve_name(res_id)
+        let name = self.resource_name(res_id)?;
+        Some(format!("@{}/{}", name.resource_type, name.entry))
+    }
+
+    /// Lookup does not follow aliases or select a value configuration. Table
+    /// fragments must agree on the identity; conflicting owners are ambiguous.
+    pub fn resource_name(&self, res_id: u32) -> Option<ResourceName<'_>> {
+        let mut found = None;
+        for package in self
+            .packages
+            .iter()
+            .filter(|p| p.entries.contains_key(&res_id))
+        {
+            let candidate = package.resource_name(res_id)?;
+            if found.is_some_and(|name| name != candidate) {
+                return None;
+            }
+            found = Some(candidate);
+        }
+        found
     }
 
     /// issue #61: valor TIPADO da melhor config de um resid. `None` = resid
@@ -360,10 +416,22 @@ fn parse_package(
     header_size: usize,
     global: &StringPool,
 ) -> RdResult<Package> {
-    if base + 288 > data.len() {
+    let end = base
+        .checked_add(size)
+        .ok_or_else(|| RdError::parse("arsc: package size overflow"))?;
+    if header_size < 284 || header_size > size || end > data.len() {
         return Err(RdError::parse("arsc: package chunk truncated (header)"));
     }
-    let pkg_id = (u32_at(data, base + 8)? & 0xFF) as u8;
+    // Every read below is confined to the package that owns the metadata.
+    let data = &data[..end];
+    let pkg_id = u8::try_from(u32_at(data, base + 8)?)
+        .map_err(|_| RdError::parse("arsc: package id exceeds 8 bits"))?;
+    let type_id_offset = if header_size >= 288 {
+        u8::try_from(u32_at(data, base + 284)?)
+            .map_err(|_| RdError::parse("arsc: typeIdOffset exceeds 8 bits"))?
+    } else {
+        0
+    };
     let type_strings_off = u32_at(data, base + 268)? as usize;
     let key_strings_off = u32_at(data, base + 276)? as usize;
 
@@ -378,14 +446,25 @@ fn parse_package(
     }
     let name = String::from_utf16_lossy(&name_units);
 
-    let (type_strings, _) = StringPool::parse(data, base + type_strings_off)?;
-    let (key_strings, _) = StringPool::parse(data, base + key_strings_off)?;
+    let symbol_pool = |offset: usize| -> RdResult<StringPool> {
+        // Zero denotes inherited overlay pools. Overlay/dynamic package
+        // composition is not implemented, so do not invent owning names.
+        if offset < header_size || offset > size.saturating_sub(8) {
+            return Err(RdError::parse("arsc: symbol pool outside owning package"));
+        }
+        let (pool, used) = StringPool::parse(data, base + offset)?;
+        if used as usize > size - offset {
+            return Err(RdError::parse("arsc: symbol pool exceeds owning package"));
+        }
+        Ok(pool)
+    };
+    let type_strings = symbol_pool(type_strings_off)?;
+    let key_strings = symbol_pool(key_strings_off)?;
 
     let mut entries: BTreeMap<u32, Vec<ResEntry>> = BTreeMap::new();
 
     // caminhar chunks internos a partir do fim do header real do pacote
     let mut p = base + header_size;
-    let end = base + size;
     while p + 8 <= end {
         let ctype = u16_at(data, p)?;
         let cheader = u16_at(data, p + 2)? as usize;
@@ -395,9 +474,21 @@ fn parse_package(
             break; // chunk truncado: não fatal para o M0 — o que veio antes fica
         }
         if ctype == RES_TABLE_TYPE_CHUNK {
+            if cheader < 20 {
+                return Err(RdError::parse("arsc: type header shorter than 20 bytes"));
+            }
             let type_id = data.get(p + 8).copied().unwrap_or(0);
+            let effective_type = type_id
+                .checked_add(type_id_offset)
+                .filter(|_| type_id != 0)
+                .ok_or_else(|| RdError::parse("arsc: invalid or overflowing type id"))?;
             let flags = data.get(p + 9).copied().unwrap_or(0);
             let entry_count = u32_at(data, p + 12)? as usize;
+            if entry_count > 65_536 {
+                return Err(RdError::parse(
+                    "arsc: entry count exceeds 16-bit resource ids",
+                ));
+            }
             let entries_start = u32_at(data, p + 16)? as usize;
 
             // issue #29: ResTable_type tem no mínimo 20 bytes de header
@@ -414,8 +505,11 @@ fn parse_package(
                 if rel_off == 0xFFFF_FFFF {
                     return Ok(());
                 }
+                if idx > u16::MAX as usize {
+                    return Err(RdError::parse("arsc: resource entry index exceeds 16 bits"));
+                }
                 let eoff = entries_abs + rel_off as usize;
-                if eoff + 8 > data.len() {
+                if eoff + 8 > p + csize {
                     return Ok(()); // entrada truncada: skip
                 }
                 let e_size = u16_at(data, eoff)? as usize;
@@ -479,8 +573,7 @@ fn parse_package(
                 } else {
                     None
                 };
-                let resid =
-                    ((pkg_id as u32) << 24) | ((type_id as u32) << 16) | (idx as u32 & 0xFFFF);
+                let resid = ((pkg_id as u32) << 24) | ((effective_type as u32) << 16) | idx as u32;
                 entries.entry(resid).or_default().push(ResEntry {
                     config: config.clone(),
                     data_type,
@@ -512,7 +605,10 @@ fn parse_package(
                     if o + 2 > data.len() {
                         break;
                     }
-                    collect(i, u16_at(data, o)? as u32 * 4)?;
+                    let offset = u16_at(data, o)?;
+                    if offset != u16::MAX {
+                        collect(i, u32::from(offset) * 4)?;
+                    }
                 }
             } else {
                 for i in 0..entry_count {
@@ -530,6 +626,7 @@ fn parse_package(
     Ok(Package {
         id: pkg_id,
         name,
+        type_id_offset,
         type_strings,
         key_strings,
         entries,
@@ -557,12 +654,18 @@ fn parse_package(
 fn parse_config(data: &[u8], cfg_base: usize, cfg_max: usize) -> RdResult<ResConfigInfo> {
     let mut cfg = ResConfigInfo::default();
     if cfg_max < 4 || cfg_base + 4 > data.len() {
+        cfg.unsupported_qualifiers = true;
         return Ok(cfg);
     }
     let cfg_size = u32_at(data, cfg_base)? as usize;
     let readable = cfg_size
         .min(cfg_max)
         .min(data.len().saturating_sub(cfg_base));
+    cfg.unsupported_qualifiers = cfg_size < 4
+        || cfg_size > readable
+        || (4..readable).any(|offset| {
+            !matches!(offset, 8..=11 | 14..=15 | 24..=25) && data[cfg_base + offset] != 0
+        });
     let lang = |off: usize| -> Option<String> {
         let b = data.get(cfg_base + off..cfg_base + off + 2)?;
         if b[0] == 0 && b[1] == 0 {
@@ -601,6 +704,26 @@ fn parse_config(data: &[u8], cfg_base: usize, cfg_max: usize) -> RdResult<ResCon
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bitmap_consumers_can_detect_unmodeled_raw_resource_qualifiers() {
+        let mut data = [0u8; 64];
+        data[..4].copy_from_slice(&64u32.to_le_bytes());
+        data[14..16].copy_from_slice(&320u16.to_le_bytes());
+        data[24..26].copy_from_slice(&26u16.to_le_bytes());
+        assert!(!parse_config(&data, 0, 64).unwrap().unsupported_qualifiers);
+        for offset in [4, 12, 13, 16, 20, 26, 28, 36, 60] {
+            data[offset] = 1;
+            assert!(parse_config(&data, 0, 64).unwrap().unsupported_qualifiers);
+            data[offset] = 0;
+        }
+        assert!(parse_config(&data, 0, 32).unwrap().unsupported_qualifiers);
+        data[8] = b'f';
+        data[9] = b'r';
+        let config = parse_config(&data, 0, 64).unwrap();
+        assert_eq!(config.language.as_deref(), Some("fr"));
+        assert!(!config.unsupported_qualifiers);
+    }
 
     fn empty_global_pool() -> Vec<u8> {
         // ResStringPool vazio válido: 28 bytes de header, 0 strings
@@ -695,6 +818,7 @@ mod tests {
             packages: vec![Package {
                 id: 0x7f,
                 name: "test".into(),
+                type_id_offset: 0,
                 type_strings: Default::default(),
                 key_strings: Default::default(),
                 entries,
@@ -782,6 +906,7 @@ mod tests {
             packages: vec![Package {
                 id: 0x7f,
                 name: "test".into(),
+                type_id_offset: 0,
                 type_strings: StringPool::default(),
                 key_strings: StringPool::default(),
                 entries,

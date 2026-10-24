@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "scope": "Bounded owned GLSurface worker cleanup and actual return-code/timestamp diagnostics; no fake quiescence.",
+  "source_snapshots": [
+    {
+      "sha256": "7fe77b2b8d8a65a4cddbae716fde05a153edf812d307c7b3154089d7011ad1e6",
+      "path": "platform/androswitch/main.c"
+    },
+    {
+      "sha256": "fb589e629b0cab26301957a9eb1b7661655c327cb4c52f3a456fa880127b1f06",
+      "path": "platform/androswitch/media.c"
+    },
+    {
+      "sha256": "a2ae3ef0df5322a9dcf40b6329203e96cc2cbc7290bd724bcecdf6ddf7979ac6",
+      "path": "platform/androswitch/media.h"
+    },
+    {
+      "sha256": "88153ad66eb5c9efcedf2d05a32d008f281b13167c9114af47d954a5616309f5",
+      "path": "platform/androswitch/glsurface.c"
+    },
+    {
+      "sha256": "0a5b4cf3c553ccf8bd6cfc70f25027d04700450c01011dbd138239b43d82bce7",
+      "path": "platform/androswitch/tests/glsurface_worker.c"
+    },
+    {
+      "sha256": "afa5891f0f53c4fb670c2acce241010e550116a306032bf94f0da65ef2721ccf",
+      "path": "scripts/test-horizon-display.ps1"
+    }
+  ],
+  "motivation": {
+    "run_id": "5e2087ff824f423f848553c42ac97f9a",
+    "raw_evidence": [
+      {
+        "sha256": "f7ca2a233544e5fa3c0951d4ce857f024746fb3b8d2dcbeb6fa31a071766f906",
+        "bytes": 500,
+        "path": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-external-result-5e2087ff824f423f848553c42ac97f9a\\logs\\teardown.log"
+      },
+      {
+        "sha256": "12b166decaee1c6aca6d632da06221660e9904ba1f7ca32b7e24bf93ba6ccd33",
+        "bytes": 221,
+        "path": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-external-result-5e2087ff824f423f848553c42ac97f9a\\logs\\session-report.json"
+      },
+      {
+        "sha256": "dcbe3551793d07eae068297115a4c77bbe975e5190d7e47e3566286cf25b091f",
+        "bytes": 189,
+        "path": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-external-result-5e2087ff824f423f848553c42ac97f9a\\userdata\\org.fixture.portraitproof\\files\\portrait-proof.json"
+      }
+    ],
+    "nro_sha256": "43f319fb156fe020cd79d05c8645e08fb6aa72d0ad44dde2892c2b558259ce47",
+    "stop_failed_tick": 642985703,
+    "terminate_entry_tick": 616423430,
+    "join_entry_tick": 602173958,
+    "backend": "ryujinx",
+    "interpretation": "The previous2s total worker wait expired while termination had not returned. No proof yet that eglTerminate itself failed or that6s fixes the actual device/emulator run.",
+    "observed": "Actual portrait fixture reports720x1280 callbacks matching surface dimensions,30frames and native readback mask15. Return failed at owned worker join with no eglTerminate completion event."
+  },
+  "policy": {
+    "watchdog_wait_ns": 15000000000,
+    "watchdog_origin": "Watchdog is started after the stop marker is written and before Rust lifecycle callbacks;15s runs from its wait entry.",
+    "ownership": "Actual successful thread wait and close are required. Timeout and sticky EGL close failure retain owners, reject renderer reuse, and require process exit.",
+    "glsurface_worker_wait_ns": 6000000000,
+    "diagnostics": "Per-launch fresh logs/media-stop.log includes raw wait/thread/close outcomes, EGL begin/end ticks/results, and quiesce outcomes. Missing completion remains incomplete evidence."
+  },
+  "host_check": {
+    "result_path": "C:/Users/Administrator/.cache/androswitch/display-stop-check/result.json",
+    "command": "./scripts/test-horizon-display.ps1 -OutputDirectory C:/Users/Administrator/.cache/androswitch/display-stop-check",
+    "result_sha256": "3ac67ce8d5ab52bede69eb1fec1bc49b7f1c09d3cae6aa194929fa653f628072",
+    "status": "passed",
+    "worker_cases": 30,
+    "framebuffer_address_guard_cases": 4,
+    "regression": "portrait-slow-termination uses a real host worker with2.2s fake EGL teardown and checks successful6s wait, TLS cleanup and detach. Existing forced-timeout scenario verifies raw wait error is retained and reuse blocked.",
+    "checks": 35,
+    "full_rotation_cases": 4
+  },
+  "target_compile": {
+    "status": "passed",
+    "sources": [
+      "main.c",
+      "media.c",
+      "glsurface.c"
+    ],
+    "compiler": "Windows devkitA64 15.2.0",
+    "flags": "-pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -fno-strict-aliasing; actual libnx/EGL/GLES headers"
+  },
+  "emulator_fix_verification": "Pending separate parent-owned actual NRO rerun; no emulator launched by this subtask.",
+  "physical_switch": "not_run_for_this_change",
+  "m9_complete": false
+}

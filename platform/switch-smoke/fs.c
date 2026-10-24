@@ -9,6 +9,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+/* Reporting identity uses real libnx randomness plus the monotonic system tick;
+ * the clock is an identity component, not a claim about available entropy. */
+uint64_t as_reporting_nonce(void) { return randomGet64(); }
+uint64_t as_reporting_tick(void) { return armGetSystemTick(); }
+
 int as_storage_prepare(const char *root) {
   if (strncmp(root, "sdmc:/switch/androswitch", 23) != 0 || strlen(root) >= 768)
     return -EINVAL;

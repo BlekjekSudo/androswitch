@@ -1,0 +1,250 @@
+{
+  "schema_version": 1,
+  "scope": "Actual unchanged APK diagnostic execution on NRO ad5899 and task-local Ryujinx CFG diagnostic build. No complete launcher workflow or first-screen pass in either run.",
+  "runs": [
+    {
+      "run_id": "18ea0223b11f486589ba3efed59eda56",
+      "nro_sha256": "ad5899a66112b54fed8a96e5581bc8732781f4621c4b516c4a2a90fcd746f45d",
+      "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+      "status": "attempted_failed",
+      "sd_original_restore": "restored",
+      "inputs": [
+        {
+          "source": "D:\\Download\\mekorama-1-7-2.apk",
+          "install_snapshot_step": 3,
+          "staged_name": "0000-external.apk",
+          "index": 0,
+          "expected_session_id": "18ea0223b11f486589ba3efed59eda56-1",
+          "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+          "bytes": 13099584
+        }
+      ],
+      "latest_session_report": {
+        "package": "com.martinmagni.mekorama",
+        "revision": 1,
+        "schema_version": 1,
+        "session_id": "18ea0223b11f486589ba3efed59eda56-1",
+        "status": "running"
+      },
+      "latest_teardown": [],
+      "observed_sessions": [
+        {
+          "completed_case_verified": false,
+          "error": null,
+          "revision": 1,
+          "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+          "runtime_status": "running",
+          "session_id": "18ea0223b11f486589ba3efed59eda56-1",
+          "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\18ea0223b11f486589ba3efed59eda56\\sessions\\18ea0223b11f486589ba3efed59eda56-1\\session-report.json",
+          "package": "com.martinmagni.mekorama"
+        }
+      ],
+      "completed_cases": [],
+      "raw_evidence": [
+        {
+          "path": "local-artifacts/m9/external-runs/18ea0223b11f486589ba3efed59eda56/verification.json",
+          "sha256": "bec10b77118b755808bdef53db758480a017e87072302487e605fb53377f6301"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18ea0223b11f486589ba3efed59eda56/launcher-test.json",
+          "sha256": "ce27469a7b44b72423db6cca777c6f941c7b9be81979a6f8742cb1997782e031"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18ea0223b11f486589ba3efed59eda56/ryujinx.stdout.log",
+          "sha256": "28bc850ee7975340a42bcea4cb3eea84863c5d83a36ddeb452715d152a1a4446"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18ea0223b11f486589ba3efed59eda56/ryujinx.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18ea0223b11f486589ba3efed59eda56/sessions/18ea0223b11f486589ba3efed59eda56-1/jni-failures.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18ea0223b11f486589ba3efed59eda56/sessions/18ea0223b11f486589ba3efed59eda56-1/media-stop.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18ea0223b11f486589ba3efed59eda56/sessions/18ea0223b11f486589ba3efed59eda56-1/memory-admission.json",
+          "sha256": "3b85f59ae1d77d7ba84d902929ad01b1e90a7a9b170f48967305fcb5097bdfeb"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18ea0223b11f486589ba3efed59eda56/sessions/18ea0223b11f486589ba3efed59eda56-1/memory.log",
+          "sha256": "d6106afa4856eec5b8030ab7de9b0c60f5b97453d6ae0cb2757cae065eb12d01"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18ea0223b11f486589ba3efed59eda56/sessions/18ea0223b11f486589ba3efed59eda56-1/native-calls.log",
+          "sha256": "34f1e16dc893bdc7319ac3396e153526e7af5a23af9926a20de452d7ad2a7a6e"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18ea0223b11f486589ba3efed59eda56/sessions/18ea0223b11f486589ba3efed59eda56-1/native-modules.log",
+          "sha256": "e011f5455bc78115ac11786375eb1d7a389414483b5ac172b2c5f9f12a0b924d"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18ea0223b11f486589ba3efed59eda56/sessions/18ea0223b11f486589ba3efed59eda56-1/session-report.json",
+          "sha256": "3f06ca2d1602ab8ab411d9075e7dc48899e1964d1f656dba94e17c30b1da5398"
+        }
+      ]
+    },
+    {
+      "run_id": "18d9ef51e6e249a19846ccc2daf52582",
+      "nro_sha256": "ad5899a66112b54fed8a96e5581bc8732781f4621c4b516c4a2a90fcd746f45d",
+      "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+      "status": "attempted_failed",
+      "sd_original_restore": "restored",
+      "inputs": [
+        {
+          "bytes": 163371628,
+          "expected_session_id": "18d9ef51e6e249a19846ccc2daf52582-1",
+          "index": 0,
+          "sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+          "install_snapshot_step": 3,
+          "staged_name": "0000-external.apk",
+          "source": "D:\\Download\\candycrush.apk"
+        }
+      ],
+      "latest_session_report": {
+        "error": "exception java.lang.ExceptionInInitializerError: m\u00e9todo Ljava/lang/Class;->getSimpleName()Ljava/lang/String; n\u00e3o resolvido [pc 0x11: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 51832, regs: [1, 0, 0, 0, 0] } }]\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><clinit>()V; cleanup: NATIVE_RESOURCE_RESET_FAILED: -16; reopen homebrew",
+        "identity_status": "known",
+        "package": "com.king.candycrushsaga",
+        "revision": 1,
+        "schema_version": 1,
+        "session_id": "18d9ef51e6e249a19846ccc2daf52582-1",
+        "status": "failed"
+      },
+      "latest_teardown": [
+        {
+          "phase": "stop_requested",
+          "tick": 2121435256
+        },
+        {
+          "phase": "native_activity_stop",
+          "tick": 2123024576
+        },
+        {
+          "phase": "java_startup_abort",
+          "tick": 2123202858
+        },
+        {
+          "phase": "media_thread_quiesce",
+          "tick": 2123723788
+        },
+        {
+          "phase": "guest_thread_quiesce",
+          "tick": 2124154423
+        },
+        {
+          "phase": "native_destructors",
+          "tick": 2124189436
+        },
+        {
+          "phase": "media_reset",
+          "tick": 2139429630
+        },
+        {
+          "phase": "media_released",
+          "tick": 2139526538
+        },
+        {
+          "phase": "activity_dispose",
+          "tick": 2139596110
+        },
+        {
+          "phase": "runtime_drop",
+          "tick": 2139755339
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 2149000894
+        },
+        {
+          "phase": "native_resource_reset",
+          "tick": 2165894519
+        },
+        {
+          "phase": "stop_failed",
+          "tick": 2169928126
+        }
+      ],
+      "observed_sessions": [
+        {
+          "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+          "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\18d9ef51e6e249a19846ccc2daf52582\\sessions\\18d9ef51e6e249a19846ccc2daf52582-1\\session-report.json",
+          "revision": 1,
+          "error": "exception java.lang.ExceptionInInitializerError: m\u00e9todo Ljava/lang/Class;->getSimpleName()Ljava/lang/String; n\u00e3o resolvido [pc 0x11: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 51832, regs: [1, 0, 0, 0, 0] } }]\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><clinit>()V; cleanup: NATIVE_RESOURCE_RESET_FAILED: -16; reopen homebrew",
+          "session_id": "18d9ef51e6e249a19846ccc2daf52582-1",
+          "package": "com.king.candycrushsaga",
+          "completed_case_verified": false,
+          "runtime_status": "failed"
+        }
+      ],
+      "completed_cases": [],
+      "raw_evidence": [
+        {
+          "path": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/verification.json",
+          "sha256": "acc0ab32565ffc6a8ed08b3e50449b91b130c323cbd85982538bcb5783698484"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/launcher-test.json",
+          "sha256": "8fd5c3d8aba02e6cc6d5839670b60aea48bdc1c23bd4fb922262fa681ca0f7ac"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/ryujinx.stdout.log",
+          "sha256": "696e7202fe00334a6ecfd04237a02af2a51cba40d33cd8504f7c1724d67e11a5"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/ryujinx.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/sessions/18d9ef51e6e249a19846ccc2daf52582-1/jni-failures.log",
+          "sha256": "9ee5e2c37e9b4b79a7dae9b9c857bf3d511fe7db69fe046630f840544f28d218"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/sessions/18d9ef51e6e249a19846ccc2daf52582-1/media-stop.log",
+          "sha256": "e3fadf184cfe6fbf11449114a329fbc9189dc862d375d3ebd8ec0bc809ecbfea"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/sessions/18d9ef51e6e249a19846ccc2daf52582-1/memory-admission.json",
+          "sha256": "cd13314a3ffd14b0225542e32fbbbf330b0ddf44bd234d8ef3c00b139aff549f"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/sessions/18d9ef51e6e249a19846ccc2daf52582-1/memory.log",
+          "sha256": "d6bb33a6d663ff9f50bf7841f49bc04f196a5e90ee80683cfd01f91e69e57632"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/sessions/18d9ef51e6e249a19846ccc2daf52582-1/native-calls.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/sessions/18d9ef51e6e249a19846ccc2daf52582-1/native-compatibility.json",
+          "sha256": "e1d8750c10464230252b08de319d81a2dec69f38c5d1e6cc4fc00b6ee0ecc548"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/sessions/18d9ef51e6e249a19846ccc2daf52582-1/native-modules.log",
+          "sha256": "a7bc7e6ffb555f5bae87290367368b4811a80e170b286583dd2c76a510671582"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/sessions/18d9ef51e6e249a19846ccc2daf52582-1/session-report.json",
+          "sha256": "5ea874e03f3f33d9fa2e7b830e01a929376a28aed044c308fbf08c04de949e1f"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/sessions/18d9ef51e6e249a19846ccc2daf52582-1/teardown.log",
+          "sha256": "95d57b79f00e78625681d775f5310ba7ef154f6b98cddd9a7c6032b3f4c74c45"
+        }
+      ]
+    }
+  ],
+  "findings": {
+    "mekorama": "Actual backend calendar and numeric offset are valid, but the adapter rejects an empty timezone abbreviation and returns null. See separate time probe receipt for measured metadata and subsequent fix tests.",
+    "candy": "Passed the previously observed rand import and reached direct DEX Class.getSimpleName. Startup failure then encountered native resource reset -16. No safe return was observed; named reset diagnostics require a subsequent NRO run.",
+    "optional_jni_observation": "FindClass java/lang/Thread was recorded as missing, but execution continued to the distinct direct DEX error. It is not established as the current startup cause."
+  },
+  "related_receipts": [
+    "reports/m9-native-time-empty-zone.json",
+    "reports/m9-native-random-20261024.json"
+  ],
+  "external_first_screen_gate": "not_verified",
+  "physical_switch": "not_run_for_new_changes"
+}

@@ -36,6 +36,27 @@ pub trait Storage {
 
 pub trait Clock {
     fn monotonic_micros(&self) -> u64;
+    /// Actual Unix epoch time, distinct from the elapsed-time sleep clock.
+    /// Providers without a wall clock must fail before an absolute-time task
+    /// is committed; inventing epoch time would silently change scheduling.
+    fn wall_time_millis(&self) -> Result<i64, PlatformError> {
+        Err(PlatformError {
+            code: "API_UNAVAILABLE",
+            operation: "wall_time_millis",
+            cause: "platform wall clock is unavailable".into(),
+        })
+    }
+}
+
+/// One real, dedicated serial callback thread per positive opaque token.
+/// The caller keeps callback owners and VM roots alive until platform joins
+/// prove quiescence. Successful start creates the thread immediately; wake
+/// cannot resurrect a terminal worker. Cancel only signals and never joins
+/// or interrupts a callback that is currently executing.
+pub trait BackgroundWorkers {
+    fn start(&self, token: u64) -> Result<(), PlatformError>;
+    fn wake(&self, token: u64) -> Result<(), PlatformError>;
+    fn cancel(&self, token: u64) -> Result<(), PlatformError>;
 }
 
 pub trait Logger {

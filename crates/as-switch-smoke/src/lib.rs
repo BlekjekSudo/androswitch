@@ -16,9 +16,14 @@ pub mod device_jni;
 #[cfg(target_os = "horizon")]
 pub mod device_native;
 #[cfg(target_os = "horizon")]
+mod device_workers;
+pub mod jni_constructor;
+#[cfg(target_os = "horizon")]
 mod launcher;
 pub mod native_probe;
 pub mod probe;
+#[cfg(any(target_os = "horizon", test))]
+mod session_report;
 
 use alloc::vec::Vec;
 

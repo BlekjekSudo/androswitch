@@ -137,13 +137,18 @@ int as_glsurface_start(const AsGlSurfaceRequest *r) {
   if (!r || !r->vm || !r->android || !r->session || !r->view ||
       r->client_version != 2)
     return -EINVAL;
+  int admission = as_worker_admission_enter();
+  if (admission)
+    return admission;
   mutexLock(&renderer.mutex);
   if (renderer.active) {
     mutexUnlock(&renderer.mutex);
+    as_worker_admission_leave();
     return -EBUSY;
   }
   if (renderer.close_error) {
     mutexUnlock(&renderer.mutex);
+    as_worker_admission_leave();
     return -EIO;
   }
   renderer.request = *r;
@@ -162,6 +167,7 @@ int as_glsurface_start(const AsGlSurfaceRequest *r) {
   if (!renderer.active)
     memset(&renderer.request, 0, sizeof(renderer.request));
   mutexUnlock(&renderer.mutex);
+  as_worker_admission_leave();
   return R_SUCCEEDED(rc) ? 0 : -EIO;
 }
 int as_glsurface_running(void) {
@@ -191,15 +197,33 @@ int as_glsurface_quiesce(void) {
   int started = renderer.started;
   mutexUnlock(&renderer.mutex);
   as_teardown_phase("glsurface_join");
-  int32_t index;
+  int32_t index = -1;
   int join_error = 0;
-  if (started &&
-      R_FAILED(svcWaitSynchronization(&index, &handle, 1, 2000000000)))
-    join_error = -EBUSY;
-  if (!join_error && started && R_FAILED(threadWaitForExit(&renderer.thread)))
-    join_error = -EIO;
-  if (!join_error && R_FAILED(threadClose(&renderer.thread)))
-    join_error = -EIO;
+  /* Driver destruction may retire GPU queues and shader workers after the
+   * final guest callback. Bound the complete owned worker, not only callbacks.
+   * The process-wide stop watchdog is still the ultimate deadline. */
+  as_media_stop_event("glsurface_wait_begin", started, handle);
+  if (started) {
+    Result waited = svcWaitSynchronization(&index, &handle, 1, 6000000000);
+    as_media_stop_event("glsurface_wait_end", R_FAILED(waited) ? -EBUSY : 0,
+                        waited);
+    if (R_FAILED(waited))
+      join_error = -EBUSY;
+  }
+  if (!join_error && started) {
+    Result waited = threadWaitForExit(&renderer.thread);
+    as_media_stop_event("glsurface_thread_wait_end",
+                        R_FAILED(waited) ? -EIO : 0, waited);
+    if (R_FAILED(waited))
+      join_error = -EIO;
+  }
+  if (!join_error) {
+    Result closed = threadClose(&renderer.thread);
+    as_media_stop_event("glsurface_thread_close_end",
+                        R_FAILED(closed) ? -EIO : 0, closed);
+    if (R_FAILED(closed))
+      join_error = -EIO;
+  }
   mutexLock(&renderer.mutex);
   renderer.joining = 0;
   if (join_error) {

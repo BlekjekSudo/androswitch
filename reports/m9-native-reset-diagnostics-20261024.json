@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T12:27:10.5592633Z",
+  "status": "diagnostics_only_host_contracts_and_arm64_compile_passed",
+  "scope": "Bounded named native resource-reset diagnostics and read-only C++ pending flags. Existing ownership, quiescence, finalization order, busy rejection and reset operation order remain unchanged.",
+  "observed_run": {
+    "session_report": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/sessions/18d9ef51e6e249a19846ccc2daf52582-1/session-report.json",
+    "session_report_sha256": "5ea874e03f3f33d9fa2e7b830e01a929376a28aed044c308fbf08c04de949e1f",
+    "teardown_log": "local-artifacts/m9/external-runs/18d9ef51e6e249a19846ccc2daf52582/sessions/18d9ef51e6e249a19846ccc2daf52582-1/teardown.log",
+    "teardown_log_sha256": "95d57b79f00e78625681d775f5310ba7ef154f6b98cddd9a7c6032b3f4c74c45",
+    "status": "failed",
+    "error": "Class.getSimpleName missing during DEX class initializer; cleanup NATIVE_RESOURCE_RESET_FAILED -16; reopen homebrew",
+    "last_phases": [
+      "native_destructors",
+      "media_reset",
+      "media_released",
+      "activity_dispose",
+      "runtime_drop",
+      "native_mapping_release",
+      "native_resource_reset",
+      "stop_failed"
+    ],
+    "established_cause": "Native reset rejected an active/pending resource. This existing run does not identify which component because the earlier implementation collapses all checks to -EBUSY.",
+    "not_established": "The specific Candy component and reason remain unknown until a separate run executes these diagnostics. No successful cleanup or APK startup is claimed by this receipt.",
+    "nro_sha256": "ad5899a66112b54fed8a96e5581bc8732781f4621c4b516c4a2a90fcd746f45d",
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be"
+  },
+  "implementation": {
+    "reset_order": [
+      "guest_threads presence",
+      "as_bionic_cxx_reset",
+      "as_bionic_keys_reset",
+      "as_bionic_sync_reset",
+      "as_bionic_locale_reset",
+      "existing JNI/mapping/allocation/provider/TLS reset"
+    ],
+    "fixed_phase_names": [
+      "native_reset_guest_threads",
+      "native_reset_guest_threads_busy",
+      "native_reset_cxx",
+      "native_reset_cxx_busy",
+      "native_reset_cxx_global_destructors_pending",
+      "native_reset_cxx_thread_destructors_pending",
+      "native_reset_keys",
+      "native_reset_keys_busy",
+      "native_reset_sync",
+      "native_reset_sync_busy",
+      "native_reset_locale",
+      "native_reset_locale_busy",
+      "native_reset_admitted"
+    ],
+    "bound": "At most nine additional fixed-name phase records per attempt; stops at first failed component. No guest-controlled strings or guest-memory dereferences.",
+    "cpp_pending": "Read-only helper returns mask0x1 for global destructor registry and mask0x2 for current host-thread TLS destructor registry. Takes existing registry lock, reads list-head presence only, preserves errno, consumes no callbacks.",
+    "safety": "No busy ownership is cleared; no new callback execution or lifecycle retry is introduced. Existing -EBUSY and process-reopen behavior stay intact. Diagnostics remain safe after Loader drops mappings because guest callback addresses are never dereferenced.",
+    "errno": "New reset phase wrapper saves/restores host errno around logging."
+  },
+  "checks": [
+    {
+      "name": "native_abi_host_and_pending_contract",
+      "status": "passed",
+      "command": "wsl.exe -d Ubuntu -u root --exec /bin/bash -c: compile fixtures/m9/native-abi/contracts.c with bionic_random.c bionic_cxx.c bionic_libc.c bionic_locale.c bionic_multibyte.c bionic_io.c bionic_keys.c bionic_log.c bionic_vfs.c missing_import.c, GNU11 -O2 -Wall -Wextra -Werror -pthread -lm, output contracts-reset; execute resulting binary",
+      "result": "native ABI contracts: PASS (C++ lifetimes, guards/once/keys, allocation, fortify, stdio/VFS, logging)",
+      "new_assertions": [
+        "Pending flags distinguish simultaneous global and current-thread TLS destructors.",
+        "Reading flags preserves errno and both pending registries.",
+        "Busy reset remains -EBUSY and does not consume either callback.",
+        "Real global finalization clears global bit and leaves TLS bit/busy rejection.",
+        "Real TLS finalization clears TLS bit and only then permits reset."
+      ]
+    },
+    {
+      "name": "wsl_strict_arm64",
+      "status": "passed",
+      "command": "make -C platform/androswitch OUTPUT_DIR=../../local-artifacts/m9/native-abi/reset-target ../../local-artifacts/m9/native-abi/reset-target/native.o ../../local-artifacts/m9/native-abi/reset-target/bionic_cxx.o",
+      "result": "Both objects compiled through product Makefile, -Wall -Wextra -Werror."
+    },
+    {
+      "name": "windows_strict_arm64",
+      "status": "passed",
+      "command": "C:/devkitPro/devkitA64/bin/aarch64-none-elf-gcc.exe with product ARM64/libnx flags, -D__SWITCH__ -O2 -Wall -Wextra -Werror; compile native.c and bionic_cxx.c to isolated native-reset-windows-arm64.o and cxx-reset-windows-arm64.o",
+      "result": "Both objects compiled successfully."
+    },
+    {
+      "name": "scoped_diff_whitespace",
+      "status": "passed",
+      "command": "git diff --check -- platform/switch-smoke/bionic_cxx.h platform/switch-smoke/bionic_cxx.c platform/switch-smoke/native.c fixtures/m9/native-abi/contracts.c"
+    }
+  ],
+  "source_files": [
+    {
+      "path": "platform/switch-smoke/native.c",
+      "sha256": "19f5ccbaf5e81b5b792bf890fce5c47a00af152a3d4e8785abae74e1942a0657"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_cxx.c",
+      "sha256": "6cadc734dd71e01a265acde7746047b1bd16a5f3c9ceb2463ea9eb10cb38f1d0"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_cxx.h",
+      "sha256": "1b3f0330faf7603277fe53cffd36e2d3dd2b9ecc93842ce55320b657f97ee405"
+    },
+    {
+      "path": "fixtures/m9/native-abi/contracts.c",
+      "sha256": "52490c11afc2fee08326208f757319e4e5f79c094b3fe48b83f742acd19187b1"
+    }
+  ],
+  "host_linked_libc_snapshot": {
+    "path": "platform/switch-smoke/bionic_libc.c",
+    "sha256": "fbae5821eebb31c1874c5e8df75769c6e92f556b741d21cfa414423948ab415b",
+    "ownership": "Framework agent time correction was frozen before the shared host fixture compiled it."
+  },
+  "environment_note": "WSL emitted a root systemd-user-session startup warning and delayed startup; compilation and execution subsequently completed with exit0. No WSL/system configuration was changed.",
+  "not_run": [
+    "No emulator execution of these new phase names or pending flags in this receipt.",
+    "No physical Switch test.",
+    "No Cargo jobs or broad full-script run."
+  ],
+  "limitations": [
+    "Current-thread pending mask does not inspect another host thread TLS; reset retains the prior requirement that all workers are already quiescent.",
+    "This is diagnostic instrumentation; it does not repair a pending finalizer, locked sync object, active pthread_once, selected locale or retained thread.",
+    "Actual first refusing component must be read from the next exact-NRO-bound teardown log."
+  ],
+  "provenance": "Original AndroSwitch diagnostic code under existing MIT OR Apache-2.0. Existing RustyDroid attribution retained."
+}

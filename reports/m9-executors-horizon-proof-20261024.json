@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T14:43:55.8696422Z",
+  "status": "executor_sdk_proof_passed_on_isolated_emulator",
+  "scope": "Normal unmodified SDK executor proof APK: dedicated FIFO worker, actual Java Thread identity, VFS results, main Handler UI and clean application return. This is not a claim of full Java concurrency or game compatibility.",
+  "basis": {
+    "host_receipt": "reports/m9-executors-framework-20261024.json",
+    "host_receipt_sha256": "4025dd439197583c6c11cf01dde5657b07c0ca6825c39796090e160743c15c9e",
+    "upstream": "RustyDroid fork at 6388281f66d254c8e01a0fdc7a5a9a30239bc762"
+  },
+  "run": {
+    "id": "12ef7960f946469e826d5826f26129f2",
+    "nro_sha256": "1f2d669925827ac9968464adc2a2050886240211b2d8ceb976e9f7c9c70fb5cd",
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "emulator_version": "1.3.3+e2143d4",
+    "frontend": "headless_sdl2",
+    "emulator_scope": "Task-local Ryujinx build with separately documented CFG unknown-MRS fix; stock emulator proof is not asserted.",
+    "sd_restore": "restored"
+  },
+  "proof": {
+    "apk_sha256": "555b7195e0043fc16c12731e3a63f55d85104e78cf891c21c798f3c4c70860ae",
+    "presented_frames": 146,
+    "runtime_status": "passed_execution",
+    "installed_identity_matches": true,
+    "returned_to_launcher": true,
+    "result_lines": [
+      "task=1 thread=1 name=SDK executor proof noLooper=true",
+      "task=2 thread=1 name=SDK executor proof noLooper=true",
+      "task=3 thread=1 name=SDK executor proof noLooper=true",
+      "EXECUTOR_PROOF_PASS"
+    ],
+    "ui_text": "Executor proof PASS: FIFO worker tasks, VFS saved",
+    "visual_review": "Parent agent explicitly viewed the captured proof UI and reported it visible; automated verification.json separately retains requires_visual_review."
+  },
+  "independent_target": {
+    "apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+    "runtime_status": "failed",
+    "next_required_api": "Landroid/content/res/Resources;->getResourcePackageName(I)Ljava/lang/String;",
+    "returned_to_launcher": true,
+    "meaning": "Mekorama advanced beyond the previous executor constructor blocker; its later async work and application screen remain unverified."
+  },
+  "physical_device": "not_run_for_this_source_and_NRO",
+  "evidence": [
+    {
+      "path": "local-artifacts/m9/external-runs/12ef7960f946469e826d5826f26129f2/verification.json",
+      "sha256": "7b03b6a26be374369a092b000261dec1fad77d56775c5f1df94dc20cfb75881f"
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/12ef7960f946469e826d5826f26129f2/sessions/12ef7960f946469e826d5826f26129f2-1/session-report.json",
+      "sha256": "7908bf96cffac005799d3a1711adca4cf1954d7ce7ba660157a28f29baffd965"
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/12ef7960f946469e826d5826f26129f2/sessions/12ef7960f946469e826d5826f26129f2-1/teardown.log",
+      "sha256": "b20a10576d63055f60c71805ca616040559cb473f3a2ae17a0d624257b290b55"
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/12ef7960f946469e826d5826f26129f2/sessions/12ef7960f946469e826d5826f26129f2-1/last-frame.ppm",
+      "sha256": "c0a44e557330bac855d2c5a559ab7d509696f868cd1654bc9b837c45002bba08"
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/12ef7960f946469e826d5826f26129f2/sessions/12ef7960f946469e826d5826f26129f2-2/session-report.json",
+      "sha256": "e9ea452d78c9780b441b61f7e6d8ff5eab2d8e20a78377bb5b62013c9c15b5f2"
+    },
+    {
+      "path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-12ef7960f946469e826d5826f26129f2\\Download\\androswitch-executor-proof.txt",
+      "sha256": "5fc0a1720c750e474ced92cd52b85d11b141a5ce005218a3cceb20071e9d9f6c"
+    }
+  ],
+  "limitations": [
+    "The same captured run remains blocked_runtime overall because Mekorama needs a further common Resources API.",
+    "Host tests, this dedicated worker proof and the independent game startup are separate levels of evidence.",
+    "No proprietary APK bytes or decompiled implementation are included in this receipt."
+  ]
+}

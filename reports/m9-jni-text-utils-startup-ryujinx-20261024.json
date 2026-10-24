@@ -1,0 +1,712 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T15:43:10.528057+00:00",
+  "scope": "Observed exact-NRO startup after generic JNI constructor and TextUtils integration; all three sessions remain incomplete and no game first screen is verified.",
+  "run_id": "f7104a7c595f4a18a158b330f39e2bea",
+  "receipt": {
+    "capture_ownership_contract": "Protocol1 runtime generation identity; matching pending request for CPU frames; identity rechecked after copy. Filesystem timestamps are not ownership evidence.",
+    "observed_sessions": [
+      {
+        "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f7104a7c595f4a18a158b330f39e2bea\\sessions\\f7104a7c595f4a18a158b330f39e2bea-1\\session-report.json",
+        "package": "org.fixture.constructorproof",
+        "session_id": "f7104a7c595f4a18a158b330f39e2bea-1",
+        "revision": 1,
+        "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+        "error": "NOT_FOUND [rd-vm]: método Ljava/lang/String;->getBytes(Ljava/lang/String;)[B não resolvido [pc 0x37: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 16, regs: [0, 2, 0, 0, 0] } }]\n  at Lorg/androswitch/contracts/ConstructorActivity;->onCreate(Landroid/os/Bundle;)V — a classe pode depender de plataforma fora do escopo M2",
+        "runtime_status": "failed",
+        "completed_case_verified": false
+      },
+      {
+        "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f7104a7c595f4a18a158b330f39e2bea\\sessions\\f7104a7c595f4a18a158b330f39e2bea-2\\session-report.json",
+        "package": "com.king.candycrushsaga",
+        "session_id": "f7104a7c595f4a18a158b330f39e2bea-2",
+        "revision": 1,
+        "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+        "error": "exception java.lang.ExceptionInInitializerError: get: JNI: get requires deleted or invalid token 0 [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 52079, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><clinit>()V",
+        "runtime_status": "failed",
+        "completed_case_verified": false
+      },
+      {
+        "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f7104a7c595f4a18a158b330f39e2bea\\sessions\\f7104a7c595f4a18a158b330f39e2bea-3\\session-report.json",
+        "package": "com.martinmagni.mekorama",
+        "session_id": "f7104a7c595f4a18a158b330f39e2bea-3",
+        "revision": 1,
+        "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+        "error": "NOT_FOUND [rd-vm]: método Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I não resolvido [pc 0x2: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 172, regs: [2, 1, 0, 3, 0] } }]\n  at Lcom/google/android/gms/measurement/internal/zzfj;->zzb(Ljava/lang/String;Landroid/content/res/Resources;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/measurement/internal/zzid;->zzc(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I não resolvido [pc 0x2: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 172, regs: [2, 1, 0, 3, 0] } }]\n  at Lcom/google/android/gms/measurement/internal/zzfj;->zzb(Ljava/lang/String;Landroid/content/res/Resources;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/measurement/internal/zzid;->zzc(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+        "runtime_status": "failed",
+        "completed_case_verified": false
+      }
+    ],
+    "cases": [
+      {
+        "first_screen": "not_visually_verified",
+        "input": {
+          "staged_name": "0000-external.apk",
+          "index": 0,
+          "bytes": 6340,
+          "sha256": "0a0fe96aec1f9f9c1933c866d5e3926e46988bf68d931d7296a524976d8e6e73",
+          "install_snapshot_step": 3,
+          "source": "D:\\Dev\\Switch\\AndroSwitch\\target\\jni-constructor-fixture\\constructor-proof.apk",
+          "expected_session_id": "f7104a7c595f4a18a158b330f39e2bea-1"
+        },
+        "error": "NOT_FOUND [rd-vm]: método Ljava/lang/String;->getBytes(Ljava/lang/String;)[B não resolvido [pc 0x37: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 16, regs: [0, 2, 0, 0, 0] } }]\n  at Lorg/androswitch/contracts/ConstructorActivity;->onCreate(Landroid/os/Bundle;)V — a classe pode depender de plataforma fora do escopo M2",
+        "installed_identity_matches": true,
+        "teardown_phases": [
+          "stop_requested",
+          "native_activity_stop",
+          "java_startup_abort",
+          "worker_admission_closed",
+          "background_worker_quiesce",
+          "media_thread_quiesce",
+          "guest_thread_quiesce",
+          "native_destructors",
+          "media_reset",
+          "media_released",
+          "activity_dispose",
+          "runtime_drop",
+          "native_mapping_release",
+          "native_resource_reset",
+          "native_reset_guest_threads",
+          "native_reset_cxx",
+          "native_reset_keys",
+          "native_reset_sync",
+          "native_reset_locale",
+          "native_reset_admitted",
+          "native_mapping_release",
+          "native_tls_reset",
+          "native_resources_released",
+          "display_geometry_reset",
+          "runtime_closed"
+        ],
+        "presented_frames": null,
+        "snapshots": [],
+        "captures": [],
+        "runtime_status": "failed",
+        "returned_to_launcher": true,
+        "status": "blocked_or_unreported"
+      },
+      {
+        "first_screen": "not_visually_verified",
+        "input": {
+          "staged_name": "0001-external.apk",
+          "index": 1,
+          "bytes": 163371628,
+          "sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+          "install_snapshot_step": 8,
+          "source": "D:\\Download\\candycrush.apk",
+          "expected_session_id": "f7104a7c595f4a18a158b330f39e2bea-2"
+        },
+        "error": "exception java.lang.ExceptionInInitializerError: get: JNI: get requires deleted or invalid token 0 [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 52079, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><clinit>()V",
+        "installed_identity_matches": true,
+        "teardown_phases": [
+          "stop_requested",
+          "native_activity_stop",
+          "java_startup_abort",
+          "worker_admission_closed",
+          "background_worker_quiesce",
+          "media_thread_quiesce",
+          "guest_thread_quiesce",
+          "native_destructors",
+          "media_reset",
+          "media_released",
+          "activity_dispose",
+          "runtime_drop",
+          "native_mapping_release",
+          "native_resource_reset",
+          "native_reset_guest_threads",
+          "native_reset_cxx",
+          "native_reset_keys",
+          "native_reset_sync",
+          "native_reset_locale",
+          "native_reset_admitted",
+          "native_mapping_release",
+          "native_tls_reset",
+          "native_resources_released",
+          "display_geometry_reset",
+          "runtime_closed"
+        ],
+        "presented_frames": null,
+        "snapshots": [],
+        "captures": [],
+        "runtime_status": "failed",
+        "returned_to_launcher": true,
+        "status": "blocked_or_unreported"
+      },
+      {
+        "first_screen": "not_visually_verified",
+        "input": {
+          "staged_name": "0002-external.apk",
+          "index": 2,
+          "bytes": 13099584,
+          "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+          "install_snapshot_step": 14,
+          "source": "D:\\Download\\mekorama-1-7-2.apk",
+          "expected_session_id": "f7104a7c595f4a18a158b330f39e2bea-3"
+        },
+        "error": "NOT_FOUND [rd-vm]: método Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I não resolvido [pc 0x2: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 172, regs: [2, 1, 0, 3, 0] } }]\n  at Lcom/google/android/gms/measurement/internal/zzfj;->zzb(Ljava/lang/String;Landroid/content/res/Resources;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/measurement/internal/zzid;->zzc(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I não resolvido [pc 0x2: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 172, regs: [2, 1, 0, 3, 0] } }]\n  at Lcom/google/android/gms/measurement/internal/zzfj;->zzb(Ljava/lang/String;Landroid/content/res/Resources;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/measurement/internal/zzid;->zzc(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+        "installed_identity_matches": true,
+        "teardown_phases": [
+          "stop_requested",
+          "egl_destroy_surface",
+          "native_activity_stop",
+          "java_activity_stop",
+          "egl_terminate",
+          "egl_terminated",
+          "worker_admission_closed",
+          "background_worker_quiesce",
+          "media_thread_quiesce",
+          "glsurface_join",
+          "guest_thread_quiesce",
+          "native_destructors",
+          "media_reset",
+          "media_released",
+          "activity_dispose",
+          "runtime_drop",
+          "native_mapping_release",
+          "native_resource_reset",
+          "native_reset_guest_threads",
+          "native_reset_cxx",
+          "native_reset_keys",
+          "native_reset_sync",
+          "native_reset_locale",
+          "native_reset_admitted",
+          "native_mapping_release",
+          "native_tls_reset",
+          "native_resources_released",
+          "display_geometry_reset",
+          "runtime_closed",
+          "launcher_refresh"
+        ],
+        "presented_frames": null,
+        "snapshots": [],
+        "captures": [],
+        "runtime_status": "failed",
+        "returned_to_launcher": true,
+        "status": "blocked_or_unreported"
+      }
+    ],
+    "commands": 16,
+    "inputs": [
+      {
+        "staged_name": "0000-external.apk",
+        "index": 0,
+        "bytes": 6340,
+        "sha256": "0a0fe96aec1f9f9c1933c866d5e3926e46988bf68d931d7296a524976d8e6e73",
+        "install_snapshot_step": 3,
+        "source": "D:\\Dev\\Switch\\AndroSwitch\\target\\jni-constructor-fixture\\constructor-proof.apk",
+        "expected_session_id": "f7104a7c595f4a18a158b330f39e2bea-1"
+      },
+      {
+        "staged_name": "0001-external.apk",
+        "index": 1,
+        "bytes": 163371628,
+        "sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+        "install_snapshot_step": 8,
+        "source": "D:\\Download\\candycrush.apk",
+        "expected_session_id": "f7104a7c595f4a18a158b330f39e2bea-2"
+      },
+      {
+        "staged_name": "0002-external.apk",
+        "index": 2,
+        "bytes": 13099584,
+        "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+        "install_snapshot_step": 14,
+        "source": "D:\\Download\\mekorama-1-7-2.apk",
+        "expected_session_id": "f7104a7c595f4a18a158b330f39e2bea-3"
+      }
+    ],
+    "native_trace_requested": true,
+    "pid": 248144,
+    "emulator_path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-bin-9f3cd3d2\\Ryujinx.exe",
+    "latest_session_report": {
+      "error": "NOT_FOUND [rd-vm]: método Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I não resolvido [pc 0x2: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 172, regs: [2, 1, 0, 3, 0] } }]\n  at Lcom/google/android/gms/measurement/internal/zzfj;->zzb(Ljava/lang/String;Landroid/content/res/Resources;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/measurement/internal/zzid;->zzc(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I não resolvido [pc 0x2: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 172, regs: [2, 1, 0, 3, 0] } }]\n  at Lcom/google/android/gms/measurement/internal/zzfj;->zzb(Ljava/lang/String;Landroid/content/res/Resources;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/measurement/internal/zzid;->zzc(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+      "identity_status": "known",
+      "package": "com.martinmagni.mekorama",
+      "revision": 1,
+      "schema_version": 1,
+      "session_id": "f7104a7c595f4a18a158b330f39e2bea-3",
+      "status": "failed"
+    },
+    "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-f7104a7c595f4a18a158b330f39e2bea",
+    "root_alive_without_cim_match": true,
+    "physical_device": "not_run",
+    "execution_attempted": true,
+    "completed_sessions": 3,
+    "sd_original_restore": "restored",
+    "session_id": "f7104a7c595f4a18a158b330f39e2bea",
+    "root_handle_pinned": true,
+    "visual_review": "required",
+    "latest_memory_admission": {
+      "allocator_available_after_load": 1569833472,
+      "allocator_available_before_load": 1597320384,
+      "estimated_parser_bytes": 54122782,
+      "package": "com.martinmagni.mekorama",
+      "parser_budget_bytes": 268435456,
+      "raw_dex_bytes": 14703020,
+      "revision": 1,
+      "schema_version": 1,
+      "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+      "session_id": "f7104a7c595f4a18a158b330f39e2bea-3",
+      "status": "vm_ready"
+    },
+    "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-f7104a7c595f4a18a158b330f39e2bea",
+    "startup_wait_ms": 30000,
+    "latest_media_stop": [
+      {
+        "operation": "egl_unbind_result",
+        "result": 1,
+        "detail": 1,
+        "tick": 1597656921
+      },
+      {
+        "operation": "egl_destroy_context_result",
+        "result": 1,
+        "detail": 8638489104,
+        "tick": 1598873326
+      },
+      {
+        "operation": "egl_destroy_surface_result",
+        "result": 1,
+        "detail": 8638499280,
+        "tick": 1599033688
+      },
+      {
+        "operation": "egl_terminate_begin",
+        "result": 0,
+        "detail": 8638178784,
+        "tick": 1599182772
+      },
+      {
+        "operation": "egl_terminate_end",
+        "result": 1,
+        "detail": 8638178784,
+        "tick": 1599756981
+      },
+      {
+        "operation": "egl_close_result",
+        "result": 0,
+        "detail": 8638178784,
+        "tick": 1599894322
+      },
+      {
+        "operation": "glsurface_wait_begin",
+        "result": 1,
+        "detail": 1441818,
+        "tick": 1600273739
+      },
+      {
+        "operation": "glsurface_wait_end",
+        "result": 0,
+        "detail": 0,
+        "tick": 1600308347
+      },
+      {
+        "operation": "glsurface_thread_wait_end",
+        "result": 0,
+        "detail": 0,
+        "tick": 1600346901
+      },
+      {
+        "operation": "glsurface_thread_close_end",
+        "result": 0,
+        "detail": 0,
+        "tick": 1600385383
+      },
+      {
+        "operation": "glsurface_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1600412192
+      },
+      {
+        "operation": "opensl_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1600428829
+      },
+      {
+        "operation": "glsurface_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1600854355
+      },
+      {
+        "operation": "opensl_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1600867153
+      },
+      {
+        "operation": "cpu_capture_publish_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1637937269
+      }
+    ],
+    "backend": "ryujinx",
+    "schema_version": 1,
+    "nro_sha256": "205ce9214d5bde04a36338e8bb692d69eb1a8526b17d9a75eb788eccdf23c3e3",
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+    "emulator_frontend": "headless_sdl2",
+    "status": "blocked_runtime",
+    "emulator_version": "1.3.3+e2143d4",
+    "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f7104a7c595f4a18a158b330f39e2bea\\androswitch.nro",
+    "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+    "latest_teardown": [
+      {
+        "phase": "stop_requested",
+        "tick": 1598882154
+      },
+      {
+        "phase": "egl_destroy_surface",
+        "tick": 1598950692
+      },
+      {
+        "phase": "native_activity_stop",
+        "tick": 1599005614
+      },
+      {
+        "phase": "java_activity_stop",
+        "tick": 1599032682
+      },
+      {
+        "phase": "egl_terminate",
+        "tick": 1599153857
+      },
+      {
+        "phase": "egl_terminated",
+        "tick": 1599854463
+      },
+      {
+        "phase": "worker_admission_closed",
+        "tick": 1599895198
+      },
+      {
+        "phase": "background_worker_quiesce",
+        "tick": 1600199733
+      },
+      {
+        "phase": "media_thread_quiesce",
+        "tick": 1600226897
+      },
+      {
+        "phase": "glsurface_join",
+        "tick": 1600253806
+      },
+      {
+        "phase": "guest_thread_quiesce",
+        "tick": 1600444289
+      },
+      {
+        "phase": "native_destructors",
+        "tick": 1600458791
+      },
+      {
+        "phase": "media_reset",
+        "tick": 1600879128
+      },
+      {
+        "phase": "media_released",
+        "tick": 1600892050
+      },
+      {
+        "phase": "activity_dispose",
+        "tick": 1600909891
+      },
+      {
+        "phase": "runtime_drop",
+        "tick": 1600945914
+      },
+      {
+        "phase": "native_mapping_release",
+        "tick": 1601739790
+      },
+      {
+        "phase": "native_resource_reset",
+        "tick": 1601834670
+      },
+      {
+        "phase": "native_reset_guest_threads",
+        "tick": 1601852217
+      },
+      {
+        "phase": "native_reset_cxx",
+        "tick": 1601869357
+      },
+      {
+        "phase": "native_reset_keys",
+        "tick": 1601888551
+      },
+      {
+        "phase": "native_reset_sync",
+        "tick": 1601906213
+      },
+      {
+        "phase": "native_reset_locale",
+        "tick": 1601928483
+      },
+      {
+        "phase": "native_reset_admitted",
+        "tick": 1601949914
+      },
+      {
+        "phase": "native_mapping_release",
+        "tick": 1601966357
+      },
+      {
+        "phase": "native_tls_reset",
+        "tick": 1602170419
+      },
+      {
+        "phase": "native_resources_released",
+        "tick": 1602192111
+      },
+      {
+        "phase": "display_geometry_reset",
+        "tick": 1602209091
+      },
+      {
+        "phase": "runtime_closed",
+        "tick": 1602232851
+      },
+      {
+        "phase": "launcher_refresh",
+        "tick": 1602333567
+      },
+      {
+        "phase": "launcher_framebuffer_open",
+        "tick": 1610771523
+      },
+      {
+        "phase": "launcher_ready",
+        "tick": 1611398012
+      },
+      {
+        "phase": "launcher_stable",
+        "tick": 1614242568
+      }
+    ]
+  },
+  "build": {
+    "target": "aarch64-nintendo-switch-freestanding",
+    "nro_bytes": 9150520,
+    "profile": "release panic=abort",
+    "executed": false,
+    "c_compiler_version": "15.2.0",
+    "nro_sha256": "205ce9214d5bde04a36338e8bb692d69eb1a8526b17d9a75eb788eccdf23c3e3",
+    "rust_toolchain": "nightly",
+    "sqlite_source_lock_sha256": "cce2cc3f0b3e6354568cc3da7d6067980ef88788f451349711975d7cb7f85e95",
+    "status": "built",
+    "windows_devkitpro": "C:/devkitPro",
+    "target_directory": "C:\\Users\\Administrator\\.cache\\androswitch\\37b5fa1d-switch-target",
+    "schema_version": 1,
+    "link_backend": "Windows"
+  },
+  "observations": {
+    "jni_fixture": "Real NewObject/A/V calls, nested native/DEX callbacks and constructor exception paths execute. Activity then fails at String.getBytes(String), before writing proof values or setting success UI. The empty output file is not a pass, and the constructor numerical results have not been verified on this NRO.",
+    "candy": "Shared FindClass now locates Thread. GetStaticMethodID cannot yet resolve the implemented Thread.currentThread platform method; the guest later passes NULL into a JNI string operation. Native initialization fails with the preserved invalid-reference error. No app-specific bypass was added.",
+    "mekorama": "TextUtils.isEmpty is passed. Renderer analytics initialization now rejects Resources.getIdentifier(String,String,String). Original and onPause errors are preserved separately from completed worker/native closure."
+  },
+  "artifacts": [
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/build-iteration14.log",
+      "sha256": "d24c70b20bbdd6a26a086daed0efcad4a4b2276d155fb11be7c6c2f9047466ff",
+      "bytes": 4171
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/constructor-build-receipt.json",
+      "sha256": "e9b1d4af5c12d33c1a1312f0b9b71c667a46c62dfc1772ec2dabca649efe25c0",
+      "bytes": 2404
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/emulator.json",
+      "sha256": "53d8bda785b6ee9f7db9cd81d9cc4afd7d23cd57a355207a7be317d0623db14a",
+      "bytes": 31767
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/jvm-constructor-oracle.txt",
+      "sha256": "769e17dc8f0890e9f486809d34e8e6ab04d1ff3019a1816a9730cccc2ff0a5b9",
+      "bytes": 411
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/launcher-test.json",
+      "sha256": "c0b5edd33ba9b856fa53785d30661bbe35ec9105c21c5fd9f8d68b1d5aff7ad9",
+      "bytes": 1819
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/product-build.json",
+      "sha256": "b0d4e988af86baba5387d369e596aa374e97cc9c1ee971bf57f8c331ff5d2dab",
+      "bytes": 606
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/ryujinx.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/ryujinx.stdout.log",
+      "sha256": "8cdbef1dab7394b85d01bdd65e79ccfc581bc3b05b0d0395d28dd8e3a196a69f",
+      "bytes": 7144
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-1/capture-owner.json",
+      "sha256": "f7f695117986f55e6d90f2116d7ffe111365dc8b029221f5ec3e7d918de6a3b8",
+      "bytes": 174
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-1/jni-failures.log",
+      "sha256": "a43bcea8ecd0e2c7986104297afc0d05fbd76ed00d4ca454c99f74d6ca165a4a",
+      "bytes": 1752
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-1/media-stop.log",
+      "sha256": "0ac6fed4541354875a5afbf2e62a1f644cdf088aa33ba6848245dbcf6256430e",
+      "bytes": 314
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-1/memory-admission.json",
+      "sha256": "fa3f3e0d50653cc4b33d4e4150b4f193149362342300a12f8193ecb67bf2df4e",
+      "bytes": 499
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-1/memory.log",
+      "sha256": "51b040315def8cc132effff6bf4dbd5e7ec980711d1aed156ba8652ee1ea9dc9",
+      "bytes": 4134
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-1/native-calls.log",
+      "sha256": "1d54e4493564a815fff16446fd4b8e30e71d703c204bb2b3a12f1133f9fbd97d",
+      "bytes": 2044
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-1/native-compatibility.json",
+      "sha256": "f70fb0a9d2f300799fc28f639733a377bef55a2e6eb833d0677dbc5caeff4b29",
+      "bytes": 387
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-1/native-modules.log",
+      "sha256": "3dfe351f006bbbff450b7b2c0b4bbfbee3c8b455d04f96c24ead36cd762ccbfb",
+      "bytes": 88
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-1/session-report.json",
+      "sha256": "7d4f189d122fc0dbd9043928a6b8feedc79d4c650bf770567e2f8086bdf416ef",
+      "bytes": 569
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-1/teardown.log",
+      "sha256": "4c7246bc92f702ce6a95c2937cc7092020801761314e5b5795c7279e65cfd0fd",
+      "bytes": 1263
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-2/capture-owner.json",
+      "sha256": "c8d6e09f4ad6b29ffe49dfbd72f994f0a56e8366954574a168f689196f93709d",
+      "bytes": 169
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-2/jni-failures.log",
+      "sha256": "2d89f365da51a086e88a5eeca34d1a47131dad513cc96da92e9e618aa0ffd168",
+      "bytes": 417
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-2/media-stop.log",
+      "sha256": "b430075ae709bb5d6b521b04b9e94b32b59aecb45ed2470d8aff8af2273f33d8",
+      "bytes": 318
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-2/memory-admission.json",
+      "sha256": "4aee96d71207fda64af3f688448c5d7103f380de8fae9ceee5f9764408199eed",
+      "bytes": 500
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-2/memory.log",
+      "sha256": "280d1bbd9aedddd9b45f70ad9f476c064e6f83b8bcdd4e2276fd7321217423c7",
+      "bytes": 8722
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-2/native-calls.log",
+      "sha256": "0b568b8098db63163dc9fdd98e3db198ebf31119353f14f75660f6bcf70e77ed",
+      "bytes": 135923
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-2/native-compatibility.json",
+      "sha256": "a96d46146aa9829faeebc0e258d37ea4390780a9ed5326573430b4b1684982df",
+      "bytes": 10535
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-2/native-modules.log",
+      "sha256": "ede286b189216a44f299e56ec7a29e65d2d422ebe923d1aad3303e393ce877aa",
+      "bytes": 91
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-2/session-report.json",
+      "sha256": "dca17f3772b8645a7b78425185e7f49553f4acfe19e2925ca45ac0d0e6901199",
+      "bytes": 495
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-2/teardown.log",
+      "sha256": "eb8878d2658bf4ace9246f69a3f375ef820b9f48557e584585ae468e7b33dddb",
+      "bytes": 1289
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-3/capture-owner.json",
+      "sha256": "cd5921f2cf6f624672c98fc6710d0c538f0a40ac78e3d0bece34d9a35d352916",
+      "bytes": 170
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-3/jni-failures.log",
+      "sha256": "b89d444c8264b7f93f35f02ce2b8c4faae07dd638ea3425dae97c8b6882178b6",
+      "bytes": 232
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-3/media-stop.log",
+      "sha256": "75d75068c89fe865d1cda9cb310bdfc02e6c5de26ff889d4ed00f5f4d8a79dcd",
+      "bytes": 1232
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-3/memory-admission.json",
+      "sha256": "fbb16ffc1e433ec2157c50a9f110a2491177abfff51a404e81976c4d03daa392",
+      "bytes": 500
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-3/memory.log",
+      "sha256": "1dc39dfe6fee53094efa59a3ddfef3cab0d311efab28f4be5edca2dea0e3d897",
+      "bytes": 12870
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-3/native-calls.log",
+      "sha256": "cf66ec7dd9d2b87faa935303feca85586b871bca458333155b89a153077a8ab6",
+      "bytes": 2794
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-3/native-compatibility.json",
+      "sha256": "f985601e26dd2a41568631b123f3b54649238a9e6dafa6f134d8ac213f17c7a3",
+      "bytes": 383
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-3/native-modules.log",
+      "sha256": "b2b54853ced47bc8f425f4a815dc118f65f9743c55330d7f7a8b7f4b5f53b268",
+      "bytes": 177
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-3/session-report.json",
+      "sha256": "d369200499f63b954e62d5eb201d0c2a6c252e2748ef76e4a22d6e1f60ae6604",
+      "bytes": 2880
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-3/teardown.log",
+      "sha256": "492aab27ebaa55643a8a8358db9e9534cc56599b8e7606abcb60af8526cb192d",
+      "bytes": 1622
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/verification.json",
+      "sha256": "d07cebd5304808a85a7fb565e97e13fa6dd198b491e84c6a04923a1d8cd65310",
+      "bytes": 23991
+    }
+  ],
+  "first_screen_gate": "not_verified_for_either_game",
+  "constructor_sdk_proof": "incomplete; no numerical/visible success claim",
+  "physical_switch": "new changes not run",
+  "m9_complete": false
+}

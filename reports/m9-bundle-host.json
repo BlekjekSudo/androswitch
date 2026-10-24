@@ -1,0 +1,144 @@
+{
+  "implementation": {
+    "string": true,
+    "semantics": [
+      "Typed put/get, absent or mismatched exact-type defaults, default-value overloads, nullable keys and nullable String values.",
+      "Distinct type tags prevent reinterpreting int/boolean/byte/char/short or floating-point register bits across Android boxed value types.",
+      "Long/double use actual 64-bit VM values. Existing typed descriptor conversion applies at the framework boundary.",
+      "Bundle size, isEmpty, containsKey, remove, clear and Intent hasExtra/removeExtra operate on the real store.",
+      "Intent snapshots and getExtras copy the same typed entries; values follow existing VM reference scanning and collection.",
+      "Bundle extends BaseBundle in shared classpath metadata, and real DEX calls declared on BaseBundle use the same object."
+    ],
+    "bounds": {
+      "key_bytes": 4096,
+      "failure": "BUNDLE_BUDGET; preserves prior entries",
+      "entries_per_object": 1024,
+      "replacement_when_full": "allowed"
+    },
+    "status": "implemented",
+    "package_specific_branches": false,
+    "primitive_types": [
+      "boolean",
+      "byte",
+      "char",
+      "short",
+      "int",
+      "long",
+      "float",
+      "double"
+    ]
+  },
+  "date": "2026-10-24",
+  "primary_references": [
+    "https://developer.android.com/reference/android/os/Bundle",
+    "https://developer.android.com/reference/android/os/BaseBundle",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/core/java/android/os/BaseBundle.java"
+  ],
+  "verification": {
+    "host": "4 focused DEX tests passed, including unchanged code under two manifest package identities",
+    "hardware": "not run",
+    "emulator": "Corrected NRO3917 run efc6db439a6b470fb6e67a908d6dca84 advanced past Bundle handling to monitor-enter in the renderer stack; first screen remains unverified."
+  },
+  "schema_version": 1,
+  "fixture_build": {
+    "apks": [
+      {
+        "sha256": "18dae22d1c3a648ae0fc800d309706f00f4ea865f64fbbaf1f24e7fe366d31ce",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bundle-fixture\\bundle.apk"
+      },
+      {
+        "sha256": "2b41490180773402adae5db668011393dd9cab1d72220ebd37ade5a1244f87b2",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bundle-fixture\\renamed.apk"
+      }
+    ],
+    "schema_version": 1,
+    "api": 26,
+    "build_tools": "35.0.0",
+    "sources": [
+      {
+        "sha256": "4098bea808f631f798bd710df2234cce4ec9e2ce670fac1819f116ea123162b7",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\bundle\\java\\org\\androswitch\\contracts\\BundleActivity.java"
+      },
+      {
+        "sha256": "bddbfd0cc6c0c67e1cf63ab3a840712e62ecf904e3514df7b61a4f7df387292d",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\bundle\\build.ps1"
+      }
+    ]
+  },
+  "limitations": [
+    "Primitive and String storage only; unsupported Bundle arrays, Parcelable/Serializable values, Parcel and Binder transport are not reported as implemented.",
+    "The tests execute actual generated DEX through the no_std portable VM and framework adapter; they are not Android reference-runtime or GPU tests.",
+    "No Mekorama or Candy Crush first-screen claim is made by these host results."
+  ],
+  "tests": [
+    "real_dex_preserves_primitive_bits_and_wide_values_in_both_packages",
+    "exact_types_defaults_null_keys_and_mutations_follow_bundle_contract",
+    "references_survive_gc_and_intent_snapshots_preserve_shared_exact_types",
+    "bounded_store_rejects_new_entries_without_mutating_previous_values"
+  ],
+  "source_hashes": [
+    {
+      "sha256": "2eb54be87531696330863405f53360ff1695febf5ebce2abe413204e6e3eed86",
+      "path": "crates/as-framework/src/services/bundle.rs"
+    },
+    {
+      "sha256": "6c8c229cb4b6ccf5665bbc44badbc7de0d0f847f429b2f87ba4e6c7d98ad9f5a",
+      "path": "crates/as-framework/src/services/mod.rs"
+    },
+    {
+      "sha256": "95ddc676f23c0d924c9d0c942814e4b34e269835eebcc6404cbed2ca5a453deb",
+      "path": "crates/as-framework/src/android.rs"
+    },
+    {
+      "sha256": "6fb8214aa24f02edf52da42b41ffa605fe8d5b8c035ce0dab460ede0176da70c",
+      "path": "crates/rd-vm/src/classpath.rs"
+    },
+    {
+      "sha256": "12da353afdc096f96bb9db74f3b3c54b7c6133806c9f0067580fd317d89c9ea6",
+      "path": "crates/as-framework/tests/bundle.rs"
+    },
+    {
+      "sha256": "d67924971db877af8260c602d0b8bbce94221b7bce37bdf54880c73761017bc6",
+      "path": "crates/as-framework/Cargo.toml"
+    }
+  ],
+  "scope": "Portable typed Bundle and Intent extras storage",
+  "observed_blocker": {
+    "run": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994",
+    "nro_sha256": "27e2cc2c88cdc436b1180e26d311bc29806803857f25c3e796cf6fec800b345d",
+    "primary_error_limit": "The complete session preserves this missing API and renderer stack; no earlier different primary exception is recorded, so stop-time overwriting cannot be ruled out from these logs.",
+    "native_trace": "Prior failing native Barcode call5 returned 0; call11 on the renderer thread then returned -1002 after JNI failures.",
+    "native_trace_hash": {
+      "sha256": "9f274ba06846cbff2a9e2f2f08b6796901e5f315a81f43b2e046cbff68127ecf",
+      "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/sessions/3f09e2eb5b7646f2a64a7b675ed3f994-1/native-calls.log"
+    },
+    "session_report_hash": {
+      "sha256": "e5d5fbe1a93257775b3af3342bb9b7818d5880099bc9781ff4265b39615e1afd",
+      "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/sessions/3f09e2eb5b7646f2a64a7b675ed3f994-1/session-report.json"
+    },
+    "error": "Bundle.putLong(Ljava/lang/String;J)V was missing under RendererWrapper.onSurfaceCreated; final saved report prefixes ACTIVITY_STOP_ERROR and includes onPause."
+  },
+  "commands": [
+    {
+      "command": "pwsh -File fixtures/m9/bundle/build.ps1",
+      "exit_code": 0,
+      "status": "passed"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-framework --features host --test bundle --locked -- --nocapture",
+      "exit_code": 0,
+      "status": "passed",
+      "passed": 4
+    }
+  ],
+  "portable_core_asserted": true,
+  "corrected_emulator_observation": {
+    "next_blocker": "monitor-enter/exit requires the portable monitor implementation",
+    "nro_sha256": "3917b6758e79a9a8f10e199f854d7db7ca707dba9ed957835c8a27e245d11f1a",
+    "first_screen": "unverified",
+    "run": "local-artifacts/m9/external-runs/efc6db439a6b470fb6e67a908d6dca84",
+    "returned_to_launcher": true
+  }
+}

@@ -1,5 +1,5 @@
 //! One NRO owns launcher and one quiescent application session at a time.
-use crate::{application::Event, device_fs::LibnxFileSystem};
+use crate::{application::Event, device_fs::LibnxFileSystem, session_report};
 use alloc::{
     boxed::Box,
     format,
@@ -36,6 +36,8 @@ struct Launcher {
     snapshots: Vec<serde_json::Value>,
     sessions: Vec<serde_json::Value>,
     serial: u64,
+    session_prefix: String,
+    current_request: Option<serde_json::Value>,
     reported: bool,
     remaining_frames: Option<u32>,
 }
@@ -47,12 +49,23 @@ fn open() -> Result<Launcher, String> {
         .map_err(|e| e.to_string())?
         .is_some()
     {
-        if let Ok(bytes) = fs::read_all(fs.as_ref(), "logs/pending-session.json", 64 << 10) {
-            let _ = fs::write_all(fs.as_ref(), "logs/last-interrupted.json", &bytes);
-        }
+        let bytes = fs::read_all(fs.as_ref(), "logs/pending-session.json", 64 << 10)
+            .map_err(|e| e.to_string())?;
+        let pending = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
+        let report = fs::read_all(fs.as_ref(), "logs/session-report.json", 1 << 20)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok());
+        let snapshot = session_report::interrupted(&pending, report.as_ref());
+        fs::write_all(
+            fs.as_ref(),
+            "logs/last-interrupted.json",
+            &serde_json::to_vec(&snapshot).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
         let _ = fs.remove("logs/pending-session.json", false);
-        shell.message("Previous session was interrupted. See logs/last-interrupted.json and session-report.json");
+        shell.message("Previous session was interrupted. Its identity and matching report are preserved in logs/last-interrupted.json");
     }
+    session_report::clear_process_evidence(fs.as_ref()).map_err(|e| e.to_string())?;
     let script = if fs
         .stat("runtime/launcher-test.json")
         .map_err(|e| e.to_string())?
@@ -64,8 +77,7 @@ fn open() -> Result<Launcher, String> {
             .map_err(|e| e.to_string())?;
         let value: Script = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
         if value.schema_version != 1
-            || value.session_id.is_empty()
-            || value.session_id.len() > 128
+            || !session_report::valid_session_id(&value.session_id)
             || value.commands.len() > 256
         {
             return Err("INVALID_LAUNCHER_TEST".into());
@@ -73,6 +85,20 @@ fn open() -> Result<Launcher, String> {
         Some(value)
     } else {
         None
+    };
+    let session_prefix = if let Some(script) = &script {
+        script.session_id.clone()
+    } else {
+        #[allow(unsafe_code)]
+        extern "C" {
+            fn as_reporting_nonce() -> u64;
+            fn as_reporting_tick() -> u64;
+        }
+        // SAFETY: scalar libnx randomness/system-tick reads; no pointers retained.
+        #[allow(unsafe_code)]
+        unsafe {
+            session_report::console_prefix(as_reporting_nonce(), as_reporting_tick())
+        }
     };
     Ok(Launcher {
         shell,
@@ -84,21 +110,21 @@ fn open() -> Result<Launcher, String> {
         snapshots: Vec::new(),
         sessions: Vec::new(),
         serial: 0,
+        session_prefix,
+        current_request: None,
         reported: false,
         remaining_frames: None,
     })
 }
 impl Launcher {
     fn prepare(&mut self, selection: Selection, events: Option<&Vec<Event>>) -> Result<(), String> {
-        self.serial += 1;
-        let session = format!(
-            "{}-{}",
-            self.script
-                .as_ref()
-                .map(|s| s.session_id.as_str())
-                .unwrap_or("console"),
-            self.serial
-        );
+        self.serial = self
+            .serial
+            .checked_add(1)
+            .ok_or("SESSION_SERIAL_OVERFLOW")?;
+        let session = session_report::session_id(&self.session_prefix, self.serial)
+            .ok_or("INVALID_SESSION_ID")?;
+        session_report::clear_current_evidence(self.fs.as_ref()).map_err(|e| e.to_string())?;
         let request = serde_json::json!({"schema_version":1,"package":selection.package,"revision":selection.revision,"session_id":session,"events":events});
         let bytes = serde_json::to_vec(&request).map_err(|e| e.to_string())?;
         fs::write_all(self.fs.as_ref(), "runtime/launch.json", &bytes)
@@ -106,12 +132,24 @@ impl Launcher {
         fs::write_all(self.fs.as_ref(), "logs/pending-session.json", &bytes)
             .map_err(|e| e.to_string())?;
         let report = serde_json::json!({"schema_version":1,"status":"running","session_id":session,"package":selection.package,"revision":selection.revision});
+        // Previous application images were removed before publishing this
+        // generation. Capture readers bind to this identity, not filesystem
+        // timestamps, which can follow the guest clock's configured offset.
+        let owner = serde_json::json!({"schema_version":1,"capture_protocol":1,
+            "session_id":session,"package":selection.package,"revision":selection.revision});
+        fs::write_all(
+            self.fs.as_ref(),
+            "logs/capture-owner.json",
+            &serde_json::to_vec(&owner).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
         fs::write_all(
             self.fs.as_ref(),
             "logs/session-report.json",
             &serde_json::to_vec(&report).map_err(|e| e.to_string())?,
         )
         .map_err(|e| e.to_string())?;
+        self.current_request = Some(request);
         self.launch = Some(selection);
         Ok(())
     }
@@ -257,24 +295,38 @@ pub unsafe extern "C" fn as_shell_presented(token: u64, hash: u64) {
 pub unsafe extern "C" fn as_shell_returned(token: u64, success: i32) {
     let l = unsafe { &mut *(token as *mut Launcher) };
     l.launch = None;
-    if let Ok(bytes) = fs::read_all(l.fs.as_ref(), "logs/session-report.json", 1 << 20) {
-        if let Ok(mut report) = serde_json::from_slice::<serde_json::Value>(&bytes) {
-            if let Ok(trace) = fs::read_all(l.fs.as_ref(), "logs/teardown.log", 64 << 10) {
-                let phases: Vec<serde_json::Value> = trace
-                    .split(|b| *b == b'\n')
-                    .filter_map(|line| serde_json::from_slice(line).ok())
-                    .collect();
-                report["teardown"] = phases.into();
-            }
-            if report["status"] == "failed" {
-                l.shell
-                    .message(format!("Launch failed: {}", report["error"]));
-            } else {
-                l.shell
-                    .message("Application stopped. Ready for another app.");
-            }
-            l.sessions.push(report);
+    let expected = l.current_request.take().unwrap_or(serde_json::Value::Null);
+    let actual = fs::read_all(l.fs.as_ref(), "logs/session-report.json", 1 << 20)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
+    if let Some(mut report) = actual
+        .as_ref()
+        .filter(|report| session_report::identity_matches(report, &expected))
+        .cloned()
+    {
+        if let Ok(trace) = fs::read_all(l.fs.as_ref(), "logs/teardown.log", 64 << 10) {
+            let phases: Vec<serde_json::Value> = trace
+                .split(|b| *b == b'\n')
+                .filter_map(|line| serde_json::from_slice(line).ok())
+                .collect();
+            report["teardown"] = phases.into();
         }
+        if report["status"] == "failed" {
+            l.shell
+                .message(format!("Launch failed: {}", report["error"]));
+        } else {
+            l.shell
+                .message("Application stopped. Ready for another app.");
+        }
+        l.sessions.push(report);
+    } else {
+        let diagnostic = session_report::reporting_error(&expected, actual.as_ref());
+        if let Ok(bytes) = serde_json::to_vec(&diagnostic) {
+            let _ = fs::write_all(l.fs.as_ref(), "logs/reporting-error.json", &bytes);
+            let _ = fs::write_all(l.fs.as_ref(), "logs/session-report.json", &bytes);
+        }
+        l.shell.message("SESSION_REPORT_IDENTITY_MISMATCH: current launch evidence is missing or belongs to another session; see logs/reporting-error.json");
+        l.sessions.push(diagnostic);
     }
     let _ = success; // Only called after proved cleanup, including a clean launch error.
     let _ = l.fs.remove("logs/pending-session.json", false);

@@ -1,0 +1,150 @@
+{
+  "implementation": {
+    "ordering": "SeqCst fences under the existing exclusive Engine/VM lease",
+    "synchronized_methods": "Engine.call wraps ACC_SYNCHRONIZED entry around the body/native path; static uses the declaring canonical Class object and instance uses receiver; normal, exception and structured-error returns release exactly one acquisition.",
+    "gc": "Held object keys are VM roots until the last exit. Unheld monitor metadata is removed.",
+    "wait_set": "Object wait/notify/notifyAll remain explicitly unavailable for an owner and do not release/mutate the lock; calls without ownership throw IllegalMonitorStateException.",
+    "entry": "Free monitor acquisition or same-owner reentry; cross-owner contention fails API_UNAVAILABLE without changing owner/depth.",
+    "status": "implemented",
+    "device_binding": "Session.current_thread_id returns existing as_jni_thread/threadGetCurHandle; no synthetic Java Thread object is introduced.",
+    "package_specific_branches": false,
+    "bounds": {
+      "depth_per_monitor": 65535,
+      "failure": "MONITOR_BUDGET before mutation",
+      "simultaneous_monitors": 1024
+    },
+    "dex_declaration_marker": "ACC_DECLARED_SYNCHRONIZED (0x20000) is not treated as the execution-lock bit; D8 non-native synchronized methods execute their explicit monitor bytecode.",
+    "inspection": "Thread.holdsLock reflects the current owner",
+    "legacy_std": "Existing std opcode behavior remains unchanged; new ownership code is selected only for the portable build.",
+    "identity": "No NativeHost means the single interpreter owner; a bound backend must return a nonzero actual current_thread_id, otherwise API_UNAVAILABLE. Native and interpreter owners have distinct namespaces.",
+    "ownership": "Held monitors map each heap object to owner identity and recursion depth. No zero-work monitor success.",
+    "exit": "Only the owner can decrement; zero depth removes the record; unowned/wrong-owner exit throws IllegalMonitorStateException; null throws NullPointerException."
+  },
+  "limitations": [
+    "Blocking contention, wait-set scheduling, interrupt/timeout wakeup and Java Thread scheduling are not implemented.",
+    "Host native-provider identity tests intentionally switch a controlled identity token; they do not claim simultaneous OS-thread or Horizon execution.",
+    "Structured VM abort from an explicit synchronized block bypasses Java exception handlers; the engine must be disposed after such a fatal error. Synchronized method wrappers release on those returned errors.",
+    "Held monitors of a terminated native thread are not automatically reassigned; thread lifecycle monitor integration is outside this subset.",
+    "JNI MonitorEnter/MonitorExit slots are not newly implemented by this change.",
+    "No game first-screen or GPU claim follows from these host tests."
+  ],
+  "primary_references": [
+    "https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-6.html#jvms-6.5.monitorenter",
+    "https://developer.android.com/reference/java/lang/Thread#holdsLock(java.lang.Object)",
+    "https://android.googlesource.com/platform/art/+/refs/heads/main/libdexfile/dex/modifiers.h"
+  ],
+  "commands": [
+    {
+      "command": "pwsh -File crates/rd-vm/tests/fixtures/portable-monitor/build.ps1",
+      "status": "passed",
+      "exit_code": 0,
+      "jvm_cases": 12
+    },
+    {
+      "passed": 6,
+      "status": "passed",
+      "exit_code": 0,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-switch-smoke --features host-cli,portable-tests --test portable_monitor --locked -- --nocapture",
+      "ignored": 0,
+      "failed": 0
+    }
+  ],
+  "scope": "Portable Java monitor ownership and synchronized method entry/exit",
+  "fixture_build": {
+    "artifacts": [
+      {
+        "sha256": "c9a3294fa3ef1f660e78e61744f8fdbcf5c25c3d47e81d27a28bbca86e6a4c87",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\portable-monitor-fixture\\dex\\classes.dex"
+      },
+      {
+        "sha256": "6d1340cc8bbb472507848e17d1a1e965b8ff8fa3b427dfb4b45b881ecefa4a76",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\portable-monitor-fixture\\jvm-oracle.txt"
+      }
+    ],
+    "sources": [
+      {
+        "sha256": "9a15cc0f9002bee14c032f872fafed038f014acd0829b07f44b60696a8a859ab",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\rd-vm\\tests\\fixtures\\portable-monitor\\MonitorFixture.java"
+      },
+      {
+        "sha256": "0470b47bdc50f3fe45e81c694b4823b209f5aab5c087279159a283d808a2c2d1",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\rd-vm\\tests\\fixtures\\portable-monitor\\build.ps1"
+      }
+    ],
+    "api": 26,
+    "schema_version": 1
+  },
+  "tests": [
+    "twelve_jvm_cases_match_with_nested_locks_exceptions_gc_and_declared_methods",
+    "ownership_reentrancy_null_invalid_and_contention_are_real_and_gc_rooted",
+    "unavailable_thread_identity_never_becomes_a_synthetic_native_owner",
+    "synchronized_native_class_and_instance_locks_release_on_every_exit",
+    "wait_set_is_explicitly_unavailable_and_never_releases_the_owned_lock",
+    "monitor_and_recursion_budgets_fail_without_changing_previous_ownership"
+  ],
+  "schema_version": 1,
+  "date": "2026-10-24",
+  "observed_blocker": {
+    "run": "local-artifacts/m9/external-runs/efc6db439a6b470fb6e67a908d6dca84",
+    "returned_to_launcher": true,
+    "scope": "Saved report proves monitor-enter API was unavailable in the renderer stack; ACTIVITY_STOP_ERROR includes later onPause wrapping.",
+    "nro_sha256": "3917b6758e79a9a8f10e199f854d7db7ca707dba9ed957835c8a27e245d11f1a",
+    "error": "ACTIVITY_STOP_ERROR: API_UNAVAILABLE [rd-vm]: monitor-enter/exit requires the portable monitor implementation [pc 0x6: Insn { opcode: 29, fmt: F11x, size: 1, kind: Reg(0) }]\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+    "verification_hash": {
+      "path": "local-artifacts/m9/external-runs/efc6db439a6b470fb6e67a908d6dca84/verification.json",
+      "sha256": "f9bd3f1da9dde70eabc36c43a8c431f33ee6dafd4889e752a9516442110cd97d"
+    }
+  },
+  "portable_core_asserted": true,
+  "verification": {
+    "host": "6 focused tests passed; 12 JVM oracle cases repeated across GC; actual native synchronized DEX flags asserted",
+    "emulator": "pending NRO containing the monitor correction",
+    "hardware": "not run"
+  },
+  "source_hashes": [
+    {
+      "path": "crates/rd-vm/src/portable/monitor.rs",
+      "sha256": "dd8dc060d2006d2307f0e76dd1cd33b128eddb37f9b169539f6574ac22ab1dba"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/mod.rs",
+      "sha256": "d8d5e65914bf1fdbfc9a14b9ebba8bcbe112f3c82cf6762c4cc02e8b1060e0af"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/gc.rs",
+      "sha256": "3e632fafa8e3a551311c41f79c145f0e9713d85b7807ab554d04d139a52924b3"
+    },
+    {
+      "path": "crates/rd-vm/src/interp.rs",
+      "sha256": "8a60625483ac1af2e92a28f6510899900ce4fc41bf39abf4c202de58e7361926"
+    },
+    {
+      "path": "crates/rd-vm/src/engine.rs",
+      "sha256": "70ec53305f43dee330cbbe9625c6f3797fed5d90cfd7ae6bd15f5127ba285ab0"
+    },
+    {
+      "path": "crates/rd-vm/src/native_host.rs",
+      "sha256": "46384b81851d0845ed8cca44295ecec58d9d8090113fd908f0bccebff289797f"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/intrinsics.rs",
+      "sha256": "5f2dfa4c9e8d6fbb412861b68afee8e20a611c232decf035388da272053be0e0"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "sha256": "2bbf6a13ff235e255ebe5d1e97068c54f9e2ea57cefc7e091eebf8ca073077b0"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_jni.rs",
+      "sha256": "037d833909c8ad2bbeedef0b4c1ddad207eec53b51951ee8e7a4406d7a17822e"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_monitor.rs",
+      "sha256": "39f482f96082e2e8d963967f0025fd748b7e0ee059a2ccf09023011e7b64457a"
+    },
+    {
+      "path": "crates/as-switch-smoke/Cargo.toml",
+      "sha256": "42d537d31d3286d221258713d344f372f293b02a0c4ba3be5fc37184a46607c9"
+    }
+  ]
+}

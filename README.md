@@ -23,11 +23,14 @@ Plus crash and startup stall. This is sample-level user feedback; see
 [hardware feedback](docs/HARDWARE_FEEDBACK.md).
 The user has also confirmed M1–M7 testing on physical Switch. In a later M7–M9
 candidate test, an APK larger than 65 MB installs, SQLite is readable and
-SharedPreferences works. That tested build blocked Candy Crush at its separate
-32 MiB raw DEX guard. The current source adds measured heap/admission policy,
-general native ABI work and a shared GLSurfaceView path; new Horizon execution
-is pending. See [M9 independent-app work](docs/M9_EXTERNAL_APPS.md). Full candidate regression
-and independent compatibility gates remain open.
+SharedPreferences works. Subsequent hardware logs admit Candy Crush's DEX files
+and expose missing startup APIs. Ryujinx reproduces those failures; shared Enum,
+native property and display improvements advance startup further. An original
+portrait fixture renders real 720x1280 EGL buffers and returns cleanly to the
+launcher. Mekorama and Candy Crush still have **no first-screen compatibility
+pass**. See [M9 independent-app work](docs/M9_EXTERNAL_APPS.md) and the separate
+[display evidence](docs/HORIZON_DISPLAY.md). Full candidate regression and
+independent compatibility gates remain open.
 M8 adds persistent XML SharedPreferences, native SQLite, boxed collections and
 DEX method reflection. M9 adds a repeated host corpus, external APK evaluation
 and startup/frame/heap measurements. See [exact evidence and limitations](docs/M8_M9_E2E.md).
@@ -66,9 +69,13 @@ engine compatibility are not established. There is no per-game configuration.
 Inherited RustyDroid capabilities are not automatically Switch capabilities.
 Read the [compatibility inventory](docs/ANDROSWITCH_COMPATIBILITY.md) and
 [M2–M4 implementation and evidence guide](docs/M2_M4_E2E.md) for the exact scope.
-The earlier Mekorama 1.7.2 build failed during class initialization on an
-unavailable `libstdc++.so` dependency. Shared C++ ABI support is now being
-validated; neither Mekorama nor Candy Crush has a new first-screen pass yet.
+Shared C++ ABI support advances both games beyond their original startup
+blockers. The latest emulator attempts pass monitor, Timer, Executor, resource,
+Bitmap, JNI constructor and Thread identity blockers. Independent SDK APKs
+verify actual workers, native-suspended GC roots, PNG pixels and JVM-matching
+JNI constructor/thread results. Candy Crush now reports unavailable
+Thread.getContextClassLoader; Mekorama reports Class.forName with a loader. Both
+return to the launcher, and neither game has a first-screen pass yet.
 Installation is not a compatibility guarantee; see
 [startup-failure diagnosis and recovery](docs/STARTUP_FAILURES.md).
 See [M7 storage improvements](docs/M7_STORAGE_E2E.md) for the new I/O path and limits.

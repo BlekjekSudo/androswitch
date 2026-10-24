@@ -1,10 +1,12 @@
 /* Linux/Bionic errno at the guest boundary; host errors retain newlib values.
  * Numeric ABI constants are from Android NDK asm-generic errno headers.
+ * Cygwin/MSYS also uses non-Linux host errno numbers and needs the same
+ * symbolic conversion. The Horizon branch remains unchanged.
  * AndroSwitch contributors, MIT OR Apache-2.0. */
 #pragma once
 #include <errno.h>
 static inline int as_errno_to_android(int value) {
-#ifdef __SWITCH__
+#if defined(__SWITCH__) || defined(__CYGWIN__)
   switch (value) {
 #ifdef EDEADLK
   case EDEADLK:
@@ -286,7 +288,7 @@ static inline int as_errno_to_android(int value) {
 #endif
 }
 static inline int as_errno_from_android(int value) {
-#ifdef __SWITCH__
+#if defined(__SWITCH__) || defined(__CYGWIN__)
   switch (value) {
 #ifdef EDEADLK
   case 35:

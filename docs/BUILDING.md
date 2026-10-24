@@ -8,6 +8,9 @@ Keep `CARGO_BUILD_JOBS=1` on low-memory machines; serialize verification builds.
 
 The host CLI and device proof are different build paths. The current
 automated NRO workflow uses Windows Rust and the WSL Ubuntu devkitPro linker.
+The product builder also accepts `-LinkBackend Windows` with an existing native
+devkitPro installation. It uses a separate `local-artifacts/product-windows`
+object directory and records the linker backend in `product-build.json`.
 No full Android OS, Python runtime or Unicorn backend is included in the NRO.
 
 ## Prerequisites
@@ -21,6 +24,18 @@ No full Android OS, Python runtime or Unicorn backend is included in the NRO.
 | Switch static library | Rust nightly-2026-08-26 with rust-src |
 | Switch link/package | WSL Ubuntu, make, devkitPro under `/opt/devkitpro`, devkitA64, libnx and packaging tools |
 | Emulator gate | An existing Ryujinx installation/profile; executable path supplied to the test script |
+
+If WSL is unavailable, the equivalent product build can use the installed
+Windows toolchain without changing the WSL distribution:
+
+```powershell
+./scripts/build-androswitch.ps1 -LinkBackend Windows -WindowsDevkitPro C:/devkitPro -WindowsMake C:/w64devkit/bin/make.exe
+```
+
+The 2026-10-24 fallback used native devkitA64 GCC 15.2.0, because an external
+Ubuntu compaction made WSL reject startup with `E_ILLEGAL_STATE_CHANGE`. It built
+the entire C object set separately, then linked the same freestanding Rust
+library. This is recorded as a Windows build, separately from prior WSL builds.
 
 The recorded M1 run used Microsoft OpenJDK 21.0.12.1 and devkitA64 GCC 16.1.0.
 Source/build-tool hashes and the tested emulator hash/version are in
@@ -40,6 +55,10 @@ does not require this database backend.
 
 The consolidated host regression command is `./scripts/check-m7-m9.ps1` after
 building the fixtures listed in [M8/M9](M8_M9_E2E.md). It does not open Ryujinx.
+Pass `-NativeHostBackend Msys` to select the installed POSIX host compiler for
+native C checks explicitly; see [native host backends](HOST_NATIVE_TESTS.md).
+`-ContinueAfterFailure` records remaining independent checks, then returns a
+failure if any required check failed. It cannot turn a partial run into a pass.
 
 From the repository root:
 
@@ -141,6 +160,12 @@ existing M4/M5 builder. The output NRO is
 under `local-artifacts/releases/`. Package generation collects full linked
 dependency notices and retains RustyDroid's attribution. Large outputs stay
 ignored. The package has one product NRO; no runner NRO is required.
+
+To keep device Cargo output on a faster drive, pass an absolute task-local
+directory, for example
+`./scripts/build-androswitch.ps1 -TargetDirectory C:/Users/Administrator/.cache/androswitch/switch-target`.
+The default remains `target/switch`. The NRO output location stays the same,
+and `target/evidence/product-build.json` records the selected target directory.
 
 See [M6/M7](M6_M7_E2E.md) for verification scope and [using the alpha](USING_ANDROSWITCH.md)
 for SD layout, controls, data retention and the current compatibility limits.

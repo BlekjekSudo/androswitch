@@ -17,10 +17,11 @@ impl Engine {
         let n = self.heap.len();
         let mut marked = vec![false; n + 1];
         let mut roots: Vec<ObjRef> = self.statics.values().filter_map(reference).collect();
-        roots.extend(self.gc_frames.iter().flatten().copied());
+        roots.extend(self.execution_frames.roots());
         roots.extend(self.heap.gc_pinned_roots());
         roots.extend(self.portable.strings.values().copied());
         roots.extend(self.portable.classes.values().copied());
+        roots.extend(self.portable.monitors.roots());
         if let Some(framework) = self.framework_host() {
             roots.extend(framework.roots());
         }
@@ -83,7 +84,10 @@ impl Engine {
         result: &Value,
         exception: Option<ObjRef>,
     ) {
-        if let Some(roots) = self.gc_frames.last_mut() {
+        if let Some(roots) = self
+            .execution_frames
+            .current_roots(self.heap.execution_owner())
+        {
             roots.clear();
             roots.extend(
                 regs.iter()

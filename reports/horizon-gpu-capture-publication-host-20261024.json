@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "scope": "GPU diagnostic capture publication only; existing native readback and rotation map preserved.",
+  "implementation": {
+    "runtime": "Diagnostic I/O failure is logged and does not fabricate an APK rendering/API failure or a completed image.",
+    "row_buffer_bytes": 3840,
+    "publish": "Write complete header and RGB rows, require successful close, then rename to final .ppm.",
+    "writes_at_1280x720": 721,
+    "temporary_suffix": ".ppm.tmp",
+    "failure": "Reject short writes, failed row generation, close and rename. Attempt temp cleanup and preserve prior final on failure. A crash may leave ignored .tmp debris."
+  },
+  "motivation": "reports/horizon-portrait-handoff-ryujinx-20261024.json",
+  "source_snapshots": [
+    {
+      "sha256": "56bc38b5abb8f469fafb519b1f6bb1ade5d725e1c523864ea1758adc801fbdbb",
+      "path": "platform/androswitch/media.c"
+    },
+    {
+      "sha256": "43283f3bf570d95d7b88976b9f6efd6cea645e4e2c30ad52565a639ecd416b68",
+      "path": "platform/androswitch/Makefile"
+    },
+    {
+      "sha256": "a76dcfb9e5f6a76dc24a5371da6d475e46334450cb8fe2af15a7cd1e75e88cfe",
+      "path": "platform/androswitch/ppm_publish.h"
+    },
+    {
+      "sha256": "72bed6c74a9fadf3b0e347003ea04552130b76cfd56bdb8c31535a0887e11eb6",
+      "path": "platform/androswitch/tests/ppm_publish.c"
+    },
+    {
+      "sha256": "6de1f92c415c359d9e5c368d4a4912fdeaace451797cefd4d98e3f75f088c007",
+      "path": "scripts/test-horizon-display.ps1"
+    }
+  ],
+  "host": {
+    "publication_cases": 12,
+    "result_path": "C:/Users/Administrator/.cache/androswitch/display-publish-check/result.json",
+    "status": "passed",
+    "command": "./scripts/test-horizon-display.ps1 -OutputDirectory C:/Users/Administrator/.cache/androswitch/display-publish-check",
+    "compile_run_checks": 37,
+    "result_sha256": "7f8b79322b51a2a991f82f20e3698fc9fc47e42f78eeeae9b604eb2936caabff",
+    "framebuffer_cases": 4,
+    "publication_coverage": [
+      "Default stdio publishes a complete5x3 image with exact header/pixels.",
+      "Instrumented real-file720p publication uses721writes and keeps final absent until close/rename.",
+      "Partial header write, partial row write and row-generation failure leave final unpublished.",
+      "Close failure and rename failure preserve prior final and remove temp.",
+      "Open failure cleans an interrupted temp; invalid dimensions/path/callback reject before opening."
+    ],
+    "worker_cases": 30,
+    "rotation_cases": 4
+  },
+  "target_compilation": [
+    {
+      "command": "aarch64-none-elf-gcc.exe -pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -IC:/devkitPro/libnx/include -IC:/devkitPro/portlibs/switch/include -Iplatform/switch-smoke -Ithird_party/android -fno-strict-aliasing -c platform/androswitch/media.c -o C:/Users/Administrator/.cache/androswitch/atomic-ppm-media.o",
+      "compiler": "devkitA64 15.2.0",
+      "status": "passed",
+      "backend": "Windows"
+    },
+    {
+      "command": "wsl -d Ubuntu -- /opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc -pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -I/opt/devkitpro/libnx/include -I/opt/devkitpro/portlibs/switch/include -I/mnt/d/Dev/Switch/AndroSwitch/platform/switch-smoke -I/mnt/d/Dev/Switch/AndroSwitch/third_party/android -fno-strict-aliasing -c /mnt/d/Dev/Switch/AndroSwitch/platform/androswitch/media.c -o /mnt/c/Users/Administrator/.cache/androswitch/ppm-media-wsl.o",
+      "compiler": "devkitA64 16.1.0",
+      "status": "passed",
+      "note": "An initial WSL make invocation exited1 after starting the compiler without a source diagnostic. Direct -pipe retry passed; systemd user-session startup warning was nonfatal on that successful retry.",
+      "backend": "WSL"
+    }
+  ],
+  "target_artifacts": [
+    {
+      "sha256": "37e481368860d794b6747ed7c5411b310d35a235a5685f070185f6c2ba7ec149",
+      "path": "C:/Users/Administrator/.cache/androswitch/atomic-ppm-media.o",
+      "bytes": 90360
+    },
+    {
+      "sha256": "e813df9e199e3ce0bb5395ed1aa2f0e9016d97850833645938d92bc4c4536c9f",
+      "path": "C:/Users/Administrator/.cache/androswitch/ppm-media-wsl.o",
+      "bytes": 90344
+    }
+  ],
+  "script_syntax": "passed",
+  "whitespace": "git diff --check passed",
+  "emulator": "Parent-owned next NRO execution is separate; no emulator started by this subtask.",
+  "physical_switch": "not_run_for_this_change",
+  "m9_complete": false
+}

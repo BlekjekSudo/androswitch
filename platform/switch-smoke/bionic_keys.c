@@ -151,6 +151,20 @@ static int once(int *control, uint64_t function) {
   }
 }
 static int equal(uint64_t left, uint64_t right) { return left == right; }
+unsigned as_bionic_keys_pending(void) {
+  int saved = errno;
+  unsigned pending = 0;
+  as_cxx_lock();
+  for (unsigned i = 0; i < KEY_COUNT; ++i)
+    if (keys[i].active && keys[i].generation == values[i].generation &&
+        keys[i].destructor && values[i].value) {
+      pending = 1;
+      break;
+    }
+  as_cxx_unlock();
+  errno = saved;
+  return pending;
+}
 int as_bionic_keys_reset(void) {
   as_cxx_lock();
   if (initializers) {

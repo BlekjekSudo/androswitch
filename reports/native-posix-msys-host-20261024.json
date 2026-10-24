@@ -1,0 +1,378 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "scope": "Explicit alternate MSYS POSIX/Cygwin host C backend, Windows Android/ARM64 compilation and ARM64 CPU oracle; no WSL/emulator/device pass inferred.",
+  "status": "passed_host_C_and_ARM64_oracle_Rust_explicitly_skipped",
+  "host": {
+    "wchar_t_bytes": 2,
+    "runtime_binary": {
+      "bytes": 3359873,
+      "sha256": "eba0437105ff92b801321378f4ee7ffef6e135f864f10f6c82ccfd2be4f99bd4",
+      "path": "C:/devkitPro/msys2/usr/bin/msys-2.0.dll"
+    },
+    "pointer_bytes": 8,
+    "backend": "Msys",
+    "constants_log": {
+      "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/probes/host-constants.log",
+      "bytes": 80,
+      "sha256": "f5dde04d286b2007acf570ad44f6007c7b0b47ddc4132fc9887364505899e35b"
+    },
+    "compiler": {
+      "target": "x86_64-pc-cygwin",
+      "path": "C:/devkitPro/msys2/usr/bin/gcc.exe",
+      "version": "gcc (GCC) 15.2.0",
+      "runtime": "MSYS POSIX/Cygwin; not GNU/Linux WSL"
+    },
+    "constants": {
+      "EDEADLK": 45,
+      "EOVERFLOW": 139,
+      "ENOSYS": 88,
+      "ECANCELED": 140
+    },
+    "long_bytes": 8,
+    "compiler_binary": {
+      "bytes": 2007036,
+      "sha256": "a2813b7a9f3afca25bc1ca5ecb0fe29b2627644efe0fca16debb777eb1ad7868",
+      "path": "C:/devkitPro/msys2/usr/bin/gcc.exe"
+    },
+    "constants_probe": {
+      "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/probes/host-constants.c",
+      "bytes": 230,
+      "sha256": "c622bc56024dc244281243476e1d034793bca0997ba374d10d7b1dbfcf139399"
+    },
+    "macros": [
+      "__CYGWIN__=1",
+      "__MSYS__=1"
+    ]
+  },
+  "implementation": {
+    "rust_selection": "-SkipRustTests explicitly omits final as-native Cargo invocation. Default still includes it.",
+    "scripts": [
+      "scripts/test-native-abi.ps1",
+      "scripts/test-native-time.ps1"
+    ],
+    "errno_fix": "Enable pre-existing symbolic Android↔host errno mapping under __CYGWIN__ in addition to __SWITCH__. Fixture keeps Android -38; no assertion or production behavior weakened.",
+    "selector": "-HostBackend Wsl|Msys; default Wsl, no automatic fallback",
+    "process_scope": "MSYS PATH used for host C only, restored before Windows Python/target compiler/Cargo and again on failure. No global environment, WSL service or emulator changes."
+  },
+  "verified": {
+    "arm64_oracle": {
+      "backend": "Unicorn ARM64 CPU oracle",
+      "status": "passed",
+      "scope": "Production native_call.S with modeled host callback clobbers; optional pure errno conversion code compiled against actual Switch/newlib. Not libnx/emulator/device execution.",
+      "result": {
+        "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/oracle/bridge-oracle.json",
+        "bytes": 1495,
+        "sha256": "a442fd6802dc4f57e40bd87c622ecf2c836b767ad4edb64c4367f8f80ffa38d5"
+      },
+      "cases": [
+        {
+          "case": "import_registers_stack_hfa_return",
+          "status": "passed",
+          "errno_helper_calls": [
+            [
+              "enter",
+              1
+            ],
+            [
+              "leave",
+              1
+            ]
+          ]
+        },
+        {
+          "case": "nested_callback",
+          "status": "passed",
+          "errno_helper_calls": [
+            [
+              "enter",
+              1
+            ],
+            [
+              "enter",
+              2
+            ],
+            [
+              "leave",
+              2
+            ],
+            [
+              "leave",
+              1
+            ]
+          ]
+        },
+        {
+          "case": "actual_switch_newlib_errno_translation",
+          "status": "passed",
+          "host_codes": [
+            88,
+            45,
+            134,
+            116,
+            139,
+            92,
+            11,
+            12,
+            22,
+            5
+          ],
+          "android_codes": [
+            38,
+            35,
+            95,
+            110,
+            75,
+            40,
+            11,
+            12,
+            22,
+            5
+          ]
+        }
+      ]
+    },
+    "errno_roundtrip": {
+      "log": {
+        "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/probes/errno-roundtrip.log",
+        "bytes": 56,
+        "sha256": "a6644e0f85efdbd49ca27410e9ad0c8e1182cf62c50f025038f7d1355e9a587b"
+      },
+      "status": "passed",
+      "symbolic_pairs": 73,
+      "source": {
+        "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/probes/errno-roundtrip.c",
+        "bytes": 4259,
+        "sha256": "af98cb0f6fa18dd0a4a99aa66167f34611eedb771510ac8ef47f0693c52fc6e4"
+      },
+      "scope": "Generated table of mapped symbolic host constants checks both directions and alias collisions. Independent canonical Switch code expectations also run in the existing ARM64 oracle."
+    },
+    "abi": {
+      "logs": [
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/elf-literal.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/elf-syscall.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/contracts-build.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/contracts-run.log",
+          "bytes": 126,
+          "sha256": "df20689afc73891589164a10d7077ce6b1f4df0a25e5a1ef409a4a3462b4a10f"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/locales-build.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/locales-run.log",
+          "bytes": 100,
+          "sha256": "a1f0f17710d2ed421eaf12a9314e0c6f2025f2fbcce795bfcf6ba8c9074bee5a"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/multibyte-build.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/multibyte-run.log",
+          "bytes": 92,
+          "sha256": "d36047cbda401a5843dbed6cce78d2fe7a722ccb1d7792eb3106e09fea4d1d91"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/random-build.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/random-run.log",
+          "bytes": 95,
+          "sha256": "43e98ac87544b2a66cfa8b9a6f0472e113acac68b7977e614a3ac446e20e8187"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/finalization-build.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/finalization-run.log",
+          "bytes": 102,
+          "sha256": "ac2fde458e3d6b012469d0f407e94b7cc749d1b53cc33a19fde9e4208661d5c1"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/switch-errno-oracle.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/arm64-bridge-oracle.log",
+          "bytes": 102,
+          "sha256": "16936a61f591d5ebeed2d11f96a6cabba39b044a5f662908eac7cb99d08736a5"
+        }
+      ],
+      "status": "passed_C_and_ARM64_oracle_Rust_skipped",
+      "command": "./scripts/test-native-abi.ps1 -HostBackend Msys -SkipRustTests",
+      "rust_loader_tests": "skipped_explicitly",
+      "result": {
+        "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/abi/host-result.json",
+        "bytes": 9945,
+        "sha256": "54205943ecacfd0a6afbceabc25edcb3f7db27d3b34a22350526b1acd8c1d765"
+      },
+      "suites": [
+        "contracts",
+        "locales",
+        "multibyte",
+        "random",
+        "finalization"
+      ],
+      "checks": 14
+    },
+    "time": {
+      "logs": [
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/time/build.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/time/contracts.log",
+          "bytes": 129,
+          "sha256": "8d5660e4c2019c7470044b719fdb7d03ea0021773a48e025d7478668a9b0cb16"
+        }
+      ],
+      "status": "passed",
+      "command": "./scripts/test-native-time.ps1 -HostBackend Msys",
+      "checks": 2,
+      "result": {
+        "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/time/host-result.json",
+        "bytes": 1535,
+        "sha256": "89b267aa76b4b776fe24712bec6daf5969a59acbd7d1ce9970a3bbc004270bf4"
+      }
+    },
+    "switch_branch": {
+      "status": "byte_identical",
+      "before": {
+        "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/probes/errno-switch-before.o",
+        "bytes": 2640,
+        "sha256": "f97b4ae157e106049689eaf1b92df8be1df6f198a412f1a571593e102dd482ba"
+      },
+      "command": "aarch64-none-elf-gcc.exe -pipe -D__SWITCH__ -O2 -fno-jump-tables -fno-tree-switch-conversion -fno-stack-protector -Iplatform/switch-smoke -c fixtures/m9/native-abi/errno_probe.c -o <before-or-after>.o",
+      "compiler": {
+        "bytes": 3075072,
+        "sha256": "e5ef7f64d1198e99049323ce5fdaf582fdbdd8e08a5390149620fc9fd1a7ce33",
+        "path": "C:/devkitPro/devkitA64/bin/aarch64-none-elf-gcc.exe"
+      },
+      "after": {
+        "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/probes/errno-switch-after.o",
+        "bytes": 2640,
+        "sha256": "f97b4ae157e106049689eaf1b92df8be1df6f198a412f1a571593e102dd482ba"
+      }
+    }
+  },
+  "initial_failures": [
+    {
+      "log": {
+        "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/initial-failures/contracts-run.log",
+        "bytes": 170,
+        "sha256": "cc1bdd672ffa2ddbc2b3fa059e3d8c58dfa6b1e94ef1b54effeb7a05232d943a"
+      },
+      "phase": "Unmodified Cygwin host probe",
+      "cause": "Fixture correctly returns Android ENOSYS -38. Host expected ENOSYS88 but converter was identity outside __SWITCH__. Fixed host mapping conditional, not fixture.",
+      "exit_code": 1536,
+      "status": "failed"
+    },
+    {
+      "log": {
+        "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/initial-failures/script-initial-python-failure.log",
+        "bytes": 182,
+        "sha256": "ad202f870e63cd99903247d50d858d18a0950f9e8bff8561795e5e36f57c7b8f"
+      },
+      "phase": "First backend-script attempt",
+      "cause": "POSIX bin first in PATH selected POSIX Python for Windows paths. Fixed process PATH restoration before Windows Python/Cargo stage. Complete script rerun then passed.",
+      "result": {
+        "path": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c/initial-failures/script-initial-python-failure.json",
+        "bytes": 9979,
+        "sha256": "84c199ee1f5042755542f199fb36b41f51229e8508c6045cd7f32a18f963764c"
+      },
+      "status": "failed"
+    }
+  ],
+  "fixtures": [
+    {
+      "bytes": 23209,
+      "sha256": "52490c11afc2fee08326208f757319e4e5f79c094b3fe48b83f742acd19187b1",
+      "path": "fixtures/m9/native-abi/contracts.c"
+    },
+    {
+      "bytes": 8704,
+      "sha256": "6ee9443528dc0a93f55749d2cc40da8570bff99c73c58f56c9f9c8c8ffddf822",
+      "path": "fixtures/m9/native-abi/locales.c"
+    },
+    {
+      "bytes": 9751,
+      "sha256": "34b582c62b6409274b3cb4e8ee725a8992403056f0bfba61f8585c0d79a6d60d",
+      "path": "fixtures/m9/native-abi/multibyte.c"
+    },
+    {
+      "bytes": 6386,
+      "sha256": "afc220775b285b2293986311347ddf2387fd82588e20846d24ad18221b79f21f",
+      "path": "fixtures/m9/native-abi/random.c"
+    },
+    {
+      "bytes": 6721,
+      "sha256": "45c99514d4584bdcc89cb370c30e46703d3b9f91db39210dc15ed0d495a3c89a",
+      "path": "fixtures/m9/native-abi/finalization.c"
+    },
+    {
+      "bytes": 6454,
+      "sha256": "df3d6e2249ee12c6ec505cf4120997fb03dd67a6df75419bae661df29bf312ac",
+      "path": "fixtures/m9/native-abi/timezones.c"
+    },
+    {
+      "bytes": 713,
+      "sha256": "3be753fd3e5cda05234d5b1af7b1c1d6d76a9f76f05fbc43d349a6d0996769d2",
+      "path": "fixtures/m9/native-abi/errno_probe.c"
+    }
+  ],
+  "source_snapshots": [
+    {
+      "bytes": 8878,
+      "sha256": "cfb487ad9d8b194f5d66fa74269f76a5f7434657c0abc905e7a17fa5d76158fd",
+      "path": "platform/switch-smoke/bionic_errno.h"
+    },
+    {
+      "bytes": 7260,
+      "sha256": "4587505bd3e8174e7b5d4250a98a4c329fb6e33fd7684b5794868d6b9579d095",
+      "path": "scripts/test-native-abi.ps1"
+    },
+    {
+      "bytes": 3575,
+      "sha256": "01fa55437c8da84264af9b1eb0904c245c72ecd7149e532c3751a8d4a69dd78d",
+      "path": "scripts/test-native-time.ps1"
+    },
+    {
+      "bytes": 9762,
+      "sha256": "bda89bcf32410821e4bf72c6f87f380b971975eb0309a7e3225178b80d9f8c70",
+      "path": "scripts/test-native-bridge.py"
+    }
+  ],
+  "script_syntax": "Both PowerShell scripts parsed with zero errors.",
+  "whitespace": "Scoped git diff --check passed.",
+  "not_run": [
+    "Rust loader Cargo tests intentionally skipped while another agent owned compiler slot.",
+    "Ubuntu WSL execution unavailable due external distribution maintenance; no WSL pass claimed.",
+    "No libnx/NRO/emulator or physical Switch execution in this subtask."
+  ],
+  "m9_complete": false,
+  "preserved_evidence_directory": "local-artifacts/m9/host-msys/20261024-34bb89a24b5340edbbf6903f4649d44c"
+}

@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T14:26:02.1461008Z",
+  "status": "host_contracts_passed_horizon_execution_pending",
+  "scope": "General bounded serial java.util.concurrent and Java Thread compatibility, no package/profile/module bypass. Dedicated BackgroundWorkers transport is required for successful Thread.start/execute.",
+  "basis": {
+    "implementation": "Independent Rust implementation from public API contracts; no JDK implementation source copied.",
+    "upstream_commit": "6388281f66d254c8e01a0fdc7a5a9a30239bc762",
+    "runtime": "AndroSwitch history-preserving RustyDroid fork"
+  },
+  "observed_blocker": {
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "nro_sha256": "23e53247fbb113709e612479149e0fa91a2245611d96fe6eaee71f46fdca8726",
+    "session_report_sha256": "f5f9dd752f91d1cea6a5b0e5b453c5dbf1908d382c380ff8faadf2876f24e202",
+    "operation": "Executors.defaultThreadFactory()Ljava/util/concurrent/ThreadFactory;",
+    "session_report": "local-artifacts/m9/external-runs/2d4de814c2244049b4ea2ace5ad24365/sessions/2d4de814c2244049b4ea2ace5ad24365-2/session-report.json",
+    "result": "Actual prior NRO failure, not proof that this new implementation runs on Horizon.",
+    "verification": "local-artifacts/m9/external-runs/2d4de814c2244049b4ea2ace5ad24365/verification.json"
+  },
+  "primary_sources": [
+    "https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ThreadPoolExecutor.html",
+    "https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/Executors.html",
+    "https://docs.oracle.com/javase/8/docs/api/java/lang/Thread.html",
+    "https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ThreadFactory.html"
+  ],
+  "implementation": {
+    "pool": "Supports core=max=1, TimeUnit.SECONDS, initialized LinkedBlockingQueue and supplied ThreadFactory. First command belongs directly to the new worker; subsequent accepted commands are observable in getQueue() and FIFO. Idle timeout measures monotonic time; later execute creates a new factory Thread. Graceful shutdown drains accepted work and rejects later submissions.",
+    "roots": "Live transport tokens root Java Threads; Thread target, pool, factory, queue, first/running/queued jobs and pending exception objects participate in GC. Temporary factory roots use unique scope tickets, so separate native workers can release VmGate and resume/unwind out of order without removing another worker scope.",
+    "threads": "Real standalone Thread targets and virtual subclass.run execute once on dedicated platform workers. Actual active NativeHost owner maps to the Java Thread object through final TLS cleanup; Interpreter fallback uses active invocation identity only. Names are Java metadata, not a claim of OS-thread naming.",
+    "namespace": "Thread/executor tokens reserve bit62; Timer tokens are hard-bounded below bit62. Generic Android background_worker_step/stopped/error route by namespace. Counters never reuse live token identities.",
+    "factory": "Actually invokes custom ThreadFactory.newThread, preserves returned Thread object/Java name/unchanged Runnable, and validates NEW/base run/start behavior before OS start or command acceptance. Null, replaced/wrapped worker target, overridden pool run/start and reentrant worker creation fail explicitly.",
+    "bounds": "32 live Java Thread workers,128 records per object family including pending-error admission,4096 queue elements in total plus at most one initial command per live worker,4096-byte requested Thread names. Platform limits can be lower and fail explicitly.",
+    "errors": "Failed start/wake leaves command unaccepted. Exact uncaught task, VM or platform error follows shared app-fatal policy; failed tasks are not counted completed. Pending job roots remain until real worker stop. No custom uncaught-handler or replacement-worker recovery claim."
+  },
+  "checks": [
+    {
+      "name": "sdk_fixture_and_actual_jvm_oracle",
+      "result": "javac --release8, D8 min-api26, aapt2;12 cases executed on Microsoft OpenJDK21.0.12.1+1-LTS.",
+      "command": "pwsh -File fixtures/m9/executors/build.ps1",
+      "status": "passed"
+    },
+    {
+      "name": "executor_portable_dex_and_library",
+      "result": "4 library tests and10 executor DEX tests passed; library includes real VM GC regression for out-of-order factory scope completion, plus3 existing memory/property tests. Executor suite includes24 JVM comparisons across original and renamed APK packages.",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p as-framework --features host --lib --test executors -- --test-threads=1",
+      "test_seconds": 12.05,
+      "status": "passed"
+    },
+    {
+      "name": "timer_regression",
+      "result": "10 executor +10 Timer tests passed after owner lifetime fix. Later scope-ticket-only fix revalidated all executor tests separately.",
+      "command": "cargo test -p as-framework --features host --test executors --test timer -- --test-threads=1",
+      "status": "passed",
+      "timer_test_seconds": 39.85
+    },
+    {
+      "name": "focused_clippy",
+      "seconds": 2.05,
+      "result": "Passed after final scope-ticket fix.",
+      "command": "cargo clippy -p as-framework --features host --lib --test executors --test timer -- -D warnings",
+      "status": "passed"
+    },
+    {
+      "name": "format_and_diff",
+      "result": "No formatting/diff errors at source freeze.",
+      "command": "rustfmt --edition 2021 owned Rust module/tests and shared integration; git diff --check on changed framework/classpath/fixture paths",
+      "status": "passed"
+    }
+  ],
+  "fixture": {
+    "oracle": {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\executor-fixture/oracle.txt",
+      "sha256": "8baee3a7081ace2f213462045e8326c5597970b30da4423c539b77948a3486d8",
+      "cases": 12
+    },
+    "apks": [
+      {
+        "sha256": "ef182c13f76278c5a15d4bc359f974e9c1b78da8e7eb36c44826ce3ea3fa2ddf",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\executor-fixture\\executor.apk"
+      },
+      {
+        "sha256": "fa252390970e88313e1fc3f44c1038014d0156594ed4a40b3899f08d123b9496",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\executor-fixture\\renamed.apk"
+      },
+      {
+        "sha256": "555b7195e0043fc16c12731e3a63f55d85104e78cf891c21c798f3c4c70860ae",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\executor-fixture\\executor-proof.apk"
+      }
+    ],
+    "build_tools": "35.0.0",
+    "schema_version": 1,
+    "sources": [
+      {
+        "sha256": "b234f51af563802de6fd2952967777fe68984766253badaec891c46f095c25ce",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\executors\\java\\org\\androswitch\\contracts\\ExecutorActivity.java"
+      },
+      {
+        "sha256": "987407808e8f05818dff25e0c71b5a8d38c6f3c8dc4472fbd853c7ba8f304f18",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\executors\\java\\org\\androswitch\\contracts\\ExecutorProofActivity.java"
+      },
+      {
+        "sha256": "fe52b11d175a988bd54eb4fa7350b5cd6c4264ef4b090b75eb772b454595bbc8",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\executors\\java\\org\\androswitch\\contracts\\ExecutorValidation.java"
+      },
+      {
+        "sha256": "86a01b811334cb6967def8a574c27c9716124fa7b19944d6c3e53f0ade8a2000",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\executors\\build.ps1"
+      }
+    ],
+    "api": 26
+  },
+  "proof": {
+    "physical_device": "not_run",
+    "apk": "target/executor-fixture/executor-proof.apk",
+    "expected": "Three ordered task lines with the same actual Java Thread ID, custom name SDK executor proof and noLooper=true, followed by EXECUTOR_PROOF_PASS; graceful shutdown and visible result posted via main Handler.",
+    "host": "passed with deterministic delivery and actual VFS writes",
+    "activity": "org.androswitch.contracts.ExecutorProofActivity",
+    "package": "org.fixture.executorproof",
+    "result_path": "/sdcard/Download/androswitch-executor-proof.txt",
+    "sha256": "555b7195e0043fc16c12731e3a63f55d85104e78cf891c21c798f3c4c70860ae",
+    "emulator": "not_run_in_this_receipt"
+  },
+  "coverage": [
+    "Default/custom factory dispatch, real returned Thread identity/name, worker-only execution and graceful FIFO drain in two package names.",
+    "Keep-alive expiry at exact monotonic deadline; subsequent submission creates a new token and invokes factory again.",
+    "Null/wrong-target/overridden-worker/throwing factory and backend start/wake failures reject before acceptance.",
+    "Unsupported pool/interrupt APIs fail without shutdown or queue mutation.",
+    "Standalone Runnable targets and Thread subclass.run dispatch, start once, alive until actual stopped.",
+    "Queued/initial/running jobs, Thread target and pool/factory graph survive GC; roots release after real stop.",
+    "Reentrant execute+shutdown and exact uncaught ArithmeticException propagation without completed-task inflation.",
+    "Native owner changes during a suspended callback do not mislabel main Handler; Java Thread identity survives between steps through TLS cleanup.",
+    "Independent pending root scope tickets survive non-LIFO native worker completion and actual VM garbage collection.",
+    "Normal SDK proof uses actual Java VFS, currentThread, custom ThreadFactory and main Handler."
+  ],
+  "limitations": [
+    "Full pool sizing/configuration, blocking queue waits, Future/submit, shutdownNow, interruption, join/await, daemon policy, ThreadGroup, priorities, OS naming and custom uncaught-handler/worker replacement are explicitly outside this bounded layer.",
+    "Pool factories with custom run/start continuations or replaced/wrapped target require resumable worker semantics and are rejected. Standalone subclass.run remains supported.",
+    "No Dynamite/Binder/analytics bypass or package exception was added.",
+    "Actual Horizon dedicated worker/concurrency/TLS behavior needs transport evidence plus a parent-run NRO-bound proof. See reports/horizon-background-workers-host-20261024.json for separate transport scope; it does not itself prove this new executor layer runs.",
+    "The JVM oracle is OpenJDK21, not an Android API26 device. No general APK/gameplay compatibility follows from host success."
+  ],
+  "shared_integration": {
+    "files": [
+      "crates/as-framework/src/services/mod.rs",
+      "crates/as-framework/src/android.rs",
+      "crates/rd-vm/src/classpath.rs",
+      "crates/as-framework/Cargo.toml"
+    ],
+    "scope": "Framework attach/dispatch/roots/references/collect/pump, actual worker identity Handler/Looper restrictions, generic background callbacks and truthful builtin hierarchy/interfaces. Parent consolidated build evidence binds the full shared source graph."
+  },
+  "sources": [
+    {
+      "sha256": "c54a1e40b45596cd2e42f4790a760cb7971ecc5c985527e75a559b167f1e4cda",
+      "path": "crates/as-framework/src/services/executors.rs"
+    },
+    {
+      "sha256": "8089ee008b3daf465af1ed7258c34153a76ed3dcd548eacc165efdafe53e728e",
+      "path": "crates/as-framework/src/services/timer.rs"
+    },
+    {
+      "sha256": "ceeac6df3e191c28b5ff60b01229cce68e9549d0b46559f1771a145b424c22e9",
+      "path": "crates/as-framework/tests/executors.rs"
+    },
+    {
+      "sha256": "86a01b811334cb6967def8a574c27c9716124fa7b19944d6c3e53f0ade8a2000",
+      "path": "fixtures/m9/executors/build.ps1"
+    },
+    {
+      "sha256": "94ab25b534dbf98114841da1fdb94f9c31f584acbd67befb920d86bdc971b7e8",
+      "path": "fixtures/m9/executors/README.md"
+    },
+    {
+      "sha256": "b234f51af563802de6fd2952967777fe68984766253badaec891c46f095c25ce",
+      "path": "fixtures/m9/executors/java/org/androswitch/contracts/ExecutorActivity.java"
+    },
+    {
+      "sha256": "987407808e8f05818dff25e0c71b5a8d38c6f3c8dc4472fbd853c7ba8f304f18",
+      "path": "fixtures/m9/executors/java/org/androswitch/contracts/ExecutorProofActivity.java"
+    },
+    {
+      "sha256": "fe52b11d175a988bd54eb4fa7350b5cd6c4264ef4b090b75eb772b454595bbc8",
+      "path": "fixtures/m9/executors/java/org/androswitch/contracts/ExecutorValidation.java"
+    }
+  ]
+}

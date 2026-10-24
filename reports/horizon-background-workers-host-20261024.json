@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "scope": "General background VM worker transport, wall-clock capability and device adapter. Separate from Timer framework semantics and NRO execution.",
+  "status": "host_transport_passed_device_adapter_pending_consolidated_compile",
+  "implementation": {
+    "errors": "Exact callback/transport failures are recorded through framework and JNI session; no fabricated task success.",
+    "stack_bytes_per_worker": 1048576,
+    "capacity": 32,
+    "cancel": "Signal-only cancellation never joins or interrupts the current callback. Wake rejects stopped, finished or not-started workers.",
+    "real_threads": "Constructor provider starts a real dedicated libnx worker immediately; no UI Looper substitution.",
+    "quiesce": "One total caller-supplied deadline over all handles, self-join and simultaneous join rejected, finalizer rounds require repeat quiescence.",
+    "callbacks": "Attach; serial framework poll/run returning relative milliseconds; guest TLS cleanup; final framework stop and JNI detach.",
+    "ownership": "Stable VM/Android/Session pointers retained by Running until all joins prove quiescence. No strong Rc<Android> cycle. Failed joins/close retain handles.",
+    "timing": "Actual epoch clock via clock_gettime(CLOCK_REALTIME), elapsed kernel waits and at most 1000 ms re-poll for wall-clock changes. Clock provider absent returns API_UNAVAILABLE."
+  },
+  "reference": {
+    "title": "Java SE 8 Timer contract",
+    "url": "https://docs.oracle.com/javase/8/docs/api/java/util/Timer.html",
+    "copied_implementation_code": false
+  },
+  "host": {
+    "clock_test": {
+      "command": "rustc --edition 2021 --test --cfg feature=\"std\" --crate-name as_platform crates/as-platform/src/lib.rs -o C:/Users/Administrator/.cache/androswitch/platform-worker-contract-tests.exe; platform-worker-contract-tests.exe wall_clock_requires_provider_and_host_reports_actual_epoch --nocapture",
+      "log": {
+        "bytes": 202,
+        "sha256": "9d41b1a380c64bfae2e7ef18086836da63037af7d75a3b92b31cd8813166a53a",
+        "path": "C:/Users/Administrator/.cache/androswitch/timer-worker-check-v2/platform-clock.log"
+      },
+      "status": "passed"
+    },
+    "transport_cases": 22,
+    "command": "./scripts/test-background-workers.ps1 -OutputDirectory C:/Users/Administrator/.cache/androswitch/timer-worker-check-v2",
+    "scenarios": [
+      "normal-delay",
+      "serial",
+      "wake",
+      "wake-during-callback",
+      "cancel-idle",
+      "cancel-active",
+      "callback-failure",
+      "wait-error",
+      "self-quiesce",
+      "self-cancel",
+      "concurrent-quiesce",
+      "create-failure",
+      "start-failure",
+      "start-close-failure",
+      "join-failure",
+      "close-failure",
+      "timeout",
+      "total-deadline",
+      "capacity",
+      "reap",
+      "invalid",
+      "wall-clock"
+    ],
+    "no_std": {
+      "command": "rustc --edition 2021 --crate-type rlib --crate-name as_platform crates/as-platform/src/lib.rs -o C:/Users/Administrator/.cache/androswitch/libas_platform_worker_nostd.rlib",
+      "artifact": {
+        "bytes": 394778,
+        "sha256": "9b4e45e2e335a99dae453dc5411c4b7cc116f52bcea08e7ff4eea07d9bf3dff0",
+        "path": "C:/Users/Administrator/.cache/androswitch/libas_platform_worker_nostd.rlib"
+      },
+      "status": "passed"
+    },
+    "result": {
+      "bytes": 11309,
+      "sha256": "557b4c0e956e90234f36cb84aa15df200f9087c0dcfd5cb0d0d3168f6013a14f",
+      "path": "C:/Users/Administrator/.cache/androswitch/timer-worker-check-v2/result.json"
+    },
+    "status": "passed"
+  },
+  "target_compilation": [
+    {
+      "compiler": "devkitA64 15.2.0",
+      "command": "aarch64-none-elf-gcc.exe -pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -IC:/devkitPro/libnx/include -IC:/devkitPro/portlibs/switch/include -Iplatform/switch-smoke -Ithird_party/android -fno-strict-aliasing -c platform/androswitch/workers.c -o C:/Users/Administrator/.cache/androswitch/timer-workers-v2.o",
+      "artifact": {
+        "bytes": 7400,
+        "sha256": "21338ac37f69e2db9f7f83e3d52090e9d633cbe737e30633a590af6054c66124",
+        "path": "C:/Users/Administrator/.cache/androswitch/timer-workers-v2.o"
+      },
+      "status": "passed",
+      "backend": "Windows"
+    },
+    {
+      "artifact": {
+        "bytes": 7400,
+        "sha256": "b4c6ec23f7a22cc37d91d7fe23d755ed9f512c5e01d69900022427713bb9b4bf",
+        "path": "C:/Users/Administrator/.cache/androswitch/timer-workers-v2-wsl.o"
+      },
+      "note": "Nonfatal WSL systemd user-session startup warning occurred; compiler exited0.",
+      "command": "wsl -d Ubuntu -- /opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc -pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -I/opt/devkitpro/libnx/include -I/opt/devkitpro/portlibs/switch/include -I/mnt/d/Dev/Switch/AndroSwitch/platform/switch-smoke -I/mnt/d/Dev/Switch/AndroSwitch/third_party/android -fno-strict-aliasing -c /mnt/d/Dev/Switch/AndroSwitch/platform/androswitch/workers.c -o /mnt/c/Users/Administrator/.cache/androswitch/timer-workers-v2-wsl.o",
+      "backend": "WSL",
+      "compiler": "devkitA64 16.1.0",
+      "status": "passed"
+    }
+  ],
+  "source_snapshots": [
+    {
+      "bytes": 2088,
+      "sha256": "bc607aa64271ef70a0dd8d221367b637643a709807edeac339670bebf6e3b050",
+      "path": "crates/as-platform/src/lib.rs"
+    },
+    {
+      "bytes": 4013,
+      "sha256": "3e691110f3b95f77e46e120d49ceb571d8842aea880bd068db4316458fad36cc",
+      "path": "crates/as-platform/src/host.rs"
+    },
+    {
+      "bytes": 4947,
+      "sha256": "d3b8c802daa3728091df7f81486849d43f2f08b4d32212bb2e33537433c368ea",
+      "path": "crates/as-switch-smoke/src/device_workers.rs"
+    },
+    {
+      "bytes": 8204,
+      "sha256": "e99847770dd772cc26506893ff2689e0789a62eba1740ce6680a6ef381642b15",
+      "path": "platform/androswitch/workers.c"
+    },
+    {
+      "bytes": 789,
+      "sha256": "6842406338aa06265748323168ff935f74803973634268a2276ca73ea2b43aa1",
+      "path": "platform/androswitch/workers.h"
+    },
+    {
+      "bytes": 4594,
+      "sha256": "0338de7dce459d8916d30535dd78cf1950d80fa7b7c66623b82c9c892734037f",
+      "path": "platform/androswitch/Makefile"
+    },
+    {
+      "bytes": 15162,
+      "sha256": "67991b2f70149d1d93645282d28302e7f074586b3f03d9750d7a683963e12cb3",
+      "path": "platform/androswitch/tests/background_workers.c"
+    },
+    {
+      "bytes": 1368,
+      "sha256": "4a0a464b0280e33e8d6595fb028996c4fe81665591609873d528a12e8219d37e",
+      "path": "platform/androswitch/tests/fake-workers/switch.h"
+    },
+    {
+      "bytes": 3661,
+      "sha256": "5114605686e342d07e13dd0a9fc05e75ad82a597b37cb1037b3fb11d566e299b",
+      "path": "scripts/test-background-workers.ps1"
+    }
+  ],
+  "limitations": [
+    "C tests use fake libnx with actual host pthreads; they do not execute guest DEX or GC.",
+    "Timer framework tests and device adapter compile await parent-owned consolidated checks.",
+    "No actual Horizon timer/clock or external-game execution in this subtask.",
+    "No real-time scheduling guarantee; application stop and all callbacks remain bounded by process teardown policy."
+  ],
+  "physical_switch": "not_run",
+  "m9_complete": false
+}

@@ -1,4 +1,4 @@
-param([string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',[string]$RyujinxProfile="$env:APPDATA/Ryujinx",[int]$TimeoutSeconds=300,[ValidateSet('workflow','quiescence','startup-failure','startup-quiescence','m9')][string]$Scenario='workflow',[string]$ExternalApk='',[switch]$AllowDesktopEmulator)
+param([string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',[string]$RyujinxProfile="$env:APPDATA/Ryujinx",[int]$TimeoutSeconds=300,[ValidateSet('workflow','quiescence','startup-failure','startup-quiescence','m9')][string]$Scenario='workflow',[string]$ExternalApk='',[switch]$Headless,[switch]$AllowDesktopEmulator)
 $ErrorActionPreference='Stop'
 if(-not $AllowDesktopEmulator){throw 'Desktop Ryujinx E2E is opt-in after reported disappearance of other app windows. Use -AllowDesktopEmulator only when ready; scripts/verify-saved-launcher-run.ps1 validates existing evidence without opening apps.'}
 $projectRoot=Split-Path -Parent $PSScriptRoot
@@ -31,7 +31,8 @@ $root=Join-Path $switchRoot 'androswitch';$backup=Join-Path $switchRoot "androsw
 foreach($path in @($root,$backup,$resultRoot)){if(-not [IO.Path]::GetFullPath($path).StartsWith($switchRoot+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Resolved SD test path escaped its designated directory'}}
 New-Item -ItemType Directory -Force -Path $run,$switchRoot | Out-Null
 $lock=[IO.File]::Open("$switchRoot/androswitch-launcher-e2e.lock",[IO.FileMode]::CreateNew,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
-$process=$null;$moved=$false;$receipt=@{schema_version=1;session_id=$id;status='running';backend='ryujinx';physical_device='not_run';sd_result=$resultRoot;scenario=$Scenario}
+$process=$null;$moved=$false;$receipt=@{schema_version=1;session_id=$id;status='running';backend='ryujinx';physical_device='not_run';sd_result=$resultRoot;scenario=$Scenario;ryujinx_profile=[IO.Path]::GetFullPath($RyujinxProfile);emulator_frontend=if($Headless){'headless_sdl2'}else{'desktop'};sd_original_restore='not_modified'}
+$receipt.emulator=@{version=(Get-Item -LiteralPath $Ryujinx).VersionInfo.ProductVersion;sha256=(Get-FileHash -LiteralPath $Ryujinx).Hash.ToLowerInvariant()}
 try{
   if(Test-Path $root){if(Test-Path "$root/e2e.lock"){throw 'Another AndroSwitch E2E test holds the SD folder'};Move-Item -LiteralPath $root -Destination $backup;$moved=$true}
   New-Item -ItemType Directory -Force -Path "$root/apks","$root/runtime","$root/logs" | Out-Null
@@ -103,7 +104,10 @@ try{
   @{schema_version=1;session_id=$id;commands=@($commands.ToArray())} | ConvertTo-Json -Depth 20 | Set-Content "$root/runtime/launcher-test.json" -Encoding utf8NoBOM
   Copy-Item "$root/runtime/launcher-test.json" "$run/launcher-test.json"
   $nro="$root/androswitch.nro";Copy-Item "$projectRoot/local-artifacts/product/androswitch.nro" $nro
-  $process=Start-Process -FilePath $Ryujinx -ArgumentList @($nro) -WorkingDirectory (Split-Path -Parent $Ryujinx) -WindowStyle Hidden -RedirectStandardOutput "$run/ryujinx.stdout.log" -RedirectStandardError "$run/ryujinx.stderr.log" -PassThru
+  $launchArguments=@('--root-data-dir',('"'+[IO.Path]::GetFullPath($RyujinxProfile)+'"'),('"'+$nro+'"'))
+  if($Headless){$launchArguments=@('--no-gui')+$launchArguments}
+  $process=Start-Process -FilePath $Ryujinx -ArgumentList $launchArguments -WorkingDirectory (Split-Path -Parent $Ryujinx) -WindowStyle Hidden -RedirectStandardOutput "$run/ryujinx.stdout.log" -RedirectStandardError "$run/ryujinx.stderr.log" -PassThru
+  $null=$process.Handle
   $receipt.pid=$process.Id;$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds);$result=$null
   do{
     if(Test-Path "$root/logs/display-error.json"){throw "Display failure: $(Get-Content "$root/logs/display-error.json" -Raw)"}
@@ -122,7 +126,8 @@ try{
     Copy-Item "$root/logs/session-report.json" "$run/expected-stop-failure.json"
     Stop-TestProcess $process
     @{schema_version=1;session_id="$id-recovery";commands=@(@{kind='frame'})} | ConvertTo-Json -Depth 8 | Set-Content "$root/runtime/launcher-test.json" -Encoding utf8NoBOM
-    $process=Start-Process -FilePath $Ryujinx -ArgumentList @($nro) -WorkingDirectory (Split-Path -Parent $Ryujinx) -WindowStyle Hidden -RedirectStandardOutput "$run/recovery.stdout.log" -RedirectStandardError "$run/recovery.stderr.log" -PassThru
+    $process=Start-Process -FilePath $Ryujinx -ArgumentList $launchArguments -WorkingDirectory (Split-Path -Parent $Ryujinx) -WindowStyle Hidden -RedirectStandardOutput "$run/recovery.stdout.log" -RedirectStandardError "$run/recovery.stderr.log" -PassThru
+    $null=$process.Handle
     $deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds);$recovery=$null
     do{if(Test-Path "$root/logs/launcher-report.json"){try{$recovery=Get-Content "$root/logs/launcher-report.json" -Raw | ConvertFrom-Json;if($recovery.session_id -eq "$id-recovery"){break}}catch{}};Start-Sleep -Milliseconds 500}while([DateTime]::UtcNow -lt $deadline)
     if($recovery.session_id -ne "$id-recovery" -or $recovery.snapshots[0].shell.message -notmatch 'Previous session was interrupted'){throw 'Next boot did not present interruption details in the console'}
@@ -138,6 +143,7 @@ try{
   Stop-TestProcess $process
   if(Test-Path $root){Move-Item -LiteralPath $root -Destination $resultRoot}
   if($moved -and (Test-Path $backup)){Move-Item -LiteralPath $backup -Destination $root}
+  $receipt.sd_original_restore='restored'
   $receipt | ConvertTo-Json -Depth 12 | Set-Content "$run/verification.json" -Encoding utf8NoBOM
   $lock.Dispose();Remove-Item -LiteralPath "$switchRoot/androswitch-launcher-e2e.lock" -ErrorAction SilentlyContinue
 }

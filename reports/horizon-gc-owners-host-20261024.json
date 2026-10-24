@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T15:06:59.2382984Z",
+  "status": "six_real_portable_vm_owner_contracts_passed",
+  "scope": "Host execution of the original portable Engine/Heap code, controlled actual-owner identities and deterministic non-LIFO suspension boundaries. This is separate from the actual pre-fix emulator failure and does not yet prove a corrected NRO.",
+  "toolchain": {
+    "commit": "8bab26f4f68e0e26f0bb7960be334d5b520ea452",
+    "rustc": "1.97.1",
+    "llvm": "22.1.6",
+    "host": "x86_64-pc-windows-gnu"
+  },
+  "command": {
+    "working_directory": "D:/Dev/Switch/AndroSwitch",
+    "tests": 6,
+    "failed": 0,
+    "test_execution_reported_seconds": "0.00",
+    "exit_code": 0,
+    "filtered_out": 0,
+    "environment": {
+      "CARGO_INCREMENTAL": "0",
+      "scope": "Only this command process; previous value restored afterward"
+    },
+    "argv": [
+      "cargo",
+      "test",
+      "-p",
+      "as-switch-smoke",
+      "--features",
+      "host-cli,portable-tests",
+      "--test",
+      "portable_execution",
+      "--",
+      "--nocapture"
+    ],
+    "note": "Reported near-zero test runtime is not a scheduling or performance benchmark.",
+    "build_and_test_elapsed": "3m32s",
+    "ignored": 0
+  },
+  "contracts": [
+    "Production Engine.gc and actual Heap allocation pinning retain local-only B and B host temporary when older A publishes, forces GC and unwinds first; objects reclaim after their own roots/scopes exit.",
+    "Independent frame publication, labels and non-LIFO return remove only the matching owner/ticket.",
+    "Same-owner nested JNI-shaped reentry retains outer roots and removes only the inner frame.",
+    "1024 active-owner cap returns VM_FRAME_BUDGET; 4096 sequential finished identities do not accumulate frame owner records.",
+    "Heap scope restoration preserves another owner allocation pins and cutoff; idle scope owner records prune.",
+    "A guest allocation never inherits a newer unrelated owner host scope pin."
+  ],
+  "implementation": {
+    "collection": "Trace frames and host pins for every owner, including native-suspended owners",
+    "diagnostics": "Labels/depth belong to executing owner; error PC is local to the Rust invocation across foreign calls, avoiding an identity lookup per instruction",
+    "lifetime": "VM lease still serializes access and releases across native calls; no global ban or hold across JNI callbacks introduced",
+    "unwind": "Stable frame owner+serial ticket and heap owner+depth cookie",
+    "frame_identity": "NativeHost.current_thread_id supplied by real Horizon Session; default single interpreter remains owner0 when no thread identity provider is present",
+    "std_path": "Original std single-interpreter Vec stacks/diagnostic PC retained",
+    "test_only_api": "Explicit portable-test-support hidden contract reexport, enabled only by as-switch-smoke portable-tests, absent from default device features",
+    "owner_metadata": "At most1024 active frame owners, idle frame/scope records removed on final unwind; existing per-owner VM max_depth enforced"
+  },
+  "rejected_initial_attempt": {
+    "command": "cargo test -p rd-vm --no-default-features --lib portable::execution -- --nocapture",
+    "reason": "Legacy rd-render/rd-testsupport dev-dependencies enable rd-vm/std. Observed rustc --test had feature std/advanced-components/default, excluding this portable module. Only identified owned Cargo244592/direct rustc254608 were stopped.",
+    "status": "stopped_before_tests_no_success_claim",
+    "log": {
+      "path": "local-artifacts/m9/gc-owners-host/20261024-owners/owner-tests-first.log",
+      "sha256": "9a4221f32ac07e3d17cf7faf51d086abc9458d3e57c243a33395f5c1e2296b20"
+    }
+  },
+  "verification": {
+    "full_clippy": "delegated to root required-check harness, not run by this subtask",
+    "scoped_git_diff_check": "passed",
+    "scoped_rustfmt_check": "passed",
+    "broader_portable_semantic_and_M4_regressions": "delegated to root required-check harness, not claimed here"
+  },
+  "before_emulator_receipt": {
+    "path": "reports/horizon-gc-owners-before-ryujinx-20261024.json",
+    "actual_failure": "bodyB getfield pc0x11 reads collected object; resource closure reaches runtime_closed/launcher_ready, with preexisting Java-stop error retained",
+    "sha256": "e25d6a9eab33e2f35e41475d376b4f9c6ea9c29d5e88e165ac90767fc0513b31"
+  },
+  "evidence": [
+    {
+      "path": "local-artifacts/m9/gc-owners-host/20261024-owners/portable-execution-tests.frozen.log",
+      "sha256": "4f5e519cb0aa7de72107eaffb31df8b2d1cd5124f250e2cbf5ef658b3433e6db"
+    }
+  ],
+  "source_snapshot": [
+    {
+      "path": "crates/rd-vm/Cargo.toml",
+      "sha256": "3dd8a5c1bdd6091d7196114defc2c53f622534c2bc3e2d6cb35307fc8d8617a7"
+    },
+    {
+      "path": "crates/rd-vm/src/lib.rs",
+      "sha256": "e1ea9a94616700b92a57c9a52cbb3c9ee34a6f9c0068d0e48565c3318378ce4b"
+    },
+    {
+      "path": "crates/rd-vm/src/engine.rs",
+      "sha256": "9cdef035eef9f07d0f6de3a34778ec25cad1e3cfa33bec995a26cdea4e867df0"
+    },
+    {
+      "path": "crates/rd-vm/src/heap.rs",
+      "sha256": "aad67df50aaa6d8f787496a4b171c0ddd00067869a07617b7c9d519efb8e449d"
+    },
+    {
+      "path": "crates/rd-vm/src/interp.rs",
+      "sha256": "a7f372b60279e6f3232aaa2ad8e5c77b5b931314c04cb2c90f49fbd752237619"
+    },
+    {
+      "path": "crates/rd-vm/src/native_host.rs",
+      "sha256": "43c3e6725afad678a5cc08f5cefe378cfaee8afe289f7e352d869f42c3217c10"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/mod.rs",
+      "sha256": "f4308066db85ca12f6d21da40bc317dd25e3ba427bc5fe5a906284ec92ebfdbb"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/gc.rs",
+      "sha256": "c86e6405779bb39acbec32f9474cf19a6aad11695e484f157646d6cd67d7db35"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/execution.rs",
+      "sha256": "1b789f67b7dc4c89620aecfd2a475517f49406c1e06ca14b2a063ac2711193d0"
+    },
+    {
+      "path": "crates/as-switch-smoke/Cargo.toml",
+      "sha256": "3d44470198f59d5db4d78c338f4356ef851b9285d700f697506832425b5dec9b"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_execution.rs",
+      "sha256": "e5466a6146205d6423903ff2eda60cdfeba9497568bc6bcb920c4e0bcf3f79d4"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "f7f174e7534072a9e1f337c8847c2d330c9cc9b9c55095cba12437b62642ef3e"
+    }
+  ],
+  "upstream": "RustyDroid fork at 6388281f66d254c8e01a0fdc7a5a9a30239bc762; author/contributor attribution retained",
+  "limitations": [
+    "Controlled host identity switches model a native VM-lease suspension boundary; these six tests do not run OS workers or ARM64 machine code.",
+    "The unchanged original APK d8194d04fdd0fc749ab6ab327d4397cbb32944e8665bb00fed54e93719decb59 reproduced the failure on the older actual NRO. A corrected actual NRO run remains separately required.",
+    "A native backend admitting independent real workers must expose stable nonzero actual thread identities; a provider without that capability remains a single-execution context.",
+    "No physical-device, broad Java concurrency or external-game compatibility claim."
+  ]
+}

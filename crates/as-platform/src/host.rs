@@ -1,6 +1,10 @@
 //! Real host services; these are never linked into a device-only build.
 use crate::{Clock, PlatformError, Storage};
-use std::{fs::File, io::Read, time::Instant};
+use std::{
+    fs::File,
+    io::Read,
+    time::{Instant, SystemTime, UNIX_EPOCH},
+};
 
 pub struct HostPlatform {
     started: Instant,
@@ -17,6 +21,18 @@ impl Default for HostPlatform {
 impl Clock for HostPlatform {
     fn monotonic_micros(&self) -> u64 {
         u64::try_from(self.started.elapsed().as_micros()).unwrap_or(u64::MAX)
+    }
+    fn wall_time_millis(&self) -> Result<i64, PlatformError> {
+        let (magnitude, negative) = match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(value) => (value.as_millis(), false),
+            Err(error) => (error.duration().as_millis(), true),
+        };
+        let value = i64::try_from(magnitude).map_err(|_| PlatformError {
+            code: "CLOCK_RANGE",
+            operation: "wall_time_millis",
+            cause: "host epoch time exceeds signed milliseconds".into(),
+        })?;
+        Ok(if negative { -value } else { value })
     }
 }
 
@@ -54,6 +70,24 @@ impl Storage for HostPlatform {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn wall_clock_requires_provider_and_host_reports_actual_epoch() {
+        struct ElapsedOnly;
+        impl Clock for ElapsedOnly {
+            fn monotonic_micros(&self) -> u64 {
+                123
+            }
+        }
+        let unavailable = ElapsedOnly.wall_time_millis().unwrap_err();
+        assert_eq!(unavailable.code, "API_UNAVAILABLE");
+        assert_eq!(unavailable.operation, "wall_time_millis");
+        let before = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        let actual = HostPlatform::default().wall_time_millis().unwrap();
+        let after = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        assert!(i128::from(actual) >= before.as_millis() as i128);
+        assert!(i128::from(actual) <= after.as_millis() as i128);
+    }
 
     #[test]
     fn bounded_reader_accepts_exact_limit_and_rejects_larger_input() {

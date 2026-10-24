@@ -1,0 +1,131 @@
+{
+  "commands": [
+    {
+      "command": "pwsh -File fixtures/m9/inherited-dispatch/build.ps1",
+      "exit_code": 0,
+      "status": "passed"
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-framework --features host --test inherited_dispatch --locked -- --nocapture",
+      "exit_code": 0,
+      "ignored": 0,
+      "passed": 4,
+      "status": "passed",
+      "failed": 0
+    }
+  ],
+  "source_hashes_captured_after_test": [
+    {
+      "sha256": "74cb095939927a9adda89d79185bad893d67e0a9cf3776ff88033391d9a821a2",
+      "path": "crates/rd-vm/src/classpath.rs"
+    },
+    {
+      "sha256": "c97f8db2d86aa77ae79b7bcccd190cc303b173c531d0bf499b8056a1852c96fb",
+      "path": "crates/rd-vm/src/interp.rs"
+    },
+    {
+      "sha256": "58330cada5766090619e9fc8d9660c88f54067cd28bed7db853de3b74ad994fc",
+      "path": "crates/rd-vm/src/engine.rs"
+    },
+    {
+      "sha256": "715abcd92ab2c6f2f8790256dbf408705e7c3ba25cf568eadc1769da6f089501",
+      "path": "crates/as-framework/tests/inherited_dispatch.rs"
+    },
+    {
+      "sha256": "9949ec981f240bf99be6e1e4a173c307dde87843b0aa7cdab739474fd9ed073b",
+      "path": "crates/as-framework/Cargo.toml"
+    }
+  ],
+  "tests": [
+    "abstract_interface_contracts_use_real_activity_context_resources_in_both_packages",
+    "concrete_dex_override_super_interface_defaults_and_static_dispatch_keep_precedence",
+    "native_dex_methods_and_explicit_abstract_class_barriers_are_never_replaced_by_host_success",
+    "wrong_receivers_unbacked_interfaces_and_missing_methods_do_not_receive_android_values"
+  ],
+  "observed_blocker": {
+    "run": "local-artifacts/m9/external-runs/2d4de814c2244049b4ea2ace5ad24365",
+    "error": "NOT_FOUND [rd-vm]: método Lcom/king/core/IEngineActivity;->getResources()Landroid/content/res/Resources; sem corpo (abstrato?) [pc 0x9: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 164, regs: [3, 0, 0, 0, 0] } }]\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V",
+    "nro_sha256": "23e53247fbb113709e612479149e0fa91a2245611d96fe6eaee71f46fdca8726",
+    "returned_to_launcher": true,
+    "verification_hash": {
+      "sha256": "e083bb305210dece5b6800df6c0290224b176edf5dea62b2be7adb746dcee136",
+      "path": "local-artifacts/m9/external-runs/2d4de814c2244049b4ea2ace5ad24365/verification.json"
+    }
+  },
+  "primary_references": [
+    "https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-5.html#jvms-5.4.3.3",
+    "https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-6.html#jvms-6.5.invokeinterface"
+  ],
+  "fixture_build": {
+    "build_tools": "35.0.0",
+    "sources": [
+      {
+        "sha256": "ce79eeb01b34f0eda085f616f1cb8c3f2ab773625e56edfbeb873680eccd9feb",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\inherited-dispatch\\java\\org\\androswitch\\contracts\\DispatchActivity.java"
+      },
+      {
+        "sha256": "209c4db4f8084bb5a876c721f5c5485e99c03c3dcf5749ff71cd444f809fcb4f",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\inherited-dispatch\\build.ps1"
+      }
+    ],
+    "apks": [
+      {
+        "sha256": "5c93299ef3cff886177c7a9f0174cd24d12911f6a711d4293ecdd32ab84f13e9",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\inherited-dispatch-fixture\\dispatch.apk"
+      },
+      {
+        "sha256": "80856ca98cd6755b846034a7f9710e9e63535955a187b184975a552ed6a79ff4",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\inherited-dispatch-fixture\\renamed.apk"
+      }
+    ],
+    "schema_version": 1,
+    "api": 26
+  },
+  "implementation": {
+    "package_specific_branch": false,
+    "preserved": [
+      "Real DEX overrides and class invoke-super lookup",
+      "Native methods with no DEX body",
+      "Interface defaults when no real framework implementation applies",
+      "Explicit abstract DEX class barriers and unresolved method errors",
+      "Legacy std behavior and existing static dispatch"
+    ],
+    "cause": "The DEX resolver reaches builtin Activity outside DEX, then finds an abstract interface declaration. Portable dispatch previously treated any DEX declaration as a class implementation, suppressing the real inherited framework provider.",
+    "validation": "Portable DEX calls validate receiver assignability before instance dispatch. Missing DEX constructors cannot be replaced by framework success. A non-static invocation cannot execute a static DEX target.",
+    "entrypoints": [
+      "DEX instance invoke instructions",
+      "Engine.invoke_instance"
+    ],
+    "policy": "Concrete, native and abstract DEX class methods retain class precedence. When only an interface candidate or no DEX method remains, the receiver-backed framework implementation is tried before selecting an interface method/default/abstract error.",
+    "status": "implemented"
+  },
+  "schema_version": 1,
+  "portable_core_asserted": true,
+  "artifact_metadata": {
+    "command": "apkanalyzer dex code --class com.king.core.IEngineActivity D:/Download/candycrush.apk",
+    "observation": "public interface abstract IEngineActivity declares abstract getResources() returning android.content.res.Resources; no method body is present",
+    "execution": "none",
+    "apk": {
+      "sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+      "path": "D:/Download/candycrush.apk"
+    },
+    "raw": {
+      "sha256": "923e4d5ac1fa308fd90d8c87e065cd4dab854f66cb0566b319b52fada43083a1",
+      "path": "local-artifacts/m9/candy-interface-metadata.txt"
+    },
+    "source_commit_policy": "Raw proprietary class metadata remains ignored; no APK or game source is included in this change",
+    "provider": "Android SDK apkanalyzer static metadata; prior REA JADX provider unavailability made the installed SDK the available fallback"
+  },
+  "date": "2026-10-24",
+  "scope": "Receiver-aware portable inherited framework dispatch",
+  "verification": {
+    "host": "4 tests passed, actual portable Engine asserted, independent Activity/Context APK under two package identities",
+    "hardware": "not run",
+    "emulator": "pending NRO containing this dispatch correction"
+  },
+  "limitations": [
+    "The tests use the actual framework Resource object and a controlled host native provider; they do not claim Android reference-runtime, JNI guest-binary, GPU or hardware execution.",
+    "This corrects shared dispatch precedence, not every Java method-resolution/verification/access-control rule.",
+    "No Candy Crush/Mekorama first-screen claim is made by host results."
+  ]
+}

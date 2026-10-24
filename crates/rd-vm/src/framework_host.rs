@@ -1,7 +1,29 @@
 //! Portable framework adapter. Dispatch uses Android descriptors, never APK identity.
 use crate::{Engine, ObjRef, Value, VmExit};
 use alloc::{rc::Rc, vec::Vec};
+/// An explicitly implemented host method. This catalog is metadata only:
+/// looking up a method never executes it or implies other overloads exist.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HostMethodKind {
+    Instance,
+    Static,
+    Constructor,
+}
 pub trait FrameworkHost {
+    fn method_metadata(
+        &self,
+        _class: &str,
+        _name: &str,
+        _descriptor: &str,
+    ) -> Option<HostMethodKind> {
+        None
+    }
+    /// Called under the VM lease. Providers retain only bounded metadata and
+    /// must not execute Java callbacks or borrow Engine asynchronously.
+    fn thread_attached(&self, _owner: u64, _name: Option<&str>) -> Result<(), VmExit> {
+        Ok(())
+    }
+    fn thread_detached(&self, _owner: u64) {}
     fn static_field(
         &self,
         _vm: &mut Engine,

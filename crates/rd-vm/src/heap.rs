@@ -93,10 +93,16 @@ pub struct Heap {
     young: Vec<bool>,
     remembered: HashSet<ObjRef>,
     // Some = host scope (pin allocations); None = guest execution.
+    #[cfg(feature = "std")]
     gc_scopes: Vec<Option<Vec<ObjRef>>>,
     births: Vec<u64>,
     allocation_clock: u64,
+    #[cfg(feature = "std")]
     existing_cutoffs: Vec<(usize, u64)>,
+    #[cfg(not(feature = "std"))]
+    execution_identity: crate::portable::execution::Identity,
+    #[cfg(not(feature = "std"))]
+    owned_scopes: crate::portable::execution::OwnerScopes,
 }
 
 impl Heap {
@@ -109,10 +115,16 @@ impl Heap {
             free: Vec::new(),
             young: Vec::new(),
             remembered: Default::default(),
+            #[cfg(feature = "std")]
             gc_scopes: Vec::new(),
             births: Vec::new(),
             allocation_clock: 0,
+            #[cfg(feature = "std")]
             existing_cutoffs: Vec::new(),
+            #[cfg(not(feature = "std"))]
+            execution_identity: Default::default(),
+            #[cfg(not(feature = "std"))]
+            owned_scopes: Default::default(),
         }
     }
 
@@ -135,15 +147,39 @@ impl Heap {
         }
         self.remembered.clear();
     }
+    #[cfg(not(feature = "std"))]
+    pub(crate) fn bind_execution_identity(
+        &mut self,
+        provider: alloc::rc::Rc<dyn crate::native_host::NativeHost>,
+    ) {
+        self.execution_identity.bind(provider);
+    }
+    #[cfg(not(feature = "std"))]
+    pub(crate) fn execution_owner(&self) -> u64 {
+        self.execution_identity.owner()
+    }
+    #[cfg(feature = "std")]
     pub(crate) fn gc_scope_depth(&self) -> usize {
         self.gc_scopes.len()
     }
+    #[cfg(not(feature = "std"))]
+    pub(crate) fn gc_scope_depth(&self) -> crate::portable::execution::ScopeMark {
+        self.owned_scopes.mark(self.execution_owner())
+    }
     pub(crate) fn gc_host_enter(&mut self, existing: bool) {
-        if existing {
-            self.existing_cutoffs
-                .push((self.gc_scopes.len(), self.allocation_clock));
+        #[cfg(feature = "std")]
+        {
+            if existing {
+                self.existing_cutoffs
+                    .push((self.gc_scopes.len(), self.allocation_clock));
+            }
+            self.gc_scopes.push(Some(Vec::new()));
         }
-        self.gc_scopes.push(Some(Vec::new()));
+        #[cfg(not(feature = "std"))]
+        self.owned_scopes.host_enter(
+            self.execution_owner(),
+            existing.then_some(self.allocation_clock),
+        );
     }
     /// A nested Rust host call can return a temporary to its enclosing host
     /// callback. Preserve all nested pins conservatively until that callback
@@ -162,20 +198,40 @@ impl Heap {
     }
 
     pub(crate) fn gc_guest_enter(&mut self) {
+        #[cfg(feature = "std")]
         self.gc_scopes.push(None);
+        #[cfg(not(feature = "std"))]
+        self.owned_scopes.guest_enter(self.execution_owner());
     }
+    #[cfg(feature = "std")]
     pub(crate) fn gc_scope_restore(&mut self, depth: usize) {
         self.gc_scopes.truncate(depth);
         self.existing_cutoffs.retain(|(d, _)| *d < depth);
     }
+    #[cfg(not(feature = "std"))]
+    pub(crate) fn gc_scope_restore(&mut self, mark: crate::portable::execution::ScopeMark) {
+        self.owned_scopes.restore(mark);
+    }
     pub(crate) fn gc_pinned_roots(&self) -> impl Iterator<Item = ObjRef> + '_ {
+        #[cfg(feature = "std")]
         let cutoff = self
             .existing_cutoffs
             .iter()
             .map(|(_, c)| *c)
             .max()
             .unwrap_or(0);
-        self.gc_scopes.iter().filter_map(Option::as_ref).flatten().copied().chain(
+        #[cfg(not(feature = "std"))]
+        let cutoff = self.owned_scopes.cutoff();
+        #[cfg(feature = "std")]
+        let pins = self
+            .gc_scopes
+            .iter()
+            .filter_map(Option::as_ref)
+            .flatten()
+            .copied();
+        #[cfg(not(feature = "std"))]
+        let pins = self.owned_scopes.roots();
+        pins.chain(
             self.births.iter().enumerate().filter(move |(_, birth)| **birth <= cutoff)
                 .map(|(i, _)| (i + 1) as ObjRef).filter(|r|
                     !matches!(self.get(*r), Ok(HeapObj::Instance { class, .. }) if class == crate::gc::FREED_CLASS)
@@ -187,9 +243,12 @@ impl Heap {
     }
 
     fn pin_allocation(&mut self, r: ObjRef) {
+        #[cfg(feature = "std")]
         if let Some(Some(roots)) = self.gc_scopes.last_mut() {
             roots.push(r);
         }
+        #[cfg(not(feature = "std"))]
+        self.owned_scopes.pin(self.execution_owner(), r);
     }
 
     pub fn budget(&self) -> usize {
@@ -538,6 +597,7 @@ impl HeapObj {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     #[test]
     fn budget_is_enforced_with_typed_oom() {

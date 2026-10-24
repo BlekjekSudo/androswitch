@@ -1,0 +1,599 @@
+{
+  "schema_version": 1,
+  "scope": "Actual exact-NRO execution of common time/Class fixes on unchanged APKs; individual completion and failure statuses retained.",
+  "runs": [
+    {
+      "run_id": "3f09e2eb5b7646f2a64a7b675ed3f994",
+      "status": "blocked_runtime",
+      "nro_sha256": "27e2cc2c88cdc436b1180e26d311bc29806803857f25c3e796cf6fec800b345d",
+      "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+      "sd_original_restore": "restored",
+      "inputs": [
+        {
+          "staged_name": "0000-external.apk",
+          "index": 0,
+          "expected_session_id": "3f09e2eb5b7646f2a64a7b675ed3f994-1",
+          "source": "D:\\Download\\mekorama-1-7-2.apk",
+          "install_snapshot_step": 3,
+          "bytes": 13099584,
+          "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01"
+        }
+      ],
+      "cases": [
+        {
+          "presented_frames": null,
+          "error": "ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: m\u00e9todo Landroid/os/Bundle;->putLong(Ljava/lang/String;J)V n\u00e3o resolvido [pc 0xd: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 289, regs: [0, 2, 3, 4, 0] } }]\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_param_long(Ljava/lang/String;J)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V \u2014 a classe pode depender de plataforma fora do escopo M2",
+          "installed_identity_matches": true,
+          "captures": [],
+          "runtime_status": "failed",
+          "input": {
+            "staged_name": "0000-external.apk",
+            "index": 0,
+            "expected_session_id": "3f09e2eb5b7646f2a64a7b675ed3f994-1",
+            "source": "D:\\Download\\mekorama-1-7-2.apk",
+            "install_snapshot_step": 3,
+            "bytes": 13099584,
+            "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01"
+          },
+          "first_screen": "not_visually_verified",
+          "teardown_phases": [
+            "stop_requested",
+            "egl_destroy_surface",
+            "native_activity_stop",
+            "java_activity_stop",
+            "egl_terminate",
+            "media_thread_quiesce",
+            "egl_terminated",
+            "glsurface_join",
+            "guest_thread_quiesce",
+            "native_destructors",
+            "media_reset",
+            "media_released",
+            "activity_dispose",
+            "runtime_drop",
+            "native_mapping_release",
+            "native_resource_reset",
+            "native_reset_guest_threads",
+            "native_reset_cxx",
+            "native_reset_keys",
+            "native_reset_sync",
+            "native_reset_locale",
+            "native_reset_admitted",
+            "native_mapping_release",
+            "native_tls_reset",
+            "native_resources_released",
+            "display_geometry_reset",
+            "runtime_closed",
+            "launcher_refresh"
+          ],
+          "returned_to_launcher": true,
+          "status": "blocked_or_unreported",
+          "snapshots": []
+        }
+      ],
+      "latest_session_report": {
+        "error": "ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: m\u00e9todo Landroid/os/Bundle;->putLong(Ljava/lang/String;J)V n\u00e3o resolvido [pc 0xd: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 289, regs: [0, 2, 3, 4, 0] } }]\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_param_long(Ljava/lang/String;J)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V \u2014 a classe pode depender de plataforma fora do escopo M2",
+        "identity_status": "known",
+        "package": "com.martinmagni.mekorama",
+        "revision": 1,
+        "schema_version": 1,
+        "session_id": "3f09e2eb5b7646f2a64a7b675ed3f994-1",
+        "status": "failed"
+      },
+      "latest_teardown": [
+        {
+          "phase": "stop_requested",
+          "tick": 431399412
+        },
+        {
+          "phase": "egl_destroy_surface",
+          "tick": 431514374
+        },
+        {
+          "phase": "native_activity_stop",
+          "tick": 431571914
+        },
+        {
+          "phase": "java_activity_stop",
+          "tick": 431603836
+        },
+        {
+          "phase": "egl_terminate",
+          "tick": 431684392
+        },
+        {
+          "phase": "media_thread_quiesce",
+          "tick": 432148963
+        },
+        {
+          "phase": "egl_terminated",
+          "tick": 432187570
+        },
+        {
+          "phase": "glsurface_join",
+          "tick": 432209959
+        },
+        {
+          "phase": "guest_thread_quiesce",
+          "tick": 432688801
+        },
+        {
+          "phase": "native_destructors",
+          "tick": 432738011
+        },
+        {
+          "phase": "media_reset",
+          "tick": 433281884
+        },
+        {
+          "phase": "media_released",
+          "tick": 433304108
+        },
+        {
+          "phase": "activity_dispose",
+          "tick": 433421735
+        },
+        {
+          "phase": "runtime_drop",
+          "tick": 433507559
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 435954418
+        },
+        {
+          "phase": "native_resource_reset",
+          "tick": 437223312
+        },
+        {
+          "phase": "native_reset_guest_threads",
+          "tick": 437389595
+        },
+        {
+          "phase": "native_reset_cxx",
+          "tick": 437412063
+        },
+        {
+          "phase": "native_reset_keys",
+          "tick": 437439640
+        },
+        {
+          "phase": "native_reset_sync",
+          "tick": 437463824
+        },
+        {
+          "phase": "native_reset_locale",
+          "tick": 437486818
+        },
+        {
+          "phase": "native_reset_admitted",
+          "tick": 437521134
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 437550840
+        },
+        {
+          "phase": "native_tls_reset",
+          "tick": 437944782
+        },
+        {
+          "phase": "native_resources_released",
+          "tick": 437967676
+        },
+        {
+          "phase": "display_geometry_reset",
+          "tick": 438011591
+        },
+        {
+          "phase": "runtime_closed",
+          "tick": 438090691
+        },
+        {
+          "phase": "launcher_refresh",
+          "tick": 438182703
+        },
+        {
+          "phase": "launcher_framebuffer_open",
+          "tick": 440899885
+        },
+        {
+          "phase": "launcher_ready",
+          "tick": 441777638
+        },
+        {
+          "phase": "launcher_stable",
+          "tick": 446405861
+        }
+      ],
+      "error": null,
+      "raw_evidence": [
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/emulator.json",
+          "sha256": "5e352eb056726a4d1d58aa6b1cbec984d8eb86c3ef5ce0fd16537b815eb279be"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/launcher-test.json",
+          "sha256": "d57d296723669d6c3b6b1b24ed21fcd33c9ce9d5dacd6319468c00ad4e33e5ac"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/ryujinx.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/ryujinx.stdout.log",
+          "sha256": "45517495de5e684174e5b90edc7909a8fe72943f2c95da4f20fb948e804b5a30"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/sessions/3f09e2eb5b7646f2a64a7b675ed3f994-1/capture-owner.json",
+          "sha256": "7815880cbef0ec9132c543cfc72248ac1b18ffbbf8943b9d30c2d7e8cbd9027c"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/sessions/3f09e2eb5b7646f2a64a7b675ed3f994-1/jni-failures.log",
+          "sha256": "a1ed0e4eadafea7b3c281d50c68c37c9ee4d9470431a0883e0ed848db514bbb0"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/sessions/3f09e2eb5b7646f2a64a7b675ed3f994-1/media-stop.log",
+          "sha256": "76fea85982fab852c4d46dd77f5c4aa07514ec161a715e99fecb61b9211ce9e3"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/sessions/3f09e2eb5b7646f2a64a7b675ed3f994-1/memory-admission.json",
+          "sha256": "0e1821df06894d79eb07bba35d5a2f063435b9e83e0ab63336aa28eaee3ceed2"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/sessions/3f09e2eb5b7646f2a64a7b675ed3f994-1/memory.log",
+          "sha256": "6d78f48e85cdcc1e4f97e3202a429c67ee285027ac1056a825240d9aa8a977aa"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/sessions/3f09e2eb5b7646f2a64a7b675ed3f994-1/native-calls.log",
+          "sha256": "9f274ba06846cbff2a9e2f2f08b6796901e5f315a81f43b2e046cbff68127ecf"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/sessions/3f09e2eb5b7646f2a64a7b675ed3f994-1/native-compatibility.json",
+          "sha256": "e2d12afed64c795de3072eb67622964a367aa76bad23c4fe408a94ea6fbd390a"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/sessions/3f09e2eb5b7646f2a64a7b675ed3f994-1/native-modules.log",
+          "sha256": "e011f5455bc78115ac11786375eb1d7a389414483b5ac172b2c5f9f12a0b924d"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/sessions/3f09e2eb5b7646f2a64a7b675ed3f994-1/session-report.json",
+          "sha256": "e5d5fbe1a93257775b3af3342bb9b7818d5880099bc9781ff4265b39615e1afd"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/sessions/3f09e2eb5b7646f2a64a7b675ed3f994-1/teardown.log",
+          "sha256": "6b2f9f9e0b19b2ff1c008e4f0c0bf32525f6b68ee44a99951e82da1bbfb95bd7"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/3f09e2eb5b7646f2a64a7b675ed3f994/verification.json",
+          "sha256": "69370c1cf4129bd983f76f1917b34dccaba64df3997cd0ed40c1878e0ea1dd30"
+        }
+      ]
+    },
+    {
+      "run_id": "a456c026c5884ecf9596370135974ae1",
+      "status": "attempted_failed",
+      "nro_sha256": "27e2cc2c88cdc436b1180e26d311bc29806803857f25c3e796cf6fec800b345d",
+      "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+      "sd_original_restore": "restored",
+      "inputs": [
+        {
+          "sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+          "install_snapshot_step": 3,
+          "staged_name": "0000-external.apk",
+          "index": 0,
+          "expected_session_id": "a456c026c5884ecf9596370135974ae1-1",
+          "source": "D:\\Download\\candycrush.apk",
+          "bytes": 163371628
+        }
+      ],
+      "cases": [],
+      "latest_session_report": {
+        "error": "API_UNAVAILABLE [rd-vm]: new-instance Ljava/util/concurrent/atomic/AtomicBoolean;: platform state for Ljava/util/concurrent/atomic/AtomicBoolean; is unavailable [pc 0xd: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 9672) }]\n  at Lcom/king/main/EngineActivity;-><init>()V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><init>()V; cleanup: NATIVE_RESOURCE_RESET_FAILED: -16; reopen homebrew",
+        "identity_status": "known",
+        "package": "com.king.candycrushsaga",
+        "revision": 1,
+        "schema_version": 1,
+        "session_id": "a456c026c5884ecf9596370135974ae1-1",
+        "status": "failed"
+      },
+      "latest_teardown": [
+        {
+          "phase": "stop_requested",
+          "tick": 1766784478
+        },
+        {
+          "phase": "native_activity_stop",
+          "tick": 1767032352
+        },
+        {
+          "phase": "java_startup_abort",
+          "tick": 1767062296
+        },
+        {
+          "phase": "media_thread_quiesce",
+          "tick": 1767252583
+        },
+        {
+          "phase": "guest_thread_quiesce",
+          "tick": 1767501676
+        },
+        {
+          "phase": "native_destructors",
+          "tick": 1767547814
+        },
+        {
+          "phase": "media_reset",
+          "tick": 1778284483
+        },
+        {
+          "phase": "media_released",
+          "tick": 1778318325
+        },
+        {
+          "phase": "activity_dispose",
+          "tick": 1778380483
+        },
+        {
+          "phase": "runtime_drop",
+          "tick": 1778505131
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 1783131121
+        },
+        {
+          "phase": "native_resource_reset",
+          "tick": 1786249253
+        },
+        {
+          "phase": "native_reset_guest_threads",
+          "tick": 1786269749
+        },
+        {
+          "phase": "native_reset_cxx",
+          "tick": 1786296864
+        },
+        {
+          "phase": "native_reset_cxx_busy",
+          "tick": 1786327328
+        },
+        {
+          "phase": "native_reset_cxx_thread_destructors_pending",
+          "tick": 1786365108
+        },
+        {
+          "phase": "stop_failed",
+          "tick": 1786555422
+        }
+      ],
+      "error": "No fresh completed launcher report before the timeout.",
+      "raw_evidence": [
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/launcher-test.json",
+          "sha256": "07413dc60f3cc3ac011e4de02846e6c4bc168a6a959e75d13400b0d3819d18ea"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/ryujinx.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/ryujinx.stdout.log",
+          "sha256": "836965b561635ab44fbd60037111e4a1d1239b8381708ad59fd1e85e79a2fe76"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/sessions/a456c026c5884ecf9596370135974ae1-1/capture-owner.json",
+          "sha256": "6f3fc367c9e0089dc8c2ca1f5f0f91c6f8e7790faea2c9a27fb2cd905e47f9c7"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/sessions/a456c026c5884ecf9596370135974ae1-1/jni-failures.log",
+          "sha256": "9ee5e2c37e9b4b79a7dae9b9c857bf3d511fe7db69fe046630f840544f28d218"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/sessions/a456c026c5884ecf9596370135974ae1-1/media-stop.log",
+          "sha256": "da18bc63db60b4cba63ef1ab48b21fc02d11d07782ab0e36109dfec8684df8b0"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/sessions/a456c026c5884ecf9596370135974ae1-1/memory-admission.json",
+          "sha256": "c95fe38b05d667e5d191b4082c77ce544a70690930dc7f40fadfb4ffd1e5326a"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/sessions/a456c026c5884ecf9596370135974ae1-1/memory.log",
+          "sha256": "ba923e7326bf570ae1c0baef4d0a83855be7d68e744ed6360740b654db4e1d68"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/sessions/a456c026c5884ecf9596370135974ae1-1/native-calls.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/sessions/a456c026c5884ecf9596370135974ae1-1/native-compatibility.json",
+          "sha256": "a6df0b9b0796ce4069d47b6fcf81a8ba0ab4bf2714a8ee29423b4cece9a4534d"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/sessions/a456c026c5884ecf9596370135974ae1-1/native-modules.log",
+          "sha256": "a7bc7e6ffb555f5bae87290367368b4811a80e170b286583dd2c76a510671582"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/sessions/a456c026c5884ecf9596370135974ae1-1/session-report.json",
+          "sha256": "f9f0583bb2adb03022db9799176b848b135514cd9391081d096b49385d2bef43"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/sessions/a456c026c5884ecf9596370135974ae1-1/teardown.log",
+          "sha256": "cea897ad781d1981b8f9e9046ddd2651141f39c77a6af261f385e3694b65401b"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/a456c026c5884ecf9596370135974ae1/verification.json",
+          "sha256": "8e13b9228a93e7d3d743a2bba4a5a170ec31f23b779238a9eebc71bb117eec13"
+        }
+      ]
+    },
+    {
+      "run_id": "e676e07c4e7c4da284ede6b4e82ec11f",
+      "status": "attempted_failed",
+      "nro_sha256": "27e2cc2c88cdc436b1180e26d311bc29806803857f25c3e796cf6fec800b345d",
+      "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+      "sd_original_restore": "restored",
+      "inputs": [
+        {
+          "sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+          "install_snapshot_step": 3,
+          "expected_session_id": "e676e07c4e7c4da284ede6b4e82ec11f-1",
+          "index": 0,
+          "source": "D:\\Download\\candycrush.apk",
+          "staged_name": "0000-external.apk",
+          "bytes": 163371628
+        }
+      ],
+      "cases": [],
+      "latest_session_report": {
+        "error": "API_UNAVAILABLE [rd-vm]: new-instance Ljava/util/concurrent/atomic/AtomicBoolean;: platform state for Ljava/util/concurrent/atomic/AtomicBoolean; is unavailable [pc 0xd: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 9672) }]\n  at Lcom/king/main/EngineActivity;-><init>()V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><init>()V; cleanup: NATIVE_RESOURCE_RESET_FAILED: -16; reopen homebrew",
+        "identity_status": "known",
+        "package": "com.king.candycrushsaga",
+        "revision": 1,
+        "schema_version": 1,
+        "session_id": "e676e07c4e7c4da284ede6b4e82ec11f-1",
+        "status": "failed"
+      },
+      "latest_teardown": [
+        {
+          "phase": "stop_requested",
+          "tick": 1882252147
+        },
+        {
+          "phase": "native_activity_stop",
+          "tick": 1882460273
+        },
+        {
+          "phase": "java_startup_abort",
+          "tick": 1882484912
+        },
+        {
+          "phase": "media_thread_quiesce",
+          "tick": 1882598928
+        },
+        {
+          "phase": "guest_thread_quiesce",
+          "tick": 1882673068
+        },
+        {
+          "phase": "native_destructors",
+          "tick": 1882699002
+        },
+        {
+          "phase": "media_reset",
+          "tick": 1890845078
+        },
+        {
+          "phase": "media_released",
+          "tick": 1890881940
+        },
+        {
+          "phase": "activity_dispose",
+          "tick": 1891004903
+        },
+        {
+          "phase": "runtime_drop",
+          "tick": 1891096227
+        },
+        {
+          "phase": "native_mapping_release",
+          "tick": 1894801176
+        },
+        {
+          "phase": "native_resource_reset",
+          "tick": 1898150369
+        },
+        {
+          "phase": "native_reset_guest_threads",
+          "tick": 1898172499
+        },
+        {
+          "phase": "native_reset_cxx",
+          "tick": 1898195846
+        },
+        {
+          "phase": "native_reset_cxx_busy",
+          "tick": 1898222208
+        },
+        {
+          "phase": "native_reset_cxx_thread_destructors_pending",
+          "tick": 1898252776
+        },
+        {
+          "phase": "stop_failed",
+          "tick": 1898487815
+        }
+      ],
+      "error": "The owned emulator exited before the launcher workflow completed.",
+      "raw_evidence": [
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/early-stop.json",
+          "sha256": "47bec4d98de9767d01848e8e0dface3ec6ba364e1851119b974a8dac8413d8f3"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/launcher-test.json",
+          "sha256": "7f26fcd2b02f3e811dbb11d25c000088892f58ea0171b946140304596ea84c3c"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/ryujinx.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/ryujinx.stdout.log",
+          "sha256": "58afbaf87123af27497e010e8f2bca0ff02246042a4d16ab0f627b75a93b4591"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/sessions/e676e07c4e7c4da284ede6b4e82ec11f-1/capture-owner.json",
+          "sha256": "c830d1bdd63001b6cede1b3936598a7073edae795d9ab91374af59175d417977"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/sessions/e676e07c4e7c4da284ede6b4e82ec11f-1/jni-failures.log",
+          "sha256": "9ee5e2c37e9b4b79a7dae9b9c857bf3d511fe7db69fe046630f840544f28d218"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/sessions/e676e07c4e7c4da284ede6b4e82ec11f-1/media-stop.log",
+          "sha256": "e12ed8e22545036505531524d90d9ebea023931c6d8e4c3621b255d7cfe16e79"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/sessions/e676e07c4e7c4da284ede6b4e82ec11f-1/memory-admission.json",
+          "sha256": "a4243069d20c41314cbbfe8380426918169b7de8a58dae4b6d5f73e3b27b84a8"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/sessions/e676e07c4e7c4da284ede6b4e82ec11f-1/memory.log",
+          "sha256": "837c6f9098a6454fa3bc81aabffd84158854e07f9b86dd9f7159533feb641c62"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/sessions/e676e07c4e7c4da284ede6b4e82ec11f-1/native-calls.log",
+          "sha256": "f231f6c4a9df0dc98b621cfa20d1531c53d86fc4865e98d8685dfee147739ecb"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/sessions/e676e07c4e7c4da284ede6b4e82ec11f-1/native-compatibility.json",
+          "sha256": "7434ced79ff0ee1e1ae55a612626f947b082a8c546988691211454462431b5f2"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/sessions/e676e07c4e7c4da284ede6b4e82ec11f-1/native-modules.log",
+          "sha256": "a7bc7e6ffb555f5bae87290367368b4811a80e170b286583dd2c76a510671582"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/sessions/e676e07c4e7c4da284ede6b4e82ec11f-1/session-report.json",
+          "sha256": "8544185388d57954dbd433a73778043f776eb624e0ecdb2a1fd70f9643e1dd38"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/sessions/e676e07c4e7c4da284ede6b4e82ec11f-1/teardown.log",
+          "sha256": "af579b39dda9cd67e09379899970b500909022ab9166c428e00d6caebc15e317"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/e676e07c4e7c4da284ede6b4e82ec11f/verification.json",
+          "sha256": "c37055b56a8c16370c3dc652b1bf660117fecf6e70538e2df5c119674b7e45e2"
+        }
+      ]
+    }
+  ],
+  "observations": {
+    "mekorama": "Formerly unmatched Barcode call5 returned, followed by later native callbacks. Completed launcher workflow with matching installation identity; Bundle.putLong renderer/stop error, all native reset stages admitted, runtime_closed. No game image.",
+    "candy": "Both attempts advance beyond Class.getSimpleName to AtomicBoolean allocation. Cleanup refuses the current-thread C++ destructor registry. Neither completes its launcher workflow.",
+    "long_attempt": "Run e676 ended early after a matching failed session and stop_failed phase. Exact executable, profile, NRO argument and start time were checked. early-stop.json records the owned PID. Harness restored SD and preserved failure; this is not a clean return or timeout claim."
+  },
+  "external_first_screen_gate": "not_verified",
+  "physical_switch": "new changes not run"
+}

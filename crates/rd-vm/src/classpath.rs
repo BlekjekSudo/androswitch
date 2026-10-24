@@ -169,6 +169,162 @@ impl Classpath {
         found.map(|(di, ci)| (di, &self.dexes[di].class_defs[ci]))
     }
 
+    /// Java simple names are source metadata, not a split on `$`: legal
+    /// top-level and declared inner names can themselves contain that byte.
+    /// DEX system InnerClass.name carries named/member/local/anonymous names.
+    pub fn class_simple_name(&self, descriptor: &str) -> RdResult<String> {
+        use rd_dex::annotations::{parse_annotation_item, parse_annotation_set_item, EncodedValue};
+        let invalid = |detail: &str| {
+            crate::err::vm_error(
+                "INVALID_CLASS_METADATA",
+                format!("Class.getSimpleName {descriptor}: {detail}"),
+            )
+        };
+        let dimensions = descriptor.bytes().take_while(|byte| *byte == b'[').count();
+        let component = &descriptor[dimensions..];
+        if dimensions > 255 || (dimensions != 0 && component == "V") {
+            return Err(invalid("invalid array descriptor"));
+        }
+        let primitive = match component {
+            "V" => Some("void"),
+            "Z" => Some("boolean"),
+            "B" => Some("byte"),
+            "C" => Some("char"),
+            "S" => Some("short"),
+            "I" => Some("int"),
+            "J" => Some("long"),
+            "F" => Some("float"),
+            "D" => Some("double"),
+            _ => None,
+        };
+        let mut name = if let Some(name) = primitive {
+            name.to_string()
+        } else {
+            let body = component
+                .strip_prefix('L')
+                .and_then(|s| s.strip_suffix(';'))
+                .filter(|s| !s.is_empty() && !s.contains(['[', ';', '.']))
+                .ok_or_else(|| invalid("invalid class descriptor"))?;
+            let binary_short_name = body
+                .rsplit('/')
+                .next()
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| invalid("empty binary class name"))?;
+            if let Some((dex_index, definition)) = self.find_class(component) {
+                let dex = &self.dexes[dex_index];
+                let mut inner_name: Option<Option<String>> = None;
+                let mut enclosing_class = false;
+                let mut enclosing_method = false;
+                if definition.annotations_off != 0 {
+                    // Read only class metadata; unrelated field/method annotation
+                    // tables and application annotations need not be materialized.
+                    let set = rd_dex::read::u32_at(&dex.data, definition.annotations_off as usize)?;
+                    if set != 0 && rd_dex::read::u32_at(&dex.data, set as usize)? > 4096 {
+                        return Err(invalid("class annotation count exceeds 4096"));
+                    }
+                    for offset in parse_annotation_set_item(&dex.data, set)? {
+                        let mut header = rd_dex::read::Reader::at(&dex.data, offset as usize)?;
+                        let visibility = rd_dex::annotations::Visibility::from_code(header.u8()?)?;
+                        let annotation_type = header.uleb128()?;
+                        if annotation_type as usize >= dex.type_ids.string_idx.len() {
+                            return Err(invalid("annotation type index is out of bounds"));
+                        }
+                        if visibility != rd_dex::annotations::Visibility::System {
+                            continue;
+                        }
+                        let kind = dex.type_str(annotation_type);
+                        if !matches!(
+                            kind,
+                            "Ldalvik/annotation/InnerClass;"
+                                | "Ldalvik/annotation/EnclosingClass;"
+                                | "Ldalvik/annotation/EnclosingMethod;"
+                        ) {
+                            continue;
+                        }
+                        if header.uleb128()? > 2 {
+                            return Err(invalid("invalid system annotation element count"));
+                        }
+                        let item = parse_annotation_item(&dex.data, offset)?;
+                        let field = if kind == "Ldalvik/annotation/InnerClass;" {
+                            "name"
+                        } else {
+                            "value"
+                        };
+                        let mut value = None;
+                        for element in &item.annotation.elements {
+                            let element_name =
+                                dex.strings.get(element.name_idx).ok_or_else(|| {
+                                    invalid("annotation element name is out of bounds")
+                                })?;
+                            if element_name == field && value.replace(&element.value).is_some() {
+                                return Err(invalid("duplicate annotation element"));
+                            }
+                        }
+                        match (kind, value) {
+                            ("Ldalvik/annotation/InnerClass;", Some(value))
+                                if inner_name.is_none() =>
+                            {
+                                inner_name = Some(match value {
+                                    EncodedValue::Null => None,
+                                    EncodedValue::String(index) => Some(
+                                        dex.strings
+                                            .get(*index)
+                                            .ok_or_else(|| {
+                                                invalid("inner name string index is out of bounds")
+                                            })?
+                                            .to_string(),
+                                    ),
+                                    _ => return Err(invalid("inner name must be String or null")),
+                                });
+                            }
+                            (
+                                "Ldalvik/annotation/EnclosingClass;",
+                                Some(EncodedValue::Type(index)),
+                            ) if !enclosing_class
+                                && (*index as usize) < dex.type_ids.string_idx.len() =>
+                            {
+                                enclosing_class = true
+                            }
+                            (
+                                "Ldalvik/annotation/EnclosingMethod;",
+                                Some(EncodedValue::Method(index)),
+                            ) if !enclosing_method && (*index as usize) < dex.method_ids.len() => {
+                                enclosing_method = true
+                            }
+                            _ => {
+                                return Err(invalid(
+                                    "missing, duplicate, or mistyped nesting annotation",
+                                ))
+                            }
+                        }
+                    }
+                }
+                if enclosing_class && enclosing_method
+                    || inner_name.is_some() != (enclosing_class || enclosing_method)
+                {
+                    return Err(invalid("inconsistent enclosing/inner annotations"));
+                }
+                match inner_name {
+                    Some(name) => name.unwrap_or_default(),
+                    None => binary_short_name.to_string(),
+                }
+            } else if !host_class_known(component) {
+                return Err(invalid("class is absent from the classpath"));
+            } else if binary_short_name.contains('$') {
+                return Err(crate::err::vm_error(
+                    "API_UNAVAILABLE",
+                    format!("Class.getSimpleName nesting metadata for platform class {component}"),
+                ));
+            } else {
+                binary_short_name.to_string()
+            }
+        };
+        for _ in 0..dimensions {
+            name.push_str("[]");
+        }
+        Ok(name)
+    }
+
     /// class_data em cache.
     pub fn class_data(
         &mut self,
@@ -271,6 +427,16 @@ impl Classpath {
         let out = self.resolve_method_uncached(class_desc, name, proto);
         self.resolve_cache.insert(key, out.clone());
         out
+    }
+
+    /// A DEX interface declaration is a candidate after class lookup, not
+    /// proof that the receiver has a class implementation. Portable hosts
+    /// complete the class chain outside DEX (for example Activity/Context)
+    /// before interface defaults/abstract declarations are selected.
+    #[cfg(not(feature = "std"))]
+    pub(crate) fn has_class_method(&mut self, class: &str, name: &str, proto: &str) -> bool {
+        self.resolve_method(class, name, proto)
+            .is_some_and(|(_, definition, _)| definition.access_flags & 0x0200 == 0)
     }
 
     fn resolve_method_uncached(
@@ -878,6 +1044,13 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         ]),
         "Ljava/util/UnknownFormatConversionException;"
         | "Ljava/util/IllegalFormatConversionException;"
+        | "Ljava/util/DuplicateFormatFlagsException;"
+        | "Ljava/util/IllegalFormatFlagsException;"
+        | "Ljava/util/FormatFlagsConversionMismatchException;"
+        | "Ljava/util/MissingFormatWidthException;"
+        | "Ljava/util/IllegalFormatWidthException;"
+        | "Ljava/util/IllegalFormatPrecisionException;"
+        | "Ljava/util/IllegalFormatCodePointException;"
         | "Ljava/util/MissingFormatArgumentException;" => Some(&[
             "Ljava/util/IllegalFormatException;",
             "Ljava/lang/IllegalArgumentException;",
@@ -904,7 +1077,9 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Throwable;",
             "Ljava/lang/Object;",
         ]),
-        "Ljava/io/FileNotFoundException;" | "Ljava/io/EOFException;" => Some(&[
+        "Ljava/io/FileNotFoundException;"
+        | "Ljava/io/EOFException;"
+        | "Ljava/io/UnsupportedEncodingException;" => Some(&[
             "Ljava/io/IOException;",
             "Ljava/lang/Exception;",
             "Ljava/lang/Throwable;",
@@ -925,7 +1100,17 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         ]),
         "Ljava/lang/NegativeArraySizeException;" => Some(RUNTIME),
         "Ljava/lang/IllegalStateException;" => Some(RUNTIME),
+        "Landroid/content/res/Resources$NotFoundException;" => Some(RUNTIME),
         "Ljava/lang/IllegalArgumentException;" => Some(RUNTIME),
+        "Ljava/lang/IllegalThreadStateException;" => Some(&[
+            "Ljava/lang/IllegalArgumentException;",
+            "Ljava/lang/RuntimeException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/util/concurrent/RejectedExecutionException;" => Some(RUNTIME),
+        "Ljava/lang/IllegalMonitorStateException;" => Some(RUNTIME),
         "Ljava/lang/NumberFormatException;" => Some(RUNTIME),
         "Ljava/lang/ArrayStoreException;" => Some(RUNTIME),
         "Ljava/lang/RuntimeException;" => Some(EXC),
@@ -957,6 +1142,7 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         ]),
         "Ljava/lang/UnsupportedOperationException;" => Some(RUNTIME),
         "Ljava/lang/StackOverflowError;" => Some(ERR),
+        "Ljava/lang/AssertionError;" => Some(ERR),
         "Ljava/lang/OutOfMemoryError;" => Some(ERR),
         // issue #41: hierarquia de ERROS de link/init — sem elas, EIIE/NCDFE
         // não casam nem com catch (Throwable) (não são subtipo de Throwable)
@@ -1062,6 +1248,10 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         // M8: Fragment legacy (32º gap real) — super das fragments do app.
         "Landroid/app/Fragment;" => Some(OBJECT),
         "Landroid/content/Intent;" => Some(OBJECT),
+        "Landroid/content/BroadcastReceiver;"
+        | "Landroid/content/IntentFilter;"
+        | "Landroid/content/pm/ResolveInfo;" => Some(OBJECT),
+        "Landroid/content/res/Configuration;" => Some(OBJECT),
         // java.util time types used by Logback's rolling-file initialization.
         "Ljava/util/Calendar;" => Some(OBJECT),
         "Ljava/util/GregorianCalendar;" => Some(&["Ljava/util/Calendar;", "Ljava/lang/Object;"]),
@@ -1111,14 +1301,21 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroid/view/MotionEvent;" => Some(&["Landroid/view/InputEvent;", "Ljava/lang/Object;"]),
         "Landroid/view/MotionEvent$PointerCoords;"
         | "Landroid/view/MotionEvent$PointerProperties;" => Some(OBJECT),
-        "Landroid/graphics/ColorSpace;"
+        "Landroid/graphics/Bitmap;"
+        | "Landroid/graphics/BitmapFactory;"
+        | "Landroid/graphics/BitmapFactory$Options;"
+        | "Landroid/graphics/Rect;"
+        | "Landroid/graphics/RectF;"
+        | "Landroid/graphics/ColorSpace;"
         | "Landroid/graphics/ColorSpace$Named;"
         | "Landroid/graphics/ColorSpace$Model;"
         | "Landroid/graphics/ColorSpace$Rgb$TransferParameters;" => Some(OBJECT),
         "Landroid/graphics/ColorSpace$Rgb;" => {
             Some(&["Landroid/graphics/ColorSpace;", "Ljava/lang/Object;"])
         }
-        "Landroid/text/SpannableString;" | "Landroid/text/SpannableStringBuilder;" => Some(OBJECT),
+        "Landroid/text/TextUtils;"
+        | "Landroid/text/SpannableString;"
+        | "Landroid/text/SpannableStringBuilder;" => Some(OBJECT),
         "Landroid/text/style/CharacterStyle;" => Some(OBJECT),
         "Landroid/text/style/MetricAffectingSpan;" => {
             Some(&["Landroid/text/style/CharacterStyle;", "Ljava/lang/Object;"])
@@ -1246,8 +1443,10 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroidx/work/WorkRequest;" => Some(OBJECT),
         "Landroidx/room/RoomDatabase;" => Some(OBJECT),
         "Landroidx/room/RoomDatabase$Builder;" => Some(OBJECT),
-        "Landroid/os/Bundle;" => Some(OBJECT),
+        "Landroid/os/Bundle;" => Some(&["Landroid/os/BaseBundle;", "Ljava/lang/Object;"]),
+        "Landroid/os/BaseBundle;" => Some(OBJECT),
         "Landroid/os/Handler;" => Some(OBJECT),
+        "Ljava/util/Timer;" | "Ljava/util/TimerTask;" => Some(OBJECT),
         "Landroid/os/Looper;" => Some(OBJECT),
         "Landroid/view/Window;" => Some(OBJECT),
         "Landroid/view/SurfaceView;" => Some(&["Landroid/view/View;", "Ljava/lang/Object;"]),
@@ -1391,6 +1590,15 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         | "Ljava/lang/Double;" => Some(&["Ljava/lang/Number;", "Ljava/lang/Object;"]),
         "Ljava/lang/Boolean;" | "Ljava/lang/Character;" => Some(OBJECT),
         "Ljava/util/concurrent/AbstractExecutorService;" => Some(OBJECT),
+        "Ljava/util/concurrent/ThreadPoolExecutor;"
+        | "Ljava/util/concurrent/Executors$DelegatedExecutorService;" => Some(&[
+            "Ljava/util/concurrent/AbstractExecutorService;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/util/concurrent/Executors;"
+        | "Ljava/util/concurrent/Executors$DefaultThreadFactory;"
+        | "Lorg/androswitch/runtime/ExecutorWorker;" => Some(OBJECT),
+        "Ljava/util/concurrent/TimeUnit;" => Some(&["Ljava/lang/Enum;", "Ljava/lang/Object;"]),
         "Ljava/util/concurrent/ForkJoinPool;" => Some(&[
             "Ljava/util/concurrent/AbstractExecutorService;",
             "Ljava/lang/Object;",
@@ -1477,6 +1685,9 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
     ];
     const MAP_IFACES: &[&str] = &["Ljava/util/Map;"];
     match class {
+        // A modeled root interface is itself a known type even though it
+        // extends no interfaces; Thread/TimerTask execute this real contract.
+        "Ljava/lang/Runnable;" => Some(&[]),
         "Ljava/lang/String;" => Some(STRING_IFACES),
         "Landroid/database/MatrixCursor;" => {
             Some(&["Landroid/database/Cursor;", "Ljava/io/Closeable;"])
@@ -1494,7 +1705,9 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         }
         "Ljava/nio/charset/Charset;" => Some(&["Ljava/lang/Comparable;"]),
         "Ljava/util/UUID;" => Some(&["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
-        "Landroid/net/Uri;" => Some(&["Landroid/os/Parcelable;", "Ljava/lang/Comparable;"]),
+        "Landroid/net/Uri;" | "Landroid/content/res/Configuration;" => {
+            Some(&["Landroid/os/Parcelable;", "Ljava/lang/Comparable;"])
+        }
         // framework value types that apps (and Compose's SaveableStateRegistry)
         // test with `Parcelable.class.isInstance(..)` / check-cast
         "Landroid/os/Bundle;"
@@ -1755,6 +1968,8 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         | "Ljava/util/concurrent/atomic/AtomicLong;"
         | "Ljava/util/concurrent/atomic/AtomicBoolean;" => Some(&["Ljava/io/Serializable;"]),
         "Ljava/util/concurrent/AbstractExecutorService;"
+        | "Ljava/util/concurrent/ThreadPoolExecutor;"
+        | "Ljava/util/concurrent/Executors$DelegatedExecutorService;"
         | "Ljava/util/concurrent/ForkJoinPool;" => Some(&[
             "Ljava/util/concurrent/ExecutorService;",
             "Ljava/util/concurrent/Executor;",
@@ -1766,6 +1981,14 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         }
         "Ljava/lang/Enum;" => Some(&["Ljava/lang/Comparable;", "Ljava/io/Serializable;"]),
         "Ljava/lang/Thread;" => Some(&["Ljava/lang/Runnable;"]),
+        "Lorg/androswitch/runtime/ExecutorWorker;" => Some(&["Ljava/lang/Runnable;"]),
+        "Ljava/util/concurrent/Executors$DefaultThreadFactory;" => {
+            Some(&["Ljava/util/concurrent/ThreadFactory;"])
+        }
+        "Ljava/util/concurrent/TimeUnit;" => {
+            Some(&["Ljava/lang/Comparable;", "Ljava/io/Serializable;"])
+        }
+        "Ljava/util/TimerTask;" => Some(&["Ljava/lang/Runnable;"]),
         _ => None,
     }
 }
@@ -1774,7 +1997,9 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
 /// Whether the host runtime models `desc` (a JDK/platform type outside the
 /// app DEX).
 pub fn host_class_known(desc: &str) -> bool {
-    builtin_hierarchy(desc).is_some() || builtin_interfaces(desc).is_some()
+    desc == "Ljava/lang/Object;"
+        || builtin_hierarchy(desc).is_some()
+        || builtin_interfaces(desc).is_some()
 }
 
 /// Like [`unresolved_method`], naming the receiver's runtime class when it

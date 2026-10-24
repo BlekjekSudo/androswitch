@@ -29,12 +29,26 @@ extern "C" {
     fn as_media_egl_attrib(display: u64, config: u64, attribute: i32, value: *mut i32) -> i32;
     fn as_media_keep_screen_on(enabled: i32) -> i32;
     fn as_native_session() -> *const c_void;
+    fn as_display_set_rotation(rotation: i32) -> i32;
+    fn as_display_rotation() -> i32;
+    fn as_display_width() -> i32;
+    fn as_display_height() -> i32;
 }
 fn error(operation: &str, code: i32) -> VmExit {
     rd_vm::err::vm_error("HORIZON_EGL_ERROR", alloc::format!("{operation}: {code}")).into()
 }
 struct HorizonEgl;
 impl EglConfigBackend for HorizonEgl {
+    fn set_display_rotation(&self, rotation: i32) -> Result<GraphicsCaps, VmExit> {
+        // SAFETY: scalar-only platform negotiation rejects changing live
+        // presentation before mutating window geometry or committed metadata.
+        #[allow(unsafe_code)]
+        let rc = unsafe { as_display_set_rotation(rotation) };
+        if rc != 0 {
+            return Err(error("set_display_rotation", rc));
+        }
+        Ok(graphics_caps())
+    }
     fn choose_config(
         &self,
         display: u64,
@@ -90,18 +104,27 @@ impl EglConfigBackend for HorizonEgl {
         }
     }
 }
+fn graphics_caps() -> GraphicsCaps {
+    // SAFETY: getters read the platform's committed scalar display metadata.
+    #[allow(unsafe_code)]
+    unsafe {
+        GraphicsCaps {
+            width: as_display_width(),
+            height: as_display_height(),
+            rotation: as_display_rotation(),
+            gles_version: 0x20000,
+            density: 2.,
+            density_dpi: 320,
+        }
+    }
+}
 pub fn bind(android: &Android) -> Result<(), VmExit> {
-    android.bind_graphics_caps(GraphicsCaps {
-        width: 1280,
-        height: 720,
-        gles_version: 0x20000,
-        density: 2.,
-        density_dpi: 320,
-    })?;
+    android.bind_graphics_caps(graphics_caps())?;
     android.bind_egl_backend(Rc::new(HorizonEgl));
     Ok(())
 }
-/// Start after onCreate and release the VM lease before the worker enters DEX.
+/// Start after onCreate while holding the VM lease. C starts asynchronously;
+/// its worker can enter DEX after the owning caller releases that lease.
 pub fn start(app: &mut App, session: &Rc<Session>) -> Result<bool, String> {
     let requests = app
         .android

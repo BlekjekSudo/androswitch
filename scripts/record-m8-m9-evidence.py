@@ -13,6 +13,8 @@ root = Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--output", default="reports/m8-m9-candidate.json", help="New report path relative to repository root")
 parser.add_argument("--physical-test-first", action="store_true", help="Record an explicit request to test this candidate on physical Switch next")
+parser.add_argument("--ryujinx-evidence", help="Completed external-APK harness receipt for this exact NRO")
+parser.add_argument("--horizon-regression", action="append", default=[], help="Passing launcher regression receipt for this exact NRO; repeat for each scenario")
 args = parser.parse_args()
 output = (root / args.output).resolve()
 if not output.is_relative_to(root):
@@ -33,7 +35,7 @@ def percentile(values, fraction):
     ordered = sorted(values)
     return ordered[min(len(ordered)-1, int((len(ordered)-1)*fraction))]
 
-source_roots = ["Cargo.toml", "Cargo.lock", "crates", "platform", "fixtures", "scripts", "third_party"]
+source_roots = ["Cargo.toml", "Cargo.lock", "crates", "platform", "fixtures", "scripts", "third_party", "tools/ryujinx-cfg"]
 if subprocess.call([git, "diff", "--quiet", "HEAD", "--", *source_roots], cwd=root):
     raise SystemExit("Commit implementation changes before freezing evidence")
 untracked = command("ls-files", "--others", "--exclude-standard", "--", *source_roots)
@@ -71,7 +73,7 @@ for case in corpus["cases"]:
     rows.append(row)
 sources = command("ls-files", "--", *source_roots).splitlines()
 fixtures = []
-for path in ["local-artifacts/m8/fixture/build-receipt.json", "local-artifacts/m9/aosp-hello/build-receipt.json", "local-artifacts/m7-improvements/fixture/build-receipt.json", "local-artifacts/dependencies/sqlite/source-receipt.json"]:
+for path in ["local-artifacts/m8/fixture/build-receipt.json", "local-artifacts/m9/aosp-hello/build-receipt.json", "local-artifacts/m7-improvements/fixture/build-receipt.json", "local-artifacts/dependencies/sqlite/source-receipt.json", "target/portable-enum-fixture/build-receipt.json", "target/portable-format-fixture/build-receipt.json", "target/portable-encoding-fixture/build-receipt.json", "target/portable-class-names-fixture/build-receipt.json", "target/portable-atomic-fixture/build-receipt.json", "target/portable-monitor-fixture/build-receipt.json", "target/portable-throwable-fixture/build-receipt.json", "target/bundle-fixture/build-receipt.json", "target/timer-fixture/build-receipt.json", "target/inherited-dispatch-fixture/build-receipt.json", "target/executor-fixture/build-receipt.json", "target/bitmap-fixture/build-receipt.json", "target/resource-names-fixture/build-receipt.json", "target/class-forname-fixture/build-receipt.json", "target/text-utils-fixture/build-receipt.json", "target/gc-owners-fixture/build-receipt.json", "target/jni-constructor-fixture/build-receipt.json", "local-artifacts/m9/jni-constructor-abi/result.json", "local-artifacts/m9/communication-fixture/build-receipt.json", "local-artifacts/m9/portrait-fixture/build-receipt.json"]:
     fixtures.append({"path": path, "sha256": sha(path), "receipt": read(path)})
 for fixture in read("fixtures/m9/host-corpus.json"):
     fixtures.append({"id": fixture["id"], "apk": fixture["apk"], "sha256": sha(fixture["apk"]), "bytes": (root / fixture["apk"]).stat().st_size})
@@ -100,11 +102,55 @@ report = {
     "host_checks": checks,
     "passed_test_executions": test_count,
     "host_corpus": {"status":corpus["status"], "cycles_per_required_case":corpus["cycles"], "completed_sessions":sum(row["completed_sessions"] for row in rows), "cases":rows, "measurement_scope":corpus["measurement_scope"], "receipt":verification, "artifact_root":relative(run), "raw_corpus_sha256":sha(relative(run / "corpus.json"))},
-    "device_build": {"command":"./scripts/build-androswitch.ps1", "log":"target/evidence/m9-device-build.log", "log_sha256":sha("target/evidence/m9-device-build.log"), "receipt":build_receipt, "executed":False},
+    "device_build": {"command":"./scripts/build-androswitch.ps1 -Toolchain " + build_receipt["rust_toolchain"] + " -TargetDirectory \"" + build_receipt["target_directory"] + "\" -LinkBackend " + build_receipt.get("link_backend", "Wsl"), "log":"target/evidence/m9-device-build.log", "log_sha256":sha("target/evidence/m9-device-build.log"), "receipt":build_receipt, "executed":False},
     "fixtures": fixtures,
     "source_inputs": [{"path":path,"sha256":sha(path)} for path in sources],
     "open_gates": ["Execute new NRO Horizon regression: workflow, startup, quiescence and m9 24-session corpus", "Record Horizon startup/frame/total-memory measurements", "Test new preferences/database/large-container/return behavior on physical Switch", "Independent NDK sample integration and wider Android-reference semantics", "Resolve Vector Pinball's observed API blocker and any subsequent failures before claiming gameplay"],
 }
 report["external_first_screen_gate"] = {"state":"not_verified", "fixture_lock":"fixtures/m9/startup-apks.lock.json", "required":["Mekorama recognizable first screen and safe Plus return", "Candy Crush recognizable first screen and safe Plus return"], "emulator":"not_run_by_this_host_evidence_collector", "requested_next_backend":"physical_switch" if args.physical_test_first else None}
+if args.ryujinx_evidence:
+    if args.physical_test_first:
+        parser.error("choose physical testing next or attach the completed emulator run")
+    evidence_path = (root / args.ryujinx_evidence).resolve()
+    if not evidence_path.is_relative_to(root):
+        parser.error("emulator receipt must stay inside the repository")
+    emulator = read(relative(evidence_path))
+    if (emulator.get("backend") != "ryujinx"
+            or emulator.get("nro_sha256") != nro_hash
+            or not emulator.get("execution_attempted")
+            or emulator.get("sd_original_restore") != "restored"
+            or emulator.get("status") in {None, "prepared_not_run", "attempted"}):
+        raise SystemExit("Emulator receipt is unfinished, mismatched, or needs SD recovery")
+    expected = {f["sha256"] for f in read("fixtures/m9/startup-apks.lock.json")["fixtures"]}
+    observed = {f["sha256"] for f in emulator.get("inputs", [])}
+    if observed != expected:
+        raise SystemExit("Emulator inputs do not match the frozen external APK corpus")
+    report["verification"]["ryujinx"] = emulator["status"] + "; see exact-NRO external execution receipt"
+    report["external_emulator"] = {"path": relative(evidence_path), "sha256": sha(relative(evidence_path)), "receipt": emulator}
+    report["device_build"]["executed"] = True
+    report["device_build"]["execution_backend"] = "ryujinx; emulator identity and limitations in external receipt"
+    report["external_first_screen_gate"]["emulator"] = emulator["status"]
+    report["external_first_screen_gate"]["state"] = "not_verified; execution evidence requires recognizable-screen visual review"
+    # Never promote nonuniform pixels or a completed workflow to a game pass.
+    # The harness also records clean rejections of unavailable Android APIs.
+regressions = []
+for supplied in args.horizon_regression:
+    evidence_path = (root / supplied).resolve()
+    if not evidence_path.is_relative_to(root):
+        parser.error("Horizon regression receipt must stay inside the repository")
+    receipt = read(relative(evidence_path))
+    if (receipt.get("backend") != "ryujinx" or receipt.get("status") != "passed"
+            or receipt.get("nro_sha256") != nro_hash
+            or receipt.get("sd_original_restore") != "restored"):
+        raise SystemExit("Horizon regression is failing, mismatched, or needs SD recovery")
+    if receipt.get("scenario") == "m9" and receipt.get("completed_sessions") != 24:
+        raise SystemExit("M9 Horizon corpus must complete all 24 sessions")
+    regressions.append({"path": relative(evidence_path), "sha256": sha(relative(evidence_path)), "receipt": receipt})
+if regressions:
+    report["horizon_regressions"] = regressions
+    report["device_build"]["executed"] = True
+    scenarios = {item["receipt"].get("scenario") for item in regressions}
+    if {"workflow", "startup-failure", "quiescence", "startup-quiescence", "m9"}.issubset(scenarios):
+        report["open_gates"].remove("Execute new NRO Horizon regression: workflow, startup, quiescence and m9 24-session corpus")
 output.write_text(json.dumps(report, indent=2, ensure_ascii=False)+"\n", encoding="utf-8")
 print(output.relative_to(root).as_posix())

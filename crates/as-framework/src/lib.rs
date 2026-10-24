@@ -4,6 +4,7 @@ extern crate alloc;
 mod android;
 mod audio;
 pub mod memory;
+pub mod properties;
 pub use audio::PcmOutput;
 mod raster;
 use alloc::{
@@ -146,11 +147,16 @@ impl App {
         })
     }
     pub fn launch(&mut self) -> Result<(), VmExit> {
+        self.android.bind_main_thread(&self.vm)?;
         self.android.launch(&mut self.vm, &self.entry)?;
         self.draw()
     }
     pub fn draw(&mut self) -> Result<(), VmExit> {
         self.android.tick(&mut self.vm)?;
+        let (width, height) = self.android.software_size();
+        if (self.frame.width, self.frame.height) != (width as usize, height as usize) {
+            self.frame = Frame::new(width as usize, height as usize);
+        }
         self.android.render(&mut self.vm, &mut self.frame)
     }
 }

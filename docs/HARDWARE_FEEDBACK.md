@@ -171,3 +171,26 @@ initialization. The accompanying display/teardown traces lack session IDs and
 show a successful NativeActivity return, consistent with the prior native sample.
 They do not demonstrate a new GPU failure in Mekorama. See
 [startup diagnosis and recovery](STARTUP_FAILURES.md).
+
+## External candidate retest: Enum and auxiliary vector
+
+The next supplied [hardware logs and screenshot receipt](../reports/hardware-external-startup-20261024T2300.json)
+records another failed startup for both games. Candy Crush's four DEX files
+(34,874,388 raw bytes) are admitted successfully. Its native initializer then
+calls unavailable `getauxval`. The final cleanup reaches `runtime_closed` and
+`launcher_ready`, with allocator usage returning to the pre-attempt checkpoint.
+The loader-provided heap capacity is 3,329,835,008 bytes; these sparse allocator
+snapshots are not a continuous memory peak or leak test.
+
+Mekorama's screenshot identifies unavailable portable `java.lang.Enum` state
+while creating an enum constant. This is a separate shared Java implementation
+gap. Older PPM images, display handoff traces, and an interrupted native-sample
+request belong to earlier activity and do not prove either game's rendering.
+The expected delivered NRO hash is recorded in the receipt; the binary running
+on hardware was not independently hashed.
+
+A later authorized [Ryujinx reproduction](../reports/m9-external-ryujinx-baseline-20261024.json)
+uses the frozen APKs and exact delivered NRO hash, reproduces both errors, and
+confirms that both rejected startups return to the launcher. New Enum and
+`getauxval` implementations need their own execution evidence before a game
+first-screen or hardware compatibility claim.

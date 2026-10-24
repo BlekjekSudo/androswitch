@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T10:34:46.8995923Z",
+  "status": "passed_host_recording_contracts",
+  "scope": "Portable framework orientation negotiation, display metrics/configuration, CPU portrait layout, and GLSurfaceView callback scheduling. Recording provider has no GPU.",
+  "source_scope_hashes": [
+    {
+      "path": "crates/as-framework/src/services/glsurface.rs",
+      "sha256": "b44b8865a6154e025a92eed80a1b7e8fe07cbbba0898a8afd337d633a908a3b4"
+    },
+    {
+      "path": "crates/as-framework/src/android.rs",
+      "sha256": "021aaf2a302360b4953946522a1f206c9fa457853d0df5bfe6f835abcf088f7f"
+    },
+    {
+      "path": "crates/as-framework/src/lib.rs",
+      "sha256": "93bad5bf56e91e9a4267ed05b79672b6d2e3d2b03734e5812120b5537a7f0a48"
+    },
+    {
+      "path": "crates/as-framework/tests/glsurface.rs",
+      "sha256": "93c8689a2c3213d9949d6969b8dbc37b26064a2df23ca0d3b12a990c2b34950e"
+    },
+    {
+      "path": "fixtures/m9/glsurface/java/org/androswitch/graphics/SurfaceActivity.java",
+      "sha256": "4390319ee2770a80108d4e55ffaff6f25e52dc4de575c682fc6ce802842c0772"
+    },
+    {
+      "path": "scripts/build-glsurface-fixture.ps1",
+      "sha256": "7a5746446c682cddc34cdad0ca65014e6de7890ba765c2b24926d31ae8bf44c6"
+    },
+    {
+      "path": "fixtures/m9/portrait/java/org/androswitch/graphics/portrait/PortraitActivity.java",
+      "sha256": "e9b862affa8f5b1627c9ba4b82bfd2389700f8571a852e893a003d0273fe3552"
+    },
+    {
+      "path": "fixtures/m9/portrait/native/portrait.c",
+      "sha256": "f0dc8146f927a16d6848f88f201897aab7d9d83f517b7a74d2110a6728c9c6cc"
+    },
+    {
+      "path": "scripts/build-portrait-fixture.ps1",
+      "sha256": "cde5b4e94646f123cde09afc7c9469bb697e71be378a4a7f577f59f3bd97c2ef"
+    }
+  ],
+  "checks": [
+    {
+      "exit_code": 0,
+      "command": "pwsh -File scripts/build-glsurface-fixture.ps1",
+      "receipt": "local-artifacts/m9/glsurface-fixture/build-receipt.json",
+      "status": "passed",
+      "receipt_sha256": "9c9188b7deed77f12eb3f34fb8931e9758142d9cde57bd62330a75ec00a4a85b"
+    },
+    {
+      "ignored": 0,
+      "log_sha256": "e629918d4346b9e27d05c0d59a9dcf6f61f9e6895fbc5eb1658bc6d78f6f9c2c",
+      "command": "cargo test -p as-framework --features host --test glsurface --locked -- --include-ignored",
+      "log": "target/evidence/m9-portrait-framework-focused.log",
+      "source_binding": "The listed framework/fixture files remained unchanged since this run. Later portable String.format and classpath additions require a final whole-tree rerun.",
+      "exit_code": 0,
+      "passed": 5,
+      "status": "passed"
+    },
+    {
+      "command": "pwsh -File scripts/build-portrait-fixture.ps1",
+      "receipt_sha256": "372ec251fb2d243f6017f6494c090b3762ae3dd6323303a0b2dbafd334006a1a",
+      "exit_code": 0,
+      "scope": "Strict API26 ARM64 JNI/GLES compilation and packaging only.",
+      "status": "passed",
+      "receipt": "local-artifacts/m9/portrait-fixture/build-receipt.json"
+    }
+  ],
+  "emulator_receipt_owner": "reports/horizon-portrait-stop-ryujinx-20261024.json",
+  "hardware": "not_run",
+  "unverified": [
+    "Physical Switch portrait presentation and touch",
+    "Active display reorientation requires lifecycle recreation and remains explicitly unavailable",
+    "Mixed software overlays on a GLSurfaceView remain unavailable",
+    "Host recording tests do not prove EGL/GPU/presentation behavior"
+  ]
+}

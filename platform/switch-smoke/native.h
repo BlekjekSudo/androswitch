@@ -1,4 +1,5 @@
 #pragma once
+#include "worker_admission.h"
 #include <stddef.h>
 #include <stdint.h>
 typedef struct {
@@ -17,3 +18,8 @@ void as_jni_vm_lock(void);
 void as_jni_vm_unlock(void);
 /* Product overrides the no-op implementation to persist shutdown phases. */
 void as_teardown_phase(const char *phase);
+/* Opt-in bounded runtime metadata diagnostics; never dereferences guest data.
+ */
+int as_native_trace_active(void);
+void as_native_trace_metadata(const char *source, const uint8_t *detail,
+                              size_t length);

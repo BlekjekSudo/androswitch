@@ -6,7 +6,66 @@ use alloc::{
     string::{String, ToString},
     vec,
 };
+pub(crate) mod atomic;
+mod charset_catalog;
+pub(crate) mod classes;
+pub(crate) mod enums;
+pub(crate) mod execution;
 pub(crate) mod file;
+pub(crate) mod format;
+pub(crate) mod monitor;
+mod string_encoding;
+pub(crate) mod throwables;
+/// Preserve Java's zero/null defaults only for real DEX declarations. Platform
+/// adapters must explicitly populate implemented fields; absence is a missing
+/// API, never evidence of a legitimate zero value.
+pub(crate) fn instance_field(
+    vm: &mut Engine,
+    receiver: ObjRef,
+    owner: &str,
+    name: &str,
+    ty: &str,
+) -> Result<Value, VmExit> {
+    match vm.heap.get(receiver)? {
+        crate::heap::HeapObj::Instance { class, fields } => {
+            if class == crate::gc::FREED_CLASS {
+                return Err(
+                    err::vm_error("VM_TYPE_ERROR", "field read on collected object").into(),
+                );
+            }
+            if let Some((_, value)) = fields.iter().find(|(field, _)| field == name) {
+                return Ok(value.clone());
+            }
+        }
+        _ => {
+            return Err(err::vm_error("VM_TYPE_ERROR", "field receiver is not an instance").into())
+        }
+    }
+    let mut class = owner.to_string();
+    for _ in 0..64 {
+        let Some((dex, definition)) = vm.cp.find_class(&class) else {
+            return Err(err::vm_error("API_UNAVAILABLE",format!("instance field {owner}->{name}:{ty}; platform declaration at {class} is not bound")).into());
+        };
+        let definition = *definition;
+        if let Some(data) = vm.cp.class_data(dex, &definition)? {
+            for field in &data.instance_fields {
+                let (_, field_name, field_type) = vm.cp.field_ref(dex, field.field_idx)?;
+                if field_name == name && field_type == ty {
+                    return Ok(crate::engine::default_for(ty));
+                }
+            }
+        }
+        let Some(parent) = vm.cp.superclass_of(&class) else {
+            break;
+        };
+        class = parent;
+    }
+    Err(err::vm_error(
+        "INVALID_FIELD",
+        format!("instance field {owner}->{name}:{ty} is not declared"),
+    )
+    .into())
+}
 #[derive(Debug, Clone)]
 pub(crate) struct FileState {
     path: String,
@@ -17,6 +76,7 @@ pub(crate) struct FileState {
 
 #[derive(Default)]
 pub(crate) struct State {
+    pub monitors: monitor::Monitors,
     pub classes: HashMap<String, ObjRef>,
     pub strings: HashMap<String, ObjRef>,
     pub filesystem: Option<Box<dyn as_platform::vfs::GuestFileSystem>>,
@@ -64,16 +124,22 @@ impl Engine {
         }
         let mut visited = crate::maps::HashSet::new();
         while visited.insert(current.clone()) {
+            if current == atomic::CLASS {
+                return atomic::attach(self, _object);
+            }
             if matches!(
                 current.as_str(),
                 "Ljava/io/File;" | "Ljava/io/FileInputStream;" | "Ljava/io/FileOutputStream;"
             ) {
                 return Ok(());
             }
-            if current == "Ljava/lang/Object;" {
+            if matches!(current.as_str(), "Ljava/lang/Object;" | "Ljava/lang/Enum;") {
                 return Ok(());
             }
             if self.cp.find_class(&current).is_none() {
+                if throwables::is_host_type(self, &current) {
+                    return throwables::attach(self, _object);
+                }
                 return Err(err::vm_error(
                     "API_UNAVAILABLE",
                     format!("new-instance {class}: platform state for {current} is unavailable"),

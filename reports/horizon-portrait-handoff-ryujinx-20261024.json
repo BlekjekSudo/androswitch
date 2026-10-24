@@ -1,0 +1,613 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "backend": "ryujinx",
+  "run_id": "134badfd1d9547a086b4256fe9e7e196",
+  "nro_sha256": "8facfea750f74aeb8b6ab8a55187f91ae8b8107ea4825092812bb660911668b0",
+  "overall_raw_status": "attempted_render_unconfirmed",
+  "handoff_status": "verified_clean_portrait_to_java_ui_and_launcher_return",
+  "render_status": "portrait_capture_incomplete_render_unconfirmed_in_this_run",
+  "single_launcher_workflow": {
+    "status": "passed_execution",
+    "commands": 10,
+    "launcher_snapshots": 11,
+    "root_handle_pinned": true,
+    "session_id": "134badfd1d9547a086b4256fe9e7e196",
+    "matching_launcher_submission_hashes": 11,
+    "emulator_pid": 239844,
+    "completed_sessions": 2
+  },
+  "sessions": [
+    {
+      "runtime_status": "passed_execution",
+      "snapshots": [
+        {
+          "views": [
+            {
+              "class": "Landroid/opengl/GLSurfaceView;",
+              "bounds": [
+                0,
+                0,
+                720,
+                1280
+              ]
+            }
+          ],
+          "frame_hash": "abbbfa39819d0f25",
+          "step": 0,
+          "native_frames": 0,
+          "presented_hash": "0000000000000000"
+        },
+        {
+          "views": [
+            {
+              "class": "Landroid/opengl/GLSurfaceView;",
+              "bounds": [
+                0,
+                0,
+                720,
+                1280
+              ]
+            }
+          ],
+          "frame_hash": "abbbfa39819d0f25",
+          "step": 1,
+          "native_frames": 2,
+          "presented_hash": "0000000000000002"
+        },
+        {
+          "views": [
+            {
+              "class": "Landroid/opengl/GLSurfaceView;",
+              "bounds": [
+                0,
+                0,
+                720,
+                1280
+              ]
+            }
+          ],
+          "frame_hash": "abbbfa39819d0f25",
+          "step": 2,
+          "native_frames": 2,
+          "presented_hash": "0000000000000002"
+        },
+        {
+          "views": [
+            {
+              "class": "Landroid/opengl/GLSurfaceView;",
+              "bounds": [
+                0,
+                0,
+                720,
+                1280
+              ]
+            }
+          ],
+          "frame_hash": "abbbfa39819d0f25",
+          "step": 3,
+          "native_frames": 2,
+          "presented_hash": "0000000000000002"
+        }
+      ],
+      "identity": {
+        "revision": 1,
+        "package": "org.fixture.portraitproof",
+        "installed_apk_sha256": "827a428a41f57a2f1f1da61f7ecdfa587e85a7268f58cf0db2fef105ba58a19f",
+        "session_id": "134badfd1d9547a086b4256fe9e7e196-1"
+      },
+      "captures": [
+        {
+          "interpretation": "Truncated/incomplete capture; raw sampled_nonuniform=false was not an actual uniformity measurement because validation failed.",
+          "raw_harness": {
+            "recognizable_app_screen": "requires_visual_review",
+            "height": 720,
+            "width": 1280,
+            "sampled_nonuniform": false,
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\134badfd1d9547a086b4256fe9e7e196\\sessions\\134badfd1d9547a086b4256fe9e7e196-1\\gles-frame-2.ppm",
+            "valid_ppm": false,
+            "sha256": "dd7a1cea9156f890a82f77bff52c5f9b529611027dd84e5e5d5006355ac5db34"
+          },
+          "independent_bytes": {
+            "missing_bytes": 42000,
+            "expected_payload_bytes": 2764800,
+            "payload_bytes": 2722800,
+            "valid_p6_header": true,
+            "all_present_pixels_identical": false
+          }
+        }
+      ],
+      "teardown_phases": [
+        "stop_requested",
+        "native_activity_stop",
+        "java_activity_stop",
+        "media_thread_quiesce",
+        "glsurface_join",
+        "egl_wait_gpu",
+        "egl_unbind",
+        "egl_destroy_context",
+        "egl_destroy_surface",
+        "egl_terminate",
+        "egl_terminated",
+        "guest_thread_quiesce",
+        "native_destructors",
+        "media_reset",
+        "media_released",
+        "activity_dispose",
+        "runtime_drop",
+        "native_mapping_release",
+        "native_resource_reset",
+        "native_mapping_release",
+        "native_tls_reset",
+        "native_resources_released",
+        "display_geometry_reset",
+        "runtime_closed",
+        "launcher_refresh"
+      ],
+      "returned_to_launcher": true,
+      "presented_frames": 2,
+      "input": {
+        "install_snapshot_step": 3,
+        "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\portrait-return\\0-portrait.apk",
+        "staged_name": "0000-external.apk",
+        "bytes": 6431,
+        "expected_session_id": "134badfd1d9547a086b4256fe9e7e196-1",
+        "index": 0,
+        "sha256": "827a428a41f57a2f1f1da61f7ecdfa587e85a7268f58cf0db2fef105ba58a19f"
+      },
+      "error": null,
+      "raw_case_status": "execution_observed_render_unconfirmed"
+    },
+    {
+      "runtime_status": "passed_execution",
+      "snapshots": [
+        {
+          "views": [
+            {
+              "class": "Landroid/widget/LinearLayout;",
+              "bounds": [
+                0,
+                0,
+                640,
+                360
+              ]
+            },
+            {
+              "class": "Landroid/widget/TextView;",
+              "bounds": [
+                0,
+                0,
+                640,
+                40
+              ]
+            },
+            {
+              "class": "Landroid/widget/Button;",
+              "bounds": [
+                0,
+                40,
+                640,
+                48
+              ]
+            },
+            {
+              "class": "Landroid/widget/Button;",
+              "bounds": [
+                0,
+                88,
+                640,
+                48
+              ]
+            },
+            {
+              "class": "Landroid/view/View;",
+              "bounds": [
+                0,
+                136,
+                640,
+                170
+              ]
+            }
+          ],
+          "frame_hash": "222976a3759a0f82",
+          "step": 0,
+          "native_frames": 0,
+          "presented_hash": "222976a3759a0f82"
+        },
+        {
+          "views": [
+            {
+              "class": "Landroid/widget/LinearLayout;",
+              "bounds": [
+                0,
+                0,
+                640,
+                360
+              ]
+            },
+            {
+              "class": "Landroid/widget/TextView;",
+              "bounds": [
+                0,
+                0,
+                640,
+                40
+              ]
+            },
+            {
+              "class": "Landroid/widget/Button;",
+              "bounds": [
+                0,
+                40,
+                640,
+                48
+              ]
+            },
+            {
+              "class": "Landroid/widget/Button;",
+              "bounds": [
+                0,
+                88,
+                640,
+                48
+              ]
+            },
+            {
+              "class": "Landroid/view/View;",
+              "bounds": [
+                0,
+                136,
+                640,
+                170
+              ]
+            }
+          ],
+          "frame_hash": "b2287d5d89642add",
+          "step": 1,
+          "native_frames": 0,
+          "presented_hash": "b2287d5d89642add"
+        },
+        {
+          "views": [
+            {
+              "class": "Landroid/widget/LinearLayout;",
+              "bounds": [
+                0,
+                0,
+                640,
+                360
+              ]
+            },
+            {
+              "class": "Landroid/widget/TextView;",
+              "bounds": [
+                0,
+                0,
+                640,
+                40
+              ]
+            },
+            {
+              "class": "Landroid/widget/Button;",
+              "bounds": [
+                0,
+                40,
+                640,
+                48
+              ]
+            },
+            {
+              "class": "Landroid/widget/Button;",
+              "bounds": [
+                0,
+                88,
+                640,
+                48
+              ]
+            },
+            {
+              "class": "Landroid/view/View;",
+              "bounds": [
+                0,
+                136,
+                640,
+                170
+              ]
+            }
+          ],
+          "frame_hash": "b2287d5d89642add",
+          "step": 2,
+          "native_frames": 0,
+          "presented_hash": "b2287d5d89642add"
+        },
+        {
+          "views": [
+            {
+              "class": "Landroid/widget/LinearLayout;",
+              "bounds": [
+                0,
+                0,
+                640,
+                360
+              ]
+            },
+            {
+              "class": "Landroid/widget/TextView;",
+              "bounds": [
+                0,
+                0,
+                640,
+                40
+              ]
+            },
+            {
+              "class": "Landroid/widget/Button;",
+              "bounds": [
+                0,
+                40,
+                640,
+                48
+              ]
+            },
+            {
+              "class": "Landroid/widget/Button;",
+              "bounds": [
+                0,
+                88,
+                640,
+                48
+              ]
+            },
+            {
+              "class": "Landroid/view/View;",
+              "bounds": [
+                0,
+                136,
+                640,
+                170
+              ]
+            }
+          ],
+          "frame_hash": "b2287d5d89642add",
+          "step": 3,
+          "native_frames": 0,
+          "presented_hash": "b2287d5d89642add"
+        }
+      ],
+      "identity": {
+        "revision": 1,
+        "package": "org.fixture.uiproof",
+        "installed_apk_sha256": "39c568280be3248058da636a80fad2378bca6e6a1496950bdcd273e36bba2d76",
+        "session_id": "134badfd1d9547a086b4256fe9e7e196-2"
+      },
+      "captures": [
+        {
+          "interpretation": "Complete capture; raw harness visual classification retained.",
+          "raw_harness": {
+            "recognizable_app_screen": "requires_visual_review",
+            "height": 720,
+            "width": 1280,
+            "sampled_nonuniform": true,
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\134badfd1d9547a086b4256fe9e7e196\\sessions\\134badfd1d9547a086b4256fe9e7e196-2\\last-frame.ppm",
+            "valid_ppm": true,
+            "sha256": "b2ce308d782381c0bcb150e218f80670e8949c6d9350da3b5cb16a4dd73abce9"
+          },
+          "independent_bytes": {
+            "missing_bytes": 0,
+            "expected_payload_bytes": 2764800,
+            "payload_bytes": 2764800,
+            "valid_p6_header": true,
+            "all_present_pixels_identical": false
+          }
+        }
+      ],
+      "teardown_phases": [
+        "stop_requested",
+        "native_activity_stop",
+        "java_activity_stop",
+        "media_thread_quiesce",
+        "guest_thread_quiesce",
+        "native_destructors",
+        "media_reset",
+        "media_released",
+        "activity_dispose",
+        "runtime_drop",
+        "native_resource_reset",
+        "native_tls_reset",
+        "native_resources_released",
+        "display_geometry_reset",
+        "runtime_closed",
+        "launcher_refresh"
+      ],
+      "returned_to_launcher": true,
+      "presented_frames": 191,
+      "input": {
+        "install_snapshot_step": 8,
+        "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\portrait-return\\1-java-ui.apk",
+        "staged_name": "0001-external.apk",
+        "bytes": 5950,
+        "expected_session_id": "134badfd1d9547a086b4256fe9e7e196-2",
+        "index": 1,
+        "sha256": "39c568280be3248058da636a80fad2378bca6e6a1496950bdcd273e36bba2d76"
+      },
+      "error": null,
+      "raw_case_status": "execution_verified_visual_review_required"
+    }
+  ],
+  "portrait_native_first_checkpoint": {
+    "schema_version": 1,
+    "surface_width": 720,
+    "surface_height": 1280,
+    "callback_width": 720,
+    "callback_height": 1280,
+    "frames": 1,
+    "readback_mask": 15,
+    "touches": 0,
+    "last_action": 0,
+    "touch_x": 0,
+    "touch_y": 0
+  },
+  "portrait_native_checkpoint_scope": "frames1/readback_mask15 supports one native diagnostic checkpoint. This run has no frame30 checkpoint and no complete portrait PPM; do not promote its overall render status or borrow proof from another run.",
+  "cpu_handoff": {
+    "logical_root_bounds": [
+      0,
+      0,
+      640,
+      360
+    ],
+    "observed_presented_frames": 191,
+    "scope": "A subsequent CPU Java application executed in the same launcher workflow with natural landscape layout after portrait cleanup.",
+    "matching_frame_and_presented_hashes": 4
+  },
+  "post_egl_cpu_queue": [
+    {
+      "generation": 1,
+      "frame": 1,
+      "slot": 0,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 2,
+      "slot": 1,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 3,
+      "slot": 2,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 4,
+      "slot": 0,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 5,
+      "slot": 1,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 6,
+      "slot": 2,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 7,
+      "slot": 0,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    },
+    {
+      "generation": 1,
+      "frame": 8,
+      "slot": 1,
+      "buffers": 3,
+      "map_fd": 1,
+      "fence_fd": 2,
+      "result": 0
+    }
+  ],
+  "sd_original_restore": "restored",
+  "source_snapshots": [
+    {
+      "bytes": 52113,
+      "sha256": "71241e9a2280641cb4949f6a24d5b8f9a1839b3a1d9ff3fc10a6be5f63c2af0f",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\134badfd1d9547a086b4256fe9e7e196\\verification.json"
+    },
+    {
+      "bytes": 21719,
+      "sha256": "d9ec2c656e32ca0084a487721ae94c604d860a1434792d76b4c0ae8aedeb0a7d",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\134badfd1d9547a086b4256fe9e7e196\\emulator.json"
+    },
+    {
+      "bytes": 1058,
+      "sha256": "400c718476c2b6b08e4c493340b459f3c554c9dc1cb17cda2f4b8818a5e32266",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\134badfd1d9547a086b4256fe9e7e196\\launcher-test.json"
+    },
+    {
+      "bytes": 8716344,
+      "sha256": "8facfea750f74aeb8b6ab8a55187f91ae8b8107ea4825092812bb660911668b0",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\134badfd1d9547a086b4256fe9e7e196\\androswitch.nro"
+    },
+    {
+      "bytes": 188,
+      "sha256": "e83f4d1f21a2743e4e9d33f8e1266c26f63b53624b2986c14954f5826000f879",
+      "path": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-external-result-134badfd1d9547a086b4256fe9e7e196\\userdata\\org.fixture.portraitproof\\files\\portrait-proof.json"
+    },
+    {
+      "bytes": 664,
+      "sha256": "9d96653db5fdc0c0e8f7aa21ed1c748156e985294fca0be07c5b5c4277b07211",
+      "path": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-external-result-134badfd1d9547a086b4256fe9e7e196\\logs\\display-handoffs.log"
+    },
+    {
+      "bytes": 874,
+      "sha256": "7b78c73c932643d2680a59d8c206a83f691f2e745e8fe9cbe74d0933dd7964c3",
+      "path": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-external-result-134badfd1d9547a086b4256fe9e7e196\\logs\\teardown.log"
+    },
+    {
+      "bytes": 5861,
+      "sha256": "13b2c8395ea3f60367b0671bd749d8fa2704af3c09e916e726432ff3b96d0f3a",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\134badfd1d9547a086b4256fe9e7e196\\sessions\\134badfd1d9547a086b4256fe9e7e196-1\\session-report.json"
+    },
+    {
+      "bytes": 6431,
+      "sha256": "827a428a41f57a2f1f1da61f7ecdfa587e85a7268f58cf0db2fef105ba58a19f",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\portrait-return\\0-portrait.apk"
+    },
+    {
+      "bytes": 2722816,
+      "sha256": "dd7a1cea9156f890a82f77bff52c5f9b529611027dd84e5e5d5006355ac5db34",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\134badfd1d9547a086b4256fe9e7e196\\sessions\\134badfd1d9547a086b4256fe9e7e196-1\\gles-frame-2.ppm"
+    },
+    {
+      "bytes": 16729,
+      "sha256": "803660b46018e81b7c746fdb465e80cecb1227550c60debe592502cfa1fdc692",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\134badfd1d9547a086b4256fe9e7e196\\sessions\\134badfd1d9547a086b4256fe9e7e196-2\\session-report.json"
+    },
+    {
+      "bytes": 5950,
+      "sha256": "39c568280be3248058da636a80fad2378bca6e6a1496950bdcd273e36bba2d76",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\portrait-return\\1-java-ui.apk"
+    },
+    {
+      "bytes": 2764816,
+      "sha256": "b2ce308d782381c0bcb150e218f80670e8949c6d9350da3b5cb16a4dd73abce9",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\134badfd1d9547a086b4256fe9e7e196\\sessions\\134badfd1d9547a086b4256fe9e7e196-2\\last-frame.ppm"
+    }
+  ],
+  "capture_race_scope": "The reviewed harness snapshots passed_execution before C worker cleanup has necessarily completed, while the older GPU capture wrote directly to its final filename. The truncated file is consistent with an in-progress copy; exact cause is not proved by these retained bytes alone.",
+  "separate_render_proof": "reports/horizon-portrait-stop-ryujinx-20261024.json",
+  "limitations": [
+    "This receipt verifies handoff/cleanup and the subsequent CPU presentation, not a new complete portrait-rendering pass.",
+    "The raw overall attempted_render_unconfirmed classification remains unchanged.",
+    "Single-workflow success does not establish arbitrary lifecycle stability, physical Switch behavior or external-game compatibility."
+  ],
+  "physical_switch": "not_run_for_this_change",
+  "m9_complete": false
+}

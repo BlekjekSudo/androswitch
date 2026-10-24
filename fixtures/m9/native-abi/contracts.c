@@ -231,6 +231,58 @@ static void *once_worker(void *unused) {
   return NULL;
 }
 int main(void) {
+  /* ARM64 getauxval uses unsigned long for both argument and result. Known
+   *
+   * zero values preserve errno; absent types must be distinguishable. */
+  _Static_assert(sizeof(unsigned long) == 8, "Android ARM64 getauxval ABI");
+  unsigned long (*auxiliary)(unsigned long) =
+      (void *)as_bionic_libc_import("getauxval");
+  assert(auxiliary);
+  errno = E2BIG;
+  assert(auxiliary(6) == 4096 && errno == E2BIG);
+  assert(auxiliary(16) == 3 && errno == E2BIG);
+  assert(auxiliary(26) == 0 && errno == E2BIG);
+  assert(auxiliary(23) == 0 && errno == E2BIG);
+  const unsigned long absent_auxiliary[] = {0, 3, 7, 9, 25, ~0UL};
+  for (unsigned i = 0; i < sizeof(absent_auxiliary) / sizeof(*absent_auxiliary);
+       ++i) {
+    errno = 0;
+    assert(auxiliary(absent_auxiliary[i]) == 0 && errno == ENOENT);
+  }
+  int (*property)(const char *, char *) =
+      (void *)as_bionic_libc_import("__system_property_get");
+  assert(property);
+  char property_value[94];
+  const char *property_names[] = {"ro.build.version.sdk", "ro.product.cpu.abi",
+                                  "ro.product.cpu.abilist",
+                                  "ro.product.cpu.abilist64"};
+  for (unsigned i = 0; i < sizeof(property_names) / sizeof(*property_names);
+       ++i) {
+    memset(property_value, 0x5a, sizeof(property_value));
+    errno = E2BIG;
+    const char *expected = i ? "arm64-v8a" : "26";
+    assert(property(property_names[i], property_value + 1) ==
+           (int)strlen(expected));
+    assert(!strcmp(property_value + 1, expected) && errno == E2BIG);
+    assert(property_value[0] == 0x5a && property_value[93] == 0x5a);
+    assert(property_value[strlen(expected) + 2] == 0x5a);
+  }
+  const char *missing_properties[] = {"",
+                                      "PATH",
+                                      "ro.hardware",
+                                      "ro.serialno",
+                                      "ro.build.fingerprint",
+                                      "ro.build.version.release",
+                                      "RO.BUILD.VERSION.SDK"};
+  for (unsigned i = 0;
+       i < sizeof(missing_properties) / sizeof(*missing_properties); ++i) {
+    memset(property_value, 0x5a, sizeof(property_value));
+    errno = EACCES;
+    assert(property(missing_properties[i], property_value + 1) == 0);
+    assert(property_value[1] == 0 && property_value[2] == 0x5a &&
+           errno == EACCES);
+    assert(property_value[0] == 0x5a && property_value[93] == 0x5a);
+  }
   register_dtor = (void *)as_bionic_cxx_import("__cxa_atexit");
   finalize = (void *)as_bionic_cxx_import("__cxa_finalize");
   acquire = (void *)as_bionic_cxx_import("__cxa_guard_acquire");
@@ -478,6 +530,34 @@ int main(void) {
                                      startup guard. */
   assert(acquire(&abandoned_guard));
   abort_guard(&abandoned_guard);
+  /* Diagnostics must distinguish both pending registries without consuming
+   * callbacks or making a busy reset succeed. */
+  int (*register_tls_probe)(uint64_t, uint64_t, uint64_t) =
+      (void *)as_bionic_cxx_import("__cxa_thread_atexit_impl");
+  assert(!as_bionic_cxx_pending());
+  assert(!register_dtor((uint64_t)record, 90, 0));
+  assert(!register_tls_probe((uint64_t)record, 91, 0));
+  errno = E2BIG;
+  assert(as_bionic_cxx_pending() ==
+             (AS_CXX_PENDING_GLOBAL | AS_CXX_PENDING_THREAD) &&
+         errno == E2BIG);
+  assert(as_bionic_cxx_reset() == -EBUSY);
+  assert(as_bionic_cxx_pending() ==
+         (AS_CXX_PENDING_GLOBAL | AS_CXX_PENDING_THREAD));
+  assert(!as_bionic_cxx_finalize());
+  assert(as_bionic_cxx_pending() == AS_CXX_PENDING_THREAD);
+  assert(as_bionic_cxx_reset() == -EBUSY);
+  assert(!as_bionic_cxx_thread_finalize());
+  assert(!as_bionic_cxx_pending() && !as_bionic_cxx_reset());
+  extern void as_bionic_libc_reset(void);
+  int (*random_draw)(void) = (void *)as_bionic_libc_import("rand");
+  void (*random_seed)(unsigned) = (void *)as_bionic_libc_import("srand");
+  assert(random_draw && random_seed);
+  random_seed(42);
+  assert(random_draw() == 71876166);
+  errno = E2BIG;
+  as_bionic_libc_reset();
+  assert(random_draw() == 1804289383 && errno == E2BIG);
   puts("native ABI contracts: PASS (C++ lifetimes, guards/once/keys, "
        "allocation, "
        "fortify, stdio/VFS, logging)");

@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T15:52:46.4325846Z",
+  "scope": "General API26 Resources.getIdentifier using actual ARSC ownership metadata and checked signed decimal lookup before name parsing. Original SDK resources, no title or SDK absence exceptions.",
+  "status": "host_passed_emulator_pending",
+  "portable_core_asserted": true,
+  "observed_blocker": {
+    "error": "NOT_FOUND [rd-vm]: método Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I não resolvido [pc 0x2: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 172, regs: [2, 1, 0, 3, 0] } }]\n  at Lcom/google/android/gms/measurement/internal/zzfj;->zzb(Ljava/lang/String;Landroid/content/res/Resources;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/measurement/internal/zzid;->zzc(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I não resolvido [pc 0x2: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 172, regs: [2, 1, 0, 3, 0] } }]\n  at Lcom/google/android/gms/measurement/internal/zzfj;->zzb(Ljava/lang/String;Landroid/content/res/Resources;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/measurement/internal/zzid;->zzc(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+    "sd_restore": "restored",
+    "nro_sha256": "205ce9214d5bde04a36338e8bb692d69eb1a8526b17d9a75eb788eccdf23c3e3",
+    "run": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea",
+    "installed_identity_matches": true,
+    "returned_to_launcher": true,
+    "session": "f7104a7c595f4a18a158b330f39e2bea-3"
+  },
+  "contract": [
+    "Integer.parseInt radix10 semantics run first and return raw signed int even when no such resource exists; ASCII signs, checked i32 overflow and API26 Unicode9 BMP Nd digits",
+    "Null name raises NullPointerException; null defaults are allowed; no implicit manifest package or guessed default type",
+    "Qualified package/type names override defaults; optional @ and @* are stripped for name lookup; exact case-sensitive actual ARSC package/type/key lookup",
+    "Real typeIdOffset and package IDs above 0x7f are preserved; aliases return their own ID; configuration-only entries are discoverable independently of selected values",
+    "Missing actual app-table names return zero, including absent third-party SDK resource names; malformed/conflicting identity metadata is an explicit error",
+    "The known Android content ID is available; the full Android framework ARSC reverse catalog and internal ResTable identifiers remain explicitly unavailable",
+    "4096 UTF8 bytes per name/default; reverse search uses existing parsed metadata rather than reading APK payloads or allocating a name index"
+  ],
+  "commands": [
+    {
+      "exit_code": 0,
+      "note": "Three normal SDK APKs built; expected obsolete Java release8 warnings only",
+      "command": "pwsh -NoProfile -File fixtures/m9/resource-names/build.ps1",
+      "status": "passed"
+    },
+    {
+      "test_seconds": 0.0,
+      "exit_code": 0,
+      "ignored": 0,
+      "status": "passed",
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p rd-apk --no-default-features --test arsc_resource_names --locked -- --nocapture",
+      "failed": 0,
+      "passed": 9
+    },
+    {
+      "test_seconds": 2.34,
+      "failed": 0,
+      "status": "passed",
+      "passed": 7,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-framework --features host --test resource_names --locked -- --nocapture",
+      "log": "target/evidence/m9-resource-identifiers-focused.log",
+      "ignored": 0,
+      "apk_variants": 3,
+      "exit_code": 0,
+      "jvm_cases": 97,
+      "jvm_comparisons": 291
+    },
+    {
+      "exit_code": 0,
+      "seconds": 5.36,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1 cargo clippy -p rd-apk --no-default-features --lib --test arsc_resource_names --locked -- -D warnings",
+      "log": "target/evidence/m9-resource-identifiers-parser-clippy.log",
+      "status": "passed"
+    },
+    {
+      "exit_code": 0,
+      "seconds": 6.64,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1 cargo clippy -p as-framework --features host --lib --test resource_names --locked -- -D warnings",
+      "log": "target/evidence/m9-resource-identifiers-framework-clippy.log",
+      "status": "passed"
+    }
+  ],
+  "fixture_build": {
+    "api": 26,
+    "build_tools": "35.0.0",
+    "schema_version": 1,
+    "sources": [
+      {
+        "sha256": "ede34a19c2c9896ccd71e93a95fc437d7a69f0753dfcba10aa8ca76949a4ec58",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\resource-names\\java\\org\\androswitch\\contracts\\IdentifierNumbers.java"
+      },
+      {
+        "sha256": "d634d29c543487ff47736e122b835a6acb451d32fd7f32a5a1ce504b7a3ddd96",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\resource-names\\java\\org\\androswitch\\contracts\\ResourceNamesActivity.java"
+      },
+      {
+        "sha256": "77f33a030e470d5a692adaaaf854f305833b3c66d6cdeb0ee28ce4e8a6c3d551",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\resource-names\\res\\layout\\screen.xml"
+      },
+      {
+        "sha256": "98ea21a1d9c38276a6b9b82cce3a9cf9883650ef1a9296bdc027a306f695d62d",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\resource-names\\res\\values\\values.xml"
+      },
+      {
+        "sha256": "1f3f00d67f91d001b00e798de74f97d1f01f396d63f2be167ca2656a94e32875",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\resource-names\\res\\values-fr\\values.xml"
+      },
+      {
+        "sha256": "99166e247b1be659f3508f21add3fe949b82caba16391c133d0f0a4db269847a",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\resource-names\\res\\values-v27\\values.xml"
+      },
+      {
+        "sha256": "aeae7c934393af3a86e8792469f8ab99c4a10da02d269dc92c5896c2202ce94c",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\resource-names\\build.ps1"
+      }
+    ],
+    "oracle": {
+      "sha256": "d9dccc7c0aff884ab4b8a897f6cf9081aed928acd9db3f13d0846aa0ec33b5a1",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\resource-names-fixture/identifier-jvm-oracle.txt"
+    },
+    "apks": [
+      {
+        "sha256": "6c73a21914262cfe29ac0c16208d7b9a5b1db6c3d4742de3576ca29cdb97b07f",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\resource-names-fixture\\resources.apk"
+      },
+      {
+        "sha256": "b2ee59e8d1d6951438cded875ad0f6ec1581dff111410fa29a144e19b0e5fca5",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\resource-names-fixture\\renamed.apk"
+      },
+      {
+        "sha256": "6d5c899a9500ec0c9067f44ac0b38629dbd121b6b97b85fcc98e85b43cb5d497",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\resource-names-fixture\\high-package.apk"
+      }
+    ]
+  },
+  "source_hashes_captured_after_test": [
+    {
+      "path": "crates/rd-apk/src/arsc.rs",
+      "sha256": "8c99e2c86f16d595293a2981760279404c4758030b52536dbc86d92a193b8535"
+    },
+    {
+      "path": "crates/rd-apk/src/arsc_identifier.rs",
+      "sha256": "f6ef69dd6239fc824aba28a4ff371ce760556c2b69a9d06dcf0090125580131c"
+    },
+    {
+      "path": "crates/rd-apk/tests/arsc_resource_names.rs",
+      "sha256": "5391049a1747a52a2d805388b22bf958fd69cf0d84480ab3f7bd654a95139e6b"
+    },
+    {
+      "path": "crates/as-framework/src/services/resource_names.rs",
+      "sha256": "eeaa187586da9c8b73021c8a40cc11ad7e568027cfef8c240e47d44d4ab42e0a"
+    },
+    {
+      "path": "crates/as-framework/tests/resource_names.rs",
+      "sha256": "79efcc8c814e920349a4633490158a97495947ed078f798dc6935ddae91c9d69"
+    }
+  ],
+  "primary_references": [
+    {
+      "contract": "getIdentifier: null name check, Integer.parseInt before AssetManager lookup",
+      "url": "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/core/java/android/content/res/ResourcesImpl.java"
+    },
+    {
+      "contract": "ResTable::identifierForName: package/type defaults, optional name prefixes, exact table identity, typeIdOffset and private attr fallback",
+      "url": "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/libs/androidfw/ResourceTypes.cpp"
+    },
+    {
+      "url": "https://android.googlesource.com/platform/external/icu/+/android-8.0.0_r1/icu4c/source/common/unicode/uvernum.h",
+      "ignored_text_sha256": "7364c73a55e1bd22e018707bf92fa235fe09e64250c6d6ab2fdf8c6e1cecace5",
+      "contract": "API26 ICU version 58.2"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/unicode-org/icu/release-58-2/icu4c/source/data/unidata/UnicodeData.txt",
+      "ignored_text_sha256": "68dfc414d28257b9b5d6ddbb8b466c768c00ebdf6cbf7784364a9b6cad55ee8f",
+      "contract": "All37 BMP Nd digit-zero blocks used for API26 numeric parsing"
+    }
+  ],
+  "verification": {
+    "emulator": "Corrected NRO and external game startup pending",
+    "android_reference_device": "not run; JVM numeric oracle and API26 primary source were used. No Android runtime reference execution claim.",
+    "host": "9 parser and7 portable Engine integration tests passed; 291 comparisons with JDK21 Integer.parseInt over API26-stable numeric cases and all37 Unicode9 BMP decimal blocks. Actual aapt2 resource IDs and table ownership used as reverse-lookup oracle.",
+    "hardware": "not run",
+    "source_binding": "Only listed relevant source files plus fixture receipt are bound here. This is not a full source manifest, final candidate binding, or an assertion that external games reach a first screen."
+  }
+}

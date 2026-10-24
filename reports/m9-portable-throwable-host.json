@@ -1,0 +1,115 @@
+{
+  "date": "2026-10-24",
+  "verification": {
+    "host": "5 focused tests passed; 51 JVM cases repeated across GC; ordinary, VM-generated and synthetic native-provider error propagation verified",
+    "emulator": "pending NRO containing this source",
+    "hardware": "not run"
+  },
+  "trigger": "Timer host DEX fixture constructing new IllegalStateException(\"timer task failed\") exposed missing portable Throwable attachment; this was a shared Java runtime gap.",
+  "tests": [
+    "fifty_one_jvm_cases_preserve_nullable_messages_overrides_and_super_dispatch",
+    "dex_constructors_shadow_fields_and_gc_do_not_alias_private_throwable_state",
+    "ordinary_vm_generated_and_native_materialized_errors_keep_real_message_state",
+    "unsupported_constructor_cause_and_stack_contracts_never_succeed_silently",
+    "throwable_private_slot_uses_the_real_heap_budget"
+  ],
+  "source_hashes": [
+    {
+      "path": "crates/rd-vm/src/portable/throwables.rs",
+      "sha256": "af8bcee569ba59e3346e858efcda06844cdac69e11cb4a3c44025169e4316276"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/mod.rs",
+      "sha256": "90f510cfc59d1ed2552d7a4a43678ec9accba1b65b809d56c24bda6f7758632c"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/intrinsics.rs",
+      "sha256": "6d56c3f08a6612ef02882283e42add12240b1cc78af51a75bf2e99b23e8f4d63"
+    },
+    {
+      "path": "crates/rd-vm/src/interp.rs",
+      "sha256": "fc1d0aa316c8a83a1ea729a21001dbc38a85d179df3f3adeaaf3085f0ecccb5a"
+    },
+    {
+      "path": "crates/rd-vm/src/engine.rs",
+      "sha256": "268e26bcc93fdc72857f7dc3639d87c4db3f630c1e1c2291c6f2996d5c34f2c1"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "sha256": "ec697194d26133fb6b6820eac40b9842b6ac398269d27dbb095d6e1149339554"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_throwable.rs",
+      "sha256": "efa355409a9c8a868a80708d41a5a0d1effa38b272f9e03fff3a186fac477362"
+    },
+    {
+      "path": "crates/as-switch-smoke/Cargo.toml",
+      "sha256": "a0552194ba7af9c4db2cb514690395632627ddcbab747d9053429c6e3be069d7"
+    }
+  ],
+  "fixture_build": {
+    "sources": [
+      {
+        "sha256": "a2194042613836212bb3ab72f915f4ef84b7b33b34940171a02670295a7a1a1e",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\rd-vm\\tests\\fixtures\\portable-throwable\\ThrowableFixture.java"
+      },
+      {
+        "sha256": "da6641aca5f790247759ec796c23d88c4d2c1b7e0edb8fb9346273eb97d20fda",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\rd-vm\\tests\\fixtures\\portable-throwable\\build.ps1"
+      }
+    ],
+    "schema_version": 1,
+    "artifacts": [
+      {
+        "sha256": "a740034dfd839747a7ae2303baa995c79dbb019cb5cf265b58beeeabd7b2c81b",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\portable-throwable-fixture\\dex\\classes.dex"
+      },
+      {
+        "sha256": "58879b8722a5d2606e3ac347a3063a8d8e35393f3ea3f137ec7fd70c4c32ede3",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\portable-throwable-fixture\\jvm-oracle.txt"
+      }
+    ],
+    "api": 26
+  },
+  "schema_version": 1,
+  "limitations": [
+    "This is message-state compatibility, not full Throwable/cause/suppression/stacktrace support.",
+    "Specialized builtin constructors requiring additional state or specialized message behavior are rejected.",
+    "The host native-provider materialization test does not execute a native guest binary or Horizon thread.",
+    "No Candy Crush/Mekorama first-screen compatibility claim follows from these host results."
+  ],
+  "implementation": {
+    "privacy": "Valid DEX fields named message/detailMessage cannot alias the private slot; no exception side table or process-global state was added.",
+    "unsupported": "Cause, suppression and stack APIs/constructors are explicit unavailable; constructors provide message-state semantics without a stack-capture compatibility claim.",
+    "status": "implemented",
+    "exception_flow": "Portable athrow reads the private message state. VM-generated and handler-materialized Throwable objects initialize that same slot. Legacy std state and behavior are unchanged.",
+    "state": "Nullable String reference in private heap field java.lang.Throwable#detailMessage, charged by Heap.put_field and traced by ordinary heap GC.",
+    "constructors": "Common implemented builtin default/String constructors; real DEX constructors are resolved normally and call their platform superclass constructor. Specialized constructor shapes remain API_UNAVAILABLE.",
+    "package_specific_branch": false,
+    "dispatch": "getMessage reads the private slot. getLocalizedMessage invokes virtual getMessage. toString invokes virtual getLocalizedMessage and uses the exact binary class name. DEX overrides and invoke-super through DEX and platform ancestors are preserved.",
+    "metadata": "AssertionError has its real Error ancestry so builtin default construction participates in the shared Throwable hierarchy."
+  },
+  "iteration_note": "Initial focused run passed 4 tests and found missing AssertionError hierarchy in the final oracle kind. Added that real ancestry and corrected exact descriptor-prefix handling; final run passed all five. The fixture uses a package beginning with L to verify binary-name preservation.",
+  "scope": "Portable Throwable detail-message state and minimal constructors/message APIs",
+  "primary_references": [
+    "https://developer.android.com/reference/java/lang/Throwable",
+    "https://source.android.com/docs/core/runtime/dex-format"
+  ],
+  "portable_core_asserted": true,
+  "commands": [
+    {
+      "command": "pwsh -File crates/rd-vm/tests/fixtures/portable-throwable/build.ps1",
+      "jvm_cases": 51,
+      "status": "passed",
+      "exit_code": 0
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 5,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-switch-smoke --features host-cli,portable-tests --test portable_throwable --locked -- --nocapture",
+      "exit_code": 0,
+      "status": "passed"
+    }
+  ]
+}

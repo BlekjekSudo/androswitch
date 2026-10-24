@@ -1,0 +1,408 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "run_id": "0239a9fb775a441fb1514029ff9ce577",
+  "scope": "Actual Ryujinx execution of the ARM64 Horizon NRO and its libnx Timer worker, VFS write, Handler UI update and clean return. Separate from host scheduler tests.",
+  "status": "passed_emulator_timer_proof_with_visual_review",
+  "raw_harness_status": "execution_verified_visual_review_required",
+  "raw_visual_review_field": "required",
+  "raw_receipt": {
+    "sha256": "ba68e19a7ca3862fd121588e845b5775093e4392569405ab8e0c57889fb7dec6",
+    "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/verification.json",
+    "bytes": 24620
+  },
+  "execution": {
+    "emulator_executable": {
+      "sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+      "path": "C:/Users/Administrator/.cache/androswitch/ryujinx-cfg-bin-9f3cd3d2/Ryujinx.exe",
+      "bytes": 74452469
+    },
+    "request": {
+      "sha256": "4c50c883e9da831d33eb27655b0a71d33b0241e502b4f07c9dc687b6c787e2a1",
+      "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/launcher-test.json",
+      "bytes": 642
+    },
+    "backend": "ryujinx",
+    "launch_root_handle_pinned": true,
+    "launcher_result": {
+      "sha256": "42518b8f4ec9118a5a407b4e1cdea90eaa88bbad5c50cf7d96a7ec5cc8847513",
+      "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/emulator.json",
+      "bytes": 8404
+    },
+    "execution_attempted": true,
+    "profile": {
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\Config.json",
+      "observation": "Configuration bytes preserved after this run. The original harness recorded the profile path but did not capture its configuration hash at process launch; this is not a claim of an independently observed launch-time hash.",
+      "root": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+      "configuration": {
+        "sha256": "b3ac639c1dcacec30dc70cf31c5f62916e6d17e00e3ae74047afb17d97881b04",
+        "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/profile-config-after-run.json",
+        "bytes": 5097
+      }
+    },
+    "process_id": 250240,
+    "emulator_version": "1.3.3+e2143d4",
+    "emulator_frontend": "headless_sdl2",
+    "emulator_stdout": {
+      "sha256": "6787ad0807b9c591c5e03570d5b1b57749f2b9b6f7f689bae56d2c9a969bed99",
+      "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/ryujinx.stdout.log",
+      "bytes": 6333
+    },
+    "apk": {
+      "sha256": "3cd48426bcd9b21fccbf40f891b0e93a91eec666027b959f67fce4e63657c46c",
+      "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/timer-proof.apk",
+      "bytes": 5188
+    },
+    "nro": {
+      "sha256": "23e53247fbb113709e612479149e0fa91a2245611d96fe6eaee71f46fdca8726",
+      "path": "D:/Dev/Switch/AndroSwitch/local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/androswitch.nro",
+      "bytes": 9007160
+    },
+    "emulator_stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/ryujinx.stderr.log",
+      "bytes": 0
+    }
+  },
+  "application": {
+    "total_snapshots": 5,
+    "installed_identity_matches": true,
+    "presented_frames": 232,
+    "views": [
+      {
+        "bounds": [
+          0,
+          0,
+          640,
+          360
+        ],
+        "text": [
+          "Timer: waiting for dedicated worker"
+        ],
+        "step": 0
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          640,
+          360
+        ],
+        "text": [
+          "Timer proof PASS: 3 worker tasks, VFS saved"
+        ],
+        "step": 1
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          640,
+          360
+        ],
+        "text": [
+          "Timer proof PASS: 3 worker tasks, VFS saved"
+        ],
+        "step": 2
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          640,
+          360
+        ],
+        "text": [
+          "Timer proof PASS: 3 worker tasks, VFS saved"
+        ],
+        "step": 3
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          640,
+          360
+        ],
+        "text": [
+          "Timer proof PASS: 3 worker tasks, VFS saved"
+        ],
+        "step": 4
+      }
+    ],
+    "session_id": "0239a9fb775a441fb1514029ff9ce577-1",
+    "matching_software_submitted_snapshots": 5,
+    "revision": 1,
+    "session_report": {
+      "sha256": "537786a7f00eace256a63d07a4592a56edd930c3b2136b854b4a56f44622727b",
+      "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/sessions/0239a9fb775a441fb1514029ff9ce577-1/session-report.json",
+      "bytes": 7346
+    },
+    "error": null,
+    "package": "org.fixture.timerproof",
+    "runtime_status": "passed_execution"
+  },
+  "timer_proof": {
+    "configured_first_delay_ms": 100,
+    "exact_content": "task=1 scheduled=1792849787674 actual=1792849787752 noLooper=true\ntask=2 scheduled=1792849787754 actual=1792849787827 noLooper=true\ntask=3 scheduled=1792849787834 actual=1792849787844 noLooper=true\nTIMER_PROOF_PASS elapsed=92\n",
+    "retained_sd_source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-0239a9fb775a441fb1514029ff9ce577\\Download\\androswitch-timer-proof.txt",
+    "durable_run_copy": {
+      "sha256": "07674b797bba2817a4b29726aa7db6ddc1ae68a25043219d65fb62dcc1750fab",
+      "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/vfs/Download/androswitch-timer-proof.txt",
+      "bytes": 226
+    },
+    "assertions": "Three actual callbacks wrote VFS timestamps; all report noLooper=true; timer.cancel and main Handler post produced the visible PASS UI.",
+    "observed_elapsed_ms": 92,
+    "tasks": [
+      {
+        "task": 1,
+        "scheduled_epoch_ms": 1792849787674,
+        "actual_epoch_ms": 1792849787752,
+        "no_looper": true
+      },
+      {
+        "task": 2,
+        "scheduled_epoch_ms": 1792849787754,
+        "actual_epoch_ms": 1792849787827,
+        "no_looper": true
+      },
+      {
+        "task": 3,
+        "scheduled_epoch_ms": 1792849787834,
+        "actual_epoch_ms": 1792849787844,
+        "no_looper": true
+      }
+    ],
+    "guest_path": "/sdcard/Download/androswitch-timer-proof.txt",
+    "configured_fixed_rate_period_ms": 80,
+    "timing_limit": "Observed timestamps are one emulator sample, not a real-time scheduling or performance guarantee."
+  },
+  "capture": {
+    "ownership": {
+      "sha256": "d002169948445b1edb5c0efc099eead09591d4684dba4d2d58621b08dbb875bb",
+      "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/sessions/0239a9fb775a441fb1514029ff9ce577-1/capture-owner.json",
+      "bytes": 168
+    },
+    "png_ppm_pixels": "Read-only Pillow comparison passed: all1280x720 RGB PNG pixels exactly equal the complete P6 payload.",
+    "ppm": {
+      "sha256": "5a410fa47ba2b539d47875b030350e41558a6a759cee99392fccdbd3614d5311",
+      "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/sessions/0239a9fb775a441fb1514029ff9ce577-1/last-frame.ppm",
+      "bytes": 2764816
+    },
+    "raw_validation": {
+      "valid_ppm": true,
+      "height": 720,
+      "sampled_nonuniform": true,
+      "width": 1280
+    },
+    "identity": {
+      "capture_protocol": 1,
+      "package": "org.fixture.timerproof",
+      "revision": 1,
+      "schema_version": 1,
+      "session_id": "0239a9fb775a441fb1514029ff9ce577-1"
+    },
+    "publication_observations": {
+      "later_cpu_rename_failures": [
+        {
+          "operation": "cpu_capture_publish_result",
+          "result": -7,
+          "detail": 0,
+          "tick": 421163617
+        },
+        {
+          "operation": "cpu_capture_publish_result",
+          "result": -7,
+          "detail": 0,
+          "tick": 453330572
+        }
+      ],
+      "limitation": "Later diagnostic replacement attempts failed rename and preserved the earlier complete image. This receipt does not claim those later images were published.",
+      "first_cpu_publish_result": 0
+    },
+    "visual_review": {
+      "reviewers": [
+        "root agent",
+        "horizon_memory agent"
+      ],
+      "observed_text": "Timer proof PASS: 3 worker tasks, VFS saved",
+      "scope": "Runtime framebuffer capture viewed after the run, not an independent photograph or desktop screenshot.",
+      "status": "passed",
+      "image_sha256": "be8a8af9b2e200cabfe547ce278c9d8435c335a8b3276dab0dd6717f37357536"
+    },
+    "png": {
+      "sha256": "be8a8af9b2e200cabfe547ce278c9d8435c335a8b3276dab0dd6717f37357536",
+      "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/sessions/0239a9fb775a441fb1514029ff9ce577-1/last-frame.png",
+      "bytes": 9062
+    }
+  },
+  "teardown": {
+    "media_stop": {
+      "sha256": "33464f8ea2a484bee485305689dee13fee5e5318de72827da104c26baafaee6d",
+      "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/sessions/0239a9fb775a441fb1514029ff9ce577-1/media-stop.log",
+      "bytes": 633
+    },
+    "returned_to_launcher": true,
+    "final_trace": [
+      {
+        "phase": "stop_requested",
+        "tick": 421617072
+      },
+      {
+        "phase": "native_activity_stop",
+        "tick": 421782336
+      },
+      {
+        "phase": "java_activity_stop",
+        "tick": 421801401
+      },
+      {
+        "phase": "worker_admission_closed",
+        "tick": 422069606
+      },
+      {
+        "phase": "background_worker_quiesce",
+        "tick": 422110089
+      },
+      {
+        "phase": "media_thread_quiesce",
+        "tick": 422213959
+      },
+      {
+        "phase": "guest_thread_quiesce",
+        "tick": 422336977
+      },
+      {
+        "phase": "native_destructors",
+        "tick": 422381024
+      },
+      {
+        "phase": "media_reset",
+        "tick": 422629495
+      },
+      {
+        "phase": "media_released",
+        "tick": 422691968
+      },
+      {
+        "phase": "activity_dispose",
+        "tick": 422711606
+      },
+      {
+        "phase": "runtime_drop",
+        "tick": 422776056
+      },
+      {
+        "phase": "native_resource_reset",
+        "tick": 423998572
+      },
+      {
+        "phase": "native_reset_guest_threads",
+        "tick": 424023085
+      },
+      {
+        "phase": "native_reset_cxx",
+        "tick": 424051282
+      },
+      {
+        "phase": "native_reset_keys",
+        "tick": 424083440
+      },
+      {
+        "phase": "native_reset_sync",
+        "tick": 424113878
+      },
+      {
+        "phase": "native_reset_locale",
+        "tick": 424137442
+      },
+      {
+        "phase": "native_reset_admitted",
+        "tick": 424170234
+      },
+      {
+        "phase": "native_mapping_release",
+        "tick": 424222081
+      },
+      {
+        "phase": "native_tls_reset",
+        "tick": 424442411
+      },
+      {
+        "phase": "native_resources_released",
+        "tick": 424462275
+      },
+      {
+        "phase": "display_geometry_reset",
+        "tick": 424533244
+      },
+      {
+        "phase": "runtime_closed",
+        "tick": 424590167
+      },
+      {
+        "phase": "launcher_refresh",
+        "tick": 424692324
+      },
+      {
+        "phase": "launcher_framebuffer_open",
+        "tick": 425969652
+      },
+      {
+        "phase": "launcher_ready",
+        "tick": 426484663
+      }
+    ],
+    "phases": {
+      "sha256": "1827d342975cbe3e233a04db7488ad0d886875ad8337af4355d64813a98ac2a6",
+      "path": "local-artifacts/m9/external-runs/0239a9fb775a441fb1514029ff9ce577/sessions/0239a9fb775a441fb1514029ff9ce577-1/teardown.log",
+      "bytes": 1312
+    },
+    "admission": "worker_admission_closed observed before background joins; native_resources_released, runtime_closed and launcher_ready observed in final trace.",
+    "worker_wait_results": [
+      {
+        "operation": "worker_wait_end",
+        "result": 0,
+        "detail": 0,
+        "tick": 422162298
+      }
+    ],
+    "case_phases": [
+      "stop_requested",
+      "native_activity_stop",
+      "java_activity_stop",
+      "worker_admission_closed",
+      "background_worker_quiesce",
+      "media_thread_quiesce",
+      "guest_thread_quiesce",
+      "native_destructors",
+      "media_reset",
+      "media_released",
+      "activity_dispose",
+      "runtime_drop",
+      "native_resource_reset",
+      "native_reset_guest_threads",
+      "native_reset_cxx",
+      "native_reset_keys",
+      "native_reset_sync",
+      "native_reset_locale",
+      "native_reset_admitted",
+      "native_mapping_release",
+      "native_tls_reset",
+      "native_resources_released",
+      "display_geometry_reset",
+      "runtime_closed",
+      "launcher_refresh"
+    ],
+    "sd_original_restore": "restored"
+  },
+  "limitations": [
+    "Only the SDK-built Timer fixture is qualified by this run.",
+    "No external-game first screen or gameplay is proved.",
+    "No physical Switch execution is claimed.",
+    "Date overloads, arbitrary Timer workloads, suspend/resume and long-duration scheduling are outside this execution receipt.",
+    "Raw harness status remains execution_verified_visual_review_required; this separate receipt binds the subsequent visual review to the captured image hash."
+  ],
+  "physical_switch": "not_run",
+  "m9_complete": false
+}

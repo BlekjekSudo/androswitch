@@ -3,7 +3,7 @@ use as_framework::{App, AppOptions, EglConfigBackend, EglConfigs, GlEvent, Graph
 use as_platform::{host::HostPlatform, host_fs::HostFileSystem};
 use rd_vm::{ObjRef, Value, VmExit};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     path::PathBuf,
     rc::Rc,
     sync::atomic::{AtomicU64, Ordering},
@@ -13,8 +13,28 @@ static NEXT: AtomicU64 = AtomicU64::new(0);
 #[derive(Default)]
 struct RecordingEgl {
     calls: RefCell<Vec<(u64, Vec<i32>, usize)>>,
+    rotations: RefCell<Vec<i32>>,
+    reject_rotation: Cell<bool>,
 }
 impl EglConfigBackend for RecordingEgl {
+    fn set_display_rotation(&self, rotation: i32) -> Result<GraphicsCaps, VmExit> {
+        self.rotations.borrow_mut().push(rotation);
+        if self.reject_rotation.get() {
+            return Err(rd_vm::err::vm_error(
+                "DISPLAY_TEST_REJECTED",
+                "provider kept display unchanged",
+            )
+            .into());
+        }
+        Ok(GraphicsCaps {
+            width: if rotation % 2 == 0 { 1280 } else { 720 },
+            height: if rotation % 2 == 0 { 720 } else { 1280 },
+            gles_version: 0x20000,
+            density: 2.,
+            density_dpi: 320,
+            rotation,
+        })
+    }
     fn choose_config(
         &self,
         display: u64,
@@ -85,6 +105,7 @@ fn make(fixture: &str, bind: bool) -> (App, Rc<RecordingEgl>) {
                 gles_version: 0x20000,
                 density: 2.,
                 density_dpi: 320,
+                rotation: 0,
             })
             .unwrap();
         app.android.bind_egl_backend(backend.clone());
@@ -133,6 +154,195 @@ fn initialize_surface(app: &mut App) -> ObjRef {
         )
         .unwrap();
     view
+}
+fn request_orientation(app: &mut App, requested: i32) -> Result<Value, VmExit> {
+    app.vm.invoke_instance(
+        app.android.activity_object().unwrap(),
+        "setRequestedOrientation",
+        "(I)V",
+        &[Value::Int(requested)],
+    )
+}
+fn requested_orientation(app: &mut App) -> i32 {
+    app.vm
+        .invoke_instance(
+            app.android.activity_object().unwrap(),
+            "getRequestedOrientation",
+            "()I",
+            &[],
+        )
+        .unwrap()
+        .as_int()
+        .unwrap()
+}
+fn display(app: &mut App) -> ObjRef {
+    let wm = app
+        .vm
+        .invoke_instance(
+            app.android.activity_object().unwrap(),
+            "getWindowManager",
+            "()Landroid/view/WindowManager;",
+            &[],
+        )
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .unwrap();
+    app.vm
+        .invoke_instance(wm, "getDefaultDisplay", "()Landroid/view/Display;", &[])
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .unwrap()
+}
+#[test]
+#[ignore = "requires scripts/build-glsurface-fixture.ps1"]
+fn negotiated_portrait_updates_real_framework_state_and_active_rotation_fails_closed() {
+    for fixture in ["surface", "renamed"] {
+        let (mut app, backend) = make(fixture, true);
+        app.vm
+            .invoke_static(
+                ACTIVITY,
+                "configureInitialOrientation",
+                "(IZ)V",
+                &[Value::Int(1), Value::Int(0)],
+            )
+            .unwrap();
+        app.launch().unwrap();
+        assert_eq!((app.frame.width, app.frame.height), (360, 640));
+        assert_eq!(app.android.views()[0].bounds, [0, 0, 720, 1280]);
+        assert!(status(&mut app).starts_with("M720:1280:2"));
+        for requested in [-1, 2, 4, 5, 10, 13, 14] {
+            request_orientation(&mut app, requested).unwrap();
+            assert_eq!(requested_orientation(&mut app), requested);
+            assert_eq!(app.android.graphics_caps().unwrap().rotation, 1);
+        }
+        for (requested, rotation) in [
+            (1, 1),
+            (7, 1),
+            (12, 1),
+            (0, 0),
+            (6, 0),
+            (11, 0),
+            (8, 2),
+            (6, 2),
+            (9, 3),
+            (7, 3),
+            (1, 1),
+        ] {
+            request_orientation(&mut app, requested).unwrap();
+            assert_eq!(requested_orientation(&mut app), requested);
+            let d = display(&mut app);
+            assert_eq!(
+                app.vm
+                    .invoke_instance(d, "getRotation", "()I", &[])
+                    .unwrap(),
+                Value::Int(rotation)
+            );
+        }
+        assert_eq!(*backend.rotations.borrow(), [1, 0, 2, 3, 1]);
+        let activity = app.android.activity_object().unwrap();
+        let resources = app
+            .vm
+            .invoke_instance(
+                activity,
+                "getResources",
+                "()Landroid/content/res/Resources;",
+                &[],
+            )
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        let metrics = app
+            .vm
+            .invoke_instance(
+                resources,
+                "getDisplayMetrics",
+                "()Landroid/util/DisplayMetrics;",
+                &[],
+            )
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        for (field, value) in [
+            ("widthPixels", 720),
+            ("heightPixels", 1280),
+            ("densityDpi", 320),
+        ] {
+            assert_eq!(
+                app.vm.heap.get_field(metrics, field).unwrap(),
+                Value::Int(value)
+            );
+        }
+        let config = app
+            .vm
+            .invoke_instance(
+                resources,
+                "getConfiguration",
+                "()Landroid/content/res/Configuration;",
+                &[],
+            )
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        for (field, value) in [
+            ("orientation", 1),
+            ("screenWidthDp", 360),
+            ("screenHeightDp", 640),
+            ("smallestScreenWidthDp", 360),
+        ] {
+            assert_eq!(
+                app.vm.heap.get_field(config, field).unwrap(),
+                Value::Int(value)
+            );
+        }
+        backend.reject_rotation.set(true);
+        assert!(request_orientation(&mut app, 0)
+            .unwrap_err()
+            .to_string()
+            .contains("DISPLAY_TEST_REJECTED"));
+        assert_eq!(requested_orientation(&mut app), 1);
+        assert_eq!(app.android.graphics_caps().unwrap().rotation, 1);
+        backend.reject_rotation.set(false);
+        let view = app.android.gl_requests().unwrap()[0].view;
+        app.android
+            .gl_choose_config(&mut app.vm, view, 0x100)
+            .unwrap();
+        let before = backend.rotations.borrow().len();
+        let error = request_orientation(&mut app, 0).unwrap_err().to_string();
+        assert!(error.contains("DISPLAY_ORIENTATION_UNAVAILABLE"), "{error}");
+        assert_eq!(backend.rotations.borrow().len(), before);
+        assert_eq!(requested_orientation(&mut app), 1);
+        app.android.touch(&mut app.vm, 0, 680., 1200.).unwrap();
+        assert!(status(&mut app).contains("T0:1:680:1200;"));
+    }
+}
+#[test]
+#[ignore = "requires scripts/build-glsurface-fixture.ps1"]
+fn negotiated_portrait_cpu_frame_has_portrait_layout_and_rejects_active_changes() {
+    let (mut app, backend) = make("surface", true);
+    app.vm
+        .invoke_static(
+            ACTIVITY,
+            "configureInitialOrientation",
+            "(IZ)V",
+            &[Value::Int(1), Value::Int(1)],
+        )
+        .unwrap();
+    app.launch().unwrap();
+    assert!(app.android.gl_requests().unwrap().is_empty());
+    assert_eq!((app.frame.width, app.frame.height), (360, 640));
+    assert_eq!(app.android.views()[0].bounds, [0, 0, 360, 640]);
+    assert!(app.frame.pixels.iter().all(|pixel| *pixel == 0xff336699));
+    assert!(request_orientation(&mut app, 0)
+        .unwrap_err()
+        .to_string()
+        .contains("DISPLAY_ORIENTATION_UNAVAILABLE"));
+    assert_eq!(requested_orientation(&mut app), 1);
+    assert_eq!(*backend.rotations.borrow(), [1]);
 }
 #[test]
 #[ignore = "requires scripts/build-glsurface-fixture.ps1"]

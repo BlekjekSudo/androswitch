@@ -1,6 +1,12 @@
-param([string]$OutputRoot='local-artifacts/product-licenses')
+param([string]$OutputRoot='local-artifacts/product-licenses',[string]$GccVersion='')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path -Parent $PSScriptRoot
+if(-not $GccVersion){
+  $buildPath=Join-Path $projectRoot 'target/evidence/product-build.json'
+  $build=if(Test-Path -LiteralPath $buildPath){Get-Content -LiteralPath $buildPath -Raw | ConvertFrom-Json}else{$null}
+  $GccVersion=if($build.c_compiler_version){$build.c_compiler_version}elseif($build.link_backend -eq 'Windows'){'15.2.0'}else{'16.1.0'}
+}
+if($GccVersion -notin @('15.2.0','16.1.0')){throw "No pinned runtime license reference for GCC $GccVersion"}
 $output=if([IO.Path]::IsPathRooted($OutputRoot)){$OutputRoot}else{Join-Path $projectRoot $OutputRoot}
 New-Item -ItemType Directory -Force -Path "$output/platform","$output/cargo","$output/rust","$output/android" | Out-Null
 $sources=@(
@@ -8,10 +14,18 @@ $sources=@(
   @{name='libnx.txt';version='libnx 4.12.0';url='https://raw.githubusercontent.com/switchbrew/libnx/v4.12.0/LICENSE.md';sha256='5b6675f85016009624d29c9222201d3c0fc6a2d5c59253367f27d3e15011cdb2'},
   @{name='nouveau.txt';version='libdrm_nouveau 1.0.1-2; source license reference';url='https://raw.githubusercontent.com/devkitPro/libdrm_nouveau/master/source/nouveau.c';sha256='ece1e4301d7bdc7b8c32a58727ff4c84dbd4d16bfa2bb2203012913b369cb8a1'},
   @{name='newlib.txt';version='newlib 4.6.0; complete notices reference';url='https://raw.githubusercontent.com/mirror/newlib-cygwin/master/COPYING.NEWLIB';sha256='fcfb5ec69b6ab52676dcc4dab7cf4338c8000ef97812dadd35b8592a640a8419'},
-  @{name='gcc-COPYING.RUNTIME';version='GCC 16.1.0 Runtime Library Exception';url='https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-16.1.0/COPYING.RUNTIME';sha256='9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74'},
-  @{name='gcc-COPYING3';version='GCC 16.1.0 GPLv3; see Runtime Library Exception';url='https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-16.1.0/COPYING3';sha256='8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903'}
+  @{name='gcc-COPYING.RUNTIME';version="GCC $GccVersion Runtime Library Exception";url="https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-$GccVersion/COPYING.RUNTIME";sha256='9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74'},
+  @{name='gcc-COPYING3';version="GCC $GccVersion GPLv3; see Runtime Library Exception";url="https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-$GccVersion/COPYING3";sha256='8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903'}
 )
 $inventory=[Collections.Generic.List[object]]::new()
+$charsetFiles=@()
+foreach($name in @('LICENSE','SOURCE.md')){
+  $destination=Join-Path $output "android/charset/$name"
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+  Copy-Item -LiteralPath "$projectRoot/third_party/android-charset/$name" -Destination $destination
+  $charsetFiles+=@{path="android/charset/$name";sha256=(Get-FileHash -LiteralPath $destination).Hash.ToLowerInvariant()}
+}
+$inventory.Add(@{component='Android API 26 ICU 58.2 charset-name recognition data';license='ICU/Unicode; full upstream notices retained';source='https://android.googlesource.com/platform/external/icu/+/android-8.0.0_r1/icu4c/source/data/mappings/convrtrs.txt';files=$charsetFiles})
 Copy-Item "$projectRoot/third_party/SQLite-NOTICE.txt" "$output/platform/SQLite-NOTICE.txt"
 Copy-Item "$projectRoot/third_party/sqlite.lock.json" "$output/platform/sqlite.lock.json"
 $inventory.Add(@{component='SQLite 3.54.1';license='public-domain';source='https://www.sqlite.org/2026/sqlite-amalgamation-3540100.zip';files=@(@{path='platform/SQLite-NOTICE.txt';sha256=(Get-FileHash "$output/platform/SQLite-NOTICE.txt").Hash.ToLowerInvariant()},@{path='platform/sqlite.lock.json';sha256=(Get-FileHash "$output/platform/sqlite.lock.json").Hash.ToLowerInvariant()})})

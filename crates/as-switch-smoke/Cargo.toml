@@ -27,7 +27,7 @@ rd-jni = { path = "../rd-jni", default-features = false }
 [features]
 host-cli = ["as-platform/std"]
 host-native = ["host-cli","as-native/oracle"]
-portable-tests = []
+portable-tests = ["rd-vm/portable-test-support"]
 
 [[bin]]
 name = "as-probe"
@@ -38,3 +38,53 @@ required-features = ["host-cli"]
 name = "portable_core"
 path = "tests/portable_core.rs"
 required-features = ["portable-tests"]
+
+[[test]]
+name = "portable_execution"
+path = "tests/portable_execution.rs"
+required-features = ["portable-tests"]
+
+[[test]]
+name = "portable_enum"
+path = "tests/portable_enum.rs"
+required-features = ["portable-tests"]
+
+[[test]]
+name = "portable_format"
+path = "tests/portable_format.rs"
+required-features = ["portable-tests"]
+
+[[test]]
+name = "portable_class_names"
+path = "tests/portable_class_names.rs"
+required-features = ["portable-tests"]
+
+[[test]]
+name = "portable_encoding"
+path = "tests/portable_encoding.rs"
+required-features = ["portable-tests"]
+
+[[test]]
+name = "portable_atomic"
+path = "tests/portable_atomic.rs"
+required-features = ["portable-tests"]
+
+[[test]]
+name = "portable_monitor"
+path = "tests/portable_monitor.rs"
+required-features = ["portable-tests"]
+
+[[test]]
+name = "portable_throwable"
+path = "tests/portable_throwable.rs"
+required-features = ["portable-tests"]
+
+[[test]]
+name = "jni_constructor"
+path = "tests/jni_constructor.rs"
+required-features = ["portable-tests"]
+
+[[test]]
+name = "jni_method_metadata"
+path = "tests/jni_method_metadata.rs"
+required-features = ["portable-tests", "host-cli"]

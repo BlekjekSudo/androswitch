@@ -1,0 +1,1533 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "scope": "Actual Java UI to native portrait workflow, same NRO/process; fixture GPU publication and cleanup evidence, not external game compatibility.",
+  "receipt": {
+    "sd_original_restore": "restored",
+    "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+    "nro_sha256": "1e84d51d96b3aa6db5ca6382e1d67e14e882706eb44497ce950f248fbead882b",
+    "cases": [
+      {
+        "error": null,
+        "input": {
+          "sha256": "39c568280be3248058da636a80fad2378bca6e6a1496950bdcd273e36bba2d76",
+          "staged_name": "0000-external.apk",
+          "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m5\\fixture\\java-ui.apk",
+          "install_snapshot_step": 3,
+          "bytes": 5950,
+          "index": 0,
+          "expected_session_id": "6c629f624a0143d3a99e8ea05cbd5bee-1"
+        },
+        "teardown_phases": [
+          "stop_requested",
+          "native_activity_stop",
+          "java_activity_stop",
+          "media_thread_quiesce",
+          "guest_thread_quiesce",
+          "native_destructors",
+          "media_reset",
+          "media_released",
+          "activity_dispose",
+          "runtime_drop",
+          "native_resource_reset",
+          "native_tls_reset",
+          "native_resources_released",
+          "display_geometry_reset",
+          "runtime_closed",
+          "launcher_refresh"
+        ],
+        "presented_frames": 607,
+        "snapshots": [
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "222976a3759a0f82",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/ui/MainActivity;",
+                "event": "onCreate",
+                "time_ms": 20417
+              },
+              {
+                "activity": "Lorg/androswitch/ui/MainActivity;",
+                "event": "onStart",
+                "time_ms": 20419
+              },
+              {
+                "activity": "Lorg/androswitch/ui/MainActivity;",
+                "event": "onResume",
+                "time_ms": 20419
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "222976a3759a0f82",
+            "step": 0,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [
+                  5,
+                  6,
+                  7,
+                  8
+                ],
+                "class": "Landroid/widget/LinearLayout;",
+                "click_method": null,
+                "clickable": false,
+                "color": 4279243801,
+                "enabled": true,
+                "height": -1,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 4,
+                "orientation": 1,
+                "text": "",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  40
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": 40,
+                "id": 2130771970,
+                "input_type": null,
+                "listener": null,
+                "object": 5,
+                "orientation": 0,
+                "text": "Count 0 / app 1",
+                "text_color": 4293916154,
+                "text_size": 20.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  40,
+                  640,
+                  48
+                ],
+                "children": [],
+                "class": "Landroid/widget/Button;",
+                "click_method": null,
+                "clickable": true,
+                "color": 4281359497,
+                "enabled": true,
+                "height": 48,
+                "id": 2130771968,
+                "input_type": null,
+                "listener": 3,
+                "object": 6,
+                "orientation": 0,
+                "text": "Add and save",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  88,
+                  640,
+                  48
+                ],
+                "children": [],
+                "class": "Landroid/widget/Button;",
+                "click_method": null,
+                "clickable": true,
+                "color": 4281359497,
+                "enabled": true,
+                "height": 48,
+                "id": 2130771971,
+                "input_type": null,
+                "listener": 3,
+                "object": 7,
+                "orientation": 0,
+                "text": "Open second activity",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  136,
+                  640,
+                  170
+                ],
+                "children": [],
+                "class": "Landroid/view/View;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": 170,
+                "id": 2130771969,
+                "input_type": null,
+                "listener": null,
+                "object": 8,
+                "orientation": 0,
+                "text": "",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "b2287d5d89642add",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/ui/MainActivity;",
+                "event": "onCreate",
+                "time_ms": 20417
+              },
+              {
+                "activity": "Lorg/androswitch/ui/MainActivity;",
+                "event": "onStart",
+                "time_ms": 20419
+              },
+              {
+                "activity": "Lorg/androswitch/ui/MainActivity;",
+                "event": "onResume",
+                "time_ms": 20419
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "b2287d5d89642add",
+            "step": 1,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [
+                  5,
+                  6,
+                  7,
+                  8
+                ],
+                "class": "Landroid/widget/LinearLayout;",
+                "click_method": null,
+                "clickable": false,
+                "color": 4279243801,
+                "enabled": true,
+                "height": -1,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 4,
+                "orientation": 1,
+                "text": "",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  40
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": 40,
+                "id": 2130771970,
+                "input_type": null,
+                "listener": null,
+                "object": 5,
+                "orientation": 0,
+                "text": "Ready 0 / app 1",
+                "text_color": 4293916154,
+                "text_size": 20.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  40,
+                  640,
+                  48
+                ],
+                "children": [],
+                "class": "Landroid/widget/Button;",
+                "click_method": null,
+                "clickable": true,
+                "color": 4281359497,
+                "enabled": true,
+                "height": 48,
+                "id": 2130771968,
+                "input_type": null,
+                "listener": 3,
+                "object": 6,
+                "orientation": 0,
+                "text": "Add and save",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  88,
+                  640,
+                  48
+                ],
+                "children": [],
+                "class": "Landroid/widget/Button;",
+                "click_method": null,
+                "clickable": true,
+                "color": 4281359497,
+                "enabled": true,
+                "height": 48,
+                "id": 2130771971,
+                "input_type": null,
+                "listener": 3,
+                "object": 7,
+                "orientation": 0,
+                "text": "Open second activity",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  136,
+                  640,
+                  170
+                ],
+                "children": [],
+                "class": "Landroid/view/View;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": 170,
+                "id": 2130771969,
+                "input_type": null,
+                "listener": null,
+                "object": 8,
+                "orientation": 0,
+                "text": "",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "b2287d5d89642add",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/ui/MainActivity;",
+                "event": "onCreate",
+                "time_ms": 20417
+              },
+              {
+                "activity": "Lorg/androswitch/ui/MainActivity;",
+                "event": "onStart",
+                "time_ms": 20419
+              },
+              {
+                "activity": "Lorg/androswitch/ui/MainActivity;",
+                "event": "onResume",
+                "time_ms": 20419
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "b2287d5d89642add",
+            "step": 2,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [
+                  5,
+                  6,
+                  7,
+                  8
+                ],
+                "class": "Landroid/widget/LinearLayout;",
+                "click_method": null,
+                "clickable": false,
+                "color": 4279243801,
+                "enabled": true,
+                "height": -1,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 4,
+                "orientation": 1,
+                "text": "",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  40
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": 40,
+                "id": 2130771970,
+                "input_type": null,
+                "listener": null,
+                "object": 5,
+                "orientation": 0,
+                "text": "Ready 0 / app 1",
+                "text_color": 4293916154,
+                "text_size": 20.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  40,
+                  640,
+                  48
+                ],
+                "children": [],
+                "class": "Landroid/widget/Button;",
+                "click_method": null,
+                "clickable": true,
+                "color": 4281359497,
+                "enabled": true,
+                "height": 48,
+                "id": 2130771968,
+                "input_type": null,
+                "listener": 3,
+                "object": 6,
+                "orientation": 0,
+                "text": "Add and save",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  88,
+                  640,
+                  48
+                ],
+                "children": [],
+                "class": "Landroid/widget/Button;",
+                "click_method": null,
+                "clickable": true,
+                "color": 4281359497,
+                "enabled": true,
+                "height": 48,
+                "id": 2130771971,
+                "input_type": null,
+                "listener": 3,
+                "object": 7,
+                "orientation": 0,
+                "text": "Open second activity",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  136,
+                  640,
+                  170
+                ],
+                "children": [],
+                "class": "Landroid/view/View;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": 170,
+                "id": 2130771969,
+                "input_type": null,
+                "listener": null,
+                "object": 8,
+                "orientation": 0,
+                "text": "",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "b2287d5d89642add",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/ui/MainActivity;",
+                "event": "onCreate",
+                "time_ms": 20417
+              },
+              {
+                "activity": "Lorg/androswitch/ui/MainActivity;",
+                "event": "onStart",
+                "time_ms": 20419
+              },
+              {
+                "activity": "Lorg/androswitch/ui/MainActivity;",
+                "event": "onResume",
+                "time_ms": 20419
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "b2287d5d89642add",
+            "step": 3,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [
+                  5,
+                  6,
+                  7,
+                  8
+                ],
+                "class": "Landroid/widget/LinearLayout;",
+                "click_method": null,
+                "clickable": false,
+                "color": 4279243801,
+                "enabled": true,
+                "height": -1,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 4,
+                "orientation": 1,
+                "text": "",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  40
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": 40,
+                "id": 2130771970,
+                "input_type": null,
+                "listener": null,
+                "object": 5,
+                "orientation": 0,
+                "text": "Ready 0 / app 1",
+                "text_color": 4293916154,
+                "text_size": 20.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  40,
+                  640,
+                  48
+                ],
+                "children": [],
+                "class": "Landroid/widget/Button;",
+                "click_method": null,
+                "clickable": true,
+                "color": 4281359497,
+                "enabled": true,
+                "height": 48,
+                "id": 2130771968,
+                "input_type": null,
+                "listener": 3,
+                "object": 6,
+                "orientation": 0,
+                "text": "Add and save",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  88,
+                  640,
+                  48
+                ],
+                "children": [],
+                "class": "Landroid/widget/Button;",
+                "click_method": null,
+                "clickable": true,
+                "color": 4281359497,
+                "enabled": true,
+                "height": 48,
+                "id": 2130771971,
+                "input_type": null,
+                "listener": 3,
+                "object": 7,
+                "orientation": 0,
+                "text": "Open second activity",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              },
+              {
+                "bounds": [
+                  0,
+                  136,
+                  640,
+                  170
+                ],
+                "children": [],
+                "class": "Landroid/view/View;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": 170,
+                "id": 2130771969,
+                "input_type": null,
+                "listener": null,
+                "object": 8,
+                "orientation": 0,
+                "text": "",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -1
+              }
+            ]
+          }
+        ],
+        "installed_identity_matches": true,
+        "captures": [],
+        "returned_to_launcher": true,
+        "first_screen": "not_visually_verified",
+        "runtime_status": "passed_execution",
+        "status": "execution_observed_render_unconfirmed"
+      },
+      {
+        "error": null,
+        "input": {
+          "sha256": "827a428a41f57a2f1f1da61f7ecdfa587e85a7268f58cf0db2fef105ba58a19f",
+          "staged_name": "0001-external.apk",
+          "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\portrait-fixture\\portrait-proof.apk",
+          "install_snapshot_step": 8,
+          "bytes": 6431,
+          "index": 1,
+          "expected_session_id": "6c629f624a0143d3a99e8ea05cbd5bee-2"
+        },
+        "teardown_phases": [
+          "stop_requested",
+          "native_activity_stop",
+          "java_activity_stop",
+          "media_thread_quiesce",
+          "glsurface_join",
+          "egl_wait_gpu",
+          "egl_unbind",
+          "egl_destroy_context",
+          "egl_destroy_surface",
+          "egl_terminate",
+          "egl_terminated",
+          "guest_thread_quiesce",
+          "native_destructors",
+          "media_reset",
+          "media_released",
+          "activity_dispose",
+          "runtime_drop",
+          "native_mapping_release",
+          "native_resource_reset",
+          "native_mapping_release",
+          "native_tls_reset",
+          "native_resources_released",
+          "display_geometry_reset",
+          "runtime_closed",
+          "launcher_refresh"
+        ],
+        "presented_frames": 860,
+        "snapshots": [
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "abbbfa39819d0f25",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+                "event": "onCreate",
+                "time_ms": 53969
+              },
+              {
+                "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+                "event": "onStart",
+                "time_ms": 53969
+              },
+              {
+                "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+                "event": "onResume",
+                "time_ms": 53973
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "0000000000000000",
+            "step": 0,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  720,
+                  1280
+                ],
+                "children": [],
+                "class": "Landroid/opengl/GLSurfaceView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 7,
+                "orientation": 0,
+                "text": "",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "abbbfa39819d0f25",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+                "event": "onCreate",
+                "time_ms": 53969
+              },
+              {
+                "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+                "event": "onStart",
+                "time_ms": 53969
+              },
+              {
+                "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+                "event": "onResume",
+                "time_ms": 53973
+              }
+            ],
+            "native_frames": 860,
+            "presented_hash": "000000000000035c",
+            "step": 1,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  720,
+                  1280
+                ],
+                "children": [],
+                "class": "Landroid/opengl/GLSurfaceView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 7,
+                "orientation": 0,
+                "text": "",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "abbbfa39819d0f25",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+                "event": "onCreate",
+                "time_ms": 53969
+              },
+              {
+                "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+                "event": "onStart",
+                "time_ms": 53969
+              },
+              {
+                "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+                "event": "onResume",
+                "time_ms": 53973
+              }
+            ],
+            "native_frames": 860,
+            "presented_hash": "000000000000035c",
+            "step": 2,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  720,
+                  1280
+                ],
+                "children": [],
+                "class": "Landroid/opengl/GLSurfaceView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 7,
+                "orientation": 0,
+                "text": "",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "abbbfa39819d0f25",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+                "event": "onCreate",
+                "time_ms": 53969
+              },
+              {
+                "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+                "event": "onStart",
+                "time_ms": 53969
+              },
+              {
+                "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+                "event": "onResume",
+                "time_ms": 53973
+              }
+            ],
+            "native_frames": 860,
+            "presented_hash": "000000000000035c",
+            "step": 3,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  720,
+                  1280
+                ],
+                "children": [],
+                "class": "Landroid/opengl/GLSurfaceView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 7,
+                "orientation": 0,
+                "text": "",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          }
+        ],
+        "installed_identity_matches": true,
+        "captures": [
+          {
+            "sha256": "fd796df04cdefe468ecf02310926c77895bec59a05917453655732bb9bff49e4",
+            "width": 1280,
+            "recognizable_app_screen": "requires_visual_review",
+            "sampled_nonuniform": true,
+            "valid_ppm": true,
+            "height": 720,
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\6c629f624a0143d3a99e8ea05cbd5bee\\sessions\\6c629f624a0143d3a99e8ea05cbd5bee-2\\gles-frame-2.ppm"
+          },
+          {
+            "sha256": "fa050cfec23c1bda86a60cf9e713e6cbd2e004610c53a788f5219b0dd2acb9a0",
+            "width": 1280,
+            "recognizable_app_screen": "requires_visual_review",
+            "sampled_nonuniform": true,
+            "valid_ppm": true,
+            "height": 720,
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\6c629f624a0143d3a99e8ea05cbd5bee\\sessions\\6c629f624a0143d3a99e8ea05cbd5bee-2\\gles-frame-30.ppm"
+          }
+        ],
+        "returned_to_launcher": true,
+        "first_screen": "not_visually_verified",
+        "runtime_status": "passed_execution",
+        "status": "execution_verified_visual_review_required"
+      }
+    ],
+    "latest_session_report": {
+      "package": "org.fixture.portraitproof",
+      "physical_device": "unclassified",
+      "presented_frames": 860,
+      "revision": 1,
+      "schema_version": 1,
+      "session_id": "6c629f624a0143d3a99e8ea05cbd5bee-2",
+      "snapshots": [
+        {
+          "audio_frames": 0,
+          "finished": false,
+          "frame_hash": "abbbfa39819d0f25",
+          "lifecycle": [
+            {
+              "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+              "event": "onCreate",
+              "time_ms": 53969
+            },
+            {
+              "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+              "event": "onStart",
+              "time_ms": 53969
+            },
+            {
+              "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+              "event": "onResume",
+              "time_ms": 53973
+            }
+          ],
+          "native_frames": 0,
+          "presented_hash": "0000000000000000",
+          "step": 0,
+          "views": [
+            {
+              "bounds": [
+                0,
+                0,
+                720,
+                1280
+              ],
+              "children": [],
+              "class": "Landroid/opengl/GLSurfaceView;",
+              "click_method": null,
+              "clickable": false,
+              "color": 0,
+              "enabled": true,
+              "height": -2,
+              "id": -1,
+              "input_type": null,
+              "listener": null,
+              "object": 7,
+              "orientation": 0,
+              "text": "",
+              "text_color": 4293916154,
+              "text_size": 18.0,
+              "touch_listener": null,
+              "visible": true,
+              "width": -2
+            }
+          ]
+        },
+        {
+          "audio_frames": 0,
+          "finished": false,
+          "frame_hash": "abbbfa39819d0f25",
+          "lifecycle": [
+            {
+              "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+              "event": "onCreate",
+              "time_ms": 53969
+            },
+            {
+              "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+              "event": "onStart",
+              "time_ms": 53969
+            },
+            {
+              "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+              "event": "onResume",
+              "time_ms": 53973
+            }
+          ],
+          "native_frames": 860,
+          "presented_hash": "000000000000035c",
+          "step": 1,
+          "views": [
+            {
+              "bounds": [
+                0,
+                0,
+                720,
+                1280
+              ],
+              "children": [],
+              "class": "Landroid/opengl/GLSurfaceView;",
+              "click_method": null,
+              "clickable": false,
+              "color": 0,
+              "enabled": true,
+              "height": -2,
+              "id": -1,
+              "input_type": null,
+              "listener": null,
+              "object": 7,
+              "orientation": 0,
+              "text": "",
+              "text_color": 4293916154,
+              "text_size": 18.0,
+              "touch_listener": null,
+              "visible": true,
+              "width": -2
+            }
+          ]
+        },
+        {
+          "audio_frames": 0,
+          "finished": false,
+          "frame_hash": "abbbfa39819d0f25",
+          "lifecycle": [
+            {
+              "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+              "event": "onCreate",
+              "time_ms": 53969
+            },
+            {
+              "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+              "event": "onStart",
+              "time_ms": 53969
+            },
+            {
+              "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+              "event": "onResume",
+              "time_ms": 53973
+            }
+          ],
+          "native_frames": 860,
+          "presented_hash": "000000000000035c",
+          "step": 2,
+          "views": [
+            {
+              "bounds": [
+                0,
+                0,
+                720,
+                1280
+              ],
+              "children": [],
+              "class": "Landroid/opengl/GLSurfaceView;",
+              "click_method": null,
+              "clickable": false,
+              "color": 0,
+              "enabled": true,
+              "height": -2,
+              "id": -1,
+              "input_type": null,
+              "listener": null,
+              "object": 7,
+              "orientation": 0,
+              "text": "",
+              "text_color": 4293916154,
+              "text_size": 18.0,
+              "touch_listener": null,
+              "visible": true,
+              "width": -2
+            }
+          ]
+        },
+        {
+          "audio_frames": 0,
+          "finished": false,
+          "frame_hash": "abbbfa39819d0f25",
+          "lifecycle": [
+            {
+              "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+              "event": "onCreate",
+              "time_ms": 53969
+            },
+            {
+              "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+              "event": "onStart",
+              "time_ms": 53969
+            },
+            {
+              "activity": "Lorg/androswitch/graphics/portrait/PortraitActivity;",
+              "event": "onResume",
+              "time_ms": 53973
+            }
+          ],
+          "native_frames": 860,
+          "presented_hash": "000000000000035c",
+          "step": 3,
+          "views": [
+            {
+              "bounds": [
+                0,
+                0,
+                720,
+                1280
+              ],
+              "children": [],
+              "class": "Landroid/opengl/GLSurfaceView;",
+              "click_method": null,
+              "clickable": false,
+              "color": 0,
+              "enabled": true,
+              "height": -2,
+              "id": -1,
+              "input_type": null,
+              "listener": null,
+              "object": 7,
+              "orientation": 0,
+              "text": "",
+              "text_color": 4293916154,
+              "text_size": 18.0,
+              "touch_listener": null,
+              "visible": true,
+              "width": -2
+            }
+          ]
+        }
+      ],
+      "status": "passed_execution"
+    },
+    "schema_version": 1,
+    "latest_teardown": [
+      {
+        "phase": "stop_requested",
+        "tick": 1613487795
+      },
+      {
+        "phase": "native_activity_stop",
+        "tick": 1613543193
+      },
+      {
+        "phase": "java_activity_stop",
+        "tick": 1613586418
+      },
+      {
+        "phase": "media_thread_quiesce",
+        "tick": 1613644467
+      },
+      {
+        "phase": "glsurface_join",
+        "tick": 1613670685
+      },
+      {
+        "phase": "egl_wait_gpu",
+        "tick": 1613972966
+      },
+      {
+        "phase": "egl_unbind",
+        "tick": 1615407932
+      },
+      {
+        "phase": "egl_destroy_context",
+        "tick": 1615588126
+      },
+      {
+        "phase": "egl_destroy_surface",
+        "tick": 1618064409
+      },
+      {
+        "phase": "egl_terminate",
+        "tick": 1618219165
+      },
+      {
+        "phase": "egl_terminated",
+        "tick": 1628375299
+      },
+      {
+        "phase": "guest_thread_quiesce",
+        "tick": 1628737912
+      },
+      {
+        "phase": "native_destructors",
+        "tick": 1628748823
+      },
+      {
+        "phase": "media_reset",
+        "tick": 1628935614
+      },
+      {
+        "phase": "media_released",
+        "tick": 1628952835
+      },
+      {
+        "phase": "activity_dispose",
+        "tick": 1628967912
+      },
+      {
+        "phase": "runtime_drop",
+        "tick": 1630534458
+      },
+      {
+        "phase": "native_mapping_release",
+        "tick": 1630659077
+      },
+      {
+        "phase": "native_resource_reset",
+        "tick": 1630921962
+      },
+      {
+        "phase": "native_mapping_release",
+        "tick": 1630956393
+      },
+      {
+        "phase": "native_tls_reset",
+        "tick": 1631141533
+      },
+      {
+        "phase": "native_resources_released",
+        "tick": 1631165354
+      },
+      {
+        "phase": "display_geometry_reset",
+        "tick": 1631190360
+      },
+      {
+        "phase": "runtime_closed",
+        "tick": 1631220447
+      },
+      {
+        "phase": "launcher_refresh",
+        "tick": 1632709476
+      },
+      {
+        "phase": "launcher_framebuffer_open",
+        "tick": 1636756081
+      },
+      {
+        "phase": "launcher_ready",
+        "tick": 1637211638
+      },
+      {
+        "phase": "launcher_stable",
+        "tick": 1645706954
+      }
+    ],
+    "execution_attempted": true,
+    "physical_device": "not_run",
+    "inputs": [
+      {
+        "sha256": "39c568280be3248058da636a80fad2378bca6e6a1496950bdcd273e36bba2d76",
+        "staged_name": "0000-external.apk",
+        "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m5\\fixture\\java-ui.apk",
+        "install_snapshot_step": 3,
+        "bytes": 5950,
+        "index": 0,
+        "expected_session_id": "6c629f624a0143d3a99e8ea05cbd5bee-1"
+      },
+      {
+        "sha256": "827a428a41f57a2f1f1da61f7ecdfa587e85a7268f58cf0db2fef105ba58a19f",
+        "staged_name": "0001-external.apk",
+        "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\portrait-fixture\\portrait-proof.apk",
+        "install_snapshot_step": 8,
+        "bytes": 6431,
+        "index": 1,
+        "expected_session_id": "6c629f624a0143d3a99e8ea05cbd5bee-2"
+      }
+    ],
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "latest_media_stop": [
+      {
+        "operation": "gpu_capture_publish_result",
+        "result": 0,
+        "detail": 2,
+        "tick": 1254916575
+      },
+      {
+        "operation": "gpu_capture_publish_result",
+        "result": 0,
+        "detail": 30,
+        "tick": 1294989870
+      },
+      {
+        "operation": "glsurface_wait_begin",
+        "result": 1,
+        "detail": 1146906,
+        "tick": 1613697584
+      },
+      {
+        "operation": "egl_unbind_result",
+        "result": 1,
+        "detail": 1,
+        "tick": 1615538931
+      },
+      {
+        "operation": "egl_destroy_context_result",
+        "result": 1,
+        "detail": 8607690592,
+        "tick": 1618022759
+      },
+      {
+        "operation": "egl_destroy_surface_result",
+        "result": 1,
+        "detail": 8607694608,
+        "tick": 1618144577
+      },
+      {
+        "operation": "egl_terminate_begin",
+        "result": 0,
+        "detail": 8609699712,
+        "tick": 1618253512
+      },
+      {
+        "operation": "egl_terminate_end",
+        "result": 1,
+        "detail": 8609699712,
+        "tick": 1627195630
+      },
+      {
+        "operation": "egl_close_result",
+        "result": 0,
+        "detail": 8609699712,
+        "tick": 1628399625
+      },
+      {
+        "operation": "glsurface_wait_end",
+        "result": 0,
+        "detail": 0,
+        "tick": 1628624663
+      },
+      {
+        "operation": "glsurface_thread_wait_end",
+        "result": 0,
+        "detail": 0,
+        "tick": 1628645896
+      },
+      {
+        "operation": "glsurface_thread_close_end",
+        "result": 0,
+        "detail": 0,
+        "tick": 1628697732
+      },
+      {
+        "operation": "glsurface_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1628714378
+      },
+      {
+        "operation": "opensl_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1628726568
+      },
+      {
+        "operation": "glsurface_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1628891270
+      },
+      {
+        "operation": "opensl_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 1628913373
+      }
+    ],
+    "emulator_path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\ryujinx-cfg-fix\\publish-versioned\\Ryujinx.exe",
+    "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\6c629f624a0143d3a99e8ea05cbd5bee\\androswitch.nro",
+    "completed_sessions": 2,
+    "pid": 241632,
+    "backend": "ryujinx",
+    "commands": 10,
+    "latest_memory_admission": {
+      "allocator_available_after_load": 1600061632,
+      "allocator_available_before_load": 1601024640,
+      "estimated_parser_bytes": 1068122,
+      "package": "org.fixture.portraitproof",
+      "parser_budget_bytes": 268435456,
+      "raw_dex_bytes": 3720,
+      "revision": 1,
+      "schema_version": 1,
+      "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+      "session_id": "6c629f624a0143d3a99e8ea05cbd5bee-2",
+      "status": "vm_ready"
+    },
+    "root_handle_pinned": true,
+    "session_id": "6c629f624a0143d3a99e8ea05cbd5bee",
+    "emulator_version": "1.3.3+e2143d4",
+    "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-6c629f624a0143d3a99e8ea05cbd5bee",
+    "status": "attempted_render_unconfirmed",
+    "observed_sessions": [
+      {
+        "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+        "error": null,
+        "completed_case_verified": false,
+        "session_id": "6c629f624a0143d3a99e8ea05cbd5bee-1",
+        "package": "org.fixture.uiproof",
+        "revision": 1,
+        "runtime_status": "passed_execution",
+        "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\6c629f624a0143d3a99e8ea05cbd5bee\\sessions\\6c629f624a0143d3a99e8ea05cbd5bee-1\\session-report.json"
+      },
+      {
+        "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+        "error": null,
+        "completed_case_verified": false,
+        "session_id": "6c629f624a0143d3a99e8ea05cbd5bee-2",
+        "package": "org.fixture.portraitproof",
+        "revision": 1,
+        "runtime_status": "passed_execution",
+        "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\6c629f624a0143d3a99e8ea05cbd5bee\\sessions\\6c629f624a0143d3a99e8ea05cbd5bee-2\\session-report.json"
+      }
+    ],
+    "emulator_frontend": "headless_sdl2",
+    "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-6c629f624a0143d3a99e8ea05cbd5bee",
+    "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+    "startup_wait_ms": 30000,
+    "visual_review": "required"
+  },
+  "native_guest_proof": {
+    "schema_version": 1,
+    "surface_width": 720,
+    "surface_height": 1280,
+    "callback_width": 720,
+    "callback_height": 1280,
+    "frames": 840,
+    "readback_mask": 15,
+    "touches": 0,
+    "last_action": 0,
+    "touch_x": 0,
+    "touch_y": 0
+  },
+  "proof_sha256": "c58a7c1efeae4652f2d141de5e3dbd605f3574bce7425ccad2b86b379147961e",
+  "raw_evidence": [
+    {
+      "path": "local-artifacts/m9/external-runs/6c629f624a0143d3a99e8ea05cbd5bee/verification.json",
+      "sha256": "1e7007d2262c2c7647a03658613848ab5e0258e535fa46e3de55e8c33b2bb60e"
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/6c629f624a0143d3a99e8ea05cbd5bee/ryujinx.stdout.log",
+      "sha256": "fa909defea8f5b94b3f5f0f16e166eafa1e200915d3ed99f5d903b3702c851bf"
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/6c629f624a0143d3a99e8ea05cbd5bee/ryujinx.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/6c629f624a0143d3a99e8ea05cbd5bee/launcher-test.json",
+      "sha256": "94027e71c1203229e7f2a830888a5e485735c380ba41cf9080cf9296dbd873a1"
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/6c629f624a0143d3a99e8ea05cbd5bee/emulator.json",
+      "sha256": "d60bef35d58f5749769f5d0e26dc36af9d6f6ae7913bb6db04d1a59ac990cc8d"
+    }
+  ],
+  "capture_publication": "Both native GPU PPM files are exactly complete and sampled nonuniform. Java CPU capture was missed; overall attempted_render_unconfirmed is retained.",
+  "visual_review": {
+    "artifact": "local-artifacts/m9/portrait-fixture/atomic-frame-30.png",
+    "sha256": "3f22201a41319dd4c9fed3979951c0d1e8ad66ca824b3980c312921ce730ca5c",
+    "observation": "Viewed converted original PPM: red/blue upper quadrants, green/yellow lower quadrants, vertical white animation bar. This is a transformed framebuffer capture, not an independent compositor screenshot."
+  },
+  "touch": "not_injected; touches=0",
+  "physical_switch": "not_run_for_these_changes",
+  "m9_complete": false
+}

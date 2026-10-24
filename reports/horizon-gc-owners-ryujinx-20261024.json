@@ -1,0 +1,293 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T15:11:40.4885073Z",
+  "status": "native_suspension_gc_lifetime_regression_fixed_on_isolated_emulator",
+  "scope": "Same original SDK/NDK API26 ARM64 APK before and after the general actual-owner VM/Heap fix. Real Horizon workers, JNI machine calls, two local-only Java payloads, forced GC, serial main Handler UI and clean resource return. This is not a claim of unrestricted concurrency, external-game or physical-device compatibility.",
+  "comparison": {
+    "before": {
+      "error": "bodyB iget Payload.value at DEX pc0x11: field read on collected object",
+      "receipt": "reports/horizon-gc-owners-before-ryujinx-20261024.json",
+      "receipt_sha256": "e25d6a9eab33e2f35e41475d376b4f9c6ea9c29d5e88e165ac90767fc0513b31",
+      "status": "failed",
+      "run": "f13b594db1074c339b56108e455b8329",
+      "nro_sha256": "1f2d669925827ac9968464adc2a2050886240211b2d8ceb976e9f7c9c70fb5cd"
+    },
+    "unchanged_apk_sha256": "d8194d04fdd0fc749ab6ab327d4397cbb32944e8665bb00fed54e93719decb59",
+    "unchanged_apk_bytes": 5914,
+    "after": {
+      "run": "c0d1b9c2953348c1ac4e02281fdda497",
+      "nro_sha256": "11391da16ac936815be9a035443b104ff7e06e82a9f6a705397ba780031670a4",
+      "native_proof": "GC_OWNERS_PROOF_PASS",
+      "status": "passed_execution",
+      "error": null
+    }
+  },
+  "run": {
+    "nro_bytes": 9142328,
+    "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-c0d1b9c2953348c1ac4e02281fdda497",
+    "revision": 1,
+    "profile_hash": "not independently preserved at launch for this run; no later mutable configuration snapshot attributed",
+    "emulator_version": "1.3.3+e2143d4",
+    "raw_harness_status": "execution_verified_visual_review_required",
+    "raw_first_screen": "not_visually_verified",
+    "profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "sd_restore": "restored",
+    "nro_hash_independently_rechecked": true,
+    "id": "c0d1b9c2953348c1ac4e02281fdda497",
+    "emulator_path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-bin-9f3cd3d2\\Ryujinx.exe",
+    "nro_sha256": "11391da16ac936815be9a035443b104ff7e06e82a9f6a705397ba780031670a4",
+    "session_id": "c0d1b9c2953348c1ac4e02281fdda497-1",
+    "frontend": "headless_sdl2",
+    "emulator_scope": "Task-local Ryujinx build with separately documented CFG unknown-MRS fix, not an unmodified stock build claim",
+    "raw_case_status": "execution_verified_visual_review_required",
+    "package": "org.fixture.gcownersproof"
+  },
+  "proof": {
+    "native_report": {
+      "schema_version": 1,
+      "status": "GC_OWNERS_PROOF_PASS",
+      "a_result": 101,
+      "b_result": 202,
+      "a_native_thread": 1114138,
+      "b_native_thread": 1146907,
+      "release_after_a_body_return": true,
+      "local_objects_passed_to_jni": false
+    },
+    "image": {
+      "complete_ppm": true,
+      "height": 720,
+      "png_sha256": "baf0e92166e139508fb40a76ebd85016ca046287e2b956b876a1f1dfa10a5cac",
+      "ppm_sha256": "956ce3192555a57980428c719b9a778438a0dab465f0d1cf19dbe0fdbab80aad",
+      "sampled_nonuniform": true,
+      "full_rgb_equality": "Read-only Pillow comparison passed: all921600 RGB pixels in PNG exactly match original PPM, dimensions1280x720",
+      "width": 1280
+    },
+    "software_presented_hash_pairs_match": 5,
+    "native_provenance": "Original VFS bytes copied/hash-compared from this archived run userdata/org.fixture.gcownersproof/files/gc-owners-proof.json into its matching session folder",
+    "protocol": "A and B suspend in native barriers without JNI references to their Payload. A forces GC, checks101 and unwinds bodyA before releaseB. B resumes, forces GC and checks202. Native success additionally requires distinct nonzero pthread_self identities, no cancellation and a successful report close.",
+    "visual_review": "Parent explicitly converted/viewed PNG; independent agent also viewed the full exact text in the saved PNG. Automated raw first_screen remains not_visually_verified and raw harness requires visual review unchanged.",
+    "ui_text": "GC owners PASS: two workers, native suspension, local roots kept",
+    "native_report_raw": "{\"schema_version\":1,\"status\":\"GC_OWNERS_PROOF_PASS\",\"a_result\":101,\"b_result\":202,\"a_native_thread\":1114138,\"b_native_thread\":1146907,\"release_after_a_body_return\":true,\"local_objects_passed_to_jni\":false}",
+    "snapshots": 5,
+    "presented_frames": 271,
+    "native_report_sha256": "6a72b5290dacda7dfa55854f1380c886227a452896858eec31d86ae02ec3ab16"
+  },
+  "terminal": {
+    "returned_to_launcher": true,
+    "final_source": "emulator.json.sessions[0], preserved with source hash in completed-session.from-emulator.json; original captured running session-report.json left unchanged",
+    "final_session_report": "passed_execution",
+    "identity_matches": true,
+    "teardown": [
+      {
+        "phase": "stop_requested",
+        "tick": 273888082
+      },
+      {
+        "phase": "native_activity_stop",
+        "tick": 273983399
+      },
+      {
+        "phase": "java_activity_stop",
+        "tick": 273999924
+      },
+      {
+        "phase": "worker_admission_closed",
+        "tick": 274243176
+      },
+      {
+        "phase": "background_worker_quiesce",
+        "tick": 274268378
+      },
+      {
+        "phase": "media_thread_quiesce",
+        "tick": 274386399
+      },
+      {
+        "phase": "guest_thread_quiesce",
+        "tick": 274441368
+      },
+      {
+        "phase": "native_destructors",
+        "tick": 274473135
+      },
+      {
+        "phase": "media_reset",
+        "tick": 274680084
+      },
+      {
+        "phase": "media_released",
+        "tick": 274706455
+      },
+      {
+        "phase": "activity_dispose",
+        "tick": 274720348
+      },
+      {
+        "phase": "runtime_drop",
+        "tick": 274770224
+      },
+      {
+        "phase": "native_mapping_release",
+        "tick": 275991294
+      },
+      {
+        "phase": "native_resource_reset",
+        "tick": 276332999
+      },
+      {
+        "phase": "native_reset_guest_threads",
+        "tick": 276354140
+      },
+      {
+        "phase": "native_reset_cxx",
+        "tick": 276385405
+      },
+      {
+        "phase": "native_reset_keys",
+        "tick": 276407783
+      },
+      {
+        "phase": "native_reset_sync",
+        "tick": 276428050
+      },
+      {
+        "phase": "native_reset_locale",
+        "tick": 276444888
+      },
+      {
+        "phase": "native_reset_admitted",
+        "tick": 276468360
+      },
+      {
+        "phase": "native_mapping_release",
+        "tick": 276488108
+      },
+      {
+        "phase": "native_tls_reset",
+        "tick": 276664442
+      },
+      {
+        "phase": "native_resources_released",
+        "tick": 276678001
+      },
+      {
+        "phase": "display_geometry_reset",
+        "tick": 276741912
+      },
+      {
+        "phase": "runtime_closed",
+        "tick": 276792608
+      },
+      {
+        "phase": "launcher_refresh",
+        "tick": 278078557
+      }
+    ],
+    "resource_guard_result": "Successful completion reaches closed admission, background/media/native quiescence, native reset, runtime_closed and launcher_refresh without stop_failed; final per-join returncodes were not preserved in this case running capture log.",
+    "capture_time_session_report": "running",
+    "final_error": null
+  },
+  "host_basis": {
+    "portable_core_asserted": true,
+    "sha256": "1097733587a570da5bff55ea16947267502b520c31dc789e50abe66aa696a1a0",
+    "receipt": "reports/horizon-gc-owners-host-20261024.json",
+    "tests_passed": 6
+  },
+  "evidence": [
+    {
+      "sha256": "b29d2f4c0a00f5bae6ad9fd120d8a62b9cdd1f81c5a56d4e409f8b8c8587af97",
+      "bytes": 35208,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\verification.json"
+    },
+    {
+      "sha256": "b5644b785dbbe796c5923b7bc24a652a76c8c4e7d0d568ec0e0eed6c0977abfd",
+      "bytes": 18488,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\emulator.json"
+    },
+    {
+      "sha256": "29bb729db59e40cee2b5d0fc8c3261c577340b8fcff932828380a6b4706ab7c9",
+      "bytes": 1200,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\launcher-test.json"
+    },
+    {
+      "sha256": "d8194d04fdd0fc749ab6ab327d4397cbb32944e8665bb00fed54e93719decb59",
+      "bytes": 5914,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\gc-owners-proof.apk"
+    },
+    {
+      "sha256": "8921b9d418436ff974e36d04b3f3abea4ad648e23cc72efb21c232282715dd10",
+      "bytes": 171,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-1\\capture-owner.json"
+    },
+    {
+      "sha256": "4ce05a0821688bc112ac1e10636076fe7101717584a5b76ec5b2189f85c6f755",
+      "bytes": 10510,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-1\\completed-session.from-emulator.json"
+    },
+    {
+      "sha256": "6a72b5290dacda7dfa55854f1380c886227a452896858eec31d86ae02ec3ab16",
+      "bytes": 205,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-1\\gc-owners-proof.json"
+    },
+    {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-1\\jni-failures.log"
+    },
+    {
+      "sha256": "baf0e92166e139508fb40a76ebd85016ca046287e2b956b876a1f1dfa10a5cac",
+      "bytes": 9496,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-1\\last-frame.png"
+    },
+    {
+      "sha256": "956ce3192555a57980428c719b9a778438a0dab465f0d1cf19dbe0fdbab80aad",
+      "bytes": 2764816,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-1\\last-frame.ppm"
+    },
+    {
+      "sha256": "5f8204424dd1268cb1f8dddf16768ada6a770caa73f591c106551cddd3091f6d",
+      "bytes": 82,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-1\\media-stop.log"
+    },
+    {
+      "sha256": "368bb2dc714ddd11ffa633b0563809512e6ea28ac772642c6ab5ce726824816c",
+      "bytes": 496,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-1\\memory-admission.json"
+    },
+    {
+      "sha256": "a93ada9a374b1f3ab01a7d0b40d99310decaeee527ff808effeb26dc49ca0c3d",
+      "bytes": 3662,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-1\\memory.log"
+    },
+    {
+      "sha256": "24875ee0f808aed41b7a5d8276705bdb70b8b863c0d9d05d48ee07846077aeee",
+      "bytes": 800,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-1\\native-calls.log"
+    },
+    {
+      "sha256": "8c28349fff6e64e63e78cfa127ba5184730cae66414b70c66fe130109745b90e",
+      "bytes": 384,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-1\\native-compatibility.json"
+    },
+    {
+      "sha256": "6778e9ce81e9a207accfe35f4553ba481069e4a3a82239a26ead382623b6d227",
+      "bytes": 87,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-1\\native-modules.log"
+    },
+    {
+      "sha256": "674e5b1f58b582bceb339ae101c206b2b9c216985d86d2b756099617a779a554",
+      "bytes": 169,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-1\\session-report.json"
+    }
+  ],
+  "upstream": "RustyDroid fork at 6388281f66d254c8e01a0fdc7a5a9a30239bc762; proper RustyDroid/contributor attribution retained",
+  "physical_device": "not_run_for_this_corrected_source_and_NRO",
+  "limitations": [
+    "This run also contains a later Bitmap SDK case. Final global media/teardown logs belong to that later case and were not attributed to GC. GC final state comes from the matching embedded launcher session.",
+    "The captured per-session media-stop.log contains only the successful CPU capture event; individual final join returncodes are not independently recorded there.",
+    "The protocol markers in native JSON reflect the source-enforced barrier/caller ordering, not an intrusive VM scheduling trace. Distinct thread tokens and payload results are runtime observations.",
+    "Host reclamation/bounds tests and this actual two-worker ARM64 lifetime proof have separate scopes; neither certifies arbitrary Java concurrency or memory leak absence on device.",
+    "Mekorama/Candy Crush application first screens and physical Switch behavior require their own evidence."
+  ]
+}

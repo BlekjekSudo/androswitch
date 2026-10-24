@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "scope": "First actual portrait NRO execution; rendering succeeds but cleanup fails. Intermediate uncommitted build, not a release pass.",
+  "nro_sha256": "43f319fb156fe020cd79d05c8645e08fb6aa72d0ad44dde2892c2b558259ce47",
+  "emulator": {
+    "version": "1.3.3+e2143d4",
+    "sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0"
+  },
+  "fixture": {
+    "sources": [
+      {
+        "sha256": "e9b862affa8f5b1627c9ba4b82bfd2389700f8571a852e893a003d0273fe3552",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\portrait\\java\\org\\androswitch\\graphics\\portrait\\PortraitActivity.java"
+      },
+      {
+        "sha256": "f0dc8146f927a16d6848f88f201897aab7d9d83f517b7a74d2110a6728c9c6cc",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\portrait\\native\\portrait.c"
+      },
+      {
+        "sha256": "cde5b4e94646f123cde09afc7c9469bb697e71be378a4a7f577f59f3bd97c2ef",
+        "file": "D:\\Dev\\Switch\\AndroSwitch\\scripts\\build-portrait-fixture.ps1"
+      }
+    ],
+    "api": 26,
+    "build_tools": "35.0.0",
+    "artifacts": [
+      {
+        "sha256": "827a428a41f57a2f1f1da61f7ecdfa587e85a7268f58cf0db2fef105ba58a19f",
+        "file": "portrait-proof.apk"
+      },
+      {
+        "sha256": "067956783bfa67a9a9ef8f8b6d8cda88cfce2bc333ec4f1542acae4825d5c966",
+        "file": "libportraitproof.so"
+      },
+      {
+        "sha256": "33081f56c9cb876f76fc6085c1282fb2b3ec3a869e16a0cf06699e44ed9ac330",
+        "file": "classes.dex"
+      }
+    ],
+    "proof": "Requires real EGL context/surface720x1280 matching Java callbacks, four GPU readbacks, animated frames, logical touch and persistent report. No host execution claim.",
+    "schema_version": 1,
+    "ndk": "28.2.13676358"
+  },
+  "execution": {
+    "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\5e2087ff824f423f848553c42ac97f9a\\androswitch.nro",
+    "sd_backup": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-external-backup-5e2087ff824f423f848553c42ac97f9a",
+    "cases": [],
+    "commands": 5,
+    "emulator_path": "D:\\Dev\\Switch\\RyujinX\\Ryujinx.exe",
+    "emulator_version": "1.3.3+e2143d4",
+    "latest_teardown": [
+      {
+        "phase": "stop_requested",
+        "tick": 601028555
+      },
+      {
+        "phase": "native_activity_stop",
+        "tick": 601491081
+      },
+      {
+        "phase": "java_activity_stop",
+        "tick": 601614789
+      },
+      {
+        "phase": "media_thread_quiesce",
+        "tick": 602091882
+      },
+      {
+        "phase": "glsurface_join",
+        "tick": 602173958
+      },
+      {
+        "phase": "egl_wait_gpu",
+        "tick": 614649849
+      },
+      {
+        "phase": "egl_unbind",
+        "tick": 614674091
+      },
+      {
+        "phase": "egl_destroy_context",
+        "tick": 614733807
+      },
+      {
+        "phase": "egl_destroy_surface",
+        "tick": 616299488
+      },
+      {
+        "phase": "egl_terminate",
+        "tick": 616423430
+      },
+      {
+        "phase": "stop_failed",
+        "tick": 642985703
+      }
+    ],
+    "error": "No fresh completed launcher report before the timeout.",
+    "status": "attempted_failed",
+    "pid": 242660,
+    "backend": "ryujinx",
+    "emulator_sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0",
+    "nro_sha256": "43f319fb156fe020cd79d05c8645e08fb6aa72d0ad44dde2892c2b558259ce47",
+    "physical_device": "not_run",
+    "session_id": "5e2087ff824f423f848553c42ac97f9a",
+    "latest_memory_admission": {
+      "allocator_available_after_load": 1600187504,
+      "allocator_available_before_load": 1601150336,
+      "estimated_parser_bytes": 1068122,
+      "package": "org.fixture.portraitproof",
+      "parser_budget_bytes": 268435456,
+      "raw_dex_bytes": 3720,
+      "revision": 1,
+      "schema_version": 1,
+      "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+      "session_id": "5e2087ff824f423f848553c42ac97f9a-1",
+      "status": "vm_ready"
+    },
+    "schema_version": 1,
+    "sd_original_restore": "restored",
+    "root_alive_without_cim_match": true,
+    "root_handle_pinned": true,
+    "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+    "sd_result": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-external-result-5e2087ff824f423f848553c42ac97f9a",
+    "ryujinx_profile": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx",
+    "latest_session_report": {
+      "error": "MEDIA_CALLBACK_NOT_QUIESCENT: reopen homebrew",
+      "identity_status": "known",
+      "package": "org.fixture.portraitproof",
+      "revision": 1,
+      "schema_version": 1,
+      "session_id": "5e2087ff824f423f848553c42ac97f9a-1",
+      "status": "failed"
+    },
+    "visual_review": "not_run",
+    "inputs": [
+      {
+        "sha256": "827a428a41f57a2f1f1da61f7ecdfa587e85a7268f58cf0db2fef105ba58a19f",
+        "index": 0,
+        "staged_name": "0000-external.apk",
+        "install_snapshot_step": 3,
+        "bytes": 6431,
+        "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\portrait-fixture\\portrait-proof.apk",
+        "expected_session_id": "5e2087ff824f423f848553c42ac97f9a-1"
+      }
+    ],
+    "execution_attempted": true,
+    "startup_wait_ms": 10000
+  },
+  "native_gpu_observation": {
+    "schema_version": 1,
+    "surface_width": 720,
+    "surface_height": 1280,
+    "callback_width": 720,
+    "callback_height": 1280,
+    "frames": 30,
+    "readback_mask": 15,
+    "touches": 0,
+    "last_action": 0,
+    "touch_x": 0,
+    "touch_y": 0
+  },
+  "native_proof": {
+    "path": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-external-result-5e2087ff824f423f848553c42ac97f9a\\userdata\\org.fixture.portraitproof\\files\\portrait-proof.json",
+    "sha256": "dcbe3551793d07eae068297115a4c77bbe975e5190d7e47e3566286cf25b091f"
+  },
+  "freshness": "Proof and frames were generated inside the harness's freshly created SD stage, bound to the exact fixture install and session in the receipt. The native proof JSON itself does not embed a session ID.",
+  "frames": [
+    {
+      "path": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-external-result-5e2087ff824f423f848553c42ac97f9a\\logs\\gles-frame-2.ppm",
+      "sha256": "fd796df04cdefe468ecf02310926c77895bec59a05917453655732bb9bff49e4"
+    },
+    {
+      "path": "C:\\Users\\Administrator\\AppData\\Roaming\\Ryujinx\\sdcard\\switch\\androswitch-external-result-5e2087ff824f423f848553c42ac97f9a\\logs\\gles-frame-30.ppm",
+      "sha256": "fa050cfec23c1bda86a60cf9e713e6cbd2e004610c53a788f5219b0dd2acb9a0"
+    }
+  ],
+  "visual_review": "Frame30 inspected: four full quadrants red/blue above green/yellow and a white animation bar, rotated into the physical1280x720 output. This is an original test fixture, not a game screen.",
+  "touch": "not exercised by this emulator request; zero touches in native proof. Inverse transform is separately covered by host geometry tests.",
+  "cleanup": "failed MEDIA_CALLBACK_NOT_QUIESCENT; no launcher return claimed. Worker reaches egl_terminate without a completed join in this build's deadline.",
+  "raw_evidence": [
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\5e2087ff824f423f848553c42ac97f9a\\verification.json",
+      "sha256": "9f31841b19d6c826db5d6923930a12abac6e3a86f69080d243b699ac607a48d0"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\5e2087ff824f423f848553c42ac97f9a\\launcher-test.json",
+      "sha256": "9709920ad63c173bccc903d6c4ffd62cb05c67b685a69f3aecea343c14518622"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\5e2087ff824f423f848553c42ac97f9a\\ryujinx.stdout.log",
+      "sha256": "4bbd32a7d7ed449d22381c80af347757a736efa813801bc798778d8e66ab2099"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\5e2087ff824f423f848553c42ac97f9a\\ryujinx.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "host_framework": {
+    "command": "cargo test -p as-framework --features host --test glsurface --locked -- --include-ignored",
+    "passed": 5,
+    "failed": 0,
+    "ignored": 0,
+    "log": {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\evidence\\m9-portrait-framework-focused.log",
+      "sha256": "e629918d4346b9e27d05c0d59a9dcf6f61f9e6895fbc5eb1658bc6d78f6f9c2c"
+    }
+  },
+  "physical_switch": "not_run_for_this_change",
+  "external_game_first_screen": "not_reached",
+  "m9_complete": false
+}

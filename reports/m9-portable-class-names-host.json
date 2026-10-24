@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "implementation": "implemented and host verified; corrected device execution pending",
+  "scope": "Portable Class.getSimpleName using actual DEX system nesting annotations",
+  "date": "2026-10-24",
+  "tests": [
+    "simple_names_match_23_jvm_cases_and_survive_gc",
+    "names_follow_actual_annotations_and_malformed_metadata_is_an_error",
+    "malformed_inner_annotation_is_not_silently_replaced_with_a_binary_guess"
+  ],
+  "fixture_build": {
+    "schema_version": 1,
+    "api": 26,
+    "sources": [
+      {
+        "sha256": "816f00b5dd6acb5275c75abf47f844b72dbb7d2ac2806ce9615c6dd011426539",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\rd-vm\\tests\\fixtures\\portable-class-names\\ClassNamesFixture.java"
+      },
+      {
+        "sha256": "4072651b5fcc3ef825b0d7912e8a2c4068f076ac16c77dee7b52f92479b2c71b",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\rd-vm\\tests\\fixtures\\portable-class-names\\build.ps1"
+      }
+    ],
+    "artifacts": [
+      {
+        "sha256": "b67cad56915174d02580101baf0bfffd7e98d4881d1aa12825702f10a45b6e2a",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\portable-class-names-fixture\\dex\\classes.dex"
+      },
+      {
+        "sha256": "a2d92fa769bc365525012d7d2410e58df7f0c9d4e91f8249b01ec653818bb312",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\portable-class-names-fixture\\jvm-oracle.txt"
+      }
+    ]
+  },
+  "verification": {
+    "emulator": "pending new NRO with this source",
+    "host": "passed, 3 tests / 23 JVM oracle cases",
+    "hardware": "not run"
+  },
+  "limitations": [
+    "This adds getSimpleName only; it does not claim complete Class reflection.",
+    "Legacy std intrinsic behavior is unchanged and not claimed newly verified by this portable test.",
+    "No first-screen, GPU, Candy Crush, or Mekorama compatibility claim follows from host reflection tests.",
+    "No proprietary application bytes were modified or checked in."
+  ],
+  "source_hashes": [
+    {
+      "sha256": "64319256e22e53d835be5479b638aef4eef3fa06eef347749cb991d13a485c26",
+      "path": "crates/rd-vm/src/classpath.rs"
+    },
+    {
+      "sha256": "3b112ef1f34bdef5a4ca6fced7084260899240793fbc2cc19e3fffda218617eb",
+      "path": "crates/rd-vm/src/portable/classes.rs"
+    },
+    {
+      "sha256": "30aee598c48d9df6371db35e1cca231a8c3ad71bdc21af0f4ed4b9226ffa966b",
+      "path": "crates/rd-vm/src/portable/mod.rs"
+    },
+    {
+      "sha256": "19aff84eee02aed9be59e42f11788043c143049378d8d33cc0549bd9fd5d1028",
+      "path": "crates/rd-vm/src/portable/intrinsics.rs"
+    },
+    {
+      "sha256": "513741b31717407bbfa8df3ae9abdfa4ce28916263f59b7d82f757b3cfd4262d",
+      "path": "crates/as-switch-smoke/Cargo.toml"
+    },
+    {
+      "sha256": "00928613daef5e34f5378d2c81b5446446bc0ea35145f770111e207b73bfa130",
+      "path": "crates/as-switch-smoke/tests/portable_class_names.rs"
+    }
+  ],
+  "contracts": [
+    "Source-level nested/member/local/anonymous names follow dalvik.annotation.InnerClass and EnclosingClass/EnclosingMethod metadata, rather than splitting binary names at dollar characters.",
+    "Anonymous classes have an empty simple name; arrays append [] to their component simple name. Primitive and void descriptors use language names.",
+    "Top-level binary names preserve literal dollar characters.",
+    "Canonical Class objects and VM strings use existing GC roots; tests execute the actual DEX call twice across GC.",
+    "Malformed, duplicate, missing, or mistyped nesting metadata fails with structured errors.",
+    "Unavailable platform nested-class metadata returns API_UNAVAILABLE rather than a guessed name."
+  ],
+  "commands": [
+    {
+      "command": "pwsh -File crates/rd-vm/tests/fixtures/portable-class-names/build.ps1",
+      "result": "Java/JVM oracle and DEX fixture built",
+      "exit_code": 0
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-switch-smoke --features host-cli,portable-tests --test portable_class_names --locked -- --nocapture",
+      "result": "actual portable Engine (PORTABLE_CORE asserted), 23 JVM oracle cases across GC and malformed metadata rejection",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "primary_references": [
+    "https://developer.android.com/reference/java/lang/Class#getSimpleName()",
+    "https://source.android.com/docs/core/runtime/dex-format"
+  ],
+  "portable_core_asserted": true
+}

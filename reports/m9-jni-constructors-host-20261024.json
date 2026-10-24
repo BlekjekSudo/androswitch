@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T15:32:05.0657951Z",
+  "status": "host_contracts_and_cross_compiler_ARM64_ABI_passed_new_NRO_pending",
+  "scope": "General NewObject/NewObjectV/NewObjectA constructor bridge and shared class lookup; no package or application-specific behavior.",
+  "basis": {
+    "runtime": "AndroSwitch history-preserving RustyDroid fork at6388281f66d254c8e01a0fdc7a5a9a30239bc762",
+    "implementation": "Independent implementation of JNI/API and AAPCS64 contracts; no JDK/ART implementation code copied."
+  },
+  "observed_blocker": {
+    "nro_sha256": "11391da16ac936815be9a035443b104ff7e06e82a9f6a705397ba780031670a4",
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "required_api": "JNI slot29 NewObjectV",
+    "prior_observation": "Exact Candy startup stopped on missing slot29 after an earlier optional or required Thread FindClass failure. These logs do not identify the NewObject constructor class/descriptor.",
+    "return": "Both prior application cases returned to launcher with matching installation identity; SD restored.",
+    "raw": [
+      {
+        "path": "local-artifacts/m9/external-runs/53b831f4f0f14c9ab188ace3301f8689/verification.json",
+        "sha256": "0059a9bfac3bf6057e8334624edc94a8d9552741352fa2862518e6cc05c5fc5c"
+      },
+      {
+        "path": "local-artifacts/m9/external-runs/53b831f4f0f14c9ab188ace3301f8689/sessions/53b831f4f0f14c9ab188ace3301f8689-1/session-report.json",
+        "sha256": "f3aaa047594d1de1807d203368493e78beff4172cbf518b4329eb7d0e729574d"
+      },
+      {
+        "path": "local-artifacts/m9/external-runs/53b831f4f0f14c9ab188ace3301f8689/sessions/53b831f4f0f14c9ab188ace3301f8689-1/jni-failures.log",
+        "sha256": "5677f9bb944c240b120191f12165f35af45509dc79320cd137e504f0c8d49c1f"
+      }
+    ]
+  },
+  "primary_sources": [
+    "https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#NewObject",
+    "https://raw.githubusercontent.com/ARM-software/abi-aa/2025Q1/aapcs64/aapcs64.rst"
+  ],
+  "implementation": {
+    "constructor": "All three entry points decode the resolved JNI descriptor, require a matching instance <init>/void signature and exact allocated/declaring class, reject abstract/interface classes, run existing class initialization before allocation, attach shared host state and execute the actual DEX constructor.",
+    "roots": "The real receiver is added to local JNI references synchronously before host attachment/constructor callbacks. Failed construction deletes the temporary receiver reference; a real constructor Throwable becomes the existing pending Java exception and returns NULL.",
+    "varargs": "Compiler va_copy/va_arg handle AAPCS64 save areas/stack and C default promotions. No guessed raw va_list layout is used. AArch64 static assertions check32-byte size and8-byte alignment. A uses exact union members, including narrow integers and float.",
+    "lookup": "FindClass uses the shared DEX/builtin registry plus validated array components and255-dimension bound. Shared Object root and empty Runnable superinterface facts replace the old JNI-only whitelist without creating new implementations of unavailable methods.",
+    "diagnostics": "Failed constructor attempts record bounded declaring class/name/descriptor metadata for subsequent exact-NRO diagnosis.",
+    "bounds": "Existing JNI descriptor argument buffer bounds each native callback to128 parameters; unavailable method/constructor metadata is not synthesized."
+  },
+  "checks": [
+    {
+      "name": "normal_sdk_ndk_and_actual_jvm_jni_oracle",
+      "command": "pwsh -File fixtures/m9/jni-construct/build.ps1",
+      "status": "passed",
+      "oracle_rows": 16,
+      "result": "NewObject/NewObjectV/NewObjectA mixed arguments and constructor exceptions/native catches/reentry run on actual OpenJDK JNI. Four further JVM rows establish initialize-once and first/persistent initialization-failure reference behavior."
+    },
+    {
+      "name": "portable_real_dex_constructor",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p as-switch-smoke --features portable-tests --test jni_constructor -- --test-threads=1",
+      "status": "passed",
+      "tests": 5,
+      "test_seconds": 0.01,
+      "result": "Actual no_std VM DEX constructors, wide/FP/object/array values, nested native-entry model, GC/root release, constructor Throwable, abstract/interface/inherited-constructor/descriptor failures, shared type lookup, initialize-once and poisoned initialization. Native callback transport is explicitly modeled in this host test."
+    },
+    {
+      "name": "actual_cross_compiler_ARM64_CPU_ABI",
+      "command": "python -X utf8 scripts/test-jni-constructor-abi.py",
+      "status": "passed",
+      "cases": 6,
+      "result": "NDK Clang19 caller invokes actual production NewObject/A/V entry points compiled by devkitA64 GCC15.2.0. Real ARM64 instructions cover GP/FP register exhaustion, stack/narrow/promoted/wide/reference arguments and pending-exception refusal; Rust dispatch is modeled.",
+      "receipt": "local-artifacts/m9/jni-constructor-abi/result.json",
+      "receipt_sha256": "c70069f97f97065d7055723c230af9094ecffe8ef8f5946a92f00fc0afdaca70"
+    },
+    {
+      "name": "strict_production_Horizon_C_compile",
+      "status": "passed",
+      "command": "C:/devkitPro/devkitA64/bin/aarch64-none-elf-gcc.exe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -IC:/devkitPro/libnx/include -c platform/switch-smoke/jni.c -o local-artifacts/m9/jni-constructor-abi/jni-strict.o"
+    },
+    {
+      "name": "focused_clippy",
+      "status": "passed",
+      "command": "cargo clippy -p as-switch-smoke --features portable-tests --lib --test jni_constructor -- -D warnings"
+    },
+    {
+      "name": "format_and_diff",
+      "status": "passed",
+      "command": "rustfmt --edition2021 scoped Rust files; git diff --check scoped tracked files"
+    }
+  ],
+  "fixture": {
+    "receipt": "target/jni-constructor-fixture/build-receipt.json",
+    "receipt_sha256": "e9b1d4af5c12d33c1a1312f0b9b71c667a46c62dfc1772ec2dabca649efe25c0",
+    "oracle": {
+      "cases": 16,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\jni-constructor-fixture/jvm-oracle.txt",
+      "sha256": "769e17dc8f0890e9f486809d34e8e6ab04d1ff3019a1816a9730cccc2ff0a5b9"
+    },
+    "artifacts": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\jni-constructor-fixture\\constructor-proof.apk",
+        "sha256": "0a0fe96aec1f9f9c1933c866d5e3926e46988bf68d931d7296a524976d8e6e73"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\jni-constructor-fixture\\renamed.apk",
+        "sha256": "2f4a0d742c3d253272925c9b20104f8309c309749214d64b43e3dad09de4076f"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\jni-constructor-fixture\\libconstructproof.so",
+        "sha256": "b1a955f7cb30c163708fc58f41d5a30cc6c75f17f47b3001503d45bfb54507e2"
+      }
+    ],
+    "proof_apk": "target/jni-constructor-fixture/constructor-proof.apk",
+    "result_path": "/sdcard/Download/androswitch-jni-constructor-proof.txt",
+    "device_proof": "Ordinary SDK Activity invokes all three JNI forms, constructor exceptions/native catches and nested JNI+GC; writes VFS result and visible TextView. It still requires actual new-NRO execution."
+  },
+  "limitations": [
+    "No complete JNI compliance or complete builtin-method metadata registry is claimed. Platform constructors absent from existing GetMethodID metadata remain unavailable.",
+    "Existing GetMethodID class-initialization side effects are retained; the portable constructor helper separately verifies the same initialization engine before allocation.",
+    "CPU ABI oracle, JVM JNI oracle and portable DEX tests are independent scopes; none replaces actual new-NRO emulator or physical-device execution.",
+    "No proprietary APK bytes, source or title-specific branches are included."
+  ],
+  "verification": {
+    "host": "passed_scoped_contracts",
+    "physical_device": "not_run_for_this_source",
+    "emulator": "pending_new_NRO"
+  },
+  "source_sha256": [
+    {
+      "path": "platform/switch-smoke/jni.c",
+      "sha256": "d4b36b2112d19e1aa21c50f9f956181bbd4ee03de6fe6050d337475bf89df3bc"
+    },
+    {
+      "path": "platform/switch-smoke/jni_arguments.h",
+      "sha256": "a7d4759d47a9b2addad90056b1d91804eb8949f9496f601d19ba086de1f9e052"
+    },
+    {
+      "path": "platform/switch-smoke/jni_construct.inc",
+      "sha256": "5b71d68109a2b9eeb6d780364b8b99d365e5915f9417688603467d99e9231289"
+    },
+    {
+      "path": "platform/switch-smoke/Makefile",
+      "sha256": "2a035de47b9308aeb04713163249590f7a3d2b11207cd9e2fbf1bd1a9ae22da2"
+    },
+    {
+      "path": "platform/androswitch/Makefile",
+      "sha256": "c339f159690afea57fc7b858e3fe5494346a2a7ffd0313c809bcf29afeda1efc"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_jni.rs",
+      "sha256": "c8fbf81f00f3329c76aa3c6fd5f79eaa1fffdd8ac21f32365c007df8b21b4fce"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/jni_constructor.rs",
+      "sha256": "4cc1df431f33cd037204d808b505c0491eb3cf6f4ab3cdb6cd1b6787cfd0d43d"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/lib.rs",
+      "sha256": "c4aa150443d9e85d2eee756342c43a33dc4f33c8cdeadee8160fb46f38b666b5"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/jni_constructor.rs",
+      "sha256": "bd1bdf0f483d9bb1d389dd87468e0921dbf6aa7651ff0dfabc522221a037c109"
+    },
+    {
+      "path": "crates/as-switch-smoke/Cargo.toml",
+      "sha256": "f89811662abb3bd1139bb3c20bb7a8f126842e3bf5fad79e6a807f6576f42103"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "sha256": "7b160a30205994a979cfc169c344e49bb969133f24a8d1b624173ff1d090dee2"
+    },
+    {
+      "path": "scripts/test-jni-constructor-abi.py",
+      "sha256": "91cb09e97e0c528a076840a6a5de6b00aa520072a37cb889c08ccc68cec9f340"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/abi_callee.c",
+      "sha256": "273690b4920cdd44376a8104e35d0d391cc7ddc5489744116f86d5a69ef1fa8f"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/abi_caller.c",
+      "sha256": "c75e2973394d2bf1c6818676fb4e4ef07d1ea02656d92bcbff0c30b430be0525"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/build.ps1",
+      "sha256": "f588882dc10847a434e72f8f825bfffc9b28a640219fe84d91d61f0122dee04c"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/java/org/androswitch/contracts/ConstructorActivity.java",
+      "sha256": "94b7f5b03d44bde54ca92a445d1aa42a65482e02e70ec1153e22a6e2c3382302"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/java/org/androswitch/contracts/ConstructorCases.java",
+      "sha256": "26210c0b83cba62bf235cd09c6c5b2cd941cdbf7c91624c1bfdf7ef3187d9121"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/native/construct.c",
+      "sha256": "b8e2fe321a39956f1d964f9fac08545aff2a6b7c07d0e99bbd32e2fa98b6a82a"
+    }
+  ]
+}

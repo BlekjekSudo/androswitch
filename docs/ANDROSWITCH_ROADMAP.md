@@ -14,7 +14,7 @@ Implementation and verification are independent. `pending` is not a pass.
 | M6 | NativeActivity/assets/window/input/threading/EGL/GLES2/PCM audio | supported proof subset implemented | passed shared contracts; Android reference pending | passed native/mixed media corpus | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
 | M7 | Console launcher/verified session teardown; scan/install/launch/return/update/uninstall; one copy-ready folder | implemented for the alpha corpus; failed-startup cleanup added | passed package workflow | console workflow / ten completed sessions; startup and boundary evidence in reports | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
 | M8 | SharedPreferences/native SQLite/reflection/collections/permissions; independent APK integration | bounded shared contracts implemented; wider integration ongoing | contract/JVM/persistence/fault tests; see candidate report | pending for new build | SQLite readable / SharedPreferences working — user reported 2026-10-24; detailed scenario results not recorded |
-| M9 | Offline v0.1 corpus/lifecycle stress/benchmarks/copy-ready package/evidence matrix; independent first-screen gate | general DEX/memory/native/GLSurfaceView startup improvements in progress; release gate incomplete | repeated candidate corpus; both frozen game APKs reach native-backend boundary on host | prepared scenarios; current source not executed | previous candidate tested — user reported 2026-10-24; new implementation not yet tested; full gate incomplete |
+| M9 | Offline v0.1 corpus/lifecycle stress/benchmarks/copy-ready package/evidence matrix; independent first-screen gate | general DEX/memory/native/GLSurfaceView startup improvements in progress; release gate incomplete | repeated candidate corpus plus scoped new API/ABI contracts | shared API improvements advance startup to Class.forName with loader (Mekorama) and Thread.getContextClassLoader (Candy); both release resources and return, neither has a first-screen pass; independent worker/GC/PNG/JNI proofs verified | delivered candidate reaches Java/native startup but both games remain blocked; hardware binary hash unrecorded; full gate incomplete |
 | M10 | DNS/socket/TLS/HTTP(S), Java/native networking and split APKs | planned | pending | pending | pending |
 | M11 | Higher API/GLES3/engine ecosystem; separate ARM32/x86 research | planned | pending | pending | pending |
 | M12 | Physical Switch stability, suspend/resume, handheld/docked, migrations, v1.0 | planned | pending | pending | pending |
@@ -46,9 +46,39 @@ corpus, original AOSP sample, external Vector Pinball evaluation, measurements,
 and a copy-ready candidate. The user now confirms working SQLite and
 SharedPreferences on Switch, with no detailed scenario/binary identity supplied.
 **M9 is not marked complete:** full regression evidence and broader independent
-compatibility remain open. The tested candidate blocked Candy Crush before
-execution at its 32 MiB raw DEX guard. Current source replaces that guard with
-decoded admission accounting and adds shared native/GL startup contracts.
+compatibility remain open. The earlier candidate blocked Candy Crush at its
+32 MiB raw DEX guard. The next hardware logs admit all four DEX files and reach
+native initialization, which rejects unavailable `getauxval`. Mekorama reaches
+enum construction and rejects the missing portable Enum implementation.
+Ryujinx reproduces both original startup failures with clean launcher return.
+Shared Enum, formatter, orientation, property and communication contracts
+advance startup beyond those original failures. A stock Ryujinx translator
+failure on an untaken CPU-register read is reproduced separately; the isolated
+[emulator diagnostic](../reports/m9-cpu-id-emulator-20261024.json) retains a
+runtime fault for an actually executed unsupported instruction. The later
+[corrected-time attempts](../reports/m9-time-fixed-startup-20261024.json) pass
+Mekorama's native time failure and Candy's locale/UTF-8/PRNG/Class blockers.
+The [next exact-NRO attempts](../reports/m9-bundle-atomic-finalization-ryujinx-20261024.json)
+verify the shared Bundle and AtomicBoolean fixes: Mekorama reaches monitor
+operations and Candy reaches Timer. Both complete native cleanup and return to
+the launcher, including Candy's formerly pending current-thread C++ destructors.
+Neither game has a recognizable first screen. Subsequent
+[shared-API attempts](../reports/m9-jni-identifiers-encoding-ryujinx-20261024.json)
+pass monitor/Timer/Executor/resource/Bitmap/TextUtils/JNI constructor blockers,
+then stop at Class.forName with a loader (Mekorama) and
+Thread.getContextClassLoader (Candy). Independent NRO proofs qualify actual
+workers, native-suspended GC roots, PNG pixels and JNI constructor/thread values.
+Those proofs are separate from the still-open game first-screen gate.
+The original portrait fixture now has real 720x1280 buffers, four successful
+GPU color readbacks, complete native frame captures and a clean launcher
+return. The [Java-to-portrait run](../reports/horizon-atomic-capture-ryujinx-20261024.json)
+retains its overall `attempted_render_unconfirmed` status because the Java CPU
+capture was missed; both sessions' execution/cleanup and the native image
+publication are verified separately. A later
+[portrait-to-Java run](../reports/horizon-capture-generation-handoff-ryujinx-20261024.json)
+verifies complete captures for both renderers, generation ownership, manual
+fixture image review and safe return. Physical testing of these new changes is
+still pending.
 The immediate additional M9 gate is a recognizable first screen and safe Plus
 return for both frozen Mekorama and Candy Crush APKs; it is still pending.
 See [independent-app status](M9_EXTERNAL_APPS.md), [hardware feedback](HARDWARE_FEEDBACK.md) and

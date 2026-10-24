@@ -1,0 +1,11 @@
+<resources>
+  <string name="greeting">A real resource value</string>
+  <item type="string" name="greeting_alias">@string/greeting</item>
+  <integer name="answer">42</integer>
+  <integer name="greeting">7</integer>
+  <string name="with.dot">A dotted resource key</string>
+  <bool name="enabled">true</bool>
+  <item type="id" name="anchor"/>
+  <string name="localized">English value</string>
+  <style name="ScopeStyle"><item name="android:textColor">#ff123456</item></style>
+</resources>

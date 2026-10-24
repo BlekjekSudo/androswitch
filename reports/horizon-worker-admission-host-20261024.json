@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "scope": "Durable shared admission barrier for guest/platform callback worker starts; bounded shutdown without late worker creation.",
+  "status": "host_contracts_passed_target_C_compiled_windows",
+  "implementation": {
+    "enter": "Success holds a common Mutex across OS thread creation/start AND owner registry insertion; all success/error/rejection exits release it. Rejection is negative host ECANCELED.",
+    "integration": [
+      "Timer serial worker",
+      "GLSurfaceView renderer",
+      "guest pthread_create with Android errno mapping",
+      "OpenSL player realization with SL_RESULT_PRECONDITIONS_VIOLATED"
+    ],
+    "module": "platform/switch-smoke/worker_admission.c",
+    "error_policy": "Existing callbacks and TLS/global destructors may finish; late starts fail explicitly and cannot revive a worker after a subsystem join.",
+    "shutdown": "as_worker_admission_begin_shutdown waits for earlier starts to finish registration, closes admission and returns before any joins; invoked after Java lifecycle outside VM lease.",
+    "exclusions": [
+      "Runner watchdog does not execute guest callbacks.",
+      "Process-handle-copy receiver is synchronously joined inside its calling operation and does not execute guest callbacks."
+    ],
+    "source_audit": "Both product and Switch-smoke link worker_admission.o. Runtime C stayed frozen during parent device build iteration10.",
+    "reset": "Only successful END of as_native_reset calls as_worker_admission_reset; every early resource-reset failure leaves admission closed."
+  },
+  "host": {
+    "admission_cases": [
+      "A real OS worker has started while threadStart return/owner registration is held; concurrent shutdown cannot return until registration completes.",
+      "Starts after shutdown reject before any additional threadCreate.",
+      "A TLS-destructor attempted worker start is rejected. Joining does not reopen admission.",
+      "Explicit reset after successful joins permits a new complete lifecycle."
+    ],
+    "worker_transport": {
+      "command": "./scripts/test-background-workers.ps1 -OutputDirectory C:/Users/Administrator/.cache/androswitch/worker-admission-check",
+      "cases": 24,
+      "status": "passed",
+      "compile_run_checks": 25,
+      "result": {
+        "bytes": 12604,
+        "path": "C:/Users/Administrator/.cache/androswitch/worker-admission-check/result.json",
+        "sha256": "28a2ee692f7fd25b7d78b6019dbdaa4e4e6c7f7e1cb7ca4fb727b24578ceecae"
+      }
+    },
+    "display": {
+      "status": "passed",
+      "admission": "GLSurface start rejected without create/owned renderer, remains closed after quiescence, normal lifecycle works after explicit reset.",
+      "result": {
+        "bytes": 21272,
+        "path": "C:/Users/Administrator/.cache/androswitch/display-admission-check/result.json",
+        "sha256": "a408b9aad7e0afebe5581a866cc0025cdf7701a16b37f25a40c74b65c6102cbb"
+      },
+      "command": "./scripts/test-horizon-display.ps1 -OutputDirectory C:/Users/Administrator/.cache/androswitch/display-admission-check",
+      "glsurface_worker_cases": 31,
+      "compile_run_checks": 38
+    }
+  },
+  "target_compilation": {
+    "windows": {
+      "objects": [
+        {
+          "bytes": 2280,
+          "path": "C:/Users/Administrator/.cache/androswitch/admission-objects/worker_admission.o",
+          "sha256": "185462720241f62a74aed562417be93f20b9aad5c35c34dc4ac522127e8d63d0"
+        },
+        {
+          "bytes": 46232,
+          "path": "C:/Users/Administrator/.cache/androswitch/admission-objects/native.o",
+          "sha256": "80bb3185e88913da3e1c7b613ed21556c3e6738f418a8d548dc3f56c4aaa0168"
+        },
+        {
+          "bytes": 7792,
+          "path": "C:/Users/Administrator/.cache/androswitch/admission-objects/workers.o",
+          "sha256": "549f933781e3e9cdaa7a97dfa98c0cdd6a19e174a534f115b4f530e051abb106"
+        },
+        {
+          "bytes": 7992,
+          "path": "C:/Users/Administrator/.cache/androswitch/admission-objects/glsurface.o",
+          "sha256": "7b89ec1ff96923bab2c090e2c6927c517d609ff80f73c0ff51d3bd11dbef7623"
+        },
+        {
+          "bytes": 15984,
+          "path": "C:/Users/Administrator/.cache/androswitch/admission-objects/opensl.o",
+          "sha256": "04dd92039eac5b8074c5ccdade7540da6d4bbec7946e8df082cf828581d50c9c"
+        }
+      ],
+      "status": "passed",
+      "flags": "-pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -IC:/devkitPro/libnx/include -IC:/devkitPro/portlibs/switch/include -Iplatform/switch-smoke -Ithird_party/android -fno-strict-aliasing -c",
+      "compiler": "devkitA64 15.2.0"
+    },
+    "wsl": {
+      "attempts": 2,
+      "note": "Both attempts failed before invoking the compiler. No distribution/service/settings changes were made by this subtask.",
+      "error": "An install, uninstall, or conversion is in progress for this distribution.",
+      "status": "not_compiled_environment_unavailable",
+      "error_code": "Wsl/Service/CreateInstance/E_ILLEGAL_STATE_CHANGE"
+    }
+  },
+  "source_snapshots": [
+    {
+      "bytes": 712,
+      "path": "platform/switch-smoke/worker_admission.c",
+      "sha256": "17d056f2387750835dc4ce619dbbe84482472e503f95dfc25a6c848ec4e5850e"
+    },
+    {
+      "bytes": 641,
+      "path": "platform/switch-smoke/worker_admission.h",
+      "sha256": "b7e599afe5369c7d88f8c177448225224d893c928b354b4475efde410baca1e8"
+    },
+    {
+      "bytes": 38460,
+      "path": "platform/switch-smoke/native.c",
+      "sha256": "81fd2b1bee0ff17434b575d953ec9cdd7e8b1763071fe1f65147c034276efd48"
+    },
+    {
+      "bytes": 929,
+      "path": "platform/switch-smoke/native.h",
+      "sha256": "c8291ac1d7403d5bb2b447210bc4e4c8f771d835495ee9c6fe2bba2cce030d4f"
+    },
+    {
+      "bytes": 5336,
+      "path": "platform/switch-smoke/Makefile",
+      "sha256": "4ecf2d672c5c2a13eb7519f5bb54153978d6bcd591ea8537896768020605cecb"
+    },
+    {
+      "bytes": 8457,
+      "path": "platform/androswitch/workers.c",
+      "sha256": "74e175e83a54d015bbb18bd0ed5b44e6dcf7da505032fb61a0334a61b4d836cd"
+    },
+    {
+      "bytes": 7599,
+      "path": "platform/androswitch/glsurface.c",
+      "sha256": "dfdac8d65a4b70d55909d6c4a39759b9d9c5377db17340ba926224c80d38042d"
+    },
+    {
+      "bytes": 17431,
+      "path": "platform/androswitch/opensl.c",
+      "sha256": "2b865a7b32ea4df13cef7adf9f9d682b70a1123456ba18711517cc6269840de8"
+    },
+    {
+      "bytes": 4779,
+      "path": "platform/androswitch/Makefile",
+      "sha256": "923bd0143f12afc79dfad81fc12b11b479e685234b9668d11a64a34dbc1e4a94"
+    },
+    {
+      "bytes": 17837,
+      "path": "platform/androswitch/tests/background_workers.c",
+      "sha256": "ad3d6422aea1065a2997018796947f2336762c97d397a228721c2becfbd5aac2"
+    },
+    {
+      "bytes": 16648,
+      "path": "platform/androswitch/tests/glsurface_worker.c",
+      "sha256": "46edfddd754f1668d9c2ee8402a8dd8d5dd965ee12e80733caa429f6c1c127e8"
+    },
+    {
+      "bytes": 3838,
+      "path": "scripts/test-background-workers.ps1",
+      "sha256": "ad667fa13264c1ff2e0fe1c5b461bad5551ab5cbf0ed6baf67ec6e7d4f71b1f2"
+    },
+    {
+      "bytes": 6104,
+      "path": "scripts/test-horizon-display.ps1",
+      "sha256": "a481568a7375182caa0a23942adf3e08ae66d0d9bad849beaafc295d9bcc3d89"
+    }
+  ],
+  "limitations": [
+    "Host transport tests use real pthreads with fake libnx; no guest DEX/JNI execution.",
+    "OpenSL and guest-pthread gated starts are inspected and strict-target-compiled, not functionally executed by these host tests.",
+    "Early-return reset admission behavior is source-verified, not a host execution of native resource reset.",
+    "Full VM/application lifecycle and actual Horizon cancellation behavior require parent NRO execution receipts."
+  ],
+  "emulator": "not_run_for_this_change_by_subtask",
+  "hardware": "not_run_for_this_change",
+  "m9_complete": false
+}

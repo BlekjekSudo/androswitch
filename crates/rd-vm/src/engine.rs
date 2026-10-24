@@ -76,12 +76,14 @@ pub struct Engine {
     /// M3: estado host do framework (Activity/View/Handler/…)
     #[cfg(feature = "std")]
     pub fw: crate::framework::HostState,
+    #[cfg(feature = "std")]
     depth: usize,
     pub(crate) fuel_used: u64,
     pub(crate) fuel_window_start: u64,
     /// AG-09: cobertura de métodos — chave `(dex_idx << 32) | method_idx`
     /// de cada corpo DEX que chegou a executar neste Engine.
     coverage: HashSet<u64>,
+    #[cfg(feature = "std")]
     pub(crate) frame_labels: Vec<String>,
     /// Cooperative green threads (threads.rs)
     #[cfg(feature = "std")]
@@ -108,6 +110,7 @@ pub struct Engine {
     pub(crate) bignums: HashMap<crate::heap::ObjRef, (i128, i32)>,
     /// dex pc of the instruction the interpreter executed last (diagnostics:
     /// VM errors name the faulting instruction of the innermost frame)
+    #[cfg(feature = "std")]
     pub(crate) last_pc: usize,
     /// view_attach.rs: OnAttachStateChangeListeners per view
     #[cfg(feature = "std")]
@@ -156,7 +159,10 @@ pub struct Engine {
     /// Mark-sweep collector statistics (`gc.rs`).
     pub(crate) gc_stats: crate::gc::GcStats,
     pub(crate) gc_slots_after: usize,
+    #[cfg(feature = "std")]
     pub(crate) gc_frames: Vec<Vec<crate::heap::ObjRef>>,
+    #[cfg(not(feature = "std"))]
+    pub(crate) execution_frames: crate::portable::execution::Frames,
     #[cfg(not(feature = "std"))]
     pub(crate) portable: crate::portable::State,
 }
@@ -200,10 +206,12 @@ impl Engine {
             clinit_failed: HashSet::new(),
             #[cfg(feature = "std")]
             fw: Default::default(),
+            #[cfg(feature = "std")]
             depth: 0,
             fuel_used: 0,
             fuel_window_start: 0,
             coverage: HashSet::new(),
+            #[cfg(feature = "std")]
             frame_labels: Vec::new(),
             #[cfg(feature = "std")]
             threads: Default::default(),
@@ -221,6 +229,7 @@ impl Engine {
             break_iters: HashMap::new(),
             #[cfg(feature = "std")]
             bignums: HashMap::new(),
+            #[cfg(feature = "std")]
             last_pc: 0,
             #[cfg(feature = "std")]
             attach_listeners: HashMap::new(),
@@ -256,7 +265,10 @@ impl Engine {
             content: Default::default(),
             gc_stats: Default::default(),
             gc_slots_after: 0,
+            #[cfg(feature = "std")]
             gc_frames: Vec::new(),
+            #[cfg(not(feature = "std"))]
+            execution_frames: Default::default(),
             #[cfg(not(feature = "std"))]
             portable: Default::default(),
             #[cfg(feature = "jit")]
@@ -317,6 +329,29 @@ impl Engine {
 
     pub fn fuel_used(&self) -> u64 {
         self.fuel_used
+    }
+
+    pub(crate) fn frame_depth(&self) -> usize {
+        #[cfg(feature = "std")]
+        {
+            self.depth
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            self.execution_frames.depth(self.heap.execution_owner())
+        }
+    }
+    pub(crate) fn frame_labels(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &String> + ExactSizeIterator {
+        #[cfg(feature = "std")]
+        {
+            self.frame_labels.iter()
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            self.execution_frames.labels(self.heap.execution_owner())
+        }
     }
 
     /// Ponto de entrada público: invoca um método static e devolve o valor.
@@ -432,7 +467,12 @@ impl Engine {
             })
             .collect::<Result<Vec<_>, VmExit>>()?;
         let class = self.heap.class_of(recv)?.to_string();
-        let Some((dex_idx, def, m)) = self.cp.resolve_method(&class, method, sig) else {
+        let resolved = self.cp.resolve_method(&class, method, sig);
+        #[cfg(not(feature = "std"))]
+        let try_host = !self.cp.has_class_method(&class, method, sig);
+        #[cfg(feature = "std")]
+        let try_host = resolved.is_none();
+        if try_host {
             // Host receiver (String, collections, java.io, android.*): the
             // same host chains the interpreter's invoke uses.
             if let Some(v) = intrinsics::call_instance_intrinsic_mref(
@@ -460,8 +500,9 @@ impl Engine {
             if let Some(v) = crate::view_props::fallback(self, &class, method, sig, recv, &args)? {
                 return Ok(v);
             }
-            return Err(crate::classpath::unresolved_method(&class, method, sig).into());
-        };
+        }
+        let (dex_idx, def, m) =
+            resolved.ok_or_else(|| crate::classpath::unresolved_method(&class, method, sig))?;
         if m.access_flags & ACC_STATIC != 0 {
             return Err(crate::err::vm_error(
                 "INVALID_ARG",
@@ -487,7 +528,45 @@ impl Engine {
         m: &EncodedMethod,
         ins: Vec<Value>,
     ) -> Result<Value, VmExit> {
-        if self.depth >= self.config.max_depth {
+        // ACC_DECLARED_SYNCHRONIZED (0x20000) is only a source declaration
+        // marker in DEX; its non-native body contains explicit monitor ops.
+        // ACC_SYNCHRONIZED (0x20), including native methods, needs VM locking.
+        #[cfg(not(feature = "std"))]
+        let monitor = if m.access_flags & 0x20 != 0 {
+            let object = if m.access_flags & ACC_STATIC != 0 {
+                let owner = self.cp.dexes[dex_idx].type_str(def.class_idx).to_string();
+                self.class_object_for(&owner)?
+            } else {
+                ins.first()
+                    .ok_or_else(|| {
+                        crate::err::vm_error("VM_TYPE_ERROR", "synchronized receiver is missing")
+                    })?
+                    .as_ref()?
+                    .ok_or_else(|| {
+                        Throwable::new("Ljava/lang/NullPointerException;", "synchronized receiver")
+                    })?
+            };
+            self.monitor_enter(object)?;
+            Some(object)
+        } else {
+            None
+        };
+        let result = self.call_body(dex_idx, def, m, ins);
+        #[cfg(not(feature = "std"))]
+        if let Some(object) = monitor {
+            self.monitor_exit(object)?;
+        }
+        result
+    }
+
+    fn call_body(
+        &mut self,
+        dex_idx: usize,
+        def: ClassDef,
+        m: &EncodedMethod,
+        ins: Vec<Value>,
+    ) -> Result<Value, VmExit> {
+        if self.frame_depth() >= self.config.max_depth {
             return Err(crate::err::vm_error(
                 "VM_STACK_OVERFLOW",
                 format!(
@@ -574,23 +653,49 @@ impl Engine {
             }
         }
         let frame_label = self.method_label(dex_idx, m);
+        #[cfg(feature = "std")]
         self.frame_labels.push(frame_label);
-        self.depth += 1;
+        #[cfg(feature = "std")]
+        {
+            self.depth += 1;
+        }
         let scope_depth = self.heap.gc_scope_depth();
-        if self.gc_frames.is_empty() {
+        #[cfg(feature = "std")]
+        let outermost = self.gc_frames.is_empty();
+        #[cfg(not(feature = "std"))]
+        let outermost = self.frame_depth() == 0;
+        let roots = ins
+            .iter()
+            .filter_map(|value| match value {
+                Value::Obj(object) => Some(*object),
+                _ => None,
+            })
+            .collect();
+        #[cfg(feature = "std")]
+        self.gc_frames.push(roots);
+        #[cfg(not(feature = "std"))]
+        let frame = self
+            .execution_frames
+            .enter(self.heap.execution_owner(), frame_label, roots)?;
+        if outermost {
             self.heap.gc_host_enter(true);
         }
         self.heap.gc_guest_enter();
-        self.gc_frames.push(
-            ins.iter()
-                .filter_map(|v| match v {
-                    Value::Obj(r) => Some(*r),
-                    _ => None,
-                })
-                .collect(),
+        // This PC lives on the invocation's Rust stack across native lease
+        // releases, so another real thread cannot replace its error location.
+        let mut frame_pc = 0;
+        let mut ret = interp::exec_frame(
+            self,
+            dex_idx,
+            frame_super.as_deref(),
+            code.clone(),
+            ins,
+            &mut frame_pc,
         );
-        let mut ret = interp::exec_frame(self, dex_idx, frame_super.as_deref(), code.clone(), ins);
+        #[cfg(feature = "std")]
         self.gc_frames.pop();
+        #[cfg(not(feature = "std"))]
+        self.execution_frames.leave(frame);
         self.heap.gc_scope_restore(scope_depth);
         // A guest allocation returned into a Rust host temporary must survive
         // the host's next guest callback, even before it is stored in a table.
@@ -603,8 +708,11 @@ impl Engine {
             }
             _ => {}
         }
-        self.depth -= 1;
-        self.frame_labels.pop();
+        #[cfg(feature = "std")]
+        {
+            self.depth -= 1;
+            self.frame_labels.pop();
+        }
         // Observabilidade opt-in (default off — nenhuma saída existente muda):
         // exceção Java que este frame NÃO tratou recebe a linha "at" do frame
         // ao desempilhar (estilo JVM, innermost primeiro). Erros estruturados
@@ -639,7 +747,10 @@ impl Engine {
                 Err(VmExit::Error(ref mut e)) if e.code != "RD_THREAD_PARK" => {
                     if !e.cause.contains("\n  at ") {
                         // innermost frame: name the faulting instruction
+                        #[cfg(feature = "std")]
                         let pc = self.last_pc;
+                        #[cfg(not(feature = "std"))]
+                        let pc = frame_pc;
                         if let Some((_, insn)) = code.instructions.iter().find(|(a, _)| *a == pc) {
                             let mut d = format!("{insn:?}");
                             d.truncate(160);
@@ -739,6 +850,12 @@ impl Engine {
 
     // ── inicialização de classe + campos estáticos ──────────────────────────
 
+    /// Read-only state for portable adapters which must reject initialization
+    /// dependencies they cannot yet schedule. Being loaded is not initialized.
+    pub fn device_class_is_initialized(&self, class: &str) -> bool {
+        self.clinit_done.contains(class)
+    }
+
     /// Garante que a classe passou por static_values + `<clinit>`.
     /// issue #37 (semântica JLS 12.4.2): falha de `<clinit>` converte para
     /// `ExceptionInInitializerError` no primeiro acesso e vira
@@ -767,6 +884,12 @@ impl Engine {
                 // já está embrulhado em EIIE/NCDFE), propaga o erro ORIGINAL —
                 // duplo-wrap divergia da JVM e mentia na message
                 if let VmExit::Exception(t) = &e {
+                    #[cfg(not(feature = "std"))]
+                    if self.cp.is_subtype(&t.class, "Ljava/lang/Error;") {
+                        // JLS12.4.2 step11: an Error is propagated unchanged;
+                        // only non-Error Java exceptions are wrapped in EIIE.
+                        return Err(e);
+                    }
                     if t.class == "Ljava/lang/ExceptionInInitializerError;"
                         || t.class == "Ljava/lang/NoClassDefFoundError;"
                     {
@@ -928,32 +1051,45 @@ impl Engine {
         if let Some(obj) = t.obj {
             return Ok(obj);
         }
-        let msg = match &t.message {
-            Some(m) => Value::Obj(
-                self.heap
-                    .alloc_string(m.clone())
-                    .map_err(crate::err::oom_throwable)?,
-            ),
-            None => Value::Null,
-        };
-        let obj = self
-            .heap
-            .alloc_instance(t.class.clone(), vec![("message".to_string(), msg)])
-            .map_err(crate::err::oom_throwable)?;
-        Ok(obj)
+        #[cfg(not(feature = "std"))]
+        {
+            crate::portable::throwables::materialize(self, &t.class, t.message.as_deref())
+        }
+        #[cfg(feature = "std")]
+        {
+            let msg = match &t.message {
+                Some(m) => Value::Obj(
+                    self.heap
+                        .alloc_string(m.clone())
+                        .map_err(crate::err::oom_throwable)?,
+                ),
+                None => Value::Null,
+            };
+            let obj = self
+                .heap
+                .alloc_instance(t.class.clone(), vec![("message".to_string(), msg)])
+                .map_err(crate::err::oom_throwable)?;
+            Ok(obj)
+        }
     }
 
     /// Cria um Throwable VM-built (ArithmeticException, NPE, …) com objeto.
     pub(super) fn vm_exception(&mut self, class: &str, message: &str) -> Result<Throwable, VmExit> {
-        let obj = self
-            .heap
-            .alloc_instance(class.to_string(), Vec::new())
-            .map_err(crate::err::oom_throwable)?;
-        let msg_ref = self
-            .heap
-            .alloc_string(message.to_string())
-            .map_err(crate::err::oom_throwable)?;
-        crate::err::put_field_result(self.heap.put_field(obj, "message", Value::Obj(msg_ref)))?;
+        #[cfg(not(feature = "std"))]
+        let obj = crate::portable::throwables::materialize(self, class, Some(message))?;
+        #[cfg(feature = "std")]
+        let obj = {
+            let obj = self
+                .heap
+                .alloc_instance(class.to_string(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            let msg_ref = self
+                .heap
+                .alloc_string(message.to_string())
+                .map_err(crate::err::oom_throwable)?;
+            crate::err::put_field_result(self.heap.put_field(obj, "message", Value::Obj(msg_ref)))?;
+            obj
+        };
         Ok(Throwable {
             class: class.to_string(),
             message: Some(message.to_string()),

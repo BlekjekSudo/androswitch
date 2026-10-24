@@ -8,6 +8,7 @@ import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.FrameLayout;
 import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.egl.EGLDisplay;
@@ -20,14 +21,26 @@ public final class SurfaceActivity extends Activity {
     private static int requestNext;
     private static boolean askThread;
     private static boolean askGl;
+    private static int initialOrientation = Integer.MIN_VALUE;
+    private static boolean softwareMode;
+    public static void configureInitialOrientation(int requested, boolean software) {
+        initialOrientation = requested; softwareMode = software;
+    }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if (initialOrientation != Integer.MIN_VALUE) setRequestedOrientation(initialOrientation);
         DisplayMetrics metrics = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(metrics);
         int version = ((ActivityManager)getSystemService("activity"))
             .getDeviceConfigurationInfo().reqGlEsVersion;
         events += "M" + metrics.widthPixels + ":" + metrics.heightPixels + ":"
             + metrics.density + ":" + version + ";";
+        if (softwareMode) {
+            FrameLayout root = new FrameLayout(this);
+            root.setBackgroundColor(0xff336699);
+            setContentView(root);
+            return;
+        }
         surface = new GLSurfaceView(this);
         surface.setEGLContextClientVersion(2);
         surface.setEGLConfigChooser(new Chooser());

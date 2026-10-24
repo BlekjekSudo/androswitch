@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T14:52:37.0887512Z",
+  "status": "host_resource_identity_contracts_passed_device_execution_pending",
+  "scope": "General four Resources name APIs from actual ARSC ownership/type/key metadata; no manifest/package profile and no per-application constants.",
+  "basis": {
+    "runtime": "AndroSwitch history-preserving RustyDroid fork",
+    "upstream_commit": "6388281f66d254c8e01a0fdc7a5a9a30239bc762",
+    "implementation": "Independent Rust implementation from Android public API and binary format contracts; no Android implementation source copied."
+  },
+  "observed_blocker": {
+    "verification": "local-artifacts/m9/external-runs/12ef7960f946469e826d5826f26129f2/verification.json",
+    "session_report": "local-artifacts/m9/external-runs/12ef7960f946469e826d5826f26129f2/sessions/12ef7960f946469e826d5826f26129f2-2/session-report.json",
+    "session_report_sha256": "e9ea452d78c9780b441b61f7e6d8ff5eab2d8e20a78377bb5b62013c9c15b5f2",
+    "nro_sha256": "1f2d669925827ac9968464adc2a2050886240211b2d8ceb976e9f7c9c70fb5cd",
+    "required_method": "Landroid/content/res/Resources;->getResourcePackageName(I)Ljava/lang/String;",
+    "result": "Prior exact-NRO failure only; new implementation E2E is recorded separately."
+  },
+  "primary_sources": [
+    "https://developer.android.com/reference/android/content/res/Resources",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/97e5130234bcdc1c4a705be4e548302934499bd4/libs/androidfw/include/androidfw/ResourceTypes.h",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/97e5130234bcdc1c4a705be4e548302934499bd4/libs/androidfw/ResourceTypes.cpp",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/97e5130234bcdc1c4a705be4e548302934499bd4/core/res/res/values/public.xml"
+  ],
+  "implementation": {
+    "apis": [
+      "getResourcePackageName(I)String",
+      "getResourceTypeName(I)String",
+      "getResourceEntryName(I)String",
+      "getResourceName(I)String"
+    ],
+    "identity": "Exact owning table package name, type pool and entry key. Alias values are not followed; localized/SDK/density value selection does not alter identity. Conflicting keys/owners are not guessed.",
+    "format": "Resource names have package:type/entry form.",
+    "ids": "Legacy284-byte package headers default typeIdOffset to0; modern headers retain offset metadata. Effective types, package IDs and entry indices are checked rather than truncated. Type/key pools stay within their owning package.",
+    "missing": "Missing/invalid application IDs and structurally invalid framework IDs throw Resources.NotFoundException with RuntimeException hierarchy.",
+    "system": "Explicit verified metadata registry contains android:id/content=0x01020002 only. Unknown nonzero-type package01 IDs fail API_UNAVAILABLE because the full framework table is unavailable; valid unsupported resources are not declared absent."
+  },
+  "checks": [
+    {
+      "name": "sdk_fixture",
+      "command": "pwsh -File fixtures/m9/resource-names/build.ps1",
+      "status": "passed",
+      "result": "Normal SDK Java8/D8 API26 and aapt2 three APKs plus resource dumps. Manifest-only rename preserves original ARSC owner; third variant uses resource package0x80."
+    },
+    {
+      "name": "arsc_resource_identity",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p rd-apk --test arsc_resource_names -- --test-threads=1",
+      "status": "passed",
+      "tests": 5,
+      "result": "Legacy header, offsets0/2/100/254, high package ID, integer overflow, missing/invalid keys, ambiguous fragments, pool bounds."
+    },
+    {
+      "name": "portable_framework_dex",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p as-framework --features host --test resource_names -- --test-threads=1",
+      "status": "passed",
+      "tests": 4,
+      "test_seconds": 7.38,
+      "result": "SDK-generated DEX invokes all four APIs on27 table entries across3 manifests/package IDs;108 name/owner/type comparisons against actual SDK table dumps, aliases/styles/config-only entries, typed exceptions/catches and explicit system subset."
+    },
+    {
+      "name": "format_and_diff",
+      "command": "rustfmt --edition2021 owned/shared Rust paths; git diff --check on scoped tracked files",
+      "status": "passed"
+    },
+    {
+      "name": "broader_regression_and_clippy",
+      "status": "pending_parent_consolidated_checks",
+      "result": "Parent requested Cargo slot release after focused integration; no new claim of parser --lib or Clippy completion."
+    }
+  ],
+  "fixture": {
+    "receipt": "target/resource-names-fixture/build-receipt.json",
+    "receipt_sha256": "90b0b2f3c3225b736b849043e6bd2142b0e2806bb7ff0523b2a676c7d0a8f886",
+    "build_tools": "35.0.0",
+    "api": 26,
+    "apks": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\resource-names-fixture\\resources.apk",
+        "sha256": "2115df59c6c7f054ac689588d4f67d2a72cebdbbbc18127ec5f851a8ff2a8d32"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\resource-names-fixture\\renamed.apk",
+        "sha256": "d45c00ccfa0c57b35d953e281b7f405805f09b2bdf770abce9334763a2f53bbb"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\resource-names-fixture\\high-package.apk",
+        "sha256": "2cda4481bc883543a736f661721ebf565d535e433a47da4e86d75e95271c5ddf"
+      }
+    ],
+    "reference": "Actual aapt2-generated IDs/names/table owners, not a self-generated expected parser format. Android reference-runtime execution has not been run."
+  },
+  "limitations": [
+    "Full framework resource table, overlay/inherited symbol-pool composition and dynamic library resource remapping are unavailable.",
+    "This adds metadata APIs only; it does not make every referenced resource value, Android service or game executable.",
+    "Host portable DEX and parser proofs do not establish Horizon/emulator or physical hardware execution for this new source."
+  ],
+  "verification": {
+    "host": "passed_scoped_contracts",
+    "android_reference": "not_run",
+    "emulator": "pending_new_NRO",
+    "physical_device": "not_run_for_this_source"
+  },
+  "source_snapshot_sha256": [
+    {
+      "path": "crates/rd-apk/src/arsc.rs",
+      "sha256": "5b5a8296b383e1f1cea41f7de1df22fe628c144643bae2c4b7b0d0f4aeefe591"
+    },
+    {
+      "path": "crates/rd-apk/tests/arsc_resource_names.rs",
+      "sha256": "a9ceaacc4ba4602ea9a6558830719f5e9ad484dd498fd217ee795f01fbf8dd6e"
+    },
+    {
+      "path": "crates/as-framework/src/services/resource_names.rs",
+      "sha256": "1dd6be07678b60fe3b127bcc54d4b97df293336fa6df4cca6b4d193639723091"
+    },
+    {
+      "path": "crates/as-framework/src/services/mod.rs",
+      "sha256": "f2d1b4f52b5844b087aff27c98d054ea32b2cf21c39d25768d746589bb4a35c4"
+    },
+    {
+      "path": "crates/as-framework/tests/resource_names.rs",
+      "sha256": "991771abf03fc0c408b11f99f0d0756e9fb476339ab55a5c6df851e2a28b884b"
+    },
+    {
+      "path": "crates/as-framework/Cargo.toml",
+      "sha256": "de2ec878cf46bfc389d06acc98457cc428831c9afc9494db4ab615b7af1c892d"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "sha256": "b4702229338397b619f5115b288e3b4d657b70fa39dc272503bd1209d5eb8d87"
+    },
+    {
+      "path": "fixtures/m9/resource-names/build.ps1",
+      "sha256": "f949c95b13216143f967298124c643d305b097315cbf45f4b38c22fcda4b773c"
+    },
+    {
+      "path": "fixtures/m9/resource-names/README.md",
+      "sha256": "81882ac0b68aeee8d1d33e451e1cb59f753a6bbfe1c7a346456cfa211504e6f3"
+    },
+    {
+      "path": "fixtures/m9/resource-names/java/org/androswitch/contracts/ResourceNamesActivity.java",
+      "sha256": "344696cebbf214b24a07c5e440cf41b12f9230756cd288f6f30b074decfa277f"
+    },
+    {
+      "path": "fixtures/m9/resource-names/res/layout/screen.xml",
+      "sha256": "77f33a030e470d5a692adaaaf854f305833b3c66d6cdeb0ee28ce4e8a6c3d551"
+    },
+    {
+      "path": "fixtures/m9/resource-names/res/values/values.xml",
+      "sha256": "c361133a6029547021e2bb5bdf6456942ef3e5c2c8b131ea7883954c9a9e8255"
+    },
+    {
+      "path": "fixtures/m9/resource-names/res/values-fr/values.xml",
+      "sha256": "1f3f00d67f91d001b00e798de74f97d1f01f396d63f2be167ca2656a94e32875"
+    },
+    {
+      "path": "fixtures/m9/resource-names/res/values-v27/values.xml",
+      "sha256": "99166e247b1be659f3508f21add3fe949b82caba16391c133d0f0a4db269847a"
+    }
+  ]
+}

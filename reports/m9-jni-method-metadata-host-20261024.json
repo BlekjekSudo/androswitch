@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T16:11:09.7938044Z",
+  "status": "host_contracts_passed_new_NRO_pending",
+  "scope": "General JNI implemented-method metadata and real adopted Java Thread identity/lifetime, plus strengthened original SDK/NDK constructor proof; no application-specific behavior.",
+  "basis": {
+    "runtime": "History-preserving RustyDroid fork at 6388281f66d254c8e01a0fdc7a5a9a30239bc762",
+    "implementation": "Independent implementation of public JNI and implemented framework contracts; no JDK/ART implementation code copied."
+  },
+  "observed_blocker": {
+    "run": "f7104a7c595f4a18a158b330f39e2bea",
+    "nro_sha256": "205ce9214d5bde04a36338e8bb692d69eb1a8526b17d9a75eb788eccdf23c3e3",
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "api": "GetStaticMethodID java/lang/Thread.currentThread()Ljava/lang/Thread;",
+    "evidence": "Actual JNI op2 records NoSuchMethodError for the exact descriptor, followed by op25 invalid token0. Earlier Thread FindClass now passes. This is startup diagnostic evidence, not game compatibility.",
+    "prior_results": "All three prior cases returned to launcher with matching installed identity; SD restored. Constructor proof stopped at String.getBytes(String), before its VFS result; encoding is a separately implemented contract.",
+    "raw": [
+      {
+        "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/verification.json",
+        "sha256": "d07cebd5304808a85a7fb565e97e13fa6dd198b491e84c6a04923a1d8cd65310"
+      },
+      {
+        "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-2/jni-failures.log",
+        "sha256": "2d89f365da51a086e88a5eeca34d1a47131dad513cc96da92e9e618aa0ffd168"
+      },
+      {
+        "path": "local-artifacts/m9/external-runs/f7104a7c595f4a18a158b330f39e2bea/sessions/f7104a7c595f4a18a158b330f39e2bea-2/session-report.json",
+        "sha256": "dca17f3772b8645a7b78425185e7f49553f4acfe19e2925ca45ac0d0e6901199"
+      }
+    ]
+  },
+  "primary_sources": [
+    "https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html",
+    "https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/invocation.html",
+    "https://raw.githubusercontent.com/ARM-software/abi-aa/2025Q1/aapcs64/aapcs64.rst"
+  ],
+  "implementation": {
+    "catalog": "FrameworkHost has an explicit default-none method metadata capability. Android advertises only implemented Thread/Executor overloads and kinds. JNI resolves real DEX definitions first, preserves actual declaring owner/static kind/native or abstract barriers, and does not inherit constructors. Lookup never executes a method body.",
+    "execution": "Platform static IDs use the existing normal Engine static intrinsic/FrameworkHost execution path. Registered host constructors use existing initialized allocation/host attachment/constructor execution, with the actual receiver rooted before callbacks.",
+    "thread_identity": "Thread.currentThread lazily adopts each real NativeHost thread identity as a genuine Java Thread. The exact bound application main owner receives main metadata; supplied modified-UTF8 JNI attach names are retained, otherwise a generated name is used. Existing executor worker identity wins, with fail-closed conflicting-owner rejection.",
+    "lifetime": "Active adopted identities are roots. Real detach removes only the active owner mapping and marks the retained Java Thread terminated; external/global references keep observable name/id and isAlive false. Weak metadata is pruned when the object is collected; a reused native owner receives a new Java Thread. Adoption is separate from Timer/Executor callback-owner checks.",
+    "attachment": "Explicit JNI attach validates supported JNI version, bounded4096-byte name and unsupported ThreadGroup before attachment succeeds. Rust registration occurs before C claims attachment success. Already-attached calls remain no-op. Platform runtime detach notifies framework under the existing VM lease after TLS callbacks.",
+    "bounds": "Existing128 Thread object records and128 active named attachment metadata; exact owner0 and conflicting live identity fail closed. Constructor metadata is explicit; unknown classes/overloads receive no arbitrary callable method IDs."
+  },
+  "checks": [
+    {
+      "name": "normal_sdk_ndk_actual_jvm_jni_oracle",
+      "command": "pwsh -File fixtures/m9/jni-construct/build.ps1",
+      "status": "passed",
+      "oracle_rows": 18,
+      "result": "Actual OpenJDK JNI runs mixed constructor arguments, reentry/exceptions/GC, initialize-once and poisoned initialization, main Thread identity and named pthread attach/detach with a retained global reference. The visible SDK Activity now independently asserts actual expected numeric/exception results before writing output."
+    },
+    {
+      "name": "portable_constructor_and_metadata",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p as-switch-smoke --features portable-tests,host-cli --test jni_constructor --test jni_method_metadata -- --test-threads=1",
+      "status": "passed",
+      "constructor_tests": 6,
+      "metadata_tests": 4,
+      "result": "Real no_std DEX and framework dispatch, default-none metadata, actual owner/static-kind/constructor validation, native/abstract DEX precedence, main/named/reused-owner identity, detach/global-root/GC and bounded metadata recovery. Native OS thread transport is modeled."
+    },
+    {
+      "name": "relevant_framework_regressions",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p as-framework --features host --lib --test executors --test timer -- --test-threads=1",
+      "status": "passed",
+      "library_tests": 8,
+      "executor_tests": 10,
+      "timer_tests": 10,
+      "result": "Existing roots, factory reentry, real Java worker identity, owner-separated Handler policy, TLS-before-detach model, FIFO/shutdown, cancellation, timers and SDK VFS/main Handler semantics remain covered."
+    },
+    {
+      "name": "actual_cross_compiler_ARM64_CPU_ABI",
+      "command": "python -X utf8 scripts/test-jni-constructor-abi.py",
+      "status": "passed",
+      "cases": 6,
+      "result": "NDK Clang19 caller to devkitA64 GCC15.2 production NewObject/A/V, GP/FP spill/stack/default promotions and pending exception refusal. Rust dispatch is modeled; this does not prove actual pthread attachment transport.",
+      "receipt": {
+        "path": "local-artifacts/m9/jni-constructor-abi/result.json",
+        "sha256": "4eb69050e56a34c6c867b06b13478089155b5b3ba2feaaa8e401c23ac4b22bdb"
+      }
+    },
+    {
+      "name": "strict_production_Horizon_JNI_C_compile",
+      "command": "C:/devkitPro/devkitA64/bin/aarch64-none-elf-gcc.exe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -IC:/devkitPro/libnx/include -c platform/switch-smoke/jni.c -o local-artifacts/m9/jni-constructor-abi/jni-strict.o",
+      "status": "passed"
+    },
+    {
+      "name": "focused_JNI_clippy",
+      "command": "cargo clippy -p as-switch-smoke --features portable-tests,host-cli --lib --test jni_constructor --test jni_method_metadata -- -D warnings",
+      "status": "passed"
+    },
+    {
+      "name": "focused_framework_clippy",
+      "command": "cargo clippy -p as-framework --features host --lib --test executors --test timer -- -D warnings",
+      "status": "passed"
+    },
+    {
+      "name": "format_and_scoped_diff",
+      "command": "rustfmt --edition 2021 scoped Rust files; git diff --check scoped files",
+      "status": "passed"
+    }
+  ],
+  "fixture": {
+    "build_receipt": {
+      "path": "target/jni-constructor-fixture/build-receipt.json",
+      "sha256": "97e3473654e47de7b166f179223ba7405e33e673c6331703fdf5003de09b0032"
+    },
+    "jvm": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\r\nOpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)\r\nOpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+    "ndk": "28.2.13676358",
+    "build_tools": "35.0.0",
+    "oracle": {
+      "cases": 18,
+      "sha256": "1231065b4cbd5813d59e95648f1fa9d6b67c21cff37913dce2a37fc0ebd58e0b",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\jni-constructor-fixture/jvm-oracle.txt"
+    },
+    "artifacts": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\jni-constructor-fixture\\constructor-proof.apk",
+        "sha256": "1c1b1b0005fbc61f953d26ebef56f407b44467a452cb153d5aa9a2e257accb13"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\jni-constructor-fixture\\renamed.apk",
+        "sha256": "4d05217497064e5e879869a31c56518c058cfbd3842c73c2f1473899fac1fa2b"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\jni-constructor-fixture\\libconstructproof.so",
+        "sha256": "556455e77c31b86ea8995401f1b07d8b6bffc34ff2c2ede57d126ef3f5eec1fd"
+      }
+    ],
+    "result_path": "/sdcard/Download/androswitch-jni-constructor-proof.txt",
+    "expected": "threads identity=89; threads attached=97; value[0..2]=-1985187208; reentry[0..2]=-1985187171; exception[0..2]=constructor failure; nativeCatch[0..2]=71; then JNI_CONSTRUCTOR_PROOF_PASS",
+    "device_status": "Pending new exact-NRO execution; actual VFS results must be compared numerically to the frozen JVM oracle, not accepted solely from PASS text."
+  },
+  "limitations": [
+    "This is a bounded implemented-method catalog, not complete Android method metadata or JNI compliance. Unknown APIs remain unavailable.",
+    "ThreadGroup attachment is rejected. JVM daemon process-exit policy, OS thread naming and full Java Thread/Looper/uncaught-handler semantics are not claimed.",
+    "The host owner-switching tests validate serialized VM semantics, not OS concurrency. Actual background/native pthread transport and retained references require the next NRO proof.",
+    "No game first screen or gameplay success is claimed; all new-source emulator and physical-device evidence remains separate.",
+    "A legacy executor test was updated to explicitly detach/re-attach a reused native owner and assert a fresh identity while the saved stopped Java Thread remains terminated. Earlier worker/TLS-owner assertions remain intact."
+  ],
+  "verification": {
+    "host": "passed_scoped_contracts",
+    "emulator": "pending_new_NRO",
+    "physical_device": "not_run_for_this_source"
+  },
+  "source_sha256": [
+    {
+      "path": "crates/rd-vm/src/framework_host.rs",
+      "sha256": "cbc1a772f29837c5fb62ae3842587c348e9f4355a237cbe2d2a133292cf5c350"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "sha256": "134b9f220e017c502dc4f88484246f1253250e655d8074c8a25b924988a47a21"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/jni_constructor.rs",
+      "sha256": "aa2bc46a8db0a39f999d56176d26d4883af639a5cc31c6101f75c2f83411ad26"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_jni.rs",
+      "sha256": "67f0d6261f64c55b1cc45dbce3165f8f3f1302f33f6b8f23cef4bb3879125d42"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/jni_constructor.rs",
+      "sha256": "4ad867a3aec40179c4c2432201a8ebfabe6378e7ad6b6bdbfffe68744cff9a12"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/jni_method_metadata.rs",
+      "sha256": "1159d194fc033eeae00ce198a602685a4e7cc6057c0d548933c4eb1d77820faf"
+    },
+    {
+      "path": "crates/as-switch-smoke/Cargo.toml",
+      "sha256": "d090739f371247e8d51177898cb4adaac1ef15627fa8ce6e23ae00e30dae7ffc"
+    },
+    {
+      "path": "crates/as-framework/src/services/executors.rs",
+      "sha256": "ce18d6aacddec5af9c340b9db45f908413ca18c8cf87c4f12d8124a3cd3cdd63"
+    },
+    {
+      "path": "crates/as-framework/src/android.rs",
+      "sha256": "5f8137d26a242d0d6e9219ef186324f185ec16ccfbe93a33414c426f8a38ca56"
+    },
+    {
+      "path": "crates/as-framework/src/lib.rs",
+      "sha256": "f57319c9d7e4ab9f4fa9597e4195112adc53a192036eacb6ed04fd9a0740cc71"
+    },
+    {
+      "path": "crates/as-framework/tests/executors.rs",
+      "sha256": "1b967cd7b260ddeabcc51dbce1ca0eb6b6c3b74f3401b402a9354a80fdccd2cb"
+    },
+    {
+      "path": "platform/switch-smoke/jni.c",
+      "sha256": "6ef0a7c0a576fbc1d45d049c2b0a673173fb661840c99e6de0da49a0c94d3063"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/build.ps1",
+      "sha256": "68f2df83af60e93e0ef6064b84dedc971fca0c279c2078aa087983d5c7088aa0"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/java/org/androswitch/contracts/ConstructorActivity.java",
+      "sha256": "8c2f258b63d3fd193d99ae8edf6bd9e4a8d23c7dfd9f0db3c000228668228d75"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/java/org/androswitch/contracts/ConstructorCases.java",
+      "sha256": "fdc487a8e5aabff52cd84f6640dbc0909e70ac4b94a6e763b15e2dd7cb53330f"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/native/construct.c",
+      "sha256": "88ea62968e2ea22ca76743d22d81e4ab370d7d63215e73083b48a4d84478721b"
+    }
+  ]
+}

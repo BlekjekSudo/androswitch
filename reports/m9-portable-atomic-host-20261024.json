@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "status": "passed_portable_host_contracts",
+  "scope": "API26 AtomicBoolean with budgeted heap state and exclusive VM operations; no Java Thread implementation claim.",
+  "observed_blocker": "reports/m9-time-fixed-startup-20261024.json",
+  "source_hashes": [
+    {
+      "path": "crates/rd-vm/src/portable/atomic.rs",
+      "sha256": "5cf6703a88f205818500412b733720ec2819c2fb60ad3944ada7e4fa573a3bbe"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/mod.rs",
+      "sha256": "352877ca54c6427a1210b0e15c025811180bc45dc30161081e6f03895a74a48f"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/intrinsics.rs",
+      "sha256": "18dcb4159063cf640ddbc6fea269686f6b11cd3191a12f2238a7bb8c41a40fd6"
+    },
+    {
+      "path": "crates/rd-vm/src/interp.rs",
+      "sha256": "44c4aa40c8bcca48eb5b5854add6ba279d7375799a4b169d65ee94ba2e0ce281"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_atomic.rs",
+      "sha256": "c35ae4ea091907d6cad05f30ed9225dbfe09e70ecdeca1d258cf11f7119a5d68"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-atomic/AtomicFixture.java",
+      "sha256": "9bb14ae0633af538dd9c02d4def7c677eed8a38e9de70b8f2b05b95bf9aee35c"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-atomic/build.ps1",
+      "sha256": "d952749bf94ff47ccd8e0b5797126b57d7c1d4e573304402dcc48f47eafd7e7f"
+    }
+  ],
+  "fixture_build": {
+    "sources": [
+      {
+        "sha256": "9bb14ae0633af538dd9c02d4def7c677eed8a38e9de70b8f2b05b95bf9aee35c",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\rd-vm\\tests\\fixtures\\portable-atomic\\AtomicFixture.java"
+      },
+      {
+        "sha256": "d952749bf94ff47ccd8e0b5797126b57d7c1d4e573304402dcc48f47eafd7e7f",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\rd-vm\\tests\\fixtures\\portable-atomic\\build.ps1"
+      }
+    ],
+    "api": 26,
+    "artifacts": [
+      {
+        "sha256": "f9c73a564f18255a1960d915a003c91190a76f09703cc26245772fa7469123f5",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\portable-atomic-fixture\\dex\\classes.dex"
+      },
+      {
+        "sha256": "04f7fcfe0176911061b82dd1628d0cd48049a1340f92a59714c24b112e1e4c86",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\portable-atomic-fixture\\jvm-oracle.txt"
+      }
+    ],
+    "schema_version": 1
+  },
+  "checks": [
+    {
+      "command": "./crates/rd-vm/tests/fixtures/portable-atomic/build.ps1",
+      "exit_code": 0,
+      "log": {
+        "path": "target/evidence/m9-atomic-fixture-focused.log",
+        "sha256": "05d3401f5c91007a3202ea1beccb17848a4a1c9b5888e468f9ead4a0825abce2"
+      }
+    },
+    {
+      "command": "cargo test -p as-switch-smoke --features host-cli,portable-tests --test portable_atomic --locked -- --include-ignored",
+      "exit_code": 0,
+      "log": {
+        "path": "target/evidence/m9-portable-atomic-focused.log",
+        "sha256": "abe02ce4770f8a708f8e8a294e1d2266e4c7ab5dc74bb4d879c18c7a2dac220e"
+      },
+      "tests": 2,
+      "jvm_differential_cases": 18,
+      "gc_passes": 2
+    }
+  ],
+  "implemented": [
+    "Default/boolean constructor, get, set, lazySet, getAndSet, compareAndSet, weakCompareAndSet and toString.",
+    "DEX subclass overrides and invoke-super; shadow fields do not alias private state.",
+    "Independent object identity, failed CAS preservation, shared references and collectible heap lifetime."
+  ],
+  "ordering": "Exclusive mutable Engine operations with no yield or guest/native call-out; JNI callbacks acquire the existing VM gate. SeqCst fences preserve volatile ordering at the boundary. Weak CAS can succeed without spurious failure. Concurrent mutable Engine access remains unsupported.",
+  "not_implemented": [
+    "AtomicInteger/Long/Reference on portable path",
+    "Post API26 access modes",
+    "Java Thread or parallel Java execution"
+  ],
+  "emulator": "pending new NRO",
+  "physical_switch": "not_run",
+  "primary_references": [
+    "https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/atomic/AtomicBoolean.html",
+    "https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/atomic/package-summary.html"
+  ],
+  "provenance": "Original portable implementation; upstream std atomics unchanged. RustyDroid attribution retained."
+}

@@ -29,6 +29,9 @@ int as_media_error(void);
 void as_media_capture(int enabled);
 uint64_t as_media_frames(void);
 uint64_t as_media_audio_frames(void);
+/* Fresh per-application diagnostic trace; completion events report real return
+ * values. Missing completion is not interpreted as successful cleanup. */
+void as_media_stop_event(const char *operation, int result, uint64_t detail);
 int64_t as_audio_open(int rate, int channels, int format);
 int as_audio_start(uint64_t id);
 int64_t as_audio_write(uint64_t id, const void *data, size_t frames,

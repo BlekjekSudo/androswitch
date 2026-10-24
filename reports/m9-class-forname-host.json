@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T16:41:59.1140177Z",
+  "scope": "General portable API26 Class.forName one-argument and name/initialize/ClassLoader overload using the one canonical application/bootstrap loader model. No package or game branches.",
+  "status": "host_passed_emulator_pending",
+  "portable_core_asserted": true,
+  "observed_blocker": {
+    "session": "84a72708c1f2407db233fc3fc68370c4-3",
+    "run": "local-artifacts/m9/external-runs/84a72708c1f2407db233fc3fc68370c4",
+    "installed_identity_matches": true,
+    "sd_restore": "restored",
+    "nro_sha256": "09dbe6f3ab5e131a51c8aad32008ac01cc3498b7212aec2609bd5892bdd22c3b",
+    "error": "NOT_FOUND [rd-vm]: método Ljava/lang/Class;->forName(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class; não resolvido [pc 0xb: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 3, idx: 26046, regs: [1, 0, 2, 0, 0] } }]\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzS()Z\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Ljava/lang/Class;->forName(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class; não resolvido [pc 0xb: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 3, idx: 26046, regs: [1, 0, 2, 0, 0] } }]\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzS()Z\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+    "returned_to_launcher": true
+  },
+  "contract": [
+    "Explicit ClassLoader argument is resolved through PackageService canonical provenance: application sees actual DEX plus modeled bootstrap classes; boot/null cannot see app DEX; unknown loaders fail explicitly",
+    "Validated binary names and array descriptors, rank1..255; reference components must exist and be visible; primitive/void names do not fabricate primitive Class objects",
+    "Required superclass/interface definitions are resolved without class initialization; missing requested class is ClassNotFoundException and missing required definition is NoClassDefFoundError",
+    "initialize=false and all arrays do not initialize component classes; initialize=true uses the actual Engine once/failed initialization state",
+    "Portable Engine propagates Java Error subclasses unchanged on first initializer failure, wraps non-Error exceptions in ExceptionInInitializerError, and preserves later NoClassDefFoundError poisoning; legacy std behavior unchanged",
+    "ClassLoader.loadClass shares the same bounded hierarchy-link helper and does not initialize",
+    "Canonical Class objects and canonical loader identities survive GC; exact implemented forName descriptors are advertised in the JNI method metadata catalog only",
+    "Initialization through an uninitialized default-bearing DEX interface is explicitly API_UNAVAILABLE before mutation. Explicit initialization of the interface is supported; dependent class initialization can then succeed"
+  ],
+  "commands": [
+    {
+      "command": "pwsh -NoProfile -File fixtures/m9/class-forname/build.ps1",
+      "exit_code": 0,
+      "status": "passed",
+      "note": "Normal Android SDK compilation and JVM execution; expected obsolete Java release8 warnings only; MissingBase omitted from both JVM JAR and DEX inputs"
+    },
+    {
+      "unsupported_default_interface_branches": 2,
+      "standard_jvm_cases": 34,
+      "test_seconds": 1.33,
+      "exit_code": 0,
+      "supported_default_interface_comparisons": 6,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-framework --features host --test class_forname --locked -- --nocapture",
+      "standard_jvm_comparisons": 68,
+      "passed": 4,
+      "status": "passed",
+      "default_interface_jvm_rows": 4,
+      "ignored": 0,
+      "manifest_identities": 2,
+      "failed": 0,
+      "log": "target/evidence/m9-class-forname-focused.log"
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1 cargo clippy -p as-framework --features host --lib --test class_forname --locked -- -D warnings",
+      "exit_code": 0,
+      "status": "passed",
+      "seconds": 11.0,
+      "log": "target/evidence/m9-class-forname-clippy.log"
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1 cargo clippy -p rd-vm --no-default-features --lib --locked -- -D warnings",
+      "exit_code": 0,
+      "status": "passed",
+      "seconds": 4.32,
+      "log": "target/evidence/m9-class-forname-vm-clippy.log"
+    },
+    {
+      "command": "rustfmt --edition 2021 --check crates/as-framework/src/services/reflection.rs crates/as-framework/src/services/reflection/class_for_name.rs crates/as-framework/tests/class_forname.rs crates/rd-vm/src/engine.rs",
+      "exit_code": 0,
+      "status": "passed"
+    }
+  ],
+  "fixture_build": {
+    "default_interface_oracle": {
+      "sha256": "7de6d83ca73d89f3291e84ac1a39b7ce0df71387f09662e10ef2d85920dc7b8f",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\class-forname-fixture/default-interface-jvm-oracle.txt"
+    },
+    "build_tools": "35.0.0",
+    "oracle": {
+      "sha256": "f8dfc7f271919769146ba4cdadd5a984fbeaecc96ba2ed54a2126ce6e063951b",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\class-forname-fixture/jvm-oracle.txt"
+    },
+    "api": 26,
+    "apks": [
+      {
+        "sha256": "e005f16a62ce32f45f06b62a72825341c76425a70960335154065639dba5c2f1",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\class-forname-fixture\\class-forname.apk"
+      },
+      {
+        "sha256": "d7b27feaa4b9007a3b7b605c56a59dcae067a0f48b6cfa7eaa5274f9630606c1",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\class-forname-fixture\\renamed.apk"
+      }
+    ],
+    "sources": [
+      {
+        "sha256": "1001e4ee8d305060601c56e0e4e43cf0860d00deb9d41e82e12942799c992c5c",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\class-forname\\java\\org\\androswitch\\contracts\\ForNameActivity.java"
+      },
+      {
+        "sha256": "e424de34e93a3173140b946eede21658dc7a076e0b5498916df35b99d57535a5",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\class-forname\\java\\org\\androswitch\\contracts\\ForNameCases.java"
+      },
+      {
+        "sha256": "5545c73d75ce7199cc29810c37d155496d1d71068f6268e8c4f086b3615e97e5",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\class-forname\\java\\org\\androswitch\\contracts\\ForNameOracle.java"
+      },
+      {
+        "sha256": "6a7b22d26d9b8c87049222ef031fb5300ad956968828322e2e91599badfc10d7",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\class-forname\\java\\org\\androswitch\\contracts\\LinkedChild.java"
+      },
+      {
+        "sha256": "b8a997887725d4afd13d4c527a62278ca218953f3d2e5a2de821d071a95ce7ea",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\class-forname\\java\\org\\androswitch\\contracts\\MissingBase.java"
+      },
+      {
+        "sha256": "16ceb19055d2e246c5da59a3602f3c32f3a315ef8968fdf16a538a1251ae41f3",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\class-forname\\build.ps1"
+      }
+    ],
+    "absent_dependency": "org.androswitch.contracts.MissingBase",
+    "schema_version": 1
+  },
+  "source_hashes_captured_after_test": [
+    {
+      "path": "crates/rd-vm/src/engine.rs",
+      "sha256": "8ce560f0dc7502d0bd68da0e20663156e4a678048b14deb3842850ad96ede5ed"
+    },
+    {
+      "path": "crates/as-framework/src/services/reflection.rs",
+      "sha256": "890e50f8d48292e1b6d21b8915da3c6901c3da9a85041ac96ca17ce0d8fcd941"
+    },
+    {
+      "path": "crates/as-framework/src/services/reflection/class_for_name.rs",
+      "sha256": "4d0326016ac00ec7b1e509d1263ab4e9f550187cc1d6c875350557d816228355"
+    },
+    {
+      "path": "crates/as-framework/src/services/package.rs",
+      "sha256": "79f15e527e1ebdbf40d4db9de0da27682cfeba89a16f12619fcc6097788e24a7"
+    },
+    {
+      "path": "crates/as-framework/src/services/mod.rs",
+      "sha256": "4ce1f96ede8e3b25da9abb1bf1943b5e52e6478e9a31cada3fda65c83b979792"
+    },
+    {
+      "path": "crates/as-framework/tests/class_forname.rs",
+      "sha256": "25f0907fb11def2eda24e161c05e709e5ea259c3209bf33440eb348bcbddc0df"
+    },
+    {
+      "path": "crates/as-framework/Cargo.toml",
+      "sha256": "64ce5ace574ecbbc02501d62ac5e6b88ba16c37ef057eaef8e3791c6258cd78c"
+    }
+  ],
+  "primary_references": [
+    {
+      "contract": "forName one-arg caller loader; explicit initialize flag/null bootstrap loader; array component loaded but not initialized; LinkageError propagation",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/lang/Class.java",
+      "ignored_source_sha256": "ee71928d8d0d59fba9451529971f6624db716399ef84bc204e0338a5b7feaa48"
+    },
+    {
+      "url": "https://docs.oracle.com/javase/specs/jls/se8/html/jls-12.html#jls-12.4.2",
+      "contract": "Detailed initialization procedure, Error propagation, erroneous state and required default-bearing interface initialization"
+    }
+  ],
+  "limits": [
+    "One application loader and one bootstrap loader; custom/dynamic loaders have no backend and return API_UNAVAILABLE rather than being ignored",
+    "Hierarchy resolution here is bounded dependency validation, not a complete ART verifier. Cycles/malformed hierarchy and resource budgets are structured errors",
+    "Default-bearing interface dependency scheduling is guarded in Class.forName; this change does not claim a complete global Java8 interface-initialization algorithm for every VM entry point",
+    "One-argument forName retains the loader of the runtime interpreted application DEX; no generalized VMStack/security-manager ecosystem is claimed",
+    "Actual Android reference device execution, corrected game first screens, and physical Switch validation were not run by these host tests"
+  ],
+  "verification": {
+    "host": "4 tests passed on asserted portable Engine,68 standard JVM comparisons and6 supported default-interface comparisons.2 expected explicit unsupported branches verified zero side effects and no class poisoning; canonical GC identities and invalid loader/rank/descriptor/budget negatives passed.",
+    "emulator": "Corrected NRO/game startup pending; parent owns actual E2E",
+    "hardware": "not run",
+    "android_reference_device": "not run; primary API26 source plus ordinary JDK21 JVM semantics used",
+    "source_binding": "Listed relevant source snapshots and original fixture receipt only; not a whole-build source manifest or external game compatibility claim"
+  }
+}

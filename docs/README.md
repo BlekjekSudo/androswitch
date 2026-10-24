@@ -1,8 +1,9 @@
 # AndroSwitch documentation
 
 Current M9 work: [independent application startup](M9_EXTERNAL_APPS.md) and
-[Horizon memory policy / Autorun reference](HORIZON_MEMORY.md). New host contract
-results are separate from pending external-game emulator/hardware execution.
+[Horizon memory policy / Autorun reference](HORIZON_MEMORY.md). Actual external
+startup failures and shared-contract improvements have separate host, emulator
+and physical-device records; neither game has a first-screen pass.
 
 - [M2–M4 persistent storage and native JNI proof](M2_M4_E2E.md)
 - [Immutable package revisions ADR](adr/013-persistent-package-revisions.md)
@@ -12,7 +13,8 @@ AndroSwitch adapts [RustyDroid](https://github.com/nadabgfccvd/RustyDroid) for
 HorizonOS. Start with the [project README](../README.md) and
 [credits/provenance](../CREDITS.md). M0–M4 developer proof gates have host and
 Ryujinx evidence. M5–M7 add supported UI/native media and a one-NRO console;
-physical Switch validation is pending.
+the user confirms M1–M7 testing on physical Switch, with detailed scenario and
+binary identities unrecorded. New changes need their own hardware verification.
 
 ## Use and reproduce the current work
 
@@ -26,13 +28,18 @@ physical Switch validation is pending.
 | [CLI reference](CLI.md) | Actual `asctl` commands, JSON, preflight and the separate method probe |
 | [Testing](TESTING.md) | Focused host gates, feature isolation, CI and evidence requirements |
 | [M1 Ryujinx E2E](M1_E2E.md) | Reproduce the actual APK/interpreter emulator proof |
+| [Horizon display](HORIZON_DISPLAY.md) | Actual portrait geometry, buffer ownership, capture publication and cleanup evidence |
+| [Horizon workers](HORIZON_WORKERS.md) | Dedicated VM worker transport, actual clocks, ownership and bounded teardown |
+| [Native host backends](HOST_NATIVE_TESTS.md) | Explicit WSL/MSYS C tests, Android errno boundaries and ARM64 CPU-oracle scope |
+| [Portable string encodings](PORTABLE_ENCODINGS.md) | API 26 byte encoders, alias recognition, allocation bounds and JVM/ART comparison limits |
+| [Independent M9 startup](M9_EXTERNAL_APPS.md) | Frozen game APKs, general API/ABI work, actual failures and first-screen gate |
 
 ## Design and progress
 
 | Document | Contents |
 | --- | --- |
 | [Roadmap](ANDROSWITCH_ROADMAP.md) | M0–M12, exit gates and backend-specific status |
-| [Architecture](ARCHITECTURE.md) | Shared core, platform boundary, persistent VFS and planned launcher/runner |
+| [Architecture](ARCHITECTURE.md) | Shared core, platform boundary, persistent VFS and verified session boundary |
 | [Compatibility inventory](ANDROSWITCH_COMPATIBILITY.md) | Verified functionality and unavailable APIs/backends |
 | [ADR 010](adr/010-androswitch-platform-boundary.md) | AndroSwitch's platform and verification contract |
 | [ADR 011](adr/011-portable-dex-smoke.md) | Portable DEX parser and bounded C ABI |
@@ -50,7 +57,9 @@ physical Switch validation is pending.
 Large generated output is kept in ignored `target/evidence/` and
 `local-artifacts/`; a fresh clone contains the compact reports and source
 needed to rebuild the fixtures. Reports distinguish host, emulator and
-physical Switch evidence. Physical Switch verification is still pending.
+physical Switch evidence. User-reported M1–M7 and later persistence results are
+scoped in [hardware feedback](HARDWARE_FEEDBACK.md); new startup/display paths
+remain unverified on physical Switch.
 Current console/media source, run IDs and binary/fixture hashes are recorded
 in [M6/M7 results](../reports/m6-m7.json). The M5 UI proof remains historical
 evidence in [its report](../reports/m5-ui.json).

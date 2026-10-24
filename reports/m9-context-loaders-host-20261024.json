@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T16:43:28.6238459Z",
+  "status": "scoped_host_contracts_passed_integrated_NRO_pending",
+  "scope": "General canonical application/bootstrap loader provenance, Java Thread context-loader get/set/inheritance and actual JNI method catalog; no package-specific logic.",
+  "basis": {
+    "runtime": "History-preserving RustyDroid fork at 6388281f66d254c8e01a0fdc7a5a9a30239bc762",
+    "implementation": "Independent public-contract implementation; no ART/libcore/JDK implementation source copied."
+  },
+  "observed_blocker": {
+    "run": "84a72708c1f2407db233fc3fc68370c4",
+    "nro_sha256": "09dbe6f3ab5e131a51c8aad32008ac01cc3498b7212aec2609bd5892bdd22c3b",
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "api": "JNI GetMethodID Thread.getContextClassLoader()Ljava/lang/ClassLoader; instance",
+    "evidence": "Exact native lookup diagnostic records missing descriptor/NoSuchMethodError after Thread.currentThread now passes. Subsequent invalid JNI token0 is not the original missing API.",
+    "prior_evidence": "The prior constructor/thread proof APK passed actual NRO execution and returned to launcher. It did not contain this new context-loader proof. Both game cases remained blocked, all3 cases returned to launcher with installation identity and SD restored.",
+    "raw": [
+      {
+        "path": "local-artifacts/m9/external-runs/84a72708c1f2407db233fc3fc68370c4/verification.json",
+        "sha256": "be0ad0a5b4d840fe3e6f30e7c86fa8835222c4ea4d0ee3b5c78bea2e83190bd2"
+      },
+      {
+        "path": "local-artifacts/m9/external-runs/84a72708c1f2407db233fc3fc68370c4/sessions/84a72708c1f2407db233fc3fc68370c4-2/jni-failures.log",
+        "sha256": "d7b04878f9e8fe8724799dddd74df71f2e619551c838a37c97b0d9a4ab7c359a"
+      },
+      {
+        "path": "local-artifacts/m9/external-runs/84a72708c1f2407db233fc3fc68370c4/sessions/84a72708c1f2407db233fc3fc68370c4-2/session-report.json",
+        "sha256": "e1291186a0b207551855486027ea01b4cfbf05e4c041e9ea1ebef3536a017249"
+      }
+    ]
+  },
+  "primary_sources": [
+    "https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/invocation.html",
+    "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/lang/Thread.java",
+    "https://android.googlesource.com/platform/art/+/android-8.0.0_r1/runtime/thread.cc",
+    "https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r1/core/java/android/app/LoadedApk.java",
+    "https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r1/core/java/android/app/ApplicationLoaders.java"
+  ],
+  "implementation": {
+    "identity": "Reuses existing rooted per-application canonical PackageService application and bootstrap loader objects. Nullable loader values resolve to bootstrap provenance. Unknown ClassLoader/subclass objects fail API_UNAVAILABLE, wrong object types throw ClassCastException; no loader argument is silently ignored.",
+    "thread_context": "Bound managed application main Thread begins with its exact defining application loader. JNI-adopted native peers begin with null/bootstrap context, as specified by JNI and consistent with the API26 native-peer constructor. Ordinary Thread constructors and DefaultThreadFactory copy the actual parent virtual getContextClassLoader result; validation and callbacks occur without retaining RefCell borrows.",
+    "mutation_and_lifetime": "get/setContextClassLoader use real Java Thread records. Set validates before mutation; explicit null is preserved. A Thread traces its context as a Java reference. A retained detached Thread keeps its context/name/id with isAlive false; a fresh peer for a reused owner gets new bootstrap context. Real original-main detach consumes only the managed-main initialization marker, so explicit reattach honors its name and bootstrap context instead of being relabeled main.",
+    "catalog": "Registers only the implemented exact Thread context getter/setter and existing Context/Class.getClassLoader plus ClassLoader.loadClass methods. Shared static metadata also includes the separately implemented/tested Class.forName overloads. Real DEX declarations/owners/static-kind rules continue to take precedence.",
+    "loading": "ClassLoader.loadClass shares the Class.forName module bounded linking helper with explicit canonical loader scope; bootstrap cannot resolve application DEX and app classes require real declarations/hierarchy. loadClass still does not initialize the class.",
+    "scope_removed": "Only newly proposed optional getParent/getSystemClassLoader handlers/catalog were removed before freeze; neither existed in this portable PackageService. A distinct Android system-loader contract is not implemented or advertised. No test assumes JVM application loader equals Android system loader."
+  },
+  "checks": [
+    {
+      "name": "original_normal_SDK_NDK_and_actual_JVM_JNI_oracle",
+      "command": "pwsh -File fixtures/m9/jni-construct/build.ps1",
+      "status": "passed",
+      "oracle_rows": 20,
+      "result": "Preserves all18 previous JVM constructor/thread rows and adds JNI context103 plus Java inherited-context snapshot107. Actual JNI main defining-loader identity, child inheritance, nullable context, restoration and attached-pthread bootstrap context are checked. The SDK Activity preserves earlier numeric/exception/thread assertions and now requires context103 before writing PASS."
+    },
+    {
+      "name": "portable_real_DEX_constructor_and_metadata_context",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p as-switch-smoke --features portable-tests,host-cli --test jni_constructor --test jni_method_metadata -- --test-threads=1",
+      "status": "passed",
+      "constructor_tests": 6,
+      "metadata_context_tests": 6,
+      "test_seconds": {
+        "constructor": 0.01,
+        "metadata_context": 1.08
+      },
+      "result": "Actual no_std VM/FrameworkHost dispatch, canonical defining-loader identity, getter/setter JNI metadata, Java inheritance snapshot compared to actual JVM, real DEX override side effects on deterministic worker delivery, custom/wrong loader refusal, detach/reattach/retained roots/GC and bounded prior metadata regressions. OS thread transport is modeled."
+    },
+    {
+      "name": "format_and_scoped_diff",
+      "status": "passed",
+      "command": "rustfmt --edition 2021 scoped Rust files; git diff --check scoped files"
+    },
+    {
+      "name": "integrated_full_regression_and_clippy",
+      "status": "parent_scheduled_after_source_freeze",
+      "result": "No duplicate Executor/Timer/Clippy run for this iteration per parent coordination. Their earlier passed receipt remains immutable; final integrated aggregator must provide current-source results."
+    }
+  ],
+  "fixture": {
+    "frozen_directory": "local-artifacts/m9/context-loader-contracts-20261024",
+    "build_receipt": {
+      "path": "local-artifacts/m9/context-loader-contracts-20261024/build-receipt.json",
+      "sha256": "a27ca6cc0609fa0400678121356ef451715e8b423222417de9398db65111d0d2"
+    },
+    "jvm": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\r\nOpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)\r\nOpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+    "ndk": "28.2.13676358",
+    "api": 26,
+    "build_tools": "35.0.0",
+    "oracle": {
+      "path": "local-artifacts/m9/context-loader-contracts-20261024/jvm-oracle.txt",
+      "sha256": "cf60da2d22275742fceedddd80151341e94e24c778a045c21db1208db71e0aa0"
+    },
+    "artifacts": [
+      {
+        "path": "local-artifacts/m9/context-loader-contracts-20261024/constructor-proof.apk",
+        "sha256": "95496996eeea4ba9db510d7a3e92ed5d76cd1b2c0870b229bf2604249d5784e1"
+      },
+      {
+        "path": "local-artifacts/m9/context-loader-contracts-20261024/renamed.apk",
+        "sha256": "04127eb8f4a0a2ebb996029c1a89cca8d929c86dd48e7787fbfd2ba059650e4b"
+      },
+      {
+        "path": "local-artifacts/m9/context-loader-contracts-20261024/libconstructproof.so",
+        "sha256": "2b704d53396230c34aa9a5f07022db1389e1b05489fe4ec9bf906f2240f427cb"
+      }
+    ],
+    "result_path": "/sdcard/Download/androswitch-jni-constructor-proof.txt",
+    "required_new_result": "threads context=103",
+    "prior_assertions_preserved": "threads identity89/attached97; values -1985187208/reentry -1985187171 for all3 JNI forms; constructor failure message and nativeCatch71; prior result lines and JNI_CONSTRUCTOR_PROOF_PASS remain.",
+    "emulator": "pending_new_exact_NRO; numeric VFS output must match JVM oracle, with visual review separate"
+  },
+  "limits": [
+    "One installed application classpath plus explicitly modeled bootstrap registry; custom/dynamic/split loader namespaces remain unsupported rather than substituted.",
+    "No new getSystemClassLoader/getParent contract, complete class verification, security manager, full JNI compliance or full Java Thread API is claimed.",
+    "Default-superinterface initialization beyond the separate Class.forName guard remains explicitly unavailable when required. See its own implementation/report for exact supported behavior.",
+    "New host tests use actual DEX methods and deterministic owner/worker delivery; they do not establish OS concurrency or physical Switch execution.",
+    "No new C JNI transport changes were made in this context iteration. Previously recorded ARM64 argument-bridge tests are not represented as newly rerun evidence."
+  ],
+  "verification": {
+    "host": "passed_scoped_contracts",
+    "integrated_checks": "parent_pending",
+    "emulator": "pending_new_NRO",
+    "physical_device": "not_run_for_this_source"
+  },
+  "source_sha256": [
+    {
+      "path": "crates/as-framework/src/services/package.rs",
+      "sha256": "79f15e527e1ebdbf40d4db9de0da27682cfeba89a16f12619fcc6097788e24a7"
+    },
+    {
+      "path": "crates/as-framework/src/services/executors.rs",
+      "sha256": "0d9f140c3b33602bb5ad8f3712c653b895466d6624f0ab038f20859c196c6f82"
+    },
+    {
+      "path": "crates/as-framework/src/services/mod.rs",
+      "sha256": "4ce1f96ede8e3b25da9abb1bf1943b5e52e6478e9a31cada3fda65c83b979792"
+    },
+    {
+      "path": "crates/as-framework/src/android.rs",
+      "sha256": "d51d6575878bbf746f529a77305d19ecaaa4aa13b538e70d503e7b5dd6f96c99"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/jni_method_metadata.rs",
+      "sha256": "8d3c4c879c5e4922fdcafbafef5aca9ff7bdd4c335f4238dd9049a6195ccce0d"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/jni_constructor.rs",
+      "sha256": "06b772ed0c62130ecb46f7328cb03fe6c253dbbe2695fd4729f77bdccdb3f13e"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/build.ps1",
+      "sha256": "092b5568bbe5b89dc646aa9fc4505c50af6b9abe0b25681a0a3e496846d472eb"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/java/org/androswitch/contracts/ConstructorActivity.java",
+      "sha256": "bb64839f778774fecb95a2b4b3c09a2bf52ffb847272b31a43eee8e0a7f0f91f"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/java/org/androswitch/contracts/ConstructorCases.java",
+      "sha256": "9277f21ec4946bc439a247323a55f39534b84cd9481fdaeeba330a68fc11c7ea"
+    },
+    {
+      "path": "fixtures/m9/jni-construct/native/construct.c",
+      "sha256": "a953d9ee4289d99654dece0ee71598d8ae46ad7971dc6ac4366c7bb6d2aaea28"
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "scope": "CPU diagnostic-image publication and row extraction; existing framebuffer pixels and queue ownership preserved. No Rust, emulator or product build in this subtask.",
+  "motivation": {
+    "diagnosis": "The previous CPU writer performed 921600 per-pixel writes plus header before queue submission. A separate runtime capture trigger/harness polling race is being repaired by the parent; this C change alone does not prove that race resolved.",
+    "observed": "Both applications returned cleanly; first Java UI session had no copied PPM, so overall attempted_render_unconfirmed is preserved. Portrait GPU captures were complete/nonuniform in that run.",
+    "nro_sha256": "1e84d51d96b3aa6db5ca6382e1d67e14e882706eb44497ce950f248fbead882b",
+    "receipt": {
+      "path": "local-artifacts/m9/external-runs/6c629f624a0143d3a99e8ea05cbd5bee/verification.json",
+      "sha256": "1e7007d2262c2c7647a03658613848ab5e0258e535fa46e3de55e8c33b2bb60e",
+      "bytes": 44005
+    }
+  },
+  "implementation": {
+    "row_buffer_bytes": 3840,
+    "writes_at_1280x720": 721,
+    "source": "CPU-owned physical RGBA linear framebuffer shadow, after successful nwindowQueueBuffer; queued block-linear GPU buffer remains untouched.",
+    "timing": "Synchronous diagnostic I/O follows queue submission; no asynchronous writer or latency claim.",
+    "publish": "Shared checked PPM publisher writes header and rows to .ppm.tmp, requires successful close, then renames to final .ppm. Failures leave prior complete final and attempt temp cleanup.",
+    "cpu_row_validation": "Reject null pointers, empty/oversized dimensions, out-of-range row, short stride/input/output and overflow before reading or writing pixels. Preserve actual RGB order, exclude alpha/stride padding.",
+    "diagnostic_failure": "Actual status is logged as cpu_capture_publish_result. Image I/O failure does not convert an already queued frame into an APK execution failure."
+  },
+  "host": {
+    "framebuffer_guard_cases": 4,
+    "result": {
+      "path": "C:/Users/Administrator/.cache/androswitch/display-cpu-publish-check/result.json",
+      "sha256": "232cbd0c3e529621b88d9990b6595ff8bcb84828e178f6c6e60692b4ae23848a",
+      "bytes": 20596
+    },
+    "compile_run_checks": 37,
+    "coverage": [
+      "All1280x720 RGB output pixels independently checked in all4 rotated CPU frames with padded stride.",
+      "Alpha excluded; output row trailing guard bytes untouched.",
+      "Twelve malformed metadata/buffer cases reject before touching output.",
+      "Shared publisher exercises actual-file partial header/row writes, row failure, close/rename/open failure, prior-final preservation, temp cleanup and complete stdio publication."
+    ],
+    "status": "passed",
+    "shared_ppm_publication_cases": 12,
+    "glsurface_worker_cases": 30,
+    "full_rotation_cpu_rgb_cases": 4,
+    "command": "./scripts/test-horizon-display.ps1 -OutputDirectory C:/Users/Administrator/.cache/androswitch/display-cpu-publish-check",
+    "cpu_row_guard_cases": 12
+  },
+  "target_compilation": [
+    {
+      "backend": "Windows",
+      "command": "aarch64-none-elf-gcc.exe -pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -IC:/devkitPro/libnx/include -IC:/devkitPro/portlibs/switch/include -Iplatform/switch-smoke -Ithird_party/android -fno-strict-aliasing -c platform/androswitch/main.c -o C:/Users/Administrator/.cache/androswitch/cpu-ppm-main.o",
+      "status": "passed",
+      "artifact": {
+        "path": "C:/Users/Administrator/.cache/androswitch/cpu-ppm-main.o",
+        "sha256": "2c802a2db5fe4987a10cf647204e67a81a74e0323aa0212fa6284dc20892c829",
+        "bytes": 21776
+      },
+      "compiler": "devkitA64 15.2.0"
+    },
+    {
+      "backend": "WSL",
+      "command": "wsl -d Ubuntu -- /opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc -pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -I/opt/devkitpro/libnx/include -I/opt/devkitpro/portlibs/switch/include -I/mnt/d/Dev/Switch/AndroSwitch/platform/switch-smoke -I/mnt/d/Dev/Switch/AndroSwitch/third_party/android -fno-strict-aliasing -c /mnt/d/Dev/Switch/AndroSwitch/platform/androswitch/main.c -o /mnt/c/Users/Administrator/.cache/androswitch/cpu-ppm-main-wsl.o",
+      "status": "passed",
+      "artifact": {
+        "path": "C:/Users/Administrator/.cache/androswitch/cpu-ppm-main-wsl.o",
+        "sha256": "301ee2158b902426bb15022d3bd0b9902e0f4455eb5e8b1386749a4ccec91ee8",
+        "bytes": 21704
+      },
+      "compiler": "devkitA64 16.1.0"
+    }
+  ],
+  "source_snapshots": [
+    {
+      "path": "platform/androswitch/main.c",
+      "sha256": "25235874bbac12fbdaf10cd48a3e6ee70eceb11be3009a5cb7ab25e63091f55d",
+      "bytes": 17193
+    },
+    {
+      "path": "platform/androswitch/rgba_ppm.h",
+      "sha256": "c2df79c3ea4093c148e18b418e1c22a8d4afd362de8f1d3226d4b409be8eb646",
+      "bytes": 1301
+    },
+    {
+      "path": "platform/androswitch/ppm_publish.h",
+      "sha256": "a76dcfb9e5f6a76dc24a5371da6d475e46334450cb8fe2af15a7cd1e75e88cfe",
+      "bytes": 2522
+    },
+    {
+      "path": "platform/androswitch/Makefile",
+      "sha256": "ee29c9d91d6ccf592ce2a628cf76f36b288f88913042431ed8de6da58c99095e",
+      "bytes": 4124
+    },
+    {
+      "path": "platform/androswitch/tests/display_rotation.c",
+      "sha256": "64da5199896ee0e6363c44897141363a916e46b8685e23e36fb1601e6207e1fd",
+      "bytes": 10582
+    },
+    {
+      "path": "scripts/test-horizon-display.ps1",
+      "sha256": "484e31adb2b013e246e369a79b2a732bbbe4d0b1c2dc9f29e54f596e7bbf682a",
+      "bytes": 5944
+    }
+  ],
+  "whitespace": "git diff --check passed before receipt/documentation update; final check follows.",
+  "emulator": "not_run_for_this_C_change; parent owns next binary/hash-bound E2E",
+  "physical_switch": "not_run_for_this_change",
+  "m9_complete": false
+}

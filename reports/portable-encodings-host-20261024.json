@@ -1,0 +1,314 @@
+{
+  "schema_version": 1,
+  "kind": "portable_string_encoding_host_contracts",
+  "recorded_at_utc": "2026-10-24T16:04:24.460499+00:00",
+  "git_head": "58c6d1cb24351c674eb6650a5834b536096d966d",
+  "working_tree_changes": true,
+  "trigger": {
+    "operation": "String.getBytes(Ljava/lang/String;)[B",
+    "observed_by_parent_in_run": "f7104a7c595f4a18a158b330f39e2bea",
+    "case": 1,
+    "pc": "0x37",
+    "claim": "missing API observed after constructor/GC/exception execution; this receipt tests the common API, not the full external app"
+  },
+  "status": {
+    "implementation": "implemented six encoders and bounded alias recognition",
+    "host": "passed: exactly 5 portable interpreter tests and focused Clippy",
+    "emulator": "not run for this encoding implementation in this receipt",
+    "physical_switch": "not run"
+  },
+  "scope": {
+    "encoders": [
+      "UTF-8 (also default getBytes())",
+      "UTF-16 (nonempty output big-endian BOM)",
+      "UTF-16BE",
+      "UTF-16LE",
+      "ISO-8859-1",
+      "US-ASCII"
+    ],
+    "alias_groups": 365,
+    "known_normalized_keys": 1548,
+    "explicit_case_insensitive_implemented_aliases": 95,
+    "unknown_name": "java.io.UnsupportedEncodingException with IOException ancestry",
+    "known_unimplemented_encoder_or_alias_form": "API_UNAVAILABLE",
+    "null_charset_name": "java.lang.NullPointerException",
+    "allocation": "checked encoded length and actual Value backing charge plus16, fallible reservation of the final managed Vec, no cloned source or encoded scratch buffer; both budget denial and reserve failure throw OutOfMemoryError",
+    "name_processing": "input length <60bytes, fixed stack buffers before allocation"
+  },
+  "commands": [
+    {
+      "command": "./crates/rd-vm/tests/fixtures/portable-encoding/build.ps1",
+      "exit_code": 0,
+      "result": "javac --release8 -> unchanged Java call sites; OpenJDK21.0.12.1 with -Dfile.encoding=UTF-8 ->33 oracle rows; d8 API26 ->classes.dex"
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 cargo test -p as-switch-smoke --features host-cli,portable-tests --test portable_encoding -- --nocapture",
+      "exit_code": 0,
+      "tests": {
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 0
+      },
+      "log": {
+        "path": "local-artifacts/m9/portable-encoding-host/20261024/portable-encoding-tests-final.log",
+        "bytes": 820,
+        "sha256": "3e16a0f321273a799b6d27a7bb44459db4d94788f2b8b2a1a759d200f3652b25"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 cargo clippy -p as-switch-smoke --features host-cli,portable-tests --test portable_encoding -- -D warnings",
+      "exit_code": 0,
+      "log": {
+        "path": "local-artifacts/m9/portable-encoding-host/20261024/portable-encoding-clippy-2.log",
+        "bytes": 161,
+        "sha256": "612c2814c1d3fbec46e79d5daf07c97e4eefaa4ee7f1a394635c986467af70fb"
+      }
+    },
+    {
+      "command": "python scripts/generate-android26-charsets.py local-artifacts/m9/portable-encoding-host/20261024/icu-convrtrs.txt --check",
+      "exit_code": 0,
+      "log": {
+        "path": "local-artifacts/m9/portable-encoding-host/20261024/catalog-check.log",
+        "bytes": 169,
+        "sha256": "81b8c986e5afa35bb8fbf33780c99b17e70a766d0dac8fe1c79742a339543520"
+      }
+    },
+    {
+      "command": "rustfmt --check --edition2021 --config skip_children=true [five encoding-owned Rust files]",
+      "exit_code": 0,
+      "log": {
+        "path": "local-artifacts/m9/portable-encoding-host/20261024/rustfmt-check.log",
+        "bytes": 54,
+        "sha256": "690141341c0c05a3e9db66d38428e4ee69f62d08080659b544a6c69a37ad5438"
+      }
+    }
+  ],
+  "test_evidence": {
+    "portable_core": "Each test constructs the original rd_vm Engine and asserts rd_vm::PORTABLE_CORE; isolated as-switch-smoke avoids std-unifying upstream dev-dependencies",
+    "jvm_equal": "31 unchanged DEX invocation cases, each executed twice across GC; UTF8/default/nonASCII/NUL/signed bytes, UTF16 byte order and BOM, empty output, Latin1/ASCII BMP replacements, aliases, null/unknown/illegal names",
+    "android26_source_derived_only": {
+      "cases": 2,
+      "input": "A + U+1F600 + Z",
+      "encodings": [
+        "US-ASCII",
+        "ISO-8859-1"
+      ],
+      "jvm_hex": "413f5a",
+      "android_art_expected_and_actual_hex": "413f3f5a",
+      "reason": "ART replaces each out-of-range UTF16 code unit, not once per supplementary code point",
+      "android_reference_execution": false
+    },
+    "lifetime_and_io": "six encoders return byte arrays retained across real DEX System.gc; fresh arrays remain independent after mutation; Java FileOutputStream emits exact UTF8 bytes readable via /storage/emulated/0 and the host backing file",
+    "failure_and_bounds": "known missing encoders and unsupported version/option/alias forms do not allocate managed output; UEE caught as IOException; oversized names rejected; over-budget encoding leaves heap bytes/object count unchanged; exact allocation budget and one byte below it checked; DEX catches OutOfMemoryError",
+    "android_data_alias_checks": 13
+  },
+  "historical_attempts": [
+    {
+      "log": {
+        "path": "local-artifacts/m9/portable-encoding-host/20261024/portable-encoding-tests.log",
+        "bytes": 1074,
+        "sha256": "1814235b5525349b6181e14dfc43d8391c50891198eb3a443ec284c547828f37"
+      },
+      "result": "test-only compile error: used array_elems instead of existing as_array_elems accessor; corrected"
+    },
+    {
+      "log": {
+        "path": "local-artifacts/m9/portable-encoding-host/20261024/portable-encoding-tests-2.log",
+        "bytes": 1481,
+        "sha256": "69e413be85ebb3e7914c4a4b91b452166d56a286250be48d1e0764057b9ef3d7"
+      },
+      "result": "4passed/1failed: fixture setup had not created Download directory; real IOException correctly reported, setup corrected"
+    },
+    {
+      "log": {
+        "path": "local-artifacts/m9/portable-encoding-host/20261024/portable-encoding-tests-3.log",
+        "bytes": 820,
+        "sha256": "74eeb6c58d01673c3de248978cb310f7d031557e3a19d2e95b3b52b5a6d237d4"
+      },
+      "result": "5passed before final test-only Clippy fix"
+    },
+    {
+      "log": {
+        "path": "local-artifacts/m9/portable-encoding-host/20261024/portable-encoding-clippy.log",
+        "bytes": 1390,
+        "sha256": "2f17686097cc6f84a544634e965371b91c914dd89acde6c27390a87c60ef850a"
+      },
+      "result": "test-only cloned slice warning; replaced with slice::from_ref"
+    }
+  ],
+  "fixtures": [
+    {
+      "path": "local-artifacts/m9/portable-encoding-host/20261024/classes.dex",
+      "bytes": 3940,
+      "sha256": "ec5b56e555fe079d5d871c653978878de0abf2b85014d32d37f469e8778ab939"
+    },
+    {
+      "path": "local-artifacts/m9/portable-encoding-host/20261024/jvm-oracle.tsv",
+      "bytes": 1800,
+      "sha256": "92367621c128ff2f499724f0bb60b567d0a2b03ab6423d86f114603241a295ce"
+    },
+    {
+      "path": "local-artifacts/m9/portable-encoding-host/20261024/build-receipt.json",
+      "bytes": 1118,
+      "sha256": "8ced10e036e32cb9493de1abe9e4398ba8360841e276d4542dacf6261ad5e616"
+    },
+    {
+      "path": "local-artifacts/m9/portable-encoding-host/20261024/icu-convrtrs.txt",
+      "bytes": 80302,
+      "sha256": "446d9587e344c9cc55af1c878f439e1c96efae3487b02b7f561ba21527b33227"
+    }
+  ],
+  "host_test_binary": {
+    "path": "target/debug/deps/portable_encoding-30110cd7cfdfd1ba.exe",
+    "bytes": 25402803,
+    "sha256": "10f0a41555f2a8f4e445fc7f2c3cb60cff8d04cb9c1cb8a20b9d2ecd8441d0b4"
+  },
+  "tool_versions": [
+    {
+      "path": "local-artifacts/m9/portable-encoding-host/20261024/rustc-version.txt",
+      "bytes": 200,
+      "sha256": "bfc521c53ecfdc13341d9fe68b1f3c14fe028103bb745674158a29050a1d0430"
+    },
+    {
+      "path": "local-artifacts/m9/portable-encoding-host/20261024/java-version.txt",
+      "bytes": 206,
+      "sha256": "f8ace56d47b5580974ae9fdf67189bb9cda08670b15dc168e2151b0301f47260"
+    }
+  ],
+  "sources_at_verified_checkpoint": [
+    {
+      "path": "crates/rd-vm/src/portable/string_encoding.rs",
+      "bytes": 7128,
+      "sha256": "a8ddf674ea40597f290dc363930203bbb9474aed4991d97320c37ded99ff68d9"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/charset_catalog.rs",
+      "bytes": 31111,
+      "sha256": "17d93625ff81ae1de8bef32febf4e1a802c1153556df414457d5cccdee858bb2"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/file.rs",
+      "bytes": 12694,
+      "sha256": "595583915c56df9fb85f7b228fb986ffd7378b17126f41098cd48b9513a6d013"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/mod.rs",
+      "bytes": 6062,
+      "sha256": "e3b26dc181ceba8610006165002d2d43d2ba98f9dff5590a3af23b90f253e0ba"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "bytes": 104777,
+      "sha256": "134b9f220e017c502dc4f88484246f1253250e655d8074c8a25b924988a47a21"
+    },
+    {
+      "path": "crates/as-switch-smoke/Cargo.toml",
+      "bytes": 2350,
+      "sha256": "d090739f371247e8d51177898cb4adaac1ef15627fa8ce6e23ae00e30dae7ffc"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_encoding.rs",
+      "bytes": 11474,
+      "sha256": "275a2669e2da1cf626ccff6d27b00bbfcdb717a82dfbb0d5bec29423414dc631"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-encoding/EncodingFixture.java",
+      "bytes": 4109,
+      "sha256": "774e5a86e312f26a3ba6ee057a52fb7dbaf8cdc388e107fabc905aa88d653417"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-encoding/build.ps1",
+      "bytes": 1653,
+      "sha256": "b4d797dd85b6b2f27d90033f25a7ed65c64fd9d6325fed119c0d3e663f441a1e"
+    },
+    {
+      "path": "scripts/generate-android26-charsets.py",
+      "bytes": 5057,
+      "sha256": "384ca02422035aed4e2bfa8375b794fd857b7fad88ee2e78310089aeb5c24d11"
+    },
+    {
+      "path": "third_party/android-charset/LICENSE",
+      "bytes": 19442,
+      "sha256": "2023a2d68dfcdb1f7b7c5dccb96f88aabba112f63f250cb9e533cc64625eff07"
+    },
+    {
+      "path": "third_party/android-charset/SOURCE.md",
+      "bytes": 3423,
+      "sha256": "bce0d2b338c1b816e5d5536fa120dc2d61f366b0b3bdb53e27a6b606c13e4684"
+    }
+  ],
+  "references": [
+    {
+      "path": "local-artifacts/reference/android26-encoding/icu-convrtrs.txt",
+      "bytes": 80302,
+      "sha256": "446d9587e344c9cc55af1c878f439e1c96efae3487b02b7f561ba21527b33227",
+      "url": "https://android.googlesource.com/platform/external/icu/+/android-8.0.0_r1/icu4c/source/data/mappings/convrtrs.txt",
+      "revision": "android-8.0.0_r1",
+      "use": "generated alias recognition data, retained full ICU license"
+    },
+    {
+      "path": "local-artifacts/reference/android26-encoding/ICU-LICENSE",
+      "bytes": 19442,
+      "sha256": "2023a2d68dfcdb1f7b7c5dccb96f88aabba112f63f250cb9e533cc64625eff07",
+      "url": "https://android.googlesource.com/platform/external/icu/+/android-8.0.0_r1/icu4c/LICENSE",
+      "revision": "android-8.0.0_r1",
+      "use": "reference only; no converter implementation copied"
+    },
+    {
+      "path": "local-artifacts/reference/android26-encoding/String.java",
+      "bytes": 118183,
+      "sha256": "1ff23e9d3d577bcce919886abdff0edcb2b025f31b5a3dc194110d694abe1743",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/lang/String.java",
+      "revision": "android-8.0.0_r1",
+      "use": "reference only; no converter implementation copied"
+    },
+    {
+      "path": "local-artifacts/reference/android26-encoding/Charset.java",
+      "bytes": 37739,
+      "sha256": "3bf7af4ddfc2b14b2568dbbb31f22560097bf3b0ffad787750a1398e51892165",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/nio/charset/Charset.java",
+      "revision": "android-8.0.0_r1",
+      "use": "reference only; no converter implementation copied"
+    },
+    {
+      "path": "local-artifacts/reference/android26-encoding/NativeConverter.cpp",
+      "bytes": 24823,
+      "sha256": "f1743e70c9449e75380fd6639f5590289cce3ef3e571eae9ec394b16d251cc9b",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/luni/src/main/native/libcore_icu_NativeConverter.cpp",
+      "revision": "android-8.0.0_r1",
+      "use": "reference only; no converter implementation copied"
+    },
+    {
+      "path": "local-artifacts/reference/android26-encoding/CharsetUtils.cc",
+      "bytes": 8431,
+      "sha256": "b20d3ef7f9f7fae518cea45b221c97d0050944b8adcf5d5fa1496a1146a69f2d",
+      "url": "https://android.googlesource.com/platform/art/+/android-8.0.0_r1/runtime/native/libcore_util_CharsetUtils.cc",
+      "revision": "android-8.0.0_r1",
+      "use": "reference only; no converter implementation copied"
+    },
+    {
+      "path": "local-artifacts/reference/android26-encoding/icu-alias.cpp",
+      "bytes": 49105,
+      "sha256": "ff2d0c559072c0cdf73cb3e1d3e82b7ee28ffba252da288067e0961325521883",
+      "url": "https://android.googlesource.com/platform/external/icu/+/android-8.0.0_r1/icu4c/source/common/ucnv_io.cpp",
+      "revision": "android-8.0.0_r1",
+      "use": "reference only; no converter implementation copied"
+    },
+    {
+      "path": "local-artifacts/reference/android26-encoding/icu-ucnv.h",
+      "bytes": 85066,
+      "sha256": "43c9a31a69d4ae1b116b0ac3ba75913d020bbca6e5c74951ca65b9c3eb5f748f",
+      "url": "https://android.googlesource.com/platform/external/icu/+/android-8.0.0_r1/icu4c/source/common/unicode/ucnv.h",
+      "revision": "android-8.0.0_r1",
+      "use": "reference only; no converter implementation copied"
+    }
+  ],
+  "limitations": [
+    "The VM stores valid Rust UTF8 strings and cannot preserve raw unpaired Java UTF16 surrogates; malformed-surrogate behavior is not covered.",
+    "UTF16 BOM/endianness behavior is verified against public Java contract and JVM; Android ART supplementary replacement behavior is source-derived, not Android device execution.",
+    "Recognition data does not implement other ICU encoders, providers, converter options, charset objects, or decoding; known gaps fail explicitly.",
+    "Managed heap budget is not a live measurement of Horizon physical memory.",
+    "This host receipt makes no complete constructor-SDK startup, external-game first-screen, emulator, physical Switch, graphics, or audio compatibility claim."
+  ]
+}

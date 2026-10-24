@@ -81,17 +81,12 @@ pub(crate) fn call(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     if class == "Ljava/lang/String;" {
+        if name == "getBytes" {
+            return super::string_encoding::get_bytes(vm, recv, sig, args);
+        }
         let s = vm.heap.as_str(recv)?.to_string();
         return match (name, sig) {
             ("length", "()I") => Ok(Some(Value::Int(s.encode_utf16().count() as i32))),
-            ("getBytes", "()[B") => {
-                let r = vm
-                    .heap
-                    .alloc_array_zeroed(crate::heap::ElemKind::Int, s.len(), "[B")?;
-                *vm.heap.array_elems_mut(r)? =
-                    s.bytes().map(|b| Value::Int(b as i8 as i32)).collect();
-                Ok(Some(Value::Obj(r)))
-            }
             ("equals", "(Ljava/lang/Object;)Z") => {
                 let other = args[0].as_ref()?.and_then(|r| vm.heap.as_str(r).ok());
                 Ok(Some(Value::Int((other == Some(s.as_str())) as i32)))

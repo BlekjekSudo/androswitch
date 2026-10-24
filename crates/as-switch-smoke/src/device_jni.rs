@@ -32,12 +32,30 @@ extern "C" {
     fn as_native_set_session(session: *const c_void);
     fn as_native_session() -> *const c_void;
     fn as_native_fail(code: i32);
+    fn as_native_jni_failure(
+        operation: u32,
+        a: u64,
+        b: u64,
+        c: u64,
+        detail: *const u8,
+        length: usize,
+    );
     fn as_native_finalize_callbacks() -> i32;
     fn as_native_finalize_thread_callbacks() -> i32;
+    fn as_native_pending_callbacks() -> u32;
     fn as_jni_vm_lock();
     fn as_jni_vm_unlock();
     fn as_jni_vm_release() -> u32;
     fn as_jni_vm_acquire(depth: u32);
+}
+fn jni_diagnostic(op: u32, a: u64, b: u64, c: u64, detail: &str) {
+    // SAFETY: C copies at most 4 KiB synchronously, retaining no Rust pointer.
+    // Only API identifiers/error classes are supplied; Java string contents
+    // and arbitrary application exception messages are deliberately omitted.
+    #[allow(unsafe_code)]
+    unsafe {
+        as_native_jni_failure(op, a, b, c, detail.as_ptr(), detail.len());
+    }
 }
 #[derive(Default)]
 struct ThreadState {
@@ -151,17 +169,38 @@ impl Session {
                     module.destructors.clone()
                 })
             };
-            let Some(functions) = functions else {
-                return self.finalize_callback_registry(vm, false);
-            };
-            for function in functions {
-                self.native_call(vm, function, &[])?;
+            if let Some(functions) = functions {
+                for function in functions {
+                    self.native_call(vm, function, &[])?;
+                }
+            } else {
+                self.finalize_callback_registry(vm, false)?;
+                // A global/TLS callback can load another library. Its fini
+                // functions must run before its executable memory is dropped.
+                if !self.finalization_pending() {
+                    return Ok(());
+                }
             }
         }
         Err(error(
             "NATIVE_FINALIZE_LIMIT",
-            "too many libraries during finalization",
+            "too many libraries or callback batches during finalization",
         ))
+    }
+    /// Caller holds the VM lease. Join guest/platform workers before using a
+    /// false result to release roots, TLS, or executable mappings.
+    pub fn finalization_pending(&self) -> bool {
+        let modules_pending = self
+            .loader
+            .borrow()
+            .modules
+            .iter()
+            .any(|module| module.initialized && !module.finalized);
+        // SAFETY: C reads host-owned callback registries; no guest addresses
+        // are dereferenced or callbacks executed. Current host thread owns TLS.
+        #[allow(unsafe_code)]
+        let callbacks_pending = unsafe { as_native_pending_callbacks() } != 0;
+        modules_pending || callbacks_pending
     }
     fn finalize_callback_registry(&self, vm: &mut Engine, thread_local: bool) -> Result<()> {
         let previous = self.vm.replace(vm as *mut Engine);
@@ -194,6 +233,14 @@ impl Session {
         self.threads.borrow_mut().entry(thread()).or_default();
     }
     pub fn detach_runtime_thread(&self) {
+        // SAFETY: platform detach holds the VM lease, after TLS callbacks;
+        // close_vm clears this pointer before the Engine can be dropped.
+        #[allow(unsafe_code)]
+        if let Some(vm) = unsafe { self.vm.get().as_ref() } {
+            if let Some(host) = vm.framework_host() {
+                host.thread_detached(thread());
+            }
+        }
         self.refs.borrow_mut().detach(thread());
         self.threads.borrow_mut().remove(&thread());
     }
@@ -330,7 +377,8 @@ impl Session {
                 } else {
                     format!("L{name};")
                 };
-                if vm.cp.find_class(&class).is_none() && !platform_class(&class) {
+                if !crate::jni_constructor::class_known(vm, &class) {
+                    jni_diagnostic(op, a, b, c, &format!("missing_class={class}"));
                     return Err(Throwable::new("Ljava/lang/NoClassDefFoundError;", class).into());
                 }
                 self.local(Handle::Class(class))
@@ -341,22 +389,25 @@ impl Session {
                 let sig = cstr(c)?;
                 rd_jni::descriptor(&sig).map_err(|e| error(&e.code, e.cause))?;
                 let is_static = length != 0;
-                let method = vm.cp.resolve_method(&class, &name, &sig).ok_or_else(|| {
-                    Throwable::new(
-                        "Ljava/lang/NoSuchMethodError;",
-                        format!("{class}->{name}{sig}"),
-                    )
-                })?;
-                if (method.2.access_flags & rd_vm::engine::ACC_STATIC != 0) != is_static {
-                    return Err(Throwable::new("Ljava/lang/NoSuchMethodError;", name).into());
-                }
+                let declaring =
+                    crate::jni_constructor::method_owner(vm, &class, &name, &sig, is_static)
+                        .map_err(|e| {
+                            jni_diagnostic(
+                                op,
+                                a,
+                                b,
+                                c,
+                                &format!("missing_method={class}->{name}{sig} static={is_static}"),
+                            );
+                            e
+                        })?;
                 vm.ensure_initialized(&class)?;
                 self.refs
                     .borrow_mut()
                     .id(
                         thread(),
                         Handle::Method {
-                            class,
+                            class: declaring,
                             name,
                             sig,
                             is_static,
@@ -579,11 +630,25 @@ impl Session {
                 Ok(bytes.len() as u64)
             }
             26 => {
+                let name = if data.is_null() {
+                    None
+                } else {
+                    Some(
+                        rd_jni::decode_modified_utf8(read_slice::<u8>(data, length)?)
+                            .map_err(|e| error(&e.code, e.cause))?,
+                    )
+                };
+                if let Some(host) = vm.framework_host() {
+                    host.thread_attached(thread(), name.as_deref())?;
+                }
                 self.refs.borrow_mut().attach(thread());
                 self.threads.borrow_mut().entry(thread()).or_default();
                 Ok(0)
             }
             27 => {
+                if let Some(host) = vm.framework_host() {
+                    host.thread_detached(thread());
+                }
                 self.refs.borrow_mut().detach(thread());
                 self.threads.borrow_mut().remove(&thread());
                 Ok(0)
@@ -618,10 +683,56 @@ impl Session {
                     .retain(|(c, _, _), _| c != &class);
                 Ok(0)
             }
-            u32::MAX => Err(error(
-                "JNI_API_UNAVAILABLE",
-                format!("JNI slot {a}: {}", text(data, length)?),
-            )),
+            38 => {
+                // Pending Java exceptions are preserved; construction does
+                // not clear them or expose an uninitialized object to native.
+                if self.pending().is_some() {
+                    return Ok(0);
+                }
+                let class = self.class(a)?;
+                let (declaring, name, sig, is_static) = self.method(b)?;
+                if declaring != class || name != "<init>" || is_static {
+                    jni_diagnostic(op, a, b, c, &format!("constructor_kind={declaring}->{name}{sig} allocated={class} static={is_static}"));
+                    return Err(error(
+                        "JNI_CONSTRUCTOR_METHOD",
+                        "NewObject requires the allocated class's instance constructor",
+                    ));
+                }
+                let (types, _) = rd_jni::descriptor(&sig).map_err(|e| error(&e.code, e.cause))?;
+                if length != types.len() {
+                    return Err(error("JNI_SIGNATURE", "constructor argument count"));
+                }
+                let values = read_slice::<u64>(data, length)?
+                    .iter()
+                    .zip(&types)
+                    .map(|(bits, ty)| self.value(*bits, ty))
+                    .collect::<Result<Vec<_>>>()?;
+                let mut local = None;
+                let result =
+                    crate::jni_constructor::construct(vm, &class, &sig, &values, |object| {
+                        let handle = self.local(Handle::Object(object))?;
+                        local = Some(handle);
+                        Ok(handle)
+                    });
+                if result.is_err() {
+                    jni_diagnostic(op, a, b, c, &format!("constructor={class}-><init>{sig}"));
+                    if let Some(handle) = local {
+                        self.refs
+                            .borrow_mut()
+                            .delete(thread(), handle, false)
+                            .map_err(jni)?;
+                    }
+                }
+                result
+            }
+            u32::MAX => {
+                let name = text(data, length)?;
+                jni_diagnostic(op, a, b, c, &format!("unavailable_jni_slot={a} api={name}"));
+                Err(error(
+                    "JNI_API_UNAVAILABLE",
+                    format!("JNI slot {a}: {name}"),
+                ))
+            }
             _ => Err(error(
                 "JNI_API_UNAVAILABLE",
                 format!("JNI bridge operation {op}"),
@@ -630,6 +741,9 @@ impl Session {
     }
 }
 impl NativeHost for Session {
+    fn current_thread_id(&self) -> Option<u64> {
+        Some(thread())
+    }
     fn load(&self, vm: &mut Engine, name: &str, absolute: bool) -> Result<()> {
         let name = if absolute {
             return Err(error("NATIVE_PATH_LOAD_UNAVAILABLE",format!("System.load({name}): loading an arbitrary VFS ELF path is not implemented; APK System.loadLibrary is supported")));
@@ -777,22 +891,6 @@ impl NativeHost for Session {
         roots
     }
 }
-fn platform_class(class: &str) -> bool {
-    matches!(
-        class,
-        "Ljava/lang/Object;"
-            | "Ljava/lang/String;"
-            | "Ljava/lang/Class;"
-            | "Ljava/lang/Throwable;"
-            | "Ljava/lang/Exception;"
-            | "Ljava/lang/RuntimeException;"
-            | "Ljava/lang/IllegalArgumentException;"
-            | "Ljava/lang/IllegalStateException;"
-            | "Ljava/lang/ArithmeticException;"
-            | "Landroid/app/NativeActivity;"
-            | "Landroid/content/res/AssetManager;"
-    )
-}
 #[repr(C)]
 struct NativeMethod {
     name: u64,
@@ -862,22 +960,34 @@ pub unsafe extern "C" fn as_jni_dispatch(
 ) -> u64 {
     let pointer = unsafe { as_native_session() }.cast::<Session>();
     if pointer.is_null() {
+        jni_diagnostic(op, a, b, c, "error=JNI_SESSION_UNAVAILABLE");
         unsafe { as_native_fail(-1005) };
         return 0;
     }
     let session = unsafe { &*pointer };
     let vm = session.vm.get();
     if vm.is_null() {
+        jni_diagnostic(op, a, b, c, "error=JNI_VM_UNAVAILABLE");
         unsafe { as_native_fail(-1006) };
         return 0;
     }
     match session.handle(unsafe { &mut *vm }, op, a, b, c, data, length) {
         Ok(value) => value,
         Err(VmExit::Exception(exception)) => {
+            jni_diagnostic(op, a, b, c, &format!("exception={}", exception.class));
             session.set_pending(exception);
             0
         }
         Err(e) => {
+            if let VmExit::Error(ref error) = e {
+                jni_diagnostic(
+                    op,
+                    a,
+                    b,
+                    c,
+                    &format!("error={} module={}", error.code, error.module_id),
+                );
+            }
             *session.fatal.borrow_mut() = Some(e);
             unsafe { as_native_fail(-1002) };
             0

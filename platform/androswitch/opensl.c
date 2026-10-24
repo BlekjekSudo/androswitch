@@ -115,15 +115,21 @@ static SLresult realize(SLObjectItf self, SLboolean async) {
   if (o->realized)
     return SL_RESULT_PRECONDITIONS_VIOLATED;
   if (o->kind == 3) {
+    if (as_worker_admission_enter())
+      return SL_RESULT_PRECONDITIONS_VIOLATED;
     Result rc = threadCreate(&o->thread, worker, o, NULL, 256 << 10, 0x2c, -2);
-    if (R_FAILED(rc))
+    if (R_FAILED(rc)) {
+      as_worker_admission_leave();
       return SL_RESULT_RESOURCE_ERROR;
+    }
     rc = threadStart(&o->thread);
     if (R_FAILED(rc)) {
       threadClose(&o->thread);
+      as_worker_admission_leave();
       return SL_RESULT_RESOURCE_ERROR;
     }
     o->started = 1;
+    as_worker_admission_leave();
   }
   o->realized = 1;
   return SL_RESULT_SUCCESS;

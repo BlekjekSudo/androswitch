@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "scope": "Real production PowerShell capture recorder against real filesystem data, old clocks and deterministic copy races. No emulator/device run and no runtime metadata build claim.",
+  "status": "passed_recorder_host_contracts",
+  "command": "./scripts/test-capture-ownership.ps1",
+  "receipt": {
+    "test_sha256": "9fac54fba4ab5cea5db8f034d170a3c4ac48f4a6650c74d27004d79df2fbbe93",
+    "harness_sha256": "9388394cb298153c3783ac4691a84770cc0b3e5b5ff58f05cf0c10f4ccd904a4",
+    "cases": [
+      {
+        "passed": true,
+        "id": "matching generation accepts old-clock GPU image"
+      },
+      {
+        "passed": true,
+        "id": "wrong generation rejected"
+      },
+      {
+        "passed": true,
+        "id": "missing protocol rejected"
+      },
+      {
+        "passed": true,
+        "id": "unknown protocol rejected"
+      },
+      {
+        "passed": true,
+        "id": "matching active CPU request accepted"
+      },
+      {
+        "passed": true,
+        "id": "after return accepts GPU and excludes launcher CPU image"
+      },
+      {
+        "passed": true,
+        "id": "different active package rejected"
+      },
+      {
+        "passed": true,
+        "id": "changed current revision rejected"
+      },
+      {
+        "passed": true,
+        "id": "generation changed during copy rejected"
+      },
+      {
+        "passed": true,
+        "id": "CPU return during copy rejected"
+      },
+      {
+        "passed": true,
+        "id": "partial PPM remains unverified"
+      },
+      {
+        "passed": true,
+        "id": "complete retry accepted"
+      },
+      {
+        "passed": true,
+        "id": "validated session copy stays immutable"
+      },
+      {
+        "passed": true,
+        "id": "invalid session path rejected"
+      }
+    ],
+    "scope": "Production recorder, real local files, guest-clock skew and deterministic copy races; no emulator or device execution.",
+    "schema_version": 1,
+    "status": "passed"
+  },
+  "receipt_file": "local-artifacts/m9/capture-ownership/fcffeabac5db4fe7827f6909b594cc10/result.json",
+  "receipt_sha256": "1d3568d88a06558aad18bb2017691f8bc4889141c3f5ed06566601763ef5656f",
+  "runtime_protocol": {
+    "capture_protocol": 1,
+    "owner": "logs/capture-owner.json written after clearing previous images, before publishing running session",
+    "identity": "session/package/revision checked before and after copying; CPU image also requires active matching pending request",
+    "timestamps": "not used to claim ownership; guest and host clock offsets can differ",
+    "implementation_build": "pending subsequent exact-NRO execution"
+  },
+  "source_hashes": [
+    {
+      "path": "scripts/test-ryujinx-external.ps1",
+      "sha256": "9388394cb298153c3783ac4691a84770cc0b3e5b5ff58f05cf0c10f4ccd904a4"
+    },
+    {
+      "path": "scripts/test-capture-ownership.ps1",
+      "sha256": "9fac54fba4ab5cea5db8f034d170a3c4ac48f4a6650c74d27004d79df2fbbe93"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/launcher.rs",
+      "sha256": "78254571422a99c1739094056cf926d73515162d850fec5f42ddf412ae9456ec"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/session_report.rs",
+      "sha256": "073076a852b77c96c972fd11a548da0e40c5d2796b905e309f04672df516be80"
+    }
+  ],
+  "physical_switch": "not_run_for_these_changes"
+}

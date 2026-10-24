@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "kind": "focused_read_only_memory_source_review",
+  "recorded_at_utc": "2026-10-24T16:37:12.787101+00:00",
+  "git_head": "58c6d1cb24351c674eb6650a5834b536096d966d",
+  "working_tree_changes": true,
+  "method": "Read-only source/call-path/diff inspection. This receipt binds the stable reviewed-area source snapshots below; it is not a whole-repository or whole-file audit.",
+  "findings": {
+    "new_actionable": [],
+    "conclusion": "No concrete new bounds, lifetime, or false-success defect found within the stated reviewed paths."
+  },
+  "checked_properties": [
+    "Loader override bounds remain intact and pointer-range overflow is checked; ordinary process-limit subtraction and alignment clamp instead of unsigned wrap.",
+    "Allocator capacity, aggregate available estimate, and kernel process accounting remain distinct; telemetry explicitly disclaims largest contiguous free knowledge.",
+    "Device DEX admission uses actual owned raw capacity and conservative decoded table/string charges; cumulative policy rejection precedes decoded parsing.",
+    "Execution frame leave uses exact owner plus serial ticket; scope restore uses the captured owner, so independent native-suspended owners do not remove each others roots.",
+    "The device identity provider uses the actual nonzero platform thread handle; the collector traces every active owner and completed owner metadata is pruned.",
+    "Encoding bounds names before fixed-buffer lookup, checks encoded size and actual Value backing charge before reserve, and fills the final vector without intervening VM callbacks/GC.",
+    "Unknown/null names, known missing encoders, managed-budget denial and backing-reserve failure preserve distinct real error contracts; no unsupported conversion reports success."
+  ],
+  "limits": [
+    "Admission estimates and managed Heap budgets do not form a hard process RSS guarantee.",
+    "Preexisting Heap arena metadata, interpreter register buffers, classpath method/code/descriptor caches and some parser vectors still grow through infallible allocations; host allocation exhaustion can abort despite lower logical/managed usage.",
+    "Aggregate newlib free space is not the largest contiguous block; fragmentation can fail a reservation below the reported aggregate.",
+    "The owner review relies on the documented exclusive VM lease, real per-thread identity and same-thread native-call return contract; it does not establish arbitrary backend correctness.",
+    "Encoding retains the documented unpaired UTF16-surrogate representation limitation and explicit unsupported encoder/provider/option gaps.",
+    "This is not a full security review, adversarial memory-exhaustion execution, new test result, or complete external-APK compatibility proof."
+  ],
+  "actions_performed": {
+    "production_source_edits": false,
+    "cargo_or_compiler_execution": false,
+    "emulator_execution": false,
+    "physical_device_execution": false,
+    "new_feature_work": false,
+    "only_new_artifact": "reports/m9-memory-source-review-20261024.json"
+  },
+  "stable_reviewed_area_snapshots": [
+    {
+      "path": "platform/androswitch/memory_policy.h",
+      "bytes": 2418,
+      "sha256": "fef208063c81d398f8b475013539bca85db6be2224640b8b22a71e8640f5205f",
+      "reviewed_area": "heap plan subtraction/alignment/clamping; loader-override precedence; aggregate-free calculation"
+    },
+    {
+      "path": "platform/androswitch/memory.c",
+      "bytes": 4663,
+      "sha256": "4deaa40da2f04ec52fdd301d192f46c8071c0beaa3b19e9a82706640d652470d",
+      "reviewed_area": "libnx heap initialization, override address bounds, allocator snapshots, truthful noncontiguous telemetry, application-override admission"
+    },
+    {
+      "path": "crates/rd-dex/src/budget.rs",
+      "bytes": 5694,
+      "sha256": "58e01e3be793710f0720f1a8e8e44e9b8ebb4a5e7d37e8932b9a65ae426c2d6c",
+      "reviewed_area": "raw capacity, decoded string/table/map/class-index charges, bounded input access, cumulative budget rejection before metadata decode"
+    },
+    {
+      "path": "crates/rd-dex/src/strings.rs",
+      "bytes": 6685,
+      "sha256": "8bced16cb681bcefa3c60d17332a1fdd8028f8efe2dcc91f3d8f622538e4b65f",
+      "reviewed_area": "string table bounds, one-MiB encoded-string scan bound and actual decoded allocation strategy used by admission accounting"
+    },
+    {
+      "path": "crates/rd-dex/src/mutf8.rs",
+      "bytes": 9371,
+      "sha256": "5509f6674656bd201882d60466923643837b41e56568140c176c56ee1d58323f",
+      "reviewed_area": "lossy decoder output expansion and String capacity strategy relevant to the DEX estimate"
+    },
+    {
+      "path": "crates/as-framework/src/memory.rs",
+      "bytes": 2431,
+      "sha256": "cad05ac7cb0d68005d38bbef647e2a0b49a5f0bbef978b5fe30ff8b034698130",
+      "reviewed_area": "parser/raw policy ceilings, actual-free callback reserve guard and reporting scope"
+    },
+    {
+      "path": "crates/rd-vm/src/heap.rs",
+      "bytes": 23342,
+      "sha256": "aad67df50aaa6d8f787496a4b171c0ddd00067869a07617b7c9d519efb8e449d",
+      "reviewed_area": "real Value-array charge, owner identity binding, per-owner allocation pins/cutoffs, captured-owner scope restore and preexisting arena growth"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/execution.rs",
+      "bytes": 14002,
+      "sha256": "1b789f67b7dc4c89620aecfd2a475517f49406c1e06ca14b2a063ac2711193d0",
+      "reviewed_area": "stable owner/serial frame tickets, owner-specific root publication and diagnostics, independent scope restoration, active-owner bound and completed-owner pruning"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/gc.rs",
+      "bytes": 3912,
+      "sha256": "c86e6405779bb39acbec32f9474cf19a6aad11695e484f157646d6cd67d7db35",
+      "reviewed_area": "root union across suspended owners and native/framework graphs, current-owner root updates and free-slot filtering"
+    },
+    {
+      "path": "crates/rd-vm/src/native_host.rs",
+      "bytes": 1161,
+      "sha256": "43c3e6725afad678a5cc08f5cefe378cfaee8afe289f7e352d869f42c3217c10",
+      "reviewed_area": "actual native thread identity contract and shared identity provider binding into Heap"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/string_encoding.rs",
+      "bytes": 7128,
+      "sha256": "a8ddf674ea40597f290dc363930203bbb9474aed4991d97320c37ded99ff68d9",
+      "reviewed_area": "fixed-size charset-name buffers, checked output length/Value charge, fallible final vector reserve, signed byte output and explicit error/gap handling"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/charset_catalog.rs",
+      "bytes": 31111,
+      "sha256": "17d93625ff81ae1de8bef32febf4e1a802c1153556df414457d5cccdee858bb2",
+      "reviewed_area": "explicit encoder-alias versus known-unsupported recognition data boundaries"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/file.rs",
+      "bytes": 12694,
+      "sha256": "595583915c56df9fb85f7b228fb986ffd7378b17126f41098cd48b9513a6d013",
+      "reviewed_area": "getBytes overload routing before legacy source-string cloning"
+    }
+  ],
+  "context_call_sites_without_whole_file_binding": [
+    {
+      "path": "crates/as-framework/src/lib.rs",
+      "reviewed_context": "cumulative multidex admission/actual capacity use and stage checks",
+      "binding": "omitted: shared integration/classloading work may modify these files; only the stated call-path context was inspected"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/application.rs",
+      "reviewed_context": "actual allocator snapshot supplied to AppOptions and admission-report claims",
+      "binding": "omitted: shared integration/classloading work may modify these files; only the stated call-path context was inspected"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/native_probe.rs",
+      "reviewed_context": "file-backed native extraction limit and reserve/staging allowance",
+      "binding": "omitted: shared integration/classloading work may modify these files; only the stated call-path context was inspected"
+    },
+    {
+      "path": "crates/rd-vm/src/engine.rs",
+      "reviewed_context": "frame entry/leave, current-owner depth/labels, captured scope mark restoration and invocation-local error PC",
+      "binding": "omitted: shared integration/classloading work may modify these files; only the stated call-path context was inspected"
+    },
+    {
+      "path": "crates/rd-vm/src/interp.rs",
+      "reviewed_context": "register root publication before guest/native calls, allocation-pressure collection and local PC updates",
+      "binding": "omitted: shared integration/classloading work may modify these files; only the stated call-path context was inspected"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "reviewed_context": "existing method/code/descriptor caches and UEE ancestry context",
+      "binding": "omitted: shared integration/classloading work may modify these files; only the stated call-path context was inspected"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_jni.rs",
+      "reviewed_context": "device Session actual thread identity and VM lease release/reacquire around native calls",
+      "binding": "omitted: shared integration/classloading work may modify these files; only the stated call-path context was inspected"
+    },
+    {
+      "path": "platform/switch-smoke/jni.c",
+      "reviewed_context": "as_jni_thread returns actual threadGetCurHandle",
+      "binding": "omitted: shared integration/classloading work may modify these files; only the stated call-path context was inspected"
+    },
+    {
+      "path": "platform/androswitch/main.c",
+      "reviewed_context": "newlib memalign allocator bridge and runtime-ready guard call sites",
+      "binding": "omitted: shared integration/classloading work may modify these files; only the stated call-path context was inspected"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/lib.rs",
+      "reviewed_context": "Rust GlobalAlloc bridge and allocation-error behavior",
+      "binding": "omitted: shared integration/classloading work may modify these files; only the stated call-path context was inspected"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_workers.rs",
+      "reviewed_context": "stable owner pointers and serialized worker callback context",
+      "binding": "omitted: shared integration/classloading work may modify these files; only the stated call-path context was inspected"
+    }
+  ],
+  "evidence_relationship": "Prior host/emulator receipts retain their original claims. This source review adds no new execution evidence and does not extend those claims to arbitrary APKs."
+}

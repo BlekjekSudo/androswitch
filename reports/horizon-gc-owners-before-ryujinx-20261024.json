@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T15:01:25.7036327Z",
+  "status": "native_suspension_gc_lifetime_regression_reproduced",
+  "scope": "Exact unchanged SDK/API26 ARM64 fixture on the pre-fix NRO, actual two-worker Java/native suspension and GC. This receipt records a failed lifetime contract, not game compatibility or physical hardware validation.",
+  "run": {
+    "emulator_path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-bin-9f3cd3d2\\Ryujinx.exe",
+    "harness_status": "blocked_runtime",
+    "id": "f13b594db1074c339b56108e455b8329",
+    "nro_sha256": "1f2d669925827ac9968464adc2a2050886240211b2d8ceb976e9f7c9c70fb5cd",
+    "frontend": "headless_sdl2",
+    "emulator_version": "1.3.3+e2143d4",
+    "profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+    "emulator_scope": "Task-local Ryujinx build with separately documented CFG unknown-MRS fix, not an unmodified stock emulator claim",
+    "sd_restore": "restored",
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "startup_wait_ms": 5000
+  },
+  "fixture": {
+    "barrier_sleep_ns": 1000000,
+    "apk_bytes": 5914,
+    "barrier_timeout_seconds": 15,
+    "on_pause_cancellation": "Native atomic abort observed by both barriers before joins; cancellation cannot publish success",
+    "local_object_contract": "Payload objects exist only in bodyA/bodyB DEX registers. Neither object is passed to JNI, stored in fields/statics, or captured by Runnable. A forces GC and fully unwinds bodyA before its wrapper releases native-suspended B.",
+    "session_id": "f13b594db1074c339b56108e455b8329-1",
+    "apk_sha256": "d8194d04fdd0fc749ab6ab327d4397cbb32944e8665bb00fed54e93719decb59",
+    "package": "org.fixture.gcownersproof",
+    "revision": 1
+  },
+  "observation": {
+    "installed_identity_matches": true,
+    "failure_method": "Lorg/androswitch/contracts/GcOwnersActivity;->bodyB()I",
+    "runtime_status": "failed",
+    "identity_status": "known",
+    "application_captures": [],
+    "error": "VM_TYPE_ERROR [rd-vm]: field read on collected object [pc 0x11: Insn { opcode: 82, fmt: F22c, size: 2, kind: RegRegIndex(2, 0, 3) }]\n  at Lorg/androswitch/contracts/GcOwnersActivity;->bodyB()I\n  at Lorg/androswitch/contracts/GcOwnersActivity;->access$200()I\n  at Lorg/androswitch/contracts/GcOwnersActivity$2;->run()V; cleanup: ACTIVITY_STOP_ERROR: VM_TYPE_ERROR [rd-vm]: field read on collected object [pc 0x11: Insn { opcode: 82, fmt: F22c, size: 2, kind: RegRegIndex(2, 0, 3) }]\n  at Lorg/androswitch/contracts/GcOwnersActivity;->bodyB()I\n  at Lorg/androswitch/contracts/GcOwnersActivity;->access$200()I\n  at Lorg/androswitch/contracts/GcOwnersActivity$2;->run()V\n  at Lorg/androswitch/contracts/GcOwnersActivity;->onPause()V",
+    "failure_pc": "0x11",
+    "failure_api": "iget Payload.value",
+    "java_stop_error": "ACTIVITY_STOP_ERROR repeats the original collected-object error during onPause; resource closure does not mean every Java lifecycle callback succeeded",
+    "resource_cleanup_reached_runtime_closed": true,
+    "launcher_ready": true,
+    "first_screen": "not_visually_verified",
+    "worker_wait_results": [
+      {
+        "operation": "worker_wait_end",
+        "result": 0,
+        "detail": 0,
+        "tick": 141224006
+      },
+      {
+        "operation": "worker_wait_end",
+        "result": 0,
+        "detail": 0,
+        "tick": 141291208
+      }
+    ]
+  },
+  "root_cause": "The VM mutex serializes current accesses but is released during machine calls. Independent suspended workers retain Java frames. Global last-frame publication/pop and heap scope truncation allow older A to overwrite/remove suspended B roots and pin scopes.",
+  "physical_device": "not_run_for_this_fixture_and_source",
+  "upstream": "RustyDroid fork at 6388281f66d254c8e01a0fdc7a5a9a30239bc762; RustyDroid and contributor credit retained",
+  "evidence": [
+    {
+      "sha256": "09d16cb7f9a0544e274543b305c33ef1f76ceb6f73583d365a01e55a0e48d81a",
+      "bytes": 10452,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\verification.json"
+    },
+    {
+      "sha256": "8cd4e85244a5558d239330a539e860d1854dbb22949adfb12667669065f1ccee",
+      "bytes": 6595,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\emulator.json"
+    },
+    {
+      "sha256": "737ee09bb046279074f692cd0a03107602c0e55291b6569f32667a1d5a44f6ec",
+      "bytes": 642,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\launcher-test.json"
+    },
+    {
+      "sha256": "d8194d04fdd0fc749ab6ab327d4397cbb32944e8665bb00fed54e93719decb59",
+      "bytes": 5914,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\gc-owners-proof.apk"
+    },
+    {
+      "sha256": "cbcca21630ff2c1364a1a0c8fd3fdbac0901bdcf8e2bc8b82d23af5f2b7724aa",
+      "bytes": 1599,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\fixture-build-receipt.json"
+    },
+    {
+      "sha256": "8e0c2d561f617700e5a4181fd5b937490c51a648f43b2698ad5fb614b58d4476",
+      "bytes": 171,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\sessions\\f13b594db1074c339b56108e455b8329-1\\capture-owner.json"
+    },
+    {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\sessions\\f13b594db1074c339b56108e455b8329-1\\jni-failures.log"
+    },
+    {
+      "sha256": "508a53dba11eac77ffb3bfe1208ef0a1ddf8cf18a982b943752e75b75bb14d78",
+      "bytes": 538,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\sessions\\f13b594db1074c339b56108e455b8329-1\\media-stop.log"
+    },
+    {
+      "sha256": "260a38d2483870685d09ce74ecdd46064e27e6ad58a7d053141c420ae6604d7d",
+      "bytes": 496,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\sessions\\f13b594db1074c339b56108e455b8329-1\\memory-admission.json"
+    },
+    {
+      "sha256": "a441ab13b073a8508b5a69a5de161c8b885a061e5b57005b2a0e6aae94d79365",
+      "bytes": 3662,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\sessions\\f13b594db1074c339b56108e455b8329-1\\memory.log"
+    },
+    {
+      "sha256": "6e675bd28d259185438de680f185934eb1f8fb26063f0f50f7822841cf410619",
+      "bytes": 665,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\sessions\\f13b594db1074c339b56108e455b8329-1\\native-calls.log"
+    },
+    {
+      "sha256": "1e4c78d1282551f25f8745b428e8c4fd4a367fda5132ef22d2d6b0a131955e8d",
+      "bytes": 384,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\sessions\\f13b594db1074c339b56108e455b8329-1\\native-compatibility.json"
+    },
+    {
+      "sha256": "6778e9ce81e9a207accfe35f4553ba481069e4a3a82239a26ead382623b6d227",
+      "bytes": 87,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\sessions\\f13b594db1074c339b56108e455b8329-1\\native-modules.log"
+    },
+    {
+      "sha256": "36ead20de99ea2faaa15365551b9c84ac949e3ea91f0b70a7aa03fdfa2f56c6c",
+      "bytes": 950,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\sessions\\f13b594db1074c339b56108e455b8329-1\\session-report.json"
+    },
+    {
+      "sha256": "8212c87ffbfc1927b5a06a69dbc8cfcdd969f1ddbdd54f8e4e3240ae5b932f69",
+      "bytes": 1364,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f13b594db1074c339b56108e455b8329\\sessions\\f13b594db1074c339b56108e455b8329-1\\teardown.log"
+    }
+  ],
+  "limitations": [
+    "The raw app session failed; safe resource closure and SD restoration are separate observations.",
+    "No successful native proof JSON or application-render proof was reported in this pre-fix run.",
+    "The mutable working tree was already receiving a fix when this older frozen NRO executed; the NRO/APK hashes bind the actual regression.",
+    "The same exact APK must still pass on a corrected NRO; this before receipt does not establish the fix."
+  ]
+}

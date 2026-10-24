@@ -18,6 +18,12 @@ pub mod framework_host;
 pub mod native_host;
 #[cfg(not(feature = "std"))]
 mod portable;
+/// Internal contracts exposed only to the isolated portable host test target.
+#[doc(hidden)]
+#[cfg(all(not(feature = "std"), feature = "portable-test-support"))]
+pub mod portable_test_support {
+    pub use crate::portable::execution::contracts::*;
+}
 #[cfg(feature = "std")]
 pub(crate) mod maps {
     pub use std::collections::{hash_map::Entry, HashMap, HashSet};

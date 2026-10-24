@@ -4,6 +4,7 @@
  * failures whose process state must never be reused. */
 #define _POSIX_C_SOURCE 200809L
 #include "../glsurface.h"
+#include "worker_admission.h"
 #include <assert.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -23,6 +24,10 @@ static struct {
   int create_calls, initialize_calls, egl_close_calls, thread_close_calls;
   int thread_close_attempts, swaps, failure, cleanup_calls, self_join;
   int self_join_result;
+  int width, height;
+  int slow_termination, termination_entered;
+  int wait_result, wait_raw_result;
+  int64_t wait_timeout;
 } test;
 static Thread *worker;
 static _Thread_local Handle current_handle;
@@ -93,13 +98,21 @@ Result svcWaitSynchronization(int32_t *index, const Handle *handles, int count,
                               int64_t timeout) {
   assert(count == 1 && worker && handles[0] == worker->handle && timeout > 0);
   __atomic_store_n(&test.wait_entered, 1, __ATOMIC_RELEASE);
+  test.wait_timeout = timeout;
   if (__atomic_exchange_n(&test.force_timeout, 0, __ATOMIC_ACQ_REL))
     return 1;
-  for (int attempt = 0; attempt < 2000; attempt++) {
+  struct timespec start, now;
+  assert(!clock_gettime(CLOCK_MONOTONIC, &start));
+  for (;;) {
     if (__atomic_load_n(&worker->done, __ATOMIC_ACQUIRE)) {
       *index = 0;
       return 0;
     }
+    assert(!clock_gettime(CLOCK_MONOTONIC, &now));
+    int64_t elapsed = (int64_t)(now.tv_sec - start.tv_sec) * 1000000000 +
+                      now.tv_nsec - start.tv_nsec;
+    if (elapsed >= timeout)
+      break;
     delay();
   }
   return 1;
@@ -141,7 +154,8 @@ int as_application_gl_call(uint64_t vm, uint64_t android, uint32_t view,
     test.attached = 0;
   }
   if (event >= 1 && event <= 3)
-    assert(context == 42 && config == 77 && width == 1280 && height == 720);
+    assert(context == 42 && config == 77 && width == test.width &&
+           height == test.height);
   if (event == 6)
     assert(!context && !config && !width && !height);
   if (event == 3) {
@@ -177,8 +191,8 @@ int as_media_egl_create(AsEglSurface *surface, uint64_t config, int version) {
   surface->context = 42;
   surface->surface = 43;
   surface->config = 77;
-  surface->width = 1280;
-  surface->height = 720;
+  surface->width = test.width;
+  surface->height = test.height;
   return test.egl_create_fail ? -502 : 0;
 }
 int as_media_egl_swap(AsEglSurface *surface) {
@@ -205,10 +219,23 @@ int as_media_egl_close(AsEglSurface *surface) {
   test.egl_close_calls++;
   if (test.egl_close_fail)
     return -503;
+  if (test.slow_termination) {
+    __atomic_store_n(&test.termination_entered, 1, __ATOMIC_RELEASE);
+    /* A real host worker remains owned for longer than the old two-second
+     * cutoff, including its EGL teardown and later TLS/detach callbacks. */
+    struct timespec pause = {2, 200000000};
+    assert(!nanosleep(&pause, NULL));
+  }
   memset(surface, 0, sizeof(*surface));
   return 0;
 }
 void as_media_gl_fail(int code) { test.failure = code; }
+void as_media_stop_event(const char *operation, int result, uint64_t detail) {
+  if (!strcmp(operation, "glsurface_wait_end")) {
+    test.wait_result = result;
+    test.wait_raw_result = (int)detail;
+  }
+}
 static void wait_for(int *flag) {
   for (int attempt = 0; attempt < 2000; attempt++) {
     if (__atomic_load_n(flag, __ATOMIC_ACQUIRE))
@@ -231,9 +258,22 @@ static void *joiner(void *unused) {
 int main(int argc, char **argv) {
   assert(argc == 2);
   const char *scenario = argv[1];
+  test.width = !strncmp(scenario, "portrait", 8) ? 720 : 1280;
+  test.height = !strncmp(scenario, "portrait", 8) ? 1280 : 720;
+  int preserve = !strcmp(scenario, "pause-preserve") ||
+                 !strcmp(scenario, "portrait-pause-preserve");
   test.callback_fail = -1;
   test.callback_error = -504;
   test.states[0] = 1 | 4;
+  if (!strcmp(scenario, "admission-closed")) {
+    as_worker_admission_begin_shutdown();
+    assert(as_glsurface_start(&request) == -ECANCELED);
+    assert(!as_glsurface_running() && !test.create_calls);
+    assert(!as_glsurface_quiesce());
+    assert(as_glsurface_start(&request) == -ECANCELED);
+    as_worker_admission_reset();
+    scenario = "normal"; /* normal complete lifecycle after admitted reset */
+  }
   if (!strcmp(scenario, "invalid")) {
     AsGlSurfaceRequest invalid = request;
     invalid.client_version = 3;
@@ -257,8 +297,7 @@ int main(int argc, char **argv) {
     assert(!as_glsurface_running() && !test.event_count);
     return 0;
   }
-  if (!strcmp(scenario, "pause-preserve") ||
-      !strcmp(scenario, "suspend-failure") ||
+  if (preserve || !strcmp(scenario, "suspend-failure") ||
       !strcmp(scenario, "resume-failure")) {
     test.states[1] = 1 | 2 | 16;
     test.states[2] = 1 | 4;
@@ -303,10 +342,12 @@ int main(int argc, char **argv) {
     test.wait_fail = 1;
   else if (!strcmp(scenario, "thread-close-failure"))
     test.close_thread_fail = 1;
+  else if (!strcmp(scenario, "portrait-slow-termination"))
+    test.slow_termination = 1;
   else if (!strcmp(scenario, "timeout") || !strcmp(scenario, "concurrent-join"))
     test.block_draw = 1;
   else
-    assert(!strcmp(scenario, "normal"));
+    assert(!strcmp(scenario, "normal") || !strcmp(scenario, "portrait"));
   assert(as_glsurface_start(&request) == 0);
   if (test.block_draw) {
     wait_for(&test.draw_entered);
@@ -322,10 +363,18 @@ int main(int argc, char **argv) {
     } else {
       test.force_timeout = 1;
       assert(as_glsurface_quiesce() == -EBUSY);
+      assert(test.wait_result == -EBUSY && test.wait_raw_result == 1);
       assert(as_glsurface_running() && as_glsurface_start(&request) == -EBUSY);
       __atomic_store_n(&test.release_draw, 1, __ATOMIC_RELEASE);
       assert(as_glsurface_quiesce() == 0);
     }
+  } else if (test.slow_termination) {
+    wait_for(&test.termination_entered);
+    assert(as_glsurface_running());
+    assert(as_glsurface_quiesce() == 0);
+    assert(test.wait_timeout == 6000000000);
+    assert(!test.wait_result && !test.wait_raw_result);
+    assert(count_event(5) == 1 && count_event(6) == 1 && !test.failure);
   } else {
     wait_for(&test.worker_done);
     int result = as_glsurface_quiesce();
@@ -346,16 +395,17 @@ int main(int argc, char **argv) {
   assert(!as_glsurface_running() && test.thread_close_calls == 1);
   assert(test.cleanup_calls == 1 && test.cleared && !test.attached);
   assert(count_event(0) == 1 && count_event(5) == (test.callback_fail != 0));
-  if (!strcmp(scenario, "normal") || test.self_join || test.block_draw) {
+  if (!strcmp(scenario, "normal") || !strcmp(scenario, "portrait") ||
+      test.self_join || test.block_draw) {
     assert(test.swaps == 1 && count_event(6) == 1 && !test.failure);
     assert(test.events[test.event_count - 2] == 10 &&
            test.events[test.event_count - 1] == 5);
   }
   if (test.self_join)
     assert(test.self_join_result == -EBUSY);
-  if (!strcmp(scenario, "pause-preserve"))
+  if (preserve)
     assert(test.create_calls == 1 && count_event(6) == 1 && test.swaps == 2);
-  if (!strcmp(scenario, "pause-preserve"))
+  if (preserve)
     assert(test.suspend_calls == 1 && test.resume_calls == 1 &&
            count_event(1) == 1 && count_event(2) == 2);
   if (!strcmp(scenario, "pause-before-create"))

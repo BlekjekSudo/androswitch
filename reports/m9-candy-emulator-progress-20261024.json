@@ -1,0 +1,350 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "scope": "Isolated emulator diagnostic validation followed by an actual unmodified Candy APK run. Not a stock-emulator or game compatibility pass.",
+  "translator_contracts": "reports/m9-cpu-id-emulator-20261024.json",
+  "emulator_changes": "Only ARMeilleure.dll replaced in a task-local stock bundle; executed unknown MRS still raises runtime undefined. Original installed emulator, guest APK and CPU capability flags unchanged.",
+  "profile": "Task-local profile; existing configuration copied, then an existing emulator key file staged to satisfy stock startup. Key contents were not logged or included in evidence/package.",
+  "runs": [
+    {
+      "observation": "Diagnostic assembly identity mismatch; emulator configuration load failed before guest execution. No APK result.",
+      "receipt": {
+        "physical_device": "not_run",
+        "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+        "commands": 5,
+        "session_id": "89c92cba622a4614adb4d001443b7351",
+        "nro_sha256": "27e8a76e36f0cdb9bf2d8886832631433521db1dab0ec37581d5cfbf88061084",
+        "status": "attempted_failed",
+        "inputs": [
+          {
+            "source": "D:\\Download\\candycrush.apk",
+            "index": 0,
+            "staged_name": "0000-external.apk",
+            "bytes": 163371628,
+            "sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+            "install_snapshot_step": 3,
+            "expected_session_id": "89c92cba622a4614adb4d001443b7351-1"
+          }
+        ],
+        "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-89c92cba622a4614adb4d001443b7351",
+        "emulator_path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\ryujinx-cfg-fix\\publish\\Ryujinx.exe",
+        "execution_attempted": true,
+        "schema_version": 1,
+        "pid": 250724,
+        "emulator_version": "1.3.3+e2143d4",
+        "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+        "backend": "ryujinx",
+        "error": "The owned emulator exited before the launcher workflow completed.",
+        "emulator_exit_code_before_cleanup": -532462766,
+        "cases": [],
+        "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\89c92cba622a4614adb4d001443b7351\\androswitch.nro",
+        "root_handle_pinned": true,
+        "emulator_sha256": "5dc6100fe5420ee8ee6d4049d0e6d8aa9719b04846f2be9aa1b00a33bd6a59f4",
+        "visual_review": "not_run",
+        "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-89c92cba622a4614adb4d001443b7351",
+        "sd_original_restore": "restored",
+        "startup_wait_ms": 10000
+      },
+      "raw_evidence": [
+        {
+          "path": "local-artifacts/m9/external-runs/89c92cba622a4614adb4d001443b7351/verification.json",
+          "sha256": "5e3e4a765d90118b1e54c4c5ca96286e85e4a7b7098fc89184fbaa17b2faad22"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/89c92cba622a4614adb4d001443b7351/ryujinx.stdout.log",
+          "sha256": "edc666434b5940f8b3a9ddaf1a3ed58d7b8674e8151c724d170d43fbd29bdc25"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/89c92cba622a4614adb4d001443b7351/ryujinx.stderr.log",
+          "sha256": "4106190d4ba4cc38cbdc0dcaffb48e186c4c6dace82d387a041a4395f579da13"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/89c92cba622a4614adb4d001443b7351/launcher-test.json",
+          "sha256": "cc22c4f9e046fcbee15d9725aea722fe3a6916b5ac74523dd8e9de93a4bea13f"
+        }
+      ]
+    },
+    {
+      "observation": "Versioned diagnostic configuration loaded; missing-key startup gate prevented deferred NRO launch in the isolated GUI profile. No APK result.",
+      "receipt": {
+        "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+        "emulator_version": "1.3.3+e2143d4",
+        "backend": "ryujinx",
+        "error": "No fresh completed launcher report before the timeout.",
+        "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+        "session_id": "46ad318a24fb45a9811da348cc685a20",
+        "cases": [],
+        "physical_device": "not_run",
+        "emulator_path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\ryujinx-cfg-fix\\publish-versioned\\Ryujinx.exe",
+        "root_handle_pinned": true,
+        "status": "attempted_failed",
+        "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-46ad318a24fb45a9811da348cc685a20",
+        "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\46ad318a24fb45a9811da348cc685a20\\androswitch.nro",
+        "startup_wait_ms": 10000,
+        "sd_original_restore": "restored",
+        "visual_review": "not_run",
+        "execution_attempted": true,
+        "inputs": [
+          {
+            "bytes": 163371628,
+            "staged_name": "0000-external.apk",
+            "expected_session_id": "46ad318a24fb45a9811da348cc685a20-1",
+            "install_snapshot_step": 3,
+            "sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+            "index": 0,
+            "source": "D:\\Download\\candycrush.apk"
+          }
+        ],
+        "commands": 5,
+        "schema_version": 1,
+        "nro_sha256": "27e8a76e36f0cdb9bf2d8886832631433521db1dab0ec37581d5cfbf88061084",
+        "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-46ad318a24fb45a9811da348cc685a20",
+        "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+        "pid": 249628
+      },
+      "raw_evidence": [
+        {
+          "path": "local-artifacts/m9/external-runs/46ad318a24fb45a9811da348cc685a20/verification.json",
+          "sha256": "44b67fbe3fba4c4d8a07694139a15f1d07cf700c6d13a00737a6cdc481b4d3e0"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/46ad318a24fb45a9811da348cc685a20/ryujinx.stdout.log",
+          "sha256": "52af87b685885171e1d4764c5a4368fd91c0ad2656116826bec013f54d10ed86"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/46ad318a24fb45a9811da348cc685a20/ryujinx.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/46ad318a24fb45a9811da348cc685a20/launcher-test.json",
+          "sha256": "ba720ffcbcae5d13e9b45b8888729f1a64c119e2c1659e0f7d3793814bdc321f"
+        }
+      ]
+    },
+    {
+      "observation": "Versioned diagnostic with headless frontend reached the actual Candy native initializer beyond the CPU resolver. Runtime rejects missing newlocale and returns cleanly. No first screen.",
+      "receipt": {
+        "status": "blocked_runtime",
+        "nro_sha256": "27e8a76e36f0cdb9bf2d8886832631433521db1dab0ec37581d5cfbf88061084",
+        "execution_attempted": true,
+        "completed_sessions": 1,
+        "inputs": [
+          {
+            "expected_session_id": "0a1b83a592254a1a8a31ec5a8246d51f-1",
+            "sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+            "index": 0,
+            "source": "D:\\Download\\candycrush.apk",
+            "staged_name": "0000-external.apk",
+            "install_snapshot_step": 3,
+            "bytes": 163371628
+          }
+        ],
+        "cases": [
+          {
+            "error": "exception java.lang.ExceptionInInitializerError: call: libcandycrushsaga.so: call requires newlocale [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 52079, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><clinit>()V",
+            "returned_to_launcher": true,
+            "presented_frames": null,
+            "status": "blocked_or_unreported",
+            "first_screen": "not_visually_verified",
+            "input": {
+              "expected_session_id": "0a1b83a592254a1a8a31ec5a8246d51f-1",
+              "sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+              "index": 0,
+              "source": "D:\\Download\\candycrush.apk",
+              "staged_name": "0000-external.apk",
+              "install_snapshot_step": 3,
+              "bytes": 163371628
+            },
+            "snapshots": [],
+            "teardown_phases": [
+              "stop_requested",
+              "native_activity_stop",
+              "java_startup_abort",
+              "media_thread_quiesce",
+              "guest_thread_quiesce",
+              "native_destructors",
+              "media_reset",
+              "media_released",
+              "activity_dispose",
+              "runtime_drop",
+              "native_mapping_release",
+              "native_resource_reset",
+              "native_mapping_release",
+              "native_tls_reset",
+              "native_resources_released",
+              "display_geometry_reset",
+              "runtime_closed"
+            ],
+            "captures": [],
+            "installed_identity_matches": true,
+            "runtime_status": "failed"
+          }
+        ],
+        "emulator_frontend": "headless_sdl2",
+        "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-0a1b83a592254a1a8a31ec5a8246d51f",
+        "sd_original_restore": "restored",
+        "emulator_path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\ryujinx-cfg-fix\\publish-versioned\\Ryujinx.exe",
+        "root_alive_without_cim_match": true,
+        "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+        "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-0a1b83a592254a1a8a31ec5a8246d51f",
+        "startup_wait_ms": 10000,
+        "latest_session_report": {
+          "error": "exception java.lang.ExceptionInInitializerError: call: libcandycrushsaga.so: call requires newlocale [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 52079, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><clinit>()V",
+          "identity_status": "known",
+          "package": "com.king.candycrushsaga",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "0a1b83a592254a1a8a31ec5a8246d51f-1",
+          "status": "failed"
+        },
+        "root_handle_pinned": true,
+        "backend": "ryujinx",
+        "latest_teardown": [
+          {
+            "phase": "stop_requested",
+            "tick": 918918894
+          },
+          {
+            "phase": "native_activity_stop",
+            "tick": 919031180
+          },
+          {
+            "phase": "java_startup_abort",
+            "tick": 919073685
+          },
+          {
+            "phase": "media_thread_quiesce",
+            "tick": 919226726
+          },
+          {
+            "phase": "guest_thread_quiesce",
+            "tick": 919380936
+          },
+          {
+            "phase": "native_destructors",
+            "tick": 919412444
+          },
+          {
+            "phase": "media_reset",
+            "tick": 919698954
+          },
+          {
+            "phase": "media_released",
+            "tick": 919727944
+          },
+          {
+            "phase": "activity_dispose",
+            "tick": 919742396
+          },
+          {
+            "phase": "runtime_drop",
+            "tick": 919812547
+          },
+          {
+            "phase": "native_mapping_release",
+            "tick": 922627242
+          },
+          {
+            "phase": "native_resource_reset",
+            "tick": 923830423
+          },
+          {
+            "phase": "native_mapping_release",
+            "tick": 923877864
+          },
+          {
+            "phase": "native_tls_reset",
+            "tick": 924298104
+          },
+          {
+            "phase": "native_resources_released",
+            "tick": 924315763
+          },
+          {
+            "phase": "display_geometry_reset",
+            "tick": 924339479
+          },
+          {
+            "phase": "runtime_closed",
+            "tick": 924442519
+          },
+          {
+            "phase": "launcher_ready",
+            "tick": 931018709
+          }
+        ],
+        "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\0a1b83a592254a1a8a31ec5a8246d51f\\androswitch.nro",
+        "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+        "latest_memory_admission": {
+          "allocator_available_after_load": 1522202464,
+          "allocator_available_before_load": 1585826064,
+          "estimated_parser_bytes": 120862904,
+          "package": "com.king.candycrushsaga",
+          "parser_budget_bytes": 268435456,
+          "raw_dex_bytes": 34874388,
+          "revision": 1,
+          "schema_version": 1,
+          "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+          "session_id": "0a1b83a592254a1a8a31ec5a8246d51f-1",
+          "status": "vm_ready"
+        },
+        "session_id": "0a1b83a592254a1a8a31ec5a8246d51f",
+        "emulator_version": "1.3.3+e2143d4",
+        "commands": 5,
+        "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+        "pid": 186260,
+        "latest_media_stop": [
+          {
+            "operation": "glsurface_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 919280357
+          },
+          {
+            "operation": "opensl_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 919359206
+          },
+          {
+            "operation": "glsurface_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 919637304
+          },
+          {
+            "operation": "opensl_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 919657651
+          }
+        ],
+        "schema_version": 1,
+        "visual_review": "required",
+        "physical_device": "not_run"
+      },
+      "raw_evidence": [
+        {
+          "path": "local-artifacts/m9/external-runs/0a1b83a592254a1a8a31ec5a8246d51f/verification.json",
+          "sha256": "09e42ada5852f5a36edb6a7c5c8b8b8b0875b349cda208da051db5c74f952c1d"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/0a1b83a592254a1a8a31ec5a8246d51f/ryujinx.stdout.log",
+          "sha256": "e1319690b01dce284092234ce12c6689367d3f604a19294668f8d0a733a52e71"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/0a1b83a592254a1a8a31ec5a8246d51f/ryujinx.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/0a1b83a592254a1a8a31ec5a8246d51f/launcher-test.json",
+          "sha256": "48963ce6fdbe26fdcaa5ef4b5a19b35e1bf047f39ba62ea6d48338d9560e0c24"
+        }
+      ]
+    }
+  ],
+  "next_observed_gap": "Bionic newlocale during native class initialization",
+  "recognizable_first_screen": "not_reached",
+  "physical_switch": "not_run_for_these_changes",
+  "m9_complete": false
+}

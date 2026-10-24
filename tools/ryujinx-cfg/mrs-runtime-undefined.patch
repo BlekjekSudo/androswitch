@@ -1,0 +1,12 @@
+diff --git a/src/ARMeilleure/Instructions/InstEmitSystem.cs b/src/ARMeilleure/Instructions/InstEmitSystem.cs
+index 11c1d03..49a640b 100644
+--- a/src/ARMeilleure/Instructions/InstEmitSystem.cs
++++ b/src/ARMeilleure/Instructions/InstEmitSystem.cs
+@@ -65,3 +65,6 @@ namespace ARMeilleure.Instructions
+                 default:
+-                    throw new NotImplementedException($"Unknown MRS 0x{op.RawOpCode:X8} at 0x{op.Address:X16}.");
++                    // Unsupported system registers fault only when executed. Translating
++                    // an untaken capability-guarded block must not fault the host.
++                    Und(context);
++                    return;
+             }

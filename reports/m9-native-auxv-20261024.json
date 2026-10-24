@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T09:12:13.8974998Z",
+  "status": "focused_host_and_switch_compile_passed",
+  "operation": "getauxval",
+  "abi": "Android ARM64: unsigned long getauxval(unsigned long)",
+  "behavior": {
+    "known_entry_errno": "preserved",
+    "AT_HWCAP_names": [
+      "FP",
+      "ASIMD"
+    ],
+    "AT_PAGESZ": 4096,
+    "absent_entry_errno": "ENOENT (Android 2)",
+    "AT_HWCAP2": 0,
+    "AT_HWCAP": 3,
+    "absent_entry_return": 0,
+    "AT_SECURE": 0
+  },
+  "rationale": [
+    "The native loader and libnx use 4096-byte mapping granules",
+    "The runtime and import bridge already require FP/Advanced SIMD; optional CPU extensions are not exposed without a detection provider",
+    "The runtime does not perform credential-changing exec; AT_SECURE describes secure-execution mode",
+    "No Linux auxiliary vector or kernel/process pointers are borrowed from the host"
+  ],
+  "tests": [
+    {
+      "status": "passed",
+      "command": "wsl.exe -d Ubuntu -- bash -lc \"cd /mnt/d/Dev/Switch/AndroSwitch && cc -pipe -std=gnu11 -O2 -Wall -Wextra -Werror -pthread -Iplatform/switch-smoke fixtures/m9/native-abi/contracts.c platform/switch-smoke/bionic_cxx.c platform/switch-smoke/bionic_libc.c platform/switch-smoke/bionic_io.c platform/switch-smoke/bionic_keys.c platform/switch-smoke/bionic_log.c platform/switch-smoke/bionic_vfs.c platform/switch-smoke/missing_import.c -lm -o local-artifacts/m9/native-abi/contracts && local-artifacts/m9/native-abi/contracts\"",
+      "scope": "Actual libc import lookup and LP64 function pointer: 4 known entries preserve errno E2BIG; 6 absent types including PHDR/BASE/ENTRY/RANDOM/ULONG_MAX return zero and ENOENT; existing native ABI C regressions included"
+    },
+    {
+      "status": "passed",
+      "command": "wsl.exe -d Ubuntu -- bash -lc \"cd /mnt/d/Dev/Switch/AndroSwitch && make -C platform/androswitch ../../local-artifacts/product/bionic_libc.o\"",
+      "scope": "devkitA64/libnx -Wall -Wextra -Werror ARM64 object compile; full NRO link and Horizon execution are separate"
+    },
+    {
+      "status": "passed",
+      "command": "git diff --check -- platform/switch-smoke/bionic_libc.c platform/switch-smoke/bionic_auxv.h fixtures/m9/native-abi/contracts.c platform/switch-smoke/Makefile platform/androswitch/Makefile",
+      "scope": "Whitespace validation; clang-format applied to touched C/header/fixture"
+    }
+  ],
+  "references": [
+    {
+      "url": "https://android.googlesource.com/platform/bionic/+/main/libc/bionic/getauxval.cpp",
+      "blob": "51ff949fc8761bb75299576b8ae03a6ad185a80d",
+      "contract": "Public return type and errno behavior"
+    },
+    {
+      "url": "https://android.googlesource.com/platform/bionic/+/477c1eb04d12b0781b8e3879cde68af1cb61857f/libc/kernel/uapi/asm-arm64/asm/hwcap.h",
+      "contract": "ARM64 HWCAP bit identities; definitions checked against installed Android NDK 28.2.13676358 headers"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/switchbrew/libnx/master/nx/source/kernel/virtmem.c",
+      "contract": "Page alignment to 0x1000"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/switchbrew/libnx/master/nx/include/switch/arm/thread_context.h",
+      "contract": "Horizon floating-point/NEON register context"
+    }
+  ],
+  "limits": [
+    "Optional CPU extensions may be available physically but are deliberately omitted; guests must retain baseline fallback implementations",
+    "AT_PHDR, AT_BASE, AT_ENTRY, AT_RANDOM and all unprovided types remain absent, not fabricated pointers",
+    "This change targets the observed first blocker; it does not certify application startup, rendering or gameplay",
+    "No new physical Switch or Ryujinx execution claim in this receipt"
+  ],
+  "source_sha256": {
+    "platform/switch-smoke/bionic_auxv.h": "3ddbe9a507d04a17e216e90040f45d90efa89da52699f7be41751cce535b3d7a",
+    "platform/switch-smoke/bionic_libc.c": "5a4d4e6e1e4fcb5c8f8a4a622bd61f2ffd391264e87c18553e5ace6711c7e8a3",
+    "fixtures/m9/native-abi/contracts.c": "4924da2e0e92a4182151cdcb7303467e4e82b8c805bd3eba7caef461fff8109f",
+    "platform/switch-smoke/Makefile": "73c3f9f3f024587a26aa557694da0a6e36a750674e6f9ac2f9618298c5c55577",
+    "platform/androswitch/Makefile": "ca88e879e9a467db1e845dab920807e393033fee5cdcdfcadc025aca636e7e96"
+  }
+}

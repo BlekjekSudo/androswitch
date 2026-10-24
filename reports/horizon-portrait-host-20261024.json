@@ -1,0 +1,254 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "scope": "General pre-surface orientation negotiation, real native-window buffer geometry, CPU presentation, inverse touch, EGL window metadata and cleanup ownership. No APK identity branches.",
+  "geometry": [
+    {
+      "software_height": 360,
+      "software_width": 640,
+      "compositor_transform": 0,
+      "native_height": 720,
+      "native_width": 1280,
+      "rotation": 0
+    },
+    {
+      "software_height": 640,
+      "software_width": 360,
+      "compositor_transform": 4,
+      "native_height": 1280,
+      "native_width": 720,
+      "rotation": 1
+    },
+    {
+      "software_height": 360,
+      "software_width": 640,
+      "compositor_transform": 3,
+      "native_height": 720,
+      "native_width": 1280,
+      "rotation": 2
+    },
+    {
+      "software_height": 640,
+      "software_width": 360,
+      "compositor_transform": 7,
+      "native_height": 1280,
+      "native_width": 720,
+      "rotation": 3
+    }
+  ],
+  "source_snapshots": [
+    {
+      "sha256": "d97a2fa75d097b7ac3a9f5179ccd10fc24a9d1f82aac00918ea32bf19d86d43f",
+      "path": "platform/androswitch/display.c"
+    },
+    {
+      "sha256": "347fa3f7e05c81f110ec9cf49486701f126df8e8668b91d3ae0c82e60a115024",
+      "path": "platform/androswitch/display.h"
+    },
+    {
+      "sha256": "1b072b3fb3750fe80d37c3650f23792a95e60c8e8aedcf350a60babf594742c1",
+      "path": "platform/androswitch/display_geometry.h"
+    },
+    {
+      "sha256": "87e531dda2ffe5d2abae8fd3a19fa6e5c4edbc93d495bb7b6afca20826192d05",
+      "path": "platform/androswitch/main.c"
+    },
+    {
+      "sha256": "0b2fde3690da09e61ca39812230d699953c395f873d4808eeba398ab428317f5",
+      "path": "platform/androswitch/media.c"
+    },
+    {
+      "sha256": "24dfe791f3d3aae4d84341108c2414bedf4aad50fad2d7ee31459333ff10a6f2",
+      "path": "platform/androswitch/Makefile"
+    },
+    {
+      "sha256": "b5b71277d370cc120e7d4df5daa70f1e9a4955a1a95b612f5da7b7f139a76522",
+      "path": "platform/androswitch/glsurface.c"
+    },
+    {
+      "sha256": "4f92a2640ec2b58c8546ba4239b61aa779142e593d089aa0d0a4058727d0e068",
+      "path": "platform/androswitch/tests/display_rotation.c"
+    },
+    {
+      "sha256": "b08c8c67459c3fca9cb674bd5055a929f99795fc6c60d112672c73dbe96b4be7",
+      "path": "platform/androswitch/tests/fake-display/switch.h"
+    },
+    {
+      "sha256": "b3277188dba7710a7e8843a9a444180df1c9ab0678257b0ad24043402063e01b",
+      "path": "platform/androswitch/tests/glsurface_worker.c"
+    },
+    {
+      "sha256": "0a2c515a3cd6f0d152d94968fa7c71bf8d1b6a3af47986bdae5bf9e68a68ebb6",
+      "path": "crates/as-switch-smoke/src/device_graphics.rs"
+    },
+    {
+      "sha256": "8d7bba75998088309d67323d8944a936d925648cc5da56cdcc1e1bc7ee9c6282",
+      "path": "crates/as-switch-smoke/src/application.rs"
+    }
+  ],
+  "source_reference": {
+    "mesa_release_buffers_line": 566,
+    "mesa_native_dimensions_line": 616,
+    "libnx": "https://github.com/switchbrew/libnx/blob/v4.12.0/nx/source/display/native_window.c",
+    "mesa_register_buffer_line": 648,
+    "copied_mesa_implementation_code": false,
+    "mesa": {
+      "sha256": "950f93d3e5b6ae9c5a42c2918623fe9a80d7ee398d92d2e73abec86b62d75916",
+      "revision": "c7876f72c1f3353725ab8468f0ef9180280a8c31",
+      "url": "https://raw.githubusercontent.com/devkitPro/pacman-packages/c7876f72c1f3353725ab8468f0ef9180280a8c31/switch/mesa/switch-mesa-20.1.0-5.patch"
+    }
+  },
+  "checks": [
+    {
+      "status": "passed",
+      "coverage": [
+        "Every CPU output pixel against independent forward placement, including2x2 expansion and ARGB/RGBA channels.",
+        "Every full-resolution source pixel round-trips through native capture placement.",
+        "Inverse touch agrees with every raster pixel; native touch stays inside the actual buffer dimensions.",
+        "Output padding/guards remain intact;11 malformed-buffer cases per rotation reject before writing.",
+        "All fixed EGL/CPU rotations, repeat-target acceptance, active-change rejection, suspended-context geometry, registered-buffer reset rejection, launcher geometry restoration, and failed negotiation preserving metadata."
+      ],
+      "command": "gcc -std=c11 -O2 -Wall -Wextra -Werror -Iplatform/androswitch/tests/fake-display platform/androswitch/tests/display_rotation.c platform/androswitch/display.c -o <cache>/display-rotation-tests.exe; run binary",
+      "full_rotations": 4,
+      "name": "Display geometry and ownership"
+    },
+    {
+      "name": "GLSurface worker contracts",
+      "status": "passed",
+      "scenarios": [
+        "normal",
+        "portrait",
+        "portrait-pause-preserve",
+        "pause-preserve",
+        "pause-recreate",
+        "pause-exit",
+        "pause-before-create",
+        "pause-preserve-exit",
+        "pause-toggle-discard",
+        "suspend-failure",
+        "resume-failure",
+        "queue-before-context",
+        "invalid",
+        "create-failure",
+        "start-failure",
+        "start-close-failure",
+        "initialize-failure",
+        "choose-failure",
+        "egl-create-failure",
+        "attach-failure",
+        "callback-failure",
+        "queue-failure",
+        "poll-failure",
+        "close-failure",
+        "self-join",
+        "wait-failure",
+        "thread-close-failure",
+        "timeout",
+        "concurrent-join"
+      ],
+      "passed": 29,
+      "scope": "Production worker against real host threads and fake EGL/libnx callbacks. New720x1280 portrait and preserved-context pause cases check callback dimensions and ownership; no real GPU is emulated.",
+      "command": "gcc -std=c11 -O2 -Wall -Wextra -Werror -pthread -Iplatform/androswitch/tests/fake-switch -Iplatform/switch-smoke platform/androswitch/tests/glsurface_worker.c platform/androswitch/glsurface.c -o <cache>/glsurface-portrait-tests.exe; run each scenario as a separate process",
+      "failed": 0
+    },
+    {
+      "status": "passed",
+      "compiler": "devkitA64 15.2.0",
+      "sources": [
+        "display.c",
+        "main.c",
+        "media.c",
+        "glsurface.c"
+      ],
+      "command": "aarch64-none-elf-gcc.exe -pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -IC:/devkitPro/libnx/include -IC:/devkitPro/portlibs/switch/include -Iplatform/switch-smoke -Ithird_party/android -fno-strict-aliasing -c <source> -o <cache>/portrait-<source>.o",
+      "name": "Windows ARM64 C compilation"
+    },
+    {
+      "status": "passed",
+      "compiler": "devkitA64 16.1.0",
+      "command": "wsl -d Ubuntu -- make -C /mnt/d/Dev/Switch/AndroSwitch/platform/androswitch OUTPUT_DIR=/mnt/c/Users/Administrator/.cache/androswitch/portrait-compile /mnt/c/Users/Administrator/.cache/androswitch/portrait-compile/display.o /mnt/c/Users/Administrator/.cache/androswitch/portrait-compile/main.o /mnt/c/Users/Administrator/.cache/androswitch/portrait-compile/media.o /mnt/c/Users/Administrator/.cache/androswitch/portrait-compile/glsurface.o",
+      "scope": "All four objects built with the product -Wall -Wextra -Werror flags; no full Rust/NRO build run by this subtask.",
+      "name": "WSL product Makefile C compilation"
+    },
+    {
+      "status": "passed",
+      "command": "rustfmt --check --edition 2021 crates/as-switch-smoke/src/device_graphics.rs crates/as-switch-smoke/src/application.rs",
+      "name": "Rust adapter formatting"
+    },
+    {
+      "status": "passed",
+      "command": "git diff --check -- platform/androswitch crates/as-switch-smoke/src/device_graphics.rs crates/as-switch-smoke/src/application.rs",
+      "name": "Whitespace"
+    }
+  ],
+  "metadata_adapter": {
+    "status": "implemented_and_target_compiled",
+    "execution_proof": "Requires separate real NRO/EGL run. Host fake-window tests do not execute Mesa.",
+    "lifetime": "Handle owned before validation, removed only on successful destroy or termination. Failed destruction preserves owners and blocks runtime reuse.",
+    "scope": "EGL_WIDTH/HEIGHT only for tracked successfully created owned window surfaces, bound to their observed registered NWindow dimensions; live geometry must still match. Internal query and guest import share the provider. Other attributes, unknown/invalid handles and non-window paths delegate to Mesa."
+  },
+  "local_artifacts": [
+    {
+      "path": "C:/Users/Administrator/.cache/androswitch/display-rotation-tests.exe",
+      "sha256": "fed3543def7dccc67a09add2a9eaaf994add9a381961f51359496af65a355c8a",
+      "bytes": 60241
+    },
+    {
+      "path": "C:/Users/Administrator/.cache/androswitch/glsurface-portrait-tests.exe",
+      "sha256": "3366aa3e63e72bb01de627dce82cd9f75222816fcbcc78676f9babbdff5fc375",
+      "bytes": 158442
+    },
+    {
+      "path": "C:/Users/Administrator/.cache/androswitch/portrait-display.o",
+      "sha256": "5cef5ece59c07e2e851f48cfd6ac165514da208a9a2d59412ce61745b10dd617",
+      "bytes": 4584
+    },
+    {
+      "path": "C:/Users/Administrator/.cache/androswitch/portrait-main.o",
+      "sha256": "d0a24dfaeb0715d09d50d0d1a467829a32ee816fcac105038602c41608d3e4e2",
+      "bytes": 20080
+    },
+    {
+      "path": "C:/Users/Administrator/.cache/androswitch/portrait-media.o",
+      "sha256": "afa2c8eebb579595056944d265788ab8ae9df7d7c4f31f9c77037fcf0f4c0b64",
+      "bytes": 87512
+    },
+    {
+      "path": "C:/Users/Administrator/.cache/androswitch/portrait-glsurface.o",
+      "sha256": "a2f82539f11c122cb658e913780a71860b801e8e506535d96e606bc81cc05536",
+      "bytes": 6736
+    },
+    {
+      "path": "C:/Users/Administrator/.cache/androswitch/portrait-compile/display.o",
+      "sha256": "f8dceadbc36d35546803c3cd50d3a456fbede382d80a42478a4ad4b1d2cb5f4c",
+      "bytes": 4656
+    },
+    {
+      "path": "C:/Users/Administrator/.cache/androswitch/portrait-compile/main.o",
+      "sha256": "c6bbaa1ceb46ac2251f9a49ad978b28157fc850481e1b93776bf393a3aa5a003",
+      "bytes": 20216
+    },
+    {
+      "path": "C:/Users/Administrator/.cache/androswitch/portrait-compile/media.o",
+      "sha256": "51a7b5b04da9ec205fb3a15d9f83ea29fae9814a19f40f17c8981d67ee928b70",
+      "bytes": 87408
+    },
+    {
+      "path": "C:/Users/Administrator/.cache/androswitch/portrait-compile/glsurface.o",
+      "sha256": "2f10b6776e90f4f3aca2f547e8c58060959e3253b6bd4d41a4768b0df7772328",
+      "bytes": 6848
+    }
+  ],
+  "verification": {
+    "host": "passed_as_scoped_above",
+    "physical_switch": "not_run_for_this_change",
+    "emulator": "parent_owned_separate_run",
+    "m9_complete": false
+  },
+  "limitations": [
+    "Changing rotation after a CPU/GL rendering path has been committed is explicitly unsupported and preserves the old state; active surface/configuration lifecycle recreation remains future work.",
+    "These tests prove math, metadata contracts, owner lifetimes and target compilation, not actual720x1280 GPU pixels or compositor behavior.",
+    "Parent-owned NRO execution must record actual surface callbacks, first frame, transformed input and clean launcher restoration. External game startup can still stop at other shared missing APIs.",
+    "Initial worker test compile omitted the native.h include path; corrected focused command above passed all29 scenarios without runtime changes."
+  ]
+}

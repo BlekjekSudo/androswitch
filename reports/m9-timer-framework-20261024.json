@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T13:28:45.1914422Z",
+  "status": "host_contracts_passed_device_background_execution_pending",
+  "scope": "Shared Timer/TimerTask scheduling on an actual dedicated platform worker per timer. No application/package/library name checks. SDK proof uses ordinary Java/Android APIs.",
+  "basis": {
+    "implementation": "Independent Rust adaptation of public Timer API contracts; no JDK Timer source code copied.",
+    "upstream_commit": "6388281f66d254c8e01a0fdc7a5a9a30239bc762",
+    "runtime": "AndroSwitch history-preserving RustyDroid fork"
+  },
+  "primary_sources": [
+    "https://docs.oracle.com/javase/8/docs/api/java/util/Timer.html",
+    "https://docs.oracle.com/javase/8/docs/api/java/util/TimerTask.html"
+  ],
+  "implementation": {
+    "reentry": "Queue borrows are dropped before task invocation. Callback ownership uses actual NativeHost.current_thread_id, with a single-interpreter identity only when no NativeHost is bound. Main-thread entry while a native worker releases VmGate is not labelled as a worker.",
+    "scheduling": "One-shot, fixed-delay from actual start, and fixed-rate from previous planned due. Repeated work is serial; period/delay validation precedes queue mutation. Date overloads explicitly unavailable before mutation.",
+    "execution": "All four constructors require successful BackgroundWorkers.start. No worker delivery occurs from the main Looper. VM callers serialize scheduling and callback entry with the platform VM lease.",
+    "state": "Unique increasing per-runtime tokens, weak Timer owner, real queued/running task GC roots. Task cancellation retains queued references until purge/due/Timer.cancel. Uncaught task error terminates that timer and retains its exact error for Android pump.",
+    "bounds": "64 worker records plus pending error records,4096 attached task records,4096 queued entries across timers,4096-byte requested names. Backend may impose a lower real thread limit. Repeated i64 due overflow fails explicitly with TIMER_TIME_OVERFLOW.",
+    "metadata": "Requested name and daemon flag retained per token. This does not implement OS thread names, Java Thread identity APIs or JVM daemon-driven process-exit policy.",
+    "clock": "System.currentTimeMillis uses actual Clock.wall_time_millis. SystemClock/nanoTime retain elapsed-time behavior. Missing/failing clock and worker operations preserve exact errors; failed start/wake/cancel do not claim success."
+  },
+  "checks": [
+    {
+      "status": "passed",
+      "command": "pwsh -File fixtures/m9/timer/build.ps1",
+      "name": "normal_sdk_fixture_and_jvm_oracle",
+      "result": "javac --release8, D8 min-api26, aapt2 APKs;12 cases run on Microsoft OpenJDK21.0.12.1+1-LTS."
+    },
+    {
+      "duration_seconds": 4.46,
+      "status": "passed",
+      "command": "CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p as-framework --features host --test timer -- --test-threads=1",
+      "name": "portable_dex_timer",
+      "result": "10 passed,0 failed;24 JVM comparisons across original and renamed package. Deterministic worker provider establishes API contracts, not actual background thread concurrency."
+    },
+    {
+      "status": "passed",
+      "command": "cargo clippy -p as-framework --features host --test timer -- -D warnings",
+      "name": "focused_clippy",
+      "result": "Passed after runtime source freeze; the final JVM-comparison-only test was added afterward and compiled/passed by the final Timer test."
+    },
+    {
+      "status": "passed",
+      "command": "rustfmt --edition2021 crates/as-framework/src/services/timer.rs crates/as-framework/src/services/mod.rs crates/as-framework/src/android.rs crates/as-framework/tests/timer.rs",
+      "name": "format",
+      "result": "Runtime and tests formatted with stable rustfmt1.9."
+    }
+  ],
+  "fixture": {
+    "apks": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\timer-fixture\\timer.apk",
+        "sha256": "f5659a845098fc52d238e941140d325b0b56bad8fb63914c750d9de90c6fa13d"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\timer-fixture\\renamed.apk",
+        "sha256": "9a44449c6cfe6c18dca438678de322b2a3be74cf7a24363124efcb72425d96a2"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\timer-fixture\\timer-proof.apk",
+        "sha256": "3cd48426bcd9b21fccbf40f891b0e93a91eec666027b959f67fce4e63657c46c"
+      }
+    ],
+    "oracle": {
+      "cases": 12,
+      "sha256": "d7cdb3e15a2baf1095bf7c12dea368d6955b86451744cfb5ebc2c3e16d9c2506",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\timer-fixture/oracle.txt"
+    },
+    "api": 26,
+    "sources": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\timer\\java\\org\\androswitch\\contracts\\TimerActivity.java",
+        "sha256": "6ab7ec42b62baa5c99ef6c73c98c6314b279b598186c62efb1a38670eef3873a"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\timer\\java\\org\\androswitch\\contracts\\TimerProofActivity.java",
+        "sha256": "1f9eb0e171652d41482f302830bfe4b257f43496549772dd9ecd0ad4a0c411d8"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\timer\\java\\org\\androswitch\\contracts\\TimerValidation.java",
+        "sha256": "825baef91487d1e1fee6b51bd21f4a6fbba78e5afb15e55bc839606692876517"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\timer\\build.ps1",
+        "sha256": "d940d526577c3289f222894fc77b59e4d220cb7b7043ffc1f1c2e45ebb7ce957"
+      }
+    ],
+    "schema_version": 1,
+    "build_tools": "35.0.0"
+  },
+  "host_coverage": [
+    "Worker-required constructors, start failure, name null validation, retained constructor metadata, unique tokens.",
+    "Wall-time backward jump and separation from elapsed clock; main drawing never delivers TimerTask.",
+    "One-shot cancel return values and duplicate rejection; fixed-delay drift and fixed-rate catch-up.",
+    "Queued/running GC roots while Timer owner is collected; cancelled queue roots released by purge; token reuse prohibited.",
+    "Reentrant task scheduling and Timer.cancel; exact uncaught ArithmeticException survives worker step and next Android pump.",
+    "Backend start/wake/cancel and clock failure do not partially schedule or report fake success.",
+    "Nested native callback changes actual thread identity; worker Handler/Looper restrictions do not affect main.",
+    "SDK proof writes actual shared VFS file and posts a main Handler callback."
+  ],
+  "proof": {
+    "emulator": "not_run_in_this_receipt",
+    "apk": "target/timer-fixture/timer-proof.apk",
+    "expected": "Three task lines with scheduled/actual epoch millis and noLooper=true; TIMER_PROOF_PASS elapsed=<measured milliseconds>. Actual TimerTask cancels its Timer and posts visible UI result via previously-created main Handler.",
+    "result_path": "/sdcard/Download/androswitch-timer-proof.txt",
+    "hardware": "not_run",
+    "package": "org.fixture.timerproof",
+    "activity": "org.androswitch.contracts.TimerProofActivity",
+    "host": "passed using deterministic delivery"
+  },
+  "limits": [
+    "Dedicated Horizon thread creation, real wait/wake latency, JNI attach/TLS detach, VM gate concurrency and actual NRO proof require separate transport tests and parent-run E2E.",
+    "Date scheduling overloads, OS-thread naming, Java Thread APIs and JVM daemon process-exit behavior are not verified/implemented by this Timer contract.",
+    "The host JVM oracle is Microsoft OpenJDK21, not an Android API26 reference device.",
+    "No Candy Crush or Mekorama runnable/gameplay claim follows from these host tests."
+  ],
+  "sources": [
+    {
+      "path": "crates/as-framework/src/services/timer.rs",
+      "sha256": "66ead05a441f306fa11b8fea9e855d62bc4f719e3edddca94cb5d4289caadb04"
+    },
+    {
+      "path": "crates/as-framework/src/services/mod.rs",
+      "sha256": "e8b9b27f7e3d85ef346f53c09210d192621e11f329c1a6e17ba5503c42c89a07"
+    },
+    {
+      "path": "crates/as-framework/src/android.rs",
+      "sha256": "deb4d4eca0343579e8859ce449c6488c46609116e00c0c2c9896b2c0727e3fd2"
+    },
+    {
+      "path": "crates/as-framework/tests/timer.rs",
+      "sha256": "5209a95797f16d6216d381f92bd0d99e48194ae6e642c7c56f60700b7bdae138"
+    },
+    {
+      "path": "crates/as-framework/Cargo.toml",
+      "sha256": "502f420e3020c890b24cef1e692d6562d6ad5b8f791dd4557128a635eb55209c"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "sha256": "6a0d2d27c0ca83113e106128b49fc31b0f5c09f402e03adad6fbea190ddf2952"
+    },
+    {
+      "path": "fixtures/m9/timer/build.ps1",
+      "sha256": "d940d526577c3289f222894fc77b59e4d220cb7b7043ffc1f1c2e45ebb7ce957"
+    },
+    {
+      "path": "fixtures/m9/timer/java/org/androswitch/contracts/TimerActivity.java",
+      "sha256": "6ab7ec42b62baa5c99ef6c73c98c6314b279b598186c62efb1a38670eef3873a"
+    },
+    {
+      "path": "fixtures/m9/timer/java/org/androswitch/contracts/TimerProofActivity.java",
+      "sha256": "1f9eb0e171652d41482f302830bfe4b257f43496549772dd9ecd0ad4a0c411d8"
+    },
+    {
+      "path": "fixtures/m9/timer/java/org/androswitch/contracts/TimerValidation.java",
+      "sha256": "825baef91487d1e1fee6b51bd21f4a6fbba78e5afb15e55bc839606692876517"
+    }
+  ]
+}

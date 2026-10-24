@@ -2,6 +2,7 @@
  * AndroSwitch contributors, MIT OR Apache-2.0; jni.h is AOSP Apache-2.0. */
 #include "../../third_party/android/jni.h"
 #include "native.h"
+#include "jni_arguments.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,7 +65,8 @@ enum {
   FIELD = 34,
   GET_FIELD = 35,
   SET_FIELD = 36,
-  UNREGISTER = 37
+  UNREGISTER = 37,
+  CONSTRUCT = 38
 };
 static uint64_t dispatch(uint32_t op, uint64_t a, uint64_t b, uint64_t c,
                          const void *data, size_t length) {
@@ -282,26 +284,7 @@ static uint64_t invoke_a(jobject receiver, jmethodID method,
   char types[128] = {0};
   size_t count = argument_types(method, types);
   uint64_t bits[128] = {0};
-  for (size_t i = 0; i < count; i++) {
-    switch (types[i]) {
-    case 'F':
-      memcpy(&bits[i], &values[i].f, 4);
-      break;
-    case 'D':
-      memcpy(&bits[i], &values[i].d, 8);
-      break;
-    case 'J':
-      bits[i] = (uint64_t)values[i].j;
-      break;
-    case 'L':
-    case '[':
-      bits[i] = (uint64_t)values[i].l;
-      break;
-    default:
-      bits[i] = (uint32_t)values[i].i;
-      break;
-    }
-  }
+  as_jni_arguments_a(types, count, values, bits);
   return dispatch(INVOKE, (uint64_t)receiver, (uint64_t)method,
                   (uint64_t)is_static, bits, count);
 }
@@ -309,29 +292,12 @@ static uint64_t invoke_v(jobject receiver, jmethodID method, va_list values,
                          int is_static) {
   char types[128] = {0};
   size_t count = argument_types(method, types);
-  jvalue args[128] = {0};
-  for (size_t i = 0; i < count; i++) {
-    switch (types[i]) {
-    case 'F':
-      args[i].f = (jfloat)va_arg(values, double);
-      break;
-    case 'D':
-      args[i].d = va_arg(values, double);
-      break;
-    case 'J':
-      args[i].j = va_arg(values, jlong);
-      break;
-    case 'L':
-    case '[':
-      args[i].l = va_arg(values, jobject);
-      break;
-    default:
-      args[i].i = va_arg(values, jint);
-      break;
-    }
-  }
-  return invoke_a(receiver, method, args, is_static);
+  uint64_t bits[128] = {0};
+  as_jni_arguments_v(types, count, values, bits);
+  return dispatch(INVOKE, (uint64_t)receiver, (uint64_t)method,
+                  (uint64_t)is_static, bits, count);
 }
+#include "jni_construct.inc"
 #define METHODS(Name, Type, Member)                                            \
   static Type call_##Name##_a(JNIEnv *e, jobject o, jmethodID m,               \
                               const jvalue *a) {                               \
@@ -471,13 +437,29 @@ static jint get_env(JavaVM *jvm, void **out, jint wanted) {
 }
 static jint attach(JavaVM *jvm, JNIEnv **out, void *args) {
   (void)jvm;
-  (void)args;
+  if (!out) return JNI_ERR;
   if (!attached) {
+    JavaVMAttachArgs *options=args;
+    const char *name=NULL;
+    size_t length=0;
+    if (options) {
+      if (options->version!=JNI_VERSION_1_2 && options->version!=JNI_VERSION_1_4 && options->version!=JNI_VERSION_1_6) {
+        *out=NULL;return JNI_EVERSION;
+      }
+      /* ThreadGroup association has no implementation. Fail before changing
+       * attachment state rather than claiming the supplied group was used. */
+      if (options->group) { *out=NULL;return JNI_ERR; }
+      name=options->name;
+      if (name) {
+        while (length<=4096 && name[length]) ++length;
+        if (length>4096) { *out=NULL;return JNI_ERR; }
+      }
+    }
+    as_jni_vm_lock();
+    dispatch(ATTACH, 0, 0, 0, name, length);
+    as_jni_vm_unlock();
     environment = &table;
     attached = 1;
-    as_jni_vm_lock();
-    dispatch(ATTACH, 0, 0, 0, NULL, 0);
-    as_jni_vm_unlock();
   }
   *out = &environment;
   return JNI_OK;
@@ -548,6 +530,9 @@ uint64_t as_jni_initialize(void) {
     BIND(GetArrayLength, array_length);
     BIND(GetObjectRefType, ref_kind);
     BIND(AllocObject, alloc_object);
+    BIND(NewObject, new_object);
+    BIND(NewObjectV, new_object_v);
+    BIND(NewObjectA, new_object_a);
     BIND(IsInstanceOf, instance_of);
     BIND(GetJavaVM, get_vm);
 #define BIND_METHODS(Name)                                                     \

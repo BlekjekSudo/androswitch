@@ -1,0 +1,340 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T15:12:41.0985639Z",
+  "status": "bitmap_fixture_execution_pixels_and_clean_return_verified",
+  "scope": "Actual unchanged original SDK Bitmap fixture on the Horizon NRO in task-local Ryujinx. Software resource decoding/raster/presentation-buffer capture only; not Candy Crush/Mekorama first-screen or gameplay compatibility.",
+  "run": {
+    "harness_raw_status": "execution_verified_visual_review_required",
+    "session_id": "c0d1b9c2953348c1ac4e02281fdda497-2",
+    "case_number": 2,
+    "sd_restore": "restored",
+    "backend": "ryujinx",
+    "emulator_version": "1.3.3+e2143d4",
+    "nro_sha256": "11391da16ac936815be9a035443b104ff7e06e82a9f6a705397ba780031670a4",
+    "frontend": "headless_sdl2",
+    "emulator_scope": "Task-local Ryujinx build with separately documented CFG unknown-MRS fix; not unmodified stock emulator",
+    "emulator": {
+      "bytes": 74452469,
+      "sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+      "path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-bin-9f3cd3d2\\Ryujinx.exe"
+    },
+    "id": "c0d1b9c2953348c1ac4e02281fdda497"
+  },
+  "fixture": {
+    "revision": 1,
+    "package": "org.fixture.bitmap",
+    "apk_bytes": 30606,
+    "apk_sha256": "dc500caf5b360a3c775b16dc9e8dbd59d3e1a658476873a958e1d3bbdbdb2647",
+    "activity": "org.androswitch.contracts.BitmapActivity",
+    "source_hashes": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\bitmap\\java\\org\\androswitch\\contracts\\BitmapActivity.java",
+        "sha256": "09499c754258d77d25f54e7c9e86605123dafd15d49873f160d269c5f0a592a0"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\bitmap\\build.ps1",
+        "sha256": "4ace2e1b74009500e900ad05f5bdfd45b7f49f28e0385a1d866170159a03331a"
+      }
+    ],
+    "build_receipt": {
+      "bytes": 4110,
+      "sha256": "bbe0473d4b66669204582d26c60e59d67bea9eb09d3ef6340b379cf7244c4fdd",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\bitmap-fixture-build-receipt.json"
+    }
+  },
+  "build": {
+    "receipt": {
+      "bytes": 606,
+      "sha256": "f55a4e6849646f994b9387a3a408ac4048734ea4334da7e9c4d7ee365da1579d",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\bitmap-product-build.json"
+    },
+    "profile": "release panic=abort",
+    "c_compiler_version": "15.2.0",
+    "source_binding_scope": "Narrow relevant bitmap source hashes match the earlier host receipt, and the product-build receipt hash matches this NRO. No whole-tree source manifest exists for this historical build; no full commit or complete-source reconstruction is inferred.",
+    "link_backend": "Windows",
+    "target": "aarch64-nintendo-switch-freestanding",
+    "frozen_relevant_bitmap_sources": [
+      {
+        "bytes": 23174,
+        "sha256": "2c4afdee9769e662911001f12a2bfcc79ef344c74299f69c5afc877edb0410e9",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\as-framework\\src\\services\\bitmap.rs"
+      },
+      {
+        "bytes": 9941,
+        "sha256": "679ca276b5b71d8e43f74f8754e9f8134bfac588ecc9bf40ceb3505ef445ee35",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\as-framework\\src\\services\\bitmap\\png.rs"
+      },
+      {
+        "bytes": 82144,
+        "sha256": "b05182e803afd3b215776c0d6ca1e06a5742215449a1550c6fa0f2ce26c65cdd",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\as-framework\\src\\android.rs"
+      },
+      {
+        "bytes": 10185,
+        "sha256": "f2d1b4f52b5844b087aff27c98d054ea32b2cf21c39d25768d746589bb4a35c4",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\crates\\as-framework\\src\\services\\mod.rs"
+      }
+    ],
+    "rust_toolchain": "nightly"
+  },
+  "observation": {
+    "launcher_ready": true,
+    "error": null,
+    "raw_harness_visual_review": "required, preserved unchanged",
+    "presented_frames": 118,
+    "derived_visual_review": "Viewed last-frame.png independently: red/green upper quadrants, blue/yellow lower quadrants, half-alpha white patch and 2x2 pixel overlay",
+    "installed_identity_matches": true,
+    "runtime_status": "passed_execution",
+    "returned_to_launcher": true,
+    "native_frames": 0,
+    "capture_owner": {
+      "capture_protocol": 1,
+      "package": "org.fixture.bitmap",
+      "revision": 1,
+      "schema_version": 1,
+      "session_id": "c0d1b9c2953348c1ac4e02281fdda497-2"
+    },
+    "capture_scope": "Captured software presentation buffer; not a full emulator-window/compositor screenshot or a GPU rendering proof",
+    "teardown_phases": [
+      "stop_requested",
+      "native_activity_stop",
+      "java_activity_stop",
+      "worker_admission_closed",
+      "background_worker_quiesce",
+      "media_thread_quiesce",
+      "guest_thread_quiesce",
+      "native_destructors",
+      "media_reset",
+      "media_released",
+      "activity_dispose",
+      "runtime_drop",
+      "native_resource_reset",
+      "native_reset_guest_threads",
+      "native_reset_cxx",
+      "native_reset_keys",
+      "native_reset_sync",
+      "native_reset_locale",
+      "native_reset_admitted",
+      "native_mapping_release",
+      "native_tls_reset",
+      "native_resources_released",
+      "display_geometry_reset",
+      "runtime_closed",
+      "launcher_refresh"
+    ]
+  },
+  "pixel_verification": {
+    "schema_version": 1,
+    "width": 1280,
+    "height": 720,
+    "ppm_sha256": "f9917e68a76b8b795d1f8259f6e482aed7e6938ac06e49b3ab61f1ee74271ffe",
+    "png_sha256": "e933ae0ef0463ad175f8dd1c1355a61615a2250020cf1467b6a404607f2ff86a",
+    "rgb_sha256": "d79f7a15bf41faa472fc63ec4ad9e61218ea1a212ce344dad372ba6f57d23069",
+    "expected_rgb_sha256": "d79f7a15bf41faa472fc63ec4ad9e61218ea1a212ce344dad372ba6f57d23069",
+    "full_pattern_match": true,
+    "png_pixels_equal_ppm": true,
+    "compared_pixels": 921600,
+    "samples": [
+      {
+        "x": 200,
+        "y": 200,
+        "actual_rgb": [
+          255,
+          0,
+          0
+        ],
+        "expected_rgb": [
+          255,
+          0,
+          0
+        ]
+      },
+      {
+        "x": 1000,
+        "y": 200,
+        "actual_rgb": [
+          0,
+          255,
+          0
+        ],
+        "expected_rgb": [
+          0,
+          255,
+          0
+        ]
+      },
+      {
+        "x": 200,
+        "y": 600,
+        "actual_rgb": [
+          0,
+          0,
+          255
+        ],
+        "expected_rgb": [
+          0,
+          0,
+          255
+        ]
+      },
+      {
+        "x": 1000,
+        "y": 600,
+        "actual_rgb": [
+          255,
+          255,
+          0
+        ],
+        "expected_rgb": [
+          255,
+          255,
+          0
+        ]
+      },
+      {
+        "x": 4,
+        "y": 4,
+        "actual_rgb": [
+          255,
+          128,
+          128
+        ],
+        "expected_rgb": [
+          255,
+          128,
+          128
+        ]
+      },
+      {
+        "x": 24,
+        "y": 24,
+        "actual_rgb": [
+          255,
+          0,
+          0
+        ],
+        "expected_rgb": [
+          255,
+          0,
+          0
+        ]
+      },
+      {
+        "x": 26,
+        "y": 24,
+        "actual_rgb": [
+          0,
+          255,
+          0
+        ],
+        "expected_rgb": [
+          0,
+          255,
+          0
+        ]
+      },
+      {
+        "x": 24,
+        "y": 26,
+        "actual_rgb": [
+          0,
+          0,
+          255
+        ],
+        "expected_rgb": [
+          0,
+          0,
+          255
+        ]
+      },
+      {
+        "x": 26,
+        "y": 26,
+        "actual_rgb": [
+          255,
+          255,
+          0
+        ],
+        "expected_rgb": [
+          255,
+          255,
+          0
+        ]
+      }
+    ]
+  },
+  "limitations": [
+    "No Android-reference device or physical Switch execution in this receipt.",
+    "No external game first-screen, gameplay, input, audio or arbitrary APK compatibility claim.",
+    "Freshness/identity follows capture protocol 1 matching the session/package/revision, not filemtime.",
+    "Original raw run/host reports were not rewritten; this is a separate derived receipt."
+  ],
+  "upstream": "RustyDroid fork at 6388281f66d254c8e01a0fdc7a5a9a30239bc762; attribution and contributor history retained",
+  "evidence": [
+    {
+      "bytes": 35208,
+      "sha256": "b29d2f4c0a00f5bae6ad9fd120d8a62b9cdd1f81c5a56d4e409f8b8c8587af97",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\verification.json"
+    },
+    {
+      "bytes": 18488,
+      "sha256": "b5644b785dbbe796c5923b7bc24a652a76c8c4e7d0d568ec0e0eed6c0977abfd",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\emulator.json"
+    },
+    {
+      "bytes": 1200,
+      "sha256": "29bb729db59e40cee2b5d0fc8c3261c577340b8fcff932828380a6b4706ab7c9",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\launcher-test.json"
+    },
+    {
+      "bytes": 9142328,
+      "sha256": "11391da16ac936815be9a035443b104ff7e06e82a9f6a705397ba780031670a4",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\androswitch.nro"
+    },
+    {
+      "bytes": 30606,
+      "sha256": "dc500caf5b360a3c775b16dc9e8dbd59d3e1a658476873a958e1d3bbdbdb2647",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\bitmap.apk"
+    },
+    {
+      "bytes": 606,
+      "sha256": "f55a4e6849646f994b9387a3a408ac4048734ea4334da7e9c4d7ee365da1579d",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\bitmap-product-build.json"
+    },
+    {
+      "bytes": 4110,
+      "sha256": "bbe0473d4b66669204582d26c60e59d67bea9eb09d3ef6340b379cf7244c4fdd",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\bitmap-fixture-build-receipt.json"
+    },
+    {
+      "bytes": 7045,
+      "sha256": "b24a099b06a2d3c5e9f6a6d121dc7464525bc5384861207fcb4e463dfdae343e",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-2\\session-report.json"
+    },
+    {
+      "bytes": 1312,
+      "sha256": "1f5edb409a7a89bce61331e5b31280166ea54317b2abb246f8132322672316f0",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-2\\teardown.log"
+    },
+    {
+      "bytes": 164,
+      "sha256": "551d05dd2547699b04e6dae9dd399cd6b73e026e5f43d9dcd8ab723affba262d",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-2\\capture-owner.json"
+    },
+    {
+      "bytes": 2764816,
+      "sha256": "f9917e68a76b8b795d1f8259f6e482aed7e6938ac06e49b3ab61f1ee74271ffe",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-2\\last-frame.ppm"
+    },
+    {
+      "bytes": 4370,
+      "sha256": "e933ae0ef0463ad175f8dd1c1355a61615a2250020cf1467b6a404607f2ff86a",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-2\\last-frame.png"
+    },
+    {
+      "bytes": 2245,
+      "sha256": "b63e42dff3460cc776e0b3e84f21c7f5cb07153b845eca8748d49967151cc072",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\c0d1b9c2953348c1ac4e02281fdda497\\sessions\\c0d1b9c2953348c1ac4e02281fdda497-2\\bitmap-pixel-verification.json"
+    }
+  ]
+}

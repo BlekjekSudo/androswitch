@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "status": "passed",
+  "scope": "Host C geometry, ownership and worker contracts; no emulator, GPU or hardware execution.",
+  "command": "./scripts/test-horizon-display.ps1 -OutputDirectory C:/Users/Administrator/.cache/androswitch/display-check",
+  "script_sha256": "01555925fded7e024ed9efeb459f4ca5e60ffb126249911378eab15985fddc0d",
+  "checks": 34,
+  "full_rotation_cases": 4,
+  "framebuffer_address_guard_cases": 4,
+  "worker_cases": 29,
+  "local_receipt": {
+    "path": "C:/Users/Administrator/.cache/androswitch/display-check/result.json",
+    "sha256": "780b4564e6e5ca6a7a770bc8afccedd356dd958937c71dfb3dc4e36396227fa7"
+  },
+  "runtime_host_receipt": "reports/horizon-portrait-host-20261024.json",
+  "source_snapshots": [
+    {
+      "path": "platform/androswitch/display.c",
+      "sha256": "d97a2fa75d097b7ac3a9f5179ccd10fc24a9d1f82aac00918ea32bf19d86d43f"
+    },
+    {
+      "path": "platform/androswitch/display.h",
+      "sha256": "347fa3f7e05c81f110ec9cf49486701f126df8e8668b91d3ae0c82e60a115024"
+    },
+    {
+      "path": "platform/androswitch/display_geometry.h",
+      "sha256": "1b072b3fb3750fe80d37c3650f23792a95e60c8e8aedcf350a60babf594742c1"
+    },
+    {
+      "path": "platform/androswitch/tests/display_rotation.c",
+      "sha256": "4f92a2640ec2b58c8546ba4239b61aa779142e593d089aa0d0a4058727d0e068"
+    },
+    {
+      "path": "platform/androswitch/tests/fake-display/switch.h",
+      "sha256": "b08c8c67459c3fca9cb674bd5055a929f99795fc6c60d112672c73dbe96b4be7"
+    },
+    {
+      "path": "platform/androswitch/framebuffer_copy.h",
+      "sha256": "886ba44f63572ef616b139c17b394a8bd218124011c7cd59f23992018d0a8ac7"
+    },
+    {
+      "path": "platform/androswitch/tests/framebuffer_copy.c",
+      "sha256": "913a4435ce84dc202a3f8e453ac6f47e11bb4dff20f2b33aca958b2af3c26381"
+    },
+    {
+      "path": "platform/androswitch/glsurface.c",
+      "sha256": "b5b71277d370cc120e7d4df5daa70f1e9a4955a1a95b612f5da7b7f139a76522"
+    },
+    {
+      "path": "platform/androswitch/glsurface.h",
+      "sha256": "6e70700a421a9a675b9418fd40fdadb0cb792265b1f1bf288d0ff01d24de080b"
+    },
+    {
+      "path": "platform/androswitch/tests/glsurface_worker.c",
+      "sha256": "b3277188dba7710a7e8843a9a444180df1c9ab0678257b0ad24043402063e01b"
+    },
+    {
+      "path": "platform/androswitch/tests/fake-switch/switch.h",
+      "sha256": "e99a17f4c8c5d7322beec6acccc00ac67b8ff4c19e51ebabe142978d3857ba18"
+    },
+    {
+      "path": "scripts/test-horizon-display.ps1",
+      "sha256": "01555925fded7e024ed9efeb459f4ca5e60ffb126249911378eab15985fddc0d"
+    }
+  ],
+  "notes": [
+    "Script syntax parser check passed.",
+    "Initial script development run failed to hash a missing empty compiler log; corrected script always creates the log, then the complete34-check run passed.",
+    "Runtime sources and previously recorded receipts were not changed during standalone-script work.",
+    "No real GPU, emulator or hardware execution is inferred."
+  ]
+}

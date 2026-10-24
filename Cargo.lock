@@ -110,6 +110,7 @@ dependencies = [
  "as-platform",
  "as-storage",
  "libm",
+ "miniz_oxide",
  "rd-apk",
  "rd-dex",
  "rd-vm",

@@ -36,12 +36,12 @@ const OOME: &str = "Ljava/lang/OutOfMemoryError;";
 /// can see WHERE a guest spins instead of only that it did.
 fn fuel_stack(vm: &Engine) -> String {
     let mut out = String::from("; pilha no esgotamento (innermost primeiro):");
-    for l in vm.frame_labels.iter().rev().take(24) {
+    for l in vm.frame_labels().rev().take(24) {
         out.push_str("\n  at ");
         out.push_str(l);
     }
-    if vm.frame_labels.len() > 24 {
-        out.push_str(&format!("\n  ... +{} frames", vm.frame_labels.len() - 24));
+    if vm.frame_labels().len() > 24 {
+        out.push_str(&format!("\n  ... +{} frames", vm.frame_labels().len() - 24));
     }
     out
 }
@@ -52,6 +52,7 @@ pub(crate) fn exec_frame(
     frame_super: Option<&str>,
     code: Arc<CodeItem>,
     ins: Vec<Value>,
+    frame_pc: &mut usize,
 ) -> Result<Value, VmExit> {
     let nregs = code.registers_size as usize;
     let ins_size = code.ins_size as usize;
@@ -94,7 +95,11 @@ pub(crate) fn exec_frame(
         }
 
         let cur_pc = pc;
-        vm.last_pc = cur_pc;
+        *frame_pc = cur_pc;
+        #[cfg(feature = "std")]
+        {
+            vm.last_pc = cur_pc;
+        }
         // Decoded instructions are sorted by address. Sequential execution
         // normally uses the next entry; branches and exception handlers still
         // use the same checked binary lookup, including identical bad-PC errors.
@@ -338,9 +343,8 @@ pub(crate) fn exec_frame(
                 regs[*a as usize] = Value::Obj(r);
             }
 
-            // monitor-*: single-thread no M2 — no-op deliberado COM referência
-            // válida (monitores reais entram com threads, M3+); null → NPE
-            // como na JVM (issue #37, notadamente monitor-exit)
+            // Portable monitors track actual ownership and recursion. Legacy
+            // std behavior remains unchanged in its existing execution model.
             0x1D | 0x1E => {
                 let Kind::Reg(a) = &insn.kind else {
                     return bad_kind(insn);
@@ -355,11 +359,16 @@ pub(crate) fn exec_frame(
                     );
                 }
                 #[cfg(not(feature = "std"))]
-                return Err(err::vm_error(
-                    "API_UNAVAILABLE",
-                    "monitor-enter/exit requires the portable monitor implementation",
-                )
-                .into());
+                {
+                    let object = regs[*a as usize].as_ref()?.ok_or_else(|| {
+                        err::vm_error("VM_TYPE_ERROR", "monitor reference disappeared")
+                    })?;
+                    if insn.opcode == 0x1D {
+                        step!(vm.monitor_enter(object));
+                    } else {
+                        step!(vm.monitor_exit(object));
+                    }
+                }
             }
 
             // ── check-cast (1F) / instance-of (20) ──────────────────────────
@@ -524,10 +533,13 @@ pub(crate) fn exec_frame(
                     None => vm.vm_exception(NPE, "throw com null")?,
                     Some(r) => {
                         let cls = vm.heap.class_of(r)?.to_string();
+                        #[cfg(feature = "std")]
                         let msg = vm.heap.get_field(r, "message").ok().and_then(|v| match v {
                             Value::Obj(m) => vm.heap.as_str(m).ok().map(str::to_string),
                             _ => None,
                         });
+                        #[cfg(not(feature = "std"))]
+                        let msg = crate::portable::throwables::message(vm, r)?;
                         Throwable {
                             class: cls,
                             message: msg,
@@ -750,6 +762,11 @@ pub(crate) fn exec_frame(
                     Ok(Some(r)) => Ok(r),
                     Err(e) => Err(e.into()),
                 });
+                #[cfg(not(feature = "std"))]
+                let v = step!(crate::portable::instance_field(
+                    vm, r, &_class, &fname, &ftype
+                ));
+                #[cfg(feature = "std")]
                 let v = match vm.heap.get_field(r, &fname) {
                     Ok(v) => v,
                     Err(_) => default_for(&ftype), // campo nunca escrito → default
@@ -1643,6 +1660,7 @@ fn do_invoke(
         return Err(err::vm_error("INVALID_FORMAT", "invoke não-static sem receiver").into());
     };
     // java/lang/Object.<init> é no-op (raiz de toda hierarquia de usuário)
+    #[cfg(feature = "std")]
     if mref.class == "Ljava/lang/Object;" && mref.name == "<init>" {
         return Ok(Value::Null);
     }
@@ -1664,6 +1682,22 @@ fn do_invoke(
         Ok(Some(r)) => r,
     };
     let recv_class = vm.heap.class_of(recv)?.to_string();
+    #[cfg(not(feature = "std"))]
+    {
+        if !vm.cp.is_subtype(&recv_class, &mref.class) {
+            return Err(err::vm_error(
+                "VM_TYPE_ERROR",
+                format!(
+                    "invoke receiver {recv_class} is not assignable to {} for {}{}",
+                    mref.class, mref.name, mref.proto
+                ),
+            )
+            .into());
+        }
+        if mref.class == "Ljava/lang/Object;" && mref.name == "<init>" {
+            return Ok(Value::Null);
+        }
+    }
 
     // `invoke-super Object.equals` from an AndroidX base implementation
     // (Fragment.equals is a final identity wrapper) must execute Object's
@@ -1678,9 +1712,27 @@ fn do_invoke(
     }
 
     // intrínseco de instância (String/StringBuilder/Throwable/Object)
+    // DEX toString overrides can invoke-super an implemented platform base.
+    // Resolve that base rather than reselecting the virtual DEX override.
+    #[cfg(not(feature = "std"))]
+    let throwable_super = is_super && vm.cp.is_subtype(&mref.class, "Ljava/lang/Throwable;");
+    #[cfg(feature = "std")]
+    let throwable_super = false;
+    let intrinsic_class = if throwable_super {
+        frame_super.unwrap_or(&mref.class)
+    } else if is_super
+        && matches!(
+            mref.class.as_str(),
+            "Ljava/lang/Enum;" | "Ljava/util/concurrent/atomic/AtomicBoolean;"
+        )
+    {
+        mref.class.as_str()
+    } else {
+        recv_class.as_str()
+    };
     if let Some(v) = intrinsics::call_instance_intrinsic_mref(
         vm,
-        &recv_class,
+        intrinsic_class,
         &mref.class,
         &mref.name,
         &mref.proto,
@@ -1739,11 +1791,9 @@ fn do_invoke(
         } else {
             &recv_class
         };
-        let has_dex = vm
-            .cp
-            .resolve_method(start, &mref.name, &mref.proto)
-            .is_some();
-        if !has_dex {
+        let class_method = vm.cp.has_class_method(start, &mref.name, &mref.proto);
+        let direct_host_target = !is_direct || vm.cp.find_class(&mref.class).is_none();
+        if !class_method && direct_host_target {
             if let Some(value) =
                 host.call(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
             {
@@ -1833,6 +1883,17 @@ fn do_invoke(
             crate::classpath::unresolved_method(&start_class, &mref.name, &mref.proto).into(),
         );
     };
+    #[cfg(not(feature = "std"))]
+    if m.access_flags & ACC_STATIC != 0 {
+        return Err(err::vm_error(
+            "INVALID_FORMAT",
+            format!(
+                "non-static invoke selected static method {}",
+                vm.method_label(d2, &m)
+            ),
+        )
+        .into());
+    }
     vm.call(d2, def, &m, raw.to_vec())
 }
 

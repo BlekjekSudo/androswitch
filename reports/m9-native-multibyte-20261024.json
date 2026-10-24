@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T11:36:59.4850615Z",
+  "status": "focused_host_contracts_and_arm64_compile_passed",
+  "scope": "General Android ARM64 multibyte conversion; no package branches, host locale conversions, or guest/host mbstate_t sharing.",
+  "observed_blocker": {
+    "session_report": "local-artifacts/m9/external-runs/56f085192fc84d3d9959ff8800a5b9bf/sessions/56f085192fc84d3d9959ff8800a5b9bf-1/session-report.json",
+    "session_report_sha256": "bea174a8f41298b026ab60b127430733e12a7eb8ba8098f0dbcb3a55e6d084a1",
+    "error": "ExceptionInInitializerError: libcandycrushsaga.so call requires mbtowc",
+    "result": "The earlier product failed at mbtowc. This receipt verifies new code with host contracts and ARM64 compilation only. Product E2E is pending and must be read from a separate run bound to its exact NRO hash."
+  },
+  "abi": {
+    "reference": "AOSP android-8.0.0_r1 / Android API26",
+    "wchar_t": "UTF-32 unsigned 32-bit guest value",
+    "mbstate_t": "LP64 8-byte object: four sequence bytes followed by four reserved bytes. Only sequence bytes are read/reset; guest reserved bytes remain untouched.",
+    "encoding": "Explicit UTF-8 decoder/encoder, independent of host global locale and Android C/C.UTF-8 selection, as in API26 Bionic.",
+    "implicit_state": "Separate per-function restartable states in actual host-thread TLS after native import bridge restores host TP. Existing locale thread/session finalization clears implicit states after guest destructors.",
+    "errors": "Invalid encoding/invalid Unicode scalar: (size_t)-1 and host EILSEQ, translated to Android errno by existing native bridge. Corrupt explicit state: EINVAL and reset. Incomplete input: (size_t)-2 with sequence retained and errno preserved.",
+    "string_conversion": "Tracks source pointer, whole-character output bounds, NUL termination and measurement without modifying source/state. Bounded partial sequence returns completed count and retains partial state; no partial UTF-8 output.",
+    "allocation": "No allocation, system calls, locale database or conversion subprocess."
+  },
+  "exports": [
+    "mbsinit",
+    "mbrtowc",
+    "mbrtoc32",
+    "mbrlen",
+    "mbtowc",
+    "mblen",
+    "wcrtomb",
+    "c32rtomb",
+    "wctomb",
+    "btowc",
+    "wctob",
+    "mbsnrtowcs",
+    "mbsrtowcs",
+    "wcsnrtombs",
+    "wcsrtombs",
+    "mbstowcs",
+    "wcstombs"
+  ],
+  "primary_sources": [
+    "https://raw.githubusercontent.com/aosp-mirror/platform_bionic/android-8.0.0_r1/libc/include/bits/mbstate_t.h",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_bionic/android-8.0.0_r1/libc/bionic/wchar.cpp",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_bionic/android-8.0.0_r1/libc/bionic/mbrtoc32.cpp",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_bionic/android-8.0.0_r1/libc/bionic/c32rtomb.cpp",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_bionic/android-8.0.0_r1/libc/bionic/mbstate.cpp",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_bionic/android-8.0.0_r1/libc/bionic/mblen.cpp",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_bionic/android-8.0.0_r1/libc/upstream-openbsd/lib/libc/locale/mbtowc.c"
+  ],
+  "implementation_provenance": "Original AndroSwitch implementation based on ABI and behavior contracts; no source payload copied. Existing RustyDroid attribution remains intact.",
+  "explicit_reference_departures": [
+    "Implicit states are per actual thread rather than historical API26 process-global static states.",
+    "A zero-byte restartable conversion returns incomplete (-2), instead of historical API26 zero.",
+    "Rejects surrogate scalars and values above U+10FFFF in both directions; historical API26 encoder/decoder accepted some non-scalars.",
+    "Bounded input ending inside a valid UTF-8 sequence preserves state and returns completed character count, rather than historical API26 numeric EILSEQ/reset behavior.",
+    "Measurement calls preserve explicit state and source pointer, rather than resetting historical API26 sequence state.",
+    "mblen maps incomplete conversion to -1 rather than exposing historical API26 cast -2."
+  ],
+  "preserved_reference_edges": [
+    "C locale still performs UTF-8 conversion even when MB_CUR_MAX is 1.",
+    "Decoder rejects U+FFFE and U+FFFF, following API26; encoder accepts them, as API26 did.",
+    "Legacy mbtowc incomplete input returns -1 while retaining private sequence and preserving errno; NULL input clears that private state."
+  ],
+  "checks": [
+    {
+      "name": "focused_multibyte_host",
+      "status": "passed",
+      "command": "wsl.exe -d Ubuntu -u root --exec /bin/bash -c: cc -pipe -std=gnu11 -O2 -Wall -Wextra -Werror -pthread -Iplatform/switch-smoke fixtures/m9/native-abi/multibyte.c platform/switch-smoke/bionic_locale.c platform/switch-smoke/bionic_multibyte.c -o local-artifacts/m9/native-abi/multibyte; execute resulting binary",
+      "result": "native multibyte contracts: PASS (UTF-8/UTF-32, LP64 state, restart, strings, TLS, errors)",
+      "coverage": [
+        "2/3/4-byte valid Unicode, every split point, upper scalar bound",
+        "Overlong/continuation/surrogate/non-scalar/noncharacter input errors and corrupted state",
+        "Reserved-state bytes preserved, output untouched on failure, errno preservation",
+        "Legacy, single-byte, restartable and string conversion interfaces",
+        "Bounded input/output and source pointer progress, NUL and measurement contracts",
+        "Two real pthread workers preserve independent partial states; cleanup resets state",
+        "Android C vs C.UTF-8 behavior"
+      ]
+    },
+    {
+      "name": "existing_locale_host",
+      "status": "passed",
+      "command": "cc -pipe -std=gnu11 -O2 -Wall -Wextra -Werror -pthread -Iplatform/switch-smoke fixtures/m9/native-abi/locales.c platform/switch-smoke/bionic_locale.c platform/switch-smoke/bionic_multibyte.c -o local-artifacts/m9/native-abi/locales; execute resulting binary",
+      "result": "native locale contracts: PASS (ABI, names/masks, ownership/TLS, numeric, Unicode, collation, time)"
+    },
+    {
+      "name": "existing_native_abi_host",
+      "status": "passed",
+      "command": "Existing fixtures/m9/native-abi/contracts.c build with bionic_cxx.c, bionic_libc.c, bionic_locale.c, bionic_multibyte.c, bionic_io.c, bionic_keys.c, bionic_log.c, bionic_vfs.c and missing_import.c; GNU11 -O2 -Wall -Wextra -Werror -pthread -lm",
+      "result": "native ABI contracts: PASS (C++ lifetimes, guards/once/keys, allocation, fortify, stdio/VFS, logging)"
+    },
+    {
+      "name": "strict_product_arm64_objects",
+      "status": "passed",
+      "command": "make -C platform/androswitch ../../local-artifacts/product/bionic_multibyte.o ../../local-artifacts/product/bionic_libc.o ../../local-artifacts/product/bionic_locale.o",
+      "result": "All three rebuilt through WSL devkitA64/libnx product Makefile, -Wall -Wextra -Werror."
+    },
+    {
+      "name": "independent_windows_arm64_objects",
+      "status": "passed",
+      "command": "C:/devkitPro/devkitA64/bin/aarch64-none-elf-gcc.exe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -IC:/devkitPro/libnx/include -Iplatform/switch-smoke -c each of bionic_multibyte.c, bionic_locale.c, bionic_libc.c",
+      "result": "Three ARM64 objects compiled successfully."
+    }
+  ],
+  "source_files": [
+    {
+      "path": "platform/switch-smoke/bionic_multibyte.c",
+      "sha256": "e45749bac9ffe6303248e601e333c37b31af44f4ffe1c5b422bc80db32e4d0ed"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_multibyte.h",
+      "sha256": "3e0f632f3b9a18082360e8be0f278432ce936192e2fa1266c7b9e74a9ff8b645"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_libc.c",
+      "sha256": "3e97273ee91a9b05c57ab356b1c58220dfa5c73853410a4929e347d1ac5a18bc"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_locale.c",
+      "sha256": "e518ab58d00609b21eb73326fe4bb4b565b0c61981eda62445ec38b035b58562"
+    },
+    {
+      "path": "platform/androswitch/Makefile",
+      "sha256": "722db1f15510955e77f8824b153ab5eb1f26e95eb0ac73558d86d4538204cf69"
+    },
+    {
+      "path": "platform/switch-smoke/Makefile",
+      "sha256": "98522f6031b9af1c08b3f3261b1989e95c3b4d43957d21cb0e2ffc3fe3f83ae2"
+    },
+    {
+      "path": "fixtures/m9/native-abi/multibyte.c",
+      "sha256": "34b582c62b6409274b3cb4e8ee725a8992403056f0bfba61f8585c0d79a6d60d"
+    },
+    {
+      "path": "scripts/test-native-abi.ps1",
+      "sha256": "2064815dc219b19966429e54ec148f5b386024851d48000c0f0d58999eef3ece"
+    }
+  ],
+  "not_run": [
+    "No Cargo jobs or complete test-native-abi.ps1 invocation in this subtask.",
+    "No emulator run with the new multibyte code in this receipt.",
+    "No physical Switch test of this new code.",
+    "No Android-device differential execution; contracts checked against primary source and focused independent fixtures."
+  ],
+  "limitations": [
+    "UTF-16 mbrtoc16/c16rtomb remains unavailable.",
+    "Historical API26 bug parity is explicitly limited as listed.",
+    "Native TLS errno bridge itself was covered by earlier native ABI/assembly receipts; this receipt does not newly reverify that entire bridge in an emulator."
+  ]
+}

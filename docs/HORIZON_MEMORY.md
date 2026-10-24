@@ -98,6 +98,16 @@ identify process memory limits separately from physical memory totals.
 
 ## Verification scope
 
+Admission checks and managed budgets do not cap total process memory or
+guarantee a contiguous allocation. Aggregate free space can be fragmented.
+Existing VM metadata, register and cache paths still include infallible Rust
+container growth; converting every such allocation into a recoverable Android
+error remains memory-hardening work. The current checks must not be presented
+as a guarantee that every admitted APK can finish loading or running.
+The [scoped source review](../reports/m9-memory-source-review-20261024.json)
+binds the reviewed source hashes and records those limits; it adds no execution
+or hardware result.
+
 The pure C policy test exercises alignment, reserve/cap decisions, unavailable
 queries, loader overrides, unsigned bounds and free estimates. It can run on
 the host without Horizon:

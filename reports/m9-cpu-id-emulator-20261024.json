@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T10:46:04.666491+00:00",
+  "status": "host_oracle_and_translator_contracts_passed_versioned_diagnostic_ready",
+  "scope": "Native CPU-feature guard investigation and isolated emulator diagnostic. No AndroSwitch runtime/guest instruction patch. Emulator E2E results are separate.",
+  "observed_failure": {
+    "verification": "local-artifacts/m9/external-runs/ff07877ffee84672987fe72a5c691349/verification.json",
+    "stdout": "local-artifacts/m9/external-runs/ff07877ffee84672987fe72a5c691349/ryujinx.stdout.log",
+    "stderr": "local-artifacts/m9/external-runs/ff07877ffee84672987fe72a5c691349/ryujinx.stderr.log",
+    "emulator": "Ryujinx 1.3.3+e2143d4",
+    "emulator_sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0",
+    "nro_sha256": "2bfc3351570abb19ae3704e9c1c41878f65470fbcdcb58f3b0374860bb38a5d2",
+    "exception": "Host .NET NotImplementedException in InstEmit.Mrs during Translator.EmitAndGetCFG",
+    "runtime_pc": "0xbb40fb0e0",
+    "instruction": "0xd5380429",
+    "decoded_instruction": "MRS x9, ID_AA64PFR1_EL1",
+    "application_fault_claim": false
+  },
+  "native_artifact": {
+    "apk_sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+    "elf_sha256": "7f2044d1632349c5a8b046df75fe37ff1fbc866a6765d5e85726a655072e1536",
+    "elf_bytes": 89417880,
+    "instruction_elf_va": "0x52000e0",
+    "instruction_file_offset": "0x52000e0",
+    "guard": "TBZ W0,#11 at ELF VA 0x52000dc skips the MRS; HWCAP_CPUID is bit 11",
+    "inference": "Stripped function at 0x51ffcbc has an ARM64 runtime CPU-feature resolver shape; exact source/compiler revision not established",
+    "native_REA_limit": "Native Ghidra/Hopper/IDA providers unavailable in this environment; focused LLVM disassembly and Unicorn execution used, not decompilation"
+  },
+  "oracle": {
+    "command": "python local-artifacts/m9/native-audit/cpu-resolver-oracle.py",
+    "script_sha256": "3fa66b1c5ef0f090a2fcad1936a33da671a2e2b985e87a0e07d6fd04ca42cd49",
+    "result": "local-artifacts/m9/native-audit/cpu-resolver-oracle-reproduced.json",
+    "result_sha256": "2be66392c1fc37a395c81a50acec8ed3ba201e28c750f855e04df74ba34f00ba",
+    "engine": "Unicorn 2.1.4",
+    "unmodified_code": true,
+    "actual_baseline": {
+      "hwcap": 3,
+      "hwcap2": 0,
+      "steps": 84,
+      "mrs_reached": 0,
+      "returned": true,
+      "features": "0x8000000000000300"
+    },
+    "positive_control": {
+      "hwcap": "0x803",
+      "steps": 51,
+      "stopped_before_mrs": "0x52000e0",
+      "mrs_executed": false
+    },
+    "coverage": "Selected resolver only, no full application or Horizon execution"
+  },
+  "emulator_fix": {
+    "source_revision": "e2143d43bcb6762340d8a01f20e7b5fdf104f02f",
+    "source_url": "https://github.com/wangxiaoming1988/Ryujinx-fork/tree/e2143d43bcb6762340d8a01f20e7b5fdf104f02f",
+    "upstream_credit": "Ryujinx and ARMeilleure contributors; MIT. Mirror preserves original Ryubing commit; official source host timed out.",
+    "original_source_git_blob": "11c1d0328e375a60cec29fc870886f8a29b88109",
+    "patch": "tools/ryujinx-cfg/mrs-runtime-undefined.patch",
+    "behavior": "Unknown MRS emits existing runtime Und callback and returns instead of throwing while emitting CFG; only actual execution faults; register values never fabricated.",
+    "options_review": "Decoder defaults to MultipleBlocks. SingleInstruction is used for debugger step only; EnableDebugging alone does not force single-step. No normal CLI/config option was found to avoid this emitter path.",
+    "build_kind": "Exact-source ARMeilleure rebuilt and substituted into a task-local stock .NET bundle; not a full clean source emulator publish.",
+    "full_publish_gap": "Exact Ryujinx.LibHac 0.21.0-alpha.116 absent from reachable nuget.org; official private package host timed out.",
+    "build_sdk": "10.0.100 targeting net9.0; explicit task-local SDK, no global installation/default change",
+    "probe_runtime": ".NET 9.0.13 installed host",
+    "version_flags": [
+      "Version=1.3.3",
+      "AssemblyVersion=1.3.3.0",
+      "FileVersion=1.3.3.0",
+      "InformationalVersion=1.3.3+e2143d4.androswitch-mrs",
+      "IncludeSourceRevisionInInformationalVersion=false"
+    ],
+    "bundle": {
+      "original": "D:\\Dev\\Switch\\RyujinX\\Ryujinx.exe",
+      "original_sha256": "cc8826b9ed4a72299c4db48fae077f5a3e659bb03671b7c40cb094d8e727cde0",
+      "bundle_version": [
+        6,
+        0
+      ],
+      "bundle_entries": 242,
+      "replaced_entry": "ARMeilleure.dll",
+      "original_assembly_sha256": "4c6432db458471bdc682d567d01fa4d52c83f7749cea0f7f83f0c02dbf1d209f",
+      "replacement_assembly_sha256": "5d7f98d738bf8170e09b29c50ddb05b45d62a16c8fdd4046b368a5a456679dd9",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\ryujinx-cfg-fix\\publish-versioned\\Ryujinx.exe",
+      "output_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+      "scope": "Original apphost and every other bundled payload preserved; manifest refreshed with unique extraction id; no profile, keys or firmware copied."
+    },
+    "bundle_validation": {
+      "status": "passed",
+      "entries": 242,
+      "unchanged_payloads": 241,
+      "changed_payloads": [
+        "ARMeilleure.dll"
+      ],
+      "unique_extraction_id": true,
+      "original_executable_unchanged": true
+    },
+    "native_support_files": "Stock native DLLs, LICENSE.txt, THIRDPARTY.md and alsoft.ini only; no profile, keys, firmware or cache copied"
+  },
+  "tests": [
+    {
+      "name": "stock_exact_source_untaken_MRS",
+      "status": "expected_failure_reproduced",
+      "exit_code": -532462766,
+      "log": "local-artifacts/m9/ryujinx-cfg-fix/stock-probe-guarded.log",
+      "result": "Same host emit-time exception despite untaken TBZ guard"
+    },
+    {
+      "name": "versioned_translator_contract",
+      "status": "passed",
+      "cases": 20,
+      "dispatchers": [
+        "managed",
+        "unmanaged"
+      ],
+      "registers": [
+        "ID_AA64PFR1_EL1",
+        "ID_AA64PFR0_EL1",
+        "ID_AA64ZFR0_EL1",
+        "ID_AA64ISAR0_EL1",
+        "ID_AA64ISAR1_EL1"
+      ],
+      "assertions": [
+        "Untaken guarded instruction has no undefined callback and completes normally",
+        "Executed instruction invokes undefined callback exactly once with exact PC/opcode",
+        "Read destination unchanged on fault",
+        "Following marker instruction not executed after fault"
+      ],
+      "result": "local-artifacts/m9/ryujinx-cfg-fix/versioned-probe-results.json",
+      "result_sha256": "24e4f9b8db7a49a6063f5f9541d088ee9b71886efcec77edc43c6cfee566fbde"
+    },
+    {
+      "name": "assembly_identity",
+      "status": "passed",
+      "assembly_version": "1.3.3.0",
+      "references_identical_to_stock": 20,
+      "rea_original_evidence": "ev_81f184a3d33c4f4fdc3c4649ab06bc781dac7dccfe21b0b0bd224d103df3579c",
+      "rea_rebuilt_evidence": "ev_316d00fb5bff1bc3295349677ae4ff97b948441f4528a667a401676cd89f6242",
+      "log": "local-artifacts/m9/ryujinx-cfg-fix/assembly-identity-versioned.jsonl",
+      "coverage": "Static metadata and assembly-name lookup, not whole emulator subsystem initialization"
+    },
+    {
+      "name": "bundle_payloads",
+      "status": "passed",
+      "unchanged": 241,
+      "changed": [
+        "ARMeilleure.dll"
+      ],
+      "original_executable_unchanged": true,
+      "new_extraction_identity": true
+    },
+    {
+      "name": "canonical_patch",
+      "status": "passed",
+      "command": "git -C local-artifacts/m9/ryujinx-cfg-fix/source apply --cached --check tools/ryujinx-cfg/mrs-runtime-undefined.patch (absolute patch path used); reverse check with --ignore-whitespace passed"
+    }
+  ],
+  "earlier_diagnostic_attempt": {
+    "sha256": "5dc6100fe5420ee8ee6d4049d0e6d8aa9719b04846f2be9aa1b00a33bd6a59f4",
+    "status": "failed_before_guest",
+    "verification": "local-artifacts/m9/external-runs/89c92cba622a4614adb4d001443b7351/verification.json",
+    "reason": "Default rebuild identity 1.0.0.0 did not match requested ARMeilleure 1.3.3.0; --no-gui --help passed but did not resolve config subsystem; versioned build corrects identities.",
+    "preserved": true
+  },
+  "primary_references": [
+    {
+      "url": "https://documentation-service.arm.com/static/6333fe3fda191e7fe057d03b",
+      "supports": "Architectural system register encoding; used for encoding only, not a claim that this CPU is present in Switch."
+    },
+    {
+      "url": "https://www.kernel.org/doc/html/latest/arch/arm64/cpu-feature-registers.html",
+      "supports": "Linux HWCAP_CPUID advertises sanctioned userspace CPU-ID register emulation; not an automatic Horizon capability."
+    },
+    {
+      "url": "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-19.1.0/compiler-rt/lib/builtins/cpu_model/aarch64/hwcap.inc",
+      "supports": "HWCAP_CPUID bit 11, FP/ASIMD bits and feature resolver argument flag."
+    },
+    {
+      "url": "https://raw.githubusercontent.com/wangxiaoming1988/Ryujinx-fork/e2143d43bcb6762340d8a01f20e7b5fdf104f02f/src/ARMeilleure/Instructions/InstEmitSystem.cs",
+      "supports": "Exact source emit-time failure."
+    },
+    {
+      "url": "https://raw.githubusercontent.com/wangxiaoming1988/Ryujinx-fork/e2143d43bcb6762340d8a01f20e7b5fdf104f02f/src/ARMeilleure/Instructions/InstEmitException.cs",
+      "supports": "Existing runtime undefined instruction path."
+    },
+    {
+      "url": "https://github.com/dotnet/runtime/blob/main/src/installer/managed/Microsoft.NET.HostModel/Bundle/Manifest.cs",
+      "supports": "Single-file manifest layout."
+    },
+    {
+      "url": "https://github.com/dotnet/runtime/blob/main/src/installer/managed/Microsoft.NET.HostModel/Bundle/FileEntry.cs",
+      "supports": "Bundle v6 file-entry layout."
+    }
+  ],
+  "limits": [
+    "No guest CPU instructions patched, no HWCAP_CPUID advertisement, no Linux guest kernel added.",
+    "No full Android application, rendering, gameplay or physical Switch pass claimed by these tests.",
+    "Versioned emulator E2E belongs to separate parent-run verification.",
+    "Unknown executed MRS remains unsupported; unknown MSR emitter behavior unchanged.",
+    "Support for native CPU-ID reads on Horizon was not established and is not required by the tested baseline guard."
+  ],
+  "source_sha256": {
+    "tools/ryujinx-cfg/.gitignore": "5e1d5f45a63a5ba643bc3d6c14fdf090cae52fc0b49debef5316ff51b0103b98",
+    "tools/ryujinx-cfg/README.md": "891291359079a262d69a49f4a35d30c7a22f289be10a9f2abda2dec195c8cd59",
+    "tools/ryujinx-cfg/CfgProbe.csproj": "a2f5e104c74e47607d5b1b1a61c2b828d80e11e11b5a3b9ff540e5ca0bcf2561",
+    "tools/ryujinx-cfg/Program.cs": "8f47de6a74e56648a87653a9faf6ba706d3f0056d2c85cb7532c82e0c8b56abb",
+    "tools/ryujinx-cfg/mrs-runtime-undefined.patch": "d32d3321e04c35ddd4749f112afa8a66c68eb8bd4eb8e8475101aa3b1c8242b9",
+    "tools/ryujinx-cfg/rebundle.py": "b7fcca620be679a94923766ded899eec4ee9fb5556f1a41a880183cfe1c5e864"
+  },
+  "evidence_sha256": {
+    "local-artifacts/m9/external-runs/ff07877ffee84672987fe72a5c691349/ryujinx.stdout.log": "0270524b239e6675b5b927b4c6f98b25e8875e0f21966024c439c2652df48859",
+    "local-artifacts/m9/external-runs/ff07877ffee84672987fe72a5c691349/ryujinx.stderr.log": "4cb051c3210a87e3fc775dc551f39e78e61639feaa8abb89cc10c28b21d5424b",
+    "local-artifacts/m9/ryujinx-cfg-fix/public-probe-versioned-build.log": "aabe60115c013140291d42cae71b6ce7cac68632ab93f1ea9719178ad231c483",
+    "local-artifacts/m9/ryujinx-cfg-fix/bundle-validation-versioned.json": "28ae2ebc4e00a27a73087e62c9567d45d7d80f85229e5c5fbf07c6c5e244484f"
+  }
+}

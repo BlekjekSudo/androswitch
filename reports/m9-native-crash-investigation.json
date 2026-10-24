@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "scope": "M9 external native startup crash diagnosis",
+  "date": "2026-10-24",
+  "observed_run": "local-artifacts/m9/external-runs/56f085192fc84d3d9959ff8800a5b9bf",
+  "nro_sha256": "1e84d51d96b3aa6db5ca6382e1d67e14e882706eb44497ce950f248fbead882b",
+  "emulator": {
+    "frontend": "headless_sdl2",
+    "version": "1.3.3+e2143d4",
+    "outcome": "native invalid memory access; process exited before launcher workflow completed",
+    "pc": "0x0000000afb7040ac",
+    "lr": "0x0000000afb7040ac",
+    "access_address": "0x0",
+    "last_java_log": "JAVA onCreate",
+    "session_status": "running",
+    "runtime_module_base": "not recorded",
+    "cause": "undetermined until actual loader base is recorded"
+  },
+  "source_mapping": {
+    "module": "local-artifacts/product/androswitch.elf",
+    "nro_text_base": "0x8500000",
+    "offset": "0x10a808",
+    "function": "as_switch_smoke::device_jni::Session::foreign",
+    "instruction": "mov w3,w0 immediately after bl as_native_call",
+    "tool": "Android NDK 28.2.13676358 llvm-addr2line/llvm-objdump",
+    "limitation": "This locates the outer runtime call; it does not identify the native ELF crash instruction."
+  },
+  "artifact": {
+    "path": "local-artifacts/mekorama/libmekorama.so",
+    "bytes": 2343584,
+    "sha256": "732c3acfc0874cec817336ae370343e634facd6156e77233d2fe001b7b48dac5"
+  },
+  "rea": {
+    "open_binary": "admitted ARM64 ELF with matching SHA256",
+    "instruction": "provider_unavailable",
+    "reason": "Windows Ghidra PE-only and not configured; Hopper unsupported host; IDA not configured",
+    "fallback": "Shipped SDK LLVM disassembly and program headers; not REA native instruction Evidence"
+  },
+  "change": {
+    "path": "platform/switch-smoke/native.c",
+    "sha256": "c7929091d42e87ccfb623d3672a0e9010634375a41b042276ce8c7a4c9be5bde",
+    "behavior": "Bounded actual loader module base/length/phdr/name diagnostics; reset at next native session",
+    "log": "logs/native-modules.log",
+    "maximum_modules": 256,
+    "maximum_logged_name_bytes": 1024,
+    "preserves_errno": true,
+    "package_special_cases": false
+  },
+  "verification": {
+    "strict_c_compile": {
+      "status": "passed",
+      "command": "wsl.exe -d Ubuntu -- bash -lc \"cd /mnt/d/Dev/Switch/AndroSwitch && /opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc -pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -O2 -Wall -Wextra -Werror -I/opt/devkitpro/libnx/include -Iplatform/switch-smoke -c platform/switch-smoke/native.c -o local-artifacts/m9/native-audit/native-diagnostics.o\"",
+      "exit_code": 0
+    },
+    "diagnostic_emulator_run": "pending parent next combined build",
+    "physical_hardware": "not run"
+  },
+  "limitations": [
+    "No arbitrary guest addresses are treated as ELF offsets without a measured base.",
+    "No gameplay, first-screen, or game compatibility success is claimed.",
+    "The source only adds diagnostic logging; it does not claim the crash is fixed."
+  ],
+  "followup_mapping_run": {
+    "run": "local-artifacts/m9/external-runs/37192c85e89c4defaa1fa645157be61b",
+    "module_mapping": "observed actual load bases; Barcode=0x9fcf23000 length0x9c000; Mekorama=0xac4d96000 length0x17d1000",
+    "registers": "not recorded: stdout ended after outer stack and stderr empty",
+    "conclusion": "No previous ASLR address is reused as the current PC; native instruction remains undetermined."
+  },
+  "diagnostics_followup": {
+    "implementation": "frozen; awaiting parent device Rust build and emulator",
+    "sources": [
+      {
+        "path": "platform/switch-smoke/native.c",
+        "sha256": "8c9ca7217ecf507b1fab8819a960906d8ec224e7573dbbd6d2a50c66ef806f9b"
+      },
+      {
+        "path": "crates/as-switch-smoke/src/device_jni.rs",
+        "sha256": "df296d38d90c3f6c5605b01609af36135798b418fa71140216eb7d3ee3d61314"
+      }
+    ],
+    "marker": "logs/native-trace.enabled",
+    "native_calls_log": "logs/native-calls.log",
+    "maximum_native_calls": 1024,
+    "native_calls": "Enter/leave correlation ID, actual function/thread/scalar x0..x3 addresses; no argument pointer dereferences",
+    "failure_log": "logs/jni-failures.log",
+    "maximum_failure_records": 256,
+    "maximum_failure_detail_bytes": 4096,
+    "failure_contents": "Actual error code/exception class and explicit failed class/method/JNI-slot lookup API metadata; arbitrary application messages and jstring content omitted",
+    "behavior": "Logging IO preserves errno; pending JNI exception/NULL/fatal behavior retained; logs reset once per native session",
+    "strict_c_compile": "passed final frozen source, exit0",
+    "initial_c_compile_failure": "GCC inlining moved diagnostic temporary into caller setjmp scope, producing -Wclobbered; enter helper now noinline, final strict compilation passed",
+    "rust_device_compile": "pending parent; host builds do not compile Horizon-only device_jni",
+    "package_special_cases": false
+  },
+  "matched_boundary_run": {
+    "run": "local-artifacts/m9/external-runs/c58fda6992e744c4be993aa7243163e0",
+    "nro_sha256": "490b1c5881889492adcdc5b1281ce379f5f4db2bc3f91462cac35278005e102e",
+    "outcome": "attempted_failed timeout, owned emulator stopped, SD restored",
+    "native_module": "libBarcodeScannerLib.so",
+    "module_base": "0x9fcf23000",
+    "module_length": "0x9c000",
+    "unmatched_enter_call": 5,
+    "function": "0x9fcf864bc",
+    "measured_relative_function": "0x634bc",
+    "exported_symbol": "Java_com_manateeworks_BarcodeScanner_MWBregisterCode",
+    "first_four_native_calls": "returned without native error",
+    "jni_failures": "empty",
+    "partial_registers": {
+      "x0": "0x0",
+      "x1": "0x86",
+      "x2": "0x80043e0",
+      "x19": "0x9fcfa8000"
+    },
+    "pc": "not recorded: partial register output ended at X24",
+    "inference": "Artifact data flow enters a date helper that calls time/localtime; its adrp x19 identifies ELF page0x85000, matching the measured X19-base. from_host_time returns NULL with newlib ENOTSUP134 when %z/%Z metadata is unavailable. This is a candidate cause requiring direct failure probe; no absent PC is inferred."
+  },
+  "time_failure_probe": {
+    "status": "frozen, actual devkitA64 strict C compile passed, emulator pending parent",
+    "source_paths": [
+      "platform/switch-smoke/native.c",
+      "platform/switch-smoke/native.h",
+      "platform/switch-smoke/bionic_libc.c"
+    ],
+    "marker": "logs/native-trace.enabled",
+    "log": "logs/native-calls.log",
+    "maximum_metadata_records": 32,
+    "fields": [
+      "actual backend success/errno",
+      "adapter errno",
+      "calendar fields",
+      "strftime %z/%Z raw lengths and metadata",
+      "actual Horizon timeToCalendarTimeWithMyRule result and metadata only on success"
+    ],
+    "behavior": "No calendar policy or API return behavior changed; diagnostic IO and formatting preserve errno",
+    "current_sources": [
+      {
+        "path": "platform/switch-smoke/native.c",
+        "sha256": "a70fa076ee253ef701e3346a98f8454dec74a4ce2950e868a3192fdd750dcbe0"
+      },
+      {
+        "path": "platform/switch-smoke/native.h",
+        "sha256": "c7a6f423f67eaf2419b51610451ac63f9f933e8e2d49d60886128e654fb4dbb9"
+      },
+      {
+        "path": "platform/switch-smoke/bionic_libc.c",
+        "sha256": "60c26347efcbb77e0e68e3b6b709502541ef876911eae378c8c374701fdd6da0"
+      }
+    ],
+    "compile": "aarch64-none-elf-gcc -pipe -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -O2 -Wall -Wextra -Werror -I/opt/devkitpro/libnx/include -Iplatform/switch-smoke -c <source>; both source objects exit0",
+    "primary_references": [
+      "https://sourceware.org/newlib/libc.html#strftime",
+      "https://github.com/switchbrew/libnx/blob/master/nx/source/runtime/newlib.c",
+      "https://github.com/switchbrew/libnx/blob/master/nx/include/switch/services/time.h"
+    ]
+  }
+}

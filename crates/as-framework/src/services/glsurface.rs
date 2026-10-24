@@ -10,6 +10,8 @@ pub struct GraphicsCaps {
     /// Runtime logical density policy, supplied by the display adapter.
     pub density: f32,
     pub density_dpi: i32,
+    /// Android Surface rotation (0..3) relative to this display's natural axes.
+    pub rotation: i32,
 }
 pub struct EglConfigs {
     pub configs: Vec<u64>,
@@ -23,6 +25,11 @@ pub trait EglConfigBackend {
         capacity: usize,
     ) -> Result<EglConfigs>;
     fn get_config_attrib(&self, display: u64, config: u64, attribute: i32) -> Result<i32>;
+    /// Change actual buffer/presentation/input coordinates before any surface
+    /// starts. Return the resulting logical display, or leave it unchanged on error.
+    fn set_display_rotation(&self, _rotation: i32) -> Result<GraphicsCaps> {
+        Err(error("API_UNAVAILABLE", "display rotation backend"))
+    }
     fn set_keep_screen_on(&self, _enabled: bool) -> Result<()> {
         Err(error("API_UNAVAILABLE", "display power inhibition"))
     }
@@ -65,6 +72,7 @@ pub(crate) struct GlSurfaces {
     window_flags: RefCell<BTreeMap<ObjRef, i32>>,
     orientations: RefCell<BTreeMap<ObjRef, i32>>,
     callback_depth: core::cell::Cell<u32>,
+    display_started: core::cell::Cell<bool>,
 }
 struct CallbackScope<'a>(&'a core::cell::Cell<u32>);
 impl Drop for CallbackScope<'_> {
@@ -155,6 +163,20 @@ impl GlSurfaces {
             }
             return Ok(true);
         }
+        if class == "Landroid/content/res/Configuration;" {
+            for field in [
+                "orientation",
+                "screenWidthDp",
+                "screenHeightDp",
+                "smallestScreenWidthDp",
+                "densityDpi",
+            ] {
+                write(vm, object, field, Value::Int(0))?;
+            }
+            // API26 Configuration() calls unset(), including fontScale=0.
+            write(vm, object, "fontScale", Value::Float(0.))?;
+            return Ok(true);
+        }
         Ok(matches!(
             class,
             EGL_API
@@ -166,6 +188,7 @@ impl GlSurfaces {
                 | "Landroid/view/Display;"
                 | "Landroid/app/ActivityManager;"
                 | "Landroid/content/pm/ConfigurationInfo;"
+                | "Landroid/content/res/Configuration;"
                 | "Landroid/media/AudioManager;"
         ))
     }
@@ -219,7 +242,22 @@ impl GlSurfaces {
             gles_version: 0,
             density: 1.,
             density_dpi: 160,
+            rotation: 0,
         })
+    }
+    pub(crate) fn caps(&self) -> Option<GraphicsCaps> {
+        *self.caps.borrow()
+    }
+    pub(crate) fn software_size(&self, android: &Android) -> (i32, i32) {
+        self.caps().map_or((android.width, android.height), |c| {
+            (
+                libm::roundf(c.width as f32 / c.density) as i32,
+                libm::roundf(c.height as f32 / c.density) as i32,
+            )
+        })
+    }
+    pub(crate) fn mark_display_started(&self) {
+        self.display_started.set(true);
     }
     pub(crate) fn dimensions(&self, view: ObjRef) -> Option<(i32, i32)> {
         if !self.views.borrow().contains_key(&view) {
@@ -227,20 +265,108 @@ impl GlSurfaces {
         }
         self.caps.borrow().map(|c| (c.width, c.height))
     }
-    pub(crate) fn bind_caps(&self, caps: GraphicsCaps) -> Result<()> {
+    fn validate_caps(caps: GraphicsCaps) -> Result<()> {
         if caps.width <= 0
             || caps.height <= 0
             || !caps.density.is_finite()
             || caps.density <= 0.
             || caps.density_dpi <= 0
             || caps.gles_version < 0x20000
+            || !(0..=3).contains(&caps.rotation)
+            || libm::roundf(caps.width as f32 / caps.density) < 1.
+            || libm::roundf(caps.height as f32 / caps.density) < 1.
+            || libm::roundf(caps.width as f32 / caps.density) > 1920.
+            || libm::roundf(caps.height as f32 / caps.density) > 1920.
         {
             return Err(error(
                 "INVALID_GRAPHICS_CAPS",
                 "display dimensions/density/GLES capability",
             ));
         }
+        Ok(())
+    }
+    pub(crate) fn bind_caps(&self, caps: GraphicsCaps) -> Result<()> {
+        Self::validate_caps(caps)?;
+        if self.display_started.get() {
+            return Err(error(
+                "DISPLAY_ACTIVE",
+                "display capabilities are already in use",
+            ));
+        }
         *self.caps.borrow_mut() = Some(caps);
+        Ok(())
+    }
+    fn request_orientation(
+        &self,
+        android: &Android,
+        activity: ObjRef,
+        requested: i32,
+    ) -> Result<()> {
+        let current = self.metrics(android);
+        let natural_landscape = if current.rotation % 2 == 0 {
+            current.width >= current.height
+        } else {
+            current.height >= current.width
+        };
+        let landscape = if natural_landscape { 0 } else { 1 };
+        let portrait = if natural_landscape { 1 } else { 0 };
+        // No orientation sensor is exposed by this backend. Sensor/user modes
+        // retain the actual orientation unless they constrain its shape.
+        let rotation = match requested {
+            -1 | 2 | 4 | 5 | 10 | 13 | 14 => current.rotation,
+            0 => landscape,
+            1 => portrait,
+            6 | 11 => {
+                if current.width >= current.height {
+                    current.rotation
+                } else {
+                    landscape
+                }
+            }
+            7 | 12 => {
+                if current.height >= current.width {
+                    current.rotation
+                } else {
+                    portrait
+                }
+            }
+            8 => (landscape + 2) % 4,
+            9 => (portrait + 2) % 4,
+            3 => {
+                return Err(error(
+                    "API_UNAVAILABLE",
+                    "Activity.setRequestedOrientation(BEHIND=3): activity display inheritance",
+                ))
+            }
+            _ => {
+                return Err(error(
+                    "API_UNAVAILABLE",
+                    format!(
+                        "Activity.setRequestedOrientation({requested}): unknown API26 orientation"
+                    ),
+                ))
+            }
+        };
+        if rotation != current.rotation {
+            if self.display_started.get() {
+                return Err(error("DISPLAY_ORIENTATION_UNAVAILABLE", format!("Activity.setRequestedOrientation({requested}): active display rotation {} -> {rotation} requires surface/configuration lifecycle recreation",current.rotation)));
+            }
+            let next = self.backend()?.set_display_rotation(rotation)?;
+            Self::validate_caps(next)?;
+            let expected = if (rotation - current.rotation).abs() % 2 == 0 {
+                (current.width, current.height)
+            } else {
+                (current.height, current.width)
+            };
+            if next.rotation != rotation || (next.width, next.height) != expected {
+                return Err(error(
+                    "INVALID_DISPLAY_RESULT",
+                    "backend did not return the requested rotation and logical dimensions",
+                ));
+            }
+            *self.caps.borrow_mut() = Some(next);
+        }
+        self.orientations.borrow_mut().insert(activity, requested);
         Ok(())
     }
     pub(crate) fn bind_backend(&self, backend: Rc<dyn EglConfigBackend>) {
@@ -277,6 +403,7 @@ impl GlSurfaces {
         Ok(requests)
     }
     pub(crate) fn choose_config(&self, vm: &mut Engine, view: ObjRef, display: u64) -> Result<u64> {
+        self.mark_display_started();
         let _scope = self.enter_callback();
         if display == 0 {
             return Err(invalid("null EGL display"));
@@ -790,6 +917,7 @@ impl GlSurfaces {
                         | "Landroid/view/Display;"
                         | "Landroid/app/ActivityManager;"
                         | "Landroid/content/pm/ConfigurationInfo;"
+                        | "Landroid/content/res/Configuration;"
                         | "Landroid/media/AudioManager;"
                 ) =>
             {
@@ -828,7 +956,9 @@ impl GlSurfaces {
             ("getHeight", "()I") if class == "Landroid/view/Display;" => {
                 Value::Int(self.metrics(android).height)
             }
-            ("getRotation", "()I") if class == "Landroid/view/Display;" => Value::Int(0),
+            ("getRotation", "()I") if class == "Landroid/view/Display;" => {
+                Value::Int(self.metrics(android).rotation)
+            }
             ("getDeviceConfigurationInfo", "()Landroid/content/pm/ConfigurationInfo;")
                 if class == "Landroid/app/ActivityManager;" =>
             {
@@ -847,6 +977,34 @@ impl GlSurfaces {
                 let metrics = shell(vm, "Landroid/util/DisplayMetrics;")?;
                 self.fill_metrics(android, vm, metrics)?;
                 Value::Obj(metrics)
+            }
+            ("getConfiguration", "()Landroid/content/res/Configuration;")
+                if class == "Landroid/content/res/Resources;" =>
+            {
+                let caps = self.metrics(android);
+                let configuration = shell(vm, "Landroid/content/res/Configuration;")?;
+                let width = libm::roundf(caps.width as f32 / caps.density) as i32;
+                let height = libm::roundf(caps.height as f32 / caps.density) as i32;
+                for (field, value) in [
+                    (
+                        "orientation",
+                        if caps.width > caps.height {
+                            2
+                        } else if caps.height > caps.width {
+                            1
+                        } else {
+                            0
+                        },
+                    ),
+                    ("screenWidthDp", width),
+                    ("screenHeightDp", height),
+                    ("smallestScreenWidthDp", width.min(height)),
+                    ("densityDpi", caps.density_dpi),
+                ] {
+                    write(vm, configuration, field, Value::Int(value))?;
+                }
+                write(vm, configuration, "fontScale", Value::Float(1.))?;
+                Value::Obj(configuration)
             }
             ("getProperty", "(Ljava/lang/String;)Ljava/lang/String;")
                 if class == "Landroid/media/AudioManager;" =>
@@ -869,14 +1027,7 @@ impl GlSurfaces {
                 .get_field(r, "volumeControlStream")
                 .unwrap_or(Value::Int(-1)),
             ("setRequestedOrientation", "(I)V") if activity => {
-                let orientation = int(args, 0)?;
-                if ![-1, 0, 6, 14].contains(&orientation) {
-                    return Err(error(
-                        "API_UNAVAILABLE",
-                        "display adapter currently uses fixed natural landscape",
-                    ));
-                }
-                self.orientations.borrow_mut().insert(r, orientation);
+                self.request_orientation(android, r, int(args, 0)?)?;
                 Value::Null
             }
             ("getRequestedOrientation", "()I") if activity => {

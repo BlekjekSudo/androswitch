@@ -115,6 +115,15 @@ libnx sector conversion. Native returns monitor eight successful console
 submissions, with operation/result/slot diagnostics on display failures. Runtime
 GPU dumps are opt-in to scripted tests, not interactive startup work.
 
+Initial application orientation is negotiated with the Horizon display adapter.
+Portrait uses real 720x1280 EGL buffers and a compositor rotation; CPU rasters
+use a checked rotated blit into the physical 1280x720 framebuffer. Touch applies
+the inverse transform. Metadata is committed only after platform acceptance;
+changing an active renderer's orientation remains explicitly unavailable.
+Cleanup resets native-window geometry and transform before launcher reuse. See
+[Horizon display orientation](HORIZON_DISPLAY.md) for the actual-window EGL
+metadata provider, ownership rules and separate verification scopes.
+
 ## Verification
 
 M8 uses `as-storage` for typed XML preferences and real native SQLite snapshots.

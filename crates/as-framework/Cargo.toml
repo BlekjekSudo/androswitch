@@ -13,11 +13,12 @@ rd-apk = { path = "../rd-apk", default-features = false }
 as-platform = { path = "../as-platform", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 libm = "=0.2.15"
+miniz_oxide = { version = "=0.9.1", default-features = false, features = ["with-alloc"] }
 rd-dex = { path = "../rd-dex", default-features = false }
 serde_json = { version = "1.0", optional = true }
-as-package = { path = "../as-package", optional = true }
+as-package = { path = "../as-package" }
 [features]
-host = ["as-platform/std", "dep:serde_json", "dep:as-package"]
+host = ["as-platform/std", "dep:serde_json"]
 [[bin]]
 name = "as-ui-probe"
 path = "src/bin/as-ui-probe.rs"
@@ -39,4 +40,49 @@ required-features = ["host"]
 [[test]]
 name = "glsurface"
 path = "tests/glsurface.rs"
+required-features = ["host"]
+
+[[test]]
+name = "communication"
+path = "tests/communication.rs"
+required-features = ["host"]
+
+[[test]]
+name = "bundle"
+path = "tests/bundle.rs"
+required-features = ["host"]
+
+[[test]]
+name = "inherited_dispatch"
+path = "tests/inherited_dispatch.rs"
+required-features = ["host"]
+
+[[test]]
+name = "timer"
+path = "tests/timer.rs"
+required-features = ["host"]
+
+[[test]]
+name = "executors"
+path = "tests/executors.rs"
+required-features = ["host"]
+
+[[test]]
+name = "bitmap"
+path = "tests/bitmap.rs"
+required-features = ["host"]
+
+[[test]]
+name = "resource_names"
+path = "tests/resource_names.rs"
+required-features = ["host"]
+
+[[test]]
+name = "text_utils"
+path = "tests/text_utils.rs"
+required-features = ["host"]
+
+[[test]]
+name = "class_forname"
+path = "tests/class_forname.rs"
 required-features = ["host"]

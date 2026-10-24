@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "recorded_utc": "2026-10-24T14:45:14.8949245Z",
+  "scope": "General portable BitmapFactory PNG/resource/immutable Bitmap and software Canvas contracts. Host golden-pixel/API-source checks only; no game first-screen or GPU/hardware compatibility claim.",
+  "status": "host_passed_emulator_pending",
+  "portable_core_asserted": true,
+  "observed_blocker": {
+    "nro_sha256": "62e894e680c37b6ebe8afdcb8ccdd38a007d8941a392ad735fe1c054a1d0a770",
+    "returned_to_launcher": true,
+    "pc": "0xf",
+    "run": "local-artifacts/m9/external-runs/186ce9775ecc42ffa4c208616dac15c4",
+    "method": "BitmapFactory.decodeResource(Resources,int)"
+  },
+  "artifact_inspection": {
+    "fallback": "Installed Android SDK apkanalyzer dex code and aapt2 dump resources; read-only ZIP member headers/chunk inventory",
+    "resources": [
+      {
+        "configuration": "default",
+        "name": "drawable/loading_logo",
+        "chunks": "IHDR/IDAT/IEND",
+        "height": 342,
+        "id": "0x7f08018b",
+        "encoding": "8-bit RGBA PNG",
+        "path": "res/aV.png",
+        "width": 501,
+        "encoded_bytes": 105265
+      },
+      {
+        "configuration": "default",
+        "name": "drawable/orange_gradient_background",
+        "chunks": "IHDR/PLTE/tRNS/IDAT/IEND",
+        "height": 128,
+        "id": "0x7f0801e2",
+        "encoding": "8-bit indexed PNG with PLTE/tRNS",
+        "path": "res/ZG.png",
+        "width": 128,
+        "encoded_bytes": 5898
+      }
+    ],
+    "draw_descriptors": [
+      "Bitmap.getWidth/getHeight",
+      "RectF(FFFF)/width/height/public coordinate fields",
+      "Canvas.drawBitmap(Bitmap,Rect,RectF,Paint), null source/paint"
+    ],
+    "raw_evidence": [
+      "local-artifacts/m9/candy-bitmap-activity.txt",
+      "local-artifacts/m9/candy-splash-descriptors.txt",
+      "local-artifacts/m9/candy-bitmap-resources.txt"
+    ],
+    "rea_provider": "jadx unavailable: REA_JADX_MCP_JAR not supplied; no provider installation performed",
+    "raw_evidence_hashes": [
+      {
+        "sha256": "02921385237599b17baaea7f482ef92660e9341d816f274ae700d45e6ad3bab2",
+        "path": "local-artifacts/m9/candy-bitmap-activity.txt"
+      },
+      {
+        "sha256": "14dfe93ace6a348460ed3cf552f7c0e71a6bf19e15fdf332a5b54ad83c2bac93",
+        "path": "local-artifacts/m9/candy-splash-descriptors.txt"
+      },
+      {
+        "sha256": "0e4820b7d82149fdb8c2d42263f017a6894cf19c1e65f436187374d8059ba7a3",
+        "path": "local-artifacts/m9/candy-bitmap-resources.txt"
+      }
+    ]
+  },
+  "implemented": [
+    "Strict CRC-checked non-interlaced 8-bit RGB/RGBA/indexed PNG with real PLTE/tRNS pixels and PNG filters 0..4",
+    "Resource IDs and aliases from actual ARSC table; API26/density bucket selection and premultiplied-alpha bilinear density scaling",
+    "API26 null/missing/malformed resource decode returns null; unsupported capabilities and budgets are structured errors",
+    "Immutable ARGB Bitmap dimensions/pixels/density/allocation metadata/recycle; live-key GC pruning",
+    "Rect/RectF constructors/coordinates/width/height and software Canvas bitmap rectangles/position with null Paint",
+    "Rc pixel leases remain charged after Java GC/recycle until last pending Draw reference drops"
+  ],
+  "budgets": {
+    "max_pixels": 4194304,
+    "encoded_bytes": 4194304,
+    "decode_working_set_bytes": 67108864,
+    "max_dimension": 4096,
+    "bitmap_objects": 4096,
+    "commands_per_bitmap_onDraw": 4096,
+    "resource_variants": 1024,
+    "retained_pixel_bytes": 33554432
+  },
+  "unsupported": [
+    "JPEG/WebP/gray/16-bit/interlaced PNG and ICC/cICP/APNG color/animation encodings",
+    "Non-null BitmapFactory.Options",
+    "Non-null bitmap Paint effects/filter/shader/xfermode",
+    "Resource configuration qualifiers beyond default/density/API and anydpi images",
+    "Mutable bitmap/copy/createBitmap, Drawable/NinePatch, native AndroidBitmap NDK handles, general Canvas matrices/filters/GPU acceleration"
+  ],
+  "commands": [
+    {
+      "command": "pwsh -NoProfile -File fixtures/m9/bitmap/build.ps1",
+      "exit_code": 0,
+      "status": "passed"
+    },
+    {
+      "exit_code": 0,
+      "integration_passed": 4,
+      "integration_seconds": 7.56,
+      "lib_passed": 8,
+      "compile_seconds": 280,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-framework --features host --test bitmap --lib --locked -- --nocapture",
+      "status": "passed",
+      "ignored": 0,
+      "failed": 0
+    },
+    {
+      "command": "cargo test -p rd-apk bitmap_consumers_can_detect_unmodeled_raw_resource_qualifiers --locked",
+      "status": "pending_parent_schedule"
+    },
+    {
+      "command": "cargo clippy -p as-framework --features host --lib --test bitmap --locked -- -D warnings",
+      "status": "pending_parent_schedule"
+    }
+  ],
+  "tests": [
+    "renamed_apks_decode_real_rgba_palette_alias_density_and_sdk_variants",
+    "canvas_uses_real_pixels_alpha_rects_and_clips_to_the_actual_frame",
+    "malformed_missing_unsupported_options_qualifiers_and_size_fail_truthfully",
+    "recycle_and_gc_release_pixel_budget_without_reusing_stale_objects"
+  ],
+  "fixture_build": {
+    "sources": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\bitmap\\java\\org\\androswitch\\contracts\\BitmapActivity.java",
+        "sha256": "09499c754258d77d25f54e7c9e86605123dafd15d49873f160d269c5f0a592a0"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\bitmap\\build.ps1",
+        "sha256": "4ace2e1b74009500e900ad05f5bdfd45b7f49f28e0385a1d866170159a03331a"
+      }
+    ],
+    "api": 26,
+    "apks": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\bitmap.apk",
+        "sha256": "dc500caf5b360a3c775b16dc9e8dbd59d3e1a658476873a958e1d3bbdbdb2647"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\renamed.apk",
+        "sha256": "91232b1efb0b47e3fee049e08414fcded8f7d17ce8a4ca74787a8632f6df54cb"
+      }
+    ],
+    "resources": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\drawable\\localized.png",
+        "sha256": "83af1168b9abcac6cb3d08bf1a2b3c5d96d1616dd77503185346d5bec24018d3"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\drawable\\oriented.png",
+        "sha256": "83af1168b9abcac6cb3d08bf1a2b3c5d96d1616dd77503185346d5bec24018d3"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\drawable\\versioned.png",
+        "sha256": "83af1168b9abcac6cb3d08bf1a2b3c5d96d1616dd77503185346d5bec24018d3"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\drawable-fr\\localized.png",
+        "sha256": "eb8b3bae907da188360f3af81e65e9a0f63f77f0c886f6aa4a706cf3a97eaca5"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\drawable-land\\oriented.png",
+        "sha256": "eb8b3bae907da188360f3af81e65e9a0f63f77f0c886f6aa4a706cf3a97eaca5"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\drawable-mdpi\\density.png",
+        "sha256": "83af1168b9abcac6cb3d08bf1a2b3c5d96d1616dd77503185346d5bec24018d3"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\drawable-nodpi\\large.png",
+        "sha256": "ca84c7dfe402ca005bdbf02334a2283b8f0485108618d5f45e695628393fc5c0"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\drawable-nodpi\\palette.png",
+        "sha256": "1d13ce5a447bca9b176d40ec9fc5bac9b47e4798d7d140f8032e0c6cc4ce7efb"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\drawable-nodpi\\quadrants.png",
+        "sha256": "83af1168b9abcac6cb3d08bf1a2b3c5d96d1616dd77503185346d5bec24018d3"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\drawable-v26\\versioned.png",
+        "sha256": "eb8b3bae907da188360f3af81e65e9a0f63f77f0c886f6aa4a706cf3a97eaca5"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\drawable-v27\\versioned.png",
+        "sha256": "83af1168b9abcac6cb3d08bf1a2b3c5d96d1616dd77503185346d5bec24018d3"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\drawable-xhdpi\\density.png",
+        "sha256": "eb8b3bae907da188360f3af81e65e9a0f63f77f0c886f6aa4a706cf3a97eaca5"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\raw\\corrupt.bin",
+        "sha256": "3d5ccb0cef4d3fd8b2474faf2038fbbb654c5c4e992aef8df4a48e8a3372d362"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\raw\\huge.bin",
+        "sha256": "c0c76f6292222ef7676e80bd7c00bac07f25d0c9e8634e7d3dd49db0f7b501c9"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\raw\\unsupported.bin",
+        "sha256": "7e63416629a82e7cb998204db9d5d8d8d5678303e3291027968f08a8272ac6f9"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\bitmap-fixture\\res\\values\\aliases.xml",
+        "sha256": "1b1b7a0c9777f4a03c17c5f16eef9d6514fcb7c3d2b645bdc8557c8707c21800"
+      }
+    ],
+    "schema_version": 1,
+    "build_tools": "35.0.0"
+  },
+  "source_hashes_captured_after_test": [
+    {
+      "path": "crates/as-framework/src/services/bitmap.rs",
+      "sha256": "2c4afdee9769e662911001f12a2bfcc79ef344c74299f69c5afc877edb0410e9"
+    },
+    {
+      "path": "crates/as-framework/src/services/bitmap/png.rs",
+      "sha256": "679ca276b5b71d8e43f74f8754e9f8134bfac588ecc9bf40ceb3505ef445ee35"
+    },
+    {
+      "path": "crates/as-framework/tests/bitmap.rs",
+      "sha256": "e57b12dfcc8b2ef7917cbc288f1f9bfca1456a108b84036494fbb3c7fe61fc5c"
+    },
+    {
+      "path": "crates/as-framework/src/android.rs",
+      "sha256": "b05182e803afd3b215776c0d6ca1e06a5742215449a1550c6fa0f2ce26c65cdd"
+    },
+    {
+      "path": "crates/as-framework/src/services/mod.rs",
+      "sha256": "f2d1b4f52b5844b087aff27c98d054ea32b2cf21c39d25768d746589bb4a35c4"
+    },
+    {
+      "path": "crates/as-framework/Cargo.toml",
+      "sha256": "de2ec878cf46bfc389d06acc98457cc428831c9afc9494db4ab615b7af1c892d"
+    },
+    {
+      "path": "crates/rd-apk/src/arsc.rs",
+      "sha256": "2c1d6da90d0b6d40216f397092ed5fab2557592d47973d24a6616a819a3baffe"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "sha256": "b4702229338397b619f5115b288e3b4d657b70fa39dc272503bd1209d5eb8d87"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "f7f174e7534072a9e1f337c8847c2d330c9cc9b9c55095cba12437b62642ef3e"
+    }
+  ],
+  "primary_references": [
+    "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/graphics/java/android/graphics/BitmapFactory.java",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/core/jni/android/graphics/BitmapFactory.cpp",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/graphics/java/android/graphics/Bitmap.java",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/libs/androidfw/ResourceTypes.cpp"
+  ],
+  "verification": {
+    "android_reference_device": "not run; semantics checked against API26 AOSP sources and normal SDK resource fixtures",
+    "hardware": "not run",
+    "host": "12 tests passed; actual portable Engine asserted. Supplied display/GLES metadata is mock; no EGL calls or GPU execution.",
+    "emulator": "corrected NRO pending"
+  }
+}

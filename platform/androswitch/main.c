@@ -1,7 +1,11 @@
+#include "display.h"
+#include "display_geometry.h"
 #include "framebuffer_copy.h"
 #include "glsurface.h"
 #include "media.h"
 #include "memory.h"
+#include "ppm_publish.h"
+#include "rgba_ppm.h"
 #include <inttypes.h>
 #include <malloc.h>
 #include <stdint.h>
@@ -110,7 +114,12 @@ uint64_t as_platform_micros(void) {
 extern uint64_t as_runtime_open(void);
 extern bool as_runtime_failed(uint64_t);
 extern int as_runtime_step(uint64_t);
-extern const uint32_t *as_runtime_pixels(uint64_t);
+typedef struct {
+  const uint32_t *pixels;
+  size_t length;
+  uint32_t width, height;
+} AsCpuFrame;
+extern bool as_runtime_frame(uint64_t, AsCpuFrame *);
 extern void as_runtime_presented(uint64_t, uint64_t);
 extern bool as_runtime_capture(uint64_t);
 extern int as_runtime_input(uint64_t, int, float, float);
@@ -127,8 +136,8 @@ extern bool as_shell_capture(uint64_t);
 static uint32_t rgba(uint32_t p) {
   return (p & 0xff00ff00) | ((p >> 16) & 255) | ((p & 255) << 16);
 }
-static bool present(Framebuffer *fb, const uint32_t *pixels, bool capture,
-                    uint64_t *submitted_hash) {
+static bool present(Framebuffer *fb, const AsCpuFrame *frame, int rotation,
+                    bool capture, uint64_t *submitted_hash) {
   if (nvMapGetFd() != pinned_map_fd || nvFenceGetFd() != pinned_fence_fd)
     return display_error("service_identity",
                          MAKERESULT(Module_Libnx, LibnxError_BadInput), -1);
@@ -152,30 +161,19 @@ static bool present(Framebuffer *fb, const uint32_t *pixels, bool capture,
   }
   u32 stride = fb->stride;
   uint8_t *memory = fb->buf_linear;
-  uint64_t checksum = UINT64_C(0xcbf29ce484222325);
-  for (unsigned y = 0; y < 720; y++) {
-    uint32_t *row = (void *)(memory + y * stride);
-    for (unsigned x = 0; x < 1280; x++) {
-      row[x] = rgba(pixels[(y / 2) * 640 + x / 2]);
-      if (!(x & 1) && !(y & 1)) {
-        uint32_t readback = rgba(row[x]);
-        checksum = (checksum ^ readback) * UINT64_C(0x100000001b3);
-      }
-    }
+  if (as_display_blit(memory, (size_t)stride * AS_PHYSICAL_HEIGHT, stride,
+                      frame->pixels, frame->length, frame->width, frame->height,
+                      rotation)) {
+    nwindowCancelBuffer(fb->win, slot, &fence);
+    return display_error("frame_geometry",
+                         MAKERESULT(Module_Libnx, LibnxError_BadInput), slot);
   }
-  if (capture) {
-    FILE *file = fopen("sdmc:/switch/androswitch/logs/last-frame.ppm", "wb");
-    if (file) {
-      fprintf(file, "P6\n1280 720\n255\n");
-      for (unsigned y = 0; y < 720; y++) {
-        uint32_t *row = (void *)(memory + y * stride);
-        for (unsigned x = 0; x < 1280; x++) {
-          uint32_t p = row[x];
-          uint8_t rgb[3] = {p, p >> 8, p >> 16};
-          fwrite(rgb, 1, 3, file);
-        }
-      }
-      fclose(file);
+  uint64_t checksum = UINT64_C(0xcbf29ce484222325);
+  for (unsigned y = 0; y < 720; y += 2) {
+    uint32_t *row = (void *)(memory + y * stride);
+    for (unsigned x = 0; x < 1280; x += 2) {
+      uint32_t readback = rgba(row[x]);
+      checksum = (checksum ^ readback) * UINT64_C(0x100000001b3);
     }
   }
   void *destination = (uint8_t *)fb->buf + (size_t)slot * fb->fb_size;
@@ -187,6 +185,17 @@ static bool present(Framebuffer *fb, const uint32_t *pixels, bool capture,
     return display_error("queue", rc, slot);
   }
   *submitted_hash = checksum;
+  if (capture) {
+    /* Present first: diagnostic SD I/O must not delay this buffer's queue
+     * submission. The linear shadow stays CPU-owned and unchanged until the
+     * next present; read it rather than the block-linear buffer just queued. */
+    AsRgbaFrame image = {memory, (size_t)stride * AS_PHYSICAL_HEIGHT, stride,
+                         AS_PHYSICAL_WIDTH, AS_PHYSICAL_HEIGHT};
+    int status = as_ppm_publish("sdmc:/switch/androswitch/logs/last-frame.ppm",
+                                image.width, image.height, as_rgba_ppm_row,
+                                &image, NULL);
+    as_media_stop_event("cpu_capture_publish_result", status, 0);
+  }
   if (display_monitor && display_frames < 8) {
     display_frames++;
     FILE *f = fopen("sdmc:/switch/androswitch/logs/display-handoffs.log", "ab");
@@ -201,7 +210,12 @@ static bool present(Framebuffer *fb, const uint32_t *pixels, bool capture,
   }
   return true;
 }
-static int open_framebuffer(Framebuffer *fb) {
+static int open_framebuffer(Framebuffer *fb, int application) {
+  if (as_display_begin_cpu(application)) {
+    display_error("framebuffer_geometry",
+                  MAKERESULT(Module_Libnx, LibnxError_BadInput), -1);
+    return -1;
+  }
   Result rc = framebufferCreate(fb, nwindowGetDefault(), 1280, 720,
                                 PIXEL_FORMAT_RGBA_8888, 3);
   if (R_FAILED(rc)) {
@@ -218,8 +232,10 @@ static int open_framebuffer(Framebuffer *fb) {
 }
 static void teardown_timeout(void *argument) {
   UEvent *done = argument;
-  /* Includes GPU retirement, two bounded joins and SD diagnostic writes. */
-  if (R_FAILED(waitSingle(waiterForUEvent(done), 10000000000))) {
+  /* Ultimate stop deadline, starting before Rust lifecycle callbacks. A GL
+   * worker may spend up to six seconds retiring Mesa/GPU state; actual joins
+   * and successful cleanup remain mandatory before launcher reuse. */
+  if (R_FAILED(waitSingle(waiterForUEvent(done), 15000000000))) {
     FILE *f =
         fopen("sdmc:/switch/androswitch/logs/teardown-failure.json", "wb");
     if (f) {
@@ -245,6 +261,10 @@ static int close_application(uint64_t app) {
     svcExitProcess();
   }
   int result = as_runtime_close(app);
+  if (!result) {
+    as_teardown_phase("display_geometry_reset");
+    result = as_display_reset();
+  }
   ueventSignal(&done);
   threadWaitForExit(&watchdog);
   threadClose(&watchdog);
@@ -297,7 +317,7 @@ int main(int argc, char **argv) {
   Framebuffer fb;
   bool framebuffer_open = false, launch = direct;
   if (!direct) {
-    if (open_framebuffer(&fb))
+    if (open_framebuffer(&fb, 0))
       return 2;
     framebuffer_open = true;
   }
@@ -306,7 +326,7 @@ int main(int argc, char **argv) {
   padInitializeDefault(&pad);
   hidInitializeTouchScreen();
   bool touching = false;
-  int last_x = 0, last_y = 0;
+  float last_x = 0, last_y = 0;
   while (appletMainLoop()) {
     if (!app && !direct && as_shell_step(shell) == 1)
       launch = true;
@@ -315,6 +335,10 @@ int main(int argc, char **argv) {
         framebufferClose(&fb);
         framebuffer_open = false;
       }
+      FILE *media_trace =
+          fopen("sdmc:/switch/androswitch/logs/media-stop.log", "wb");
+      if (media_trace)
+        fclose(media_trace);
       as_memory_log("application_open_begin");
       app = as_runtime_open();
       as_memory_log("application_open_end");
@@ -330,8 +354,10 @@ int main(int argc, char **argv) {
           svcExitProcess();
         if (direct)
           break;
+        if (as_display_reset())
+          svcExitProcess();
         as_shell_returned(shell, 0);
-        if (open_framebuffer(&fb))
+        if (open_framebuffer(&fb, 0))
           break;
         framebuffer_open = true;
         continue;
@@ -342,12 +368,18 @@ int main(int argc, char **argv) {
           if (close_application(app))
             svcExitProcess();
           app = 0;
+          native = NULL;
           if (direct)
             break;
           as_shell_returned(shell, 0);
+          if (open_framebuffer(&fb, 0))
+            break;
+          framebuffer_open = true;
+          touching = false;
+          continue;
         }
       } else if (!as_glsurface_running()) {
-        if (open_framebuffer(&fb)) {
+        if (open_framebuffer(&fb, 1)) {
           close_application(app);
           app = 0;
           break;
@@ -385,7 +417,7 @@ int main(int argc, char **argv) {
       as_teardown_phase("launcher_refresh");
       as_shell_returned(shell, 1);
       as_teardown_phase("launcher_framebuffer_open");
-      if (open_framebuffer(&fb))
+      if (open_framebuffer(&fb, 0))
         break;
       framebuffer_open = true;
       touching = false;
@@ -418,8 +450,8 @@ int main(int argc, char **argv) {
     HidTouchScreenState touch = {0};
     hidGetTouchScreenStates(&touch, 1);
     if (touch.count) {
-      last_x = touch.touches[0].x / 2;
-      last_y = touch.touches[0].y / 2;
+      as_display_touch(app ? as_display_rotation() : 0, touch.touches[0].x,
+                       touch.touches[0].y, &last_x, &last_y);
       if (app)
         as_runtime_input(app, touching ? 2 : 0, last_x, last_y);
       touching = true;
@@ -434,11 +466,19 @@ int main(int argc, char **argv) {
     if (native || (app && as_glsurface_running())) {
       checksum = as_media_frames();
       svcSleepThread(1000000);
-    } else if (!present(&fb,
-                        app ? as_runtime_pixels(app) : as_shell_pixels(shell),
-                        app ? as_runtime_capture(app) : as_shell_capture(shell),
-                        &checksum))
-      break;
+    } else {
+      AsCpuFrame frame = {app ? NULL : as_shell_pixels(shell), 640 * 360, 640,
+                          360};
+      if (app && !as_runtime_frame(app, &frame)) {
+        display_error("runtime_frame_metadata",
+                      MAKERESULT(Module_Libnx, LibnxError_BadInput), -1);
+        break;
+      }
+      if (!present(&fb, &frame, app ? as_display_rotation() : 0,
+                   app ? as_runtime_capture(app) : as_shell_capture(shell),
+                   &checksum))
+        break;
+    }
     if (app)
       as_runtime_presented(app, checksum);
     else {

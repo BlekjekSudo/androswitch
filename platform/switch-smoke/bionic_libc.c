@@ -1,6 +1,11 @@
 /* ABI-compatible scalar C/fortify imports shared by all guest libraries.
  * AndroSwitch contributors, MIT OR Apache-2.0. */
+#include "bionic_auxv.h"
 #include "bionic_cxx.h"
+#include "bionic_locale.h"
+#include "bionic_multibyte.h"
+#include "bionic_properties.h"
+#include "bionic_random.h"
 #include "native.h"
 #include <errno.h>
 #include <math.h>
@@ -11,6 +16,12 @@
 #include <strings.h>
 #include <sys/time.h>
 #include <time.h>
+#ifdef __SWITCH__
+#include <switch.h>
+#endif
+extern int as_native_trace_active(void) __attribute__((weak));
+extern void as_native_trace_metadata(const char *, const uint8_t *, size_t)
+    __attribute__((weak));
 static void bounds_fail(void) { as_native_trap(-1210); }
 static void *memcpy_checked(void *out, const void *in, size_t count,
                             size_t size) {
@@ -106,6 +117,60 @@ typedef struct {
 } GuestTm;
 static __thread GuestTm static_time;
 static __thread char time_zone[64];
+/* Failure-only diagnostics retain actual host/platform calendar metadata, not
+ * application strings. Never change errno or fabricate a successful calendar. */
+static void trace_time_failure(const char *source, const time_t *value,
+                               const struct tm *host, int host_errno) {
+  int saved_errno = errno;
+  if (!as_native_trace_active || !as_native_trace_metadata ||
+      !as_native_trace_active())
+    return;
+  char detail[512], offset[16] = {0}, zone[64] = {0};
+  size_t offset_length = 0, zone_length = 0;
+  if (host) {
+    offset_length = strftime(offset, sizeof(offset), "%z", host);
+    zone_length = strftime(zone, sizeof(zone), "%Z", host);
+    offset[sizeof(offset) - 1] = 0;
+    zone[sizeof(zone) - 1] = 0;
+  }
+  int length = snprintf(
+      detail, sizeof(detail),
+      "epoch=%lld backend_success=%d backend_errno=%d adapter_errno=%d "
+      "year=%d mon=%d mday=%d hour=%d min=%d sec=%d isdst=%d "
+      "z_length=%zu z=\"%s\" Z_length=%zu Z=\"%s\"",
+      value ? (long long)*value : 0, host != NULL, host_errno, saved_errno,
+      host ? host->tm_year : 0, host ? host->tm_mon : 0,
+      host ? host->tm_mday : 0, host ? host->tm_hour : 0,
+      host ? host->tm_min : 0, host ? host->tm_sec : 0,
+      host ? host->tm_isdst : 0, offset_length, offset, zone_length, zone);
+  if (length > 0)
+    as_native_trace_metadata(source, (const uint8_t *)detail,
+                               strnlen(detail, sizeof(detail) - 1));
+#ifdef __SWITCH__
+  if (value && *value >= 0) {
+    TimeCalendarTime calendar = {0};
+    TimeCalendarAdditionalInfo info = {0};
+    Result result = timeToCalendarTimeWithMyRule((u64)*value, &calendar, &info);
+    info.timezoneName[sizeof(info.timezoneName) - 1] = 0;
+    if (R_SUCCEEDED(result))
+      length = snprintf(
+          detail, sizeof(detail),
+          "timeToCalendarTimeWithMyRule_result=0x%x year=%u mon=%u mday=%u "
+          "hour=%u min=%u sec=%u offset=%d DST=%u zone=\"%s\"",
+          result, (unsigned)calendar.year, (unsigned)calendar.month,
+          (unsigned)calendar.day, (unsigned)calendar.hour,
+          (unsigned)calendar.minute, (unsigned)calendar.second, info.offset,
+          info.DST, info.timezoneName);
+    else
+      length = snprintf(detail, sizeof(detail),
+                        "timeToCalendarTimeWithMyRule_result=0x%x", result);
+    if (length > 0)
+      as_native_trace_metadata("horizon-time", (const uint8_t *)detail,
+                                 strnlen(detail, sizeof(detail) - 1));
+  }
+#endif
+  errno = saved_errno;
+}
 static GuestTm *from_host_time(const struct tm *host, GuestTm *guest, int utc) {
   guest->sec = host->tm_sec;
   guest->min = host->tm_min;
@@ -120,7 +185,7 @@ static GuestTm *from_host_time(const struct tm *host, GuestTm *guest, int utc) {
     guest->gmtoff = 0;
     guest->zone = "GMT";
   } else {
-    char offset[16];
+    char offset[16] = {0};
     if (strftime(offset, sizeof(offset), "%z", host) != 5 ||
         (offset[0] != '+' && offset[0] != '-') || offset[1] < '0' ||
         offset[1] > '9' || offset[2] < '0' || offset[2] > '9' ||
@@ -133,7 +198,15 @@ static GuestTm *from_host_time(const struct tm *host, GuestTm *guest, int utc) {
                     ((offset[3] - '0') * 10 + offset[4] - '0') * 60;
     if (offset[0] == '-')
       guest->gmtoff = -guest->gmtoff;
-    if (!strftime(time_zone, sizeof(time_zone), "%Z", host)) {
+    /* An empty timezone abbreviation is valid (and is reported by Horizon
+     * when the calendar/offset are available without a location name).
+     * Do not turn that metadata absence into a failed localtime/mktime.
+     * Clear the previous thread-local name so empty output cannot retain it;
+     * a nonempty partial output still indicates a formatting/buffer failure. */
+    memset(time_zone, 0, sizeof(time_zone));
+    size_t zone_length = strftime(time_zone, sizeof(time_zone), "%Z", host);
+    if ((!zone_length && time_zone[0]) || zone_length >= sizeof(time_zone) ||
+        time_zone[zone_length] != '\0') {
       errno = ENOTSUP;
       return NULL;
     }
@@ -147,7 +220,12 @@ static GuestTm *guest_gmtime_r(const time_t *value, GuestTm *out) {
 }
 static GuestTm *guest_localtime_r(const time_t *value, GuestTm *out) {
   struct tm host;
-  return localtime_r(value, &host) ? from_host_time(&host, out, 0) : NULL;
+  int success = localtime_r(value, &host) != NULL;
+  int host_errno = errno;
+  GuestTm *result = success ? from_host_time(&host, out, 0) : NULL;
+  if (!result)
+    trace_time_failure("localtime_r", value, success ? &host : NULL, host_errno);
+  return result;
 }
 static GuestTm *guest_gmtime(const time_t *value) {
   return guest_gmtime_r(value, &static_time);
@@ -165,8 +243,11 @@ static time_t guest_mktime(GuestTm *value) {
   host.tm_year = value->year;
   host.tm_isdst = value->isdst;
   time_t result = mktime(&host);
-  if (result != (time_t)-1 && !from_host_time(&host, value, 0))
+  int host_errno = errno;
+  if (result != (time_t)-1 && !from_host_time(&host, value, 0)) {
+    trace_time_failure("mktime", &result, &host, host_errno);
     return (time_t)-1;
+  }
   return result;
 }
 static int64_t guest_clock(void) {
@@ -194,7 +275,10 @@ static void set_abort_message(const char *message) {
   as_cxx_unlock();
 }
 const char *as_bionic_abort_message(void) { return abort_message; }
-void as_bionic_libc_reset(void) { set_abort_message(NULL); }
+void as_bionic_libc_reset(void) {
+  set_abort_message(NULL);
+  as_bionic_random_reset();
+}
 static int guest_vasprintf(char **out, const char *format, va_list args) {
   if (!out) {
     errno = EINVAL;
@@ -235,6 +319,13 @@ static void guest_exit(int status) {
   as_native_trap(-1205);
 }
 static void guest_abort(void) { as_native_trap(-1206); }
+static unsigned long guest_getauxval(unsigned long type) {
+  unsigned long value;
+  if (as_bionic_auxv(type, &value))
+    return value;
+  errno = ENOENT;
+  return 0;
+}
 #define API(n, f)                                                              \
   if (!strcmp(name, n))                                                        \
   return (uint64_t)(f)
@@ -259,6 +350,8 @@ uint64_t as_bionic_libc_import(const char *name) {
   API("exit", guest_exit);
   API("_exit", guest_exit);
   API("abort", guest_abort);
+  API("getauxval", guest_getauxval);
+  API("__system_property_get", as_bionic_property_get);
   SCALAR(memchr);
   SCALAR(strcasecmp);
   SCALAR(strncasecmp);
@@ -341,5 +434,9 @@ uint64_t as_bionic_libc_import(const char *name) {
   SCALAR(modff);
   SCALAR(hypot);
   SCALAR(hypotf);
-  return 0;
+  uint64_t locale = as_bionic_locale_import(name);
+  if (locale)
+    return locale;
+  uint64_t multibyte = as_bionic_multibyte_import(name);
+  return multibyte ? multibyte : as_bionic_random_import(name);
 }

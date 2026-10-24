@@ -165,10 +165,16 @@ struct Task {
 }
 #[derive(Clone)]
 enum Draw {
+    Bitmap(services::bitmap::BitmapDraw),
     Color(u32),
     Rect([f32; 4], u32),
     Circle(f32, f32, f32, u32),
     Text(String, f32, f32, f32, u32),
+}
+#[derive(Clone)]
+struct BundleEntry {
+    kind: &'static str,
+    value: Value,
 }
 #[derive(Default)]
 struct State {
@@ -180,7 +186,7 @@ struct State {
     serial: u64,
     roots: Vec<ObjRef>,
     intents: BTreeMap<ObjRef, String>,
-    bundles: BTreeMap<ObjRef, BTreeMap<String, Value>>,
+    bundles: BTreeMap<ObjRef, BTreeMap<Option<String>, BundleEntry>>,
     builders: BTreeMap<ObjRef, String>,
     paints: BTreeMap<ObjRef, (u32, f32)>,
     canvases: BTreeMap<ObjRef, Vec<Draw>>,
@@ -228,6 +234,53 @@ impl Android {
     pub fn now(&self) -> u64 {
         self.clock.monotonic_micros() / 1000
     }
+    /// Pixels retained by live Java bitmaps and pending Canvas commands.
+    pub fn bitmap_memory_bytes(&self) -> usize {
+        self.services.bitmaps.bytes()
+    }
+    pub fn bind_background_workers(&self, backend: Rc<dyn as_platform::BackgroundWorkers>) {
+        self.services.timers.bind(backend.clone());
+        self.services.executors.bind(backend);
+    }
+    pub fn bind_main_thread(&self, vm: &Engine) -> Result<()> {
+        self.services.executors.bind_main(vm)
+    }
+    /// Requested Java metadata, not a claim of OS-thread naming or JVM daemon
+    /// process-exit policy. The token identifies the real dedicated worker.
+    pub fn timer_worker_metadata(&self, token: u64) -> Option<(Option<String>, bool)> {
+        self.services.timers.metadata(token)
+    }
+    /// Called on the dedicated worker under the runtime VM lease. Delays are
+    /// relative milliseconds; None requests terminal worker cleanup.
+    pub fn timer_worker_step(&self, vm: &mut Engine, token: u64) -> Result<Option<u64>> {
+        self.services.timers.step(self, vm, token)
+    }
+    /// Platform calls only after the worker callback and TLS cleanup finish.
+    pub fn timer_worker_stopped(&self, token: u64) {
+        self.services.timers.stopped(token);
+    }
+    pub fn background_worker_error(&self, token: u64, failure: VmExit) {
+        if token & services::executors::TOKEN_BIT != 0 {
+            self.services.executors.worker_error(token, failure);
+        } else {
+            self.services.timers.worker_error(token, failure);
+        }
+    }
+    /// Shared worker transport; tokens identify the owning service namespace.
+    pub fn background_worker_step(&self, vm: &mut Engine, token: u64) -> Result<Option<u64>> {
+        if token & services::executors::TOKEN_BIT != 0 {
+            self.services.executors.step(self, vm, token)
+        } else {
+            self.timer_worker_step(vm, token)
+        }
+    }
+    pub fn background_worker_stopped(&self, token: u64) {
+        if token & services::executors::TOKEN_BIT != 0 {
+            self.services.executors.stopped(token);
+        } else {
+            self.timer_worker_stopped(token);
+        }
+    }
     /// Bind the readable guest APK alias installed by the runtime's VFS.
     /// Call before launching: package metadata must not advertise an APK path
     /// that the application cannot actually open.
@@ -240,6 +293,12 @@ impl Android {
     }
     pub fn bind_egl_backend(&self, backend: Rc<dyn EglConfigBackend>) {
         self.services.glsurface.bind_backend(backend);
+    }
+    pub fn graphics_caps(&self) -> Option<GraphicsCaps> {
+        self.services.glsurface.caps()
+    }
+    pub fn software_size(&self) -> (i32, i32) {
+        self.services.glsurface.software_size(self)
     }
     pub fn gl_requests(&self) -> Result<Vec<GlSurfaceRequest>> {
         self.services.glsurface.requests(self)
@@ -397,6 +456,7 @@ impl Android {
     }
     pub fn tick(&self, vm: &mut Engine) -> Result<()> {
         self.services.flush()?;
+        self.services.pump(self, vm)?;
         for _ in 0..256 {
             let action = self.state.borrow_mut().actions.pop_front();
             if let Some(action) = action {
@@ -688,7 +748,7 @@ impl Android {
                 .services
                 .glsurface
                 .dimensions(root)
-                .unwrap_or((self.width, self.height));
+                .unwrap_or_else(|| self.software_size());
             self.layout_node(root, 0, 0, width, height, 0);
         }
     }
@@ -799,6 +859,7 @@ impl Android {
         if !self.gl_requests()?.is_empty() {
             return Ok(());
         }
+        self.services.glsurface.mark_display_started();
         frame.clear(0xff101419);
         if let Some(root) = self.active_root() {
             self.draw_view(vm, frame, root, 0)?;
@@ -844,6 +905,7 @@ impl Android {
             draw?;
             for cmd in commands {
                 match cmd {
+                    Draw::Bitmap(bitmap) => bitmap.render(frame, x, y, w, h),
                     Draw::Color(c) => frame.rect(x, y, w, h, c),
                     Draw::Rect(b, c) => frame.rect(
                         x + b[0] as i32,
@@ -1123,6 +1185,20 @@ impl Android {
 }
 
 impl FrameworkHost for Android {
+    fn method_metadata(
+        &self,
+        class: &str,
+        name: &str,
+        sig: &str,
+    ) -> Option<rd_vm::framework_host::HostMethodKind> {
+        services::Services::method_metadata(class, name, sig)
+    }
+    fn thread_attached(&self, owner: u64, name: Option<&str>) -> Result<()> {
+        self.services.executors.attached(owner, name)
+    }
+    fn thread_detached(&self, owner: u64) {
+        self.services.executors.detached(owner)
+    }
     fn static_field(
         &self,
         vm: &mut Engine,
@@ -1203,7 +1279,11 @@ impl FrameworkHost for Android {
             refs.extend(v.touch_listener);
         }
         if let Some(bundle) = s.bundles.get(&r) {
-            refs.extend(bundle.values().filter_map(|v| v.as_ref().ok().flatten()));
+            refs.extend(
+                bundle
+                    .values()
+                    .filter_map(|v| v.value.as_ref().ok().flatten()),
+            );
         }
         refs.extend(self.services.references(r));
         refs
@@ -1280,7 +1360,17 @@ impl FrameworkHost for Android {
     ) -> Result<Option<Value>> {
         let arguments = typed_args(sig, args)?;
         let args = arguments.as_slice();
-        if let Some(value) = self.services.call_static(vm, class, name, sig, args)? {
+        if let Some(value) = self
+            .services
+            .bitmaps
+            .call_static(self, vm, class, name, sig, args)?
+        {
+            return Ok(Some(value));
+        }
+        if let Some(value) = self
+            .services
+            .call_static(self, vm, class, name, sig, args)?
+        {
             return Ok(Some(value));
         }
         let value = match (class, name, sig) {
@@ -1297,6 +1387,11 @@ impl FrameworkHost for Android {
             ("Ljava/lang/System;", "nanoTime", "()J") => {
                 Value::Long(self.clock.monotonic_micros().saturating_mul(1000) as i64)
             }
+            ("Ljava/lang/System;", "currentTimeMillis", "()J") => Value::Long(
+                self.clock
+                    .wall_time_millis()
+                    .map_err(|e| error(e.code, e.to_string()))?,
+            ),
             ("Ljava/lang/Integer;", "toString", "(I)Ljava/lang/String;") => {
                 string(vm, int(args, 0)?.to_string())?
             }
@@ -1317,7 +1412,11 @@ impl FrameworkHost for Android {
                 Value::Null
             }
             ("Landroid/os/Looper;", "getMainLooper" | "myLooper", "()Landroid/os/Looper;") => {
-                if name == "myLooper" && self.services.glsurface.in_callback() {
+                if name == "myLooper"
+                    && (self.services.glsurface.in_callback()
+                        || self.services.timers.in_callback(vm)?
+                        || self.services.executors.in_callback(vm)?)
+                {
                     return Ok(Some(Value::Null));
                 }
                 let existing = self.state.borrow().looper;
@@ -1362,11 +1461,13 @@ impl FrameworkHost for Android {
         if class == "Landroid/os/Handler;"
             && name == "<init>"
             && sig == "()V"
-            && self.services.glsurface.in_callback()
+            && (self.services.glsurface.in_callback()
+                || self.services.timers.in_callback(vm)?
+                || self.services.executors.in_callback(vm)?)
         {
             return Err(Throwable::new(
                 "Ljava/lang/RuntimeException;",
-                "Cannot create Handler: platform GL worker has no prepared Looper",
+                "Cannot create Handler: platform callback worker has no prepared Looper",
             )
             .into());
         }
@@ -1807,6 +1908,9 @@ impl Android {
     ) -> Result<Option<Value>> {
         if self.state.borrow().builders.contains_key(&r) {
             let v = match name {
+                "length" if sig == "()I" => {
+                    Value::Int(self.state.borrow().builders[&r].encode_utf16().count() as i32)
+                }
                 "<init>" if sig == "()V" || sig == "(I)V" => Value::Null,
                 "<init>" if sig == "(Ljava/lang/String;)V" => {
                     self.state
@@ -1894,6 +1998,18 @@ impl Android {
             return Ok(Some(v));
         }
         if platform == "Landroid/graphics/Canvas;" {
+            if let Some(bitmap) = self.services.bitmaps.draw(self, vm, name, sig, args)? {
+                let mut state = self.state.borrow_mut();
+                let commands = state
+                    .canvases
+                    .get_mut(&r)
+                    .ok_or_else(|| error("CANVAS_EXPIRED", "draw outside onDraw"))?;
+                if commands.len() >= 4096 {
+                    return Err(error("CANVAS_BUDGET", "4096 recorded commands per onDraw"));
+                }
+                commands.push(Draw::Bitmap(bitmap));
+                return Ok(Some(Value::Null));
+            }
             let paint_index = match (name, sig) {
                 ("drawRect", "(FFFFLandroid/graphics/Paint;)V") => Some(4),
                 ("drawCircle", "(FFFLandroid/graphics/Paint;)V") => Some(3),
@@ -1943,53 +2059,6 @@ impl Android {
                 .ok_or_else(|| error("CANVAS_EXPIRED", "draw outside onDraw"))?
                 .push(command);
             return Ok(Some(Value::Null));
-        }
-        if platform == "Landroid/os/Bundle;" || platform == "Landroid/content/Intent;" {
-            let is_intent = platform == "Landroid/content/Intent;";
-            let result = match (name, sig) {
-                ("putInt", "(Ljava/lang/String;I)V")
-                | ("putString", "(Ljava/lang/String;Ljava/lang/String;)V")
-                | ("putExtra", "(Ljava/lang/String;I)Landroid/content/Intent;")
-                | ("putExtra", "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;") => {
-                    let key = text(vm, &args[0])?;
-                    self.state
-                        .borrow_mut()
-                        .bundles
-                        .entry(r)
-                        .or_default()
-                        .insert(key, args[1].clone());
-                    if is_intent {
-                        Value::Obj(r)
-                    } else {
-                        Value::Null
-                    }
-                }
-                ("getInt", "(Ljava/lang/String;)I")
-                | ("getInt", "(Ljava/lang/String;I)I")
-                | ("getIntExtra", "(Ljava/lang/String;I)I") => {
-                    let key = text(vm, &args[0])?;
-                    self.state
-                        .borrow()
-                        .bundles
-                        .get(&r)
-                        .and_then(|b| b.get(&key))
-                        .cloned()
-                        .unwrap_or_else(|| args.get(1).cloned().unwrap_or(Value::Int(0)))
-                }
-                ("getString", "(Ljava/lang/String;)Ljava/lang/String;")
-                | ("getStringExtra", "(Ljava/lang/String;)Ljava/lang/String;") => {
-                    let key = text(vm, &args[0])?;
-                    self.state
-                        .borrow()
-                        .bundles
-                        .get(&r)
-                        .and_then(|b| b.get(&key))
-                        .cloned()
-                        .unwrap_or(Value::Null)
-                }
-                _ => return Ok(None),
-            };
-            return Ok(Some(result));
         }
         if !self.state.borrow().views.contains_key(&r) {
             return Ok(None);

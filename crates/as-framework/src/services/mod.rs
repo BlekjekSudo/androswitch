@@ -1,29 +1,53 @@
 use super::*;
+pub(super) mod bitmap;
+mod bundle;
 mod collections;
+mod communication;
 mod database;
+pub(super) mod executors;
 pub(super) mod glsurface;
 mod package;
 mod permissions;
 mod preferences;
 mod reflection;
+mod resource_names;
+mod text_utils;
+pub(super) mod timer;
 pub(super) struct Services {
+    pub(super) bitmaps: bitmap::Bitmaps,
     collections: collections::Collections,
+    communication: communication::Communication,
     preferences: preferences::PreferenceService,
     database: database::DatabaseService,
     pub(super) glsurface: glsurface::GlSurfaces,
+    pub(super) timers: timer::Timers,
+    pub(super) executors: executors::Executors,
     package_metadata: package::PackageService,
     package: String,
     fs: Rc<dyn as_platform::fs::FileSystem>,
 }
 impl Services {
+    pub(super) fn method_metadata(
+        class: &str,
+        name: &str,
+        sig: &str,
+    ) -> Option<rd_vm::framework_host::HostMethodKind> {
+        executors::Executors::metadata(class, name, sig)
+            .or_else(|| package::PackageService::metadata(class, name, sig))
+            .or_else(|| reflection::metadata(class, name, sig))
+    }
     pub(super) fn new(fs: Rc<dyn as_platform::fs::FileSystem>, apk: &Apk) -> Result<Self> {
         let store =
             as_storage::Store::new(fs.clone(), &apk.manifest.package).map_err(storage_error)?;
         Ok(Self {
+            bitmaps: Default::default(),
             collections: Default::default(),
+            communication: Default::default(),
             preferences: preferences::PreferenceService::new(store.clone()),
             database: database::DatabaseService::new(store),
             glsurface: Default::default(),
+            timers: Default::default(),
+            executors: Default::default(),
             package_metadata: Default::default(),
             package: apk.manifest.package.clone(),
             fs,
@@ -32,10 +56,27 @@ impl Services {
     pub(super) fn flush(&self) -> Result<()> {
         self.preferences.flush()
     }
+    pub(super) fn pump(&self, android: &Android, vm: &mut Engine) -> Result<()> {
+        self.timers.pump()?;
+        self.executors.pump()?;
+        self.communication.pump(android, vm)
+    }
     pub(super) fn bind_package_source(&self, package: &str, path: String) -> Result<()> {
         self.package_metadata.bind_source(package, path)
     }
     pub(super) fn attach(&self, vm: &mut Engine, class: &str, r: ObjRef) -> Result<bool> {
+        if self.bitmaps.attach(vm, class, r)? {
+            return Ok(true);
+        }
+        if self.executors.attach(vm, class, r)? {
+            return Ok(true);
+        }
+        if self.timers.attach(vm, class, r)? {
+            return Ok(true);
+        }
+        if self.communication.attach(vm, class, r)? {
+            return Ok(true);
+        }
         if self.glsurface.attach(vm, class, r)? {
             return Ok(true);
         }
@@ -51,13 +92,23 @@ impl Services {
         name: &str,
         _descriptor: &str,
     ) -> Result<Option<Value>> {
+        if let Some(value) = self.executors.static_field(vm, class, name, _descriptor)? {
+            return Ok(Some(value));
+        }
         if name == "TYPE" {
             if let Some(descriptor) = collections::primitive(class) {
                 return Ok(Some(Value::Obj(vm.device_class_object(descriptor)?)));
             }
         }
         if class == "Landroid/os/Build$VERSION;" && name == "SDK_INT" {
-            return Ok(Some(Value::Int(26)));
+            return Ok(Some(Value::Int(crate::properties::sdk_int().ok_or_else(
+                || {
+                    error(
+                        "RUNTIME_CONFIGURATION",
+                        "missing numeric Android SDK property",
+                    )
+                },
+            )?)));
         }
         if class == "Ljava/lang/Boolean;" && matches!(name, "TRUE" | "FALSE") {
             return self
@@ -69,21 +120,42 @@ impl Services {
     }
     pub(super) fn call_static(
         &self,
+        android: &Android,
         vm: &mut Engine,
         class: &str,
         name: &str,
         sig: &str,
         args: &[Value],
     ) -> Result<Option<Value>> {
-        if self.glsurface.in_callback() && class == "Ljava/lang/Thread;" && name == "currentThread"
+        if let Some(value) = text_utils::call_static(vm, class, name, sig, args)? {
+            return Ok(Some(value));
+        }
+        if let Some(value) = self
+            .executors
+            .call_static(android, vm, class, name, sig, args)?
+        {
+            return Ok(Some(value));
+        }
+        if (self.glsurface.in_callback() || self.timers.in_callback(vm)?)
+            && class == "Ljava/lang/Thread;"
+            && name == "currentThread"
         {
             return Err(error(
                 "API_UNAVAILABLE",
-                "Java Thread identity for the platform GL worker",
+                "Java Thread identity for the platform callback worker",
             ));
         }
-        if let Some(value) = reflection::call_static(vm, class, name, sig, args)? {
+        if let Some(value) = reflection::call_static(self, vm, class, name, sig, args)? {
             return Ok(Some(value));
+        }
+        if class == "Landroid/util/Log;" && name == "isLoggable" && sig == "(Ljava/lang/String;I)Z"
+        {
+            text(vm, &args[0])?;
+            // Android's default tag threshold is INFO. No log.tag property
+            // provider is installed; this is shared policy for every tag.
+            return Ok(Some(Value::Int(i32::from(
+                (4..=7).contains(&int(args, 1)?),
+            ))));
         }
         if class == "Landroid/util/Log;"
             && matches!(name, "v" | "d" | "i" | "w" | "e" | "wtf")
@@ -144,6 +216,30 @@ impl Services {
         r: ObjRef,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        if let Some(value) = self.bitmaps.call(vm, class, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
+        if let Some(value) = resource_names::call(android, vm, class, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
+        if let Some(value) = self
+            .executors
+            .call(android, vm, class, name, sig, r, args)?
+        {
+            return Ok(Some(value));
+        }
+        if let Some(value) = self.timers.call(android, vm, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
+        if let Some(value) = bundle::call(android, vm, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
+        if let Some(value) = self
+            .communication
+            .call(self, android, vm, name, sig, r, args)?
+        {
+            return Ok(Some(value));
+        }
         if let Some(value) = reflection::call(self, vm, class, name, sig, r, args)? {
             return Ok(Some(value));
         }
@@ -175,15 +271,23 @@ impl Services {
         roots.extend(self.collections.roots());
         roots.extend(self.package_metadata.roots());
         roots.extend(self.glsurface.roots());
+        roots.extend(self.communication.roots());
+        roots.extend(self.timers.roots());
+        roots.extend(self.executors.roots());
         roots
     }
     pub(super) fn references(&self, r: ObjRef) -> Vec<ObjRef> {
         let mut refs = self.collections.references(r);
         refs.extend(self.preferences.references(r));
         refs.extend(self.database.references(r));
+        refs.extend(self.executors.references(r));
         refs
     }
     pub(super) fn collect(&self, marked: &[bool]) {
+        self.bitmaps.collect(marked);
+        self.communication.collect(marked);
+        self.timers.collect(marked);
+        self.executors.collect(marked);
         self.glsurface.collect(marked);
         self.collections.collect(marked);
         self.preferences.collect(marked);

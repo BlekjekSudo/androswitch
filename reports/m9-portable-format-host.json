@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T10:35:35.9002802Z",
+  "status": "passed_portable_host_contracts",
+  "portable_core_asserted": true,
+  "source_hashes": [
+    {
+      "path": "crates/rd-vm/src/portable/format.rs",
+      "sha256": "ef78ab584c743b02ddfe2c70c0b70bb439e8cb2bfa706735c130d1e266990758"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/mod.rs",
+      "sha256": "ee8957246a59ee8a52a801e41772109f051936b501f99868247c9ed678cc61ff"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/intrinsics.rs",
+      "sha256": "eca3a1ce413e9c5439423e310d941deacf3153df922cd5af6e9ab2aa9f9fde06"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "sha256": "2ed997bdc6ae7dadb31da512f7c17e53627398fc5be3d29ae172876e93c6434f"
+    },
+    {
+      "path": "crates/as-switch-smoke/Cargo.toml",
+      "sha256": "0c2556c4a04496622241a440165b15fa490b70a9a706179558e63ff24864e4d9"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_format.rs",
+      "sha256": "98bc88841136eb7985bb95790359bd026b996820eb4504a53a559bd0024b0610"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-format/FormatFixture.java",
+      "sha256": "876f9d99bc17d5353ab4f7bbb1d6a955da7355090ef37c408b3d1533af638bf0"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-format/build.ps1",
+      "sha256": "aa77e0acba70561f942daa06c152c10f3781e90598a2927fd4a175eddd23c0cc"
+    }
+  ],
+  "profile": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  },
+  "checks": [
+    {
+      "receipt": "target/portable-format-fixture/build-receipt.json",
+      "status": "passed",
+      "oracle": "JVM Locale.ROOT; %n line endings canonicalized to Android LF",
+      "command": "pwsh -File crates/rd-vm/tests/fixtures/portable-format/build.ps1",
+      "exit_code": 0,
+      "receipt_sha256": "cb91dfc77913e4011ea049154ea25a21ee9c84db61578cb5f53d9dcf1d96d531"
+    },
+    {
+      "exit_code": 0,
+      "differential_cases": 24,
+      "status": "passed",
+      "passed": 2,
+      "ignored": 0,
+      "rounds": 2,
+      "log_sha256": "88a8d52ca6f27f6c03da099e311495e370cd2c789084aadf0e051a1ab5ce2cc9",
+      "log": "target/evidence/m9-portable-format-focused.log",
+      "command": "cargo test -p as-switch-smoke --features portable-tests --test portable_format --locked -- --nocapture",
+      "log_scope": "Final completion output captured from tool session60266; earlier compilation lines are not included."
+    },
+    {
+      "command": "rustfmt --edition 2021 --check crates/rd-vm/src/portable/format.rs crates/rd-vm/src/portable/mod.rs crates/rd-vm/src/portable/intrinsics.rs crates/rd-vm/src/classpath.rs crates/as-switch-smoke/tests/portable_format.rs",
+      "status": "passed",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check (owned formatter and fixture paths)",
+      "status": "passed",
+      "exit_code": 0
+    }
+  ],
+  "implemented": [
+    "String.format(String,Object[]) and explicit null-Locale overload",
+    "s/S,b/B,c/C,d,x/X,o,% and Android LF newline",
+    "Explicit, ordinary and relative argument indices; width, allowed flags and string/boolean precision",
+    "Byte/Short/Integer/Long widths and signed decimal/unsigned radix formatting",
+    "Actual DEX toString callbacks with GC roots retained by real DEX frames",
+    "Android format exception hierarchy; null format/array/elements including Dalvik const0",
+    "64 KiB input/output/field and 4096 argument admission"
+  ],
+  "unsupported_explicit": [
+    "Non-null Locale and locale-dependent grouping/case conversion",
+    "Floating-point, date/time and hash conversions",
+    "java.util.Formatter object lifecycle and Formattable.formatTo callbacks",
+    "Unpaired UTF16 surrogates or precision splitting a surrogate pair"
+  ],
+  "legacy_std_formatter": "Unchanged",
+  "references": [
+    "https://developer.android.com/reference/java/util/Formatter"
+  ],
+  "emulator": "Not verified by this host receipt; root owns subsequent NRO/E2E",
+  "physical_device": "not_run",
+  "clippy": "pending_consolidated_parent_checks"
+}

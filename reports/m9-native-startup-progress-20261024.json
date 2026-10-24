@@ -1,0 +1,359 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-24",
+  "scope": "Independent unmodified APK runs on the same exact NRO2bcd and byte-identical diagnostic emulator, copied to task-local SSD directory for these runs.",
+  "runs": [
+    {
+      "receipt": {
+        "emulator_frontend": "headless_sdl2",
+        "session_id": "37192c85e89c4defaa1fa645157be61b",
+        "observed_sessions": [
+          {
+            "session_id": "37192c85e89c4defaa1fa645157be61b-1",
+            "runtime_status": "running",
+            "revision": 1,
+            "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\37192c85e89c4defaa1fa645157be61b\\sessions\\37192c85e89c4defaa1fa645157be61b-1\\session-report.json",
+            "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+            "completed_case_verified": false,
+            "package": "com.martinmagni.mekorama",
+            "error": null
+          }
+        ],
+        "emulator_exit_code_before_cleanup": -532462766,
+        "visual_review": "not_run",
+        "root_handle_pinned": true,
+        "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-37192c85e89c4defaa1fa645157be61b",
+        "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+        "status": "attempted_failed",
+        "pid": 226676,
+        "cases": [],
+        "schema_version": 1,
+        "emulator_version": "1.3.3+e2143d4",
+        "startup_wait_ms": 30000,
+        "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+        "latest_media_stop": [],
+        "error": "The owned emulator exited before the launcher workflow completed.",
+        "sd_original_restore": "restored",
+        "execution_attempted": true,
+        "physical_device": "not_run",
+        "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+        "backend": "ryujinx",
+        "latest_session_report": {
+          "package": "com.martinmagni.mekorama",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "37192c85e89c4defaa1fa645157be61b-1",
+          "status": "running"
+        },
+        "latest_memory_admission": {
+          "allocator_available_after_load": 1570095216,
+          "allocator_available_before_load": 1597582128,
+          "estimated_parser_bytes": 54122782,
+          "package": "com.martinmagni.mekorama",
+          "parser_budget_bytes": 268435456,
+          "raw_dex_bytes": 14703020,
+          "revision": 1,
+          "schema_version": 1,
+          "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+          "session_id": "37192c85e89c4defaa1fa645157be61b-1",
+          "status": "vm_ready"
+        },
+        "commands": 5,
+        "nro_sha256": "2bcd3922f6f2aadb153f7b63fc5f124d6a92d00e96da431536464904b7839321",
+        "emulator_path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-bin-9f3cd3d2\\Ryujinx.exe",
+        "inputs": [
+          {
+            "install_snapshot_step": 3,
+            "expected_session_id": "37192c85e89c4defaa1fa645157be61b-1",
+            "bytes": 13099584,
+            "index": 0,
+            "staged_name": "0000-external.apk",
+            "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+            "source": "D:\\Download\\mekorama-1-7-2.apk"
+          }
+        ],
+        "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\37192c85e89c4defaa1fa645157be61b\\androswitch.nro",
+        "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-37192c85e89c4defaa1fa645157be61b"
+      },
+      "raw_evidence": [
+        {
+          "path": "local-artifacts/m9/external-runs/37192c85e89c4defaa1fa645157be61b/verification.json",
+          "sha256": "26d7b6010537599e9810c6b97d93892e0b5afa9e24c49347f49344e0dc0ccc45"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/37192c85e89c4defaa1fa645157be61b/ryujinx.stdout.log",
+          "sha256": "c976f5637366774fee1b9b6a3831899b9ade7b5583a1fafa35d24747e890af0c"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/37192c85e89c4defaa1fa645157be61b/ryujinx.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/37192c85e89c4defaa1fa645157be61b/launcher-test.json",
+          "sha256": "67d21a1abe363352b382e672dc3f9a2f85179b069b27326b5a4921b244009a26"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/37192c85e89c4defaa1fa645157be61b/sessions/37192c85e89c4defaa1fa645157be61b-1/native-modules.log",
+          "sha256": "e011f5455bc78115ac11786375eb1d7a389414483b5ac172b2c5f9f12a0b924d"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/37192c85e89c4defaa1fa645157be61b/sessions/37192c85e89c4defaa1fa645157be61b-1/session-report.json",
+          "sha256": "ba21b3d8f5059907348b813b8e2e609943c808de94bcf5fc455fa105ab281eea"
+        }
+      ]
+    },
+    {
+      "receipt": {
+        "sd_original_restore": "restored",
+        "pid": 249684,
+        "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+        "cases": [
+          {
+            "error": "exception java.lang.ExceptionInInitializerError: call: libcandycrushsaga.so: call requires rand [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 52079, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><clinit>()V",
+            "first_screen": "not_visually_verified",
+            "snapshots": [],
+            "presented_frames": null,
+            "teardown_phases": [
+              "stop_requested",
+              "native_activity_stop",
+              "java_startup_abort",
+              "media_thread_quiesce",
+              "guest_thread_quiesce",
+              "native_destructors",
+              "media_reset",
+              "media_released",
+              "activity_dispose",
+              "runtime_drop",
+              "native_mapping_release",
+              "native_resource_reset",
+              "native_mapping_release",
+              "native_tls_reset",
+              "native_resources_released",
+              "display_geometry_reset",
+              "runtime_closed"
+            ],
+            "installed_identity_matches": true,
+            "input": {
+              "expected_session_id": "75f92e37c3754322bd535be1cd7c1f8a-1",
+              "install_snapshot_step": 3,
+              "staged_name": "0000-external.apk",
+              "sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+              "bytes": 163371628,
+              "source": "D:\\Download\\candycrush.apk",
+              "index": 0
+            },
+            "captures": [],
+            "runtime_status": "failed",
+            "status": "blocked_or_unreported",
+            "returned_to_launcher": true
+          }
+        ],
+        "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\75f92e37c3754322bd535be1cd7c1f8a\\androswitch.nro",
+        "session_id": "75f92e37c3754322bd535be1cd7c1f8a",
+        "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+        "latest_media_stop": [
+          {
+            "operation": "glsurface_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 1413621100
+          },
+          {
+            "operation": "opensl_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 1413768036
+          },
+          {
+            "operation": "glsurface_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 1428619046
+          },
+          {
+            "operation": "opensl_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 1434555235
+          },
+          {
+            "operation": "cpu_capture_publish_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 1482292154
+          }
+        ],
+        "physical_device": "not_run",
+        "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+        "observed_sessions": [
+          {
+            "session_id": "75f92e37c3754322bd535be1cd7c1f8a-1",
+            "runtime_status": "failed",
+            "error": "exception java.lang.ExceptionInInitializerError: call: libcandycrushsaga.so: call requires rand [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 52079, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><clinit>()V",
+            "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+            "completed_case_verified": false,
+            "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\75f92e37c3754322bd535be1cd7c1f8a\\sessions\\75f92e37c3754322bd535be1cd7c1f8a-1\\session-report.json",
+            "package": "com.king.candycrushsaga",
+            "revision": 1
+          }
+        ],
+        "emulator_version": "1.3.3+e2143d4",
+        "schema_version": 1,
+        "execution_attempted": true,
+        "backend": "ryujinx",
+        "latest_session_report": {
+          "error": "exception java.lang.ExceptionInInitializerError: call: libcandycrushsaga.so: call requires rand [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 52079, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><clinit>()V",
+          "identity_status": "known",
+          "package": "com.king.candycrushsaga",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "75f92e37c3754322bd535be1cd7c1f8a-1",
+          "status": "failed"
+        },
+        "latest_teardown": [
+          {
+            "phase": "stop_requested",
+            "tick": 1411389859
+          },
+          {
+            "phase": "native_activity_stop",
+            "tick": 1413320348
+          },
+          {
+            "phase": "java_startup_abort",
+            "tick": 1413377001
+          },
+          {
+            "phase": "media_thread_quiesce",
+            "tick": 1413561757
+          },
+          {
+            "phase": "guest_thread_quiesce",
+            "tick": 1413790306
+          },
+          {
+            "phase": "native_destructors",
+            "tick": 1414033791
+          },
+          {
+            "phase": "media_reset",
+            "tick": 1434675857
+          },
+          {
+            "phase": "media_released",
+            "tick": 1434791535
+          },
+          {
+            "phase": "activity_dispose",
+            "tick": 1434854179
+          },
+          {
+            "phase": "runtime_drop",
+            "tick": 1434976527
+          },
+          {
+            "phase": "native_mapping_release",
+            "tick": 1440985320
+          },
+          {
+            "phase": "native_resource_reset",
+            "tick": 1442950667
+          },
+          {
+            "phase": "native_mapping_release",
+            "tick": 1442996476
+          },
+          {
+            "phase": "native_tls_reset",
+            "tick": 1443353481
+          },
+          {
+            "phase": "native_resources_released",
+            "tick": 1443381319
+          },
+          {
+            "phase": "display_geometry_reset",
+            "tick": 1443425112
+          },
+          {
+            "phase": "runtime_closed",
+            "tick": 1443521829
+          },
+          {
+            "phase": "launcher_ready",
+            "tick": 1450091867
+          }
+        ],
+        "inputs": [
+          {
+            "expected_session_id": "75f92e37c3754322bd535be1cd7c1f8a-1",
+            "install_snapshot_step": 3,
+            "staged_name": "0000-external.apk",
+            "sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+            "bytes": 163371628,
+            "source": "D:\\Download\\candycrush.apk",
+            "index": 0
+          }
+        ],
+        "nro_sha256": "2bcd3922f6f2aadb153f7b63fc5f124d6a92d00e96da431536464904b7839321",
+        "commands": 5,
+        "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-75f92e37c3754322bd535be1cd7c1f8a",
+        "emulator_path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-bin-9f3cd3d2\\Ryujinx.exe",
+        "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-75f92e37c3754322bd535be1cd7c1f8a",
+        "root_handle_pinned": true,
+        "latest_memory_admission": {
+          "allocator_available_after_load": 1522201856,
+          "allocator_available_before_load": 1585825328,
+          "estimated_parser_bytes": 120862904,
+          "package": "com.king.candycrushsaga",
+          "parser_budget_bytes": 268435456,
+          "raw_dex_bytes": 34874388,
+          "revision": 1,
+          "schema_version": 1,
+          "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+          "session_id": "75f92e37c3754322bd535be1cd7c1f8a-1",
+          "status": "vm_ready"
+        },
+        "completed_sessions": 1,
+        "status": "blocked_runtime",
+        "visual_review": "required",
+        "emulator_frontend": "headless_sdl2",
+        "startup_wait_ms": 30000
+      },
+      "raw_evidence": [
+        {
+          "path": "local-artifacts/m9/external-runs/75f92e37c3754322bd535be1cd7c1f8a/verification.json",
+          "sha256": "790c8b8aca5b6fbdfab17844af98196387146f658c8ad7950b37656f536a0b3c"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/75f92e37c3754322bd535be1cd7c1f8a/ryujinx.stdout.log",
+          "sha256": "796b6fdcfa1b6c7bca7e53c820f56d23b3d5f0e30fe7e98cbf2c5abad8f71ce7"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/75f92e37c3754322bd535be1cd7c1f8a/ryujinx.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/75f92e37c3754322bd535be1cd7c1f8a/launcher-test.json",
+          "sha256": "824fb826f27f73679d29da719530ad43f38ce8c2d2f7c1b510b9a5341a98f34b"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/75f92e37c3754322bd535be1cd7c1f8a/sessions/75f92e37c3754322bd535be1cd7c1f8a-1/native-modules.log",
+          "sha256": "a7bc7e6ffb555f5bae87290367368b4811a80e170b286583dd2c76a510671582"
+        },
+        {
+          "path": "local-artifacts/m9/external-runs/75f92e37c3754322bd535be1cd7c1f8a/sessions/75f92e37c3754322bd535be1cd7c1f8a-1/session-report.json",
+          "sha256": "da0452a09a3648c7a0a564ed93fdfca6c669a4c69a4e7b3244e365295b548a51"
+        }
+      ]
+    }
+  ],
+  "observations": {
+    "mekorama": "Actual library bases are recorded. Emulator terminates after outer native boundary stack; registers/faultPC are absent from this output, so the native cause remains undetermined. No completion or first-screen proof.",
+    "candy": "Passes previous multibyte boundary and reaches named rand failure in class initialization. Installation identity matches and bounded teardown returns to launcher; no first screen."
+  },
+  "historical_null_access": "reports/m9-external-native-startup-20261024.json records the earlier measured null access. Its old faultPC cannot be combined with new ASLR bases.",
+  "physical_switch": "not_run_for_these_changes",
+  "recognizable_first_screens": "not_reached",
+  "m9_complete": false
+}

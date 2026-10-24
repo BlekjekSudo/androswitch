@@ -2,7 +2,9 @@
 
 Test the affected API/ABI contract and record the backend that actually ran
 it. Host execution, a Horizon emulator run and a physical Switch run are
-different evidence. The current M1–M4 physical-device status is **not run**.
+different evidence. The user reports M1–M7 physical Switch testing, without
+per-scenario binary identities. New changes require their own hardware evidence;
+see [hardware feedback](HARDWARE_FEEDBACK.md).
 
 ## Host checks
 
@@ -70,6 +72,28 @@ The environment variables apply to the current shell's build. Disabling debug
 symbols reduces memory use; test semantics/debug assertions are retained.
 
 ## Ryujinx E2E
+
+The current M7–M9 gate is `scripts/check-m7-m9.ps1`, followed by
+`scripts/test-m9-host.ps1 -Cycles 12`, the product build and the launcher
+workflow/startup/quiescence/M9 emulator scenarios. The launcher M9 scenario
+requires 24 completed sessions. Use the explicit native host backend documented
+in [native tests](HOST_NATIVE_TESTS.md); an unavailable WSL instance is not a
+passing WSL result. `-ContinueAfterFailure` collects independent failures and
+still exits with failure if any required check fails.
+
+Desktop emulator tests require `-AllowDesktopEmulator`. After the user's
+reported disappearance of unrelated windows, current external-app tests use
+`-Headless` and a separate `-RyujinxProfile`, with guarded task-owned process
+cleanup and SD backup/restore. The harness does not manage desktop windows.
+Only run it with user authorization. The optional isolated CPU-register
+diagnostic is described in [the host tool](../tools/ryujinx-cfg/README.md);
+its result must retain that emulator identity and must not be called a stock
+Ryujinx or physical Switch pass.
+
+External-app verification requires the frozen original APK hashes, this exact
+NRO, matching installation/session identity, a recognizable screen reviewed
+from a session-owned capture, and safe return. A missing-API rejection or a
+nonuniform framebuffer alone cannot pass that gate.
 
 ```powershell
 ./scripts/test-ryujinx-m1.ps1 -Ryujinx "D:/path/to/Ryujinx.exe"

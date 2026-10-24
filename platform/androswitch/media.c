@@ -4,11 +4,15 @@
 #include "media.h"
 #include "../../third_party/android/jni.h"
 #include "bionic_errno.h"
+#include "display.h"
+#include "display_geometry.h"
 #include "glsurface.h"
 #include "media_format.h"
+#include "ppm_publish.h"
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -318,8 +322,12 @@ static int64_t event_time(Input *e) { return e->time; }
 /* The guest ANativeWindow is a token. Only this boundary translates it to a
  * real libnx native window, so APK pointers never masquerade as NWindow. */
 static int window_refs;
-static int window_width(void *w) { return w == &window_token ? 1280 : -EINVAL; }
-static int window_height(void *w) { return w == &window_token ? 720 : -EINVAL; }
+static int window_width(void *w) {
+  return w == &window_token ? as_display_width() : -EINVAL;
+}
+static int window_height(void *w) {
+  return w == &window_token ? as_display_height() : -EINVAL;
+}
 static int window_format(void *w) { return w == &window_token ? 1 : -EINVAL; }
 static void window_acquire(void *w) {
   if (w == &window_token)
@@ -336,17 +344,61 @@ static void window_release(void *w) {
 static int window_geometry(void *w, int width, int height, int format) {
   if (w != &window_token)
     return -EINVAL;
-  return ((width == 0 && height == 0) || (width == 1280 && height == 720)) &&
+  return ((width == 0 && height == 0) ||
+          (width == as_display_width() && height == as_display_height())) &&
                  (format == 0 || format == 1)
              ? 0
              : -ENOTSUP;
 }
 static EGLSurface surfaces[16];
+static u32 surface_dimensions[16][2];
 static EGLContext contexts[16];
 static EGLDisplay display;
 static Mutex graphics_mutex;
 static unsigned current_bindings;
 static __thread int bound_context;
+static Mutex stop_event_mutex;
+void as_media_stop_event(const char *operation, int result, uint64_t detail) {
+  mutexLock(&stop_event_mutex);
+  FILE *file = fopen("sdmc:/switch/androswitch/logs/media-stop.log", "ab");
+  if (file) {
+    fprintf(file,
+            "{\"operation\":\"%s\",\"result\":%d,\"detail\":%" PRIu64
+            ",\"tick\":%" PRIu64 "}\n",
+            operation, result, detail, armGetSystemTick());
+    fclose(file);
+  }
+  mutexUnlock(&stop_event_mutex);
+}
+/* devkitPro Mesa20.1 allocates window buffers from nwindowGetDimensions, but
+ * does not populate EGL's base.Width/Height. For our tracked window surfaces,
+ * report their real registered native-buffer geometry. Other attributes and
+ * invalid/unowned handles retain Mesa's EGL validation/error behavior. */
+static EGLBoolean guest_query_surface(EGLDisplay d, EGLSurface s,
+                                      EGLint attribute, EGLint *value) {
+  if (d == display && value &&
+      (attribute == EGL_WIDTH || attribute == EGL_HEIGHT)) {
+    mutexLock(&graphics_mutex);
+    for (unsigned i = 0; i < 16; i++) {
+      if (s && surfaces[i] == s) {
+        u32 width = 0, height = 0;
+        NWindow *window = nwindowGetDefault();
+        Result rc = nwindowGetDimensions(window, &width, &height);
+        int valid = !R_FAILED(rc) && window->slots_configured && width &&
+                    height && width == surface_dimensions[i][0] &&
+                    height == surface_dimensions[i][1];
+        if (valid)
+          *value = (EGLint)(attribute == EGL_WIDTH ? width : height);
+        mutexUnlock(&graphics_mutex);
+        if (!valid)
+          failure(-2331);
+        return valid ? EGL_TRUE : EGL_FALSE;
+      }
+    }
+    mutexUnlock(&graphics_mutex);
+  }
+  return eglQuerySurface(d, s, attribute, value);
+}
 static EGLDisplay guest_display(EGLNativeDisplayType d) {
   if (d != EGL_DEFAULT_DISPLAY)
     return EGL_NO_DISPLAY;
@@ -363,12 +415,34 @@ static EGLSurface guest_surface(EGLDisplay d, EGLConfig config, void *window,
   unsigned i = 0;
   while (i < 16 && surfaces[i])
     i++;
-  EGLSurface s =
-      i == 16 ? EGL_NO_SURFACE
-              : eglCreateWindowSurface(
-                    d, config, (EGLNativeWindowType)nwindowGetDefault(), attrs);
-  if (s)
+  if (i == 16 || as_display_begin_gpu()) {
+    mutexUnlock(&graphics_mutex);
+    failure(-2330);
+    return EGL_NO_SURFACE;
+  }
+  EGLSurface s = eglCreateWindowSurface(
+      d, config, (EGLNativeWindowType)nwindowGetDefault(), attrs);
+  u32 width = 0, height = 0;
+  NWindow *native_window = nwindowGetDefault();
+  if (s) {
+    /* Own the handle before validation, so even a failed destroy preserves
+     * enough ownership for fail-closed teardown. Geometry is observed from
+     * the actual registered buffer queue, never copied from requested caps. */
     surfaces[i] = s;
+    Result rc = nwindowGetDimensions(native_window, &width, &height);
+    surface_dimensions[i][0] = width;
+    surface_dimensions[i][1] = height;
+    if (R_FAILED(rc) || !native_window->slots_configured ||
+        width != (u32)as_display_width() ||
+        height != (u32)as_display_height()) {
+      if (eglDestroySurface(d, s)) {
+        surfaces[i] = 0;
+        memset(surface_dimensions[i], 0, sizeof(surface_dimensions[i]));
+      }
+      s = EGL_NO_SURFACE;
+      failure(-2331);
+    }
+  }
   mutexUnlock(&graphics_mutex);
   return s;
 }
@@ -395,6 +469,8 @@ static EGLBoolean guest_make_current(EGLDisplay d, EGLSurface draw,
     as_teardown_phase("egl_unbind");
   }
   EGLBoolean ok = eglMakeCurrent(d, draw, read, c);
+  if (c == EGL_NO_CONTEXT)
+    as_media_stop_event("egl_unbind_result", (int)ok, current_bindings);
   if (ok) {
     mutexLock(&graphics_mutex);
     if (bound_context)
@@ -408,16 +484,24 @@ static EGLBoolean guest_make_current(EGLDisplay d, EGLSurface draw,
 }
 static EGLBoolean guest_destroy_surface(EGLDisplay d, EGLSurface s) {
   as_teardown_phase("egl_destroy_surface");
+  mutexLock(&graphics_mutex);
   EGLBoolean ok = eglDestroySurface(d, s);
+  as_media_stop_event("egl_destroy_surface_result", (int)ok,
+                      (uint64_t)(uintptr_t)s);
   if (ok)
     for (unsigned i = 0; i < 16; i++)
-      if (surfaces[i] == s)
+      if (surfaces[i] == s) {
         surfaces[i] = 0;
+        memset(surface_dimensions[i], 0, sizeof(surface_dimensions[i]));
+      }
+  mutexUnlock(&graphics_mutex);
   return ok;
 }
 static EGLBoolean guest_destroy_context(EGLDisplay d, EGLContext c) {
   as_teardown_phase("egl_destroy_context");
   EGLBoolean ok = eglDestroyContext(d, c);
+  as_media_stop_event("egl_destroy_context_result", (int)ok,
+                      (uint64_t)(uintptr_t)c);
   if (ok)
     for (unsigned i = 0; i < 16; i++)
       if (contexts[i] == c)
@@ -441,31 +525,60 @@ static void guest_read_pixels(GLint x, GLint y, GLsizei width, GLsizei height,
   } else
     glReadPixels(x, y, width, height, format, type, pixels);
 }
+typedef struct {
+  const uint8_t *pixels;
+  unsigned width, height;
+  int rotation;
+} AsGpuCapture;
+static int gpu_capture_row(void *context, unsigned y, uint8_t *rgb,
+                           size_t capacity) {
+  const AsGpuCapture *capture = context;
+  if (capacity < AS_PHYSICAL_WIDTH * 3 || y >= AS_PHYSICAL_HEIGHT)
+    return -1;
+  for (unsigned x = 0; x < AS_PHYSICAL_WIDTH; x++) {
+    unsigned sx, sy;
+    as_display_source_xy(capture->rotation, x, y, 1, &sx, &sy);
+    if (sx >= capture->width || sy >= capture->height)
+      return -1;
+    const uint8_t *pixel =
+        capture->pixels +
+        ((size_t)(capture->height - 1 - sy) * capture->width + sx) * 4;
+    memcpy(rgb + x * 3, pixel, 3);
+  }
+  return 0;
+}
 static EGLBoolean guest_swap(EGLDisplay d, EGLSurface s) {
   uint64_t frame = as_media_frames();
   if (diagnostic_capture && (frame == 2 || frame == 30)) {
-    uint8_t *pixels = malloc(1280 * 720 * 4);
+    EGLint width = 0, height = 0;
+    if (!guest_query_surface(d, s, EGL_WIDTH, &width) ||
+        !guest_query_surface(d, s, EGL_HEIGHT, &height) ||
+        width != as_display_width() || height != as_display_height()) {
+      failure(-2331);
+      return EGL_FALSE;
+    }
+    uint8_t *pixels = malloc((size_t)width * height * 4);
     if (pixels) {
       /* Read scanlines so the capture stays bounded and does not rely on a
        * large temporary transfer buffer in the Mesa/NV staging path. */
-      memset(pixels, 0, 1280 * 720 * 4);
+      memset(pixels, 0, (size_t)width * height * 4);
       glFinish();
-      for (int y = 0; y < 720; y++)
-        glReadPixels(0, y, 1280, 1, GL_RGBA, GL_UNSIGNED_BYTE,
-                     pixels + y * 1280 * 4);
+      for (int y = 0; y < height; y++)
+        glReadPixels(0, y, width, 1, GL_RGBA, GL_UNSIGNED_BYTE,
+                     pixels + (size_t)y * width * 4);
       if (glGetError() == GL_NO_ERROR) {
         char path[160];
         snprintf(path, sizeof(path),
                  "sdmc:/switch/androswitch/logs/gles-frame-%llu.ppm",
                  (unsigned long long)frame);
-        FILE *f = fopen(path, "wb");
-        if (f) {
-          fprintf(f, "P6\n1280 720\n255\n");
-          for (int y = 719; y >= 0; y--)
-            for (int x = 0; x < 1280; x++)
-              fwrite(pixels + (y * 1280 + x) * 4, 1, 3, f);
-          fclose(f);
-        }
+        /* Keep the image unpublished while rows are written. External evidence
+         * readers can observe a final filename only after a successful close.
+         */
+        AsGpuCapture capture = {pixels, (unsigned)width, (unsigned)height,
+                                as_display_rotation()};
+        int result = as_ppm_publish(path, AS_PHYSICAL_WIDTH, AS_PHYSICAL_HEIGHT,
+                                    gpu_capture_row, &capture, NULL);
+        as_media_stop_event("gpu_capture_publish_result", result, frame);
       }
       free(pixels);
     }
@@ -478,12 +591,23 @@ static EGLBoolean guest_swap(EGLDisplay d, EGLSurface s) {
   return ok;
 }
 static EGLBoolean guest_terminate(EGLDisplay d) {
-  if (current_bindings)
+  mutexLock(&graphics_mutex);
+  if (current_bindings) {
+    as_media_stop_event("egl_terminate_bound", -EBUSY, current_bindings);
+    mutexUnlock(&graphics_mutex);
     return EGL_FALSE;
+  }
   as_teardown_phase("egl_terminate");
+  as_media_stop_event("egl_terminate_begin", 0, (uint64_t)(uintptr_t)d);
   EGLBoolean ok = eglTerminate(d);
-  if (ok)
+  as_media_stop_event("egl_terminate_end", (int)ok, (uint64_t)(uintptr_t)d);
+  if (ok) {
     display = 0;
+    memset(contexts, 0, sizeof(contexts));
+    memset(surfaces, 0, sizeof(surfaces));
+    memset(surface_dimensions, 0, sizeof(surface_dimensions));
+  }
+  mutexUnlock(&graphics_mutex);
   as_teardown_phase(ok ? "egl_terminated" : "egl_terminate_failed");
   return ok;
 }
@@ -512,8 +636,8 @@ int as_media_egl_create(AsEglSurface *s, uint64_t selected, int version) {
       !guest_make_current(d, (EGLSurface)s->surface, (EGLSurface)s->surface,
                           (EGLContext)s->context))
     return -2312;
-  if (!eglQuerySurface(d, (EGLSurface)s->surface, EGL_WIDTH, &s->width) ||
-      !eglQuerySurface(d, (EGLSurface)s->surface, EGL_HEIGHT, &s->height))
+  if (!guest_query_surface(d, (EGLSurface)s->surface, EGL_WIDTH, &s->width) ||
+      !guest_query_surface(d, (EGLSurface)s->surface, EGL_HEIGHT, &s->height))
     return -2313;
   glViewport(0, 0, s->width, s->height);
   return 0;
@@ -546,8 +670,8 @@ int as_media_egl_resume(AsEglSurface *s) {
   if (!guest_make_current(d, (EGLSurface)s->surface, (EGLSurface)s->surface,
                           (EGLContext)s->context))
     return -2312;
-  if (!eglQuerySurface(d, (EGLSurface)s->surface, EGL_WIDTH, &s->width) ||
-      !eglQuerySurface(d, (EGLSurface)s->surface, EGL_HEIGHT, &s->height))
+  if (!guest_query_surface(d, (EGLSurface)s->surface, EGL_WIDTH, &s->width) ||
+      !guest_query_surface(d, (EGLSurface)s->surface, EGL_HEIGHT, &s->height))
     return -2313;
   glViewport(0, 0, s->width, s->height);
   return 0;
@@ -576,6 +700,7 @@ int as_media_egl_close(AsEglSurface *s) {
   }
   if (!error && !guest_terminate(d))
     error = -2318;
+  as_media_stop_event("egl_close_result", error, s->display);
   if (!error)
     memset(s, 0, sizeof(*s));
   return error;
@@ -974,16 +1099,13 @@ int as_media_reset(void) {
     free(b);
   }
   for (unsigned i = 0; i < 16; i++) {
-    if (contexts[i])
-      eglDestroyContext(display, contexts[i]);
-    if (surfaces[i])
-      eglDestroySurface(display, surfaces[i]);
+    if (contexts[i] && !guest_destroy_context(display, contexts[i]))
+      return -EIO;
+    if (surfaces[i] && !guest_destroy_surface(display, surfaces[i]))
+      return -EIO;
   }
-  if (display)
-    eglTerminate(display);
-  display = 0;
-  memset(contexts, 0, sizeof(contexts));
-  memset(surfaces, 0, sizeof(surfaces));
+  if (display && !guest_terminate(display))
+    return -EIO;
   while (assets)
     asset_close(assets);
   memset(&looper, 0, sizeof(looper));
@@ -1006,9 +1128,12 @@ int as_media_library(const char *name) {
 int as_media_quiesce(void) {
   extern int as_sl_quiesce(void);
   int gl = as_glsurface_quiesce();
+  as_media_stop_event("glsurface_quiesce_result", gl, as_glsurface_running());
   if (gl)
     return gl;
-  return as_sl_quiesce();
+  int sl = as_sl_quiesce();
+  as_media_stop_event("opensl_quiesce_result", sl, 0);
+  return sl;
 }
 #define API(n, f)                                                              \
   if (!strcmp(name, n))                                                        \
@@ -1076,7 +1201,7 @@ static uint64_t media_lookup(const char *name) {
   API("eglBindAPI", eglBindAPI);
   API("eglQueryAPI", eglQueryAPI);
   API("eglSwapInterval", eglSwapInterval);
-  API("eglQuerySurface", eglQuerySurface);
+  API("eglQuerySurface", guest_query_surface);
   API("eglGetCurrentDisplay", eglGetCurrentDisplay);
   API("eglGetCurrentSurface", eglGetCurrentSurface);
   API("eglGetCurrentContext", eglGetCurrentContext);

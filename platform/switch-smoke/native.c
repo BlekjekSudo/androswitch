@@ -6,6 +6,8 @@
 #include "native.h"
 #include "bionic_cxx.h"
 #include "bionic_errno.h"
+#include "bionic_finalize.h"
+#include "bionic_locale.h"
 #include <errno.h>
 #include <malloc.h>
 #include <math.h>
@@ -33,6 +35,186 @@ typedef struct Mapping {
 static Handle own_process;
 static Mapping *mappings;
 static Mutex resource_mutex;
+static unsigned module_log_entries;
+static Mutex diagnostics_mutex;
+static int diagnostics_ready, native_trace_enabled;
+static unsigned native_trace_calls, jni_failure_entries;
+static unsigned native_trace_metadata_entries;
+static int native_trace_started, jni_failures_started;
+
+static void diagnostic_text(FILE *file, const uint8_t *bytes, size_t length) {
+  for (size_t i = 0; i < length && i < 4096; ++i) {
+    unsigned char byte = bytes[i];
+    if (byte >= 0x20 && byte < 0x7f && byte != '"' && byte != '\\')
+      fputc(byte, file);
+    else
+      fprintf(file, "\\x%02x", byte);
+  }
+  if (length > 4096)
+    fputs("[truncated]", file);
+}
+/* Called under diagnostics_mutex, on host TLS. Failed diagnostics must never
+ *
+ * alter guest errno, pending exceptions, or the native call's return value. */
+static void diagnostics_begin(void) {
+  if (diagnostics_ready)
+    return;
+  diagnostics_ready = 1;
+  FILE *marker =
+      fopen("sdmc:/switch/androswitch/logs/native-trace.enabled", "rb");
+  native_trace_enabled = marker != NULL;
+  if (marker)
+    fclose(marker);
+  FILE *failures =
+      fopen("sdmc:/switch/androswitch/logs/jni-failures.log", "wb");
+  if (failures) {
+    fclose(failures);
+    jni_failures_started = 1;
+  }
+  FILE *calls = fopen("sdmc:/switch/androswitch/logs/native-calls.log", "wb");
+  if (calls) {
+    fclose(calls);
+    native_trace_started = 1;
+  }
+}
+int as_native_trace_active(void) {
+  int saved_errno = errno;
+  mutexLock(&diagnostics_mutex);
+  diagnostics_begin();
+  int active = native_trace_enabled;
+  mutexUnlock(&diagnostics_mutex);
+  errno = saved_errno;
+  return active;
+}
+void as_native_trace_metadata(const char *source, const uint8_t *detail,
+                              size_t length) {
+  int saved_errno = errno;
+  mutexLock(&diagnostics_mutex);
+  diagnostics_begin();
+  if (native_trace_enabled && native_trace_metadata_entries < 32) {
+    ++native_trace_metadata_entries;
+    FILE *file = fopen("sdmc:/switch/androswitch/logs/native-calls.log",
+                       native_trace_started ? "ab" : "wb");
+    if (file) {
+      native_trace_started = 1;
+      fprintf(file, "metadata thread=0x%llx source=\"",
+              (unsigned long long)threadGetCurHandle());
+      diagnostic_text(file, (const uint8_t *)source, strnlen(source, 128));
+      fputs("\" detail=\"", file);
+      diagnostic_text(file, detail, length);
+      fprintf(file, "\" detail_bytes=%zu\n", length);
+      fclose(file);
+    }
+  }
+  mutexUnlock(&diagnostics_mutex);
+  errno = saved_errno;
+}
+void as_native_jni_failure(uint32_t operation, uint64_t a, uint64_t b,
+                           uint64_t c, const uint8_t *detail, size_t length) {
+  int saved_errno = errno;
+  mutexLock(&diagnostics_mutex);
+  diagnostics_begin();
+  if (jni_failure_entries < 256) {
+    ++jni_failure_entries;
+    FILE *file = fopen("sdmc:/switch/androswitch/logs/jni-failures.log",
+                       jni_failures_started ? "ab" : "wb");
+    if (file) {
+      jni_failures_started = 1;
+      fprintf(file,
+              "jni_failure op=%u thread=0x%llx a=0x%llx b=0x%llx "
+              "c=0x%llx detail=\"",
+              operation, (unsigned long long)threadGetCurHandle(),
+              (unsigned long long)a, (unsigned long long)b,
+              (unsigned long long)c);
+      diagnostic_text(file, detail, length);
+      fprintf(file, "\" detail_bytes=%zu\n", length);
+      fclose(file);
+    }
+  }
+  mutexUnlock(&diagnostics_mutex);
+  errno = saved_errno;
+}
+/* Keep diagnostic temporaries outside the guest call's setjmp scope. */
+static __attribute__((noinline)) unsigned
+record_native_enter(const AsNativeCall *frame) {
+  int saved_errno = errno;
+  unsigned ticket = 0;
+  mutexLock(&diagnostics_mutex);
+  diagnostics_begin();
+  if (native_trace_enabled && native_trace_calls < 1024) {
+    ticket = ++native_trace_calls;
+    FILE *file = fopen("sdmc:/switch/androswitch/logs/native-calls.log",
+                       native_trace_started ? "ab" : "wb");
+    if (file) {
+      native_trace_started = 1;
+      fprintf(file,
+              "enter call=%u thread=0x%llx function=0x%llx "
+              "x0=0x%llx x1=0x%llx x2=0x%llx x3=0x%llx\n",
+              ticket, (unsigned long long)threadGetCurHandle(),
+              (unsigned long long)frame->function,
+              (unsigned long long)frame->integer[0],
+              (unsigned long long)frame->integer[1],
+              (unsigned long long)frame->integer[2],
+              (unsigned long long)frame->integer[3]);
+      fclose(file);
+    }
+  }
+  mutexUnlock(&diagnostics_mutex);
+  errno = saved_errno;
+  return ticket;
+}
+static void record_native_leave(unsigned ticket, const AsNativeCall *frame,
+                                int error) {
+  if (!ticket)
+    return;
+  int saved_errno = errno;
+  mutexLock(&diagnostics_mutex);
+  FILE *file = fopen("sdmc:/switch/androswitch/logs/native-calls.log",
+                     native_trace_started ? "ab" : "wb");
+  if (file) {
+    native_trace_started = 1;
+    fprintf(file, "leave call=%u thread=0x%llx error=%d", ticket,
+            (unsigned long long)threadGetCurHandle(), error);
+    if (!error)
+      fprintf(file, " x0=0x%llx x1=0x%llx",
+              (unsigned long long)frame->result_integer[0],
+              (unsigned long long)frame->result_integer[1]);
+    fputc('\n', file);
+    fclose(file);
+  }
+  mutexUnlock(&diagnostics_mutex);
+  errno = saved_errno;
+}
+/* Crash diagnostics use actual loader allocations, never inferred ELF bases.
+ *
+ * Keep this bounded and escape names so one library cannot forge log records.
+
+ * * The next native session truncates the previous log at its first module. */
+static void record_module_mapping(const Mapping *mapping) {
+  int saved_errno = errno;
+  if (module_log_entries >= 256)
+    return;
+  FILE *file = fopen("sdmc:/switch/androswitch/logs/native-modules.log",
+                     module_log_entries ? "ab" : "wb");
+  if (file) {
+    fprintf(file, "module base=0x%llx length=0x%zx phdrs=%zu name=\"",
+            (unsigned long long)(uintptr_t)mapping->address, mapping->size,
+            mapping->program_header_count);
+    size_t length = strlen(mapping->library_name);
+    for (size_t i = 0; i < length && i < 1024; ++i) {
+      unsigned char byte = (unsigned char)mapping->library_name[i];
+      if (byte >= 0x20 && byte < 0x7f && byte != '"' && byte != '\\')
+        fputc(byte, file);
+      else
+        fprintf(file, "\\x%02x", byte);
+    }
+    fprintf(file, "\" name_bytes=%zu%s\n", length,
+            length > 1024 ? " name_truncated=true" : "");
+    fclose(file);
+    ++module_log_entries;
+  }
+  errno = saved_errno;
+}
 __attribute__((weak)) void as_teardown_phase(const char *phase) { (void)phase; }
 typedef struct GuestAllocation {
   void *pointer;
@@ -326,6 +508,7 @@ int as_native_register_module(uint64_t token, const char *name,
   mapping->library_name = owned_name;
   mapping->program_headers = owned_headers;
   mapping->program_header_count = length / 56;
+  record_module_mapping(mapping);
   mutexUnlock(&resource_mutex);
   return 0;
 }
@@ -470,6 +653,7 @@ void as_native_thread_cleanup(void) {
   int cxx_error = as_bionic_cxx_thread_finalize();
   if (!cxx_error)
     cxx_error = as_bionic_keys_thread_finalize();
+  as_bionic_locale_thread_finalize();
   if (cxx_error) {
     as_native_fail(cxx_error);
     as_native_record_worker_error(cxx_error);
@@ -505,6 +689,7 @@ static void guest_thread_main(void *argument) {
   int cxx_error = as_bionic_cxx_thread_finalize();
   if (!cxx_error)
     cxx_error = as_bionic_keys_thread_finalize();
+  as_bionic_locale_thread_finalize();
   if (cxx_error) {
     as_native_fail(cxx_error);
     as_native_record_worker_error(cxx_error);
@@ -523,9 +708,14 @@ static int guest_pthread_create(uint64_t *out, const void *attributes,
   if (attributes) {
     return as_errno_to_android(ENOTSUP);
   }
+  int admission = as_worker_admission_enter();
+  if (admission)
+    return as_errno_to_android(-admission);
   GuestThread *thread = calloc(1, sizeof(*thread));
-  if (!thread)
+  if (!thread) {
+    as_worker_admission_leave();
     return ENOMEM;
+  }
   thread->function = (uint64_t)function;
   thread->argument = (uint64_t)argument;
   thread->session = context.session;
@@ -533,12 +723,14 @@ static int guest_pthread_create(uint64_t *out, const void *attributes,
                            1024 * 1024, 0x2c, -2);
   if (R_FAILED(rc)) {
     free(thread);
+    as_worker_admission_leave();
     return EAGAIN;
   }
   rc = threadStart(&thread->thread);
   if (R_FAILED(rc)) {
     threadClose(&thread->thread);
     free(thread);
+    as_worker_admission_leave();
     return EAGAIN;
   }
   *out = (uint64_t)thread;
@@ -546,6 +738,7 @@ static int guest_pthread_create(uint64_t *out, const void *attributes,
   thread->next = guest_threads;
   guest_threads = thread;
   mutexUnlock(&resource_mutex);
+  as_worker_admission_leave();
   return 0;
 }
 static int guest_pthread_join(uint64_t handle, void **result) {
@@ -607,12 +800,12 @@ int as_cxx_invoke(uint64_t function, uint64_t argument) {
   return rc;
 }
 int as_native_finalize_thread_callbacks(void) {
-  int rc = as_bionic_cxx_thread_finalize();
-  if (!rc)
-    rc = as_bionic_keys_thread_finalize();
-  return rc;
+  return as_bionic_finalize_thread();
 }
-int as_native_finalize_callbacks(void) { return as_bionic_cxx_finalize(); }
+int as_native_finalize_callbacks(void) { return as_bionic_finalize_session(); }
+unsigned as_native_pending_callbacks(void) {
+  return as_bionic_finalization_pending();
+}
 static uint64_t guard = 0x6173577463684a4e;
 uint64_t as_native_guest_tls(void) {
   if (!context.guest) {
@@ -628,7 +821,14 @@ uint64_t as_native_guest_tls(void) {
   return (uint64_t)(context.guest + 4096);
 }
 void *as_native_session(void) { return context.session; }
-void as_native_set_session(void *session) { context.session = session; }
+void as_native_set_session(void *session) {
+  context.session = session;
+  int saved_errno = errno;
+  mutexLock(&diagnostics_mutex);
+  diagnostics_begin();
+  mutexUnlock(&diagnostics_mutex);
+  errno = saved_errno;
+}
 int as_native_last_error(void) { return context.error; }
 void as_native_fail(int code) { context.error = code; }
 void as_native_trap(int code) {
@@ -655,9 +855,12 @@ uint64_t as_native_tls(size_t module, const uint8_t *bytes, size_t length,
 uint64_t as_native_tlsdesc_address(void) { return (uint64_t)as_native_tlsdesc; }
 int as_native_call(AsNativeCall *frame) {
   int host_errno = errno;
+  unsigned trace_ticket = record_native_enter(frame);
   frame->guest_tls = as_native_guest_tls();
-  if (!frame->guest_tls)
+  if (!frame->guest_tls) {
+    record_native_leave(trace_ticket, frame, -ENOMEM);
     return -ENOMEM;
+  }
   context.error = 0;
   ImportBridge *bridge = (void *)context.guest;
   uint64_t bridge_depth = bridge->depth;
@@ -668,6 +871,7 @@ int as_native_call(AsNativeCall *frame) {
     as_native_call_asm(frame);
   context.escape = previous;
   bridge->depth = bridge_depth;
+  record_native_leave(trace_ticket, frame, context.error);
   errno = host_errno;
   return context.error;
 }
@@ -776,13 +980,48 @@ int as_native_quiesce(uint64_t timeout_ns) {
     free(t);
   }
 }
+/* Fixed component names only, with at most nine additional phase records per
+ *
+ * attempt. Logging never changes admission/ownership or calls guest code. */
+static void reset_phase(const char *phase) {
+  int saved = errno;
+  as_teardown_phase(phase);
+  errno = saved;
+}
 int as_native_reset(void) {
   as_teardown_phase("native_resource_reset");
-  if (guest_threads || as_bionic_cxx_reset() || as_bionic_keys_reset())
+  reset_phase("native_reset_guest_threads");
+  if (guest_threads) {
+    reset_phase("native_reset_guest_threads_busy");
     return -EBUSY;
+  }
+  reset_phase("native_reset_cxx");
+  if (as_bionic_cxx_reset()) {
+    reset_phase("native_reset_cxx_busy");
+    unsigned pending = as_bionic_cxx_pending();
+    if (pending & AS_CXX_PENDING_GLOBAL)
+      reset_phase("native_reset_cxx_global_destructors_pending");
+    if (pending & AS_CXX_PENDING_THREAD)
+      reset_phase("native_reset_cxx_thread_destructors_pending");
+    return -EBUSY;
+  }
+  reset_phase("native_reset_keys");
+  if (as_bionic_keys_reset()) {
+    reset_phase("native_reset_keys_busy");
+    return -EBUSY;
+  }
   extern int as_bionic_sync_reset(void);
-  if (as_bionic_sync_reset())
+  reset_phase("native_reset_sync");
+  if (as_bionic_sync_reset()) {
+    reset_phase("native_reset_sync_busy");
     return -EBUSY;
+  }
+  reset_phase("native_reset_locale");
+  if (as_bionic_locale_reset()) {
+    reset_phase("native_reset_locale_busy");
+    return -EBUSY;
+  }
+  reset_phase("native_reset_admitted");
   extern void as_jni_reset(void);
   as_jni_reset();
   while (mappings) {
@@ -813,11 +1052,18 @@ int as_native_reset(void) {
   memset(tls_template, 0, sizeof(tls_template));
   memset(tls_modules, 0, sizeof(tls_modules));
   tls_used = 256;
+  module_log_entries = 0;
+  diagnostics_ready = native_trace_enabled = 0;
+  native_trace_calls = jni_failure_entries = 0;
+  native_trace_metadata_entries = 0;
+  native_trace_started = jni_failures_started = 0;
   if (own_process) {
     svcCloseHandle(own_process);
     own_process = 0;
   }
   as_teardown_phase("native_resources_released");
+  /* Every earlier failure keeps the common admission barrier closed. */
+  as_worker_admission_reset();
   return 0;
 }
 uint64_t as_native_import(const char *name) {

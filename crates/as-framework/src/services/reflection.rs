@@ -2,6 +2,28 @@
 use super::*;
 const CLASS: &str = "Ljava/lang/Class;";
 const METHOD: &str = "Ljava/lang/reflect/Method;";
+mod class_for_name;
+pub(super) fn link_class(
+    vm: &Engine,
+    class: &str,
+    scope: super::package::LoaderScope,
+) -> Result<()> {
+    class_for_name::link_class(vm, class, scope)
+}
+pub(super) fn metadata(
+    class: &str,
+    name: &str,
+    sig: &str,
+) -> Option<rd_vm::framework_host::HostMethodKind> {
+    (class == CLASS
+        && name == "forName"
+        && matches!(
+            sig,
+            "(Ljava/lang/String;)Ljava/lang/Class;"
+                | "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;"
+        ))
+    .then_some(rd_vm::framework_host::HostMethodKind::Static)
+}
 fn thrown(class: &str, message: impl Into<String>) -> VmExit {
     Throwable::new(class, message).into()
 }
@@ -33,34 +55,17 @@ fn class_name(d: &str) -> String {
     }
 }
 pub(super) fn call_static(
+    services: &Services,
     vm: &mut Engine,
     class: &str,
     name: &str,
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>> {
-    if class != CLASS || name != "forName" || sig != "(Ljava/lang/String;)Ljava/lang/Class;" {
+    if class != CLASS || name != "forName" {
         return Ok(None);
     }
-    let name = text(vm, &args[0])?;
-    let d = if name.starts_with('[') {
-        name.replace('.', "/")
-    } else {
-        descriptor(&name)
-    };
-    let base = d.trim_start_matches('[');
-    let primitive_array =
-        d.starts_with('[') && matches!(base, "Z" | "B" | "C" | "S" | "I" | "J" | "F" | "D");
-    if !primitive_array
-        && vm.cp.find_class(base).is_none()
-        && !rd_vm::classpath::host_class_known(base)
-    {
-        return Err(thrown("Ljava/lang/ClassNotFoundException;", name));
-    }
-    if !d.starts_with('[') {
-        vm.ensure_initialized(&d)?;
-    }
-    Ok(Some(Value::Obj(vm.device_class_object(&d)?)))
+    class_for_name::call(services, vm, sig, args)
 }
 fn unbox(vm: &Engine, target: &str, value: &Value) -> Result<Value> {
     if target.len() != 1 {

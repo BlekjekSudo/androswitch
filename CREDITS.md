@@ -66,6 +66,13 @@ domain), compiled from its hash-pinned original amalgamation. See
 its original license files are included in packaged dependency notices.
 SharedPreferences behavior is referenced against AOSP Android 8.0.0_r1
 `SharedPreferencesImpl` (Android Open Source Project, Apache-2.0).
+The shared broadcast/service and locale contracts also use Android 8.0.0_r1
+framework/Bionic as behavior and ABI references. The new implementations are
+AndroSwitch code; pinned reference links and tested limits accompany their
+receipts. The task-local emulator diagnostic retains Ryujinx's MIT attribution;
+its source patch and reproducible tooling are documented in
+[tools/ryujinx-cfg](tools/ryujinx-cfg/README.md). Emulator binaries and keys are
+excluded from the repository and release package.
 The M9 external evaluation downloads an unmodified Vector Pinball APK from
 F-Droid, credited to dozingcat/Vector Pinball contributors (GPL v3);
 that APK is not bundled in the AndroSwitch distribution.
@@ -89,6 +96,7 @@ that APK is not bundled in the AndroSwitch distribution.
 | [Mesa](https://docs.mesa3d.org/) / [devkitPro Switch Mesa](https://github.com/devkitPro/mesa) / Nouveau contributors | Actual EGL/GLES2 driver and shader compiler linked into the product NRO |
 | [Khronos](https://www.khronos.org/) / AOSP OpenSL ES contributors | Public OpenSL ES interface layouts and identifiers; original headers/notices retained |
 | GCC / GNU libstdc++ / newlib contributors | Device C/C++ runtime; redistribution notices and the GCC Runtime Library Exception are included in packaged dependencies |
+| Unicode / ICU / IBM contributors | Pinned API 26 charset-name recognition data; original [license and provenance](third_party/android-charset/SOURCE.md) retained and packaged. Encoder implementations are original AndroSwitch code. |
 
 These acknowledgements do not change the components' individual licenses.
 Tools, external APKs and proprietary game assets are not bundled in the

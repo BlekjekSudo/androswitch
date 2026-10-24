@@ -7,6 +7,14 @@ const CLASS_LOADER: &str = "Ljava/lang/ClassLoader;";
 const BOOT_LOADER: &str = "Ljava/lang/BootClassLoader;";
 const APPLICATION_INFO: &str = "Landroid/content/pm/ApplicationInfo;";
 
+/// Provenance of the only loaders backed by this runtime's classpath.
+/// A Java ClassLoader-shaped object alone does not confer loading behavior.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum LoaderScope {
+    Application,
+    Bootstrap,
+}
+
 #[derive(Default)]
 pub(super) struct PackageService {
     source: RefCell<Option<String>>,
@@ -37,7 +45,7 @@ impl PackageService {
             )
         })
     }
-    fn loader(&self, vm: &mut Engine) -> Result<ObjRef> {
+    pub(super) fn app_loader(&self, vm: &mut Engine) -> Result<ObjRef> {
         if let Some(loader) = *self.class_loader.borrow() {
             return Ok(loader);
         }
@@ -45,13 +53,51 @@ impl PackageService {
         *self.class_loader.borrow_mut() = Some(loader);
         Ok(loader)
     }
-    fn boot_loader(&self, vm: &mut Engine) -> Result<ObjRef> {
+    pub(super) fn bootstrap_loader(&self, vm: &mut Engine) -> Result<ObjRef> {
         if let Some(loader) = *self.boot_loader.borrow() {
             return Ok(loader);
         }
         let loader = shell(vm, BOOT_LOADER)?;
         *self.boot_loader.borrow_mut() = Some(loader);
         Ok(loader)
+    }
+    pub(super) fn resolve_loader(
+        &self,
+        vm: &Engine,
+        loader: Option<ObjRef>,
+    ) -> Result<LoaderScope> {
+        let Some(loader) = loader else {
+            return Ok(LoaderScope::Bootstrap);
+        };
+        if *self.class_loader.borrow() == Some(loader) {
+            return Ok(LoaderScope::Application);
+        }
+        if *self.boot_loader.borrow() == Some(loader) {
+            return Ok(LoaderScope::Bootstrap);
+        }
+        if !vm.cp.is_subtype(vm.heap.class_of(loader)?, CLASS_LOADER) {
+            return Err(
+                Throwable::new("Ljava/lang/ClassCastException;", "expected ClassLoader").into(),
+            );
+        }
+        Err(error(
+            "API_UNAVAILABLE",
+            "custom or unregistered ClassLoader has no loading backend",
+        ))
+    }
+    pub(super) fn metadata(
+        class: &str,
+        name: &str,
+        sig: &str,
+    ) -> Option<rd_vm::framework_host::HostMethodKind> {
+        use rd_vm::framework_host::HostMethodKind::Instance;
+        match (class, name, sig) {
+            (CONTEXT | "Ljava/lang/Class;", "getClassLoader", "()Ljava/lang/ClassLoader;")
+            | (CLASS_LOADER, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;") => {
+                Some(Instance)
+            }
+            _ => None,
+        }
     }
     fn info(&self, android: &Android, vm: &mut Engine) -> Result<ObjRef> {
         if let Some(info) = *self.application_info.borrow() {
@@ -145,7 +191,7 @@ impl PackageService {
                 ("getApplicationInfo", "()Landroid/content/pm/ApplicationInfo;") => {
                     Value::Obj(self.info(android, vm)?)
                 }
-                ("getClassLoader", "()Ljava/lang/ClassLoader;") => Value::Obj(self.loader(vm)?),
+                ("getClassLoader", "()Ljava/lang/ClassLoader;") => Value::Obj(self.app_loader(vm)?),
                 ("getPackageCodePath" | "getPackageResourcePath", "()Ljava/lang/String;") => {
                     string(vm, self.source()?)?
                 }
@@ -191,6 +237,12 @@ impl PackageService {
         }
         let app_loader = *self.class_loader.borrow() == Some(receiver);
         let boot_loader = *self.boot_loader.borrow() == Some(receiver);
+        if vm.cp.is_subtype(&actual, CLASS_LOADER)
+            && name == "loadClass"
+            && sig == "(Ljava/lang/String;)Ljava/lang/Class;"
+        {
+            self.resolve_loader(vm, Some(receiver))?;
+        }
         if (app_loader || boot_loader)
             && name == "loadClass"
             && sig == "(Ljava/lang/String;)Ljava/lang/Class;"
@@ -206,6 +258,7 @@ impl PackageService {
             }
             // ClassLoader.loadClass resolves metadata; it must not invoke
             // the class initializer (Class.forName normally does).
+            super::reflection::link_class(vm, &class, self.resolve_loader(vm, Some(receiver))?)?;
             return Ok(Some(Value::Obj(vm.device_class_object(&class)?)));
         }
         if actual == "Ljava/lang/Class;"
@@ -217,9 +270,9 @@ impl PackageService {
             return Ok(Some(if class.len() == 1 {
                 Value::Null // Android returns null only for primitive Class objects.
             } else if vm.cp.find_class(element).is_some() {
-                Value::Obj(self.loader(vm)?)
+                Value::Obj(self.app_loader(vm)?)
             } else {
-                Value::Obj(self.boot_loader(vm)?)
+                Value::Obj(self.bootstrap_loader(vm)?)
             }));
         }
         Ok(None)

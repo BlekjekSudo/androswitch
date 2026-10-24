@@ -175,6 +175,15 @@ static void guard_finish(uint64_t *address, int complete) {
 }
 static void guard_release(uint64_t *address) { guard_finish(address, 1); }
 static void guard_abort(uint64_t *address) { guard_finish(address, 0); }
+unsigned as_bionic_cxx_pending(void) {
+  int saved = errno;
+  as_cxx_lock();
+  unsigned pending = (destructors ? AS_CXX_PENDING_GLOBAL : 0) |
+                     (thread_destructors ? AS_CXX_PENDING_THREAD : 0);
+  as_cxx_unlock();
+  errno = saved;
+  return pending;
+}
 int as_bionic_cxx_reset(void) {
   /* Caller has proved every guest/platform thread quiescent. A controlled
    * startup trap can abandon an in-progress local-static guard; its code and

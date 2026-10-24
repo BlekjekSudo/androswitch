@@ -1,0 +1,185 @@
+{
+  "stale_evidence": {
+    "current_session": "console-2",
+    "reason": "last-interrupted is an older org.fixture.nativemedia request, while the latest report/admission/native audit identify Candy Crush. Both reuse console-2 across boots.",
+    "stale_render_files": [
+      "gles-frame-2.ppm",
+      "gles-frame-30.ppm",
+      "display-handoffs.log"
+    ],
+    "pending_marker": "Not present in the supplied directory; original SD copy completeness was not independently verified.",
+    "render_scope": "These supplied files are older than the latest session; no Candy Crush/Mekorama game frame is proved by them.",
+    "not_evidence_of_new_candy_crash": true,
+    "last_interrupted": {
+      "events": null,
+      "package": "org.fixture.nativemedia",
+      "revision": 1,
+      "schema_version": 1,
+      "session_id": "console-2"
+    }
+  },
+  "compatibility": {
+    "candy_crush": "startup_blocked_native_import",
+    "m9_complete": false,
+    "first_game_screen": "not_proved",
+    "physical_cleanup": "latest Candy Crush abort cleanly returned to launcher",
+    "mekorama": "startup_blocked_shared_enum"
+  },
+  "memory": {
+    "largest_logged_allocator_used": 199994656,
+    "smallest_logged_free_estimate": 3129840352,
+    "scope": "Sparse newlib allocator snapshots, not continuous peak RAM, largest-contiguous-space measurement or a general leak test. Memory log lacks per-record package/session fields; earlier attempt is not independently attributable.",
+    "after_failed_attempt_free_estimate": 3320316896,
+    "heap_source": 1,
+    "largest_logged_allocator_arena": 392503296,
+    "after_failed_attempt_allocator_used": 9518112,
+    "application_open_checkpoints": 2,
+    "prior_failed_attempt_closed_allocator_used": 9504144,
+    "loader_override_heap_bytes": 3329835008,
+    "before_last_attempt_allocator_used": 9518112
+  },
+  "recorded_date": "2026-10-24",
+  "excluded": [
+    "The first similarly named local JPEG currently displays a football game, not AndroSwitch. It was not used or copied as AndroSwitch evidence."
+  ],
+  "evidence_type": "user_supplied_physical_switch_logs_and_screenshot",
+  "candy_crush": {
+    "memory_admission": {
+      "allocator_available_after_load": 3241373600,
+      "allocator_available_before_load": 3304991760,
+      "estimated_parser_bytes": 120862904,
+      "package": "com.king.candycrushsaga",
+      "parser_budget_bytes": 268435456,
+      "raw_dex_bytes": 34874388,
+      "revision": 1,
+      "schema_version": 1,
+      "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+      "session_id": "console-2",
+      "status": "vm_ready"
+    },
+    "error": "exception java.lang.ExceptionInInitializerError: call: libcandycrushsaga.so: call requires getauxval [pc 0x2: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 52079, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;-><clinit>()V",
+    "session_id": "console-2",
+    "revision": 1,
+    "runtime_status": "failed",
+    "package": "com.king.candycrushsaga",
+    "native_import_policy": "unimplemented strong function imports trap with library/symbol on first invocation",
+    "native_import_count": 159,
+    "cleanup": {
+      "last_phase": "launcher_ready",
+      "scope": "Latest teardown and memory checkpoints show cleanup. This does not establish successful game startup or gameplay.",
+      "launcher_ready": true,
+      "runtime_closed": true,
+      "status": "clean_startup_abort_and_return_observed",
+      "phases": [
+        "stop_requested",
+        "native_activity_stop",
+        "java_startup_abort",
+        "media_thread_quiesce",
+        "guest_thread_quiesce",
+        "native_destructors",
+        "media_reset",
+        "media_released",
+        "activity_dispose",
+        "runtime_drop",
+        "native_mapping_release",
+        "native_resource_reset",
+        "native_mapping_release",
+        "native_tls_reset",
+        "native_resources_released",
+        "runtime_closed",
+        "launcher_ready"
+      ],
+      "native_resources_released": true
+    },
+    "blocker_symbol": "getauxval"
+  },
+  "source_snapshots": [
+    {
+      "source": "C:\\Users\\Administrator\\Pictures\\pesnx\\logs\\display-handoffs.log",
+      "snapshot": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\hardware\\20261024T2300-received\\display-handoffs.log",
+      "source_modified_utc": "2026-10-24T02:01:38.0000000Z",
+      "bytes": 776,
+      "sha256": "44f48c649afd8345b7834224b0c2f41dccc928a0738f645fb2de106feddc7845"
+    },
+    {
+      "source": "C:\\Users\\Administrator\\Pictures\\pesnx\\logs\\gles-frame-2.ppm",
+      "snapshot": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\hardware\\20261024T2300-received\\gles-frame-2.ppm",
+      "source_modified_utc": "2026-10-24T01:30:12.0000000Z",
+      "bytes": 2764816,
+      "sha256": "ff5e6e871ea727da1cec3f097b8a05547788d9c3978c1ea5cc085c186ae2708a"
+    },
+    {
+      "source": "C:\\Users\\Administrator\\Pictures\\pesnx\\logs\\gles-frame-30.ppm",
+      "snapshot": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\hardware\\20261024T2300-received\\gles-frame-30.ppm",
+      "source_modified_utc": "2026-10-24T01:26:52.0000000Z",
+      "bytes": 2764816,
+      "sha256": "0502f3d04b60edcf428537ec55bb4cf766211a14bba0e5ac06b89ed945115149"
+    },
+    {
+      "source": "C:\\Users\\Administrator\\Pictures\\pesnx\\logs\\last-interrupted.json",
+      "snapshot": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\hardware\\20261024T2300-received\\last-interrupted.json",
+      "source_modified_utc": "2026-10-24T13:36:06.0000000Z",
+      "bytes": 108,
+      "sha256": "87fa6b42e76eceb0a286911501fdc710708314c68eda2ed0e6c9b2b8801c1ff7"
+    },
+    {
+      "source": "C:\\Users\\Administrator\\Pictures\\pesnx\\logs\\memory-admission.json",
+      "snapshot": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\hardware\\20261024T2300-received\\memory-admission.json",
+      "source_modified_utc": "2026-10-24T16:00:28.0000000Z",
+      "bytes": 416,
+      "sha256": "9e2d5ad1191408a106111c37065ca04ab732ef3392aa6ca460ca31b342a1c203"
+    },
+    {
+      "source": "C:\\Users\\Administrator\\Pictures\\pesnx\\logs\\memory.log",
+      "snapshot": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\hardware\\20261024T2300-received\\memory.log",
+      "source_modified_utc": "2026-10-24T16:00:54.0000000Z",
+      "bytes": 10012,
+      "sha256": "f957ad7aed307e41aa5c0fd5153bceacc6f34009648af11699a49d93b0078411"
+    },
+    {
+      "source": "C:\\Users\\Administrator\\Pictures\\pesnx\\logs\\native-compatibility.json",
+      "snapshot": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\hardware\\20261024T2300-received\\native-compatibility.json",
+      "source_modified_utc": "2026-10-24T16:00:42.0000000Z",
+      "bytes": 9152,
+      "sha256": "36d80d236b3b2c84e1f912d474511a834753a06b8a4444c167bba570ac078c57"
+    },
+    {
+      "source": "C:\\Users\\Administrator\\Pictures\\pesnx\\logs\\session-report.json",
+      "snapshot": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\hardware\\20261024T2300-received\\session-report.json",
+      "source_modified_utc": "2026-10-24T16:00:42.0000000Z",
+      "bytes": 407,
+      "sha256": "5ac4adb33813a8dc9d17f37287b8b4e0bb00df671f2625df97ae25e01dcd4cfc"
+    },
+    {
+      "source": "C:\\Users\\Administrator\\Pictures\\pesnx\\logs\\teardown.log",
+      "snapshot": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\hardware\\20261024T2300-received\\teardown.log",
+      "source_modified_utc": "2026-10-24T16:00:44.0000000Z",
+      "bytes": 875,
+      "sha256": "8664d5e147e909f1e3a4936f34f2251b3b0a636de10199ebfe5b742df6fc863b"
+    }
+  ],
+  "emulator_execution": "Separate parent-owned E2E reports; this hardware receipt does not substitute emulator results.",
+  "hardware_binary_identity": {
+    "observed_sha256": null,
+    "basis": "Last distributed candidate; user device NRO hash was not independently supplied.",
+    "expected_candidate_sha256": "6a46553edcc12cbe4239cc4a58fa0b647efca52d58f7d23eadee9843f9e87cf3"
+  },
+  "reporting_findings": [
+    "Interactive session IDs restart at console-1 each launcher boot and can collide with historical evidence.",
+    "Launcher return previously accepted session-report without checking package/revision/session identity.",
+    "Interruption UI pointed to mutable session-report; previous report was not embedded in its snapshot.",
+    "Per-application graphics/native/admission/teardown snapshots could remain from an earlier attempt."
+  ],
+  "supplied_log_directory": "C:/Users/Administrator/Pictures/pesnx/logs",
+  "schema_version": 1,
+  "mekorama": {
+    "package": "com.martinmagni.mekorama",
+    "snapshot": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\hardware\\20261024T2300-received\\mekorama-enum-screenshot.jpg",
+    "screenshot_sha256": "ca66d7e1f2528bc4b6dce95067334c1d83f86186ecdb25281dfa47578f1ab7b1",
+    "scope": "Screen visibly returns to the launcher. Supplied JSON session report is Candy Crush, so its exact teardown/memory figures are not attributed to Mekorama.",
+    "screenshot_source": "C:/Users/Administrator/Pictures/pesnx/2026102416001000-BE6BC5185DB9E9F19C32657EE3DDDBB9.jpg",
+    "error": "exception java.lang.ExceptionInInitializerError: new-instance Lcom/martinmagni/mekorama/Mekorama$IAPState;: platform state for Ljava/lang/Enum; is unavailable",
+    "runtime_status": "blocked_framework_initializer_in_screenshot",
+    "revision": 1
+  }
+}

@@ -29,6 +29,8 @@ extern "C" {
     fn as_media_audio_frames() -> u64;
     fn as_native_quiesce(timeout: u64) -> i32;
     fn as_native_reset() -> i32;
+    fn as_worker_admission_begin_shutdown();
+    fn as_platform_wall_millis(output: *mut i64) -> i32;
     fn as_teardown_phase(phase: *const core::ffi::c_char);
     fn as_audio_open(rate: i32, channels: i32, format: i32) -> i64;
     fn as_audio_start(id: u64) -> i32;
@@ -97,6 +99,22 @@ impl Clock for HorizonClock {
             as_platform_micros()
         }
     }
+    fn wall_time_millis(&self) -> Result<i64, as_platform::PlatformError> {
+        let mut value = 0;
+        // SAFETY: the platform writes this live scalar only on successful
+        // checked CLOCK_REALTIME conversion. Monotonic time is a separate API.
+        #[allow(unsafe_code)]
+        let result = unsafe { as_platform_wall_millis(&mut value) };
+        if result == 0 {
+            Ok(value)
+        } else {
+            Err(as_platform::PlatformError {
+                code: "HORIZON_CLOCK_ERROR",
+                operation: "wall_time_millis",
+                cause: alloc::format!("CLOCK_REALTIME: {result}"),
+            })
+        }
+    }
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -140,10 +158,8 @@ fn save_error(message: &str) {
             .ok()
             .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
             .unwrap_or(serde_json::Value::Null);
-        let data = serde_json::to_vec(
-            &serde_json::json!({"schema_version":1,"status":"failed","error":message,"session_id":pending["session_id"],"package":pending["package"],"revision":pending["revision"]}),
-        )
-        .unwrap_or_default();
+        let data = serde_json::to_vec(&crate::session_report::failure(&pending, message))
+            .unwrap_or_default();
         let _ = fs::write_all(&fs, "logs/session-report.json", &data);
     }
 }
@@ -249,14 +265,13 @@ fn open() -> Result<Running, String> {
     );
     app.android.bind_audio(Rc::new(HorizonAudio));
     crate::device_graphics::bind(&app.android).map_err(|e| e.to_string())?;
-    let native = if app.android.apk.native_libs.is_empty() {
-        None
-    } else {
-        let native = device_jni::Session::new(&app.android.apk).map_err(|e| e.to_string())?;
-        native.bind_vm(&mut app.vm);
-        app.vm.bind_native(native.clone());
-        Some(native)
-    };
+    // Java-only applications can own background VM callbacks too. Every device
+    // application therefore has a real JNI/thread session, even before loading
+    // an ELF. Retain it in Running before a worker can be started or fail.
+    let native = device_jni::Session::new(&app.android.apk).map_err(|e| e.to_string())?;
+    native.bind_vm(&mut app.vm);
+    app.vm.bind_native(native.clone());
+    let native = Some(native);
     let pending = request.events.as_ref().map(|_| 0);
     let mut running = Running {
         app,
@@ -287,9 +302,19 @@ fn open() -> Result<Running, String> {
 impl Running {
     fn start(&mut self) -> Result<(), String> {
         device_jni::lock();
-        let result = self.app.launch().map_err(|e| e.to_string());
+        let result = self.start_locked();
         device_jni::unlock();
-        result?;
+        result
+    }
+    // onCreate can start a Timer immediately. Keep every subsequent VM and
+    // framework access under the same lease used by that actual worker.
+    fn start_locked(&mut self) -> Result<(), String> {
+        crate::device_workers::bind(
+            &mut self.app,
+            self.native.as_ref().ok_or("JNI_SESSION_MISSING")?,
+        )
+        .map_err(|e| e.to_string())?;
+        self.app.launch().map_err(|e| e.to_string())?;
         let app = &mut self.app;
         if app.vm.cp.is_subtype(
             &alloc::format!("L{};", app.entry.replace('.', "/")),
@@ -318,7 +343,6 @@ impl Running {
             };
             let library = metadata("android.app.lib_name", "main");
             let symbol = metadata("android.app.func_name", "ANativeActivity_onCreate");
-            device_jni::lock();
             let created = (|| -> Result<u64, String> {
                 let function = session
                     .native_entry(&mut app.vm, &library, &symbol)
@@ -341,20 +365,12 @@ impl Running {
                     .map_err(|e| e.to_string())?;
                 Ok(activity)
             })();
-            device_jni::unlock();
             created?;
         }
         let requests = self.app.android.gl_requests().map_err(|e| e.to_string())?;
         if !requests.is_empty() {
             if self.native_activity != 0 {
                 return Err("GL_COMPOSITION_UNAVAILABLE: NativeActivity and GLSurfaceView share one display".into());
-            }
-            if self.native.is_none() {
-                let session =
-                    device_jni::Session::new(&self.app.android.apk).map_err(|e| e.to_string())?;
-                session.bind_vm(&mut self.app.vm);
-                self.app.vm.bind_native(session.clone());
-                self.native = Some(session);
             }
             self.gl_surface = crate::device_graphics::start(
                 &mut self.app,
@@ -380,12 +396,17 @@ impl Running {
             let _ = fs::write_all(self.fs.as_ref(), "logs/native-compatibility.json", &bytes);
         }
     }
-    fn cleanup_error(&self, message: &str) {
-        if let Some(cause) = &self.startup_error {
-            save_error(&alloc::format!("{cause}; cleanup: {message}"));
-        } else {
-            save_error(message);
+    fn cleanup_error(&mut self, message: &str) {
+        let combined = crate::session_report::cleanup_failure(
+            self.startup_error
+                .as_deref()
+                .or(self.runtime_error.as_deref()),
+            message,
+        );
+        if self.startup_error.is_none() && self.runtime_error.is_none() {
+            self.runtime_error = Some(message.to_string());
         }
+        save_error(&combined);
     }
     fn event(&mut self, event: Event) -> Result<(), String> {
         if self.native_activity != 0 {
@@ -514,6 +535,11 @@ pub unsafe extern "C" fn as_runtime_step(token: u64) -> i32 {
     let running = unsafe { &mut *(token as *mut Running) };
     device_jni::lock();
     let result = running.poll();
+    if let Err(error) = &result {
+        if running.runtime_error.is_none() {
+            running.runtime_error = Some(error.clone());
+        }
+    }
     device_jni::unlock();
     match result {
         Ok(code) => code,
@@ -533,6 +559,38 @@ pub unsafe extern "C" fn as_runtime_pixels(token: u64) -> *const u32 {
         .frame
         .pixels
         .as_ptr()
+}
+#[repr(C)]
+pub struct CpuFrame {
+    pixels: *const u32,
+    length: usize,
+    width: u32,
+    height: u32,
+}
+/// # Safety
+/// Token and output are live, accessed by the owning presentation loop. The
+/// returned slice metadata remains valid until the next runtime step/event.
+#[allow(unsafe_code)]
+#[no_mangle]
+pub unsafe extern "C" fn as_runtime_frame(token: u64, output: *mut CpuFrame) -> bool {
+    if output.is_null() {
+        return false;
+    }
+    let frame = &unsafe { &*(token as *const Running) }.app.frame;
+    let (Ok(width), Ok(height)) = (u32::try_from(frame.width), u32::try_from(frame.height)) else {
+        return false;
+    };
+    // SAFETY: caller supplies writable scalar metadata, with no ownership
+    // transfer of the retained Rust raster allocation.
+    unsafe {
+        *output = CpuFrame {
+            pixels: frame.pixels.as_ptr(),
+            length: frame.pixels.len(),
+            width,
+            height,
+        };
+    }
+    true
 }
 /// # Safety
 /// Token is live, accessed only by its owning platform loop.
@@ -559,15 +617,21 @@ pub unsafe extern "C" fn as_runtime_presented(token: u64, checksum: u64) {
     device_jni::unlock();
 }
 /// # Safety
-/// `token` is live. Only the test driver's final frame requests a capture.
+/// `token` is live. The test driver's explicit Frame events and final frame
+/// request a capture. Interactive sessions never request one here.
 #[allow(unsafe_code)]
 #[no_mangle]
 pub unsafe extern "C" fn as_runtime_capture(token: u64) -> bool {
     let r = unsafe { &*(token as *const Running) };
-    r.request
-        .events
-        .as_ref()
-        .is_some_and(|e| r.pending == Some(e.len()))
+    r.request.events.as_ref().is_some_and(|events| {
+        r.pending.is_some_and(|step| {
+            step == events.len()
+                || step
+                    .checked_sub(1)
+                    .and_then(|index| events.get(index))
+                    .is_some_and(|event| matches!(event, Event::Frame))
+        })
+    })
 }
 /// # Safety
 /// `token` is live and uniquely accessed; UI events use the same Android path as E2E events.
@@ -586,7 +650,9 @@ pub unsafe extern "C" fn as_runtime_input(token: u64, kind: i32, a: f32, b: f32)
         }
     });
     if let Err(error) = &result {
-        running.runtime_error = Some(error.clone());
+        if running.runtime_error.is_none() {
+            running.runtime_error = Some(error.clone());
+        }
     }
     device_jni::unlock();
     match result {
@@ -630,6 +696,20 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
     if let Err(error) = stopped {
         running.cleanup_error(&alloc::format!("ACTIVITY_STOP_ERROR: {error}"));
     }
+    // Close every actual platform/guest worker creation path atomically with
+    // its registration. Destructors may still call Java/native services, but
+    // cannot create a new callback owner behind an already completed join.
+    phase(c"worker_admission_closed");
+    unsafe { as_worker_admission_begin_shutdown() };
+    phase(c"background_worker_quiesce");
+    let background_workers = crate::device_workers::quiesce(6_000_000_000);
+    if background_workers != 0 {
+        running.cleanup_error(&alloc::format!(
+            "BACKGROUND_WORKER_NOT_QUIESCENT: {background_workers}; reopen homebrew"
+        ));
+        core::mem::forget(running);
+        return -1;
+    }
     phase(c"media_thread_quiesce");
     let media_threads = unsafe { as_media_quiesce() };
     if media_threads != 0 {
@@ -648,25 +728,45 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
     }
     // Static/thread-local C++ destructors may call Java, files, or media.
     // Execute them while both the VM session and all mapped code are alive.
-    phase(c"native_destructors");
-    device_jni::lock();
-    let finalized = if let Some(native) = &running.native {
-        native.finalize_libraries(&mut running.app.vm)
-    } else {
-        Ok(())
-    };
-    device_jni::unlock();
-    if let Err(finalized) = finalized {
-        running.cleanup_error(&alloc::format!("NATIVE_FINALIZE_FAILED: {finalized}"));
-        core::mem::forget(running);
-        return -1;
+    let mut finalization_settled = false;
+    for _ in 0..64 {
+        phase(c"native_destructors");
+        device_jni::lock();
+        let finalized = if let Some(native) = &running.native {
+            native.finalize_libraries(&mut running.app.vm)
+        } else {
+            Ok(())
+        };
+        device_jni::unlock();
+        if let Err(finalized) = finalized {
+            running.cleanup_error(&alloc::format!("NATIVE_FINALIZE_FAILED: {finalized}"));
+            core::mem::forget(running);
+            return -1;
+        }
+        // A callback may create another guest/platform worker. Prove
+        // quiescence again before inspecting its newly registered callbacks.
+        let background_workers = crate::device_workers::quiesce(6_000_000_000);
+        let media_threads = unsafe { as_media_quiesce() };
+        let native_threads = unsafe { as_native_quiesce(2_000_000_000) };
+        if background_workers != 0 || media_threads != 0 || native_threads != 0 {
+            running.cleanup_error("DESTRUCTOR_NOT_QUIESCENT: reopen homebrew");
+            core::mem::forget(running);
+            return -1;
+        }
+        device_jni::lock();
+        let pending = running
+            .native
+            .as_ref()
+            .is_some_and(|native| native.finalization_pending());
+        device_jni::unlock();
+        if !pending {
+            finalization_settled = true;
+            break;
+        }
+        phase(c"native_destructors_pending");
     }
-    // A callback may create another guest/platform worker. Prove quiescence
-    // again before releasing any JNI roots or executable memory.
-    let media_threads = unsafe { as_media_quiesce() };
-    let native_threads = unsafe { as_native_quiesce(2_000_000_000) };
-    if media_threads != 0 || native_threads != 0 {
-        running.cleanup_error("DESTRUCTOR_NOT_QUIESCENT: reopen homebrew");
+    if !finalization_settled {
+        running.cleanup_error("NATIVE_FINALIZE_LIMIT: callbacks did not settle; reopen homebrew");
         core::mem::forget(running);
         return -1;
     }
@@ -687,12 +787,18 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
     // Ordinary interactive sessions also need a report; otherwise the shell
     // can display a stale result from a previous APK. Preserve any named error.
     let fs = running.fs.clone();
-    let startup_error = running.startup_error.clone();
+    let primary_error = running
+        .startup_error
+        .clone()
+        .or(running.runtime_error.clone());
     let final_report = if running.request.events.is_none() {
         fs::read_all(fs.as_ref(), "logs/session-report.json", 1 << 20)
             .ok()
             .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
-            .filter(|report| report["status"] == "running")
+            .filter(|report| {
+                let expected = serde_json::json!({"schema_version":1,"session_id":running.request.session_id,"package":running.request.package,"revision":running.request.revision});
+                report["status"] == "running" && crate::session_report::identity_matches(report, &expected)
+            })
             .and_then(|mut report| {
                 report["status"] = "stopping".into();
                 let bytes = serde_json::to_vec(&report).ok()?;
@@ -710,10 +816,10 @@ pub unsafe extern "C" fn as_runtime_close(token: u64) -> i32 {
     let rc = unsafe { as_native_reset() };
     if rc != 0 {
         let message = alloc::format!("NATIVE_RESOURCE_RESET_FAILED: {rc}; reopen homebrew");
-        save_error(&match startup_error {
-            Some(cause) => alloc::format!("{cause}; cleanup: {message}"),
-            None => message,
-        });
+        save_error(&crate::session_report::cleanup_failure(
+            primary_error.as_deref(),
+            &message,
+        ));
     } else if let Some(bytes) = final_report {
         let _ = fs::write_all(fs.as_ref(), "logs/session-report.json", &bytes);
     }

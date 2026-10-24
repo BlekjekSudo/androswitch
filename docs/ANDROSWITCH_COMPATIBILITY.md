@@ -53,7 +53,8 @@ metadata/resource entries remain capped at 64 MiB; native extraction has a
 separate adaptive ceiling up to 128 MiB. Current source replaces the fixed
 32 MiB raw DEX guard with decoded-memory admission accounting (parser ceiling
 up to 256 MiB, raw ceiling up to 128 MiB) and live allocator reserve checks.
-New memory/native/GLSurfaceView implementation awaits Horizon execution; see
+New memory/native/GLSurfaceView paths have scoped Horizon execution; full
+regression and external-game first screens remain pending. See
 [independent-app work and remaining limits](M9_EXTERNAL_APPS.md). The 128 MiB
 container proof is host-tested. The user reports installation of a Candy Crush
 APK larger than 65 MB on Switch; detailed file-backed scenarios remain unrecorded.
@@ -73,14 +74,14 @@ after bounded cleanup; it does not fabricate the missing ABI. See
 
 M8/M9 results are scoped by scenario, not an APK-wide compatibility badge:
 
-| Scenario | Host | New candidate emulator | Physical Switch |
+| Scenario | Host | Latest observed emulator | Physical Switch |
 | --- | --- | --- | --- |
 | Preferences / renamed preferences, restart and GC | Contract tests passed | not run in emulator | SharedPreferences works (user report); individual renamed/restart/GC results not recorded |
 | Native SQLite notes / renamed notes, transaction/cursor/reflection | Contract tests passed | not run in emulator | SQLite readable (user report); individual transaction/renamed/reflection results not recorded |
 | AOSP HelloActivity original source/layout | Recorded in candidate corpus; static rendering only | not run | individual result not recorded |
 | Vector Pinball 1.16.0, unmodified F-Droid APK | Shared metadata/source access advances startup; now blocked at portable monitor-enter/exit in MultiDex.doInstallation; no gameplay | not run | individual result not recorded |
-| Mekorama 1.7.2, hash frozen in startup lock | DEX admitted; blocked at System.loadLibrary without host native backend | current source not run | Earlier candidate native dependency failure; new implementation unrun |
-| Candy Crush Saga 1.332.1.1, hash frozen in startup lock | 34,874,388 raw DEX bytes admitted; blocked at System.loadLibrary without host native backend | current source not run | Earlier APK installation passed (user report), old launch blocked by raw DEX >32 MiB; new implementation unrun |
+| Mekorama 1.7.2, hash frozen in startup lock | DEX admitted; blocked at System.loadLibrary without host native backend | monitor, Executor, resource APIs and TextUtils advance renderer startup to Class.forName with loader; native reset and launcher return complete, original/onPause errors retained; no first screen | latest user screenshot shows the earlier Enum initializer blocker; binary hash unrecorded |
+| Candy Crush Saga 1.332.1.1, hash frozen in startup lock | 34,874,388 raw DEX bytes admitted; blocked at System.loadLibrary without host native backend | isolated diagnostic emulator passes Timer, inherited getResources, Bitmap, JNI constructors and currentThread, then rejects Thread.getContextClassLoader; C++ finalization and launcher return complete; no first screen | latest logs confirm DEX admitted, then getauxval unavailable; teardown reaches launcher_ready; binary hash unrecorded |
 | External NDK hello-jni/native-activity | Build/integration pending | pending | pending |
 
 The [candidate report](../reports/m8-m9-candidate.json) records exact fixture
