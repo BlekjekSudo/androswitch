@@ -25526,7 +25526,8 @@ const P49_BIOMETRIC_RESULT: &str =
 const P49_BIOMETRIC_CALLBACK: &str =
     "Landroid/hardware/biometrics/BiometricPrompt$AuthenticationCallback;";
 const P49_PROMPT_INFO: &str = "Landroid/hardware/biometrics/PromptInfo;";
-const P49_BIOMETRIC_IDENTIFIER: &str = "Landroid/hardware/biometrics/BiometricAuthenticator$Identifier;";
+const P49_BIOMETRIC_IDENTIFIER: &str =
+    "Landroid/hardware/biometrics/BiometricAuthenticator$Identifier;";
 
 const P49_HDMI_MANAGER: &str = "Landroid/hardware/hdmi/HdmiControlManager;";
 const P49_HDMI_DEVICE_INFO: &str = "Landroid/hardware/hdmi/HdmiDeviceInfo;";
@@ -25657,53 +25658,12 @@ fn p49_empty_list(vm: &mut Engine) -> Result<Value, VmExit> {
     p49_list_value(vm, Vec::new())
 }
 
-fn p49_set_value(vm: &mut Engine, elems: Vec<Value>) -> Result<Value, VmExit> {
-    Ok(Value::Obj(new_collection(vm, "Ljava/util/HashSet;", elems)?))
-}
-
 fn p49_alloc_value(
     vm: &mut Engine,
     class: &str,
     fields: Vec<(String, Value)>,
 ) -> Result<Value, VmExit> {
     Ok(Value::Obj(alloc_obj(vm, class, fields)?))
-}
-
-fn p49_mark_used(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
-    put(vm, recv, "rd_used", Value::Int(1))
-}
-
-fn p49_clone_bytes_or_empty(vm: &mut Engine, value: &Value) -> Result<Value, VmExit> {
-    if matches!(value, Value::Obj(_)) {
-        p57_clone_array(vm, value, "[B", ElemKind::Int)
-    } else {
-        crate::arrays::new_array(vm, "[B", ElemKind::Int, Vec::new())
-    }
-}
-
-fn p49_clone_bytes_or_null(vm: &mut Engine, value: &Value) -> Result<Value, VmExit> {
-    if matches!(value, Value::Obj(_)) {
-        p57_clone_array(vm, value, "[B", ElemKind::Int)
-    } else {
-        Ok(Value::Null)
-    }
-}
-
-fn p49_clone_ints_or_empty(vm: &mut Engine, value: &Value) -> Result<Value, VmExit> {
-    if matches!(value, Value::Obj(_)) {
-        p57_clone_array(vm, value, "[I", ElemKind::Int)
-    } else {
-        new_int_array(vm, &[])
-    }
-}
-
-fn p49_clone_objects_or_empty(
-    vm: &mut Engine,
-    value: &Value,
-    desc: &str,
-) -> Result<Value, VmExit> {
-    let elems = array_elems(vm, Some(value));
-    obj_array(vm, desc, elems)
 }
 
 fn p49_new_byte_array(vm: &mut Engine, bytes: &[u8]) -> Result<Value, VmExit> {
@@ -25750,7 +25710,11 @@ fn p49_value_array_equal(vm: &Engine, a: &Value, b: &Value) -> bool {
     }
     let aa = array_elems(vm, Some(a));
     let bb = array_elems(vm, Some(b));
-    aa.len() == bb.len() && aa.iter().zip(bb.iter()).all(|(x, y)| objects_equal(vm, x, y))
+    aa.len() == bb.len()
+        && aa
+            .iter()
+            .zip(bb.iter())
+            .all(|(x, y)| objects_equal(vm, x, y))
 }
 
 fn p49_other(vm: &Engine, recv: ObjRef, args: &[Value], class: &str) -> Option<ObjRef> {
@@ -25816,7 +25780,9 @@ fn p49_crypto_instance(
         ("getSignature", "()Ljava/security/Signature;") => {
             p49_crypto_get(vm, recv, "Ljava/security/Signature;")
         }
-        ("getCipher", "()Ljavax/crypto/Cipher;") => p49_crypto_get(vm, recv, "Ljavax/crypto/Cipher;"),
+        ("getCipher", "()Ljavax/crypto/Cipher;") => {
+            p49_crypto_get(vm, recv, "Ljavax/crypto/Cipher;")
+        }
         ("getMac", "()Ljavax/crypto/Mac;") => p49_crypto_get(vm, recv, "Ljavax/crypto/Mac;"),
         ("getIdentityCredential", "()Landroid/security/identity/IdentityCredential;") => {
             p49_crypto_get(vm, recv, "Landroid/security/identity/IdentityCredential;")
@@ -25828,12 +25794,15 @@ fn p49_crypto_instance(
             let value = get(vm, recv, "mCrypto");
             let op_id = match value {
                 Value::Obj(r)
-                    if af_is_subtype(vm, &Value::Obj(r), "Landroid/security/identity/IdentityCredential;")
-                        || af_is_subtype(
-                            vm,
-                            &Value::Obj(r),
-                            "Landroid/security/identity/PresentationSession;",
-                        ) =>
+                    if af_is_subtype(
+                        vm,
+                        &Value::Obj(r),
+                        "Landroid/security/identity/IdentityCredential;",
+                    ) || af_is_subtype(
+                        vm,
+                        &Value::Obj(r),
+                        "Landroid/security/identity/PresentationSession;",
+                    ) =>
                 {
                     match get(vm, r, "rd_credstore_operation_handle") {
                         Value::Long(v) => v,
@@ -26115,11 +26084,21 @@ fn p49_prompt_info_instance(
             Value::Null
         }
         ("setConfirmationRequested", "(Z)V") => {
-            put(vm, recv, "mConfirmationRequested", Value::Int(iarg(args, 0)))?;
+            put(
+                vm,
+                recv,
+                "mConfirmationRequested",
+                Value::Int(iarg(args, 0)),
+            )?;
             Value::Null
         }
         ("setDeviceCredentialAllowed", "(Z)V") => {
-            put(vm, recv, "mDeviceCredentialAllowed", Value::Int(iarg(args, 0)))?;
+            put(
+                vm,
+                recv,
+                "mDeviceCredentialAllowed",
+                Value::Int(iarg(args, 0)),
+            )?;
             Value::Null
         }
         ("setAuthenticators", "(I)V") => {
@@ -26157,11 +26136,17 @@ fn p49_prompt_info_instance(
             Value::Null
         }
         ("setIgnoreEnrollmentState", "(Z)V") => {
-            put(vm, recv, "mIgnoreEnrollmentState", Value::Int(iarg(args, 0)))?;
+            put(
+                vm,
+                recv,
+                "mIgnoreEnrollmentState",
+                Value::Int(iarg(args, 0)),
+            )?;
             Value::Null
         }
         ("setIsForLegacyFingerprintManager", "(I)V") => {
-            let boxed = crate::boxes::box_value(vm, "Ljava/lang/Integer;", Value::Int(iarg(args, 0)))?;
+            let boxed =
+                crate::boxes::box_value(vm, "Ljava/lang/Integer;", Value::Int(iarg(args, 0)))?;
             let ids = p49_list_value(vm, vec![Value::Obj(boxed)])?;
             put(vm, recv, "mAllowedSensorIds", ids)?;
             put(vm, recv, "mIsForLegacyFingerprintManager", Value::Int(1))?;
@@ -26199,7 +26184,9 @@ fn p49_prompt_info_instance(
         ("isDisallowBiometricsIfPolicyExists", "()Z") => {
             bool_value(field_bool(vm, recv, "mDisallowBiometricsIfPolicyExists"))
         }
-        ("isReceiveSystemEvents", "()Z") => bool_value(field_bool(vm, recv, "mReceiveSystemEvents")),
+        ("isReceiveSystemEvents", "()Z") => {
+            bool_value(field_bool(vm, recv, "mReceiveSystemEvents"))
+        }
         ("getAllowedSensorIds", "()Ljava/util/List;") => match get(vm, recv, "mAllowedSensorIds") {
             Value::Obj(_) => get(vm, recv, "mAllowedSensorIds"),
             _ => p49_empty_list(vm)?,
@@ -26420,7 +26407,10 @@ fn p49_biometric_prompt_instance(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    if matches!(name, "authenticate" | "authenticateUser" | "authenticateForOperation") {
+    if matches!(
+        name,
+        "authenticate" | "authenticateUser" | "authenticateForOperation"
+    ) {
         // The null checks and crypto-strength check below are AOSP's.  The
         // subsequent `mService.authenticate(...)` is not reached in this
         // registered profile because Builder.build() found no AUTH_SERVICE;
@@ -26503,10 +26493,12 @@ fn p49_biometric_prompt_instance(
         ("getNegativeButtonText", "()Ljava/lang/CharSequence;") => {
             get(vm, info, "mNegativeButtonText")
         }
-        ("isConfirmationRequired", "()Z") => bool_value(match get(vm, info, "mConfirmationRequested") {
-            Value::Int(v) => v != 0,
-            _ => true,
-        }),
+        ("isConfirmationRequired", "()Z") => {
+            bool_value(match get(vm, info, "mConfirmationRequested") {
+                Value::Int(v) => v != 0,
+                _ => true,
+            })
+        }
         ("getAllowedAuthenticators", "()I") => Value::Int(field_int(vm, info, "mAuthenticators")),
         ("getAllowedSensorIds", "()Ljava/util/List;") => match get(vm, info, "mAllowedSensorIds") {
             Value::Obj(_) => get(vm, info, "mAllowedSensorIds"),
@@ -26536,19 +26528,15 @@ fn p49_biometric_instance(
         }
         P49_BIOMETRIC_IDENTIFIER => p49_biometric_identifier_instance(vm, name, sig, recv, args),
         P49_BIOMETRIC_RESULT => Ok(Some(match (name, sig) {
-            (
-                "<init>",
-                "(Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;I)V",
-            ) => {
+            ("<init>", "(Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;I)V") => {
                 let crypto = args.first().cloned().unwrap_or(Value::Null);
                 put(vm, recv, "mCryptoObject", crypto)?;
                 put(vm, recv, "mAuthenticationType", Value::Int(iarg(args, 1)))?;
                 Value::Null
             }
-            (
-                "getCryptoObject",
-                "()Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;",
-            ) => get(vm, recv, "mCryptoObject"),
+            ("getCryptoObject", "()Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;") => {
+                get(vm, recv, "mCryptoObject")
+            }
             ("getAuthenticationResultType", "()I") => {
                 Value::Int(field_int(vm, recv, "mAuthenticationType"))
             }
@@ -26606,14 +26594,19 @@ fn p49_biometric_instance(
             _ => Ok(None),
         },
         P49_BIOMETRIC_MANAGER => Ok(Some(match (name, sig) {
-            ("<init>", "(Landroid/content/Context;Landroid/hardware/biometrics/IAuthService;)V") => {
+            (
+                "<init>",
+                "(Landroid/content/Context;Landroid/hardware/biometrics/IAuthService;)V",
+            ) => {
                 let context = args.first().cloned().unwrap_or(Value::Null);
                 let service = args.get(1).cloned().unwrap_or(Value::Null);
                 put(vm, recv, "mContext", context)?;
                 put(vm, recv, "mService", service)?;
                 Value::Null
             }
-            ("canAuthenticate", "()I") | ("canAuthenticate", "(I)I") | ("canAuthenticate", "(II)I") => {
+            ("canAuthenticate", "()I")
+            | ("canAuthenticate", "(I)I")
+            | ("canAuthenticate", "(II)I") => {
                 Value::Int(1) // BIOMETRIC_ERROR_HW_UNAVAILABLE with no service.
             }
             ("getSensorProperties", "()Ljava/util/List;") => {
@@ -26760,9 +26753,13 @@ fn p49_device_features_instance(
         ("getRecordTvScreenSupport", "()I") => {
             Value::Int(field_int(vm, recv, "mRecordTvScreenSupport"))
         }
-        ("getSetOsdStringSupport", "()I") => Value::Int(field_int(vm, recv, "mSetOsdStringSupport")),
+        ("getSetOsdStringSupport", "()I") => {
+            Value::Int(field_int(vm, recv, "mSetOsdStringSupport"))
+        }
         ("getDeckControlSupport", "()I") => Value::Int(field_int(vm, recv, "mDeckControlSupport")),
-        ("getSetAudioRateSupport", "()I") => Value::Int(field_int(vm, recv, "mSetAudioRateSupport")),
+        ("getSetAudioRateSupport", "()I") => {
+            Value::Int(field_int(vm, recv, "mSetAudioRateSupport"))
+        }
         ("getArcTxSupport", "()I") => Value::Int(field_int(vm, recv, "mArcTxSupport")),
         ("getArcRxSupport", "()I") => Value::Int(field_int(vm, recv, "mArcRxSupport")),
         ("getSetAudioVolumeLevelSupport", "()I") => {
@@ -26853,29 +26850,6 @@ fn p49_hdmi_builder_defaults(vm: &mut Engine, recv: ObjRef, kind: i32) -> Result
     put(vm, recv, "mDeviceId", Value::Int(-1))?;
     put(vm, recv, "mAdopterId", Value::Int(-1))?;
     Ok(())
-}
-
-fn p49_hdmi_make_device(
-    vm: &mut Engine,
-    kind: i32,
-    physical_address: i32,
-    port_id: i32,
-    vendor_id: i32,
-    display_name: &str,
-    device_id: i32,
-    adopter_id: i32,
-) -> Result<Value, VmExit> {
-    let r = alloc_obj(vm, P49_HDMI_DEVICE_INFO, Vec::new())?;
-    p49_hdmi_builder_defaults(vm, r, kind)?;
-    put(vm, r, "mPhysicalAddress", Value::Int(physical_address))?;
-    put(vm, r, "mPortId", Value::Int(port_id))?;
-    put(vm, r, "mVendorId", Value::Int(vendor_id))?;
-    let name = jstr(vm, display_name)?;
-    put(vm, r, "mDisplayName", name)?;
-    put(vm, r, "mDeviceId", Value::Int(device_id))?;
-    put(vm, r, "mAdopterId", Value::Int(adopter_id))?;
-    p49_hdmi_device_finish(vm, r)?;
-    Ok(Value::Obj(r))
 }
 
 const P49_HDMI_INFO_FIELDS: [&str; 12] = [
@@ -27124,12 +27098,8 @@ fn p49_hdmi_device_info_instance(
             );
             if kind == 0 {
                 if let Some(features) = field_obj(vm, recv, "mDeviceFeatures") {
-                    let features_text = vm.invoke_instance(
-                        features,
-                        "toString",
-                        "()Ljava/lang/String;",
-                        &[],
-                    )?;
+                    let features_text =
+                        vm.invoke_instance(features, "toString", "()Ljava/lang/String;", &[])?;
                     text.push_str("\n  ");
                     text.push_str(&opt_str(vm, Some(&features_text)).unwrap_or_default());
                 }
@@ -27163,7 +27133,7 @@ fn p49_hdmi_port_instance(
             ("<init>", "(III)V") => {
                 let ty = iarg(args, 1);
                 if ty != 0 && ty != 1 {
-                    return Err(iae(format!("type should be 0 or 1.")));
+                    return Err(iae("type should be 0 or 1."));
                 }
                 if iarg(args, 2) < 0 {
                     return Err(iae("address should be positive."));
@@ -27171,7 +27141,12 @@ fn p49_hdmi_port_instance(
                 put(vm, recv, "mId", Value::Int(iarg(args, 0)))?;
                 put(vm, recv, "mType", Value::Int(ty))?;
                 put(vm, recv, "mAddress", Value::Int(iarg(args, 2)))?;
-                for field in ["mCecSupported", "mArcSupported", "mEarcSupported", "mMhlSupported"] {
+                for field in [
+                    "mCecSupported",
+                    "mArcSupported",
+                    "mEarcSupported",
+                    "mMhlSupported",
+                ] {
                     put(vm, recv, field, Value::Int(0))?;
                 }
                 Value::Null
@@ -27252,7 +27227,11 @@ fn p49_hdmi_port_instance(
             format!(
                 "port_id: {}, type: {}, address: 0x{:04x}, cec: {}, arc: {}, mhl: {}, earc: {}",
                 field_int(vm, recv, "mId"),
-                if field_int(vm, recv, "mType") == 0 { "HDMI_IN" } else { "HDMI_OUT" },
+                if field_int(vm, recv, "mType") == 0 {
+                    "HDMI_IN"
+                } else {
+                    "HDMI_OUT"
+                },
                 field_int(vm, recv, "mAddress"),
                 field_bool(vm, recv, "mCecSupported"),
                 field_bool(vm, recv, "mArcSupported"),
@@ -27321,15 +27300,11 @@ fn p49_hdmi_manager_instance(
         ("isDeviceConnected", "(Landroid/hardware/hdmi/HdmiDeviceInfo;)Z")
         | ("isRemoteDeviceConnected", "(Landroid/hardware/hdmi/HdmiDeviceInfo;)Z") => {
             let target = req_obj(args, 0, "targetDevice")?;
-            let target_address = match vm.invoke_instance(
-                target,
-                "getPhysicalAddress",
-                "()I",
-                &[],
-            )? {
-                Value::Int(v) => v,
-                _ => field_int(vm, target, "mPhysicalAddress"),
-            };
+            let target_address =
+                match vm.invoke_instance(target, "getPhysicalAddress", "()I", &[])? {
+                    Value::Int(v) => v,
+                    _ => field_int(vm, target, "mPhysicalAddress"),
+                };
             bool_value(
                 local_address != 0xffff
                     && target_address != 0xffff
@@ -27392,7 +27367,12 @@ fn p49_input_identifier(vm: &mut Engine, device: ObjRef) -> Result<Value, VmExit
         return Ok(Value::Obj(existing));
     }
     let identifier = alloc_obj(vm, P49_INPUT_DEVICE_IDENTIFIER, Vec::new())?;
-    put(vm, identifier, "mDescriptor", get(vm, device, "mDescriptor"))?;
+    put(
+        vm,
+        identifier,
+        "mDescriptor",
+        get(vm, device, "mDescriptor"),
+    )?;
     put(
         vm,
         identifier,
@@ -27467,6 +27447,7 @@ fn p49_input_device_defaults(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn p49_motion_range_value(
     vm: &mut Engine,
     axis: i32,
@@ -27576,7 +27557,10 @@ fn p49_input_device_instance2(
                 put(vm, recv, "mHasBattery", Value::Int(iarg(args, 0)))?;
                 Value::Obj(recv)
             }
-            ("setKeyboardLanguageTag", "(Ljava/lang/String;)Landroid/view/InputDevice$Builder;") => {
+            (
+                "setKeyboardLanguageTag",
+                "(Ljava/lang/String;)Landroid/view/InputDevice$Builder;",
+            ) => {
                 let v = args.first().cloned().unwrap_or(Value::Null);
                 put(vm, recv, "mKeyboardLanguageTag", v)?;
                 Value::Obj(recv)
@@ -27680,7 +27664,8 @@ fn p49_input_device_instance2(
             ("equals", "(Ljava/lang/Object;)Z") => {
                 let equal = p49_other(vm, recv, args, P49_HOST_USI_VERSION)
                     .map(|other| {
-                        field_int(vm, recv, "mMajorVersion") == field_int(vm, other, "mMajorVersion")
+                        field_int(vm, recv, "mMajorVersion")
+                            == field_int(vm, other, "mMajorVersion")
                             && field_int(vm, recv, "mMinorVersion")
                                 == field_int(vm, other, "mMinorVersion")
                     })
@@ -28030,7 +28015,8 @@ fn p49_value_equal(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, VmExit
     }
     match (a, b) {
         (Value::Obj(x), Value::Obj(y)) => {
-            let result = vm.invoke_instance(*x, "equals", "(Ljava/lang/Object;)Z", &[Value::Obj(*y)])?;
+            let result =
+                vm.invoke_instance(*x, "equals", "(Ljava/lang/Object;)Z", &[Value::Obj(*y)])?;
             Ok(result.as_int().unwrap_or(0) != 0)
         }
         _ => Ok(a == b),
@@ -28059,7 +28045,9 @@ fn p49_array_hash_deep(vm: &mut Engine, value: &Value) -> i32 {
     }
     let mut result: i32 = 1;
     for elem in array_elems(vm, Some(value)) {
-        result = result.wrapping_mul(31).wrapping_add(p49_value_hash(vm, &elem));
+        result = result
+            .wrapping_mul(31)
+            .wrapping_add(p49_value_hash(vm, &elem));
     }
     result
 }
@@ -28142,24 +28130,36 @@ fn p49_sound_model_hash(vm: &mut Engine, recv: ObjRef) -> i32 {
     let uuid = get(vm, recv, "mUuid");
     let vendor = get(vm, recv, "mVendorUuid");
     let mut result: i32 = 1;
-    result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "mVersion"));
-    result = result.wrapping_mul(31).wrapping_add(p49_array_hash(vm, &data));
-    result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "mType"));
-    result = result.wrapping_mul(31).wrapping_add(p49_value_hash(vm, &uuid));
-    result = result.wrapping_mul(31).wrapping_add(p49_value_hash(vm, &vendor));
+    result = result
+        .wrapping_mul(31)
+        .wrapping_add(field_int(vm, recv, "mVersion"));
+    result = result
+        .wrapping_mul(31)
+        .wrapping_add(p49_array_hash(vm, &data));
+    result = result
+        .wrapping_mul(31)
+        .wrapping_add(field_int(vm, recv, "mType"));
+    result = result
+        .wrapping_mul(31)
+        .wrapping_add(p49_value_hash(vm, &uuid));
+    result = result
+        .wrapping_mul(31)
+        .wrapping_add(p49_value_hash(vm, &vendor));
     result
 }
 
 fn p49_sound_model_equal(vm: &mut Engine, recv: ObjRef, other: ObjRef) -> Result<bool, VmExit> {
-    Ok(field_int(vm, recv, "mType") == field_int(vm, other, "mType")
-        && p49_value_equal(vm, &get(vm, recv, "mUuid"), &get(vm, other, "mUuid"))?
-        && p49_value_equal(
-            vm,
-            &get(vm, recv, "mVendorUuid"),
-            &get(vm, other, "mVendorUuid"),
-        )?
-        && p49_value_array_equal(vm, &get(vm, recv, "mData"), &get(vm, other, "mData"))
-        && field_int(vm, recv, "mVersion") == field_int(vm, other, "mVersion"))
+    Ok(
+        field_int(vm, recv, "mType") == field_int(vm, other, "mType")
+            && p49_value_equal(vm, &get(vm, recv, "mUuid"), &get(vm, other, "mUuid"))?
+            && p49_value_equal(
+                vm,
+                &get(vm, recv, "mVendorUuid"),
+                &get(vm, other, "mVendorUuid"),
+            )?
+            && p49_value_array_equal(vm, &get(vm, recv, "mData"), &get(vm, other, "mData"))
+            && field_int(vm, recv, "mVersion") == field_int(vm, other, "mVersion"),
+    )
 }
 
 fn p49_sound_model_common(
@@ -28213,52 +28213,50 @@ fn p49_sound_trigger_instance(
             }
             p49_sound_model_common(vm, name, sig, recv, args)
         }
-        P49_GENERIC_SOUND_MODEL => {
-            match (name, sig) {
-                ("<init>", "(Ljava/util/UUID;Ljava/util/UUID;[BI)V") => {
-                    p49_sound_model_init(
-                        vm,
-                        recv,
-                        &args.first().cloned().unwrap_or(Value::Null),
-                        &args.get(1).cloned().unwrap_or(Value::Null),
-                        1,
-                        &args.get(2).cloned().unwrap_or(Value::Null),
-                        iarg(args, 3),
-                    )?;
-                    Ok(Some(Value::Null))
-                }
-                ("<init>", "(Ljava/util/UUID;Ljava/util/UUID;[B)V") => {
-                    p49_sound_model_init(
-                        vm,
-                        recv,
-                        &args.first().cloned().unwrap_or(Value::Null),
-                        &args.get(1).cloned().unwrap_or(Value::Null),
-                        1,
-                        &args.get(2).cloned().unwrap_or(Value::Null),
-                        -1,
-                    )?;
-                    Ok(Some(Value::Null))
-                }
-                ("describeContents", "()I") => Ok(Some(Value::Int(0))),
-                ("toString", "()Ljava/lang/String;") => {
-                    let uuid = value_string(vm, &get(vm, recv, "mUuid"))?;
-                    let vendor = value_string(vm, &get(vm, recv, "mVendorUuid"))?;
-                    let data_len = array_elems(vm, Some(&get(vm, recv, "mData"))).len();
-                    Ok(Some(jstr(
-                        vm,
-                        format!(
-                            "GenericSoundModel [uuid={}, vendorUuid={}, type={}, data={}, version={}]",
-                            uuid,
-                            vendor,
-                            field_int(vm, recv, "mType"),
-                            data_len,
-                            field_int(vm, recv, "mVersion")
-                        ),
-                    )?))
-                }
-                _ => p49_sound_model_common(vm, name, sig, recv, args),
+        P49_GENERIC_SOUND_MODEL => match (name, sig) {
+            ("<init>", "(Ljava/util/UUID;Ljava/util/UUID;[BI)V") => {
+                p49_sound_model_init(
+                    vm,
+                    recv,
+                    &args.first().cloned().unwrap_or(Value::Null),
+                    &args.get(1).cloned().unwrap_or(Value::Null),
+                    1,
+                    &args.get(2).cloned().unwrap_or(Value::Null),
+                    iarg(args, 3),
+                )?;
+                Ok(Some(Value::Null))
             }
-        }
+            ("<init>", "(Ljava/util/UUID;Ljava/util/UUID;[B)V") => {
+                p49_sound_model_init(
+                    vm,
+                    recv,
+                    &args.first().cloned().unwrap_or(Value::Null),
+                    &args.get(1).cloned().unwrap_or(Value::Null),
+                    1,
+                    &args.get(2).cloned().unwrap_or(Value::Null),
+                    -1,
+                )?;
+                Ok(Some(Value::Null))
+            }
+            ("describeContents", "()I") => Ok(Some(Value::Int(0))),
+            ("toString", "()Ljava/lang/String;") => {
+                let uuid = value_string(vm, &get(vm, recv, "mUuid"))?;
+                let vendor = value_string(vm, &get(vm, recv, "mVendorUuid"))?;
+                let data_len = array_elems(vm, Some(&get(vm, recv, "mData"))).len();
+                Ok(Some(jstr(
+                    vm,
+                    format!(
+                        "GenericSoundModel [uuid={}, vendorUuid={}, type={}, data={}, version={}]",
+                        uuid,
+                        vendor,
+                        field_int(vm, recv, "mType"),
+                        data_len,
+                        field_int(vm, recv, "mVersion")
+                    ),
+                )?))
+            }
+            _ => p49_sound_model_common(vm, name, sig, recv, args),
+        },
         P49_KEYPHRASE_SOUND_MODEL => {
             const KEYPHRASES_DESC: &str = "[Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;";
             match (name, sig) {
@@ -28361,11 +28359,8 @@ fn p49_sound_trigger_instance(
             ("<init>", "(IILjava/util/Locale;Ljava/lang/String;[I)V") => {
                 let locale = req_obj(args, 2, "locale")?;
                 let text = req_obj(args, 3, "text")?;
-                let users = p49_array_or_empty(
-                    vm,
-                    &args.get(4).cloned().unwrap_or(Value::Null),
-                    "[I",
-                )?;
+                let users =
+                    p49_array_or_empty(vm, &args.get(4).cloned().unwrap_or(Value::Null), "[I")?;
                 put(vm, recv, "mId", Value::Int(iarg(args, 0)))?;
                 put(vm, recv, "mRecognitionModes", Value::Int(iarg(args, 1)))?;
                 put(vm, recv, "mLocale", Value::Obj(locale))?;
@@ -28385,12 +28380,19 @@ fn p49_sound_trigger_instance(
                 let users = get(vm, recv, "mUsers");
                 let mut result: i32 = 1;
                 result = result.wrapping_mul(31).wrapping_add(host_hash(vm, &text));
-                result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "mId"));
-                result = result.wrapping_mul(31).wrapping_add(p49_value_hash(vm, &locale));
                 result = result
                     .wrapping_mul(31)
-                    .wrapping_add(field_int(vm, recv, "mRecognitionModes"));
-                result = result.wrapping_mul(31).wrapping_add(p49_array_hash(vm, &users));
+                    .wrapping_add(field_int(vm, recv, "mId"));
+                result = result
+                    .wrapping_mul(31)
+                    .wrapping_add(p49_value_hash(vm, &locale));
+                result =
+                    result
+                        .wrapping_mul(31)
+                        .wrapping_add(field_int(vm, recv, "mRecognitionModes"));
+                result = result
+                    .wrapping_mul(31)
+                    .wrapping_add(p49_array_hash(vm, &users));
                 Value::Int(result)
             }
             ("equals", "(Ljava/lang/Object;)Z") => {
@@ -28492,11 +28494,8 @@ fn p49_sound_trigger_instance(
                     &args.get(2).cloned().unwrap_or(Value::Null),
                     "[Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseRecognitionExtra;",
                 )?;
-                let data = p49_array_or_empty(
-                    vm,
-                    &args.get(3).cloned().unwrap_or(Value::Null),
-                    "[B",
-                )?;
+                let data =
+                    p49_array_or_empty(vm, &args.get(3).cloned().unwrap_or(Value::Null), "[B")?;
                 put(vm, recv, "captureRequested", Value::Int(iarg(args, 0)))?;
                 put(vm, recv, "allowMultipleTriggers", Value::Int(iarg(args, 1)))?;
                 put(vm, recv, "keyphrases", keyphrases)?;
@@ -28505,7 +28504,11 @@ fn p49_sound_trigger_instance(
                     vm,
                     recv,
                     "audioCapabilities",
-                    Value::Int(if sig.ends_with("I)V") { iarg(args, 4) } else { 0 }),
+                    Value::Int(if sig.ends_with("I)V") {
+                        iarg(args, 4)
+                    } else {
+                        0
+                    }),
                 )?;
                 Value::Null
             }
@@ -28538,11 +28541,19 @@ fn p49_sound_trigger_instance(
             }
             ("hashCode", "()I") => {
                 let mut result: i32 = 1;
-                result = result
-                    .wrapping_mul(31)
-                    .wrapping_add(if field_bool(vm, recv, "captureRequested") { 1 } else { 0 });
                 result = result.wrapping_mul(31).wrapping_add(
-                    if field_bool(vm, recv, "allowMultipleTriggers") { 1 } else { 0 },
+                    if field_bool(vm, recv, "captureRequested") {
+                        1
+                    } else {
+                        0
+                    },
+                );
+                result = result.wrapping_mul(31).wrapping_add(
+                    if field_bool(vm, recv, "allowMultipleTriggers") {
+                        1
+                    } else {
+                        0
+                    },
                 );
                 result = result
                     .wrapping_mul(31)
@@ -28550,9 +28561,10 @@ fn p49_sound_trigger_instance(
                 result = result
                     .wrapping_mul(31)
                     .wrapping_add(p49_array_hash(vm, &get(vm, recv, "data")));
-                result = result
-                    .wrapping_mul(31)
-                    .wrapping_add(field_int(vm, recv, "audioCapabilities"));
+                result =
+                    result
+                        .wrapping_mul(31)
+                        .wrapping_add(field_int(vm, recv, "audioCapabilities"));
                 Value::Int(result)
             }
             ("toString", "()Ljava/lang/String;") => {
@@ -28617,10 +28629,7 @@ fn p49_sound_trigger_instance(
                 put(vm, recv, "confidenceLevels", levels)?;
                 Value::Null
             }
-            (
-                "<init>",
-                "(III[Landroid/hardware/soundtrigger/SoundTrigger$ConfidenceLevel;)V",
-            ) => {
+            ("<init>", "(III[Landroid/hardware/soundtrigger/SoundTrigger$ConfidenceLevel;)V") => {
                 let levels = p49_array_or_empty(
                     vm,
                     &args.get(3).cloned().unwrap_or(Value::Null),
@@ -28647,26 +28656,32 @@ fn p49_sound_trigger_instance(
                 result = result
                     .wrapping_mul(31)
                     .wrapping_add(p49_array_hash_deep(vm, &get(vm, recv, "confidenceLevels")));
-                result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "id"));
                 result = result
                     .wrapping_mul(31)
-                    .wrapping_add(field_int(vm, recv, "recognitionModes"));
-                result = result
-                    .wrapping_mul(31)
-                    .wrapping_add(field_int(vm, recv, "coarseConfidenceLevel"));
+                    .wrapping_add(field_int(vm, recv, "id"));
+                result =
+                    result
+                        .wrapping_mul(31)
+                        .wrapping_add(field_int(vm, recv, "recognitionModes"));
+                result = result.wrapping_mul(31).wrapping_add(field_int(
+                    vm,
+                    recv,
+                    "coarseConfidenceLevel",
+                ));
                 Value::Int(result)
             }
             ("equals", "(Ljava/lang/Object;)Z") => {
                 if matches!(args.first(), Some(Value::Obj(r)) if *r == recv) {
                     bool_value(true)
-                } else if let Some(other) = p49_other_exact(vm, args, P49_KEYPHRASE_RECOGNITION_EXTRA) {
+                } else if let Some(other) =
+                    p49_other_exact(vm, args, P49_KEYPHRASE_RECOGNITION_EXTRA)
+                {
                     bool_value(
                         p49_value_array_equal_deep(
                             vm,
                             &get(vm, recv, "confidenceLevels"),
                             &get(vm, other, "confidenceLevels"),
-                        )?
-                            && field_int(vm, recv, "id") == field_int(vm, other, "id")
+                        )? && field_int(vm, recv, "id") == field_int(vm, other, "id")
                             && field_int(vm, recv, "recognitionModes")
                                 == field_int(vm, other, "recognitionModes")
                             && field_int(vm, recv, "coarseConfidenceLevel")
@@ -28764,7 +28779,8 @@ fn p49_sound_trigger_instance(
                     }
                     bool_value(
                         field_int(vm, recv, "mId") == field_int(vm, other, "mId")
-                            && field_str(vm, recv, "mKeyphrase") == field_str(vm, other, "mKeyphrase")
+                            && field_str(vm, recv, "mKeyphrase")
+                                == field_str(vm, other, "mKeyphrase")
                             && sets_equal
                             && field_int(vm, recv, "mRecognitionModeFlags")
                                 == field_int(vm, other, "mRecognitionModeFlags"),
@@ -28780,14 +28796,18 @@ fn p49_sound_trigger_instance(
                     locale_hash = locale_hash.wrapping_add(p49_value_hash(vm, locale));
                 }
                 let mut result: i32 = 1;
-                result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "mId"));
+                result = result
+                    .wrapping_mul(31)
+                    .wrapping_add(field_int(vm, recv, "mId"));
                 result = result
                     .wrapping_mul(31)
                     .wrapping_add(host_hash(vm, &get(vm, recv, "mKeyphrase")));
                 result = result.wrapping_mul(31).wrapping_add(locale_hash);
-                result = result
-                    .wrapping_mul(31)
-                    .wrapping_add(field_int(vm, recv, "mRecognitionModeFlags"));
+                result = result.wrapping_mul(31).wrapping_add(field_int(
+                    vm,
+                    recv,
+                    "mRecognitionModeFlags",
+                ));
                 Value::Int(result)
             }
             ("toString", "()Ljava/lang/String;") => {
@@ -29233,7 +29253,9 @@ fn p49_tv_rating_value(
         obj_array(vm, "[Ljava/lang/String;", values)?
     };
     let base = p49_objects_hash(vm, &[domain_value.clone(), rating_value.clone()]);
-    let hash = base.wrapping_mul(31).wrapping_add(p49_array_hash(vm, &subs_value));
+    let hash = base
+        .wrapping_mul(31)
+        .wrapping_add(p49_array_hash(vm, &subs_value));
     p49_alloc_value(
         vm,
         P49_TV_RATING,
@@ -29318,7 +29340,12 @@ const P49_TV_TRACK_FIELDS: [&str; 17] = [
     "mExtra",
 ];
 
-fn p49_tv_track_defaults(vm: &mut Engine, recv: ObjRef, kind: i32, id: Value) -> Result<(), VmExit> {
+fn p49_tv_track_defaults(
+    vm: &mut Engine,
+    recv: ObjRef,
+    kind: i32,
+    id: Value,
+) -> Result<(), VmExit> {
     put(vm, recv, "mType", Value::Int(kind))?;
     put(vm, recv, "mId", id)?;
     put(vm, recv, "mLanguage", Value::Null)?;
@@ -29402,10 +29429,7 @@ fn p49_tv_instance(
                 let _ = p49_req_obj_arg(args, 0)?;
                 Value::Int(2) // INPUT_STATE_DISCONNECTED for an unknown ID.
             }
-            (
-                "getAvailableExtensionInterfaceNames",
-                "(Ljava/lang/String;)Ljava/util/List;",
-            ) => {
+            ("getAvailableExtensionInterfaceNames", "(Ljava/lang/String;)Ljava/util/List;") => {
                 let _ = p49_req_obj_arg(args, 0)?;
                 p49_empty_list(vm)?
             }
@@ -29429,10 +29453,7 @@ fn p49_tv_instance(
                 put(vm, recv, "rd_callbacks", stored)?;
                 Value::Null
             }
-            (
-                "unregisterCallback",
-                "(Landroid/media/tv/TvInputManager$TvInputCallback;)V",
-            ) => {
+            ("unregisterCallback", "(Landroid/media/tv/TvInputManager$TvInputCallback;)V") => {
                 let callback = p49_req_obj_arg(args, 0)?;
                 let mut callbacks = collection_items(vm, Some(&get(vm, recv, "rd_callbacks")));
                 if let Some(pos) = callbacks
@@ -29459,13 +29480,11 @@ fn p49_tv_instance(
             }
             ("isRatingBlocked", "(Landroid/media/tv/TvContentRating;)Z") => {
                 let rating = p49_req_obj_arg(args, 0)?;
-                let blocked_strings: Vec<String> = collection_items(
-                    vm,
-                    Some(&get(vm, recv, "rd_blocked_rating_strings")),
-                )
-                .iter()
-                .filter_map(|v| opt_str(vm, Some(v)))
-                .collect();
+                let blocked_strings: Vec<String> =
+                    collection_items(vm, Some(&get(vm, recv, "rd_blocked_rating_strings")))
+                        .iter()
+                        .filter_map(|v| opt_str(vm, Some(v)))
+                        .collect();
                 let mut blocked = false;
                 for blocked_text in blocked_strings {
                     let blocked_rating = p49_tv_rating_unflatten(vm, &blocked_text)?;
@@ -29483,13 +29502,11 @@ fn p49_tv_instance(
                 bool_value(blocked)
             }
             ("getBlockedRatings", "()Ljava/util/List;") => {
-                let blocked_strings: Vec<String> = collection_items(
-                    vm,
-                    Some(&get(vm, recv, "rd_blocked_rating_strings")),
-                )
-                .iter()
-                .filter_map(|v| opt_str(vm, Some(v)))
-                .collect();
+                let blocked_strings: Vec<String> =
+                    collection_items(vm, Some(&get(vm, recv, "rd_blocked_rating_strings")))
+                        .iter()
+                        .filter_map(|v| opt_str(vm, Some(v)))
+                        .collect();
                 let mut ratings = Vec::new();
                 for text in blocked_strings {
                     ratings.push(p49_tv_rating_unflatten(vm, &text)?);
@@ -29498,22 +29515,16 @@ fn p49_tv_instance(
             }
             ("addBlockedRating", "(Landroid/media/tv/TvContentRating;)V") => {
                 let rating = p49_req_obj_arg(args, 0)?;
-                let flattened = vm.invoke_instance(
-                    rating,
-                    "flattenToString",
-                    "()Ljava/lang/String;",
-                    &[],
-                )?;
+                let flattened =
+                    vm.invoke_instance(rating, "flattenToString", "()Ljava/lang/String;", &[])?;
                 let Some(text) = opt_str(vm, Some(&flattened)) else {
                     return Ok(None);
                 };
-                let mut strings: Vec<String> = collection_items(
-                    vm,
-                    Some(&get(vm, recv, "rd_blocked_rating_strings")),
-                )
-                .iter()
-                .filter_map(|v| opt_str(vm, Some(v)))
-                .collect();
+                let mut strings: Vec<String> =
+                    collection_items(vm, Some(&get(vm, recv, "rd_blocked_rating_strings")))
+                        .iter()
+                        .filter_map(|v| opt_str(vm, Some(v)))
+                        .collect();
                 if !strings.iter().any(|s| s == &text) {
                     strings.push(text);
                     let mut values = Vec::new();
@@ -29527,23 +29538,17 @@ fn p49_tv_instance(
             }
             ("removeBlockedRating", "(Landroid/media/tv/TvContentRating;)V") => {
                 let rating = p49_req_obj_arg(args, 0)?;
-                let flattened = vm.invoke_instance(
-                    rating,
-                    "flattenToString",
-                    "()Ljava/lang/String;",
-                    &[],
-                )?;
+                let flattened =
+                    vm.invoke_instance(rating, "flattenToString", "()Ljava/lang/String;", &[])?;
                 let Some(text) = opt_str(vm, Some(&flattened)) else {
                     return Ok(None);
                 };
-                let strings: Vec<String> = collection_items(
-                    vm,
-                    Some(&get(vm, recv, "rd_blocked_rating_strings")),
-                )
-                .iter()
-                .filter_map(|v| opt_str(vm, Some(v)))
-                .filter(|s| s != &text)
-                .collect();
+                let strings: Vec<String> =
+                    collection_items(vm, Some(&get(vm, recv, "rd_blocked_rating_strings")))
+                        .iter()
+                        .filter_map(|v| opt_str(vm, Some(v)))
+                        .filter(|s| s != &text)
+                        .collect();
                 let mut values = Vec::new();
                 for s in strings {
                     values.push(jstr(vm, s)?);
@@ -29614,7 +29619,13 @@ fn p49_tv_instance(
                     vm,
                     created_ref,
                     recv,
-                    &["mDomain", "mRatingSystem", "mRating", "mSubRatings", "mHashCode"],
+                    &[
+                        "mDomain",
+                        "mRatingSystem",
+                        "mRating",
+                        "mSubRatings",
+                        "mHashCode",
+                    ],
                 )?;
                 Value::Null
             }
@@ -29634,15 +29645,17 @@ fn p49_tv_instance(
             ("contains", "(Landroid/media/tv/TvContentRating;)Z") => {
                 let other = p49_req_obj_arg(args, 0)?;
                 if field_str(vm, recv, "mDomain") != field_str(vm, other, "mDomain")
-                    || field_str(vm, recv, "mRatingSystem")
-                        != field_str(vm, other, "mRatingSystem")
+                    || field_str(vm, recv, "mRatingSystem") != field_str(vm, other, "mRatingSystem")
                     || field_str(vm, recv, "mRating") != field_str(vm, other, "mRating")
                 {
                     bool_value(false)
                 } else {
                     let mine = get(vm, recv, "mSubRatings");
                     let theirs = get(vm, other, "mSubRatings");
-                    match (matches!(mine, Value::Obj(_)), matches!(theirs, Value::Obj(_))) {
+                    match (
+                        matches!(mine, Value::Obj(_)),
+                        matches!(theirs, Value::Obj(_)),
+                    ) {
                         (false, false) => bool_value(true),
                         (false, true) => bool_value(false),
                         (true, false) => bool_value(true),
@@ -29685,17 +29698,14 @@ fn p49_tv_instance(
             Ok(Some(match (name, sig) {
                 ("<init>", "(ILjava/lang/String;)V") => {
                     let kind = iarg(args, 0);
-                    if !matches!(kind, 0 | 1 | 2) {
+                    if !matches!(kind, 0..=2) {
                         return Err(iae(format!("Unknown type: {kind}")));
                     }
                     let id = p49_req_obj_arg(args, 1)?;
                     p49_tv_track_defaults(vm, recv, kind, Value::Obj(id))?;
                     Value::Null
                 }
-                (
-                    "setLanguage",
-                    "(Ljava/lang/String;)Landroid/media/tv/TvTrackInfo$Builder;",
-                ) => {
+                ("setLanguage", "(Ljava/lang/String;)Landroid/media/tv/TvTrackInfo$Builder;") => {
                     let value = p49_req_obj_arg(args, 0)?;
                     put(vm, recv, "mLanguage", Value::Obj(value))?;
                     Value::Obj(recv)
@@ -29708,10 +29718,7 @@ fn p49_tv_instance(
                     put(vm, recv, "mDescription", Value::Obj(value))?;
                     Value::Obj(recv)
                 }
-                (
-                    "setEncoding",
-                    "(Ljava/lang/String;)Landroid/media/tv/TvTrackInfo$Builder;",
-                ) => {
+                ("setEncoding", "(Ljava/lang/String;)Landroid/media/tv/TvTrackInfo$Builder;") => {
                     let value = args.first().cloned().unwrap_or(Value::Null);
                     put(vm, recv, "mEncoding", value)?;
                     Value::Obj(recv)
@@ -29720,10 +29727,7 @@ fn p49_tv_instance(
                     put(vm, recv, "mEncrypted", Value::Int(iarg(args, 0)))?;
                     Value::Obj(recv)
                 }
-                (
-                    "setAudioChannelCount",
-                    "(I)Landroid/media/tv/TvTrackInfo$Builder;",
-                ) => {
+                ("setAudioChannelCount", "(I)Landroid/media/tv/TvTrackInfo$Builder;") => {
                     if kind != 0 {
                         return Err(ise("Not an audio track"));
                     }
@@ -29737,10 +29741,7 @@ fn p49_tv_instance(
                     put(vm, recv, "mAudioSampleRate", Value::Int(iarg(args, 0)))?;
                     Value::Obj(recv)
                 }
-                (
-                    "setAudioDescription",
-                    "(Z)Landroid/media/tv/TvTrackInfo$Builder;",
-                ) => {
+                ("setAudioDescription", "(Z)Landroid/media/tv/TvTrackInfo$Builder;") => {
                     if kind != 0 {
                         return Err(ise("Not an audio track"));
                     }
@@ -29782,10 +29783,7 @@ fn p49_tv_instance(
                     put(vm, recv, "mVideoFrameRate", Value::Float(farg(args, 0)))?;
                     Value::Obj(recv)
                 }
-                (
-                    "setVideoPixelAspectRatio",
-                    "(F)Landroid/media/tv/TvTrackInfo$Builder;",
-                ) => {
+                ("setVideoPixelAspectRatio", "(F)Landroid/media/tv/TvTrackInfo$Builder;") => {
                     if kind != 1 {
                         return Err(ise("Not a video track"));
                     }
@@ -29812,10 +29810,7 @@ fn p49_tv_instance(
                     )?;
                     Value::Obj(recv)
                 }
-                (
-                    "setExtra",
-                    "(Landroid/os/Bundle;)Landroid/media/tv/TvTrackInfo$Builder;",
-                ) => {
+                ("setExtra", "(Landroid/os/Bundle;)Landroid/media/tv/TvTrackInfo$Builder;") => {
                     let extra = p49_req_obj_arg(args, 0)?;
                     let clone = alloc_obj(vm, "Landroid/os/Bundle;", Vec::new())?;
                     vm.invoke_instance(
@@ -30004,7 +29999,11 @@ fn p49_check_builder_not_used(vm: &Engine, recv: ObjRef) -> Result<(), VmExit> {
 }
 
 fn p49_bool_hash(v: bool) -> i32 {
-    if v { 1231 } else { 1237 }
+    if v {
+        1231
+    } else {
+        1237
+    }
 }
 
 fn p49_collection_hash(vm: &mut Engine, value: &Value) -> i32 {
@@ -30013,7 +30012,9 @@ fn p49_collection_hash(vm: &mut Engine, value: &Value) -> i32 {
     }
     let mut result: i32 = 1;
     for item in collection_items(vm, Some(value)) {
-        result = result.wrapping_mul(31).wrapping_add(p49_value_hash(vm, &item));
+        result = result
+            .wrapping_mul(31)
+            .wrapping_add(p49_value_hash(vm, &item));
     }
     result
 }
@@ -30146,7 +30147,12 @@ fn p49_mac_address_instance(
     let addr = p49_mac_long(vm, recv);
     Ok(Some(match (name, sig) {
         ("<init>", "(J)V") => {
-            put(vm, recv, "mAddr", Value::Long(larg(args, 0) & P49_MAC_VALID_MASK))?;
+            put(
+                vm,
+                recv,
+                "mAddr",
+                Value::Long(larg(args, 0) & P49_MAC_VALID_MASK),
+            )?;
             Value::Null
         }
         ("getAddressType", "()I") => Value::Int(if addr == P49_MAC_VALID_MASK {
@@ -30199,8 +30205,18 @@ fn p49_companion_manager_instance(
             "(Landroid/companion/ICompanionDeviceManager;Landroid/content/Context;)V",
         )
     {
-        put(vm, recv, "mService", args.first().cloned().unwrap_or(Value::Null))?;
-        put(vm, recv, "mContext", args.get(1).cloned().unwrap_or(Value::Null))?;
+        put(
+            vm,
+            recv,
+            "mService",
+            args.first().cloned().unwrap_or(Value::Null),
+        )?;
+        put(
+            vm,
+            recv,
+            "mContext",
+            args.get(1).cloned().unwrap_or(Value::Null),
+        )?;
         return Ok(Some(Value::Null));
     }
     if (name, sig) == ("checkFeaturePresent", "()Z") {
@@ -30398,15 +30414,22 @@ fn p49_association_request_instance(
     }
 
     Ok(Some(match (name, sig) {
-        (
-            "<init>",
-            "(ZLjava/util/List;Ljava/lang/String;Ljava/lang/CharSequence;ZZ)V",
-        ) => {
+        ("<init>", "(ZLjava/util/List;Ljava/lang/String;Ljava/lang/CharSequence;ZZ)V") => {
             let filters = req_obj(args, 1, "deviceFilters")?;
             put(vm, recv, "mSingleDevice", Value::Int(iarg(args, 0)))?;
             put(vm, recv, "mDeviceFilters", Value::Obj(filters))?;
-            put(vm, recv, "mDeviceProfile", args.get(2).cloned().unwrap_or(Value::Null))?;
-            put(vm, recv, "mDisplayName", args.get(3).cloned().unwrap_or(Value::Null))?;
+            put(
+                vm,
+                recv,
+                "mDeviceProfile",
+                args.get(2).cloned().unwrap_or(Value::Null),
+            )?;
+            put(
+                vm,
+                recv,
+                "mDisplayName",
+                args.get(3).cloned().unwrap_or(Value::Null),
+            )?;
             put(vm, recv, "mSelfManaged", Value::Int(iarg(args, 4)))?;
             put(vm, recv, "mForceConfirmation", Value::Int(iarg(args, 5)))?;
             put(vm, recv, "mAssociatedDevice", Value::Null)?;
@@ -30533,14 +30556,17 @@ fn p49_association_request_instance(
             result = result
                 .wrapping_mul(31)
                 .wrapping_add(host_hash(vm, &get(vm, recv, "mPackageName")));
-            result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "mUserId"));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mUserId"));
             result = result.wrapping_mul(31).wrapping_add(host_hash(
                 vm,
                 &get(vm, recv, "mDeviceProfilePrivilegesDescription"),
             ));
-            result = result
-                .wrapping_mul(31)
-                .wrapping_add(host_hash(vm, &Value::Long(field_long(vm, recv, "mCreationTime"))));
+            result = result.wrapping_mul(31).wrapping_add(host_hash(
+                vm,
+                &Value::Long(field_long(vm, recv, "mCreationTime")),
+            ));
             result = result
                 .wrapping_mul(31)
                 .wrapping_add(p49_bool_hash(field_bool(vm, recv, "mSkipPrompt")));
@@ -30622,7 +30648,12 @@ fn p49_association_info_instance(
                     "mNotifyOnDeviceNearby",
                     Value::Int(field_int(vm, info, "mNotifyOnDeviceNearby")),
                 )?;
-                put(vm, recv, "mRevoked", Value::Int(field_int(vm, info, "mRevoked")))?;
+                put(
+                    vm,
+                    recv,
+                    "mRevoked",
+                    Value::Int(field_int(vm, info, "mRevoked")),
+                )?;
                 put(
                     vm,
                     recv,
@@ -30660,10 +30691,7 @@ fn p49_association_info_instance(
                 Value::Obj(recv)
             }
             ("setRevoked", "(Z)Landroid/companion/AssociationInfo$Builder;")
-            | (
-                "setRevoked",
-                "(Z)Landroid/companion/AssociationInfo$NonActionableBuilder;",
-            ) => {
+            | ("setRevoked", "(Z)Landroid/companion/AssociationInfo$NonActionableBuilder;") => {
                 put(vm, recv, "mRevoked", Value::Int(iarg(args, 0)))?;
                 Value::Obj(recv)
             }
@@ -30676,8 +30704,8 @@ fn p49_association_info_instance(
                 Value::Obj(recv)
             }
             ("build", "()Landroid/companion/AssociationInfo;") => {
-                let original = field_obj(vm, recv, "mOriginalInfo")
-                    .ok_or_else(|| npe("mOriginalInfo"))?;
+                let original =
+                    field_obj(vm, recv, "mOriginalInfo").ok_or_else(|| npe("mOriginalInfo"))?;
                 let out = alloc_obj(vm, P49_ASSOCIATION_INFO, Vec::new())?;
                 p49_copy_fields(vm, original, out, &P49_ASSOCIATION_INFO_FIELDS)?;
                 for field in [
@@ -30985,8 +31013,18 @@ fn p49_bt_filter_instance(
             "<init>",
             "(Ljava/util/regex/Pattern;Ljava/lang/String;Ljava/util/List;Ljava/util/List;)V",
         ) => {
-            put(vm, recv, "mNamePattern", args.first().cloned().unwrap_or(Value::Null))?;
-            put(vm, recv, "mAddress", args.get(1).cloned().unwrap_or(Value::Null))?;
+            put(
+                vm,
+                recv,
+                "mNamePattern",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            put(
+                vm,
+                recv,
+                "mAddress",
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
             for (index, field) in [(2, "mServiceUuids"), (3, "mServiceUuidMasks")] {
                 let raw = args.get(index).cloned().unwrap_or(Value::Null);
                 let value = if matches!(raw, Value::Obj(_)) {
@@ -31015,8 +31053,11 @@ fn p49_bt_filter_instance(
                 bool_value(true)
             } else if let Some(other) = p49_other_exact(vm, args, P49_BT_FILTER) {
                 bool_value(
-                    objects_equal(vm, &get(vm, recv, "mNamePattern"), &get(vm, other, "mNamePattern"))
-                        && field_str(vm, recv, "mAddress") == field_str(vm, other, "mAddress")
+                    objects_equal(
+                        vm,
+                        &get(vm, recv, "mNamePattern"),
+                        &get(vm, other, "mNamePattern"),
+                    ) && field_str(vm, recv, "mAddress") == field_str(vm, other, "mAddress")
                         && p49_list_equal(
                             vm,
                             &get(vm, recv, "mServiceUuids"),
@@ -31463,8 +31504,18 @@ fn p49_wifi_filter_instance(
             "(Ljava/util/regex/Pattern;Landroid/net/MacAddress;Landroid/net/MacAddress;)V",
         ) => {
             let mask = req_obj(args, 2, "mBssidMask")?;
-            put(vm, recv, "mNamePattern", args.first().cloned().unwrap_or(Value::Null))?;
-            put(vm, recv, "mBssid", args.get(1).cloned().unwrap_or(Value::Null))?;
+            put(
+                vm,
+                recv,
+                "mNamePattern",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            put(
+                vm,
+                recv,
+                "mBssid",
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
             put(vm, recv, "mBssidMask", Value::Obj(mask))?;
             Value::Null
         }
@@ -31478,8 +31529,11 @@ fn p49_wifi_filter_instance(
                 bool_value(true)
             } else if let Some(other) = p49_other_exact(vm, args, P49_WIFI_FILTER) {
                 bool_value(
-                    objects_equal(vm, &get(vm, recv, "mNamePattern"), &get(vm, other, "mNamePattern"))
-                        && p49_value_equal(vm, &get(vm, recv, "mBssid"), &get(vm, other, "mBssid"))?
+                    objects_equal(
+                        vm,
+                        &get(vm, recv, "mNamePattern"),
+                        &get(vm, other, "mNamePattern"),
+                    ) && p49_value_equal(vm, &get(vm, recv, "mBssid"), &get(vm, other, "mBssid"))?
                         && p49_value_equal(
                             vm,
                             &get(vm, recv, "mBssidMask"),

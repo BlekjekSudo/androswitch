@@ -2276,7 +2276,10 @@ const SERVICES: &[(&str, &str)] = &[
         "fingerprint",
         "Landroid/hardware/fingerprint/FingerprintManager;",
     ),
-    ("biometric", "Landroid/hardware/biometrics/BiometricManager;"),
+    (
+        "biometric",
+        "Landroid/hardware/biometrics/BiometricManager;",
+    ),
     ("hdmi_control", "Landroid/hardware/hdmi/HdmiControlManager;"),
     ("input", "Landroid/hardware/input/InputManager;"),
     ("midi", "Landroid/media/midi/MidiManager;"),

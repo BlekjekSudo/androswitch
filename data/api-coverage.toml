@@ -819,15 +819,15 @@ key_apis = ["android.media.projection.MediaProjectionManager.getMediaProjection"
 id = "android-media-tv"
 prefix = "android.media.tv"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
-milestone = "future"
-notes = "TV input/interactive TV APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-media-tv"
-key_apis = ["android.media.tv.TvInputManager.getTvInputList"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "TvInputManager uses a service-present/no-input profile: empty input and rating-system lists, null unknown input info, disconnected unknown state, local callback registration, and in-memory parental-control/blocked-rating state. TvContentRating create/unflatten/flatten/contains value semantics (including caller-array sub-rating sorting and null sub-rating list) and TvTrackInfo builders/typed getters/equality are modeled. No TvInputInfo construction, input sessions/tuning/recording, interactive TV apps, XML rating-system loading, settings persistence, broadcasts, service-dispatched callbacks, unmodifiable sub-rating-list wrapper, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-media-tv-sessions-and-services"
+key_apis = ["android.media.tv.TvInputManager.getTvInputList", "android.media.tv.TvInputManager.getInputState", "android.media.tv.TvInputManager.addBlockedRating", "android.media.tv.TvContentRating.createRating", "android.media.tv.TvContentRating.flattenToString", "android.media.tv.TvTrackInfo.getAudioChannelCount"]
 
 [[surface]]
 id = "android-media-audiofx"
@@ -847,15 +847,15 @@ key_apis = ["android.media.audiofx.Equalizer.setEnabled"]
 id = "android-media-midi"
 prefix = "android.media.midi"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
-milestone = "future"
-notes = "MIDI device/service APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-media-midi"
-key_apis = ["android.media.midi.MidiManager.getDevices"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "MidiManager is a no-device profile with empty device arrays/sets and local callback registration/deduplication. MidiDeviceInfo validates port counts, preserves properties/private/protocol fields, synthesizes ordered input/output PortInfo values, and uses ID equality; MidiReceiver implements max-message-size chunking and flush dispatch, with exact-base recording for tests. No device opening, Bluetooth MIDI, MidiDeviceServer, real input/output ports or streams, service status events, timestamp scheduling, USB/BLE transports, or parcel round trips are claimed; a non-positive receiver maximum uses a bounded exception instead of AOSP's non-terminating loop."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-media-midi-devices-and-transports"
+key_apis = ["android.media.midi.MidiManager.getDevices", "android.media.midi.MidiManager.registerDeviceCallback", "android.media.midi.MidiDeviceInfo.getPorts", "android.media.midi.MidiDeviceInfo.getProperties", "android.media.midi.MidiReceiver.send", "android.media.midi.MidiReceiver.flush"]
 
 # ===================== Camera =====================
 [[surface]]
@@ -962,43 +962,43 @@ key_apis = ["android.hardware.usb.UsbManager.getDeviceList", "android.hardware.u
 id = "android-hardware-fingerprint"
 prefix = "android.hardware.fingerprint"
 domain = "hardware"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "legacy"
-notes = "Legacy FingerprintManager authentication is not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-hardware-fingerprint"
-key_apis = ["android.hardware.fingerprint.FingerprintManager.authenticate"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "FingerprintManager uses the AOSP absent-IFingerprintService profile: no hardware or enrolled templates, a null enrolled list, empty sensor properties, and authenticate() validates the callback then sends no success/error callback. Fingerprint identifiers and fingerprint CryptoObject/AuthenticationResult wrappers preserve explicit values with type-filtered crypto getters. No fingerprint HAL, enrollment/removal, real authentication or cancellation dispatch, UDFPS events, sensor-property service data, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-hardware-fingerprint-hal"
+key_apis = ["android.hardware.fingerprint.FingerprintManager.isHardwareDetected", "android.hardware.fingerprint.FingerprintManager.hasEnrolledFingerprints", "android.hardware.fingerprint.FingerprintManager.authenticate", "android.hardware.fingerprint.Fingerprint.getBiometricId", "android.hardware.fingerprint.FingerprintManager$CryptoObject.getCipher", "android.hardware.fingerprint.FingerprintManager$AuthenticationResult.getUserId"]
 
 [[surface]]
 id = "android-hardware-biometrics"
 prefix = "android.hardware.biometrics"
 domain = "hardware"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "future"
-notes = "BiometricPrompt/BiometricManager authentication is not modelled; no fake user authentication is reported."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-hardware-biometrics"
-key_apis = ["android.hardware.biometrics.BiometricPrompt.authenticate", "android.hardware.biometrics.BiometricManager.canAuthenticate"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "BiometricManager uses the absent-IAuthService profile: canAuthenticate returns BIOMETRIC_ERROR_HW_UNAVAILABLE, sensor-property and localized-string getters take the AOSP null-service dereference, and no authentication success is fabricated. BiometricPrompt.Builder/PromptInfo preserve values and enforce title, negative-button, executor/listener and device-credential combination validation; authenticate validates arguments before the absent-service dereference. Shared CryptoObject and AuthenticationResult values and authenticatorToStr are modeled. No system biometric/credential dialog, HAL/session, enrollment, callbacks from a real sensor, sensor properties, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-hardware-biometrics-auth-service"
+key_apis = ["android.hardware.biometrics.BiometricManager.canAuthenticate", "android.hardware.biometrics.BiometricManager.authenticatorToStr", "android.hardware.biometrics.BiometricPrompt.authenticate", "android.hardware.biometrics.BiometricPrompt$Builder.build", "android.hardware.biometrics.BiometricPrompt.getTitle", "android.hardware.biometrics.BiometricPrompt$CryptoObject.getSignature"]
 
 [[surface]]
 id = "android-hardware-hdmi"
 prefix = "android.hardware.hdmi"
 domain = "hardware"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "future"
-notes = "HDMI CEC APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-hardware-hdmi"
-key_apis = ["android.hardware.hdmi.HdmiControlManager.getConnectedDevices"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "HdmiControlManager uses a service-present/no-device profile with null typed clients, empty connected-device and port lists, and the invalid local physical address. DeviceFeatures operand decoding/encoding and unknown-status update, HdmiDeviceInfo/HdmiPortInfo builders and values, and HdmiUtils local-port, physical-address validity and relative-position calculations are modeled. No CEC clients or messages, hotplug/device listeners, routing/power/vendor commands, MHL/eARC behavior, HAL state, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-hardware-hdmi-cec-clients"
+key_apis = ["android.hardware.hdmi.HdmiControlManager.getConnectedDevices", "android.hardware.hdmi.HdmiControlManager.getPhysicalAddress", "android.hardware.hdmi.DeviceFeatures.fromOperand", "android.hardware.hdmi.HdmiDeviceInfo.getLogicalAddress", "android.hardware.hdmi.HdmiPortInfo.getAddress", "android.hardware.hdmi.HdmiUtils.getHdmiAddressRelativePosition"]
 
 [[surface]]
 id = "android-hardware-display"
@@ -1018,29 +1018,29 @@ key_apis = ["android.hardware.display.DisplayManager.getDisplay", "android.hardw
 id = "android-hardware-input"
 prefix = "android.hardware.input"
 domain = "hardware"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "future"
-notes = "InputManager hardware keyboard/gamepad enumeration is not modelled; agent tap/text input is a RustyDroid tool surface, not this Android API."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-hardware-input"
-key_apis = ["android.hardware.input.InputManager.getInputDeviceIds"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "InputManager uses a service-present/no-device profile: empty input-device, keyboard-layout and sensor snapshots, null device/layout/Bluetooth lookups, all-false key probes, local listener registration with AOSP null-argument asymmetry, and the Android 14 touchpad-gesture TODO result. InputDevice.Builder, MotionRange, InputDeviceIdentifier and HostUsiVersion preserve explicit values and derived source/keyboard/virtual classifications. No real evdev enumeration, input-event injection or dispatch, key-character maps, persistent layout selection, sensors, vibrators/lights/batteries, device enablement, or parcel round trips are claimed; agent tap/text input remains a separate RustyDroid tool surface."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-hardware-input-real-devices"
+key_apis = ["android.hardware.input.InputManager.getInputDeviceIds", "android.hardware.input.InputManager.registerInputDeviceListener", "android.hardware.input.InputManager.deviceHasKeys", "android.hardware.input.InputManager.getInputDevice", "android.hardware.input.InputDeviceIdentifier.getDescriptor", "android.hardware.input.HostUsiVersion.getMajorVersion"]
 
 [[surface]]
 id = "android-hardware-soundtrigger"
 prefix = "android.hardware.soundtrigger"
 domain = "hardware"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "future"
-notes = "Always-on sound trigger/keyphrase models are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-hardware-soundtrigger"
-key_apis = ["android.hardware.soundtrigger.SoundTriggerDetector.startRecognition"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "The android.hardware.soundtrigger value layer is modeled: SoundModel, GenericSoundModel, KeyphraseSoundModel, Keyphrase, ModelParamRange, RecognitionConfig, ConfidenceLevel, KeyphraseRecognitionExtra and KeyphraseMetadata preserve AOSP null normalization (zero vendor UUID and empty arrays), getters, equality/hash and metadata phrase/locale support. No sound-trigger HAL/module or service session, model loading, recognition start/stop or events, model-parameter queries, assistant integration, android.media.soundtrigger manager/detector behavior, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-hardware-soundtrigger-hal"
+key_apis = ["android.hardware.soundtrigger.SoundTrigger$GenericSoundModel.getVendorUuid", "android.hardware.soundtrigger.SoundTrigger$KeyphraseSoundModel.getKeyphrases", "android.hardware.soundtrigger.SoundTrigger$Keyphrase.getUsers", "android.hardware.soundtrigger.SoundTrigger$KeyphraseRecognitionExtra.getConfidenceLevels", "android.hardware.soundtrigger.KeyphraseMetadata.supportsPhrase", "android.hardware.soundtrigger.KeyphraseMetadata.supportsLocale"]
 
 # ===================== Telephony =====================
 [[surface]]
@@ -1202,15 +1202,15 @@ key_apis = ["android.nfc.tech.Ndef.get", "android.nfc.tech.MifareClassic.get"]
 id = "android-companion"
 prefix = "android.companion"
 domain = "connectivity"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "future"
-notes = "CompanionDeviceManager association/presence APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-companion"
-key_apis = ["android.companion.CompanionDeviceManager.associate"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "CompanionDeviceManager uses the guarded absent-ICompanionDeviceManager profile: feature absent, empty associations, no notification access, a null cancellation intent, and no-op guarded associate/disassociate/presence calls without fabricating a device. AssociationRequest, AssociationInfo and classic Bluetooth/BLE/Wi-Fi device-filter builders preserve one-time-use and AOSP validation semantics; companion-facing android.net.MacAddress parsing/formatting/type/matching is modeled. No system association UI, discovery or Bluetooth/Wi-Fi stack, DeviceFilter matching/display-name production, presence observation, transports/messages, notification-access grants, role/permission grants, persistent associations, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-companion-service-and-discovery"
+key_apis = ["android.companion.CompanionDeviceManager.checkFeaturePresent", "android.companion.CompanionDeviceManager.getMyAssociations", "android.companion.AssociationRequest.getDeviceFilters", "android.companion.AssociationInfo.getDeviceMacAddressAsString", "android.companion.BluetoothLeDeviceFilter.getScanFilter", "android.companion.WifiDeviceFilter.getBssidMask"]
 
 # ===================== Security =====================
 [[surface]]

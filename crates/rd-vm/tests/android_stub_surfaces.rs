@@ -6566,6 +6566,10 @@ fn p49_new(engine: &mut Engine, class: &str, sig: &str, args: &[Value]) -> ObjRe
     value
 }
 
+fn p49_field_or_null(engine: &Engine, recv: ObjRef, name: &str) -> Value {
+    engine.heap.get_field(recv, name).unwrap_or(Value::Null)
+}
+
 fn p49_list_get(engine: &mut Engine, list: Value, index: i32) -> Value {
     call(
         engine,
@@ -6610,13 +6614,7 @@ fn fingerprint_absent_service_and_values_are_guest_visible() {
         Value::Int(0)
     );
     assert_eq!(
-        call(
-            &mut engine,
-            manager,
-            "hasEnrolledFingerprints",
-            "()Z",
-            &[]
-        ),
+        call(&mut engine, manager, "hasEnrolledFingerprints", "()Z", &[]),
         Value::Int(0)
     );
     assert_eq!(
@@ -6639,8 +6637,7 @@ fn fingerprint_absent_service_and_values_are_guest_visible() {
     );
     assert_eq!(p57_collection_size(&mut engine, sensors), 0);
 
-    let callback_class =
-        "Landroid/hardware/fingerprint/FingerprintManager$AuthenticationCallback;";
+    let callback_class = "Landroid/hardware/fingerprint/FingerprintManager$AuthenticationCallback;";
     let callback = p49_new(&mut engine, callback_class, "()V", &[]);
     let authenticate_sig = "(Landroid/hardware/fingerprint/FingerprintManager$CryptoObject;Landroid/os/CancellationSignal;ILandroid/hardware/fingerprint/FingerprintManager$AuthenticationCallback;Landroid/os/Handler;)V";
     assert_throws(
@@ -6671,8 +6668,14 @@ fn fingerprint_absent_service_and_values_are_guest_visible() {
             Value::Null,
         ],
     );
-    assert_eq!(field(&engine, callback, "rd_result"), Value::Null);
-    assert_eq!(field(&engine, callback, "rd_error_code"), Value::Null);
+    assert_eq!(
+        p49_field_or_null(&engine, callback, "rd_result"),
+        Value::Null
+    );
+    assert_eq!(
+        p49_field_or_null(&engine, callback, "rd_error_code"),
+        Value::Null
+    );
 
     let name = text(&mut engine, "right index");
     let fingerprint = p49_new(
@@ -6920,23 +6923,11 @@ fn biometrics_absent_service_prompt_and_crypto_are_guest_visible() {
         "Use your fingerprint"
     );
     assert_eq!(
-        call(
-            &mut engine,
-            prompt,
-            "getAllowedAuthenticators",
-            "()I",
-            &[]
-        ),
+        call(&mut engine, prompt, "getAllowedAuthenticators", "()I", &[]),
         Value::Int(0x000f)
     );
     assert_eq!(
-        call(
-            &mut engine,
-            prompt,
-            "isConfirmationRequired",
-            "()Z",
-            &[]
-        ),
+        call(&mut engine, prompt, "isConfirmationRequired", "()Z", &[]),
         Value::Int(0)
     );
 
@@ -6970,7 +6961,10 @@ fn biometrics_absent_service_prompt_and_crypto_are_guest_visible() {
         ),
         "Ljava/lang/NullPointerException;",
     );
-    assert_eq!(field(&engine, callback, "rd_result"), Value::Null);
+    assert_eq!(
+        p49_field_or_null(&engine, callback, "rd_result"),
+        Value::Null
+    );
 
     let signature = instance(&mut engine, "Ljava/security/Signature;");
     let crypto = p49_new(
@@ -7052,13 +7046,7 @@ fn hdmi_no_device_profile_and_values_are_guest_visible() {
     );
     assert_eq!(p57_collection_size(&mut engine, ports), 0);
     assert_eq!(
-        call(
-            &mut engine,
-            manager,
-            "getPhysicalAddress",
-            "()I",
-            &[]
-        ),
+        call(&mut engine, manager, "getPhysicalAddress", "()I", &[]),
         Value::Int(0xffff)
     );
 
@@ -7174,13 +7162,7 @@ fn hdmi_no_device_profile_and_values_are_guest_visible() {
         Value::Int(4)
     );
     assert_eq!(
-        call(
-            &mut engine,
-            device,
-            "getLogicalAddress",
-            "()I",
-            &[]
-        ),
+        call(&mut engine, device, "getLogicalAddress", "()I", &[]),
         Value::Int(5)
     );
     assert_eq!(
@@ -7259,7 +7241,7 @@ fn hdmi_no_device_profile_and_values_are_guest_visible() {
         call_static(
             &mut engine,
             utils,
-            "getRelativePosition",
+            "getHdmiAddressRelativePosition",
             "(II)I",
             &[Value::Int(0x1200), Value::Int(0x1200)],
         ),
@@ -7269,7 +7251,7 @@ fn hdmi_no_device_profile_and_values_are_guest_visible() {
         call_static(
             &mut engine,
             utils,
-            "getRelativePosition",
+            "getHdmiAddressRelativePosition",
             "(II)I",
             &[Value::Int(0x1000), Value::Int(0x1200)],
         ),
@@ -7279,7 +7261,7 @@ fn hdmi_no_device_profile_and_values_are_guest_visible() {
         call_static(
             &mut engine,
             utils,
-            "getRelativePosition",
+            "getHdmiAddressRelativePosition",
             "(II)I",
             &[Value::Int(0x1100), Value::Int(0x1200)],
         ),
@@ -7326,25 +7308,25 @@ fn input_no_device_profile_and_device_values_are_guest_visible() {
     );
     assert!(array_values(&engine, &static_ids).is_empty());
     let keys = int_array(&mut engine, &[4, 82]);
-    let has_keys = call(
-        &mut engine,
-        manager,
-        "deviceHasKeys",
-        "([I)[Z",
-        &[keys],
+    let has_keys = call(&mut engine, manager, "deviceHasKeys", "([I)[Z", &[keys]);
+    assert_eq!(
+        array_values(&engine, &has_keys),
+        vec![Value::Int(0), Value::Int(0)]
     );
-    assert_eq!(array_values(&engine, &has_keys), vec![Value::Int(0), Value::Int(0)]);
 
     let listener = instance(
         &mut engine,
         "Landroid/hardware/input/InputManager$InputDeviceListener;",
     );
-    let register_sig = "(Landroid/hardware/input/InputManager$InputDeviceListener;Landroid/os/Handler;)V";
+    let register_sig =
+        "(Landroid/hardware/input/InputManager$InputDeviceListener;Landroid/os/Handler;)V";
     assert_throws(
-        engine.invoke_instance(manager, "registerInputDeviceListener", register_sig, &[
-            Value::Null,
-            Value::Null,
-        ]),
+        engine.invoke_instance(
+            manager,
+            "registerInputDeviceListener",
+            register_sig,
+            &[Value::Null, Value::Null],
+        ),
         "Ljava/lang/NullPointerException;",
     );
     call(
@@ -7365,9 +7347,12 @@ fn input_no_device_profile_and_device_values_are_guest_visible() {
     assert_eq!(p57_collection_size(&mut engine, stored), 1);
     let unregister_sig = "(Landroid/hardware/input/InputManager$InputDeviceListener;)V";
     assert_throws(
-        engine.invoke_instance(manager, "unregisterInputDeviceListener", unregister_sig, &[
-            Value::Null,
-        ]),
+        engine.invoke_instance(
+            manager,
+            "unregisterInputDeviceListener",
+            unregister_sig,
+            &[Value::Null],
+        ),
         "Ljava/lang/IllegalArgumentException;",
     );
     call(
@@ -7395,7 +7380,11 @@ fn input_no_device_profile_and_device_values_are_guest_visible() {
     );
     let builder_class = "Landroid/view/InputDevice$Builder;";
     for (method, sig, argument) in [
-        ("setId", "(I)Landroid/view/InputDevice$Builder;", Value::Int(-1)),
+        (
+            "setId",
+            "(I)Landroid/view/InputDevice$Builder;",
+            Value::Int(-1),
+        ),
         (
             "setGeneration",
             "(I)Landroid/view/InputDevice$Builder;",
@@ -7501,7 +7490,10 @@ fn input_no_device_profile_and_device_values_are_guest_visible() {
         "()Landroid/view/InputDevice;",
         &[],
     ));
-    assert_eq!(call(&mut engine, device, "getId", "()I", &[]), Value::Int(-1));
+    assert_eq!(
+        call(&mut engine, device, "getId", "()I", &[]),
+        Value::Int(-1)
+    );
     assert_eq!(
         call(&mut engine, device, "isVirtual", "()Z", &[]),
         Value::Int(1)
@@ -7539,13 +7531,7 @@ fn input_no_device_profile_and_device_values_are_guest_visible() {
         Value::Int(1)
     );
     assert_eq!(
-        call(
-            &mut engine,
-            device,
-            "isFullKeyboard",
-            "()Z",
-            &[]
-        ),
+        call(&mut engine, device, "isFullKeyboard", "()Z", &[]),
         Value::Int(1)
     );
     assert_eq!(
@@ -7601,5 +7587,1611 @@ fn input_no_device_profile_and_device_values_are_guest_visible() {
             &[Value::Obj(context)],
         ),
         Value::Int(1)
+    );
+}
+
+#[test]
+fn soundtrigger_models_and_metadata_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let uuid = p49_uuid(&mut engine, "123e4567-e89b-12d3-a456-426614174000");
+    let vendor_uuid = p49_uuid(&mut engine, "123e4567-e89b-12d3-a456-426614174999");
+    let generic_class = "Landroid/hardware/soundtrigger/SoundTrigger$GenericSoundModel;";
+
+    let generic = p49_new(
+        &mut engine,
+        generic_class,
+        "(Ljava/util/UUID;Ljava/util/UUID;[B)V",
+        &[uuid.clone(), Value::Null, Value::Null],
+    );
+    assert_eq!(
+        call(&mut engine, generic, "getType", "()I", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, generic, "getVersion", "()I", &[]),
+        Value::Int(-1)
+    );
+    let data = call(&mut engine, generic, "getData", "()[B", &[]);
+    assert_eq!(byte_array_values(&engine, &data), Vec::<u8>::new());
+    let normalized_vendor = object(call(
+        &mut engine,
+        generic,
+        "getVendorUuid",
+        "()Ljava/util/UUID;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            normalized_vendor,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "00000000-0000-0000-0000-000000000000"
+    );
+
+    let generic_data = byte_array(&mut engine, &[1, 2, 3]);
+    let generic_versioned = p49_new(
+        &mut engine,
+        generic_class,
+        "(Ljava/util/UUID;Ljava/util/UUID;[BI)V",
+        &[
+            uuid.clone(),
+            vendor_uuid.clone(),
+            generic_data,
+            Value::Int(7),
+        ],
+    );
+    let generic_data_copy = byte_array(&mut engine, &[1, 2, 3]);
+    let generic_equal = p49_new(
+        &mut engine,
+        generic_class,
+        "(Ljava/util/UUID;Ljava/util/UUID;[BI)V",
+        &[
+            uuid.clone(),
+            vendor_uuid.clone(),
+            generic_data_copy,
+            Value::Int(7),
+        ],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            generic_versioned,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(generic_equal)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, generic_versioned, "hashCode", "()I", &[]),
+        call(&mut engine, generic_equal, "hashCode", "()I", &[])
+    );
+
+    let locale = p49_locale(&mut engine, "pt");
+    let phrase = text(&mut engine, "Ok Rusty");
+    let keyphrase_class = "Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;";
+    let bad_keyphrase = instance(&mut engine, keyphrase_class);
+    assert_throws(
+        engine.invoke_instance(
+            bad_keyphrase,
+            "<init>",
+            "(IILjava/util/Locale;Ljava/lang/String;[I)V",
+            &[
+                Value::Int(1),
+                Value::Int(1),
+                Value::Null,
+                phrase.clone(),
+                Value::Null,
+            ],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let keyphrase = p49_new(
+        &mut engine,
+        keyphrase_class,
+        "(IILjava/util/Locale;Ljava/lang/String;[I)V",
+        &[
+            Value::Int(4),
+            Value::Int(5),
+            Value::Obj(locale),
+            phrase.clone(),
+            Value::Null,
+        ],
+    );
+    let users = call(&mut engine, keyphrase, "getUsers", "()[I", &[]);
+    assert!(array_values(&engine, &users).is_empty());
+    let phrase_copy = text(&mut engine, "Ok Rusty");
+    let keyphrase_equal = p49_new(
+        &mut engine,
+        keyphrase_class,
+        "(IILjava/util/Locale;Ljava/lang/String;[I)V",
+        &[
+            Value::Int(4),
+            Value::Int(5),
+            Value::Obj(locale),
+            phrase_copy,
+            Value::Null,
+        ],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            keyphrase,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(keyphrase_equal)]
+        ),
+        Value::Int(1)
+    );
+
+    let keyphrases = object_array(
+        &mut engine,
+        "[Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;",
+        vec![Value::Obj(keyphrase)],
+    );
+    let keyphrases_equal = object_array(
+        &mut engine,
+        "[Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;",
+        vec![Value::Obj(keyphrase_equal)],
+    );
+    let model_data = byte_array(&mut engine, &[9]);
+    let key_model_class = "Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseSoundModel;";
+    let key_model_sig = "(Ljava/util/UUID;Ljava/util/UUID;[B[Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;)V";
+    let key_model = p49_new(
+        &mut engine,
+        key_model_class,
+        key_model_sig,
+        &[uuid.clone(), vendor_uuid.clone(), model_data, keyphrases],
+    );
+    let model_data_copy = byte_array(&mut engine, &[9]);
+    let key_model_equal = p49_new(
+        &mut engine,
+        key_model_class,
+        key_model_sig,
+        &[
+            uuid.clone(),
+            vendor_uuid.clone(),
+            model_data_copy,
+            keyphrases_equal,
+        ],
+    );
+    assert_eq!(
+        call(&mut engine, key_model, "getType", "()I", &[]),
+        Value::Int(0)
+    );
+    let returned_keyphrases = call(
+        &mut engine,
+        key_model,
+        "getKeyphrases",
+        "()[Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;",
+        &[],
+    );
+    assert_eq!(
+        array_values(&engine, &returned_keyphrases),
+        vec![Value::Obj(keyphrase)]
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            key_model,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(key_model_equal)]
+        ),
+        Value::Int(1)
+    );
+
+    let range = p49_new(
+        &mut engine,
+        "Landroid/hardware/soundtrigger/SoundTrigger$ModelParamRange;",
+        "(II)V",
+        &[Value::Int(-2), Value::Int(9)],
+    );
+    let range_equal = p49_new(
+        &mut engine,
+        "Landroid/hardware/soundtrigger/SoundTrigger$ModelParamRange;",
+        "(II)V",
+        &[Value::Int(-2), Value::Int(9)],
+    );
+    assert_eq!(
+        call(&mut engine, range, "getStart", "()I", &[]),
+        Value::Int(-2)
+    );
+    assert_eq!(
+        call(&mut engine, range, "getEnd", "()I", &[]),
+        Value::Int(9)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            range,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(range_equal)]
+        ),
+        Value::Int(1)
+    );
+
+    let confidence = p49_new(
+        &mut engine,
+        "Landroid/hardware/soundtrigger/SoundTrigger$ConfidenceLevel;",
+        "(II)V",
+        &[Value::Int(7), Value::Int(80)],
+    );
+    assert_eq!(field(&engine, confidence, "userId"), Value::Int(7));
+    assert_eq!(
+        field(&engine, confidence, "confidenceLevel"),
+        Value::Int(80)
+    );
+    let levels = object_array(
+        &mut engine,
+        "[Landroid/hardware/soundtrigger/SoundTrigger$ConfidenceLevel;",
+        vec![Value::Obj(confidence)],
+    );
+    let extra = p49_new(
+        &mut engine,
+        "Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseRecognitionExtra;",
+        "(III[Landroid/hardware/soundtrigger/SoundTrigger$ConfidenceLevel;)V",
+        &[Value::Int(3), Value::Int(5), Value::Int(66), levels],
+    );
+    let returned_levels = call(
+        &mut engine,
+        extra,
+        "getConfidenceLevels",
+        "()Ljava/util/Collection;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, returned_levels.clone()), 1);
+    assert_eq!(
+        p49_list_get(&mut engine, returned_levels, 0),
+        Value::Obj(confidence)
+    );
+    let extras = object_array(
+        &mut engine,
+        "[Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseRecognitionExtra;",
+        vec![Value::Obj(extra)],
+    );
+    let config_data = byte_array(&mut engine, &[4, 5]);
+    let config = p49_new(
+        &mut engine,
+        "Landroid/hardware/soundtrigger/SoundTrigger$RecognitionConfig;",
+        "(ZZ[Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseRecognitionExtra;[BI)V",
+        &[
+            Value::Int(1),
+            Value::Int(0),
+            extras,
+            config_data,
+            Value::Int(3),
+        ],
+    );
+    assert_eq!(field(&engine, config, "captureRequested"), Value::Int(1));
+    assert_eq!(
+        field(&engine, config, "allowMultipleTriggers"),
+        Value::Int(0)
+    );
+    assert_eq!(field(&engine, config, "audioCapabilities"), Value::Int(3));
+
+    let locales = list_of(&mut engine, &[Value::Obj(locale)]);
+    let metadata_phrase = text(&mut engine, "Ok Rusty");
+    let metadata = p49_new(
+        &mut engine,
+        "Landroid/hardware/soundtrigger/KeyphraseMetadata;",
+        "(ILjava/lang/String;Ljava/util/Set;I)V",
+        &[
+            Value::Int(9),
+            metadata_phrase,
+            Value::Obj(locales),
+            Value::Int(5),
+        ],
+    );
+    let lower_phrase = text(&mut engine, "ok rusty");
+    assert_eq!(
+        call(
+            &mut engine,
+            metadata,
+            "supportsPhrase",
+            "(Ljava/lang/String;)Z",
+            &[lower_phrase]
+        ),
+        Value::Int(1)
+    );
+    let english = p49_locale(&mut engine, "en");
+    assert_eq!(
+        call(
+            &mut engine,
+            metadata,
+            "supportsLocale",
+            "(Ljava/util/Locale;)Z",
+            &[Value::Obj(english)]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            metadata,
+            "supportsLocale",
+            "(Ljava/util/Locale;)Z",
+            &[Value::Obj(locale)]
+        ),
+        Value::Int(1)
+    );
+}
+
+#[test]
+fn midi_no_device_profile_values_and_receiver_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let manager = p57_system_service(&mut engine, "midi");
+    assert_eq!(
+        engine.heap.class_of(manager).unwrap(),
+        "Landroid/media/midi/MidiManager;"
+    );
+    let devices = call(
+        &mut engine,
+        manager,
+        "getDevices",
+        "()[Landroid/media/midi/MidiDeviceInfo;",
+        &[],
+    );
+    assert!(array_values(&engine, &devices).is_empty());
+    let transport_devices = call(
+        &mut engine,
+        manager,
+        "getDevicesForTransport",
+        "(I)Ljava/util/Set;",
+        &[Value::Int(0)],
+    );
+    assert_eq!(p57_collection_size(&mut engine, transport_devices), 0);
+
+    let callback = p49_new(
+        &mut engine,
+        "Landroid/media/midi/MidiManager$DeviceCallback;",
+        "()V",
+        &[],
+    );
+    let register_sig = "(Landroid/media/midi/MidiManager$DeviceCallback;Landroid/os/Handler;)V";
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "registerDeviceCallback",
+            register_sig,
+            &[Value::Null, Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    call(
+        &mut engine,
+        manager,
+        "registerDeviceCallback",
+        register_sig,
+        &[Value::Obj(callback), Value::Null],
+    );
+    call(
+        &mut engine,
+        manager,
+        "registerDeviceCallback",
+        register_sig,
+        &[Value::Obj(callback), Value::Null],
+    );
+    let stored = field(&engine, manager, "rd_device_callbacks");
+    assert_eq!(p57_collection_size(&mut engine, stored), 1);
+    call(
+        &mut engine,
+        manager,
+        "unregisterDeviceCallback",
+        "(Landroid/media/midi/MidiManager$DeviceCallback;)V",
+        &[Value::Obj(callback)],
+    );
+    let stored = field(&engine, manager, "rd_device_callbacks");
+    assert_eq!(p57_collection_size(&mut engine, stored), 0);
+
+    let bundle = p49_new(&mut engine, "Landroid/os/Bundle;", "()V", &[]);
+    let input_names = p57_string_array(&mut engine, &["in-a", "in-b"]);
+    let output_names = p57_string_array(&mut engine, &["out-a"]);
+    let info_class = "Landroid/media/midi/MidiDeviceInfo;";
+    let info_sig = "(IIII[Ljava/lang/String;[Ljava/lang/String;Landroid/os/Bundle;ZI)V";
+    let bad_info = instance(&mut engine, info_class);
+    assert_throws(
+        engine.invoke_instance(
+            bad_info,
+            "<init>",
+            info_sig,
+            &[
+                Value::Int(1),
+                Value::Int(1),
+                Value::Int(257),
+                Value::Int(0),
+                Value::Null,
+                Value::Null,
+                Value::Obj(bundle),
+                Value::Int(0),
+                Value::Int(0),
+            ],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let info = p49_new(
+        &mut engine,
+        info_class,
+        info_sig,
+        &[
+            Value::Int(2),
+            Value::Int(42),
+            Value::Int(2),
+            Value::Int(1),
+            input_names,
+            output_names,
+            Value::Obj(bundle),
+            Value::Int(1),
+            Value::Int(1),
+        ],
+    );
+    assert_eq!(
+        call(&mut engine, info, "getType", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(call(&mut engine, info, "getId", "()I", &[]), Value::Int(42));
+    assert_eq!(
+        call(&mut engine, info, "isPrivate", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, info, "getDefaultProtocol", "()I", &[]),
+        Value::Int(1)
+    );
+    let ports = call(
+        &mut engine,
+        info,
+        "getPorts",
+        "()[Landroid/media/midi/MidiDeviceInfo$PortInfo;",
+        &[],
+    );
+    let port_values = array_values(&engine, &ports);
+    assert_eq!(port_values.len(), 3);
+    let first_port = object(port_values[0].clone());
+    assert_eq!(
+        call(&mut engine, first_port, "getType", "()I", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            first_port,
+            "getName",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "in-a"
+    );
+    let output_port = object(port_values[2].clone());
+    assert_eq!(
+        call(&mut engine, output_port, "getType", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(
+        call(&mut engine, output_port, "getPortNumber", "()I", &[]),
+        Value::Int(0)
+    );
+    let same_id = p49_new(
+        &mut engine,
+        info_class,
+        info_sig,
+        &[
+            Value::Int(9),
+            Value::Int(42),
+            Value::Int(0),
+            Value::Int(0),
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            Value::Int(0),
+            Value::Int(0),
+        ],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            info,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(same_id)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, info, "hashCode", "()I", &[]),
+        Value::Int(42)
+    );
+    assert!(
+        call_text(&mut engine, info, "toString", "()Ljava/lang/String;", &[])
+            .starts_with("MidiDeviceInfo[mType=2,mInputPortCount=2,mOutputPortCount=1,")
+    );
+
+    call(
+        &mut engine,
+        callback,
+        "onDeviceAdded",
+        "(Landroid/media/midi/MidiDeviceInfo;)V",
+        &[Value::Obj(info)],
+    );
+    assert_eq!(field(&engine, callback, "rd_last_added"), Value::Obj(info));
+
+    let receiver = p49_new(
+        &mut engine,
+        "Landroid/media/midi/MidiReceiver;",
+        "(I)V",
+        &[Value::Int(2)],
+    );
+    assert_eq!(
+        call(&mut engine, receiver, "getMaxMessageSize", "()I", &[]),
+        Value::Int(2)
+    );
+    let message = byte_array(&mut engine, &[0x90, 1, 2, 3, 4]);
+    call(
+        &mut engine,
+        receiver,
+        "send",
+        "([BIIJ)V",
+        &[message, Value::Int(1), Value::Int(3), Value::Long(99)],
+    );
+    assert_eq!(field(&engine, receiver, "rd_send_calls"), Value::Int(2));
+    let received = field(&engine, receiver, "rd_received");
+    assert_eq!(byte_array_values(&engine, &received), vec![1, 2, 3]);
+    assert_eq!(field(&engine, receiver, "rd_last_offset"), Value::Int(3));
+    assert_eq!(field(&engine, receiver, "rd_last_count"), Value::Int(1));
+    assert_eq!(
+        field(&engine, receiver, "rd_last_timestamp"),
+        Value::Long(99)
+    );
+    call(&mut engine, receiver, "flush", "()V", &[]);
+    assert_eq!(field(&engine, receiver, "rd_flushed"), Value::Int(1));
+}
+
+#[test]
+fn tv_no_input_profile_ratings_and_tracks_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let manager = p57_system_service(&mut engine, "tv_input");
+    assert_eq!(
+        engine.heap.class_of(manager).unwrap(),
+        "Landroid/media/tv/TvInputManager;"
+    );
+    let inputs = call(
+        &mut engine,
+        manager,
+        "getTvInputList",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, inputs), 0);
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "getTvInputInfo",
+            "(Ljava/lang/String;)Landroid/media/tv/TvInputInfo;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let input_id = text(&mut engine, "input-1");
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getTvInputInfo",
+            "(Ljava/lang/String;)Landroid/media/tv/TvInputInfo;",
+            std::slice::from_ref(&input_id)
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getInputState",
+            "(Ljava/lang/String;)I",
+            &[input_id]
+        ),
+        Value::Int(2)
+    );
+    let systems = call(
+        &mut engine,
+        manager,
+        "getTvContentRatingSystemList",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, systems), 0);
+
+    let callback = p49_new(
+        &mut engine,
+        "Landroid/media/tv/TvInputManager$TvInputCallback;",
+        "()V",
+        &[],
+    );
+    let handler = instance(&mut engine, "Landroid/os/Handler;");
+    let register_sig = "(Landroid/media/tv/TvInputManager$TvInputCallback;Landroid/os/Handler;)V";
+    call(
+        &mut engine,
+        manager,
+        "registerCallback",
+        register_sig,
+        &[Value::Obj(callback), Value::Obj(handler)],
+    );
+    call(
+        &mut engine,
+        manager,
+        "registerCallback",
+        register_sig,
+        &[Value::Obj(callback), Value::Obj(handler)],
+    );
+    let callbacks = p49_field_or_null(&engine, manager, "rd_callbacks");
+    assert_eq!(p57_collection_size(&mut engine, callbacks), 2);
+    call(
+        &mut engine,
+        manager,
+        "unregisterCallback",
+        "(Landroid/media/tv/TvInputManager$TvInputCallback;)V",
+        &[Value::Obj(callback)],
+    );
+    let callbacks = field(&engine, manager, "rd_callbacks");
+    assert_eq!(p57_collection_size(&mut engine, callbacks), 1);
+
+    let rating_class = "Landroid/media/tv/TvContentRating;";
+    let create_sig = "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)Landroid/media/tv/TvContentRating;";
+    let empty = text(&mut engine, "");
+    let domain = text(&mut engine, "example.org");
+    let system = text(&mut engine, "US");
+    let main_rating = text(&mut engine, "TV-14");
+    assert_throws(
+        engine.invoke_static(
+            rating_class,
+            "createRating",
+            create_sig,
+            &[empty, system.clone(), main_rating.clone(), Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let subratings = p57_string_array(&mut engine, &["V", "FV"]);
+    let candidate = object(call_static(
+        &mut engine,
+        rating_class,
+        "createRating",
+        create_sig,
+        &[
+            domain.clone(),
+            system.clone(),
+            main_rating.clone(),
+            subratings.clone(),
+        ],
+    ));
+    assert_eq!(p57_string_values(&engine, &subratings), ["FV", "V"]);
+    assert_eq!(
+        call_text(
+            &mut engine,
+            candidate,
+            "flattenToString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "example.org/US/TV-14/FV/V"
+    );
+    let subrating_list = call(
+        &mut engine,
+        candidate,
+        "getSubRatings",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, subrating_list.clone()), 2);
+    let first_subrating = p49_list_get(&mut engine, subrating_list, 0);
+    assert_eq!(text_of(&engine, &first_subrating), "FV");
+
+    let no_subratings = p57_string_array(&mut engine, &[]);
+    let base = object(call_static(
+        &mut engine,
+        rating_class,
+        "createRating",
+        create_sig,
+        &[domain, system, main_rating, no_subratings],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            base,
+            "getSubRatings",
+            "()Ljava/util/List;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            candidate,
+            "contains",
+            "(Landroid/media/tv/TvContentRating;)Z",
+            &[Value::Obj(base)]
+        ),
+        Value::Int(1)
+    );
+
+    call(
+        &mut engine,
+        manager,
+        "addBlockedRating",
+        "(Landroid/media/tv/TvContentRating;)V",
+        &[Value::Obj(base)],
+    );
+    call(
+        &mut engine,
+        manager,
+        "addBlockedRating",
+        "(Landroid/media/tv/TvContentRating;)V",
+        &[Value::Obj(base)],
+    );
+    let blocked = call(
+        &mut engine,
+        manager,
+        "getBlockedRatings",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, blocked.clone()), 1);
+    let blocked_first = object(p49_list_get(&mut engine, blocked, 0));
+    assert_ne!(blocked_first, base);
+    assert_eq!(
+        call(
+            &mut engine,
+            blocked_first,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(base)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "isRatingBlocked",
+            "(Landroid/media/tv/TvContentRating;)Z",
+            &[Value::Obj(candidate)]
+        ),
+        Value::Int(1)
+    );
+    call(
+        &mut engine,
+        manager,
+        "removeBlockedRating",
+        "(Landroid/media/tv/TvContentRating;)V",
+        &[Value::Obj(base)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "isRatingBlocked",
+            "(Landroid/media/tv/TvContentRating;)Z",
+            &[Value::Obj(candidate)]
+        ),
+        Value::Int(0)
+    );
+    let flattened = text(&mut engine, "example.org/US/TV-14/FV/V");
+    let round_trip = object(call_static(
+        &mut engine,
+        rating_class,
+        "unflattenFromString",
+        "(Ljava/lang/String;)Landroid/media/tv/TvContentRating;",
+        &[flattened],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            round_trip,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(candidate)]
+        ),
+        Value::Int(1)
+    );
+
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "isParentalControlsEnabled",
+            "()Z",
+            &[]
+        ),
+        Value::Int(0)
+    );
+    call(
+        &mut engine,
+        manager,
+        "setParentalControlsEnabled",
+        "(Z)V",
+        &[Value::Int(1)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "isParentalControlsEnabled",
+            "()Z",
+            &[]
+        ),
+        Value::Int(1)
+    );
+
+    let builder_class = "Landroid/media/tv/TvTrackInfo$Builder;";
+    let bad_builder = instance(&mut engine, builder_class);
+    assert_throws(
+        engine.invoke_instance(
+            bad_builder,
+            "<init>",
+            "(ILjava/lang/String;)V",
+            &[Value::Int(3), Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let audio_id = text(&mut engine, "audio-1");
+    let audio_builder = p49_new(
+        &mut engine,
+        builder_class,
+        "(ILjava/lang/String;)V",
+        &[Value::Int(0), audio_id],
+    );
+    let language = text(&mut engine, "pt");
+    call(
+        &mut engine,
+        audio_builder,
+        "setLanguage",
+        "(Ljava/lang/String;)Landroid/media/tv/TvTrackInfo$Builder;",
+        &[language],
+    );
+    let description = text(&mut engine, "Portuguese");
+    call(
+        &mut engine,
+        audio_builder,
+        "setDescription",
+        "(Ljava/lang/CharSequence;)Landroid/media/tv/TvTrackInfo$Builder;",
+        &[description],
+    );
+    call(
+        &mut engine,
+        audio_builder,
+        "setAudioChannelCount",
+        "(I)Landroid/media/tv/TvTrackInfo$Builder;",
+        &[Value::Int(2)],
+    );
+    call(
+        &mut engine,
+        audio_builder,
+        "setAudioSampleRate",
+        "(I)Landroid/media/tv/TvTrackInfo$Builder;",
+        &[Value::Int(48_000)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            audio_builder,
+            "setVideoWidth",
+            "(I)Landroid/media/tv/TvTrackInfo$Builder;",
+            &[Value::Int(1920)],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+    let extra = p49_new(&mut engine, "Landroid/os/Bundle;", "()V", &[]);
+    call(
+        &mut engine,
+        audio_builder,
+        "setExtra",
+        "(Landroid/os/Bundle;)Landroid/media/tv/TvTrackInfo$Builder;",
+        &[Value::Obj(extra)],
+    );
+    let audio = object(call(
+        &mut engine,
+        audio_builder,
+        "build",
+        "()Landroid/media/tv/TvTrackInfo;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, audio, "getType", "()I", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            audio,
+            "getLanguage",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "pt"
+    );
+    assert_eq!(
+        call(&mut engine, audio, "getAudioChannelCount", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(
+        call(&mut engine, audio, "getAudioSampleRate", "()I", &[]),
+        Value::Int(48_000)
+    );
+    let copied_extra = object(call(
+        &mut engine,
+        audio,
+        "getExtra",
+        "()Landroid/os/Bundle;",
+        &[],
+    ));
+    assert_ne!(copied_extra, extra);
+
+    let audio_id_copy = text(&mut engine, "audio-1");
+    let audio_builder_copy = p49_new(
+        &mut engine,
+        builder_class,
+        "(ILjava/lang/String;)V",
+        &[Value::Int(0), audio_id_copy],
+    );
+    let language_copy = text(&mut engine, "pt");
+    call(
+        &mut engine,
+        audio_builder_copy,
+        "setLanguage",
+        "(Ljava/lang/String;)Landroid/media/tv/TvTrackInfo$Builder;",
+        &[language_copy],
+    );
+    let description_copy = text(&mut engine, "Portuguese");
+    call(
+        &mut engine,
+        audio_builder_copy,
+        "setDescription",
+        "(Ljava/lang/CharSequence;)Landroid/media/tv/TvTrackInfo$Builder;",
+        &[description_copy],
+    );
+    call(
+        &mut engine,
+        audio_builder_copy,
+        "setAudioChannelCount",
+        "(I)Landroid/media/tv/TvTrackInfo$Builder;",
+        &[Value::Int(2)],
+    );
+    call(
+        &mut engine,
+        audio_builder_copy,
+        "setAudioSampleRate",
+        "(I)Landroid/media/tv/TvTrackInfo$Builder;",
+        &[Value::Int(48_000)],
+    );
+    let audio_equal = object(call(
+        &mut engine,
+        audio_builder_copy,
+        "build",
+        "()Landroid/media/tv/TvTrackInfo;",
+        &[],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            audio,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(audio_equal)]
+        ),
+        Value::Int(1),
+        "TvTrackInfo equality ignores mExtra"
+    );
+    assert_eq!(
+        call(&mut engine, audio, "hashCode", "()I", &[]),
+        call(&mut engine, audio_equal, "hashCode", "()I", &[])
+    );
+
+    let video_id = text(&mut engine, "video-1");
+    let video_builder = p49_new(
+        &mut engine,
+        builder_class,
+        "(ILjava/lang/String;)V",
+        &[Value::Int(1), video_id],
+    );
+    let video = object(call(
+        &mut engine,
+        video_builder,
+        "build",
+        "()Landroid/media/tv/TvTrackInfo;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, video, "getVideoPixelAspectRatio", "()F", &[]),
+        Value::Float(1.0)
+    );
+}
+
+#[test]
+fn companion_absent_service_values_filters_and_mac_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let mac_class = "Landroid/net/MacAddress;";
+    let mac_sig = "(Ljava/lang/String;)Landroid/net/MacAddress;";
+    let mac_text = text(&mut engine, "02:11:22:AA:BB:CC");
+    let mac_value = call_static(&mut engine, mac_class, "fromString", mac_sig, &[mac_text]);
+    let mac = object(mac_value.clone());
+    assert_eq!(
+        call_text(&mut engine, mac, "toString", "()Ljava/lang/String;", &[]),
+        "02:11:22:aa:bb:cc"
+    );
+    assert_eq!(
+        call(&mut engine, mac, "getAddressType", "()I", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, mac, "isLocallyAssigned", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call_text(&mut engine, mac, "toOuiString", "()Ljava/lang/String;", &[]),
+        "02:11:22"
+    );
+    let mac_bytes = call(&mut engine, mac, "toByteArray", "()[B", &[]);
+    assert_eq!(
+        byte_array_values(&engine, &mac_bytes),
+        vec![0x02, 0x11, 0x22, 0xaa, 0xbb, 0xcc]
+    );
+    let mask_text = text(&mut engine, "ff:ff:ff:00:00:00");
+    let mask = object(call_static(
+        &mut engine,
+        mac_class,
+        "fromString",
+        mac_sig,
+        &[mask_text],
+    ));
+    let base_text = text(&mut engine, "02:11:22:00:00:99");
+    let base = object(call_static(
+        &mut engine,
+        mac_class,
+        "fromString",
+        mac_sig,
+        &[base_text],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            mac,
+            "matches",
+            "(Landroid/net/MacAddress;Landroid/net/MacAddress;)Z",
+            &[Value::Obj(base), Value::Obj(mask)]
+        ),
+        Value::Int(1)
+    );
+    let short_mac = text(&mut engine, "1:2:3");
+    assert_throws(
+        engine.invoke_static(mac_class, "fromString", mac_sig, &[short_mac]),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let invalid_mac = text(&mut engine, "GG:11:22:33:44:55");
+    assert_throws(
+        engine.invoke_static(mac_class, "fromString", mac_sig, &[invalid_mac]),
+        "Ljava/lang/NumberFormatException;",
+    );
+
+    let pattern = af_pattern(&mut engine, "Rusty.*");
+    let bt_builder = p49_new(
+        &mut engine,
+        "Landroid/companion/BluetoothDeviceFilter$Builder;",
+        "()V",
+        &[],
+    );
+    call(
+        &mut engine,
+        bt_builder,
+        "setNamePattern",
+        "(Ljava/util/regex/Pattern;)Landroid/companion/BluetoothDeviceFilter$Builder;",
+        std::slice::from_ref(&pattern),
+    );
+    let bt_address = text(&mut engine, "02:11:22:AA:BB:CC");
+    call(
+        &mut engine,
+        bt_builder,
+        "setAddress",
+        "(Ljava/lang/String;)Landroid/companion/BluetoothDeviceFilter$Builder;",
+        &[bt_address],
+    );
+    call(
+        &mut engine,
+        bt_builder,
+        "addServiceUuid",
+        "(Landroid/os/ParcelUuid;Landroid/os/ParcelUuid;)Landroid/companion/BluetoothDeviceFilter$Builder;",
+        &[Value::Null, Value::Null],
+    );
+    let bt_filter = object(call(
+        &mut engine,
+        bt_builder,
+        "build",
+        "()Landroid/companion/BluetoothDeviceFilter;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, bt_filter, "getMediumType", "()I", &[]),
+        Value::Int(0)
+    );
+    let service_uuids = call(
+        &mut engine,
+        bt_filter,
+        "getServiceUuids",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, service_uuids), 1);
+    assert_throws(
+        engine.invoke_instance(
+            bt_builder,
+            "build",
+            "()Landroid/companion/BluetoothDeviceFilter;",
+            &[],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    let ble_builder = p49_new(
+        &mut engine,
+        "Landroid/companion/BluetoothLeDeviceFilter$Builder;",
+        "()V",
+        &[],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            ble_builder,
+            "setRawDataFilter",
+            "([B[B)Landroid/companion/BluetoothLeDeviceFilter$Builder;",
+            &[Value::Null, Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let raw = byte_array(&mut engine, &[1, 2]);
+    let short_mask = byte_array(&mut engine, &[1]);
+    assert_throws(
+        engine.invoke_instance(
+            ble_builder,
+            "setRawDataFilter",
+            "([B[B)Landroid/companion/BluetoothLeDeviceFilter$Builder;",
+            &[raw, short_mask],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let raw = byte_array(&mut engine, &[1, 2]);
+    let raw_mask = byte_array(&mut engine, &[0xff, 0xf0]);
+    call(
+        &mut engine,
+        ble_builder,
+        "setRawDataFilter",
+        "([B[B)Landroid/companion/BluetoothLeDeviceFilter$Builder;",
+        &[raw, raw_mask],
+    );
+    let long_prefix = text(&mut engine, "ThisPrefixIsTooLong");
+    let suffix = text(&mut engine, "!");
+    assert_throws(
+        engine.invoke_instance(
+            ble_builder,
+            "setRenameFromName",
+            "(Ljava/lang/String;Ljava/lang/String;II)Landroid/companion/BluetoothLeDeviceFilter$Builder;",
+            &[long_prefix, suffix.clone(), Value::Int(0), Value::Int(3)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let prefix = text(&mut engine, "Watch");
+    call(
+        &mut engine,
+        ble_builder,
+        "setRenameFromName",
+        "(Ljava/lang/String;Ljava/lang/String;II)Landroid/companion/BluetoothLeDeviceFilter$Builder;",
+        &[prefix, suffix, Value::Int(0), Value::Int(3)],
+    );
+    let second_prefix = text(&mut engine, "Other");
+    let second_suffix = text(&mut engine, "?");
+    assert_throws(
+        engine.invoke_instance(
+            ble_builder,
+            "setRenameFromName",
+            "(Ljava/lang/String;Ljava/lang/String;II)Landroid/companion/BluetoothLeDeviceFilter$Builder;",
+            &[
+                second_prefix,
+                second_suffix,
+                Value::Int(0),
+                Value::Int(1),
+            ],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+    let ble_filter = object(call(
+        &mut engine,
+        ble_builder,
+        "build",
+        "()Landroid/companion/BluetoothLeDeviceFilter;",
+        &[],
+    ));
+    let scan_filter = call(
+        &mut engine,
+        ble_filter,
+        "getScanFilter",
+        "()Landroid/bluetooth/le/ScanFilter;",
+        &[],
+    );
+    assert_eq!(
+        engine.heap.class_of(object(scan_filter)).unwrap(),
+        "Landroid/bluetooth/le/ScanFilter;"
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            ble_filter,
+            "getRenamePrefix",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "Watch"
+    );
+    assert_eq!(
+        call(&mut engine, ble_filter, "getMediumType", "()I", &[]),
+        Value::Int(1)
+    );
+
+    let wifi_builder = p49_new(
+        &mut engine,
+        "Landroid/companion/WifiDeviceFilter$Builder;",
+        "()V",
+        &[],
+    );
+    call(
+        &mut engine,
+        wifi_builder,
+        "setBssid",
+        "(Landroid/net/MacAddress;)Landroid/companion/WifiDeviceFilter$Builder;",
+        std::slice::from_ref(&mac_value),
+    );
+    let wifi_filter = object(call(
+        &mut engine,
+        wifi_builder,
+        "build",
+        "()Landroid/companion/WifiDeviceFilter;",
+        &[],
+    ));
+    let default_mask = object(call(
+        &mut engine,
+        wifi_filter,
+        "getBssidMask",
+        "()Landroid/net/MacAddress;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            default_mask,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "ff:ff:ff:ff:ff:ff"
+    );
+    assert_eq!(
+        call(&mut engine, wifi_filter, "getMediumType", "()I", &[]),
+        Value::Int(2)
+    );
+    let bad_wifi_builder = p49_new(
+        &mut engine,
+        "Landroid/companion/WifiDeviceFilter$Builder;",
+        "()V",
+        &[],
+    );
+    call(
+        &mut engine,
+        bad_wifi_builder,
+        "setBssidMask",
+        "(Landroid/net/MacAddress;)Landroid/companion/WifiDeviceFilter$Builder;",
+        &[Value::Null],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            bad_wifi_builder,
+            "build",
+            "()Landroid/companion/WifiDeviceFilter;",
+            &[],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            bad_wifi_builder,
+            "build",
+            "()Landroid/companion/WifiDeviceFilter;",
+            &[],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    let request_builder = p49_new(
+        &mut engine,
+        "Landroid/companion/AssociationRequest$Builder;",
+        "()V",
+        &[],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            request_builder,
+            "setDisplayName",
+            "(Ljava/lang/CharSequence;)Landroid/companion/AssociationRequest$Builder;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    call(
+        &mut engine,
+        request_builder,
+        "addDeviceFilter",
+        "(Landroid/companion/DeviceFilter;)Landroid/companion/AssociationRequest$Builder;",
+        &[Value::Null],
+    );
+    call(
+        &mut engine,
+        request_builder,
+        "addDeviceFilter",
+        "(Landroid/companion/DeviceFilter;)Landroid/companion/AssociationRequest$Builder;",
+        &[Value::Obj(bt_filter)],
+    );
+    call(
+        &mut engine,
+        request_builder,
+        "setSingleDevice",
+        "(Z)Landroid/companion/AssociationRequest$Builder;",
+        &[Value::Int(1)],
+    );
+    let profile = text(&mut engine, "android.app.role.COMPANION_DEVICE_WATCH");
+    call(
+        &mut engine,
+        request_builder,
+        "setDeviceProfile",
+        "(Ljava/lang/String;)Landroid/companion/AssociationRequest$Builder;",
+        &[profile],
+    );
+    call(
+        &mut engine,
+        request_builder,
+        "setSelfManaged",
+        "(Z)Landroid/companion/AssociationRequest$Builder;",
+        &[Value::Int(1)],
+    );
+    let display_name = text(&mut engine, "Rusty Watch");
+    call(
+        &mut engine,
+        request_builder,
+        "setDisplayName",
+        "(Ljava/lang/CharSequence;)Landroid/companion/AssociationRequest$Builder;",
+        &[display_name],
+    );
+    let request = object(call(
+        &mut engine,
+        request_builder,
+        "build",
+        "()Landroid/companion/AssociationRequest;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, request, "isSingleDevice", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, request, "isSelfManaged", "()Z", &[]),
+        Value::Int(1)
+    );
+    let request_filters = call(
+        &mut engine,
+        request,
+        "getDeviceFilters",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, request_filters.clone()), 1);
+    assert_eq!(
+        p49_list_get(&mut engine, request_filters, 0),
+        Value::Obj(bt_filter)
+    );
+    assert!(matches!(
+        call(&mut engine, request, "getCreationTime", "()J", &[]),
+        Value::Long(_)
+    ));
+
+    let info_class = "Landroid/companion/AssociationInfo;";
+    let info_sig = "(IILjava/lang/String;Landroid/net/MacAddress;Ljava/lang/CharSequence;Ljava/lang/String;Landroid/companion/AssociatedDevice;ZZZJJI)V";
+    let package_name = text(&mut engine, "dev.RustyDroid.test");
+    let info_display = text(&mut engine, "Rusty Watch");
+    let info_profile = text(&mut engine, "android.app.role.COMPANION_DEVICE_WATCH");
+    let bad_info = instance(&mut engine, info_class);
+    assert_throws(
+        engine.invoke_instance(
+            bad_info,
+            "<init>",
+            info_sig,
+            &[
+                Value::Int(0),
+                Value::Int(10),
+                package_name.clone(),
+                mac_value.clone(),
+                info_display.clone(),
+                info_profile.clone(),
+                Value::Null,
+                Value::Int(0),
+                Value::Int(1),
+                Value::Int(0),
+                Value::Long(123),
+                Value::Long(456),
+                Value::Int(3),
+            ],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let info = p49_new(
+        &mut engine,
+        info_class,
+        info_sig,
+        &[
+            Value::Int(7),
+            Value::Int(10),
+            package_name,
+            mac_value,
+            info_display,
+            info_profile,
+            Value::Null,
+            Value::Int(0),
+            Value::Int(1),
+            Value::Int(0),
+            Value::Long(123),
+            Value::Long(456),
+            Value::Int(3),
+        ],
+    );
+    assert_eq!(call(&mut engine, info, "getId", "()I", &[]), Value::Int(7));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            info,
+            "getDeviceMacAddressAsString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "02:11:22:AA:BB:CC"
+    );
+    let last_connected = object(call(
+        &mut engine,
+        info,
+        "getLastTimeConnectedMs",
+        "()Ljava/lang/Long;",
+        &[],
+    ));
+    assert_eq!(field(&engine, last_connected, "value"), Value::Long(456));
+    let lower_mac_text = text(&mut engine, "02:11:22:aa:bb:cc");
+    assert_eq!(
+        call(
+            &mut engine,
+            info,
+            "isLinkedTo",
+            "(Ljava/lang/String;)Z",
+            &[lower_mac_text]
+        ),
+        Value::Int(1)
+    );
+
+    let info_builder = p49_new(
+        &mut engine,
+        "Landroid/companion/AssociationInfo$Builder;",
+        "(Landroid/companion/AssociationInfo;)V",
+        &[Value::Obj(info)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            info_builder,
+            "setLastTimeConnected",
+            "(J)Landroid/companion/AssociationInfo$Builder;",
+            &[Value::Long(-1)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    call(
+        &mut engine,
+        info_builder,
+        "setLastTimeConnected",
+        "(J)Landroid/companion/AssociationInfo$Builder;",
+        &[Value::Long(789)],
+    );
+    call(
+        &mut engine,
+        info_builder,
+        "setRevoked",
+        "(Z)Landroid/companion/AssociationInfo$Builder;",
+        &[Value::Int(1)],
+    );
+    let updated = object(call(
+        &mut engine,
+        info_builder,
+        "build",
+        "()Landroid/companion/AssociationInfo;",
+        &[],
+    ));
+    assert_ne!(updated, info);
+    assert_eq!(
+        call(&mut engine, updated, "getId", "()I", &[]),
+        Value::Int(7)
+    );
+    assert_eq!(
+        call(&mut engine, updated, "isRevoked", "()Z", &[]),
+        Value::Int(1)
+    );
+
+    let manager = p57_system_service(&mut engine, "companiondevice");
+    assert_eq!(
+        engine.heap.class_of(manager).unwrap(),
+        "Landroid/companion/CompanionDeviceManager;"
+    );
+    assert_eq!(
+        call(&mut engine, manager, "checkFeaturePresent", "()Z", &[]),
+        Value::Int(0)
+    );
+    let associations = call(
+        &mut engine,
+        manager,
+        "getMyAssociations",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, associations), 0);
+    let component = instance(&mut engine, "Landroid/content/ComponentName;");
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "hasNotificationAccess",
+            "(Landroid/content/ComponentName;)Z",
+            &[Value::Obj(component)]
+        ),
+        Value::Int(0)
+    );
+    call(
+        &mut engine,
+        manager,
+        "associate",
+        "(Landroid/companion/AssociationRequest;Landroid/companion/CompanionDeviceManager$Callback;Landroid/os/Handler;)V",
+        &[Value::Null, Value::Null, Value::Null],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "buildAssociationCancellationIntent",
+            "()Landroid/content/IntentSender;",
+            &[]
+        ),
+        Value::Null
+    );
+
+    let callback = p49_new(
+        &mut engine,
+        "Landroid/companion/CompanionDeviceManager$Callback;",
+        "()V",
+        &[],
+    );
+    let sender = instance(&mut engine, "Landroid/content/IntentSender;");
+    call(
+        &mut engine,
+        callback,
+        "onAssociationPending",
+        "(Landroid/content/IntentSender;)V",
+        &[Value::Obj(sender)],
+    );
+    assert_eq!(
+        field(&engine, callback, "rd_pending_sender"),
+        Value::Obj(sender)
+    );
+    assert_eq!(
+        field(&engine, callback, "rd_found_sender"),
+        Value::Obj(sender)
     );
 }

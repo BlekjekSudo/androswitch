@@ -1762,9 +1762,10 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Object;",
         ]),
         "Landroid/hardware/fingerprint/FingerprintManager$CryptoObject;"
-        | "Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;" => {
-            Some(&["Landroid/hardware/biometrics/CryptoObject;", "Ljava/lang/Object;"])
-        }
+        | "Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;" => Some(&[
+            "Landroid/hardware/biometrics/CryptoObject;",
+            "Ljava/lang/Object;",
+        ]),
         "Landroid/hardware/fingerprint/FingerprintManager$AuthenticationCallback;"
         | "Landroid/hardware/biometrics/BiometricPrompt$AuthenticationCallback;" => Some(&[
             "Landroid/hardware/biometrics/BiometricAuthenticator$AuthenticationCallback;",
