@@ -1,0 +1,254 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T18:14:46.2145567Z",
+  "scope": "Fail-closed shared virtual Object.equals dispatch across real host overrides, bounded DEX inheritance, arrays, and production JNI Invocation. No collection value-equality implementation or package-specific handling.",
+  "status": "host_passed_emulator_pending",
+  "portable_core_asserted": true,
+  "supplements": {
+    "sha256": "f5ab958b708305b4282bf196c60ed465fb53485c84ee0506d566725afc3bba2b",
+    "reason": "The earlier lifecycle and 18-case value tests did not cover Object-typed host overrides. Read-only review found that a declaring-Object identity shortcut could bypass genuine String/boxed bodies and fabricate identity results for unsupported collection overrides. This receipt binds the correction; the previous receipt remains immutable.",
+    "path": "reports/m9-application-lifecycle-host-20261025.json"
+  },
+  "contract": [
+    "FrameworkHost receives the DEX method-reference class even for virtual calls, so a declaring Object reference is not treated as a nonvirtual body. The early Android declaring-Object identity branch and Collections noncontainer generic identity fallback are removed.",
+    "Existing real String/boxed/other implemented host value bodies run before inherited Object identity is considered. Real DEX class overrides remain authoritative.",
+    "Inherited identity is admitted only for an actual heap array, actual Object, or a maximum-64-edge DEX-only superclass chain reaching Object without crossing an unsupported builtin boundary. Arrays are verified by the heap object variant, not only by a descriptor prefix.",
+    "ArrayList/HashMap equality and DEX subclasses without a DEX override fail API_UNAVAILABLE rather than returning an invented identity comparison. This includes self-comparison; the unavailable body is not represented as executed.",
+    "Existing opcode-aware DEX invoke-super Object.equals retains identity and does not call the DEX override recursively. Object method metadata does not claim JNI CallNonvirtual support.",
+    "Boxed equality now returns false immediately for different final wrapper classes instead of recursing into the same equals host body. Same-class payload behavior remains in the existing implementation.",
+    "Production JNI tests resolve the actual Object.equals method ID, decode actual object handles, and invoke the shared Invocation path. The actual receiver reaches host value bodies or the same unsupported-builtin guard regardless of the method ID declaration."
+  ],
+  "commands": [
+    {
+      "command": "fixtures/m9/application-lifecycle/build.ps1",
+      "status": "passed",
+      "exit_code": 0
+    },
+    {
+      "passed": 10,
+      "unsupported_collection_assertions": 8,
+      "compile_seconds": 13.54,
+      "status": "passed",
+      "log": "local-artifacts/m9/object-equality-host/20261025/lifecycle-2.log",
+      "ignored": 0,
+      "jvm_supported_value_comparisons": 66,
+      "failed": 0,
+      "manifest_identities": 2,
+      "jvm_arraylist_snapshot_comparisons": 6,
+      "exit_code": 0,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-framework --features host --test application_lifecycle --locked -- --test-threads=1",
+      "seconds": 3.71
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-switch-smoke --features host-cli,portable-tests --test jni_objects --locked -- --test-threads=1",
+      "compile_seconds": 2.0,
+      "seconds": 0.77,
+      "status": "passed",
+      "passed": 5,
+      "ignored": 0,
+      "exit_code": 0,
+      "failed": 0,
+      "log": "local-artifacts/m9/object-equality-host/20261025/jni-2.log"
+    },
+    {
+      "seconds": 2.53,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1 cargo clippy -p as-framework --features host --lib --test application_lifecycle --locked -- -D warnings",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local-artifacts/m9/object-equality-host/20261025/framework-clippy.log"
+    },
+    {
+      "seconds": 2.98,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1 cargo clippy -p as-switch-smoke --features host-cli,portable-tests --lib --test jni_objects --locked -- -D warnings",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local-artifacts/m9/object-equality-host/20261025/jni-clippy.log"
+    }
+  ],
+  "jvm_cases": {
+    "unsupported_rows": [
+      26,
+      27,
+      28,
+      29
+    ],
+    "manifest_identities": 2,
+    "unsupported_reference_result": "All four JVM collection rows produce true. Runtime assertions require API_UNAVAILABLE, never accepting false or true as a substitute implementation.",
+    "total_rows": 37,
+    "new_supported": "Object-typed equal distinct Strings; null String; equal distinct boxed Integers; Integer/Long mismatch and null; inherited DEX identity and equals overrides; true Object super calls; primitive/object/multidimensional array self/distinct/null.",
+    "supported_value_comparisons": 66,
+    "arraylist_snapshot_comparisons": 6,
+    "supported_total_comparisons": 72,
+    "explicit_unsupported_assertions": 8
+  },
+  "jni_test": "production_virtual_object_method_id_honors_host_overrides_and_rejects_unknown_builtin_equals",
+  "limits": [
+    "No new collection value-equality implementation is claimed. Unknown builtin equality boundaries fail explicitly even where future API work may establish inherited identity.",
+    "JNI CallNonvirtual is not implemented or verified by these tests; DEX invoke-super identity is separately exercised through the opcode-aware interpreter.",
+    "Tests execute the portable interpreter and real production JNI handle/invocation dispatch on the host. No native machine-code JNI transport, Horizon emulator, or physical Switch execution is claimed by this receipt.",
+    "The plain Object JNI invocation receiver is allocated directly in the real heap, as in existing reference-table tests. This scoped invocation test does not claim a new Engine.new_instance Object constructor path.",
+    "String value tests retain existing Rust UTF8 storage limitations for arbitrary unpaired UTF16 surrogates, as documented by the earlier lifecycle receipt."
+  ],
+  "fixture_receipt": {
+    "sha256": "65c2de9c5c90d3ceebf486f80c257d8f39f0f4c064d24c4cad99b4d14c0fd415",
+    "path": "target/application-lifecycle-fixture/build-receipt.json"
+  },
+  "fixture_build": {
+    "value_oracle": {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture/jvm-value-oracle.txt",
+      "sha256": "1ce844030de0609bba58c478f36172a8522a07d8799f84e9d2d87a6373c30365"
+    },
+    "schema_version": 1,
+    "api": 26,
+    "build_tools": "35.0.0",
+    "apks": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture\\lifecycle.apk",
+        "sha256": "f6280e1b81e9c2cdf0b13dd6ed1045cef950cf3cb0dd79d09982fa451b2b76a3"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture\\renamed.apk",
+        "sha256": "6a1c88f905f2b4924505b6f60bf3fd541140ef07b71218ed8e24550ed2e4b50d"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture\\legacy-pause.apk",
+        "sha256": "a1d1e735afb22a6dd6d2906887cc1da5830c6a20fde44e182bd60ddb808c79f7"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture\\lifecycle-proof.apk",
+        "sha256": "62f2413ad0aff20d32f7368ae0b93eeb414b2546a18ef72e696be948fa2ff620"
+      }
+    ],
+    "sources": [
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\LifecycleListOracle.java",
+        "sha256": "00914a0a4175a44ad8a0cb1e23bc3bb592c55d053a17653cbf89ae558205d8c5"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\LifecycleProbe.java",
+        "sha256": "2fc3080058ba84385cef66870ac717edd8f189e39f0774ae7da84fd8818d998a"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\LifecycleProof.java",
+        "sha256": "f3554837522000d683eb384f2dcb64bc5b3c423412e27f58a6968de97fe332c1"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\LifecycleProofActivity.java",
+        "sha256": "22b6bfe67ebee4410fbed4f16e30c6d47eded383a0f86d5a90b28eb3c74aa23b"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\LifecycleValueOracle.java",
+        "sha256": "63ab1d945af66bb62420f548aa6b9d6cb0302a08748d627b50e27ded2403b8c5"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\ObservedActivity.java",
+        "sha256": "1a56ea9576331134449a752490641a8a0e2063f5c674393f583b95e1c85104bb"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\ObserverApplication.java",
+        "sha256": "fcf3e94b7f5335cd79abab7f114804b030f929cbf0cc0dcd8b5d4efa52945842"
+      },
+      {
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\application-lifecycle\\build.ps1",
+        "sha256": "2a591f6b8ce5bd329061cc228fa62c0b7d007081521d9e37f8a65b5339d23e57"
+      }
+    ],
+    "oracle": {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\application-lifecycle-fixture/jvm-list-oracle.txt",
+      "sha256": "24e38356ce768ea8908e9e51a0dcb34a28ac11b2845426634f850ae42610cd57"
+    }
+  },
+  "unchanged_jni_fixture_receipt": {
+    "sha256": "310a4fe10a7e5ef1c5c5623275b941a76593dd6efb28d75ced7fa09d8c9cabda",
+    "path": "target/jni-objects-fixture/build-receipt.json"
+  },
+  "sources": [
+    {
+      "sha256": "1fbde9a63b8d83b92122075d1e2b4589474a14933a32aed4afce3f80460f7c23",
+      "snapshot": "local-artifacts\\m9\\object-equality-host\\20261025\\frozen\\crates\\as-framework\\src\\android.rs",
+      "path": "crates/as-framework/src/android.rs"
+    },
+    {
+      "sha256": "3197207beb6e012aa145f83a37d35757e5020b2a0993efe646cb5c1e9e469f09",
+      "snapshot": "local-artifacts\\m9\\object-equality-host\\20261025\\frozen\\crates\\as-framework\\src\\services\\collections.rs",
+      "path": "crates/as-framework/src/services/collections.rs"
+    },
+    {
+      "sha256": "fe03cd6d7d7b5e15b5f6dcfa13515f319bb318186974d1c3349e0a2502ba0b62",
+      "snapshot": "local-artifacts\\m9\\object-equality-host\\20261025\\frozen\\crates\\as-framework\\src\\services\\mod.rs",
+      "path": "crates/as-framework/src/services/mod.rs"
+    },
+    {
+      "sha256": "fdc8e6987b91f4b48334866b44782e92acaeaa604a6fec32641bedff0058bee6",
+      "snapshot": "local-artifacts\\m9\\object-equality-host\\20261025\\frozen\\crates\\as-framework\\tests\\application_lifecycle.rs",
+      "path": "crates/as-framework/tests/application_lifecycle.rs"
+    },
+    {
+      "sha256": "9e4410b97454ee4a819f2f94510a16fdfaaee088ed5c954329c8b2812f7015ac",
+      "snapshot": "local-artifacts\\m9\\object-equality-host\\20261025\\frozen\\crates\\as-switch-smoke\\tests\\jni_objects.rs",
+      "path": "crates/as-switch-smoke/tests/jni_objects.rs"
+    },
+    {
+      "sha256": "d1a669181feefcff042bb0fda9c75467e9daddac17d34295b017bd6dfdfcf2b6",
+      "snapshot": "local-artifacts\\m9\\object-equality-host\\20261025\\frozen\\crates\\as-switch-smoke\\src\\jni_objects.rs",
+      "path": "crates/as-switch-smoke/src/jni_objects.rs"
+    },
+    {
+      "sha256": "aa2bc46a8db0a39f999d56176d26d4883af639a5cc31c6101f75c2f83411ad26",
+      "snapshot": "local-artifacts\\m9\\object-equality-host\\20261025\\frozen\\crates\\as-switch-smoke\\src\\jni_constructor.rs",
+      "path": "crates/as-switch-smoke/src/jni_constructor.rs"
+    },
+    {
+      "sha256": "a7f372b60279e6f3232aaa2ad8e5c77b5b931314c04cb2c90f49fbd752237619",
+      "snapshot": "local-artifacts\\m9\\object-equality-host\\20261025\\frozen\\crates\\rd-vm\\src\\interp.rs",
+      "path": "crates/rd-vm/src/interp.rs"
+    },
+    {
+      "sha256": "e5be8483f4ad07b2152809d5ec6f96f2b6e467070f5cba957f79eaeed6aeaf44",
+      "snapshot": "local-artifacts\\m9\\object-equality-host\\20261025\\frozen\\crates\\rd-vm\\src\\engine.rs",
+      "path": "crates/rd-vm/src/engine.rs"
+    },
+    {
+      "sha256": "00b3066e5ae1254cceb43449b73d6e1ecffd6a0cee81258fc2e3fb7173f1ae97",
+      "snapshot": "local-artifacts\\m9\\object-equality-host\\20261025\\frozen\\crates\\rd-vm\\src\\classpath.rs",
+      "path": "crates/rd-vm/src/classpath.rs"
+    },
+    {
+      "sha256": "63ab1d945af66bb62420f548aa6b9d6cb0302a08748d627b50e27ded2403b8c5",
+      "snapshot": "local-artifacts\\m9\\object-equality-host\\20261025\\frozen\\fixtures\\m9\\application-lifecycle\\java\\org\\androswitch\\contracts\\LifecycleValueOracle.java",
+      "path": "fixtures/m9/application-lifecycle/java/org/androswitch/contracts/LifecycleValueOracle.java"
+    }
+  ],
+  "logs": [
+    {
+      "sha256": "6eec6bc922d188fe100f262322e30b3ea80274661388b3fc5cb1436410f7b25a",
+      "path": "local-artifacts/m9/object-equality-host/20261025/lifecycle-1.log"
+    },
+    {
+      "sha256": "26330fbd6c5db1474c7cde3a7a0880ed60fd637baf7c0402c5c6fb9598f432ae",
+      "path": "local-artifacts/m9/object-equality-host/20261025/lifecycle-2.log"
+    },
+    {
+      "sha256": "7378a9d0da0772f192e5cf3b1c9ff66533b77787c9f191452a607572a22c93ad",
+      "path": "local-artifacts/m9/object-equality-host/20261025/jni-1.log"
+    },
+    {
+      "sha256": "094d741a85c42ca8ae923931e8bc186b189a60bc10d37389c72125779cdcbd12",
+      "path": "local-artifacts/m9/object-equality-host/20261025/jni-2.log"
+    },
+    {
+      "sha256": "8a76856edda706570aabe3982cb9bca3d37bbd8e640f71239c85942d699ff008",
+      "path": "local-artifacts/m9/object-equality-host/20261025/framework-clippy.log"
+    },
+    {
+      "sha256": "6ead9b29fb0baa663df05e0488ae6de5349832ec6f8a5e027d48e37e45773315",
+      "path": "local-artifacts/m9/object-equality-host/20261025/jni-clippy.log"
+    }
+  ],
+  "diagnostic_attempts": [
+    "Expanded lifecycle attempt 1 reproduced a preexisting Integer.equals(Long) recursion and the isolated Rust test process exited with STATUS_STACK_OVERFLOW. The bounded wrapper-type check fixes this actual new negative case.",
+    "JNI attempt 1 passed the original four tests and all new String/boxed/unsupported-builtin assertions, then hit an unavailable Engine.new_instance Object constructor helper. The invocation-only test now directly allocates the real empty Object heap instance without claiming constructor support.",
+    "Final lifecycle and JNI targets passed after these concrete corrections. Both focused Clippy commands passed on the final frozen source."
+  ],
+  "implementation_commit": "46982ab"
+}

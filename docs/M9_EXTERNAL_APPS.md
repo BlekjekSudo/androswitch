@@ -188,6 +188,10 @@ is separate evidence and still requires a corrected NRO execution.
   body; unimplemented builtin equality bodies, including collection equality,
   report `API_UNAVAILABLE`. True invoke-super is dispatched by the opcode;
   a method reference declaring Object does not imply a nonvirtual call.
+  The [expanded dispatch receipt](../reports/m9-object-equality-guard-host-20261025.json)
+  records 72 supported JVM comparisons, eight explicit unsupported assertions,
+  and five production JNI tests. It also records the corrected mismatched
+  wrapper-type recursion found by those extra cases.
   The independent SDK
   proof records real startup/return callbacks; save remains `not_observed`
   unless an actual save callback occurs. NRO verification is still pending.
