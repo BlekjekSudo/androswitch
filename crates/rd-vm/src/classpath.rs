@@ -1455,9 +1455,7 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Landroid/view/View;",
             "Ljava/lang/Object;",
         ]),
-        "Landroid/opengl/GLSurfaceView$Renderer;"
-        | "Landroid/opengl/GLSurfaceView$EGLConfigChooser;"
-        | "Ljavax/microedition/khronos/egl/EGL10;"
+        "Ljavax/microedition/khronos/egl/EGL10;"
         | "Ljavax/microedition/khronos/egl/EGLDisplay;"
         | "Ljavax/microedition/khronos/egl/EGLConfig;"
         | "Ljavax/microedition/khronos/opengles/GL;"
@@ -1466,7 +1464,7 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         | "Landroid/util/DisplayMetrics;"
         | "Landroid/app/ActivityManager;"
         | "Landroid/content/pm/ConfigurationInfo;" => Some(OBJECT),
-        "Landroid/media/AudioManager;" | "Landroid/view/View$OnTouchListener;" => Some(OBJECT),
+        "Landroid/media/AudioManager;" => Some(OBJECT),
         "Landroid/view/ViewGroup$LayoutParams;" => Some(VIEWGROUP_LAYOUT_PARAMS),
         "Landroid/view/ViewGroup$MarginLayoutParams;" => Some(MARGIN_LAYOUT_PARAMS),
         "Landroid/widget/LinearLayout$LayoutParams;" => Some(LINEAR_LAYOUT_PARAMS),
@@ -1653,6 +1651,9 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
 /// Interfaces de plataforma conhecidas sem DEX (issue #26: check-cast /
 /// instanceof para CharSequence/Comparable/… sobre String/StringBuilder).
 fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
+    if host_interface_modifiers(class).is_some() {
+        return Some(&[]);
+    }
     if class == "Ljavax/microedition/khronos/opengles/GL10;" {
         return Some(&["Ljavax/microedition/khronos/opengles/GL;"]);
     }
@@ -2000,6 +2001,21 @@ pub fn host_class_known(desc: &str) -> bool {
     desc == "Ljava/lang/Object;"
         || builtin_hierarchy(desc).is_some()
         || builtin_interfaces(desc).is_some()
+}
+
+/// Exact root callback interfaces whose dispatch contracts are implemented by
+/// the portable framework. Nested public interfaces are implicitly static;
+/// Class modifiers are PUBLIC|STATIC|INTERFACE|ABSTRACT (JLS9.1.1).
+/// This metadata does not make arbitrary Android listeners available.
+pub fn host_interface_modifiers(desc: &str) -> Option<u32> {
+    match desc {
+        "Landroid/view/View$OnClickListener;"
+        | "Landroid/view/View$OnTouchListener;"
+        | "Landroid/content/SharedPreferences$OnSharedPreferenceChangeListener;"
+        | "Landroid/opengl/GLSurfaceView$Renderer;"
+        | "Landroid/opengl/GLSurfaceView$EGLConfigChooser;" => Some(0x0609),
+        _ => None,
+    }
 }
 
 /// Like [`unresolved_method`], naming the receiver's runtime class when it

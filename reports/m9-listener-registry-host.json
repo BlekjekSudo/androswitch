@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T17:05:11.7735813Z",
+  "scope": "Explicit builtin metadata for five actually implemented portable Android callback interfaces; shared Class.forName/ClassLoader dependency resolution remains strict.",
+  "status": "host_passed_emulator_pending",
+  "portable_core_asserted": true,
+  "trigger": {
+    "file": "crates/as-framework/tests/lifecycle.rs",
+    "prior_error": "NoClassDefFoundError Landroid/view/View$OnClickListener;",
+    "operation": "canonical application ClassLoader.loadClass of ordinary Java UI Activity",
+    "note": "Integrated host regression, not a game execution failure",
+    "test": "package_context_directories_and_class_loader_use_real_storage_and_vm_metadata",
+    "source_baseline": "1b2a968"
+  },
+  "interface_facts": {
+    "superinterfaces": [],
+    "modifiers_hex": "0x0609",
+    "java_reflection_scope": "Existing Class.getSuperclass returns null for these known interfaces. Class.getModifiers/isInterface API bodies were not newly added; modifier facts are explicit Rust class metadata.",
+    "registration": "Explicit modeled interface facts; no prefix matching or permissive listener fallback",
+    "descriptors": [
+      "Landroid/view/View$OnClickListener;",
+      "Landroid/view/View$OnTouchListener;",
+      "Landroid/content/SharedPreferences$OnSharedPreferenceChangeListener;",
+      "Landroid/opengl/GLSurfaceView$Renderer;",
+      "Landroid/opengl/GLSurfaceView$EGLConfigChooser;"
+    ],
+    "superclass": null,
+    "modifiers": "PUBLIC STATIC INTERFACE ABSTRACT"
+  },
+  "contract": [
+    "All five callbacks have preexisting real providers: click/touch in android.rs, shared-preference listener delivery in services/preferences.rs, renderer/config chooser in services/glsurface.rs",
+    "Previously class-shaped facts for OnTouchListener/GLSurfaceView.Renderer/EGLConfigChooser removed; modeled root interface facts now establish host_class_known",
+    "Original normal SDK Activity implements click/touch and executes real onClick during startup; another original class declares preference/GL callback dependencies",
+    "Class.forName and canonical ClassLoader.loadClass agree on these dependencies; Class identity and Java Class.getSuperclass are checked",
+    "Unimplemented sibling listeners such as OnLongClickListener/OnKeyListener/EGLContextFactory remain absent from the supported registry; missing app definition/dependency tests remain unchanged"
+  ],
+  "commands": [
+    {
+      "exit_code": 0,
+      "status": "passed",
+      "command": "pwsh -NoProfile -File fixtures/m9/class-forname/build.ps1"
+    },
+    {
+      "passed": 5,
+      "test_seconds": 1.05,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-framework --features host --test class_forname --locked -- --nocapture",
+      "exit_code": 0,
+      "ignored": 0,
+      "status": "passed",
+      "log": "target/evidence/m9-listener-registry-class-forname.log",
+      "failed": 0
+    },
+    {
+      "log": "target/evidence/m9-listener-registry-lifecycle.log",
+      "test_seconds": 0.44,
+      "filtered_out": 7,
+      "passed": 1,
+      "exit_code": 0,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 cargo test -p as-framework --features host --test lifecycle --locked package_context_directories_and_class_loader_use_real_storage_and_vm_metadata -- --include-ignored --nocapture",
+      "ignored": 0,
+      "status": "passed",
+      "failed": 0
+    },
+    {
+      "log": "target/evidence/m9-listener-registry-clippy.log",
+      "exit_code": 0,
+      "status": "passed",
+      "seconds": 5.05,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1 cargo clippy -p as-framework --features host --lib --test class_forname --test lifecycle --locked -- -D warnings"
+    },
+    {
+      "log": "target/evidence/m9-listener-registry-vm-clippy.log",
+      "exit_code": 0,
+      "status": "passed",
+      "seconds": 1.91,
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1 cargo clippy -p rd-vm --no-default-features --lib --locked -- -D warnings"
+    }
+  ],
+  "fixture_build": {
+    "sources": [
+      {
+        "sha256": "77c9a38aa1a9b6cf57cb87924c86aea5152df60fd27bc1d2d9d2b5efb119fb21",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\class-forname\\java\\org\\androswitch\\contracts\\ForNameActivity.java"
+      },
+      {
+        "sha256": "e424de34e93a3173140b946eede21658dc7a076e0b5498916df35b99d57535a5",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\class-forname\\java\\org\\androswitch\\contracts\\ForNameCases.java"
+      },
+      {
+        "sha256": "5545c73d75ce7199cc29810c37d155496d1d71068f6268e8c4f086b3615e97e5",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\class-forname\\java\\org\\androswitch\\contracts\\ForNameOracle.java"
+      },
+      {
+        "sha256": "6a7b22d26d9b8c87049222ef031fb5300ad956968828322e2e91599badfc10d7",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\class-forname\\java\\org\\androswitch\\contracts\\LinkedChild.java"
+      },
+      {
+        "sha256": "309031e18898e993ef6e3c6f6cf6220c8c30f0d3d4ca502af4c933ab69dc6ec6",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\class-forname\\java\\org\\androswitch\\contracts\\ListenerContracts.java"
+      },
+      {
+        "sha256": "b8a997887725d4afd13d4c527a62278ca218953f3d2e5a2de821d071a95ce7ea",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\class-forname\\java\\org\\androswitch\\contracts\\MissingBase.java"
+      },
+      {
+        "sha256": "16ceb19055d2e246c5da59a3602f3c32f3a315ef8968fdf16a538a1251ae41f3",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\m9\\class-forname\\build.ps1"
+      }
+    ],
+    "api": 26,
+    "build_tools": "35.0.0",
+    "schema_version": 1,
+    "oracle": {
+      "sha256": "f8dfc7f271919769146ba4cdadd5a984fbeaecc96ba2ed54a2126ce6e063951b",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\class-forname-fixture/jvm-oracle.txt"
+    },
+    "default_interface_oracle": {
+      "sha256": "7de6d83ca73d89f3291e84ac1a39b7ce0df71387f09662e10ef2d85920dc7b8f",
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\class-forname-fixture/default-interface-jvm-oracle.txt"
+    },
+    "apks": [
+      {
+        "sha256": "43411560f036a56adfc000e3b03614136b4176fe876503c29d83bd550b09fc01",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\class-forname-fixture\\class-forname.apk"
+      },
+      {
+        "sha256": "810c89d0ce0bcbbdf1de7aca5b2532b1ce3898a7e0ba06637608d6e8d8f1d6e6",
+        "path": "D:\\Dev\\Switch\\AndroSwitch\\target\\class-forname-fixture\\renamed.apk"
+      }
+    ],
+    "absent_dependency": "org.androswitch.contracts.MissingBase"
+  },
+  "source_hashes_captured_after_test": [
+    {
+      "sha256": "a6eb2addf00cbf59070b3cfb027690e21daec827a563789687a7c53c7b2aaba4",
+      "path": "crates/rd-vm/src/classpath.rs"
+    },
+    {
+      "sha256": "fe10952684bc579c43599db659dc9cb2e373d2353e0c94d3cb0b55fdb8d43347",
+      "path": "crates/as-framework/src/services/reflection.rs"
+    },
+    {
+      "sha256": "f3b97ecebeb7dc894f96ade1db990478c1ff9765823571be65a2f31a0996ece8",
+      "path": "crates/as-framework/tests/class_forname.rs"
+    },
+    {
+      "sha256": "77c9a38aa1a9b6cf57cb87924c86aea5152df60fd27bc1d2d9d2b5efb119fb21",
+      "path": "fixtures/m9/class-forname/java/org/androswitch/contracts/ForNameActivity.java"
+    },
+    {
+      "sha256": "309031e18898e993ef6e3c6f6cf6220c8c30f0d3d4ca502af4c933ab69dc6ec6",
+      "path": "fixtures/m9/class-forname/java/org/androswitch/contracts/ListenerContracts.java"
+    }
+  ],
+  "primary_references": [
+    "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/core/java/android/view/View.java",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/core/java/android/content/SharedPreferences.java",
+    "https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r1/opengl/java/android/opengl/GLSurfaceView.java",
+    "https://docs.oracle.com/javase/specs/jls/se8/html/jls-9.html#jls-9.1.1"
+  ],
+  "verification": {
+    "hardware": "not run",
+    "android_reference_device": "not run; normal SDK fixture and API26 source declarations used",
+    "scope_limit": "No broader listener API registration, reflection API implementation, ART verifier, or external game first screen is claimed.",
+    "emulator": "corrected NRO pending parent integration",
+    "host": "Five ClassForName tests passed plus the actual previously failing lifecycle test, with0ignored.74 supported JVM comparisons and two guarded default-interface cases retained."
+  },
+  "historical_receipts": "reports/m9-class-forname-host.json remains unchanged; this followup binds the corrected registry and rebuilt fixture."
+}

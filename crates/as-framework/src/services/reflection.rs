@@ -181,6 +181,7 @@ pub(super) fn call(
                     Some("Ljava/lang/Object;".into())
                 } else if d.len() == 1
                     || d == "Ljava/lang/Object;"
+                    || rd_vm::classpath::host_interface_modifiers(&d).is_some()
                     || vm
                         .cp
                         .find_class(&d)

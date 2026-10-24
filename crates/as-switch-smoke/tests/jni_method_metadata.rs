@@ -199,7 +199,7 @@ fn actual_loader_identity_context_inheritance_and_unknown_loader_failures() {
     assert_eq!(context(&mut app, main), Some(application));
     let app_name = Value::StrPlaceholder("org.androswitch.contracts.LoaderParentThread".into());
     assert!(
-        matches!(app.vm.invoke_instance(bootstrap,"loadClass","(Ljava/lang/String;)Ljava/lang/Class;",&[app_name.clone()]),Err(VmExit::Exception(e)) if e.class=="Ljava/lang/ClassNotFoundException;")
+        matches!(app.vm.invoke_instance(bootstrap,"loadClass","(Ljava/lang/String;)Ljava/lang/Class;",std::slice::from_ref(&app_name)),Err(VmExit::Exception(e)) if e.class=="Ljava/lang/ClassNotFoundException;")
     );
     let expected = app
         .vm

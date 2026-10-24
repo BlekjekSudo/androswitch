@@ -293,3 +293,93 @@ fn default_interface_initialization_is_explicitly_unavailable_without_mutating_o
         }
     }
 }
+
+#[test]
+fn implemented_callback_dependencies_have_explicit_interface_metadata_and_no_unknown_siblings() {
+    for fixture in ["class-forname", "renamed"] {
+        let mut app = app(fixture);
+        let app_loader = loader(&app);
+        assert_eq!(
+            app.vm.statics[&(ACTIVITY.into(), "clicks".into())],
+            Value::Int(1)
+        );
+        for (name, owner) in [
+            ("android.view.View$OnClickListener", ACTIVITY),
+            ("android.view.View$OnTouchListener", ACTIVITY),
+            (
+                "android.content.SharedPreferences$OnSharedPreferenceChangeListener",
+                "Lorg/androswitch/contracts/ListenerContracts;",
+            ),
+            (
+                "android.opengl.GLSurfaceView$Renderer",
+                "Lorg/androswitch/contracts/ListenerContracts;",
+            ),
+            (
+                "android.opengl.GLSurfaceView$EGLConfigChooser",
+                "Lorg/androswitch/contracts/ListenerContracts;",
+            ),
+        ] {
+            let descriptor = format!("L{};", name.replace('.', "/"));
+            assert_eq!(
+                rd_vm::classpath::host_interface_modifiers(&descriptor),
+                Some(0x0609)
+            );
+            assert!(rd_vm::classpath::host_class_known(&descriptor));
+            assert!(app.vm.cp.is_subtype(owner, &descriptor));
+            let class = lookup(&mut app, Some(name), false, app_loader.clone()).unwrap();
+            let loaded = app
+                .vm
+                .invoke_instance(
+                    app_loader.as_ref().unwrap().unwrap(),
+                    "loadClass",
+                    "(Ljava/lang/String;)Ljava/lang/Class;",
+                    &[Value::StrPlaceholder(name.into())],
+                )
+                .unwrap();
+            assert_eq!(class, loaded);
+            assert_eq!(
+                app.vm
+                    .invoke_instance(
+                        class.as_ref().unwrap().unwrap(),
+                        "getSuperclass",
+                        "()Ljava/lang/Class;",
+                        &[]
+                    )
+                    .unwrap(),
+                Value::Null
+            );
+        }
+        for name in [
+            "org.androswitch.contracts.ForNameActivity",
+            "org.androswitch.contracts.ListenerContracts",
+        ] {
+            assert_eq!(
+                lookup(&mut app, Some(name), false, app_loader.clone()).unwrap(),
+                app.vm
+                    .invoke_instance(
+                        app_loader.as_ref().unwrap().unwrap(),
+                        "loadClass",
+                        "(Ljava/lang/String;)Ljava/lang/Class;",
+                        &[Value::StrPlaceholder(name.into())]
+                    )
+                    .unwrap()
+            );
+        }
+        for name in [
+            "android.view.View$OnLongClickListener",
+            "android.view.View$OnKeyListener",
+            "android.opengl.GLSurfaceView$EGLContextFactory",
+        ] {
+            let descriptor = format!("L{};", name.replace('.', "/"));
+            assert_eq!(
+                rd_vm::classpath::host_interface_modifiers(&descriptor),
+                None
+            );
+            assert!(!rd_vm::classpath::host_class_known(&descriptor));
+            exception(
+                lookup(&mut app, Some(name), false, app_loader.clone()),
+                "Ljava/lang/ClassNotFoundException;",
+            );
+        }
+    }
+}

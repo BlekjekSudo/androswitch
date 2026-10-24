@@ -169,6 +169,10 @@ screen and returns cleanly to the launcher.
   results. Initialization that still requires an uninitialized default-bearing
   interface fails explicitly before mutation; automatic default-interface
   scheduling and custom class loaders remain unavailable.
+  The [listener registry correction](../reports/m9-listener-registry-host.json)
+  registers explicit interface facts for five callback contracts already
+  implemented by the framework. It restores strict class loading of the
+  ordinary SDK UI Activity; unknown sibling listeners remain unavailable.
 - `Resources.getIdentifier` uses the same actual resource-table identity as
   the name APIs, with qualified/default names, aliases and signed numeric IDs.
   The [identifier tests](../reports/m9-resource-identifiers-host.json) include
