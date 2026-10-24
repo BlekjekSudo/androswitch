@@ -154,15 +154,15 @@ key_apis = ["android.app.admin.DevicePolicyManager.isAdminActive"]
 id = "android-app-backup"
 prefix = "android.app.backup"
 domain = "app-lifecycle"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "BackupManager/BackupAgent transport and restore are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-app-backup"
-key_apis = ["android.app.backup.BackupManager.dataChanged"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "BackupManager is modelled with no backup system service (IBackupManager stays null, as when the service is not published): dataChanged/dataChanged(String)/dataChangedForUser, setBackupEnabled, setAutoRestore, setFrameworkSchedulingEnabled, setBackupServiceActive, backupNow, cancelBackups, setAncestralSerialNumber, excludeKeysFromRestore, updateTransportAttributes and reportDelayedRestoreResult are dropped, isBackupEnabled/isBackupServiceActive/isAppEligibleForBackup are false, getCurrentTransport/getCurrentTransportComponent/listAllTransports/selectBackupTransport/getConfigurationIntent/getDestinationString/getDataManagementIntent/getDataManagementIntentLabel/getDataManagementLabel/getUserForAncestralSerialNumber are null, getAvailableRestoreToken is 0, beginRestoreSession is null, requestBackup returns -1, and requestRestore returns -1 unconditionally as since Android P. BackupAgent provides its stable onBind binder, the onCreate overload chain (user/destination storage, event-logger creation in the three-argument form), no-op onDestroy/onRestoreFinished/onQuotaExceeded, and getBackupRestoreEventLogger, with BackupManager.getBackupRestoreEventLogger enforcing the initialised-agent IllegalStateException and getDelayedRestoreLogger returning a fresh restore logger whose logging results are empty; RestoreObserver and BackupObserver base callbacks are no-ops. No backup transport, BackupAgent onBackup/onRestore data flow, key/value or full-backup helpers, restore sessions, or transport selection effects are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-app-backup-transport-restore"
+key_apis = ["android.app.backup.BackupManager.dataChanged", "android.app.backup.BackupManager.isBackupEnabled", "android.app.backup.BackupManager.requestBackup", "android.app.backup.BackupManager.requestRestore", "android.app.backup.BackupAgent.onBind", "android.app.backup.BackupAgent.getBackupRestoreEventLogger"]
 
 [[surface]]
 id = "android-app-slice"
@@ -1061,15 +1061,15 @@ key_apis = ["android.telephony.TelephonyManager.getSimState", "android.telephony
 id = "android-telephony-gsm"
 prefix = "android.telephony.gsm"
 domain = "telephony"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "legacy"
-notes = "Legacy GSM SMS APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-telephony-gsm-legacy"
-key_apis = ["android.telephony.gsm.SmsManager.sendTextMessage"]
+notes = "The deprecated GsmCellLocation value class is fully modelled: lac/cid/psc defaulting to -1, the Bundle constructor reading lac/cid/psc with -1 defaults (NullPointerException on a null bundle), setLacAndCid/setPsc, setStateInvalid, isEmpty, fillInNotifierBundle writing the same keys back, lac^cid hashCode, cast-failure-tolerant equals, and the [lac, cid, psc] toString; CellLocation.requestLocationUpdate drops the request with no telephony service. The legacy GSM SmsManager/SmsMessage wrappers, CellLocation.newFromBundle/getEmpty phone-type selection against a real TelephonyManager, and any radio/cell information source are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-telephony-gsm-legacy-sms"
+key_apis = ["android.telephony.gsm.GsmCellLocation.getLac", "android.telephony.gsm.GsmCellLocation.getCid", "android.telephony.gsm.GsmCellLocation.setStateInvalid", "android.telephony.gsm.GsmCellLocation.fillInNotifierBundle", "android.telephony.gsm.GsmCellLocation.isEmpty", "android.telephony.gsm.GsmCellLocation.toString"]
 
 [[surface]]
 id = "android-telephony-mbms"

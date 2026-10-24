@@ -1925,6 +1925,27 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         | "Landroid/app/slice/SliceItem;"
         | "Landroid/app/slice/SliceSpec;"
         | "Landroid/app/slice/SliceManager;" => Some(OBJECT),
+        // Appendix C Batch 35-D bounded android.app.backup /
+        // android.telephony.gsm slices.
+        "Landroid/app/backup/BackupAgent;" => Some(&[
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/app/backup/BackupManager;"
+        | "Landroid/app/backup/RestoreObserver;"
+        | "Landroid/app/backup/BackupObserver;"
+        | "Landroid/app/backup/BackupRestoreEventLogger;"
+        | "Landroid/telephony/CellLocation;" => Some(OBJECT),
+        "Landroid/telephony/gsm/GsmCellLocation;" => {
+            Some(&["Landroid/telephony/CellLocation;", "Ljava/lang/Object;"])
+        }
+        "Landroid/app/backup/BackupAgent$BackupServiceBinder;" => Some(&[
+            "Landroid/app/IBackupAgent$Stub;",
+            "Landroid/os/Binder;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/app/IBackupAgent$Stub;" => Some(&["Landroid/os/Binder;", "Ljava/lang/Object;"]),
         _ => None,
     }
 }
@@ -2506,6 +2527,13 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         | "Landroid/location/Criteria;"
         | "Landroid/app/slice/SliceItem;"
         | "Landroid/app/slice/SliceSpec;" => Some(&["Landroid/os/Parcelable;"]),
+        // Interfaces in the Batch 35-D bounded slices.
+        "Landroid/app/backup/BackupAgent$BackupServiceBinder;"
+        | "Landroid/app/IBackupAgent$Stub;" => Some(&[
+            "Landroid/app/IBackupAgent;",
+            "Landroid/os/IBinder;",
+            "Landroid/os/IInterface;",
+        ]),
         _ => None,
     }
 }

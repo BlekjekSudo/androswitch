@@ -431,6 +431,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial35c_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial35d_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -581,6 +584,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial35c_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial35d_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -662,6 +668,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial35c_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial35d_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -38699,6 +38708,503 @@ pub(crate) fn partial35c_host_static(
         (P35C_CRITERIA, "ACCURACY_LOW") => Some(1),
         (P35C_CRITERIA, "ACCURACY_MEDIUM") => Some(2),
         (P35C_CRITERIA, "ACCURACY_HIGH") => Some(3),
+        _ => None,
+    };
+    Ok(int_value.map(Value::Int))
+}
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 35-D: android.app.backup + android.telephony.gsm.
+// Backup profile: there is no "backup" system service, so the static
+// IBackupManager stays null and every BackupManager call takes its
+// AOSP no-service path. GSM cell location is a pure value class.
+// ---------------------------------------------------------------------------
+
+const P35D_BACKUP_MANAGER: &str = "Landroid/app/backup/BackupManager;";
+const P35D_BACKUP_AGENT: &str = "Landroid/app/backup/BackupAgent;";
+const P35D_BACKUP_BINDER: &str = "Landroid/app/backup/BackupAgent$BackupServiceBinder;";
+const P35D_RESTORE_OBSERVER: &str = "Landroid/app/backup/RestoreObserver;";
+const P35D_BACKUP_OBSERVER: &str = "Landroid/app/backup/BackupObserver;";
+const P35D_EVENT_LOGGER: &str = "Landroid/app/backup/BackupRestoreEventLogger;";
+const P35D_CELL_LOCATION: &str = "Landroid/telephony/CellLocation;";
+const P35D_GSM_CELL_LOCATION: &str = "Landroid/telephony/gsm/GsmCellLocation;";
+
+fn p35d_class(c: &str) -> bool {
+    matches!(
+        c,
+        P35D_BACKUP_MANAGER
+            | P35D_BACKUP_AGENT
+            | P35D_RESTORE_OBSERVER
+            | P35D_BACKUP_OBSERVER
+            | P35D_EVENT_LOGGER
+            | P35D_CELL_LOCATION
+            | P35D_GSM_CELL_LOCATION
+    )
+}
+
+fn p35d_new_event_logger(vm: &mut Engine, operation_type: i32) -> Result<ObjRef, VmExit> {
+    let logger = alloc_obj(vm, P35D_EVENT_LOGGER, Vec::new())?;
+    vm.invoke_instance(logger, "<init>", "(I)V", &[Value::Int(operation_type)])?;
+    Ok(logger)
+}
+
+fn p35d_backup_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/content/Context;)V") => {
+            put(vm, recv, "mContext", p35_arg(args, 0))?;
+            Value::Null
+        }
+        // requestRestore always fails since Android P.
+        ("requestRestore", "(Landroid/app/backup/RestoreObserver;)I")
+        | (
+            "requestRestore",
+            "(Landroid/app/backup/RestoreObserver;Landroid/app/backup/BackupManagerMonitor;)I",
+        ) => Value::Int(-1),
+        // sService == null paths: writes are dropped, reads default.
+        ("dataChanged", "()V")
+        | ("setBackupEnabled", "(Z)V")
+        | ("setAutoRestore", "(Z)V")
+        | ("setFrameworkSchedulingEnabled", "(Z)V")
+        | ("setBackupServiceActive", "(Landroid/os/UserHandle;Z)V")
+        | ("backupNow", "()V")
+        | ("cancelBackups", "()V")
+        | ("setAncestralSerialNumber", "(J)V")
+        | ("excludeKeysFromRestore", "(Ljava/lang/String;Ljava/util/List;)V")
+        | ("reportDelayedRestoreResult", "(Landroid/app/backup/BackupRestoreEventLogger;)V")
+        | (
+            "selectBackupTransport",
+            "(Landroid/content/ComponentName;Landroid/app/backup/SelectBackupTransportCallback;)V",
+        )
+        | (
+            "updateTransportAttributes",
+            "(Landroid/content/ComponentName;Ljava/lang/String;Landroid/content/Intent;Ljava/lang/String;Landroid/content/Intent;Ljava/lang/String;)V",
+        )
+        | (
+            "updateTransportAttributes",
+            "(Landroid/content/ComponentName;Ljava/lang/String;Landroid/content/Intent;Ljava/lang/String;Landroid/content/Intent;Ljava/lang/CharSequence;)V",
+        ) => Value::Null,
+        ("isBackupEnabled", "()Z") | ("isAppEligibleForBackup", "(Ljava/lang/String;)Z") => {
+            Value::Int(0)
+        }
+        ("isBackupServiceActive", "(Landroid/os/UserHandle;)Z") => {
+            // The permission-in-service compat change (EnabledAfter R)
+            // is on for current apps, skipping the local permission
+            // enforcement; the service is absent either way.
+            let change_enabled = vm
+                .invoke_static(
+                    "Landroid/app/compat/CompatChanges;",
+                    "isChangeEnabled",
+                    "(J)Z",
+                    &[Value::Long(158_482_162)],
+                )
+                .map(|v| v.as_int().unwrap_or(1) != 0)
+                .unwrap_or(true);
+            if !change_enabled {
+                if let Some(context) = field_obj(vm, recv, "mContext") {
+                    let permission = jstr(vm, "android.permission.BACKUP")?;
+                    let message = jstr(vm, "isBackupServiceActive")?;
+                    vm.invoke_instance(
+                        context,
+                        "enforceCallingOrSelfPermission",
+                        "(Ljava/lang/String;Ljava/lang/String;)V",
+                        &[permission, message],
+                    )?;
+                }
+            }
+            Value::Int(0)
+        }
+        ("getCurrentTransport", "()Ljava/lang/String;")
+        | ("getCurrentTransportComponent", "()Landroid/content/ComponentName;")
+        | ("listAllTransports", "()[Ljava/lang/String;")
+        | ("selectBackupTransport", "(Ljava/lang/String;)Ljava/lang/String;")
+        | ("beginRestoreSession", "()Landroid/app/backup/RestoreSession;")
+        | ("getUserForAncestralSerialNumber", "(J)Landroid/os/UserHandle;")
+        | ("getConfigurationIntent", "(Ljava/lang/String;)Landroid/content/Intent;")
+        | ("getDestinationString", "(Ljava/lang/String;)Ljava/lang/String;")
+        | ("getDataManagementIntent", "(Ljava/lang/String;)Landroid/content/Intent;")
+        | ("getDataManagementIntentLabel", "(Ljava/lang/String;)Ljava/lang/CharSequence;") => {
+            Value::Null
+        }
+        ("getDataManagementLabel", "(Ljava/lang/String;)Ljava/lang/String;") => {
+            let label = vm.invoke_instance(
+                recv,
+                "getDataManagementIntentLabel",
+                "(Ljava/lang/String;)Ljava/lang/CharSequence;",
+                args,
+            )?;
+            match label {
+                Value::Obj(label) => {
+                    vm.invoke_instance(label, "toString", "()Ljava/lang/String;", &[])?
+                }
+                _ => Value::Null,
+            }
+        }
+        ("getAvailableRestoreToken", "(Ljava/lang/String;)J") => Value::Long(0),
+        (
+            "requestBackup",
+            "([Ljava/lang/String;Landroid/app/backup/BackupObserver;)I"
+            | "([Ljava/lang/String;Landroid/app/backup/BackupObserver;Landroid/app/backup/BackupManagerMonitor;I)I",
+        ) => Value::Int(-1),
+        (
+            "getBackupRestoreEventLogger",
+            "(Landroid/app/backup/BackupAgent;)Landroid/app/backup/BackupRestoreEventLogger;",
+        ) => {
+            let Some(agent) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            let logger = vm.invoke_instance(
+                agent,
+                "getBackupRestoreEventLogger",
+                "()Landroid/app/backup/BackupRestoreEventLogger;",
+                &[],
+            )?;
+            if !matches!(logger, Value::Obj(_)) {
+                return Err(ise(
+                    "Attempting to get logger on an uninitialised BackupAgent",
+                ));
+            }
+            logger
+        }
+        ("getDelayedRestoreLogger", "()Landroid/app/backup/BackupRestoreEventLogger;") => {
+            // OperationType.RESTORE
+            Value::Obj(p35d_new_event_logger(vm, 1)?)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35d_backup_agent_binder(vm: &mut Engine, agent: ObjRef) -> Result<ObjRef, VmExit> {
+    if let Some(binder) = field_obj(vm, agent, "mBinder") {
+        return Ok(binder);
+    }
+    let binder = alloc_obj(
+        vm,
+        P35D_BACKUP_BINDER,
+        vec![("rd_agent".to_string(), Value::Obj(agent))],
+    )?;
+    put(vm, agent, "mBinder", Value::Obj(binder))?;
+    Ok(binder)
+}
+
+fn p35d_backup_agent_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            p35d_backup_agent_binder(vm, recv)?;
+            Value::Null
+        }
+        ("onBind", "()Landroid/os/IBinder;") => Value::Obj(p35d_backup_agent_binder(vm, recv)?),
+        ("onCreate", "()V") | ("onDestroy", "()V") | ("onRestoreFinished", "()V") => Value::Null,
+        ("onCreate", "(Landroid/os/UserHandle;)V") => {
+            put(vm, recv, "mUser", p35_arg(args, 0))?;
+            vm.invoke_instance(recv, "onCreate", "()V", &[])?
+        }
+        ("onCreate", "(Landroid/os/UserHandle;I)V") => {
+            put(vm, recv, "mBackupDestination", Value::Int(iarg(args, 1)))?;
+            vm.invoke_instance(
+                recv,
+                "onCreate",
+                "(Landroid/os/UserHandle;)V",
+                &[p35_arg(args, 0)],
+            )?
+        }
+        ("onCreate", "(Landroid/os/UserHandle;II)V") => {
+            put(vm, recv, "mBackupDestination", Value::Int(iarg(args, 1)))?;
+            let logger = p35d_new_event_logger(vm, iarg(args, 2))?;
+            put(vm, recv, "mLogger", Value::Obj(logger))?;
+            vm.invoke_instance(
+                recv,
+                "onCreate",
+                "(Landroid/os/UserHandle;I)V",
+                &[p35_arg(args, 0), Value::Int(iarg(args, 1))],
+            )?
+        }
+        ("onQuotaExceeded", "(JJ)V") => Value::Null,
+        ("getBackupRestoreEventLogger", "()Landroid/app/backup/BackupRestoreEventLogger;") => {
+            get(vm, recv, "mLogger")
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35d_observer_instance(
+    _vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    _recv: ObjRef,
+    _args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let handled = matches!(
+        (class, name, sig),
+        (P35D_RESTORE_OBSERVER, "<init>", "()V")
+            | (
+                P35D_RESTORE_OBSERVER,
+                "restoreSetsAvailable",
+                "([Landroid/app/backup/RestoreSet;)V"
+            )
+            | (P35D_RESTORE_OBSERVER, "restoreStarting", "(I)V")
+            | (P35D_RESTORE_OBSERVER, "onUpdate", "(ILjava/lang/String;)V")
+            | (P35D_RESTORE_OBSERVER, "restoreFinished", "(I)V")
+            | (P35D_BACKUP_OBSERVER, "<init>", "()V")
+            | (
+                P35D_BACKUP_OBSERVER,
+                "onUpdate",
+                "(Ljava/lang/String;Landroid/app/backup/BackupProgress;)V"
+            )
+            | (P35D_BACKUP_OBSERVER, "onResult", "(Ljava/lang/String;I)V")
+            | (P35D_BACKUP_OBSERVER, "backupFinished", "(I)V")
+    );
+    Ok(handled.then_some(Value::Null))
+}
+
+fn p35d_event_logger_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(I)V") => {
+            put(vm, recv, "mOperationType", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        // Nothing has been logged yet in this profile.
+        ("getLoggingResults", "()Ljava/util/List;") => p35_empty_list(vm)?,
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p35d_bundle_get_int(
+    vm: &mut Engine,
+    bundle: ObjRef,
+    key: &str,
+    default: i32,
+) -> Result<i32, VmExit> {
+    let key = jstr(vm, key)?;
+    let value = vm.invoke_instance(
+        bundle,
+        "getInt",
+        "(Ljava/lang/String;I)I",
+        &[key, Value::Int(default)],
+    )?;
+    Ok(value.as_int().unwrap_or(default))
+}
+
+fn p35d_gsm_cell_location_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            put(vm, recv, "mLac", Value::Int(-1))?;
+            put(vm, recv, "mCid", Value::Int(-1))?;
+            put(vm, recv, "mPsc", Value::Int(-1))?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/os/Bundle;)V") => {
+            let Some(bundle) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            let lac = p35d_bundle_get_int(vm, bundle, "lac", -1)?;
+            let cid = p35d_bundle_get_int(vm, bundle, "cid", -1)?;
+            let psc = p35d_bundle_get_int(vm, bundle, "psc", -1)?;
+            put(vm, recv, "mLac", Value::Int(lac))?;
+            put(vm, recv, "mCid", Value::Int(cid))?;
+            put(vm, recv, "mPsc", Value::Int(psc))?;
+            Value::Null
+        }
+        ("getLac", "()I") => Value::Int(field_int(vm, recv, "mLac")),
+        ("getCid", "()I") => Value::Int(field_int(vm, recv, "mCid")),
+        ("getPsc", "()I") => Value::Int(field_int(vm, recv, "mPsc")),
+        ("setStateInvalid", "()V") => {
+            put(vm, recv, "mLac", Value::Int(-1))?;
+            put(vm, recv, "mCid", Value::Int(-1))?;
+            put(vm, recv, "mPsc", Value::Int(-1))?;
+            Value::Null
+        }
+        ("setLacAndCid", "(II)V") => {
+            put(vm, recv, "mLac", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mCid", Value::Int(iarg(args, 1)))?;
+            Value::Null
+        }
+        ("setPsc", "(I)V") => {
+            put(vm, recv, "mPsc", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("fillInNotifierBundle", "(Landroid/os/Bundle;)V") => {
+            let Some(bundle) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            for (key, field) in [("lac", "mLac"), ("cid", "mCid"), ("psc", "mPsc")] {
+                let key_value = jstr(vm, key)?;
+                vm.invoke_instance(
+                    bundle,
+                    "putInt",
+                    "(Ljava/lang/String;I)V",
+                    &[key_value, Value::Int(field_int(vm, recv, field))],
+                )?;
+            }
+            Value::Null
+        }
+        ("isEmpty", "()Z") => Value::Int(
+            (field_int(vm, recv, "mLac") == -1
+                && field_int(vm, recv, "mCid") == -1
+                && field_int(vm, recv, "mPsc") == -1) as i32,
+        ),
+        ("hashCode", "()I") => {
+            Value::Int(field_int(vm, recv, "mLac") ^ field_int(vm, recv, "mCid"))
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let Some(other) = oarg(args, 0) else {
+                return Ok(Some(Value::Int(0)));
+            };
+            // AOSP catches the ClassCastException from its cast.
+            if !vm
+                .cp
+                .is_subtype(&class_of(vm, other), P35D_GSM_CELL_LOCATION)
+            {
+                return Ok(Some(Value::Int(0)));
+            }
+            let eq = field_int(vm, recv, "mLac") == field_int(vm, other, "mLac")
+                && field_int(vm, recv, "mCid") == field_int(vm, other, "mCid")
+                && field_int(vm, recv, "mPsc") == field_int(vm, other, "mPsc");
+            Value::Int(eq as i32)
+        }
+        ("toString", "()Ljava/lang/String;") => jstr(
+            vm,
+            format!(
+                "[{},{},{}]",
+                field_int(vm, recv, "mLac"),
+                field_int(vm, recv, "mCid"),
+                field_int(vm, recv, "mPsc"),
+            ),
+        )?,
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn partial35d_instance_for_class(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P35D_BACKUP_MANAGER => p35d_backup_manager_instance(vm, name, sig, recv, args),
+        P35D_BACKUP_AGENT => p35d_backup_agent_instance(vm, name, sig, recv, args),
+        P35D_RESTORE_OBSERVER | P35D_BACKUP_OBSERVER => {
+            p35d_observer_instance(vm, class, name, sig, recv, args)
+        }
+        P35D_EVENT_LOGGER => p35d_event_logger_instance(vm, name, sig, recv, args),
+        P35D_GSM_CELL_LOCATION => p35d_gsm_cell_location_instance(vm, name, sig, recv, args),
+        P35D_CELL_LOCATION => {
+            // Only the constructor is concrete on the abstract base.
+            Ok((name == "<init>" && sig == "()V").then_some(Value::Null))
+        }
+        _ => Ok(None),
+    }
+}
+
+pub(crate) fn partial35d_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    for class in [recv_class, mref_class] {
+        if p35d_class(class) {
+            let value = partial35d_instance_for_class(vm, class, name, sig, recv, args)?;
+            if value.is_some() {
+                return Ok(value);
+            }
+        }
+    }
+    let actual = class_of(vm, recv);
+    if actual != recv_class && actual != mref_class && p35d_class(&actual) {
+        return partial35d_instance_for_class(vm, &actual, name, sig, recv, args);
+    }
+    Ok(None)
+}
+
+pub(crate) fn partial35d_static(
+    _vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    _args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // With no backup/telephony service, the static entry points drop the
+    // request exactly as AOSP does.
+    let handled = matches!(
+        (class, name, sig),
+        (P35D_BACKUP_MANAGER, "dataChanged", "(Ljava/lang/String;)V")
+            | (
+                P35D_BACKUP_MANAGER,
+                "dataChangedForUser",
+                "(ILjava/lang/String;)V"
+            )
+            | (P35D_CELL_LOCATION, "requestLocationUpdate", "()V")
+    );
+    Ok(handled.then_some(Value::Null))
+}
+
+pub(crate) fn partial35d_host_static(
+    vm: &mut Engine,
+    class: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    let text = match (class, field) {
+        (P35D_BACKUP_MANAGER, "EXTRA_BACKUP_SERVICES_AVAILABLE") => {
+            Some("backup_services_available")
+        }
+        (P35D_BACKUP_MANAGER, "PACKAGE_MANAGER_SENTINEL") => Some("@pm@"),
+        _ => None,
+    };
+    if let Some(text) = text {
+        return jstr(vm, text).map(Some);
+    }
+    let int_value = match (class, field) {
+        (P35D_BACKUP_MANAGER, "SUCCESS") => Some(0),
+        (P35D_BACKUP_MANAGER, "ERROR_BACKUP_NOT_ALLOWED") => Some(-2001),
+        (P35D_BACKUP_MANAGER, "ERROR_PACKAGE_NOT_FOUND") => Some(-2002),
+        (P35D_BACKUP_MANAGER, "ERROR_BACKUP_CANCELLED") => Some(-2003),
+        (P35D_BACKUP_MANAGER, "ERROR_TRANSPORT_UNAVAILABLE") => Some(-1),
+        (P35D_BACKUP_MANAGER, "ERROR_TRANSPORT_INVALID") => Some(-2),
+        (P35D_BACKUP_MANAGER, "FLAG_NON_INCREMENTAL_BACKUP") => Some(1),
+        (P35D_BACKUP_AGENT, "RESULT_SUCCESS") => Some(0),
+        (P35D_BACKUP_AGENT, "RESULT_ERROR") => Some(-1),
+        (P35D_BACKUP_AGENT, "TYPE_EOF") => Some(0),
+        (P35D_BACKUP_AGENT, "TYPE_FILE") => Some(1),
+        (P35D_BACKUP_AGENT, "TYPE_DIRECTORY") => Some(2),
+        (P35D_BACKUP_AGENT, "TYPE_SYMLINK") => Some(3),
+        (P35D_BACKUP_AGENT, "FLAG_CLIENT_SIDE_ENCRYPTION_ENABLED") => Some(1),
+        (P35D_BACKUP_AGENT, "FLAG_DEVICE_TO_DEVICE_TRANSFER") => Some(2),
+        (P35D_BACKUP_AGENT, "FLAG_FAKE_CLIENT_SIDE_ENCRYPTION_ENABLED") => Some(1i32 << 31),
         _ => None,
     };
     Ok(int_value.map(Value::Int))

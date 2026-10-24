@@ -13591,3 +13591,372 @@ fn slice_values_builder_and_missing_manager_are_guest_visible() {
         "Ljava/lang/NullPointerException;",
     );
 }
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 35-D: android.app.backup + android.telephony.gsm.
+// ---------------------------------------------------------------------------
+
+const P35D_BACKUP_MANAGER: &str = "Landroid/app/backup/BackupManager;";
+const P35D_BACKUP_AGENT: &str = "Landroid/app/backup/BackupAgent;";
+const P35D_RESTORE_OBSERVER: &str = "Landroid/app/backup/RestoreObserver;";
+const P35D_GSM: &str = "Landroid/telephony/gsm/GsmCellLocation;";
+
+#[test]
+fn backup_without_a_backup_service_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, CONTEXT);
+    let manager = p49_new(
+        &mut engine,
+        P35D_BACKUP_MANAGER,
+        "(Landroid/content/Context;)V",
+        &[Value::Obj(context)],
+    );
+
+    // All calls take the no-service path: writes drop, reads default.
+    call(&mut engine, manager, "dataChanged", "()V", &[]);
+    let package = text(&mut engine, "com.example.app");
+    call_static(
+        &mut engine,
+        P35D_BACKUP_MANAGER,
+        "dataChanged",
+        "(Ljava/lang/String;)V",
+        std::slice::from_ref(&package),
+    );
+    assert_eq!(
+        call(&mut engine, manager, "isBackupEnabled", "()Z", &[]),
+        Value::Int(0)
+    );
+    call(
+        &mut engine,
+        manager,
+        "setBackupEnabled",
+        "(Z)V",
+        &[Value::Int(1)],
+    );
+    assert_eq!(
+        call(&mut engine, manager, "isBackupEnabled", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getCurrentTransport",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "listAllTransports",
+            "()[Ljava/lang/String;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "isAppEligibleForBackup",
+            "(Ljava/lang/String;)Z",
+            std::slice::from_ref(&package),
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getAvailableRestoreToken",
+            "(Ljava/lang/String;)J",
+            &[package],
+        ),
+        Value::Long(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "beginRestoreSession",
+            "()Landroid/app/backup/RestoreSession;",
+            &[]
+        ),
+        Value::Null
+    );
+    let packages = object_array(&mut engine, "[Ljava/lang/String;", vec![]);
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "requestBackup",
+            "([Ljava/lang/String;Landroid/app/backup/BackupObserver;)I",
+            &[packages, Value::Null],
+        ),
+        Value::Int(-1)
+    );
+    // requestRestore has returned -1 unconditionally since Android P.
+    let observer = p49_new(&mut engine, P35D_RESTORE_OBSERVER, "()V", &[]);
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "requestRestore",
+            "(Landroid/app/backup/RestoreObserver;)I",
+            &[Value::Obj(observer)],
+        ),
+        Value::Int(-1)
+    );
+    call(&mut engine, manager, "backupNow", "()V", &[]);
+    call(&mut engine, manager, "cancelBackups", "()V", &[]);
+
+    // Observer base-class callbacks are no-ops.
+    call(
+        &mut engine,
+        observer,
+        "restoreStarting",
+        "(I)V",
+        &[Value::Int(3)],
+    );
+    let current = text(&mut engine, "com.example.app");
+    call(
+        &mut engine,
+        observer,
+        "onUpdate",
+        "(ILjava/lang/String;)V",
+        &[Value::Int(1), current],
+    );
+    call(
+        &mut engine,
+        observer,
+        "restoreFinished",
+        "(I)V",
+        &[Value::Int(0)],
+    );
+
+    // BackupAgent lifecycle and logger wiring.
+    let agent = p49_new(&mut engine, P35D_BACKUP_AGENT, "()V", &[]);
+    assert!(engine
+        .cp
+        .is_subtype(P35D_BACKUP_AGENT, "Landroid/content/Context;"));
+    let binder = object(call(
+        &mut engine,
+        agent,
+        "onBind",
+        "()Landroid/os/IBinder;",
+        &[],
+    ));
+    assert_eq!(
+        engine.heap.class_of(binder).unwrap(),
+        "Landroid/app/backup/BackupAgent$BackupServiceBinder;"
+    );
+    assert!(engine.cp.is_subtype(
+        "Landroid/app/backup/BackupAgent$BackupServiceBinder;",
+        "Landroid/os/IBinder;"
+    ));
+    let binder_again = object(call(
+        &mut engine,
+        agent,
+        "onBind",
+        "()Landroid/os/IBinder;",
+        &[],
+    ));
+    assert_eq!(binder_again, binder);
+    // The logger only exists after the three-argument onCreate.
+    assert_eq!(
+        call(
+            &mut engine,
+            agent,
+            "getBackupRestoreEventLogger",
+            "()Landroid/app/backup/BackupRestoreEventLogger;",
+            &[],
+        ),
+        Value::Null
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "getBackupRestoreEventLogger",
+            "(Landroid/app/backup/BackupAgent;)Landroid/app/backup/BackupRestoreEventLogger;",
+            &[Value::Obj(agent)],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+    call(
+        &mut engine,
+        agent,
+        "onCreate",
+        "(Landroid/os/UserHandle;II)V",
+        &[Value::Null, Value::Int(0), Value::Int(1)],
+    );
+    let logger = call(
+        &mut engine,
+        agent,
+        "getBackupRestoreEventLogger",
+        "()Landroid/app/backup/BackupRestoreEventLogger;",
+        &[],
+    );
+    assert!(matches!(logger, Value::Obj(_)));
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getBackupRestoreEventLogger",
+            "(Landroid/app/backup/BackupAgent;)Landroid/app/backup/BackupRestoreEventLogger;",
+            &[Value::Obj(agent)],
+        ),
+        logger
+    );
+    let results = call(
+        &mut engine,
+        object(logger),
+        "getLoggingResults",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, results), 0);
+    call(
+        &mut engine,
+        agent,
+        "onQuotaExceeded",
+        "(JJ)V",
+        &[Value::Long(10), Value::Long(5)],
+    );
+    call(&mut engine, agent, "onDestroy", "()V", &[]);
+}
+
+#[test]
+fn gsm_cell_location_values_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let location = p49_new(&mut engine, P35D_GSM, "()V", &[]);
+    assert!(engine
+        .cp
+        .is_subtype(P35D_GSM, "Landroid/telephony/CellLocation;"));
+    assert_eq!(
+        call(&mut engine, location, "getLac", "()I", &[]),
+        Value::Int(-1)
+    );
+    assert_eq!(
+        call(&mut engine, location, "getCid", "()I", &[]),
+        Value::Int(-1)
+    );
+    assert_eq!(
+        call(&mut engine, location, "getPsc", "()I", &[]),
+        Value::Int(-1)
+    );
+    assert_eq!(
+        call(&mut engine, location, "isEmpty", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            location,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "[-1,-1,-1]"
+    );
+
+    call(
+        &mut engine,
+        location,
+        "setLacAndCid",
+        "(II)V",
+        &[Value::Int(410), Value::Int(234567)],
+    );
+    call(&mut engine, location, "setPsc", "(I)V", &[Value::Int(99)]);
+    assert_eq!(
+        call(&mut engine, location, "getLac", "()I", &[]),
+        Value::Int(410)
+    );
+    assert_eq!(
+        call(&mut engine, location, "getCid", "()I", &[]),
+        Value::Int(234567)
+    );
+    assert_eq!(
+        call(&mut engine, location, "isEmpty", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            location,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "[410,234567,99]"
+    );
+    assert_eq!(
+        call(&mut engine, location, "hashCode", "()I", &[]),
+        Value::Int(410 ^ 234567)
+    );
+
+    // Round-trip through the notifier bundle and the Bundle constructor.
+    let bundle = p41_bundle(&mut engine);
+    call(
+        &mut engine,
+        location,
+        "fillInNotifierBundle",
+        "(Landroid/os/Bundle;)V",
+        &[Value::Obj(bundle)],
+    );
+    let from_bundle = p49_new(
+        &mut engine,
+        P35D_GSM,
+        "(Landroid/os/Bundle;)V",
+        &[Value::Obj(bundle)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            location,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(from_bundle)]
+        ),
+        Value::Int(1)
+    );
+    // The Bundle constructor dereferences its argument.
+    let null_bundle = instance(&mut engine, P35D_GSM);
+    assert_throws(
+        engine.invoke_instance(
+            null_bundle,
+            "<init>",
+            "(Landroid/os/Bundle;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    // A non-GsmCellLocation argument simply compares unequal (the cast
+    // failure is caught inside AOSP's equals).
+    assert_eq!(
+        call(
+            &mut engine,
+            location,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(bundle)]
+        ),
+        Value::Int(0)
+    );
+    call(&mut engine, location, "setStateInvalid", "()V", &[]);
+    assert_eq!(
+        call(&mut engine, location, "isEmpty", "()Z", &[]),
+        Value::Int(1)
+    );
+
+    // With no telephony service the static update request is dropped.
+    call_static(
+        &mut engine,
+        "Landroid/telephony/CellLocation;",
+        "requestLocationUpdate",
+        "()V",
+        &[],
+    );
+}
