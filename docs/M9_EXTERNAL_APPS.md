@@ -391,6 +391,20 @@ contracts and strict ARM64 compilation pass. Exact Android ICU table/version
 equivalence and the unsupported `strftime_l` `%s` extension are outside that
 evidence. Product execution is recorded separately for each NRO.
 
+
+The next shared host contracts add genuine
+[CopyOnWriteArrayList snapshots](JAVA_COPY_ON_WRITE.md),
+[DEX field reflection](JAVA_FIELD_REFLECTION.md), canonical `TimeUnit` constants
+and saturating conversions. The [TimeUnit receipt](../reports/m9-time-unit-host-20261025.json)
+records 3,990 JVM comparisons. The
+[portable execution contract](PORTABLE_EXECUTION.md) also guards unfinished
+class initialization by its actual owner and retains native local allocations
+across callback GC. These scoped host passes do not establish either external
+application's first screen. The [NRO19 SDK run](../reports/m9-cow-fields-timeunit-horizon-20261025.json)
+verifies all three proofs, exact VFS transcripts and launcher return on one
+binary. Its captures have recognizable PASS labels; existing single-line
+TextView handling still clips multiline TimeUnit text.
+
 The harness stages only the supplied paths and does not change desktop window
 configuration:
 
