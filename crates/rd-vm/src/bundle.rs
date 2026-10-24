@@ -9,7 +9,8 @@
 //! - `getX(String)` returns the stored value, or the typed default: 0,
 //!   false, 0.0 or null.
 //! - `getX(String, default)` returns the stored value, else `default`.
-//! - `getParcelable(String, Class)` and similar (API 33) ignore the class.
+//! - `getParcelable(String, Class)` and similar (API 33) filter by class:
+//!   a stored value that isn't an instance comes back as null, as in AOSP.
 //!
 //! The rest is modelled directly: `containsKey`, `remove`, `keySet`, `size`,
 //! `isEmpty`, `clear`, `putAll`, `get`, copy constructors and
@@ -142,7 +143,12 @@ fn dump_stats(vm: &mut Engine, writer: ObjRef, bundle: Option<ObjRef>) -> Result
     match bundle {
         None => {
             let line = crate::intrinsics::alloc_string(vm, "[null]".to_string())?;
-            vm.invoke_instance(writer, "println", "(Ljava/lang/String;)V", &[Value::Obj(line)])?;
+            vm.invoke_instance(
+                writer,
+                "println",
+                "(Ljava/lang/String;)V",
+                &[Value::Obj(line)],
+            )?;
         }
         Some(bundle) => {
             // Iterating the entries materializes a parcelled Bundle, as in
@@ -161,10 +167,7 @@ fn dump_stats(vm: &mut Engine, writer: ObjRef, bundle: Option<ObjRef>) -> Result
                 };
                 if size > 1024 {
                     let key = if key == NULL_KEY { "null" } else { &key };
-                    let line = crate::intrinsics::alloc_string(
-                        vm,
-                        format!("{key} [size={size}]"),
-                    )?;
+                    let line = crate::intrinsics::alloc_string(vm, format!("{key} [size={size}]"))?;
                     vm.invoke_instance(
                         writer,
                         "println",
@@ -289,15 +292,128 @@ fn typed_access(
         name.starts_with("get")
     };
     if is_get {
+        // API-33 class-filtered getters: `getParcelable(key, Class)`,
+        // `getParcelableArray/List`, `getSparseParcelableArray`,
+        // `getSerializable(key, Class)` (and the Intent equivalents).
+        if params.len() == 2 && params[1] == "Ljava/lang/Class;" {
+            let stored = read(vm);
+            return Ok(Some(class_filtered_get(vm, name, args, stored)?));
+        }
         let cur = read(vm).map(|v| coerce_stored(vm, v, &ret)).transpose()?;
         return Ok(Some(match (cur, params.len()) {
             (Some(v), _) => v,
-            // getX(key, default) — but not getParcelable(key, Class) (API 33)
-            (None, 2) if params[1] != "Ljava/lang/Class;" => args[1].clone(),
+            // getX(key, default)
+            (None, 2) => args[1].clone(),
             (None, _) => typed_default(&ret),
         }));
     }
     Ok(None)
+}
+
+/// The descriptor a `java.lang.Class` object stands for (the canonical
+/// Class object stores it in the `class_name` heap field).
+fn class_desc_of(vm: &Engine, class_obj: ObjRef) -> Option<String> {
+    match vm.heap.get_field(class_obj, "class_name") {
+        Ok(Value::Obj(s)) => vm.heap.as_str(s).ok().map(str::to_string),
+        _ => None,
+    }
+}
+
+fn is_instance(vm: &Engine, value: &Value, target: &str) -> bool {
+    match value {
+        Value::Null => true,
+        Value::Obj(o) => match vm.heap.class_of(*o) {
+            Ok(class) => class == target || vm.cp.is_subtype(class, target),
+            Err(_) => false,
+        },
+        _ => false,
+    }
+}
+
+/// AOSP's API-33 typed getters: the stored value comes back only if it is
+/// an instance of the supplied `Class` (element-wise for arrays, lists and
+/// sparse arrays, matching the filter AOSP applies while materializing
+/// lazy values). Any mismatch yields null (AOSP logs a type warning —
+/// unobservable to apps). A null `Class` is rejected exactly where AOSP
+/// calls `Objects.requireNonNull`.
+fn class_filtered_get(
+    vm: &mut Engine,
+    name: &str,
+    args: &[Value],
+    stored: Option<Value>,
+) -> Result<Value, VmExit> {
+    let base = name.strip_suffix("Extra").unwrap_or(name);
+    let container = matches!(
+        base,
+        "getParcelableArray"
+            | "getParcelableArrayList"
+            | "getSparseParcelableArray"
+            | "getArrayList"
+    );
+    let class_obj = match args.get(1) {
+        Some(Value::Obj(o)) => Some(*o),
+        _ => None,
+    };
+    let Some(class_obj) = class_obj else {
+        if container {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/NullPointerException;",
+                format!("{name}: clazz is null"),
+            )));
+        }
+        return Ok(stored.unwrap_or(Value::Null));
+    };
+    let stored = stored.unwrap_or(Value::Null);
+    if stored == Value::Null {
+        return Ok(Value::Null);
+    }
+    let Some(target) = class_desc_of(vm, class_obj) else {
+        return Ok(stored);
+    };
+    let Value::Obj(o) = stored else {
+        return Ok(Value::Null);
+    };
+    let matches = match base {
+        "getParcelableArray" => match vm.heap.as_array_elems(o) {
+            Ok((elems, _)) => {
+                let elems: Vec<Value> = elems.to_vec();
+                elems.iter().all(|v| is_instance(vm, v, &target))
+            }
+            Err(_) => false,
+        },
+        "getParcelableArrayList" | "getArrayList" => {
+            let size = vm
+                .invoke_instance(o, "size", "()I", &[])?
+                .as_int()
+                .unwrap_or(-1);
+            let mut ok = size >= 0;
+            let mut i = 0;
+            while ok && i < size {
+                let item =
+                    vm.invoke_instance(o, "get", "(I)Ljava/lang/Object;", &[Value::Int(i)])?;
+                ok = is_instance(vm, &item, &target);
+                i += 1;
+            }
+            ok
+        }
+        "getSparseParcelableArray" => {
+            let size = vm
+                .invoke_instance(o, "size", "()I", &[])?
+                .as_int()
+                .unwrap_or(-1);
+            let mut ok = size >= 0;
+            let mut i = 0;
+            while ok && i < size {
+                let item =
+                    vm.invoke_instance(o, "valueAt", "(I)Ljava/lang/Object;", &[Value::Int(i)])?;
+                ok = is_instance(vm, &item, &target);
+                i += 1;
+            }
+            ok
+        }
+        _ => is_instance(vm, &stored, &target),
+    };
+    Ok(if matches { stored } else { Value::Null })
 }
 
 /// Wrapper class for a primitive descriptor.
