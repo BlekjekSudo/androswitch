@@ -413,6 +413,9 @@ pub(crate) fn host_static(
             return Ok(Some(Value::Int(value)));
         }
     }
+    if let Some(value) = partial57_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -545,6 +548,9 @@ pub(crate) fn static_intrinsic(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(value) = partial57_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -609,6 +615,9 @@ pub(crate) fn instance_intrinsic(
         && (recv_class == TEXT_CLASSIFIER || field_bool(vm, recv, "rd_noop"))
     {
         return text_classifier_instance(vm, name, sig, recv, args);
+    }
+    if let Some(value) = partial57_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
         recv_class
@@ -20043,4 +20052,5434 @@ fn android_os_static(
         _ => return Ok(None),
     };
     Ok(Some(value))
+}
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 57-A: bounded no-service/value subsets for eight surfaces
+// that were previously `not_implemented`:
+//   android.view.textservice, android.view.translation,
+//   android.hardware.usb, android.telephony.euicc, android.app.usage,
+//   android.print, android.security.keystore and android.mtp.
+//
+// These handlers model only the documented subsets in data/api-coverage.toml.
+// In particular there is no spell-check or translation service, no USB/MTP
+// device, no eUICC controller, no usage-history database, no print spooler or
+// printer, and no AndroidKeyStore provider/key material below.
+// ---------------------------------------------------------------------------
+
+const P57_TEXT_SERVICES_MANAGER: &str = "Landroid/view/textservice/TextServicesManager;";
+const P57_SPELL_SESSION: &str = "Landroid/view/textservice/SpellCheckerSession;";
+const P57_SPELL_PARAMS: &str =
+    "Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams;";
+const P57_SPELL_PARAMS_BUILDER: &str =
+    "Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;";
+const P57_TEXT_INFO: &str = "Landroid/view/textservice/TextInfo;";
+const P57_SUGGESTIONS_INFO: &str = "Landroid/view/textservice/SuggestionsInfo;";
+const P57_SENTENCE_SUGGESTIONS_INFO: &str = "Landroid/view/textservice/SentenceSuggestionsInfo;";
+const P57_SPELL_SUBTYPE: &str = "Landroid/view/textservice/SpellCheckerSubtype;";
+
+const P57_TRANSLATION_MANAGER: &str = "Landroid/view/translation/TranslationManager;";
+const P57_TRANSLATION_SPEC: &str = "Landroid/view/translation/TranslationSpec;";
+const P57_TRANSLATION_REQUEST_VALUE: &str = "Landroid/view/translation/TranslationRequestValue;";
+const P57_VIEW_TRANSLATION_REQUEST: &str = "Landroid/view/translation/ViewTranslationRequest;";
+const P57_VIEW_TRANSLATION_REQUEST_BUILDER: &str =
+    "Landroid/view/translation/ViewTranslationRequest$Builder;";
+const P57_TRANSLATION_CONTEXT: &str = "Landroid/view/translation/TranslationContext;";
+const P57_TRANSLATION_CONTEXT_BUILDER: &str =
+    "Landroid/view/translation/TranslationContext$Builder;";
+const P57_TRANSLATION_CAPABILITY: &str = "Landroid/view/translation/TranslationCapability;";
+
+const P57_USB_MANAGER: &str = "Landroid/hardware/usb/UsbManager;";
+const P57_USB_CONSTANTS: &str = "Landroid/hardware/usb/UsbConstants;";
+const P57_USB_DEVICE: &str = "Landroid/hardware/usb/UsbDevice;";
+const P57_USB_DEVICE_BUILDER: &str = "Landroid/hardware/usb/UsbDevice$Builder;";
+const P57_USB_CONFIGURATION: &str = "Landroid/hardware/usb/UsbConfiguration;";
+const P57_USB_INTERFACE: &str = "Landroid/hardware/usb/UsbInterface;";
+const P57_USB_ENDPOINT: &str = "Landroid/hardware/usb/UsbEndpoint;";
+
+const P57_EUICC_MANAGER: &str = "Landroid/telephony/euicc/EuiccManager;";
+const P57_EUICC_INFO: &str = "Landroid/telephony/euicc/EuiccInfo;";
+
+const P57_USAGE_MANAGER: &str = "Landroid/app/usage/UsageStatsManager;";
+const P57_USAGE_STATS: &str = "Landroid/app/usage/UsageStats;";
+const P57_USAGE_EVENTS: &str = "Landroid/app/usage/UsageEvents;";
+const P57_USAGE_EVENT: &str = "Landroid/app/usage/UsageEvents$Event;";
+
+const P57_PRINT_MANAGER: &str = "Landroid/print/PrintManager;";
+const P57_PRINT_ATTRIBUTES: &str = "Landroid/print/PrintAttributes;";
+const P57_PRINT_ATTRIBUTES_BUILDER: &str = "Landroid/print/PrintAttributes$Builder;";
+const P57_MEDIA_SIZE: &str = "Landroid/print/PrintAttributes$MediaSize;";
+const P57_RESOLUTION: &str = "Landroid/print/PrintAttributes$Resolution;";
+const P57_MARGINS: &str = "Landroid/print/PrintAttributes$Margins;";
+const P57_PAGE_RANGE: &str = "Landroid/print/PageRange;";
+const P57_PRINTER_ID: &str = "Landroid/print/PrinterId;";
+
+const P57_KEY_PROPERTIES: &str = "Landroid/security/keystore/KeyProperties;";
+const P57_KEY_GEN_SPEC: &str = "Landroid/security/keystore/KeyGenParameterSpec;";
+const P57_KEY_GEN_SPEC_BUILDER: &str = "Landroid/security/keystore/KeyGenParameterSpec$Builder;";
+const P57_KEY_PROTECTION: &str = "Landroid/security/keystore/KeyProtection;";
+const P57_KEY_PROTECTION_BUILDER: &str = "Landroid/security/keystore/KeyProtection$Builder;";
+const P57_KEY_INFO: &str = "Landroid/security/keystore/KeyInfo;";
+
+const P57_MTP_CONSTANTS: &str = "Landroid/mtp/MtpConstants;";
+const P57_MTP_DEVICE_INFO: &str = "Landroid/mtp/MtpDeviceInfo;";
+const P57_MTP_STORAGE_INFO: &str = "Landroid/mtp/MtpStorageInfo;";
+const P57_MTP_OBJECT_INFO: &str = "Landroid/mtp/MtpObjectInfo;";
+const P57_MTP_OBJECT_INFO_BUILDER: &str = "Landroid/mtp/MtpObjectInfo$Builder;";
+const P57_MTP_DEVICE: &str = "Landroid/mtp/MtpDevice;";
+
+fn p57_class(c: &str) -> bool {
+    matches!(
+        c,
+        P57_TEXT_SERVICES_MANAGER
+            | P57_SPELL_SESSION
+            | P57_SPELL_PARAMS
+            | P57_SPELL_PARAMS_BUILDER
+            | P57_TEXT_INFO
+            | P57_SUGGESTIONS_INFO
+            | P57_SENTENCE_SUGGESTIONS_INFO
+            | P57_SPELL_SUBTYPE
+            | P57_TRANSLATION_MANAGER
+            | P57_TRANSLATION_SPEC
+            | P57_TRANSLATION_REQUEST_VALUE
+            | P57_VIEW_TRANSLATION_REQUEST
+            | P57_VIEW_TRANSLATION_REQUEST_BUILDER
+            | P57_TRANSLATION_CONTEXT
+            | P57_TRANSLATION_CONTEXT_BUILDER
+            | P57_TRANSLATION_CAPABILITY
+            | P57_USB_MANAGER
+            | P57_USB_DEVICE
+            | P57_USB_DEVICE_BUILDER
+            | P57_USB_CONFIGURATION
+            | P57_USB_INTERFACE
+            | P57_USB_ENDPOINT
+            | P57_EUICC_MANAGER
+            | P57_EUICC_INFO
+            | P57_USAGE_MANAGER
+            | P57_USAGE_STATS
+            | P57_USAGE_EVENTS
+            | P57_USAGE_EVENT
+            | P57_PRINT_MANAGER
+            | P57_PRINT_ATTRIBUTES
+            | P57_PRINT_ATTRIBUTES_BUILDER
+            | P57_MEDIA_SIZE
+            | P57_RESOLUTION
+            | P57_MARGINS
+            | P57_PAGE_RANGE
+            | P57_PRINTER_ID
+            | P57_KEY_GEN_SPEC
+            | P57_KEY_GEN_SPEC_BUILDER
+            | P57_KEY_PROTECTION
+            | P57_KEY_PROTECTION_BUILDER
+            | P57_KEY_INFO
+            | P57_MTP_DEVICE_INFO
+            | P57_MTP_STORAGE_INFO
+            | P57_MTP_OBJECT_INFO
+            | P57_MTP_OBJECT_INFO_BUILDER
+            | P57_MTP_DEVICE
+    )
+}
+
+fn p57_opt_string(vm: &mut Engine, s: Option<String>) -> Result<Value, VmExit> {
+    match s {
+        Some(s) => jstr(vm, s),
+        None => Ok(Value::Null),
+    }
+}
+
+fn p57_clone_array(
+    vm: &mut Engine,
+    value: &Value,
+    desc: &str,
+    kind: ElemKind,
+) -> Result<Value, VmExit> {
+    let elems = array_elems(vm, Some(value));
+    crate::arrays::new_array(vm, desc, kind, elems)
+}
+
+fn p57_string_values(vm: &Engine, value: &Value) -> Vec<Option<String>> {
+    array_elems(vm, Some(value))
+        .iter()
+        .map(|v| opt_str(vm, Some(v)))
+        .collect()
+}
+
+fn p57_new_string_array(vm: &mut Engine, values: &[Option<String>]) -> Result<Value, VmExit> {
+    let mut elems = Vec::with_capacity(values.len());
+    for value in values {
+        elems.push(p57_opt_string(vm, value.clone())?);
+    }
+    obj_array(vm, "[Ljava/lang/String;", elems)
+}
+
+fn p57_new_map(vm: &mut Engine, entries: Vec<(Value, Value)>) -> Result<Value, VmExit> {
+    let r = alloc_obj(vm, "Ljava/util/HashMap;", Vec::new())?;
+    vm.fw.objects.insert(r, HostObj::Map { entries });
+    Ok(Value::Obj(r))
+}
+
+fn p57_map_entries(vm: &Engine, recv: ObjRef, field: &str) -> Vec<(Value, Value)> {
+    match field_obj(vm, recv, field) {
+        Some(map) => match vm.fw.objects.get(&map) {
+            Some(HostObj::Map { entries }) => entries.clone(),
+            _ => Vec::new(),
+        },
+        None => Vec::new(),
+    }
+}
+
+fn p57_ensure_map(vm: &mut Engine, recv: ObjRef, field: &str) -> Result<ObjRef, VmExit> {
+    if let Some(map) = field_obj(vm, recv, field) {
+        if matches!(vm.fw.objects.get(&map), Some(HostObj::Map { .. })) {
+            return Ok(map);
+        }
+    }
+    let map = match p57_new_map(vm, Vec::new())? {
+        Value::Obj(r) => r,
+        _ => unreachable!(),
+    };
+    put(vm, recv, field, Value::Obj(map))?;
+    Ok(map)
+}
+
+fn p57_map_put_string(
+    vm: &mut Engine,
+    recv: ObjRef,
+    field: &str,
+    key: String,
+    value: Value,
+) -> Result<(), VmExit> {
+    let map = p57_ensure_map(vm, recv, field)?;
+    let key_value = jstr(vm, key.clone())?;
+    if let Some(HostObj::Map { entries }) = vm.fw.objects.get_mut(&map) {
+        let mut replaced = false;
+        for (k, v) in entries.iter_mut() {
+            if let Value::Obj(kr) = k {
+                if vm.heap.as_str(*kr).ok() == Some(key.as_str()) {
+                    *v = value.clone();
+                    replaced = true;
+                    break;
+                }
+            }
+        }
+        if !replaced {
+            entries.push((key_value, value));
+        }
+    }
+    Ok(())
+}
+
+fn p57_date_ms(vm: &Engine, value: &Value) -> Option<i64> {
+    let Value::Obj(r) = value else {
+        return None;
+    };
+    if class_of(vm, *r) != "Ljava/util/Date;" {
+        return None;
+    }
+    match get(vm, *r, "rd_ms") {
+        Value::Long(ms) => Some(ms),
+        Value::Int(ms) => Some(ms as i64),
+        _ => Some(0),
+    }
+}
+
+fn p57_new_date(vm: &mut Engine, ms: i64) -> Result<Value, VmExit> {
+    let r = alloc_obj(
+        vm,
+        "Ljava/util/Date;",
+        vec![("rd_ms".to_string(), Value::Long(ms))],
+    )?;
+    Ok(Value::Obj(r))
+}
+
+fn p57_clone_date(vm: &mut Engine, value: &Value) -> Result<Value, VmExit> {
+    match p57_date_ms(vm, value) {
+        Some(ms) => p57_new_date(vm, ms),
+        None => Ok(value.clone()),
+    }
+}
+
+fn p57_utf16_slice(text: &str, start: i32, end: i32) -> Result<String, VmExit> {
+    let units: Vec<u16> = text.encode_utf16().collect();
+    if start < 0 || end < start || end as usize > units.len() {
+        return Err(idx_oob(format!(
+            "start {start}, end {end}, length {}",
+            units.len()
+        )));
+    }
+    Ok(String::from_utf16_lossy(
+        &units[start as usize..end as usize],
+    ))
+}
+
+fn p57_check_builder_unused(vm: &Engine, recv: ObjRef) -> Result<(), VmExit> {
+    if field_bool(vm, recv, "rd_used") {
+        return Err(ise("Builder should not be touched after build()"));
+    }
+    Ok(())
+}
+
+// --- android.view.textservice ------------------------------------------------
+
+fn p57_text_info_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/String;)V") => {
+            let text = opt_str_arg(vm, args, 0);
+            if text.as_deref().map(str::is_empty).unwrap_or(true) {
+                return Err(iae("charSequence is empty"));
+            }
+            let value = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mCharSequence", value)?;
+            put(vm, recv, "mCookie", Value::Int(0))?;
+            put(vm, recv, "mSequenceNumber", Value::Int(0))?;
+            Value::Null
+        }
+        ("<init>", "(Ljava/lang/String;II)V") => {
+            let text = opt_str_arg(vm, args, 0);
+            if text.as_deref().map(str::is_empty).unwrap_or(true) {
+                return Err(iae("charSequence is empty"));
+            }
+            let value = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mCharSequence", value)?;
+            put(vm, recv, "mCookie", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mSequenceNumber", Value::Int(iarg(args, 2)))?;
+            Value::Null
+        }
+        ("<init>", "(Ljava/lang/CharSequence;IIII)V") => {
+            let text = charseq(vm, args.first())?;
+            let Some(text) = text.filter(|s| !s.is_empty()) else {
+                return Err(iae("charSequence is empty"));
+            };
+            let slice = p57_utf16_slice(&text, iarg(args, 1), iarg(args, 2))?;
+            let value = jstr(vm, slice)?;
+            put(vm, recv, "mCharSequence", value)?;
+            put(vm, recv, "mCookie", Value::Int(iarg(args, 3)))?;
+            put(vm, recv, "mSequenceNumber", Value::Int(iarg(args, 4)))?;
+            Value::Null
+        }
+        ("getText", "()Ljava/lang/String;") => {
+            let value = get(vm, recv, "mCharSequence");
+            match charseq(vm, Some(&value))? {
+                Some(s) => jstr(vm, s)?,
+                None => Value::Null,
+            }
+        }
+        ("getCharSequence", "()Ljava/lang/CharSequence;") => get(vm, recv, "mCharSequence"),
+        ("getCookie", "()I") => Value::Int(field_int(vm, recv, "mCookie")),
+        ("getSequence", "()I") => Value::Int(field_int(vm, recv, "mSequenceNumber")),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_suggestions_info_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(I[Ljava/lang/String;)V") | ("<init>", "(I[Ljava/lang/String;II)V") => {
+            let available = oarg(args, 1).is_some();
+            let suggestions = if available {
+                args.get(1).cloned().unwrap_or(Value::Null)
+            } else {
+                obj_array(vm, "[Ljava/lang/String;", Vec::new())?
+            };
+            put(
+                vm,
+                recv,
+                "mSuggestionsAttributes",
+                Value::Int(iarg(args, 0)),
+            )?;
+            put(vm, recv, "mSuggestions", suggestions)?;
+            put(vm, recv, "mSuggestionsAvailable", bool_value(available))?;
+            put(vm, recv, "mCookie", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mSequence", Value::Int(iarg(args, 3)))?;
+            Value::Null
+        }
+        ("setCookieAndSequence", "(II)V") => {
+            put(vm, recv, "mCookie", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mSequence", Value::Int(iarg(args, 1)))?;
+            Value::Null
+        }
+        ("getCookie", "()I") => Value::Int(field_int(vm, recv, "mCookie")),
+        ("getSequence", "()I") => Value::Int(field_int(vm, recv, "mSequence")),
+        ("getSuggestionsAttributes", "()I") => {
+            Value::Int(field_int(vm, recv, "mSuggestionsAttributes"))
+        }
+        ("getSuggestionsCount", "()I") => {
+            if !field_bool(vm, recv, "mSuggestionsAvailable") {
+                Value::Int(-1)
+            } else {
+                let arr = get(vm, recv, "mSuggestions");
+                Value::Int(array_elems(vm, Some(&arr)).len() as i32)
+            }
+        }
+        ("getSuggestionAt", "(I)Ljava/lang/String;") => {
+            let arr = get(vm, recv, "mSuggestions");
+            let elems = array_elems(vm, Some(&arr));
+            let index = iarg(args, 0);
+            if index < 0 || index as usize >= elems.len() {
+                return Err(oob(format!(
+                    "Index {index} out of bounds for length {}",
+                    elems.len()
+                )));
+            }
+            elems[index as usize].clone()
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_sentence_suggestions_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "([Landroid/view/textservice/SuggestionsInfo;[I[I)V") => {
+            let Some(infos) = args.first().filter(|_| oarg(args, 0).is_some()) else {
+                return Err(npe("suggestionsInfos"));
+            };
+            let Some(offsets) = args.get(1).filter(|_| oarg(args, 1).is_some()) else {
+                return Err(npe("offsets"));
+            };
+            let Some(lengths) = args.get(2).filter(|_| oarg(args, 2).is_some()) else {
+                return Err(npe("lengths"));
+            };
+            let infos = infos.clone();
+            let offsets = offsets.clone();
+            let lengths = lengths.clone();
+            let n = array_elems(vm, Some(&infos)).len();
+            if array_elems(vm, Some(&offsets)).len() != n
+                || array_elems(vm, Some(&lengths)).len() != n
+            {
+                return Err(iae("array lengths differ"));
+            }
+            let infos = p57_clone_array(
+                vm,
+                &infos,
+                "[Landroid/view/textservice/SuggestionsInfo;",
+                ElemKind::Obj,
+            )?;
+            let offsets = p57_clone_array(vm, &offsets, "[I", ElemKind::Int)?;
+            let lengths = p57_clone_array(vm, &lengths, "[I", ElemKind::Int)?;
+            put(vm, recv, "mSuggestionsInfos", infos)?;
+            put(vm, recv, "mOffsets", offsets)?;
+            put(vm, recv, "mLengths", lengths)?;
+            Value::Null
+        }
+        ("getSuggestionsCount", "()I") => {
+            let arr = get(vm, recv, "mSuggestionsInfos");
+            Value::Int(array_elems(vm, Some(&arr)).len() as i32)
+        }
+        ("getSuggestionsInfoAt", "(I)Landroid/view/textservice/SuggestionsInfo;") => {
+            let arr = get(vm, recv, "mSuggestionsInfos");
+            let elems = array_elems(vm, Some(&arr));
+            let i = iarg(args, 0);
+            if i < 0 || i as usize >= elems.len() {
+                Value::Null
+            } else {
+                elems[i as usize].clone()
+            }
+        }
+        ("getOffsetAt", "(I)I") => {
+            let values = int_values(vm, Some(&get(vm, recv, "mOffsets")));
+            let i = iarg(args, 0);
+            Value::Int(if i < 0 || i as usize >= values.len() {
+                -1
+            } else {
+                values[i as usize]
+            })
+        }
+        ("getLengthAt", "(I)I") => {
+            let values = int_values(vm, Some(&get(vm, recv, "mLengths")));
+            let i = iarg(args, 0);
+            Value::Int(if i < 0 || i as usize >= values.len() {
+                -1
+            } else {
+                values[i as usize]
+            })
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_spell_subtype_hash(locale: &str, extra: &str) -> i32 {
+    let mut result = 1i32;
+    result = result
+        .wrapping_mul(31)
+        .wrapping_add(java_string_hash(locale));
+    result = result
+        .wrapping_mul(31)
+        .wrapping_add(java_string_hash(extra));
+    result
+}
+
+fn p57_spell_subtype_extra_map(extra: &str) -> Vec<(String, Option<String>)> {
+    let mut out: Vec<(String, Option<String>)> = Vec::new();
+    for pair in extra.split(',') {
+        let mut parts = pair.split('=');
+        let Some(key) = parts.next() else { continue };
+        let value = parts.next().map(str::to_string);
+        if let Some(existing) = out.iter_mut().find(|(k, _)| k == key) {
+            existing.1 = value;
+        } else {
+            out.push((key.to_string(), value));
+        }
+    }
+    out
+}
+
+fn p57_spell_subtype_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(ILjava/lang/String;Ljava/lang/String;)V") => {
+            let locale = opt_str_arg(vm, args, 1).unwrap_or_default();
+            let extra = opt_str_arg(vm, args, 2).unwrap_or_default();
+            let lv = jstr(vm, &locale)?;
+            let ev = jstr(vm, &extra)?;
+            let empty = jstr(vm, "")?;
+            put(vm, recv, "mSubtypeNameResId", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mSubtypeLocale", lv)?;
+            put(vm, recv, "mSubtypeLanguageTag", empty)?;
+            put(vm, recv, "mSubtypeExtraValue", ev)?;
+            put(vm, recv, "mSubtypeId", Value::Int(0))?;
+            put(
+                vm,
+                recv,
+                "mSubtypeHashCode",
+                Value::Int(p57_spell_subtype_hash(&locale, &extra)),
+            )?;
+            Value::Null
+        }
+        ("<init>", "(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V") => {
+            let locale = opt_str_arg(vm, args, 1).unwrap_or_default();
+            let tag = opt_str_arg(vm, args, 2).unwrap_or_default();
+            let extra = opt_str_arg(vm, args, 3).unwrap_or_default();
+            let subtype_id = iarg(args, 4);
+            let lv = jstr(vm, &locale)?;
+            let tv = jstr(vm, tag)?;
+            let ev = jstr(vm, &extra)?;
+            let hash = if subtype_id != 0 {
+                subtype_id
+            } else {
+                p57_spell_subtype_hash(&locale, &extra)
+            };
+            put(vm, recv, "mSubtypeNameResId", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mSubtypeLocale", lv)?;
+            put(vm, recv, "mSubtypeLanguageTag", tv)?;
+            put(vm, recv, "mSubtypeExtraValue", ev)?;
+            put(vm, recv, "mSubtypeId", Value::Int(subtype_id))?;
+            put(vm, recv, "mSubtypeHashCode", Value::Int(hash))?;
+            Value::Null
+        }
+        ("getNameResId", "()I") => Value::Int(field_int(vm, recv, "mSubtypeNameResId")),
+        ("getLocale", "()Ljava/lang/String;") => jstr(
+            vm,
+            field_str(vm, recv, "mSubtypeLocale").unwrap_or_default(),
+        )?,
+        ("getLanguageTag", "()Ljava/lang/String;") => jstr(
+            vm,
+            field_str(vm, recv, "mSubtypeLanguageTag").unwrap_or_default(),
+        )?,
+        ("getExtraValue", "()Ljava/lang/String;") => jstr(
+            vm,
+            field_str(vm, recv, "mSubtypeExtraValue").unwrap_or_default(),
+        )?,
+        ("containsExtraValueKey", "(Ljava/lang/String;)Z") => {
+            let key = opt_str_arg(vm, args, 0);
+            let extra = field_str(vm, recv, "mSubtypeExtraValue").unwrap_or_default();
+            let found = key
+                .as_ref()
+                .map(|k| {
+                    p57_spell_subtype_extra_map(&extra)
+                        .iter()
+                        .any(|(ek, _)| ek == k)
+                })
+                .unwrap_or(false);
+            bool_value(found)
+        }
+        ("getExtraValueOf", "(Ljava/lang/String;)Ljava/lang/String;") => {
+            let key = opt_str_arg(vm, args, 0).unwrap_or_default();
+            let extra = field_str(vm, recv, "mSubtypeExtraValue").unwrap_or_default();
+            let value = p57_spell_subtype_extra_map(&extra)
+                .into_iter()
+                .find(|(k, _)| *k == key)
+                .and_then(|(_, v)| v);
+            p57_opt_string(vm, value)?
+        }
+        ("getLocaleObject", "()Ljava/util/Locale;") => {
+            let tag = field_str(vm, recv, "mSubtypeLanguageTag").unwrap_or_default();
+            let locale = if !tag.is_empty() {
+                tag
+            } else {
+                field_str(vm, recv, "mSubtypeLocale").unwrap_or_default()
+            };
+            if locale.is_empty() {
+                Value::Null
+            } else {
+                // java.util.Locale is already hosted; construct through its
+                // one-argument constructor with an AOSP locale string form.
+                let r = alloc_obj(vm, "Ljava/util/Locale;", Vec::new())?;
+                let s = jstr(vm, locale)?;
+                vm.invoke_instance(r, "<init>", "(Ljava/lang/String;)V", &[s])?;
+                Value::Obj(r)
+            }
+        }
+        ("hashCode", "()I") => Value::Int(field_int(vm, recv, "mSubtypeHashCode")),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(other) if class_of(vm, other) == P57_SPELL_SUBTYPE => {
+                    let my_id = field_int(vm, recv, "mSubtypeId");
+                    let other_id = field_int(vm, other, "mSubtypeId");
+                    if my_id != 0 || other_id != 0 {
+                        field_int(vm, recv, "mSubtypeHashCode")
+                            == field_int(vm, other, "mSubtypeHashCode")
+                    } else {
+                        field_int(vm, recv, "mSubtypeHashCode")
+                            == field_int(vm, other, "mSubtypeHashCode")
+                            && field_int(vm, recv, "mSubtypeNameResId")
+                                == field_int(vm, other, "mSubtypeNameResId")
+                            && field_str(vm, recv, "mSubtypeLocale")
+                                == field_str(vm, other, "mSubtypeLocale")
+                            && field_str(vm, recv, "mSubtypeLanguageTag")
+                                == field_str(vm, other, "mSubtypeLanguageTag")
+                            && field_str(vm, recv, "mSubtypeExtraValue")
+                                == field_str(vm, other, "mSubtypeExtraValue")
+                    }
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_spell_params_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P57_SPELL_PARAMS_BUILDER {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "()V") => {
+                put(vm, recv, "mLocale", Value::Null)?;
+                put(
+                    vm,
+                    recv,
+                    "mShouldReferToSpellCheckerLanguageSettings",
+                    Value::Int(0),
+                )?;
+                put(vm, recv, "mSupportedAttributes", Value::Int(0))?;
+                let extras = empty_bundle(vm)?;
+                put(vm, recv, "mExtras", extras)?;
+                Value::Null
+            }
+            ("setLocale", "(Ljava/util/Locale;)Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;") => {
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mLocale", v)?;
+                Value::Obj(recv)
+            }
+            ("setShouldReferToSpellCheckerLanguageSettings", "(Z)Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;") => {
+                put(
+                    vm,
+                    recv,
+                    "mShouldReferToSpellCheckerLanguageSettings",
+                    Value::Int(iarg(args, 0)),
+                )?;
+                Value::Obj(recv)
+            }
+            ("setSupportedAttributes", "(I)Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;") => {
+                put(vm, recv, "mSupportedAttributes", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setExtras", "(Landroid/os/Bundle;)Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;") => {
+                let v = match args.first() {
+                    Some(Value::Obj(_)) => args.first().cloned().unwrap(),
+                    _ => return Err(npe("extras")),
+                };
+                put(vm, recv, "mExtras", v)?;
+                Value::Obj(recv)
+            }
+            ("build", "()Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams;") => {
+                if field_obj(vm, recv, "mLocale").is_none()
+                    && !field_bool(vm, recv, "mShouldReferToSpellCheckerLanguageSettings")
+                {
+                    return Err(iae(
+                        "mLocale should not be null if  mShouldReferToSpellCheckerLanguageSettings is false.",
+                    ));
+                }
+                let out = alloc_obj(vm, P57_SPELL_PARAMS, Vec::new())?;
+                for f in [
+                    "mLocale",
+                    "mShouldReferToSpellCheckerLanguageSettings",
+                    "mSupportedAttributes",
+                    "mExtras",
+                ] {
+                    let v = get(vm, recv, f);
+                    put(vm, out, f, v)?;
+                }
+                Value::Obj(out)
+            }
+            _ => return Ok(None),
+        }));
+    }
+    Ok(Some(match (name, sig) {
+        ("getLocale", "()Ljava/util/Locale;") => get(vm, recv, "mLocale"),
+        ("shouldReferToSpellCheckerLanguageSettings", "()Z") => bool_value(field_bool(
+            vm,
+            recv,
+            "mShouldReferToSpellCheckerLanguageSettings",
+        )),
+        ("getSupportedAttributes", "()I") => {
+            Value::Int(field_int(vm, recv, "mSupportedAttributes"))
+        }
+        ("getExtras", "()Landroid/os/Bundle;") => {
+            let v = get(vm, recv, "mExtras");
+            if matches!(v, Value::Obj(_)) {
+                v
+            } else {
+                empty_bundle(vm)?
+            }
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_text_services_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // The host profile intentionally has no installed/enabled spell checker.
+    // Manager objects obtained from Context have no constructor-run fields.
+    let _ = args;
+    Ok(Some(match (name, sig) {
+        ("newSpellCheckerSession", "(Landroid/os/Bundle;Ljava/util/Locale;Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionListener;Z)Landroid/view/textservice/SpellCheckerSession;") => {
+            if oarg(args, 2).is_none() {
+                return Err(npe("listener"));
+            }
+            Value::Null
+        }
+        ("newSpellCheckerSession", "(Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams;Ljava/util/concurrent/Executor;Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionListener;)Landroid/view/textservice/SpellCheckerSession;") => {
+            let Some(params) = oarg(args, 0) else {
+                return Err(npe("params"));
+            };
+            if oarg(args, 1).is_none() {
+                return Err(npe("executor"));
+            }
+            if oarg(args, 2).is_none() {
+                return Err(npe("listener"));
+            }
+            if !field_bool(vm, params, "mShouldReferToSpellCheckerLanguageSettings")
+                && field_obj(vm, params, "mLocale").is_none()
+            {
+                return Err(iae(
+                    "Locale should not be null if you don't refer settings.",
+                ));
+            }
+            Value::Null
+        }
+        ("getEnabledSpellCheckers", "()[Landroid/view/textservice/SpellCheckerInfo;") => {
+            obj_array(
+                vm,
+                "[Landroid/view/textservice/SpellCheckerInfo;",
+                Vec::new(),
+            )?
+        }
+        ("getEnabledSpellCheckerInfos", "()Ljava/util/List;") => {
+            Value::Obj(new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?)
+        }
+        ("getCurrentSpellCheckerInfo", "()Landroid/view/textservice/SpellCheckerInfo;")
+        | ("getCurrentSpellChecker", "()Landroid/view/textservice/SpellCheckerInfo;")
+        | ("getCurrentSpellCheckerSubtype", "(Z)Landroid/view/textservice/SpellCheckerSubtype;") => {
+            Value::Null
+        }
+        ("isSpellCheckerEnabled", "()Z") => Value::Int(0),
+        ("getInputMethodManager", "()Landroid/view/inputmethod/InputMethodManager;") => {
+            let _ = recv;
+            Value::Null
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_spell_session_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/view/textservice/SpellCheckerInfo;Landroid/view/textservice/TextServicesManager;Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionListener;Ljava/util/concurrent/Executor;)V") => {
+            if oarg(args, 0).is_none() || oarg(args, 1).is_none() || oarg(args, 2).is_none() {
+                return Err(npe("SpellCheckerSession arguments"));
+            }
+            let info = args.first().cloned().unwrap();
+            let manager = args.get(1).cloned().unwrap();
+            let listener = args.get(2).cloned().unwrap();
+            let executor = args.get(3).cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mSpellCheckerInfo", info)?;
+            put(vm, recv, "mTextServicesManager", manager)?;
+            put(vm, recv, "mSpellCheckerSessionListener", listener)?;
+            put(vm, recv, "mExecutor", executor)?;
+            put(vm, recv, "rd_closed", Value::Int(0))?;
+            Value::Null
+        }
+        ("isSessionDisconnected", "()Z") => Value::Int(1),
+        ("getSpellChecker", "()Landroid/view/textservice/SpellCheckerInfo;") => {
+            get(vm, recv, "mSpellCheckerInfo")
+        }
+        ("cancel", "()V") => Value::Null,
+        ("close", "()V") => {
+            put(vm, recv, "rd_closed", Value::Int(1))?;
+            Value::Null
+        }
+        // A manager in this profile never returns a live session; a directly
+        // constructed session remains in AOSP's wait-for-connection state and
+        // queues work rather than fabricating suggestions.
+        ("getSentenceSuggestions", "([Landroid/view/textservice/TextInfo;I)V")
+        | ("getSuggestions", "(Landroid/view/textservice/TextInfo;I)V")
+        | ("getSuggestions", "([Landroid/view/textservice/TextInfo;IZ)V") => Value::Null,
+        _ => return Ok(None),
+    }))
+}
+
+// --- android.view.translation ---------------------------------------------
+
+fn p57_ulocale_language(vm: &mut Engine, locale: ObjRef) -> Result<String, VmExit> {
+    if let Some(lang) = field_str(vm, locale, "rd_lang") {
+        return Ok(lang);
+    }
+    let tag = ulocale_tag(vm, locale)?;
+    Ok(tag.split(['-', '_']).next().unwrap_or_default().to_string())
+}
+
+fn p57_translation_spec_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/String;I)V") => {
+            let Some(language) = opt_str_arg(vm, args, 0) else {
+                return Err(npe("language"));
+            };
+            // AOSP's ULocale.Builder accepts this as its language subtag.
+            // Keep the deprecated language field verbatim.
+            let locale = ulocale_from_tag(vm, &language)?;
+            let lang = jstr(vm, language)?;
+            put(vm, recv, "mLanguage", lang)?;
+            put(vm, recv, "mLocale", locale)?;
+            put(vm, recv, "mDataFormat", Value::Int(iarg(args, 1)))?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/icu/util/ULocale;I)V") => {
+            let Some(locale) = oarg(args, 0) else {
+                return Err(npe("locale"));
+            };
+            let language = p57_ulocale_language(vm, locale)?;
+            let lang = jstr(vm, language)?;
+            let locale_value = args.first().cloned().unwrap();
+            put(vm, recv, "mLanguage", lang)?;
+            put(vm, recv, "mLocale", locale_value)?;
+            put(vm, recv, "mDataFormat", Value::Int(iarg(args, 1)))?;
+            Value::Null
+        }
+        ("getLanguage", "()Ljava/lang/String;") => {
+            p57_opt_string(vm, field_str(vm, recv, "mLanguage"))?
+        }
+        ("getLocale", "()Landroid/icu/util/ULocale;") => get(vm, recv, "mLocale"),
+        ("getDataFormat", "()I") => Value::Int(field_int(vm, recv, "mDataFormat")),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(other) if class_of(vm, other) == P57_TRANSLATION_SPEC => {
+                    if other == recv {
+                        true
+                    } else {
+                        let my_locale = field_obj(vm, recv, "mLocale");
+                        let other_locale = field_obj(vm, other, "mLocale");
+                        let locale_eq = match (my_locale, other_locale) {
+                            (Some(a), Some(b)) => ulocale_tag(vm, a)? == ulocale_tag(vm, b)?,
+                            (None, None) => true,
+                            _ => false,
+                        };
+                        field_str(vm, recv, "mLanguage") == field_str(vm, other, "mLanguage")
+                            && locale_eq
+                            && field_int(vm, recv, "mDataFormat")
+                                == field_int(vm, other, "mDataFormat")
+                    }
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        ("hashCode", "()I") => {
+            let language_hash = field_str(vm, recv, "mLanguage")
+                .map(|s| java_string_hash(&s))
+                .unwrap_or(0);
+            let locale_hash = match field_obj(vm, recv, "mLocale") {
+                Some(locale) => java_string_hash(&ulocale_tag(vm, locale)?),
+                None => 0,
+            };
+            let mut hash = 1i32;
+            hash = hash.wrapping_mul(31).wrapping_add(language_hash);
+            hash = hash.wrapping_mul(31).wrapping_add(locale_hash);
+            hash = hash
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mDataFormat"));
+            Value::Int(hash)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let language = field_str(vm, recv, "mLanguage").unwrap_or_else(|| "null".into());
+            let locale = match field_obj(vm, recv, "mLocale") {
+                Some(r) => crate::intrinsics::object_to_string(vm, r)?,
+                None => "null".into(),
+            };
+            jstr(
+                vm,
+                format!(
+                    "TranslationSpec {{ language = {language}, locale = {locale}, dataFormat = {} }}",
+                    field_int(vm, recv, "mDataFormat")
+                ),
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_translation_request_value_hash(vm: &Engine, recv: ObjRef) -> Result<i32, VmExit> {
+    let text = get(vm, recv, "mText");
+    let hash = match text {
+        Value::Obj(r) => match vm.heap.as_str(r) {
+            Ok(s) => java_string_hash(s),
+            Err(_) => identity_hash(r),
+        },
+        _ => 0,
+    };
+    Ok(31i32.wrapping_add(hash))
+}
+
+fn p57_translation_request_value_equal(
+    vm: &mut Engine,
+    a: &Value,
+    b: &Value,
+) -> Result<bool, VmExit> {
+    let (Some(a), Some(b)) = (obj(Some(a)), obj(Some(b))) else {
+        return Ok(matches!((a, b), (Value::Null, Value::Null)));
+    };
+    if a == b {
+        return Ok(true);
+    }
+    if class_of(vm, a) != P57_TRANSLATION_REQUEST_VALUE
+        || class_of(vm, b) != P57_TRANSLATION_REQUEST_VALUE
+    {
+        return Ok(false);
+    }
+    let av = get(vm, a, "mText");
+    let bv = get(vm, b, "mText");
+    Ok(charseq(vm, Some(&av))? == charseq(vm, Some(&bv))?)
+}
+
+fn p57_translation_request_value_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/CharSequence;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mText", v)?;
+            Value::Null
+        }
+        ("getText", "()Ljava/lang/CharSequence;") => get(vm, recv, "mText"),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let other = args.first().cloned().unwrap_or(Value::Null);
+            bool_value(p57_translation_request_value_equal(
+                vm,
+                &Value::Obj(recv),
+                &other,
+            )?)
+        }
+        ("hashCode", "()I") => Value::Int(p57_translation_request_value_hash(vm, recv)?),
+        ("toString", "()Ljava/lang/String;") => {
+            let v = get(vm, recv, "mText");
+            let text = value_string(vm, &v)?;
+            jstr(vm, format!("TranslationRequestValue {{ text = {text} }}"))?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_view_translation_map_hash(
+    vm: &mut Engine,
+    entries: &[(Value, Value)],
+) -> Result<i32, VmExit> {
+    let mut hash = 0i32;
+    for (k, v) in entries {
+        let kh = match k {
+            Value::Obj(r) => vm
+                .heap
+                .as_str(*r)
+                .map(java_string_hash)
+                .unwrap_or_else(|_| identity_hash(*r)),
+            _ => 0,
+        };
+        let vh = match v {
+            Value::Obj(r) => p57_translation_request_value_hash(vm, *r)?,
+            _ => 0,
+        };
+        hash = hash.wrapping_add(kh ^ vh);
+    }
+    Ok(hash)
+}
+
+fn p57_view_translation_request_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/view/autofill/AutofillId;Ljava/util/Map;)V") => {
+            let Some(id) = oarg(args, 0) else {
+                return Err(npe("autofillId"));
+            };
+            let Some(map) = oarg(args, 1) else {
+                return Err(npe("translationRequestValues"));
+            };
+            let _ = id;
+            let _ = map;
+            let idv = args.first().cloned().unwrap();
+            let mapv = args.get(1).cloned().unwrap();
+            put(vm, recv, "mAutofillId", idv)?;
+            put(vm, recv, "mTranslationRequestValues", mapv)?;
+            Value::Null
+        }
+        ("getValue", "(Ljava/lang/String;)Landroid/view/translation/TranslationRequestValue;") => {
+            let Some(key) = opt_str_arg(vm, args, 0) else {
+                return Err(npe("key should not be null"));
+            };
+            let entries = p57_map_entries(vm, recv, "mTranslationRequestValues");
+            let mut found = None;
+            for (k, v) in entries {
+                if opt_str(vm, Some(&k)).as_deref() == Some(key.as_str()) {
+                    found = Some(v);
+                    break;
+                }
+            }
+            match found {
+                Some(v) => v,
+                None => return Err(iae(format!("Request does not contain value for key={key}"))),
+            }
+        }
+        ("getKeys", "()Ljava/util/Set;") => {
+            let entries = p57_map_entries(vm, recv, "mTranslationRequestValues");
+            let keys: Vec<Value> = entries.into_iter().map(|(k, _)| k).collect();
+            Value::Obj(new_collection(vm, "Ljava/util/HashSet;", keys)?)
+        }
+        ("getAutofillId", "()Landroid/view/autofill/AutofillId;") => get(vm, recv, "mAutofillId"),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(other) if class_of(vm, other) == P57_VIEW_TRANSLATION_REQUEST => {
+                    if other == recv {
+                        true
+                    } else {
+                        let my_id = get(vm, recv, "mAutofillId");
+                        let other_id = get(vm, other, "mAutofillId");
+                        let id_eq = match (obj(Some(&my_id)), obj(Some(&other_id))) {
+                            (Some(a), Some(b)) => {
+                                a == b
+                                    || vm
+                                        .invoke_instance(
+                                            a,
+                                            "equals",
+                                            "(Ljava/lang/Object;)Z",
+                                            &[Value::Obj(b)],
+                                        )
+                                        .map(|v| v == Value::Int(1))?
+                            }
+                            _ => my_id == other_id,
+                        };
+                        if !id_eq {
+                            false
+                        } else {
+                            let mine = p57_map_entries(vm, recv, "mTranslationRequestValues");
+                            let theirs = p57_map_entries(vm, other, "mTranslationRequestValues");
+                            if mine.len() != theirs.len() {
+                                false
+                            } else {
+                                let mut all = true;
+                                for (k, v) in &mine {
+                                    let key = opt_str(vm, Some(k));
+                                    let found =
+                                        theirs.iter().find(|(ok, _)| opt_str(vm, Some(ok)) == key);
+                                    match found {
+                                        Some((_, ov))
+                                            if p57_translation_request_value_equal(vm, v, ov)? => {}
+                                        _ => {
+                                            all = false;
+                                            break;
+                                        }
+                                    }
+                                }
+                                all
+                            }
+                        }
+                    }
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        ("hashCode", "()I") => {
+            let id_hash = match field_obj(vm, recv, "mAutofillId") {
+                Some(id) => vm
+                    .invoke_instance(id, "hashCode", "()I", &[])
+                    .map(|v| v.as_int().unwrap_or(0))?,
+                None => 0,
+            };
+            let entries = p57_map_entries(vm, recv, "mTranslationRequestValues");
+            let map_hash = p57_view_translation_map_hash(vm, &entries)?;
+            let mut hash = 1i32;
+            hash = hash.wrapping_mul(31).wrapping_add(id_hash);
+            hash = hash.wrapping_mul(31).wrapping_add(map_hash);
+            Value::Int(hash)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let id = get(vm, recv, "mAutofillId");
+            let id_string = value_string(vm, &id)?;
+            let entries = p57_map_entries(vm, recv, "mTranslationRequestValues");
+            let mut parts = Vec::new();
+            for (k, v) in entries {
+                parts.push(format!(
+                    "{}={}",
+                    value_string(vm, &k)?,
+                    value_string(vm, &v)?
+                ));
+            }
+            jstr(
+                vm,
+                format!(
+                    "ViewTranslationRequest {{ autofillId = {id_string}, translationRequestValues = {{{}}} }}",
+                    parts.join(", ")
+                ),
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_view_translation_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/view/autofill/AutofillId;)V") => {
+            let Some(_) = oarg(args, 0) else {
+                return Err(npe("autofillId"));
+            };
+            let v = args.first().cloned().unwrap();
+            put(vm, recv, "mAutofillId", v)?;
+            put(vm, recv, "rd_used", Value::Int(0))?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/view/autofill/AutofillId;J)V") => {
+            let Some(host) = oarg(args, 0) else {
+                return Err(npe("autofillId"));
+            };
+            let child = alloc_obj(vm, AUTOFILL_ID, Vec::new())?;
+            vm.invoke_instance(
+                child,
+                "<init>",
+                "(Landroid/view/autofill/AutofillId;JI)V",
+                &[
+                    Value::Obj(host),
+                    Value::Long(larg(args, 1)),
+                    Value::Int(0),
+                ],
+            )?;
+            put(vm, recv, "mAutofillId", Value::Obj(child))?;
+            put(vm, recv, "rd_used", Value::Int(0))?;
+            Value::Null
+        }
+        ("setValue", "(Ljava/lang/String;Landroid/view/translation/TranslationRequestValue;)Landroid/view/translation/ViewTranslationRequest$Builder;") => {
+            p57_check_builder_unused(vm, recv)?;
+            let Some(key) = opt_str_arg(vm, args, 0) else {
+                return Err(npe("key"));
+            };
+            let Some(_) = oarg(args, 1) else {
+                return Err(npe("value"));
+            };
+            let v = args.get(1).cloned().unwrap();
+            p57_map_put_string(vm, recv, "mTranslationRequestValues", key, v)?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/view/translation/ViewTranslationRequest;") => {
+            p57_check_builder_unused(vm, recv)?;
+            put(vm, recv, "rd_used", Value::Int(1))?;
+            let map = p57_ensure_map(vm, recv, "mTranslationRequestValues")?;
+            let out = alloc_obj(vm, P57_VIEW_TRANSLATION_REQUEST, Vec::new())?;
+            let id = get(vm, recv, "mAutofillId");
+            put(vm, out, "mAutofillId", id)?;
+            put(
+                vm,
+                out,
+                "mTranslationRequestValues",
+                Value::Obj(map),
+            )?;
+            Value::Obj(out)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_translation_flag_string(flags: i32) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if flags & 1 != 0 {
+        parts.push("FLAG_LOW_LATENCY".to_string());
+    }
+    if flags & 2 != 0 {
+        parts.push("FLAG_TRANSLITERATION".to_string());
+    }
+    if flags & 4 != 0 {
+        parts.push("FLAG_DEFINITIONS".to_string());
+    }
+    let unknown = flags & !7;
+    if unknown != 0 {
+        parts.push(format!("{unknown:x}"));
+    }
+    if parts.is_empty() {
+        "0".to_string()
+    } else {
+        parts.join("|")
+    }
+}
+
+fn p57_translation_context_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P57_TRANSLATION_CONTEXT_BUILDER {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "(Landroid/view/translation/TranslationSpec;Landroid/view/translation/TranslationSpec;)V") => {
+                if oarg(args, 0).is_none() {
+                    return Err(npe("sourceSpec"));
+                }
+                if oarg(args, 1).is_none() {
+                    return Err(npe("targetSpec"));
+                }
+                let a = args.first().cloned().unwrap();
+                let b = args.get(1).cloned().unwrap();
+                put(vm, recv, "mSourceSpec", a)?;
+                put(vm, recv, "mTargetSpec", b)?;
+                put(vm, recv, "mTranslationFlags", Value::Int(0))?;
+                put(vm, recv, "mActivityId", Value::Null)?;
+                put(vm, recv, "rd_used", Value::Int(0))?;
+                Value::Null
+            }
+            ("setTranslationFlags", "(I)Landroid/view/translation/TranslationContext$Builder;") => {
+                p57_check_builder_unused(vm, recv)?;
+                put(vm, recv, "mTranslationFlags", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setActivityId", "(Landroid/app/assist/ActivityId;)Landroid/view/translation/TranslationContext$Builder;") => {
+                p57_check_builder_unused(vm, recv)?;
+                let Some(_) = oarg(args, 0) else {
+                    return Err(npe("activityId"));
+                };
+                let v = args.first().cloned().unwrap();
+                put(vm, recv, "mActivityId", v)?;
+                Value::Obj(recv)
+            }
+            ("build", "()Landroid/view/translation/TranslationContext;") => {
+                p57_check_builder_unused(vm, recv)?;
+                let flags = field_int(vm, recv, "mTranslationFlags");
+                if flags & !7 != 0 {
+                    return Err(iae(format!("translation flags invalid: {flags}")));
+                }
+                put(vm, recv, "rd_used", Value::Int(1))?;
+                let out = alloc_obj(vm, P57_TRANSLATION_CONTEXT, Vec::new())?;
+                for f in [
+                    "mSourceSpec",
+                    "mTargetSpec",
+                    "mTranslationFlags",
+                    "mActivityId",
+                ] {
+                    let v = get(vm, recv, f);
+                    put(vm, out, f, v)?;
+                }
+                Value::Obj(out)
+            }
+            _ => return Ok(None),
+        }));
+    }
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/view/translation/TranslationSpec;Landroid/view/translation/TranslationSpec;ILandroid/app/assist/ActivityId;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("sourceSpec"));
+            }
+            if oarg(args, 1).is_none() {
+                return Err(npe("targetSpec"));
+            }
+            let flags = iarg(args, 2);
+            if flags & !7 != 0 {
+                return Err(iae(format!("translation flags invalid: {flags}")));
+            }
+            let a = args.first().cloned().unwrap();
+            let b = args.get(1).cloned().unwrap();
+            let activity = args.get(3).cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mSourceSpec", a)?;
+            put(vm, recv, "mTargetSpec", b)?;
+            put(vm, recv, "mTranslationFlags", Value::Int(flags))?;
+            put(vm, recv, "mActivityId", activity)?;
+            Value::Null
+        }
+        ("getSourceSpec", "()Landroid/view/translation/TranslationSpec;") => {
+            get(vm, recv, "mSourceSpec")
+        }
+        ("getTargetSpec", "()Landroid/view/translation/TranslationSpec;") => {
+            get(vm, recv, "mTargetSpec")
+        }
+        ("getTranslationFlags", "()I") => {
+            Value::Int(field_int(vm, recv, "mTranslationFlags"))
+        }
+        ("getActivityId", "()Landroid/app/assist/ActivityId;") => get(vm, recv, "mActivityId"),
+        ("toString", "()Ljava/lang/String;") => {
+            let source = get(vm, recv, "mSourceSpec");
+            let target = get(vm, recv, "mTargetSpec");
+            let activity = get(vm, recv, "mActivityId");
+            let source_s = value_string(vm, &source)?;
+            let target_s = value_string(vm, &target)?;
+            let activity_s = value_string(vm, &activity)?;
+            jstr(
+                vm,
+                format!(
+                    "TranslationContext {{ sourceSpec = {source_s}, targetSpec = {target_s}, translationFlags = {}, activityId = {activity_s} }}",
+                    p57_translation_flag_string(field_int(vm, recv, "mTranslationFlags"))
+                ),
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_translation_capability_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(ILandroid/view/translation/TranslationSpec;Landroid/view/translation/TranslationSpec;ZI)V") => {
+            if oarg(args, 1).is_none() {
+                return Err(npe("sourceSpec should not be null"));
+            }
+            if oarg(args, 2).is_none() {
+                return Err(npe("targetSpec should not be null"));
+            }
+            let source = args.get(1).cloned().unwrap();
+            let target = args.get(2).cloned().unwrap();
+            put(vm, recv, "mState", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mSourceSpec", source)?;
+            put(vm, recv, "mTargetSpec", target)?;
+            put(vm, recv, "mUiTranslationEnabled", Value::Int(iarg(args, 3)))?;
+            put(
+                vm,
+                recv,
+                "mSupportedTranslationFlags",
+                Value::Int(iarg(args, 4)),
+            )?;
+            Value::Null
+        }
+        ("getState", "()I") => Value::Int(field_int(vm, recv, "mState")),
+        ("getSourceSpec", "()Landroid/view/translation/TranslationSpec;") => {
+            get(vm, recv, "mSourceSpec")
+        }
+        ("getTargetSpec", "()Landroid/view/translation/TranslationSpec;") => {
+            get(vm, recv, "mTargetSpec")
+        }
+        ("isUiTranslationEnabled", "()Z") => {
+            bool_value(field_bool(vm, recv, "mUiTranslationEnabled"))
+        }
+        ("getSupportedTranslationFlags", "()I") => {
+            Value::Int(field_int(vm, recv, "mSupportedTranslationFlags"))
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let source = get(vm, recv, "mSourceSpec");
+            let target = get(vm, recv, "mTargetSpec");
+            let source_s = value_string(vm, &source)?;
+            let target_s = value_string(vm, &target)?;
+            jstr(
+                vm,
+                format!(
+                    "TranslationCapability {{ state = {}, sourceSpec = {source_s}, targetSpec = {target_s}, uiTranslationEnabled = {}, supportedTranslationFlags = {} }}",
+                    p57_translation_model_state(field_int(vm, recv, "mState")),
+                    field_bool(vm, recv, "mUiTranslationEnabled"),
+                    field_int(vm, recv, "mSupportedTranslationFlags")
+                ),
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_translation_model_state(state: i32) -> String {
+    match state {
+        1 => "STATE_AVAILABLE_TO_DOWNLOAD".into(),
+        2 => "STATE_DOWNLOADING".into(),
+        3 => "STATE_ON_DEVICE".into(),
+        4 => "STATE_NOT_AVAILABLE".into(),
+        1000 => "STATE_REMOVED_AND_AVAILABLE".into(),
+        _ => format!("{:x}", state as u32),
+    }
+}
+
+fn p57_translation_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // No on-device translation service is installed in this profile.
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/content/Context;Landroid/view/translation/ITranslationManager;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("context cannot be null"));
+            }
+            let v = args.first().cloned().unwrap();
+            put(vm, recv, "mContext", v)?;
+            Value::Null
+        }
+        ("createOnDeviceTranslator", "(Landroid/view/translation/TranslationContext;Ljava/util/concurrent/Executor;Ljava/util/function/Consumer;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("translationContext cannot be null"));
+            }
+            if oarg(args, 1).is_none() {
+                return Err(npe("executor cannot be null"));
+            }
+            if oarg(args, 2).is_none() {
+                return Err(npe("callback cannot be null"));
+            }
+            // No service exists to create a session. The synchronous API's
+            // documented null result is modeled below; async callback delivery
+            // through a guest Executor remains outside this partial slice.
+            Value::Null
+        }
+        ("createOnDeviceTranslator", "(Landroid/view/translation/TranslationContext;)Landroid/view/translation/Translator;")
+        | ("createTranslator", "(Landroid/view/translation/TranslationContext;)Landroid/view/translation/Translator;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("translationContext cannot be null"));
+            }
+            Value::Null
+        }
+        ("getOnDeviceTranslationCapabilities", "(II)Ljava/util/Set;")
+        | ("getTranslationCapabilities", "(II)Ljava/util/Set;") => {
+            Value::Obj(new_collection(vm, "Ljava/util/HashSet;", Vec::new())?)
+        }
+        ("addOnDeviceTranslationCapabilityUpdateListener", "(Ljava/util/concurrent/Executor;Ljava/util/function/Consumer;)V")
+        | ("addTranslationCapabilityUpdateListener", "(Ljava/util/concurrent/Executor;Ljava/util/function/Consumer;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("executor should not be null"));
+            }
+            if oarg(args, 1).is_none() {
+                return Err(npe("capability listener should not be null"));
+            }
+            Value::Null
+        }
+        ("removeOnDeviceTranslationCapabilityUpdateListener", "(Ljava/util/function/Consumer;)V")
+        | ("removeTranslationCapabilityUpdateListener", "(Ljava/util/function/Consumer;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("capability listener should not be null"));
+            }
+            Value::Null
+        }
+        ("getOnDeviceTranslationSettingsActivityIntent", "()Landroid/app/PendingIntent;")
+        | ("getTranslationSettingsActivityIntent", "()Landroid/app/PendingIntent;") => {
+            let _ = recv;
+            Value::Null
+        }
+        _ => return Ok(None),
+    }))
+}
+
+// --- android.hardware.usb ---------------------------------------------------
+
+fn p57_usb_endpoint_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(IIII)V") => {
+            put(vm, recv, "mAddress", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mAttributes", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mMaxPacketSize", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mInterval", Value::Int(iarg(args, 3)))?;
+            Value::Null
+        }
+        ("getAddress", "()I") => Value::Int(field_int(vm, recv, "mAddress")),
+        ("getEndpointNumber", "()I") => Value::Int(field_int(vm, recv, "mAddress") & 15),
+        ("getDirection", "()I") => Value::Int(field_int(vm, recv, "mAddress") & 128),
+        ("getAttributes", "()I") => Value::Int(field_int(vm, recv, "mAttributes")),
+        ("getType", "()I") => Value::Int(field_int(vm, recv, "mAttributes") & 3),
+        ("getMaxPacketSize", "()I") => Value::Int(field_int(vm, recv, "mMaxPacketSize")),
+        ("getInterval", "()I") => Value::Int(field_int(vm, recv, "mInterval")),
+        ("toString", "()Ljava/lang/String;") => jstr(
+            vm,
+            format!(
+                "UsbEndpoint[mAddress={},mAttributes={},mMaxPacketSize={},mInterval={}]",
+                field_int(vm, recv, "mAddress"),
+                field_int(vm, recv, "mAttributes"),
+                field_int(vm, recv, "mMaxPacketSize"),
+                field_int(vm, recv, "mInterval")
+            ),
+        )?,
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_usb_interface_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(IIILjava/lang/String;II[Landroid/hardware/usb/UsbEndpoint;)V") => {
+            let name_v = args.get(3).cloned().unwrap_or(Value::Null);
+            let Some(endpoints) = oarg(args, 6) else {
+                return Err(npe("endpoints"));
+            };
+            let _ = endpoints;
+            let endpoints = args.get(6).cloned().unwrap();
+            let endpoints = p57_clone_array(
+                vm,
+                &endpoints,
+                "[Landroid/hardware/usb/UsbEndpoint;",
+                ElemKind::Obj,
+            )?;
+            put(vm, recv, "mId", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mAlternateSetting", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mClass", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mName", name_v)?;
+            put(vm, recv, "mSubclass", Value::Int(iarg(args, 4)))?;
+            put(vm, recv, "mProtocol", Value::Int(iarg(args, 5)))?;
+            put(vm, recv, "mEndpoints", endpoints)?;
+            Value::Null
+        }
+        ("getId", "()I") => Value::Int(field_int(vm, recv, "mId")),
+        ("getAlternateSetting", "()I") => Value::Int(field_int(vm, recv, "mAlternateSetting")),
+        ("getName", "()Ljava/lang/String;") => get(vm, recv, "mName"),
+        ("getInterfaceClass", "()I") => Value::Int(field_int(vm, recv, "mClass")),
+        ("getInterfaceSubclass", "()I") => Value::Int(field_int(vm, recv, "mSubclass")),
+        ("getInterfaceProtocol", "()I") => Value::Int(field_int(vm, recv, "mProtocol")),
+        ("getEndpointCount", "()I") => {
+            let arr = get(vm, recv, "mEndpoints");
+            Value::Int(array_elems(vm, Some(&arr)).len() as i32)
+        }
+        ("getEndpoint", "(I)Landroid/hardware/usb/UsbEndpoint;") => {
+            let arr = get(vm, recv, "mEndpoints");
+            let elems = array_elems(vm, Some(&arr));
+            let i = iarg(args, 0);
+            if i < 0 || i as usize >= elems.len() {
+                return Err(oob(format!(
+                    "Index {i} out of bounds for length {}",
+                    elems.len()
+                )));
+            }
+            elems[i as usize].clone()
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let arr = get(vm, recv, "mEndpoints");
+            let mut endpoint_text = String::new();
+            for ep in array_elems(vm, Some(&arr)) {
+                endpoint_text.push(' ');
+                endpoint_text.push_str(&value_string(vm, &ep)?);
+            }
+            jstr(
+                vm,
+                format!(
+                    "UsbInterface[mId={},mAlternateSetting={},mName={},mClass={},mSubclass={},mProtocol={},mEndpoints=[]{}]",
+                    field_int(vm, recv, "mId"),
+                    field_int(vm, recv, "mAlternateSetting"),
+                    field_str(vm, recv, "mName").unwrap_or_else(|| "null".into()),
+                    field_int(vm, recv, "mClass"),
+                    field_int(vm, recv, "mSubclass"),
+                    field_int(vm, recv, "mProtocol"),
+                    endpoint_text
+                ),
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_usb_configuration_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(ILjava/lang/String;II[Landroid/hardware/usb/UsbInterface;)V") => {
+            let name_v = args.get(1).cloned().unwrap_or(Value::Null);
+            let Some(_) = oarg(args, 4) else {
+                return Err(npe("interfaces"));
+            };
+            let interfaces = args.get(4).cloned().unwrap();
+            let interfaces = p57_clone_array(
+                vm,
+                &interfaces,
+                "[Landroid/hardware/usb/UsbInterface;",
+                ElemKind::Obj,
+            )?;
+            put(vm, recv, "mId", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mName", name_v)?;
+            put(vm, recv, "mAttributes", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mMaxPower", Value::Int(iarg(args, 3)))?;
+            put(vm, recv, "mInterfaces", interfaces)?;
+            Value::Null
+        }
+        ("getId", "()I") => Value::Int(field_int(vm, recv, "mId")),
+        ("getName", "()Ljava/lang/String;") => get(vm, recv, "mName"),
+        ("isSelfPowered", "()Z") => bool_value(field_int(vm, recv, "mAttributes") & 64 != 0),
+        ("isRemoteWakeup", "()Z") => bool_value(field_int(vm, recv, "mAttributes") & 32 != 0),
+        ("getMaxPower", "()I") => Value::Int(field_int(vm, recv, "mMaxPower") * 2),
+        ("getInterfaceCount", "()I") => {
+            let arr = get(vm, recv, "mInterfaces");
+            Value::Int(array_elems(vm, Some(&arr)).len() as i32)
+        }
+        ("getInterface", "(I)Landroid/hardware/usb/UsbInterface;") => {
+            let arr = get(vm, recv, "mInterfaces");
+            let elems = array_elems(vm, Some(&arr));
+            let i = iarg(args, 0);
+            if i < 0 || i as usize >= elems.len() {
+                return Err(oob(format!(
+                    "Index {i} out of bounds for length {}",
+                    elems.len()
+                )));
+            }
+            elems[i as usize].clone()
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let arr = get(vm, recv, "mInterfaces");
+            let mut interface_text = String::new();
+            for item in array_elems(vm, Some(&arr)) {
+                interface_text.push('\n');
+                interface_text.push_str(&value_string(vm, &item)?);
+            }
+            jstr(
+                vm,
+                format!(
+                    "UsbConfiguration[mId={},mName={},mAttributes={},mMaxPower={},mInterfaces=[]{}]",
+                    field_int(vm, recv, "mId"),
+                    field_str(vm, recv, "mName").unwrap_or_else(|| "null".into()),
+                    field_int(vm, recv, "mAttributes"),
+                    field_int(vm, recv, "mMaxPower"),
+                    interface_text
+                ),
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_usb_device_all_interfaces(vm: &Engine, recv: ObjRef) -> Vec<Value> {
+    let cached = get(vm, recv, "mInterfaces");
+    if matches!(cached, Value::Obj(_)) {
+        return array_elems(vm, Some(&cached));
+    }
+    let mut out = Vec::new();
+    let configs = get(vm, recv, "mConfigurations");
+    for config in array_elems(vm, Some(&configs)) {
+        if let Value::Obj(config_ref) = config {
+            let interfaces = get(vm, config_ref, "mInterfaces");
+            out.extend(array_elems(vm, Some(&interfaces)));
+        }
+    }
+    out
+}
+
+#[allow(clippy::too_many_arguments)]
+fn p57_usb_device_set_fields(
+    vm: &mut Engine,
+    recv: ObjRef,
+    name: Value,
+    vendor: i32,
+    product: i32,
+    class: i32,
+    subclass: i32,
+    protocol: i32,
+    manufacturer: Value,
+    product_name: Value,
+    version: Value,
+    configurations: Value,
+    serial: Value,
+    flags: [i32; 5],
+) -> Result<(), VmExit> {
+    put(vm, recv, "mName", name)?;
+    put(vm, recv, "mVendorId", Value::Int(vendor))?;
+    put(vm, recv, "mProductId", Value::Int(product))?;
+    put(vm, recv, "mClass", Value::Int(class))?;
+    put(vm, recv, "mSubclass", Value::Int(subclass))?;
+    put(vm, recv, "mProtocol", Value::Int(protocol))?;
+    put(vm, recv, "mManufacturerName", manufacturer)?;
+    put(vm, recv, "mProductName", product_name)?;
+    put(vm, recv, "mVersion", version)?;
+    put(vm, recv, "mConfigurations", configurations)?;
+    put(vm, recv, "rd_serial", serial)?;
+    put(vm, recv, "mHasAudioPlayback", Value::Int(flags[0]))?;
+    put(vm, recv, "mHasAudioCapture", Value::Int(flags[1]))?;
+    put(vm, recv, "mHasMidi", Value::Int(flags[2]))?;
+    put(vm, recv, "mHasVideoPlayback", Value::Int(flags[3]))?;
+    put(vm, recv, "mHasVideoCapture", Value::Int(flags[4]))?;
+    Ok(())
+}
+
+fn p57_usb_device_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/String;IIIIILjava/lang/String;Ljava/lang/String;Ljava/lang/String;[Landroid/hardware/usb/UsbConfiguration;Landroid/hardware/usb/IUsbSerialReader;ZZZZZ)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("name"));
+            }
+            if opt_str_arg(vm, args, 8)
+                .filter(|s| !s.is_empty())
+                .is_none()
+            {
+                return Err(iae("version must not be empty"));
+            }
+            let Some(_) = oarg(args, 9) else {
+                return Err(npe("configurations"));
+            };
+            if array_elems(vm, args.get(9)).iter().any(|v| obj(Some(v)).is_none()) {
+                return Err(npe("configurations contains null"));
+            }
+            if oarg(args, 10).is_none() {
+                return Err(npe("serialNumberReader"));
+            }
+            let flags = [
+                iarg(args, 11),
+                iarg(args, 12),
+                iarg(args, 13),
+                iarg(args, 14),
+                iarg(args, 15),
+            ];
+            p57_usb_device_set_fields(
+                vm,
+                recv,
+                args[0].clone(),
+                iarg(args, 1),
+                iarg(args, 2),
+                iarg(args, 3),
+                iarg(args, 4),
+                iarg(args, 5),
+                args[6].clone(),
+                args[7].clone(),
+                args[8].clone(),
+                args[9].clone(),
+                Value::Null,
+                flags,
+            )?;
+            Value::Null
+        }
+        ("getDeviceName", "()Ljava/lang/String;") => get(vm, recv, "mName"),
+        ("getManufacturerName", "()Ljava/lang/String;") => get(vm, recv, "mManufacturerName"),
+        ("getProductName", "()Ljava/lang/String;") => get(vm, recv, "mProductName"),
+        ("getVersion", "()Ljava/lang/String;") => get(vm, recv, "mVersion"),
+        ("getSerialNumber", "()Ljava/lang/String;") => get(vm, recv, "rd_serial"),
+        ("getDeviceId", "()I") => {
+            let name = field_str(vm, recv, "mName").unwrap_or_default();
+            Value::Int(p57_usb_device_id_from_name(&name))
+        }
+        ("getVendorId", "()I") => Value::Int(field_int(vm, recv, "mVendorId")),
+        ("getProductId", "()I") => Value::Int(field_int(vm, recv, "mProductId")),
+        ("getDeviceClass", "()I") => Value::Int(field_int(vm, recv, "mClass")),
+        ("getDeviceSubclass", "()I") => Value::Int(field_int(vm, recv, "mSubclass")),
+        ("getDeviceProtocol", "()I") => Value::Int(field_int(vm, recv, "mProtocol")),
+        ("getConfigurationCount", "()I") => {
+            let arr = get(vm, recv, "mConfigurations");
+            Value::Int(array_elems(vm, Some(&arr)).len() as i32)
+        }
+        ("getConfiguration", "(I)Landroid/hardware/usb/UsbConfiguration;") => {
+            let arr = get(vm, recv, "mConfigurations");
+            let elems = array_elems(vm, Some(&arr));
+            let i = iarg(args, 0);
+            if i < 0 || i as usize >= elems.len() {
+                return Err(oob(format!(
+                    "Index {i} out of bounds for length {}",
+                    elems.len()
+                )));
+            }
+            elems[i as usize].clone()
+        }
+        ("getInterfaceCount", "()I") => {
+            Value::Int(p57_usb_device_all_interfaces(vm, recv).len() as i32)
+        }
+        ("getInterface", "(I)Landroid/hardware/usb/UsbInterface;") => {
+            let interfaces = p57_usb_device_all_interfaces(vm, recv);
+            let i = iarg(args, 0);
+            if i < 0 || i as usize >= interfaces.len() {
+                return Err(oob(format!(
+                    "Index {i} out of bounds for length {}",
+                    interfaces.len()
+                )));
+            }
+            interfaces[i as usize].clone()
+        }
+        ("hasAudioPlayback", "()Z") => {
+            bool_value(field_bool(vm, recv, "mHasAudioPlayback"))
+        }
+        ("hasAudioCapture", "()Z") => {
+            bool_value(field_bool(vm, recv, "mHasAudioCapture"))
+        }
+        ("hasMidi", "()Z") => bool_value(field_bool(vm, recv, "mHasMidi")),
+        ("hasVideoPlayback", "()Z") => {
+            bool_value(field_bool(vm, recv, "mHasVideoPlayback"))
+        }
+        ("hasVideoCapture", "()Z") => {
+            bool_value(field_bool(vm, recv, "mHasVideoCapture"))
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(other) if class_of(vm, other) == P57_USB_DEVICE => {
+                    field_str(vm, recv, "mName") == field_str(vm, other, "mName")
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        ("hashCode", "()I") => Value::Int(
+            field_str(vm, recv, "mName")
+                .map(|s| java_string_hash(&s))
+                .unwrap_or(0),
+        ),
+        ("toString", "()Ljava/lang/String;") => {
+            let configs = get(vm, recv, "mConfigurations");
+            let mut config_text = String::new();
+            for config in array_elems(vm, Some(&configs)) {
+                config_text.push('\n');
+                config_text.push_str(&value_string(vm, &config)?);
+            }
+            jstr(
+                vm,
+                format!(
+                    "UsbDevice[mName={},mVendorId={},mProductId={},mClass={},mSubclass={},mProtocol={},mManufacturerName={},mProductName={},mVersion={},mConfigs=[]{}]",
+                    field_str(vm, recv, "mName").unwrap_or_else(|| "null".into()),
+                    field_int(vm, recv, "mVendorId"),
+                    field_int(vm, recv, "mProductId"),
+                    field_int(vm, recv, "mClass"),
+                    field_int(vm, recv, "mSubclass"),
+                    field_int(vm, recv, "mProtocol"),
+                    field_str(vm, recv, "mManufacturerName")
+                        .unwrap_or_else(|| "null".into()),
+                    field_str(vm, recv, "mProductName")
+                        .unwrap_or_else(|| "null".into()),
+                    field_str(vm, recv, "mVersion").unwrap_or_else(|| "null".into()),
+                    config_text
+                ),
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_usb_device_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/String;IIIIILjava/lang/String;Ljava/lang/String;Ljava/lang/String;[Landroid/hardware/usb/UsbConfiguration;Ljava/lang/String;ZZZZZ)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("name"));
+            }
+            if opt_str_arg(vm, args, 8)
+                .filter(|s| !s.is_empty())
+                .is_none()
+            {
+                return Err(iae("version must not be empty"));
+            }
+            let serial = args.get(10).cloned().unwrap_or(Value::Null);
+            let flags = [
+                iarg(args, 11),
+                iarg(args, 12),
+                iarg(args, 13),
+                iarg(args, 14),
+                iarg(args, 15),
+            ];
+            p57_usb_device_set_fields(
+                vm,
+                recv,
+                args[0].clone(),
+                iarg(args, 1),
+                iarg(args, 2),
+                iarg(args, 3),
+                iarg(args, 4),
+                iarg(args, 5),
+                args[6].clone(),
+                args[7].clone(),
+                args[8].clone(),
+                args[9].clone(),
+                serial,
+                flags,
+            )?;
+            // AOSP exposes this temporary public field on Builder.
+            let serial = get(vm, recv, "rd_serial");
+            put(vm, recv, "serialNumber", serial)?;
+            Value::Null
+        }
+        ("build", "(Landroid/hardware/usb/IUsbSerialReader;)Landroid/hardware/usb/UsbDevice;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("serialReader"));
+            }
+            let configs_value = get(vm, recv, "mConfigurations");
+            if obj(Some(&configs_value)).is_none() {
+                return Err(npe("configurations"));
+            }
+            if array_elems(vm, Some(&configs_value))
+                .iter()
+                .any(|v| obj(Some(v)).is_none())
+            {
+                return Err(npe("configurations contains null"));
+            }
+            let out = alloc_obj(vm, P57_USB_DEVICE, Vec::new())?;
+            for f in [
+                "mName",
+                "mVendorId",
+                "mProductId",
+                "mClass",
+                "mSubclass",
+                "mProtocol",
+                "mManufacturerName",
+                "mProductName",
+                "mVersion",
+                "mConfigurations",
+                "rd_serial",
+                "mHasAudioPlayback",
+                "mHasAudioCapture",
+                "mHasMidi",
+                "mHasVideoPlayback",
+                "mHasVideoCapture",
+            ] {
+                let v = get(vm, recv, f);
+                put(vm, out, f, v)?;
+            }
+            Value::Obj(out)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_usb_device_id_from_name(name: &str) -> i32 {
+    // libusbhost's usb_device_get_unique_id_from_name scans
+    // "/dev/bus/usb/%d/%d" and returns bus * 1000 + device (with zeroes for
+    // fields which do not scan).
+    let Some(rest) = name.strip_prefix("/dev/bus/usb/") else {
+        return 0;
+    };
+    let mut parts = rest.split('/');
+    let bus: i32 = parts.next().and_then(|p| p.parse().ok()).unwrap_or(0);
+    let device: i32 = parts.next().and_then(|p| p.parse().ok()).unwrap_or(0);
+    bus.wrapping_mul(1000).wrapping_add(device)
+}
+
+fn p57_usb_device_name_from_id(id: i32) -> String {
+    format!("/dev/bus/usb/{:03}/{:03}", id / 1000, id % 1000)
+}
+
+fn p57_usb_functions_to_string(functions: i64) -> String {
+    let mut parts = Vec::new();
+    for (mask, name) in [
+        (1_i64 << 2, "mtp"),
+        (1_i64 << 4, "ptp"),
+        (1_i64 << 5, "rndis"),
+        (1_i64 << 3, "midi"),
+        (1_i64 << 1, "accessory"),
+        (1_i64 << 6, "audio_source"),
+        (1_i64 << 10, "ncm"),
+        (1_i64 << 7, "uvc"),
+        (1_i64, "adb"),
+    ] {
+        if functions & mask != 0 {
+            parts.push(name);
+        }
+    }
+    parts.join(",")
+}
+
+fn p57_usb_functions_from_string(functions: Option<String>) -> Result<i64, VmExit> {
+    let Some(functions) = functions else {
+        return Ok(0);
+    };
+    if functions == "none" {
+        return Ok(0);
+    }
+    let map = [
+        ("mtp", 1_i64 << 2),
+        ("ptp", 1_i64 << 4),
+        ("rndis", 1_i64 << 5),
+        ("midi", 1_i64 << 3),
+        ("accessory", 1_i64 << 1),
+        ("audio_source", 1_i64 << 6),
+        ("adb", 1_i64),
+        ("ncm", 1_i64 << 10),
+        ("uvc", 1_i64 << 7),
+    ];
+    let mut out = 0i64;
+    for function in functions.split(',') {
+        if function.is_empty() {
+            continue;
+        }
+        match map.iter().find(|(name, _)| *name == function) {
+            Some((_, code)) => out |= code,
+            None => {
+                return Err(iae(format!("Invalid usb function {functions}")));
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn p57_usb_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // This profile exposes no USB host/accessory service or devices.
+    let _ = recv;
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/content/Context;Landroid/hardware/usb/IUsbManager;)V") => {
+            let context = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mContext", context)?;
+            Value::Null
+        }
+        ("getDeviceList", "()Ljava/util/HashMap;") => p57_new_map(vm, Vec::new())?,
+        (
+            "openDevice",
+            "(Landroid/hardware/usb/UsbDevice;)Landroid/hardware/usb/UsbDeviceConnection;",
+        ) => Value::Null,
+        ("getAccessoryList", "()[Landroid/hardware/usb/UsbAccessory;") => Value::Null,
+        (
+            "openAccessory",
+            "(Landroid/hardware/usb/UsbAccessory;)Landroid/os/ParcelFileDescriptor;",
+        ) => Value::Null,
+        ("hasPermission", "(Landroid/hardware/usb/UsbDevice;)Z")
+        | ("hasPermission", "(Landroid/hardware/usb/UsbDevice;Ljava/lang/String;II)Z")
+        | ("hasPermission", "(Landroid/hardware/usb/UsbAccessory;)Z")
+        | ("hasPermission", "(Landroid/hardware/usb/UsbAccessory;II)Z") => Value::Int(0),
+        ("requestPermission", "(Landroid/hardware/usb/UsbDevice;Landroid/app/PendingIntent;)V")
+        | (
+            "requestPermission",
+            "(Landroid/hardware/usb/UsbAccessory;Landroid/app/PendingIntent;)V",
+        ) => Value::Null,
+        ("isFunctionEnabled", "(Ljava/lang/String;)Z") => Value::Int(0),
+        ("getCurrentFunctions", "()J") => Value::Long(0),
+        ("getHashForMkFs", "(Ljava/lang/String;)Ljava/lang/String;") => Value::Null,
+        _ => return Ok(None),
+    }))
+}
+
+// --- android.telephony.euicc ----------------------------------------------
+
+fn p57_euicc_send_unavailable(vm: &mut Engine, callback: Option<&Value>) -> Result<(), VmExit> {
+    let Some(pi) = obj(callback) else {
+        return Err(npe("callbackIntent"));
+    };
+    // AOSP catches PendingIntent.CanceledException. Host-created/fake pending
+    // intents have no delivery target in this no-controller profile.
+    let _ = vm.invoke_instance(pi, "send", "(I)V", &[Value::Int(2)]);
+    Ok(())
+}
+
+fn p57_euicc_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P57_EUICC_INFO {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "(Ljava/lang/String;)V") => {
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "osVersion", v)?;
+                Value::Null
+            }
+            ("getOsVersion", "()Ljava/lang/String;") => get(vm, recv, "osVersion"),
+            ("describeContents", "()I") => Value::Int(0),
+            _ => return Ok(None),
+        }));
+    }
+
+    // No IEuiccController is present, so AOSP's isEnabled() is always false.
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/content/Context;)V") => {
+            let context = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mContext", context)?;
+            put(vm, recv, "mCardId", Value::Int(-1))?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/content/Context;I)V") => {
+            let context = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mContext", context)?;
+            put(vm, recv, "mCardId", Value::Int(iarg(args, 1)))?;
+            Value::Null
+        }
+        ("createForCardId", "(I)Landroid/telephony/euicc/EuiccManager;") => {
+            let out = alloc_obj(vm, P57_EUICC_MANAGER, Vec::new())?;
+            let context = get(vm, recv, "mContext");
+            put(vm, out, "mContext", context)?;
+            put(vm, out, "mCardId", Value::Int(iarg(args, 0)))?;
+            Value::Obj(out)
+        }
+        ("isEnabled", "()Z") => Value::Int(0),
+        ("getEid", "()Ljava/lang/String;") => Value::Null,
+        ("getOtaStatus", "()I") => Value::Int(5),
+        ("getEuiccInfo", "()Landroid/telephony/euicc/EuiccInfo;") => Value::Null,
+        (
+            "downloadSubscription",
+            "(Landroid/telephony/euicc/DownloadableSubscription;ZLandroid/app/PendingIntent;)V",
+        ) => {
+            p57_euicc_send_unavailable(vm, args.get(2))?;
+            Value::Null
+        }
+        ("continueOperation", "(Landroid/content/Intent;Landroid/os/Bundle;)V") => {
+            // AOSP first extracts the callback PendingIntent from the
+            // resolution intent. Parcelable Intent extras are not modeled in
+            // this slice, so a null intent is the faithful failure and any
+            // other intent has no controller operation to continue.
+            if oarg(args, 0).is_none() {
+                return Err(npe("resolutionIntent"));
+            }
+            Value::Null
+        }
+        (
+            "getDownloadableSubscriptionMetadata",
+            "(Landroid/telephony/euicc/DownloadableSubscription;Landroid/app/PendingIntent;)V",
+        ) => {
+            p57_euicc_send_unavailable(vm, args.get(1))?;
+            Value::Null
+        }
+        ("getDefaultDownloadableSubscriptionList", "(Landroid/app/PendingIntent;)V") => {
+            p57_euicc_send_unavailable(vm, args.first())?;
+            Value::Null
+        }
+        ("deleteSubscription", "(ILandroid/app/PendingIntent;)V") => {
+            p57_euicc_send_unavailable(vm, args.get(1))?;
+            Value::Null
+        }
+        ("switchToSubscription", "(ILandroid/app/PendingIntent;)V") => {
+            p57_euicc_send_unavailable(vm, args.get(1))?;
+            Value::Null
+        }
+        ("switchToSubscription", "(IILandroid/app/PendingIntent;)V") => {
+            p57_euicc_send_unavailable(vm, args.get(2))?;
+            Value::Null
+        }
+        ("updateSubscriptionNickname", "(ILjava/lang/String;Landroid/app/PendingIntent;)V") => {
+            p57_euicc_send_unavailable(vm, args.get(2))?;
+            Value::Null
+        }
+        ("eraseSubscriptions", "(Landroid/app/PendingIntent;)V") => {
+            p57_euicc_send_unavailable(vm, args.first())?;
+            Value::Null
+        }
+        (
+            "eraseSubscriptions",
+            "(Landroid/app/PendingIntent;Landroid/telephony/euicc/EraseEuiccOptions;)V",
+        ) => {
+            p57_euicc_send_unavailable(vm, args.first())?;
+            Value::Null
+        }
+        (
+            "eraseSubscriptions",
+            "(Landroid/telephony/euicc/EraseEuiccOptions;Landroid/app/PendingIntent;)V",
+        ) => {
+            p57_euicc_send_unavailable(vm, args.get(1))?;
+            Value::Null
+        }
+        ("retainSubscriptionsForFactoryReset", "(Landroid/app/PendingIntent;)V") => {
+            p57_euicc_send_unavailable(vm, args.first())?;
+            Value::Null
+        }
+        ("setSupportedCountries", "(Ljava/util/List;)V")
+        | ("setUnsupportedCountries", "(Ljava/util/List;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("countries"));
+            }
+            Value::Null
+        }
+        ("getSupportedCountries", "()Ljava/util/List;")
+        | ("getUnsupportedCountries", "()Ljava/util/List;") => {
+            Value::Obj(new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?)
+        }
+        ("isSupportedCountry", "(Ljava/lang/String;)Z") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("countryIso"));
+            }
+            Value::Int(0)
+        }
+        ("isSimPortAvailable", "(I)Z") => Value::Int(0),
+        (
+            "startResolutionActivity",
+            "(Landroid/app/Activity;ILandroid/content/Intent;Landroid/app/PendingIntent;)V",
+        ) => {
+            if oarg(args, 2).is_none() {
+                return Err(npe("resultIntent"));
+            }
+            // The hidden resolution PendingIntent is carried as a Parcelable
+            // Intent extra, which this slice does not model.
+            return Err(iae("Invalid result intent"));
+        }
+        _ => return Ok(None),
+    }))
+}
+
+// --- android.app.usage -------------------------------------------------------
+
+const P57_USAGE_STATS_FIELDS: &[&str] = &[
+    "mPackageName",
+    "mBeginTimeStamp",
+    "mEndTimeStamp",
+    "mLastTimeUsed",
+    "mLastTimeVisible",
+    "mLastTimeComponentUsed",
+    "mLastTimeForegroundServiceUsed",
+    "mTotalTimeInForeground",
+    "mTotalTimeVisible",
+    "mTotalTimeForegroundServiceUsed",
+    "mLaunchCount",
+    "mAppLaunchCount",
+    "mLastEvent",
+];
+
+fn p57_usage_stats_copy(vm: &mut Engine, recv: ObjRef, other: ObjRef) -> Result<(), VmExit> {
+    for f in P57_USAGE_STATS_FIELDS {
+        let v = get(vm, other, f);
+        put(vm, recv, f, v)?;
+    }
+    Ok(())
+}
+
+fn p57_usage_stats_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        ("<init>", "(Landroid/app/usage/UsageStats;)V") => {
+            let Some(other) = oarg(args, 0) else {
+                return Err(npe("stats"));
+            };
+            p57_usage_stats_copy(vm, recv, other)?;
+            Value::Null
+        }
+        ("getObfuscatedForInstantApp", "()Landroid/app/usage/UsageStats;") => {
+            let out = alloc_obj(vm, P57_USAGE_STATS, Vec::new())?;
+            p57_usage_stats_copy(vm, out, recv)?;
+            let package = jstr(vm, "android.instant_app")?;
+            put(vm, out, "mPackageName", package)?;
+            Value::Obj(out)
+        }
+        ("getPackageName", "()Ljava/lang/String;") => get(vm, recv, "mPackageName"),
+        ("getFirstTimeStamp", "()J") => Value::Long(field_long(vm, recv, "mBeginTimeStamp")),
+        ("getLastTimeStamp", "()J") => Value::Long(field_long(vm, recv, "mEndTimeStamp")),
+        ("getLastTimeUsed", "()J") => Value::Long(field_long(vm, recv, "mLastTimeUsed")),
+        ("getLastTimeVisible", "()J") => Value::Long(field_long(vm, recv, "mLastTimeVisible")),
+        ("getTotalTimeInForeground", "()J") => {
+            Value::Long(field_long(vm, recv, "mTotalTimeInForeground"))
+        }
+        ("getTotalTimeVisible", "()J") => Value::Long(field_long(vm, recv, "mTotalTimeVisible")),
+        ("getLastTimeForegroundServiceUsed", "()J") => {
+            Value::Long(field_long(vm, recv, "mLastTimeForegroundServiceUsed"))
+        }
+        ("getTotalTimeForegroundServiceUsed", "()J") => {
+            Value::Long(field_long(vm, recv, "mTotalTimeForegroundServiceUsed"))
+        }
+        ("getLastTimeAnyComponentUsed", "()J") => {
+            Value::Long(field_long(vm, recv, "mLastTimeComponentUsed"))
+        }
+        ("getLastTimePackageUsed", "()J") => Value::Long(
+            field_long(vm, recv, "mLastTimeUsed")
+                .max(field_long(vm, recv, "mLastTimeVisible"))
+                .max(field_long(vm, recv, "mLastTimeForegroundServiceUsed"))
+                .max(field_long(vm, recv, "mLastTimeComponentUsed")),
+        ),
+        ("getAppLaunchCount", "()I") => Value::Int(field_int(vm, recv, "mAppLaunchCount")),
+        ("add", "(Landroid/app/usage/UsageStats;)V") => {
+            let Some(right) = oarg(args, 0) else {
+                return Err(npe("right"));
+            };
+            let my_package = field_str(vm, recv, "mPackageName");
+            let right_package = field_str(vm, right, "mPackageName");
+            if my_package.is_none() {
+                return Err(npe("mPackageName"));
+            }
+            if my_package != right_package {
+                return Err(iae(format!(
+                    "Can't merge UsageStats for package '{}' with UsageStats for package '{}'.",
+                    my_package.unwrap_or_default(),
+                    right_package.unwrap_or_else(|| "null".into())
+                )));
+            }
+            let my_begin = field_long(vm, recv, "mBeginTimeStamp");
+            let right_begin = field_long(vm, right, "mBeginTimeStamp");
+            if right_begin > my_begin {
+                for f in [
+                    "mLastTimeUsed",
+                    "mLastTimeVisible",
+                    "mLastTimeComponentUsed",
+                    "mLastTimeForegroundServiceUsed",
+                ] {
+                    let value = field_long(vm, recv, f).max(field_long(vm, right, f));
+                    put(vm, recv, f, Value::Long(value))?;
+                }
+            }
+            put(
+                vm,
+                recv,
+                "mBeginTimeStamp",
+                Value::Long(my_begin.min(right_begin)),
+            )?;
+            let end =
+                field_long(vm, recv, "mEndTimeStamp").max(field_long(vm, right, "mEndTimeStamp"));
+            put(vm, recv, "mEndTimeStamp", Value::Long(end))?;
+            for f in [
+                "mTotalTimeInForeground",
+                "mTotalTimeVisible",
+                "mTotalTimeForegroundServiceUsed",
+            ] {
+                let value = field_long(vm, recv, f).wrapping_add(field_long(vm, right, f));
+                put(vm, recv, f, Value::Long(value))?;
+            }
+            for f in ["mLaunchCount", "mAppLaunchCount"] {
+                let value = field_int(vm, recv, f).wrapping_add(field_int(vm, right, f));
+                put(vm, recv, f, Value::Int(value))?;
+            }
+            Value::Null
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+const P57_USAGE_EVENT_FIELDS: &[&str] = &[
+    "mPackage",
+    "mClass",
+    "mInstanceId",
+    "mTaskRootPackage",
+    "mTaskRootClass",
+    "mTimeStamp",
+    "mEventType",
+    "mConfiguration",
+    "mShortcutId",
+    "mAction",
+    "mContentType",
+    "mContentAnnotations",
+    "mFlags",
+    "mBucketAndReason",
+    "mNotificationChannelId",
+    "mLocusId",
+];
+
+fn p57_usage_event_copy(vm: &mut Engine, recv: ObjRef, other: ObjRef) -> Result<(), VmExit> {
+    for f in P57_USAGE_EVENT_FIELDS {
+        let v = get(vm, other, f);
+        put(vm, recv, f, v)?;
+    }
+    Ok(())
+}
+
+fn p57_usage_event_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        ("<init>", "(IJ)V") => {
+            put(vm, recv, "mEventType", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mTimeStamp", Value::Long(larg(args, 1)))?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/app/usage/UsageEvents$Event;)V") => {
+            let Some(other) = oarg(args, 0) else {
+                return Err(npe("orig"));
+            };
+            p57_usage_event_copy(vm, recv, other)?;
+            Value::Null
+        }
+        ("copyFrom", "(Landroid/app/usage/UsageEvents$Event;)V") => {
+            let Some(other) = oarg(args, 0) else {
+                return Err(npe("orig"));
+            };
+            p57_usage_event_copy(vm, recv, other)?;
+            Value::Null
+        }
+        ("getPackageName", "()Ljava/lang/String;") => get(vm, recv, "mPackage"),
+        ("isInstantApp", "()Z") => bool_value(field_int(vm, recv, "mFlags") & 1 == 1),
+        ("getClassName", "()Ljava/lang/String;") => get(vm, recv, "mClass"),
+        ("getInstanceId", "()I") => Value::Int(field_int(vm, recv, "mInstanceId")),
+        ("getTaskRootPackageName", "()Ljava/lang/String;") => get(vm, recv, "mTaskRootPackage"),
+        ("getTaskRootClassName", "()Ljava/lang/String;") => get(vm, recv, "mTaskRootClass"),
+        ("getTimeStamp", "()J") => Value::Long(field_long(vm, recv, "mTimeStamp")),
+        ("getEventType", "()I") => Value::Int(field_int(vm, recv, "mEventType")),
+        ("getConfiguration", "()Landroid/content/res/Configuration;") => {
+            get(vm, recv, "mConfiguration")
+        }
+        ("getShortcutId", "()Ljava/lang/String;") => get(vm, recv, "mShortcutId"),
+        ("getAppStandbyBucket", "()I") => Value::Int(
+            ((field_int(vm, recv, "mBucketAndReason") as u32 & 0xffff_0000) >> 16) as i32,
+        ),
+        ("getStandbyReason", "()I") => {
+            Value::Int(field_int(vm, recv, "mBucketAndReason") & 0x0000_ffff)
+        }
+        ("getNotificationChannelId", "()Ljava/lang/String;") => {
+            get(vm, recv, "mNotificationChannelId")
+        }
+        ("getLocusId", "()Ljava/lang/String;") => get(vm, recv, "mLocusId"),
+        ("getObfuscatedIfInstantApp", "()Landroid/app/usage/UsageEvents$Event;") => {
+            if field_int(vm, recv, "mFlags") & 1 != 1 {
+                Value::Obj(recv)
+            } else {
+                let out = alloc_obj(vm, P57_USAGE_EVENT, Vec::new())?;
+                p57_usage_event_copy(vm, out, recv)?;
+                let package = jstr(vm, "android.instant_app")?;
+                let class = jstr(vm, "android.instant_app")?;
+                put(vm, out, "mPackage", package)?;
+                put(vm, out, "mClass", class)?;
+                Value::Obj(out)
+            }
+        }
+        ("getObfuscatedNotificationEvent", "()Landroid/app/usage/UsageEvents$Event;") => {
+            let out = alloc_obj(vm, P57_USAGE_EVENT, Vec::new())?;
+            p57_usage_event_copy(vm, out, recv)?;
+            let channel = jstr(vm, "unknown_channel_id")?;
+            put(vm, out, "mNotificationChannelId", channel)?;
+            Value::Obj(out)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_usage_events_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => {
+            put(vm, recv, "mEventCount", Value::Int(0))?;
+            put(vm, recv, "mIndex", Value::Int(0))?;
+            Value::Null
+        }
+        ("<init>", "(Ljava/util/List;[Ljava/lang/String;)V")
+        | ("<init>", "(Ljava/util/List;[Ljava/lang/String;Z)V") => {
+            let Some(_) = oarg(args, 0) else {
+                return Err(npe("events"));
+            };
+            let items = collection_items(vm, args.first());
+            let events = obj_array(vm, "[Landroid/app/usage/UsageEvents$Event;", items.clone())?;
+            let pool = args.get(1).cloned().unwrap_or(Value::Null);
+            put(vm, recv, "rd_events", events)?;
+            put(vm, recv, "mStringPool", pool)?;
+            put(vm, recv, "mEventCount", Value::Int(items.len() as i32))?;
+            put(vm, recv, "mIndex", Value::Int(0))?;
+            put(
+                vm,
+                recv,
+                "mIncludeTaskRoots",
+                Value::Int(if sig.ends_with("Z)V") {
+                    iarg(args, 2)
+                } else {
+                    0
+                }),
+            )?;
+            Value::Null
+        }
+        ("hasNextEvent", "()Z") => {
+            bool_value(field_int(vm, recv, "mIndex") < field_int(vm, recv, "mEventCount"))
+        }
+        ("getNextEvent", "(Landroid/app/usage/UsageEvents$Event;)Z") => {
+            let Some(out) = oarg(args, 0) else {
+                return Err(iae("Given eventOut must not be null"));
+            };
+            let index = field_int(vm, recv, "mIndex");
+            let count = field_int(vm, recv, "mEventCount");
+            if index >= count {
+                Value::Int(0)
+            } else {
+                let arr = get(vm, recv, "rd_events");
+                let elems = array_elems(vm, Some(&arr));
+                match elems.get(index as usize) {
+                    Some(Value::Obj(source_event)) => {
+                        p57_usage_event_copy(vm, out, *source_event)?;
+                        put(vm, recv, "mIndex", Value::Int(index + 1))?;
+                        Value::Int(1)
+                    }
+                    _ => Value::Int(0),
+                }
+            }
+        }
+        ("resetToStart", "()V") => {
+            put(vm, recv, "mIndex", Value::Int(0))?;
+            Value::Null
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_new_empty_usage_events(vm: &mut Engine) -> Result<Value, VmExit> {
+    let r = alloc_obj(vm, P57_USAGE_EVENTS, Vec::new())?;
+    put(vm, r, "mEventCount", Value::Int(0))?;
+    put(vm, r, "mIndex", Value::Int(0))?;
+    Ok(Value::Obj(r))
+}
+
+fn p57_usage_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // Bounded profile: no persisted usage history or standby controller.
+    let empty_list = |vm: &mut Engine| -> Result<Value, VmExit> {
+        Ok(Value::Obj(new_collection(
+            vm,
+            "Ljava/util/ArrayList;",
+            Vec::new(),
+        )?))
+    };
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/content/Context;Landroid/app/usage/IUsageStatsManager;)V") => {
+            let context = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mContext", context)?;
+            Value::Null
+        }
+        ("queryUsageStats", "(IJJ)Ljava/util/List;")
+        | ("queryConfigurations", "(IJJ)Ljava/util/List;")
+        | ("queryEventStats", "(IJJ)Ljava/util/List;") => empty_list(vm)?,
+        ("queryEvents", "(JJ)Landroid/app/usage/UsageEvents;")
+        | ("queryEventsForSelf", "(JJ)Landroid/app/usage/UsageEvents;") => {
+            p57_new_empty_usage_events(vm)?
+        }
+        ("queryAndAggregateUsageStats", "(JJ)Ljava/util/Map;") => {
+            p57_new_map(vm, Vec::new())?
+        }
+        ("isAppStandbyEnabled", "()Z") => Value::Int(0),
+        ("isAppInactive", "(Ljava/lang/String;)Z") => Value::Int(0),
+        ("setAppInactive", "(Ljava/lang/String;Z)V") => Value::Null,
+        ("getAppStandbyBucket", "()I") | ("getAppStandbyBucket", "(Ljava/lang/String;)I") => {
+            Value::Int(10)
+        }
+        ("setAppStandbyBucket", "(Ljava/lang/String;I)V") => Value::Null,
+        ("getAppStandbyBuckets", "()Ljava/util/Map;") => p57_new_map(vm, Vec::new())?,
+        ("setAppStandbyBuckets", "(Ljava/util/Map;)V") => Value::Null,
+        ("getAppMinStandbyBucket", "(Ljava/lang/String;)I") => Value::Int(10),
+        ("registerAppUsageObserver", "(I[Ljava/lang/String;JLjava/util/concurrent/TimeUnit;Landroid/app/PendingIntent;)V") => {
+            if oarg(args, 1).is_none() {
+                return Err(npe("observedEntities"));
+            }
+            if oarg(args, 3).is_none() {
+                return Err(npe("timeUnit"));
+            }
+            if oarg(args, 4).is_none() {
+                return Err(npe("callbackIntent"));
+            }
+            Value::Null
+        }
+        ("unregisterAppUsageObserver", "(I)V")
+        | ("unregisterUsageSessionObserver", "(I)V")
+        | ("unregisterAppUsageLimitObserver", "(I)V") => Value::Null,
+        ("registerUsageSessionObserver", "(I[Ljava/lang/String;Ljava/time/Duration;Ljava/time/Duration;Landroid/app/PendingIntent;Landroid/app/PendingIntent;)V") => {
+            if oarg(args, 1).is_none() {
+                return Err(npe("observedEntities"));
+            }
+            if oarg(args, 2).is_none() {
+                return Err(npe("timeLimit"));
+            }
+            if oarg(args, 3).is_none() {
+                return Err(npe("sessionThresholdTime"));
+            }
+            if oarg(args, 4).is_none() {
+                return Err(npe("limitReachedCallbackIntent"));
+            }
+            Value::Null
+        }
+        ("registerAppUsageLimitObserver", "(I[Ljava/lang/String;Ljava/time/Duration;Landroid/app/PendingIntent;)V") => {
+            if oarg(args, 1).is_none() {
+                return Err(npe("observedEntities"));
+            }
+            if oarg(args, 2).is_none() {
+                return Err(npe("timeLimit"));
+            }
+            if oarg(args, 3).is_none() {
+                return Err(npe("callbackIntent"));
+            }
+            Value::Null
+        }
+        ("queryBroadcastResponseStats", "(Landroid/content/ComponentName;J)Ljava/util/List;") => {
+            empty_list(vm)?
+        }
+        ("getUsageSource", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+// --- android.print ---------------------------------------------------------
+
+fn p57_valid_single_flag(value: i32, valid: i32) -> bool {
+    value & valid != 0 && value.count_ones() == 1 && value & !valid == 0
+}
+
+fn p57_media_size_new(
+    vm: &mut Engine,
+    id: Value,
+    label: Value,
+    package: Value,
+    width: i32,
+    height: i32,
+    res_id: i32,
+) -> Result<Value, VmExit> {
+    let r = alloc_obj(vm, P57_MEDIA_SIZE, Vec::new())?;
+    put(vm, r, "mId", id)?;
+    put(vm, r, "mLabel", label)?;
+    put(vm, r, "mPackageName", package)?;
+    put(vm, r, "mWidthMils", Value::Int(width))?;
+    put(vm, r, "mHeightMils", Value::Int(height))?;
+    put(vm, r, "mLabelResId", Value::Int(res_id))?;
+    Ok(Value::Obj(r))
+}
+
+fn p57_media_size_standard(vm: &mut Engine, id: &str) -> Result<Option<Value>, VmExit> {
+    let dims = match id {
+        "UNKNOWN_PORTRAIT" => (1, i32::MAX),
+        "UNKNOWN_LANDSCAPE" => (i32::MAX, 1),
+        "ISO_A0" => (33110, 46810),
+        "ISO_A1" => (23390, 33110),
+        "ISO_A2" => (16540, 23390),
+        "ISO_A3" => (11690, 16540),
+        "ISO_A4" => (8270, 11690),
+        "ISO_A5" => (5830, 8270),
+        "ISO_A6" => (4130, 5830),
+        "ISO_A7" => (2910, 4130),
+        "ISO_A8" => (2050, 2910),
+        "ISO_A9" => (1460, 2050),
+        "ISO_A10" => (1020, 1460),
+        "ISO_B0" => (39370, 55670),
+        "ISO_B1" => (27830, 39370),
+        "ISO_B2" => (19690, 27830),
+        "ISO_B3" => (13900, 19690),
+        "ISO_B4" => (9840, 13900),
+        "ISO_B5" => (6930, 9840),
+        "ISO_B6" => (4920, 6930),
+        "ISO_B7" => (3460, 4920),
+        "ISO_B8" => (2440, 3460),
+        "ISO_B9" => (1730, 2440),
+        "ISO_B10" => (1220, 1730),
+        "ISO_C0" => (36100, 51060),
+        "ISO_C1" => (25510, 36100),
+        "ISO_C2" => (18030, 25510),
+        "ISO_C3" => (12760, 18030),
+        "ISO_C4" => (9020, 12760),
+        "ISO_C5" => (6380, 9020),
+        "ISO_C6" => (4490, 6380),
+        "ISO_C7" => (3190, 4490),
+        "ISO_C8" => (2240, 3190),
+        "ISO_C9" => (1570, 2240),
+        "ISO_C10" => (1100, 1570),
+        "NA_LETTER" => (8500, 11000),
+        "NA_GOVT_LETTER" => (8000, 10500),
+        "NA_LEGAL" => (8500, 14000),
+        "NA_JUNIOR_LEGAL" => (8000, 5000),
+        "NA_LEDGER" => (17000, 11000),
+        "NA_TABLOID" => (11000, 17000),
+        _ => return Ok(None),
+    };
+    let idv = jstr(vm, id)?;
+    let label = jstr(vm, id)?;
+    let pkg = jstr(vm, "android")?;
+    Ok(Some(p57_media_size_new(
+        vm, idv, label, pkg, dims.0, dims.1, 0,
+    )?))
+}
+
+fn p57_media_size_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;II)V") => {
+            let id = opt_str_arg(vm, args, 0);
+            let label = opt_str_arg(vm, args, 1);
+            if id.as_deref().map(str::is_empty).unwrap_or(true) {
+                return Err(iae("id cannot be empty."));
+            }
+            if label.as_deref().map(str::is_empty).unwrap_or(true) {
+                return Err(iae("label cannot be empty."));
+            }
+            if iarg(args, 2) <= 0 {
+                return Err(iae("widthMils cannot be less than or equal to zero."));
+            }
+            if iarg(args, 3) <= 0 {
+                return Err(iae("heightMils cannot be less than or equal to zero."));
+            }
+            put(vm, recv, "mId", args[0].clone())?;
+            put(vm, recv, "mLabel", args[1].clone())?;
+            put(vm, recv, "mPackageName", Value::Null)?;
+            put(vm, recv, "mWidthMils", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mHeightMils", Value::Int(iarg(args, 3)))?;
+            put(vm, recv, "mLabelResId", Value::Int(0))?;
+            Value::Null
+        }
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;III)V") => {
+            // Hidden predefined-size constructor: (id, package, res, w, h).
+            if opt_str_arg(vm, args, 0)
+                .as_deref()
+                .map(str::is_empty)
+                .unwrap_or(true)
+            {
+                return Err(iae("id cannot be empty."));
+            }
+            if opt_str_arg(vm, args, 1)
+                .as_deref()
+                .map(str::is_empty)
+                .unwrap_or(true)
+                || iarg(args, 2) == 0
+            {
+                return Err(iae("label cannot be empty."));
+            }
+            if iarg(args, 3) <= 0 {
+                return Err(iae("widthMils cannot be less than or equal to zero."));
+            }
+            if iarg(args, 4) <= 0 {
+                return Err(iae("heightMils cannot be less than or equal to zero."));
+            }
+            put(vm, recv, "mId", args[0].clone())?;
+            put(vm, recv, "mLabel", Value::Null)?;
+            put(vm, recv, "mPackageName", args[1].clone())?;
+            put(vm, recv, "mWidthMils", Value::Int(iarg(args, 3)))?;
+            put(vm, recv, "mHeightMils", Value::Int(iarg(args, 4)))?;
+            put(vm, recv, "mLabelResId", Value::Int(iarg(args, 2)))?;
+            Value::Null
+        }
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;III)V") => {
+            if opt_str_arg(vm, args, 0)
+                .as_deref()
+                .map(str::is_empty)
+                .unwrap_or(true)
+            {
+                return Err(iae("id cannot be empty."));
+            }
+            if iarg(args, 3) <= 0 {
+                return Err(iae("widthMils cannot be less than or equal to zero."));
+            }
+            if iarg(args, 4) <= 0 {
+                return Err(iae("heightMils cannot be less than or equal to zero."));
+            }
+            let has_label = opt_str_arg(vm, args, 1)
+                .as_deref()
+                .map(|s| !s.is_empty())
+                .unwrap_or(false);
+            let has_res = opt_str_arg(vm, args, 2)
+                .as_deref()
+                .map(|s| !s.is_empty())
+                .unwrap_or(false)
+                && iarg(args, 5) != 0;
+            if has_label == has_res {
+                return Err(iae("label cannot be empty."));
+            }
+            put(vm, recv, "mId", args[0].clone())?;
+            put(vm, recv, "mLabel", args[1].clone())?;
+            put(vm, recv, "mPackageName", args[2].clone())?;
+            put(vm, recv, "mWidthMils", Value::Int(iarg(args, 3)))?;
+            put(vm, recv, "mHeightMils", Value::Int(iarg(args, 4)))?;
+            put(vm, recv, "mLabelResId", Value::Int(iarg(args, 5)))?;
+            Value::Null
+        }
+        ("getId", "()Ljava/lang/String;") => get(vm, recv, "mId"),
+        ("getLabel", "(Landroid/content/pm/PackageManager;)Ljava/lang/String;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("packageManager"));
+            }
+            let label = get(vm, recv, "mLabel");
+            if matches!(label, Value::Obj(_)) {
+                label
+            } else {
+                // Framework media-size string resources are not modeled; IDs
+                // remain the stable human-readable fallback for predefined
+                // sizes created through the hidden constructor.
+                get(vm, recv, "mId")
+            }
+        }
+        ("getWidthMils", "()I") => Value::Int(field_int(vm, recv, "mWidthMils")),
+        ("getHeightMils", "()I") => Value::Int(field_int(vm, recv, "mHeightMils")),
+        ("isPortrait", "()Z") => bool_value(
+            field_int(vm, recv, "mHeightMils") >= field_int(vm, recv, "mWidthMils"),
+        ),
+        ("asPortrait", "()Landroid/print/PrintAttributes$MediaSize;") => {
+            let w = field_int(vm, recv, "mWidthMils");
+            let h = field_int(vm, recv, "mHeightMils");
+            if h >= w {
+                Value::Obj(recv)
+            } else {
+                p57_media_size_new(
+                    vm,
+                    get(vm, recv, "mId"),
+                    get(vm, recv, "mLabel"),
+                    get(vm, recv, "mPackageName"),
+                    w.min(h),
+                    w.max(h),
+                    field_int(vm, recv, "mLabelResId"),
+                )?
+            }
+        }
+        ("asLandscape", "()Landroid/print/PrintAttributes$MediaSize;") => {
+            let w = field_int(vm, recv, "mWidthMils");
+            let h = field_int(vm, recv, "mHeightMils");
+            if h < w {
+                Value::Obj(recv)
+            } else {
+                p57_media_size_new(
+                    vm,
+                    get(vm, recv, "mId"),
+                    get(vm, recv, "mLabel"),
+                    get(vm, recv, "mPackageName"),
+                    w.max(h),
+                    w.min(h),
+                    field_int(vm, recv, "mLabelResId"),
+                )?
+            }
+        }
+        ("hashCode", "()I") => {
+            let mut hash = 1i32;
+            hash = hash
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mWidthMils"));
+            hash = hash
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mHeightMils"));
+            Value::Int(hash)
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => bool_value(matches!(
+            oarg(args, 0),
+            Some(other)
+                if class_of(vm, other) == P57_MEDIA_SIZE
+                    && field_int(vm, recv, "mWidthMils") == field_int(vm, other, "mWidthMils")
+                    && field_int(vm, recv, "mHeightMils") == field_int(vm, other, "mHeightMils")
+        )),
+        ("toString", "()Ljava/lang/String;") => jstr(
+            vm,
+            format!(
+                "MediaSize{{id: {}, label: {}, packageName: {}, heightMils: {}, widthMils: {}, labelResId: {}}}",
+                field_str(vm, recv, "mId").unwrap_or_else(|| "null".into()),
+                field_str(vm, recv, "mLabel").unwrap_or_else(|| "null".into()),
+                field_str(vm, recv, "mPackageName").unwrap_or_else(|| "null".into()),
+                field_int(vm, recv, "mHeightMils"),
+                field_int(vm, recv, "mWidthMils"),
+                field_int(vm, recv, "mLabelResId")
+            ),
+        )?,
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_resolution_new(
+    vm: &mut Engine,
+    id: Value,
+    label: Value,
+    horizontal: i32,
+    vertical: i32,
+) -> Result<Value, VmExit> {
+    let r = alloc_obj(vm, P57_RESOLUTION, Vec::new())?;
+    put(vm, r, "mId", id)?;
+    put(vm, r, "mLabel", label)?;
+    put(vm, r, "mHorizontalDpi", Value::Int(horizontal))?;
+    put(vm, r, "mVerticalDpi", Value::Int(vertical))?;
+    Ok(Value::Obj(r))
+}
+
+fn p57_resolution_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;II)V") => {
+            if opt_str_arg(vm, args, 0)
+                .as_deref()
+                .map(str::is_empty)
+                .unwrap_or(true)
+            {
+                return Err(iae("id cannot be empty."));
+            }
+            if opt_str_arg(vm, args, 1)
+                .as_deref()
+                .map(str::is_empty)
+                .unwrap_or(true)
+            {
+                return Err(iae("label cannot be empty."));
+            }
+            if iarg(args, 2) <= 0 {
+                return Err(iae("horizontalDpi cannot be less than or equal to zero."));
+            }
+            if iarg(args, 3) <= 0 {
+                return Err(iae("verticalDpi cannot be less than or equal to zero."));
+            }
+            put(vm, recv, "mId", args[0].clone())?;
+            put(vm, recv, "mLabel", args[1].clone())?;
+            put(vm, recv, "mHorizontalDpi", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mVerticalDpi", Value::Int(iarg(args, 3)))?;
+            Value::Null
+        }
+        ("getId", "()Ljava/lang/String;") => get(vm, recv, "mId"),
+        ("getLabel", "()Ljava/lang/String;") => get(vm, recv, "mLabel"),
+        ("getHorizontalDpi", "()I") => Value::Int(field_int(vm, recv, "mHorizontalDpi")),
+        ("getVerticalDpi", "()I") => Value::Int(field_int(vm, recv, "mVerticalDpi")),
+        ("hashCode", "()I") => {
+            let mut hash = 1i32;
+            hash = hash
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mHorizontalDpi"));
+            hash = hash
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mVerticalDpi"));
+            Value::Int(hash)
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => bool_value(matches!(
+            oarg(args, 0),
+            Some(other)
+                if class_of(vm, other) == P57_RESOLUTION
+                    && field_int(vm, recv, "mHorizontalDpi")
+                        == field_int(vm, other, "mHorizontalDpi")
+                    && field_int(vm, recv, "mVerticalDpi")
+                        == field_int(vm, other, "mVerticalDpi")
+        )),
+        ("toString", "()Ljava/lang/String;") => jstr(
+            vm,
+            format!(
+                "Resolution{{id: {}, label: {}, horizontalDpi: {}, verticalDpi: {}}}",
+                field_str(vm, recv, "mId").unwrap_or_else(|| "null".into()),
+                field_str(vm, recv, "mLabel").unwrap_or_else(|| "null".into()),
+                field_int(vm, recv, "mHorizontalDpi"),
+                field_int(vm, recv, "mVerticalDpi")
+            ),
+        )?,
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_margins_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(IIII)V") => {
+            put(vm, recv, "mLeftMils", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mTopMils", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mRightMils", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mBottomMils", Value::Int(iarg(args, 3)))?;
+            Value::Null
+        }
+        ("getLeftMils", "()I") => Value::Int(field_int(vm, recv, "mLeftMils")),
+        ("getTopMils", "()I") => Value::Int(field_int(vm, recv, "mTopMils")),
+        ("getRightMils", "()I") => Value::Int(field_int(vm, recv, "mRightMils")),
+        ("getBottomMils", "()I") => Value::Int(field_int(vm, recv, "mBottomMils")),
+        ("hashCode", "()I") => {
+            let mut hash = 1i32;
+            for f in ["mBottomMils", "mLeftMils", "mRightMils", "mTopMils"] {
+                hash = hash.wrapping_mul(31).wrapping_add(field_int(vm, recv, f));
+            }
+            Value::Int(hash)
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => bool_value(matches!(
+            oarg(args, 0),
+            Some(other)
+                if class_of(vm, other) == P57_MARGINS
+                    && ["mLeftMils", "mTopMils", "mRightMils", "mBottomMils"]
+                        .iter()
+                        .all(|f| field_int(vm, recv, f) == field_int(vm, other, f))
+        )),
+        ("toString", "()Ljava/lang/String;") => jstr(
+            vm,
+            format!(
+                "Margins{{leftMils: {}, topMils: {}, rightMils: {}, bottomMils: {}}}",
+                field_int(vm, recv, "mLeftMils"),
+                field_int(vm, recv, "mTopMils"),
+                field_int(vm, recv, "mRightMils"),
+                field_int(vm, recv, "mBottomMils")
+            ),
+        )?,
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_print_attributes_copy(vm: &mut Engine, recv: ObjRef, other: ObjRef) -> Result<(), VmExit> {
+    for f in [
+        "mMediaSize",
+        "mResolution",
+        "mMinMargins",
+        "mColorMode",
+        "mDuplexMode",
+    ] {
+        let v = get(vm, other, f);
+        put(vm, recv, f, v)?;
+    }
+    Ok(())
+}
+
+fn p57_print_value_equal(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, VmExit> {
+    match (obj(Some(a)), obj(Some(b))) {
+        (None, None) => Ok(true),
+        (Some(a), Some(b)) => {
+            if a == b {
+                Ok(true)
+            } else {
+                Ok(
+                    vm.invoke_instance(a, "equals", "(Ljava/lang/Object;)Z", &[Value::Obj(b)])?
+                        == Value::Int(1),
+                )
+            }
+        }
+        _ => Ok(false),
+    }
+}
+
+fn p57_print_value_hash(vm: &mut Engine, v: &Value) -> Result<i32, VmExit> {
+    match obj(Some(v)) {
+        Some(r) => Ok(vm
+            .invoke_instance(r, "hashCode", "()I", &[])?
+            .as_int()
+            .unwrap_or(0)),
+        None => Ok(0),
+    }
+}
+
+fn p57_print_attributes_rotated(
+    vm: &mut Engine,
+    recv: ObjRef,
+    portrait: bool,
+) -> Result<Value, VmExit> {
+    let Some(media) = field_obj(vm, recv, "mMediaSize") else {
+        return Err(npe("mMediaSize"));
+    };
+    let is_portrait = field_int(vm, media, "mHeightMils") >= field_int(vm, media, "mWidthMils");
+    if is_portrait == portrait {
+        return Ok(Value::Obj(recv));
+    }
+    let Some(resolution) = field_obj(vm, recv, "mResolution") else {
+        return Err(npe("mResolution"));
+    };
+    let color = field_int(vm, recv, "mColorMode");
+    let duplex = field_int(vm, recv, "mDuplexMode");
+    if !p57_valid_single_flag(color, 3) {
+        return Err(iae(format!("invalid color mode: {color}")));
+    }
+    if !p57_valid_single_flag(duplex, 7) {
+        return Err(iae(format!("invalid duplex mode: {duplex}")));
+    }
+    let new_media = vm.invoke_instance(
+        media,
+        if portrait {
+            "asPortrait"
+        } else {
+            "asLandscape"
+        },
+        "()Landroid/print/PrintAttributes$MediaSize;",
+        &[],
+    )?;
+    let new_resolution = p57_resolution_new(
+        vm,
+        get(vm, resolution, "mId"),
+        get(vm, resolution, "mLabel"),
+        field_int(vm, resolution, "mVerticalDpi"),
+        field_int(vm, resolution, "mHorizontalDpi"),
+    )?;
+    let margins = get(vm, recv, "mMinMargins");
+    let out = alloc_obj(vm, P57_PRINT_ATTRIBUTES, Vec::new())?;
+    put(vm, out, "mMediaSize", new_media)?;
+    put(vm, out, "mResolution", new_resolution)?;
+    put(vm, out, "mMinMargins", margins)?;
+    put(vm, out, "mColorMode", Value::Int(color))?;
+    put(vm, out, "mDuplexMode", Value::Int(duplex))?;
+    Ok(Value::Obj(out))
+}
+
+fn p57_print_attributes_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        ("getMediaSize", "()Landroid/print/PrintAttributes$MediaSize;") => {
+            get(vm, recv, "mMediaSize")
+        }
+        ("setMediaSize", "(Landroid/print/PrintAttributes$MediaSize;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mMediaSize", v)?;
+            Value::Null
+        }
+        ("getResolution", "()Landroid/print/PrintAttributes$Resolution;") => {
+            get(vm, recv, "mResolution")
+        }
+        ("setResolution", "(Landroid/print/PrintAttributes$Resolution;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mResolution", v)?;
+            Value::Null
+        }
+        ("getMinMargins", "()Landroid/print/PrintAttributes$Margins;") => {
+            get(vm, recv, "mMinMargins")
+        }
+        ("setMinMargins", "(Landroid/print/PrintAttributes$Margins;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mMinMargins", v)?;
+            Value::Null
+        }
+        ("getColorMode", "()I") => Value::Int(field_int(vm, recv, "mColorMode")),
+        ("setColorMode", "(I)V") => {
+            let mode = iarg(args, 0);
+            if !p57_valid_single_flag(mode, 3) {
+                return Err(iae(format!("invalid color mode: {mode}")));
+            }
+            put(vm, recv, "mColorMode", Value::Int(mode))?;
+            Value::Null
+        }
+        ("getDuplexMode", "()I") => Value::Int(field_int(vm, recv, "mDuplexMode")),
+        ("setDuplexMode", "(I)V") => {
+            let mode = iarg(args, 0);
+            if !p57_valid_single_flag(mode, 7) {
+                return Err(iae(format!("invalid duplex mode: {mode}")));
+            }
+            put(vm, recv, "mDuplexMode", Value::Int(mode))?;
+            Value::Null
+        }
+        ("isPortrait", "()Z") => {
+            let Some(media) = field_obj(vm, recv, "mMediaSize") else {
+                return Err(npe("mMediaSize"));
+            };
+            bool_value(field_int(vm, media, "mHeightMils") >= field_int(vm, media, "mWidthMils"))
+        }
+        ("asPortrait", "()Landroid/print/PrintAttributes;") => {
+            p57_print_attributes_rotated(vm, recv, true)?
+        }
+        ("asLandscape", "()Landroid/print/PrintAttributes;") => {
+            p57_print_attributes_rotated(vm, recv, false)?
+        }
+        ("clear", "()V") => {
+            put(vm, recv, "mMediaSize", Value::Null)?;
+            put(vm, recv, "mResolution", Value::Null)?;
+            put(vm, recv, "mMinMargins", Value::Null)?;
+            put(vm, recv, "mColorMode", Value::Int(0))?;
+            put(vm, recv, "mDuplexMode", Value::Int(0))?;
+            Value::Null
+        }
+        ("copyFrom", "(Landroid/print/PrintAttributes;)V") => {
+            let Some(other) = oarg(args, 0) else {
+                return Err(npe("other"));
+            };
+            p57_print_attributes_copy(vm, recv, other)?;
+            Value::Null
+        }
+        ("hashCode", "()I") => {
+            let mut hash = 1i32;
+            hash = hash
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mColorMode"));
+            hash = hash
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mDuplexMode"));
+            for f in ["mMinMargins", "mMediaSize", "mResolution"] {
+                let v = get(vm, recv, f);
+                let h = p57_print_value_hash(vm, &v)?;
+                hash = hash.wrapping_mul(31).wrapping_add(h);
+            }
+            Value::Int(hash)
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(other) if class_of(vm, other) == P57_PRINT_ATTRIBUTES => {
+                    if other == recv {
+                        true
+                    } else if field_int(vm, recv, "mColorMode")
+                        != field_int(vm, other, "mColorMode")
+                        || field_int(vm, recv, "mDuplexMode") != field_int(vm, other, "mDuplexMode")
+                    {
+                        false
+                    } else {
+                        let mut all = true;
+                        for f in ["mMinMargins", "mMediaSize", "mResolution"] {
+                            let a = get(vm, recv, f);
+                            let b = get(vm, other, f);
+                            if !p57_print_value_equal(vm, &a, &b)? {
+                                all = false;
+                                break;
+                            }
+                        }
+                        all
+                    }
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let media = get(vm, recv, "mMediaSize");
+            let resolution = get(vm, recv, "mResolution");
+            let margins = get(vm, recv, "mMinMargins");
+            let media_s = value_string(vm, &media)?;
+            let orientation = match obj(Some(&media)) {
+                Some(m) => {
+                    if field_int(vm, m, "mHeightMils") >= field_int(vm, m, "mWidthMils") {
+                        "portrait"
+                    } else {
+                        "landscape"
+                    }
+                }
+                None => "null",
+            };
+            let resolution_s = value_string(vm, &resolution)?;
+            let margins_s = value_string(vm, &margins)?;
+            let color = match field_int(vm, recv, "mColorMode") {
+                1 => "COLOR_MODE_MONOCHROME",
+                2 => "COLOR_MODE_COLOR",
+                _ => "COLOR_MODE_UNKNOWN",
+            };
+            let duplex = match field_int(vm, recv, "mDuplexMode") {
+                1 => "DUPLEX_MODE_NONE",
+                2 => "DUPLEX_MODE_LONG_EDGE",
+                4 => "DUPLEX_MODE_SHORT_EDGE",
+                _ => "DUPLEX_MODE_UNKNOWN",
+            };
+            jstr(
+                vm,
+                format!(
+                    "PrintAttributes{{mediaSize: {media_s}, orientation: {orientation}, resolution: {resolution_s}, minMargins: {margins_s}, colorMode: {color}, duplexMode: {duplex}}}"
+                ),
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_print_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // Builder delegates directly to its PrintAttributes instance. Store the
+    // attributes fields on the builder and materialize the same field set.
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        (
+            "setMediaSize",
+            "(Landroid/print/PrintAttributes$MediaSize;)Landroid/print/PrintAttributes$Builder;",
+        ) => {
+            let Some(_) = oarg(args, 0) else {
+                return Err(npe("mediaSize"));
+            };
+            put(vm, recv, "mMediaSize", args[0].clone())?;
+            Value::Obj(recv)
+        }
+        (
+            "setResolution",
+            "(Landroid/print/PrintAttributes$Resolution;)Landroid/print/PrintAttributes$Builder;",
+        ) => {
+            let Some(_) = oarg(args, 0) else {
+                return Err(npe("resolution"));
+            };
+            put(vm, recv, "mResolution", args[0].clone())?;
+            Value::Obj(recv)
+        }
+        (
+            "setMinMargins",
+            "(Landroid/print/PrintAttributes$Margins;)Landroid/print/PrintAttributes$Builder;",
+        ) => {
+            let Some(_) = oarg(args, 0) else {
+                return Err(npe("margins"));
+            };
+            put(vm, recv, "mMinMargins", args[0].clone())?;
+            Value::Obj(recv)
+        }
+        ("setColorMode", "(I)Landroid/print/PrintAttributes$Builder;") => {
+            let mode = iarg(args, 0);
+            if !p57_valid_single_flag(mode, 3) {
+                return Err(iae(format!("invalid color mode: {mode}")));
+            }
+            put(vm, recv, "mColorMode", Value::Int(mode))?;
+            Value::Obj(recv)
+        }
+        ("setDuplexMode", "(I)Landroid/print/PrintAttributes$Builder;") => {
+            let mode = iarg(args, 0);
+            if !p57_valid_single_flag(mode, 7) {
+                return Err(iae(format!("invalid duplex mode: {mode}")));
+            }
+            put(vm, recv, "mDuplexMode", Value::Int(mode))?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/print/PrintAttributes;") => {
+            if let Some(existing) = field_obj(vm, recv, "rd_attributes") {
+                p57_print_attributes_copy(vm, existing, recv)?;
+                Value::Obj(existing)
+            } else {
+                let out = alloc_obj(vm, P57_PRINT_ATTRIBUTES, Vec::new())?;
+                p57_print_attributes_copy(vm, out, recv)?;
+                put(vm, recv, "rd_attributes", Value::Obj(out))?;
+                Value::Obj(out)
+            }
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_page_range_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(II)V") => {
+            let start = iarg(args, 0);
+            let end = iarg(args, 1);
+            if start < 0 {
+                return Err(iae("start cannot be less than zero."));
+            }
+            if end < 0 {
+                return Err(iae("end cannot be less than zero."));
+            }
+            if start > end {
+                return Err(iae("start must be lesser than end."));
+            }
+            put(vm, recv, "mStart", Value::Int(start))?;
+            put(vm, recv, "mEnd", Value::Int(end))?;
+            Value::Null
+        }
+        ("getStart", "()I") => Value::Int(field_int(vm, recv, "mStart")),
+        ("getEnd", "()I") => Value::Int(field_int(vm, recv, "mEnd")),
+        ("contains", "(I)Z") => bool_value(
+            iarg(args, 0) >= field_int(vm, recv, "mStart")
+                && iarg(args, 0) <= field_int(vm, recv, "mEnd"),
+        ),
+        ("getSize", "()I") => Value::Int(
+            field_int(vm, recv, "mEnd")
+                .wrapping_sub(field_int(vm, recv, "mStart"))
+                .wrapping_add(1),
+        ),
+        ("hashCode", "()I") => {
+            let mut hash = 1i32;
+            hash = hash
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mEnd"));
+            hash = hash
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mStart"));
+            Value::Int(hash)
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => bool_value(matches!(
+            oarg(args, 0),
+            Some(other)
+                if class_of(vm, other) == P57_PAGE_RANGE
+                    && field_int(vm, recv, "mStart") == field_int(vm, other, "mStart")
+                    && field_int(vm, recv, "mEnd") == field_int(vm, other, "mEnd")
+        )),
+        ("toString", "()Ljava/lang/String;") => {
+            let start = field_int(vm, recv, "mStart");
+            let end = field_int(vm, recv, "mEnd");
+            jstr(
+                vm,
+                if start == 0 && end == i32::MAX {
+                    "PageRange[<all pages>]".into()
+                } else {
+                    format!("PageRange[{start} - {end}]")
+                },
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_component_equal(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, VmExit> {
+    match (obj(Some(a)), obj(Some(b))) {
+        (Some(a), Some(b)) => {
+            if a == b {
+                Ok(true)
+            } else {
+                Ok(
+                    vm.invoke_instance(a, "equals", "(Ljava/lang/Object;)Z", &[Value::Obj(b)])?
+                        == Value::Int(1),
+                )
+            }
+        }
+        _ => Ok(matches!((a, b), (Value::Null, Value::Null))),
+    }
+}
+
+fn p57_printer_id_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/content/ComponentName;Ljava/lang/String;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("serviceName"));
+            }
+            if oarg(args, 1).is_none() {
+                return Err(npe("localId"));
+            }
+            put(vm, recv, "mServiceName", args[0].clone())?;
+            put(vm, recv, "mLocalId", args[1].clone())?;
+            Value::Null
+        }
+        ("getServiceName", "()Landroid/content/ComponentName;") => get(vm, recv, "mServiceName"),
+        ("getLocalId", "()Ljava/lang/String;") => get(vm, recv, "mLocalId"),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(other) if class_of(vm, other) == P57_PRINTER_ID => {
+                    let a = get(vm, recv, "mServiceName");
+                    let b = get(vm, other, "mServiceName");
+                    p57_component_equal(vm, &a, &b)?
+                        && field_str(vm, recv, "mLocalId") == field_str(vm, other, "mLocalId")
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        ("hashCode", "()I") => {
+            let service = get(vm, recv, "mServiceName");
+            let service_hash = p57_print_value_hash(vm, &service)?;
+            let local_hash = field_str(vm, recv, "mLocalId")
+                .map(|s| java_string_hash(&s))
+                .unwrap_or(0);
+            let mut hash = 1i32;
+            hash = hash.wrapping_mul(31).wrapping_add(service_hash);
+            hash = hash.wrapping_mul(31).wrapping_add(local_hash);
+            Value::Int(hash)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let service = get(vm, recv, "mServiceName");
+            let flattened = match obj(Some(&service)) {
+                Some(r) => {
+                    let v =
+                        vm.invoke_instance(r, "flattenToString", "()Ljava/lang/String;", &[])?;
+                    opt_str(vm, Some(&v)).unwrap_or_else(|| "null".into())
+                }
+                None => "null".into(),
+            };
+            jstr(
+                vm,
+                format!(
+                    "PrinterId{{serviceName={flattened}, localId={}}}",
+                    field_str(vm, recv, "mLocalId").unwrap_or_else(|| "null".into())
+                ),
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_print_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // The print feature/service is absent, matching PrintManager's null
+    // IPrintManager branches.
+    let empty_list = |vm: &mut Engine| -> Result<Value, VmExit> {
+        Ok(Value::Obj(new_collection(
+            vm,
+            "Ljava/util/ArrayList;",
+            Vec::new(),
+        )?))
+    };
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/content/Context;Landroid/print/IPrintManager;II)V") => {
+            let context = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mContext", context)?;
+            put(vm, recv, "mUserId", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mAppId", Value::Int(iarg(args, 3)))?;
+            Value::Null
+        }
+        ("getGlobalPrintManagerForUser", "(I)Landroid/print/PrintManager;") => Value::Null,
+        ("addPrintJobStateChangeListener", "(Landroid/print/PrintManager$PrintJobStateChangeListener;)V")
+        | ("removePrintJobStateChangeListener", "(Landroid/print/PrintManager$PrintJobStateChangeListener;)V") => Value::Null,
+        ("getPrintJob", "(Landroid/print/PrintJobId;)Landroid/print/PrintJob;") => Value::Null,
+        ("getCustomPrinterIcon", "(Landroid/print/PrinterId;)Landroid/graphics/drawable/Icon;") => Value::Null,
+        ("getPrintJobs", "()Ljava/util/List;") => empty_list(vm)?,
+        ("print", "(Ljava/lang/String;Landroid/print/PrintDocumentAdapter;Landroid/print/PrintAttributes;)Landroid/print/PrintJob;") => {
+            // AOSP checks the null service before validating Activity/name.
+            Value::Null
+        }
+        ("addPrintServicesChangeListener", "(Landroid/print/PrintManager$PrintServicesChangeListener;Landroid/os/Handler;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("listener"));
+            }
+            Value::Null
+        }
+        ("removePrintServicesChangeListener", "(Landroid/print/PrintManager$PrintServicesChangeListener;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("listener"));
+            }
+            Value::Null
+        }
+        ("getPrintServices", "(I)Ljava/util/List;") => {
+            let flags = iarg(args, 0);
+            if flags & !3 != 0 {
+                return Err(iae(format!(
+                    "selectionFlags contains invalid bits: {flags}"
+                )));
+            }
+            empty_list(vm)?
+        }
+        ("addPrintServiceRecommendationsChangeListener", "(Landroid/print/PrintManager$PrintServiceRecommendationsChangeListener;Landroid/os/Handler;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("listener"));
+            }
+            Value::Null
+        }
+        ("removePrintServiceRecommendationsChangeListener", "(Landroid/print/PrintManager$PrintServiceRecommendationsChangeListener;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("listener"));
+            }
+            Value::Null
+        }
+        ("getPrintServiceRecommendations", "()Ljava/util/List;") => empty_list(vm)?,
+        ("createPrinterDiscoverySession", "()Landroid/print/PrinterDiscoverySession;") => {
+            Value::Null
+        }
+        ("setPrintServiceEnabled", "(Landroid/content/ComponentName;Z)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("service"));
+            }
+            Value::Null
+        }
+        ("isPrintServiceEnabled", "(Landroid/content/ComponentName;)Z") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("service"));
+            }
+            Value::Int(0)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+// --- android.security.keystore --------------------------------------------
+
+fn p57_clone_string_array_or_null(vm: &mut Engine, value: &Value) -> Result<Value, VmExit> {
+    if obj(Some(value)).is_none() {
+        return Ok(Value::Null);
+    }
+    let values = p57_string_values(vm, value);
+    p57_new_string_array(vm, &values)
+}
+
+fn p57_clone_string_array_or_empty(vm: &mut Engine, value: &Value) -> Result<Value, VmExit> {
+    if obj(Some(value)).is_none() {
+        return obj_array(vm, "[Ljava/lang/String;", Vec::new());
+    }
+    p57_clone_string_array_or_null(vm, value)
+}
+
+fn p57_clone_byte_array_or_null(vm: &mut Engine, value: &Value) -> Result<Value, VmExit> {
+    if obj(Some(value)).is_none() {
+        return Ok(Value::Null);
+    }
+    p57_clone_array(vm, value, "[B", ElemKind::Int)
+}
+
+fn p57_new_x500_principal(vm: &mut Engine, name: &str) -> Result<Value, VmExit> {
+    let r = alloc_obj(vm, "Ljavax/security/auth/x500/X500Principal;", Vec::new())?;
+    let s = jstr(vm, name)?;
+    // No complete X.500 name parser is part of this key-parameters slice;
+    // retain the exact RFC 1779 input for host stringification paths.
+    put(vm, r, "rd_name", s.clone())?;
+    put(vm, r, "name", s)?;
+    Ok(Value::Obj(r))
+}
+
+fn p57_new_big_integer_one(vm: &mut Engine) -> Result<Value, VmExit> {
+    let r = alloc_obj(vm, "Ljava/math/BigInteger;", Vec::new())?;
+    let s = jstr(vm, "1")?;
+    vm.invoke_instance(r, "<init>", "(Ljava/lang/String;)V", &[s])?;
+    Ok(Value::Obj(r))
+}
+
+const P57_KEYGEN_FIELDS: &[&str] = &[
+    "mKeystoreAlias",
+    "mNamespace",
+    "mKeySize",
+    "mSpec",
+    "mCertificateSubject",
+    "mCertificateSerialNumber",
+    "mCertificateNotBefore",
+    "mCertificateNotAfter",
+    "mKeyValidityStart",
+    "mKeyValidityForOriginationEnd",
+    "mKeyValidityForConsumptionEnd",
+    "mPurposes",
+    "mDigests",
+    "mEncryptionPaddings",
+    "mSignaturePaddings",
+    "mBlockModes",
+    "mRandomizedEncryptionRequired",
+    "mUserAuthenticationRequired",
+    "mUserAuthenticationValidityDurationSeconds",
+    "mUserAuthenticationType",
+    "mUserPresenceRequired",
+    "mAttestationChallenge",
+    "mDevicePropertiesAttestationIncluded",
+    "mAttestationIds",
+    "mUniqueIdIncluded",
+    "mUserAuthenticationValidWhileOnBody",
+    "mInvalidatedByBiometricEnrollment",
+    "mIsStrongBoxBacked",
+    "mUserConfirmationRequired",
+    "mUnlockedDeviceRequired",
+    "mCriticalToDeviceEncryption",
+    "mMaxUsageCount",
+    "mAttestKeyAlias",
+    "mBoundToSecureUserId",
+];
+
+fn p57_keygen_defaults(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    put(vm, recv, "mNamespace", Value::Int(-1))?;
+    put(vm, recv, "mKeySize", Value::Int(-1))?;
+    put(vm, recv, "mRandomizedEncryptionRequired", Value::Int(1))?;
+    put(
+        vm,
+        recv,
+        "mUserAuthenticationValidityDurationSeconds",
+        Value::Int(0),
+    )?;
+    put(vm, recv, "mUserAuthenticationType", Value::Int(2))?;
+    let ids = crate::arrays::new_array(vm, "[I", ElemKind::Int, Vec::new())?;
+    put(vm, recv, "mAttestationIds", ids)?;
+    put(vm, recv, "mInvalidatedByBiometricEnrollment", Value::Int(1))?;
+    put(vm, recv, "mMaxUsageCount", Value::Int(-1))?;
+    put(vm, recv, "mBoundToSecureUserId", Value::Long(0))?;
+    Ok(())
+}
+
+fn p57_keygen_copy(
+    vm: &mut Engine,
+    recv: ObjRef,
+    other: ObjRef,
+    defensive: bool,
+) -> Result<(), VmExit> {
+    for f in P57_KEYGEN_FIELDS {
+        let mut v = get(vm, other, f);
+        if defensive {
+            v = match *f {
+                "mCertificateNotBefore"
+                | "mCertificateNotAfter"
+                | "mKeyValidityStart"
+                | "mKeyValidityForOriginationEnd"
+                | "mKeyValidityForConsumptionEnd" => p57_clone_date(vm, &v)?,
+                "mDigests" => p57_clone_string_array_or_null(vm, &v)?,
+                "mEncryptionPaddings" | "mSignaturePaddings" | "mBlockModes" => {
+                    p57_clone_string_array_or_empty(vm, &v)?
+                }
+                "mAttestationChallenge" => p57_clone_byte_array_or_null(vm, &v)?,
+                "mAttestationIds" => {
+                    if obj(Some(&v)).is_none() {
+                        crate::arrays::new_array(vm, "[I", ElemKind::Int, Vec::new())?
+                    } else {
+                        p57_clone_array(vm, &v, "[I", ElemKind::Int)?
+                    }
+                }
+                _ => v,
+            };
+        }
+        put(vm, recv, f, v)?;
+    }
+    Ok(())
+}
+
+fn p57_keygen_finish(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    let alias = field_str(vm, recv, "mKeystoreAlias");
+    if alias.as_deref().map(str::is_empty).unwrap_or(true) {
+        return Err(iae("keyStoreAlias must not be empty"));
+    }
+    if field_obj(vm, recv, "mCertificateSubject").is_none() {
+        let subject = if field_obj(vm, recv, "mAttestationChallenge").is_none() {
+            p57_new_x500_principal(vm, "CN=Fake")?
+        } else {
+            p57_new_x500_principal(vm, "CN=Android Keystore Key")?
+        };
+        put(vm, recv, "mCertificateSubject", subject)?;
+    }
+    if field_obj(vm, recv, "mCertificateSerialNumber").is_none() {
+        let one = p57_new_big_integer_one(vm)?;
+        put(vm, recv, "mCertificateSerialNumber", one)?;
+    }
+    if field_obj(vm, recv, "mCertificateNotBefore").is_none() {
+        let d = p57_new_date(vm, 0)?;
+        put(vm, recv, "mCertificateNotBefore", d)?;
+    }
+    if field_obj(vm, recv, "mCertificateNotAfter").is_none() {
+        let d = p57_new_date(vm, 2_461_449_600_000)?;
+        put(vm, recv, "mCertificateNotAfter", d)?;
+    }
+    let before_value = get(vm, recv, "mCertificateNotBefore");
+    let before = p57_date_ms(vm, &before_value).unwrap_or(0);
+    let after_value = get(vm, recv, "mCertificateNotAfter");
+    let after = p57_date_ms(vm, &after_value).unwrap_or(0);
+    if after < before {
+        return Err(iae("certificateNotAfter < certificateNotBefore"));
+    }
+    for f in [
+        "mCertificateNotBefore",
+        "mCertificateNotAfter",
+        "mKeyValidityStart",
+        "mKeyValidityForOriginationEnd",
+        "mKeyValidityForConsumptionEnd",
+    ] {
+        let v = get(vm, recv, f);
+        let cloned = p57_clone_date(vm, &v)?;
+        put(vm, recv, f, cloned)?;
+    }
+    let digests = get(vm, recv, "mDigests");
+    let digests = p57_clone_string_array_or_null(vm, &digests)?;
+    put(vm, recv, "mDigests", digests)?;
+    for f in ["mEncryptionPaddings", "mSignaturePaddings", "mBlockModes"] {
+        let v = get(vm, recv, f);
+        let cloned = p57_clone_string_array_or_empty(vm, &v)?;
+        put(vm, recv, f, cloned)?;
+    }
+    let challenge = get(vm, recv, "mAttestationChallenge");
+    let challenge = p57_clone_byte_array_or_null(vm, &challenge)?;
+    put(vm, recv, "mAttestationChallenge", challenge)?;
+    if field_obj(vm, recv, "mAttestationIds").is_none() {
+        let ids = crate::arrays::new_array(vm, "[I", ElemKind::Int, Vec::new())?;
+        put(vm, recv, "mAttestationIds", ids)?;
+    }
+    Ok(())
+}
+
+fn p57_keygen_get_digests(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
+    let v = get(vm, recv, "mDigests");
+    if obj(Some(&v)).is_none() {
+        return Err(ise("Digests not specified"));
+    }
+    p57_clone_string_array_or_null(vm, &v)
+}
+
+fn p57_keygen_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P57_KEY_GEN_SPEC {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "(Ljava/lang/String;IILjava/security/spec/AlgorithmParameterSpec;Ljavax/security/auth/x500/X500Principal;Ljava/math/BigInteger;Ljava/util/Date;Ljava/util/Date;Ljava/util/Date;Ljava/util/Date;Ljava/util/Date;I[Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;ZZIIZ[BZ[IZZZZZZZILjava/lang/String;J)V") => {
+                // AOSP's hidden canonical constructor uses the same field order
+                // as P57_KEYGEN_FIELDS.
+                for (i, f) in P57_KEYGEN_FIELDS.iter().enumerate() {
+                    let v = args.get(i).cloned().unwrap_or(Value::Null);
+                    put(vm, recv, f, v)?;
+                }
+                p57_keygen_finish(vm, recv)?;
+                Value::Null
+            }
+            ("getKeystoreAlias", "()Ljava/lang/String;") => get(vm, recv, "mKeystoreAlias"),
+            ("getUid", "()I") => match field_int(vm, recv, "mNamespace") {
+                -1 => Value::Int(-1),
+                102 => Value::Int(1010),
+                ns => {
+                    return Err(iae(format!(
+                        "No UID corresponding to namespace {ns}"
+                    )))
+                }
+            },
+            ("getNamespace", "()I") => Value::Int(field_int(vm, recv, "mNamespace")),
+            ("getKeySize", "()I") => Value::Int(field_int(vm, recv, "mKeySize")),
+            ("getAlgorithmParameterSpec", "()Ljava/security/spec/AlgorithmParameterSpec;") => {
+                get(vm, recv, "mSpec")
+            }
+            ("getCertificateSubject", "()Ljavax/security/auth/x500/X500Principal;") => {
+                get(vm, recv, "mCertificateSubject")
+            }
+            ("getCertificateSerialNumber", "()Ljava/math/BigInteger;") => {
+                get(vm, recv, "mCertificateSerialNumber")
+            }
+            ("getCertificateNotBefore", "()Ljava/util/Date;") => {
+                let v = get(vm, recv, "mCertificateNotBefore");
+                p57_clone_date(vm, &v)?
+            }
+            ("getCertificateNotAfter", "()Ljava/util/Date;") => {
+                let v = get(vm, recv, "mCertificateNotAfter");
+                p57_clone_date(vm, &v)?
+            }
+            ("getKeyValidityStart", "()Ljava/util/Date;") => {
+                let v = get(vm, recv, "mKeyValidityStart");
+                p57_clone_date(vm, &v)?
+            }
+            ("getKeyValidityForConsumptionEnd", "()Ljava/util/Date;") => {
+                let v = get(vm, recv, "mKeyValidityForConsumptionEnd");
+                p57_clone_date(vm, &v)?
+            }
+            ("getKeyValidityForOriginationEnd", "()Ljava/util/Date;") => {
+                let v = get(vm, recv, "mKeyValidityForOriginationEnd");
+                p57_clone_date(vm, &v)?
+            }
+            ("getPurposes", "()I") => Value::Int(field_int(vm, recv, "mPurposes")),
+            ("getDigests", "()[Ljava/lang/String;") => p57_keygen_get_digests(vm, recv)?,
+            ("isDigestsSpecified", "()Z") => {
+                bool_value(field_obj(vm, recv, "mDigests").is_some())
+            }
+            ("getEncryptionPaddings", "()[Ljava/lang/String;") => {
+                let v = get(vm, recv, "mEncryptionPaddings");
+                p57_clone_string_array_or_empty(vm, &v)?
+            }
+            ("getSignaturePaddings", "()[Ljava/lang/String;") => {
+                let v = get(vm, recv, "mSignaturePaddings");
+                p57_clone_string_array_or_empty(vm, &v)?
+            }
+            ("getBlockModes", "()[Ljava/lang/String;") => {
+                let v = get(vm, recv, "mBlockModes");
+                p57_clone_string_array_or_empty(vm, &v)?
+            }
+            ("isRandomizedEncryptionRequired", "()Z") => {
+                bool_value(field_bool(vm, recv, "mRandomizedEncryptionRequired"))
+            }
+            ("isUserAuthenticationRequired", "()Z") => {
+                bool_value(field_bool(vm, recv, "mUserAuthenticationRequired"))
+            }
+            ("isUserConfirmationRequired", "()Z") => {
+                bool_value(field_bool(vm, recv, "mUserConfirmationRequired"))
+            }
+            ("getUserAuthenticationValidityDurationSeconds", "()I") => Value::Int(field_int(
+                vm,
+                recv,
+                "mUserAuthenticationValidityDurationSeconds",
+            )),
+            ("getUserAuthenticationType", "()I") => {
+                Value::Int(field_int(vm, recv, "mUserAuthenticationType"))
+            }
+            ("isUserPresenceRequired", "()Z") => {
+                bool_value(field_bool(vm, recv, "mUserPresenceRequired"))
+            }
+            ("getAttestationChallenge", "()[B") => {
+                let v = get(vm, recv, "mAttestationChallenge");
+                p57_clone_byte_array_or_null(vm, &v)?
+            }
+            ("isDevicePropertiesAttestationIncluded", "()Z") => bool_value(field_bool(
+                vm,
+                recv,
+                "mDevicePropertiesAttestationIncluded",
+            )),
+            ("getAttestationIds", "()[I") => {
+                let v = get(vm, recv, "mAttestationIds");
+                if obj(Some(&v)).is_none() {
+                    return Err(npe("mAttestationIds"));
+                }
+                p57_clone_array(vm, &v, "[I", ElemKind::Int)?
+            }
+            ("isUniqueIdIncluded", "()Z") => {
+                bool_value(field_bool(vm, recv, "mUniqueIdIncluded"))
+            }
+            ("isUserAuthenticationValidWhileOnBody", "()Z") => bool_value(field_bool(
+                vm,
+                recv,
+                "mUserAuthenticationValidWhileOnBody",
+            )),
+            ("isInvalidatedByBiometricEnrollment", "()Z") => bool_value(field_bool(
+                vm,
+                recv,
+                "mInvalidatedByBiometricEnrollment",
+            )),
+            ("isStrongBoxBacked", "()Z") => {
+                bool_value(field_bool(vm, recv, "mIsStrongBoxBacked"))
+            }
+            ("isUnlockedDeviceRequired", "()Z") => {
+                bool_value(field_bool(vm, recv, "mUnlockedDeviceRequired"))
+            }
+            ("getBoundToSpecificSecureUserId", "()J") => {
+                Value::Long(field_long(vm, recv, "mBoundToSecureUserId"))
+            }
+            ("isCriticalToDeviceEncryption", "()Z") => {
+                bool_value(field_bool(vm, recv, "mCriticalToDeviceEncryption"))
+            }
+            ("getMaxUsageCount", "()I") => {
+                Value::Int(field_int(vm, recv, "mMaxUsageCount"))
+            }
+            ("getAttestKeyAlias", "()Ljava/lang/String;") => get(vm, recv, "mAttestKeyAlias"),
+            _ => return Ok(None),
+        }));
+    }
+
+    // KeyGenParameterSpec.Builder.
+    let self_value = Value::Obj(recv);
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/String;I)V") => {
+            let Some(alias) = opt_str_arg(vm, args, 0) else {
+                return Err(npe("keystoreAlias == null"));
+            };
+            if alias.is_empty() {
+                return Err(iae("keystoreAlias must not be empty"));
+            }
+            p57_keygen_defaults(vm, recv)?;
+            put(vm, recv, "mKeystoreAlias", args[0].clone())?;
+            put(vm, recv, "mPurposes", Value::Int(iarg(args, 1)))?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/security/keystore/KeyGenParameterSpec;)V") => {
+            let Some(source) = oarg(args, 0) else {
+                return Err(npe("sourceSpec"));
+            };
+            p57_keygen_copy(vm, recv, source, true)?;
+            Value::Null
+        }
+        ("setUid", "(I)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            let ns = match iarg(args, 0) {
+                -1 => -1,
+                1010 => 102,
+                uid => {
+                    return Err(iae(format!(
+                        "No namespace corresponding to uid {uid}"
+                    )))
+                }
+            };
+            put(vm, recv, "mNamespace", Value::Int(ns))?;
+            self_value
+        }
+        ("setNamespace", "(I)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mNamespace", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setKeySize", "(I)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            if iarg(args, 0) < 0 {
+                return Err(iae("keySize < 0"));
+            }
+            put(vm, recv, "mKeySize", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setAlgorithmParameterSpec", "(Ljava/security/spec/AlgorithmParameterSpec;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("spec == null"));
+            }
+            put(vm, recv, "mSpec", args[0].clone())?;
+            self_value
+        }
+        ("setCertificateSubject", "(Ljavax/security/auth/x500/X500Principal;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("subject == null"));
+            }
+            put(vm, recv, "mCertificateSubject", args[0].clone())?;
+            self_value
+        }
+        ("setCertificateSerialNumber", "(Ljava/math/BigInteger;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("serialNumber == null"));
+            }
+            put(vm, recv, "mCertificateSerialNumber", args[0].clone())?;
+            self_value
+        }
+        ("setCertificateNotBefore", "(Ljava/util/Date;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("date == null"));
+            }
+            let v = p57_clone_date(vm, &args[0])?;
+            put(vm, recv, "mCertificateNotBefore", v)?;
+            self_value
+        }
+        ("setCertificateNotAfter", "(Ljava/util/Date;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("date == null"));
+            }
+            let v = p57_clone_date(vm, &args[0])?;
+            put(vm, recv, "mCertificateNotAfter", v)?;
+            self_value
+        }
+        ("setKeyValidityStart", "(Ljava/util/Date;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            let v = p57_clone_date(vm, &args[0])?;
+            put(vm, recv, "mKeyValidityStart", v)?;
+            self_value
+        }
+        ("setKeyValidityEnd", "(Ljava/util/Date;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            let a = p57_clone_date(vm, &args[0])?;
+            let b = p57_clone_date(vm, &args[0])?;
+            put(vm, recv, "mKeyValidityForOriginationEnd", a)?;
+            put(vm, recv, "mKeyValidityForConsumptionEnd", b)?;
+            self_value
+        }
+        ("setKeyValidityForOriginationEnd", "(Ljava/util/Date;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            let v = p57_clone_date(vm, &args[0])?;
+            put(vm, recv, "mKeyValidityForOriginationEnd", v)?;
+            self_value
+        }
+        ("setKeyValidityForConsumptionEnd", "(Ljava/util/Date;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            let v = p57_clone_date(vm, &args[0])?;
+            put(vm, recv, "mKeyValidityForConsumptionEnd", v)?;
+            self_value
+        }
+        ("setDigests", "([Ljava/lang/String;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            let v = p57_clone_string_array_or_null(vm, &args[0])?;
+            put(vm, recv, "mDigests", v)?;
+            self_value
+        }
+        ("setEncryptionPaddings", "([Ljava/lang/String;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            let v = p57_clone_string_array_or_empty(vm, &args[0])?;
+            put(vm, recv, "mEncryptionPaddings", v)?;
+            self_value
+        }
+        ("setSignaturePaddings", "([Ljava/lang/String;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            let v = p57_clone_string_array_or_empty(vm, &args[0])?;
+            put(vm, recv, "mSignaturePaddings", v)?;
+            self_value
+        }
+        ("setBlockModes", "([Ljava/lang/String;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            let v = p57_clone_string_array_or_empty(vm, &args[0])?;
+            put(vm, recv, "mBlockModes", v)?;
+            self_value
+        }
+        ("setRandomizedEncryptionRequired", "(Z)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mRandomizedEncryptionRequired", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setUserAuthenticationRequired", "(Z)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mUserAuthenticationRequired", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setUserConfirmationRequired", "(Z)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mUserConfirmationRequired", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setUserAuthenticationValidityDurationSeconds", "(I)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            let seconds = iarg(args, 0);
+            if seconds < -1 {
+                return Err(iae("seconds must be -1 or larger"));
+            }
+            if seconds == -1 {
+                put(vm, recv, "mUserAuthenticationValidityDurationSeconds", Value::Int(0))?;
+                put(vm, recv, "mUserAuthenticationType", Value::Int(2))?;
+            } else {
+                put(vm, recv, "mUserAuthenticationValidityDurationSeconds", Value::Int(seconds))?;
+                put(vm, recv, "mUserAuthenticationType", Value::Int(1 | 2))?;
+            }
+            self_value
+        }
+        ("setUserAuthenticationParameters", "(II)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            if iarg(args, 0) < 0 {
+                return Err(iae("timeout must be 0 or larger"));
+            }
+            put(vm, recv, "mUserAuthenticationValidityDurationSeconds", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mUserAuthenticationType", Value::Int(iarg(args, 1)))?;
+            self_value
+        }
+        ("setUserPresenceRequired", "(Z)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mUserPresenceRequired", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setAttestationChallenge", "([B)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            // AOSP Builder stores the reference; the spec constructor clones.
+            put(vm, recv, "mAttestationChallenge", args[0].clone())?;
+            self_value
+        }
+        ("setDevicePropertiesAttestationIncluded", "(Z)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mDevicePropertiesAttestationIncluded", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setAttestationIds", "([I)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mAttestationIds", args[0].clone())?;
+            self_value
+        }
+        ("setUniqueIdIncluded", "(Z)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mUniqueIdIncluded", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setUserAuthenticationValidWhileOnBody", "(Z)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mUserAuthenticationValidWhileOnBody", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setInvalidatedByBiometricEnrollment", "(Z)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mInvalidatedByBiometricEnrollment", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setIsStrongBoxBacked", "(Z)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mIsStrongBoxBacked", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setUnlockedDeviceRequired", "(Z)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mUnlockedDeviceRequired", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setCriticalToDeviceEncryption", "(Z)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mCriticalToDeviceEncryption", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setMaxUsageCount", "(I)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            let count = iarg(args, 0);
+            if count == -1 || count > 0 {
+                put(vm, recv, "mMaxUsageCount", Value::Int(count))?;
+                self_value
+            } else {
+                return Err(iae(
+                    "maxUsageCount must be either UNRESTRICTED_USAGE_COUNT or a positive value",
+                ));
+            }
+        }
+        ("setAttestKeyAlias", "(Ljava/lang/String;)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mAttestKeyAlias", args[0].clone())?;
+            self_value
+        }
+        ("setBoundToSpecificSecureUserId", "(J)Landroid/security/keystore/KeyGenParameterSpec$Builder;") => {
+            put(vm, recv, "mBoundToSecureUserId", Value::Long(larg(args, 0)))?;
+            self_value
+        }
+        ("build", "()Landroid/security/keystore/KeyGenParameterSpec;") => {
+            let out = alloc_obj(vm, P57_KEY_GEN_SPEC, Vec::new())?;
+            p57_keygen_copy(vm, out, recv, false)?;
+            p57_keygen_finish(vm, out)?;
+            Value::Obj(out)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+const P57_KEY_PROTECTION_FIELDS: &[&str] = &[
+    "mKeyValidityStart",
+    "mKeyValidityForOriginationEnd",
+    "mKeyValidityForConsumptionEnd",
+    "mPurposes",
+    "mEncryptionPaddings",
+    "mSignaturePaddings",
+    "mDigests",
+    "mBlockModes",
+    "mRandomizedEncryptionRequired",
+    "mUserAuthenticationRequired",
+    "mUserAuthenticationType",
+    "mUserAuthenticationValidityDurationSeconds",
+    "mUserPresenceRequired",
+    "mUserAuthenticationValidWhileOnBody",
+    "mInvalidatedByBiometricEnrollment",
+    "mBoundToSecureUserId",
+    "mCriticalToDeviceEncryption",
+    "mUserConfirmationRequired",
+    "mUnlockedDeviceRequired",
+    "mIsStrongBoxBacked",
+    "mMaxUsageCount",
+    "mRollbackResistant",
+];
+
+fn p57_key_protection_defaults(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    put(vm, recv, "mRandomizedEncryptionRequired", Value::Int(1))?;
+    put(
+        vm,
+        recv,
+        "mUserAuthenticationValidityDurationSeconds",
+        Value::Int(0),
+    )?;
+    put(vm, recv, "mUserAuthenticationType", Value::Int(2))?;
+    put(vm, recv, "mInvalidatedByBiometricEnrollment", Value::Int(1))?;
+    put(vm, recv, "mBoundToSecureUserId", Value::Long(0))?;
+    put(vm, recv, "mMaxUsageCount", Value::Int(-1))?;
+    Ok(())
+}
+
+fn p57_key_protection_finish(vm: &mut Engine, recv: ObjRef, other: ObjRef) -> Result<(), VmExit> {
+    for f in P57_KEY_PROTECTION_FIELDS {
+        let mut v = get(vm, other, f);
+        v = match *f {
+            "mKeyValidityStart"
+            | "mKeyValidityForOriginationEnd"
+            | "mKeyValidityForConsumptionEnd" => p57_clone_date(vm, &v)?,
+            "mDigests" => p57_clone_string_array_or_null(vm, &v)?,
+            "mEncryptionPaddings" | "mSignaturePaddings" | "mBlockModes" => {
+                p57_clone_string_array_or_empty(vm, &v)?
+            }
+            _ => v,
+        };
+        put(vm, recv, f, v)?;
+    }
+    Ok(())
+}
+
+fn p57_key_protection_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P57_KEY_PROTECTION {
+        return Ok(Some(match (name, sig) {
+            ("getKeyValidityStart", "()Ljava/util/Date;") => {
+                let v = get(vm, recv, "mKeyValidityStart");
+                p57_clone_date(vm, &v)?
+            }
+            ("getKeyValidityForConsumptionEnd", "()Ljava/util/Date;") => {
+                let v = get(vm, recv, "mKeyValidityForConsumptionEnd");
+                p57_clone_date(vm, &v)?
+            }
+            ("getKeyValidityForOriginationEnd", "()Ljava/util/Date;") => {
+                let v = get(vm, recv, "mKeyValidityForOriginationEnd");
+                p57_clone_date(vm, &v)?
+            }
+            ("getPurposes", "()I") => Value::Int(field_int(vm, recv, "mPurposes")),
+            ("getEncryptionPaddings", "()[Ljava/lang/String;") => {
+                let v = get(vm, recv, "mEncryptionPaddings");
+                p57_clone_string_array_or_empty(vm, &v)?
+            }
+            ("getSignaturePaddings", "()[Ljava/lang/String;") => {
+                let v = get(vm, recv, "mSignaturePaddings");
+                p57_clone_string_array_or_empty(vm, &v)?
+            }
+            ("getDigests", "()[Ljava/lang/String;") => p57_keygen_get_digests(vm, recv)?,
+            ("isDigestsSpecified", "()Z") => bool_value(field_obj(vm, recv, "mDigests").is_some()),
+            ("getBlockModes", "()[Ljava/lang/String;") => {
+                let v = get(vm, recv, "mBlockModes");
+                p57_clone_string_array_or_empty(vm, &v)?
+            }
+            ("isRandomizedEncryptionRequired", "()Z") => {
+                bool_value(field_bool(vm, recv, "mRandomizedEncryptionRequired"))
+            }
+            ("isUserAuthenticationRequired", "()Z") => {
+                bool_value(field_bool(vm, recv, "mUserAuthenticationRequired"))
+            }
+            ("isUserConfirmationRequired", "()Z") => {
+                bool_value(field_bool(vm, recv, "mUserConfirmationRequired"))
+            }
+            ("getUserAuthenticationType", "()I") => {
+                Value::Int(field_int(vm, recv, "mUserAuthenticationType"))
+            }
+            ("getUserAuthenticationValidityDurationSeconds", "()I") => Value::Int(field_int(
+                vm,
+                recv,
+                "mUserAuthenticationValidityDurationSeconds",
+            )),
+            ("isUserPresenceRequired", "()Z") => {
+                bool_value(field_bool(vm, recv, "mUserPresenceRequired"))
+            }
+            ("isUserAuthenticationValidWhileOnBody", "()Z") => {
+                bool_value(field_bool(vm, recv, "mUserAuthenticationValidWhileOnBody"))
+            }
+            ("isInvalidatedByBiometricEnrollment", "()Z") => {
+                bool_value(field_bool(vm, recv, "mInvalidatedByBiometricEnrollment"))
+            }
+            ("getBoundToSpecificSecureUserId", "()J") => {
+                Value::Long(field_long(vm, recv, "mBoundToSecureUserId"))
+            }
+            ("isCriticalToDeviceEncryption", "()Z") => {
+                bool_value(field_bool(vm, recv, "mCriticalToDeviceEncryption"))
+            }
+            ("isUnlockedDeviceRequired", "()Z") => {
+                bool_value(field_bool(vm, recv, "mUnlockedDeviceRequired"))
+            }
+            ("isStrongBoxBacked", "()Z") => bool_value(field_bool(vm, recv, "mIsStrongBoxBacked")),
+            ("getMaxUsageCount", "()I") => Value::Int(field_int(vm, recv, "mMaxUsageCount")),
+            ("isRollbackResistant", "()Z") => {
+                bool_value(field_bool(vm, recv, "mRollbackResistant"))
+            }
+            _ => return Ok(None),
+        }));
+    }
+
+    let self_value = Value::Obj(recv);
+    Ok(Some(match (name, sig) {
+        ("<init>", "(I)V") => {
+            p57_key_protection_defaults(vm, recv)?;
+            put(vm, recv, "mPurposes", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        (
+            "setKeyValidityStart",
+            "(Ljava/util/Date;)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            let v = p57_clone_date(vm, &args[0])?;
+            put(vm, recv, "mKeyValidityStart", v)?;
+            self_value
+        }
+        (
+            "setKeyValidityEnd",
+            "(Ljava/util/Date;)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            let a = p57_clone_date(vm, &args[0])?;
+            let b = p57_clone_date(vm, &args[0])?;
+            put(vm, recv, "mKeyValidityForOriginationEnd", a)?;
+            put(vm, recv, "mKeyValidityForConsumptionEnd", b)?;
+            self_value
+        }
+        (
+            "setKeyValidityForOriginationEnd",
+            "(Ljava/util/Date;)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            let v = p57_clone_date(vm, &args[0])?;
+            put(vm, recv, "mKeyValidityForOriginationEnd", v)?;
+            self_value
+        }
+        (
+            "setKeyValidityForConsumptionEnd",
+            "(Ljava/util/Date;)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            let v = p57_clone_date(vm, &args[0])?;
+            put(vm, recv, "mKeyValidityForConsumptionEnd", v)?;
+            self_value
+        }
+        (
+            "setEncryptionPaddings",
+            "([Ljava/lang/String;)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            let v = p57_clone_string_array_or_empty(vm, &args[0])?;
+            put(vm, recv, "mEncryptionPaddings", v)?;
+            self_value
+        }
+        (
+            "setSignaturePaddings",
+            "([Ljava/lang/String;)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            let v = p57_clone_string_array_or_empty(vm, &args[0])?;
+            put(vm, recv, "mSignaturePaddings", v)?;
+            self_value
+        }
+        (
+            "setDigests",
+            "([Ljava/lang/String;)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            let v = p57_clone_string_array_or_null(vm, &args[0])?;
+            put(vm, recv, "mDigests", v)?;
+            self_value
+        }
+        (
+            "setBlockModes",
+            "([Ljava/lang/String;)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            let v = p57_clone_string_array_or_empty(vm, &args[0])?;
+            put(vm, recv, "mBlockModes", v)?;
+            self_value
+        }
+        (
+            "setRandomizedEncryptionRequired",
+            "(Z)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            put(
+                vm,
+                recv,
+                "mRandomizedEncryptionRequired",
+                Value::Int(iarg(args, 0)),
+            )?;
+            self_value
+        }
+        (
+            "setUserAuthenticationRequired",
+            "(Z)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            put(
+                vm,
+                recv,
+                "mUserAuthenticationRequired",
+                Value::Int(iarg(args, 0)),
+            )?;
+            self_value
+        }
+        ("setUserConfirmationRequired", "(Z)Landroid/security/keystore/KeyProtection$Builder;") => {
+            put(
+                vm,
+                recv,
+                "mUserConfirmationRequired",
+                Value::Int(iarg(args, 0)),
+            )?;
+            self_value
+        }
+        (
+            "setUserAuthenticationValidityDurationSeconds",
+            "(I)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            let seconds = iarg(args, 0);
+            if seconds < -1 {
+                return Err(iae("seconds must be -1 or larger"));
+            }
+            if seconds == -1 {
+                put(
+                    vm,
+                    recv,
+                    "mUserAuthenticationValidityDurationSeconds",
+                    Value::Int(0),
+                )?;
+                put(vm, recv, "mUserAuthenticationType", Value::Int(2))?;
+            } else {
+                put(
+                    vm,
+                    recv,
+                    "mUserAuthenticationValidityDurationSeconds",
+                    Value::Int(seconds),
+                )?;
+                put(vm, recv, "mUserAuthenticationType", Value::Int(3))?;
+            }
+            self_value
+        }
+        (
+            "setUserAuthenticationParameters",
+            "(II)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            if iarg(args, 0) < 0 {
+                return Err(iae("timeout must be 0 or larger"));
+            }
+            put(
+                vm,
+                recv,
+                "mUserAuthenticationValidityDurationSeconds",
+                Value::Int(iarg(args, 0)),
+            )?;
+            put(
+                vm,
+                recv,
+                "mUserAuthenticationType",
+                Value::Int(iarg(args, 1)),
+            )?;
+            self_value
+        }
+        ("setUserPresenceRequired", "(Z)Landroid/security/keystore/KeyProtection$Builder;") => {
+            put(vm, recv, "mUserPresenceRequired", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        (
+            "setUserAuthenticationValidWhileOnBody",
+            "(Z)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            put(
+                vm,
+                recv,
+                "mUserAuthenticationValidWhileOnBody",
+                Value::Int(iarg(args, 0)),
+            )?;
+            self_value
+        }
+        (
+            "setInvalidatedByBiometricEnrollment",
+            "(Z)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            put(
+                vm,
+                recv,
+                "mInvalidatedByBiometricEnrollment",
+                Value::Int(iarg(args, 0)),
+            )?;
+            self_value
+        }
+        (
+            "setBoundToSpecificSecureUserId",
+            "(J)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            put(vm, recv, "mBoundToSecureUserId", Value::Long(larg(args, 0)))?;
+            self_value
+        }
+        (
+            "setCriticalToDeviceEncryption",
+            "(Z)Landroid/security/keystore/KeyProtection$Builder;",
+        ) => {
+            put(
+                vm,
+                recv,
+                "mCriticalToDeviceEncryption",
+                Value::Int(iarg(args, 0)),
+            )?;
+            self_value
+        }
+        ("setUnlockedDeviceRequired", "(Z)Landroid/security/keystore/KeyProtection$Builder;") => {
+            put(
+                vm,
+                recv,
+                "mUnlockedDeviceRequired",
+                Value::Int(iarg(args, 0)),
+            )?;
+            self_value
+        }
+        ("setIsStrongBoxBacked", "(Z)Landroid/security/keystore/KeyProtection$Builder;") => {
+            put(vm, recv, "mIsStrongBoxBacked", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setMaxUsageCount", "(I)Landroid/security/keystore/KeyProtection$Builder;") => {
+            let count = iarg(args, 0);
+            if count == -1 || count > 0 {
+                put(vm, recv, "mMaxUsageCount", Value::Int(count))?;
+                self_value
+            } else {
+                return Err(iae(
+                    "maxUsageCount must be either UNRESTRICTED_USAGE_COUNT or a positive value",
+                ));
+            }
+        }
+        ("setRollbackResistant", "(Z)Landroid/security/keystore/KeyProtection$Builder;") => {
+            put(vm, recv, "mRollbackResistant", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("build", "()Landroid/security/keystore/KeyProtection;") => {
+            let out = alloc_obj(vm, P57_KEY_PROTECTION, Vec::new())?;
+            p57_key_protection_finish(vm, out, recv)?;
+            Value::Obj(out)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+const P57_KEY_INFO_FIELDS: &[&str] = &[
+    "mKeystoreAlias",
+    "mInsideSecureHardware",
+    "mOrigin",
+    "mKeySize",
+    "mKeyValidityStart",
+    "mKeyValidityForOriginationEnd",
+    "mKeyValidityForConsumptionEnd",
+    "mPurposes",
+    "mEncryptionPaddings",
+    "mSignaturePaddings",
+    "mDigests",
+    "mBlockModes",
+    "mUserAuthenticationRequired",
+    "mUserAuthenticationValidityDurationSeconds",
+    "mUserAuthenticationType",
+    "mUserAuthenticationRequirementEnforcedBySecureHardware",
+    "mUserAuthenticationValidWhileOnBody",
+    "mTrustedUserPresenceRequired",
+    "mInvalidatedByBiometricEnrollment",
+    "mUserConfirmationRequired",
+    "mSecurityLevel",
+    "mRemainingUsageCount",
+];
+
+fn p57_key_info_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/String;ZIILjava/util/Date;Ljava/util/Date;Ljava/util/Date;I[Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;ZIIZZZZZII)V") => {
+            for (i, f) in P57_KEY_INFO_FIELDS.iter().enumerate() {
+                let mut v = args.get(i).cloned().unwrap_or(Value::Null);
+                v = match *f {
+                    "mKeyValidityStart" | "mKeyValidityForOriginationEnd"
+                    | "mKeyValidityForConsumptionEnd" => p57_clone_date(vm, &v)?,
+                    "mEncryptionPaddings" | "mSignaturePaddings" | "mDigests"
+                    | "mBlockModes" => p57_clone_string_array_or_empty(vm, &v)?,
+                    _ => v,
+                };
+                put(vm, recv, f, v)?;
+            }
+            Value::Null
+        }
+        ("getKeystoreAlias", "()Ljava/lang/String;") => get(vm, recv, "mKeystoreAlias"),
+        ("isInsideSecureHardware", "()Z") => {
+            bool_value(field_bool(vm, recv, "mInsideSecureHardware"))
+        }
+        ("getOrigin", "()I") => Value::Int(field_int(vm, recv, "mOrigin")),
+        ("getKeySize", "()I") => Value::Int(field_int(vm, recv, "mKeySize")),
+        ("getKeyValidityStart", "()Ljava/util/Date;") => {
+            let v = get(vm, recv, "mKeyValidityStart");
+            p57_clone_date(vm, &v)?
+        }
+        ("getKeyValidityForConsumptionEnd", "()Ljava/util/Date;") => {
+            let v = get(vm, recv, "mKeyValidityForConsumptionEnd");
+            p57_clone_date(vm, &v)?
+        }
+        ("getKeyValidityForOriginationEnd", "()Ljava/util/Date;") => {
+            let v = get(vm, recv, "mKeyValidityForOriginationEnd");
+            p57_clone_date(vm, &v)?
+        }
+        ("getPurposes", "()I") => Value::Int(field_int(vm, recv, "mPurposes")),
+        ("getBlockModes", "()[Ljava/lang/String;") => {
+            let v = get(vm, recv, "mBlockModes");
+            p57_clone_string_array_or_empty(vm, &v)?
+        }
+        ("getEncryptionPaddings", "()[Ljava/lang/String;") => {
+            let v = get(vm, recv, "mEncryptionPaddings");
+            p57_clone_string_array_or_empty(vm, &v)?
+        }
+        ("getSignaturePaddings", "()[Ljava/lang/String;") => {
+            let v = get(vm, recv, "mSignaturePaddings");
+            p57_clone_string_array_or_empty(vm, &v)?
+        }
+        ("getDigests", "()[Ljava/lang/String;") => {
+            let v = get(vm, recv, "mDigests");
+            p57_clone_string_array_or_empty(vm, &v)?
+        }
+        ("isUserAuthenticationRequired", "()Z") => {
+            bool_value(field_bool(vm, recv, "mUserAuthenticationRequired"))
+        }
+        ("isUserConfirmationRequired", "()Z") => {
+            bool_value(field_bool(vm, recv, "mUserConfirmationRequired"))
+        }
+        ("getUserAuthenticationValidityDurationSeconds", "()I") => Value::Int(field_int(
+            vm,
+            recv,
+            "mUserAuthenticationValidityDurationSeconds",
+        )),
+        ("getUserAuthenticationType", "()I") => {
+            Value::Int(field_int(vm, recv, "mUserAuthenticationType"))
+        }
+        ("isUserAuthenticationRequirementEnforcedBySecureHardware", "()Z") => bool_value(
+            field_bool(
+                vm,
+                recv,
+                "mUserAuthenticationRequirementEnforcedBySecureHardware",
+            ),
+        ),
+        ("isUserAuthenticationValidWhileOnBody", "()Z") => bool_value(field_bool(
+            vm,
+            recv,
+            "mUserAuthenticationValidWhileOnBody",
+        )),
+        ("isInvalidatedByBiometricEnrollment", "()Z") => bool_value(field_bool(
+            vm,
+            recv,
+            "mInvalidatedByBiometricEnrollment",
+        )),
+        ("isTrustedUserPresenceRequired", "()Z") => {
+            bool_value(field_bool(vm, recv, "mTrustedUserPresenceRequired"))
+        }
+        ("getSecurityLevel", "()I") => Value::Int(field_int(vm, recv, "mSecurityLevel")),
+        ("getRemainingUsageCount", "()I") => {
+            Value::Int(field_int(vm, recv, "mRemainingUsageCount"))
+        }
+        _ => return Ok(None),
+    }))
+}
+
+// --- android.mtp -----------------------------------------------------------
+
+fn p57_mtp_device_info_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let supported = |field: &str| -> Result<Value, VmExit> {
+        let v = get(vm, recv, field);
+        if obj(Some(&v)).is_none() {
+            return Err(npe(field));
+        }
+        Ok(bool_value(
+            int_values(vm, Some(&v)).contains(&iarg(args, 0)),
+        ))
+    };
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        ("getManufacturer", "()Ljava/lang/String;") => get(vm, recv, "mManufacturer"),
+        ("getModel", "()Ljava/lang/String;") => get(vm, recv, "mModel"),
+        ("getVersion", "()Ljava/lang/String;") => get(vm, recv, "mVersion"),
+        ("getSerialNumber", "()Ljava/lang/String;") => get(vm, recv, "mSerialNumber"),
+        ("getOperationsSupported", "()[I") => get(vm, recv, "mOperationsSupported"),
+        ("getEventsSupported", "()[I") => get(vm, recv, "mEventsSupported"),
+        ("getDevicePropertySupported", "()[I") => get(vm, recv, "mDevicePropertySupported"),
+        ("isOperationSupported", "(I)Z") => supported("mOperationsSupported")?,
+        ("isEventSupported", "(I)Z") => supported("mEventsSupported")?,
+        ("isDevicePropertySupported", "(I)Z") => supported("mDevicePropertySupported")?,
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_mtp_storage_info_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    _args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        ("getStorageId", "()I") => Value::Int(field_int(vm, recv, "mStorageId")),
+        ("getMaxCapacity", "()J") => Value::Long(field_long(vm, recv, "mMaxCapacity")),
+        ("getFreeSpace", "()J") => Value::Long(field_long(vm, recv, "mFreeSpace")),
+        ("getDescription", "()Ljava/lang/String;") => get(vm, recv, "mDescription"),
+        ("getVolumeIdentifier", "()Ljava/lang/String;") => get(vm, recv, "mVolumeIdentifier"),
+        _ => return Ok(None),
+    }))
+}
+
+const P57_MTP_OBJECT_INFO_FIELDS: &[&str] = &[
+    "mHandle",
+    "mStorageId",
+    "mFormat",
+    "mProtectionStatus",
+    "mCompressedSize",
+    "mThumbFormat",
+    "mThumbCompressedSize",
+    "mThumbPixWidth",
+    "mThumbPixHeight",
+    "mImagePixWidth",
+    "mImagePixHeight",
+    "mImagePixDepth",
+    "mParent",
+    "mAssociationType",
+    "mAssociationDesc",
+    "mSequenceNumber",
+    "mName",
+    "mDateCreated",
+    "mDateModified",
+    "mKeywords",
+];
+
+fn p57_mtp_uint32(value: i32) -> i64 {
+    value as u32 as i64
+}
+
+fn p57_mtp_object_info_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    _args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => {
+            let empty = jstr(vm, "")?;
+            let empty2 = jstr(vm, "")?;
+            put(vm, recv, "mName", empty)?;
+            put(vm, recv, "mKeywords", empty2)?;
+            Value::Null
+        }
+        ("getObjectHandle", "()I") => Value::Int(field_int(vm, recv, "mHandle")),
+        ("getStorageId", "()I") => Value::Int(field_int(vm, recv, "mStorageId")),
+        ("getFormat", "()I") => Value::Int(field_int(vm, recv, "mFormat")),
+        ("getProtectionStatus", "()I") => Value::Int(field_int(vm, recv, "mProtectionStatus")),
+        ("getCompressedSize", "()I") => Value::Int(field_int(vm, recv, "mCompressedSize")),
+        ("getCompressedSizeLong", "()J") => {
+            Value::Long(p57_mtp_uint32(field_int(vm, recv, "mCompressedSize")))
+        }
+        ("getThumbFormat", "()I") => Value::Int(field_int(vm, recv, "mThumbFormat")),
+        ("getThumbCompressedSize", "()I") => {
+            Value::Int(field_int(vm, recv, "mThumbCompressedSize"))
+        }
+        ("getThumbCompressedSizeLong", "()J") => {
+            Value::Long(p57_mtp_uint32(field_int(vm, recv, "mThumbCompressedSize")))
+        }
+        ("getThumbPixWidth", "()I") => Value::Int(field_int(vm, recv, "mThumbPixWidth")),
+        ("getThumbPixWidthLong", "()J") => {
+            Value::Long(p57_mtp_uint32(field_int(vm, recv, "mThumbPixWidth")))
+        }
+        ("getThumbPixHeight", "()I") => Value::Int(field_int(vm, recv, "mThumbPixHeight")),
+        ("getThumbPixHeightLong", "()J") => {
+            Value::Long(p57_mtp_uint32(field_int(vm, recv, "mThumbPixHeight")))
+        }
+        ("getImagePixWidth", "()I") => Value::Int(field_int(vm, recv, "mImagePixWidth")),
+        ("getImagePixWidthLong", "()J") => {
+            Value::Long(p57_mtp_uint32(field_int(vm, recv, "mImagePixWidth")))
+        }
+        ("getImagePixHeight", "()I") => Value::Int(field_int(vm, recv, "mImagePixHeight")),
+        ("getImagePixHeightLong", "()J") => {
+            Value::Long(p57_mtp_uint32(field_int(vm, recv, "mImagePixHeight")))
+        }
+        ("getImagePixDepth", "()I") => Value::Int(field_int(vm, recv, "mImagePixDepth")),
+        ("getImagePixDepthLong", "()J") => {
+            Value::Long(p57_mtp_uint32(field_int(vm, recv, "mImagePixDepth")))
+        }
+        ("getParent", "()I") => Value::Int(field_int(vm, recv, "mParent")),
+        ("getAssociationType", "()I") => Value::Int(field_int(vm, recv, "mAssociationType")),
+        ("getAssociationDesc", "()I") => Value::Int(field_int(vm, recv, "mAssociationDesc")),
+        ("getSequenceNumber", "()I") => Value::Int(field_int(vm, recv, "mSequenceNumber")),
+        ("getSequenceNumberLong", "()J") => {
+            Value::Long(p57_mtp_uint32(field_int(vm, recv, "mSequenceNumber")))
+        }
+        ("getName", "()Ljava/lang/String;") => {
+            let v = get(vm, recv, "mName");
+            if matches!(v, Value::Obj(_)) {
+                v
+            } else {
+                jstr(vm, "")?
+            }
+        }
+        ("getDateCreated", "()J") => Value::Long(field_long(vm, recv, "mDateCreated")),
+        ("getDateModified", "()J") => Value::Long(field_long(vm, recv, "mDateModified")),
+        ("getKeywords", "()Ljava/lang/String;") => {
+            let v = get(vm, recv, "mKeywords");
+            if matches!(v, Value::Obj(_)) {
+                v
+            } else {
+                jstr(vm, "")?
+            }
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_mtp_builder_info(vm: &Engine, recv: ObjRef) -> Result<ObjRef, VmExit> {
+    field_obj(vm, recv, "mObjectInfo").ok_or_else(|| npe("mObjectInfo"))
+}
+
+fn p57_mtp_long_to_uint32(value: i64) -> Result<i64, VmExit> {
+    if !(0..=0xffff_ffff).contains(&value) {
+        return Err(iae(format!(
+            "value should be in range [0, 4294967295], but is {value}"
+        )));
+    }
+    Ok(value)
+}
+
+fn p57_mtp_object_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let self_value = Value::Obj(recv);
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => {
+            let info = alloc_obj(vm, P57_MTP_OBJECT_INFO, Vec::new())?;
+            let empty = jstr(vm, "")?;
+            let empty2 = jstr(vm, "")?;
+            put(vm, info, "mName", empty)?;
+            put(vm, info, "mKeywords", empty2)?;
+            put(vm, info, "mHandle", Value::Int(-1))?;
+            put(vm, recv, "mObjectInfo", Value::Obj(info))?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/mtp/MtpObjectInfo;)V") => {
+            let Some(source) = oarg(args, 0) else {
+                return Err(npe("objectInfo"));
+            };
+            let info = alloc_obj(vm, P57_MTP_OBJECT_INFO, Vec::new())?;
+            for f in P57_MTP_OBJECT_INFO_FIELDS {
+                if *f == "mHandle" {
+                    continue;
+                }
+                let v = get(vm, source, f);
+                put(vm, info, f, v)?;
+            }
+            put(vm, info, "mHandle", Value::Int(-1))?;
+            put(vm, recv, "mObjectInfo", Value::Obj(info))?;
+            Value::Null
+        }
+        ("setObjectHandle", "(I)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mHandle", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setAssociationDesc", "(I)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mAssociationDesc", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setAssociationType", "(I)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mAssociationType", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setCompressedSize", "(J)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let v = p57_mtp_long_to_uint32(larg(args, 0))?;
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mCompressedSize", Value::Int(v as u32 as i32))?;
+            self_value
+        }
+        ("setDateCreated", "(J)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mDateCreated", Value::Long(larg(args, 0)))?;
+            self_value
+        }
+        ("setDateModified", "(J)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mDateModified", Value::Long(larg(args, 0)))?;
+            self_value
+        }
+        ("setFormat", "(I)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mFormat", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setImagePixDepth", "(J)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let v = p57_mtp_long_to_uint32(larg(args, 0))?;
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mImagePixDepth", Value::Int(v as u32 as i32))?;
+            self_value
+        }
+        ("setImagePixHeight", "(J)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let v = p57_mtp_long_to_uint32(larg(args, 0))?;
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mImagePixHeight", Value::Int(v as u32 as i32))?;
+            self_value
+        }
+        ("setImagePixWidth", "(J)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let v = p57_mtp_long_to_uint32(larg(args, 0))?;
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mImagePixWidth", Value::Int(v as u32 as i32))?;
+            self_value
+        }
+        ("setKeywords", "(Ljava/lang/String;)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("value"));
+            }
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mKeywords", args[0].clone())?;
+            self_value
+        }
+        ("setName", "(Ljava/lang/String;)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("value"));
+            }
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mName", args[0].clone())?;
+            self_value
+        }
+        ("setParent", "(I)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mParent", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setProtectionStatus", "(I)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mProtectionStatus", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setSequenceNumber", "(J)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let v = p57_mtp_long_to_uint32(larg(args, 0))?;
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mSequenceNumber", Value::Int(v as u32 as i32))?;
+            self_value
+        }
+        ("setStorageId", "(I)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mStorageId", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setThumbCompressedSize", "(J)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let v = p57_mtp_long_to_uint32(larg(args, 0))?;
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(
+                vm,
+                info,
+                "mThumbCompressedSize",
+                Value::Int(v as u32 as i32),
+            )?;
+            self_value
+        }
+        ("setThumbFormat", "(I)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mThumbFormat", Value::Int(iarg(args, 0)))?;
+            self_value
+        }
+        ("setThumbPixHeight", "(J)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let v = p57_mtp_long_to_uint32(larg(args, 0))?;
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mThumbPixHeight", Value::Int(v as u32 as i32))?;
+            self_value
+        }
+        ("setThumbPixWidth", "(J)Landroid/mtp/MtpObjectInfo$Builder;") => {
+            let v = p57_mtp_long_to_uint32(larg(args, 0))?;
+            let info = p57_mtp_builder_info(vm, recv)?;
+            put(vm, info, "mThumbPixWidth", Value::Int(v as u32 as i32))?;
+            self_value
+        }
+        ("build", "()Landroid/mtp/MtpObjectInfo;") => {
+            let info = get(vm, recv, "mObjectInfo");
+            put(vm, recv, "mObjectInfo", Value::Null)?;
+            info
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p57_ioexception(message: &str) -> VmExit {
+    throw("Ljava/io/IOException;", message)
+}
+
+fn p57_mtp_device_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/hardware/usb/UsbDevice;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("device"));
+            }
+            put(vm, recv, "mDevice", args[0].clone())?;
+            put(vm, recv, "rd_open", Value::Int(0))?;
+            Value::Null
+        }
+        ("open", "(Landroid/hardware/usb/UsbDeviceConnection;)Z") => {
+            let Some(connection) = oarg(args, 0) else {
+                return Err(npe("connection"));
+            };
+            // There is no native MTP/USB transport. AOSP closes the supplied
+            // connection when opening fails.
+            let _ = vm.invoke_instance(connection, "close", "()V", &[]);
+            put(vm, recv, "rd_open", Value::Int(0))?;
+            Value::Int(0)
+        }
+        ("close", "()V") => {
+            put(vm, recv, "rd_open", Value::Int(0))?;
+            Value::Null
+        }
+        ("getDeviceName", "()Ljava/lang/String;") => {
+            let Some(device) = field_obj(vm, recv, "mDevice") else {
+                return Err(npe("mDevice"));
+            };
+            get(vm, device, "mName")
+        }
+        ("getDeviceId", "()I") => {
+            let Some(device) = field_obj(vm, recv, "mDevice") else {
+                return Err(npe("mDevice"));
+            };
+            let device_name = field_str(vm, device, "mName").unwrap_or_default();
+            Value::Int(p57_usb_device_id_from_name(&device_name))
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let Some(device) = field_obj(vm, recv, "mDevice") else {
+                return Err(npe("mDevice"));
+            };
+            get(vm, device, "mName")
+        }
+        ("getDeviceInfo", "()Landroid/mtp/MtpDeviceInfo;") => Value::Null,
+        ("setDevicePropertyInitVersion", "(Ljava/lang/String;)I") => Value::Int(-1),
+        ("getStorageIds", "()[I") => Value::Null,
+        ("getObjectHandles", "(III)[I") => Value::Null,
+        ("getObject", "(II)[B") => {
+            if iarg(args, 1) < 0 {
+                return Err(iae("objectSize should not be negative"));
+            }
+            Value::Null
+        }
+        ("getPartialObject", "(IJJ[B)J") | ("getPartialObject64", "(IJJ[B)J") => {
+            if oarg(args, 3).is_none() {
+                return Err(npe("buffer"));
+            }
+            return Err(p57_ioexception("Failed to obtain object bytes"));
+        }
+        ("getThumbnail", "(I)[B") => Value::Null,
+        ("getStorageInfo", "(I)Landroid/mtp/MtpStorageInfo;") => Value::Null,
+        ("getObjectInfo", "(I)Landroid/mtp/MtpObjectInfo;") => Value::Null,
+        ("deleteObject", "(I)Z") => Value::Int(0),
+        ("getParent", "(I)J") => Value::Long(-1),
+        ("getStorageId", "(I)J") => Value::Long(-1),
+        ("importFile", "(ILjava/lang/String;)Z") => {
+            if oarg(args, 1).is_none() {
+                return Err(npe("destPath"));
+            }
+            Value::Int(0)
+        }
+        ("importFile", "(ILandroid/os/ParcelFileDescriptor;)Z") => {
+            if oarg(args, 1).is_none() {
+                return Err(npe("descriptor"));
+            }
+            Value::Int(0)
+        }
+        ("sendObject", "(IJLandroid/os/ParcelFileDescriptor;)Z") => {
+            if oarg(args, 2).is_none() {
+                return Err(npe("descriptor"));
+            }
+            Value::Int(0)
+        }
+        ("sendObjectInfo", "(Landroid/mtp/MtpObjectInfo;)Landroid/mtp/MtpObjectInfo;") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("info"));
+            }
+            Value::Null
+        }
+        ("readEvent", "(Landroid/os/CancellationSignal;)Landroid/mtp/MtpEvent;") => {
+            return Err(p57_ioexception("Failed to submit event request"));
+        }
+        ("getObjectSizeLong", "(II)J") => {
+            return Err(p57_ioexception("Failed to obtain object size"));
+        }
+        _ => return Ok(None),
+    }))
+}
+
+// --- Batch 57 routers --------------------------------------------------------
+
+fn partial57_instance_for_class(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P57_TEXT_SERVICES_MANAGER => p57_text_services_manager_instance(vm, name, sig, recv, args),
+        P57_SPELL_SESSION => p57_spell_session_instance(vm, name, sig, recv, args),
+        P57_SPELL_PARAMS | P57_SPELL_PARAMS_BUILDER => {
+            p57_spell_params_instance(vm, class, name, sig, recv, args)
+        }
+        P57_TEXT_INFO => p57_text_info_instance(vm, name, sig, recv, args),
+        P57_SUGGESTIONS_INFO => p57_suggestions_info_instance(vm, name, sig, recv, args),
+        P57_SENTENCE_SUGGESTIONS_INFO => {
+            p57_sentence_suggestions_instance(vm, name, sig, recv, args)
+        }
+        P57_SPELL_SUBTYPE => p57_spell_subtype_instance(vm, name, sig, recv, args),
+        P57_TRANSLATION_MANAGER => p57_translation_manager_instance(vm, name, sig, recv, args),
+        P57_TRANSLATION_SPEC => p57_translation_spec_instance(vm, name, sig, recv, args),
+        P57_TRANSLATION_REQUEST_VALUE => {
+            p57_translation_request_value_instance(vm, name, sig, recv, args)
+        }
+        P57_VIEW_TRANSLATION_REQUEST => {
+            p57_view_translation_request_instance(vm, name, sig, recv, args)
+        }
+        P57_VIEW_TRANSLATION_REQUEST_BUILDER => {
+            p57_view_translation_builder_instance(vm, name, sig, recv, args)
+        }
+        P57_TRANSLATION_CONTEXT | P57_TRANSLATION_CONTEXT_BUILDER => {
+            p57_translation_context_instance(vm, class, name, sig, recv, args)
+        }
+        P57_TRANSLATION_CAPABILITY => {
+            p57_translation_capability_instance(vm, name, sig, recv, args)
+        }
+        P57_USB_MANAGER => p57_usb_manager_instance(vm, name, sig, recv, args),
+        P57_USB_DEVICE => p57_usb_device_instance(vm, name, sig, recv, args),
+        P57_USB_DEVICE_BUILDER => p57_usb_device_builder_instance(vm, name, sig, recv, args),
+        P57_USB_CONFIGURATION => p57_usb_configuration_instance(vm, name, sig, recv, args),
+        P57_USB_INTERFACE => p57_usb_interface_instance(vm, name, sig, recv, args),
+        P57_USB_ENDPOINT => p57_usb_endpoint_instance(vm, name, sig, recv, args),
+        P57_EUICC_MANAGER | P57_EUICC_INFO => p57_euicc_instance(vm, class, name, sig, recv, args),
+        P57_USAGE_MANAGER => p57_usage_manager_instance(vm, name, sig, recv, args),
+        P57_USAGE_STATS => p57_usage_stats_instance(vm, name, sig, recv, args),
+        P57_USAGE_EVENTS => p57_usage_events_instance(vm, name, sig, recv, args),
+        P57_USAGE_EVENT => p57_usage_event_instance(vm, name, sig, recv, args),
+        P57_PRINT_MANAGER => p57_print_manager_instance(vm, name, sig, recv, args),
+        P57_PRINT_ATTRIBUTES => p57_print_attributes_instance(vm, name, sig, recv, args),
+        P57_PRINT_ATTRIBUTES_BUILDER => p57_print_builder_instance(vm, name, sig, recv, args),
+        P57_MEDIA_SIZE => p57_media_size_instance(vm, name, sig, recv, args),
+        P57_RESOLUTION => p57_resolution_instance(vm, name, sig, recv, args),
+        P57_MARGINS => p57_margins_instance(vm, name, sig, recv, args),
+        P57_PAGE_RANGE => p57_page_range_instance(vm, name, sig, recv, args),
+        P57_PRINTER_ID => p57_printer_id_instance(vm, name, sig, recv, args),
+        P57_KEY_GEN_SPEC | P57_KEY_GEN_SPEC_BUILDER => {
+            p57_keygen_instance(vm, class, name, sig, recv, args)
+        }
+        P57_KEY_PROTECTION | P57_KEY_PROTECTION_BUILDER => {
+            p57_key_protection_instance(vm, class, name, sig, recv, args)
+        }
+        P57_KEY_INFO => p57_key_info_instance(vm, name, sig, recv, args),
+        P57_MTP_DEVICE_INFO => p57_mtp_device_info_instance(vm, name, sig, recv, args),
+        P57_MTP_STORAGE_INFO => p57_mtp_storage_info_instance(vm, name, sig, recv, args),
+        P57_MTP_OBJECT_INFO => p57_mtp_object_info_instance(vm, name, sig, recv, args),
+        P57_MTP_OBJECT_INFO_BUILDER => p57_mtp_object_builder_instance(vm, name, sig, recv, args),
+        P57_MTP_DEVICE => p57_mtp_device_instance(vm, name, sig, recv, args),
+        _ => Ok(None),
+    }
+}
+
+pub(crate) fn partial57_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    for class in [recv_class, mref_class] {
+        if p57_class(class) {
+            let v = partial57_instance_for_class(vm, class, name, sig, recv, args)?;
+            if v.is_some() {
+                return Ok(v);
+            }
+        }
+    }
+
+    // Managers returned by Context may be created for a framework subclass or
+    // through a test harness class label that is not one of the exact class
+    // constants above. Fall back based on the receiver's actual class when it
+    // is one of this batch's classes.
+    let actual = class_of(vm, recv);
+    if actual != recv_class && actual != mref_class && p57_class(&actual) {
+        return partial57_instance_for_class(vm, &actual, name, sig, recv, args);
+    }
+    Ok(None)
+}
+
+pub(crate) fn partial57_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (class, name, sig) {
+        (
+            P57_TRANSLATION_REQUEST_VALUE,
+            "forText",
+            "(Ljava/lang/CharSequence;)Landroid/view/translation/TranslationRequestValue;",
+        ) => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("text should not be null"));
+            }
+            let r = alloc_obj(vm, P57_TRANSLATION_REQUEST_VALUE, Vec::new())?;
+            put(vm, r, "mText", args[0].clone())?;
+            Value::Obj(r)
+        }
+        (P57_USB_DEVICE, "getDeviceId", "(Ljava/lang/String;)I") => {
+            let Some(device_name) = opt_str_arg(vm, args, 0) else {
+                return Err(npe("deviceName"));
+            };
+            Value::Int(p57_usb_device_id_from_name(&device_name))
+        }
+        (P57_USB_DEVICE, "getDeviceName", "(I)Ljava/lang/String;") => {
+            jstr(vm, p57_usb_device_name_from_id(iarg(args, 0)))?
+        }
+        (
+            P57_USB_DEVICE,
+            "getFileDescriptorForDevice",
+            "(Landroid/hardware/usb/UsbDevice;)Landroid/os/ParcelFileDescriptor;",
+        ) => Value::Null,
+        (P57_USB_MANAGER, "areSettableFunctions", "(J)Z") => {
+            let functions = larg(args, 0);
+            const SETTABLE: i64 = (1 << 2) | (1 << 4) | (1 << 5) | (1 << 3) | (1 << 10) | (1 << 7);
+            bool_value(
+                functions == 0
+                    || ((functions & !SETTABLE) == 0
+                        && ((functions as u64).count_ones() == 1
+                            || functions == ((1 << 5) | (1 << 10)))),
+            )
+        }
+        (P57_USB_MANAGER, "usbFunctionsToString", "(J)Ljava/lang/String;") => {
+            jstr(vm, p57_usb_functions_to_string(larg(args, 0)))?
+        }
+        (P57_USB_MANAGER, "usbFunctionsFromString", "(Ljava/lang/String;)J") => {
+            Value::Long(p57_usb_functions_from_string(opt_str_arg(vm, args, 0))?)
+        }
+        (
+            P57_USB_MANAGER,
+            "getGlobalUsbAlsaJackDetector",
+            "()Landroid/hardware/usb/UsbAlsaJackDetector;",
+        )
+        | (
+            P57_USB_MANAGER,
+            "checkAndGetGlobalUsbAlsaJackDetector",
+            "()Landroid/hardware/usb/UsbAlsaJackDetector;",
+        ) => Value::Null,
+        (P57_USB_CONSTANTS, "usbClassName", "(I)Ljava/lang/String;") => {
+            let text = match iarg(args, 0) {
+                0 => "USB_CLASS_PER_INTERFACE",
+                1 => "USB_CLASS_AUDIO",
+                2 => "USB_CLASS_COMM",
+                3 => "USB_CLASS_HID",
+                5 => "USB_CLASS_PHYSICA",
+                6 => "USB_CLASS_STILL_IMAGE",
+                7 => "USB_CLASS_PRINTER",
+                8 => "USB_CLASS_MASS_STORAGE",
+                9 => "USB_CLASS_HUB",
+                10 => "USB_CLASS_CDC_DATA",
+                11 => "USB_CLASS_CSCID",
+                13 => "USB_CLASS_CONTENT_SEC",
+                14 => "USB_CLASS_VIDEO",
+                15 => "USB_CLASS_PERSONAL_HEALTHCARE",
+                16 => "USB_CLASS_AUDIO_VIDEO",
+                17 => "USB_CLASS_BILLBOARD",
+                18 => "USB_CLASS_TYPE_C_BRIDGE",
+                220 => "USB_CLASS_DIAGNOSTIC",
+                224 => "USB_CLASS_WIRELESS_CONTROLLER",
+                239 => "USB_CLASS_MISC",
+                254 => "USB_CLASS_APP_SPEC",
+                255 => "USB_CLASS_VENDOR_SPEC",
+                _ => "UNKNOWN",
+            };
+            jstr(vm, text)?
+        }
+        (P57_USB_CONSTANTS, "usbSubclassName", "(I)Ljava/lang/String;") => {
+            let text = match iarg(args, 0) {
+                1 => "USB_INTERFACE_SUBCLASS_BOOT",
+                _ => "UNKNOWN",
+            };
+            jstr(vm, text)?
+        }
+        (
+            P57_MEDIA_SIZE,
+            "getStandardMediaSizeById",
+            "(Ljava/lang/String;)Landroid/print/PrintAttributes$MediaSize;",
+        ) => match opt_str_arg(vm, args, 0) {
+            Some(id) => p57_media_size_standard(vm, &id)?.unwrap_or(Value::Null),
+            None => Value::Null,
+        },
+        (P57_KEY_PROPERTIES, "namespaceToLegacyUid", "(I)I") => match iarg(args, 0) {
+            -1 => Value::Int(-1),
+            102 => Value::Int(1010),
+            ns => return Err(iae(format!("No UID corresponding to namespace {ns}"))),
+        },
+        (P57_KEY_PROPERTIES, "legacyUidToNamespace", "(I)I") => match iarg(args, 0) {
+            -1 => Value::Int(-1),
+            1010 => Value::Int(102),
+            uid => return Err(iae(format!("No namespace corresponding to uid {uid}"))),
+        },
+        (P57_MTP_CONSTANTS, "isAbstractObject", "(I)Z") => bool_value(matches!(
+            iarg(args, 0),
+            0xba01 | 0xba02 | 0xba03 | 0xba04 | 0xba05 | 0xba09 | 0xba0a | 0xba0b | 0xba81
+        )),
+        _ => return Ok(None),
+    }))
+}
+
+pub(crate) fn partial57_host_static(
+    vm: &mut Engine,
+    class: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    {
+        let value = match (class, field) {
+            (P57_PRINT_ATTRIBUTES, "COLOR_MODE_MONOCHROME") => Some(1),
+            (P57_PRINT_ATTRIBUTES, "COLOR_MODE_COLOR") => Some(2),
+            (P57_PRINT_ATTRIBUTES, "DUPLEX_MODE_NONE") => Some(1),
+            (P57_PRINT_ATTRIBUTES, "DUPLEX_MODE_LONG_EDGE") => Some(2),
+            (P57_PRINT_ATTRIBUTES, "DUPLEX_MODE_SHORT_EDGE") => Some(4),
+            (P57_EUICC_MANAGER, "EUICC_OTA_STATUS_UNAVAILABLE") => Some(5),
+            (P57_EUICC_MANAGER, "EMBEDDED_SUBSCRIPTION_RESULT_ERROR") => Some(2),
+            (P57_USAGE_MANAGER, "STANDBY_BUCKET_EXEMPTED") => Some(5),
+            (P57_USAGE_MANAGER, "STANDBY_BUCKET_ACTIVE") => Some(10),
+            (P57_USAGE_MANAGER, "STANDBY_BUCKET_WORKING_SET") => Some(20),
+            (P57_USAGE_MANAGER, "STANDBY_BUCKET_FREQUENT") => Some(30),
+            (P57_USAGE_MANAGER, "STANDBY_BUCKET_RARE") => Some(40),
+            (P57_USAGE_MANAGER, "STANDBY_BUCKET_RESTRICTED") => Some(45),
+            (P57_USAGE_MANAGER, "STANDBY_BUCKET_NEVER") => Some(50),
+            (P57_KEY_PROPERTIES, "AUTH_DEVICE_CREDENTIAL") => Some(1),
+            (P57_KEY_PROPERTIES, "AUTH_BIOMETRIC_STRONG") => Some(2),
+            (P57_KEY_PROPERTIES, "PURPOSE_ENCRYPT") => Some(1),
+            (P57_KEY_PROPERTIES, "PURPOSE_DECRYPT") => Some(2),
+            (P57_KEY_PROPERTIES, "PURPOSE_SIGN") => Some(4),
+            (P57_KEY_PROPERTIES, "PURPOSE_VERIFY") => Some(8),
+            (P57_KEY_PROPERTIES, "PURPOSE_WRAP_KEY") => Some(32),
+            (P57_KEY_PROPERTIES, "PURPOSE_AGREE_KEY") => Some(64),
+            (P57_KEY_PROPERTIES, "PURPOSE_ATTEST_KEY") => Some(128),
+            (P57_KEY_PROPERTIES, "NAMESPACE_APPLICATION") => Some(-1),
+            (P57_KEY_PROPERTIES, "NAMESPACE_WIFI") => Some(102),
+            (P57_KEY_PROPERTIES, "NAMESPACE_LOCKSETTINGS") => Some(103),
+            (P57_KEY_PROPERTIES, "UNRESTRICTED_USAGE_COUNT") => Some(-1),
+            _ => None,
+        };
+        if let Some(v) = value {
+            return Ok(Some(Value::Int(v)));
+        }
+    }
+
+    if class == P57_USB_MANAGER {
+        let value = match field {
+            "FUNCTION_NONE" => Some(0),
+            "FUNCTION_MTP" => Some(1 << 2),
+            "FUNCTION_PTP" => Some(1 << 4),
+            "FUNCTION_RNDIS" => Some(1 << 5),
+            "FUNCTION_MIDI" => Some(1 << 3),
+            "FUNCTION_ACCESSORY" => Some(1 << 1),
+            "FUNCTION_AUDIO_SOURCE" => Some(1 << 6),
+            "FUNCTION_ADB" => Some(1),
+            "FUNCTION_NCM" => Some(1 << 10),
+            "FUNCTION_UVC" => Some(1 << 7),
+            _ => None,
+        };
+        if let Some(v) = value {
+            return Ok(Some(Value::Long(v)));
+        }
+    }
+
+    if class == P57_MEDIA_SIZE {
+        if let Some(v) = p57_media_size_standard(vm, field)? {
+            return Ok(Some(v));
+        }
+    }
+    if class == P57_PAGE_RANGE && field == "ALL_PAGES" {
+        let r = alloc_obj(vm, P57_PAGE_RANGE, Vec::new())?;
+        put(vm, r, "mStart", Value::Int(0))?;
+        put(vm, r, "mEnd", Value::Int(i32::MAX))?;
+        return Ok(Some(Value::Obj(r)));
+    }
+    if class == P57_MARGINS && field == "NO_MARGINS" {
+        let r = alloc_obj(vm, P57_MARGINS, Vec::new())?;
+        for f in ["mLeftMils", "mTopMils", "mRightMils", "mBottomMils"] {
+            put(vm, r, f, Value::Int(0))?;
+        }
+        return Ok(Some(Value::Obj(r)));
+    }
+    Ok(None)
 }

@@ -1633,6 +1633,71 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Throwable;",
             "Ljava/lang/Object;",
         ]),
+        // Appendix C Batch 57-A bounded partial slices.
+        "Landroid/view/textservice/TextServicesManager;"
+        | "Landroid/view/textservice/SpellCheckerSession;"
+        | "Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionListener;"
+        | "Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams;"
+        | "Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$BaseBuilder;"
+        | "Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;"
+        | "Landroid/view/textservice/TextInfo;"
+        | "Landroid/view/textservice/SuggestionsInfo;"
+        | "Landroid/view/textservice/SentenceSuggestionsInfo;"
+        | "Landroid/view/textservice/SpellCheckerSubtype;"
+        | "Landroid/view/textservice/SpellCheckerInfo;"
+        | "Landroid/view/translation/TranslationManager;"
+        | "Landroid/view/translation/TranslationSpec;"
+        | "Landroid/view/translation/TranslationRequestValue;"
+        | "Landroid/view/translation/ViewTranslationRequest;"
+        | "Landroid/view/translation/ViewTranslationRequest$Builder;"
+        | "Landroid/view/translation/TranslationContext;"
+        | "Landroid/view/translation/TranslationContext$BaseBuilder;"
+        | "Landroid/view/translation/TranslationCapability;"
+        | "Landroid/view/translation/Translator;"
+        | "Landroid/hardware/usb/UsbManager;"
+        | "Landroid/hardware/usb/UsbConstants;"
+        | "Landroid/hardware/usb/UsbDevice;"
+        | "Landroid/hardware/usb/UsbDevice$Builder;"
+        | "Landroid/hardware/usb/UsbConfiguration;"
+        | "Landroid/hardware/usb/UsbInterface;"
+        | "Landroid/hardware/usb/UsbEndpoint;"
+        | "Landroid/hardware/usb/UsbAccessory;"
+        | "Landroid/hardware/usb/UsbDeviceConnection;"
+        | "Landroid/telephony/euicc/EuiccManager;"
+        | "Landroid/telephony/euicc/EuiccInfo;"
+        | "Landroid/app/usage/UsageStatsManager;"
+        | "Landroid/app/usage/UsageStats;"
+        | "Landroid/app/usage/UsageEvents;"
+        | "Landroid/app/usage/UsageEvents$Event;"
+        | "Landroid/print/PrintManager;"
+        | "Landroid/print/PrintManager$PrintJobStateChangeListener;"
+        | "Landroid/print/PrintManager$PrintServicesChangeListener;"
+        | "Landroid/print/PrintManager$PrintServiceRecommendationsChangeListener;"
+        | "Landroid/print/PrintAttributes;"
+        | "Landroid/print/PrintAttributes$Builder;"
+        | "Landroid/print/PrintAttributes$MediaSize;"
+        | "Landroid/print/PrintAttributes$Resolution;"
+        | "Landroid/print/PrintAttributes$Margins;"
+        | "Landroid/print/PageRange;"
+        | "Landroid/print/PrinterId;"
+        | "Landroid/print/PrintJobId;"
+        | "Landroid/security/keystore/KeyProperties;"
+        | "Landroid/security/keystore/KeyGenParameterSpec;"
+        | "Landroid/security/keystore/KeyGenParameterSpec$Builder;"
+        | "Landroid/security/keystore/KeyProtection;"
+        | "Landroid/security/keystore/KeyProtection$Builder;"
+        | "Landroid/security/keystore/KeyInfo;"
+        | "Landroid/mtp/MtpConstants;"
+        | "Landroid/mtp/MtpDeviceInfo;"
+        | "Landroid/mtp/MtpStorageInfo;"
+        | "Landroid/mtp/MtpObjectInfo;"
+        | "Landroid/mtp/MtpObjectInfo$Builder;"
+        | "Landroid/mtp/MtpDevice;"
+        | "Landroid/mtp/MtpEvent;" => Some(OBJECT),
+        "Landroid/view/translation/TranslationContext$Builder;" => Some(&[
+            "Landroid/view/translation/TranslationContext$BaseBuilder;",
+            "Ljava/lang/Object;",
+        ]),
         _ => None,
     }
 }
@@ -2068,6 +2133,38 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             Some(&["Landroid/animation/ValueAnimator$AnimatorUpdateListener;"])
         }
         "Landroid/system/StructTimespec;" => Some(&["Ljava/lang/Comparable;"]),
+        // Parcelable value types in the Batch 57-A bounded slices.
+        "Landroid/view/textservice/TextInfo;"
+        | "Landroid/view/textservice/SuggestionsInfo;"
+        | "Landroid/view/textservice/SentenceSuggestionsInfo;"
+        | "Landroid/view/textservice/SpellCheckerSubtype;"
+        | "Landroid/view/textservice/SpellCheckerInfo;"
+        | "Landroid/view/translation/TranslationSpec;"
+        | "Landroid/view/translation/TranslationRequestValue;"
+        | "Landroid/view/translation/ViewTranslationRequest;"
+        | "Landroid/view/translation/TranslationContext;"
+        | "Landroid/view/translation/TranslationCapability;"
+        | "Landroid/hardware/usb/UsbDevice;"
+        | "Landroid/hardware/usb/UsbConfiguration;"
+        | "Landroid/hardware/usb/UsbInterface;"
+        | "Landroid/hardware/usb/UsbEndpoint;"
+        | "Landroid/hardware/usb/UsbAccessory;"
+        | "Landroid/telephony/euicc/EuiccInfo;"
+        | "Landroid/app/usage/UsageStats;"
+        | "Landroid/app/usage/UsageEvents;"
+        | "Landroid/print/PrintAttributes;"
+        | "Landroid/print/PageRange;"
+        | "Landroid/print/PrinterId;"
+        | "Landroid/print/PrintJobId;" => Some(&["Landroid/os/Parcelable;"]),
+        "Landroid/security/keystore/KeyGenParameterSpec;" => Some(&[
+            "Ljava/security/spec/AlgorithmParameterSpec;",
+            "Landroid/security/keystore/UserAuthArgs;",
+        ]),
+        "Landroid/security/keystore/KeyProtection;" => Some(&[
+            "Ljava/security/KeyStore$ProtectionParameter;",
+            "Landroid/security/keystore/UserAuthArgs;",
+        ]),
+        "Landroid/security/keystore/KeyInfo;" => Some(&["Ljava/security/spec/KeySpec;"]),
         _ => None,
     }
 }

@@ -2269,6 +2269,9 @@ const SERVICES: &[(&str, &str)] = &[
         "Landroid/media/session/MediaSessionManager;",
     ),
     ("usagestats", "Landroid/app/usage/UsageStatsManager;"),
+    ("usb", "Landroid/hardware/usb/UsbManager;"),
+    ("euicc", "Landroid/telephony/euicc/EuiccManager;"),
+    ("print", "Landroid/print/PrintManager;"),
 ];
 
 fn system_service_class(key: &str) -> &'static str {
