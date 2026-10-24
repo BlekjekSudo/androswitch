@@ -77,9 +77,11 @@ JNI constructor/thread/context results. Independent SDK APKs also verify
 installed package metadata and actual worker ThreadLocal isolation in Horizon.
 The next SDK proofs verify COW snapshots, DEX field reflection and TimeUnit
 conversions on one NRO. Original Candy Crush now requires BaseInputConnection;
-Mekorama reaches a surface-created callback and requires Runtime.getRuntime.
+Mekorama now passes Runtime initialization and next requires AbstractCollection
+state in an app-provided subclass.
 Both return to the launcher, and neither game has a first-screen pass yet.
-See [the exact game observations](reports/m9-input-runtime-startup-ryujinx-20261025.json).
+See [the two-game observations](reports/m9-input-runtime-startup-ryujinx-20261025.json)
+and [the later Runtime/Mekorama run](reports/m9-runtime-resources-horizon-20261025.json).
 Installation is not a compatibility guarantee; see
 [startup-failure diagnosis and recovery](docs/STARTUP_FAILURES.md).
 See [M7 storage improvements](docs/M7_STORAGE_E2E.md) for the new I/O path and limits.

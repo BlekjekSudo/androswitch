@@ -1,0 +1,560 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T20:05:06.579186+00:00",
+  "local_evidence_date": "2026-10-25",
+  "scope": "Shared java.lang.Runtime singleton and explicitly bound process processor resources",
+  "implementation_commit": "89bb62094c5f05e0c89ffd2a9664a394b5b02f4b",
+  "source_binding": "28 source snapshots were copied immediately after the successful focused checks and before shared graph release. Byte comparison with the subsequent implementation commit is recorded per file; only the listed source is bound, not a complete transitive toolchain snapshot.",
+  "status": {
+    "implementation": "two_methods_implemented",
+    "host": "passed",
+    "arm64_libnx_compile": "passed_for_smoke_and_product_objects",
+    "real_horizon_syscall_execution": "not_run_by_this_receipt",
+    "ryujinx": "separate_parent_run_required",
+    "physical_switch": "not_run",
+    "external_game_first_screen": "not_established"
+  },
+  "surface": {
+    "static_method": "java/lang/Runtime.getRuntime()Ljava/lang/Runtime;",
+    "instance_method": "java/lang/Runtime.availableProcessors()I",
+    "singleton": "One framework-rooted object per Android/application VM; stable across GC, constructor not advertised.",
+    "provider_contract": "as_platform::RuntimeResources::available_processors()->Result<u32,PlatformError>",
+    "device": "Fresh svcGetInfo InfoType_CoreMask/CUR_PROCESS_HANDLE query and nonzero allowed mask popcount; preserve query failure, do not write failed output, no guessed fallback.",
+    "host": "Fresh std::thread::available_parallelism query; this is the standard OS-derived parallelism estimate, subject to documented affinity/processor-group/quota limitations, not an independent exact CPU measurement.",
+    "admission": "getRuntime may exist without provider; availableProcessors fails explicitly until bound. Reject zero/out-of-positive-Java-int results. Clone provider before calling it; no runtime RefCell borrow survives a provider callback.",
+    "unsupported": "Java heap memory statistics, Runtime-specific gc/finalization, process exec, exit/halt, library load methods and shutdown hooks remain unadvertised/unsupported. System.gc remains real collector behavior.",
+    "memory_policy": "No new memory API, no allocator estimate relabeled as managed Java heap memory, no changes to platform heap/admission/lifetime."
+  },
+  "commands": [
+    {
+      "command": "pwsh -NoProfile -File fixtures/m9/runtime/build.ps1",
+      "exit_code": 0,
+      "result": "Original/renamed normal SDK APK/DEX and JVM oracles; Java8 obsolete-options warnings preserved."
+    },
+    {
+      "command": "pwsh -NoProfile -File scripts/test-runtime-resources.ps1",
+      "exit_code": 0,
+      "result": "Production C wrapper executed under Windows GCC against fake kernel: 64 individual bits, sparse/full/high masks, fresh query changes, zero/error/null output handling; 70 actual fake svcGetInfo calls in one contract executable. Two strict real libnx ARM64 objects compiled."
+    },
+    {
+      "command": "cargo test -p as-platform --features std -- --nocapture",
+      "exit_code": 0,
+      "tests_passed": 4,
+      "doc_tests": 0,
+      "log": "target/evidence/m9-runtime-resources-platform-20261025.log"
+    },
+    {
+      "command": "cargo test -p as-framework --features host --test runtime_resources --test glsurface -- --nocapture",
+      "exit_code": 0,
+      "runtime_tests_passed": 5,
+      "glsurface_tests_ignored": 6,
+      "log": "target/evidence/m9-runtime-resources-tests-20261025-2.log"
+    },
+    {
+      "command": "cargo test -p as-framework --features host --test glsurface -- --ignored --nocapture",
+      "exit_code": 0,
+      "tests_passed": 6,
+      "ignored": 0,
+      "log": "target/evidence/m9-runtime-resources-glsurface-20261025.log"
+    },
+    {
+      "command": "cargo clippy -p as-framework --features host --lib --test runtime_resources --test glsurface -- -D warnings",
+      "exit_code": 0,
+      "log": "target/evidence/m9-runtime-resources-clippy-20261025.log"
+    },
+    {
+      "command": "cargo clippy -p as-platform --features std --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log": "target/evidence/m9-runtime-resources-platform-clippy-20261025.log"
+    }
+  ],
+  "prior_attempts": [
+    {
+      "exit_code": 101,
+      "classification": "Initial framework compile rejected Runtime.bind visibility from the Android wrapper. Fixed Runtime type/bind visibility to pub(in crate::android), matching existing service ownership; tests then compiled and passed. No assertions removed.",
+      "log": "target/evidence/m9-runtime-resources-tests-20261025-1.log"
+    },
+    {
+      "classification": "Initial ordinary GL test invocation executed0 and ignored6. It was not counted as regression coverage; explicit --ignored rerun executed and passed all6."
+    }
+  ],
+  "test_detail": {
+    "portable_core_asserted": true,
+    "runtime_tests": 5,
+    "jvm_rows_compared": 16,
+    "jvm_rows": "same=true; afterGC=true; positive=true; class=java.lang.Runtime, across two namespaces and two fresh passes with GC after each row. Numeric host/JVM CPU counts are deliberately not compared across separate environments.",
+    "actual_host_provider": "Java query output also compared with std::thread::available_parallelism on the executing Windows host.",
+    "controlled_provider": "7->2 dynamic counts, missing provider,0/u32::MAX rejection, exact query error, recovery3, reentrant provider rebinding9->4; these are synthetic test values, not Switch counts.",
+    "gc": "Runtime singleton survives true Engine GC while unrelated object is collected; forged Runtime receiver rejected.",
+    "metadata_and_unsupported": "Only two exact supported descriptors advertised. Constructor and memory/gc/finalization/exec/exit/halt/shutdown-hook calls do not succeed.",
+    "sdk_vfs": "Normal proof Activity uses the same singleton/provider, queries twice around System.gc, draws UI and writes /sdcard/Download/androswitch-runtime-proof.txt. Host test asserts controlled-provider6 transcript and2 provider calls. Temp host VFS file was not retained; frozen source assertion/raw pass log are evidence, not an independently hashed host VFS copy.",
+    "host_proof_expected_transcript": "RUNTIME_PROOF_PASS\nsingleton=true\nfirstAvailableProcessors=6\navailableProcessors=6\n"
+  },
+  "proof_apk": {
+    "package": "org.fixture.runtimeproof",
+    "activity": "org.androswitch.contracts.RuntimeProofActivity",
+    "frozen_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-artifacts/target/runtime-fixture/original/runtime-proof.apk",
+    "sha256": "783a6581b31d3f8481a7afe0c69491f76811227e4dfc4bf7312d1a8e24fed5ee",
+    "vfs_path": "/sdcard/Download/androswitch-runtime-proof.txt",
+    "meaning": "Actual future NRO run must record its observed count, reviewed UI and safe return separately; host synthetic count6 is not a device claim."
+  },
+  "toolchain": {
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: x86_64-pc-windows-gnu\nrelease: 1.97.1\nLLVM version: 22.1.6",
+    "java": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+    "android_api": 26,
+    "build_tools": "35.0.0",
+    "compile_platform": 35,
+    "host_c": "w64devkit GCC16.2.0 x86_64-w64-mingw32, Windows host execution; not WSL or Horizon",
+    "target_c": "devkitA64 GCC15.2.0 aarch64-none-elf, real libnx headers; compile only",
+    "cargo_environment": {
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_BUILD_JOBS": "1",
+      "CARGO_PROFILE_TEST_DEBUG": "0"
+    }
+  },
+  "primary_references": [
+    {
+      "url": "https://android.googlesource.com/platform/libcore/+/android-8.0.0_r1/ojluni/src/main/java/java/lang/Runtime.java",
+      "revision": "android-8.0.0_r1",
+      "lines": "59,92-93,698-712",
+      "relevance": "Singleton/private construction and positive pollable CPU count. Android/Linux uses sysconf(_SC_NPROCESSORS_CONF); the Horizon implementation intentionally queries its own process permissions. Reference inspected only; no Runtime implementation source copied.",
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/local-artifacts/reference/android26-runtime/Runtime.java",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/reference/local-artifacts/reference/android26-runtime/Runtime.java",
+      "sha256": "03561022840086caeadd8253198ffaba6972700de20a680cd5c7b057dcc5fb51",
+      "bytes": 48939
+    },
+    {
+      "url": "https://raw.githubusercontent.com/switchbrew/libnx/v4.12.0/nx/include/switch/kernel/svc.h",
+      "revision": "v4.12.0",
+      "relevance": "Public InfoType_CoreMask is the bitmask of allowed core IDs. The snapshot binds the actual installed header used for strict target compilation.",
+      "workspace_path": "C:/devkitPro/libnx/include/switch/kernel/svc.h",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/reference/libnx-svc.h",
+      "sha256": "b60a0604d3b899f6b7af448afebca52b6a8762800497d0f14b7063a6e14517c3",
+      "bytes": 63972
+    },
+    {
+      "url": "https://doc.rust-lang.org/std/thread/fn.available_parallelism.html",
+      "relevance": "Host standard-library query is an OS-derived estimate recomputed each call and can over/undercount under documented restrictions."
+    },
+    {
+      "url": "https://docs.oracle.com/javase/8/docs/api/java/lang/Runtime.html",
+      "relevance": "Public JVM Runtime contract; actual Java oracle was executed independently."
+    }
+  ],
+  "limits": [
+    "No exact CPU model, physical core count or scheduler quota claim beyond backend query semantics.",
+    "No guessed fallback CPU or device/Java heap memory values.",
+    "No new process execution, shutdown or native thread-pool support.",
+    "New host proof does not qualify original Mekorama/Candy APK first screens, GPU behavior, actual Horizon syscall or physical hardware.",
+    "Existing infallible metadata/allocation and memory fragmentation limits remain; this is not a security audit."
+  ],
+  "sources": [
+    {
+      "workspace_path": "crates/as-platform/src/lib.rs",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-platform/src/lib.rs",
+      "sha256": "74df8fb8904de7345585c8c0c32646d42271bc53603a21961c39605b85d26f53",
+      "bytes": 2498,
+      "commit_blob_sha256": "74df8fb8904de7345585c8c0c32646d42271bc53603a21961c39605b85d26f53",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/as-platform/src/host.rs",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-platform/src/host.rs",
+      "sha256": "7d9d2919e5dd37fbfde009b39c6419f178a3b70ddacf43a1e1746dd61651a806",
+      "bytes": 4926,
+      "commit_blob_sha256": "7d9d2919e5dd37fbfde009b39c6419f178a3b70ddacf43a1e1746dd61651a806",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/as-platform/Cargo.toml",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-platform/Cargo.toml",
+      "sha256": "3387a60b4cc9b176561c4f775b64fca9f6b519ae42a9ff2604c559f9150e4167",
+      "bytes": 237,
+      "commit_blob_sha256": "3387a60b4cc9b176561c4f775b64fca9f6b519ae42a9ff2604c559f9150e4167",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/as-framework/src/services/runtime.rs",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-framework/src/services/runtime.rs",
+      "sha256": "9670ebed3fb59e3157dfbe5784df8e2a0f3f8fbc9dac893ab2c8c7b0a899884b",
+      "bytes": 3603,
+      "commit_blob_sha256": "9670ebed3fb59e3157dfbe5784df8e2a0f3f8fbc9dac893ab2c8c7b0a899884b",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/as-framework/src/services/mod.rs",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-framework/src/services/mod.rs",
+      "sha256": "418e1de53c597a093149b0f8c18c48c6a70142a80ab79112b9a1a81ed9121c80",
+      "bytes": 12933,
+      "commit_blob_sha256": "418e1de53c597a093149b0f8c18c48c6a70142a80ab79112b9a1a81ed9121c80",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/as-framework/src/android.rs",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-framework/src/android.rs",
+      "sha256": "d528d2a8068c8a00a058287ab88fbac2bd4dbfe813423b0f68aa0e77b61f742f",
+      "bytes": 93404,
+      "commit_blob_sha256": "d528d2a8068c8a00a058287ab88fbac2bd4dbfe813423b0f68aa0e77b61f742f",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/as-framework/src/lib.rs",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-framework/src/lib.rs",
+      "sha256": "a3762e4b51921d9251b1a81f781ce9592427d873191688dcd758c46ad7c636c3",
+      "bytes": 6372,
+      "commit_blob_sha256": "a3762e4b51921d9251b1a81f781ce9592427d873191688dcd758c46ad7c636c3",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/as-framework/Cargo.toml",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-framework/Cargo.toml",
+      "sha256": "b654c0dd8db257b3b10870c761aba458ee91ba3fbe8d02d2f490700a3f11c3f7",
+      "bytes": 2846,
+      "commit_blob_sha256": "b654c0dd8db257b3b10870c761aba458ee91ba3fbe8d02d2f490700a3f11c3f7",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/as-framework/tests/runtime_resources.rs",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-framework/tests/runtime_resources.rs",
+      "sha256": "c267bd18c0425373e74da86c7c632f85ae1cd4e6f0a107af379700103c61a714",
+      "bytes": 9816,
+      "commit_blob_sha256": "c267bd18c0425373e74da86c7c632f85ae1cd4e6f0a107af379700103c61a714",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/as-framework/tests/glsurface.rs",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-framework/tests/glsurface.rs",
+      "sha256": "3802c85fa403238ab18f8850b081f79216e734dc87f5af56d889d54c377a3c7e",
+      "bytes": 22498,
+      "commit_blob_sha256": "3802c85fa403238ab18f8850b081f79216e734dc87f5af56d889d54c377a3c7e",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/as-switch-smoke/src/device_resources.rs",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-switch-smoke/src/device_resources.rs",
+      "sha256": "3e0aa3ddfdbe5f3b0c45d49a2d94296acf63b5298357825cc6f38b6e15572e63",
+      "bytes": 1195,
+      "commit_blob_sha256": "3e0aa3ddfdbe5f3b0c45d49a2d94296acf63b5298357825cc6f38b6e15572e63",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/as-switch-smoke/src/application.rs",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-switch-smoke/src/application.rs",
+      "sha256": "78301e3935b0a7156a06df005169ffdcf86706caedc30bbb7317ad42d1668bd0",
+      "bytes": 34291,
+      "commit_blob_sha256": "78301e3935b0a7156a06df005169ffdcf86706caedc30bbb7317ad42d1668bd0",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/as-switch-smoke/src/lib.rs",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-switch-smoke/src/lib.rs",
+      "sha256": "34d280b07e5125504db722eb98ab8868b98f9db84356aecb7afb7f5e1800c049",
+      "bytes": 6826,
+      "commit_blob_sha256": "34d280b07e5125504db722eb98ab8868b98f9db84356aecb7afb7f5e1800c049",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/as-switch-smoke/Cargo.toml",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/as-switch-smoke/Cargo.toml",
+      "sha256": "395ea2be97a06441b4068b503b7726891f42bd5bbe10eb470b0f29f60c79982e",
+      "bytes": 2462,
+      "commit_blob_sha256": "395ea2be97a06441b4068b503b7726891f42bd5bbe10eb470b0f29f60c79982e",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/rd-vm/src/classpath.rs",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/rd-vm/src/classpath.rs",
+      "sha256": "f2ca0f1426cb2949a0e74aaaf30a0f5034786a60434aaadd26137e56f4666473",
+      "bytes": 109199,
+      "commit_blob_sha256": "f2ca0f1426cb2949a0e74aaaf30a0f5034786a60434aaadd26137e56f4666473",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "crates/rd-vm/src/engine.rs",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/crates/rd-vm/src/engine.rs",
+      "sha256": "7a0d0d44b9b4a23434ad88108993027048a6786ddbd9648f2273e00ffda5b854",
+      "bytes": 52630,
+      "commit_blob_sha256": "7a0d0d44b9b4a23434ad88108993027048a6786ddbd9648f2273e00ffda5b854",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "Cargo.lock",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/Cargo.lock",
+      "sha256": "f7f174e7534072a9e1f337c8847c2d330c9cc9b9c55095cba12437b62642ef3e",
+      "bytes": 28670,
+      "commit_blob_sha256": "f7f174e7534072a9e1f337c8847c2d330c9cc9b9c55095cba12437b62642ef3e",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "platform/switch-smoke/resource_info.c",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/platform/switch-smoke/resource_info.c",
+      "sha256": "3fa81273a95fee509248761ddfda654370aab48e3de50e1cf50252a5077d0457",
+      "bytes": 354,
+      "commit_blob_sha256": "3fa81273a95fee509248761ddfda654370aab48e3de50e1cf50252a5077d0457",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "platform/switch-smoke/resource_info.h",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/platform/switch-smoke/resource_info.h",
+      "sha256": "f6e039eb317a43875c95e0239581619d0d198828fdd36b74413dc62f9331329f",
+      "bytes": 702,
+      "commit_blob_sha256": "f6e039eb317a43875c95e0239581619d0d198828fdd36b74413dc62f9331329f",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "platform/switch-smoke/tests/resource_info.c",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/platform/switch-smoke/tests/resource_info.c",
+      "sha256": "0ba9daf6d0e7b5cb5bae7fd85e84ac6f7215f03614027cb6ef71e59aa2458cf2",
+      "bytes": 1793,
+      "commit_blob_sha256": "0ba9daf6d0e7b5cb5bae7fd85e84ac6f7215f03614027cb6ef71e59aa2458cf2",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "platform/switch-smoke/tests/fake-resources/switch.h",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/platform/switch-smoke/tests/fake-resources/switch.h",
+      "sha256": "a4e0d19e2b40a649d6316f8e4d8863367f63915c8d139320622b11e6678ef13a",
+      "bytes": 298,
+      "commit_blob_sha256": "a4e0d19e2b40a649d6316f8e4d8863367f63915c8d139320622b11e6678ef13a",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "platform/switch-smoke/Makefile",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/platform/switch-smoke/Makefile",
+      "sha256": "b2f0986d6c31445f12ecaa5c2b6229519a8a1f35ab607cc53b776f8ea84bdb3d",
+      "bytes": 5581,
+      "commit_blob_sha256": "611bcd002b7f8d88bda3a0bb559151edfccca9fc512f7aa0b71a79a8bdd3bd7e",
+      "exact_commit_bytes": false
+    },
+    {
+      "workspace_path": "platform/androswitch/Makefile",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/platform/androswitch/Makefile",
+      "sha256": "bb36c24b3cb3e33a464ab1dc20854041a3ad102c7377d2cd7af916c5f9136386",
+      "bytes": 5005,
+      "commit_blob_sha256": "faf38e718c8b6e626774ace61e229fa9fcda4a36f08617ba2dbf8bfa6f26cef2",
+      "exact_commit_bytes": false
+    },
+    {
+      "workspace_path": "scripts/test-runtime-resources.ps1",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/scripts/test-runtime-resources.ps1",
+      "sha256": "d043b110bb80d71f9d85f9c02852732161422ec06510e98c36bc56cd1984c444",
+      "bytes": 4238,
+      "commit_blob_sha256": "d043b110bb80d71f9d85f9c02852732161422ec06510e98c36bc56cd1984c444",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "fixtures/m9/runtime/build.ps1",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/fixtures/m9/runtime/build.ps1",
+      "sha256": "f6ae7b72811e93ac1b9ed521394e1e834a782be4da76cb1230d9c716edda46d9",
+      "bytes": 4076,
+      "commit_blob_sha256": "f6ae7b72811e93ac1b9ed521394e1e834a782be4da76cb1230d9c716edda46d9",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "fixtures/m9/runtime/java/org/androswitch/contracts/RuntimeActivity.java",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/fixtures/m9/runtime/java/org/androswitch/contracts/RuntimeActivity.java",
+      "sha256": "4fb525ae243010b5c39aa931cbce56f503f22c04deb7b2b85a2ebc47d993b273",
+      "bytes": 340,
+      "commit_blob_sha256": "4fb525ae243010b5c39aa931cbce56f503f22c04deb7b2b85a2ebc47d993b273",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "fixtures/m9/runtime/java/org/androswitch/contracts/RuntimeCases.java",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/fixtures/m9/runtime/java/org/androswitch/contracts/RuntimeCases.java",
+      "sha256": "34f0777c7a347f3ea2146a218551f15b4713ade3d619b89c1c6d5a01cbeeb3ed",
+      "bytes": 923,
+      "commit_blob_sha256": "34f0777c7a347f3ea2146a218551f15b4713ade3d619b89c1c6d5a01cbeeb3ed",
+      "exact_commit_bytes": true
+    },
+    {
+      "workspace_path": "fixtures/m9/runtime/java/org/androswitch/contracts/RuntimeProofActivity.java",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-source/fixtures/m9/runtime/java/org/androswitch/contracts/RuntimeProofActivity.java",
+      "sha256": "7615d15ad55bb34ef58fd64ba9d80b2507ca205aea165d2701731c2ccdcf1417",
+      "bytes": 1282,
+      "commit_blob_sha256": "7615d15ad55bb34ef58fd64ba9d80b2507ca205aea165d2701731c2ccdcf1417",
+      "exact_commit_bytes": true
+    }
+  ],
+  "raw_logs": [
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/target/evidence/m9-runtime-resources-fixture-20261025.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/raw-logs/target/evidence/m9-runtime-resources-fixture-20261025.log",
+      "sha256": "ab15f46cbe9f887b42e3c71fb9e6a0f65aaae6c4125e01e6438eca1b4fd3defd",
+      "bytes": 613
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/target/evidence/m9-runtime-resources-c-20261025.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/raw-logs/target/evidence/m9-runtime-resources-c-20261025.log",
+      "sha256": "c666895d26ef12156bb28effa1e3f11b73e540a20610170b5c581c3da6f15eeb",
+      "bytes": 749
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/target/evidence/m9-runtime-resources-platform-20261025.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/raw-logs/target/evidence/m9-runtime-resources-platform-20261025.log",
+      "sha256": "9d6db0feb0e3e0302ea887c3bea0a5b62c24c2c2a7e7470e28c719175151856f",
+      "bytes": 846
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/target/evidence/m9-runtime-resources-tests-20261025-1.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/raw-logs/target/evidence/m9-runtime-resources-tests-20261025-1.log",
+      "sha256": "b9c4317bf4773109a2bf925303868791483cfd6c16f7848dfc87335f87d4e233",
+      "bytes": 1010
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/target/evidence/m9-runtime-resources-tests-20261025-2.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/raw-logs/target/evidence/m9-runtime-resources-tests-20261025-2.log",
+      "sha256": "83fc1b26e7e9d10d01069dd73693bfd774a888f1a1f778385c88f4752b33dea8",
+      "bytes": 1837
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/target/evidence/m9-runtime-resources-glsurface-20261025.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/raw-logs/target/evidence/m9-runtime-resources-glsurface-20261025.log",
+      "sha256": "d69b041f630154e04bbfc57c343c4cc12fc4fca6b78e1adb964b48a703180ce8",
+      "bytes": 808
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/target/evidence/m9-runtime-resources-clippy-20261025.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/raw-logs/target/evidence/m9-runtime-resources-clippy-20261025.log",
+      "sha256": "693050ed37ee82e6dc3715c158f7bedfbca4a158baf873abfd07379faee90003",
+      "bytes": 459
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/target/evidence/m9-runtime-resources-platform-clippy-20261025.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/raw-logs/target/evidence/m9-runtime-resources-platform-clippy-20261025.log",
+      "sha256": "b62815f18a623d763ca3010298efc51b0f76238eb5afc2668ca051e6acb67651",
+      "bytes": 153
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/local-artifacts/tests/runtime-resources/host-build.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/c-contract/local-artifacts/tests/runtime-resources/host-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/local-artifacts/tests/runtime-resources/host-contract.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/c-contract/local-artifacts/tests/runtime-resources/host-contract.log",
+      "sha256": "30f49e98abe1c74e63a042f9d266dca68d8f6855dfdfbf1c3123e3b286cf4f01",
+      "bytes": 92
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/local-artifacts/tests/runtime-resources/host-machine.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/c-contract/local-artifacts/tests/runtime-resources/host-machine.log",
+      "sha256": "5a93bd82f1f12e8b275a5cb5df82e8bac02d52c05d53b534913d0bc49ac46b9b",
+      "bytes": 20
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/local-artifacts/tests/runtime-resources/host-version.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/c-contract/local-artifacts/tests/runtime-resources/host-version.log",
+      "sha256": "87438b7ee2429bf0a85f172c569d3ae10e611821ed289ef1f83e20a19663d877",
+      "bytes": 228
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/local-artifacts/tests/runtime-resources/target-machine.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/c-contract/local-artifacts/tests/runtime-resources/target-machine.log",
+      "sha256": "d29b529a8dd97fc42b5f7d36410c74babdc09c7b41de34ac0e4de38bacd2556b",
+      "bytes": 18
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/local-artifacts/tests/runtime-resources/target-product.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/c-contract/local-artifacts/tests/runtime-resources/target-product.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/local-artifacts/tests/runtime-resources/target-smoke.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/c-contract/local-artifacts/tests/runtime-resources/target-smoke.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/local-artifacts/tests/runtime-resources/target-version.log",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/c-contract/local-artifacts/tests/runtime-resources/target-version.log",
+      "sha256": "4f46d7d87c6c05f228ebf2995d2f81519b74932b777c76b2106d34417e9e2952",
+      "bytes": 251
+    }
+  ],
+  "artifacts": [
+    {
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-artifacts/local-artifacts/tests/runtime-resources/result.json",
+      "sha256": "fd307e60453b516fa6d46cce053efda2b81c96c734d758b51d74db9db301b0d3",
+      "bytes": 6236
+    },
+    {
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-artifacts/target/runtime-fixture/build-receipt.json",
+      "sha256": "0afb36623aa6b9bc7c082f933d563703902f2910c7b35e8273fccec74695e8d8",
+      "bytes": 2599
+    },
+    {
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-artifacts/target/runtime-fixture/original/oracle.tsv",
+      "sha256": "71eabf6d9f26bd3224d82720b77af833d019f04c486dff9a5e3aa1454ea52ee1",
+      "bytes": 73
+    },
+    {
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-artifacts/target/runtime-fixture/original/runtime-proof.apk",
+      "sha256": "783a6581b31d3f8481a7afe0c69491f76811227e4dfc4bf7312d1a8e24fed5ee",
+      "bytes": 2898
+    },
+    {
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-artifacts/target/runtime-fixture/original/runtime.apk",
+      "sha256": "14b338d49e0391b0195221ff0da4234b449b8845819fdc8fac5bc005a5f38f35",
+      "bytes": 2898
+    },
+    {
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-artifacts/target/runtime-fixture/renamed/oracle.tsv",
+      "sha256": "71eabf6d9f26bd3224d82720b77af833d019f04c486dff9a5e3aa1454ea52ee1",
+      "bytes": 73
+    },
+    {
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-artifacts/target/runtime-fixture/renamed/runtime.apk",
+      "sha256": "ce8e4ddb458d9416183eeda6b32657cf43e0c288ad30f98e4b94314b9dd5f079",
+      "bytes": 2899
+    },
+    {
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-artifacts/target/runtime-fixture/original/dex/classes.dex",
+      "sha256": "77e47c1d070b88f8b497ac0d736e3656f9aa3f74b0822ded86312909c7881b90",
+      "bytes": 3492
+    },
+    {
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/tested-artifacts/target/runtime-fixture/renamed/dex/classes.dex",
+      "sha256": "ad7eeec1c28ccbbf1ea6a6a8d5441aa91dfdb372a85b180a88a38de5b01bbe8f",
+      "bytes": 3476
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/local-artifacts/tests/runtime-resources/resource-info-product.o",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/c-contract/local-artifacts/tests/runtime-resources/resource-info-product.o",
+      "sha256": "ab68f4179d5d292664e2ceb16cb5a5c54b39b102c92d548a7ecc448a160c83a2",
+      "bytes": 1456
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/local-artifacts/tests/runtime-resources/resource-info-smoke.o",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/c-contract/local-artifacts/tests/runtime-resources/resource-info-smoke.o",
+      "sha256": "ab68f4179d5d292664e2ceb16cb5a5c54b39b102c92d548a7ecc448a160c83a2",
+      "bytes": 1456
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/local-artifacts/tests/runtime-resources/resource-info.exe",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/c-contract/local-artifacts/tests/runtime-resources/resource-info.exe",
+      "sha256": "8b3eb997d443a2c89e108f704c773ecfd3cf2a80fbea1f52d563c4a64b8b0b03",
+      "bytes": 53451
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/local-artifacts/tests/runtime-resources/result.json",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/c-contract/local-artifacts/tests/runtime-resources/result.json",
+      "sha256": "fd307e60453b516fa6d46cce053efda2b81c96c734d758b51d74db9db301b0d3",
+      "bytes": 6236
+    }
+  ],
+  "documentation_snapshots": [
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/docs/JAVA_RUNTIME_RESOURCES.md",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/documentation/docs/JAVA_RUNTIME_RESOURCES.md",
+      "sha256": "a9ef170f5b8722c7b6ea40f75eddffad5df299dfdd5ed2f2610f0eef0d388477",
+      "bytes": 4828
+    },
+    {
+      "workspace_path": "D:/Dev/Switch/AndroSwitch/fixtures/m9/runtime/README.md",
+      "snapshot_path": "local-artifacts/m9/runtime-resources-host/20261025/documentation/fixtures/m9/runtime/README.md",
+      "sha256": "6c78f27e09276a240c3d0d7a05638a2d5e5ea99ae9bc1f627e5c0388a245108e",
+      "bytes": 1222
+    }
+  ]
+}

@@ -462,3 +462,13 @@ surface-created callback, then billing initialization requests Runtime.getRuntim
 Neither produces a verified game screen. Both installed identities match the
 original frozen APK hashes and both return to the launcher; the test SD folder
 is restored normally. Missing contracts remain failures, not no-op successes.
+
+
+The later [Runtime/Mekorama NRO20 run](../reports/m9-runtime-resources-horizon-20261025.json)
+verifies a genuine per-VM Runtime singleton across GC and two fresh libnx process
+CoreMask queries (three allowed CPUs in this emulator process). The original
+Mekorama APK then passes that initializer and reaches its billing purchases
+callback; a DEX subclass now needs the shared AbstractCollection base contract.
+There is still no verified game screen. Both sessions return and SD restoration
+completes. Candy Crush was not rerun on NRO20; its latest observed input-connection
+failure remains the separate NRO19 result.

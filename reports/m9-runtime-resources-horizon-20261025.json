@@ -1,0 +1,762 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-24T20:06:52.773406+00:00",
+  "implementation_commit": "89bb620",
+  "status": "runtime_sdk_passed_mekorama_blocked",
+  "scope": "Actual shared Runtime singleton and process allowed CPU query via libnx, followed by original frozen Mekorama APK. No application-specific branches or modified game APK. Candy Crush not rerun on this NRO.",
+  "build": {
+    "profile": "release panic=abort",
+    "windows_devkitpro": "C:/devkitPro",
+    "schema_version": 1,
+    "target_directory": "C:\\Users\\Administrator\\.cache\\androswitch\\37b5fa1d-switch-target",
+    "nro_sha256": "866226e6ab4821c54f2afab01ae7e8bf8407b4997f086f3aa080a7edc2e53789",
+    "executed": false,
+    "link_backend": "Windows",
+    "target": "aarch64-nintendo-switch-freestanding",
+    "sqlite_source_lock_sha256": "cce2cc3f0b3e6354568cc3da7d6067980ef88788f451349711975d7cb7f85e95",
+    "status": "built",
+    "c_compiler_version": "15.2.0",
+    "cargo_version": "cargo 1.100.0-nightly (e8cb624d5 2026-08-22)",
+    "nro_bytes": 9424952,
+    "rust_toolchain": "nightly",
+    "rustc_verbose": "rustc 1.100.0-nightly (787af2b8c 2026-08-25)\r\nbinary: rustc\r\ncommit-hash: 787af2b8c80638c51a4fc8e44f84e6891f243ec7\r\ncommit-date: 2026-08-25\r\nhost: x86_64-pc-windows-gnu\r\nrelease: 1.100.0-nightly\r\nLLVM version: 23.1.0"
+  },
+  "receipt": {
+    "observed_sessions": [
+      {
+        "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\0393b4d1ec504d84b591a49cb71c86d6\\sessions\\0393b4d1ec504d84b591a49cb71c86d6-1\\session-report.json",
+        "session_id": "0393b4d1ec504d84b591a49cb71c86d6-1",
+        "error": null,
+        "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+        "revision": 1,
+        "package": "org.fixture.runtimeproof",
+        "runtime_status": "passed_execution",
+        "completed_case_verified": false
+      },
+      {
+        "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\0393b4d1ec504d84b591a49cb71c86d6\\sessions\\0393b4d1ec504d84b591a49cb71c86d6-2\\session-report.json",
+        "session_id": "0393b4d1ec504d84b591a49cb71c86d6-2",
+        "error": "API_UNAVAILABLE [rd-vm]: new-instance Lcom/google/android/gms/internal/play_billing/zzaa;: platform state for Ljava/util/AbstractCollection; is unavailable [pc 0x0: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 728) }]\n  at Lcom/google/android/gms/internal/play_billing/zzaa;-><clinit>()V\n  at Lcom/google/android/gms/internal/play_billing/zzu;-><clinit>()V\n  at Lcom/android/billingclient/api/BillingClientImpl;->zzM(Ljava/lang/String;Lcom/android/billingclient/api/PurchasesResponseListener;)V\n  at Lcom/android/billingclient/api/BillingClientImpl;->queryPurchasesAsync(Lcom/android/billingclient/api/QueryPurchasesParams;Lcom/android/billingclient/api/PurchasesResponseListener;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->iap_fetch_purchases()V\n  at Lcom/martinmagni/mekorama/Mekorama;->onBillingSetupFinished(Lcom/android/billingclient/api/BillingResult;)V\n  at Lcom/android/billingclient/api/BillingClientImpl;->startConnection(Lcom/android/billingclient/api/BillingClientStateListener;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->iap_init_os()V; cleanup: ACTIVITY_STOP_ERROR: API_UNAVAILABLE [rd-vm]: new-instance Lcom/google/android/gms/internal/play_billing/zzaa;: platform state for Ljava/util/AbstractCollection; is unavailable [pc 0x0: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 728) }]\n  at Lcom/google/android/gms/internal/play_billing/zzaa;-><clinit>()V\n  at Lcom/google/android/gms/internal/play_billing/zzu;-><clinit>()V\n  at Lcom/android/billingclient/api/BillingClientImpl;->zzM(Ljava/lang/String;Lcom/android/billingclient/api/PurchasesResponseListener;)V\n  at Lcom/android/billingclient/api/BillingClientImpl;->queryPurchasesAsync(Lcom/android/billingclient/api/QueryPurchasesParams;Lcom/android/billingclient/api/PurchasesResponseListener;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->iap_fetch_purchases()V\n  at Lcom/martinmagni/mekorama/Mekorama;->onBillingSetupFinished(Lcom/android/billingclient/api/BillingResult;)V\n  at Lcom/android/billingclient/api/BillingClientImpl;->startConnection(Lcom/android/billingclient/api/BillingClientStateListener;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->iap_init_os()V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+        "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+        "revision": 1,
+        "package": "com.martinmagni.mekorama",
+        "runtime_status": "failed",
+        "completed_case_verified": false
+      }
+    ],
+    "root_stop_wait_ms": 502,
+    "root_stop_wait_attempts": 1,
+    "latest_memory_admission": {
+      "allocator_available_after_load": 1569878608,
+      "allocator_available_before_load": 1597367264,
+      "estimated_parser_bytes": 54122782,
+      "package": "com.martinmagni.mekorama",
+      "parser_budget_bytes": 268435456,
+      "raw_dex_bytes": 14703020,
+      "revision": 1,
+      "schema_version": 1,
+      "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+      "session_id": "0393b4d1ec504d84b591a49cb71c86d6-2",
+      "status": "vm_ready"
+    },
+    "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-0393b4d1ec504d84b591a49cb71c86d6",
+    "session_id": "0393b4d1ec504d84b591a49cb71c86d6",
+    "sd_original_restore": "restored",
+    "emulator_frontend": "headless_sdl2",
+    "latest_session_report": {
+      "error": "API_UNAVAILABLE [rd-vm]: new-instance Lcom/google/android/gms/internal/play_billing/zzaa;: platform state for Ljava/util/AbstractCollection; is unavailable [pc 0x0: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 728) }]\n  at Lcom/google/android/gms/internal/play_billing/zzaa;-><clinit>()V\n  at Lcom/google/android/gms/internal/play_billing/zzu;-><clinit>()V\n  at Lcom/android/billingclient/api/BillingClientImpl;->zzM(Ljava/lang/String;Lcom/android/billingclient/api/PurchasesResponseListener;)V\n  at Lcom/android/billingclient/api/BillingClientImpl;->queryPurchasesAsync(Lcom/android/billingclient/api/QueryPurchasesParams;Lcom/android/billingclient/api/PurchasesResponseListener;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->iap_fetch_purchases()V\n  at Lcom/martinmagni/mekorama/Mekorama;->onBillingSetupFinished(Lcom/android/billingclient/api/BillingResult;)V\n  at Lcom/android/billingclient/api/BillingClientImpl;->startConnection(Lcom/android/billingclient/api/BillingClientStateListener;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->iap_init_os()V; cleanup: ACTIVITY_STOP_ERROR: API_UNAVAILABLE [rd-vm]: new-instance Lcom/google/android/gms/internal/play_billing/zzaa;: platform state for Ljava/util/AbstractCollection; is unavailable [pc 0x0: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 728) }]\n  at Lcom/google/android/gms/internal/play_billing/zzaa;-><clinit>()V\n  at Lcom/google/android/gms/internal/play_billing/zzu;-><clinit>()V\n  at Lcom/android/billingclient/api/BillingClientImpl;->zzM(Ljava/lang/String;Lcom/android/billingclient/api/PurchasesResponseListener;)V\n  at Lcom/android/billingclient/api/BillingClientImpl;->queryPurchasesAsync(Lcom/android/billingclient/api/QueryPurchasesParams;Lcom/android/billingclient/api/PurchasesResponseListener;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->iap_fetch_purchases()V\n  at Lcom/martinmagni/mekorama/Mekorama;->onBillingSetupFinished(Lcom/android/billingclient/api/BillingResult;)V\n  at Lcom/android/billingclient/api/BillingClientImpl;->startConnection(Lcom/android/billingclient/api/BillingClientStateListener;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->iap_init_os()V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+      "identity_status": "known",
+      "package": "com.martinmagni.mekorama",
+      "revision": 1,
+      "schema_version": 1,
+      "session_id": "0393b4d1ec504d84b591a49cb71c86d6-2",
+      "status": "failed"
+    },
+    "visual_review": "required",
+    "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+    "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-0393b4d1ec504d84b591a49cb71c86d6",
+    "native_trace_requested": true,
+    "execution_attempted": true,
+    "emulator_path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-bin-9f3cd3d2\\Ryujinx.exe",
+    "cases": [
+      {
+        "returned_to_launcher": true,
+        "presented_frames": 1370,
+        "runtime_status": "passed_execution",
+        "teardown_phases": [
+          "stop_requested",
+          "native_activity_stop",
+          "java_activity_stop",
+          "worker_admission_closed",
+          "background_worker_quiesce",
+          "media_thread_quiesce",
+          "guest_thread_quiesce",
+          "native_destructors",
+          "media_reset",
+          "media_released",
+          "activity_dispose",
+          "runtime_drop",
+          "native_resource_reset",
+          "native_reset_guest_threads",
+          "native_reset_cxx",
+          "native_reset_keys",
+          "native_reset_sync",
+          "native_reset_locale",
+          "native_reset_admitted",
+          "native_mapping_release",
+          "native_tls_reset",
+          "native_resources_released",
+          "display_geometry_reset",
+          "runtime_closed",
+          "launcher_refresh"
+        ],
+        "input": {
+          "expected_session_id": "0393b4d1ec504d84b591a49cb71c86d6-1",
+          "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\proofs-frozen-89bb620-iteration20\\01-runtime-proof.apk",
+          "sha256": "783a6581b31d3f8481a7afe0c69491f76811227e4dfc4bf7312d1a8e24fed5ee",
+          "staged_name": "0000-external.apk",
+          "index": 0,
+          "bytes": 2898,
+          "install_snapshot_step": 3
+        },
+        "captures": [
+          {
+            "file": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\0393b4d1ec504d84b591a49cb71c86d6\\sessions\\0393b4d1ec504d84b591a49cb71c86d6-1\\last-frame.ppm",
+            "sha256": "ef7671f135f94a1e1c992c4d13200979567210ef20aff26ba82138463a57957d",
+            "height": 720,
+            "recognizable_app_screen": "requires_visual_review",
+            "sampled_nonuniform": true,
+            "valid_ppm": true,
+            "width": 1280
+          }
+        ],
+        "snapshots": [
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "886f279126c426a8",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onCreate",
+                "time_ms": 5925
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onStart",
+                "time_ms": 5930
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onResume",
+                "time_ms": 5931
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "886f279126c426a8",
+            "step": 0,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 15,
+                "orientation": 0,
+                "text": "Runtime proof PASS: 3 available processors; VFS saved",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "886f279126c426a8",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onCreate",
+                "time_ms": 5925
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onStart",
+                "time_ms": 5930
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onResume",
+                "time_ms": 5931
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "886f279126c426a8",
+            "step": 1,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 15,
+                "orientation": 0,
+                "text": "Runtime proof PASS: 3 available processors; VFS saved",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "886f279126c426a8",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onCreate",
+                "time_ms": 5925
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onStart",
+                "time_ms": 5930
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onResume",
+                "time_ms": 5931
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "886f279126c426a8",
+            "step": 2,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 15,
+                "orientation": 0,
+                "text": "Runtime proof PASS: 3 available processors; VFS saved",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "886f279126c426a8",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onCreate",
+                "time_ms": 5925
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onStart",
+                "time_ms": 5930
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onResume",
+                "time_ms": 5931
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "886f279126c426a8",
+            "step": 3,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 15,
+                "orientation": 0,
+                "text": "Runtime proof PASS: 3 available processors; VFS saved",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          },
+          {
+            "audio_frames": 0,
+            "finished": false,
+            "frame_hash": "886f279126c426a8",
+            "lifecycle": [
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onCreate",
+                "time_ms": 5925
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onStart",
+                "time_ms": 5930
+              },
+              {
+                "activity": "Lorg/androswitch/contracts/RuntimeProofActivity;",
+                "event": "onResume",
+                "time_ms": 5931
+              }
+            ],
+            "native_frames": 0,
+            "presented_hash": "886f279126c426a8",
+            "step": 4,
+            "views": [
+              {
+                "bounds": [
+                  0,
+                  0,
+                  640,
+                  360
+                ],
+                "children": [],
+                "class": "Landroid/widget/TextView;",
+                "click_method": null,
+                "clickable": false,
+                "color": 0,
+                "enabled": true,
+                "height": -2,
+                "id": -1,
+                "input_type": null,
+                "listener": null,
+                "object": 15,
+                "orientation": 0,
+                "text": "Runtime proof PASS: 3 available processors; VFS saved",
+                "text_color": 4293916154,
+                "text_size": 18.0,
+                "touch_listener": null,
+                "visible": true,
+                "width": -2
+              }
+            ]
+          }
+        ],
+        "status": "execution_verified_visual_review_required",
+        "error": null,
+        "first_screen": "not_visually_verified",
+        "installed_identity_matches": true
+      },
+      {
+        "returned_to_launcher": true,
+        "presented_frames": null,
+        "runtime_status": "failed",
+        "teardown_phases": [
+          "stop_requested",
+          "egl_destroy_surface",
+          "native_activity_stop",
+          "java_activity_stop",
+          "egl_terminate",
+          "egl_terminated",
+          "worker_admission_closed",
+          "background_worker_quiesce",
+          "media_thread_quiesce",
+          "glsurface_join",
+          "guest_thread_quiesce",
+          "native_destructors",
+          "media_reset",
+          "media_released",
+          "activity_dispose",
+          "runtime_drop",
+          "native_mapping_release",
+          "native_resource_reset",
+          "native_reset_guest_threads",
+          "native_reset_cxx",
+          "native_reset_keys",
+          "native_reset_sync",
+          "native_reset_locale",
+          "native_reset_admitted",
+          "native_mapping_release",
+          "native_tls_reset",
+          "native_resources_released",
+          "display_geometry_reset",
+          "runtime_closed",
+          "launcher_refresh"
+        ],
+        "input": {
+          "expected_session_id": "0393b4d1ec504d84b591a49cb71c86d6-2",
+          "source": "D:\\Download\\mekorama-1-7-2.apk",
+          "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+          "staged_name": "0001-external.apk",
+          "index": 1,
+          "bytes": 13099584,
+          "install_snapshot_step": 8
+        },
+        "captures": [],
+        "snapshots": [],
+        "status": "blocked_or_unreported",
+        "error": "API_UNAVAILABLE [rd-vm]: new-instance Lcom/google/android/gms/internal/play_billing/zzaa;: platform state for Ljava/util/AbstractCollection; is unavailable [pc 0x0: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 728) }]\n  at Lcom/google/android/gms/internal/play_billing/zzaa;-><clinit>()V\n  at Lcom/google/android/gms/internal/play_billing/zzu;-><clinit>()V\n  at Lcom/android/billingclient/api/BillingClientImpl;->zzM(Ljava/lang/String;Lcom/android/billingclient/api/PurchasesResponseListener;)V\n  at Lcom/android/billingclient/api/BillingClientImpl;->queryPurchasesAsync(Lcom/android/billingclient/api/QueryPurchasesParams;Lcom/android/billingclient/api/PurchasesResponseListener;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->iap_fetch_purchases()V\n  at Lcom/martinmagni/mekorama/Mekorama;->onBillingSetupFinished(Lcom/android/billingclient/api/BillingResult;)V\n  at Lcom/android/billingclient/api/BillingClientImpl;->startConnection(Lcom/android/billingclient/api/BillingClientStateListener;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->iap_init_os()V; cleanup: ACTIVITY_STOP_ERROR: API_UNAVAILABLE [rd-vm]: new-instance Lcom/google/android/gms/internal/play_billing/zzaa;: platform state for Ljava/util/AbstractCollection; is unavailable [pc 0x0: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 728) }]\n  at Lcom/google/android/gms/internal/play_billing/zzaa;-><clinit>()V\n  at Lcom/google/android/gms/internal/play_billing/zzu;-><clinit>()V\n  at Lcom/android/billingclient/api/BillingClientImpl;->zzM(Ljava/lang/String;Lcom/android/billingclient/api/PurchasesResponseListener;)V\n  at Lcom/android/billingclient/api/BillingClientImpl;->queryPurchasesAsync(Lcom/android/billingclient/api/QueryPurchasesParams;Lcom/android/billingclient/api/PurchasesResponseListener;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->iap_fetch_purchases()V\n  at Lcom/martinmagni/mekorama/Mekorama;->onBillingSetupFinished(Lcom/android/billingclient/api/BillingResult;)V\n  at Lcom/android/billingclient/api/BillingClientImpl;->startConnection(Lcom/android/billingclient/api/BillingClientStateListener;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->iap_init_os()V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+        "first_screen": "not_visually_verified",
+        "installed_identity_matches": true
+      }
+    ],
+    "pid": 239268,
+    "root_handle_pinned": true,
+    "completed_sessions": 2,
+    "status": "blocked_runtime",
+    "backend": "ryujinx",
+    "capture_ownership_contract": "Protocol1 runtime generation identity; matching pending request for CPU frames; identity rechecked after copy. Filesystem timestamps are not ownership evidence.",
+    "startup_wait_ms": 30000,
+    "latest_teardown": [
+      {
+        "phase": "stop_requested",
+        "tick": 944566752
+      },
+      {
+        "phase": "egl_destroy_surface",
+        "tick": 944598597
+      },
+      {
+        "phase": "native_activity_stop",
+        "tick": 944658752
+      },
+      {
+        "phase": "java_activity_stop",
+        "tick": 944682445
+      },
+      {
+        "phase": "egl_terminate",
+        "tick": 944726497
+      },
+      {
+        "phase": "egl_terminated",
+        "tick": 945100467
+      },
+      {
+        "phase": "worker_admission_closed",
+        "tick": 945520740
+      },
+      {
+        "phase": "background_worker_quiesce",
+        "tick": 945573388
+      },
+      {
+        "phase": "media_thread_quiesce",
+        "tick": 945594777
+      },
+      {
+        "phase": "glsurface_join",
+        "tick": 945617122
+      },
+      {
+        "phase": "guest_thread_quiesce",
+        "tick": 945835584
+      },
+      {
+        "phase": "native_destructors",
+        "tick": 945850938
+      },
+      {
+        "phase": "media_reset",
+        "tick": 946356840
+      },
+      {
+        "phase": "media_released",
+        "tick": 946374211
+      },
+      {
+        "phase": "activity_dispose",
+        "tick": 946388277
+      },
+      {
+        "phase": "runtime_drop",
+        "tick": 946420702
+      },
+      {
+        "phase": "native_mapping_release",
+        "tick": 947662680
+      },
+      {
+        "phase": "native_resource_reset",
+        "tick": 948414633
+      },
+      {
+        "phase": "native_reset_guest_threads",
+        "tick": 948452691
+      },
+      {
+        "phase": "native_reset_cxx",
+        "tick": 948484081
+      },
+      {
+        "phase": "native_reset_keys",
+        "tick": 948499153
+      },
+      {
+        "phase": "native_reset_sync",
+        "tick": 948518019
+      },
+      {
+        "phase": "native_reset_locale",
+        "tick": 948539923
+      },
+      {
+        "phase": "native_reset_admitted",
+        "tick": 948557804
+      },
+      {
+        "phase": "native_mapping_release",
+        "tick": 948573615
+      },
+      {
+        "phase": "native_tls_reset",
+        "tick": 948815804
+      },
+      {
+        "phase": "native_resources_released",
+        "tick": 948854211
+      },
+      {
+        "phase": "display_geometry_reset",
+        "tick": 948870535
+      },
+      {
+        "phase": "runtime_closed",
+        "tick": 948887040
+      },
+      {
+        "phase": "launcher_refresh",
+        "tick": 948923337
+      },
+      {
+        "phase": "launcher_framebuffer_open",
+        "tick": 951069803
+      },
+      {
+        "phase": "launcher_ready",
+        "tick": 951849383
+      },
+      {
+        "phase": "launcher_stable",
+        "tick": 955451905
+      }
+    ],
+    "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\0393b4d1ec504d84b591a49cb71c86d6\\androswitch.nro",
+    "commands": 10,
+    "physical_device": "not_run",
+    "schema_version": 1,
+    "inputs": [
+      {
+        "expected_session_id": "0393b4d1ec504d84b591a49cb71c86d6-1",
+        "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\proofs-frozen-89bb620-iteration20\\01-runtime-proof.apk",
+        "sha256": "783a6581b31d3f8481a7afe0c69491f76811227e4dfc4bf7312d1a8e24fed5ee",
+        "staged_name": "0000-external.apk",
+        "index": 0,
+        "bytes": 2898,
+        "install_snapshot_step": 3
+      },
+      {
+        "expected_session_id": "0393b4d1ec504d84b591a49cb71c86d6-2",
+        "source": "D:\\Download\\mekorama-1-7-2.apk",
+        "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+        "staged_name": "0001-external.apk",
+        "index": 1,
+        "bytes": 13099584,
+        "install_snapshot_step": 8
+      }
+    ],
+    "nro_sha256": "866226e6ab4821c54f2afab01ae7e8bf8407b4997f086f3aa080a7edc2e53789",
+    "emulator_sha256": "9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be",
+    "emulator_version": "1.3.3+e2143d4",
+    "latest_media_stop": [
+      {
+        "operation": "egl_unbind_result",
+        "result": 1,
+        "detail": 1,
+        "tick": 943245200
+      },
+      {
+        "operation": "egl_destroy_context_result",
+        "result": 1,
+        "detail": 8612079120,
+        "tick": 944553532
+      },
+      {
+        "operation": "egl_destroy_surface_result",
+        "result": 1,
+        "detail": 8634647728,
+        "tick": 944686189
+      },
+      {
+        "operation": "egl_terminate_begin",
+        "result": 0,
+        "detail": 8638084544,
+        "tick": 944746669
+      },
+      {
+        "operation": "egl_terminate_end",
+        "result": 1,
+        "detail": 8638084544,
+        "tick": 945074538
+      },
+      {
+        "operation": "egl_close_result",
+        "result": 0,
+        "detail": 8638084544,
+        "tick": 945218363
+      },
+      {
+        "operation": "glsurface_wait_begin",
+        "result": 1,
+        "detail": 1277978,
+        "tick": 945641717
+      },
+      {
+        "operation": "glsurface_wait_end",
+        "result": 0,
+        "detail": 0,
+        "tick": 945664116
+      },
+      {
+        "operation": "glsurface_thread_wait_end",
+        "result": 0,
+        "detail": 0,
+        "tick": 945740951
+      },
+      {
+        "operation": "glsurface_thread_close_end",
+        "result": 0,
+        "detail": 0,
+        "tick": 945786405
+      },
+      {
+        "operation": "glsurface_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 945804334
+      },
+      {
+        "operation": "opensl_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 945820060
+      },
+      {
+        "operation": "glsurface_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 946316459
+      },
+      {
+        "operation": "opensl_quiesce_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 946335793
+      },
+      {
+        "operation": "cpu_capture_publish_result",
+        "result": 0,
+        "detail": 0,
+        "tick": 977763331
+      }
+    ],
+    "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay."
+  },
+  "receipt_file": {
+    "path": "local-artifacts/m9/external-runs/0393b4d1ec504d84b591a49cb71c86d6/verification.json",
+    "sha256": "fbe589e526d95add6d4e83251887168c67628cbf5e6ebad8042eb57606e271f0",
+    "bytes": 28225
+  },
+  "build_log": {
+    "path": "local-artifacts/m9/external-runs/0393b4d1ec504d84b591a49cb71c86d6/build.log",
+    "sha256": "50076a9046b50e0cb0ed88f43d8b4e6d0e10a86f260088b0683a2fa7edbe2530",
+    "bytes": 4501
+  },
+  "runtime_proof": {
+    "path": "local-artifacts/m9/external-runs/0393b4d1ec504d84b591a49cb71c86d6/proofs/runtime-proof.txt",
+    "sha256": "5d94cf835f5fffdb8e3320030bd30fcfd83af2a9822632d54dc4f654847e59dd",
+    "bytes": 83,
+    "text": "RUNTIME_PROOF_PASS\nsingleton=true\nfirstAvailableProcessors=3\navailableProcessors=3\n"
+  },
+  "visual_review": {
+    "performed": true,
+    "runtime": "Recognizable Runtime proof PASS: 3 available processors; VFS saved. Number originates from real Horizon process CoreMask query; not a fixed constant or host OS count.",
+    "image": {
+      "path": "local-artifacts/m9/external-runs/0393b4d1ec504d84b591a49cb71c86d6/runtime-proof.png",
+      "sha256": "bcba5e30537d44fde90b292afdcab0214e4c8dc090d3bf67c379fd1421be3c40",
+      "bytes": 9457
+    },
+    "mekorama": "No first-screen capture; runtime failed before proof."
+  },
+  "observations": {
+    "runtime": "Both real provider queries return three allowed processors and singleton identity survives actual guest GC.",
+    "mekorama": "Runtime initializer succeeds. Offline billing callback reaches a real app collection subclass; admission stops at unsupported AbstractCollection platform state. Original and cleanup callbacks retain exact structured error, then native resources release and launcher returns."
+  },
+  "host_receipt": {
+    "path": "reports/m9-runtime-resources-host-20261025.json",
+    "sha256": "b9ff670141ff74f2b5633ab840d9a8a856d31401b41ccb4d72ad08884b47a4f0",
+    "bytes": 33683
+  },
+  "limitations": [
+    "Harness overall result is blocked_runtime, not a completed game compatibility pass.",
+    "Only runtime SDK and Mekorama evaluated on this build; two-game corpus gate remains open.",
+    "Task-local diagnostic Ryujinx, not stock emulator or physical Switch; see m9-cpu-id-emulator-20261024.json.",
+    "Foreign initializer waiting, Runtime memory/process/shutdown APIs remain unavailable."
+  ],
+  "physical_device": "not_run_for_this_build"
+}
