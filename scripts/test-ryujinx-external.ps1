@@ -141,7 +141,19 @@ function Stop-OwnedProcesses {
         try{
             if(-not $process.HasExited){
                 $process.Kill()
-                if(-not $process.WaitForExit(10000)){throw 'The owned root process did not stop; preserve its SD backup.'}
+                $stopTimer=[Diagnostics.Stopwatch]::StartNew()
+                $stopped=$false;$waitAttempts=0
+                # GPU/process teardown can outlast one ten-second wait even
+                # after TerminateProcess. Keep waiting on our pinned handle;
+                # never turn an incomplete inventory into permission to move SD.
+                while(-not $stopped -and $waitAttempts -lt 3){
+                    $waitAttempts++
+                    $stopped=$process.WaitForExit(10000)
+                }
+                $stopTimer.Stop()
+                $receipt.root_stop_wait_ms=$stopTimer.ElapsedMilliseconds
+                $receipt.root_stop_wait_attempts=$waitAttempts
+                if(-not $stopped){throw 'The owned root process did not stop; preserve its SD backup.'}
             }
         }catch{
             $receipt.root_stop_error=$_.Exception.Message
