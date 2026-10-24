@@ -83,3 +83,13 @@ run on Android, Ryujinx or a physical Switch. They do not establish game
 compatibility. Frame/scope metadata allocation remains subject to the existing
 infallible Rust collection growth limits; this change is not a complete memory
 exhaustion or concurrency security review.
+
+
+The [NRO19 regression run](../reports/m9-owned-gc-jni-horizon-20261025.json)
+subsequently executes two original SDK/native proofs on the same binary:
+non-LIFO native suspension across two actual workers and JNI constructors with
+GC, reentry, exceptions and actual thread/context identities. Both expected
+file results and recognizable PASS captures are verified, both sessions return
+to the launcher, and emulator storage is restored. This supplements the host
+contracts; foreign-owner initializer waiting and physical-hardware validation
+remain open.
