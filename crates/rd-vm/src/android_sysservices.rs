@@ -13,7 +13,11 @@
 //!   quoting;
 //! * the pure `android.view.animation.*Interpolator` easing functions;
 //! * an in-memory `android.accounts.AccountManager` account database for the
-//!   explicit-account, password and user-data operations.
+//!   explicit-account, password and user-data operations;
+//! * `android.gesture` point/stroke/gesture geometry and the PCA oriented
+//!   bounding box used by `GestureStroke`;
+//! * the sensorless `android.hardware` profile: SensorManager orientation
+//!   math, `Sensor` value getters and a ConsumerIrManager with no emitter.
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
@@ -28,6 +32,16 @@ const RFC822_TOKEN: &str = "Landroid/text/util/Rfc822Token;";
 const RFC822_TOKENIZER: &str = "Landroid/text/util/Rfc822Tokenizer;";
 const ACCOUNT: &str = "Landroid/accounts/Account;";
 const ACCOUNT_MANAGER: &str = "Landroid/accounts/AccountManager;";
+const GESTURE: &str = "Landroid/gesture/Gesture;";
+const GESTURE_POINT: &str = "Landroid/gesture/GesturePoint;";
+const GESTURE_STROKE: &str = "Landroid/gesture/GestureStroke;";
+const GESTURE_UTILS: &str = "Landroid/gesture/GestureUtils;";
+const ORIENTED_BOUNDING_BOX: &str = "Landroid/gesture/OrientedBoundingBox;";
+const RECT_F: &str = "Landroid/graphics/RectF;";
+const SENSOR_MANAGER: &str = "Landroid/hardware/SensorManager;";
+const SENSOR: &str = "Landroid/hardware/Sensor;";
+const CONSUMER_IR_MANAGER: &str = "Landroid/hardware/ConsumerIrManager;";
+const CARRIER_FREQUENCY_RANGE: &str = "Landroid/hardware/ConsumerIrManager$CarrierFrequencyRange;";
 
 const FLAG_SHORTER: i32 = 1 << 0;
 const FLAG_CALCULATE_ROUNDED: i32 = 1 << 1;
@@ -180,6 +194,9 @@ pub(crate) fn static_intrinsic(
         RFC822_TOKEN => rfc822_token_static(vm, name, sig, args),
         ACCOUNT => account_static(vm, name, sig, args),
         ACCOUNT_MANAGER if name == "get" => account_manager_get(vm, args).map(Some),
+        GESTURE_UTILS => gesture_utils_static(vm, name, sig, args),
+        SENSOR_MANAGER => sensor_manager_static(vm, name, sig, args),
+        SENSOR => sensor_static(vm, name, sig, args),
         _ => Ok(None),
     }
 }
@@ -191,6 +208,14 @@ fn handled_class(recv_class: &str, mref_class: &str) -> Option<&'static str> {
         RFC822_TOKENIZER,
         ACCOUNT,
         ACCOUNT_MANAGER,
+        GESTURE,
+        GESTURE_POINT,
+        GESTURE_STROKE,
+        ORIENTED_BOUNDING_BOX,
+        SENSOR_MANAGER,
+        SENSOR,
+        CONSUMER_IR_MANAGER,
+        CARRIER_FREQUENCY_RANGE,
     ];
     if let Some(c) = HANDLED.iter().find(|c| **c == recv_class) {
         return Some(c);
@@ -222,6 +247,14 @@ pub(crate) fn instance_intrinsic(
         RFC822_TOKENIZER => rfc822_tokenizer_instance(vm, name, sig, args),
         ACCOUNT => account_instance(vm, name, sig, recv, args),
         ACCOUNT_MANAGER => account_manager_instance(vm, name, sig, recv, args),
+        GESTURE => gesture_instance(vm, name, sig, recv, args),
+        GESTURE_POINT => gesture_point_instance(vm, name, sig, recv, args),
+        GESTURE_STROKE => gesture_stroke_instance(vm, name, sig, recv, args),
+        ORIENTED_BOUNDING_BOX => oriented_bounding_box_instance(vm, name, sig, recv, args),
+        SENSOR_MANAGER => sensor_manager_instance(vm, name, sig, recv, args),
+        SENSOR => sensor_instance(vm, name, sig, recv, args),
+        CONSUMER_IR_MANAGER => consumer_ir_instance(vm, name, sig, recv, args),
+        CARRIER_FREQUENCY_RANGE => carrier_frequency_range_instance(vm, name, sig, recv, args),
         _ if INTERPOLATORS.contains(&class) => {
             interpolator_instance(vm, class, name, sig, recv, args)
         }
@@ -1629,5 +1662,1237 @@ fn account_manager_instance(
         _ => return Ok(None),
     };
     let _ = recv;
+    Ok(Some(v))
+}
+
+// ---------------------------------------------------------------------------
+// Shared value helpers for the reconstructed system-service subsets
+// ---------------------------------------------------------------------------
+
+fn int_field(vm: &Engine, recv: ObjRef, field: &str, default: i32) -> i32 {
+    match get(vm, recv, field) {
+        Value::Int(v) => v,
+        _ => default,
+    }
+}
+fn long_field(vm: &Engine, recv: ObjRef, field: &str, default: i64) -> i64 {
+    match get(vm, recv, field) {
+        Value::Long(v) => v,
+        Value::Int(v) => i64::from(v),
+        _ => default,
+    }
+}
+fn float_field(vm: &Engine, recv: ObjRef, field: &str) -> f32 {
+    match get(vm, recv, field) {
+        Value::Float(v) => v,
+        Value::Int(v) => v as f32,
+        _ => 0.0,
+    }
+}
+#[allow(dead_code)]
+fn double_field(vm: &Engine, recv: ObjRef, field: &str) -> f64 {
+    match get(vm, recv, field) {
+        Value::Double(v) => v,
+        Value::Float(v) => f64::from(v),
+        Value::Long(v) => v as f64,
+        Value::Int(v) => f64::from(v),
+        _ => 0.0,
+    }
+}
+fn obj_field(vm: &Engine, recv: ObjRef, field: &str) -> Option<ObjRef> {
+    match get(vm, recv, field) {
+        Value::Obj(r) => Some(r),
+        _ => None,
+    }
+}
+#[allow(dead_code)]
+fn darg(args: &[Value], i: usize) -> f64 {
+    match args.get(i) {
+        Some(Value::Double(v)) => *v,
+        Some(Value::Float(v)) => f64::from(*v),
+        Some(Value::Long(v)) => *v as f64,
+        Some(Value::Int(v)) => f64::from(*v),
+        _ => 0.0,
+    }
+}
+fn new_list(vm: &mut Engine, elems: Vec<Value>) -> Result<ObjRef, VmExit> {
+    let list = alloc_obj(vm, "Ljava/util/ArrayList;", Vec::new())?;
+    vm.fw.objects.insert(list, HostObj::List { elems });
+    Ok(list)
+}
+fn list_elems(vm: &Engine, list: Option<ObjRef>) -> Vec<Value> {
+    let Some(list) = list else {
+        return Vec::new();
+    };
+    match vm.fw.objects.get(&list) {
+        Some(HostObj::List { elems }) => elems.clone(),
+        _ => Vec::new(),
+    }
+}
+fn float_array(vm: &mut Engine, values: &[f32]) -> Result<Value, VmExit> {
+    crate::arrays::new_array(
+        vm,
+        "[F",
+        ElemKind::Float,
+        values.iter().copied().map(Value::Float).collect(),
+    )
+}
+fn long_array(vm: &mut Engine, values: &[i64]) -> Result<Value, VmExit> {
+    crate::arrays::new_array(
+        vm,
+        "[J",
+        ElemKind::Long,
+        values.iter().copied().map(Value::Long).collect(),
+    )
+}
+#[allow(dead_code)]
+fn int_array(vm: &mut Engine, values: &[i32]) -> Result<Value, VmExit> {
+    crate::arrays::new_array(
+        vm,
+        "[I",
+        ElemKind::Int,
+        values.iter().copied().map(Value::Int).collect(),
+    )
+}
+#[allow(dead_code)]
+fn byte_array(vm: &mut Engine, values: &[u8]) -> Result<Value, VmExit> {
+    crate::arrays::new_array(
+        vm,
+        "[B",
+        ElemKind::Int,
+        values
+            .iter()
+            .map(|b| Value::Int(i32::from(*b as i8)))
+            .collect(),
+    )
+}
+fn array_values(vm: &Engine, array: Option<ObjRef>) -> Vec<Value> {
+    let Some(array) = array else {
+        return Vec::new();
+    };
+    vm.heap
+        .as_array_elems(array)
+        .map(|(elems, _)| elems.to_vec())
+        .unwrap_or_default()
+}
+fn array_floats(vm: &Engine, array: Option<ObjRef>) -> Vec<f32> {
+    array_values(vm, array)
+        .into_iter()
+        .map(|v| match v {
+            Value::Float(f) => f,
+            Value::Int(i) => i as f32,
+            _ => 0.0,
+        })
+        .collect()
+}
+#[allow(dead_code)]
+fn array_bytes(vm: &Engine, array: Option<ObjRef>) -> Vec<u8> {
+    array_values(vm, array)
+        .into_iter()
+        .map(|v| match v {
+            Value::Int(i) => i as u8,
+            _ => 0,
+        })
+        .collect()
+}
+fn set_array_floats(vm: &mut Engine, array: ObjRef, values: &[f32]) -> Result<(), VmExit> {
+    let elems = vm
+        .heap
+        .array_elems_mut(array)
+        .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))?;
+    for (slot, value) in elems.iter_mut().zip(values.iter()) {
+        *slot = Value::Float(*value);
+    }
+    Ok(())
+}
+fn aioobe(index: usize, len: usize) -> VmExit {
+    throw(
+        "Ljava/lang/ArrayIndexOutOfBoundsException;",
+        format!("Index {index} out of bounds for length {len}"),
+    )
+}
+
+// ---------------------------------------------------------------------------
+// android.gesture
+// ---------------------------------------------------------------------------
+
+fn rectf_object(
+    vm: &mut Engine,
+    left: f32,
+    top: f32,
+    right: f32,
+    bottom: f32,
+) -> Result<ObjRef, VmExit> {
+    alloc_obj(
+        vm,
+        RECT_F,
+        vec![
+            ("left".to_string(), Value::Float(left)),
+            ("top".to_string(), Value::Float(top)),
+            ("right".to_string(), Value::Float(right)),
+            ("bottom".to_string(), Value::Float(bottom)),
+        ],
+    )
+}
+fn rect_values(vm: &Engine, rect: ObjRef) -> [f32; 4] {
+    [
+        float_field(vm, rect, "left"),
+        float_field(vm, rect, "top"),
+        float_field(vm, rect, "right"),
+        float_field(vm, rect, "bottom"),
+    ]
+}
+fn put_rect_values(vm: &mut Engine, rect: ObjRef, values: [f32; 4]) -> Result<(), VmExit> {
+    put(vm, rect, "left", Value::Float(values[0]))?;
+    put(vm, rect, "top", Value::Float(values[1]))?;
+    put(vm, rect, "right", Value::Float(values[2]))?;
+    put(vm, rect, "bottom", Value::Float(values[3]))
+}
+fn rect_is_empty(values: [f32; 4]) -> bool {
+    values[0] >= values[2] || values[1] >= values[3]
+}
+fn rect_union_point(values: &mut [f32; 4], x: f32, y: f32) {
+    // AOSP RectF.union(float,float) deliberately has no isEmpty shortcut.
+    if x < values[0] {
+        values[0] = x;
+    } else if x > values[2] {
+        values[2] = x;
+    }
+    if y < values[1] {
+        values[1] = y;
+    } else if y > values[3] {
+        values[3] = y;
+    }
+}
+fn rect_union_rect(dst: &mut [f32; 4], src: [f32; 4]) {
+    if rect_is_empty(src) {
+        return;
+    }
+    if rect_is_empty(*dst) {
+        *dst = src;
+        return;
+    }
+    dst[0] = dst[0].min(src[0]);
+    dst[1] = dst[1].min(src[1]);
+    dst[2] = dst[2].max(src[2]);
+    dst[3] = dst[3].max(src[3]);
+}
+
+fn gesture_point_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match (name, sig) {
+        ("<init>", "(FFJ)V") => {
+            put(vm, recv, "x", Value::Float(farg(args, 0)))?;
+            put(vm, recv, "y", Value::Float(farg(args, 1)))?;
+            put(vm, recv, "timestamp", Value::Long(larg(args, 2)))?;
+            Ok(Some(Value::Null))
+        }
+        ("clone", "()Ljava/lang/Object;") => {
+            let copy = alloc_obj(
+                vm,
+                GESTURE_POINT,
+                vec![
+                    ("x".to_string(), Value::Float(float_field(vm, recv, "x"))),
+                    ("y".to_string(), Value::Float(float_field(vm, recv, "y"))),
+                    (
+                        "timestamp".to_string(),
+                        Value::Long(long_field(vm, recv, "timestamp", 0)),
+                    ),
+                ],
+            )?;
+            Ok(Some(Value::Obj(copy)))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn gesture_centroid(points: &[f32]) -> Result<[f32; 2], VmExit> {
+    let mut center_x = 0.0f32;
+    let mut center_y = 0.0f32;
+    let mut i = 0usize;
+    while i < points.len() {
+        center_x += points[i];
+        i += 1;
+        if i >= points.len() {
+            return Err(aioobe(i, points.len()));
+        }
+        center_y += points[i];
+        i += 1;
+    }
+    let count = points.len() as f32;
+    Ok([2.0 * center_x / count, 2.0 * center_y / count])
+}
+fn gesture_covariance(points: &[f32]) -> [[f32; 2]; 2] {
+    let mut c = [[0.0f32; 2]; 2];
+    let mut i = 0usize;
+    while i + 1 < points.len() {
+        let x = points[i];
+        let y = points[i + 1];
+        c[0][0] += x * x;
+        c[0][1] += x * y;
+        c[1][0] = c[0][1];
+        c[1][1] += y * y;
+        i += 2;
+    }
+    let divisor = (points.len() / 2) as f32;
+    for row in &mut c {
+        for value in row {
+            *value /= divisor;
+        }
+    }
+    c
+}
+fn gesture_orientation(covariance: [[f32; 2]; 2]) -> [f32; 2] {
+    let mut target = [0.0f32; 2];
+    if covariance[0][1] == 0.0 || covariance[1][0] == 0.0 {
+        target = [1.0, 0.0];
+    }
+    let a = -covariance[0][0] - covariance[1][1];
+    let b = covariance[0][0] * covariance[1][1] - covariance[0][1] * covariance[1][0];
+    let value = a / 2.0;
+    let right_side = (f64::from(value).powi(2) - f64::from(b)).sqrt() as f32;
+    let lambda1 = -value + right_side;
+    let lambda2 = -value - right_side;
+    if lambda1 == lambda2 {
+        target = [0.0, 0.0];
+    } else {
+        let lambda = if lambda1 > lambda2 { lambda1 } else { lambda2 };
+        target[0] = 1.0;
+        // Intentionally divide by zero exactly as AOSP does when c01 == 0;
+        // the earlier [1,0] assignment is overwritten in this branch.
+        target[1] = (lambda - covariance[0][0]) / covariance[0][1];
+    }
+    target
+}
+fn gesture_obb_object(
+    vm: &mut Engine,
+    angle_degrees: f32,
+    center_x: f32,
+    center_y: f32,
+    width: f32,
+    height: f32,
+) -> Result<ObjRef, VmExit> {
+    let ratio = width / height;
+    let squareness = if ratio > 1.0 { 1.0 / ratio } else { ratio };
+    alloc_obj(
+        vm,
+        ORIENTED_BOUNDING_BOX,
+        vec![
+            ("orientation".to_string(), Value::Float(angle_degrees)),
+            ("centerX".to_string(), Value::Float(center_x)),
+            ("centerY".to_string(), Value::Float(center_y)),
+            ("width".to_string(), Value::Float(width)),
+            ("height".to_string(), Value::Float(height)),
+            ("squareness".to_string(), Value::Float(squareness)),
+        ],
+    )
+}
+fn compute_gesture_obb(vm: &mut Engine, original: &[f32]) -> Result<Value, VmExit> {
+    let centroid = gesture_centroid(original)?;
+    let mut points = original.to_vec();
+    for pair in points.chunks_exact_mut(2) {
+        pair[0] -= centroid[0];
+        pair[1] -= centroid[1];
+    }
+    let target = gesture_orientation(gesture_covariance(&points));
+    let angle = if target[0] == 0.0 && target[1] == 0.0 {
+        (-core::f64::consts::PI / 2.0) as f32
+    } else {
+        let angle = f64::from(target[1]).atan2(f64::from(target[0])) as f32;
+        let cos = f64::from(-angle).cos() as f32;
+        let sin = f64::from(-angle).sin() as f32;
+        for pair in points.chunks_exact_mut(2) {
+            let (x, y) = (pair[0], pair[1]);
+            pair[0] = x * cos - y * sin;
+            pair[1] = x * sin + y * cos;
+        }
+        angle
+    };
+    let mut min_x = f32::MAX;
+    let mut min_y = f32::MAX;
+    // Java Float.MIN_VALUE is the smallest positive subnormal, not -MAX.
+    let mut max_x = f32::from_bits(1);
+    let mut max_y = f32::from_bits(1);
+    for pair in points.chunks_exact(2) {
+        if pair[0] < min_x {
+            min_x = pair[0];
+        }
+        if pair[0] > max_x {
+            max_x = pair[0];
+        }
+        if pair[1] < min_y {
+            min_y = pair[1];
+        }
+        if pair[1] > max_y {
+            max_y = pair[1];
+        }
+    }
+    Ok(Value::Obj(gesture_obb_object(
+        vm,
+        (f64::from(angle) * 180.0 / core::f64::consts::PI) as f32,
+        centroid[0],
+        centroid[1],
+        max_x - min_x,
+        max_y - min_y,
+    )?))
+}
+
+fn gesture_utils_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("computeOrientedBoundingBox", "([F)Landroid/gesture/OrientedBoundingBox;") => {
+            let array = oarg(args, 0).ok_or_else(|| npe("originalPoints == null"))?;
+            let points = array_floats(vm, Some(array));
+            compute_gesture_obb(vm, &points)?
+        }
+        (
+            "computeOrientedBoundingBox",
+            "(Ljava/util/ArrayList;)Landroid/gesture/OrientedBoundingBox;",
+        ) => {
+            let list = oarg(args, 0).ok_or_else(|| npe("originalPoints == null"))?;
+            let mut points = Vec::new();
+            for value in list_elems(vm, Some(list)) {
+                let Value::Obj(point) = value else {
+                    return Err(npe("GesturePoint == null"));
+                };
+                points.push(float_field(vm, point, "x"));
+                points.push(float_field(vm, point, "y"));
+            }
+            compute_gesture_obb(vm, &points)?
+        }
+        ("computeCentroid", "([F)[F") => {
+            let array = oarg(args, 0).ok_or_else(|| npe("points == null"))?;
+            let points = array_floats(vm, Some(array));
+            float_array(vm, &gesture_centroid(&points)?)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn clone_gesture_stroke(vm: &mut Engine, recv: ObjRef) -> Result<ObjRef, VmExit> {
+    let bbox = obj_field(vm, recv, "boundingBox")
+        .ok_or_else(|| npe("GestureStroke.boundingBox == null"))?;
+    let [left, top, right, bottom] = rect_values(vm, bbox);
+    let points = array_floats(vm, obj_field(vm, recv, "points"));
+    let times: Vec<i64> = array_values(vm, obj_field(vm, recv, "timestamps"))
+        .into_iter()
+        .map(|v| match v {
+            Value::Long(v) => v,
+            Value::Int(v) => i64::from(v),
+            _ => 0,
+        })
+        .collect();
+    let bbox = rectf_object(vm, left, top, right, bottom)?;
+    let points = float_array(vm, &points)?;
+    let timestamps = long_array(vm, &times)?;
+    alloc_obj(
+        vm,
+        GESTURE_STROKE,
+        vec![
+            ("boundingBox".to_string(), Value::Obj(bbox)),
+            (
+                "length".to_string(),
+                Value::Float(float_field(vm, recv, "length")),
+            ),
+            ("points".to_string(), points),
+            ("timestamps".to_string(), timestamps),
+            ("mCachedPath".to_string(), Value::Null),
+        ],
+    )
+}
+
+fn gesture_stroke_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Ljava/util/ArrayList;)V") => {
+            let list = oarg(args, 0).ok_or_else(|| npe("points == null"))?;
+            let mut points = Vec::new();
+            let mut timestamps = Vec::new();
+            let mut bbox: Option<[f32; 4]> = None;
+            let mut length = 0.0f32;
+            let mut previous: Option<(f32, f32)> = None;
+            for value in list_elems(vm, Some(list)) {
+                let Value::Obj(point) = value else {
+                    return Err(npe("GesturePoint == null"));
+                };
+                let x = float_field(vm, point, "x");
+                let y = float_field(vm, point, "y");
+                points.push(x);
+                points.push(y);
+                timestamps.push(long_field(vm, point, "timestamp", 0));
+                if let Some(values) = &mut bbox {
+                    let (px, py) = previous.unwrap();
+                    // Java widens Math.hypot(float,float) to double, then
+                    // narrows on compound assignment to the float length.
+                    length =
+                        (f64::from(length) + f64::from(x - px).hypot(f64::from(y - py))) as f32;
+                    rect_union_point(values, x, y);
+                } else {
+                    bbox = Some([x, y, x, y]);
+                    length = 0.0;
+                }
+                previous = Some((x, y));
+            }
+            let bbox_value = match bbox {
+                Some([l, t, r, b]) => Value::Obj(rectf_object(vm, l, t, r, b)?),
+                None => Value::Null,
+            };
+            let points_value = float_array(vm, &points)?;
+            let timestamps_value = long_array(vm, &timestamps)?;
+            put(vm, recv, "boundingBox", bbox_value)?;
+            put(vm, recv, "length", Value::Float(length))?;
+            put(vm, recv, "points", points_value)?;
+            put(vm, recv, "timestamps", timestamps_value)?;
+            put(vm, recv, "mCachedPath", Value::Null)?;
+            Value::Null
+        }
+        ("clone", "()Ljava/lang/Object;") => Value::Obj(clone_gesture_stroke(vm, recv)?),
+        ("computeOrientedBoundingBox", "()Landroid/gesture/OrientedBoundingBox;") => {
+            let points_ref =
+                obj_field(vm, recv, "points").ok_or_else(|| npe("GestureStroke.points == null"))?;
+            let points = array_floats(vm, Some(points_ref));
+            compute_gesture_obb(vm, &points)?
+        }
+        ("clearPath", "()V") => Value::Null,
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn next_gesture_id(vm: &mut Engine) -> i64 {
+    let key = (GESTURE.to_string(), "rd$nextId".to_string());
+    let next = match vm.statics.get(&key) {
+        Some(Value::Long(v)) => *v,
+        _ => crate::jlsystem::epoch_ms().wrapping_add(1),
+    };
+    vm.statics.insert(key, Value::Long(next.wrapping_add(1)));
+    next
+}
+fn init_gesture(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    let bbox = rectf_object(vm, 0.0, 0.0, 0.0, 0.0)?;
+    let strokes = new_list(vm, Vec::new())?;
+    let id = next_gesture_id(vm);
+    put(vm, recv, "mBoundingBox", Value::Obj(bbox))?;
+    put(vm, recv, "mStrokes", Value::Obj(strokes))?;
+    put(vm, recv, "mGestureID", Value::Long(id))
+}
+fn gesture_strokes_list(vm: &mut Engine, recv: ObjRef) -> Result<ObjRef, VmExit> {
+    if let Some(list) = obj_field(vm, recv, "mStrokes") {
+        vm.fw
+            .objects
+            .entry(list)
+            .or_insert_with(|| HostObj::List { elems: Vec::new() });
+        return Ok(list);
+    }
+    let list = new_list(vm, Vec::new())?;
+    put(vm, recv, "mStrokes", Value::Obj(list))?;
+    Ok(list)
+}
+fn gesture_bbox(vm: &mut Engine, recv: ObjRef) -> Result<ObjRef, VmExit> {
+    if let Some(rect) = obj_field(vm, recv, "mBoundingBox") {
+        return Ok(rect);
+    }
+    let rect = rectf_object(vm, 0.0, 0.0, 0.0, 0.0)?;
+    put(vm, recv, "mBoundingBox", Value::Obj(rect))?;
+    Ok(rect)
+}
+
+fn gesture_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "()V") => {
+            init_gesture(vm, recv)?;
+            Value::Null
+        }
+        ("clone", "()Ljava/lang/Object;") => {
+            let strokes_list = gesture_strokes_list(vm, recv)?;
+            let stroke_values = list_elems(vm, Some(strokes_list));
+            let mut copied_strokes = Vec::new();
+            for value in stroke_values {
+                let Value::Obj(stroke) = value else {
+                    return Err(npe("GestureStroke == null"));
+                };
+                copied_strokes.push(Value::Obj(clone_gesture_stroke(vm, stroke)?));
+            }
+            let src_bbox = gesture_bbox(vm, recv)?;
+            let bbox = rect_values(vm, src_bbox);
+            let copy = alloc_obj(vm, GESTURE, Vec::new())?;
+            init_gesture(vm, copy)?;
+            let copy_bbox = gesture_bbox(vm, copy)?;
+            put_rect_values(vm, copy_bbox, bbox)?;
+            let copy_strokes = gesture_strokes_list(vm, copy)?;
+            if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&copy_strokes) {
+                *elems = copied_strokes;
+            }
+            Value::Obj(copy)
+        }
+        ("getStrokes", "()Ljava/util/ArrayList;") => Value::Obj(gesture_strokes_list(vm, recv)?),
+        ("getStrokesCount", "()I") => {
+            let list = gesture_strokes_list(vm, recv)?;
+            Value::Int(list_elems(vm, Some(list)).len() as i32)
+        }
+        ("addStroke", "(Landroid/gesture/GestureStroke;)V") => {
+            let list = gesture_strokes_list(vm, recv)?;
+            let stroke_value = args.first().cloned().unwrap_or(Value::Null);
+            if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&list) {
+                elems.push(stroke_value.clone());
+            }
+            // AOSP appends first and only then dereferences stroke.boundingBox.
+            let Value::Obj(stroke) = stroke_value else {
+                return Err(npe("stroke == null"));
+            };
+            let src = obj_field(vm, stroke, "boundingBox")
+                .ok_or_else(|| npe("stroke.boundingBox == null"))?;
+            let src_values = rect_values(vm, src);
+            let dst = gesture_bbox(vm, recv)?;
+            let mut dst_values = rect_values(vm, dst);
+            rect_union_rect(&mut dst_values, src_values);
+            put_rect_values(vm, dst, dst_values)?;
+            Value::Null
+        }
+        ("getLength", "()F") => {
+            let list = gesture_strokes_list(vm, recv)?;
+            let mut len: i32 = 0;
+            for value in list_elems(vm, Some(list)) {
+                let Value::Obj(stroke) = value else {
+                    return Err(npe("GestureStroke == null"));
+                };
+                // Java `int += float` truncates after every stroke.
+                len = (len as f32 + float_field(vm, stroke, "length")) as i32;
+            }
+            Value::Float(len as f32)
+        }
+        ("getBoundingBox", "()Landroid/graphics/RectF;") => Value::Obj(gesture_bbox(vm, recv)?),
+        ("getID", "()J") => Value::Long(long_field(vm, recv, "mGestureID", 0)),
+        ("setID", "(J)V") => {
+            put(vm, recv, "mGestureID", Value::Long(larg(args, 0)))?;
+            Value::Null
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn oriented_bounding_box_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if (name, sig) != ("<init>", "(FFFFF)V") {
+        return Ok(None);
+    }
+    let width = farg(args, 3);
+    let height = farg(args, 4);
+    let ratio = width / height;
+    let squareness = if ratio > 1.0 { 1.0 / ratio } else { ratio };
+    put(vm, recv, "orientation", Value::Float(farg(args, 0)))?;
+    put(vm, recv, "centerX", Value::Float(farg(args, 1)))?;
+    put(vm, recv, "centerY", Value::Float(farg(args, 2)))?;
+    put(vm, recv, "width", Value::Float(width))?;
+    put(vm, recv, "height", Value::Float(height))?;
+    put(vm, recv, "squareness", Value::Float(squareness))?;
+    Ok(Some(Value::Null))
+}
+
+// ---------------------------------------------------------------------------
+// android.hardware: sensorless SensorManager, Sensor values, Consumer IR
+// ---------------------------------------------------------------------------
+
+fn empty_list(vm: &mut Engine) -> Result<Value, VmExit> {
+    // The existing Collections intrinsic returns the immutable host list,
+    // so mutation attempts follow the normal UOE path.
+    vm.invoke_static(
+        "Ljava/util/Collections;",
+        "emptyList",
+        "()Ljava/util/List;",
+        &[],
+    )
+}
+fn required_floats(vm: &Engine, args: &[Value], i: usize, what: &str) -> Result<Vec<f32>, VmExit> {
+    let array = oarg(args, i).ok_or_else(|| npe(what))?;
+    Ok(array_floats(vm, Some(array)))
+}
+fn float_at(values: &[f32], index: usize) -> Result<f32, VmExit> {
+    values
+        .get(index)
+        .copied()
+        .ok_or_else(|| aioobe(index, values.len()))
+}
+fn sensor_manager_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("getRotationMatrix", "([F[F[F[F)Z") => {
+            let gravity = required_floats(vm, args, 2, "gravity == null")?;
+            let (mut ax, mut ay, mut az) = (
+                float_at(&gravity, 0)?,
+                float_at(&gravity, 1)?,
+                float_at(&gravity, 2)?,
+            );
+            let norm_sq_a = ax * ax + ay * ay + az * az;
+            let free_fall_squared = 0.01f32 * 9.81f32 * 9.81f32;
+            if norm_sq_a < free_fall_squared {
+                bool_value(false)
+            } else {
+                let geomagnetic = required_floats(vm, args, 3, "geomagnetic == null")?;
+                let (ex, ey, ez) = (
+                    float_at(&geomagnetic, 0)?,
+                    float_at(&geomagnetic, 1)?,
+                    float_at(&geomagnetic, 2)?,
+                );
+                let mut hx = ey * az - ez * ay;
+                let mut hy = ez * ax - ex * az;
+                let mut hz = ex * ay - ey * ax;
+                let norm_h = (f64::from(hx * hx + hy * hy + hz * hz)).sqrt() as f32;
+                if norm_h < 0.1 {
+                    bool_value(false)
+                } else {
+                    let inv_h = 1.0f32 / norm_h;
+                    hx *= inv_h;
+                    hy *= inv_h;
+                    hz *= inv_h;
+                    let inv_a = 1.0f32 / ((f64::from(ax * ax + ay * ay + az * az)).sqrt() as f32);
+                    ax *= inv_a;
+                    ay *= inv_a;
+                    az *= inv_a;
+                    let mx = ay * hz - az * hy;
+                    let my = az * hx - ax * hz;
+                    let mz = ax * hy - ay * hx;
+                    if let Some(r) = oarg(args, 0) {
+                        let mut out = array_floats(vm, Some(r));
+                        if out.len() == 9 {
+                            out.copy_from_slice(&[hx, hy, hz, mx, my, mz, ax, ay, az]);
+                            set_array_floats(vm, r, &out)?;
+                        } else if out.len() == 16 {
+                            out.copy_from_slice(&[
+                                hx, hy, hz, 0.0, mx, my, mz, 0.0, ax, ay, az, 0.0, 0.0, 0.0, 0.0,
+                                1.0,
+                            ]);
+                            set_array_floats(vm, r, &out)?;
+                        }
+                    }
+                    if let Some(i_ref) = oarg(args, 1) {
+                        let inv_e =
+                            1.0f32 / ((f64::from(ex * ex + ey * ey + ez * ez)).sqrt() as f32);
+                        let c = (ex * mx + ey * my + ez * mz) * inv_e;
+                        let s = (ex * ax + ey * ay + ez * az) * inv_e;
+                        let mut out = array_floats(vm, Some(i_ref));
+                        if out.len() == 9 {
+                            out.copy_from_slice(&[1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c]);
+                            set_array_floats(vm, i_ref, &out)?;
+                        } else if out.len() == 16 {
+                            out.copy_from_slice(&[
+                                1.0, 0.0, 0.0, 0.0, 0.0, c, s, 0.0, 0.0, -s, c, 0.0, 0.0, 0.0, 0.0,
+                                1.0,
+                            ]);
+                            set_array_floats(vm, i_ref, &out)?;
+                        }
+                    }
+                    bool_value(true)
+                }
+            }
+        }
+        ("getInclination", "([F)F") => {
+            let values = required_floats(vm, args, 0, "I == null")?;
+            let result = if values.len() == 9 {
+                f64::from(float_at(&values, 5)?).atan2(f64::from(float_at(&values, 4)?))
+            } else {
+                f64::from(float_at(&values, 6)?).atan2(f64::from(float_at(&values, 5)?))
+            };
+            Value::Float(result as f32)
+        }
+        ("remapCoordinateSystem", "([FII[F)Z") => {
+            let in_ref = oarg(args, 0).ok_or_else(|| npe("inR == null"))?;
+            let out_ref = oarg(args, 3).ok_or_else(|| npe("outR == null"))?;
+            let input = array_floats(vm, Some(in_ref));
+            let existing = array_floats(vm, Some(out_ref));
+            // AOSP's same-array path uses a fixed float[16] temporary, so a
+            // 9-element in-place remap fails the length check and returns false.
+            if (in_ref == out_ref && input.len() != 16) || input.len() != existing.len() {
+                bool_value(false)
+            } else {
+                let x_axis = iarg(args, 1);
+                let y_axis = iarg(args, 2);
+                if (x_axis & 0x7c) != 0
+                    || (y_axis & 0x7c) != 0
+                    || (x_axis & 0x3) == 0
+                    || (y_axis & 0x3) == 0
+                    || (x_axis & 0x3) == (y_axis & 0x3)
+                {
+                    bool_value(false)
+                } else {
+                    let mut z_axis = x_axis ^ y_axis;
+                    let x = (x_axis & 0x3) - 1;
+                    let y = (y_axis & 0x3) - 1;
+                    let z = (z_axis & 0x3) - 1;
+                    let axis_y = (z + 1) % 3;
+                    let axis_z = (z + 2) % 3;
+                    if ((x ^ axis_y) | (y ^ axis_z)) != 0 {
+                        z_axis ^= 0x80;
+                    }
+                    let sx = x_axis >= 0x80;
+                    let sy = y_axis >= 0x80;
+                    let sz = z_axis >= 0x80;
+                    let row_len = if input.len() == 16 { 4 } else { 3 };
+                    let mut out = existing;
+                    for j in 0..3usize {
+                        let offset = j * row_len;
+                        for i in 0..3i32 {
+                            let index = offset + i as usize;
+                            if index >= out.len() {
+                                return Err(aioobe(index, out.len()));
+                            }
+                            if x == i {
+                                out[index] = if sx { -input[offset] } else { input[offset] };
+                            }
+                            if y == i {
+                                out[index] = if sy {
+                                    -input[offset + 1]
+                                } else {
+                                    input[offset + 1]
+                                };
+                            }
+                            if z == i {
+                                out[index] = if sz {
+                                    -input[offset + 2]
+                                } else {
+                                    input[offset + 2]
+                                };
+                            }
+                        }
+                    }
+                    if out.len() == 16 {
+                        for index in [3, 7, 11, 12, 13, 14] {
+                            out[index] = 0.0;
+                        }
+                        out[15] = 1.0;
+                    }
+                    set_array_floats(vm, out_ref, &out)?;
+                    bool_value(true)
+                }
+            }
+        }
+        ("getOrientation", "([F[F)[F") => {
+            let r_ref = oarg(args, 0).ok_or_else(|| npe("R == null"))?;
+            let values_ref = oarg(args, 1).ok_or_else(|| npe("values == null"))?;
+            let r = array_floats(vm, Some(r_ref));
+            let mut out = array_floats(vm, Some(values_ref));
+            let computed = if r.len() == 9 {
+                [
+                    f64::from(float_at(&r, 1)?).atan2(f64::from(float_at(&r, 4)?)) as f32,
+                    f64::from(-float_at(&r, 7)?).asin() as f32,
+                    f64::from(-float_at(&r, 6)?).atan2(f64::from(float_at(&r, 8)?)) as f32,
+                ]
+            } else {
+                [
+                    f64::from(float_at(&r, 1)?).atan2(f64::from(float_at(&r, 5)?)) as f32,
+                    f64::from(-float_at(&r, 9)?).asin() as f32,
+                    f64::from(-float_at(&r, 8)?).atan2(f64::from(float_at(&r, 10)?)) as f32,
+                ]
+            };
+            if out.len() < 3 {
+                return Err(aioobe(out.len(), out.len()));
+            }
+            out[..3].copy_from_slice(&computed);
+            set_array_floats(vm, values_ref, &out)?;
+            Value::Obj(values_ref)
+        }
+        ("getAltitude", "(FF)F") => {
+            let coef = 1.0f32 / 5.255f32;
+            Value::Float(
+                44330.0f32
+                    * (1.0f32
+                        - (f64::from(farg(args, 1) / farg(args, 0)).powf(f64::from(coef)) as f32)),
+            )
+        }
+        ("getAngleChange", "([F[F[F)V") => {
+            fn unpack(values: &[f32]) -> [f32; 9] {
+                let mut out = [0.0f32; 9];
+                if values.len() == 9 {
+                    out.copy_from_slice(values);
+                } else if values.len() == 16 {
+                    out.copy_from_slice(&[
+                        values[0], values[1], values[2], values[4], values[5], values[6],
+                        values[8], values[9], values[10],
+                    ]);
+                }
+                out
+            }
+            let out_ref = oarg(args, 0).ok_or_else(|| npe("angleChange == null"))?;
+            let r = unpack(&required_floats(vm, args, 1, "R == null")?);
+            let p = unpack(&required_floats(vm, args, 2, "prevR == null")?);
+            let rd1 = p[0] * r[1] + p[3] * r[4] + p[6] * r[7];
+            let rd4 = p[1] * r[1] + p[4] * r[4] + p[7] * r[7];
+            let rd6 = p[2] * r[0] + p[5] * r[3] + p[8] * r[6];
+            let rd7 = p[2] * r[1] + p[5] * r[4] + p[8] * r[7];
+            let rd8 = p[2] * r[2] + p[5] * r[5] + p[8] * r[8];
+            let mut out = array_floats(vm, Some(out_ref));
+            if out.len() < 3 {
+                return Err(aioobe(out.len(), out.len()));
+            }
+            out[0] = f64::from(rd1).atan2(f64::from(rd4)) as f32;
+            out[1] = f64::from(-rd7).asin() as f32;
+            out[2] = f64::from(-rd6).atan2(f64::from(rd8)) as f32;
+            set_array_floats(vm, out_ref, &out)?;
+            Value::Null
+        }
+        ("getRotationMatrixFromVector", "([F[F)V") => {
+            let r_ref = oarg(args, 0).ok_or_else(|| npe("R == null"))?;
+            let rv = required_floats(vm, args, 1, "rotationVector == null")?;
+            let q1 = float_at(&rv, 0)?;
+            let q2 = float_at(&rv, 1)?;
+            let q3 = float_at(&rv, 2)?;
+            let q0 = if rv.len() >= 4 {
+                rv[3]
+            } else {
+                let value = 1.0f32 - q1 * q1 - q2 * q2 - q3 * q3;
+                if value > 0.0 {
+                    f64::from(value).sqrt() as f32
+                } else {
+                    0.0
+                }
+            };
+            let sq_q1 = 2.0f32 * q1 * q1;
+            let sq_q2 = 2.0f32 * q2 * q2;
+            let sq_q3 = 2.0f32 * q3 * q3;
+            let q1_q2 = 2.0f32 * q1 * q2;
+            let q3_q0 = 2.0f32 * q3 * q0;
+            let q1_q3 = 2.0f32 * q1 * q3;
+            let q2_q0 = 2.0f32 * q2 * q0;
+            let q2_q3 = 2.0f32 * q2 * q3;
+            let q1_q0 = 2.0f32 * q1 * q0;
+            let mut out = array_floats(vm, Some(r_ref));
+            if out.len() == 9 {
+                out.copy_from_slice(&[
+                    1.0 - sq_q2 - sq_q3,
+                    q1_q2 - q3_q0,
+                    q1_q3 + q2_q0,
+                    q1_q2 + q3_q0,
+                    1.0 - sq_q1 - sq_q3,
+                    q2_q3 - q1_q0,
+                    q1_q3 - q2_q0,
+                    q2_q3 + q1_q0,
+                    1.0 - sq_q1 - sq_q2,
+                ]);
+                set_array_floats(vm, r_ref, &out)?;
+            } else if out.len() == 16 {
+                out.copy_from_slice(&[
+                    1.0 - sq_q2 - sq_q3,
+                    q1_q2 - q3_q0,
+                    q1_q3 + q2_q0,
+                    0.0,
+                    q1_q2 + q3_q0,
+                    1.0 - sq_q1 - sq_q3,
+                    q2_q3 - q1_q0,
+                    0.0,
+                    q1_q3 - q2_q0,
+                    q2_q3 + q1_q0,
+                    1.0 - sq_q1 - sq_q2,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                ]);
+                set_array_floats(vm, r_ref, &out)?;
+            }
+            Value::Null
+        }
+        ("getQuaternionFromVector", "([F[F)V") => {
+            let q_ref = oarg(args, 0).ok_or_else(|| npe("Q == null"))?;
+            let rv = required_floats(vm, args, 1, "rv == null")?;
+            let mut out = array_floats(vm, Some(q_ref));
+            if out.is_empty() {
+                return Err(aioobe(0, 0));
+            }
+            out[0] = if rv.len() >= 4 {
+                rv[3]
+            } else {
+                let value = 1.0f32
+                    - float_at(&rv, 0)? * float_at(&rv, 0)?
+                    - float_at(&rv, 1)? * float_at(&rv, 1)?
+                    - float_at(&rv, 2)? * float_at(&rv, 2)?;
+                if value > 0.0 {
+                    f64::from(value).sqrt() as f32
+                } else {
+                    0.0
+                }
+            };
+            for i in 0..3 {
+                if i + 1 >= out.len() {
+                    // AOSP writes Q[0] before failing on a short Q.
+                    set_array_floats(vm, q_ref, &out)?;
+                    return Err(aioobe(i + 1, out.len()));
+                }
+                out[i + 1] = float_at(&rv, i)?;
+            }
+            set_array_floats(vm, q_ref, &out)?;
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn sensor_reporting_mode(vm: &Engine, sensor: ObjRef) -> i32 {
+    (int_field(vm, sensor, "mFlags", 0) & 0xe) >> 1
+}
+fn sensor_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    _recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "()V") | ("<init>", "(Landroid/content/Context;Landroid/os/Looper;)V") => {
+            Value::Null
+        }
+        ("getSensorList", "(I)Ljava/util/List;")
+        | ("getDynamicSensorList", "(I)Ljava/util/List;")
+        | ("getFullSensorList", "()Ljava/util/List;")
+        | ("getFullDynamicSensorList", "()Ljava/util/List;") => empty_list(vm)?,
+        ("getDefaultSensor", "(I)Landroid/hardware/Sensor;")
+        | ("getDefaultSensor", "(IZ)Landroid/hardware/Sensor;")
+        | ("getSensorByHandle", "(I)Landroid/hardware/Sensor;") => Value::Null,
+        ("isDynamicSensorDiscoverySupported", "()Z") => bool_value(false),
+        (
+            "registerListener",
+            "(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;I)Z",
+        )
+        | (
+            "registerListener",
+            "(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;II)Z",
+        )
+        | (
+            "registerListener",
+            "(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;ILandroid/os/Handler;)Z",
+        )
+        | (
+            "registerListener",
+            "(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;IILandroid/os/Handler;)Z",
+        ) => bool_value(false),
+        ("unregisterListener", "(Landroid/hardware/SensorEventListener;)V")
+        | (
+            "unregisterListener",
+            "(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;)V",
+        ) => Value::Null,
+        ("flush", "(Landroid/hardware/SensorEventListener;)Z") => {
+            if oarg(args, 0).is_none() {
+                return Err(iae("listener cannot be null"));
+            }
+            bool_value(false)
+        }
+        (
+            "requestTriggerSensor",
+            "(Landroid/hardware/TriggerEventListener;Landroid/hardware/Sensor;)Z",
+        ) => {
+            let sensor = oarg(args, 1).ok_or_else(|| iae("sensor cannot be null"))?;
+            if oarg(args, 0).is_none() {
+                return Err(iae("listener cannot be null"));
+            }
+            let _ = sensor_reporting_mode(vm, sensor);
+            bool_value(false)
+        }
+        (
+            "cancelTriggerSensor",
+            "(Landroid/hardware/TriggerEventListener;Landroid/hardware/Sensor;)Z",
+        ) => bool_value(false),
+        (
+            "registerDynamicSensorCallback",
+            "(Landroid/hardware/SensorManager$DynamicSensorCallback;)V",
+        )
+        | (
+            "registerDynamicSensorCallback",
+            "(Landroid/hardware/SensorManager$DynamicSensorCallback;Landroid/os/Handler;)V",
+        ) => {
+            if oarg(args, 0).is_none() {
+                return Err(iae("callback cannot be null"));
+            }
+            Value::Null
+        }
+        (
+            "unregisterDynamicSensorCallback",
+            "(Landroid/hardware/SensorManager$DynamicSensorCallback;)V",
+        ) => Value::Null,
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+const SENSOR_VALUE_LENGTHS: &[i32] = &[
+    0, 3, 3, 3, 3, 1, 1, 1, 1, 3, 3, 5, 1, 1, 6, 4, 6, 1, 1, 1, 5, 1, 1, 1, 1, 1, 1, 1, 16, 1, 1,
+    1, 2, 16, 1, 6, 1, 6, 6, 6, 9, 9, 2,
+];
+fn sensor_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if (name, sig) != ("getMaxLengthValuesArray", "(Landroid/hardware/Sensor;I)I") {
+        return Ok(None);
+    }
+    let sensor = oarg(args, 0).ok_or_else(|| npe("sensor == null"))?;
+    let sensor_type = int_field(vm, sensor, "mType", 0);
+    if sensor_type == 11 && iarg(args, 1) <= 17 {
+        return Ok(Some(Value::Int(3)));
+    }
+    if sensor_type < 0 {
+        return Err(aioobe(sensor_type as usize, SENSOR_VALUE_LENGTHS.len()));
+    }
+    if sensor_type as usize >= SENSOR_VALUE_LENGTHS.len() {
+        return Ok(Some(Value::Int(16)));
+    }
+    Ok(Some(Value::Int(SENSOR_VALUE_LENGTHS[sensor_type as usize])))
+}
+
+fn sensor_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let flags = int_field(vm, recv, "mFlags", 0);
+    let v = match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        ("getName", "()Ljava/lang/String;") => get(vm, recv, "mName"),
+        ("getVendor", "()Ljava/lang/String;") => get(vm, recv, "mVendor"),
+        ("getType", "()I") => Value::Int(int_field(vm, recv, "mType", 0)),
+        ("getVersion", "()I") => Value::Int(int_field(vm, recv, "mVersion", 0)),
+        ("getMaximumRange", "()F") => Value::Float(float_field(vm, recv, "mMaxRange")),
+        ("getResolution", "()F") => Value::Float(float_field(vm, recv, "mResolution")),
+        ("getPower", "()F") => Value::Float(float_field(vm, recv, "mPower")),
+        ("getMinDelay", "()I") => Value::Int(int_field(vm, recv, "mMinDelay", 0)),
+        ("getFifoReservedEventCount", "()I") => {
+            Value::Int(int_field(vm, recv, "mFifoReservedEventCount", 0))
+        }
+        ("getFifoMaxEventCount", "()I") => Value::Int(int_field(vm, recv, "mFifoMaxEventCount", 0)),
+        ("getStringType", "()Ljava/lang/String;") => get(vm, recv, "mStringType"),
+        ("getUuid", "()Ljava/util/UUID;") => get(vm, recv, "mUuid"),
+        ("getId", "()I") => Value::Int(int_field(vm, recv, "mId", 0)),
+        ("getRequiredPermission", "()Ljava/lang/String;") => get(vm, recv, "mRequiredPermission"),
+        ("getHandle", "()I") => Value::Int(int_field(vm, recv, "mHandle", 0)),
+        ("getMaxDelay", "()I") => Value::Int(int_field(vm, recv, "mMaxDelay", 0)),
+        ("getReportingMode", "()I") => Value::Int((flags & 0xe) >> 1),
+        ("getHighestDirectReportRateLevel", "()I") => Value::Int(((flags & 0x380) >> 7).min(3)),
+        ("isDirectChannelTypeSupported", "(I)Z") => bool_value(match iarg(args, 0) {
+            1 => flags & (1 << 10) > 0,
+            2 => flags & (1 << 11) > 0,
+            _ => false,
+        }),
+        ("isWakeUpSensor", "()Z") => bool_value(flags & 1 != 0),
+        ("isDynamicSensor", "()Z") => bool_value(flags & 0x20 != 0),
+        ("isAdditionalInfoSupported", "()Z") => bool_value(flags & 0x40 != 0),
+        ("isDataInjectionSupported", "()Z") => bool_value(((flags & 0x10) >> 4) != 0),
+        ("setRange", "(FF)V") => {
+            put(vm, recv, "mMaxRange", Value::Float(farg(args, 0)))?;
+            put(vm, recv, "mResolution", Value::Float(farg(args, 1)))?;
+            Value::Null
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let name_value = get(vm, recv, "mName");
+            let vendor_value = get(vm, recv, "mVendor");
+            let rendered = format!(
+                "{{Sensor name=\"{}\", vendor=\"{}\", version={}, type={}, maxRange={}, resolution={}, power={}, minDelay={}}}",
+                opt_str(vm, Some(&name_value)).as_deref().unwrap_or("null"),
+                opt_str(vm, Some(&vendor_value)).as_deref().unwrap_or("null"),
+                int_field(vm, recv, "mVersion", 0),
+                int_field(vm, recv, "mType", 0),
+                crate::repr::java_float(float_field(vm, recv, "mMaxRange")),
+                crate::repr::java_float(float_field(vm, recv, "mResolution")),
+                crate::repr::java_float(float_field(vm, recv, "mPower")),
+                int_field(vm, recv, "mMinDelay", 0),
+            );
+            jstr(vm, rendered)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn consumer_ir_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Landroid/content/Context;)V") => {
+            let context = oarg(args, 0).ok_or_else(|| npe("context == null"))?;
+            let package = vm
+                .invoke_instance(context, "getPackageName", "()Ljava/lang/String;", &[])
+                .unwrap_or(Value::Null);
+            put(vm, recv, "mPackageName", package)?;
+            put(vm, recv, "mService", Value::Null)?;
+            Value::Null
+        }
+        ("hasIrEmitter", "()Z") => bool_value(false),
+        ("transmit", "(I[I)V") => Value::Null,
+        (
+            "getCarrierFrequencies",
+            "()[Landroid/hardware/ConsumerIrManager$CarrierFrequencyRange;",
+        ) => Value::Null,
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn carrier_frequency_range_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Landroid/hardware/ConsumerIrManager;II)V") => {
+            put(
+                vm,
+                recv,
+                "this$0",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            put(vm, recv, "mMinFrequency", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mMaxFrequency", Value::Int(iarg(args, 2)))?;
+            Value::Null
+        }
+        ("<init>", "(II)V") => {
+            put(vm, recv, "mMinFrequency", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mMaxFrequency", Value::Int(iarg(args, 1)))?;
+            Value::Null
+        }
+        ("getMinFrequency", "()I") => Value::Int(int_field(vm, recv, "mMinFrequency", 0)),
+        ("getMaxFrequency", "()I") => Value::Int(int_field(vm, recv, "mMaxFrequency", 0)),
+        _ => return Ok(None),
+    };
     Ok(Some(v))
 }

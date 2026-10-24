@@ -2223,6 +2223,7 @@ const SERVICES: &[(&str, &str)] = &[
     ),
     ("location", "Landroid/location/LocationManager;"),
     ("sensor", "Landroid/hardware/SensorManager;"),
+    ("consumer_ir", "Landroid/hardware/ConsumerIrManager;"),
     (
         "accessibility",
         "Landroid/view/accessibility/AccessibilityManager;",

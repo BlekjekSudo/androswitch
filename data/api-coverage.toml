@@ -905,15 +905,30 @@ key_apis = ["android.hardware.Camera.open", "android.hardware.Camera.startPrevie
 id = "android-hardware"
 prefix = "android.hardware"
 domain = "hardware"
-status = "stub"
+status = "partial"
 domain_module = "fd-hardware"
-module = "rd-vm/classpath"
-code = ["crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/android_display.rs", "crates/rd-vm/src/android_util.rs"]
-milestone = "M10"
-notes = "Only display-adjacent/value classes have nearby models. SensorManager and most hardware managers are hierarchy/stub or absent, not virtual devices yet."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-hardware-managers"
-key_apis = ["android.hardware.SensorManager.getDefaultSensor", "android.hardware.SensorEventListener.onSensorChanged", "android.hardware.ConsumerIrManager.transmit"]
+module = "rd-vm/android-sysservices"
+code = [
+    "crates/rd-vm/src/classpath.rs",
+    "crates/rd-vm/src/android_display.rs",
+    "crates/rd-vm/src/android_util.rs",
+    "crates/rd-vm/src/android_sysservices.rs",
+    "crates/rd-vm/src/m8.rs",
+]
+milestone = "M10/AA6"
+notes = "SensorManager models a sensorless device: static/dynamic sensor lists are empty, there is no default or handle-addressable sensor, dynamic discovery is unsupported, listener/flush/trigger registration cannot succeed, and the AOSP rotation-matrix, inclination, coordinate-remap, orientation, altitude, angle-change, rotation-vector and quaternion math is implemented. Sensor field getters/reporting-mode and direct-channel flag decoding and ConsumerIrManager's no-emitter state (hasIrEmitter=false, transmit no-op, carrier frequencies=null) are implemented. Physical/virtual sensor event streams, direct channels, trigger delivery and most other android.hardware managers remain incomplete."
+evidence = [
+    "docs/compat-matrix.md",
+    "crates/rd-vm/tests/android_sysservices_batch6.rs",
+]
+gap_id = "gap-android-hardware-managers-partial"
+key_apis = [
+    "android.hardware.SensorManager.getSensorList",
+    "android.hardware.SensorManager.getDefaultSensor",
+    "android.hardware.SensorManager.getRotationMatrix",
+    "android.hardware.SensorManager.getOrientation",
+    "android.hardware.ConsumerIrManager.hasIrEmitter",
+]
 
 [[surface]]
 id = "android-location"
@@ -1528,15 +1543,23 @@ key_apis = ["android.accessibilityservice.AccessibilityService.onAccessibilityEv
 id = "android-gesture"
 prefix = "android.gesture"
 domain = "misc"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-ui"
-module = "none"
-code = []
-milestone = "legacy"
-notes = "Legacy gesture libraries/prediction are not modelled; agent tap input is separate."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-gesture-legacy"
-key_apis = ["android.gesture.GestureLibraries.fromRawResource"]
+module = "rd-vm/android-sysservices"
+code = ["crates/rd-vm/src/android_sysservices.rs"]
+milestone = "M10/AA6"
+notes = "GesturePoint, GestureStroke, Gesture and OrientedBoundingBox implement AOSP point capture, stroke length/bounding-box geometry, clones, deterministic gesture IDs, total-length truncation and GestureUtils centroid/covariance PCA oriented bounding boxes. GestureLibrary/GestureStore loading, Learner prediction, gesture serialization files, GestureOverlayView and Path/Bitmap rendering are not implemented."
+evidence = [
+    "docs/compat-matrix.md",
+    "crates/rd-vm/tests/android_sysservices_batch6.rs",
+]
+gap_id = "gap-android-gesture-legacy-partial"
+key_apis = [
+    "android.gesture.Gesture.addStroke",
+    "android.gesture.Gesture.getBoundingBox",
+    "android.gesture.Gesture.getLength",
+    "android.gesture.GestureStroke.computeOrientedBoundingBox",
+]
 
 [[surface]]
 id = "android-accounts"
