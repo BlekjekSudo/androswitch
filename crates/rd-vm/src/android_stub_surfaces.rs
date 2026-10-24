@@ -416,6 +416,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial57_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial49_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -551,6 +554,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial57_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial49_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -617,6 +623,9 @@ pub(crate) fn instance_intrinsic(
         return text_classifier_instance(vm, name, sig, recv, args);
     }
     if let Some(value) = partial57_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial49_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -25482,4 +25491,6644 @@ pub(crate) fn partial57_host_static(
         return Ok(Some(Value::Obj(r)));
     }
     Ok(None)
+}
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 49-A: bounded absent-hardware/value slices for
+// android.hardware.fingerprint, android.hardware.biometrics,
+// android.hardware.hdmi, android.hardware.input,
+// android.hardware.soundtrigger, android.media.midi, android.media.tv and
+// android.companion.  The registry notes for these rows are the contract:
+// no biometric sensor/UI, no CEC bus or settings service, no registered
+// input/MIDI/TV devices, no SoundTrigger HAL/session, and no companion
+// association service or discovery UI are modelled here.
+// ---------------------------------------------------------------------------
+
+const P49_FINGERPRINT_MANAGER: &str = "Landroid/hardware/fingerprint/FingerprintManager;";
+const P49_FINGERPRINT: &str = "Landroid/hardware/fingerprint/Fingerprint;";
+const P49_FINGERPRINT_CRYPTO: &str =
+    "Landroid/hardware/fingerprint/FingerprintManager$CryptoObject;";
+const P49_FINGERPRINT_RESULT: &str =
+    "Landroid/hardware/fingerprint/FingerprintManager$AuthenticationResult;";
+const P49_FINGERPRINT_CALLBACK: &str =
+    "Landroid/hardware/fingerprint/FingerprintManager$AuthenticationCallback;";
+
+const P49_BIOMETRIC_MANAGER: &str = "Landroid/hardware/biometrics/BiometricManager;";
+const P49_BIOMETRIC_AUTHENTICATORS: &str =
+    "Landroid/hardware/biometrics/BiometricManager$Authenticators;";
+const P49_BIOMETRIC_STRINGS: &str = "Landroid/hardware/biometrics/BiometricManager$Strings;";
+const P49_BIOMETRIC_PROMPT: &str = "Landroid/hardware/biometrics/BiometricPrompt;";
+const P49_BIOMETRIC_PROMPT_BUILDER: &str = "Landroid/hardware/biometrics/BiometricPrompt$Builder;";
+const P49_BIOMETRIC_CRYPTO: &str = "Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;";
+const P49_BIOMETRIC_CRYPTO_BASE: &str = "Landroid/hardware/biometrics/CryptoObject;";
+const P49_BIOMETRIC_RESULT: &str =
+    "Landroid/hardware/biometrics/BiometricPrompt$AuthenticationResult;";
+const P49_BIOMETRIC_CALLBACK: &str =
+    "Landroid/hardware/biometrics/BiometricPrompt$AuthenticationCallback;";
+const P49_PROMPT_INFO: &str = "Landroid/hardware/biometrics/PromptInfo;";
+const P49_BIOMETRIC_IDENTIFIER: &str = "Landroid/hardware/biometrics/BiometricAuthenticator$Identifier;";
+
+const P49_HDMI_MANAGER: &str = "Landroid/hardware/hdmi/HdmiControlManager;";
+const P49_HDMI_DEVICE_INFO: &str = "Landroid/hardware/hdmi/HdmiDeviceInfo;";
+const P49_HDMI_DEVICE_INFO_BUILDER: &str = "Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;";
+const P49_HDMI_PORT_INFO: &str = "Landroid/hardware/hdmi/HdmiPortInfo;";
+const P49_HDMI_PORT_INFO_BUILDER: &str = "Landroid/hardware/hdmi/HdmiPortInfo$Builder;";
+const P49_HDMI_UTILS: &str = "Landroid/hardware/hdmi/HdmiUtils;";
+
+const P49_INPUT_MANAGER: &str = "Landroid/hardware/input/InputManager;";
+const P49_INPUT_DEVICE: &str = "Landroid/view/InputDevice;";
+const P49_INPUT_DEVICE_BUILDER: &str = "Landroid/view/InputDevice$Builder;";
+const P49_INPUT_MOTION_RANGE: &str = "Landroid/view/InputDevice$MotionRange;";
+const P49_HOST_USI_VERSION: &str = "Landroid/hardware/input/HostUsiVersion;";
+const P49_INPUT_DEVICE_IDENTIFIER: &str = "Landroid/hardware/input/InputDeviceIdentifier;";
+
+const P49_SOUND_TRIGGER: &str = "Landroid/hardware/soundtrigger/SoundTrigger;";
+const P49_SOUND_MODEL: &str = "Landroid/hardware/soundtrigger/SoundTrigger$SoundModel;";
+const P49_GENERIC_SOUND_MODEL: &str =
+    "Landroid/hardware/soundtrigger/SoundTrigger$GenericSoundModel;";
+const P49_KEYPHRASE_SOUND_MODEL: &str =
+    "Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseSoundModel;";
+const P49_SOUND_KEYPHRASE: &str = "Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;";
+const P49_MODEL_PARAM_RANGE: &str = "Landroid/hardware/soundtrigger/SoundTrigger$ModelParamRange;";
+const P49_RECOGNITION_CONFIG: &str =
+    "Landroid/hardware/soundtrigger/SoundTrigger$RecognitionConfig;";
+const P49_CONFIDENCE_LEVEL: &str = "Landroid/hardware/soundtrigger/SoundTrigger$ConfidenceLevel;";
+const P49_KEYPHRASE_RECOGNITION_EXTRA: &str =
+    "Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseRecognitionExtra;";
+const P49_KEYPHRASE_METADATA: &str = "Landroid/hardware/soundtrigger/KeyphraseMetadata;";
+
+const P49_MIDI_MANAGER: &str = "Landroid/media/midi/MidiManager;";
+const P49_MIDI_DEVICE_INFO: &str = "Landroid/media/midi/MidiDeviceInfo;";
+const P49_MIDI_PORT_INFO: &str = "Landroid/media/midi/MidiDeviceInfo$PortInfo;";
+const P49_MIDI_RECEIVER: &str = "Landroid/media/midi/MidiReceiver;";
+const P49_MIDI_DEVICE_CALLBACK: &str = "Landroid/media/midi/MidiManager$DeviceCallback;";
+
+const P49_TV_MANAGER: &str = "Landroid/media/tv/TvInputManager;";
+const P49_TV_RATING: &str = "Landroid/media/tv/TvContentRating;";
+const P49_TV_TRACK: &str = "Landroid/media/tv/TvTrackInfo;";
+const P49_TV_TRACK_BUILDER: &str = "Landroid/media/tv/TvTrackInfo$Builder;";
+
+const P49_COMPANION_MANAGER: &str = "Landroid/companion/CompanionDeviceManager;";
+const P49_COMPANION_CALLBACK: &str = "Landroid/companion/CompanionDeviceManager$Callback;";
+const P49_ASSOCIATION_REQUEST: &str = "Landroid/companion/AssociationRequest;";
+const P49_ASSOCIATION_REQUEST_BUILDER: &str = "Landroid/companion/AssociationRequest$Builder;";
+const P49_ASSOCIATION_INFO: &str = "Landroid/companion/AssociationInfo;";
+const P49_ASSOCIATION_INFO_BUILDER: &str = "Landroid/companion/AssociationInfo$Builder;";
+const P49_BT_FILTER: &str = "Landroid/companion/BluetoothDeviceFilter;";
+const P49_BT_FILTER_BUILDER: &str = "Landroid/companion/BluetoothDeviceFilter$Builder;";
+const P49_BLE_FILTER: &str = "Landroid/companion/BluetoothLeDeviceFilter;";
+const P49_BLE_FILTER_BUILDER: &str = "Landroid/companion/BluetoothLeDeviceFilter$Builder;";
+const P49_WIFI_FILTER: &str = "Landroid/companion/WifiDeviceFilter;";
+const P49_WIFI_FILTER_BUILDER: &str = "Landroid/companion/WifiDeviceFilter$Builder;";
+const P49_DEVICE_FILTER: &str = "Landroid/companion/DeviceFilter;";
+const P49_MAC_ADDRESS: &str = "Landroid/net/MacAddress;";
+
+fn p49_class(c: &str) -> bool {
+    matches!(
+        c,
+        P49_FINGERPRINT_MANAGER
+            | P49_FINGERPRINT
+            | P49_FINGERPRINT_CRYPTO
+            | P49_FINGERPRINT_RESULT
+            | P49_FINGERPRINT_CALLBACK
+            | P49_BIOMETRIC_MANAGER
+            | P49_BIOMETRIC_STRINGS
+            | P49_BIOMETRIC_PROMPT
+            | P49_BIOMETRIC_PROMPT_BUILDER
+            | P49_BIOMETRIC_CRYPTO
+            | P49_BIOMETRIC_CRYPTO_BASE
+            | P49_BIOMETRIC_RESULT
+            | P49_BIOMETRIC_CALLBACK
+            | P49_PROMPT_INFO
+            | P49_BIOMETRIC_IDENTIFIER
+            | P49_HDMI_MANAGER
+            | P49_DEVICE_FEATURES
+            | P49_DEVICE_FEATURES_BUILDER
+            | P49_HDMI_DEVICE_INFO
+            | P49_HDMI_DEVICE_INFO_BUILDER
+            | P49_HDMI_PORT_INFO
+            | P49_HDMI_PORT_INFO_BUILDER
+            | P49_INPUT_MANAGER
+            | P49_INPUT_DEVICE
+            | P49_INPUT_DEVICE_BUILDER
+            | P49_INPUT_MOTION_RANGE
+            | P49_HOST_USI_VERSION
+            | P49_INPUT_DEVICE_IDENTIFIER
+            | P49_SOUND_MODEL
+            | P49_GENERIC_SOUND_MODEL
+            | P49_KEYPHRASE_SOUND_MODEL
+            | P49_SOUND_KEYPHRASE
+            | P49_MODEL_PARAM_RANGE
+            | P49_RECOGNITION_CONFIG
+            | P49_CONFIDENCE_LEVEL
+            | P49_KEYPHRASE_RECOGNITION_EXTRA
+            | P49_KEYPHRASE_METADATA
+            | P49_MIDI_MANAGER
+            | P49_MIDI_DEVICE_INFO
+            | P49_MIDI_PORT_INFO
+            | P49_MIDI_RECEIVER
+            | P49_MIDI_DEVICE_CALLBACK
+            | P49_TV_MANAGER
+            | P49_TV_CALLBACK
+            | P49_TV_RATING
+            | P49_TV_TRACK
+            | P49_TV_TRACK_BUILDER
+            | P49_COMPANION_MANAGER
+            | P49_COMPANION_CALLBACK
+            | P49_ASSOCIATION_REQUEST
+            | P49_ASSOCIATION_REQUEST_BUILDER
+            | P49_ASSOCIATION_INFO
+            | P49_ASSOCIATION_INFO_BUILDER
+            | P49_BT_FILTER
+            | P49_BT_FILTER_BUILDER
+            | P49_BLE_FILTER
+            | P49_BLE_FILTER_BUILDER
+            | P49_WIFI_FILTER
+            | P49_WIFI_FILTER_BUILDER
+            | P49_MAC_ADDRESS
+    )
+}
+
+fn p49_list_value(vm: &mut Engine, elems: Vec<Value>) -> Result<Value, VmExit> {
+    Ok(Value::Obj(new_list(vm, elems)?))
+}
+
+fn p49_empty_list(vm: &mut Engine) -> Result<Value, VmExit> {
+    p49_list_value(vm, Vec::new())
+}
+
+fn p49_set_value(vm: &mut Engine, elems: Vec<Value>) -> Result<Value, VmExit> {
+    Ok(Value::Obj(new_collection(vm, "Ljava/util/HashSet;", elems)?))
+}
+
+fn p49_alloc_value(
+    vm: &mut Engine,
+    class: &str,
+    fields: Vec<(String, Value)>,
+) -> Result<Value, VmExit> {
+    Ok(Value::Obj(alloc_obj(vm, class, fields)?))
+}
+
+fn p49_mark_used(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    put(vm, recv, "rd_used", Value::Int(1))
+}
+
+fn p49_clone_bytes_or_empty(vm: &mut Engine, value: &Value) -> Result<Value, VmExit> {
+    if matches!(value, Value::Obj(_)) {
+        p57_clone_array(vm, value, "[B", ElemKind::Int)
+    } else {
+        crate::arrays::new_array(vm, "[B", ElemKind::Int, Vec::new())
+    }
+}
+
+fn p49_clone_bytes_or_null(vm: &mut Engine, value: &Value) -> Result<Value, VmExit> {
+    if matches!(value, Value::Obj(_)) {
+        p57_clone_array(vm, value, "[B", ElemKind::Int)
+    } else {
+        Ok(Value::Null)
+    }
+}
+
+fn p49_clone_ints_or_empty(vm: &mut Engine, value: &Value) -> Result<Value, VmExit> {
+    if matches!(value, Value::Obj(_)) {
+        p57_clone_array(vm, value, "[I", ElemKind::Int)
+    } else {
+        new_int_array(vm, &[])
+    }
+}
+
+fn p49_clone_objects_or_empty(
+    vm: &mut Engine,
+    value: &Value,
+    desc: &str,
+) -> Result<Value, VmExit> {
+    let elems = array_elems(vm, Some(value));
+    obj_array(vm, desc, elems)
+}
+
+fn p49_new_byte_array(vm: &mut Engine, bytes: &[u8]) -> Result<Value, VmExit> {
+    crate::arrays::new_array(
+        vm,
+        "[B",
+        ElemKind::Int,
+        bytes.iter().map(|b| Value::Int(*b as i8 as i32)).collect(),
+    )
+}
+
+fn p49_byte_values(vm: &Engine, value: &Value) -> Vec<u8> {
+    array_elems(vm, Some(value))
+        .iter()
+        .map(|v| v.as_int().unwrap_or(0) as u8)
+        .collect()
+}
+
+fn p49_objects_hash(vm: &Engine, values: &[Value]) -> i32 {
+    let mut result: i32 = 1;
+    for value in values {
+        result = result.wrapping_mul(31).wrapping_add(host_hash(vm, value));
+    }
+    result
+}
+
+fn p49_array_hash(vm: &Engine, value: &Value) -> i32 {
+    if matches!(value, Value::Null) {
+        return 0;
+    }
+    let mut result: i32 = 1;
+    for elem in array_elems(vm, Some(value)) {
+        result = result.wrapping_mul(31).wrapping_add(host_hash(vm, &elem));
+    }
+    result
+}
+
+fn p49_value_array_equal(vm: &Engine, a: &Value, b: &Value) -> bool {
+    if matches!((a, b), (Value::Null, Value::Null)) {
+        return true;
+    }
+    if matches!(a, Value::Null) || matches!(b, Value::Null) {
+        return false;
+    }
+    let aa = array_elems(vm, Some(a));
+    let bb = array_elems(vm, Some(b));
+    aa.len() == bb.len() && aa.iter().zip(bb.iter()).all(|(x, y)| objects_equal(vm, x, y))
+}
+
+fn p49_other(vm: &Engine, recv: ObjRef, args: &[Value], class: &str) -> Option<ObjRef> {
+    match args.first() {
+        Some(Value::Obj(r)) if *r != recv || true => {
+            if vm.cp.is_subtype(&class_of(vm, *r), class) {
+                Some(*r)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn p49_copy_fields(
+    vm: &mut Engine,
+    src: ObjRef,
+    dst: ObjRef,
+    fields: &[&str],
+) -> Result<(), VmExit> {
+    for field in fields {
+        let value = get(vm, src, field);
+        put(vm, dst, field, value)?;
+    }
+    Ok(())
+}
+
+fn p49_zero_uuid(vm: &mut Engine) -> Result<Value, VmExit> {
+    // java.util.UUID's private state is hosted elsewhere; the (J,J)
+    // constructor is the public way to materialize UUID(0, 0).
+    let r = alloc_obj(vm, "Ljava/util/UUID;", Vec::new())?;
+    let _ = vm.invoke_instance(r, "<init>", "(JJ)V", &[Value::Long(0), Value::Long(0)]);
+    Ok(Value::Obj(r))
+}
+
+fn p49_crypto_get(vm: &Engine, recv: ObjRef, expected: &str) -> Value {
+    let value = get(vm, recv, "mCrypto");
+    if af_is_subtype(vm, &value, expected) {
+        value
+    } else {
+        Value::Null
+    }
+}
+
+fn p49_crypto_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/security/Signature;)V")
+        | ("<init>", "(Ljavax/crypto/Cipher;)V")
+        | ("<init>", "(Ljavax/crypto/Mac;)V")
+        | ("<init>", "(Landroid/security/identity/IdentityCredential;)V")
+        | ("<init>", "(Landroid/security/identity/PresentationSession;)V") => {
+            let value = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mCrypto", value)?;
+            Value::Null
+        }
+        ("getSignature", "()Ljava/security/Signature;") => {
+            p49_crypto_get(vm, recv, "Ljava/security/Signature;")
+        }
+        ("getCipher", "()Ljavax/crypto/Cipher;") => p49_crypto_get(vm, recv, "Ljavax/crypto/Cipher;"),
+        ("getMac", "()Ljavax/crypto/Mac;") => p49_crypto_get(vm, recv, "Ljavax/crypto/Mac;"),
+        ("getIdentityCredential", "()Landroid/security/identity/IdentityCredential;") => {
+            p49_crypto_get(vm, recv, "Landroid/security/identity/IdentityCredential;")
+        }
+        ("getPresentationSession", "()Landroid/security/identity/PresentationSession;") => {
+            p49_crypto_get(vm, recv, "Landroid/security/identity/PresentationSession;")
+        }
+        ("getOpId", "()J") => {
+            let value = get(vm, recv, "mCrypto");
+            let op_id = match value {
+                Value::Obj(r)
+                    if af_is_subtype(vm, &Value::Obj(r), "Landroid/security/identity/IdentityCredential;")
+                        || af_is_subtype(
+                            vm,
+                            &Value::Obj(r),
+                            "Landroid/security/identity/PresentationSession;",
+                        ) =>
+                {
+                    match get(vm, r, "rd_credstore_operation_handle") {
+                        Value::Long(v) => v,
+                        Value::Int(v) => v as i64,
+                        _ => field_long(vm, r, "mCredstoreOperationHandle"),
+                    }
+                }
+                // AndroidKeyStoreProvider operation-handle lookup is part of
+                // the unmodelled keystore provider; non-identity wrappers in
+                // this bounded slice therefore report the documented 0.
+                _ => 0,
+            };
+            Value::Long(op_id)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_biometric_identifier_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        ("<init>", "(Ljava/lang/CharSequence;IJ)V") => {
+            let value = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mName", value)?;
+            put(vm, recv, "mBiometricId", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mDeviceId", Value::Long(larg(args, 2)))?;
+            Value::Null
+        }
+        ("getName", "()Ljava/lang/CharSequence;") => get(vm, recv, "mName"),
+        ("getBiometricId", "()I") => Value::Int(field_int(vm, recv, "mBiometricId")),
+        ("getDeviceId", "()J") => Value::Long(field_long(vm, recv, "mDeviceId")),
+        ("setName", "(Ljava/lang/CharSequence;)V") => {
+            let value = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mName", value)?;
+            Value::Null
+        }
+        ("setDeviceId", "(J)V") => {
+            put(vm, recv, "mDeviceId", Value::Long(larg(args, 0)))?;
+            Value::Null
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_fingerprint_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P49_FINGERPRINT => {
+            if let Some(value) = p49_biometric_identifier_instance(vm, name, sig, recv, args)? {
+                return Ok(Some(value));
+            }
+            return Ok(Some(match (name, sig) {
+                ("<init>", "(Ljava/lang/CharSequence;IIJ)V") => {
+                    let value = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "mName", value)?;
+                    put(vm, recv, "mGroupId", Value::Int(iarg(args, 1)))?;
+                    put(vm, recv, "mBiometricId", Value::Int(iarg(args, 2)))?;
+                    put(vm, recv, "mDeviceId", Value::Long(larg(args, 3)))?;
+                    Value::Null
+                }
+                ("<init>", "(Ljava/lang/CharSequence;IJ)V") => {
+                    let value = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "mName", value)?;
+                    put(vm, recv, "mBiometricId", Value::Int(iarg(args, 1)))?;
+                    put(vm, recv, "mDeviceId", Value::Long(larg(args, 2)))?;
+                    Value::Null
+                }
+                ("getGroupId", "()I") => Value::Int(field_int(vm, recv, "mGroupId")),
+                ("describeContents", "()I") => Value::Int(0),
+                _ => return Ok(None),
+            }));
+        }
+        P49_FINGERPRINT_CRYPTO => return p49_crypto_instance(vm, name, sig, recv, args),
+        P49_FINGERPRINT_RESULT => {
+            return Ok(Some(match (name, sig) {
+                (
+                    "<init>",
+                    "(Landroid/hardware/fingerprint/FingerprintManager$CryptoObject;Landroid/hardware/fingerprint/Fingerprint;IZ)V",
+                ) => {
+                    let crypto = args.first().cloned().unwrap_or(Value::Null);
+                    let fingerprint = args.get(1).cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "mCryptoObject", crypto)?;
+                    put(vm, recv, "mFingerprint", fingerprint)?;
+                    put(vm, recv, "mUserId", Value::Int(iarg(args, 2)))?;
+                    put(vm, recv, "mIsStrongBiometric", Value::Int(iarg(args, 3)))?;
+                    Value::Null
+                }
+                (
+                    "getCryptoObject",
+                    "()Landroid/hardware/fingerprint/FingerprintManager$CryptoObject;",
+                ) => get(vm, recv, "mCryptoObject"),
+                ("getFingerprint", "()Landroid/hardware/fingerprint/Fingerprint;") => {
+                    get(vm, recv, "mFingerprint")
+                }
+                ("getUserId", "()I") => Value::Int(field_int(vm, recv, "mUserId")),
+                ("isStrongBiometric", "()Z") => {
+                    bool_value(field_bool(vm, recv, "mIsStrongBiometric"))
+                }
+                _ => return Ok(None),
+            }));
+        }
+        P49_FINGERPRINT_CALLBACK => {
+            // The public callback class supplies empty defaults.  Only the
+            // exact host-allocated base object records calls for tests; a
+            // guest subclass keeps its own DEX dispatch.
+            if class_of(vm, recv) != P49_FINGERPRINT_CALLBACK {
+                return Ok(None);
+            }
+            return Ok(Some(match (name, sig) {
+                ("<init>", "()V") => Value::Null,
+                ("onAuthenticationError", "(ILjava/lang/CharSequence;)V") => {
+                    let text = args.get(1).cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_error_code", Value::Int(iarg(args, 0)))?;
+                    put(vm, recv, "rd_error_string", text)?;
+                    Value::Null
+                }
+                ("onAuthenticationHelp", "(ILjava/lang/CharSequence;)V") => {
+                    let text = args.get(1).cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_help_code", Value::Int(iarg(args, 0)))?;
+                    put(vm, recv, "rd_help_string", text)?;
+                    Value::Null
+                }
+                (
+                    "onAuthenticationSucceeded",
+                    "(Landroid/hardware/fingerprint/FingerprintManager$AuthenticationResult;)V",
+                ) => {
+                    let value = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_result", value)?;
+                    Value::Null
+                }
+                ("onAuthenticationFailed", "()V") => {
+                    put(vm, recv, "rd_failed", Value::Int(1))?;
+                    Value::Null
+                }
+                ("onAuthenticationAcquired", "(I)V") => {
+                    put(vm, recv, "rd_acquired", Value::Int(iarg(args, 0)))?;
+                    Value::Null
+                }
+                ("onUdfpsPointerDown", "(I)V") | ("onUdfpsPointerUp", "(I)V") => Value::Null,
+                _ => return Ok(None),
+            }));
+        }
+        P49_FINGERPRINT_MANAGER => {}
+        _ => return Ok(None),
+    }
+
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/content/Context;Landroid/hardware/fingerprint/IFingerprintService;)V") => {
+            let context = args.first().cloned().unwrap_or(Value::Null);
+            let service = args.get(1).cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mContext", context)?;
+            put(vm, recv, "mService", service)?;
+            Value::Null
+        }
+        ("isHardwareDetected", "()Z") => bool_value(false),
+        ("hasEnrolledFingerprints", "()Z") | ("hasEnrolledFingerprints", "(I)Z") => {
+            bool_value(false)
+        }
+        ("hasEnrolledTemplates", "()Z") | ("hasEnrolledTemplates", "(I)Z") => bool_value(false),
+        ("getEnrolledFingerprints", "()Ljava/util/List;")
+        | ("getEnrolledFingerprints", "(I)Ljava/util/List;") => Value::Null,
+        ("getSensorProperties", "()Ljava/util/List;")
+        | ("getSensorPropertiesInternal", "()Ljava/util/List;") => p49_empty_list(vm)?,
+        (
+            "authenticate",
+            "(Landroid/hardware/fingerprint/FingerprintManager$CryptoObject;Landroid/os/CancellationSignal;ILandroid/hardware/fingerprint/FingerprintManager$AuthenticationCallback;Landroid/os/Handler;)V",
+        ) => {
+            if oarg(args, 3).is_none() {
+                return Err(iae("Must supply an authentication callback"));
+            }
+            // With no IFingerprintService AOSP's options overload simply
+            // leaves the `if (mService != null)` block; no callback is sent.
+            Value::Null
+        }
+        (
+            "authenticate",
+            "(Landroid/hardware/fingerprint/FingerprintManager$CryptoObject;Landroid/os/CancellationSignal;Landroid/hardware/fingerprint/FingerprintManager$AuthenticationCallback;Landroid/os/Handler;I)V",
+        )
+        | (
+            "authenticate",
+            "(Landroid/hardware/fingerprint/FingerprintManager$CryptoObject;Landroid/os/CancellationSignal;Landroid/hardware/fingerprint/FingerprintManager$AuthenticationCallback;Landroid/os/Handler;III)V",
+        )
+        | (
+            "authenticate",
+            "(Landroid/hardware/fingerprint/FingerprintManager$CryptoObject;Landroid/os/CancellationSignal;Landroid/hardware/fingerprint/FingerprintManager$AuthenticationCallback;Landroid/os/Handler;Landroid/hardware/fingerprint/FingerprintAuthenticateOptions;)V",
+        ) => {
+            if oarg(args, 2).is_none() {
+                return Err(iae("Must supply an authentication callback"));
+            }
+            Value::Null
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_prompt_info_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => {
+            put(vm, recv, "mTitle", Value::Null)?;
+            put(vm, recv, "mUseDefaultTitle", Value::Int(0))?;
+            put(vm, recv, "mSubtitle", Value::Null)?;
+            put(vm, recv, "mUseDefaultSubtitle", Value::Int(0))?;
+            put(vm, recv, "mDescription", Value::Null)?;
+            put(vm, recv, "mDeviceCredentialTitle", Value::Null)?;
+            put(vm, recv, "mDeviceCredentialSubtitle", Value::Null)?;
+            put(vm, recv, "mDeviceCredentialDescription", Value::Null)?;
+            put(vm, recv, "mNegativeButtonText", Value::Null)?;
+            put(vm, recv, "mConfirmationRequested", Value::Int(1))?;
+            put(vm, recv, "mDeviceCredentialAllowed", Value::Int(0))?;
+            put(vm, recv, "mAuthenticators", Value::Int(0))?;
+            put(vm, recv, "mDisallowBiometricsIfPolicyExists", Value::Int(0))?;
+            put(vm, recv, "mReceiveSystemEvents", Value::Int(0))?;
+            let ids = p49_empty_list(vm)?;
+            put(vm, recv, "mAllowedSensorIds", ids)?;
+            put(vm, recv, "mAllowBackgroundAuthentication", Value::Int(0))?;
+            put(vm, recv, "mIgnoreEnrollmentState", Value::Int(0))?;
+            put(vm, recv, "mIsForLegacyFingerprintManager", Value::Int(0))?;
+            Value::Null
+        }
+        ("setTitle", "(Ljava/lang/CharSequence;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mTitle", v)?;
+            Value::Null
+        }
+        ("setUseDefaultTitle", "(Z)V") => {
+            put(vm, recv, "mUseDefaultTitle", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("setSubtitle", "(Ljava/lang/CharSequence;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mSubtitle", v)?;
+            Value::Null
+        }
+        ("setUseDefaultSubtitle", "(Z)V") => {
+            put(vm, recv, "mUseDefaultSubtitle", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("setDescription", "(Ljava/lang/CharSequence;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mDescription", v)?;
+            Value::Null
+        }
+        ("setDeviceCredentialTitle", "(Ljava/lang/CharSequence;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mDeviceCredentialTitle", v)?;
+            Value::Null
+        }
+        ("setDeviceCredentialSubtitle", "(Ljava/lang/CharSequence;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mDeviceCredentialSubtitle", v)?;
+            Value::Null
+        }
+        ("setDeviceCredentialDescription", "(Ljava/lang/CharSequence;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mDeviceCredentialDescription", v)?;
+            Value::Null
+        }
+        ("setNegativeButtonText", "(Ljava/lang/CharSequence;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mNegativeButtonText", v)?;
+            Value::Null
+        }
+        ("setConfirmationRequested", "(Z)V") => {
+            put(vm, recv, "mConfirmationRequested", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("setDeviceCredentialAllowed", "(Z)V") => {
+            put(vm, recv, "mDeviceCredentialAllowed", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("setAuthenticators", "(I)V") => {
+            put(vm, recv, "mAuthenticators", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("setDisallowBiometricsIfPolicyExists", "(Z)V") => {
+            put(
+                vm,
+                recv,
+                "mDisallowBiometricsIfPolicyExists",
+                Value::Int(iarg(args, 0)),
+            )?;
+            Value::Null
+        }
+        ("setReceiveSystemEvents", "(Z)V") => {
+            put(vm, recv, "mReceiveSystemEvents", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("setAllowedSensorIds", "(Ljava/util/List;)V") => {
+            if oarg(args, 0).is_none() {
+                return Err(npe("sensorIds"));
+            }
+            let ids = p49_list_value(vm, collection_items(vm, args.first()))?;
+            put(vm, recv, "mAllowedSensorIds", ids)?;
+            Value::Null
+        }
+        ("setAllowBackgroundAuthentication", "(Z)V") => {
+            put(
+                vm,
+                recv,
+                "mAllowBackgroundAuthentication",
+                Value::Int(iarg(args, 0)),
+            )?;
+            Value::Null
+        }
+        ("setIgnoreEnrollmentState", "(Z)V") => {
+            put(vm, recv, "mIgnoreEnrollmentState", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("setIsForLegacyFingerprintManager", "(I)V") => {
+            let boxed = crate::boxes::box_value(vm, "Ljava/lang/Integer;", Value::Int(iarg(args, 0)))?;
+            let ids = p49_list_value(vm, vec![Value::Obj(boxed)])?;
+            put(vm, recv, "mAllowedSensorIds", ids)?;
+            put(vm, recv, "mIsForLegacyFingerprintManager", Value::Int(1))?;
+            Value::Null
+        }
+        ("getTitle", "()Ljava/lang/CharSequence;") => get(vm, recv, "mTitle"),
+        ("isUseDefaultTitle", "()Z") => bool_value(field_bool(vm, recv, "mUseDefaultTitle")),
+        ("getSubtitle", "()Ljava/lang/CharSequence;") => get(vm, recv, "mSubtitle"),
+        ("isUseDefaultSubtitle", "()Z") => bool_value(field_bool(vm, recv, "mUseDefaultSubtitle")),
+        ("getDescription", "()Ljava/lang/CharSequence;") => get(vm, recv, "mDescription"),
+        ("getDeviceCredentialTitle", "()Ljava/lang/CharSequence;") => {
+            get(vm, recv, "mDeviceCredentialTitle")
+        }
+        ("getDeviceCredentialSubtitle", "()Ljava/lang/CharSequence;") => {
+            get(vm, recv, "mDeviceCredentialSubtitle")
+        }
+        ("getDeviceCredentialDescription", "()Ljava/lang/CharSequence;") => {
+            get(vm, recv, "mDeviceCredentialDescription")
+        }
+        ("getNegativeButtonText", "()Ljava/lang/CharSequence;") => {
+            get(vm, recv, "mNegativeButtonText")
+        }
+        ("isConfirmationRequested", "()Z") => {
+            // PromptInfo's field initializer is true; explicitly allocated
+            // host objects that did not run <init> keep that default.
+            bool_value(match get(vm, recv, "mConfirmationRequested") {
+                Value::Int(v) => v != 0,
+                _ => true,
+            })
+        }
+        ("isDeviceCredentialAllowed", "()Z") => {
+            bool_value(field_bool(vm, recv, "mDeviceCredentialAllowed"))
+        }
+        ("getAuthenticators", "()I") => Value::Int(field_int(vm, recv, "mAuthenticators")),
+        ("isDisallowBiometricsIfPolicyExists", "()Z") => {
+            bool_value(field_bool(vm, recv, "mDisallowBiometricsIfPolicyExists"))
+        }
+        ("isReceiveSystemEvents", "()Z") => bool_value(field_bool(vm, recv, "mReceiveSystemEvents")),
+        ("getAllowedSensorIds", "()Ljava/util/List;") => match get(vm, recv, "mAllowedSensorIds") {
+            Value::Obj(_) => get(vm, recv, "mAllowedSensorIds"),
+            _ => p49_empty_list(vm)?,
+        },
+        ("isAllowBackgroundAuthentication", "()Z") => {
+            bool_value(field_bool(vm, recv, "mAllowBackgroundAuthentication"))
+        }
+        ("isIgnoreEnrollmentState", "()Z") => {
+            bool_value(field_bool(vm, recv, "mIgnoreEnrollmentState"))
+        }
+        ("isForLegacyFingerprintManager", "()Z") => {
+            bool_value(field_bool(vm, recv, "mIsForLegacyFingerprintManager"))
+        }
+        ("containsTestConfigurations", "()Z") => {
+            let ids = collection_items(vm, Some(&get(vm, recv, "mAllowedSensorIds")));
+            let legacy = field_bool(vm, recv, "mIsForLegacyFingerprintManager");
+            let background = field_bool(vm, recv, "mAllowBackgroundAuthentication");
+            bool_value(if legacy && ids.len() == 1 && !background {
+                false
+            } else {
+                !ids.is_empty() || background
+            })
+        }
+        ("containsPrivateApiConfigurations", "()Z") => bool_value(
+            field_bool(vm, recv, "mDisallowBiometricsIfPolicyExists")
+                || field_bool(vm, recv, "mUseDefaultTitle")
+                || field_bool(vm, recv, "mUseDefaultSubtitle")
+                || field_obj(vm, recv, "mDeviceCredentialTitle").is_some()
+                || field_obj(vm, recv, "mDeviceCredentialSubtitle").is_some()
+                || field_obj(vm, recv, "mDeviceCredentialDescription").is_some()
+                || field_bool(vm, recv, "mReceiveSystemEvents"),
+        ),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_prompt_info_ref(vm: &Engine, prompt_or_builder: ObjRef) -> Option<ObjRef> {
+    field_obj(vm, prompt_or_builder, "mPromptInfo")
+}
+
+fn p49_biometric_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if name == "<init>" {
+        return Ok(Some(match sig {
+            "(Landroid/content/Context;)V" => {
+                let context = args.first().cloned().unwrap_or(Value::Null);
+                let info = alloc_obj(vm, P49_PROMPT_INFO, Vec::new())?;
+                let _ = p49_prompt_info_instance(vm, "<init>", "()V", info, &[])?;
+                put(vm, recv, "mContext", context)?;
+                put(vm, recv, "mPromptInfo", Value::Obj(info))?;
+                put(vm, recv, "rd_negative_executor", Value::Null)?;
+                put(vm, recv, "rd_negative_listener", Value::Null)?;
+                Value::Null
+            }
+            _ => return Ok(None),
+        }));
+    }
+    let Some(info) = p49_prompt_info_ref(vm, recv) else {
+        return Ok(None);
+    };
+    let set_info = |vm: &mut Engine, field: &str, value: Value| -> Result<Value, VmExit> {
+        put(vm, info, field, value)?;
+        Ok(Value::Obj(recv))
+    };
+    Ok(Some(match (name, sig) {
+        ("setTitle", "(Ljava/lang/CharSequence;)Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            set_info(vm, "mTitle", v)?
+        }
+        ("setUseDefaultTitle", "()Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            set_info(vm, "mUseDefaultTitle", Value::Int(1))?
+        }
+        ("setSubtitle", "(Ljava/lang/CharSequence;)Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            set_info(vm, "mSubtitle", v)?
+        }
+        ("setUseDefaultSubtitle", "()Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            set_info(vm, "mUseDefaultSubtitle", Value::Int(1))?
+        }
+        ("setDescription", "(Ljava/lang/CharSequence;)Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            set_info(vm, "mDescription", v)?
+        }
+        (
+            "setTextForDeviceCredential",
+            "(Ljava/lang/CharSequence;Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Landroid/hardware/biometrics/BiometricPrompt$Builder;",
+        ) => {
+            if let Some(v) = args.first().filter(|v| matches!(v, Value::Obj(_))) {
+                put(vm, info, "mDeviceCredentialTitle", v.clone())?;
+            }
+            if let Some(v) = args.get(1).filter(|v| matches!(v, Value::Obj(_))) {
+                put(vm, info, "mDeviceCredentialSubtitle", v.clone())?;
+            }
+            if let Some(v) = args.get(2).filter(|v| matches!(v, Value::Obj(_))) {
+                put(vm, info, "mDeviceCredentialDescription", v.clone())?;
+            }
+            Value::Obj(recv)
+        }
+        (
+            "setNegativeButton",
+            "(Ljava/lang/CharSequence;Ljava/util/concurrent/Executor;Landroid/content/DialogInterface$OnClickListener;)Landroid/hardware/biometrics/BiometricPrompt$Builder;",
+        ) => {
+            let text = charseq(vm, args.first())?;
+            if text.as_deref().map(str::is_empty).unwrap_or(true) {
+                return Err(iae("Text must be set and non-empty"));
+            }
+            if oarg(args, 1).is_none() {
+                return Err(iae("Executor must not be null"));
+            }
+            if oarg(args, 2).is_none() {
+                return Err(iae("Listener must not be null"));
+            }
+            let value = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, info, "mNegativeButtonText", value)?;
+            put(vm, recv, "rd_negative_executor", args[1].clone())?;
+            put(vm, recv, "rd_negative_listener", args[2].clone())?;
+            Value::Obj(recv)
+        }
+        ("setConfirmationRequired", "(Z)Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            set_info(vm, "mConfirmationRequested", Value::Int(iarg(args, 0)))?
+        }
+        ("setDeviceCredentialAllowed", "(Z)Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            set_info(vm, "mDeviceCredentialAllowed", Value::Int(iarg(args, 0)))?
+        }
+        ("setAllowedAuthenticators", "(I)Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            set_info(vm, "mAuthenticators", Value::Int(iarg(args, 0)))?
+        }
+        ("setAllowedSensorIds", "(Ljava/util/List;)Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            let _ = p49_prompt_info_instance(vm, "setAllowedSensorIds", "(Ljava/util/List;)V", info, args)?;
+            Value::Obj(recv)
+        }
+        ("setAllowBackgroundAuthentication", "(Z)Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            set_info(
+                vm,
+                "mAllowBackgroundAuthentication",
+                Value::Int(iarg(args, 0)),
+            )?
+        }
+        ("setDisallowBiometricsIfPolicyExists", "(Z)Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            set_info(
+                vm,
+                "mDisallowBiometricsIfPolicyExists",
+                Value::Int(iarg(args, 0)),
+            )?
+        }
+        ("setReceiveSystemEvents", "(Z)Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            set_info(vm, "mReceiveSystemEvents", Value::Int(iarg(args, 0)))?
+        }
+        ("setIgnoreEnrollmentState", "(Z)Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            set_info(vm, "mIgnoreEnrollmentState", Value::Int(iarg(args, 0)))?
+        }
+        ("setIsForLegacyFingerprintManager", "(I)Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            let _ = p49_prompt_info_instance(
+                vm,
+                "setIsForLegacyFingerprintManager",
+                "(I)V",
+                info,
+                args,
+            )?;
+            Value::Obj(recv)
+        }
+        ("setService", "(Landroid/hardware/biometrics/IAuthService;)Landroid/hardware/biometrics/BiometricPrompt$Builder;") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mService", v)?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/hardware/biometrics/BiometricPrompt;") => {
+            let title = charseq(vm, Some(&get(vm, info, "mTitle")))?;
+            let negative = charseq(vm, Some(&get(vm, info, "mNegativeButtonText")))?;
+            let use_default_title = field_bool(vm, info, "mUseDefaultTitle");
+            let credential_allowed = field_bool(vm, info, "mDeviceCredentialAllowed");
+            let authenticators = field_int(vm, info, "mAuthenticators");
+            let will_show_credential = credential_allowed || (authenticators & (1 << 15)) != 0;
+            if title.as_deref().map(str::is_empty).unwrap_or(true) && !use_default_title {
+                return Err(iae("Title must be set and non-empty"));
+            } else if negative.as_deref().map(str::is_empty).unwrap_or(true)
+                && !will_show_credential
+            {
+                return Err(iae("Negative text must be set and non-empty"));
+            } else if !negative.as_deref().map(str::is_empty).unwrap_or(true)
+                && will_show_credential
+            {
+                return Err(iae(
+                    "Can't have both negative button behavior and device credential enabled",
+                ));
+            }
+            let prompt = alloc_obj(vm, P49_BIOMETRIC_PROMPT, Vec::new())?;
+            let fields = [
+                ("mContext", get(vm, recv, "mContext")),
+                ("mPromptInfo", Value::Obj(info)),
+                ("mService", get(vm, recv, "mService")),
+                ("rd_negative_executor", get(vm, recv, "rd_negative_executor")),
+                ("rd_negative_listener", get(vm, recv, "rd_negative_listener")),
+                ("mIsPromptShowing", Value::Int(0)),
+                ("mCryptoObject", Value::Null),
+                ("mExecutor", Value::Null),
+                ("mAuthenticationCallback", Value::Null),
+            ];
+            for (field, value) in fields {
+                put(vm, prompt, field, value)?;
+            }
+            Value::Obj(prompt)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_biometric_prompt_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if matches!(name, "authenticate" | "authenticateUser" | "authenticateForOperation") {
+        // The null checks and crypto-strength check below are AOSP's.  The
+        // subsequent `mService.authenticate(...)` is not reached in this
+        // registered profile because Builder.build() found no AUTH_SERVICE;
+        // AOSP dereferences that null field outside its RemoteException catch.
+        match (name, sig) {
+            (
+                "authenticate",
+                "(Landroid/os/CancellationSignal;Ljava/util/concurrent/Executor;Landroid/hardware/biometrics/BiometricPrompt$AuthenticationCallback;)V",
+            ) => {
+                if oarg(args, 0).is_none() {
+                    return Err(iae("Must supply a cancellation signal"));
+                }
+                if oarg(args, 1).is_none() {
+                    return Err(iae("Must supply an executor"));
+                }
+                if oarg(args, 2).is_none() {
+                    return Err(iae("Must supply a callback"));
+                }
+            }
+            (
+                "authenticate",
+                "(Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;Landroid/os/CancellationSignal;Ljava/util/concurrent/Executor;Landroid/hardware/biometrics/BiometricPrompt$AuthenticationCallback;)V",
+            ) => {
+                if oarg(args, 0).is_none() {
+                    return Err(iae("Must supply a crypto object"));
+                }
+                if oarg(args, 1).is_none() {
+                    return Err(iae("Must supply a cancellation signal"));
+                }
+                if oarg(args, 2).is_none() {
+                    return Err(iae("Must supply an executor"));
+                }
+                if oarg(args, 3).is_none() {
+                    return Err(iae("Must supply a callback"));
+                }
+                let info = p49_prompt_info_ref(vm, recv);
+                let mut authenticators = info.map(|r| field_int(vm, r, "mAuthenticators")).unwrap_or(0);
+                if authenticators == 0 {
+                    authenticators = 0x000f;
+                }
+                let biometric_strength = authenticators & 0x00ff;
+                if (biometric_strength & !0x000f) != 0 {
+                    return Err(iae("Only Strong biometrics supported with crypto"));
+                }
+            }
+            (
+                "authenticateUser",
+                "(Landroid/os/CancellationSignal;Ljava/util/concurrent/Executor;Landroid/hardware/biometrics/BiometricPrompt$AuthenticationCallback;I)V",
+            )
+            | (
+                "authenticateForOperation",
+                "(Landroid/os/CancellationSignal;Ljava/util/concurrent/Executor;Landroid/hardware/biometrics/BiometricPrompt$AuthenticationCallback;J)J",
+            ) => {
+                if oarg(args, 0).is_none() {
+                    return Err(iae("Must supply a cancellation signal"));
+                }
+                if oarg(args, 1).is_none() {
+                    return Err(iae("Must supply an executor"));
+                }
+                if oarg(args, 2).is_none() {
+                    return Err(iae("Must supply a callback"));
+                }
+            }
+            _ => return Ok(None),
+        }
+        return Err(throw("Ljava/lang/NullPointerException;", ""));
+    }
+
+    let Some(info) = p49_prompt_info_ref(vm, recv) else {
+        return Ok(None);
+    };
+    Ok(Some(match (name, sig) {
+        ("getTitle", "()Ljava/lang/CharSequence;") => get(vm, info, "mTitle"),
+        ("shouldUseDefaultTitle", "()Z") => bool_value(field_bool(vm, info, "mUseDefaultTitle")),
+        ("getSubtitle", "()Ljava/lang/CharSequence;") => get(vm, info, "mSubtitle"),
+        ("shouldUseDefaultSubtitle", "()Z") => {
+            bool_value(field_bool(vm, info, "mUseDefaultSubtitle"))
+        }
+        ("getDescription", "()Ljava/lang/CharSequence;") => get(vm, info, "mDescription"),
+        ("getNegativeButtonText", "()Ljava/lang/CharSequence;") => {
+            get(vm, info, "mNegativeButtonText")
+        }
+        ("isConfirmationRequired", "()Z") => bool_value(match get(vm, info, "mConfirmationRequested") {
+            Value::Int(v) => v != 0,
+            _ => true,
+        }),
+        ("getAllowedAuthenticators", "()I") => Value::Int(field_int(vm, info, "mAuthenticators")),
+        ("getAllowedSensorIds", "()Ljava/util/List;") => match get(vm, info, "mAllowedSensorIds") {
+            Value::Obj(_) => get(vm, info, "mAllowedSensorIds"),
+            _ => p49_empty_list(vm)?,
+        },
+        ("isAllowBackgroundAuthentication", "()Z") => {
+            bool_value(field_bool(vm, info, "mAllowBackgroundAuthentication"))
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_biometric_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P49_PROMPT_INFO => p49_prompt_info_instance(vm, name, sig, recv, args),
+        P49_BIOMETRIC_PROMPT_BUILDER => p49_biometric_builder_instance(vm, name, sig, recv, args),
+        P49_BIOMETRIC_PROMPT => p49_biometric_prompt_instance(vm, name, sig, recv, args),
+        P49_BIOMETRIC_CRYPTO | P49_BIOMETRIC_CRYPTO_BASE => {
+            p49_crypto_instance(vm, name, sig, recv, args)
+        }
+        P49_BIOMETRIC_IDENTIFIER => p49_biometric_identifier_instance(vm, name, sig, recv, args),
+        P49_BIOMETRIC_RESULT => Ok(Some(match (name, sig) {
+            (
+                "<init>",
+                "(Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;I)V",
+            ) => {
+                let crypto = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mCryptoObject", crypto)?;
+                put(vm, recv, "mAuthenticationType", Value::Int(iarg(args, 1)))?;
+                Value::Null
+            }
+            (
+                "getCryptoObject",
+                "()Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;",
+            ) => get(vm, recv, "mCryptoObject"),
+            ("getAuthenticationResultType", "()I") => {
+                Value::Int(field_int(vm, recv, "mAuthenticationType"))
+            }
+            _ => return Ok(None),
+        })),
+        P49_BIOMETRIC_CALLBACK => {
+            if class_of(vm, recv) != P49_BIOMETRIC_CALLBACK {
+                return Ok(None);
+            }
+            Ok(Some(match (name, sig) {
+                ("<init>", "()V") => Value::Null,
+                ("onAuthenticationError", "(ILjava/lang/CharSequence;)V") => {
+                    let text = args.get(1).cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_error_code", Value::Int(iarg(args, 0)))?;
+                    put(vm, recv, "rd_error_string", text)?;
+                    Value::Null
+                }
+                ("onAuthenticationHelp", "(ILjava/lang/CharSequence;)V") => {
+                    let text = args.get(1).cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_help_code", Value::Int(iarg(args, 0)))?;
+                    put(vm, recv, "rd_help_string", text)?;
+                    Value::Null
+                }
+                (
+                    "onAuthenticationSucceeded",
+                    "(Landroid/hardware/biometrics/BiometricPrompt$AuthenticationResult;)V",
+                ) => {
+                    let value = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_result", value)?;
+                    Value::Null
+                }
+                ("onAuthenticationFailed", "()V") => {
+                    put(vm, recv, "rd_failed", Value::Int(1))?;
+                    Value::Null
+                }
+                ("onAuthenticationAcquired", "(I)V") => {
+                    put(vm, recv, "rd_acquired", Value::Int(iarg(args, 0)))?;
+                    Value::Null
+                }
+                ("onSystemEvent", "(I)V") => {
+                    put(vm, recv, "rd_system_event", Value::Int(iarg(args, 0)))?;
+                    Value::Null
+                }
+                _ => return Ok(None),
+            }))
+        }
+        P49_BIOMETRIC_STRINGS => match (name, sig) {
+            ("getButtonLabel", "()Ljava/lang/CharSequence;")
+            | ("getPromptMessage", "()Ljava/lang/CharSequence;")
+            | ("getSettingName", "()Ljava/lang/CharSequence;") => {
+                // Strings was constructed with the same absent IAuthService;
+                // its getters dereference that field in AOSP.
+                Err(throw("Ljava/lang/NullPointerException;", ""))
+            }
+            _ => Ok(None),
+        },
+        P49_BIOMETRIC_MANAGER => Ok(Some(match (name, sig) {
+            ("<init>", "(Landroid/content/Context;Landroid/hardware/biometrics/IAuthService;)V") => {
+                let context = args.first().cloned().unwrap_or(Value::Null);
+                let service = args.get(1).cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mContext", context)?;
+                put(vm, recv, "mService", service)?;
+                Value::Null
+            }
+            ("canAuthenticate", "()I") | ("canAuthenticate", "(I)I") | ("canAuthenticate", "(II)I") => {
+                Value::Int(1) // BIOMETRIC_ERROR_HW_UNAVAILABLE with no service.
+            }
+            ("getSensorProperties", "()Ljava/util/List;") => {
+                return Err(throw("Ljava/lang/NullPointerException;", ""));
+            }
+            ("getStrings", "(I)Landroid/hardware/biometrics/BiometricManager$Strings;") => {
+                p49_alloc_value(
+                    vm,
+                    P49_BIOMETRIC_STRINGS,
+                    vec![
+                        ("mContext".to_string(), get(vm, recv, "mContext")),
+                        ("mService".to_string(), get(vm, recv, "mService")),
+                        ("mAuthenticators".to_string(), Value::Int(iarg(args, 0))),
+                    ],
+                )?
+            }
+            _ => return Ok(None),
+        })),
+        _ => Ok(None),
+    }
+}
+
+const P49_DEVICE_FEATURES: &str = "Landroid/hardware/hdmi/DeviceFeatures;";
+const P49_DEVICE_FEATURES_BUILDER: &str = "Landroid/hardware/hdmi/DeviceFeatures$Builder;";
+
+const P49_FEATURE_FIELDS: [&str; 7] = [
+    "mRecordTvScreenSupport",
+    "mSetOsdStringSupport",
+    "mDeckControlSupport",
+    "mSetAudioRateSupport",
+    "mArcTxSupport",
+    "mArcRxSupport",
+    "mSetAudioVolumeLevelSupport",
+];
+
+fn p49_device_features_value(vm: &mut Engine, status: i32) -> Result<Value, VmExit> {
+    let fields = P49_FEATURE_FIELDS
+        .iter()
+        .map(|field| ((*field).to_string(), Value::Int(status)))
+        .collect();
+    p49_alloc_value(vm, P49_DEVICE_FEATURES, fields)
+}
+
+fn p49_device_features_from_operand(vm: &mut Engine, bytes: &[u8]) -> Result<Value, VmExit> {
+    let mut statuses = [2; 7];
+    if let Some(b) = bytes.first() {
+        for (index, shift) in [6, 5, 4, 3, 2, 1, 0].iter().enumerate() {
+            statuses[index] = if (b >> shift) & 1 == 1 { 1 } else { 0 };
+        }
+    }
+    let fields = P49_FEATURE_FIELDS
+        .iter()
+        .zip(statuses.iter())
+        .map(|(field, status)| ((*field).to_string(), Value::Int(*status)))
+        .collect();
+    p49_alloc_value(vm, P49_DEVICE_FEATURES, fields)
+}
+
+fn p49_device_features_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P49_DEVICE_FEATURES_BUILDER {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "(I)V") => {
+                for field in P49_FEATURE_FIELDS {
+                    put(vm, recv, field, Value::Int(iarg(args, 0)))?;
+                }
+                Value::Null
+            }
+            ("<init>", "(Landroid/hardware/hdmi/DeviceFeatures;)V") => {
+                let other = req_obj(args, 0, "info")?;
+                p49_copy_fields(vm, other, recv, &P49_FEATURE_FIELDS)?;
+                Value::Null
+            }
+            ("setRecordTvScreenSupport", "(I)Landroid/hardware/hdmi/DeviceFeatures$Builder;") => {
+                put(vm, recv, "mRecordTvScreenSupport", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setSetOsdStringSupport", "(I)Landroid/hardware/hdmi/DeviceFeatures$Builder;") => {
+                put(vm, recv, "mSetOsdStringSupport", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setDeckControlSupport", "(I)Landroid/hardware/hdmi/DeviceFeatures$Builder;") => {
+                put(vm, recv, "mDeckControlSupport", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setSetAudioRateSupport", "(I)Landroid/hardware/hdmi/DeviceFeatures$Builder;") => {
+                put(vm, recv, "mSetAudioRateSupport", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setArcTxSupport", "(I)Landroid/hardware/hdmi/DeviceFeatures$Builder;") => {
+                put(vm, recv, "mArcTxSupport", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setArcRxSupport", "(I)Landroid/hardware/hdmi/DeviceFeatures$Builder;") => {
+                put(vm, recv, "mArcRxSupport", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            (
+                "setSetAudioVolumeLevelSupport",
+                "(I)Landroid/hardware/hdmi/DeviceFeatures$Builder;",
+            ) => {
+                put(
+                    vm,
+                    recv,
+                    "mSetAudioVolumeLevelSupport",
+                    Value::Int(iarg(args, 0)),
+                )?;
+                Value::Obj(recv)
+            }
+            (
+                "update",
+                "(Landroid/hardware/hdmi/DeviceFeatures;)Landroid/hardware/hdmi/DeviceFeatures$Builder;",
+            ) => {
+                let other = req_obj(args, 0, "newDeviceFeatures")?;
+                for field in P49_FEATURE_FIELDS {
+                    let new_status = field_int(vm, other, field);
+                    if new_status != 2 {
+                        put(vm, recv, field, Value::Int(new_status))?;
+                    }
+                }
+                Value::Obj(recv)
+            }
+            ("build", "()Landroid/hardware/hdmi/DeviceFeatures;") => {
+                let out = alloc_obj(vm, P49_DEVICE_FEATURES, Vec::new())?;
+                p49_copy_fields(vm, recv, out, &P49_FEATURE_FIELDS)?;
+                Value::Obj(out)
+            }
+            _ => return Ok(None),
+        }));
+    }
+
+    Ok(Some(match (name, sig) {
+        ("toBuilder", "()Landroid/hardware/hdmi/DeviceFeatures$Builder;") => {
+            let out = alloc_obj(vm, P49_DEVICE_FEATURES_BUILDER, Vec::new())?;
+            p49_copy_fields(vm, recv, out, &P49_FEATURE_FIELDS)?;
+            Value::Obj(out)
+        }
+        ("getRecordTvScreenSupport", "()I") => {
+            Value::Int(field_int(vm, recv, "mRecordTvScreenSupport"))
+        }
+        ("getSetOsdStringSupport", "()I") => Value::Int(field_int(vm, recv, "mSetOsdStringSupport")),
+        ("getDeckControlSupport", "()I") => Value::Int(field_int(vm, recv, "mDeckControlSupport")),
+        ("getSetAudioRateSupport", "()I") => Value::Int(field_int(vm, recv, "mSetAudioRateSupport")),
+        ("getArcTxSupport", "()I") => Value::Int(field_int(vm, recv, "mArcTxSupport")),
+        ("getArcRxSupport", "()I") => Value::Int(field_int(vm, recv, "mArcRxSupport")),
+        ("getSetAudioVolumeLevelSupport", "()I") => {
+            Value::Int(field_int(vm, recv, "mSetAudioVolumeLevelSupport"))
+        }
+        ("toOperand", "()[B") => {
+            let mut result = 0u8;
+            for (field, shift) in P49_FEATURE_FIELDS.iter().zip([6, 5, 4, 3, 2, 1, 0]) {
+                if field_int(vm, recv, field) == 1 {
+                    result |= 1 << shift;
+                }
+            }
+            p49_new_byte_array(vm, &[result])?
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let equal = p49_other(vm, recv, args, P49_DEVICE_FEATURES)
+                .map(|other| {
+                    P49_FEATURE_FIELDS
+                        .iter()
+                        .all(|f| field_int(vm, recv, f) == field_int(vm, other, f))
+                })
+                .unwrap_or(false);
+            bool_value(equal || matches!(args.first(), Some(Value::Obj(r)) if *r == recv))
+        }
+        ("hashCode", "()I") => {
+            let values: Vec<Value> = P49_FEATURE_FIELDS
+                .iter()
+                .map(|f| Value::Int(field_int(vm, recv, f)))
+                .collect();
+            Value::Int(p49_objects_hash(vm, &values))
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let status = |value: i32| match value {
+                1 => "Y",
+                0 => "N",
+                _ => "?",
+            };
+            jstr(
+                vm,
+                format!(
+                    "Device features: record_tv_screen: {} set_osd_string: {} deck_control: {} set_audio_rate: {} arc_tx: {} arc_rx: {} set_audio_volume_level: {} ",
+                    status(field_int(vm, recv, "mRecordTvScreenSupport")),
+                    status(field_int(vm, recv, "mSetOsdStringSupport")),
+                    status(field_int(vm, recv, "mDeckControlSupport")),
+                    status(field_int(vm, recv, "mSetAudioRateSupport")),
+                    status(field_int(vm, recv, "mArcTxSupport")),
+                    status(field_int(vm, recv, "mArcRxSupport")),
+                    status(field_int(vm, recv, "mSetAudioVolumeLevelSupport")),
+                ),
+            )?
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_hdmi_device_id(kind: i32, logical_address: i32, port_id: i32) -> i32 {
+    match kind {
+        1 => 0x80 + port_id, // MHL
+        2 => 0xc0 + port_id, // hardware
+        0 => logical_address,
+        _ => 0xffff,
+    }
+}
+
+fn p49_hdmi_device_finish(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    let kind = field_int(vm, recv, "mHdmiDeviceType");
+    let id = p49_hdmi_device_id(
+        kind,
+        field_int(vm, recv, "mLogicalAddress"),
+        field_int(vm, recv, "mPortId"),
+    );
+    put(vm, recv, "mId", Value::Int(id))
+}
+
+fn p49_hdmi_builder_defaults(vm: &mut Engine, recv: ObjRef, kind: i32) -> Result<(), VmExit> {
+    put(vm, recv, "mHdmiDeviceType", Value::Int(kind))?;
+    put(vm, recv, "mPhysicalAddress", Value::Int(0xffff))?;
+    put(vm, recv, "mPortId", Value::Int(-1))?;
+    put(vm, recv, "mLogicalAddress", Value::Int(-1))?;
+    put(vm, recv, "mDeviceType", Value::Int(2))?;
+    put(vm, recv, "mCecVersion", Value::Int(0x05))?;
+    put(vm, recv, "mVendorId", Value::Int(0xff_ffff))?;
+    let empty = jstr(vm, "")?;
+    put(vm, recv, "mDisplayName", empty)?;
+    put(vm, recv, "mDevicePowerStatus", Value::Int(-1))?;
+    let features = p49_device_features_value(vm, if kind == 0 { 2 } else { 0 })?;
+    put(vm, recv, "mDeviceFeatures", features)?;
+    put(vm, recv, "mDeviceId", Value::Int(-1))?;
+    put(vm, recv, "mAdopterId", Value::Int(-1))?;
+    Ok(())
+}
+
+fn p49_hdmi_make_device(
+    vm: &mut Engine,
+    kind: i32,
+    physical_address: i32,
+    port_id: i32,
+    vendor_id: i32,
+    display_name: &str,
+    device_id: i32,
+    adopter_id: i32,
+) -> Result<Value, VmExit> {
+    let r = alloc_obj(vm, P49_HDMI_DEVICE_INFO, Vec::new())?;
+    p49_hdmi_builder_defaults(vm, r, kind)?;
+    put(vm, r, "mPhysicalAddress", Value::Int(physical_address))?;
+    put(vm, r, "mPortId", Value::Int(port_id))?;
+    put(vm, r, "mVendorId", Value::Int(vendor_id))?;
+    let name = jstr(vm, display_name)?;
+    put(vm, r, "mDisplayName", name)?;
+    put(vm, r, "mDeviceId", Value::Int(device_id))?;
+    put(vm, r, "mAdopterId", Value::Int(adopter_id))?;
+    p49_hdmi_device_finish(vm, r)?;
+    Ok(Value::Obj(r))
+}
+
+const P49_HDMI_INFO_FIELDS: [&str; 12] = [
+    "mHdmiDeviceType",
+    "mPhysicalAddress",
+    "mPortId",
+    "mLogicalAddress",
+    "mDeviceType",
+    "mCecVersion",
+    "mVendorId",
+    "mDisplayName",
+    "mDevicePowerStatus",
+    "mDeviceFeatures",
+    "mDeviceId",
+    "mAdopterId",
+];
+
+fn p49_hdmi_device_info_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P49_HDMI_DEVICE_INFO_BUILDER {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "(I)V") => {
+                p49_hdmi_builder_defaults(vm, recv, iarg(args, 0))?;
+                Value::Null
+            }
+            ("<init>", "(Landroid/hardware/hdmi/HdmiDeviceInfo;)V") => {
+                let other = req_obj(args, 0, "hdmiDeviceInfo")?;
+                p49_copy_fields(vm, other, recv, &P49_HDMI_INFO_FIELDS)?;
+                Value::Null
+            }
+            ("setPhysicalAddress", "(I)Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;") => {
+                put(vm, recv, "mPhysicalAddress", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setPortId", "(I)Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;") => {
+                put(vm, recv, "mPortId", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setLogicalAddress", "(I)Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;") => {
+                put(vm, recv, "mLogicalAddress", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setDeviceType", "(I)Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;") => {
+                put(vm, recv, "mDeviceType", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setCecVersion", "(I)Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;") => {
+                put(vm, recv, "mCecVersion", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setVendorId", "(I)Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;") => {
+                put(vm, recv, "mVendorId", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setDisplayName", "(Ljava/lang/String;)Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;") => {
+                let value = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mDisplayName", value)?;
+                Value::Obj(recv)
+            }
+            ("setDevicePowerStatus", "(I)Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;") => {
+                put(vm, recv, "mDevicePowerStatus", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            (
+                "setDeviceFeatures",
+                "(Landroid/hardware/hdmi/DeviceFeatures;)Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;",
+            ) => {
+                let value = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mDeviceFeatures", value)?;
+                Value::Obj(recv)
+            }
+            ("setDeviceId", "(I)Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;") => {
+                put(vm, recv, "mDeviceId", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setAdopterId", "(I)Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;") => {
+                put(vm, recv, "mAdopterId", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            (
+                "updateDeviceFeatures",
+                "(Landroid/hardware/hdmi/DeviceFeatures;)Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;",
+            ) => {
+                let Some(current) = field_obj(vm, recv, "mDeviceFeatures") else {
+                    return Err(npe("mDeviceFeatures"));
+                };
+                let newer = req_obj(args, 0, "deviceFeatures")?;
+                let out = alloc_obj(vm, P49_DEVICE_FEATURES, Vec::new())?;
+                for field in P49_FEATURE_FIELDS {
+                    let new_status = field_int(vm, newer, field);
+                    let value = if new_status == 2 {
+                        field_int(vm, current, field)
+                    } else {
+                        new_status
+                    };
+                    put(vm, out, field, Value::Int(value))?;
+                }
+                put(vm, recv, "mDeviceFeatures", Value::Obj(out))?;
+                Value::Obj(recv)
+            }
+            ("build", "()Landroid/hardware/hdmi/HdmiDeviceInfo;") => {
+                let out = alloc_obj(vm, P49_HDMI_DEVICE_INFO, Vec::new())?;
+                p49_copy_fields(vm, recv, out, &P49_HDMI_INFO_FIELDS)?;
+                p49_hdmi_device_finish(vm, out)?;
+                Value::Obj(out)
+            }
+            _ => return Ok(None),
+        }));
+    }
+
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => {
+            p49_hdmi_builder_defaults(vm, recv, 100)?;
+            put(vm, recv, "mPhysicalAddress", Value::Int(0xffff))?;
+            put(vm, recv, "mId", Value::Int(0xffff))?;
+            put(vm, recv, "mLogicalAddress", Value::Int(-1))?;
+            put(vm, recv, "mDeviceType", Value::Int(-1))?;
+            put(vm, recv, "mVendorId", Value::Int(0))?;
+            let name = jstr(vm, "Inactive")?;
+            put(vm, recv, "mDisplayName", name)?;
+            let features = p49_device_features_value(vm, 2)?;
+            put(vm, recv, "mDeviceFeatures", features)?;
+            Value::Null
+        }
+        ("toBuilder", "()Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;") => {
+            let out = alloc_obj(vm, P49_HDMI_DEVICE_INFO_BUILDER, Vec::new())?;
+            p49_copy_fields(vm, recv, out, &P49_HDMI_INFO_FIELDS)?;
+            Value::Obj(out)
+        }
+        ("getId", "()I") => Value::Int(match get(vm, recv, "mId") {
+            Value::Int(v) => v,
+            _ => p49_hdmi_device_id(
+                field_int(vm, recv, "mHdmiDeviceType"),
+                field_int(vm, recv, "mLogicalAddress"),
+                field_int(vm, recv, "mPortId"),
+            ),
+        }),
+        ("getDeviceFeatures", "()Landroid/hardware/hdmi/DeviceFeatures;") => {
+            get(vm, recv, "mDeviceFeatures")
+        }
+        ("getLogicalAddress", "()I") => Value::Int(field_int(vm, recv, "mLogicalAddress")),
+        ("getPhysicalAddress", "()I") => Value::Int(match get(vm, recv, "mPhysicalAddress") {
+            Value::Int(v) => v,
+            _ => 0xffff,
+        }),
+        ("getPortId", "()I") => Value::Int(match get(vm, recv, "mPortId") {
+            Value::Int(v) => v,
+            _ => -1,
+        }),
+        ("getDeviceType", "()I") => Value::Int(field_int(vm, recv, "mDeviceType")),
+        ("getCecVersion", "()I") => Value::Int(match get(vm, recv, "mCecVersion") {
+            Value::Int(v) => v,
+            _ => 0x05,
+        }),
+        ("getDevicePowerStatus", "()I") => Value::Int(match get(vm, recv, "mDevicePowerStatus") {
+            Value::Int(v) => v,
+            _ => -1,
+        }),
+        ("getDeviceId", "()I") => Value::Int(match get(vm, recv, "mDeviceId") {
+            Value::Int(v) => v,
+            _ => -1,
+        }),
+        ("getAdopterId", "()I") => Value::Int(match get(vm, recv, "mAdopterId") {
+            Value::Int(v) => v,
+            _ => -1,
+        }),
+        ("isSourceType", "()Z") => {
+            let kind = field_int(vm, recv, "mHdmiDeviceType");
+            bool_value(if kind == 0 {
+                matches!(field_int(vm, recv, "mDeviceType"), 4 | 1 | 3)
+            } else {
+                kind == 1
+            })
+        }
+        ("isCecDevice", "()Z") => bool_value(field_int(vm, recv, "mHdmiDeviceType") == 0),
+        ("isMhlDevice", "()Z") => bool_value(field_int(vm, recv, "mHdmiDeviceType") == 1),
+        ("isInactivated", "()Z") => bool_value(field_int(vm, recv, "mHdmiDeviceType") == 100),
+        ("getDisplayName", "()Ljava/lang/String;") => get(vm, recv, "mDisplayName"),
+        ("getVendorId", "()I") => Value::Int(field_int(vm, recv, "mVendorId")),
+        ("describeContents", "()I") => Value::Int(0),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let equal = p49_other(vm, recv, args, P49_HDMI_DEVICE_INFO)
+                .map(|other| {
+                    P49_HDMI_INFO_FIELDS.iter().all(|field| {
+                        if *field == "mDeviceFeatures" {
+                            true // AOSP HdmiDeviceInfo.equals excludes features.
+                        } else if *field == "mDisplayName" {
+                            field_str(vm, recv, field) == field_str(vm, other, field)
+                        } else {
+                            field_int(vm, recv, field) == field_int(vm, other, field)
+                        }
+                    })
+                })
+                .unwrap_or(false);
+            bool_value(equal || matches!(args.first(), Some(Value::Obj(r)) if *r == recv))
+        }
+        ("hashCode", "()I") => {
+            let display_name = get(vm, recv, "mDisplayName");
+            let values = [
+                Value::Int(field_int(vm, recv, "mHdmiDeviceType")),
+                Value::Int(field_int(vm, recv, "mPhysicalAddress")),
+                Value::Int(field_int(vm, recv, "mPortId")),
+                Value::Int(field_int(vm, recv, "mLogicalAddress")),
+                Value::Int(field_int(vm, recv, "mDeviceType")),
+                Value::Int(field_int(vm, recv, "mCecVersion")),
+                Value::Int(field_int(vm, recv, "mVendorId")),
+                Value::Int(field_int(vm, recv, "mDevicePowerStatus")),
+                display_name,
+                Value::Int(field_int(vm, recv, "mDeviceId")),
+                Value::Int(field_int(vm, recv, "mAdopterId")),
+            ];
+            Value::Int(p49_objects_hash(vm, &values))
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let kind = field_int(vm, recv, "mHdmiDeviceType");
+            let prefix = match kind {
+                0 => format!(
+                    "CEC: logical_address: 0x{:02X} device_type: {} cec_version: {} vendor_id: {} display_name: {} power_status: {} ",
+                    field_int(vm, recv, "mLogicalAddress"),
+                    field_int(vm, recv, "mDeviceType"),
+                    field_int(vm, recv, "mCecVersion"),
+                    field_int(vm, recv, "mVendorId"),
+                    field_str(vm, recv, "mDisplayName").unwrap_or_default(),
+                    field_int(vm, recv, "mDevicePowerStatus")
+                ),
+                1 => format!(
+                    "MHL: device_id: 0x{:04X} adopter_id: 0x{:04X} ",
+                    field_int(vm, recv, "mDeviceId"),
+                    field_int(vm, recv, "mAdopterId")
+                ),
+                2 => "Hardware: ".to_string(),
+                100 => "Inactivated: ".to_string(),
+                _ => return Ok(Some(jstr(vm, "")?)),
+            };
+            let mut text = format!(
+                "{}physical_address: 0x{:04X} port_id: {}",
+                prefix,
+                field_int(vm, recv, "mPhysicalAddress"),
+                field_int(vm, recv, "mPortId")
+            );
+            if kind == 0 {
+                if let Some(features) = field_obj(vm, recv, "mDeviceFeatures") {
+                    let features_text = vm.invoke_instance(
+                        features,
+                        "toString",
+                        "()Ljava/lang/String;",
+                        &[],
+                    )?;
+                    text.push_str("\n  ");
+                    text.push_str(&opt_str(vm, Some(&features_text)).unwrap_or_default());
+                }
+            }
+            jstr(vm, text)?
+        }
+        _ => return Ok(None),
+    }))
+}
+
+const P49_HDMI_PORT_FIELDS: [&str; 7] = [
+    "mId",
+    "mType",
+    "mAddress",
+    "mCecSupported",
+    "mArcSupported",
+    "mMhlSupported",
+    "mEarcSupported",
+];
+
+fn p49_hdmi_port_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P49_HDMI_PORT_INFO_BUILDER {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "(III)V") => {
+                let ty = iarg(args, 1);
+                if ty != 0 && ty != 1 {
+                    return Err(iae(format!("type should be 0 or 1.")));
+                }
+                if iarg(args, 2) < 0 {
+                    return Err(iae("address should be positive."));
+                }
+                put(vm, recv, "mId", Value::Int(iarg(args, 0)))?;
+                put(vm, recv, "mType", Value::Int(ty))?;
+                put(vm, recv, "mAddress", Value::Int(iarg(args, 2)))?;
+                for field in ["mCecSupported", "mArcSupported", "mEarcSupported", "mMhlSupported"] {
+                    put(vm, recv, field, Value::Int(0))?;
+                }
+                Value::Null
+            }
+            ("<init>", "(Landroid/hardware/hdmi/HdmiPortInfo;)V") => {
+                let other = req_obj(args, 0, "hdmiPortInfo")?;
+                p49_copy_fields(vm, other, recv, &P49_HDMI_PORT_FIELDS)?;
+                Value::Null
+            }
+            ("setCecSupported", "(Z)Landroid/hardware/hdmi/HdmiPortInfo$Builder;") => {
+                put(vm, recv, "mCecSupported", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setArcSupported", "(Z)Landroid/hardware/hdmi/HdmiPortInfo$Builder;") => {
+                put(vm, recv, "mArcSupported", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setEarcSupported", "(Z)Landroid/hardware/hdmi/HdmiPortInfo$Builder;") => {
+                put(vm, recv, "mEarcSupported", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setMhlSupported", "(Z)Landroid/hardware/hdmi/HdmiPortInfo$Builder;") => {
+                put(vm, recv, "mMhlSupported", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("build", "()Landroid/hardware/hdmi/HdmiPortInfo;") => {
+                let out = alloc_obj(vm, P49_HDMI_PORT_INFO, Vec::new())?;
+                p49_copy_fields(vm, recv, out, &P49_HDMI_PORT_FIELDS)?;
+                Value::Obj(out)
+            }
+            _ => return Ok(None),
+        }));
+    }
+
+    Ok(Some(match (name, sig) {
+        ("<init>", "(IIIZZZ)V") => {
+            put(vm, recv, "mId", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mType", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mAddress", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mCecSupported", Value::Int(iarg(args, 3)))?;
+            put(vm, recv, "mMhlSupported", Value::Int(iarg(args, 4)))?;
+            put(vm, recv, "mArcSupported", Value::Int(iarg(args, 5)))?;
+            put(vm, recv, "mEarcSupported", Value::Int(0))?;
+            Value::Null
+        }
+        ("toBuilder", "()Landroid/hardware/hdmi/HdmiPortInfo$Builder;") => {
+            let out = alloc_obj(vm, P49_HDMI_PORT_INFO_BUILDER, Vec::new())?;
+            p49_copy_fields(vm, recv, out, &P49_HDMI_PORT_FIELDS)?;
+            Value::Obj(out)
+        }
+        ("getId", "()I") => Value::Int(field_int(vm, recv, "mId")),
+        ("getType", "()I") => Value::Int(field_int(vm, recv, "mType")),
+        ("getAddress", "()I") => Value::Int(field_int(vm, recv, "mAddress")),
+        ("isCecSupported", "()Z") => bool_value(field_bool(vm, recv, "mCecSupported")),
+        ("isMhlSupported", "()Z") => bool_value(field_bool(vm, recv, "mMhlSupported")),
+        ("isArcSupported", "()Z") => bool_value(field_bool(vm, recv, "mArcSupported")),
+        ("isEarcSupported", "()Z") => bool_value(field_bool(vm, recv, "mEarcSupported")),
+        ("describeContents", "()I") => Value::Int(0),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let equal = p49_other(vm, recv, args, P49_HDMI_PORT_INFO)
+                .map(|other| {
+                    P49_HDMI_PORT_FIELDS
+                        .iter()
+                        .all(|f| field_int(vm, recv, f) == field_int(vm, other, f))
+                })
+                .unwrap_or(false);
+            bool_value(equal || matches!(args.first(), Some(Value::Obj(r)) if *r == recv))
+        }
+        ("hashCode", "()I") => {
+            let values: Vec<Value> = P49_HDMI_PORT_FIELDS
+                .iter()
+                .map(|f| Value::Int(field_int(vm, recv, f)))
+                .collect();
+            Value::Int(p49_objects_hash(vm, &values))
+        }
+        ("toString", "()Ljava/lang/String;") => jstr(
+            vm,
+            format!(
+                "port_id: {}, type: {}, address: 0x{:04x}, cec: {}, arc: {}, mhl: {}, earc: {}",
+                field_int(vm, recv, "mId"),
+                if field_int(vm, recv, "mType") == 0 { "HDMI_IN" } else { "HDMI_OUT" },
+                field_int(vm, recv, "mAddress"),
+                field_bool(vm, recv, "mCecSupported"),
+                field_bool(vm, recv, "mArcSupported"),
+                field_bool(vm, recv, "mMhlSupported"),
+                field_bool(vm, recv, "mEarcSupported"),
+            ),
+        )?,
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_local_port_from_physical_address(target: i32, mine: i32) -> i32 {
+    if mine == target {
+        return 0;
+    }
+    let mut mask = 0xf000;
+    let mut final_mask = 0xf000;
+    let mut masked = mine;
+    while masked != 0 {
+        masked = mine & mask;
+        final_mask |= mask;
+        mask >>= 4;
+    }
+    let port_address = target & final_mask;
+    if (port_address & (final_mask << 4)) != mine {
+        return -1;
+    }
+    mask <<= 4;
+    let mut port = port_address & mask;
+    while (port >> 4) != 0 {
+        port >>= 4;
+    }
+    port
+}
+
+fn p49_hdmi_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let local_address = match get(vm, recv, "mLocalPhysicalAddress") {
+        Value::Int(v) => v,
+        _ => 0xffff,
+    };
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/hardware/hdmi/IHdmiControlService;)V") => {
+            let service = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mService", service)?;
+            put(vm, recv, "mLocalPhysicalAddress", Value::Int(0xffff))?;
+            Value::Null
+        }
+        // This manager profile has a present control service with an empty
+        // supported-type/device/port snapshot.  Null-service-only AOSP paths
+        // that would dereference mService are deliberately not claimed.
+        ("getClient", "(I)Landroid/hardware/hdmi/HdmiClient;")
+        | ("getPlaybackClient", "()Landroid/hardware/hdmi/HdmiPlaybackClient;")
+        | ("getTvClient", "()Landroid/hardware/hdmi/HdmiTvClient;")
+        | ("getAudioSystemClient", "()Landroid/hardware/hdmi/HdmiAudioSystemClient;")
+        | ("getSwitchClient", "()Landroid/hardware/hdmi/HdmiSwitchClient;") => Value::Null,
+        ("getConnectedDevices", "()Ljava/util/List;")
+        | ("getConnectedDevicesList", "()Ljava/util/List;")
+        | ("getPortInfo", "()Ljava/util/List;") => p49_empty_list(vm)?,
+        ("getPhysicalAddress", "()I") => Value::Int(local_address),
+        ("isDeviceConnected", "(Landroid/hardware/hdmi/HdmiDeviceInfo;)Z")
+        | ("isRemoteDeviceConnected", "(Landroid/hardware/hdmi/HdmiDeviceInfo;)Z") => {
+            let target = req_obj(args, 0, "targetDevice")?;
+            let target_address = match vm.invoke_instance(
+                target,
+                "getPhysicalAddress",
+                "()I",
+                &[],
+            )? {
+                Value::Int(v) => v,
+                _ => field_int(vm, target, "mPhysicalAddress"),
+            };
+            bool_value(
+                local_address != 0xffff
+                    && target_address != 0xffff
+                    && p49_local_port_from_physical_address(target_address, local_address) != -1,
+            )
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_hdmi_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P49_DEVICE_FEATURES | P49_DEVICE_FEATURES_BUILDER => {
+            p49_device_features_instance(vm, class, name, sig, recv, args)
+        }
+        P49_HDMI_DEVICE_INFO | P49_HDMI_DEVICE_INFO_BUILDER => {
+            p49_hdmi_device_info_instance(vm, class, name, sig, recv, args)
+        }
+        P49_HDMI_PORT_INFO | P49_HDMI_PORT_INFO_BUILDER => {
+            p49_hdmi_port_instance(vm, class, name, sig, recv, args)
+        }
+        P49_HDMI_MANAGER => p49_hdmi_manager_instance(vm, name, sig, recv, args),
+        _ => Ok(None),
+    }
+}
+
+const P49_INPUT_DEVICE_FIELDS: [&str; 21] = [
+    "mId",
+    "mGeneration",
+    "mControllerNumber",
+    "mName",
+    "mVendorId",
+    "mProductId",
+    "mDescriptor",
+    "mIsExternal",
+    "mSources",
+    "mKeyboardType",
+    "mKeyCharacterMap",
+    "mKeyboardLanguageTag",
+    "mKeyboardLayoutType",
+    "mHasVibrator",
+    "mHasMicrophone",
+    "mHasButtonUnderPad",
+    "mHasSensor",
+    "mHasBattery",
+    "mUsiVersionMajor",
+    "mUsiVersionMinor",
+    "mAssociatedDisplayId",
+];
+
+fn p49_input_identifier(vm: &mut Engine, device: ObjRef) -> Result<Value, VmExit> {
+    if let Value::Obj(existing) = get(vm, device, "mIdentifier") {
+        return Ok(Value::Obj(existing));
+    }
+    let identifier = alloc_obj(vm, P49_INPUT_DEVICE_IDENTIFIER, Vec::new())?;
+    put(vm, identifier, "mDescriptor", get(vm, device, "mDescriptor"))?;
+    put(
+        vm,
+        identifier,
+        "mVendorId",
+        Value::Int(field_int(vm, device, "mVendorId")),
+    )?;
+    put(
+        vm,
+        identifier,
+        "mProductId",
+        Value::Int(field_int(vm, device, "mProductId")),
+    )?;
+    put(vm, device, "mIdentifier", Value::Obj(identifier))?;
+    Ok(Value::Obj(identifier))
+}
+
+fn p49_input_finish_device(vm: &mut Engine, device: ObjRef) -> Result<(), VmExit> {
+    let _ = p49_input_identifier(vm, device)?;
+    let major = match get(vm, device, "mUsiVersionMajor") {
+        Value::Int(v) => v,
+        _ => -1,
+    };
+    let minor = match get(vm, device, "mUsiVersionMinor") {
+        Value::Int(v) => v,
+        _ => -1,
+    };
+    let usi = alloc_obj(
+        vm,
+        P49_HOST_USI_VERSION,
+        vec![
+            ("mMajorVersion".to_string(), Value::Int(major)),
+            ("mMinorVersion".to_string(), Value::Int(minor)),
+        ],
+    )?;
+    put(vm, device, "mHostUsiVersion", Value::Obj(usi))?;
+    if field_obj(vm, device, "mMotionRanges").is_none() {
+        let ranges = obj_array(vm, "[Landroid/view/InputDevice$MotionRange;", Vec::new())?;
+        put(vm, device, "mMotionRanges", ranges)?;
+    }
+    Ok(())
+}
+
+fn p49_input_device_defaults(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    put(vm, recv, "mId", Value::Int(0))?;
+    put(vm, recv, "mGeneration", Value::Int(0))?;
+    put(vm, recv, "mControllerNumber", Value::Int(0))?;
+    let empty = jstr(vm, "")?;
+    put(vm, recv, "mName", empty.clone())?;
+    put(vm, recv, "mVendorId", Value::Int(0))?;
+    put(vm, recv, "mProductId", Value::Int(0))?;
+    put(vm, recv, "mDescriptor", empty)?;
+    put(vm, recv, "mIsExternal", Value::Int(0))?;
+    put(vm, recv, "mSources", Value::Int(0))?;
+    put(vm, recv, "mKeyboardType", Value::Int(0))?;
+    put(vm, recv, "mKeyCharacterMap", Value::Null)?;
+    put(vm, recv, "mKeyboardLanguageTag", Value::Null)?;
+    put(vm, recv, "mKeyboardLayoutType", Value::Null)?;
+    for field in [
+        "mHasVibrator",
+        "mHasMicrophone",
+        "mHasButtonUnderPad",
+        "mHasSensor",
+        "mHasBattery",
+    ] {
+        put(vm, recv, field, Value::Int(0))?;
+    }
+    put(vm, recv, "mUsiVersionMajor", Value::Int(-1))?;
+    put(vm, recv, "mUsiVersionMinor", Value::Int(-1))?;
+    put(vm, recv, "mAssociatedDisplayId", Value::Int(-1))?;
+    let ranges = obj_array(vm, "[Landroid/view/InputDevice$MotionRange;", Vec::new())?;
+    put(vm, recv, "rd_motion_ranges", ranges)?;
+    Ok(())
+}
+
+fn p49_motion_range_value(
+    vm: &mut Engine,
+    axis: i32,
+    source: i32,
+    min: f32,
+    max: f32,
+    flat: f32,
+    fuzz: f32,
+    resolution: f32,
+) -> Result<Value, VmExit> {
+    p49_alloc_value(
+        vm,
+        P49_INPUT_MOTION_RANGE,
+        vec![
+            ("mAxis".to_string(), Value::Int(axis)),
+            ("mSource".to_string(), Value::Int(source)),
+            ("mMin".to_string(), Value::Float(min)),
+            ("mMax".to_string(), Value::Float(max)),
+            ("mFlat".to_string(), Value::Float(flat)),
+            ("mFuzz".to_string(), Value::Float(fuzz)),
+            ("mResolution".to_string(), Value::Float(resolution)),
+        ],
+    )
+}
+
+fn p49_input_device_instance2(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P49_INPUT_DEVICE_BUILDER {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "()V") => {
+                p49_input_device_defaults(vm, recv)?;
+                Value::Null
+            }
+            ("setId", "(I)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mId", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setGeneration", "(I)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mGeneration", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setControllerNumber", "(I)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mControllerNumber", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setName", "(Ljava/lang/String;)Landroid/view/InputDevice$Builder;") => {
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mName", v)?;
+                Value::Obj(recv)
+            }
+            ("setVendorId", "(I)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mVendorId", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setProductId", "(I)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mProductId", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setDescriptor", "(Ljava/lang/String;)Landroid/view/InputDevice$Builder;") => {
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mDescriptor", v)?;
+                Value::Obj(recv)
+            }
+            ("setExternal", "(Z)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mIsExternal", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setSources", "(I)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mSources", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setKeyboardType", "(I)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mKeyboardType", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            (
+                "setKeyCharacterMap",
+                "(Landroid/view/KeyCharacterMap;)Landroid/view/InputDevice$Builder;",
+            ) => {
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mKeyCharacterMap", v)?;
+                Value::Obj(recv)
+            }
+            ("setHasVibrator", "(Z)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mHasVibrator", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setHasMicrophone", "(Z)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mHasMicrophone", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setHasButtonUnderPad", "(Z)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mHasButtonUnderPad", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setHasSensor", "(Z)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mHasSensor", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setHasBattery", "(Z)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mHasBattery", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setKeyboardLanguageTag", "(Ljava/lang/String;)Landroid/view/InputDevice$Builder;") => {
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mKeyboardLanguageTag", v)?;
+                Value::Obj(recv)
+            }
+            ("setKeyboardLayoutType", "(Ljava/lang/String;)Landroid/view/InputDevice$Builder;") => {
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mKeyboardLayoutType", v)?;
+                Value::Obj(recv)
+            }
+            (
+                "setUsiVersion",
+                "(Landroid/hardware/input/HostUsiVersion;)Landroid/view/InputDevice$Builder;",
+            ) => {
+                let (major, minor) = match oarg(args, 0) {
+                    Some(v) => (
+                        field_int(vm, v, "mMajorVersion"),
+                        field_int(vm, v, "mMinorVersion"),
+                    ),
+                    None => (-1, -1),
+                };
+                put(vm, recv, "mUsiVersionMajor", Value::Int(major))?;
+                put(vm, recv, "mUsiVersionMinor", Value::Int(minor))?;
+                Value::Obj(recv)
+            }
+            ("setAssociatedDisplayId", "(I)Landroid/view/InputDevice$Builder;") => {
+                put(vm, recv, "mAssociatedDisplayId", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("addMotionRange", "(IIFFFFF)Landroid/view/InputDevice$Builder;") => {
+                let range = p49_motion_range_value(
+                    vm,
+                    iarg(args, 0),
+                    iarg(args, 1),
+                    farg(args, 2),
+                    farg(args, 3),
+                    farg(args, 4),
+                    farg(args, 5),
+                    farg(args, 6),
+                )?;
+                let current = get(vm, recv, "rd_motion_ranges");
+                let mut ranges = array_elems(vm, Some(&current));
+                ranges.push(range);
+                let stored = obj_array(vm, "[Landroid/view/InputDevice$MotionRange;", ranges)?;
+                put(vm, recv, "rd_motion_ranges", stored)?;
+                Value::Obj(recv)
+            }
+            ("build", "()Landroid/view/InputDevice;") => {
+                let out = alloc_obj(vm, P49_INPUT_DEVICE, Vec::new())?;
+                p49_copy_fields(vm, recv, out, &P49_INPUT_DEVICE_FIELDS)?;
+                let ranges = get(vm, recv, "rd_motion_ranges");
+                put(vm, out, "rd_motion_ranges", ranges)?;
+                p49_input_finish_device(vm, out)?;
+                Value::Obj(out)
+            }
+            _ => return Ok(None),
+        }));
+    }
+
+    if class == P49_INPUT_MOTION_RANGE {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "(IIFFFFF)V") => {
+                put(vm, recv, "mAxis", Value::Int(iarg(args, 0)))?;
+                put(vm, recv, "mSource", Value::Int(iarg(args, 1)))?;
+                put(vm, recv, "mMin", Value::Float(farg(args, 2)))?;
+                put(vm, recv, "mMax", Value::Float(farg(args, 3)))?;
+                put(vm, recv, "mFlat", Value::Float(farg(args, 4)))?;
+                put(vm, recv, "mFuzz", Value::Float(farg(args, 5)))?;
+                put(vm, recv, "mResolution", Value::Float(farg(args, 6)))?;
+                Value::Null
+            }
+            ("getAxis", "()I") => Value::Int(field_int(vm, recv, "mAxis")),
+            ("getSource", "()I") => Value::Int(field_int(vm, recv, "mSource")),
+            ("isFromSource", "(I)Z") => {
+                bool_value((field_int(vm, recv, "mSource") & iarg(args, 0)) == iarg(args, 0))
+            }
+            ("getMin", "()F") => Value::Float(field_float(vm, recv, "mMin")),
+            ("getMax", "()F") => Value::Float(field_float(vm, recv, "mMax")),
+            ("getRange", "()F") => {
+                Value::Float(field_float(vm, recv, "mMax") - field_float(vm, recv, "mMin"))
+            }
+            ("getFlat", "()F") => Value::Float(field_float(vm, recv, "mFlat")),
+            ("getFuzz", "()F") => Value::Float(field_float(vm, recv, "mFuzz")),
+            ("getResolution", "()F") => Value::Float(field_float(vm, recv, "mResolution")),
+            _ => return Ok(None),
+        }));
+    }
+
+    if class == P49_HOST_USI_VERSION {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "(II)V") => {
+                put(vm, recv, "mMajorVersion", Value::Int(iarg(args, 0)))?;
+                put(vm, recv, "mMinorVersion", Value::Int(iarg(args, 1)))?;
+                Value::Null
+            }
+            ("getMajorVersion", "()I") => Value::Int(field_int(vm, recv, "mMajorVersion")),
+            ("getMinorVersion", "()I") => Value::Int(field_int(vm, recv, "mMinorVersion")),
+            ("isValid", "()Z") => bool_value(
+                field_int(vm, recv, "mMajorVersion") >= 0
+                    && field_int(vm, recv, "mMinorVersion") >= 0,
+            ),
+            ("equals", "(Ljava/lang/Object;)Z") => {
+                let equal = p49_other(vm, recv, args, P49_HOST_USI_VERSION)
+                    .map(|other| {
+                        field_int(vm, recv, "mMajorVersion") == field_int(vm, other, "mMajorVersion")
+                            && field_int(vm, recv, "mMinorVersion")
+                                == field_int(vm, other, "mMinorVersion")
+                    })
+                    .unwrap_or(false);
+                bool_value(equal || matches!(args.first(), Some(Value::Obj(r)) if *r == recv))
+            }
+            ("hashCode", "()I") => Value::Int(
+                (31 + field_int(vm, recv, "mMajorVersion"))
+                    .wrapping_mul(31)
+                    .wrapping_add(field_int(vm, recv, "mMinorVersion")),
+            ),
+            ("toString", "()Ljava/lang/String;") => jstr(
+                vm,
+                format!(
+                    "HostUsiVersion {{ majorVersion = {}, minorVersion = {} }}",
+                    field_int(vm, recv, "mMajorVersion"),
+                    field_int(vm, recv, "mMinorVersion")
+                ),
+            )?,
+            ("describeContents", "()I") => Value::Int(0),
+            _ => return Ok(None),
+        }));
+    }
+
+    if class == P49_INPUT_DEVICE_IDENTIFIER {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "(Ljava/lang/String;II)V") => {
+                let descriptor = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mDescriptor", descriptor)?;
+                put(vm, recv, "mVendorId", Value::Int(iarg(args, 1)))?;
+                put(vm, recv, "mProductId", Value::Int(iarg(args, 2)))?;
+                Value::Null
+            }
+            ("getDescriptor", "()Ljava/lang/String;") => get(vm, recv, "mDescriptor"),
+            ("getVendorId", "()I") => Value::Int(field_int(vm, recv, "mVendorId")),
+            ("getProductId", "()I") => Value::Int(field_int(vm, recv, "mProductId")),
+            ("equals", "(Ljava/lang/Object;)Z") => {
+                let equal = p49_other(vm, recv, args, P49_INPUT_DEVICE_IDENTIFIER)
+                    .map(|other| {
+                        field_str(vm, recv, "mDescriptor") == field_str(vm, other, "mDescriptor")
+                            && field_int(vm, recv, "mVendorId") == field_int(vm, other, "mVendorId")
+                            && field_int(vm, recv, "mProductId")
+                                == field_int(vm, other, "mProductId")
+                    })
+                    .unwrap_or(false);
+                bool_value(equal || matches!(args.first(), Some(Value::Obj(r)) if *r == recv))
+            }
+            ("hashCode", "()I") => {
+                let values = [
+                    get(vm, recv, "mDescriptor"),
+                    Value::Int(field_int(vm, recv, "mVendorId")),
+                    Value::Int(field_int(vm, recv, "mProductId")),
+                ];
+                Value::Int(p49_objects_hash(vm, &values))
+            }
+            _ => return Ok(None),
+        }));
+    }
+
+    if class == P49_INPUT_MANAGER {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "(Landroid/content/Context;)V") => {
+                let context = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mContext", context)?;
+                Value::Null
+            }
+            ("getInputDevice", "(I)Landroid/view/InputDevice;")
+            | ("getInputDeviceByDescriptor", "(Ljava/lang/String;)Landroid/view/InputDevice;") => {
+                Value::Null
+            }
+            ("getInputDeviceIds", "()[I") => new_int_array(vm, &[])?,
+            ("isInputDeviceEnabled", "(I)Z") => bool_value(false),
+            ("enableInputDevice", "(I)V") | ("disableInputDevice", "(I)V") => Value::Null,
+            (
+                "registerInputDeviceListener",
+                "(Landroid/hardware/input/InputManager$InputDeviceListener;Landroid/os/Handler;)V",
+            ) => {
+                let listener = req_obj(args, 0, "listener must not be null")?;
+                let current = collection_items(vm, Some(&get(vm, recv, "rd_input_listeners")));
+                if !current.iter().any(|v| matches!(v, Value::Obj(r) if *r == listener)) {
+                    let mut next = current;
+                    next.push(Value::Obj(listener));
+                    let stored = p49_list_value(vm, next)?;
+                    put(vm, recv, "rd_input_listeners", stored)?;
+                }
+                Value::Null
+            }
+            (
+                "unregisterInputDeviceListener",
+                "(Landroid/hardware/input/InputManager$InputDeviceListener;)V",
+            ) => {
+                let Some(listener) = oarg(args, 0) else {
+                    return Err(iae("listener must not be null"));
+                };
+                let next: Vec<Value> = collection_items(vm, Some(&get(vm, recv, "rd_input_listeners")))
+                    .into_iter()
+                    .filter(|v| !matches!(v, Value::Obj(r) if *r == listener))
+                    .collect();
+                let stored = p49_list_value(vm, next)?;
+                put(vm, recv, "rd_input_listeners", stored)?;
+                Value::Null
+            }
+            ("isInTabletMode", "()I") | ("isMicMuted", "()I") => Value::Int(-1),
+            ("getKeyboardLayouts", "()[Landroid/hardware/input/KeyboardLayout;") => {
+                obj_array(vm, "[Landroid/hardware/input/KeyboardLayout;", Vec::new())?
+            }
+            (
+                "getKeyboardLayoutsForInputDevice",
+                "(Landroid/hardware/input/InputDeviceIdentifier;)[Landroid/hardware/input/KeyboardLayout;",
+            )
+            | (
+                "getKeyboardLayoutListForInputDevice",
+                "(Landroid/hardware/input/InputDeviceIdentifier;Landroid/view/inputmethod/InputMethodInfo;Landroid/view/inputmethod/InputMethodSubtype;)[Landroid/hardware/input/KeyboardLayout;",
+            ) => obj_array(vm, "[Landroid/hardware/input/KeyboardLayout;", Vec::new())?,
+            ("getKeyboardLayout", "(Ljava/lang/String;)Landroid/hardware/input/KeyboardLayout;") => {
+                Value::Null
+            }
+            (
+                "getKeyboardLayoutDescriptorsForInputDevice",
+                "(Landroid/view/InputDevice;)Ljava/util/List;",
+            ) => {
+                let _ = req_obj(args, 0, "device")?;
+                p49_empty_list(vm)?
+            }
+            (
+                "getKeyboardLayoutTypeForLayoutDescriptor",
+                "(Ljava/lang/String;)Ljava/lang/String;",
+            ) => jstr(vm, "")?,
+            ("deviceHasKeys", "([I)[Z") => {
+                let count = array_elems(vm, args.first()).len();
+                crate::arrays::new_array(
+                    vm,
+                    "[Z",
+                    ElemKind::Int,
+                    vec![Value::Int(0); count],
+                )?
+            }
+            ("deviceHasKeys", "(I[I)[Z") => {
+                let count = array_elems(vm, args.get(1)).len();
+                crate::arrays::new_array(
+                    vm,
+                    "[Z",
+                    ElemKind::Int,
+                    vec![Value::Int(0); count],
+                )?
+            }
+            ("getKeyCodeForKeyLocation", "(II)I") => Value::Int(0),
+            ("getSensorList", "(I)[Landroid/hardware/input/InputSensorInfo;") => {
+                obj_array(vm, "[Landroid/hardware/input/InputSensorInfo;", Vec::new())?
+            }
+            ("enableSensor", "(IIII)Z") | ("flushSensor", "(II)Z") => bool_value(false),
+            ("disableSensor", "(II)V") => Value::Null,
+            ("getHostUsiVersion", "(Landroid/view/Display;)Landroid/hardware/input/HostUsiVersion;") => {
+                let _ = req_obj(args, 0, "display")?;
+                Value::Null
+            }
+            ("getInputDeviceBluetoothAddress", "(I)Ljava/lang/String;") => Value::Null,
+            ("areTouchpadGesturesAvailable", "(Landroid/content/Context;)Z") => {
+                // AOSP's Android 14 implementation is explicitly a TODO that
+                // returns true, including before using the context argument.
+                bool_value(true)
+            }
+            _ => return Ok(None),
+        }));
+    }
+
+    // InputDevice itself.
+    Ok(Some(match (name, sig) {
+        (
+            "<init>",
+            "(IIILjava/lang/String;IILjava/lang/String;ZII Landroid/view/KeyCharacterMap;Ljava/lang/String;Ljava/lang/String;ZZZZZIII)V",
+        ) => return Ok(None),
+        (
+            "<init>",
+            "(IIILjava/lang/String;IILjava/lang/String;ZIILandroid/view/KeyCharacterMap;Ljava/lang/String;Ljava/lang/String;ZZZZZIII)V",
+        ) => {
+            put(vm, recv, "mId", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mGeneration", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mControllerNumber", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mName", args.get(3).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mVendorId", Value::Int(iarg(args, 4)))?;
+            put(vm, recv, "mProductId", Value::Int(iarg(args, 5)))?;
+            put(vm, recv, "mDescriptor", args.get(6).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mIsExternal", Value::Int(iarg(args, 7)))?;
+            put(vm, recv, "mSources", Value::Int(iarg(args, 8)))?;
+            put(vm, recv, "mKeyboardType", Value::Int(iarg(args, 9)))?;
+            put(vm, recv, "mKeyCharacterMap", args.get(10).cloned().unwrap_or(Value::Null))?;
+            // The IETF tag is stored verbatim in this slice; AOSP's
+            // ULocale canonicalization is not part of the input row claim.
+            put(vm, recv, "mKeyboardLanguageTag", args.get(11).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mKeyboardLayoutType", args.get(12).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mHasVibrator", Value::Int(iarg(args, 13)))?;
+            put(vm, recv, "mHasMicrophone", Value::Int(iarg(args, 14)))?;
+            put(vm, recv, "mHasButtonUnderPad", Value::Int(iarg(args, 15)))?;
+            put(vm, recv, "mHasSensor", Value::Int(iarg(args, 16)))?;
+            put(vm, recv, "mHasBattery", Value::Int(iarg(args, 17)))?;
+            put(vm, recv, "mUsiVersionMajor", Value::Int(iarg(args, 18)))?;
+            put(vm, recv, "mUsiVersionMinor", Value::Int(iarg(args, 19)))?;
+            put(vm, recv, "mAssociatedDisplayId", Value::Int(iarg(args, 20)))?;
+            let ranges = obj_array(vm, "[Landroid/view/InputDevice$MotionRange;", Vec::new())?;
+            put(vm, recv, "rd_motion_ranges", ranges)?;
+            p49_input_finish_device(vm, recv)?;
+            Value::Null
+        }
+        ("addMotionRange", "(IIFFFFF)V") => {
+            let range = p49_motion_range_value(
+                vm,
+                iarg(args, 0),
+                iarg(args, 1),
+                farg(args, 2),
+                farg(args, 3),
+                farg(args, 4),
+                farg(args, 5),
+                farg(args, 6),
+            )?;
+            let current = get(vm, recv, "rd_motion_ranges");
+            let mut ranges = array_elems(vm, Some(&current));
+            ranges.push(range);
+            let stored = obj_array(vm, "[Landroid/view/InputDevice$MotionRange;", ranges)?;
+            put(vm, recv, "rd_motion_ranges", stored)?;
+            Value::Null
+        }
+        ("getId", "()I") => Value::Int(field_int(vm, recv, "mId")),
+        ("getControllerNumber", "()I") => Value::Int(field_int(vm, recv, "mControllerNumber")),
+        ("getIdentifier", "()Landroid/hardware/input/InputDeviceIdentifier;") => {
+            p49_input_identifier(vm, recv)?
+        }
+        ("getGeneration", "()I") => Value::Int(field_int(vm, recv, "mGeneration")),
+        ("getVendorId", "()I") => Value::Int(field_int(vm, recv, "mVendorId")),
+        ("getProductId", "()I") => Value::Int(field_int(vm, recv, "mProductId")),
+        ("getDescriptor", "()Ljava/lang/String;") => get(vm, recv, "mDescriptor"),
+        ("isVirtual", "()Z") => bool_value(field_int(vm, recv, "mId") < 0),
+        ("isExternal", "()Z") => bool_value(field_bool(vm, recv, "mIsExternal")),
+        ("isFullKeyboard", "()Z") => bool_value(
+            (field_int(vm, recv, "mSources") & 0x101) == 0x101
+                && field_int(vm, recv, "mKeyboardType") == 2,
+        ),
+        ("getName", "()Ljava/lang/String;") => get(vm, recv, "mName"),
+        ("getSources", "()I") => Value::Int(field_int(vm, recv, "mSources")),
+        ("supportsSource", "(I)Z") => {
+            bool_value((field_int(vm, recv, "mSources") & iarg(args, 0)) == iarg(args, 0))
+        }
+        ("getKeyboardType", "()I") => Value::Int(field_int(vm, recv, "mKeyboardType")),
+        ("getKeyCharacterMap", "()Landroid/view/KeyCharacterMap;") => get(vm, recv, "mKeyCharacterMap"),
+        ("getKeyboardLanguageTag", "()Ljava/lang/String;") => get(vm, recv, "mKeyboardLanguageTag"),
+        ("getKeyboardLayoutType", "()Ljava/lang/String;") => get(vm, recv, "mKeyboardLayoutType"),
+        ("hasKeys", "([I)[Z") => {
+            let count = array_elems(vm, args.first()).len();
+            crate::arrays::new_array(vm, "[Z", ElemKind::Int, vec![Value::Int(0); count])?
+        }
+        ("getKeyCodeForKeyLocation", "(I)I") => Value::Int(0),
+        ("getMotionRange", "(I)Landroid/view/InputDevice$MotionRange;") => {
+            let axis = iarg(args, 0);
+            let ranges = array_elems(vm, Some(&get(vm, recv, "rd_motion_ranges")));
+            ranges
+                .into_iter()
+                .find(|range| match range {
+                    Value::Obj(r) => field_int(vm, *r, "mAxis") == axis,
+                    _ => false,
+                })
+                .unwrap_or(Value::Null)
+        }
+        ("getMotionRange", "(II)Landroid/view/InputDevice$MotionRange;") => {
+            let axis = iarg(args, 0);
+            let source = iarg(args, 1);
+            let ranges = array_elems(vm, Some(&get(vm, recv, "rd_motion_ranges")));
+            ranges
+                .into_iter()
+                .find(|range| match range {
+                    Value::Obj(r) => {
+                        field_int(vm, *r, "mAxis") == axis
+                            && (field_int(vm, *r, "mSource") & source) == source
+                    }
+                    _ => false,
+                })
+                .unwrap_or(Value::Null)
+        }
+        ("getMotionRanges", "()Ljava/util/List;") => {
+            let ranges = array_elems(vm, Some(&get(vm, recv, "rd_motion_ranges")));
+            p49_list_value(vm, ranges)?
+        }
+        ("getBluetoothAddress", "()Ljava/lang/String;") => Value::Null,
+        ("hasMicrophone", "()Z") => bool_value(field_bool(vm, recv, "mHasMicrophone")),
+        ("hasButtonUnderPad", "()Z") => bool_value(field_bool(vm, recv, "mHasButtonUnderPad")),
+        ("hasSensor", "()Z") => bool_value(field_bool(vm, recv, "mHasSensor")),
+        ("hasBattery", "()Z") => bool_value(field_bool(vm, recv, "mHasBattery")),
+        ("getHostUsiVersion", "()Landroid/hardware/input/HostUsiVersion;") => {
+            match get(vm, recv, "mHostUsiVersion") {
+                Value::Obj(r) => {
+                    if field_int(vm, r, "mMajorVersion") >= 0
+                        && field_int(vm, r, "mMinorVersion") >= 0
+                    {
+                        Value::Obj(r)
+                    } else {
+                        Value::Null
+                    }
+                }
+                _ => {
+                    let major = match get(vm, recv, "mUsiVersionMajor") {
+                        Value::Int(v) => v,
+                        _ => -1,
+                    };
+                    let minor = match get(vm, recv, "mUsiVersionMinor") {
+                        Value::Int(v) => v,
+                        _ => -1,
+                    };
+                    if major >= 0 && minor >= 0 {
+                        p49_alloc_value(
+                            vm,
+                            P49_HOST_USI_VERSION,
+                            vec![
+                                ("mMajorVersion".to_string(), Value::Int(major)),
+                                ("mMinorVersion".to_string(), Value::Int(minor)),
+                            ],
+                        )?
+                    } else {
+                        Value::Null
+                    }
+                }
+            }
+        }
+        ("getAssociatedDisplayId", "()I") => {
+            Value::Int(match get(vm, recv, "mAssociatedDisplayId") {
+                Value::Int(v) => v,
+                _ => -1,
+            })
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_input_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    p49_input_device_instance2(vm, class, name, sig, recv, args)
+}
+
+fn p49_value_equal(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, VmExit> {
+    if objects_equal(vm, a, b) {
+        return Ok(true);
+    }
+    match (a, b) {
+        (Value::Obj(x), Value::Obj(y)) => {
+            let result = vm.invoke_instance(*x, "equals", "(Ljava/lang/Object;)Z", &[Value::Obj(*y)])?;
+            Ok(result.as_int().unwrap_or(0) != 0)
+        }
+        _ => Ok(a == b),
+    }
+}
+
+fn p49_value_hash(vm: &mut Engine, value: &Value) -> i32 {
+    match value {
+        Value::Obj(r) => {
+            if vm.heap.as_str(*r).is_ok() {
+                host_hash(vm, value)
+            } else {
+                match vm.invoke_instance(*r, "hashCode", "()I", &[]) {
+                    Ok(v) => v.as_int().unwrap_or_else(|_| host_hash(vm, value)),
+                    Err(_) => host_hash(vm, value),
+                }
+            }
+        }
+        _ => host_hash(vm, value),
+    }
+}
+
+fn p49_array_hash_deep(vm: &mut Engine, value: &Value) -> i32 {
+    if matches!(value, Value::Null) {
+        return 0;
+    }
+    let mut result: i32 = 1;
+    for elem in array_elems(vm, Some(value)) {
+        result = result.wrapping_mul(31).wrapping_add(p49_value_hash(vm, &elem));
+    }
+    result
+}
+
+fn p49_value_array_equal_deep(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, VmExit> {
+    if matches!((a, b), (Value::Null, Value::Null)) {
+        return Ok(true);
+    }
+    if matches!(a, Value::Null) || matches!(b, Value::Null) {
+        return Ok(false);
+    }
+    let aa = array_elems(vm, Some(a));
+    let bb = array_elems(vm, Some(b));
+    if aa.len() != bb.len() {
+        return Ok(false);
+    }
+    for (x, y) in aa.iter().zip(bb.iter()) {
+        if !p49_value_equal(vm, x, y)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn p49_array_to_string(vm: &mut Engine, value: &Value) -> Result<String, VmExit> {
+    if matches!(value, Value::Null) {
+        return Ok("null".to_string());
+    }
+    let mut parts = Vec::new();
+    for elem in array_elems(vm, Some(value)) {
+        parts.push(value_string(vm, &elem)?);
+    }
+    Ok(format!("[{}]", parts.join(", ")))
+}
+
+fn p49_other_exact(vm: &Engine, args: &[Value], class: &str) -> Option<ObjRef> {
+    match args.first() {
+        Some(Value::Obj(r)) if class_of(vm, *r) == class => Some(*r),
+        _ => None,
+    }
+}
+
+fn p49_array_or_empty(vm: &mut Engine, value: &Value, desc: &str) -> Result<Value, VmExit> {
+    if matches!(value, Value::Obj(_)) {
+        Ok(value.clone())
+    } else if desc == "[B" || desc == "[I" || desc == "[Z" {
+        crate::arrays::new_array(vm, desc, ElemKind::Int, Vec::new())
+    } else {
+        obj_array(vm, desc, Vec::new())
+    }
+}
+
+fn p49_sound_model_init(
+    vm: &mut Engine,
+    recv: ObjRef,
+    uuid: &Value,
+    vendor_uuid: &Value,
+    kind: i32,
+    data: &Value,
+    version: i32,
+) -> Result<(), VmExit> {
+    if !matches!(uuid, Value::Obj(_)) {
+        return Err(npe("uuid"));
+    }
+    let vendor = if matches!(vendor_uuid, Value::Obj(_)) {
+        vendor_uuid.clone()
+    } else {
+        p49_zero_uuid(vm)?
+    };
+    let data = p49_array_or_empty(vm, data, "[B")?;
+    put(vm, recv, "mUuid", uuid.clone())?;
+    put(vm, recv, "mVendorUuid", vendor)?;
+    put(vm, recv, "mType", Value::Int(kind))?;
+    put(vm, recv, "mData", data)?;
+    put(vm, recv, "mVersion", Value::Int(version))
+}
+
+fn p49_sound_model_hash(vm: &mut Engine, recv: ObjRef) -> i32 {
+    let data = get(vm, recv, "mData");
+    let uuid = get(vm, recv, "mUuid");
+    let vendor = get(vm, recv, "mVendorUuid");
+    let mut result: i32 = 1;
+    result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "mVersion"));
+    result = result.wrapping_mul(31).wrapping_add(p49_array_hash(vm, &data));
+    result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "mType"));
+    result = result.wrapping_mul(31).wrapping_add(p49_value_hash(vm, &uuid));
+    result = result.wrapping_mul(31).wrapping_add(p49_value_hash(vm, &vendor));
+    result
+}
+
+fn p49_sound_model_equal(vm: &mut Engine, recv: ObjRef, other: ObjRef) -> Result<bool, VmExit> {
+    Ok(field_int(vm, recv, "mType") == field_int(vm, other, "mType")
+        && p49_value_equal(vm, &get(vm, recv, "mUuid"), &get(vm, other, "mUuid"))?
+        && p49_value_equal(
+            vm,
+            &get(vm, recv, "mVendorUuid"),
+            &get(vm, other, "mVendorUuid"),
+        )?
+        && p49_value_array_equal(vm, &get(vm, recv, "mData"), &get(vm, other, "mData"))
+        && field_int(vm, recv, "mVersion") == field_int(vm, other, "mVersion"))
+}
+
+fn p49_sound_model_common(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("getUuid", "()Ljava/util/UUID;") => get(vm, recv, "mUuid"),
+        ("getType", "()I") => Value::Int(field_int(vm, recv, "mType")),
+        ("getVendorUuid", "()Ljava/util/UUID;") => get(vm, recv, "mVendorUuid"),
+        ("getVersion", "()I") => Value::Int(field_int(vm, recv, "mVersion")),
+        ("getData", "()[B") => get(vm, recv, "mData"),
+        ("hashCode", "()I") => Value::Int(p49_sound_model_hash(vm, recv)),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            if matches!(args.first(), Some(Value::Obj(r)) if *r == recv) {
+                bool_value(true)
+            } else if let Some(other) = p49_other(vm, recv, args, P49_SOUND_MODEL) {
+                bool_value(p49_sound_model_equal(vm, recv, other)?)
+            } else {
+                bool_value(false)
+            }
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_sound_trigger_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P49_SOUND_MODEL => {
+            if (name, sig) == ("<init>", "(Ljava/util/UUID;Ljava/util/UUID;I[BI)V") {
+                p49_sound_model_init(
+                    vm,
+                    recv,
+                    &args.first().cloned().unwrap_or(Value::Null),
+                    &args.get(1).cloned().unwrap_or(Value::Null),
+                    iarg(args, 2),
+                    &args.get(3).cloned().unwrap_or(Value::Null),
+                    iarg(args, 4),
+                )?;
+                return Ok(Some(Value::Null));
+            }
+            p49_sound_model_common(vm, name, sig, recv, args)
+        }
+        P49_GENERIC_SOUND_MODEL => {
+            match (name, sig) {
+                ("<init>", "(Ljava/util/UUID;Ljava/util/UUID;[BI)V") => {
+                    p49_sound_model_init(
+                        vm,
+                        recv,
+                        &args.first().cloned().unwrap_or(Value::Null),
+                        &args.get(1).cloned().unwrap_or(Value::Null),
+                        1,
+                        &args.get(2).cloned().unwrap_or(Value::Null),
+                        iarg(args, 3),
+                    )?;
+                    Ok(Some(Value::Null))
+                }
+                ("<init>", "(Ljava/util/UUID;Ljava/util/UUID;[B)V") => {
+                    p49_sound_model_init(
+                        vm,
+                        recv,
+                        &args.first().cloned().unwrap_or(Value::Null),
+                        &args.get(1).cloned().unwrap_or(Value::Null),
+                        1,
+                        &args.get(2).cloned().unwrap_or(Value::Null),
+                        -1,
+                    )?;
+                    Ok(Some(Value::Null))
+                }
+                ("describeContents", "()I") => Ok(Some(Value::Int(0))),
+                ("toString", "()Ljava/lang/String;") => {
+                    let uuid = value_string(vm, &get(vm, recv, "mUuid"))?;
+                    let vendor = value_string(vm, &get(vm, recv, "mVendorUuid"))?;
+                    let data_len = array_elems(vm, Some(&get(vm, recv, "mData"))).len();
+                    Ok(Some(jstr(
+                        vm,
+                        format!(
+                            "GenericSoundModel [uuid={}, vendorUuid={}, type={}, data={}, version={}]",
+                            uuid,
+                            vendor,
+                            field_int(vm, recv, "mType"),
+                            data_len,
+                            field_int(vm, recv, "mVersion")
+                        ),
+                    )?))
+                }
+                _ => p49_sound_model_common(vm, name, sig, recv, args),
+            }
+        }
+        P49_KEYPHRASE_SOUND_MODEL => {
+            const KEYPHRASES_DESC: &str = "[Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;";
+            match (name, sig) {
+                (
+                    "<init>",
+                    "(Ljava/util/UUID;Ljava/util/UUID;[B[Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;I)V",
+                ) => {
+                    p49_sound_model_init(
+                        vm,
+                        recv,
+                        &args.first().cloned().unwrap_or(Value::Null),
+                        &args.get(1).cloned().unwrap_or(Value::Null),
+                        0,
+                        &args.get(2).cloned().unwrap_or(Value::Null),
+                        iarg(args, 4),
+                    )?;
+                    let keyphrases = p49_array_or_empty(
+                        vm,
+                        &args.get(3).cloned().unwrap_or(Value::Null),
+                        KEYPHRASES_DESC,
+                    )?;
+                    put(vm, recv, "mKeyphrases", keyphrases)?;
+                    Ok(Some(Value::Null))
+                }
+                (
+                    "<init>",
+                    "(Ljava/util/UUID;Ljava/util/UUID;[B[Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;)V",
+                ) => {
+                    p49_sound_model_init(
+                        vm,
+                        recv,
+                        &args.first().cloned().unwrap_or(Value::Null),
+                        &args.get(1).cloned().unwrap_or(Value::Null),
+                        0,
+                        &args.get(2).cloned().unwrap_or(Value::Null),
+                        -1,
+                    )?;
+                    let keyphrases = p49_array_or_empty(
+                        vm,
+                        &args.get(3).cloned().unwrap_or(Value::Null),
+                        KEYPHRASES_DESC,
+                    )?;
+                    put(vm, recv, "mKeyphrases", keyphrases)?;
+                    Ok(Some(Value::Null))
+                }
+                (
+                    "getKeyphrases",
+                    "()[Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;",
+                ) => Ok(Some(match get(vm, recv, "mKeyphrases") {
+                    Value::Obj(_) => get(vm, recv, "mKeyphrases"),
+                    _ => obj_array(vm, KEYPHRASES_DESC, Vec::new())?,
+                })),
+                ("describeContents", "()I") => Ok(Some(Value::Int(0))),
+                ("hashCode", "()I") => {
+                    let base = p49_sound_model_hash(vm, recv);
+                    let key_hash = p49_array_hash_deep(vm, &get(vm, recv, "mKeyphrases"));
+                    Ok(Some(Value::Int(base.wrapping_mul(31).wrapping_add(key_hash))))
+                }
+                ("equals", "(Ljava/lang/Object;)Z") => {
+                    if matches!(args.first(), Some(Value::Obj(r)) if *r == recv) {
+                        return Ok(Some(bool_value(true)));
+                    }
+                    let Some(other) = p49_other(vm, recv, args, P49_SOUND_MODEL) else {
+                        return Ok(Some(bool_value(false)));
+                    };
+                    if !p49_sound_model_equal(vm, recv, other)? {
+                        return Ok(Some(bool_value(false)));
+                    }
+                    if !vm.cp.is_subtype(&class_of(vm, other), P49_KEYPHRASE_SOUND_MODEL) {
+                        return Ok(Some(bool_value(false)));
+                    }
+                    Ok(Some(bool_value(p49_value_array_equal_deep(
+                        vm,
+                        &get(vm, recv, "mKeyphrases"),
+                        &get(vm, other, "mKeyphrases"),
+                    )?)))
+                }
+                ("toString", "()Ljava/lang/String;") => {
+                    let keyphrases = p49_array_to_string(vm, &get(vm, recv, "mKeyphrases"))?;
+                    let uuid = value_string(vm, &get(vm, recv, "mUuid"))?;
+                    let vendor = value_string(vm, &get(vm, recv, "mVendorUuid"))?;
+                    let data_len = array_elems(vm, Some(&get(vm, recv, "mData"))).len();
+                    Ok(Some(jstr(
+                        vm,
+                        format!(
+                            "KeyphraseSoundModel [keyphrases={}, uuid={}, vendorUuid={}, type={}, data={}, version={}]",
+                            keyphrases,
+                            uuid,
+                            vendor,
+                            field_int(vm, recv, "mType"),
+                            data_len,
+                            field_int(vm, recv, "mVersion")
+                        ),
+                    )?))
+                }
+                _ => p49_sound_model_common(vm, name, sig, recv, args),
+            }
+        }
+        P49_SOUND_KEYPHRASE => Ok(Some(match (name, sig) {
+            ("<init>", "(IILjava/util/Locale;Ljava/lang/String;[I)V") => {
+                let locale = req_obj(args, 2, "locale")?;
+                let text = req_obj(args, 3, "text")?;
+                let users = p49_array_or_empty(
+                    vm,
+                    &args.get(4).cloned().unwrap_or(Value::Null),
+                    "[I",
+                )?;
+                put(vm, recv, "mId", Value::Int(iarg(args, 0)))?;
+                put(vm, recv, "mRecognitionModes", Value::Int(iarg(args, 1)))?;
+                put(vm, recv, "mLocale", Value::Obj(locale))?;
+                put(vm, recv, "mText", Value::Obj(text))?;
+                put(vm, recv, "mUsers", users)?;
+                Value::Null
+            }
+            ("getId", "()I") => Value::Int(field_int(vm, recv, "mId")),
+            ("getRecognitionModes", "()I") => Value::Int(field_int(vm, recv, "mRecognitionModes")),
+            ("getLocale", "()Ljava/util/Locale;") => get(vm, recv, "mLocale"),
+            ("getText", "()Ljava/lang/String;") => get(vm, recv, "mText"),
+            ("getUsers", "()[I") => get(vm, recv, "mUsers"),
+            ("describeContents", "()I") => Value::Int(0),
+            ("hashCode", "()I") => {
+                let text = get(vm, recv, "mText");
+                let locale = get(vm, recv, "mLocale");
+                let users = get(vm, recv, "mUsers");
+                let mut result: i32 = 1;
+                result = result.wrapping_mul(31).wrapping_add(host_hash(vm, &text));
+                result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "mId"));
+                result = result.wrapping_mul(31).wrapping_add(p49_value_hash(vm, &locale));
+                result = result
+                    .wrapping_mul(31)
+                    .wrapping_add(field_int(vm, recv, "mRecognitionModes"));
+                result = result.wrapping_mul(31).wrapping_add(p49_array_hash(vm, &users));
+                Value::Int(result)
+            }
+            ("equals", "(Ljava/lang/Object;)Z") => {
+                if matches!(args.first(), Some(Value::Obj(r)) if *r == recv) {
+                    bool_value(true)
+                } else if let Some(other) = p49_other_exact(vm, args, P49_SOUND_KEYPHRASE) {
+                    bool_value(
+                        field_str(vm, recv, "mText") == field_str(vm, other, "mText")
+                            && field_int(vm, recv, "mId") == field_int(vm, other, "mId")
+                            && p49_value_equal(
+                                vm,
+                                &get(vm, recv, "mLocale"),
+                                &get(vm, other, "mLocale"),
+                            )?
+                            && field_int(vm, recv, "mRecognitionModes")
+                                == field_int(vm, other, "mRecognitionModes")
+                            && p49_value_array_equal(
+                                vm,
+                                &get(vm, recv, "mUsers"),
+                                &get(vm, other, "mUsers"),
+                            ),
+                    )
+                } else {
+                    bool_value(false)
+                }
+            }
+            ("toString", "()Ljava/lang/String;") => {
+                let locale_tag = match field_obj(vm, recv, "mLocale") {
+                    Some(locale) => match vm.invoke_instance(
+                        locale,
+                        "toLanguageTag",
+                        "()Ljava/lang/String;",
+                        &[],
+                    ) {
+                        Ok(v) => opt_str(vm, Some(&v)).unwrap_or_default(),
+                        Err(_) => value_string(vm, &Value::Obj(locale))?,
+                    },
+                    None => "null".to_string(),
+                };
+                let users = p49_array_to_string(vm, &get(vm, recv, "mUsers"))?;
+                jstr(
+                    vm,
+                    format!(
+                        "Keyphrase [id={}, recognitionModes={}, locale={}, text={}, users={}]",
+                        field_int(vm, recv, "mId"),
+                        field_int(vm, recv, "mRecognitionModes"),
+                        locale_tag,
+                        field_str(vm, recv, "mText").unwrap_or_else(|| "null".to_string()),
+                        users
+                    ),
+                )?
+            }
+            _ => return Ok(None),
+        })),
+        P49_MODEL_PARAM_RANGE => Ok(Some(match (name, sig) {
+            ("<init>", "(II)V") => {
+                put(vm, recv, "mStart", Value::Int(iarg(args, 0)))?;
+                put(vm, recv, "mEnd", Value::Int(iarg(args, 1)))?;
+                Value::Null
+            }
+            ("getStart", "()I") => Value::Int(field_int(vm, recv, "mStart")),
+            ("getEnd", "()I") => Value::Int(field_int(vm, recv, "mEnd")),
+            ("describeContents", "()I") => Value::Int(0),
+            ("hashCode", "()I") => Value::Int(
+                (31 + field_int(vm, recv, "mStart"))
+                    .wrapping_mul(31)
+                    .wrapping_add(field_int(vm, recv, "mEnd")),
+            ),
+            ("equals", "(Ljava/lang/Object;)Z") => {
+                let equal = p49_other_exact(vm, args, P49_MODEL_PARAM_RANGE)
+                    .map(|other| {
+                        field_int(vm, recv, "mStart") == field_int(vm, other, "mStart")
+                            && field_int(vm, recv, "mEnd") == field_int(vm, other, "mEnd")
+                    })
+                    .unwrap_or(false);
+                bool_value(equal || matches!(args.first(), Some(Value::Obj(r)) if *r == recv))
+            }
+            ("toString", "()Ljava/lang/String;") => jstr(
+                vm,
+                format!(
+                    "ModelParamRange [start={}, end={}]",
+                    field_int(vm, recv, "mStart"),
+                    field_int(vm, recv, "mEnd")
+                ),
+            )?,
+            _ => return Ok(None),
+        })),
+        P49_RECOGNITION_CONFIG => Ok(Some(match (name, sig) {
+            (
+                "<init>",
+                "(ZZ[Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseRecognitionExtra;[BI)V",
+            )
+            | (
+                "<init>",
+                "(ZZ[Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseRecognitionExtra;[B)V",
+            ) => {
+                let keyphrases = p49_array_or_empty(
+                    vm,
+                    &args.get(2).cloned().unwrap_or(Value::Null),
+                    "[Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseRecognitionExtra;",
+                )?;
+                let data = p49_array_or_empty(
+                    vm,
+                    &args.get(3).cloned().unwrap_or(Value::Null),
+                    "[B",
+                )?;
+                put(vm, recv, "captureRequested", Value::Int(iarg(args, 0)))?;
+                put(vm, recv, "allowMultipleTriggers", Value::Int(iarg(args, 1)))?;
+                put(vm, recv, "keyphrases", keyphrases)?;
+                put(vm, recv, "data", data)?;
+                put(
+                    vm,
+                    recv,
+                    "audioCapabilities",
+                    Value::Int(if sig.ends_with("I)V") { iarg(args, 4) } else { 0 }),
+                )?;
+                Value::Null
+            }
+            ("describeContents", "()I") => Value::Int(0),
+            ("equals", "(Ljava/lang/Object;)Z") => {
+                if matches!(args.first(), Some(Value::Obj(r)) if *r == recv) {
+                    bool_value(true)
+                } else if let Some(other) = p49_other(vm, recv, args, P49_RECOGNITION_CONFIG) {
+                    bool_value(
+                        field_bool(vm, recv, "captureRequested")
+                            == field_bool(vm, other, "captureRequested")
+                            && field_bool(vm, recv, "allowMultipleTriggers")
+                                == field_bool(vm, other, "allowMultipleTriggers")
+                            && p49_value_array_equal_deep(
+                                vm,
+                                &get(vm, recv, "keyphrases"),
+                                &get(vm, other, "keyphrases"),
+                            )?
+                            && p49_value_array_equal(
+                                vm,
+                                &get(vm, recv, "data"),
+                                &get(vm, other, "data"),
+                            )
+                            && field_int(vm, recv, "audioCapabilities")
+                                == field_int(vm, other, "audioCapabilities"),
+                    )
+                } else {
+                    bool_value(false)
+                }
+            }
+            ("hashCode", "()I") => {
+                let mut result: i32 = 1;
+                result = result
+                    .wrapping_mul(31)
+                    .wrapping_add(if field_bool(vm, recv, "captureRequested") { 1 } else { 0 });
+                result = result.wrapping_mul(31).wrapping_add(
+                    if field_bool(vm, recv, "allowMultipleTriggers") { 1 } else { 0 },
+                );
+                result = result
+                    .wrapping_mul(31)
+                    .wrapping_add(p49_array_hash_deep(vm, &get(vm, recv, "keyphrases")));
+                result = result
+                    .wrapping_mul(31)
+                    .wrapping_add(p49_array_hash(vm, &get(vm, recv, "data")));
+                result = result
+                    .wrapping_mul(31)
+                    .wrapping_add(field_int(vm, recv, "audioCapabilities"));
+                Value::Int(result)
+            }
+            ("toString", "()Ljava/lang/String;") => {
+                let keyphrases = p49_array_to_string(vm, &get(vm, recv, "keyphrases"))?;
+                let data = p49_array_to_string(vm, &get(vm, recv, "data"))?;
+                jstr(
+                    vm,
+                    format!(
+                        "RecognitionConfig [captureRequested={}, allowMultipleTriggers={}, keyphrases={}, data={}, audioCapabilities={:x}]",
+                        field_bool(vm, recv, "captureRequested"),
+                        field_bool(vm, recv, "allowMultipleTriggers"),
+                        keyphrases,
+                        data,
+                        field_int(vm, recv, "audioCapabilities")
+                    ),
+                )?
+            }
+            _ => return Ok(None),
+        })),
+        P49_CONFIDENCE_LEVEL => Ok(Some(match (name, sig) {
+            ("<init>", "(II)V") => {
+                put(vm, recv, "userId", Value::Int(iarg(args, 0)))?;
+                put(vm, recv, "confidenceLevel", Value::Int(iarg(args, 1)))?;
+                Value::Null
+            }
+            ("describeContents", "()I") => Value::Int(0),
+            ("hashCode", "()I") => Value::Int(
+                (31 + field_int(vm, recv, "confidenceLevel"))
+                    .wrapping_mul(31)
+                    .wrapping_add(field_int(vm, recv, "userId")),
+            ),
+            ("equals", "(Ljava/lang/Object;)Z") => {
+                let equal = p49_other_exact(vm, args, P49_CONFIDENCE_LEVEL)
+                    .map(|other| {
+                        field_int(vm, recv, "confidenceLevel")
+                            == field_int(vm, other, "confidenceLevel")
+                            && field_int(vm, recv, "userId") == field_int(vm, other, "userId")
+                    })
+                    .unwrap_or(false);
+                bool_value(equal || matches!(args.first(), Some(Value::Obj(r)) if *r == recv))
+            }
+            ("toString", "()Ljava/lang/String;") => jstr(
+                vm,
+                format!(
+                    "ConfidenceLevel [userId={}, confidenceLevel={}]",
+                    field_int(vm, recv, "userId"),
+                    field_int(vm, recv, "confidenceLevel")
+                ),
+            )?,
+            _ => return Ok(None),
+        })),
+        P49_KEYPHRASE_RECOGNITION_EXTRA => Ok(Some(match (name, sig) {
+            ("<init>", "(III)V") => {
+                let levels = obj_array(
+                    vm,
+                    "[Landroid/hardware/soundtrigger/SoundTrigger$ConfidenceLevel;",
+                    Vec::new(),
+                )?;
+                put(vm, recv, "id", Value::Int(iarg(args, 0)))?;
+                put(vm, recv, "recognitionModes", Value::Int(iarg(args, 1)))?;
+                put(vm, recv, "coarseConfidenceLevel", Value::Int(iarg(args, 2)))?;
+                put(vm, recv, "confidenceLevels", levels)?;
+                Value::Null
+            }
+            (
+                "<init>",
+                "(III[Landroid/hardware/soundtrigger/SoundTrigger$ConfidenceLevel;)V",
+            ) => {
+                let levels = p49_array_or_empty(
+                    vm,
+                    &args.get(3).cloned().unwrap_or(Value::Null),
+                    "[Landroid/hardware/soundtrigger/SoundTrigger$ConfidenceLevel;",
+                )?;
+                put(vm, recv, "id", Value::Int(iarg(args, 0)))?;
+                put(vm, recv, "recognitionModes", Value::Int(iarg(args, 1)))?;
+                put(vm, recv, "coarseConfidenceLevel", Value::Int(iarg(args, 2)))?;
+                put(vm, recv, "confidenceLevels", levels)?;
+                Value::Null
+            }
+            ("getKeyphraseId", "()I") => Value::Int(field_int(vm, recv, "id")),
+            ("getRecognitionModes", "()I") => Value::Int(field_int(vm, recv, "recognitionModes")),
+            ("getCoarseConfidenceLevel", "()I") => {
+                Value::Int(field_int(vm, recv, "coarseConfidenceLevel"))
+            }
+            ("getConfidenceLevels", "()Ljava/util/Collection;") => {
+                let levels = array_elems(vm, Some(&get(vm, recv, "confidenceLevels")));
+                p49_list_value(vm, levels)?
+            }
+            ("describeContents", "()I") => Value::Int(0),
+            ("hashCode", "()I") => {
+                let mut result: i32 = 1;
+                result = result
+                    .wrapping_mul(31)
+                    .wrapping_add(p49_array_hash_deep(vm, &get(vm, recv, "confidenceLevels")));
+                result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "id"));
+                result = result
+                    .wrapping_mul(31)
+                    .wrapping_add(field_int(vm, recv, "recognitionModes"));
+                result = result
+                    .wrapping_mul(31)
+                    .wrapping_add(field_int(vm, recv, "coarseConfidenceLevel"));
+                Value::Int(result)
+            }
+            ("equals", "(Ljava/lang/Object;)Z") => {
+                if matches!(args.first(), Some(Value::Obj(r)) if *r == recv) {
+                    bool_value(true)
+                } else if let Some(other) = p49_other_exact(vm, args, P49_KEYPHRASE_RECOGNITION_EXTRA) {
+                    bool_value(
+                        p49_value_array_equal_deep(
+                            vm,
+                            &get(vm, recv, "confidenceLevels"),
+                            &get(vm, other, "confidenceLevels"),
+                        )?
+                            && field_int(vm, recv, "id") == field_int(vm, other, "id")
+                            && field_int(vm, recv, "recognitionModes")
+                                == field_int(vm, other, "recognitionModes")
+                            && field_int(vm, recv, "coarseConfidenceLevel")
+                                == field_int(vm, other, "coarseConfidenceLevel"),
+                    )
+                } else {
+                    bool_value(false)
+                }
+            }
+            ("toString", "()Ljava/lang/String;") => {
+                let levels = p49_array_to_string(vm, &get(vm, recv, "confidenceLevels"))?;
+                jstr(
+                    vm,
+                    format!(
+                        "KeyphraseRecognitionExtra [id={}, recognitionModes={}, coarseConfidenceLevel={}, confidenceLevels={}]",
+                        field_int(vm, recv, "id"),
+                        field_int(vm, recv, "recognitionModes"),
+                        field_int(vm, recv, "coarseConfidenceLevel"),
+                        levels
+                    ),
+                )?
+            }
+            _ => return Ok(None),
+        })),
+        P49_KEYPHRASE_METADATA => Ok(Some(match (name, sig) {
+            ("<init>", "(ILjava/lang/String;Ljava/util/Set;I)V") => {
+                let locales_arg = req_obj(args, 2, "supportedLocales")?;
+                let items = collection_items(vm, Some(&Value::Obj(locales_arg)));
+                let locales = Value::Obj(new_collection(vm, "Landroid/util/ArraySet;", items)?);
+                let keyphrase = args.get(1).cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mId", Value::Int(iarg(args, 0)))?;
+                put(vm, recv, "mKeyphrase", keyphrase)?;
+                put(vm, recv, "mSupportedLocales", locales)?;
+                put(vm, recv, "mRecognitionModeFlags", Value::Int(iarg(args, 3)))?;
+                Value::Null
+            }
+            ("getId", "()I") => Value::Int(field_int(vm, recv, "mId")),
+            ("getKeyphrase", "()Ljava/lang/String;") => get(vm, recv, "mKeyphrase"),
+            ("getSupportedLocales", "()Ljava/util/Set;") => get(vm, recv, "mSupportedLocales"),
+            ("getRecognitionModeFlags", "()I") => {
+                Value::Int(field_int(vm, recv, "mRecognitionModeFlags"))
+            }
+            ("supportsPhrase", "(Ljava/lang/String;)Z") => {
+                let Some(keyphrase) = field_str(vm, recv, "mKeyphrase") else {
+                    return Err(npe("getKeyphrase()"));
+                };
+                if keyphrase.is_empty() {
+                    bool_value(true)
+                } else {
+                    bool_value(
+                        opt_str_arg(vm, args, 0)
+                            .map(|phrase| keyphrase.eq_ignore_ascii_case(&phrase))
+                            .unwrap_or(false),
+                    )
+                }
+            }
+            ("supportsLocale", "(Ljava/util/Locale;)Z") => {
+                let locales = collection_items(vm, Some(&get(vm, recv, "mSupportedLocales")));
+                if locales.is_empty() {
+                    bool_value(true)
+                } else {
+                    let target = args.first().cloned().unwrap_or(Value::Null);
+                    let mut found = false;
+                    for locale in &locales {
+                        if p49_value_equal(vm, locale, &target)? {
+                            found = true;
+                            break;
+                        }
+                    }
+                    bool_value(found)
+                }
+            }
+            ("describeContents", "()I") => Value::Int(0),
+            ("equals", "(Ljava/lang/Object;)Z") => {
+                if matches!(args.first(), Some(Value::Obj(r)) if *r == recv) {
+                    bool_value(true)
+                } else if let Some(other) = p49_other_exact(vm, args, P49_KEYPHRASE_METADATA) {
+                    let mine = collection_items(vm, Some(&get(vm, recv, "mSupportedLocales")));
+                    let theirs = collection_items(vm, Some(&get(vm, other, "mSupportedLocales")));
+                    let mut sets_equal = mine.len() == theirs.len();
+                    if sets_equal {
+                        for item in &mine {
+                            let mut found = false;
+                            for other_item in &theirs {
+                                if p49_value_equal(vm, item, other_item)? {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if !found {
+                                sets_equal = false;
+                                break;
+                            }
+                        }
+                    }
+                    bool_value(
+                        field_int(vm, recv, "mId") == field_int(vm, other, "mId")
+                            && field_str(vm, recv, "mKeyphrase") == field_str(vm, other, "mKeyphrase")
+                            && sets_equal
+                            && field_int(vm, recv, "mRecognitionModeFlags")
+                                == field_int(vm, other, "mRecognitionModeFlags"),
+                    )
+                } else {
+                    bool_value(false)
+                }
+            }
+            ("hashCode", "()I") => {
+                let locales = collection_items(vm, Some(&get(vm, recv, "mSupportedLocales")));
+                let mut locale_hash: i32 = 0;
+                for locale in &locales {
+                    locale_hash = locale_hash.wrapping_add(p49_value_hash(vm, locale));
+                }
+                let mut result: i32 = 1;
+                result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "mId"));
+                result = result
+                    .wrapping_mul(31)
+                    .wrapping_add(host_hash(vm, &get(vm, recv, "mKeyphrase")));
+                result = result.wrapping_mul(31).wrapping_add(locale_hash);
+                result = result
+                    .wrapping_mul(31)
+                    .wrapping_add(field_int(vm, recv, "mRecognitionModeFlags"));
+                Value::Int(result)
+            }
+            ("toString", "()Ljava/lang/String;") => {
+                let locales = collection_items(vm, Some(&get(vm, recv, "mSupportedLocales")));
+                let mut parts = Vec::new();
+                for locale in &locales {
+                    parts.push(value_string(vm, locale)?);
+                }
+                jstr(
+                    vm,
+                    format!(
+                        "KeyphraseMetadata {{ id = {}, keyphrase = {}, supportedLocales = [{}], recognitionModeFlags = {} }}",
+                        field_int(vm, recv, "mId"),
+                        field_str(vm, recv, "mKeyphrase").unwrap_or_else(|| "null".to_string()),
+                        parts.join(", "),
+                        field_int(vm, recv, "mRecognitionModeFlags")
+                    ),
+                )?
+            }
+            _ => return Ok(None),
+        })),
+        _ => Ok(None),
+    }
+}
+
+fn p49_midi_port_info(
+    vm: &mut Engine,
+    port_type: i32,
+    port_number: i32,
+    name: &Value,
+) -> Result<Value, VmExit> {
+    let name = if matches!(name, Value::Obj(_)) {
+        name.clone()
+    } else {
+        jstr(vm, "")?
+    };
+    p49_alloc_value(
+        vm,
+        P49_MIDI_PORT_INFO,
+        vec![
+            ("mPortType".to_string(), Value::Int(port_type)),
+            ("mPortNumber".to_string(), Value::Int(port_number)),
+            ("mName".to_string(), name),
+        ],
+    )
+}
+
+fn p49_midi_receiver_send(
+    vm: &mut Engine,
+    recv: ObjRef,
+    msg: &Value,
+    mut offset: i32,
+    mut count: i32,
+    timestamp: i64,
+) -> Result<Value, VmExit> {
+    let max = match get(vm, recv, "mMaxMessageSize") {
+        Value::Int(v) => v,
+        _ => i32::MAX,
+    };
+    // Non-positive maxima make AOSP's loop non-terminating; that pathological
+    // constructor argument is outside this bounded slice.
+    if max <= 0 && count > 0 {
+        return Err(ise("MidiReceiver maxMessageSize must be positive"));
+    }
+    while count > 0 {
+        let length = if count > max { max } else { count };
+        vm.invoke_instance(
+            recv,
+            "onSend",
+            "([BIIJ)V",
+            &[
+                msg.clone(),
+                Value::Int(offset),
+                Value::Int(length),
+                Value::Long(timestamp),
+            ],
+        )?;
+        offset += length;
+        count -= length;
+    }
+    Ok(Value::Null)
+}
+
+fn p49_midi_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P49_MIDI_MANAGER => Ok(Some(match (name, sig) {
+            ("<init>", "(Landroid/media/midi/IMidiManager;)V") => {
+                let service = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mService", service)?;
+                let callbacks = p49_empty_list(vm)?;
+                put(vm, recv, "rd_device_callbacks", callbacks)?;
+                Value::Null
+            }
+            ("getDevices", "()[Landroid/media/midi/MidiDeviceInfo;") => {
+                obj_array(vm, "[Landroid/media/midi/MidiDeviceInfo;", Vec::new())?
+            }
+            ("getDevicesForTransport", "(I)Ljava/util/Set;") => {
+                Value::Obj(new_collection(vm, "Landroid/util/ArraySet;", Vec::new())?)
+            }
+            (
+                "registerDeviceCallback",
+                "(Landroid/media/midi/MidiManager$DeviceCallback;Landroid/os/Handler;)V",
+            ) => {
+                let callback = req_obj(args, 0, "callback")?;
+                let mut callbacks = collection_items(
+                    vm,
+                    Some(&get(vm, recv, "rd_device_callbacks")),
+                );
+                if !callbacks
+                    .iter()
+                    .any(|v| matches!(v, Value::Obj(r) if *r == callback))
+                {
+                    callbacks.push(Value::Obj(callback));
+                    let stored = p49_list_value(vm, callbacks)?;
+                    put(vm, recv, "rd_device_callbacks", stored)?;
+                }
+                Value::Null
+            }
+            (
+                "registerDeviceCallback",
+                "(ILjava/util/concurrent/Executor;Landroid/media/midi/MidiManager$DeviceCallback;)V",
+            ) => {
+                let _ = req_obj(args, 1, "executor")?;
+                let callback = req_obj(args, 2, "callback")?;
+                let mut callbacks = collection_items(
+                    vm,
+                    Some(&get(vm, recv, "rd_device_callbacks")),
+                );
+                if !callbacks
+                    .iter()
+                    .any(|v| matches!(v, Value::Obj(r) if *r == callback))
+                {
+                    callbacks.push(Value::Obj(callback));
+                    let stored = p49_list_value(vm, callbacks)?;
+                    put(vm, recv, "rd_device_callbacks", stored)?;
+                }
+                Value::Null
+            }
+            (
+                "unregisterDeviceCallback",
+                "(Landroid/media/midi/MidiManager$DeviceCallback;)V",
+            ) => {
+                let callback = req_obj(args, 0, "callback")?;
+                let callbacks: Vec<Value> = collection_items(
+                    vm,
+                    Some(&get(vm, recv, "rd_device_callbacks")),
+                )
+                .into_iter()
+                .filter(|v| !matches!(v, Value::Obj(r) if *r == callback))
+                .collect();
+                let stored = p49_list_value(vm, callbacks)?;
+                put(vm, recv, "rd_device_callbacks", stored)?;
+                Value::Null
+            }
+            _ => return Ok(None),
+        })),
+        P49_MIDI_DEVICE_CALLBACK => {
+            if class_of(vm, recv) != P49_MIDI_DEVICE_CALLBACK {
+                return Ok(None);
+            }
+            Ok(Some(match (name, sig) {
+                ("<init>", "()V") => Value::Null,
+                ("onDeviceAdded", "(Landroid/media/midi/MidiDeviceInfo;)V") => {
+                    let device = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_last_added", device)?;
+                    Value::Null
+                }
+                ("onDeviceRemoved", "(Landroid/media/midi/MidiDeviceInfo;)V") => {
+                    let device = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_last_removed", device)?;
+                    Value::Null
+                }
+                ("onDeviceStatusChanged", "(Landroid/media/midi/MidiDeviceStatus;)V") => {
+                    let status = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_last_status", status)?;
+                    Value::Null
+                }
+                _ => return Ok(None),
+            }))
+        }
+        P49_MIDI_PORT_INFO => Ok(Some(match (name, sig) {
+            ("<init>", "(IILjava/lang/String;)V") => {
+                let name_value = args.get(2).cloned().unwrap_or(Value::Null);
+                let stored_name = if matches!(name_value, Value::Obj(_)) {
+                    name_value
+                } else {
+                    jstr(vm, "")?
+                };
+                put(vm, recv, "mPortType", Value::Int(iarg(args, 0)))?;
+                put(vm, recv, "mPortNumber", Value::Int(iarg(args, 1)))?;
+                put(vm, recv, "mName", stored_name)?;
+                Value::Null
+            }
+            ("getType", "()I") => Value::Int(field_int(vm, recv, "mPortType")),
+            ("getPortNumber", "()I") => Value::Int(field_int(vm, recv, "mPortNumber")),
+            ("getName", "()Ljava/lang/String;") => match get(vm, recv, "mName") {
+                Value::Obj(_) => get(vm, recv, "mName"),
+                _ => jstr(vm, "")?,
+            },
+            _ => return Ok(None),
+        })),
+        P49_MIDI_DEVICE_INFO => Ok(Some(match (name, sig) {
+            (
+                "<init>",
+                "(IIII[Ljava/lang/String;[Ljava/lang/String;Landroid/os/Bundle;ZI)V",
+            ) => {
+                let input_count = iarg(args, 2);
+                let output_count = iarg(args, 3);
+                if !(0..=256).contains(&input_count) {
+                    return Err(iae(format!(
+                        "numInputPorts out of range = {input_count}"
+                    )));
+                }
+                if !(0..=256).contains(&output_count) {
+                    return Err(iae(format!(
+                        "numOutputPorts out of range = {output_count}"
+                    )));
+                }
+                let input_names_arg = args.get(4).cloned().unwrap_or(Value::Null);
+                let output_names_arg = args.get(5).cloned().unwrap_or(Value::Null);
+                let input_names = if matches!(input_names_arg, Value::Obj(_)) {
+                    input_names_arg
+                } else {
+                    obj_array(
+                        vm,
+                        "[Ljava/lang/String;",
+                        vec![Value::Null; input_count as usize],
+                    )?
+                };
+                let output_names = if matches!(output_names_arg, Value::Obj(_)) {
+                    output_names_arg
+                } else {
+                    obj_array(
+                        vm,
+                        "[Ljava/lang/String;",
+                        vec![Value::Null; output_count as usize],
+                    )?
+                };
+                put(vm, recv, "mType", Value::Int(iarg(args, 0)))?;
+                put(vm, recv, "mId", Value::Int(iarg(args, 1)))?;
+                put(vm, recv, "mInputPortCount", Value::Int(input_count))?;
+                put(vm, recv, "mOutputPortCount", Value::Int(output_count))?;
+                put(vm, recv, "mInputPortNames", input_names)?;
+                put(vm, recv, "mOutputPortNames", output_names)?;
+                put(
+                    vm,
+                    recv,
+                    "mProperties",
+                    args.get(6).cloned().unwrap_or(Value::Null),
+                )?;
+                put(vm, recv, "mIsPrivate", Value::Int(iarg(args, 7)))?;
+                put(vm, recv, "mDefaultProtocol", Value::Int(iarg(args, 8)))?;
+                Value::Null
+            }
+            ("getType", "()I") => Value::Int(field_int(vm, recv, "mType")),
+            ("getId", "()I") => Value::Int(field_int(vm, recv, "mId")),
+            ("getInputPortCount", "()I") => Value::Int(field_int(vm, recv, "mInputPortCount")),
+            ("getOutputPortCount", "()I") => Value::Int(field_int(vm, recv, "mOutputPortCount")),
+            (
+                "getPorts",
+                "()[Landroid/media/midi/MidiDeviceInfo$PortInfo;",
+            ) => {
+                let input_count = field_int(vm, recv, "mInputPortCount");
+                let output_count = field_int(vm, recv, "mOutputPortCount");
+                let input_names = array_elems(vm, Some(&get(vm, recv, "mInputPortNames")));
+                let output_names = array_elems(vm, Some(&get(vm, recv, "mOutputPortNames")));
+                let mut ports = Vec::new();
+                for i in 0..input_count {
+                    let Some(name) = input_names.get(i as usize) else {
+                        return Err(oob(i.to_string()));
+                    };
+                    ports.push(p49_midi_port_info(vm, 1, i, name)?);
+                }
+                for i in 0..output_count {
+                    let Some(name) = output_names.get(i as usize) else {
+                        return Err(oob(i.to_string()));
+                    };
+                    ports.push(p49_midi_port_info(vm, 2, i, name)?);
+                }
+                obj_array(
+                    vm,
+                    "[Landroid/media/midi/MidiDeviceInfo$PortInfo;",
+                    ports,
+                )?
+            }
+            ("getProperties", "()Landroid/os/Bundle;") => get(vm, recv, "mProperties"),
+            ("isPrivate", "()Z") => bool_value(field_bool(vm, recv, "mIsPrivate")),
+            ("getDefaultProtocol", "()I") => Value::Int(field_int(vm, recv, "mDefaultProtocol")),
+            ("equals", "(Ljava/lang/Object;)Z") => {
+                let equal = p49_other(vm, recv, args, P49_MIDI_DEVICE_INFO)
+                    .map(|other| field_int(vm, recv, "mId") == field_int(vm, other, "mId"))
+                    .unwrap_or(false);
+                bool_value(equal)
+            }
+            ("hashCode", "()I") => Value::Int(field_int(vm, recv, "mId")),
+            ("toString", "()Ljava/lang/String;") => {
+                let properties = get(vm, recv, "mProperties");
+                if !matches!(properties, Value::Obj(_)) {
+                    return Err(npe("mProperties.getString()"));
+                }
+                let properties_text = value_string(vm, &properties)?;
+                jstr(
+                    vm,
+                    format!(
+                        "MidiDeviceInfo[mType={},mInputPortCount={},mOutputPortCount={},mProperties={},mIsPrivate={},mDefaultProtocol={}",
+                        field_int(vm, recv, "mType"),
+                        field_int(vm, recv, "mInputPortCount"),
+                        field_int(vm, recv, "mOutputPortCount"),
+                        properties_text,
+                        field_bool(vm, recv, "mIsPrivate"),
+                        field_int(vm, recv, "mDefaultProtocol")
+                    ),
+                )?
+            }
+            ("describeContents", "()I") => Value::Int(0),
+            _ => return Ok(None),
+        })),
+        P49_MIDI_RECEIVER => {
+            // Concrete MidiReceiver.send/flush logic applies to subclasses;
+            // only the abstract onSend recording below is restricted to the
+            // exact host-allocated base used by host-side tests.
+            match (name, sig) {
+                ("<init>", "()V") => {
+                    put(vm, recv, "mMaxMessageSize", Value::Int(i32::MAX))?;
+                    Ok(Some(Value::Null))
+                }
+                ("<init>", "(I)V") => {
+                    put(vm, recv, "mMaxMessageSize", Value::Int(iarg(args, 0)))?;
+                    Ok(Some(Value::Null))
+                }
+                ("getMaxMessageSize", "()I") => Ok(Some(Value::Int(
+                    match get(vm, recv, "mMaxMessageSize") {
+                        Value::Int(v) => v,
+                        _ => i32::MAX,
+                    },
+                ))),
+                ("send", "([BII)V") => Ok(Some(p49_midi_receiver_send(
+                    vm,
+                    recv,
+                    &args.first().cloned().unwrap_or(Value::Null),
+                    iarg(args, 1),
+                    iarg(args, 2),
+                    0,
+                )?)),
+                ("send", "([BIIJ)V") => Ok(Some(p49_midi_receiver_send(
+                    vm,
+                    recv,
+                    &args.first().cloned().unwrap_or(Value::Null),
+                    iarg(args, 1),
+                    iarg(args, 2),
+                    larg(args, 3),
+                )?)),
+                ("flush", "()V") => {
+                    vm.invoke_instance(recv, "onFlush", "()V", &[])?;
+                    Ok(Some(Value::Null))
+                }
+                ("onFlush", "()V") => {
+                    if class_of(vm, recv) != P49_MIDI_RECEIVER {
+                        return Ok(None);
+                    }
+                    put(vm, recv, "rd_flushed", Value::Int(1))?;
+                    Ok(Some(Value::Null))
+                }
+                ("onSend", "([BIIJ)V") => {
+                    if class_of(vm, recv) != P49_MIDI_RECEIVER {
+                        return Ok(None);
+                    }
+                    let msg = args.first().cloned().unwrap_or(Value::Null);
+                    let bytes = p49_byte_values(vm, &msg);
+                    let offset = iarg(args, 1);
+                    let count = iarg(args, 2);
+                    if offset < 0 || count < 0 || offset.saturating_add(count) > bytes.len() as i32 {
+                        return Err(idx_oob(format!(
+                            "offset={offset}, count={count}, length={}",
+                            bytes.len()
+                        )));
+                    }
+                    let mut received = p49_byte_values(vm, &get(vm, recv, "rd_received"));
+                    received.extend_from_slice(
+                        &bytes[offset as usize..(offset + count) as usize],
+                    );
+                    let stored = p49_new_byte_array(vm, &received)?;
+                    let calls = field_int(vm, recv, "rd_send_calls") + 1;
+                    put(vm, recv, "rd_received", stored)?;
+                    put(vm, recv, "rd_send_calls", Value::Int(calls))?;
+                    put(vm, recv, "rd_last_offset", Value::Int(offset))?;
+                    put(vm, recv, "rd_last_count", Value::Int(count))?;
+                    put(vm, recv, "rd_last_timestamp", Value::Long(larg(args, 3)))?;
+                    Ok(Some(Value::Null))
+                }
+                _ => Ok(None),
+            }
+        }
+        _ => Ok(None),
+    }
+}
+
+const P49_TV_CALLBACK: &str = "Landroid/media/tv/TvInputManager$TvInputCallback;";
+
+fn p49_req_obj_arg(args: &[Value], i: usize) -> Result<ObjRef, VmExit> {
+    // The TV sources in this slice use the one-argument
+    // com.android.internal.util.Preconditions.checkNotNull, which throws a
+    // message-less NullPointerException.
+    oarg(args, i).ok_or_else(|| npe(""))
+}
+
+fn p49_tv_rating_hash(vm: &Engine, recv: ObjRef) -> i32 {
+    match get(vm, recv, "mHashCode") {
+        Value::Int(v) => v,
+        _ => {
+            let base = p49_objects_hash(vm, &[get(vm, recv, "mDomain"), get(vm, recv, "mRating")]);
+            base.wrapping_mul(31)
+                .wrapping_add(p49_array_hash(vm, &get(vm, recv, "mSubRatings")))
+        }
+    }
+}
+
+fn p49_tv_rating_value(
+    vm: &mut Engine,
+    domain: &str,
+    rating_system: &str,
+    rating: &str,
+    mut sub_ratings: Vec<String>,
+) -> Result<Value, VmExit> {
+    sub_ratings.sort();
+    let domain_value = jstr(vm, domain)?;
+    let system_value = jstr(vm, rating_system)?;
+    let rating_value = jstr(vm, rating)?;
+    let subs_value = if sub_ratings.is_empty() {
+        Value::Null
+    } else {
+        let mut values = Vec::new();
+        for sub in &sub_ratings {
+            values.push(jstr(vm, sub)?);
+        }
+        obj_array(vm, "[Ljava/lang/String;", values)?
+    };
+    let base = p49_objects_hash(vm, &[domain_value.clone(), rating_value.clone()]);
+    let hash = base.wrapping_mul(31).wrapping_add(p49_array_hash(vm, &subs_value));
+    p49_alloc_value(
+        vm,
+        P49_TV_RATING,
+        vec![
+            ("mDomain".to_string(), domain_value),
+            ("mRatingSystem".to_string(), system_value),
+            ("mRating".to_string(), rating_value),
+            ("mSubRatings".to_string(), subs_value),
+            ("mHashCode".to_string(), Value::Int(hash)),
+        ],
+    )
+}
+
+fn p49_tv_rating_from_values(
+    vm: &mut Engine,
+    domain: Value,
+    rating_system: Value,
+    rating: Value,
+    sub_ratings: Value,
+) -> Result<Value, VmExit> {
+    let domain_text = opt_str(vm, Some(&domain)).unwrap_or_default();
+    let system_text = opt_str(vm, Some(&rating_system)).unwrap_or_default();
+    let rating_text = opt_str(vm, Some(&rating)).unwrap_or_default();
+    let mut subs: Vec<String> = array_elems(vm, Some(&sub_ratings))
+        .iter()
+        .filter_map(|v| opt_str(vm, Some(v)))
+        .collect();
+    subs.sort();
+    p49_tv_rating_value(vm, &domain_text, &system_text, &rating_text, subs)
+}
+
+fn p49_tv_rating_unflatten(vm: &mut Engine, text: &str) -> Result<Value, VmExit> {
+    if text.is_empty() {
+        return Err(iae("ratingString cannot be empty"));
+    }
+    // Java String.split removes trailing empty strings; rating strings
+    // produced by flattenToString do not rely on trailing empties.
+    let mut parts: Vec<&str> = text.split('/').collect();
+    while parts.len() > 1 && parts.last().is_some_and(|s| s.is_empty()) {
+        parts.pop();
+    }
+    if parts.len() < 3 {
+        return Err(iae(format!("Invalid rating string: {text}")));
+    }
+    let subs: Vec<String> = parts[3..].iter().map(|s| (*s).to_string()).collect();
+    p49_tv_rating_value(vm, parts[0], parts[1], parts[2], subs)
+}
+
+fn p49_tv_rating_flatten(vm: &Engine, recv: ObjRef) -> String {
+    let mut text = format!(
+        "{}/{}/{}",
+        field_str(vm, recv, "mDomain").unwrap_or_else(|| "null".to_string()),
+        field_str(vm, recv, "mRatingSystem").unwrap_or_else(|| "null".to_string()),
+        field_str(vm, recv, "mRating").unwrap_or_else(|| "null".to_string())
+    );
+    if matches!(get(vm, recv, "mSubRatings"), Value::Obj(_)) {
+        for sub in array_elems(vm, Some(&get(vm, recv, "mSubRatings"))) {
+            text.push('/');
+            text.push_str(&opt_str(vm, Some(&sub)).unwrap_or_else(|| "null".to_string()));
+        }
+    }
+    text
+}
+
+const P49_TV_TRACK_FIELDS: [&str; 17] = [
+    "mType",
+    "mId",
+    "mLanguage",
+    "mDescription",
+    "mEncoding",
+    "mEncrypted",
+    "mAudioChannelCount",
+    "mAudioSampleRate",
+    "mAudioDescription",
+    "mHardOfHearing",
+    "mSpokenSubtitle",
+    "mVideoWidth",
+    "mVideoHeight",
+    "mVideoFrameRate",
+    "mVideoPixelAspectRatio",
+    "mVideoActiveFormatDescription",
+    "mExtra",
+];
+
+fn p49_tv_track_defaults(vm: &mut Engine, recv: ObjRef, kind: i32, id: Value) -> Result<(), VmExit> {
+    put(vm, recv, "mType", Value::Int(kind))?;
+    put(vm, recv, "mId", id)?;
+    put(vm, recv, "mLanguage", Value::Null)?;
+    put(vm, recv, "mDescription", Value::Null)?;
+    put(vm, recv, "mEncoding", Value::Null)?;
+    put(vm, recv, "mEncrypted", Value::Int(0))?;
+    put(vm, recv, "mAudioChannelCount", Value::Int(0))?;
+    put(vm, recv, "mAudioSampleRate", Value::Int(0))?;
+    put(vm, recv, "mAudioDescription", Value::Int(0))?;
+    put(vm, recv, "mHardOfHearing", Value::Int(0))?;
+    put(vm, recv, "mSpokenSubtitle", Value::Int(0))?;
+    put(vm, recv, "mVideoWidth", Value::Int(0))?;
+    put(vm, recv, "mVideoHeight", Value::Int(0))?;
+    put(vm, recv, "mVideoFrameRate", Value::Float(0.0))?;
+    put(vm, recv, "mVideoPixelAspectRatio", Value::Float(1.0))?;
+    put(vm, recv, "mVideoActiveFormatDescription", Value::Int(0))?;
+    put(vm, recv, "mExtra", Value::Null)
+}
+
+fn p49_tv_track_hash(vm: &Engine, recv: ObjRef) -> i32 {
+    let kind = field_int(vm, recv, "mType");
+    let mut result = p49_objects_hash(
+        vm,
+        &[
+            get(vm, recv, "mId"),
+            Value::Int(kind),
+            get(vm, recv, "mLanguage"),
+            get(vm, recv, "mDescription"),
+        ],
+    );
+    if kind == 0 {
+        result = p49_objects_hash(
+            vm,
+            &[
+                Value::Int(result),
+                Value::Int(field_int(vm, recv, "mAudioChannelCount")),
+                Value::Int(field_int(vm, recv, "mAudioSampleRate")),
+            ],
+        );
+    } else if kind == 1 {
+        result = p49_objects_hash(
+            vm,
+            &[
+                Value::Int(result),
+                Value::Int(field_int(vm, recv, "mVideoWidth")),
+                Value::Int(field_int(vm, recv, "mVideoHeight")),
+                Value::Float(field_float(vm, recv, "mVideoFrameRate")),
+                Value::Float(field_float(vm, recv, "mVideoPixelAspectRatio")),
+            ],
+        );
+    }
+    result
+}
+
+fn p49_tv_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P49_TV_MANAGER => Ok(Some(match (name, sig) {
+            ("<init>", "(Landroid/media/tv/ITvInputManager;I)V") => {
+                let service = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mService", service)?;
+                put(vm, recv, "mUserId", Value::Int(iarg(args, 1)))?;
+                let callbacks = p49_empty_list(vm)?;
+                put(vm, recv, "rd_callbacks", callbacks)?;
+                let blocked = p49_empty_list(vm)?;
+                put(vm, recv, "rd_blocked_rating_strings", blocked)?;
+                Value::Null
+            }
+            ("getTvInputList", "()Ljava/util/List;") => p49_empty_list(vm)?,
+            ("getTvInputInfo", "(Ljava/lang/String;)Landroid/media/tv/TvInputInfo;") => {
+                let _ = p49_req_obj_arg(args, 0)?;
+                Value::Null
+            }
+            ("getInputState", "(Ljava/lang/String;)I") => {
+                let _ = p49_req_obj_arg(args, 0)?;
+                Value::Int(2) // INPUT_STATE_DISCONNECTED for an unknown ID.
+            }
+            (
+                "getAvailableExtensionInterfaceNames",
+                "(Ljava/lang/String;)Ljava/util/List;",
+            ) => {
+                let _ = p49_req_obj_arg(args, 0)?;
+                p49_empty_list(vm)?
+            }
+            (
+                "getExtensionInterface",
+                "(Ljava/lang/String;Ljava/lang/String;)Landroid/os/IBinder;",
+            ) => {
+                let _ = p49_req_obj_arg(args, 0)?;
+                let _ = p49_req_obj_arg(args, 1)?;
+                Value::Null
+            }
+            (
+                "registerCallback",
+                "(Landroid/media/tv/TvInputManager$TvInputCallback;Landroid/os/Handler;)V",
+            ) => {
+                let callback = p49_req_obj_arg(args, 0)?;
+                let _ = p49_req_obj_arg(args, 1)?;
+                let mut callbacks = collection_items(vm, Some(&get(vm, recv, "rd_callbacks")));
+                callbacks.push(Value::Obj(callback));
+                let stored = p49_list_value(vm, callbacks)?;
+                put(vm, recv, "rd_callbacks", stored)?;
+                Value::Null
+            }
+            (
+                "unregisterCallback",
+                "(Landroid/media/tv/TvInputManager$TvInputCallback;)V",
+            ) => {
+                let callback = p49_req_obj_arg(args, 0)?;
+                let mut callbacks = collection_items(vm, Some(&get(vm, recv, "rd_callbacks")));
+                if let Some(pos) = callbacks
+                    .iter()
+                    .position(|v| matches!(v, Value::Obj(r) if *r == callback))
+                {
+                    callbacks.remove(pos);
+                }
+                let stored = p49_list_value(vm, callbacks)?;
+                put(vm, recv, "rd_callbacks", stored)?;
+                Value::Null
+            }
+            ("isParentalControlsEnabled", "()Z") => {
+                bool_value(field_bool(vm, recv, "rd_parental_controls_enabled"))
+            }
+            ("setParentalControlsEnabled", "(Z)V") => {
+                put(
+                    vm,
+                    recv,
+                    "rd_parental_controls_enabled",
+                    Value::Int(iarg(args, 0)),
+                )?;
+                Value::Null
+            }
+            ("isRatingBlocked", "(Landroid/media/tv/TvContentRating;)Z") => {
+                let rating = p49_req_obj_arg(args, 0)?;
+                let blocked_strings: Vec<String> = collection_items(
+                    vm,
+                    Some(&get(vm, recv, "rd_blocked_rating_strings")),
+                )
+                .iter()
+                .filter_map(|v| opt_str(vm, Some(v)))
+                .collect();
+                let mut blocked = false;
+                for blocked_text in blocked_strings {
+                    let blocked_rating = p49_tv_rating_unflatten(vm, &blocked_text)?;
+                    let contains = vm.invoke_instance(
+                        rating,
+                        "contains",
+                        "(Landroid/media/tv/TvContentRating;)Z",
+                        &[blocked_rating],
+                    )?;
+                    if contains.as_int().unwrap_or(0) != 0 {
+                        blocked = true;
+                        break;
+                    }
+                }
+                bool_value(blocked)
+            }
+            ("getBlockedRatings", "()Ljava/util/List;") => {
+                let blocked_strings: Vec<String> = collection_items(
+                    vm,
+                    Some(&get(vm, recv, "rd_blocked_rating_strings")),
+                )
+                .iter()
+                .filter_map(|v| opt_str(vm, Some(v)))
+                .collect();
+                let mut ratings = Vec::new();
+                for text in blocked_strings {
+                    ratings.push(p49_tv_rating_unflatten(vm, &text)?);
+                }
+                p49_list_value(vm, ratings)?
+            }
+            ("addBlockedRating", "(Landroid/media/tv/TvContentRating;)V") => {
+                let rating = p49_req_obj_arg(args, 0)?;
+                let flattened = vm.invoke_instance(
+                    rating,
+                    "flattenToString",
+                    "()Ljava/lang/String;",
+                    &[],
+                )?;
+                let Some(text) = opt_str(vm, Some(&flattened)) else {
+                    return Ok(None);
+                };
+                let mut strings: Vec<String> = collection_items(
+                    vm,
+                    Some(&get(vm, recv, "rd_blocked_rating_strings")),
+                )
+                .iter()
+                .filter_map(|v| opt_str(vm, Some(v)))
+                .collect();
+                if !strings.iter().any(|s| s == &text) {
+                    strings.push(text);
+                    let mut values = Vec::new();
+                    for s in strings {
+                        values.push(jstr(vm, s)?);
+                    }
+                    let stored = p49_list_value(vm, values)?;
+                    put(vm, recv, "rd_blocked_rating_strings", stored)?;
+                }
+                Value::Null
+            }
+            ("removeBlockedRating", "(Landroid/media/tv/TvContentRating;)V") => {
+                let rating = p49_req_obj_arg(args, 0)?;
+                let flattened = vm.invoke_instance(
+                    rating,
+                    "flattenToString",
+                    "()Ljava/lang/String;",
+                    &[],
+                )?;
+                let Some(text) = opt_str(vm, Some(&flattened)) else {
+                    return Ok(None);
+                };
+                let strings: Vec<String> = collection_items(
+                    vm,
+                    Some(&get(vm, recv, "rd_blocked_rating_strings")),
+                )
+                .iter()
+                .filter_map(|v| opt_str(vm, Some(v)))
+                .filter(|s| s != &text)
+                .collect();
+                let mut values = Vec::new();
+                for s in strings {
+                    values.push(jstr(vm, s)?);
+                }
+                let stored = p49_list_value(vm, values)?;
+                put(vm, recv, "rd_blocked_rating_strings", stored)?;
+                Value::Null
+            }
+            ("getTvContentRatingSystemList", "()Ljava/util/List;") => p49_empty_list(vm)?,
+            _ => return Ok(None),
+        })),
+        P49_TV_CALLBACK => {
+            if class_of(vm, recv) != P49_TV_CALLBACK {
+                return Ok(None);
+            }
+            Ok(Some(match (name, sig) {
+                ("<init>", "()V") => Value::Null,
+                ("onInputStateChanged", "(Ljava/lang/String;I)V") => {
+                    let input = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_state_input", input)?;
+                    put(vm, recv, "rd_state", Value::Int(iarg(args, 1)))?;
+                    Value::Null
+                }
+                ("onInputAdded", "(Ljava/lang/String;)V") => {
+                    let input = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_added", input)?;
+                    Value::Null
+                }
+                ("onInputRemoved", "(Ljava/lang/String;)V") => {
+                    let input = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_removed", input)?;
+                    Value::Null
+                }
+                ("onInputUpdated", "(Ljava/lang/String;)V") => {
+                    let input = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_updated", input)?;
+                    Value::Null
+                }
+                ("onTvInputInfoUpdated", "(Landroid/media/tv/TvInputInfo;)V") => {
+                    let input = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_info_updated", input)?;
+                    Value::Null
+                }
+                ("onCurrentTunedInfosUpdated", "(Ljava/util/List;)V") => {
+                    let input = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "rd_tuned_infos", input)?;
+                    Value::Null
+                }
+                _ => return Ok(None),
+            }))
+        }
+        P49_TV_RATING => Ok(Some(match (name, sig) {
+            (
+                "<init>",
+                "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)V",
+            ) => {
+                let created = p49_tv_rating_from_values(
+                    vm,
+                    args.first().cloned().unwrap_or(Value::Null),
+                    args.get(1).cloned().unwrap_or(Value::Null),
+                    args.get(2).cloned().unwrap_or(Value::Null),
+                    args.get(3).cloned().unwrap_or(Value::Null),
+                )?;
+                let Value::Obj(created_ref) = created else {
+                    return Ok(None);
+                };
+                p49_copy_fields(
+                    vm,
+                    created_ref,
+                    recv,
+                    &["mDomain", "mRatingSystem", "mRating", "mSubRatings", "mHashCode"],
+                )?;
+                Value::Null
+            }
+            ("getDomain", "()Ljava/lang/String;") => get(vm, recv, "mDomain"),
+            ("getRatingSystem", "()Ljava/lang/String;") => get(vm, recv, "mRatingSystem"),
+            ("getMainRating", "()Ljava/lang/String;") => get(vm, recv, "mRating"),
+            ("getSubRatings", "()Ljava/util/List;") => match get(vm, recv, "mSubRatings") {
+                Value::Obj(_) => {
+                    let subs = array_elems(vm, Some(&get(vm, recv, "mSubRatings")));
+                    p49_list_value(vm, subs)?
+                }
+                _ => Value::Null,
+            },
+            ("flattenToString", "()Ljava/lang/String;") => {
+                jstr(vm, p49_tv_rating_flatten(vm, recv))?
+            }
+            ("contains", "(Landroid/media/tv/TvContentRating;)Z") => {
+                let other = p49_req_obj_arg(args, 0)?;
+                if field_str(vm, recv, "mDomain") != field_str(vm, other, "mDomain")
+                    || field_str(vm, recv, "mRatingSystem")
+                        != field_str(vm, other, "mRatingSystem")
+                    || field_str(vm, recv, "mRating") != field_str(vm, other, "mRating")
+                {
+                    bool_value(false)
+                } else {
+                    let mine = get(vm, recv, "mSubRatings");
+                    let theirs = get(vm, other, "mSubRatings");
+                    match (matches!(mine, Value::Obj(_)), matches!(theirs, Value::Obj(_))) {
+                        (false, false) => bool_value(true),
+                        (false, true) => bool_value(false),
+                        (true, false) => bool_value(true),
+                        (true, true) => {
+                            let mine_texts: Vec<Option<String>> = array_elems(vm, Some(&mine))
+                                .iter()
+                                .map(|v| opt_str(vm, Some(v)))
+                                .collect();
+                            let contains_all = array_elems(vm, Some(&theirs))
+                                .iter()
+                                .map(|v| opt_str(vm, Some(v)))
+                                .all(|s| mine_texts.contains(&s));
+                            bool_value(contains_all)
+                        }
+                    }
+                }
+            }
+            ("equals", "(Ljava/lang/Object;)Z") => {
+                let equal = p49_other(vm, recv, args, P49_TV_RATING)
+                    .map(|other| {
+                        p49_tv_rating_hash(vm, recv) == p49_tv_rating_hash(vm, other)
+                            && field_str(vm, recv, "mDomain") == field_str(vm, other, "mDomain")
+                            && field_str(vm, recv, "mRatingSystem")
+                                == field_str(vm, other, "mRatingSystem")
+                            && field_str(vm, recv, "mRating") == field_str(vm, other, "mRating")
+                            && p49_value_array_equal(
+                                vm,
+                                &get(vm, recv, "mSubRatings"),
+                                &get(vm, other, "mSubRatings"),
+                            )
+                    })
+                    .unwrap_or(false);
+                bool_value(equal)
+            }
+            ("hashCode", "()I") => Value::Int(p49_tv_rating_hash(vm, recv)),
+            _ => return Ok(None),
+        })),
+        P49_TV_TRACK_BUILDER => {
+            let kind = field_int(vm, recv, "mType");
+            Ok(Some(match (name, sig) {
+                ("<init>", "(ILjava/lang/String;)V") => {
+                    let kind = iarg(args, 0);
+                    if !matches!(kind, 0 | 1 | 2) {
+                        return Err(iae(format!("Unknown type: {kind}")));
+                    }
+                    let id = p49_req_obj_arg(args, 1)?;
+                    p49_tv_track_defaults(vm, recv, kind, Value::Obj(id))?;
+                    Value::Null
+                }
+                (
+                    "setLanguage",
+                    "(Ljava/lang/String;)Landroid/media/tv/TvTrackInfo$Builder;",
+                ) => {
+                    let value = p49_req_obj_arg(args, 0)?;
+                    put(vm, recv, "mLanguage", Value::Obj(value))?;
+                    Value::Obj(recv)
+                }
+                (
+                    "setDescription",
+                    "(Ljava/lang/CharSequence;)Landroid/media/tv/TvTrackInfo$Builder;",
+                ) => {
+                    let value = p49_req_obj_arg(args, 0)?;
+                    put(vm, recv, "mDescription", Value::Obj(value))?;
+                    Value::Obj(recv)
+                }
+                (
+                    "setEncoding",
+                    "(Ljava/lang/String;)Landroid/media/tv/TvTrackInfo$Builder;",
+                ) => {
+                    let value = args.first().cloned().unwrap_or(Value::Null);
+                    put(vm, recv, "mEncoding", value)?;
+                    Value::Obj(recv)
+                }
+                ("setEncrypted", "(Z)Landroid/media/tv/TvTrackInfo$Builder;") => {
+                    put(vm, recv, "mEncrypted", Value::Int(iarg(args, 0)))?;
+                    Value::Obj(recv)
+                }
+                (
+                    "setAudioChannelCount",
+                    "(I)Landroid/media/tv/TvTrackInfo$Builder;",
+                ) => {
+                    if kind != 0 {
+                        return Err(ise("Not an audio track"));
+                    }
+                    put(vm, recv, "mAudioChannelCount", Value::Int(iarg(args, 0)))?;
+                    Value::Obj(recv)
+                }
+                ("setAudioSampleRate", "(I)Landroid/media/tv/TvTrackInfo$Builder;") => {
+                    if kind != 0 {
+                        return Err(ise("Not an audio track"));
+                    }
+                    put(vm, recv, "mAudioSampleRate", Value::Int(iarg(args, 0)))?;
+                    Value::Obj(recv)
+                }
+                (
+                    "setAudioDescription",
+                    "(Z)Landroid/media/tv/TvTrackInfo$Builder;",
+                ) => {
+                    if kind != 0 {
+                        return Err(ise("Not an audio track"));
+                    }
+                    put(vm, recv, "mAudioDescription", Value::Int(iarg(args, 0)))?;
+                    Value::Obj(recv)
+                }
+                ("setHardOfHearing", "(Z)Landroid/media/tv/TvTrackInfo$Builder;") => {
+                    if kind != 0 && kind != 2 {
+                        return Err(ise("Not an audio track or a subtitle track"));
+                    }
+                    put(vm, recv, "mHardOfHearing", Value::Int(iarg(args, 0)))?;
+                    Value::Obj(recv)
+                }
+                ("setSpokenSubtitle", "(Z)Landroid/media/tv/TvTrackInfo$Builder;") => {
+                    if kind != 0 {
+                        return Err(ise("Not an audio track"));
+                    }
+                    put(vm, recv, "mSpokenSubtitle", Value::Int(iarg(args, 0)))?;
+                    Value::Obj(recv)
+                }
+                ("setVideoWidth", "(I)Landroid/media/tv/TvTrackInfo$Builder;") => {
+                    if kind != 1 {
+                        return Err(ise("Not a video track"));
+                    }
+                    put(vm, recv, "mVideoWidth", Value::Int(iarg(args, 0)))?;
+                    Value::Obj(recv)
+                }
+                ("setVideoHeight", "(I)Landroid/media/tv/TvTrackInfo$Builder;") => {
+                    if kind != 1 {
+                        return Err(ise("Not a video track"));
+                    }
+                    put(vm, recv, "mVideoHeight", Value::Int(iarg(args, 0)))?;
+                    Value::Obj(recv)
+                }
+                ("setVideoFrameRate", "(F)Landroid/media/tv/TvTrackInfo$Builder;") => {
+                    if kind != 1 {
+                        return Err(ise("Not a video track"));
+                    }
+                    put(vm, recv, "mVideoFrameRate", Value::Float(farg(args, 0)))?;
+                    Value::Obj(recv)
+                }
+                (
+                    "setVideoPixelAspectRatio",
+                    "(F)Landroid/media/tv/TvTrackInfo$Builder;",
+                ) => {
+                    if kind != 1 {
+                        return Err(ise("Not a video track"));
+                    }
+                    put(
+                        vm,
+                        recv,
+                        "mVideoPixelAspectRatio",
+                        Value::Float(farg(args, 0)),
+                    )?;
+                    Value::Obj(recv)
+                }
+                (
+                    "setVideoActiveFormatDescription",
+                    "(B)Landroid/media/tv/TvTrackInfo$Builder;",
+                ) => {
+                    if kind != 1 {
+                        return Err(ise("Not a video track"));
+                    }
+                    put(
+                        vm,
+                        recv,
+                        "mVideoActiveFormatDescription",
+                        Value::Int(iarg(args, 0) as i8 as i32),
+                    )?;
+                    Value::Obj(recv)
+                }
+                (
+                    "setExtra",
+                    "(Landroid/os/Bundle;)Landroid/media/tv/TvTrackInfo$Builder;",
+                ) => {
+                    let extra = p49_req_obj_arg(args, 0)?;
+                    let clone = alloc_obj(vm, "Landroid/os/Bundle;", Vec::new())?;
+                    vm.invoke_instance(
+                        clone,
+                        "<init>",
+                        "(Landroid/os/Bundle;)V",
+                        &[Value::Obj(extra)],
+                    )?;
+                    put(vm, recv, "mExtra", Value::Obj(clone))?;
+                    Value::Obj(recv)
+                }
+                ("build", "()Landroid/media/tv/TvTrackInfo;") => {
+                    let out = alloc_obj(vm, P49_TV_TRACK, Vec::new())?;
+                    p49_copy_fields(vm, recv, out, &P49_TV_TRACK_FIELDS)?;
+                    Value::Obj(out)
+                }
+                _ => return Ok(None),
+            }))
+        }
+        P49_TV_TRACK => {
+            let kind = field_int(vm, recv, "mType");
+            Ok(Some(match (name, sig) {
+                (
+                    "<init>",
+                    "(ILjava/lang/String;Ljava/lang/String;Ljava/lang/CharSequence;Ljava/lang/String;ZIIZZZIIFFBLandroid/os/Bundle;)V",
+                ) => {
+                    put(vm, recv, "mType", Value::Int(iarg(args, 0)))?;
+                    put(vm, recv, "mId", args.get(1).cloned().unwrap_or(Value::Null))?;
+                    put(vm, recv, "mLanguage", args.get(2).cloned().unwrap_or(Value::Null))?;
+                    put(vm, recv, "mDescription", args.get(3).cloned().unwrap_or(Value::Null))?;
+                    put(vm, recv, "mEncoding", args.get(4).cloned().unwrap_or(Value::Null))?;
+                    put(vm, recv, "mEncrypted", Value::Int(iarg(args, 5)))?;
+                    put(vm, recv, "mAudioChannelCount", Value::Int(iarg(args, 6)))?;
+                    put(vm, recv, "mAudioSampleRate", Value::Int(iarg(args, 7)))?;
+                    put(vm, recv, "mAudioDescription", Value::Int(iarg(args, 8)))?;
+                    put(vm, recv, "mHardOfHearing", Value::Int(iarg(args, 9)))?;
+                    put(vm, recv, "mSpokenSubtitle", Value::Int(iarg(args, 10)))?;
+                    put(vm, recv, "mVideoWidth", Value::Int(iarg(args, 11)))?;
+                    put(vm, recv, "mVideoHeight", Value::Int(iarg(args, 12)))?;
+                    put(vm, recv, "mVideoFrameRate", Value::Float(farg(args, 13)))?;
+                    put(vm, recv, "mVideoPixelAspectRatio", Value::Float(farg(args, 14)))?;
+                    put(
+                        vm,
+                        recv,
+                        "mVideoActiveFormatDescription",
+                        Value::Int(iarg(args, 15) as i8 as i32),
+                    )?;
+                    put(vm, recv, "mExtra", args.get(16).cloned().unwrap_or(Value::Null))?;
+                    Value::Null
+                }
+                ("getType", "()I") => Value::Int(kind),
+                ("getId", "()Ljava/lang/String;") => get(vm, recv, "mId"),
+                ("getLanguage", "()Ljava/lang/String;") => get(vm, recv, "mLanguage"),
+                ("getDescription", "()Ljava/lang/CharSequence;") => get(vm, recv, "mDescription"),
+                ("getEncoding", "()Ljava/lang/String;") => get(vm, recv, "mEncoding"),
+                ("isEncrypted", "()Z") => bool_value(field_bool(vm, recv, "mEncrypted")),
+                ("getAudioChannelCount", "()I") => {
+                    if kind != 0 {
+                        return Err(ise("Not an audio track"));
+                    }
+                    Value::Int(field_int(vm, recv, "mAudioChannelCount"))
+                }
+                ("getAudioSampleRate", "()I") => {
+                    if kind != 0 {
+                        return Err(ise("Not an audio track"));
+                    }
+                    Value::Int(field_int(vm, recv, "mAudioSampleRate"))
+                }
+                ("isAudioDescription", "()Z") => {
+                    if kind != 0 {
+                        return Err(ise("Not an audio track"));
+                    }
+                    bool_value(field_bool(vm, recv, "mAudioDescription"))
+                }
+                ("isHardOfHearing", "()Z") => {
+                    if kind != 0 && kind != 2 {
+                        return Err(ise("Not an audio or a subtitle track"));
+                    }
+                    bool_value(field_bool(vm, recv, "mHardOfHearing"))
+                }
+                ("isSpokenSubtitle", "()Z") => {
+                    if kind != 0 {
+                        return Err(ise("Not an audio track"));
+                    }
+                    bool_value(field_bool(vm, recv, "mSpokenSubtitle"))
+                }
+                ("getVideoWidth", "()I") => {
+                    if kind != 1 {
+                        return Err(ise("Not a video track"));
+                    }
+                    Value::Int(field_int(vm, recv, "mVideoWidth"))
+                }
+                ("getVideoHeight", "()I") => {
+                    if kind != 1 {
+                        return Err(ise("Not a video track"));
+                    }
+                    Value::Int(field_int(vm, recv, "mVideoHeight"))
+                }
+                ("getVideoFrameRate", "()F") => {
+                    if kind != 1 {
+                        return Err(ise("Not a video track"));
+                    }
+                    Value::Float(field_float(vm, recv, "mVideoFrameRate"))
+                }
+                ("getVideoPixelAspectRatio", "()F") => {
+                    if kind != 1 {
+                        return Err(ise("Not a video track"));
+                    }
+                    Value::Float(match get(vm, recv, "mVideoPixelAspectRatio") {
+                        Value::Float(v) => v,
+                        _ => 1.0,
+                    })
+                }
+                ("getVideoActiveFormatDescription", "()B") => {
+                    if kind != 1 {
+                        return Err(ise("Not a video track"));
+                    }
+                    Value::Int(field_int(vm, recv, "mVideoActiveFormatDescription") as i8 as i32)
+                }
+                ("getExtra", "()Landroid/os/Bundle;") => get(vm, recv, "mExtra"),
+                ("describeContents", "()I") => Value::Int(0),
+                ("equals", "(Ljava/lang/Object;)Z") => {
+                    if matches!(args.first(), Some(Value::Obj(r)) if *r == recv) {
+                        bool_value(true)
+                    } else if let Some(other) = p49_other(vm, recv, args, P49_TV_TRACK) {
+                        let common = field_str(vm, recv, "mId") == field_str(vm, other, "mId")
+                            && kind == field_int(vm, other, "mType")
+                            && field_str(vm, recv, "mLanguage") == field_str(vm, other, "mLanguage")
+                            && opt_str(vm, Some(&get(vm, recv, "mDescription")))
+                                == opt_str(vm, Some(&get(vm, other, "mDescription")))
+                            && field_str(vm, recv, "mEncoding") == field_str(vm, other, "mEncoding")
+                            && field_bool(vm, recv, "mEncrypted")
+                                == field_bool(vm, other, "mEncrypted");
+                        let specific = match kind {
+                            0 => {
+                                field_int(vm, recv, "mAudioChannelCount")
+                                    == field_int(vm, other, "mAudioChannelCount")
+                                    && field_int(vm, recv, "mAudioSampleRate")
+                                        == field_int(vm, other, "mAudioSampleRate")
+                                    && field_bool(vm, recv, "mAudioDescription")
+                                        == field_bool(vm, other, "mAudioDescription")
+                                    && field_bool(vm, recv, "mHardOfHearing")
+                                        == field_bool(vm, other, "mHardOfHearing")
+                                    && field_bool(vm, recv, "mSpokenSubtitle")
+                                        == field_bool(vm, other, "mSpokenSubtitle")
+                            }
+                            1 => {
+                                field_int(vm, recv, "mVideoWidth")
+                                    == field_int(vm, other, "mVideoWidth")
+                                    && field_int(vm, recv, "mVideoHeight")
+                                        == field_int(vm, other, "mVideoHeight")
+                                    && field_float(vm, recv, "mVideoFrameRate")
+                                        == field_float(vm, other, "mVideoFrameRate")
+                                    && field_float(vm, recv, "mVideoPixelAspectRatio")
+                                        == field_float(vm, other, "mVideoPixelAspectRatio")
+                                    && field_int(vm, recv, "mVideoActiveFormatDescription")
+                                        == field_int(vm, other, "mVideoActiveFormatDescription")
+                            }
+                            2 => {
+                                field_bool(vm, recv, "mHardOfHearing")
+                                    == field_bool(vm, other, "mHardOfHearing")
+                            }
+                            _ => true,
+                        };
+                        bool_value(common && specific)
+                    } else {
+                        bool_value(false)
+                    }
+                }
+                ("hashCode", "()I") => Value::Int(p49_tv_track_hash(vm, recv)),
+                _ => return Ok(None),
+            }))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn p49_check_builder_not_used(vm: &Engine, recv: ObjRef) -> Result<(), VmExit> {
+    if field_bool(vm, recv, "rd_used") {
+        Err(ise(
+            "This Builder should not be reused. Use a new Builder instance instead",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn p49_bool_hash(v: bool) -> i32 {
+    if v { 1231 } else { 1237 }
+}
+
+fn p49_collection_hash(vm: &mut Engine, value: &Value) -> i32 {
+    if matches!(value, Value::Null) {
+        return 0;
+    }
+    let mut result: i32 = 1;
+    for item in collection_items(vm, Some(value)) {
+        result = result.wrapping_mul(31).wrapping_add(p49_value_hash(vm, &item));
+    }
+    result
+}
+
+fn p49_list_equal(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, VmExit> {
+    if matches!((a, b), (Value::Null, Value::Null)) {
+        return Ok(true);
+    }
+    if matches!(a, Value::Null) || matches!(b, Value::Null) {
+        return Ok(false);
+    }
+    let aa = collection_items(vm, Some(a));
+    let bb = collection_items(vm, Some(b));
+    if aa.len() != bb.len() {
+        return Ok(false);
+    }
+    for (x, y) in aa.iter().zip(bb.iter()) {
+        if !p49_value_equal(vm, x, y)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn p49_current_time_millis(vm: &mut Engine) -> i64 {
+    match vm.invoke_static("Ljava/lang/System;", "currentTimeMillis", "()J", &[]) {
+        Ok(Value::Long(v)) => v,
+        _ => vm.fw.clock() as i64,
+    }
+}
+
+const P49_MAC_VALID_MASK: i64 = (1i64 << 48) - 1;
+
+fn p49_mac_value_from_long(vm: &mut Engine, addr: i64) -> Result<Value, VmExit> {
+    p49_alloc_value(
+        vm,
+        P49_MAC_ADDRESS,
+        vec![("mAddr".to_string(), Value::Long(addr & P49_MAC_VALID_MASK))],
+    )
+}
+
+fn p49_mac_long(vm: &Engine, recv: ObjRef) -> i64 {
+    field_long(vm, recv, "mAddr") & P49_MAC_VALID_MASK
+}
+
+fn p49_mac_long_from_obj_value(vm: &Engine, value: &Value) -> Option<i64> {
+    match value {
+        Value::Obj(r) if vm.cp.is_subtype(&class_of(vm, *r), P49_MAC_ADDRESS) => {
+            Some(p49_mac_long(vm, *r))
+        }
+        _ => None,
+    }
+}
+
+fn p49_mac_bytes_from_long(addr: i64) -> [u8; 6] {
+    let addr = (addr & P49_MAC_VALID_MASK) as u64;
+    [
+        (addr >> 40) as u8,
+        (addr >> 32) as u8,
+        (addr >> 24) as u8,
+        (addr >> 16) as u8,
+        (addr >> 8) as u8,
+        addr as u8,
+    ]
+}
+
+fn p49_mac_format_long(addr: i64) -> String {
+    let b = p49_mac_bytes_from_long(addr);
+    format!(
+        "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+        b[0], b[1], b[2], b[3], b[4], b[5]
+    )
+}
+
+fn p49_parse_mac_string(text: &str) -> Result<i64, VmExit> {
+    let mut parts: Vec<&str> = text.split(':').collect();
+    while parts.len() > 1 && parts.last().is_some_and(|s| s.is_empty()) {
+        parts.pop();
+    }
+    if parts.len() != 6 {
+        return Err(iae(format!("{text} was not a valid MAC address")));
+    }
+    let mut result: i64 = 0;
+    for part in parts {
+        let normalized = part.strip_prefix('+').unwrap_or(part);
+        let x = match i64::from_str_radix(normalized, 16) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(throw(
+                    "Ljava/lang/NumberFormatException;",
+                    format!("For input string: \"{part}\" under radix 16"),
+                ))
+            }
+        };
+        if !(0..=0xff).contains(&x) {
+            return Err(iae(format!("{text}was not a valid MAC address")));
+        }
+        result = (result << 8) + x;
+    }
+    Ok(result)
+}
+
+fn p49_mac_long_from_bytes(bytes: &[u8]) -> i64 {
+    bytes.iter().fold(0i64, |acc, b| (acc << 8) + (*b as i64))
+}
+
+fn p49_mac_value_from_bytes(vm: &mut Engine, value: &Value) -> Result<Value, VmExit> {
+    if !matches!(value, Value::Obj(_)) {
+        return Err(npe(""));
+    }
+    let bytes = p49_byte_values(vm, value);
+    if bytes.len() != 6 {
+        let shown = bytes
+            .iter()
+            .map(|b| (*b as i8).to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(iae(format!("[{shown}] was not a valid MAC address")));
+    }
+    p49_mac_value_from_long(vm, p49_mac_long_from_bytes(&bytes))
+}
+
+fn p49_mac_address_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let addr = p49_mac_long(vm, recv);
+    Ok(Some(match (name, sig) {
+        ("<init>", "(J)V") => {
+            put(vm, recv, "mAddr", Value::Long(larg(args, 0) & P49_MAC_VALID_MASK))?;
+            Value::Null
+        }
+        ("getAddressType", "()I") => Value::Int(if addr == P49_MAC_VALID_MASK {
+            3
+        } else if (p49_mac_bytes_from_long(addr)[0] & 0x01) != 0 {
+            2
+        } else {
+            1
+        }),
+        ("isLocallyAssigned", "()Z") => bool_value((p49_mac_bytes_from_long(addr)[0] & 0x02) != 0),
+        ("toByteArray", "()[B") => p49_new_byte_array(vm, &p49_mac_bytes_from_long(addr))?,
+        ("toString", "()Ljava/lang/String;") => jstr(vm, p49_mac_format_long(addr))?,
+        ("toOuiString", "()Ljava/lang/String;") => {
+            let b = p49_mac_bytes_from_long(addr);
+            jstr(vm, format!("{:02x}:{:02x}:{:02x}", b[0], b[1], b[2]))?
+        }
+        ("hashCode", "()I") => Value::Int(((addr >> 32) ^ addr) as i32),
+        ("equals", "(Ljava/lang/Object;)Z") => bool_value(
+            p49_mac_long_from_obj_value(vm, &args.first().cloned().unwrap_or(Value::Null))
+                .map(|other| other == addr)
+                .unwrap_or(false),
+        ),
+        ("describeContents", "()I") => Value::Int(0),
+        ("matches", "(Landroid/net/MacAddress;Landroid/net/MacAddress;)Z") => {
+            let base = req_obj(args, 0, "baseAddress")?;
+            let mask = req_obj(args, 1, "mask")?;
+            bool_value(
+                (addr & p49_mac_long(vm, mask))
+                    == (p49_mac_long(vm, base) & p49_mac_long(vm, mask)),
+            )
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_companion_feature_present(vm: &Engine, recv: ObjRef) -> bool {
+    matches!(get(vm, recv, "mService"), Value::Obj(_))
+}
+
+fn p49_companion_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if (name, sig)
+        == (
+            "<init>",
+            "(Landroid/companion/ICompanionDeviceManager;Landroid/content/Context;)V",
+        )
+    {
+        put(vm, recv, "mService", args.first().cloned().unwrap_or(Value::Null))?;
+        put(vm, recv, "mContext", args.get(1).cloned().unwrap_or(Value::Null))?;
+        return Ok(Some(Value::Null));
+    }
+    if (name, sig) == ("checkFeaturePresent", "()Z") {
+        return Ok(Some(bool_value(p49_companion_feature_present(vm, recv))));
+    }
+    if (name, sig) == ("dispatchMessage", "(II[B)V") {
+        return Ok(Some(Value::Null));
+    }
+    if p49_companion_feature_present(vm, recv) {
+        return Ok(None);
+    }
+    Ok(Some(match (name, sig) {
+        (
+            "associate",
+            "(Landroid/companion/AssociationRequest;Landroid/companion/CompanionDeviceManager$Callback;Landroid/os/Handler;)V",
+        )
+        | (
+            "associate",
+            "(Landroid/companion/AssociationRequest;Ljava/util/concurrent/Executor;Landroid/companion/CompanionDeviceManager$Callback;)V",
+        )
+        | ("associate", "(Ljava/lang/String;Landroid/net/MacAddress;[B)V")
+        | ("enableSystemDataSyncForTypes", "(II)V")
+        | ("disableSystemDataSyncForTypes", "(II)V")
+        | ("disassociate", "(Ljava/lang/String;)V")
+        | ("disassociate", "(I)V")
+        | ("requestNotificationAccess", "(Landroid/content/ComponentName;)V")
+        | (
+            "addOnAssociationsChangedListener",
+            "(Ljava/util/concurrent/Executor;Landroid/companion/CompanionDeviceManager$OnAssociationsChangedListener;)V",
+        )
+        | (
+            "removeOnAssociationsChangedListener",
+            "(Landroid/companion/CompanionDeviceManager$OnAssociationsChangedListener;)V",
+        )
+        | ("startObservingDevicePresence", "(Ljava/lang/String;)V")
+        | ("stopObservingDevicePresence", "(Ljava/lang/String;)V") => Value::Null,
+        ("buildAssociationCancellationIntent", "()Landroid/content/IntentSender;") => Value::Null,
+        ("getAssociations", "()Ljava/util/List;")
+        | ("getMyAssociations", "()Ljava/util/List;")
+        | ("getAllAssociations", "()Ljava/util/List;") => p49_empty_list(vm)?,
+        ("hasNotificationAccess", "(Landroid/content/ComponentName;)Z") => bool_value(false),
+        (
+            "isDeviceAssociatedForWifiConnection",
+            "(Ljava/lang/String;Landroid/net/MacAddress;Landroid/os/UserHandle;)Z",
+        ) => bool_value(false),
+        (
+            "canPairWithoutPrompt",
+            "(Ljava/lang/String;Ljava/lang/String;Landroid/os/UserHandle;)Z",
+        ) => bool_value(false),
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_companion_callback_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class_of(vm, recv) != P49_COMPANION_CALLBACK {
+        return Ok(None);
+    }
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        ("onDeviceFound", "(Landroid/content/IntentSender;)V") => {
+            let sender = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "rd_found_sender", sender)?;
+            Value::Null
+        }
+        ("onAssociationPending", "(Landroid/content/IntentSender;)V") => {
+            let sender = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "rd_pending_sender", sender.clone())?;
+            put(vm, recv, "rd_found_sender", sender)?;
+            Value::Null
+        }
+        ("onAssociationCreated", "(Landroid/companion/AssociationInfo;)V") => {
+            let info = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "rd_created", info)?;
+            Value::Null
+        }
+        ("onFailure", "(Ljava/lang/CharSequence;)V") => {
+            let error = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "rd_failure", error)?;
+            Value::Null
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_association_request_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P49_ASSOCIATION_REQUEST_BUILDER {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "()V") => {
+                put(vm, recv, "rd_used", Value::Int(0))?;
+                put(vm, recv, "mSingleDevice", Value::Int(0))?;
+                put(vm, recv, "mDeviceFilters", Value::Null)?;
+                put(vm, recv, "mDeviceProfile", Value::Null)?;
+                put(vm, recv, "mDisplayName", Value::Null)?;
+                put(vm, recv, "mSelfManaged", Value::Int(0))?;
+                put(vm, recv, "mForceConfirmation", Value::Int(0))?;
+                Value::Null
+            }
+            ("setSingleDevice", "(Z)Landroid/companion/AssociationRequest$Builder;") => {
+                p49_check_builder_not_used(vm, recv)?;
+                put(vm, recv, "mSingleDevice", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            (
+                "addDeviceFilter",
+                "(Landroid/companion/DeviceFilter;)Landroid/companion/AssociationRequest$Builder;",
+            ) => {
+                p49_check_builder_not_used(vm, recv)?;
+                if let Some(filter) = oarg(args, 0) {
+                    let mut filters = collection_items(vm, Some(&get(vm, recv, "mDeviceFilters")));
+                    filters.push(Value::Obj(filter));
+                    let stored = p49_list_value(vm, filters)?;
+                    put(vm, recv, "mDeviceFilters", stored)?;
+                }
+                Value::Obj(recv)
+            }
+            (
+                "setDeviceProfile",
+                "(Ljava/lang/String;)Landroid/companion/AssociationRequest$Builder;",
+            ) => {
+                p49_check_builder_not_used(vm, recv)?;
+                let value = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mDeviceProfile", value)?;
+                Value::Obj(recv)
+            }
+            (
+                "setDisplayName",
+                "(Ljava/lang/CharSequence;)Landroid/companion/AssociationRequest$Builder;",
+            ) => {
+                p49_check_builder_not_used(vm, recv)?;
+                let value = req_obj(args, 0, "displayName")?;
+                put(vm, recv, "mDisplayName", Value::Obj(value))?;
+                Value::Obj(recv)
+            }
+            ("setSelfManaged", "(Z)Landroid/companion/AssociationRequest$Builder;") => {
+                p49_check_builder_not_used(vm, recv)?;
+                put(vm, recv, "mSelfManaged", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setForceConfirmation", "(Z)Landroid/companion/AssociationRequest$Builder;") => {
+                p49_check_builder_not_used(vm, recv)?;
+                put(vm, recv, "mForceConfirmation", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("build", "()Landroid/companion/AssociationRequest;")
+            | ("build", "()Ljava/lang/Object;") => {
+                p49_check_builder_not_used(vm, recv)?;
+                put(vm, recv, "rd_used", Value::Int(1))?;
+                if field_bool(vm, recv, "mSelfManaged")
+                    && !matches!(get(vm, recv, "mDisplayName"), Value::Obj(_))
+                {
+                    return Err(ise(
+                        "Request for a self-managed association MUST provide the display name of the device",
+                    ));
+                }
+                let out = alloc_obj(vm, P49_ASSOCIATION_REQUEST, Vec::new())?;
+                for field in [
+                    "mSingleDevice",
+                    "mDeviceProfile",
+                    "mDisplayName",
+                    "mSelfManaged",
+                    "mForceConfirmation",
+                ] {
+                    let value = get(vm, recv, field);
+                    put(vm, out, field, value)?;
+                }
+                let filters = match get(vm, recv, "mDeviceFilters") {
+                    Value::Obj(_) => get(vm, recv, "mDeviceFilters"),
+                    _ => p49_empty_list(vm)?,
+                };
+                put(vm, out, "mDeviceFilters", filters)?;
+                put(vm, out, "mAssociatedDevice", Value::Null)?;
+                put(vm, out, "mPackageName", Value::Null)?;
+                put(vm, out, "mUserId", Value::Int(0))?;
+                put(vm, out, "mDeviceProfilePrivilegesDescription", Value::Null)?;
+                let now = p49_current_time_millis(vm);
+                put(vm, out, "mCreationTime", Value::Long(now))?;
+                put(vm, out, "mSkipPrompt", Value::Int(0))?;
+                Value::Obj(out)
+            }
+            _ => return Ok(None),
+        }));
+    }
+
+    Ok(Some(match (name, sig) {
+        (
+            "<init>",
+            "(ZLjava/util/List;Ljava/lang/String;Ljava/lang/CharSequence;ZZ)V",
+        ) => {
+            let filters = req_obj(args, 1, "deviceFilters")?;
+            put(vm, recv, "mSingleDevice", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mDeviceFilters", Value::Obj(filters))?;
+            put(vm, recv, "mDeviceProfile", args.get(2).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mDisplayName", args.get(3).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mSelfManaged", Value::Int(iarg(args, 4)))?;
+            put(vm, recv, "mForceConfirmation", Value::Int(iarg(args, 5)))?;
+            put(vm, recv, "mAssociatedDevice", Value::Null)?;
+            put(vm, recv, "mPackageName", Value::Null)?;
+            put(vm, recv, "mUserId", Value::Int(0))?;
+            put(vm, recv, "mDeviceProfilePrivilegesDescription", Value::Null)?;
+            let now = p49_current_time_millis(vm);
+            put(vm, recv, "mCreationTime", Value::Long(now))?;
+            put(vm, recv, "mSkipPrompt", Value::Int(0))?;
+            Value::Null
+        }
+        ("getDeviceProfile", "()Ljava/lang/String;") => get(vm, recv, "mDeviceProfile"),
+        ("getDisplayName", "()Ljava/lang/CharSequence;") => get(vm, recv, "mDisplayName"),
+        ("isSelfManaged", "()Z") => bool_value(field_bool(vm, recv, "mSelfManaged")),
+        ("isForceConfirmation", "()Z") => bool_value(field_bool(vm, recv, "mForceConfirmation")),
+        ("isSingleDevice", "()Z") => bool_value(field_bool(vm, recv, "mSingleDevice")),
+        ("setPackageName", "(Ljava/lang/String;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mPackageName", v)?;
+            Value::Null
+        }
+        ("setUserId", "(I)V") => {
+            put(vm, recv, "mUserId", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("setDeviceProfilePrivilegesDescription", "(Ljava/lang/String;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mDeviceProfilePrivilegesDescription", v)?;
+            Value::Null
+        }
+        ("setSkipPrompt", "(Z)V") => {
+            put(vm, recv, "mSkipPrompt", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("setDisplayName", "(Ljava/lang/CharSequence;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mDisplayName", v)?;
+            Value::Null
+        }
+        ("setAssociatedDevice", "(Landroid/companion/AssociatedDevice;)V") => {
+            let v = args.first().cloned().unwrap_or(Value::Null);
+            put(vm, recv, "mAssociatedDevice", v)?;
+            Value::Null
+        }
+        ("getDeviceFilters", "()Ljava/util/List;") => match get(vm, recv, "mDeviceFilters") {
+            Value::Obj(_) => get(vm, recv, "mDeviceFilters"),
+            _ => p49_empty_list(vm)?,
+        },
+        ("getAssociatedDevice", "()Landroid/companion/AssociatedDevice;") => {
+            get(vm, recv, "mAssociatedDevice")
+        }
+        ("getPackageName", "()Ljava/lang/String;") => get(vm, recv, "mPackageName"),
+        ("getUserId", "()I") => Value::Int(field_int(vm, recv, "mUserId")),
+        ("getDeviceProfilePrivilegesDescription", "()Ljava/lang/String;") => {
+            get(vm, recv, "mDeviceProfilePrivilegesDescription")
+        }
+        ("getCreationTime", "()J") => Value::Long(field_long(vm, recv, "mCreationTime")),
+        ("isSkipPrompt", "()Z") => bool_value(field_bool(vm, recv, "mSkipPrompt")),
+        ("describeContents", "()I") => Value::Int(0),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            if matches!(args.first(), Some(Value::Obj(r)) if *r == recv) {
+                bool_value(true)
+            } else if let Some(other) = p49_other_exact(vm, args, P49_ASSOCIATION_REQUEST) {
+                bool_value(
+                    field_bool(vm, recv, "mSingleDevice") == field_bool(vm, other, "mSingleDevice")
+                        && p49_list_equal(
+                            vm,
+                            &get(vm, recv, "mDeviceFilters"),
+                            &get(vm, other, "mDeviceFilters"),
+                        )?
+                        && field_str(vm, recv, "mDeviceProfile")
+                            == field_str(vm, other, "mDeviceProfile")
+                        && p49_value_equal(
+                            vm,
+                            &get(vm, recv, "mDisplayName"),
+                            &get(vm, other, "mDisplayName"),
+                        )?
+                        && p49_value_equal(
+                            vm,
+                            &get(vm, recv, "mAssociatedDevice"),
+                            &get(vm, other, "mAssociatedDevice"),
+                        )?
+                        && field_bool(vm, recv, "mSelfManaged")
+                            == field_bool(vm, other, "mSelfManaged")
+                        && field_bool(vm, recv, "mForceConfirmation")
+                            == field_bool(vm, other, "mForceConfirmation")
+                        && field_str(vm, recv, "mPackageName")
+                            == field_str(vm, other, "mPackageName")
+                        && field_int(vm, recv, "mUserId") == field_int(vm, other, "mUserId")
+                        && field_str(vm, recv, "mDeviceProfilePrivilegesDescription")
+                            == field_str(vm, other, "mDeviceProfilePrivilegesDescription")
+                        && field_long(vm, recv, "mCreationTime")
+                            == field_long(vm, other, "mCreationTime")
+                        && field_bool(vm, recv, "mSkipPrompt")
+                            == field_bool(vm, other, "mSkipPrompt"),
+                )
+            } else {
+                bool_value(false)
+            }
+        }
+        ("hashCode", "()I") => {
+            let mut result: i32 = 1;
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_bool_hash(field_bool(vm, recv, "mSingleDevice")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_collection_hash(vm, &get(vm, recv, "mDeviceFilters")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(host_hash(vm, &get(vm, recv, "mDeviceProfile")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_value_hash(vm, &get(vm, recv, "mDisplayName")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_value_hash(vm, &get(vm, recv, "mAssociatedDevice")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_bool_hash(field_bool(vm, recv, "mSelfManaged")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_bool_hash(field_bool(vm, recv, "mForceConfirmation")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(host_hash(vm, &get(vm, recv, "mPackageName")));
+            result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "mUserId"));
+            result = result.wrapping_mul(31).wrapping_add(host_hash(
+                vm,
+                &get(vm, recv, "mDeviceProfilePrivilegesDescription"),
+            ));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(host_hash(vm, &Value::Long(field_long(vm, recv, "mCreationTime"))));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_bool_hash(field_bool(vm, recv, "mSkipPrompt")));
+            Value::Int(result)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let filters = value_string(vm, &get(vm, recv, "mDeviceFilters"))?;
+            let display = value_string(vm, &get(vm, recv, "mDisplayName"))?;
+            let associated = value_string(vm, &get(vm, recv, "mAssociatedDevice"))?;
+            jstr(
+                vm,
+                format!(
+                    "AssociationRequest {{ singleDevice = {}, deviceFilters = {}, deviceProfile = {}, displayName = {}, associatedDevice = {}, selfManaged = {}, forceConfirmation = {}, packageName = {}, userId = {}, deviceProfilePrivilegesDescription = {}, creationTime = {}, skipPrompt = {} }}",
+                    field_bool(vm, recv, "mSingleDevice"),
+                    filters,
+                    field_str(vm, recv, "mDeviceProfile").unwrap_or_else(|| "null".to_string()),
+                    display,
+                    associated,
+                    field_bool(vm, recv, "mSelfManaged"),
+                    field_bool(vm, recv, "mForceConfirmation"),
+                    field_str(vm, recv, "mPackageName").unwrap_or_else(|| "null".to_string()),
+                    field_int(vm, recv, "mUserId"),
+                    field_str(vm, recv, "mDeviceProfilePrivilegesDescription")
+                        .unwrap_or_else(|| "null".to_string()),
+                    field_long(vm, recv, "mCreationTime"),
+                    field_bool(vm, recv, "mSkipPrompt")
+                ),
+            )?
+        }
+        _ => return Ok(None),
+    }))
+}
+
+const P49_ASSOCIATION_INFO_FIELDS: [&str; 13] = [
+    "mId",
+    "mUserId",
+    "mPackageName",
+    "mDeviceMacAddress",
+    "mDisplayName",
+    "mDeviceProfile",
+    "mAssociatedDevice",
+    "mSelfManaged",
+    "mNotifyOnDeviceNearby",
+    "mRevoked",
+    "mTimeApprovedMs",
+    "mLastTimeConnectedMs",
+    "mSystemDataSyncFlags",
+];
+
+fn p49_date_string(vm: &mut Engine, millis: i64) -> String {
+    let Ok(date) = alloc_obj(vm, "Ljava/util/Date;", Vec::new()) else {
+        return millis.to_string();
+    };
+    if vm
+        .invoke_instance(date, "<init>", "(J)V", &[Value::Long(millis)])
+        .is_err()
+    {
+        return millis.to_string();
+    }
+    value_string(vm, &Value::Obj(date)).unwrap_or_else(|_| millis.to_string())
+}
+
+fn p49_association_info_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P49_ASSOCIATION_INFO_BUILDER {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "(Landroid/companion/AssociationInfo;)V") => {
+                let info = req_obj(args, 0, "info")?;
+                put(vm, recv, "mOriginalInfo", Value::Obj(info))?;
+                put(
+                    vm,
+                    recv,
+                    "mNotifyOnDeviceNearby",
+                    Value::Int(field_int(vm, info, "mNotifyOnDeviceNearby")),
+                )?;
+                put(vm, recv, "mRevoked", Value::Int(field_int(vm, info, "mRevoked")))?;
+                put(
+                    vm,
+                    recv,
+                    "mLastTimeConnectedMs",
+                    Value::Long(field_long(vm, info, "mLastTimeConnectedMs")),
+                )?;
+                put(
+                    vm,
+                    recv,
+                    "mSystemDataSyncFlags",
+                    Value::Int(field_int(vm, info, "mSystemDataSyncFlags")),
+                )?;
+                Value::Null
+            }
+            ("setLastTimeConnected", "(J)Landroid/companion/AssociationInfo$Builder;")
+            | (
+                "setLastTimeConnected",
+                "(J)Landroid/companion/AssociationInfo$NonActionableBuilder;",
+            ) => {
+                let value = larg(args, 0);
+                if value < 0 {
+                    return Err(iae(format!(
+                        "lastTimeConnectedMs must not be negative! (Given {value} )"
+                    )));
+                }
+                put(vm, recv, "mLastTimeConnectedMs", Value::Long(value))?;
+                Value::Obj(recv)
+            }
+            ("setNotifyOnDeviceNearby", "(Z)Landroid/companion/AssociationInfo$Builder;")
+            | (
+                "setNotifyOnDeviceNearby",
+                "(Z)Landroid/companion/AssociationInfo$NonActionableBuilder;",
+            ) => {
+                put(vm, recv, "mNotifyOnDeviceNearby", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setRevoked", "(Z)Landroid/companion/AssociationInfo$Builder;")
+            | (
+                "setRevoked",
+                "(Z)Landroid/companion/AssociationInfo$NonActionableBuilder;",
+            ) => {
+                put(vm, recv, "mRevoked", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("setSystemDataSyncFlags", "(I)Landroid/companion/AssociationInfo$Builder;")
+            | (
+                "setSystemDataSyncFlags",
+                "(I)Landroid/companion/AssociationInfo$NonActionableBuilder;",
+            ) => {
+                put(vm, recv, "mSystemDataSyncFlags", Value::Int(iarg(args, 0)))?;
+                Value::Obj(recv)
+            }
+            ("build", "()Landroid/companion/AssociationInfo;") => {
+                let original = field_obj(vm, recv, "mOriginalInfo")
+                    .ok_or_else(|| npe("mOriginalInfo"))?;
+                let out = alloc_obj(vm, P49_ASSOCIATION_INFO, Vec::new())?;
+                p49_copy_fields(vm, original, out, &P49_ASSOCIATION_INFO_FIELDS)?;
+                for field in [
+                    "mNotifyOnDeviceNearby",
+                    "mRevoked",
+                    "mLastTimeConnectedMs",
+                    "mSystemDataSyncFlags",
+                ] {
+                    let value = get(vm, recv, field);
+                    put(vm, out, field, value)?;
+                }
+                Value::Obj(out)
+            }
+            _ => return Ok(None),
+        }));
+    }
+
+    Ok(Some(match (name, sig) {
+        (
+            "<init>",
+            "(IILjava/lang/String;Landroid/net/MacAddress;Ljava/lang/CharSequence;Ljava/lang/String;Landroid/companion/AssociatedDevice;ZZZJJI)V",
+        ) => {
+            if iarg(args, 0) <= 0 {
+                return Err(iae("Association ID should be greater than 0"));
+            }
+            if oarg(args, 3).is_none() && oarg(args, 4).is_none() {
+                return Err(iae(
+                    "MAC address and the Display Name must NOT be null at the same time",
+                ));
+            }
+            put(vm, recv, "mId", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mUserId", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mPackageName", args.get(2).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mDeviceMacAddress", args.get(3).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mDisplayName", args.get(4).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mDeviceProfile", args.get(5).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mAssociatedDevice", args.get(6).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mSelfManaged", Value::Int(iarg(args, 7)))?;
+            put(vm, recv, "mNotifyOnDeviceNearby", Value::Int(iarg(args, 8)))?;
+            put(vm, recv, "mRevoked", Value::Int(iarg(args, 9)))?;
+            put(vm, recv, "mTimeApprovedMs", Value::Long(larg(args, 10)))?;
+            put(vm, recv, "mLastTimeConnectedMs", Value::Long(larg(args, 11)))?;
+            put(vm, recv, "mSystemDataSyncFlags", Value::Int(iarg(args, 12)))?;
+            Value::Null
+        }
+        ("getId", "()I") => Value::Int(field_int(vm, recv, "mId")),
+        ("getUserId", "()I") => Value::Int(field_int(vm, recv, "mUserId")),
+        ("getPackageName", "()Ljava/lang/String;") => get(vm, recv, "mPackageName"),
+        ("getDeviceMacAddress", "()Landroid/net/MacAddress;") => get(vm, recv, "mDeviceMacAddress"),
+        ("getDeviceMacAddressAsString", "()Ljava/lang/String;") => {
+            match p49_mac_long_from_obj_value(vm, &get(vm, recv, "mDeviceMacAddress")) {
+                Some(addr) => jstr(vm, p49_mac_format_long(addr).to_uppercase())?,
+                None => Value::Null,
+            }
+        }
+        ("getDisplayName", "()Ljava/lang/CharSequence;") => get(vm, recv, "mDisplayName"),
+        ("getDeviceProfile", "()Ljava/lang/String;") => get(vm, recv, "mDeviceProfile"),
+        ("getAssociatedDevice", "()Landroid/companion/AssociatedDevice;") => {
+            get(vm, recv, "mAssociatedDevice")
+        }
+        ("isSelfManaged", "()Z") => bool_value(field_bool(vm, recv, "mSelfManaged")),
+        ("isNotifyOnDeviceNearby", "()Z") => bool_value(field_bool(vm, recv, "mNotifyOnDeviceNearby")),
+        ("getTimeApprovedMs", "()J") => Value::Long(field_long(vm, recv, "mTimeApprovedMs")),
+        ("belongsToPackage", "(ILjava/lang/String;)Z") => bool_value(
+            field_int(vm, recv, "mUserId") == iarg(args, 0)
+                && field_str(vm, recv, "mPackageName") == opt_str_arg(vm, args, 1),
+        ),
+        ("isRevoked", "()Z") => bool_value(field_bool(vm, recv, "mRevoked")),
+        ("getLastTimeConnectedMs", "()Ljava/lang/Long;") => {
+            let boxed = crate::boxes::box_value(
+                vm,
+                "Ljava/lang/Long;",
+                Value::Long(field_long(vm, recv, "mLastTimeConnectedMs")),
+            )?;
+            Value::Obj(boxed)
+        }
+        ("getSystemDataSyncFlags", "()I") => Value::Int(field_int(vm, recv, "mSystemDataSyncFlags")),
+        ("isLinkedTo", "(Ljava/lang/String;)Z") => {
+            if field_bool(vm, recv, "mSelfManaged") {
+                bool_value(false)
+            } else if let Some(text) = opt_str_arg(vm, args, 0) {
+                match p49_parse_mac_string(&text) {
+                    Ok(parsed) => bool_value(
+                        p49_mac_long_from_obj_value(vm, &get(vm, recv, "mDeviceMacAddress"))
+                            .map(|addr| addr == parsed)
+                            .unwrap_or(false),
+                    ),
+                    Err(_) => bool_value(false),
+                }
+            } else {
+                bool_value(false)
+            }
+        }
+        ("shouldBindWhenPresent", "()Z") => bool_value(
+            field_bool(vm, recv, "mNotifyOnDeviceNearby") || field_bool(vm, recv, "mSelfManaged"),
+        ),
+        ("toShortString", "()Ljava/lang/String;") => {
+            let mut text = format!("id={}", field_int(vm, recv, "mId"));
+            if let Some(addr) = p49_mac_long_from_obj_value(vm, &get(vm, recv, "mDeviceMacAddress")) {
+                text.push_str(&format!(", addr={}", p49_mac_format_long(addr).to_uppercase()));
+            }
+            if field_bool(vm, recv, "mSelfManaged") {
+                text.push_str(", self-managed");
+            }
+            text.push_str(&format!(
+                ", pkg=u{}/{}",
+                field_int(vm, recv, "mUserId"),
+                field_str(vm, recv, "mPackageName").unwrap_or_else(|| "null".to_string())
+            ));
+            jstr(vm, text)?
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let mac = value_string(vm, &get(vm, recv, "mDeviceMacAddress"))?;
+            let display = value_string(vm, &get(vm, recv, "mDisplayName"))?;
+            let associated = value_string(vm, &get(vm, recv, "mAssociatedDevice"))?;
+            let approved = p49_date_string(vm, field_long(vm, recv, "mTimeApprovedMs"));
+            let last_raw = field_long(vm, recv, "mLastTimeConnectedMs");
+            let last = if last_raw == i64::MAX {
+                "None".to_string()
+            } else {
+                p49_date_string(vm, last_raw)
+            };
+            jstr(
+                vm,
+                format!(
+                    "Association{{mId={}, mUserId={}, mPackageName='{}', mDeviceMacAddress={}, mDisplayName='{}', mDeviceProfile='{}', mSelfManaged={}, mAssociatedDevice={}, mNotifyOnDeviceNearby={}, mRevoked={}, mTimeApprovedMs={}, mLastTimeConnectedMs={}, mSystemDataSyncFlags={}}}",
+                    field_int(vm, recv, "mId"),
+                    field_int(vm, recv, "mUserId"),
+                    field_str(vm, recv, "mPackageName").unwrap_or_else(|| "null".to_string()),
+                    mac,
+                    display,
+                    field_str(vm, recv, "mDeviceProfile").unwrap_or_else(|| "null".to_string()),
+                    field_bool(vm, recv, "mSelfManaged"),
+                    associated,
+                    field_bool(vm, recv, "mNotifyOnDeviceNearby"),
+                    field_bool(vm, recv, "mRevoked"),
+                    approved,
+                    last,
+                    field_int(vm, recv, "mSystemDataSyncFlags")
+                ),
+            )?
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            if matches!(args.first(), Some(Value::Obj(r)) if *r == recv) {
+                bool_value(true)
+            } else if let Some(other) = p49_other(vm, recv, args, P49_ASSOCIATION_INFO) {
+                bool_value(
+                    field_int(vm, recv, "mId") == field_int(vm, other, "mId")
+                        && field_int(vm, recv, "mUserId") == field_int(vm, other, "mUserId")
+                        && field_bool(vm, recv, "mSelfManaged")
+                            == field_bool(vm, other, "mSelfManaged")
+                        && field_bool(vm, recv, "mNotifyOnDeviceNearby")
+                            == field_bool(vm, other, "mNotifyOnDeviceNearby")
+                        && field_bool(vm, recv, "mRevoked") == field_bool(vm, other, "mRevoked")
+                        && field_long(vm, recv, "mTimeApprovedMs")
+                            == field_long(vm, other, "mTimeApprovedMs")
+                        && field_long(vm, recv, "mLastTimeConnectedMs")
+                            == field_long(vm, other, "mLastTimeConnectedMs")
+                        && field_str(vm, recv, "mPackageName")
+                            == field_str(vm, other, "mPackageName")
+                        && p49_value_equal(
+                            vm,
+                            &get(vm, recv, "mDeviceMacAddress"),
+                            &get(vm, other, "mDeviceMacAddress"),
+                        )?
+                        && p49_value_equal(
+                            vm,
+                            &get(vm, recv, "mDisplayName"),
+                            &get(vm, other, "mDisplayName"),
+                        )?
+                        && field_str(vm, recv, "mDeviceProfile")
+                            == field_str(vm, other, "mDeviceProfile")
+                        && p49_value_equal(
+                            vm,
+                            &get(vm, recv, "mAssociatedDevice"),
+                            &get(vm, other, "mAssociatedDevice"),
+                        )?
+                        && field_int(vm, recv, "mSystemDataSyncFlags")
+                            == field_int(vm, other, "mSystemDataSyncFlags"),
+                )
+            } else {
+                bool_value(false)
+            }
+        }
+        ("hashCode", "()I") => {
+            let mut result: i32 = 1;
+            result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "mId"));
+            result = result.wrapping_mul(31).wrapping_add(field_int(vm, recv, "mUserId"));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(host_hash(vm, &get(vm, recv, "mPackageName")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_value_hash(vm, &get(vm, recv, "mDeviceMacAddress")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_value_hash(vm, &get(vm, recv, "mDisplayName")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(host_hash(vm, &get(vm, recv, "mDeviceProfile")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_value_hash(vm, &get(vm, recv, "mAssociatedDevice")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_bool_hash(field_bool(vm, recv, "mSelfManaged")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_bool_hash(field_bool(vm, recv, "mNotifyOnDeviceNearby")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_bool_hash(field_bool(vm, recv, "mRevoked")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(host_hash(vm, &Value::Long(field_long(vm, recv, "mTimeApprovedMs"))));
+            result = result.wrapping_mul(31).wrapping_add(host_hash(
+                vm,
+                &Value::Long(field_long(vm, recv, "mLastTimeConnectedMs")),
+            ));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mSystemDataSyncFlags"));
+            Value::Int(result)
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_bt_filter_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P49_BT_FILTER_BUILDER {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "()V") => {
+                put(vm, recv, "rd_used", Value::Int(0))?;
+                put(vm, recv, "mNamePattern", Value::Null)?;
+                put(vm, recv, "mAddress", Value::Null)?;
+                put(vm, recv, "mServiceUuids", Value::Null)?;
+                put(vm, recv, "mServiceUuidMasks", Value::Null)?;
+                Value::Null
+            }
+            (
+                "setNamePattern",
+                "(Ljava/util/regex/Pattern;)Landroid/companion/BluetoothDeviceFilter$Builder;",
+            ) => {
+                p49_check_builder_not_used(vm, recv)?;
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mNamePattern", v)?;
+                Value::Obj(recv)
+            }
+            (
+                "setAddress",
+                "(Ljava/lang/String;)Landroid/companion/BluetoothDeviceFilter$Builder;",
+            ) => {
+                p49_check_builder_not_used(vm, recv)?;
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mAddress", v)?;
+                Value::Obj(recv)
+            }
+            (
+                "addServiceUuid",
+                "(Landroid/os/ParcelUuid;Landroid/os/ParcelUuid;)Landroid/companion/BluetoothDeviceFilter$Builder;",
+            ) => {
+                p49_check_builder_not_used(vm, recv)?;
+                let mut uuids = collection_items(vm, Some(&get(vm, recv, "mServiceUuids")));
+                let mut masks = collection_items(vm, Some(&get(vm, recv, "mServiceUuidMasks")));
+                uuids.push(args.first().cloned().unwrap_or(Value::Null));
+                masks.push(args.get(1).cloned().unwrap_or(Value::Null));
+                let stored_uuids = p49_list_value(vm, uuids)?;
+                let stored_masks = p49_list_value(vm, masks)?;
+                put(vm, recv, "mServiceUuids", stored_uuids)?;
+                put(vm, recv, "mServiceUuidMasks", stored_masks)?;
+                Value::Obj(recv)
+            }
+            ("build", "()Landroid/companion/BluetoothDeviceFilter;")
+            | ("build", "()Ljava/lang/Object;") => {
+                p49_check_builder_not_used(vm, recv)?;
+                put(vm, recv, "rd_used", Value::Int(1))?;
+                let out = alloc_obj(vm, P49_BT_FILTER, Vec::new())?;
+                for field in ["mNamePattern", "mAddress"] {
+                    let value = get(vm, recv, field);
+                    put(vm, out, field, value)?;
+                }
+                for field in ["mServiceUuids", "mServiceUuidMasks"] {
+                    let value = match get(vm, recv, field) {
+                        Value::Obj(_) => get(vm, recv, field),
+                        _ => p49_empty_list(vm)?,
+                    };
+                    put(vm, out, field, value)?;
+                }
+                Value::Obj(out)
+            }
+            _ => return Ok(None),
+        }));
+    }
+
+    Ok(Some(match (name, sig) {
+        (
+            "<init>",
+            "(Ljava/util/regex/Pattern;Ljava/lang/String;Ljava/util/List;Ljava/util/List;)V",
+        ) => {
+            put(vm, recv, "mNamePattern", args.first().cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mAddress", args.get(1).cloned().unwrap_or(Value::Null))?;
+            for (index, field) in [(2, "mServiceUuids"), (3, "mServiceUuidMasks")] {
+                let raw = args.get(index).cloned().unwrap_or(Value::Null);
+                let value = if matches!(raw, Value::Obj(_)) {
+                    raw
+                } else {
+                    p49_empty_list(vm)?
+                };
+                put(vm, recv, field, value)?;
+            }
+            Value::Null
+        }
+        ("getNamePattern", "()Ljava/util/regex/Pattern;") => get(vm, recv, "mNamePattern"),
+        ("getAddress", "()Ljava/lang/String;") => get(vm, recv, "mAddress"),
+        ("getServiceUuids", "()Ljava/util/List;") => match get(vm, recv, "mServiceUuids") {
+            Value::Obj(_) => get(vm, recv, "mServiceUuids"),
+            _ => p49_empty_list(vm)?,
+        },
+        ("getServiceUuidMasks", "()Ljava/util/List;") => match get(vm, recv, "mServiceUuidMasks") {
+            Value::Obj(_) => get(vm, recv, "mServiceUuidMasks"),
+            _ => p49_empty_list(vm)?,
+        },
+        ("getMediumType", "()I") => Value::Int(0),
+        ("describeContents", "()I") => Value::Int(0),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            if matches!(args.first(), Some(Value::Obj(r)) if *r == recv) {
+                bool_value(true)
+            } else if let Some(other) = p49_other_exact(vm, args, P49_BT_FILTER) {
+                bool_value(
+                    objects_equal(vm, &get(vm, recv, "mNamePattern"), &get(vm, other, "mNamePattern"))
+                        && field_str(vm, recv, "mAddress") == field_str(vm, other, "mAddress")
+                        && p49_list_equal(
+                            vm,
+                            &get(vm, recv, "mServiceUuids"),
+                            &get(vm, other, "mServiceUuids"),
+                        )?
+                        && p49_list_equal(
+                            vm,
+                            &get(vm, recv, "mServiceUuidMasks"),
+                            &get(vm, other, "mServiceUuidMasks"),
+                        )?,
+                )
+            } else {
+                bool_value(false)
+            }
+        }
+        ("hashCode", "()I") => {
+            let mut result: i32 = 1;
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_value_hash(vm, &get(vm, recv, "mNamePattern")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(host_hash(vm, &get(vm, recv, "mAddress")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_collection_hash(vm, &get(vm, recv, "mServiceUuids")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_collection_hash(vm, &get(vm, recv, "mServiceUuidMasks")));
+            Value::Int(result)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let pattern = value_string(vm, &get(vm, recv, "mNamePattern"))?;
+            let uuids = value_string(vm, &get(vm, recv, "mServiceUuids"))?;
+            let masks = value_string(vm, &get(vm, recv, "mServiceUuidMasks"))?;
+            jstr(
+                vm,
+                format!(
+                    "BluetoothDeviceFilter{{mNamePattern={}, mAddress='{}', mServiceUuids={}, mServiceUuidMasks={}}}",
+                    pattern,
+                    field_str(vm, recv, "mAddress").unwrap_or_else(|| "null".to_string()),
+                    uuids,
+                    masks
+                ),
+            )?
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_default_scan_filter(vm: &mut Engine) -> Result<Value, VmExit> {
+    p49_alloc_value(
+        vm,
+        "Landroid/bluetooth/le/ScanFilter;",
+        vec![("rd_default_empty".to_string(), Value::Int(1))],
+    )
+}
+
+fn p49_ble_filter_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P49_BLE_FILTER_BUILDER {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "()V") => {
+                put(vm, recv, "rd_used", Value::Int(0))?;
+                put(vm, recv, "mScanFilter", Value::Null)?;
+                put(vm, recv, "mNamePattern", Value::Null)?;
+                put(vm, recv, "mRawDataFilter", Value::Null)?;
+                put(vm, recv, "mRawDataFilterMask", Value::Null)?;
+                put(vm, recv, "mRenamePrefix", Value::Null)?;
+                put(vm, recv, "mRenameSuffix", Value::Null)?;
+                put(vm, recv, "mRenameBytesFrom", Value::Int(-1))?;
+                put(vm, recv, "mRenameBytesLength", Value::Int(0))?;
+                put(vm, recv, "mRenameNameFrom", Value::Int(-1))?;
+                put(vm, recv, "mRenameNameLength", Value::Int(0))?;
+                put(vm, recv, "mRenameBytesReverseOrder", Value::Int(0))?;
+                Value::Null
+            }
+            (
+                "setNamePattern",
+                "(Ljava/util/regex/Pattern;)Landroid/companion/BluetoothLeDeviceFilter$Builder;",
+            ) => {
+                p49_check_builder_not_used(vm, recv)?;
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mNamePattern", v)?;
+                Value::Obj(recv)
+            }
+            (
+                "setScanFilter",
+                "(Landroid/bluetooth/le/ScanFilter;)Landroid/companion/BluetoothLeDeviceFilter$Builder;",
+            ) => {
+                p49_check_builder_not_used(vm, recv)?;
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mScanFilter", v)?;
+                Value::Obj(recv)
+            }
+            ("setRawDataFilter", "([B[B)Landroid/companion/BluetoothLeDeviceFilter$Builder;") => {
+                p49_check_builder_not_used(vm, recv)?;
+                let raw = req_obj(args, 0, "rawDataFilter")?;
+                let mask_value = args.get(1).cloned().unwrap_or(Value::Null);
+                if matches!(mask_value, Value::Obj(_))
+                    && array_elems(vm, Some(&Value::Obj(raw))).len()
+                        != array_elems(vm, Some(&mask_value)).len()
+                {
+                    return Err(iae("Mask and filter should be the same length"));
+                }
+                put(vm, recv, "mRawDataFilter", Value::Obj(raw))?;
+                put(vm, recv, "mRawDataFilterMask", mask_value)?;
+                Value::Obj(recv)
+            }
+            (
+                "setRenameFromBytes",
+                "(Ljava/lang/String;Ljava/lang/String;IILjava/nio/ByteOrder;)Landroid/companion/BluetoothLeDeviceFilter$Builder;",
+            ) => {
+                if matches!(get(vm, recv, "mRenamePrefix"), Value::Obj(_)) {
+                    return Err(ise("Renaming rule can only be set once"));
+                }
+                if iarg(args, 3) <= 0 {
+                    return Err(iae("Range must be non-empty"));
+                }
+                let little = match args.get(4) {
+                    Some(Value::Obj(order)) => field_str(vm, *order, "name")
+                        .or_else(|| field_str(vm, *order, "mName"))
+                        .map(|s| s.contains("LITTLE"))
+                        .unwrap_or(false),
+                    _ => false,
+                };
+                put(vm, recv, "mRenameBytesFrom", Value::Int(iarg(args, 2)))?;
+                put(vm, recv, "mRenameBytesLength", Value::Int(iarg(args, 3)))?;
+                put(
+                    vm,
+                    recv,
+                    "mRenameBytesReverseOrder",
+                    Value::Int(if little { 1 } else { 0 }),
+                )?;
+                p49_check_builder_not_used(vm, recv)?;
+                if opt_str_arg(vm, args, 0).map(|s| s.chars().count()).unwrap_or(0) > 10 {
+                    return Err(iae("Prefix is too long"));
+                }
+                put(vm, recv, "mRenamePrefix", args.first().cloned().unwrap_or(Value::Null))?;
+                put(vm, recv, "mRenameSuffix", args.get(1).cloned().unwrap_or(Value::Null))?;
+                Value::Obj(recv)
+            }
+            (
+                "setRenameFromName",
+                "(Ljava/lang/String;Ljava/lang/String;II)Landroid/companion/BluetoothLeDeviceFilter$Builder;",
+            ) => {
+                if matches!(get(vm, recv, "mRenamePrefix"), Value::Obj(_)) {
+                    return Err(ise("Renaming rule can only be set once"));
+                }
+                if iarg(args, 3) <= 0 {
+                    return Err(iae("Range must be non-empty"));
+                }
+                put(vm, recv, "mRenameNameFrom", Value::Int(iarg(args, 2)))?;
+                put(vm, recv, "mRenameNameLength", Value::Int(iarg(args, 3)))?;
+                put(vm, recv, "mRenameBytesReverseOrder", Value::Int(0))?;
+                p49_check_builder_not_used(vm, recv)?;
+                if opt_str_arg(vm, args, 0).map(|s| s.chars().count()).unwrap_or(0) > 10 {
+                    return Err(iae("Prefix is too long"));
+                }
+                put(vm, recv, "mRenamePrefix", args.first().cloned().unwrap_or(Value::Null))?;
+                put(vm, recv, "mRenameSuffix", args.get(1).cloned().unwrap_or(Value::Null))?;
+                Value::Obj(recv)
+            }
+            ("build", "()Landroid/companion/BluetoothLeDeviceFilter;")
+            | ("build", "()Ljava/lang/Object;") => {
+                p49_check_builder_not_used(vm, recv)?;
+                put(vm, recv, "rd_used", Value::Int(1))?;
+                let out = alloc_obj(vm, P49_BLE_FILTER, Vec::new())?;
+                for field in [
+                    "mNamePattern",
+                    "mRawDataFilter",
+                    "mRawDataFilterMask",
+                    "mRenamePrefix",
+                    "mRenameSuffix",
+                    "mRenameBytesLength",
+                    "mRenameNameLength",
+                    "mRenameBytesReverseOrder",
+                ] {
+                    let value = get(vm, recv, field);
+                    put(vm, out, field, value)?;
+                }
+                put(
+                    vm,
+                    out,
+                    "mRenameBytesFrom",
+                    Value::Int(match get(vm, recv, "mRenameBytesFrom") {
+                        Value::Int(v) => v,
+                        _ => -1,
+                    }),
+                )?;
+                put(
+                    vm,
+                    out,
+                    "mRenameNameFrom",
+                    Value::Int(match get(vm, recv, "mRenameNameFrom") {
+                        Value::Int(v) => v,
+                        _ => -1,
+                    }),
+                )?;
+                let scan = match get(vm, recv, "mScanFilter") {
+                    Value::Obj(_) => get(vm, recv, "mScanFilter"),
+                    _ => p49_default_scan_filter(vm)?,
+                };
+                put(vm, out, "mScanFilter", scan)?;
+                Value::Obj(out)
+            }
+            _ => return Ok(None),
+        }));
+    }
+
+    Ok(Some(match (name, sig) {
+        (
+            "<init>",
+            "(Ljava/util/regex/Pattern;Landroid/bluetooth/le/ScanFilter;[B[BLjava/lang/String;Ljava/lang/String;IIIIZ)V",
+        ) => {
+            put(vm, recv, "mNamePattern", args.first().cloned().unwrap_or(Value::Null))?;
+            let raw_scan = args.get(1).cloned().unwrap_or(Value::Null);
+            let scan = if matches!(raw_scan, Value::Obj(_)) {
+                raw_scan
+            } else {
+                p49_default_scan_filter(vm)?
+            };
+            put(vm, recv, "mScanFilter", scan)?;
+            put(vm, recv, "mRawDataFilter", args.get(2).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mRawDataFilterMask", args.get(3).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mRenamePrefix", args.get(4).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mRenameSuffix", args.get(5).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mRenameBytesFrom", Value::Int(iarg(args, 6)))?;
+            put(vm, recv, "mRenameBytesLength", Value::Int(iarg(args, 7)))?;
+            put(vm, recv, "mRenameNameFrom", Value::Int(iarg(args, 8)))?;
+            put(vm, recv, "mRenameNameLength", Value::Int(iarg(args, 9)))?;
+            put(vm, recv, "mRenameBytesReverseOrder", Value::Int(iarg(args, 10)))?;
+            Value::Null
+        }
+        ("getNamePattern", "()Ljava/util/regex/Pattern;") => get(vm, recv, "mNamePattern"),
+        ("getScanFilter", "()Landroid/bluetooth/le/ScanFilter;") => match get(vm, recv, "mScanFilter") {
+            Value::Obj(_) => get(vm, recv, "mScanFilter"),
+            _ => p49_default_scan_filter(vm)?,
+        },
+        ("getRawDataFilter", "()[B") => get(vm, recv, "mRawDataFilter"),
+        ("getRawDataFilterMask", "()[B") => get(vm, recv, "mRawDataFilterMask"),
+        ("getRenamePrefix", "()Ljava/lang/String;") => get(vm, recv, "mRenamePrefix"),
+        ("getRenameSuffix", "()Ljava/lang/String;") => get(vm, recv, "mRenameSuffix"),
+        ("getRenameBytesFrom", "()I") => Value::Int(match get(vm, recv, "mRenameBytesFrom") {
+            Value::Int(v) => v,
+            _ => -1,
+        }),
+        ("getRenameBytesLength", "()I") => Value::Int(field_int(vm, recv, "mRenameBytesLength")),
+        ("isRenameBytesReverseOrder", "()Z") => bool_value(field_bool(vm, recv, "mRenameBytesReverseOrder")),
+        ("getMediumType", "()I") => Value::Int(1),
+        ("describeContents", "()I") => Value::Int(0),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            if matches!(args.first(), Some(Value::Obj(r)) if *r == recv) {
+                bool_value(true)
+            } else if let Some(other) = p49_other_exact(vm, args, P49_BLE_FILTER) {
+                let a_scan = get(vm, recv, "mScanFilter");
+                let b_scan = get(vm, other, "mScanFilter");
+                let both_default = match (&a_scan, &b_scan) {
+                    (Value::Obj(x), Value::Obj(y)) => {
+                        field_bool(vm, *x, "rd_default_empty")
+                            && field_bool(vm, *y, "rd_default_empty")
+                    }
+                    _ => false,
+                };
+                let scan_equal = both_default || p49_value_equal(vm, &a_scan, &b_scan)?;
+                bool_value(
+                    field_int(vm, recv, "mRenameBytesFrom")
+                        == field_int(vm, other, "mRenameBytesFrom")
+                        && field_int(vm, recv, "mRenameBytesLength")
+                            == field_int(vm, other, "mRenameBytesLength")
+                        && field_int(vm, recv, "mRenameNameFrom")
+                            == field_int(vm, other, "mRenameNameFrom")
+                        && field_int(vm, recv, "mRenameNameLength")
+                            == field_int(vm, other, "mRenameNameLength")
+                        && field_bool(vm, recv, "mRenameBytesReverseOrder")
+                            == field_bool(vm, other, "mRenameBytesReverseOrder")
+                        && objects_equal(vm, &get(vm, recv, "mNamePattern"), &get(vm, other, "mNamePattern"))
+                        && scan_equal
+                        && p49_value_array_equal(
+                            vm,
+                            &get(vm, recv, "mRawDataFilter"),
+                            &get(vm, other, "mRawDataFilter"),
+                        )
+                        && p49_value_array_equal(
+                            vm,
+                            &get(vm, recv, "mRawDataFilterMask"),
+                            &get(vm, other, "mRawDataFilterMask"),
+                        )
+                        && field_str(vm, recv, "mRenamePrefix")
+                            == field_str(vm, other, "mRenamePrefix")
+                        && field_str(vm, recv, "mRenameSuffix")
+                            == field_str(vm, other, "mRenameSuffix"),
+                )
+            } else {
+                bool_value(false)
+            }
+        }
+        ("hashCode", "()I") => {
+            let mut result: i32 = 1;
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_value_hash(vm, &get(vm, recv, "mNamePattern")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_value_hash(vm, &get(vm, recv, "mScanFilter")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_array_hash(vm, &get(vm, recv, "mRawDataFilter")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_array_hash(vm, &get(vm, recv, "mRawDataFilterMask")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(host_hash(vm, &get(vm, recv, "mRenamePrefix")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(host_hash(vm, &get(vm, recv, "mRenameSuffix")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mRenameBytesFrom"));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mRenameBytesLength"));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mRenameNameFrom"));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(field_int(vm, recv, "mRenameNameLength"));
+            result = result.wrapping_mul(31).wrapping_add(p49_bool_hash(field_bool(
+                vm,
+                recv,
+                "mRenameBytesReverseOrder",
+            )));
+            Value::Int(result)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let pattern = value_string(vm, &get(vm, recv, "mNamePattern"))?;
+            let scan = value_string(vm, &get(vm, recv, "mScanFilter"))?;
+            let raw = p49_array_to_string(vm, &get(vm, recv, "mRawDataFilter"))?;
+            let mask = p49_array_to_string(vm, &get(vm, recv, "mRawDataFilterMask"))?;
+            jstr(
+                vm,
+                format!(
+                    "BluetoothLEDeviceFilter{{mNamePattern={}, mScanFilter={}, mRawDataFilter={}, mRawDataFilterMask={}, mRenamePrefix='{}', mRenameSuffix='{}', mRenameBytesFrom={}, mRenameBytesLength={}, mRenameNameFrom={}, mRenameNameLength={}, mRenameBytesReverseOrder={}}}",
+                    pattern,
+                    scan,
+                    raw,
+                    mask,
+                    field_str(vm, recv, "mRenamePrefix").unwrap_or_else(|| "null".to_string()),
+                    field_str(vm, recv, "mRenameSuffix").unwrap_or_else(|| "null".to_string()),
+                    field_int(vm, recv, "mRenameBytesFrom"),
+                    field_int(vm, recv, "mRenameBytesLength"),
+                    field_int(vm, recv, "mRenameNameFrom"),
+                    field_int(vm, recv, "mRenameNameLength"),
+                    field_bool(vm, recv, "mRenameBytesReverseOrder")
+                ),
+            )?
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_wifi_filter_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P49_WIFI_FILTER_BUILDER {
+        return Ok(Some(match (name, sig) {
+            ("<init>", "()V") => {
+                put(vm, recv, "rd_used", Value::Int(0))?;
+                put(vm, recv, "mNamePattern", Value::Null)?;
+                put(vm, recv, "mBssid", Value::Null)?;
+                put(vm, recv, "mBssidMask", Value::Null)?;
+                put(vm, recv, "rd_bssid_mask_set", Value::Int(0))?;
+                Value::Null
+            }
+            (
+                "setNamePattern",
+                "(Ljava/util/regex/Pattern;)Landroid/companion/WifiDeviceFilter$Builder;",
+            ) => {
+                p49_check_builder_not_used(vm, recv)?;
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mNamePattern", v)?;
+                Value::Obj(recv)
+            }
+            (
+                "setBssid",
+                "(Landroid/net/MacAddress;)Landroid/companion/WifiDeviceFilter$Builder;",
+            ) => {
+                p49_check_builder_not_used(vm, recv)?;
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mBssid", v)?;
+                Value::Obj(recv)
+            }
+            (
+                "setBssidMask",
+                "(Landroid/net/MacAddress;)Landroid/companion/WifiDeviceFilter$Builder;",
+            ) => {
+                p49_check_builder_not_used(vm, recv)?;
+                let v = args.first().cloned().unwrap_or(Value::Null);
+                put(vm, recv, "mBssidMask", v)?;
+                put(vm, recv, "rd_bssid_mask_set", Value::Int(1))?;
+                Value::Obj(recv)
+            }
+            ("build", "()Landroid/companion/WifiDeviceFilter;") => {
+                p49_check_builder_not_used(vm, recv)?;
+                put(vm, recv, "rd_used", Value::Int(1))?;
+                let mask = if field_bool(vm, recv, "rd_bssid_mask_set") {
+                    match get(vm, recv, "mBssidMask") {
+                        Value::Obj(_) => get(vm, recv, "mBssidMask"),
+                        _ => return Err(npe("mBssidMask")),
+                    }
+                } else {
+                    p49_mac_value_from_long(vm, P49_MAC_VALID_MASK)?
+                };
+                p49_alloc_value(
+                    vm,
+                    P49_WIFI_FILTER,
+                    vec![
+                        ("mNamePattern".to_string(), get(vm, recv, "mNamePattern")),
+                        ("mBssid".to_string(), get(vm, recv, "mBssid")),
+                        ("mBssidMask".to_string(), mask),
+                    ],
+                )?
+            }
+            _ => return Ok(None),
+        }));
+    }
+
+    Ok(Some(match (name, sig) {
+        (
+            "<init>",
+            "(Ljava/util/regex/Pattern;Landroid/net/MacAddress;Landroid/net/MacAddress;)V",
+        ) => {
+            let mask = req_obj(args, 2, "mBssidMask")?;
+            put(vm, recv, "mNamePattern", args.first().cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mBssid", args.get(1).cloned().unwrap_or(Value::Null))?;
+            put(vm, recv, "mBssidMask", Value::Obj(mask))?;
+            Value::Null
+        }
+        ("getNamePattern", "()Ljava/util/regex/Pattern;") => get(vm, recv, "mNamePattern"),
+        ("getBssid", "()Landroid/net/MacAddress;") => get(vm, recv, "mBssid"),
+        ("getBssidMask", "()Landroid/net/MacAddress;") => get(vm, recv, "mBssidMask"),
+        ("getMediumType", "()I") => Value::Int(2),
+        ("describeContents", "()I") => Value::Int(0),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            if matches!(args.first(), Some(Value::Obj(r)) if *r == recv) {
+                bool_value(true)
+            } else if let Some(other) = p49_other_exact(vm, args, P49_WIFI_FILTER) {
+                bool_value(
+                    objects_equal(vm, &get(vm, recv, "mNamePattern"), &get(vm, other, "mNamePattern"))
+                        && p49_value_equal(vm, &get(vm, recv, "mBssid"), &get(vm, other, "mBssid"))?
+                        && p49_value_equal(
+                            vm,
+                            &get(vm, recv, "mBssidMask"),
+                            &get(vm, other, "mBssidMask"),
+                        )?,
+                )
+            } else {
+                bool_value(false)
+            }
+        }
+        ("hashCode", "()I") => {
+            let mut result: i32 = 1;
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_value_hash(vm, &get(vm, recv, "mNamePattern")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_value_hash(vm, &get(vm, recv, "mBssid")));
+            result = result
+                .wrapping_mul(31)
+                .wrapping_add(p49_value_hash(vm, &get(vm, recv, "mBssidMask")));
+            Value::Int(result)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p49_companion_instance(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P49_COMPANION_MANAGER => p49_companion_manager_instance(vm, name, sig, recv, args),
+        P49_COMPANION_CALLBACK => p49_companion_callback_instance(vm, name, sig, recv, args),
+        P49_ASSOCIATION_REQUEST | P49_ASSOCIATION_REQUEST_BUILDER => {
+            p49_association_request_instance(vm, class, name, sig, recv, args)
+        }
+        P49_ASSOCIATION_INFO | P49_ASSOCIATION_INFO_BUILDER => {
+            p49_association_info_instance(vm, class, name, sig, recv, args)
+        }
+        P49_BT_FILTER | P49_BT_FILTER_BUILDER => {
+            p49_bt_filter_instance(vm, class, name, sig, recv, args)
+        }
+        P49_BLE_FILTER | P49_BLE_FILTER_BUILDER => {
+            p49_ble_filter_instance(vm, class, name, sig, recv, args)
+        }
+        P49_WIFI_FILTER | P49_WIFI_FILTER_BUILDER => {
+            p49_wifi_filter_instance(vm, class, name, sig, recv, args)
+        }
+        P49_MAC_ADDRESS => p49_mac_address_instance(vm, name, sig, recv, args),
+        _ => Ok(None),
+    }
+}
+
+// --- Batch 49-A routers -----------------------------------------------------
+
+fn partial49_instance_for_class(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P49_FINGERPRINT_MANAGER
+        | P49_FINGERPRINT
+        | P49_FINGERPRINT_CRYPTO
+        | P49_FINGERPRINT_RESULT
+        | P49_FINGERPRINT_CALLBACK => p49_fingerprint_instance(vm, class, name, sig, recv, args),
+        P49_BIOMETRIC_MANAGER
+        | P49_BIOMETRIC_STRINGS
+        | P49_BIOMETRIC_PROMPT
+        | P49_BIOMETRIC_PROMPT_BUILDER
+        | P49_BIOMETRIC_CRYPTO
+        | P49_BIOMETRIC_CRYPTO_BASE
+        | P49_BIOMETRIC_RESULT
+        | P49_BIOMETRIC_CALLBACK
+        | P49_PROMPT_INFO
+        | P49_BIOMETRIC_IDENTIFIER => p49_biometric_instance(vm, class, name, sig, recv, args),
+        P49_HDMI_MANAGER
+        | P49_DEVICE_FEATURES
+        | P49_DEVICE_FEATURES_BUILDER
+        | P49_HDMI_DEVICE_INFO
+        | P49_HDMI_DEVICE_INFO_BUILDER
+        | P49_HDMI_PORT_INFO
+        | P49_HDMI_PORT_INFO_BUILDER => p49_hdmi_instance(vm, class, name, sig, recv, args),
+        P49_INPUT_MANAGER
+        | P49_INPUT_DEVICE
+        | P49_INPUT_DEVICE_BUILDER
+        | P49_INPUT_MOTION_RANGE
+        | P49_HOST_USI_VERSION
+        | P49_INPUT_DEVICE_IDENTIFIER => p49_input_instance(vm, class, name, sig, recv, args),
+        P49_SOUND_MODEL
+        | P49_GENERIC_SOUND_MODEL
+        | P49_KEYPHRASE_SOUND_MODEL
+        | P49_SOUND_KEYPHRASE
+        | P49_MODEL_PARAM_RANGE
+        | P49_RECOGNITION_CONFIG
+        | P49_CONFIDENCE_LEVEL
+        | P49_KEYPHRASE_RECOGNITION_EXTRA
+        | P49_KEYPHRASE_METADATA => p49_sound_trigger_instance(vm, class, name, sig, recv, args),
+        P49_MIDI_MANAGER
+        | P49_MIDI_DEVICE_INFO
+        | P49_MIDI_PORT_INFO
+        | P49_MIDI_RECEIVER
+        | P49_MIDI_DEVICE_CALLBACK => p49_midi_instance(vm, class, name, sig, recv, args),
+        P49_TV_MANAGER | P49_TV_CALLBACK | P49_TV_RATING | P49_TV_TRACK | P49_TV_TRACK_BUILDER => {
+            p49_tv_instance(vm, class, name, sig, recv, args)
+        }
+        P49_COMPANION_MANAGER
+        | P49_COMPANION_CALLBACK
+        | P49_ASSOCIATION_REQUEST
+        | P49_ASSOCIATION_REQUEST_BUILDER
+        | P49_ASSOCIATION_INFO
+        | P49_ASSOCIATION_INFO_BUILDER
+        | P49_BT_FILTER
+        | P49_BT_FILTER_BUILDER
+        | P49_BLE_FILTER
+        | P49_BLE_FILTER_BUILDER
+        | P49_WIFI_FILTER
+        | P49_WIFI_FILTER_BUILDER
+        | P49_MAC_ADDRESS => p49_companion_instance(vm, class, name, sig, recv, args),
+        _ => Ok(None),
+    }
+}
+
+pub(crate) fn partial49_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    for class in [recv_class, mref_class] {
+        if p49_class(class) {
+            let value = partial49_instance_for_class(vm, class, name, sig, recv, args)?;
+            if value.is_some() {
+                return Ok(value);
+            }
+        }
+    }
+    let actual = class_of(vm, recv);
+    if actual != recv_class && actual != mref_class && p49_class(&actual) {
+        return partial49_instance_for_class(vm, &actual, name, sig, recv, args);
+    }
+    Ok(None)
+}
+
+fn p49_hdmi_is_valid_physical_address(address: i32) -> bool {
+    if !(0..0xffff).contains(&address) {
+        return false;
+    }
+    let mut mask = 0xf000;
+    let mut has_zero = false;
+    for _ in 0..4 {
+        if address & mask == 0 {
+            has_zero = true;
+        } else if has_zero {
+            return false;
+        }
+        mask >>= 4;
+    }
+    true
+}
+
+fn p49_hdmi_first_different_digit_pos(address1: i32, address2: i32) -> Option<i32> {
+    if !p49_hdmi_is_valid_physical_address(address1)
+        || !p49_hdmi_is_valid_physical_address(address2)
+    {
+        return None;
+    }
+    let mut mask = 0xf000;
+    for i in 0..4 {
+        if address1 & mask != address2 & mask {
+            return Some(i);
+        }
+        mask >>= 4;
+    }
+    Some(-1)
+}
+
+fn p49_hdmi_relative_position(src: i32, dest: i32) -> i32 {
+    if src == 0xffff || dest == 0xffff {
+        return 0;
+    }
+    let Some(first_diff_pos) = p49_hdmi_first_different_digit_pos(src, dest) else {
+        return 0;
+    };
+    if first_diff_pos == -1 {
+        return 3;
+    }
+    let mask = 0xf000 >> (first_diff_pos * 4);
+    let next_pos = first_diff_pos + 1;
+    if src & mask == 0 {
+        if next_pos == 4 || ((0xf000 >> (next_pos * 4)) & dest) == 0 {
+            return 4;
+        }
+        return 5;
+    }
+    if dest & mask == 0 {
+        if next_pos == 4 || ((0xf000 >> (next_pos * 4)) & src) == 0 {
+            return 1;
+        }
+        return 2;
+    }
+    if next_pos == 4 {
+        return 6;
+    }
+    let next_mask = 0xf000 >> (next_pos * 4);
+    if next_mask & src == 0 && next_mask & dest == 0 {
+        6
+    } else {
+        7
+    }
+}
+
+pub(crate) fn partial49_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (class, name, sig) {
+        (
+            P49_DEVICE_FEATURES,
+            "fromOperand",
+            "([B)Landroid/hardware/hdmi/DeviceFeatures;",
+        ) => {
+            if !matches!(args.first(), Some(Value::Obj(_))) {
+                return Err(npe(""));
+            }
+            let bytes = p49_byte_values(vm, &args.first().cloned().unwrap_or(Value::Null));
+            p49_device_features_from_operand(vm, &bytes)?
+        }
+        (P49_HDMI_UTILS, "getLocalPortFromPhysicalAddress", "(II)I") => {
+            Value::Int(p49_local_port_from_physical_address(iarg(args, 0), iarg(args, 1)))
+        }
+        (P49_HDMI_UTILS, "isValidPhysicalAddress", "(I)Z") => {
+            bool_value(p49_hdmi_is_valid_physical_address(iarg(args, 0)))
+        }
+        (P49_HDMI_UTILS, "getHdmiAddressRelativePosition", "(II)I") => {
+            Value::Int(p49_hdmi_relative_position(iarg(args, 0), iarg(args, 1)))
+        }
+        (P49_BIOMETRIC_MANAGER, "authenticatorToStr", "(I)Ljava/lang/String;") => {
+            let text = match iarg(args, 0) {
+                0x000f => "BIOMETRIC_STRONG".to_string(),
+                0x00ff => "BIOMETRIC_WEAK".to_string(),
+                0x0fff => "BIOMETRIC_CONVENIENCE".to_string(),
+                0x8000 => "DEVICE_CREDENTIAL".to_string(),
+                other => format!("Unknown authenticator type: {other}"),
+            };
+            jstr(vm, text)?
+        }
+        (P49_INPUT_DEVICE, "getDevice", "(I)Landroid/view/InputDevice;") => Value::Null,
+        (P49_INPUT_DEVICE, "getDeviceIds", "()[I") => new_int_array(vm, &[])?,
+        (
+            P49_TV_RATING,
+            "createRating",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)Landroid/media/tv/TvContentRating;",
+        ) => {
+            let domain = opt_str_arg(vm, args, 0);
+            if domain.as_deref().unwrap_or("").is_empty() {
+                return Err(iae("domain cannot be empty"));
+            }
+            let system = opt_str_arg(vm, args, 1);
+            if system.as_deref().unwrap_or("").is_empty() {
+                return Err(iae("ratingSystem cannot be empty"));
+            }
+            let rating = opt_str_arg(vm, args, 2);
+            if rating.as_deref().unwrap_or("").is_empty() {
+                return Err(iae("rating cannot be empty"));
+            }
+            // TvContentRating's private constructor sorts the caller's
+            // varargs array in place and retains that same array.
+            if let Some(array_ref) = oarg(args, 3) {
+                let mut values = array_elems(vm, args.get(3));
+                let mut keys: Vec<String> = values
+                    .iter()
+                    .map(|value| opt_str(vm, Some(value)).unwrap_or_default())
+                    .collect();
+                let mut paired: Vec<(String, Value)> =
+                    keys.drain(..).zip(values.drain(..)).collect();
+                paired.sort_by(|a, b| a.0.cmp(&b.0));
+                let sorted: Vec<Value> = paired.into_iter().map(|(_, value)| value).collect();
+                if let Ok(elems) = vm.heap.array_elems_mut(array_ref) {
+                    *elems = sorted;
+                }
+            }
+            p49_tv_rating_from_values(
+                vm,
+                args.first().cloned().unwrap_or(Value::Null),
+                args.get(1).cloned().unwrap_or(Value::Null),
+                args.get(2).cloned().unwrap_or(Value::Null),
+                args.get(3).cloned().unwrap_or(Value::Null),
+            )?
+        }
+        (
+            P49_TV_RATING,
+            "unflattenFromString",
+            "(Ljava/lang/String;)Landroid/media/tv/TvContentRating;",
+        ) => {
+            let text = opt_str_arg(vm, args, 0).unwrap_or_default();
+            p49_tv_rating_unflatten(vm, &text)?
+        }
+        (P49_MAC_ADDRESS, "fromString", "(Ljava/lang/String;)Landroid/net/MacAddress;") => {
+            let Some(text) = opt_str_arg(vm, args, 0) else {
+                return Err(npe(""));
+            };
+            let addr = p49_parse_mac_string(&text)?;
+            p49_mac_value_from_long(vm, addr)?
+        }
+        (P49_MAC_ADDRESS, "fromBytes", "([B)Landroid/net/MacAddress;") => {
+            p49_mac_value_from_bytes(vm, &args.first().cloned().unwrap_or(Value::Null))?
+        }
+        (P49_MAC_ADDRESS, "isMacAddress", "([B)Z") => bool_value(
+            matches!(args.first(), Some(Value::Obj(_)))
+                && p49_byte_values(vm, &args.first().cloned().unwrap_or(Value::Null)).len() == 6,
+        ),
+        (P49_MAC_ADDRESS, "macAddressType", "([B)I") => {
+            let bytes = p49_byte_values(vm, &args.first().cloned().unwrap_or(Value::Null));
+            if !matches!(args.first(), Some(Value::Obj(_))) || bytes.len() != 6 {
+                Value::Int(0)
+            } else {
+                let addr = p49_mac_long_from_bytes(&bytes);
+                Value::Int(if addr == P49_MAC_VALID_MASK {
+                    3
+                } else if bytes[0] & 1 != 0 {
+                    2
+                } else {
+                    1
+                })
+            }
+        }
+        (P49_MAC_ADDRESS, "byteAddrFromStringAddr", "(Ljava/lang/String;)[B") => {
+            let Some(text) = opt_str_arg(vm, args, 0) else {
+                return Err(npe(""));
+            };
+            let addr = p49_parse_mac_string(&text)?;
+            p49_new_byte_array(vm, &p49_mac_bytes_from_long(addr))?
+        }
+        (P49_MAC_ADDRESS, "stringAddrFromByteAddr", "([B)Ljava/lang/String;") => {
+            let bytes = p49_byte_values(vm, &args.first().cloned().unwrap_or(Value::Null));
+            if !matches!(args.first(), Some(Value::Obj(_))) || bytes.len() != 6 {
+                Value::Null
+            } else {
+                jstr(vm, p49_mac_format_long(p49_mac_long_from_bytes(&bytes)))?
+            }
+        }
+        _ => return Ok(None),
+    }))
+}
+
+pub(crate) fn partial49_host_static(
+    vm: &mut Engine,
+    class: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    if class == P49_TV_RATING && field == "UNRATED" {
+        return p49_tv_rating_value(vm, "null", "null", "null", Vec::new()).map(Some);
+    }
+    if class == P49_MAC_ADDRESS {
+        let addr = match field {
+            "BROADCAST_ADDRESS" => Some(P49_MAC_VALID_MASK),
+            "ALL_ZEROS_ADDRESS" => Some(0),
+            _ => None,
+        };
+        if let Some(addr) = addr {
+            return p49_mac_value_from_long(vm, addr).map(Some);
+        }
+    }
+
+    let text = match (class, field) {
+        (P49_ASSOCIATION_REQUEST, "DEVICE_PROFILE_WATCH") => {
+            Some("android.app.role.COMPANION_DEVICE_WATCH")
+        }
+        (P49_ASSOCIATION_REQUEST, "DEVICE_PROFILE_GLASSES") => {
+            Some("android.app.role.COMPANION_DEVICE_GLASSES")
+        }
+        (P49_ASSOCIATION_REQUEST, "DEVICE_PROFILE_APP_STREAMING") => {
+            Some("android.app.role.COMPANION_DEVICE_APP_STREAMING")
+        }
+        (P49_ASSOCIATION_REQUEST, "DEVICE_PROFILE_NEARBY_DEVICE_STREAMING") => {
+            Some("android.app.role.COMPANION_DEVICE_NEARBY_DEVICE_STREAMING")
+        }
+        (P49_ASSOCIATION_REQUEST, "DEVICE_PROFILE_AUTOMOTIVE_PROJECTION") => {
+            Some("android.app.role.SYSTEM_AUTOMOTIVE_PROJECTION")
+        }
+        (P49_ASSOCIATION_REQUEST, "DEVICE_PROFILE_COMPUTER") => {
+            Some("android.app.role.COMPANION_DEVICE_COMPUTER")
+        }
+        (P49_MIDI_MANAGER, "BLUETOOTH_MIDI_SERVICE_INTENT") => {
+            Some("android.media.midi.BluetoothMidiService")
+        }
+        (P49_MIDI_MANAGER, "BLUETOOTH_MIDI_SERVICE_PACKAGE") => {
+            Some("com.android.bluetoothmidiservice")
+        }
+        (P49_MIDI_MANAGER, "BLUETOOTH_MIDI_SERVICE_CLASS") => {
+            Some("com.android.bluetoothmidiservice.BluetoothMidiService")
+        }
+        (P49_MIDI_DEVICE_INFO, "PROPERTY_NAME") => Some("name"),
+        (P49_MIDI_DEVICE_INFO, "PROPERTY_MANUFACTURER") => Some("manufacturer"),
+        (P49_MIDI_DEVICE_INFO, "PROPERTY_PRODUCT") => Some("product"),
+        (P49_MIDI_DEVICE_INFO, "PROPERTY_VERSION") => Some("version"),
+        (P49_MIDI_DEVICE_INFO, "PROPERTY_SERIAL_NUMBER") => Some("serial_number"),
+        (P49_MIDI_DEVICE_INFO, "PROPERTY_USB_DEVICE") => Some("usb_device"),
+        (P49_MIDI_DEVICE_INFO, "PROPERTY_BLUETOOTH_DEVICE") => Some("bluetooth_device"),
+        (P49_MIDI_DEVICE_INFO, "PROPERTY_ALSA_CARD") => Some("alsa_card"),
+        (P49_MIDI_DEVICE_INFO, "PROPERTY_ALSA_DEVICE") => Some("alsa_device"),
+        (P49_MIDI_DEVICE_INFO, "PROPERTY_SERVICE_INFO") => Some("service_info"),
+        _ => None,
+    };
+    if let Some(text) = text {
+        return jstr(vm, text).map(Some);
+    }
+
+    if class == P49_INPUT_MANAGER && field == "BLOCK_UNTRUSTED_TOUCHES" {
+        return Ok(Some(Value::Long(158_002_302)));
+    }
+    if class == P49_TV_MANAGER && field == "TIME_SHIFT_INVALID_TIME" {
+        return Ok(Some(Value::Long(i64::MIN)));
+    }
+    if class == P49_TV_MANAGER && field == "TV_MESSAGE_GROUP_ID_NONE" {
+        return Ok(Some(Value::Long(-1)));
+    }
+
+    let value = match (class, field) {
+        (P49_FINGERPRINT_MANAGER, "ENROLL_FIND_SENSOR") => Some(1),
+        (P49_FINGERPRINT_MANAGER, "ENROLL_ENROLL") => Some(2),
+        (P49_FINGERPRINT_MANAGER, "SENSOR_ID_ANY") => Some(-1),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_HW_UNAVAILABLE") => Some(1),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_UNABLE_TO_PROCESS") => Some(2),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_TIMEOUT") => Some(3),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_NO_SPACE") => Some(4),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_CANCELED") => Some(5),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_UNABLE_TO_REMOVE") => Some(6),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_LOCKOUT") => Some(7),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_VENDOR") => Some(8),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_LOCKOUT_PERMANENT") => Some(9),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_USER_CANCELED") => Some(10),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_NO_FINGERPRINTS") => Some(11),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_HW_NOT_PRESENT") => Some(12),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_NEGATIVE_BUTTON") => Some(13),
+        (P49_FINGERPRINT_MANAGER, "BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL") => Some(14),
+        (P49_FINGERPRINT_MANAGER, "BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED") => Some(15),
+        (P49_FINGERPRINT_MANAGER, "BIOMETRIC_ERROR_RE_ENROLL") => Some(16),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_UNKNOWN") => Some(17),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ERROR_BAD_CALIBRATION") => Some(18),
+        (P49_FINGERPRINT_MANAGER, "BIOMETRIC_ERROR_POWER_PRESSED") => Some(19),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ACQUIRED_GOOD") => Some(0),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ACQUIRED_PARTIAL") => Some(1),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ACQUIRED_INSUFFICIENT") => Some(2),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ACQUIRED_IMAGER_DIRTY") => Some(3),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ACQUIRED_TOO_SLOW") => Some(4),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ACQUIRED_TOO_FAST") => Some(5),
+        (P49_FINGERPRINT_MANAGER, "FINGERPRINT_ACQUIRED_VENDOR") => Some(6),
+        (P49_BIOMETRIC_MANAGER, "BIOMETRIC_SUCCESS") => Some(0),
+        (P49_BIOMETRIC_MANAGER, "BIOMETRIC_ERROR_HW_UNAVAILABLE") => Some(1),
+        (P49_BIOMETRIC_MANAGER, "BIOMETRIC_ERROR_NONE_ENROLLED") => Some(11),
+        (P49_BIOMETRIC_MANAGER, "BIOMETRIC_ERROR_NO_HARDWARE") => Some(12),
+        (P49_BIOMETRIC_MANAGER, "BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED") => Some(15),
+        (P49_BIOMETRIC_AUTHENTICATORS, "EMPTY_SET") => Some(0),
+        (P49_BIOMETRIC_AUTHENTICATORS, "BIOMETRIC_MAX_STRENGTH") => Some(0x0001),
+        (P49_BIOMETRIC_AUTHENTICATORS, "BIOMETRIC_STRONG") => Some(0x000f),
+        (P49_BIOMETRIC_AUTHENTICATORS, "BIOMETRIC_WEAK") => Some(0x00ff),
+        (P49_BIOMETRIC_AUTHENTICATORS, "BIOMETRIC_CONVENIENCE") => Some(0x0fff),
+        (P49_BIOMETRIC_AUTHENTICATORS, "BIOMETRIC_MIN_STRENGTH") => Some(0x7fff),
+        (P49_BIOMETRIC_AUTHENTICATORS, "DEVICE_CREDENTIAL") => Some(1 << 15),
+        (P49_BIOMETRIC_PROMPT, "HIDE_DIALOG_DELAY") => Some(2000),
+        (P49_BIOMETRIC_PROMPT, "DISMISSED_REASON_BIOMETRIC_CONFIRMED") => Some(1),
+        (P49_BIOMETRIC_PROMPT, "DISMISSED_REASON_NEGATIVE") => Some(2),
+        (P49_BIOMETRIC_PROMPT, "DISMISSED_REASON_USER_CANCEL") => Some(3),
+        (P49_BIOMETRIC_PROMPT, "DISMISSED_REASON_BIOMETRIC_CONFIRM_NOT_REQUIRED") => Some(4),
+        (P49_BIOMETRIC_PROMPT, "DISMISSED_REASON_ERROR") => Some(5),
+        (P49_BIOMETRIC_PROMPT, "DISMISSED_REASON_SERVER_REQUESTED") => Some(6),
+        (P49_BIOMETRIC_PROMPT, "DISMISSED_REASON_CREDENTIAL_CONFIRMED") => Some(7),
+        (P49_BIOMETRIC_PROMPT, "AUTHENTICATION_RESULT_TYPE_DEVICE_CREDENTIAL") => Some(1),
+        (P49_BIOMETRIC_PROMPT, "AUTHENTICATION_RESULT_TYPE_BIOMETRIC") => Some(2),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_SUCCESS") => Some(0),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_HW_UNAVAILABLE") => Some(1),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_UNABLE_TO_PROCESS") => Some(2),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_TIMEOUT") => Some(3),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_NO_SPACE") => Some(4),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_CANCELED") => Some(5),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_UNABLE_TO_REMOVE") => Some(6),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_LOCKOUT") => Some(7),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_VENDOR") => Some(8),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_LOCKOUT_PERMANENT") => Some(9),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_USER_CANCELED") => Some(10),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_NO_BIOMETRICS") => Some(11),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_HW_NOT_PRESENT") => Some(12),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_NEGATIVE_BUTTON") => Some(13),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL") => Some(14),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED") => Some(15),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ERROR_RE_ENROLL") => Some(16),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ACQUIRED_GOOD") => Some(0),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ACQUIRED_PARTIAL") => Some(1),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ACQUIRED_INSUFFICIENT") => Some(2),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ACQUIRED_IMAGER_DIRTY") => Some(3),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ACQUIRED_TOO_SLOW") => Some(4),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ACQUIRED_TOO_FAST") => Some(5),
+        (P49_BIOMETRIC_PROMPT, "BIOMETRIC_ACQUIRED_VENDOR") => Some(6),
+        (P49_DEVICE_FEATURES, "FEATURE_NOT_SUPPORTED") => Some(0),
+        (P49_DEVICE_FEATURES, "FEATURE_SUPPORTED") => Some(1),
+        (P49_DEVICE_FEATURES, "FEATURE_SUPPORT_UNKNOWN") => Some(2),
+        (P49_HDMI_DEVICE_INFO, "DEVICE_TV") => Some(0),
+        (P49_HDMI_DEVICE_INFO, "DEVICE_RECORDER") => Some(1),
+        (P49_HDMI_DEVICE_INFO, "DEVICE_RESERVED") => Some(2),
+        (P49_HDMI_DEVICE_INFO, "DEVICE_TUNER") => Some(3),
+        (P49_HDMI_DEVICE_INFO, "DEVICE_PLAYBACK") => Some(4),
+        (P49_HDMI_DEVICE_INFO, "DEVICE_AUDIO_SYSTEM") => Some(5),
+        (P49_HDMI_DEVICE_INFO, "DEVICE_PURE_CEC_SWITCH") => Some(6),
+        (P49_HDMI_DEVICE_INFO, "DEVICE_VIDEO_PROCESSOR") => Some(7),
+        (P49_HDMI_DEVICE_INFO, "DEVICE_INACTIVE") => Some(-1),
+        (P49_HDMI_DEVICE_INFO, "ADDR_INTERNAL") => Some(0),
+        (P49_HDMI_DEVICE_INFO, "ADDR_INVALID") => Some(-1),
+        (P49_HDMI_DEVICE_INFO, "PATH_INTERNAL") => Some(0),
+        (P49_HDMI_DEVICE_INFO, "PATH_INVALID") => Some(0xffff),
+        (P49_HDMI_DEVICE_INFO, "PORT_INVALID") => Some(-1),
+        (P49_HDMI_DEVICE_INFO, "ID_INVALID") => Some(0xffff),
+        (P49_HDMI_DEVICE_INFO, "VENDOR_ID_UNKNOWN") => Some(0xff_ffff),
+        (P49_HDMI_MANAGER, "POWER_STATUS_UNKNOWN") => Some(-1),
+        (P49_HDMI_MANAGER, "POWER_STATUS_ON") => Some(0),
+        (P49_HDMI_MANAGER, "POWER_STATUS_STANDBY") => Some(1),
+        (P49_HDMI_MANAGER, "POWER_STATUS_TRANSIENT_TO_ON") => Some(2),
+        (P49_HDMI_MANAGER, "POWER_STATUS_TRANSIENT_TO_STANDBY") => Some(3),
+        (P49_HDMI_MANAGER, "RESULT_SUCCESS") => Some(0),
+        (P49_HDMI_MANAGER, "RESULT_TIMEOUT") => Some(1),
+        (P49_HDMI_MANAGER, "RESULT_SOURCE_NOT_AVAILABLE") => Some(2),
+        (P49_HDMI_MANAGER, "RESULT_TARGET_NOT_AVAILABLE") => Some(3),
+        (P49_HDMI_MANAGER, "RESULT_ALREADY_IN_PROGRESS") => Some(4),
+        (P49_HDMI_MANAGER, "RESULT_EXCEPTION") => Some(5),
+        (P49_HDMI_MANAGER, "RESULT_INCORRECT_MODE") => Some(6),
+        (P49_HDMI_MANAGER, "RESULT_COMMUNICATION_FAILED") => Some(7),
+        (P49_HDMI_MANAGER, "DEVICE_EVENT_ADD_DEVICE") => Some(1),
+        (P49_HDMI_MANAGER, "DEVICE_EVENT_REMOVE_DEVICE") => Some(2),
+        (P49_HDMI_MANAGER, "DEVICE_EVENT_UPDATE_DEVICE") => Some(3),
+        (P49_HDMI_MANAGER, "HDMI_CEC_CONTROL_ENABLED") => Some(1),
+        (P49_HDMI_MANAGER, "HDMI_CEC_CONTROL_DISABLED") => Some(0),
+        (P49_HDMI_MANAGER, "HDMI_CEC_VERSION_1_4_B") => Some(0x05),
+        (P49_HDMI_MANAGER, "HDMI_CEC_VERSION_2_0") => Some(0x06),
+        (P49_HDMI_UTILS, "TARGET_NOT_UNDER_LOCAL_DEVICE") => Some(-1),
+        (P49_HDMI_UTILS, "TARGET_SAME_PHYSICAL_ADDRESS") => Some(0),
+        (P49_HDMI_UTILS, "HDMI_RELATIVE_POSITION_UNKNOWN") => Some(0),
+        (P49_HDMI_UTILS, "HDMI_RELATIVE_POSITION_DIRECTLY_BELOW") => Some(1),
+        (P49_HDMI_UTILS, "HDMI_RELATIVE_POSITION_BELOW") => Some(2),
+        (P49_HDMI_UTILS, "HDMI_RELATIVE_POSITION_SAME") => Some(3),
+        (P49_HDMI_UTILS, "HDMI_RELATIVE_POSITION_DIRECTLY_ABOVE") => Some(4),
+        (P49_HDMI_UTILS, "HDMI_RELATIVE_POSITION_ABOVE") => Some(5),
+        (P49_HDMI_UTILS, "HDMI_RELATIVE_POSITION_SIBLING") => Some(6),
+        (P49_HDMI_UTILS, "HDMI_RELATIVE_POSITION_DIFFERENT_BRANCH") => Some(7),
+        (P49_INPUT_MANAGER, "SWITCH_STATE_UNKNOWN") => Some(-1),
+        (P49_INPUT_MANAGER, "SWITCH_STATE_OFF") => Some(0),
+        (P49_INPUT_MANAGER, "SWITCH_STATE_ON") => Some(1),
+        (P49_INPUT_DEVICE, "SOURCE_CLASS_MASK") => Some(0xff),
+        (P49_INPUT_DEVICE, "SOURCE_CLASS_NONE") => Some(0),
+        (P49_INPUT_DEVICE, "SOURCE_CLASS_BUTTON") => Some(0x01),
+        (P49_INPUT_DEVICE, "SOURCE_CLASS_POINTER") => Some(0x02),
+        (P49_INPUT_DEVICE, "SOURCE_CLASS_TRACKBALL") => Some(0x04),
+        (P49_INPUT_DEVICE, "SOURCE_CLASS_POSITION") => Some(0x08),
+        (P49_INPUT_DEVICE, "SOURCE_CLASS_JOYSTICK") => Some(0x10),
+        (P49_INPUT_DEVICE, "SOURCE_UNKNOWN") => Some(0),
+        (P49_INPUT_DEVICE, "SOURCE_KEYBOARD") => Some(0x0000_0101),
+        (P49_INPUT_DEVICE, "SOURCE_DPAD") => Some(0x0000_0201),
+        (P49_INPUT_DEVICE, "SOURCE_GAMEPAD") => Some(0x0000_0401),
+        (P49_INPUT_DEVICE, "SOURCE_TOUCHSCREEN") => Some(0x0000_1002),
+        (P49_INPUT_DEVICE, "SOURCE_MOUSE") => Some(0x0000_2002),
+        (P49_INPUT_DEVICE, "SOURCE_STYLUS") => Some(0x0000_4002),
+        (P49_INPUT_DEVICE, "SOURCE_BLUETOOTH_STYLUS") => Some(0x0000_c002),
+        (P49_INPUT_DEVICE, "SOURCE_TRACKBALL") => Some(0x0001_0004),
+        (P49_INPUT_DEVICE, "SOURCE_MOUSE_RELATIVE") => Some(0x0002_0004),
+        (P49_INPUT_DEVICE, "SOURCE_TOUCHPAD") => Some(0x0010_0008),
+        (P49_INPUT_DEVICE, "SOURCE_TOUCH_NAVIGATION") => Some(0x0020_0000),
+        (P49_INPUT_DEVICE, "SOURCE_ROTARY_ENCODER") => Some(0x0040_0000),
+        (P49_INPUT_DEVICE, "SOURCE_JOYSTICK") => Some(0x0100_0010),
+        (P49_INPUT_DEVICE, "SOURCE_HDMI") => Some(0x0200_0001),
+        (P49_INPUT_DEVICE, "SOURCE_SENSOR") => Some(0x0400_0000),
+        (P49_INPUT_DEVICE, "SOURCE_ANY") => Some(-256),
+        (P49_INPUT_DEVICE, "KEYBOARD_TYPE_NONE") => Some(0),
+        (P49_INPUT_DEVICE, "KEYBOARD_TYPE_NON_ALPHABETIC") => Some(1),
+        (P49_INPUT_DEVICE, "KEYBOARD_TYPE_ALPHABETIC") => Some(2),
+        (P49_SOUND_TRIGGER, "STATUS_OK") => Some(0),
+        (P49_SOUND_TRIGGER, "STATUS_ERROR") => Some(i32::MIN),
+        (P49_SOUND_TRIGGER, "STATUS_PERMISSION_DENIED") => Some(-1),
+        (P49_SOUND_TRIGGER, "STATUS_NO_INIT") => Some(-19),
+        (P49_SOUND_TRIGGER, "STATUS_BAD_VALUE") => Some(-22),
+        (P49_SOUND_TRIGGER, "STATUS_DEAD_OBJECT") => Some(-32),
+        (P49_SOUND_TRIGGER, "STATUS_INVALID_OPERATION") => Some(-38),
+        (P49_SOUND_TRIGGER, "STATUS_BUSY") => Some(-16),
+        (P49_SOUND_TRIGGER, "RECOGNITION_MODE_VOICE_TRIGGER") => Some(0x1),
+        (P49_SOUND_TRIGGER, "RECOGNITION_MODE_USER_IDENTIFICATION") => Some(0x2),
+        (P49_SOUND_TRIGGER, "RECOGNITION_MODE_USER_AUTHENTICATION") => Some(0x4),
+        (P49_SOUND_TRIGGER, "RECOGNITION_MODE_GENERIC") => Some(0x8),
+        (P49_SOUND_TRIGGER, "RECOGNITION_STATUS_SUCCESS") => Some(0),
+        (P49_SOUND_TRIGGER, "RECOGNITION_STATUS_ABORT") => Some(1),
+        (P49_SOUND_TRIGGER, "RECOGNITION_STATUS_FAILURE") => Some(2),
+        (P49_SOUND_TRIGGER, "RECOGNITION_STATUS_GET_STATE_RESPONSE") => Some(3),
+        (P49_SOUND_MODEL, "TYPE_UNKNOWN") => Some(-1),
+        (P49_SOUND_MODEL, "TYPE_KEYPHRASE") => Some(0),
+        (P49_SOUND_MODEL, "TYPE_GENERIC_SOUND") => Some(1),
+        (P49_MIDI_MANAGER, "TRANSPORT_MIDI_BYTE_STREAM") => Some(1),
+        (P49_MIDI_MANAGER, "TRANSPORT_UNIVERSAL_MIDI_PACKETS") => Some(2),
+        (P49_MIDI_DEVICE_INFO, "TYPE_USB") => Some(1),
+        (P49_MIDI_DEVICE_INFO, "TYPE_VIRTUAL") => Some(2),
+        (P49_MIDI_DEVICE_INFO, "TYPE_BLUETOOTH") => Some(3),
+        (P49_MIDI_DEVICE_INFO, "PROTOCOL_UMP_USE_MIDI_CI") => Some(0),
+        (P49_MIDI_DEVICE_INFO, "PROTOCOL_UMP_MIDI_1_0_UP_TO_64_BITS") => Some(1),
+        (P49_MIDI_DEVICE_INFO, "PROTOCOL_UMP_MIDI_1_0_UP_TO_64_BITS_AND_JRTS") => Some(2),
+        (P49_MIDI_DEVICE_INFO, "PROTOCOL_UMP_MIDI_1_0_UP_TO_128_BITS") => Some(3),
+        (P49_MIDI_DEVICE_INFO, "PROTOCOL_UMP_MIDI_1_0_UP_TO_128_BITS_AND_JRTS") => Some(4),
+        (P49_MIDI_DEVICE_INFO, "PROTOCOL_UMP_MIDI_2_0") => Some(17),
+        (P49_MIDI_DEVICE_INFO, "PROTOCOL_UMP_MIDI_2_0_AND_JRTS") => Some(18),
+        (P49_MIDI_DEVICE_INFO, "PROTOCOL_UNKNOWN") => Some(-1),
+        (P49_MIDI_PORT_INFO, "TYPE_INPUT") => Some(1),
+        (P49_MIDI_PORT_INFO, "TYPE_OUTPUT") => Some(2),
+        (P49_TV_MANAGER, "INPUT_STATE_CONNECTED") => Some(0),
+        (P49_TV_MANAGER, "INPUT_STATE_CONNECTED_STANDBY") => Some(1),
+        (P49_TV_MANAGER, "INPUT_STATE_DISCONNECTED") => Some(2),
+        (P49_TV_MANAGER, "TIME_SHIFT_STATUS_UNKNOWN") => Some(0),
+        (P49_TV_MANAGER, "TIME_SHIFT_STATUS_UNSUPPORTED") => Some(1),
+        (P49_TV_MANAGER, "TIME_SHIFT_STATUS_UNAVAILABLE") => Some(2),
+        (P49_TV_MANAGER, "TIME_SHIFT_STATUS_AVAILABLE") => Some(3),
+        (P49_TV_MANAGER, "VIDEO_UNAVAILABLE_REASON_UNKNOWN") => Some(0),
+        (P49_TV_MANAGER, "VIDEO_UNAVAILABLE_REASON_TUNING") => Some(1),
+        (P49_TV_MANAGER, "VIDEO_UNAVAILABLE_REASON_WEAK_SIGNAL") => Some(2),
+        (P49_TV_MANAGER, "VIDEO_UNAVAILABLE_REASON_BUFFERING") => Some(3),
+        (P49_TV_MANAGER, "VIDEO_UNAVAILABLE_REASON_AUDIO_ONLY") => Some(4),
+        (P49_TV_MANAGER, "VIDEO_UNAVAILABLE_REASON_NOT_CONNECTED") => Some(5),
+        (P49_TV_MANAGER, "RECORDING_ERROR_UNKNOWN") => Some(0),
+        (P49_TV_MANAGER, "RECORDING_ERROR_INSUFFICIENT_SPACE") => Some(1),
+        (P49_TV_MANAGER, "RECORDING_ERROR_RESOURCE_BUSY") => Some(2),
+        (P49_TV_TRACK, "TYPE_AUDIO") => Some(0),
+        (P49_TV_TRACK, "TYPE_VIDEO") => Some(1),
+        (P49_TV_TRACK, "TYPE_SUBTITLE") => Some(2),
+        (P49_DEVICE_FILTER, "MEDIUM_TYPE_BLUETOOTH") => Some(0),
+        (P49_DEVICE_FILTER, "MEDIUM_TYPE_BLUETOOTH_LE") => Some(1),
+        (P49_DEVICE_FILTER, "MEDIUM_TYPE_WIFI") => Some(2),
+        (P49_MAC_ADDRESS, "TYPE_UNKNOWN") => Some(0),
+        (P49_MAC_ADDRESS, "TYPE_UNICAST") => Some(1),
+        (P49_MAC_ADDRESS, "TYPE_MULTICAST") => Some(2),
+        (P49_MAC_ADDRESS, "TYPE_BROADCAST") => Some(3),
+        _ => None,
+    };
+    Ok(value.map(Value::Int))
 }

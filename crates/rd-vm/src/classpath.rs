@@ -1694,6 +1694,96 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         | "Landroid/mtp/MtpObjectInfo$Builder;"
         | "Landroid/mtp/MtpDevice;"
         | "Landroid/mtp/MtpEvent;" => Some(OBJECT),
+        // Appendix C Batch 49-A bounded partial slices.
+        "Landroid/hardware/fingerprint/FingerprintManager;"
+        | "Landroid/hardware/fingerprint/FingerprintManager$AuthenticationResult;"
+        | "Landroid/hardware/biometrics/BiometricManager;"
+        | "Landroid/hardware/biometrics/BiometricManager$Authenticators;"
+        | "Landroid/hardware/biometrics/BiometricManager$Strings;"
+        | "Landroid/hardware/biometrics/BiometricPrompt;"
+        | "Landroid/hardware/biometrics/BiometricPrompt$Builder;"
+        | "Landroid/hardware/biometrics/CryptoObject;"
+        | "Landroid/hardware/biometrics/PromptInfo;"
+        | "Landroid/hardware/biometrics/BiometricAuthenticator;"
+        | "Landroid/hardware/biometrics/BiometricAuthenticator$Identifier;"
+        | "Landroid/hardware/biometrics/BiometricAuthenticator$AuthenticationResult;"
+        | "Landroid/hardware/biometrics/BiometricAuthenticator$AuthenticationCallback;"
+        | "Landroid/hardware/biometrics/BiometricConstants;"
+        | "Landroid/hardware/biometrics/BiometricFingerprintConstants;"
+        | "Landroid/hardware/hdmi/HdmiControlManager;"
+        | "Landroid/hardware/hdmi/HdmiUtils;"
+        | "Landroid/hardware/hdmi/DeviceFeatures;"
+        | "Landroid/hardware/hdmi/DeviceFeatures$Builder;"
+        | "Landroid/hardware/hdmi/HdmiDeviceInfo;"
+        | "Landroid/hardware/hdmi/HdmiDeviceInfo$Builder;"
+        | "Landroid/hardware/hdmi/HdmiPortInfo;"
+        | "Landroid/hardware/hdmi/HdmiPortInfo$Builder;"
+        | "Landroid/hardware/input/InputManager;"
+        | "Landroid/hardware/input/InputManager$InputDeviceListener;"
+        | "Landroid/hardware/input/HostUsiVersion;"
+        | "Landroid/hardware/input/InputDeviceIdentifier;"
+        | "Landroid/view/InputDevice;"
+        | "Landroid/view/InputDevice$Builder;"
+        | "Landroid/view/InputDevice$MotionRange;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$SoundModel;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$ModelParamRange;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$RecognitionConfig;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$ConfidenceLevel;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseRecognitionExtra;"
+        | "Landroid/hardware/soundtrigger/KeyphraseMetadata;"
+        | "Landroid/provider/OneTimeUseBuilder;"
+        | "Landroid/media/midi/MidiManager;"
+        | "Landroid/media/midi/MidiManager$DeviceCallback;"
+        | "Landroid/media/midi/MidiDeviceInfo;"
+        | "Landroid/media/midi/MidiDeviceInfo$PortInfo;"
+        | "Landroid/media/midi/MidiReceiver;"
+        | "Landroid/media/tv/TvInputManager;"
+        | "Landroid/media/tv/TvInputManager$TvInputCallback;"
+        | "Landroid/media/tv/TvContentRating;"
+        | "Landroid/media/tv/TvTrackInfo;"
+        | "Landroid/media/tv/TvTrackInfo$Builder;"
+        | "Landroid/companion/CompanionDeviceManager;"
+        | "Landroid/companion/CompanionDeviceManager$Callback;"
+        | "Landroid/companion/CompanionDeviceManager$OnAssociationsChangedListener;"
+        | "Landroid/companion/AssociationRequest;"
+        | "Landroid/companion/AssociationInfo;"
+        | "Landroid/companion/AssociationInfo$Builder;"
+        | "Landroid/companion/AssociationInfo$NonActionableBuilder;"
+        | "Landroid/companion/BluetoothDeviceFilter;"
+        | "Landroid/companion/BluetoothLeDeviceFilter;"
+        | "Landroid/companion/WifiDeviceFilter;"
+        | "Landroid/companion/WifiDeviceFilter$Builder;"
+        | "Landroid/companion/DeviceFilter;"
+        | "Landroid/net/MacAddress;" => Some(OBJECT),
+        "Landroid/hardware/fingerprint/Fingerprint;" => Some(&[
+            "Landroid/hardware/biometrics/BiometricAuthenticator$Identifier;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/hardware/fingerprint/FingerprintManager$CryptoObject;"
+        | "Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;" => {
+            Some(&["Landroid/hardware/biometrics/CryptoObject;", "Ljava/lang/Object;"])
+        }
+        "Landroid/hardware/fingerprint/FingerprintManager$AuthenticationCallback;"
+        | "Landroid/hardware/biometrics/BiometricPrompt$AuthenticationCallback;" => Some(&[
+            "Landroid/hardware/biometrics/BiometricAuthenticator$AuthenticationCallback;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/hardware/biometrics/BiometricPrompt$AuthenticationResult;" => Some(&[
+            "Landroid/hardware/biometrics/BiometricAuthenticator$AuthenticationResult;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/hardware/soundtrigger/SoundTrigger$GenericSoundModel;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseSoundModel;" => Some(&[
+            "Landroid/hardware/soundtrigger/SoundTrigger$SoundModel;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/companion/AssociationRequest$Builder;"
+        | "Landroid/companion/BluetoothDeviceFilter$Builder;"
+        | "Landroid/companion/BluetoothLeDeviceFilter$Builder;" => {
+            Some(&["Landroid/provider/OneTimeUseBuilder;", "Ljava/lang/Object;"])
+        }
         "Landroid/view/translation/TranslationContext$Builder;" => Some(&[
             "Landroid/view/translation/TranslationContext$BaseBuilder;",
             "Ljava/lang/Object;",
@@ -2165,6 +2255,46 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Landroid/security/keystore/UserAuthArgs;",
         ]),
         "Landroid/security/keystore/KeyInfo;" => Some(&["Ljava/security/spec/KeySpec;"]),
+        // Interfaces in the Batch 49-A bounded slices.
+        "Landroid/hardware/fingerprint/FingerprintManager;" => Some(&[
+            "Landroid/hardware/biometrics/BiometricAuthenticator;",
+            "Landroid/hardware/biometrics/BiometricFingerprintConstants;",
+        ]),
+        "Landroid/hardware/biometrics/BiometricPrompt;" => Some(&[
+            "Landroid/hardware/biometrics/BiometricAuthenticator;",
+            "Landroid/hardware/biometrics/BiometricConstants;",
+        ]),
+        "Landroid/hardware/biometrics/BiometricAuthenticator$Identifier;"
+        | "Landroid/hardware/fingerprint/Fingerprint;"
+        | "Landroid/hardware/biometrics/PromptInfo;"
+        | "Landroid/hardware/hdmi/HdmiDeviceInfo;"
+        | "Landroid/hardware/hdmi/HdmiPortInfo;"
+        | "Landroid/hardware/input/HostUsiVersion;"
+        | "Landroid/hardware/input/InputDeviceIdentifier;"
+        | "Landroid/view/InputDevice;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$GenericSoundModel;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseSoundModel;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$ModelParamRange;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$RecognitionConfig;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$ConfidenceLevel;"
+        | "Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseRecognitionExtra;"
+        | "Landroid/hardware/soundtrigger/KeyphraseMetadata;"
+        | "Landroid/media/midi/MidiDeviceInfo;"
+        | "Landroid/media/tv/TvTrackInfo;"
+        | "Landroid/companion/AssociationRequest;"
+        | "Landroid/companion/AssociationInfo;"
+        | "Landroid/net/MacAddress;" => Some(&["Landroid/os/Parcelable;"]),
+        "Landroid/companion/DeviceFilter;" => Some(&["Landroid/os/Parcelable;"]),
+        "Landroid/companion/BluetoothDeviceFilter;"
+        | "Landroid/companion/BluetoothLeDeviceFilter;"
+        | "Landroid/companion/WifiDeviceFilter;" => Some(&[
+            "Landroid/companion/DeviceFilter;",
+            "Landroid/os/Parcelable;",
+        ]),
+        "Landroid/companion/AssociationInfo$Builder;" => {
+            Some(&["Landroid/companion/AssociationInfo$NonActionableBuilder;"])
+        }
         _ => None,
     }
 }

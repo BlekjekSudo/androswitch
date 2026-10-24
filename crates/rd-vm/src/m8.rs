@@ -2272,6 +2272,19 @@ const SERVICES: &[(&str, &str)] = &[
     ("usb", "Landroid/hardware/usb/UsbManager;"),
     ("euicc", "Landroid/telephony/euicc/EuiccManager;"),
     ("print", "Landroid/print/PrintManager;"),
+    (
+        "fingerprint",
+        "Landroid/hardware/fingerprint/FingerprintManager;",
+    ),
+    ("biometric", "Landroid/hardware/biometrics/BiometricManager;"),
+    ("hdmi_control", "Landroid/hardware/hdmi/HdmiControlManager;"),
+    ("input", "Landroid/hardware/input/InputManager;"),
+    ("midi", "Landroid/media/midi/MidiManager;"),
+    ("tv_input", "Landroid/media/tv/TvInputManager;"),
+    (
+        "companiondevice",
+        "Landroid/companion/CompanionDeviceManager;",
+    ),
 ];
 
 fn system_service_class(key: &str) -> &'static str {
