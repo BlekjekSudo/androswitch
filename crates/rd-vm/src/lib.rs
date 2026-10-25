@@ -112,7 +112,7 @@ pub use value::Value;
 pub const MODULE_ID: &str = "rd-vm";
 
 /// Issue #230: fronteira de `Engine` para o estado host que vive em
-/// `thread_local!` fora do `Engine`. Esvazia/reinicia as tabelas
+/// estado thread-local (macro do std) fora do `Engine`. Esvazia/reinicia as tabelas
 /// indexadas por `ObjRef` (spannable, random, regex, uri, xml,
 /// annotations, io-chars) e o RNG de UUID. Sem isto, um `Engine` novo
 /// na mesma thread (relaunch, próximo cenário de `rd test`) herdava
