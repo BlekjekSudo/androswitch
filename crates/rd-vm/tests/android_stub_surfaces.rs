@@ -5807,6 +5807,75 @@ fn usb_explicit_descriptors_and_no_device_manager_are_guest_visible() {
         ),
         Value::Int(1)
     );
+
+    // Deep audit: usbFunctionsFromString maps null/"none" to FUNCTION_NONE,
+    // skips empty segments, and rejects unknown names with IAE.
+    let usb_manager_class = "Landroid/hardware/usb/UsbManager;";
+    assert_eq!(
+        call_static(
+            &mut engine,
+            usb_manager_class,
+            "usbFunctionsFromString",
+            "(Ljava/lang/String;)J",
+            &[Value::Null],
+        ),
+        Value::Long(0)
+    );
+    let none_functions = text(&mut engine, "none");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            usb_manager_class,
+            "usbFunctionsFromString",
+            "(Ljava/lang/String;)J",
+            &[none_functions],
+        ),
+        Value::Long(0)
+    );
+    let bogus_functions = text(&mut engine, "mtp,bogus");
+    assert_throws(
+        engine.invoke_static(
+            usb_manager_class,
+            "usbFunctionsFromString",
+            "(Ljava/lang/String;)J",
+            &[bogus_functions],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    // Deep audit: only none, a single settable function, or the
+    // rndis+ncm pair are settable (adb is not in the settable mask).
+    assert_eq!(
+        call_static(
+            &mut engine,
+            usb_manager_class,
+            "areSettableFunctions",
+            "(J)Z",
+            &[Value::Long((1 << 2) | (1 << 4))],
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            usb_manager_class,
+            "areSettableFunctions",
+            "(J)Z",
+            &[Value::Long(1)],
+        ),
+        Value::Int(0)
+    );
+
+    // Deep audit: interface lookup is a raw array access past the end.
+    assert_throws(
+        engine.invoke_instance(
+            device,
+            "getInterface",
+            "(I)Landroid/hardware/usb/UsbInterface;",
+            &[Value::Int(99)],
+        ),
+        "Ljava/lang/ArrayIndexOutOfBoundsException;",
+    );
 }
 
 #[test]
