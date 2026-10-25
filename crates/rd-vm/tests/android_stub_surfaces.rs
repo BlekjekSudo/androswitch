@@ -11321,6 +11321,329 @@ fn spell_checker_service_session_defaults_are_guest_visible() {
     );
 }
 
+#[test]
+fn speech_and_textservice_deep_audit_fixes_are_guest_visible() {
+    // A guest listener/callback whose delivery methods throw
+    // RemoteException, which AOSP's spell-checker IPC wrappers swallow.
+    let mut dex = DexBuilder::new();
+    let throwing = dex.class("LDeepAuditSpellListener;", "Ljava/lang/Object;");
+    let remote_type = dex.type_idx("Landroid/os/RemoteException;");
+    let make_throw = |dex: &DexBuilder| {
+        // The platform RemoteException constructor is outside the modeled
+        // classpath; throwing the freshly allocated instance still carries
+        // the exact throwable class through the VM.
+        let mut code = op21c(0x22, 0, remote_type);
+        code.extend(op11x(0x27, 0));
+        dex.code(3, 2, 1, code)
+    };
+    let throw_suggestions = make_throw(&dex);
+    dex.r#virtual(
+        throwing,
+        "onGetSuggestions",
+        "V",
+        vec!["[Landroid/view/textservice/SuggestionsInfo;"],
+        ACC_PUBLIC,
+        Some(throw_suggestions),
+    );
+    let throw_created = make_throw(&dex);
+    dex.r#virtual(
+        throwing,
+        "onSessionCreated",
+        "V",
+        vec!["Lcom/android/internal/textservice/ISpellCheckerSession;"],
+        ACC_PUBLIC,
+        Some(throw_created),
+    );
+
+    // Minimal Context/PackageManager overrides returning test fields, used
+    // to reach RecognizerIntent's resolved-activity path.
+    let audit_context = dex.class("LDeepAuditContext;", "Landroid/content/Context;");
+    dex.instance_field(
+        audit_context,
+        "rd_pm",
+        "Landroid/content/pm/PackageManager;",
+    );
+    let pm_field = dex.field_idx(
+        "LDeepAuditContext;",
+        "Landroid/content/pm/PackageManager;",
+        "rd_pm",
+    );
+    let mut get_pm_code = op22c(0x54, 0, 1, pm_field); // iget-object v0, v1(this)
+    get_pm_code.extend(op11x(0x11, 0)); // return-object v0
+    let get_pm_blob = dex.code(2, 1, 0, get_pm_code);
+    dex.r#virtual(
+        audit_context,
+        "getPackageManager",
+        "Landroid/content/pm/PackageManager;",
+        vec![],
+        ACC_PUBLIC,
+        Some(get_pm_blob),
+    );
+    // The host path only needs virtual dispatch to resolveActivity; use a
+    // plain DEX test double rather than modelling PackageManager's full
+    // abstract platform hierarchy in this fixture.
+    let audit_pm = dex.class("LDeepAuditPackageManager;", "Ljava/lang/Object;");
+    dex.instance_field(audit_pm, "rd_result", "Landroid/content/ContentResolver;");
+    let result_field = dex.field_idx(
+        "LDeepAuditPackageManager;",
+        "Landroid/content/ContentResolver;",
+        "rd_result",
+    );
+    let mut resolve_code = op22c(0x54, 0, 1, result_field); // iget-object v0, v1(this)
+    resolve_code.extend(op11x(0x11, 0)); // return-object v0
+    let resolve_blob = dex.code(4, 3, 0, resolve_code);
+    dex.r#virtual(
+        audit_pm,
+        "resolveActivity",
+        "Landroid/content/ContentResolver;",
+        vec!["Landroid/content/Intent;", "I"],
+        ACC_PUBLIC,
+        Some(resolve_blob),
+    );
+    let mut engine = engine_of(&dex);
+    // RecognitionSupport defaults are List.of(): immutable on the built
+    // object and assigned back into the builder, so a post-build add*
+    // hits UnsupportedOperationException rather than checkNotUsed.
+    let builder = p49_new(&mut engine, P35_SUPPORT_BUILDER, "()V", &[]);
+    let support = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/speech/RecognitionSupport;",
+        &[],
+    ));
+    let pending = object(call(
+        &mut engine,
+        support,
+        "getPendingOnDeviceLanguages",
+        "()Ljava/util/List;",
+        &[],
+    ));
+    let de = text(&mut engine, "de");
+    assert_throws(
+        engine.invoke_instance(
+            pending,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            std::slice::from_ref(&de),
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "addPendingOnDeviceLanguage",
+            "(Ljava/lang/String;)Landroid/speech/RecognitionSupport$Builder;",
+            &[de],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+
+    // Defaults for every unset field are assigned before the generated
+    // constructor rejects an explicitly-set null list.
+    let failed_builder = p49_new(&mut engine, P35_SUPPORT_BUILDER, "()V", &[]);
+    call(
+        &mut engine,
+        failed_builder,
+        "setInstalledOnDeviceLanguages",
+        "(Ljava/util/List;)Landroid/speech/RecognitionSupport$Builder;",
+        &[Value::Null],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            failed_builder,
+            "build",
+            "()Landroid/speech/RecognitionSupport;",
+            &[],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let fr = text(&mut engine, "fr");
+    assert_throws(
+        engine.invoke_instance(
+            failed_builder,
+            "addPendingOnDeviceLanguage",
+            "(Ljava/lang/String;)Landroid/speech/RecognitionSupport$Builder;",
+            &[fr],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+
+    // The generated add* methods only call the checked setter when the
+    // current list is null; adding to an explicitly-set list after build
+    // therefore still mutates the built object's list.
+    let explicit_builder = p49_new(&mut engine, P35_SUPPORT_BUILDER, "()V", &[]);
+    let online = p35_string_list(&mut engine, &["en"]);
+    call(
+        &mut engine,
+        explicit_builder,
+        "setOnlineLanguages",
+        "(Ljava/util/List;)Landroid/speech/RecognitionSupport$Builder;",
+        &[online],
+    );
+    let explicit_support = object(call(
+        &mut engine,
+        explicit_builder,
+        "build",
+        "()Landroid/speech/RecognitionSupport;",
+        &[],
+    ));
+    let es = text(&mut engine, "es");
+    call(
+        &mut engine,
+        explicit_builder,
+        "addOnlineLanguage",
+        "(Ljava/lang/String;)Landroid/speech/RecognitionSupport$Builder;",
+        &[es],
+    );
+    let online_after = call(
+        &mut engine,
+        explicit_support,
+        "getOnlineLanguages",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, online_after), 2);
+
+    // AlternativeSpan passes its sentence as the *name* argument to
+    // Preconditions.checkCollectionNotEmpty, yielding this exact text.
+    let empty_span = instance(&mut engine, P35_SPAN);
+    let no_alternatives = p35_string_list(&mut engine, &[]);
+    match engine.invoke_instance(
+        empty_span,
+        "<init>",
+        "(IILjava/util/List;)V",
+        &[Value::Int(0), Value::Int(1), no_alternatives],
+    ) {
+        Err(VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/IllegalArgumentException;");
+            assert_eq!(
+                t.message.as_deref(),
+                Some("List of alternative strings must not be empty. is empty")
+            );
+        }
+        other => panic!("expected empty-alternatives failure, got {other:?}"),
+    }
+
+    // A resolved voice-search activity with details metadata but a null
+    // packageName reaches new ComponentName(null, ...) in AOSP and NPEs,
+    // rather than making getVoiceDetailsIntent return null.
+    let details_bundle = p41_bundle(&mut engine);
+    let details_key = text(&mut engine, "android.speech.DETAILS");
+    let details_class = text(&mut engine, "com.example.Details");
+    call(
+        &mut engine,
+        details_bundle,
+        "putString",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+        &[details_key, details_class],
+    );
+    let activity_info = instance(&mut engine, "Landroid/content/pm/ActivityInfo;");
+    engine
+        .heap
+        .put_field(activity_info, "metaData", Value::Obj(details_bundle))
+        .unwrap();
+    engine
+        .heap
+        .put_field(activity_info, "packageName", Value::Null)
+        .unwrap();
+    let resolve_info = instance(&mut engine, "Landroid/content/ContentResolver;");
+    engine
+        .heap
+        .put_field(resolve_info, "activityInfo", Value::Obj(activity_info))
+        .unwrap();
+    let audit_pm = instance(&mut engine, "LDeepAuditPackageManager;");
+    engine
+        .heap
+        .put_field(audit_pm, "rd_result", Value::Obj(resolve_info))
+        .unwrap();
+    let audit_context = instance(&mut engine, "LDeepAuditContext;");
+    engine
+        .heap
+        .put_field(audit_context, "rd_pm", Value::Obj(audit_pm))
+        .unwrap();
+    match engine.invoke_static(
+        P35_RINTENT,
+        "getVoiceDetailsIntent",
+        "(Landroid/content/Context;)Landroid/content/Intent;",
+        &[Value::Obj(audit_context)],
+    ) {
+        Err(VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/NullPointerException;");
+            assert_eq!(t.message.as_deref(), Some("package name is null"));
+        }
+        other => panic!("expected null-package ComponentName failure, got {other:?}"),
+    }
+
+    // Sentence-level empty results are the one shared
+    // EMPTY_SENTENCE_SUGGESTIONS_INFOS array instance.
+    let session = p49_new(&mut engine, P35_SPELL_SESSION, "()V", &[]);
+    let empty_once = call(
+        &mut engine,
+        session,
+        "onGetSentenceSuggestionsMultiple",
+        "([Landroid/view/textservice/TextInfo;I)[Landroid/view/textservice/SentenceSuggestionsInfo;",
+        &[Value::Null, Value::Int(5)],
+    );
+    let empty_infos = object_array(&mut engine, "[Landroid/view/textservice/TextInfo;", vec![]);
+    let empty_twice = call(
+        &mut engine,
+        session,
+        "onGetSentenceSuggestionsMultiple",
+        "([Landroid/view/textservice/TextInfo;I)[Landroid/view/textservice/SentenceSuggestionsInfo;",
+        &[empty_infos.clone(), Value::Int(5)],
+    );
+    assert_eq!(empty_once, empty_twice);
+
+    // InternalISpellCheckerSession swallows only RemoteException from
+    // result delivery.
+    let throwing_listener = instance(&mut engine, "LDeepAuditSpellListener;");
+    let bundle = p41_bundle(&mut engine);
+    let empty_locale = text(&mut engine, "");
+    let internal = p49_new(
+        &mut engine,
+        P35_SPELL_INTERNAL,
+        "(Ljava/lang/String;Lcom/android/internal/textservice/ISpellCheckerSessionListener;Landroid/os/Bundle;Landroid/service/textservice/SpellCheckerService$Session;I)V",
+        &[
+            empty_locale,
+            Value::Obj(throwing_listener),
+            Value::Obj(bundle),
+            Value::Obj(session),
+            Value::Int(0),
+        ],
+    );
+    call(
+        &mut engine,
+        internal,
+        "onGetSuggestionsMultiple",
+        "([Landroid/view/textservice/TextInfo;IZ)V",
+        &[empty_infos, Value::Int(5), Value::Int(0)],
+    );
+
+    // The binder likewise swallows RemoteException from onSessionCreated
+    // (here the service reference is gone, so the session is null).
+    let binder = p49_new(
+        &mut engine,
+        P35_SPELL_BINDER,
+        "(Landroid/service/textservice/SpellCheckerService;)V",
+        &[Value::Null],
+    );
+    let throwing_callback = instance(&mut engine, "LDeepAuditSpellListener;");
+    call(
+        &mut engine,
+        binder,
+        "getISpellCheckerSession",
+        "(Ljava/lang/String;Lcom/android/internal/textservice/ISpellCheckerSessionListener;Landroid/os/Bundle;ILcom/android/internal/textservice/ISpellCheckerServiceCallback;)V",
+        &[
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            Value::Int(0),
+            Value::Obj(throwing_callback),
+        ],
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Appendix C Batch 35-B: android.speech.tts + android.service.voice.
 // ---------------------------------------------------------------------------

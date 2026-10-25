@@ -33755,6 +33755,50 @@ fn p35_empty_list(vm: &mut Engine) -> Result<Value, VmExit> {
     )?))
 }
 
+/// `List.of()` as used for generated DataClass defaults: immutable, so
+/// mutation attempts fail with UnsupportedOperationException.
+fn p35_immutable_empty_list(vm: &mut Engine) -> Result<Value, VmExit> {
+    vm.invoke_static(
+        "Ljava/util/Collections;",
+        "emptyList",
+        "()Ljava/util/List;",
+        &[],
+    )
+}
+
+/// AOSP spell-checker IPC wrappers catch only RemoteException around
+/// session/listener delivery; every other Java throwable propagates.
+fn p35_swallow_remote_exception(
+    vm: &Engine,
+    result: Result<Value, VmExit>,
+) -> Result<Value, VmExit> {
+    match result {
+        Err(VmExit::Exception(t)) if vm.cp.is_subtype(&t.class, "Landroid/os/RemoteException;") => {
+            Ok(Value::Null)
+        }
+        other => other,
+    }
+}
+
+/// SentenceLevelAdapter.EMPTY_SENTENCE_SUGGESTIONS_INFOS is one shared
+/// array instance, not a fresh empty array per call.
+fn p35_empty_sentence_suggestions(vm: &mut Engine) -> Result<Value, VmExit> {
+    let key = (
+        "Landroid/service/textservice/SpellCheckerService$SentenceLevelAdapter;".to_string(),
+        "EMPTY_SENTENCE_SUGGESTIONS_INFOS".to_string(),
+    );
+    if let Some(value @ Value::Obj(_)) = vm.statics.get(&key) {
+        return Ok(value.clone());
+    }
+    let value = obj_array(
+        vm,
+        "[Landroid/view/textservice/SentenceSuggestionsInfo;",
+        Vec::new(),
+    )?;
+    vm.statics.insert(key, value.clone());
+    Ok(value)
+}
+
 /// `maybeInitializeManagerService()` in this profile: there is no
 /// SPEECH_RECOGNITION_SERVICE, so the internal listener reports
 /// `ERROR_CLIENT` (5), exactly as AOSP does when the manager is missing.
@@ -34340,16 +34384,24 @@ fn p35_recognition_support_instance(
             let mut values = Vec::new();
             for (field, _, _, bit) in FIELDS {
                 let value = if set & bit == 0 {
-                    p35_empty_list(vm)?
+                    // AOSP assigns List.of() back into the builder field,
+                    // which is observable through a later add* call: it
+                    // hits the immutable list, not checkNotUsed.
+                    let empty = p35_immutable_empty_list(vm)?;
+                    put(vm, recv, field, empty.clone())?;
+                    empty
                 } else {
-                    match get(vm, recv, field) {
-                        Value::Obj(r) => Value::Obj(r),
-                        // AnnotationValidations.NonNull in the generated
-                        // RecognitionSupport constructor.
-                        _ => return Err(npe("")),
-                    }
+                    get(vm, recv, field)
                 };
                 values.push((field.to_string(), value));
+            }
+            // All builder defaults are assigned before the generated
+            // constructor runs its NonNull validations, even when an
+            // explicitly-set list is null and construction fails.
+            for (_, value) in &values {
+                if !matches!(value, Value::Obj(_)) {
+                    return Err(npe(""));
+                }
             }
             let support = alloc_obj(vm, P35_RECOGNITION_SUPPORT, values)?;
             return Ok(Some(Value::Obj(support)));
@@ -34654,12 +34706,18 @@ fn p35_alternative_span_instance(
                     "Illegal range [{start}, {end}), must be start < end."
                 )));
             }
-            let size = match vm.invoke_instance(oarg(args, 2).unwrap_or(0), "size", "()I", &[]) {
-                Ok(v) => v.as_int().unwrap_or(0),
-                Err(_) => collection_items(vm, Some(&alternatives)).len() as i32,
+            // Preconditions.checkCollectionNotEmpty calls isEmpty() and
+            // treats AOSP's sentence as the value *name*, so the actual
+            // failure text is "...must not be empty. is empty".
+            let empty = match vm.invoke_instance(oarg(args, 2).unwrap_or(0), "isEmpty", "()Z", &[])
+            {
+                Ok(v) => v.as_int().unwrap_or(0) != 0,
+                Err(_) => collection_items(vm, Some(&alternatives)).is_empty(),
             };
-            if size == 0 {
-                return Err(iae("List of alternative strings must not be empty."));
+            if empty {
+                return Err(iae(
+                    "List of alternative strings must not be empty. is empty",
+                ));
             }
             Value::Null
         }
@@ -34793,12 +34851,15 @@ fn p35_spell_instance(
                 let Some(callback) = oarg(args, 4) else {
                     return Err(npe(""));
                 };
-                vm.invoke_instance(
+                // Only this callback sits inside AOSP's RemoteException
+                // catch; session creation above is outside it.
+                let delivered = vm.invoke_instance(
                     callback,
                     "onSessionCreated",
                     "(Lcom/android/internal/textservice/ISpellCheckerSession;)V",
                     &[internal_value],
-                )?
+                );
+                p35_swallow_remote_exception(vm, delivered)?
             }
             _ => return Ok(None),
         };
@@ -34840,47 +34901,53 @@ fn p35_spell_instance(
                 "onGetSuggestionsMultiple",
                 "([Landroid/view/textservice/TextInfo;IZ)V",
             ) => {
-                let Some(session) = field_obj(vm, recv, "mSession") else {
-                    return Err(npe(""));
-                };
-                let result = vm.invoke_instance(
-                    session,
-                    "onGetSuggestionsMultiple",
-                    "([Landroid/view/textservice/TextInfo;IZ)[Landroid/view/textservice/SuggestionsInfo;",
-                    args,
-                )?;
-                let Some(listener) = field_obj(vm, recv, "mListener") else {
-                    return Err(npe(""));
-                };
-                vm.invoke_instance(
-                    listener,
-                    "onGetSuggestions",
-                    "([Landroid/view/textservice/SuggestionsInfo;)V",
-                    &[result],
-                )?
+                let delivered = (|| {
+                    let Some(session) = field_obj(vm, recv, "mSession") else {
+                        return Err(npe(""));
+                    };
+                    let result = vm.invoke_instance(
+                        session,
+                        "onGetSuggestionsMultiple",
+                        "([Landroid/view/textservice/TextInfo;IZ)[Landroid/view/textservice/SuggestionsInfo;",
+                        args,
+                    )?;
+                    let Some(listener) = field_obj(vm, recv, "mListener") else {
+                        return Err(npe(""));
+                    };
+                    vm.invoke_instance(
+                        listener,
+                        "onGetSuggestions",
+                        "([Landroid/view/textservice/SuggestionsInfo;)V",
+                        &[result],
+                    )
+                })();
+                p35_swallow_remote_exception(vm, delivered)?
             }
             (
                 "onGetSentenceSuggestionsMultiple",
                 "([Landroid/view/textservice/TextInfo;I)V",
             ) => {
-                let Some(session) = field_obj(vm, recv, "mSession") else {
-                    return Err(npe(""));
-                };
-                let result = vm.invoke_instance(
-                    session,
-                    "onGetSentenceSuggestionsMultiple",
-                    "([Landroid/view/textservice/TextInfo;I)[Landroid/view/textservice/SentenceSuggestionsInfo;",
-                    args,
-                )?;
-                let Some(listener) = field_obj(vm, recv, "mListener") else {
-                    return Err(npe(""));
-                };
-                vm.invoke_instance(
-                    listener,
-                    "onGetSentenceSuggestions",
-                    "([Landroid/view/textservice/SentenceSuggestionsInfo;)V",
-                    &[result],
-                )?
+                let delivered = (|| {
+                    let Some(session) = field_obj(vm, recv, "mSession") else {
+                        return Err(npe(""));
+                    };
+                    let result = vm.invoke_instance(
+                        session,
+                        "onGetSentenceSuggestionsMultiple",
+                        "([Landroid/view/textservice/TextInfo;I)[Landroid/view/textservice/SentenceSuggestionsInfo;",
+                        args,
+                    )?;
+                    let Some(listener) = field_obj(vm, recv, "mListener") else {
+                        return Err(npe(""));
+                    };
+                    vm.invoke_instance(
+                        listener,
+                        "onGetSentenceSuggestions",
+                        "([Landroid/view/textservice/SentenceSuggestionsInfo;)V",
+                        &[result],
+                    )
+                })();
+                p35_swallow_remote_exception(vm, delivered)?
             }
             ("onCancel", "()V") => {
                 let Some(session) = field_obj(vm, recv, "mSession") else {
@@ -34971,16 +35038,15 @@ fn p35_spell_instance(
             "onGetSentenceSuggestionsMultiple",
             "([Landroid/view/textservice/TextInfo;I)[Landroid/view/textservice/SentenceSuggestionsInfo;",
         ) => {
-            let empty = "[Landroid/view/textservice/SentenceSuggestionsInfo;";
             if oarg(args, 0).is_none() || array_elems(vm, args.first()).is_empty() {
-                obj_array(vm, empty, Vec::new())?
+                p35_empty_sentence_suggestions(vm)?
             } else {
                 let Some(internal) = field_obj(vm, recv, "mInternalSession") else {
                     return Err(npe(""));
                 };
                 match field_str(vm, internal, "mLocale") {
-                    None => obj_array(vm, empty, Vec::new())?,
-                    Some(locale) if locale.is_empty() => obj_array(vm, empty, Vec::new())?,
+                    None => p35_empty_sentence_suggestions(vm)?,
+                    Some(locale) if locale.is_empty() => p35_empty_sentence_suggestions(vm)?,
                     // SentenceLevelAdapter word splitting (WordIterator)
                     // is outside this slice.
                     Some(_) => return Ok(None),
@@ -35174,7 +35240,7 @@ pub(crate) fn partial35_static(
         let info = vm.invoke_instance(
             pm,
             "resolveActivity",
-            "(Landroid/content/Intent;I)Landroid/content/pm/ResolveInfo;",
+            "(Landroid/content/Intent;I)Landroid/content/ContentResolver;",
             &[Value::Obj(search), Value::Int(128)],
         )?;
         let Value::Obj(info) = info else {
@@ -35196,8 +35262,11 @@ pub(crate) fn partial35_static(
         let Value::Obj(_) = class_name else {
             return Ok(Some(Value::Null));
         };
+        // AOSP passes activityInfo.packageName straight to
+        // new ComponentName(String, String), which NPEs on a null package
+        // instead of making getVoiceDetailsIntent return null.
         let Some(package) = field_str(vm, activity, "packageName") else {
-            return Ok(Some(Value::Null));
+            return Err(npe("package name is null"));
         };
         let details = p35_new_intent(vm, "android.speech.action.GET_LANGUAGE_DETAILS")?;
         let component = alloc_obj(vm, "Landroid/content/ComponentName;", Vec::new())?;
