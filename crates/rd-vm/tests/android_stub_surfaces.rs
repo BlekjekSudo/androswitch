@@ -9774,6 +9774,34 @@ fn companion_absent_service_values_filters_and_mac_are_guest_visible() {
         field(&engine, callback, "rd_found_sender"),
         Value::Obj(sender)
     );
+
+    // Deep audit: the absent-service getMyAssociations result is
+    // Collections.emptyList(), so adding to it throws (the deprecated
+    // getAssociations maps into a fresh list and stays empty here).
+    let my_associations = object(call(
+        &mut engine,
+        manager,
+        "getMyAssociations",
+        "()Ljava/util/List;",
+        &[],
+    ));
+    assert_throws(
+        engine.invoke_instance(
+            my_associations,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Null],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+    let legacy_associations = call(
+        &mut engine,
+        manager,
+        "getAssociations",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, legacy_associations), 0);
 }
 
 // ---------------------------------------------------------------------------

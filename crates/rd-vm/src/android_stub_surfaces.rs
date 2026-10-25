@@ -30371,7 +30371,7 @@ fn p49_parse_mac_string(text: &str) -> Result<i64, VmExit> {
             }
         };
         if !(0..=0xff).contains(&x) {
-            return Err(iae(format!("{text}was not a valid MAC address")));
+            return Err(iae(format!("{text} was not a valid MAC address")));
         }
         result = (result << 8) + x;
     }
@@ -30515,9 +30515,19 @@ fn p49_companion_manager_instance(
         | ("startObservingDevicePresence", "(Ljava/lang/String;)V")
         | ("stopObservingDevicePresence", "(Ljava/lang/String;)V") => Value::Null,
         ("buildAssociationCancellationIntent", "()Landroid/content/IntentSender;") => Value::Null,
-        ("getAssociations", "()Ljava/util/List;")
-        | ("getMyAssociations", "()Ljava/util/List;")
-        | ("getAllAssociations", "()Ljava/util/List;") => p49_empty_list(vm)?,
+        ("getAssociations", "()Ljava/util/List;") => p49_empty_list(vm)?,
+        ("getMyAssociations", "()Ljava/util/List;")
+        | ("getAllAssociations", "()Ljava/util/List;") => {
+            // The guarded absent-service path in AOSP returns
+            // Collections.emptyList() for these two getters (the deprecated
+            // getAssociations above maps into a fresh mutable list instead).
+            vm.invoke_static(
+                "Ljava/util/Collections;",
+                "emptyList",
+                "()Ljava/util/List;",
+                &[],
+            )?
+        }
         ("hasNotificationAccess", "(Landroid/content/ComponentName;)Z") => bool_value(false),
         (
             "isDeviceAssociatedForWifiConnection",
