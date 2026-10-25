@@ -483,9 +483,9 @@ A fonte executável deste apêndice é [`data/jetpack.toml`](data/jetpack.toml),
 <!-- BEGIN JETPACK -->
 | Categoria | Bibliotecas (implementação nativa ou shim) | Status das bibliotecas | Módulos |
 |---|---|---|---|
-| Foundation | appcompat, core-ktx, activity, annotation, multidex, startup | partial 3 · not_implemented 3 | `none`, `rd-vm/androidx`, `rd-vm/m9` |
+| Foundation | appcompat, core-ktx, activity, annotation, multidex, startup | partial 4 · not_implemented 2 | `none`, `rd-vm/androidx`, `rd-vm/classpath+inflate`, `rd-vm/m9` |
 | Architecture | lifecycle-runtime, lifecycle-livedata, lifecycle-viewmodel, lifecycle-savedstate, room, paging 3, work, navigation, datastore, collection, palette | partial 9 · not_implemented 2 | `none`, `rd-vm/androidx`, `rd-vm/m8` |
-| UI | compose, recyclerview, viewpager2, constraintlayout, coordinatorlayout, drawerlayout, swiperefreshlayout, cardview, fragment, browser (custom tabs), emoji2, material (extra além da tabela da spec) | partial 3 · stub 2 · not_implemented 7 | `none`, `rd-vm/androidx`, `rd-vm/inflate`, `rd-vm/m8` |
+| UI | compose, recyclerview, viewpager2, constraintlayout, coordinatorlayout, drawerlayout, swiperefreshlayout, cardview, fragment, browser (custom tabs), emoji2, material (extra além da tabela da spec) | partial 3 · stub 7 · not_implemented 2 | `none`, `rd-vm/androidx`, `rd-vm/classpath+inflate`, `rd-vm/m8` |
 | Behavior | media3/ExoPlayer, cameraX, biometric, security-crypto, credential-manager, photo-picker (privacy) | partial 1 · not_implemented 5 | `none`, `rd-vm/androidx` |
 | DI/async | hilt/dagger, kotlinx-coroutines/flow, rxjava bridge | not_implemented 3 | `none` |
 | 3rd-party comuns | okhttp, retrofit, moshi, gson, coil, glide, picasso, guava ListenableFuture (extra — base de work/camera) | partial 2 · not_implemented 6 | `none`, `rd-vm/androidx`, `rd-vm/m8` |
@@ -505,9 +505,9 @@ A fonte executável deste apêndice é [`data/gms.toml`](data/gms.toml), validad
 <!-- BEGIN GMS -->
 | Categoria | Serviços (shim sem GMS) | Status dos serviços | Módulos |
 |---|---|---|---|
-| GMS core | GoogleApiAvailability / common, Tasks API | not_implemented 2 | `none` |
-| Play Services | Location (fused), Maps, Billing, Auth (Google Sign-In), Ads, Fit/Health, Cast, Nearby, SafetyNet / Play Integrity | not_implemented 9 | `none` |
-| Firebase | Firebase core (FirebaseApp), Firebase Analytics, Firebase Auth, Firebase Messaging (FCM), Firebase Crashlytics, Cloud Firestore, Realtime Database, Firebase Remote Config (extra além da spec), Firebase Storage (extra além da spec), ML Kit (extra além da spec) | not_implemented 10 | `none` |
+| GMS core | GoogleApiAvailability / common, Tasks API | partial 2 | `rd-vm/gms` |
+| Play Services | Location (fused), Maps, Billing, Auth (Google Sign-In), Ads, Fit/Health, Cast, Nearby, SafetyNet / Play Integrity | partial 9 | `rd-vm/gms` |
+| Firebase | Firebase core (FirebaseApp), Firebase Analytics, Firebase Auth, Firebase Messaging (FCM), Firebase Crashlytics, Cloud Firestore, Realtime Database, Firebase Remote Config (extra além da spec), Firebase Storage (extra além da spec), ML Kit (extra além da spec) | partial 9 · not_implemented 1 | `none`, `rd-vm/gms` |
 <!-- END GMS -->
 
 ## Apêndice F — Componentes & Manifest (modelo completo — CORE-12)
