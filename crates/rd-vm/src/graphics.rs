@@ -451,6 +451,58 @@ pub(crate) fn cs_text(vm: &mut Engine, v: &Value) -> Result<String, VmExit> {
         Err(_) => Ok(String::new()),
     }
 }
+fn checked_text_slice(
+    vm: &mut Engine,
+    v: Option<&Value>,
+    is_char_array: bool,
+    i0: i32,
+    i1: i32,
+    count_mode: bool,
+) -> Result<String, VmExit> {
+    let Some(Value::Obj(first_ref)) = v else {
+        return Err(exc("Ljava/lang/NullPointerException;", "text == null"));
+    };
+    let units: Vec<u16> = if is_char_array {
+        vm.heap
+            .as_array_elems(*first_ref)
+            .map(|(e, _)| {
+                e.iter()
+                    .map(|c| match c {
+                        Value::Int(i) => *i as u16,
+                        _ => 0,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    } else {
+        cs_text(vm, &Value::Obj(*first_ref))?
+            .encode_utf16()
+            .collect()
+    };
+    if count_mode {
+        if i0 < 0
+            || i1 < 0
+            || (i0 as usize) > units.len()
+            || (i1 as usize) > units.len() - (i0 as usize)
+        {
+            return Err(exc(
+                "Ljava/lang/IndexOutOfBoundsException;",
+                "char[] index/count out of bounds",
+            ));
+        }
+        let st_u = i0 as usize;
+        Ok(String::from_utf16_lossy(&units[st_u..st_u + i1 as usize]))
+    } else {
+        if i0 < 0 || i1 < i0 || (i1 as usize) > units.len() {
+            return Err(exc(
+                "Ljava/lang/IndexOutOfBoundsException;",
+                "text start/end out of bounds",
+            ));
+        }
+        Ok(String::from_utf16_lossy(&units[i0 as usize..i1 as usize]))
+    }
+}
+
 fn sub(s: &str, a: i32, e: i32) -> String {
     let a = a.max(0) as usize;
     let e = (e.max(0) as usize).max(a);
@@ -860,6 +912,35 @@ impl LayoutS {
     }
 }
 
+const MAX_BITMAP_DIM: i32 = 16_384;
+const MAX_BITMAP_BYTES: i64 = i32::MAX as i64;
+const MAX_PATH_POINTS: usize = 65_536;
+const MAX_PATH_CONTOURS: usize = 16_384;
+const MAX_CANVAS_SAVE_DEPTH: usize = 1_024;
+const MAX_DISPLAY_LIST_OPS: usize = 32_768;
+const MAX_RASTER_OPS_VISITED: usize = 32_768;
+const MAX_SUMMARY_OPS_VISITED: usize = 8_192;
+
+fn path_point_count(p: &[Vec<(f32, f32)>]) -> usize {
+    p.iter().map(Vec::len).sum()
+}
+
+fn ensure_path_budget(
+    p: &[Vec<(f32, f32)>],
+    add_pts: usize,
+    add_contours: usize,
+) -> Result<(), VmExit> {
+    if path_point_count(p).saturating_add(add_pts) > MAX_PATH_POINTS
+        || p.len().saturating_add(add_contours) > MAX_PATH_CONTOURS
+    {
+        return Err(exc(
+            "Ljava/lang/OutOfMemoryError;",
+            "Path exceeds maximum point/contour budget",
+        ));
+    }
+    Ok(())
+}
+
 fn record(vm: &mut Engine, canvas: ObjRef, p: PaintSnap, k: OpK) {
     let (target, s) = match vm.gfx.objs.get_mut(&canvas) {
         Some(G::Canvas(c)) => (c.target.clone(), *c.top()),
@@ -875,15 +956,23 @@ fn record(vm: &mut Engine, canvas: ObjRef, p: PaintSnap, k: OpK) {
     match target {
         Target::Node(n) => {
             if let Some(G::Node(ns)) = vm.gfx.objs.get_mut(&n) {
-                ns.ops.push(op);
+                if ns.ops.len() < MAX_DISPLAY_LIST_OPS {
+                    ns.ops.push(op);
+                }
             }
         }
         Target::Bitmap(bm) => {
             if let Some(G::Bitmap(_, _, ops)) = vm.gfx.objs.get_mut(&bm) {
-                ops.push(op);
+                if ops.len() < MAX_DISPLAY_LIST_OPS {
+                    ops.push(op);
+                }
             }
         }
-        Target::Frame => vm.gfx.frame.push(op),
+        Target::Frame => {
+            if vm.gfx.frame.len() < MAX_DISPLAY_LIST_OPS {
+                vm.gfx.frame.push(op);
+            }
+        }
         Target::None => {}
     }
 }
@@ -1227,8 +1316,16 @@ pub(crate) fn static_intrinsic(
                     "width and height must be > 0",
                 ));
             }
+            let total_bytes = i64::from(w).saturating_mul(i64::from(h)).saturating_mul(4);
+            if w > MAX_BITMAP_DIM || h > MAX_BITMAP_DIM || total_bytes > MAX_BITMAP_BYTES {
+                return Err(exc(
+                    "Ljava/lang/IllegalArgumentException;",
+                    "Bitmap dimensions exceed maximum supported bounds",
+                ));
+            }
             let ops = match src.and_then(|s| vm.gfx.objs.get(&s)) {
-                Some(G::Bitmap(_, _, o)) => o.clone(),
+                Some(G::Bitmap(_, _, o)) if o.len() <= MAX_DISPLAY_LIST_OPS => o.clone(),
+                Some(G::Bitmap(_, _, o)) => o[..MAX_DISPLAY_LIST_OPS].to_vec(),
                 _ => Vec::new(),
             };
             let r = vm
@@ -1564,8 +1661,13 @@ pub(crate) fn instance_intrinsic(
         G::Bitmap(w, h, _) => Ok(Some(match name {
             "getWidth" => Value::Int(w),
             "getHeight" => Value::Int(h),
-            "getRowBytes" => Value::Int(w * 4),
-            "getByteCount" | "getAllocationByteCount" => Value::Int(w * h * 4),
+            "getRowBytes" => Value::Int((i64::from(w) * 4).clamp(0, i64::from(i32::MAX)) as i32),
+            "getByteCount" | "getAllocationByteCount" => Value::Int(
+                i64::from(w)
+                    .saturating_mul(i64::from(h))
+                    .saturating_mul(4)
+                    .clamp(0, i64::from(i32::MAX)) as i32,
+            ),
             "isMutable" | "hasAlpha" => b(true),
             "isRecycled" | "compress" | "isPremultiplied" => b(name == "isPremultiplied"),
             "getConfig" => {
@@ -1602,9 +1704,55 @@ pub(crate) fn instance_intrinsic(
                 Value::Obj(r)
             }
             "getPixels" => {
-                if let Some(arr) = obj(a(0)) {
+                let Some(arr) = obj(a(0)) else {
+                    return Err(exc("Ljava/lang/NullPointerException;", "pixels == null"));
+                };
+                let (offset, stride, x, y, width, height) = (
+                    i64::from(it(a(1))),
+                    i64::from(it(a(2))),
+                    i64::from(it(a(3))),
+                    i64::from(it(a(4))),
+                    i64::from(it(a(5))),
+                    i64::from(it(a(6))),
+                );
+                if x < 0
+                    || y < 0
+                    || width < 0
+                    || height < 0
+                    || x + width > i64::from(w)
+                    || y + height > i64::from(h)
+                    || stride.abs() < width
+                {
+                    return Err(exc(
+                        "Ljava/lang/IllegalArgumentException;",
+                        "Bitmap.getPixels out of bitmap bounds",
+                    ));
+                }
+                if width > 0 && height > 0 {
+                    let arr_len = vm
+                        .heap
+                        .as_array_elems(arr)
+                        .map(|(e, _)| e.len() as i64)
+                        .unwrap_or(0);
+                    let last_row = offset.saturating_add((height - 1).saturating_mul(stride));
+                    if offset < 0
+                        || offset.saturating_add(width) > arr_len
+                        || last_row < 0
+                        || last_row.saturating_add(width) > arr_len
+                    {
+                        return Err(exc(
+                            "Ljava/lang/ArrayIndexOutOfBoundsException;",
+                            "Bitmap.getPixels array bounds",
+                        ));
+                    }
                     if let Ok(e) = vm.heap.array_elems_mut(arr) {
-                        e.iter_mut().for_each(|x| *x = Value::Int(0));
+                        for row in 0..height {
+                            let start = (offset + row * stride) as usize;
+                            let end = start + width as usize;
+                            for slot in &mut e[start..end] {
+                                *slot = Value::Int(0);
+                            }
+                        }
                     }
                 }
                 Value::Null
@@ -1983,19 +2131,14 @@ fn paint_method(
             Value::Null
         }
         "measureText" => {
-            let t = cs_text(vm, a(0).unwrap_or(&Value::Null))?;
             let t = if args.len() >= 3 {
-                sub(
-                    &t,
-                    it(a(1)),
-                    if sig.starts_with("([C") {
-                        it(a(1)) + it(a(2))
-                    } else {
-                        it(a(2))
-                    },
-                )
+                let is_ca = sig.starts_with("([C");
+                checked_text_slice(vm, a(0), is_ca, it(a(1)), it(a(2)), is_ca)?
             } else {
-                t
+                let Some(v0) = a(0).filter(|v| !matches!(v, Value::Null)) else {
+                    return Err(exc("Ljava/lang/NullPointerException;", "text == null"));
+                };
+                cs_text(vm, v0)?
             };
             changed = false;
             Value::Float(measure(&t, p.text_size, p.letter_spacing) * p.scale_x)
@@ -2061,16 +2204,8 @@ fn paint_method(
         }
         "getTextBounds" => {
             changed = false;
-            let t = cs_text(vm, a(0).unwrap_or(&Value::Null))?;
-            let t = sub(
-                &t,
-                it(a(1)),
-                if sig.starts_with("([C") {
-                    it(a(1)) + it(a(2))
-                } else {
-                    it(a(2))
-                },
-            );
+            let is_ca = sig.starts_with("([C");
+            let t = checked_text_slice(vm, a(0), is_ca, it(a(1)), it(a(2)), is_ca)?;
             if let Some(r) = obj(args.last()) {
                 set_rect(
                     vm,
@@ -2170,7 +2305,7 @@ fn path_method(
     let a = |i: usize| args.get(i);
     let f = |i: usize| fl(args.get(i));
     let dir_ccw = |vm: &Engine, v: Option<&Value>| ord(vm, v) == 1;
-    let add_poly = |vm: &mut Engine, mut poly: Vec<(f32, f32)>, ccw: bool| {
+    let add_poly = |vm: &mut Engine, mut poly: Vec<(f32, f32)>, ccw: bool| -> Result<(), VmExit> {
         if ccw {
             poly.reverse();
         }
@@ -2178,11 +2313,14 @@ fn path_method(
         if let Some(f0) = poly.first().copied() {
             poly.push(f0);
         }
+        ensure_path_budget(p, poly.len(), 1)?;
         p.push(poly);
+        Ok(())
     };
     Ok(Some(match name {
         "moveTo" | "rMoveTo" => {
             let p = path_mut(vm, recv);
+            ensure_path_budget(p, 1, 1)?;
             let (x0, y0) = if name == "rMoveTo" {
                 last_pt(p)
             } else {
@@ -2193,6 +2331,7 @@ fn path_method(
         }
         "lineTo" | "rLineTo" => {
             let p = path_mut(vm, recv);
+            ensure_path_budget(p, 2, usize::from(p.is_empty()))?;
             let (x0, y0) = last_pt(p);
             let (x, y) = if name == "rLineTo" {
                 (x0 + f(0), y0 + f(1))
@@ -2202,11 +2341,14 @@ fn path_method(
             if p.is_empty() {
                 p.push(vec![(0.0, 0.0)]);
             }
-            p.last_mut().expect("non-empty").push((x, y));
+            if let Some(last) = p.last_mut() {
+                last.push((x, y));
+            }
             Value::Null
         }
         "quadTo" | "rQuadTo" | "cubicTo" | "rCubicTo" | "conicTo" | "rConicTo" => {
             let p = path_mut(vm, recv);
+            ensure_path_budget(p, 17, usize::from(p.is_empty()))?;
             let (x0, y0) = last_pt(p);
             let rel = name.starts_with('r');
             let o = |v: f32, axis: usize| {
@@ -2219,40 +2361,41 @@ fn path_method(
             if p.is_empty() {
                 p.push(vec![(0.0, 0.0)]);
             }
-            let sp = p.last_mut().expect("non-empty");
-            let n = 16;
-            if name.contains("ubic") {
-                let (x1, y1, x2, y2, x3, y3) = (
-                    o(f(0), 0),
-                    o(f(1), 1),
-                    o(f(2), 0),
-                    o(f(3), 1),
-                    o(f(4), 0),
-                    o(f(5), 1),
-                );
-                for i in 1..=n {
-                    let t = i as f32 / n as f32;
-                    let u = 1.0 - t;
-                    sp.push((
-                        u * u * u * x0
-                            + 3.0 * u * u * t * x1
-                            + 3.0 * u * t * t * x2
-                            + t * t * t * x3,
-                        u * u * u * y0
-                            + 3.0 * u * u * t * y1
-                            + 3.0 * u * t * t * y2
-                            + t * t * t * y3,
-                    ));
-                }
-            } else {
-                let (x1, y1, x2, y2) = (o(f(0), 0), o(f(1), 1), o(f(2), 0), o(f(3), 1));
-                for i in 1..=n {
-                    let t = i as f32 / n as f32;
-                    let u = 1.0 - t;
-                    sp.push((
-                        u * u * x0 + 2.0 * u * t * x1 + t * t * x2,
-                        u * u * y0 + 2.0 * u * t * y1 + t * t * y2,
-                    ));
+            if let Some(sp) = p.last_mut() {
+                let n = 16;
+                if name.contains("ubic") {
+                    let (x1, y1, x2, y2, x3, y3) = (
+                        o(f(0), 0),
+                        o(f(1), 1),
+                        o(f(2), 0),
+                        o(f(3), 1),
+                        o(f(4), 0),
+                        o(f(5), 1),
+                    );
+                    for i in 1..=n {
+                        let t = i as f32 / n as f32;
+                        let u = 1.0 - t;
+                        sp.push((
+                            u * u * u * x0
+                                + 3.0 * u * u * t * x1
+                                + 3.0 * u * t * t * x2
+                                + t * t * t * x3,
+                            u * u * u * y0
+                                + 3.0 * u * u * t * y1
+                                + 3.0 * u * t * t * y2
+                                + t * t * t * y3,
+                        ));
+                    }
+                } else {
+                    let (x1, y1, x2, y2) = (o(f(0), 0), o(f(1), 1), o(f(2), 0), o(f(3), 1));
+                    for i in 1..=n {
+                        let t = i as f32 / n as f32;
+                        let u = 1.0 - t;
+                        sp.push((
+                            u * u * x0 + 2.0 * u * t * x1 + t * t * x2,
+                            u * u * y0 + 2.0 * u * t * y1 + t * t * y2,
+                        ));
+                    }
                 }
             }
             Value::Null
@@ -2276,8 +2419,11 @@ fn path_method(
                 })
                 .collect();
             let p = path_mut(vm, recv);
+            ensure_path_budget(p, pts.len(), 1)?;
             if name == "arcTo" && !p.is_empty() && !(args.last() == Some(&Value::Int(1))) {
-                p.last_mut().expect("non-empty").extend(pts);
+                if let Some(last) = p.last_mut() {
+                    last.extend(pts);
+                }
             } else {
                 p.push(pts);
             }
@@ -2285,6 +2431,7 @@ fn path_method(
         }
         "close" => {
             let p = path_mut(vm, recv);
+            ensure_path_budget(p, 2, 1)?;
             if let Some(sp) = p.last_mut() {
                 if let Some(f0) = sp.first().copied() {
                     sp.push(f0);
@@ -2314,7 +2461,7 @@ fn path_method(
                 vm,
                 vec![(r[0], r[1]), (r[2], r[1]), (r[2], r[3]), (r[0], r[3])],
                 ccw,
-            );
+            )?;
             Value::Null
         }
         "addOval" | "addCircle" => {
@@ -2324,7 +2471,7 @@ fn path_method(
                 _ => ([f(0), f(1), f(2), f(3)], a(4)),
             };
             let ccw = dir_ccw(vm, d);
-            add_poly(vm, oval_poly(r[0], r[1], r[2], r[3]), ccw);
+            add_poly(vm, oval_poly(r[0], r[1], r[2], r[3]), ccw)?;
             Value::Null
         }
         "addRoundRect" => {
@@ -2348,11 +2495,16 @@ fn path_method(
             };
             let d = args.last();
             let ccw = dir_ccw(vm, d);
-            add_poly(vm, rrect_poly(r[0], r[1], r[2], r[3], rad), ccw);
+            add_poly(vm, rrect_poly(r[0], r[1], r[2], r[3], rad), ccw)?;
             Value::Null
         }
         "addPath" => {
+            if matches!(a(0), None | Some(Value::Null)) {
+                return Err(exc("Ljava/lang/NullPointerException;", "src == null"));
+            }
             let mut o = path_of(vm, obj(a(0)));
+            let add_pts = path_point_count(&o);
+            let add_contours = o.len();
             let m = if args.len() == 3 {
                 tr(f(1), f(2))
             } else if args.len() == 2 {
@@ -2365,7 +2517,9 @@ fn path_method(
                     *pt = ap(&m, pt.0, pt.1);
                 }
             }
-            path_mut(vm, recv).extend(o);
+            let p = path_mut(vm, recv);
+            ensure_path_budget(p, add_pts, add_contours)?;
+            p.extend(o);
             Value::Null
         }
         "offset" | "transform" => {
@@ -2402,7 +2556,10 @@ fn path_method(
                 0 => p1, // DIFFERENCE: keep first (approx.)
                 1 => p1, // INTERSECT approx.
                 4 => p2, // REVERSE_DIFFERENCE approx.
-                _ => p1.into_iter().chain(p2).collect(),
+                _ => {
+                    ensure_path_budget(&p1, path_point_count(&p2), p2.len())?;
+                    p1.into_iter().chain(p2).collect()
+                }
             };
             vm.gfx.objs.insert(recv, G::Path(res, false));
             b(true)
@@ -2529,27 +2686,40 @@ fn matrix_method(
             // mapPoints([F) | mapPoints(dst,src) | mapPoints(dst,dstIndex,src,srcIndex,count)
             // AOSP Matrix.mapPoints validates via checkPointArrays and the
             // two-array overload requires equal lengths (AIOOBE otherwise).
-            let (dst, src, di, si, n) = match args.len() {
-                1 => (a(0), a(0), 0i32, 0i32, -1i32),
-                2 => (a(0), a(1), 0, 0, -1),
-                _ => (a(0), a(2), it(a(1)), it(a(3)), it(a(4))),
+            let (dst, src, di, si) = match args.len() {
+                1 => (a(0), a(0), 0i32, 0i32),
+                2 => (a(0), a(1), 0, 0),
+                _ => (a(0), a(2), it(a(1)), it(a(3))),
             };
             if matches!(dst, None | Some(Value::Null)) || matches!(src, None | Some(Value::Null)) {
                 return Err(exc("Ljava/lang/NullPointerException;", "mapPoints"));
             }
             let src_len = float_array_len(vm, src);
             let dst_len = float_array_len(vm, dst);
-            let count = if n < 0 { src_len / 2 } else { n };
+            let count = if args.len() <= 2 {
+                src_len / 2
+            } else {
+                it(a(4))
+            };
             if args.len() == 2 && dst_len != src_len {
                 return Err(exc(
                     "Ljava/lang/ArrayIndexOutOfBoundsException;",
                     "mapPoints",
                 ));
             }
-            let (src_stop, dst_stop) = (si + (count << 1), di + (count << 1));
-            if (count | si | di | src_stop | dst_stop) < 0
-                || src_stop > src_len
-                || dst_stop > dst_len
+            if count < 0 || si < 0 || di < 0 {
+                return Err(exc(
+                    "Ljava/lang/ArrayIndexOutOfBoundsException;",
+                    "mapPoints",
+                ));
+            }
+            let point_floats = (count as usize).saturating_mul(2);
+            let (si, di) = (si as usize, di as usize);
+            let (src_len_u, dst_len_u) = (src_len.max(0) as usize, dst_len.max(0) as usize);
+            if si > src_len_u
+                || point_floats > src_len_u - si
+                || di > dst_len_u
+                || point_floats > dst_len_u - di
             {
                 return Err(exc(
                     "Ljava/lang/ArrayIndexOutOfBoundsException;",
@@ -2557,10 +2727,14 @@ fn matrix_method(
                 ));
             }
             let v = float_array(vm, src);
-            let (si, di) = (si as usize, di as usize);
-            let pts: Vec<f32> = v[si..]
+            if si > v.len() || point_floats > v.len() - si {
+                return Err(exc(
+                    "Ljava/lang/ArrayIndexOutOfBoundsException;",
+                    "mapPoints",
+                ));
+            }
+            let pts: Vec<f32> = v[si..si + point_floats]
                 .chunks(2)
-                .take(count as usize)
                 .flat_map(|c| {
                     let (x, y) = ap(&m, c[0], *c.get(1).unwrap_or(&0.0));
                     [x, y]
@@ -2671,6 +2845,12 @@ fn canvas_method(
     let out = match name {
         "save" => {
             let c = cvf(vm, recv);
+            if c.stack.len() >= MAX_CANVAS_SAVE_DEPTH {
+                return Err(exc(
+                    "Ljava/lang/OutOfMemoryError;",
+                    "Canvas save stack exceeds maximum depth",
+                ));
+            }
             let s = *c.top();
             c.stack.push(s);
             Value::Int(c.stack.len() as i32 - 1)
@@ -2698,6 +2878,12 @@ fn canvas_method(
                     .unwrap_or(1.0)
             };
             let c = cvf(vm, recv);
+            if c.stack.len() >= MAX_CANVAS_SAVE_DEPTH {
+                return Err(exc(
+                    "Ljava/lang/OutOfMemoryError;",
+                    "Canvas save stack exceeds maximum depth",
+                ));
+            }
             let mut s = *c.top();
             s.alpha *= alpha;
             c.stack.push(s);
@@ -2996,7 +3182,9 @@ fn canvas_method(
         }
         "drawText" | "drawTextRun" => {
             // (String,FFP) (String,IIFFP) (CharSequence,IIFFP) ([C,IIFFP) ; drawTextRun(cs, start, end, ctxStart, ctxEnd, x, y, isRtl, paint)
-            let text = cs_text(vm, a(0).unwrap_or(&Value::Null))?;
+            let Some(Value::Obj(first_ref)) = a(0) else {
+                return Err(exc("Ljava/lang/NullPointerException;", "text == null"));
+            };
             let ints: Vec<i32> = args[1..]
                 .iter()
                 .take_while(|v| matches!(v, Value::Int(_)))
@@ -3012,10 +3200,18 @@ fn canvas_method(
                     }
                 })
                 .collect();
-            let t = match (sig.starts_with("([C"), ints.len()) {
-                (true, n) if n >= 2 => sub(&text, ints[0], ints[0] + ints[1]),
-                (false, n) if n >= 2 => sub(&text, ints[0], ints[1]),
-                _ => text,
+            let is_ca = sig.starts_with("([C");
+            let t = if ints.len() >= 2 {
+                checked_text_slice(
+                    vm,
+                    Some(&Value::Obj(*first_ref)),
+                    is_ca,
+                    ints[0],
+                    ints[1],
+                    is_ca && name == "drawText",
+                )?
+            } else {
+                cs_text(vm, &Value::Obj(*first_ref))?
             };
             let p = paint_of(vm, args.last());
             let (x, y) = (
@@ -3135,7 +3331,7 @@ fn node_method(
             let (w, h) = if args.len() == 2 {
                 (it(a(0)), it(a(1)))
             } else {
-                (n.r - n.l, n.b - n.t)
+                (n.r.saturating_sub(n.l), n.b.saturating_sub(n.t))
             };
             n.ops.clear();
             let c = vm
@@ -3175,21 +3371,23 @@ fn node_method(
             b(true)
         }
         ("offsetLeftAndRight", _) => {
-            n.l += it(a(0));
-            n.r += it(a(0));
+            let d = it(a(0));
+            n.l = n.l.saturating_add(d);
+            n.r = n.r.saturating_add(d);
             b(true)
         }
         ("offsetTopAndBottom", _) => {
-            n.t += it(a(0));
-            n.b += it(a(0));
+            let d = it(a(0));
+            n.t = n.t.saturating_add(d);
+            n.b = n.b.saturating_add(d);
             b(true)
         }
         ("getLeft", _) => Value::Int(n.l),
         ("getTop", _) => Value::Int(n.t),
         ("getRight", _) => Value::Int(n.r),
         ("getBottom", _) => Value::Int(n.b),
-        ("getWidth", _) => Value::Int(n.r - n.l),
-        ("getHeight", _) => Value::Int(n.b - n.t),
+        ("getWidth", _) => Value::Int(n.r.saturating_sub(n.l)),
+        ("getHeight", _) => Value::Int(n.b.saturating_sub(n.t)),
         ("setClipToBounds", _) => {
             n.clip_bounds = it(a(0)) != 0;
             b(true)
@@ -3687,10 +3885,29 @@ impl Engine {
         palpha: f32,
         depth: usize,
     ) {
-        if depth > 64 {
+        let mut budget = MAX_RASTER_OPS_VISITED;
+        self.raster_ops_budgeted(r, ops, parent, pclip, palpha, depth, &mut budget);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn raster_ops_budgeted(
+        &self,
+        r: &mut Raster<'_>,
+        ops: &[Op],
+        parent: &M,
+        pclip: [f32; 4],
+        palpha: f32,
+        depth: usize,
+        budget: &mut usize,
+    ) {
+        if depth > 64 || *budget == 0 {
             return;
         }
         for op in ops {
+            if *budget == 0 {
+                return;
+            }
+            *budget -= 1;
             let m = mul(parent, &op.m);
             // op.clip is in the recording surface's device space → map by parent
             let cc = [
@@ -3795,11 +4012,16 @@ impl Engine {
                             ns.outline.or(Some([
                                 0.0,
                                 0.0,
-                                (ns.r - ns.l) as f32,
-                                (ns.b - ns.t) as f32,
+                                ns.r.saturating_sub(ns.l) as f32,
+                                ns.b.saturating_sub(ns.t) as f32,
                             ]))
                         } else if ns.clip_bounds {
-                            Some([0.0, 0.0, (ns.r - ns.l) as f32, (ns.b - ns.t) as f32])
+                            Some([
+                                0.0,
+                                0.0,
+                                ns.r.saturating_sub(ns.l) as f32,
+                                ns.b.saturating_sub(ns.t) as f32,
+                            ])
                         } else {
                             None
                         };
@@ -3812,13 +4034,14 @@ impl Engine {
                                 nclip[3].min(p0.1.max(p1.1)),
                             ];
                         }
-                        self.raster_ops(
+                        self.raster_ops_budgeted(
                             r,
                             &ns.ops,
                             &nm,
                             nclip,
                             alpha * ns.g("alpha", 1.0),
                             depth + 1,
+                            budget,
                         );
                     }
                 }
@@ -3845,7 +4068,7 @@ impl Engine {
                         if op.p.tint.is_some() {
                             r.tint = op.p.tint;
                         }
-                        self.raster_ops(r, bops, &s, bclip, alpha, depth + 1);
+                        self.raster_ops_budgeted(r, bops, &s, bclip, alpha, depth + 1, budget);
                         r.tint = saved;
                     }
                 }
@@ -3857,16 +4080,21 @@ impl Engine {
     /// recursing into render nodes and bitmaps); used by `RD_TRACE_DRAW`.
     pub fn frame_summary(&self) -> String {
         let mut out = String::new();
-        self.summ_ops(&self.gfx.frame, 0, &mut out);
+        let mut budget = MAX_SUMMARY_OPS_VISITED;
+        self.summ_ops(&self.gfx.frame, 0, &mut out, &mut budget);
         out
     }
 
-    fn summ_ops(&self, ops: &[Op], depth: usize, out: &mut String) {
+    fn summ_ops(&self, ops: &[Op], depth: usize, out: &mut String, budget: &mut usize) {
         use std::fmt::Write;
-        if depth > 32 {
+        if depth > 32 || *budget == 0 {
             return;
         }
         for op in ops {
+            if *budget == 0 {
+                return;
+            }
+            *budget -= 1;
             let pad = "  ".repeat(depth);
             let head = format!(
                 "{pad}a={:.2} argb={:08x} clip={:?} ",
@@ -3878,14 +4106,14 @@ impl Engine {
                 OpK::Node(n) => {
                     let _ = writeln!(out, "{head}Node");
                     if let Some(G::Node(ns)) = self.gfx.objs.get(n) {
-                        self.summ_ops(&ns.ops, depth + 1, out);
+                        self.summ_ops(&ns.ops, depth + 1, out, budget);
                     }
                 }
                 OpK::Bitmap(b, dst) => {
                     let _ = writeln!(out, "{head}Bitmap {:?}", dst.map(|v| v as i32));
                     if let Some(G::Bitmap(w, h, bops)) = self.gfx.objs.get(b) {
                         let _ = writeln!(out, "{pad}  ({w}x{h}, {} ops)", bops.len());
-                        self.summ_ops(bops, depth + 1, out);
+                        self.summ_ops(bops, depth + 1, out, budget);
                     }
                 }
                 OpK::Text(t, x, y, sz) => {
@@ -3920,21 +4148,27 @@ impl Engine {
 
     /// Draw-op count of the window display list (diagnostics / runtime_health).
     pub fn frame_op_count(&self) -> usize {
-        fn count(e: &Engine, ops: &[Op], d: usize) -> usize {
-            if d > 64 {
+        fn count(e: &Engine, ops: &[Op], d: usize, budget: &mut usize) -> usize {
+            if d > 64 || *budget == 0 {
                 return 0;
             }
-            ops.iter()
-                .map(|o| match &o.k {
-                    OpK::Node(n) => match e.gfx.objs.get(n) {
-                        Some(G::Node(ns)) => 1 + count(e, &ns.ops, d + 1),
-                        _ => 1,
-                    },
-                    _ => 1,
-                })
-                .sum()
+            let mut total = 0usize;
+            for o in ops {
+                if *budget == 0 {
+                    break;
+                }
+                *budget -= 1;
+                total = total.saturating_add(1);
+                if let OpK::Node(n) = &o.k {
+                    if let Some(G::Node(ns)) = e.gfx.objs.get(n) {
+                        total = total.saturating_add(count(e, &ns.ops, d + 1, budget));
+                    }
+                }
+            }
+            total
         }
-        count(self, &self.gfx.frame, 0)
+        let mut budget = MAX_RASTER_OPS_VISITED;
+        count(self, &self.gfx.frame, 0, &mut budget)
     }
 
     /// Starts recording the window frame; returns a host Canvas that targets it.

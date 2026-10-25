@@ -409,6 +409,11 @@ pub struct AgentSession {
     logs: Arc<Mutex<Vec<u8>>>,
     /// ADR 009: snapshot frame presented but engine not yet materialized.
     pending_snapshot: Option<PendingSnapshot>,
+    /// Issue #259: pacotes cujo estado visível ao guest pode divergir
+    /// de um install pristine NESTA sessão (engine já rodou, grants
+    /// mudaram). O fingerprint do snapshot só enxerga o APK — servir
+    /// ou gravar frame para estes pacotes quebraria o determinismo.
+    snapshot_dirty: std::collections::HashSet<String>,
     devices: DeviceTable,
     behavior: SwitchTable,
     /// Round 6: cached screen model / PNG per frame version, resource
@@ -459,6 +464,7 @@ impl AgentSession {
             activity: None,
             logs,
             pending_snapshot: None,
+            snapshot_dirty: std::collections::HashSet::new(),
             devices: DeviceTable::embedded().expect("devices.toml embutido parseia"),
             behavior: SwitchTable::embedded().expect("behavior-switches.toml embutido parseia"),
             screen: ScreenState::default(),
@@ -1619,6 +1625,16 @@ impl AgentSession {
         let warm = self.engine.is_some()
             && self.engine_package.as_deref() == Some(package_out.as_str())
             && self.native_engine == selected_engine;
+        // Issue #259: lançar um pacote DIFERENTE abandona qualquer
+        // frame de snapshot apresentado — ele nunca pode ser servido
+        // ou materializado para o novo alvo, nem se este launch falhar.
+        if self
+            .pending_snapshot
+            .as_ref()
+            .is_some_and(|p| p.package != package_out)
+        {
+            self.pending_snapshot = None;
+        }
         // ADR 009 (opt-in): present a stored first frame immediately; the
         // engine materializes lazily on the first engine-requiring tool.
         // Only when no other engine is live (a cold launch would replace
@@ -1682,6 +1698,13 @@ impl AgentSession {
             if let Err(e) = self.capture_snapshot(&package_out, &desc) {
                 snapshot_error = Some(e.cause);
             }
+        }
+        // Issue #259: com o engine real executado, o estado do app
+        // pode ter persistido — marcado DEPOIS da captura acima (que
+        // registra exatamente o frame deste primeiro launch pristine).
+        // O rastreio só é consultado com RD_SNAPSHOT ligado.
+        if !used_snapshot && snapshot_enabled() {
+            self.mark_snapshot_dirty(&package_out);
         }
         let mut out = serde_json::json!({
             "launched": true,
@@ -2243,6 +2266,12 @@ impl AgentSession {
                 perms.revoke(permission).map_err(rd_to_rd)?
             }
         };
+        // Issue #259: o conjunto de grants divergiu do install — o
+        // fingerprint do APK não o enxerga, então snapshot não pode
+        // mais servir nem gravar frames para este pacote na sessão.
+        if let Some(p) = self.active.clone() {
+            self.mark_snapshot_dirty(&p);
+        }
         // keep the running engine's grant set in sync (perms.rs)
         if self.engine_package == self.active {
             let granted: Option<Vec<String>> = self.active.as_ref().and_then(|p| {
@@ -5178,6 +5207,63 @@ mod tests {
         assert!(s2.engine.is_some());
         let (v, err) = call(&mut s2, "tap", serde_json::json!({"x": 10, "y": 10}));
         assert!(!err, "tap after materialization: {v}");
+        std::env::remove_var("RD_SNAPSHOT_DIR");
+        let _ = std::fs::remove_dir_all(&snap_root);
+    }
+
+    /// Issue #259: o fingerprint do APK não enxerga grants nem estado
+    /// persistido — assim que a sessão diverge do install pristine
+    /// (aqui: um grant), o snapshot não pode mais ser servido.
+    #[test]
+    fn snapshot_gated_by_session_state() {
+        let _guard = SESSION_LOCK.lock().unwrap();
+        let apk_path = fixture_form_apk_path("com.test.form");
+        let snap_root = std::env::temp_dir().join(format!(
+            "rd-snap-gate-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::env::set_var("RD_SNAPSHOT_DIR", &snap_root);
+
+        // Sessão 1 (pristine): captura o snapshot.
+        let mut s1 = AgentSession::new();
+        install_ok(&mut s1, &apk_path);
+        let lv = launch_ok(&mut s1, serde_json::json!({}));
+        let activity = lv["activity"].as_str().expect("activity desc").to_string();
+        s1.capture_snapshot("com.test.form", &activity)
+            .expect("capture");
+        let key = s1
+            .find_installed("com.test.form")
+            .and_then(|a| a.snapshot_key.clone())
+            .expect("snapshot key recorded");
+        assert!(load_snapshot(&key).is_some());
+
+        // Sessão 2: pristine serve o frame; após conceder CAMERA, o
+        // mesmo snapshot não pode mais ser apresentado (o primeiro
+        // frame real agora veria a permissão concedida) — é o fluxo
+        // install → grant → launch da issue.
+        let mut s2 = AgentSession::new();
+        install_ok(&mut s2, &apk_path);
+        assert!(
+            s2.snapshot_for_launch("com.test.form", &activity, Some(&key), None)
+                .is_some(),
+            "sessão pristine serve o snapshot"
+        );
+        let (v, err) = call(
+            &mut s2,
+            "permissions_grant",
+            serde_json::json!({"permission": "android.permission.CAMERA"}),
+        );
+        assert!(!err, "grant: {v}");
+        assert!(
+            s2.snapshot_for_launch("com.test.form", &activity, Some(&key), None)
+                .is_none(),
+            "após um grant, servir o frame pré-grant quebraria o determinismo"
+        );
+
         std::env::remove_var("RD_SNAPSHOT_DIR");
         let _ = std::fs::remove_dir_all(&snap_root);
     }
