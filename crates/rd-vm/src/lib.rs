@@ -112,6 +112,40 @@ pub use value::Value;
 /// Módulo do contrato de erro.
 pub const MODULE_ID: &str = "rd-vm";
 
+/// Issue #230: fronteira de `Engine` para o estado host que vive em
+/// estado thread-local (macro do std) fora do `Engine`. Esvazia/reinicia as tabelas
+/// indexadas por `ObjRef` (spannable, random, regex, uri, xml,
+/// annotations, io-chars) e o RNG de UUID. Sem isto, um `Engine` novo
+/// na mesma thread (relaunch, próximo cenário de `rd test`) herdava
+/// estado fantasma de um heap morto, porque os `ObjRef`s reiniciam com
+/// o `Heap::new`. O VFS de arquivos NÃO entra aqui: dados persistidos
+/// sobrevivem a relaunch dentro da sessão (comportamento Android);
+/// quem o limpa é `clear_package_data` (clear/remove) e `reset_vfs`
+/// (sessão nova).
+///
+/// Contrato: chamar ao descartar um `Engine` (o MCP faz isso ao matar o
+/// engine ativo) ou antes de construir outro na mesma thread.
+///
+/// Premissa explícita: um `Engine` vivo por vez por thread — o padrão
+/// de todas as superfícies (MCP, CLI, suítes). A migração dessas
+/// tabelas para dentro de `HostState` segue como follow-up da #230.
+pub fn reset_host_thread_state() {
+    android_spannable::reset_all();
+    jrandom::reset_all();
+    jregex::reset_all();
+    android_uri::reset_all();
+    xml_res::reset_all();
+    jannotations::reset_all();
+    jio_chars::reset_all();
+    juuid::reset_all();
+}
+
+/// Issue #230: apaga o armazenamento privado de um pacote no VFS
+/// (`/data/user/0/<pkg>/`) — backend de `package_clear`/`package_remove`.
+pub use jfile::clear_package_data;
+/// Issue #230: zera o VFS inteiro — fronteira de sessão nova.
+pub use jfile::reset_all as reset_vfs;
+
 /// Converte um `EncodedValue` (static_values de class_def) em `Value`,
 /// alocando strings no heap da VM. `None` = tipo não representável no M2
 /// (arrays/annotations aninhadas em static_values — raras; o campo fica
