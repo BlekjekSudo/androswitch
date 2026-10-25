@@ -18,6 +18,44 @@ const FLAG_SPARSE: u8 = 0x01;
 const FLAG_OFFSET16: u8 = 0x02;
 const ENTRY_FLAG_COMPLEX: u16 = 0x0001;
 
+/// Issue #331 (item 3): tetos ACUMULADOS de materialização de um
+/// `resources.arsc` inteiro. Sem orçamento, offsets repetidos
+/// (aliasing) para uma única entrada complexa/string grande
+/// multiplicam clones no heap do host muito além do tamanho do
+/// arquivo (um chunk válido de ~128 KB alocando GiB).
+const MAX_TOTAL_ARSC_ENTRIES: usize = 4_000_000; // entradas + itens de bag
+const MAX_TOTAL_ARSC_STRING_BYTES: usize = 128 * 1024 * 1024;
+
+#[derive(Default)]
+struct ArscBudget {
+    entries: usize,
+    string_bytes: usize,
+}
+
+impl ArscBudget {
+    /// Cobra 1 entrada/item + os bytes da string clonada (se houver).
+    fn charge(&mut self, string: Option<&str>) -> RdResult<()> {
+        self.entries = self
+            .entries
+            .checked_add(1)
+            .ok_or_else(|| RdError::parse("arsc: entry count overflow"))?;
+        if let Some(s) = string {
+            self.string_bytes = self
+                .string_bytes
+                .checked_add(s.len())
+                .ok_or_else(|| RdError::parse("arsc: string bytes overflow"))?;
+        }
+        if self.entries > MAX_TOTAL_ARSC_ENTRIES || self.string_bytes > MAX_TOTAL_ARSC_STRING_BYTES
+        {
+            return Err(RdError::parse(format!(
+                "arsc: materialization budget exceeded ({} entries, {} string bytes)",
+                self.entries, self.string_bytes
+            )));
+        }
+        Ok(())
+    }
+}
+
 #[inline]
 fn u16_at(d: &[u8], off: usize) -> RdResult<u16> {
     d.get(off..off + 2)
@@ -180,6 +218,7 @@ impl Arsc {
 
         let mut packages = Vec::new();
         let mut seen_packages = 0u32;
+        let mut budget = ArscBudget::default();
         while p + 8 <= data.len() && seen_packages < package_count {
             let ctype = u16_at(data, p)?;
             let cheader = u16_at(data, p + 2)? as usize;
@@ -205,6 +244,7 @@ impl Arsc {
                     csize,
                     pkg_header_size,
                     &global_strings,
+                    &mut budget,
                 )?);
                 seen_packages += 1;
             }
@@ -343,8 +383,20 @@ fn parse_package(
     size: usize,
     header_size: usize,
     global: &StringPool,
+    budget: &mut ArscBudget,
 ) -> RdResult<Package> {
-    if base + 288 > data.len() {
+    // Issue #331 (item 3): o header de 288 bytes tem de caber no
+    // PRÓPRIO chunk — checar só contra `data.len()` lia o header
+    // cruzando para o chunk seguinte quando `size < 288`.
+    if size < 288 || header_size < 288 {
+        return Err(RdError::parse(format!(
+            "arsc: package chunk too small (size {size}, header {header_size}, need 288)"
+        )));
+    }
+    let hdr_end = base
+        .checked_add(288)
+        .ok_or_else(|| RdError::parse("arsc: package offset overflow"))?;
+    if hdr_end > data.len() {
         return Err(RdError::parse("arsc: package chunk truncated (header)"));
     }
     let pkg_id = (u32_at(data, base + 8)? & 0xFF) as u8;
@@ -432,13 +484,15 @@ fn parse_package(
                             let name = u32_at(data, m)?;
                             let dtype = *data.get(m + 7).unwrap_or(&0);
                             let value = u32_at(data, m + 8)?;
+                            let item_string = (dtype == 3)
+                                .then(|| global.get(value).map(str::to_owned))
+                                .flatten();
+                            budget.charge(item_string.as_deref())?;
                             bag.push(ResMapEntry {
                                 name,
                                 data_type: dtype,
                                 data: value,
-                                string: (dtype == 3)
-                                    .then(|| global.get(value).map(str::to_owned))
-                                    .flatten(),
+                                string: item_string,
                             });
                         }
                         (bag.len() == map_count).then_some(bag)
@@ -463,6 +517,7 @@ fn parse_package(
                 } else {
                     None
                 };
+                budget.charge(string.as_deref())?;
                 let resid =
                     ((pkg_id as u32) << 24) | ((type_id as u32) << 16) | (idx as u32 & 0xFFFF);
                 entries.entry(resid).or_default().push(ResEntry {
@@ -738,5 +793,96 @@ mod tests {
             None,
             "absent attributes stay absent"
         );
+    }
+
+    // ─── #331 (item 3): orçamento acumulado anti-aliasing ───────────────────
+
+    /// arsc mínimo: pool global com UMA string UTF-8 de `slen` bytes e
+    /// um pacote cujo type chunk (OFFSET16) tem `count` entradas, TODAS
+    /// com `rel_off = 0` apontando para uma única entrada simples
+    /// (string idx 0) — cada entrada clona a string inteira.
+    fn aliased_string_arsc(count: u32, slen: usize) -> Vec<u8> {
+        fn varint2(v: usize) -> [u8; 2] {
+            [0x80 | ((v >> 8) as u8), (v & 0xFF) as u8]
+        }
+        // pool global UTF-8 (1 string grande)
+        let mut global = Vec::new();
+        global.extend_from_slice(&0x0001u16.to_le_bytes());
+        global.extend_from_slice(&28u16.to_le_bytes());
+        global.extend_from_slice(&0u32.to_le_bytes()); // size (patched)
+        global.extend_from_slice(&1u32.to_le_bytes());
+        global.extend_from_slice(&0u32.to_le_bytes());
+        global.extend_from_slice(&crate::pool::UTF8_FLAG.to_le_bytes());
+        global.extend_from_slice(&32u32.to_le_bytes()); // stringsStart = 28+4
+        global.extend_from_slice(&0u32.to_le_bytes());
+        global.extend_from_slice(&0u32.to_le_bytes()); // offset 0
+        global.extend(varint2(slen));
+        global.extend(varint2(slen));
+        global.extend(std::iter::repeat(b'A').take(slen));
+        global.push(0);
+        let gs = global.len() as u32;
+        global[4..8].copy_from_slice(&gs.to_le_bytes());
+
+        // type chunk: header 56 (20 + config zero), tabela OFFSET16 zeros
+        let cheader = 56usize;
+        let entries_start = cheader + count as usize * 2;
+        let mut tc = Vec::new();
+        tc.extend_from_slice(&RES_TABLE_TYPE_CHUNK.to_le_bytes());
+        tc.extend_from_slice(&(cheader as u16).to_le_bytes());
+        tc.extend_from_slice(&((entries_start + 16) as u32).to_le_bytes());
+        tc.push(1); // type id
+        tc.push(FLAG_OFFSET16);
+        tc.extend_from_slice(&0u16.to_le_bytes());
+        tc.extend_from_slice(&count.to_le_bytes());
+        tc.extend_from_slice(&(entries_start as u32).to_le_bytes());
+        tc.resize(cheader, 0); // config (zeros)
+        tc.extend(std::iter::repeat(0u8).take(count as usize * 2));
+        // ResTable_entry {size 8, flags 0, key 0} + Res_value {8, 0, 3, 0}
+        tc.extend_from_slice(&8u16.to_le_bytes());
+        tc.extend_from_slice(&0u16.to_le_bytes());
+        tc.extend_from_slice(&0u32.to_le_bytes());
+        tc.extend_from_slice(&8u16.to_le_bytes());
+        tc.push(0);
+        tc.push(3);
+        tc.extend_from_slice(&0u32.to_le_bytes());
+
+        // pacote: header 288 + pool vazio (tipos/chaves) + type chunk
+        let mut pkg = Vec::new();
+        pkg.extend_from_slice(&RES_TABLE_PACKAGE_TYPE.to_le_bytes());
+        pkg.extend_from_slice(&288u16.to_le_bytes());
+        pkg.extend_from_slice(&0u32.to_le_bytes()); // size (patched)
+        pkg.extend_from_slice(&0x7fu32.to_le_bytes()); // id
+        pkg.resize(288, 0);
+        pkg[268..272].copy_from_slice(&288u32.to_le_bytes()); // typeStrings
+        pkg[276..280].copy_from_slice(&288u32.to_le_bytes()); // keyStrings
+        pkg.extend(empty_global_pool());
+        pkg.extend_from_slice(&tc);
+        let ps = pkg.len() as u32;
+        pkg[4..8].copy_from_slice(&ps.to_le_bytes());
+
+        let mut d = Vec::new();
+        d.extend_from_slice(&RES_TABLE_TYPE.to_le_bytes());
+        d.extend_from_slice(&12u16.to_le_bytes());
+        d.extend_from_slice(&0u32.to_le_bytes()); // size (patched)
+        d.extend_from_slice(&1u32.to_le_bytes()); // packageCount
+        d.extend_from_slice(&global);
+        d.extend_from_slice(&pkg);
+        let total = d.len() as u32;
+        d[4..8].copy_from_slice(&total.to_le_bytes());
+        d
+    }
+
+    #[test]
+    fn issue_331_aliased_entries_hit_materialization_budget() {
+        // ~40 KB de arquivo; sem orçamento, 5_000 clones de 30_000 B
+        // = 150 MB materializados. Com orçamento: erro tipado.
+        let d = aliased_string_arsc(5_000, 30_000);
+        let err = format!("{:?}", Arsc::parse(&d).unwrap_err());
+        assert!(err.contains("budget"), "esperado orçamento: {err}");
+        // E a versão pequena (10 entradas) continua válida.
+        let small = aliased_string_arsc(10, 30_000);
+        let arsc = Arsc::parse(&small).expect("arsc pequeno válido");
+        let s = arsc.resolve_string(0x7f01_0000).expect("string resolve");
+        assert_eq!(s.len(), 30_000);
     }
 }
