@@ -5,8 +5,10 @@
 //! (apps malformados mentem no local header — o CD é o registro de verdade).
 
 use crate::error::{RdError, RdResult};
+use crate::paged::PagedZip;
 use flate2::read::DeflateDecoder;
 use std::io::Read;
+use std::sync::Arc;
 
 pub const EOCD_SIG: u32 = 0x0605_4b50;
 pub const ZIP64_EOCD_LOCATOR_SIG: u32 = 0x0706_4b50;
@@ -37,9 +39,29 @@ impl ZipEntry {
     }
 }
 
+/// Fonte dos bytes do container (ADR 008 Stage 2): arquivo inteiro em
+/// memória (caminho histórico, ≤ `Apk::MAX_INPUT_BYTES`) ou leitura
+/// paginada sob demanda para arquivos grandes (até 16 GiB, RSS travado
+/// no cache de páginas do [`PagedZip`]). A política de leitura —
+/// métodos, orçamentos anti-bomba, CRC — é idêntica nos dois modos.
+#[derive(Clone)]
+enum ZipSource {
+    Whole(Vec<u8>),
+    Paged(Arc<PagedZip>),
+}
+
+impl std::fmt::Debug for ZipSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ZipSource::Whole(d) => write!(f, "Whole({} bytes)", d.len()),
+            ZipSource::Paged(p) => write!(f, "Paged({} bytes)", p.file_len()),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Zip {
-    data: Vec<u8>,
+    source: ZipSource,
     entries: Vec<ZipEntry>,
     /// Offset do central directory já resolvido (ZIP64-aware) — fonte única
     /// para a detecção de assinatura (issue #35: o re-scan duplicado em
@@ -177,17 +199,10 @@ impl Zip {
         }
 
         // issue #84: detecção de nomes repetidos (ordem de aparição).
-        let mut seen = std::collections::HashSet::new();
-        let mut dup_seen = std::collections::HashSet::new();
-        let mut duplicates = Vec::new();
-        for e in &entries {
-            if !seen.insert(e.name.as_str()) && dup_seen.insert(e.name.as_str()) {
-                duplicates.push(e.name.clone());
-            }
-        }
+        let duplicates = Self::compute_duplicates(&entries);
 
         Ok(Zip {
-            data,
+            source: ZipSource::Whole(data),
             entries,
             duplicates,
             cd_offset,
@@ -199,6 +214,38 @@ impl Zip {
         let data = std::fs::read(path)
             .map_err(|e| RdError::io(&e, format!("reading {}", path.display())))?;
         Self::parse(data)
+    }
+
+    /// Abre do disco em modo PAGINADO (ADR 008 Stage 2): só o diretório
+    /// central é materializado; os payloads leem sob demanda com RSS
+    /// travado (cache de 16 MiB do [`PagedZip`]). É a rota de
+    /// `Apk::open` acima de `Apk::MAX_INPUT_BYTES` — o teto efetivo
+    /// sobe para os 16 GiB do `PagedZip`.
+    pub fn open_paged(path: &std::path::Path) -> RdResult<Zip> {
+        let paged = PagedZip::open(path)?;
+        let entries = paged.entries().to_vec();
+        let duplicates = Self::compute_duplicates(&entries);
+        let cd_offset = paged.cd_offset();
+        Ok(Zip {
+            source: ZipSource::Paged(Arc::new(paged)),
+            entries,
+            duplicates,
+            cd_offset,
+        })
+    }
+
+    /// issue #84: nomes que aparecem mais de uma vez no CD (ordem de
+    /// aparição) — mesma regra nos modos whole e paginado.
+    fn compute_duplicates(entries: &[ZipEntry]) -> Vec<String> {
+        let mut seen = std::collections::HashSet::new();
+        let mut dup_seen = std::collections::HashSet::new();
+        let mut duplicates = Vec::new();
+        for e in entries {
+            if !seen.insert(e.name.as_str()) && dup_seen.insert(e.name.as_str()) {
+                duplicates.push(e.name.clone());
+            }
+        }
+        duplicates
     }
 
     /// Varre o fim do arquivo por EOCD; resolve ZIP64 quando presente.
@@ -317,21 +364,31 @@ impl Zip {
     }
 
     pub fn read_entry(&self, entry: &ZipEntry) -> RdResult<Vec<u8>> {
+        match &self.source {
+            // O PagedZip aplica a MESMA política de leitura (métodos,
+            // orçamentos anti-bomba, CRC) — paridade coberta pelo teste
+            // `open_paged_matches_whole_parse`.
+            ZipSource::Paged(p) => p.read_entry(entry),
+            ZipSource::Whole(data) => Self::read_entry_whole(data, entry),
+        }
+    }
+
+    fn read_entry_whole(data: &[u8], entry: &ZipEntry) -> RdResult<Vec<u8>> {
         let off = entry.local_header_offset as usize;
-        if u32_at(&self.data, off)? != LOCAL_HEADER_SIG {
+        if u32_at(data, off)? != LOCAL_HEADER_SIG {
             return Err(RdError::parse(format!(
                 "zip: bad local header for {:?}",
                 entry.name
             )));
         }
         // usar extra_len do LOCAL header (pode diferir do CD!)
-        let name_len = u16_at(&self.data, off + 26)? as usize;
-        let extra_len = u16_at(&self.data, off + 28)? as usize;
+        let name_len = u16_at(data, off + 26)? as usize;
+        let extra_len = u16_at(data, off + 28)? as usize;
         let data_start = off + 30 + name_len + extra_len;
         let data_end = data_start
             .checked_add(entry.compressed_size as usize)
             .ok_or_else(|| RdError::parse("zip: compressed size overflow"))?;
-        let compressed = self.data.get(data_start..data_end).ok_or_else(|| {
+        let compressed = data.get(data_start..data_end).ok_or_else(|| {
             RdError::parse(format!("zip: payload of {:?} out of bounds", entry.name))
         })?;
 
@@ -427,9 +484,56 @@ impl Zip {
         self.cd_offset
     }
 
-    /// Bytes brutos do container (uso interno: detecção do bloco de assinatura).
+    /// Bytes brutos do container (contrato público estável: a assinatura
+    /// não muda com a fonte paginada). No modo paginado devolve um slice
+    /// **vazio**, porque o arquivo nunca é materializado. Quem precisa
+    /// distinguir os modos usa [`Zip::whole_bytes`] / [`Zip::is_paged`];
+    /// janelas sob demanda saem de [`Zip::read_range`].
     pub fn raw_bytes(&self) -> &[u8] {
-        &self.data
+        self.whole_bytes().unwrap_or(&[])
+    }
+
+    /// Bytes brutos quando o container está inteiro em memória; `None` no
+    /// modo paginado (a detecção do bloco de assinatura lê só a janela que
+    /// termina no CD).
+    pub fn whole_bytes(&self) -> Option<&[u8]> {
+        match &self.source {
+            ZipSource::Whole(d) => Some(d),
+            ZipSource::Paged(_) => None,
+        }
+    }
+
+    /// Modo paginado? (arquivo acima do teto whole-file, lido sob demanda)
+    pub fn is_paged(&self) -> bool {
+        matches!(self.source, ZipSource::Paged(_))
+    }
+
+    /// Tamanho total do container em bytes (sem materializá-lo).
+    pub fn file_len(&self) -> u64 {
+        match &self.source {
+            ZipSource::Whole(d) => d.len() as u64,
+            ZipSource::Paged(p) => p.file_len(),
+        }
+    }
+
+    /// Janela crua `[off, off+len)` do container. No modo whole copia da
+    /// memória; no paginado lê sob demanda pelo cache de páginas.
+    pub fn read_range(&self, off: u64, len: usize) -> RdResult<Vec<u8>> {
+        match &self.source {
+            ZipSource::Whole(d) => {
+                let start = off as usize;
+                let end = start
+                    .checked_add(len)
+                    .ok_or_else(|| RdError::parse("zip: read_range overflow"))?;
+                d.get(start..end).map(<[u8]>::to_vec).ok_or_else(|| {
+                    RdError::parse(format!(
+                        "zip: read_range [{start}..{end}) fora do arquivo ({})",
+                        d.len()
+                    ))
+                })
+            }
+            ZipSource::Paged(p) => p.read_range(off, len),
+        }
     }
 
     /// Nomes que casam com um prefixo (ex.: "assets/", "lib/arm64-v8a/").
@@ -738,5 +842,114 @@ mod tests {
             handcrafted_zip_deflate(&compressed, content.len() as u32, crc32(&content), "a.bin");
         let zip = Zip::parse(bytes).unwrap();
         assert_eq!(zip.read("a.bin").unwrap(), content);
+    }
+
+    // ─── ADR 008 Stage 2: ZipSource (whole × paginado) ──────────────────
+
+    fn write_temp_zip(
+        tag: &str,
+        write: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
+    ) -> std::io::Result<std::path::PathBuf> {
+        let dir = std::env::temp_dir().join(format!("rd-zip-{tag}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join("t.zip");
+        let mut f = std::fs::File::create(&path)?;
+        write(&mut f)?;
+        drop(f);
+        Ok(path)
+    }
+
+    /// Paridade total whole × paginado sobre o mesmo container: entradas,
+    /// duplicatas (#84), leituras STORED e DEFLATE, janelas cruas e os
+    /// sinais de modo (`is_paged`/`raw_bytes`).
+    #[test]
+    fn open_paged_matches_whole_parse() {
+        use std::io::Write as _;
+        let big = [7u8; 1000];
+        let bytes = handcrafted_zip_multi(&[
+            ("classes.dex", b"dex-primeira-ocorrencia"),
+            ("assets/x.bin", &big),
+            ("classes.dex", b"dex-duplicada"),
+        ]);
+        let whole = Zip::parse(bytes.clone()).unwrap();
+        let path = write_temp_zip("parity", |f| f.write_all(&bytes)).unwrap();
+        let paged = Zip::open_paged(&path).unwrap();
+
+        assert!(!whole.is_paged() && whole.whole_bytes().is_some());
+        assert!(paged.is_paged() && paged.whole_bytes().is_none());
+        // contrato estável de `raw_bytes`: inteiro = bytes do arquivo,
+        // paginado = vazio (nunca materializa)
+        assert_eq!(whole.raw_bytes().len() as u64, whole.file_len());
+        assert!(paged.raw_bytes().is_empty());
+        assert_eq!(paged.entries(), whole.entries());
+        assert_eq!(paged.duplicates(), whole.duplicates());
+        assert_eq!(paged.cd_offset(), whole.cd_offset());
+        assert_eq!(paged.file_len(), bytes.len() as u64);
+        assert_eq!(whole.file_len(), bytes.len() as u64);
+        for name in ["classes.dex", "assets/x.bin"] {
+            assert_eq!(
+                paged.read(name).unwrap(),
+                whole.read(name).unwrap(),
+                "{name}"
+            );
+        }
+        for (off, len) in [(0u64, 32usize), ((bytes.len() - 22) as u64, 22)] {
+            assert_eq!(
+                paged.read_range(off, len).unwrap(),
+                whole.read_range(off, len).unwrap(),
+                "janela [{off}..{})",
+                off + len as u64
+            );
+        }
+
+        // DEFLATE pelos dois caminhos (mesma política de inflate/CRC).
+        let content = b"paged deflate parity ".repeat(50);
+        let compressed = deflate_bytes(&content);
+        let dbytes =
+            handcrafted_zip_deflate(&compressed, content.len() as u32, crc32(&content), "a.bin");
+        let dpath = write_temp_zip("parity-deflate", |f| f.write_all(&dbytes)).unwrap();
+        assert_eq!(
+            Zip::open_paged(&dpath).unwrap().read("a.bin").unwrap(),
+            content
+        );
+
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+        std::fs::remove_dir_all(dpath.parent().unwrap()).ok();
+    }
+
+    /// Arquivo >512 MiB com buraco esparso entre os payloads e o CD: o modo
+    /// paginado abre e lê sem materializar o arquivo (custo de disco ~zero
+    /// no teste — o buraco nunca é lido, só os offsets importam).
+    #[test]
+    fn open_paged_sparse_above_wholefile_cap() {
+        use std::io::{Seek, SeekFrom, Write as _};
+        let bytes = handcrafted_zip_multi(&[
+            ("AndroidManifest.xml", b"<axml/>"),
+            ("classes.dex", b"dex\n035\0fake"),
+        ]);
+        let eocd = bytes.len() - 22;
+        let rd32 = |b: &[u8], o: usize| u32::from_le_bytes(b[o..o + 4].try_into().unwrap());
+        let cd_start = rd32(&bytes, eocd + 16) as usize;
+        let (head, tail) = bytes.split_at(cd_start);
+        let mut tail = tail.to_vec();
+        const TARGET_CD: u64 = 600 * 1024 * 1024;
+        let tail_eocd = tail.len() - 22;
+        tail[tail_eocd + 16..tail_eocd + 20].copy_from_slice(&(TARGET_CD as u32).to_le_bytes());
+
+        let path = write_temp_zip("sparse", |f| {
+            f.write_all(head)?;
+            f.seek(SeekFrom::Start(TARGET_CD))?;
+            f.write_all(&tail)
+        })
+        .unwrap();
+        let z = Zip::open_paged(&path).unwrap();
+        assert!(z.is_paged());
+        assert_eq!(z.file_len(), TARGET_CD + tail.len() as u64);
+        assert!(z.file_len() > 512 * 1024 * 1024, "acima do teto whole-file");
+        assert_eq!(z.cd_offset(), TARGET_CD);
+        assert_eq!(z.entry_count(), 2);
+        assert_eq!(z.read("AndroidManifest.xml").unwrap(), b"<axml/>");
+        assert_eq!(z.read("classes.dex").unwrap(), b"dex\n035\0fake");
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
     }
 }

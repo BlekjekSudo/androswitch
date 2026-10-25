@@ -6,25 +6,32 @@
 //! bytes this reader can ever pin in RSS are capped by the cache size,
 //! independent of the APK size (a 15 GiB APK opens in O(tail + CD) reads).
 //!
-//! Scope of the prototype: EOCD + ZIP64 locator/EOCD discovery from the
-//! file tail, central-directory parse entry-by-entry through the cache,
-//! and on-demand entry extraction (STORED/DEFLATE, CRC-checked, same
-//! policy as [`crate::zip::Zip::read_entry`]). The legacy in-memory
-//! [`crate::zip::Zip`] remains the default until Stage 2 integration
-//! swaps `Apk`'s backend (see ADR 008).
+//! Scope: EOCD + ZIP64 locator/EOCD discovery from the file tail,
+//! central-directory parse entry-by-entry through the cache, and
+//! on-demand entry extraction (STORED/DEFLATE, CRC-checked, same
+//! policy as [`crate::zip::Zip::read_entry`]). Stage 2 integration:
+//! [`crate::zip::Zip::open_paged`] wraps this reader as a `ZipSource`,
+//! and `Apk::open` routes files above the whole-file cap here.
 
 use crate::error::{RdError, RdResult};
 use crate::zip::{crc32, ZipEntry, CD_ENTRY_SIG, EOCD_SIG, ZIP64_EOCD_LOCATOR_SIG, ZIP64_EOCD_SIG};
-use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Read as _;
 use std::os::unix::fs::FileExt;
 use std::path::Path;
+use std::sync::Mutex;
 
 pub const PAGE_BYTES: usize = 64 * 1024;
 pub const CACHE_PAGES: usize = 256; // 256 * 64 KiB = 16 MiB hard cap
 pub const MAX_APK_BYTES: u64 = 16 * 1024 * 1024 * 1024; // 16 GiB
+
+/// Issue #245: soma de offset vindo de estruturas não confiáveis
+/// (EOCD/ZIP64/CD) — overflow vira erro tipado, nunca panic.
+fn ck(off: u64, n: u64) -> RdResult<u64> {
+    off.checked_add(n)
+        .ok_or_else(|| RdError::parse(format!("paged-zip: offset overflow at {off}+{n}")))
+}
 
 struct LruPageCache {
     file: File,
@@ -37,15 +44,23 @@ impl LruPageCache {
     fn read_exact_at(&mut self, off: u64, buf: &mut [u8]) -> RdResult<()> {
         let mut done = 0usize;
         while done < buf.len() {
-            let pos = off + done as u64;
+            // Issue #245: offsets vêm de CD/ZIP64 não confiáveis — somas
+            // sempre checked, erro tipado em vez de panic de overflow.
+            let pos = off
+                .checked_add(done as u64)
+                .ok_or_else(|| RdError::parse(format!("paged-zip: offset overflow at {off}")))?;
             if pos >= self.len {
                 return Err(RdError::parse(format!("paged-zip: read past EOF at {pos}")));
             }
             let page_idx = pos / PAGE_BYTES as u64;
             let page_off = (pos % PAGE_BYTES as u64) as usize;
             let take = (PAGE_BYTES - page_off).min(buf.len() - done);
-            if let Some(pos_in_q) = self.pages.iter().position(|(i, _)| *i == page_idx) {
-                let (_, page) = self.pages.remove(pos_in_q).expect("position checked");
+            if let Some((_, page)) = self
+                .pages
+                .iter()
+                .position(|(i, _)| *i == page_idx)
+                .and_then(|p| self.pages.remove(p))
+            {
                 buf[done..done + take].copy_from_slice(&page[page_off..page_off + take]);
                 self.pages.push_back((page_idx, page));
             } else {
@@ -70,6 +85,19 @@ impl LruPageCache {
     }
 
     fn read_vec(&mut self, off: u64, len: usize) -> RdResult<Vec<u8>> {
+        // Issue #245: validar a janela contra o EOF ANTES de alocar — um
+        // CD malicioso declarando gigabytes não pode virar uma alocação
+        // arbitrária (abort por OOM) antes de qualquer checagem.
+        let end = off
+            .checked_add(len as u64)
+            .filter(|&end| end <= self.len)
+            .ok_or_else(|| {
+                RdError::parse(format!(
+                    "paged-zip: read [{off}..+{len}) beyond EOF ({})",
+                    self.len
+                ))
+            })?;
+        let _ = end;
         let mut buf = vec![0u8; len];
         self.read_exact_at(off, &mut buf)?;
         Ok(buf)
@@ -93,8 +121,11 @@ impl LruPageCache {
 }
 
 /// Paged ZIP container: metadata in memory, payloads on disk.
+/// O cache vive num `Mutex` (não `RefCell`): `PagedZip` é `Send + Sync`,
+/// então `Zip`/`Apk` paginados cruzam threads como o caminho whole-file
+/// (a `Arc<PagedZip>` do `ZipSource` e o `Arc<Apk>` do agente exigem).
 pub struct PagedZip {
-    cache: RefCell<LruPageCache>,
+    cache: Mutex<LruPageCache>,
     entries: Vec<ZipEntry>,
     cd_offset: u64,
     file_len: u64,
@@ -129,7 +160,7 @@ impl PagedZip {
         let mut eocd_rel = None;
         let mut i = tail_len - 22;
         loop {
-            if u32::from_le_bytes(tail[i..i + 4].try_into().expect("4")) == EOCD_SIG {
+            if u32::from_le_bytes([tail[i], tail[i + 1], tail[i + 2], tail[i + 3]]) == EOCD_SIG {
                 eocd_rel = Some(i);
                 break;
             }
@@ -141,8 +172,8 @@ impl PagedZip {
         let eocd_rel =
             eocd_rel.ok_or_else(|| RdError::parse("paged-zip: EOCD not found in tail"))?;
         let eocd = (len - tail_len as u64) + eocd_rel as u64;
-        let rd16 = |b: &[u8], o: usize| u16::from_le_bytes(b[o..o + 2].try_into().expect("2"));
-        let rd32 = |b: &[u8], o: usize| u32::from_le_bytes(b[o..o + 4].try_into().expect("4"));
+        let rd16 = |b: &[u8], o: usize| u16::from_le_bytes([b[o], b[o + 1]]);
+        let rd32 = |b: &[u8], o: usize| u32::from_le_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]]);
         let mut entry_count = rd16(&tail, eocd_rel + 10) as u64;
         let mut cd_size = rd32(&tail, eocd_rel + 12) as u64;
         let mut cd_offset = rd32(&tail, eocd_rel + 16) as u64;
@@ -153,31 +184,34 @@ impl PagedZip {
             if cache.u32_at(loc)? != ZIP64_EOCD_LOCATOR_SIG {
                 return Err(RdError::parse("paged-zip: ZIP64 sentinel without locator"));
             }
-            let z64 = cache.u64_at(loc + 8)?;
+            let z64 = cache.u64_at(ck(loc, 8)?)?;
             if cache.u32_at(z64)? != ZIP64_EOCD_SIG {
                 return Err(RdError::parse("paged-zip: ZIP64 EOCD signature mismatch"));
             }
-            entry_count = cache.u64_at(z64 + 32)?;
-            cd_size = cache.u64_at(z64 + 40)?;
-            cd_offset = cache.u64_at(z64 + 48)?;
+            entry_count = cache.u64_at(ck(z64, 32)?)?;
+            cd_size = cache.u64_at(ck(z64, 40)?)?;
+            cd_offset = cache.u64_at(ck(z64, 48)?)?;
         }
         let _ = cd_size;
         // Stream the central directory entry-by-entry through the cache.
-        let mut entries = Vec::with_capacity((entry_count as usize).min(1_000_000));
+        // Issue #245: a pré-alocação é limitada pelo que cabe fisicamente
+        // no CD (cada entrada ocupa ≥46 B), não só pela contagem declarada.
+        let cd_room = (len.saturating_sub(cd_offset) / 46) as usize;
+        let mut entries = Vec::with_capacity((entry_count as usize).min(cd_room.min(1_000_000)));
         let mut p = cd_offset;
         for n in 0..entry_count {
             let entry = Self::parse_cd_entry(&mut cache, p).map_err(|e: RdError| {
                 e.with_suggestion(format!("paged-zip: parsing CD entry #{n}"))
             })?;
             let stride = 46u64
-                + cache.u16_at(p + 28)? as u64
-                + cache.u16_at(p + 30)? as u64
-                + cache.u16_at(p + 32)? as u64;
+                + cache.u16_at(ck(p, 28)?)? as u64
+                + cache.u16_at(ck(p, 30)?)? as u64
+                + cache.u16_at(ck(p, 32)?)? as u64;
             entries.push(entry);
-            p += stride;
+            p = ck(p, stride)?;
         }
         Ok(PagedZip {
-            cache: RefCell::new(cache),
+            cache: Mutex::new(cache),
             entries,
             cd_offset,
             file_len: len,
@@ -190,40 +224,59 @@ impl PagedZip {
                 "paged-zip: bad CD entry signature at {off}"
             )));
         }
-        let flags = cache.u16_at(off + 8)?;
-        let method = cache.u16_at(off + 10)?;
-        let crc = cache.u32_at(off + 16)?;
-        let mut csize = cache.u32_at(off + 20)? as u64;
-        let mut usize_ = cache.u32_at(off + 24)? as u64;
-        let name_len = cache.u16_at(off + 28)? as usize;
-        let extra_len = cache.u16_at(off + 30)? as usize;
-        let mut lho = cache.u32_at(off + 42)? as u64;
-        let name_bytes = cache.read_vec(off + 46, name_len)?;
+        let flags = cache.u16_at(ck(off, 8)?)?;
+        let method = cache.u16_at(ck(off, 10)?)?;
+        let crc = cache.u32_at(ck(off, 16)?)?;
+        let mut csize = cache.u32_at(ck(off, 20)?)? as u64;
+        let mut usize_ = cache.u32_at(ck(off, 24)?)? as u64;
+        let name_len = cache.u16_at(ck(off, 28)?)? as usize;
+        let extra_len = cache.u16_at(ck(off, 30)?)? as usize;
+        let mut lho = cache.u32_at(ck(off, 42)?)? as u64;
+        let name_bytes = cache.read_vec(ck(off, 46)?, name_len)?;
         let name = String::from_utf8_lossy(&name_bytes).into_owned();
         if csize == 0xFFFF_FFFF || usize_ == 0xFFFF_FFFF || lho == 0xFFFF_FFFF {
-            let extra = cache.read_vec(off + 46 + name_len as u64, extra_len)?;
+            let extra = cache.read_vec(ck(ck(off, 46)?, name_len as u64)?, extra_len)?;
+            // Issue #245: id/sz e os campos u64 são lidos com bounds-check
+            // contra o extra REAL — um bloco 0x0001 truncado (sz declarado
+            // maior que o extra presente) é erro tipado, nunca panic de
+            // slice. Mesma política do u64_at do zip.rs.
+            let u64_in = |b: &[u8], o: usize| -> RdResult<u64> {
+                b.get(o..o + 8)
+                    .map(|s| {
+                        let mut a = [0u8; 8];
+                        a.copy_from_slice(s);
+                        u64::from_le_bytes(a)
+                    })
+                    .ok_or_else(|| {
+                        RdError::parse(format!("paged-zip: truncated ZIP64 extra @ {o}"))
+                    })
+            };
             let mut q = 0usize;
             while q + 4 <= extra.len() {
-                let id = u16::from_le_bytes(extra[q..q + 2].try_into().expect("2"));
-                let sz = u16::from_le_bytes(extra[q + 2..q + 4].try_into().expect("2")) as usize;
+                let id = u16::from_le_bytes([extra[q], extra[q + 1]]);
+                let sz = u16::from_le_bytes([extra[q + 2], extra[q + 3]]) as usize;
+                let block_end = (q + 4).checked_add(sz).filter(|&e| e <= extra.len());
                 if id == 0x0001 {
+                    let block_end = block_end
+                        .ok_or_else(|| RdError::parse("paged-zip: truncated ZIP64 extra block"))?;
                     let mut f = q + 4;
-                    let rd =
-                        |b: &[u8], o: usize| u64::from_le_bytes(b[o..o + 8].try_into().expect("8"));
-                    if usize_ == 0xFFFF_FFFF && f + 8 <= q + 4 + sz {
-                        usize_ = rd(&extra, f);
+                    if usize_ == 0xFFFF_FFFF && f + 8 <= block_end {
+                        usize_ = u64_in(&extra, f)?;
                         f += 8;
                     }
-                    if csize == 0xFFFF_FFFF && f + 8 <= q + 4 + sz {
-                        csize = rd(&extra, f);
+                    if csize == 0xFFFF_FFFF && f + 8 <= block_end {
+                        csize = u64_in(&extra, f)?;
                         f += 8;
                     }
-                    if lho == 0xFFFF_FFFF && f + 8 <= q + 4 + sz {
-                        lho = rd(&extra, f);
+                    if lho == 0xFFFF_FFFF && f + 8 <= block_end {
+                        lho = u64_in(&extra, f)?;
                     }
                     break;
                 }
-                q += 4 + sz;
+                match block_end {
+                    Some(e) => q = e,
+                    None => break,
+                }
             }
         }
         Ok(ZipEntry {
@@ -248,10 +301,29 @@ impl PagedZip {
     }
     /// Bytes the page cache currently pins (hard-capped at 16 MiB).
     pub fn cached_bytes(&self) -> usize {
-        self.cache.borrow().pages.iter().map(|(_, p)| p.len()).sum()
+        self.lock_cache().pages.iter().map(|(_, p)| p.len()).sum()
+    }
+
+    /// Takes the page-cache lock without panicking on poison. The cache only
+    /// memoizes immutable file pages (payloads are CRC-checked again on
+    /// extraction), so a thread that panicked mid-read cannot leave
+    /// guest-visible state behind; on poison the pages are dropped and the
+    /// cache refills from disk.
+    fn lock_cache(&self) -> std::sync::MutexGuard<'_, LruPageCache> {
+        self.cache.lock().unwrap_or_else(|poisoned| {
+            let mut guard = poisoned.into_inner();
+            guard.pages.clear();
+            guard
+        })
     }
     pub fn find(&self, name: &str) -> Option<&ZipEntry> {
         self.entries.iter().find(|e| e.name == name)
+    }
+
+    /// Janela crua do container (ex.: bloco de assinatura antes do CD) sem
+    /// materializar o arquivo — passa pelo cache de páginas (teto 16 MiB).
+    pub fn read_range(&self, off: u64, len: usize) -> RdResult<Vec<u8>> {
+        self.lock_cache().read_vec(off, len)
     }
 
     pub fn read(&self, name: &str) -> RdResult<Vec<u8>> {
@@ -262,7 +334,27 @@ impl PagedZip {
     }
 
     pub fn read_entry(&self, entry: &ZipEntry) -> RdResult<Vec<u8>> {
-        let mut cache = self.cache.borrow_mut();
+        // Issue #245: os orçamentos são aplicados ANTES de materializar
+        // qualquer byte — nos dois sentidos (comprimido e declarado),
+        // também para STORED, cuja "descompressão" é a própria cópia.
+        // try_from: em alvos 32-bit um tamanho >4 GiB é erro tipado,
+        // nunca truncamento silencioso.
+        const MAX_INFLATE_BUDGET: u64 = 512 * 1024 * 1024;
+        if entry.uncompressed_size > MAX_INFLATE_BUDGET
+            || entry.compressed_size > MAX_INFLATE_BUDGET
+        {
+            return Err(RdError::invalid_format(format!(
+                "paged-zip: {:?} declara {}/{} bytes (comprimido/expandido, teto {MAX_INFLATE_BUDGET})",
+                entry.name, entry.compressed_size, entry.uncompressed_size
+            )));
+        }
+        let compressed_len = usize::try_from(entry.compressed_size).map_err(|_| {
+            RdError::invalid_format(format!(
+                "paged-zip: {:?} compressed_size não cabe em usize",
+                entry.name
+            ))
+        })?;
+        let mut cache = self.lock_cache();
         let off = entry.local_header_offset;
         if cache.u32_at(off)? != 0x0403_4b50 {
             return Err(RdError::parse(format!(
@@ -270,22 +362,17 @@ impl PagedZip {
                 entry.name
             )));
         }
-        let name_len = cache.u16_at(off + 26)? as u64;
-        let extra_len = cache.u16_at(off + 28)? as u64;
-        let data_start = off + 30 + name_len + extra_len;
-        let compressed = cache.read_vec(data_start, entry.compressed_size as usize)?;
+        let name_len = cache.u16_at(ck(off, 26)?)? as u64;
+        let extra_len = cache.u16_at(ck(off, 28)?)? as u64;
+        let data_start = ck(ck(off, 30)?, ck(name_len, extra_len)?)?;
+        let compressed = cache.read_vec(data_start, compressed_len)?;
         drop(cache);
         let out: Vec<u8> = match entry.method {
             0 => compressed,
             8 => {
-                const MAX_INFLATE_BUDGET: u64 = 512 * 1024 * 1024;
+                // O teto (MAX_INFLATE_BUDGET) já foi aplicado na entrada da
+                // função, para STORED e DEFLATE igualmente (issue #245).
                 let declared = entry.uncompressed_size;
-                if declared > MAX_INFLATE_BUDGET {
-                    return Err(RdError::invalid_format(format!(
-                        "paged-zip: {:?} declara {declared} bytes (> teto {MAX_INFLATE_BUDGET})",
-                        entry.name
-                    )));
-                }
                 let mut decoder = flate2::read::DeflateDecoder::new(&compressed[..])
                     .take(declared.saturating_add(1));
                 let mut buf = Vec::with_capacity(declared.min(64 * 1024 * 1024) as usize);
@@ -480,5 +567,110 @@ mod tests {
             z.cached_bytes()
         );
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // ─── Issue #245: hardening contra ZIP/ZIP64 malformado ───────────
+    // Estilo Result com `?` (sem unwrap novo), como nos testes do Stage 2.
+
+    type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+    fn write_tmp(
+        tag: &str,
+        bytes: &[u8],
+    ) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+        let dir = std::env::temp_dir().join(format!("rd-paged245-{tag}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join("t.zip");
+        let mut f = std::fs::File::create(&path)?;
+        f.write_all(bytes)?;
+        drop(f);
+        Ok(path)
+    }
+
+    /// ZIP de 1 entrada STORED "a" com campos do CD sob controle do teste.
+    fn adversarial_zip(csize: u32, usize_: u32, lho: u32, extra: &[u8]) -> Vec<u8> {
+        let name = b"a";
+        let mut out = Vec::new();
+        // local header mínimo (o payload não é lido nestes testes)
+        out.extend_from_slice(&0x0403_4b50u32.to_le_bytes());
+        out.extend_from_slice(&[0u8; 22]);
+        out.extend_from_slice(&(name.len() as u16).to_le_bytes());
+        out.extend_from_slice(&0u16.to_le_bytes());
+        out.extend_from_slice(name);
+        let cd_off = out.len() as u32;
+        out.extend_from_slice(&CD_ENTRY_SIG.to_le_bytes());
+        out.extend_from_slice(&20u16.to_le_bytes());
+        out.extend_from_slice(&20u16.to_le_bytes());
+        out.extend_from_slice(&0u16.to_le_bytes()); // flags
+        out.extend_from_slice(&0u16.to_le_bytes()); // method STORED
+        out.extend_from_slice(&0u16.to_le_bytes());
+        out.extend_from_slice(&0u16.to_le_bytes());
+        out.extend_from_slice(&0u32.to_le_bytes()); // crc
+        out.extend_from_slice(&csize.to_le_bytes());
+        out.extend_from_slice(&usize_.to_le_bytes());
+        out.extend_from_slice(&(name.len() as u16).to_le_bytes());
+        out.extend_from_slice(&(extra.len() as u16).to_le_bytes());
+        out.extend_from_slice(&0u16.to_le_bytes()); // comment len
+        out.extend_from_slice(&0u16.to_le_bytes()); // disk start
+        out.extend_from_slice(&0u16.to_le_bytes()); // internal attrs
+        out.extend_from_slice(&0u32.to_le_bytes()); // external attrs
+        out.extend_from_slice(&lho.to_le_bytes());
+        out.extend_from_slice(name);
+        out.extend_from_slice(extra);
+        let cd_size = (out.len() as u32) - cd_off;
+        out.extend_from_slice(&EOCD_SIG.to_le_bytes());
+        out.extend_from_slice(&0u16.to_le_bytes());
+        out.extend_from_slice(&0u16.to_le_bytes());
+        out.extend_from_slice(&1u16.to_le_bytes());
+        out.extend_from_slice(&1u16.to_le_bytes());
+        out.extend_from_slice(&cd_size.to_le_bytes());
+        out.extend_from_slice(&cd_off.to_le_bytes());
+        out.extend_from_slice(&0u16.to_le_bytes());
+        out
+    }
+
+    /// Bug 1: extra ZIP64 truncado (sz=24 declarado, 2 bytes presentes)
+    /// com usize sentinela — antes: panic de slice; agora: erro tipado.
+    #[test]
+    fn truncated_zip64_extra_is_typed_error_not_panic() -> TestResult {
+        let extra: &[u8] = &[0x01, 0x00, 24, 0x00, 0xAA, 0xBB];
+        let bytes = adversarial_zip(3, 0xFFFF_FFFF, 0, extra);
+        let path = write_tmp("trunc64", &bytes)?;
+        assert!(
+            PagedZip::open(&path).is_err(),
+            "extra ZIP64 truncado recusa com erro (sem panic)"
+        );
+        Ok(())
+    }
+
+    /// Bug 2: tamanhos declarados acima do teto — recusa ANTES de
+    /// alocar/ler (arquivo minúsculo, declaração de 600 MiB).
+    #[test]
+    fn declared_sizes_above_budget_refused_before_reading() -> TestResult {
+        let big = 600 * 1024 * 1024u32;
+        let bytes = adversarial_zip(big, big, 0, &[]);
+        let path = write_tmp("toobig", &bytes)?;
+        let z = PagedZip::open(&path)?;
+        assert!(
+            z.read("a").is_err(),
+            "leitura acima do orçamento recusa com erro tipado"
+        );
+        Ok(())
+    }
+
+    /// Bug 3: local_header_offset via ZIP64 colado em u64::MAX — as
+    /// somas de offset são checked: erro tipado, nunca panic de
+    /// overflow (o build de teste é debug, onde overflow panica).
+    #[test]
+    fn near_max_local_header_offset_is_typed_error_not_panic() -> TestResult {
+        let mut extra = Vec::new();
+        extra.extend_from_slice(&0x0001u16.to_le_bytes());
+        extra.extend_from_slice(&8u16.to_le_bytes());
+        extra.extend_from_slice(&0xFFFF_FFFF_FFFF_FFF8u64.to_le_bytes());
+        let bytes = adversarial_zip(3, 3, 0xFFFF_FFFF, &extra);
+        let path = write_tmp("maxlho", &bytes)?;
+        let z = PagedZip::open(&path)?;
+        assert!(z.read("a").is_err(), "lho ~u64::MAX recusa sem panic");
+        Ok(())
     }
 }
