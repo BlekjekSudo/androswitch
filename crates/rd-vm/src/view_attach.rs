@@ -18,9 +18,11 @@
 //! Detach mirrors this (`onDetachedFromWindow`, `onViewDetachedFromWindow`)
 //! when a view is removed from an attached parent or the activity finishes.
 
+use std::collections::HashSet;
+
 use crate::engine::Engine;
 use crate::err::VmExit;
-use crate::framework::HostObj;
+use crate::framework::{HostObj, MAX_VIEW_DEPTH};
 use crate::heap::ObjRef;
 use crate::value::Value;
 
@@ -73,32 +75,47 @@ fn notify(vm: &mut Engine, view: ObjRef, attached: bool) -> Result<(), VmExit> {
 }
 
 /// Attach `root` and its subtree (pre-order). Already-attached views are
-/// skipped.
+/// skipped. Bounded by `MAX_VIEW_DEPTH` and cycle-guarded on an explicit heap
+/// worklist so deep or corrupted View graphs never exhaust the native stack.
 pub(crate) fn dispatch_attach(vm: &mut Engine, root: ObjRef) -> Result<(), VmExit> {
-    if !vm.attached_views.insert(root) {
-        // already attached: still visit children added while detached
-        for c in children(vm, root) {
-            dispatch_attach(vm, c)?;
+    let mut stack = vec![(root, 0usize)];
+    let mut seen = HashSet::new();
+    while let Some((cur, depth)) = stack.pop() {
+        if depth > MAX_VIEW_DEPTH || !seen.insert(cur) {
+            continue;
         }
-        return Ok(());
-    }
-    call_override(vm, root, "onAttachedToWindow")?;
-    notify(vm, root, true)?;
-    // children may have been added by onAttachedToWindow (Compose adds its
-    // AndroidComposeView there): read them after the callback
-    for c in children(vm, root) {
-        dispatch_attach(vm, c)?;
+        if vm.attached_views.insert(cur) {
+            call_override(vm, cur, "onAttachedToWindow")?;
+            notify(vm, cur, true)?;
+        }
+        // children may have been added by onAttachedToWindow (Compose adds its
+        // AndroidComposeView there): read them after the callback and push in
+        // reverse so pre-order visits child 0, 1, 2, ...
+        for c in children(vm, cur).into_iter().rev() {
+            stack.push((c, depth + 1));
+        }
     }
     Ok(())
 }
 
+/// Detach `root` and its subtree (post-order: children before parent).
+/// Iterative and bounded by `MAX_VIEW_DEPTH` + `seen` cycle guard.
 pub(crate) fn dispatch_detach(vm: &mut Engine, root: ObjRef) -> Result<(), VmExit> {
-    for c in children(vm, root) {
-        dispatch_detach(vm, c)?;
-    }
-    if vm.attached_views.remove(&root) {
-        call_override(vm, root, "onDetachedFromWindow")?;
-        notify(vm, root, false)?;
+    let mut stack = vec![(root, 0usize, false)];
+    let mut seen = HashSet::new();
+    while let Some((cur, depth, expanded)) = stack.pop() {
+        if !expanded {
+            if depth > MAX_VIEW_DEPTH || !seen.insert(cur) {
+                continue;
+            }
+            stack.push((cur, depth, true));
+            for c in children(vm, cur).into_iter().rev() {
+                stack.push((c, depth + 1, false));
+            }
+        } else if vm.attached_views.remove(&cur) {
+            call_override(vm, cur, "onDetachedFromWindow")?;
+            notify(vm, cur, false)?;
+        }
     }
     Ok(())
 }
@@ -189,7 +206,8 @@ pub(crate) fn instance_intrinsic(
         }
         ("getRootView", "()Landroid/view/View;") => {
             let mut cur = recv;
-            while let Some(p) = parent_of(vm, cur) {
+            for _ in 0..=MAX_VIEW_DEPTH {
+                let Some(p) = parent_of(vm, cur) else { break };
                 cur = p;
             }
             Ok(Some(Value::Obj(cur)))
