@@ -7781,6 +7781,85 @@ fn hdmi_no_device_profile_and_values_are_guest_visible() {
         ),
         Value::Int(6)
     );
+
+    // Deep audit: remaining relative-position branches (directly below,
+    // below, above, different branch, and invalid/unassigned unknown).
+    for (src, dest, expected) in [
+        (0x1200, 0x1000, 1), // directly below
+        (0x1230, 0x1000, 2), // below
+        (0x1000, 0x1230, 5), // above
+        (0x1110, 0x1210, 7), // different branch
+        (0x1010, 0x1200, 0), // invalid physical address -> unknown
+        (0xffff, 0x1200, 0), // unassigned -> unknown
+    ] {
+        assert_eq!(
+            call_static(
+                &mut engine,
+                utils,
+                "getHdmiAddressRelativePosition",
+                "(II)I",
+                &[Value::Int(src), Value::Int(dest)],
+            ),
+            Value::Int(expected),
+            "relative position {src:#06x} vs {dest:#06x}"
+        );
+    }
+
+    // Deep audit: an empty DeviceFeatures operand keeps every status at
+    // FEATURE_SUPPORT_UNKNOWN (2) instead of clearing them.
+    let empty_operand = byte_array(&mut engine, &[]);
+    let unknown_features = object(call_static(
+        &mut engine,
+        "Landroid/hardware/hdmi/DeviceFeatures;",
+        "fromOperand",
+        "([B)Landroid/hardware/hdmi/DeviceFeatures;",
+        &[empty_operand],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            unknown_features,
+            "getRecordTvScreenSupport",
+            "()I",
+            &[]
+        ),
+        Value::Int(2)
+    );
+
+    // Deep audit: HdmiPortInfo.Builder rejects an invalid port type and a
+    // negative address in its constructor.
+    let bad_type_builder = instance(&mut engine, "Landroid/hardware/hdmi/HdmiPortInfo$Builder;");
+    assert_throws(
+        engine.invoke_instance(
+            bad_type_builder,
+            "<init>",
+            "(III)V",
+            &[Value::Int(1), Value::Int(7), Value::Int(0x1000)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let bad_address_builder = instance(&mut engine, "Landroid/hardware/hdmi/HdmiPortInfo$Builder;");
+    assert_throws(
+        engine.invoke_instance(
+            bad_address_builder,
+            "<init>",
+            "(III)V",
+            &[Value::Int(1), Value::Int(0), Value::Int(-1)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    // Deep audit: isDeviceConnected null-checks its argument before the
+    // invalid-local-address early return of this profile.
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "isDeviceConnected",
+            "(Landroid/hardware/hdmi/HdmiDeviceInfo;)Z",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
 }
 
 #[test]
