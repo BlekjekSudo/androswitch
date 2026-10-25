@@ -63,7 +63,7 @@ export PATH="$HOME/.cargo/bin:$PATH"   # rustc 1.99.1 em 2026-10-25
 - [x] S1 `data/jetpack.toml` (46 libs/6 categorias) + `data/gms.toml` (21 serviços/3 categorias) + `docs/appendix-d-e.md` — status = realidade em `main`
 - [x] S2 `fd_jetpack.rs` + `fd_gms.rs` + testes unitários (34 passed em rd-framework, clippy/fmt limpos)
 - [x] S3 CLI `rd jetpack`/`rd gms` + testes CLI (8 passed, clippy limpo)
-- [ ] S4 xtask + docs gerados + spec D/E + ADR 011 + ledger D/E
+- [x] S4 xtask + docs gerados + spec D/E + ADR 012 + ledger D/E (xtask 14 testes ✅, geradores idempotentes)
 - [ ] S5 Runtime AndroidX (`androidx.rs`) + estado/GC/dispatch + testes
 - [ ] S6 Runtime GMS/Firebase (`gms.rs`) + estado/GC/dispatch + testes
 - [ ] S7 Hierarquias classpath (hook mínimo) + inflate AndroidX
@@ -77,3 +77,4 @@ export PATH="$HOME/.cargo/bin:$PATH"   # rustc 1.99.1 em 2026-10-25
 - 2026-10-25 S1: inventários TOML validados (parse + unicidade); statuses iniciais conservadores (D: 5 partial m8/m9, 3 stub, resto not_implemented; E: tudo not_implemented).
 
 - 2026-10-25 S3: rd jetpack/gms list|show|check|report no ar (main.rs só aditivo; [LOCK] coordenado entre os agentes). Meu ADR vira 012 (011 ficou com M10 do Runtime-E2E).
+- 2026-10-25 S4: xtask jetpack/gms report+spec, docs/jetpack.md+gms.md, tabelas D/E geradas em RustyDroid.md (marcadores BEGIN/END), compat-matrix com seções D/E, ADR 012. Testes xtask travam docs==gerado.

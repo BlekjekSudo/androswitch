@@ -26,8 +26,8 @@
 | Crate | Fase | Escopo |
 |---|---|---|
 | `rd-apk` | M0 | ZIP + AXML + arsc + assinaturas + manifest model completo |
-| `rd-framework` | M0 | fd-permissions (motor completo + gating maxSdk/since_api) · fd-devices · fd-behavior · fd-api-coverage (registro executável do Apêndice C) |
-| `rd-cli` | M0–M6 | inspect · perm · device · behavior · api-coverage · dex disasm · vm exec · app run · mcp · test (suítes JUnit, M6) |
+| `rd-framework` | M0 | fd-permissions (motor completo + gating maxSdk/since_api) · fd-devices · fd-behavior · fd-api-coverage (registro executável do Apêndice C) · fd-jetpack (Apêndice D) · fd-gms (Apêndice E, modo sem GMS honesto) |
+| `rd-cli` | M0–M6 | inspect · perm · device · behavior · api-coverage · jetpack · gms · dex disasm · vm exec · app run · mcp · test (suítes JUnit, M6) |
 | `rd-dex` | M1 | parser DEX completo + disassembler smali validado vs baksmali + fuzz targets |
 | `rd-vm` | M2–M9 | interpretador Dalvik + golden harness vs JVM + framework host headless (Activity/View/Handler/Looper) + LayoutInflater AXML/ARSC + componentes M9 (notificações/IME/widgets/a11y/atalhos) + ponte JNI (feature `native`) |
 | `rd-testsupport` | M0–M6 | fixtures de teste (APK/DEX/AXML/ARSC sintéticos; dev-only, fora do binário) |
@@ -107,12 +107,37 @@ Regras, dependências e limites em [engine-registry.md](engine-registry.md); fon
 | System UI | `android.accessibilityservice`, `android.app.usage`, `android.appwidget`, `android.inputmethodservice`, `android.print` | partial 5 | `rd-vm/android-stub-surfaces`, `rd-vm/m9` |
 | Misc | `android.accounts`, `android.animation`, `android.gesture`, `android.icu`, `android.mtp`, `android.preference`, `android.system`, `android.transition` | partial 8 | `rd-vm/android-stub-surfaces`, `rd-vm/android-sysservices`, `rd-vm/framework`, `rd-vm/intrinsics` |
 
+## AndroidX/Jetpack (Apêndice D — registro por módulo, não execução)
+
+**46 bibliotecas em 6 categorias** (supported 0, partial 6, stub 3, not_implemented 37). Fonte executável: `data/jetpack.toml`; relatório completo em [jetpack.md](jetpack.md), ledger em [appendix-d-e.md](appendix-d-e.md), consulta via `rd jetpack`. Cada módulo declara estratégia (`dex-passthrough`/`host-shim`/`host-native`); `supported` é só o subconjunto documentado — nunca a biblioteca inteira.
+
+| Categoria | Bibliotecas (implementação nativa ou shim) | Status das bibliotecas | Módulos |
+|---|---|---|---|
+| Foundation | appcompat, core-ktx, activity, annotation, multidex, startup | partial 1 · not_implemented 5 | `none`, `rd-vm/m9` |
+| Architecture | lifecycle-runtime, lifecycle-livedata, lifecycle-viewmodel, lifecycle-savedstate, room, paging 3, work, navigation, datastore, collection, palette | partial 2 · not_implemented 9 | `none`, `rd-vm/m8` |
+| UI | compose, recyclerview, viewpager2, constraintlayout, coordinatorlayout, drawerlayout, swiperefreshlayout, cardview, fragment, browser (custom tabs), emoji2, material (extra além da tabela da spec) | partial 2 · stub 2 · not_implemented 8 | `none`, `rd-vm/inflate`, `rd-vm/m8` |
+| Behavior | media3/ExoPlayer, cameraX, biometric, security-crypto, credential-manager, photo-picker (privacy) | not_implemented 6 | `none` |
+| DI/async | hilt/dagger, kotlinx-coroutines/flow, rxjava bridge | not_implemented 3 | `none` |
+| 3rd-party comuns | okhttp, retrofit, moshi, gson, coil, glide, picasso, guava ListenableFuture (extra — base de work/camera) | partial 1 · stub 1 · not_implemented 6 | `none`, `rd-vm/m8` |
+
+## Play Services / Firebase (Apêndice E — registro sem GMS, não backend)
+
+**21 serviços em 3 categorias** (supported 0, partial 0, stub 0, not_implemented 21), modo `no-gms-honest` com `network = "none"` validado em todos. Fonte executável: `data/gms.toml`; relatório completo em [gms.md](gms.md), consulta via `rd gms`. Status mede o shim local programável — nunca paridade com os servidores do Google.
+
+| Categoria | Serviços (shim sem GMS) | Status dos serviços | Módulos |
+|---|---|---|---|
+| GMS core | GoogleApiAvailability / common, Tasks API | not_implemented 2 | `none` |
+| Play Services | Location (fused), Maps, Billing, Auth (Google Sign-In), Ads, Fit/Health, Cast, Nearby, SafetyNet / Play Integrity | not_implemented 9 | `none` |
+| Firebase | Firebase core (FirebaseApp), Firebase Analytics, Firebase Auth, Firebase Messaging (FCM), Firebase Crashlytics, Cloud Firestore, Realtime Database, Firebase Remote Config (extra além da spec), Firebase Storage (extra além da spec), ML Kit (extra além da spec) | not_implemented 10 | `none` |
+
 ## Dados versionados (M0)
 
 - permissions.toml: **175** permissões + 13 roles (Apêndice B)
 - devices.toml: **6** perfis (piso: `moto-e5`)
 - behavior-switches.toml: **25** comutadores targetSdk 26→36 (PRF-07)
 - api-coverage.toml: **106** superfícies android.* em 17 domínios (Apêndice C)
+- jetpack.toml: **46** bibliotecas AndroidX/3rd-party em 6 categorias (Apêndice D)
+- gms.toml: **21** serviços GMS/Firebase em 3 categorias (Apêndice E, sem GMS honesto)
 
 ## Compatibilidade por módulo (checklist PARTE 0)
 
