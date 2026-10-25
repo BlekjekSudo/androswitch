@@ -557,8 +557,13 @@ fn decode_gles_version(feat: &XmlElement) -> Option<String> {
         let code = bits as u32;
         return Some(format!("{}.{}", code >> 16, code & 0xFFFF));
     }
-    if let Some(code) = attr.as_u32() {
-        return Some(format!("{}.{}", code >> 16, code & 0xFFFF));
+    // Só texto numérico. Uma referência (`@integer/…`) também responde a
+    // `as_u32()` (com o id do recurso), mas não é uma versão: o texto é
+    // preservado.
+    if matches!(attr.value, AttrValue::String(_)) {
+        if let Some(code) = attr.as_u32() {
+            return Some(format!("{}.{}", code >> 16, code & 0xFFFF));
+        }
     }
     let raw = attr.text();
     let trimmed = raw.trim();
@@ -1084,5 +1089,22 @@ mod tests {
             json.get("meta_data").is_none(),
             "meta_data vazio não deve aparecer no JSON"
         );
+    }
+
+    /// Delta da revisão (#254): uma referência em glEsVersion não vira
+    /// "major.minor" a partir do id do recurso.
+    #[test]
+    fn gl_es_version_reference_is_not_decoded_as_a_version() {
+        let feat = XmlElement {
+            name: "uses-feature".to_string(),
+            attrs: vec![android_attr(
+                "glEsVersion",
+                AttrValue::Reference(0x7f0a_0001),
+            )],
+            children: Vec::new(),
+            text: None,
+        };
+        let v = decode_gles_version(&feat).expect("attr present");
+        assert_ne!(v, format!("{}.{}", 0x7f0a_0001u32 >> 16, 0x0001));
     }
 }
