@@ -262,6 +262,9 @@ pub enum Pending {
         out: ObjRef,
         all: Vec<ObjRef>,
         success_list: bool,
+        /// `whenAllComplete`: nunca falha/cancela por causa dos membros;
+        /// conclui com sucesso vendendo a lista das próprias Tasks.
+        never_fail: bool,
     },
 }
 
@@ -1009,6 +1012,7 @@ fn run_pending(vm: &mut Engine, src: ObjRef, p: Pending) -> Result<(), VmExit> {
             out,
             all,
             success_list,
+            never_fail,
         } => {
             let states: Vec<Option<TaskHost>> = all.iter().map(|r| task_state(vm, *r)).collect();
             if !states
@@ -1025,8 +1029,14 @@ fn run_pending(vm: &mut Engine, src: ObjRef, p: Pending) -> Result<(), VmExit> {
                         out,
                         all,
                         success_list,
+                        never_fail,
                     });
                 return Ok(());
+            }
+            if never_fail {
+                let elems: Vec<Value> = all.iter().map(|r| Value::Obj(*r)).collect();
+                let list = make_list(vm, elems)?;
+                return settle_task(vm, out, Some(list), None, false);
             }
             if states.iter().flatten().any(|t| t.canceled) {
                 return settle_task(vm, out, None, None, true);
@@ -1228,6 +1238,7 @@ fn tasks_static(vm: &mut Engine, name: &str, args: &[Value]) -> Result<Option<Va
                 out,
                 all: tasks.clone(),
                 success_list: name == "whenAllSuccess",
+                never_fail: name == "whenAllComplete",
             };
             if tasks.is_empty()
                 || tasks

@@ -1901,3 +1901,196 @@ fn unknown_gms_surface_returns_none() {
         None
     );
 }
+
+// ── Tasks: agregação e continuações (cobertura do subconjunto registado) ─
+#[test]
+fn tasks_when_all_success_failure_and_complete() {
+    let mut e = engine();
+    let a_val = s(&mut e, "A");
+    let ta = ov(cs!(
+        e,
+        TASKS,
+        "forResult",
+        "(Ljava/lang/Object;)Lcom/google/android/gms/tasks/Task;",
+        [a_val]
+    )
+    .unwrap());
+    assert_eq!(svm!(e, task_result(&mut e, ta)), "A");
+
+    // whenAllSuccess com uma Task ainda pendente: só conclui quando todas
+    // concluírem, e o resultado é a lista dos resultados por ordem.
+    let tcs = obj(&mut e, TASK_SOURCE);
+    ci!(e, TASK_SOURCE, "<init>", "()V", tcs, []).unwrap();
+    let tb = ov(ci!(
+        e,
+        TASK_SOURCE,
+        "getTask",
+        "()Lcom/google/android/gms/tasks/Task;",
+        tcs,
+        []
+    )
+    .unwrap());
+    let list = host_list(&mut e, vec![Value::Obj(ta), Value::Obj(tb)]);
+    let all = ov(cs!(
+        e,
+        TASKS,
+        "whenAllSuccess",
+        "(Ljava/util/Collection;)Lcom/google/android/gms/tasks/Task;",
+        [list]
+    )
+    .unwrap());
+    assert_eq!(task_flag(&mut e, all, "isComplete"), 0);
+    let b_val = s(&mut e, "B");
+    ci!(
+        e,
+        TASK_SOURCE,
+        "setResult",
+        "(Ljava/lang/Object;)V",
+        tcs,
+        [b_val]
+    )
+    .unwrap();
+    assert_eq!(task_flag(&mut e, all, "isSuccessful"), 1);
+    let results = ov(task_result(&mut e, all));
+    match e.fw.objects.get(&results) {
+        Some(HostObj::List { elems }) => {
+            assert_eq!(elems.len(), 2);
+            match &elems[1] {
+                Value::Obj(r) => assert_eq!(e.heap.as_str(*r).unwrap(), "B"),
+                other => panic!("elem[1]: {other:?}"),
+            }
+        }
+        other => panic!("resultados whenAllSuccess: {other:?}"),
+    }
+
+    // Uma falha contamina whenAll; whenAllComplete conclui mesmo assim.
+    let exc = obj(&mut e, "Ljava/lang/RuntimeException;");
+    let m = s(&mut e, "falhou");
+    e.heap.put_field(exc, "message", m).unwrap();
+    let tf = ov(cs!(
+        e,
+        TASKS,
+        "forException",
+        "(Ljava/lang/Exception;)Lcom/google/android/gms/tasks/Task;",
+        [Value::Obj(exc)]
+    )
+    .unwrap());
+    let list2 = host_list(&mut e, vec![Value::Obj(ta), Value::Obj(tf)]);
+    let wall = ov(cs!(
+        e,
+        TASKS,
+        "whenAll",
+        "(Ljava/util/Collection;)Lcom/google/android/gms/tasks/Task;",
+        [list2]
+    )
+    .unwrap());
+    assert_eq!(task_flag(&mut e, wall, "isComplete"), 1);
+    assert_eq!(task_flag(&mut e, wall, "isSuccessful"), 0);
+    let list3 = host_list(&mut e, vec![Value::Obj(ta), Value::Obj(tf)]);
+    let wcomplete = ov(cs!(
+        e,
+        TASKS,
+        "whenAllComplete",
+        "(Ljava/util/Collection;)Lcom/google/android/gms/tasks/Task;",
+        [list3]
+    )
+    .unwrap());
+    assert_eq!(task_flag(&mut e, wcomplete, "isSuccessful"), 1);
+}
+
+#[test]
+fn tasks_continue_with_executes_dex_continuation() {
+    let mut b = DexBuilder::new();
+    let cls = b.class("LCont;", "Ljava/lang/Object;");
+    let depois = b.intern("depois") as u16;
+    b.r#virtual(
+        cls,
+        "then",
+        "Ljava/lang/Object;",
+        vec!["Lcom/google/android/gms/tasks/Task;"],
+        ACC_PUBLIC,
+        Some(b.code(3, 2, 0, {
+            let mut u = op21c(0x1A, 0, depois); // const-string v0, "depois"
+            u.extend(op11x(0x11, 0)); // return-object v0
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+    let src_val = s(&mut e, "antes");
+    let src = ov(cs!(
+        e,
+        TASKS,
+        "forResult",
+        "(Ljava/lang/Object;)Lcom/google/android/gms/tasks/Task;",
+        [src_val]
+    )
+    .unwrap());
+    let cont = obj(&mut e, "LCont;");
+    let out = ov(ci!(
+        e,
+        TASK,
+        "continueWith",
+        "(Lcom/google/android/gms/tasks/Continuation;)Lcom/google/android/gms/tasks/Task;",
+        src,
+        [Value::Obj(cont)]
+    )
+    .unwrap());
+    assert_eq!(task_flag(&mut e, out, "isSuccessful"), 1);
+    assert_eq!(svm!(e, task_result(&mut e, out)), "depois");
+}
+
+#[test]
+fn firebase_auth_state_listener_fires_on_add_and_signin() {
+    let mut b = DexBuilder::new();
+    counter_observer_class(
+        &mut b,
+        "LAuthLis;",
+        "onAuthStateChanged",
+        vec!["Lcom/google/firebase/auth/FirebaseAuth;"],
+    );
+    let mut e = engine_of(&b);
+    let auth = ov(cs!(
+        e,
+        FIREBASE_AUTH,
+        "getInstance",
+        "()Lcom/google/firebase/auth/FirebaseAuth;",
+        []
+    )
+    .unwrap());
+    let lis = obj(&mut e, "LAuthLis;");
+    ci!(
+        e,
+        FIREBASE_AUTH,
+        "addAuthStateListener",
+        "(Lcom/google/firebase/auth/FirebaseAuth$AuthStateListener;)V",
+        auth,
+        [Value::Obj(lis)]
+    )
+    .unwrap();
+    assert_eq!(
+        called(&e, "LAuthLis;"),
+        1,
+        "dispara já ao registar (upstream)"
+    );
+
+    let email = s(&mut e, "user@x.pt");
+    let pwd = s(&mut e, "secret1");
+    let t = ov(ci!(
+        e,
+        FIREBASE_AUTH,
+        "createUserWithEmailAndPassword",
+        "(Ljava/lang/String;Ljava/lang/String;)Lcom/google/android/gms/tasks/Task;",
+        auth,
+        [email, pwd]
+    )
+    .unwrap());
+    assert_eq!(task_flag(&mut e, t, "isSuccessful"), 1);
+    assert_eq!(
+        called(&e, "LAuthLis;"),
+        2,
+        "dispara na mudança de utilizador"
+    );
+
+    ci!(e, FIREBASE_AUTH, "signOut", "()V", auth, []).unwrap();
+    assert_eq!(called(&e, "LAuthLis;"), 3, "dispara no signOut");
+}
