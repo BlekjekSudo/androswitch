@@ -1564,3 +1564,122 @@ fn m8_dex_callbacks_fire() {
         Some(&Value::Int(5))
     );
 }
+
+#[test]
+fn prefs_clear_notifies_null_once_and_null_keys_tolerated() {
+    let mut b = DexBuilder::new();
+    let listener_class = b.class("LPrefsClearListener;", "Ljava/lang/Object;");
+    b.instance_field(listener_class, "changeCount", "I");
+    b.instance_field(listener_class, "nullKeyCount", "I");
+    let count_field = b.field_idx("LPrefsClearListener;", "I", "changeCount");
+    let null_field = b.field_idx("LPrefsClearListener;", "I", "nullKeyCount");
+    b.r#virtual(
+        listener_class,
+        "onSharedPreferenceChanged",
+        "V",
+        vec!["Landroid/content/SharedPreferences;", "Ljava/lang/String;"],
+        ACC_PUBLIC,
+        Some(b.code(6, 3, 0, {
+            // v0/v1 temps; p0=this(v3), p1=prefs(v4), p2=key(v5)
+            let mut code = op22c(0x52, 0, 3, count_field); // iget v0, this, count
+            code.extend(op11n(0x12, 1, 1)); // const/4 v1, 1
+            code.extend(op12x(0xb0, 0, 1)); // add-int/2addr v0, v1
+            code.extend(op22c(0x59, 0, 3, count_field)); // iput v0, this, count
+                                                         // if (key != null) skip: if-eqz -> offset 6 code units ahead
+            code.extend(op21c(0x39, 5, 8)); // if-nez v5, +8 (to return-void)
+            code.extend(op22c(0x52, 0, 3, null_field)); // iget v0, this, nullCount
+            code.extend(op11n(0x12, 1, 1)); // const/4 v1, 1
+            code.extend(op12x(0xb0, 0, 1)); // add-int/2addr
+            code.extend(op22c(0x59, 0, 3, null_field)); // iput
+            code.extend(op10x(0x0e)); // return-void
+            code
+        })),
+    );
+
+    let mut e = engine_of(&b);
+    let prefs = named_prefs(&mut e, "clear-test");
+    let listener = e.new_dex_instance_pub("LPrefsClearListener;").unwrap();
+    e.heap
+        .put_field(listener, "changeCount", Value::Int(0))
+        .unwrap();
+    e.heap
+        .put_field(listener, "nullKeyCount", Value::Int(0))
+        .unwrap();
+    rd_vm::framework::call_host_instance(
+        &mut e,
+        "Landroid/content/SharedPreferences;",
+        "registerOnSharedPreferenceChangeListener",
+        "(Landroid/content/SharedPreferences$OnSharedPreferenceChangeListener;)V",
+        prefs,
+        &[Value::Obj(listener)],
+    )
+    .unwrap();
+
+    let editor = prefs_editor(&mut e, prefs);
+    let value = s(&mut e, "v");
+    prefs_put(
+        &mut e,
+        editor,
+        "putString",
+        "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;",
+        "k1",
+        value.clone(),
+    );
+    prefs_commit(&mut e, editor);
+    assert_eq!(
+        e.heap.get_field(listener, "changeCount").unwrap(),
+        Value::Int(1)
+    );
+    assert_eq!(
+        e.heap.get_field(listener, "nullKeyCount").unwrap(),
+        Value::Int(0)
+    );
+
+    // clear() reports exactly one null-key callback (since targetSdk R).
+    let editor = prefs_editor(&mut e, prefs);
+    rd_vm::framework::call_host_instance(
+        &mut e,
+        "Landroid/content/SharedPreferences$Editor;",
+        "clear",
+        "()Landroid/content/SharedPreferences$Editor;",
+        editor,
+        &[],
+    )
+    .unwrap();
+    prefs_commit(&mut e, editor);
+    assert_eq!(
+        e.heap.get_field(listener, "changeCount").unwrap(),
+        Value::Int(2)
+    );
+    assert_eq!(
+        e.heap.get_field(listener, "nullKeyCount").unwrap(),
+        Value::Int(1)
+    );
+    assert_eq!(prefs_get_string(&mut e, prefs, "k1"), "<missing>");
+
+    // Null keys are tolerated: default back, not an NPE.
+    let default = s(&mut e, "d");
+    let default_cmp = default.clone();
+    let got = rd_vm::framework::call_host_instance(
+        &mut e,
+        "Landroid/content/SharedPreferences;",
+        "getString",
+        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+        prefs,
+        &[Value::Null, default],
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(got, default_cmp);
+    let contains = rd_vm::framework::call_host_instance(
+        &mut e,
+        "Landroid/content/SharedPreferences;",
+        "contains",
+        "(Ljava/lang/String;)Z",
+        prefs,
+        &[Value::Null],
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(contains, Value::Int(0));
+}

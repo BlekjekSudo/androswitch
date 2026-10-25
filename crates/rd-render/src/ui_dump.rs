@@ -27,83 +27,172 @@ use rd_vm::framework::{UiNode, Vis};
 /// issue #62: budget de tamanho do dump — um `text` de 8 MB com `&&&&` multiplica
 /// a saída 5×; acima disso é amplificação hostil → erro tipado (nunca silêncio).
 pub const MAX_DUMP_BYTES: usize = 64 * 1024 * 1024;
+const MAX_DUMP_DEPTH: usize = 512;
+
+fn dump_too_large() -> RdError {
+    RdError {
+        code: "INVALID_FORMAT".into(),
+        cause: format!(
+            "dump uiautomator excede {} bytes — amplificação de saída hostil (issue #62)",
+            MAX_DUMP_BYTES
+        ),
+        suggestion: Some("árvore de views com text hostil; cap no framework do app".into()),
+        module_id: crate::MODULE_ID.into(),
+    }
+}
+
+fn push_bounded(out: &mut String, part: &str) -> Result<(), RdError> {
+    if out
+        .len()
+        .checked_add(part.len())
+        .filter(|len| *len <= MAX_DUMP_BYTES)
+        .is_none()
+    {
+        return Err(dump_too_large());
+    }
+    out.push_str(part);
+    Ok(())
+}
+
+fn push_indent(out: &mut String, depth: usize) -> Result<(), RdError> {
+    for _ in 0..depth {
+        push_bounded(out, "  ")?;
+    }
+    Ok(())
+}
 
 /// Serializa a árvore no XML do uiautomator. Erro tipado se o dump excede
 /// `MAX_DUMP_BYTES` (amplificação hostil — issue #62).
 pub fn uiautomator_xml(root: &UiNode, package: &str) -> Result<String, RdError> {
-    let mut out = String::from(
+    let mut out = String::new();
+    push_bounded(
+        &mut out,
         "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<hierarchy rotation=\"0\">\n",
-    );
+    )?;
+    // Escape the package once, under the same byte budget; the escaped value
+    // is then streamed into each node without another unbounded allocation.
+    let mut pkg_esc = String::new();
+    push_xml_escaped(&mut pkg_esc, package)?;
     // issue #54: index POR-IRMÃOS — o contador global DFS fazia o primeiro
     // filho do root sair com index=1 (real: 0) e qualquer seletor
     // node[@index='N'] gravado em dispositivo real divergir.
-    emit_node(root, package, 1, 0, &mut out)?;
-    out.push_str("</hierarchy>\n");
+    emit_node(root, &pkg_esc, 1, 0, &mut out)?;
+    push_bounded(&mut out, "</hierarchy>\n")?;
     Ok(out)
 }
 
 fn emit_node(
-    n: &UiNode,
-    package: &str,
+    root: &UiNode,
+    pkg_esc: &str,
     depth: usize,
     sibling_index: usize,
     out: &mut String,
 ) -> Result<(), RdError> {
-    if n.visibility == Vis::Gone {
-        return Ok(()); // uiautomator real: GONE não aparece no dump
+    enum Event<'a> {
+        Enter(&'a UiNode, usize, usize),
+        Exit(usize),
     }
-    if out.len() > MAX_DUMP_BYTES {
-        return Err(RdError {
-            code: "INVALID_FORMAT".into(),
-            cause: format!(
-                "dump uiautomator excede {} bytes — amplificação de saída hostil (issue #62)",
-                MAX_DUMP_BYTES
-            ),
-            suggestion: Some("árvore de views com text hostil; cap no framework do app".into()),
-            module_id: crate::MODULE_ID.into(),
-        });
-    }
-    let (x, y, w, h) = n.bounds;
-    let indent = "  ".repeat(depth);
-    let res = xml_escape(n.resource_id.as_deref().unwrap_or_default());
-    // o PARÂMETRO cru desce para os filhos (escape é por nível — nunca duplo)
-    let pkg_esc = xml_escape(package);
-    let clickable = if n.clickable { "true" } else { "false" };
-    let enabled = if n.enabled { "true" } else { "false" };
-    let focusable = if n.focusable { "true" } else { "false" };
-    // issue #53: filhos GONE não são emitidos — se não sobra NENHUM, o nó é
-    // self-closing (não <node>…</node> vazio).
-    let empty = !n.children.iter().any(|c| c.visibility != Vis::Gone);
-    // issue #62: bounds hostis (i32::MAX + w) não podem panicar na API pública
-    let x2 = x.saturating_add(w);
-    let y2 = y.saturating_add(h);
-    out.push_str(&format!(
-        "{indent}<node index=\"{sibling_index}\" text=\"{}\" resource-id=\"{res}\" class=\"{}\" \
-package=\"{pkg_esc}\" content-desc=\"\" checkable=\"false\" checked=\"false\" \
-clickable=\"{clickable}\" enabled=\"{enabled}\" focusable=\"{focusable}\" focused=\"false\" \
-scrollable=\"false\" long-clickable=\"false\" password=\"false\" selected=\"false\" \
-bounds=\"[{x},{y}][{x2},{y2}]\"{}>\n",
-        xml_escape(&n.text),
-        xml_escape(&n.class),
-        if empty { "/" } else { "" }
-    ));
-    // issue #62: nó com subárvore cortada ganha marcador EXPLÍCITO — o agente
-    // não pode ler a árvore como completa.
-    if n.truncated {
-        out.push_str(&format!(
-            "{indent}<!-- truncated: subárvore além de 512 níveis (cap hostil) -->\n"
-        ));
-    }
-    for (i, c) in n
-        .children
-        .iter()
-        .filter(|c| c.visibility != Vis::Gone)
-        .enumerate()
-    {
-        emit_node(c, package, depth + 1, i, out)?;
-    }
-    if !empty {
-        out.push_str(&format!("{indent}</node>\n"));
+
+    // The public UiNode tree is untrusted, so traversal is iterative: a
+    // depth cap alone still leaves hundreds of recursive native frames.
+    let mut stack = vec![Event::Enter(root, depth, sibling_index)];
+    while let Some(event) = stack.pop() {
+        let (n, depth, sibling_index) = match event {
+            Event::Exit(depth) => {
+                push_indent(out, depth)?;
+                push_bounded(out, "</node>\n")?;
+                continue;
+            }
+            Event::Enter(n, depth, sibling_index) => (n, depth, sibling_index),
+        };
+        if n.visibility == Vis::Gone {
+            continue; // uiautomator real: GONE não aparece no dump
+        }
+        if depth > MAX_DUMP_DEPTH {
+            push_indent(out, depth)?;
+            push_bounded(
+                out,
+                "<!-- truncated: subárvore além de 512 níveis (cap hostil) -->\n",
+            )?;
+            continue;
+        }
+        let (x, y, w, h) = n.bounds;
+        let clickable = if n.clickable { "true" } else { "false" };
+        let enabled = if n.enabled { "true" } else { "false" };
+        let focusable = if n.focusable { "true" } else { "false" };
+        // issue #53: filhos GONE não são emitidos — se não sobra NENHUM, o nó é
+        // self-closing (não <node>…</node> vazio).
+        let visible_children = n
+            .children
+            .iter()
+            .filter(|c| c.visibility != Vis::Gone)
+            .count();
+        let empty = visible_children == 0;
+        // Bounds hostis não podem panicar nem inverter o retângulo: tamanhos
+        // negativos colapsam em zero e as somas saturam.
+        let x2 = x.saturating_add(w.max(0));
+        let y2 = y.saturating_add(h.max(0));
+
+        push_indent(out, depth)?;
+        push_bounded(out, "<node index=\"")?;
+        push_bounded(out, &sibling_index.to_string())?;
+        push_bounded(out, "\" text=\"")?;
+        push_xml_escaped(out, &n.text)?;
+        push_bounded(out, "\" resource-id=\"")?;
+        push_xml_escaped(out, n.resource_id.as_deref().unwrap_or_default())?;
+        push_bounded(out, "\" class=\"")?;
+        push_xml_escaped(out, &n.class)?;
+        push_bounded(out, "\" package=\"")?;
+        push_bounded(out, pkg_esc)?;
+        push_bounded(
+            out,
+            "\" content-desc=\"\" checkable=\"false\" checked=\"false\" clickable=\"",
+        )?;
+        push_bounded(out, clickable)?;
+        push_bounded(out, "\" enabled=\"")?;
+        push_bounded(out, enabled)?;
+        push_bounded(out, "\" focusable=\"")?;
+        push_bounded(out, focusable)?;
+        push_bounded(
+            out,
+            "\" focused=\"false\" scrollable=\"false\" long-clickable=\"false\" \
+password=\"false\" selected=\"false\" bounds=\"[",
+        )?;
+        push_bounded(out, &x.to_string())?;
+        push_bounded(out, ",")?;
+        push_bounded(out, &y.to_string())?;
+        push_bounded(out, "][")?;
+        push_bounded(out, &x2.to_string())?;
+        push_bounded(out, ",")?;
+        push_bounded(out, &y2.to_string())?;
+        push_bounded(out, "]\"")?;
+        if empty {
+            push_bounded(out, "/")?;
+        }
+        push_bounded(out, ">\n")?;
+
+        // issue #62: nó com subárvore cortada ganha marcador EXPLÍCITO — o agente
+        // não pode ler a árvore como completa.
+        if n.truncated {
+            push_indent(out, depth)?;
+            push_bounded(
+                out,
+                "<!-- truncated: subárvore além de 512 níveis (cap hostil) -->\n",
+            )?;
+        }
+        if !empty {
+            stack.push(Event::Exit(depth));
+            for (reverse_index, c) in n
+                .children
+                .iter()
+                .filter(|c| c.visibility != Vis::Gone)
+                .rev()
+                .enumerate()
+            {
+                let i = visible_children - 1 - reverse_index;
+                stack.push(Event::Enter(c, depth + 1, i));
+            }
+        }
     }
     Ok(())
 }
@@ -113,26 +202,33 @@ bounds=\"[{x},{y}][{x2},{y2}]\"{}>\n",
 /// - `\t\n\r` legais em XML 1.0 mas normalizados por parsers quando crus —
 ///   viram referências `&#x9;`/`&#xA;`/`&#xD;` (o serializer do Android emite
 ///   `&#10;` para texto multilinha);
-/// - os proibidos (U+0000–U+0008/U+000B/U+000C/U+000E–U+001F) viram U+FFFD —
-///   mesmo saneamento do getText do Android; o dump permanece XML válido
-///   (expat: "not well-formed" sem isto).
-fn xml_escape(s: &str) -> String {
-    let mut o = String::with_capacity(s.len());
+/// - os proibidos (U+0000–U+0008/U+000B/U+000C/U+000E–U+001F) e os
+///   não-caracteres U+FFFE/U+FFFF viram U+FFFD — mesmo saneamento do
+///   getText do Android; o dump permanece XML válido (expat:
+///   "not well-formed" sem isto).
+///
+/// The escaped bytes are streamed into `out` under `MAX_DUMP_BYTES`, so a
+/// hostile field cannot first materialize a multi-gigabyte temporary.
+fn push_xml_escaped(out: &mut String, s: &str) -> Result<(), RdError> {
     for c in s.chars() {
         match c {
-            '&' => o.push_str("&amp;"),
-            '<' => o.push_str("&lt;"),
-            '>' => o.push_str("&gt;"),
-            '"' => o.push_str("&quot;"),
-            '\'' => o.push_str("&apos;"),
-            '\t' => o.push_str("&#x9;"),
-            '\n' => o.push_str("&#xA;"),
-            '\r' => o.push_str("&#xD;"),
-            c if (c as u32) < 0x20 => o.push('\u{FFFD}'),
-            _ => o.push(c),
+            '&' => push_bounded(out, "&amp;")?,
+            '<' => push_bounded(out, "&lt;")?,
+            '>' => push_bounded(out, "&gt;")?,
+            '"' => push_bounded(out, "&quot;")?,
+            '\'' => push_bounded(out, "&apos;")?,
+            '\t' => push_bounded(out, "&#x9;")?,
+            '\n' => push_bounded(out, "&#xA;")?,
+            '\r' => push_bounded(out, "&#xD;")?,
+            '\u{FFFE}' | '\u{FFFF}' => push_bounded(out, "\u{FFFD}")?,
+            c if (c as u32) < 0x20 => push_bounded(out, "\u{FFFD}")?,
+            _ => {
+                let mut buf = [0; 4];
+                push_bounded(out, c.encode_utf8(&mut buf))?;
+            }
         }
     }
-    o
+    Ok(())
 }
 
 #[cfg(test)]
@@ -333,5 +429,39 @@ mod tests {
         n.truncated = true;
         let xml = uiautomator_xml(&n, "p").unwrap();
         assert!(xml.contains("<!-- truncated:"), "{xml}");
+    }
+
+    #[test]
+    fn deep_public_tree_is_capped_and_marked() {
+        let mut root = node("L599", None, "", (0, 0, 1, 1));
+        for i in (0..599).rev() {
+            let mut parent = node(&format!("L{i}"), None, "", (0, 0, 1, 1));
+            parent.children.push(root);
+            root = parent;
+        }
+        let xml = uiautomator_xml(&root, "p").unwrap();
+        assert_eq!(xml.matches("<node ").count(), 512);
+        assert!(xml.contains("<!-- truncated:"), "cap is explicit");
+    }
+
+    #[test]
+    fn single_node_cannot_bypass_dump_budget() {
+        let mut root = node("C", None, "", (0, 0, 1, 1));
+        // 13.5M ampersands expand to 67.5 MB, just over MAX_DUMP_BYTES.
+        root.text = "&".repeat(13_500_000);
+        match uiautomator_xml(&root, "p") {
+            Err(err) => assert_eq!(err.code, "INVALID_FORMAT"),
+            Ok(_) => panic!("expected dump budget error"),
+        }
+    }
+
+    #[test]
+    fn xml_noncharacters_are_sanitized_and_negative_size_does_not_invert_bounds() {
+        let root = node("C", Some("id\u{FFFE}"), "a\u{FFFF}b", (10, 20, -5, -7));
+        let xml = uiautomator_xml(&root, "p").unwrap();
+        assert!(!xml.contains('\u{FFFE}'), "{xml}");
+        assert!(!xml.contains('\u{FFFF}'), "{xml}");
+        assert_eq!(xml.matches('\u{FFFD}').count(), 2, "{xml}");
+        assert!(xml.contains("bounds=\"[10,20][10,20]\""), "{xml}");
     }
 }

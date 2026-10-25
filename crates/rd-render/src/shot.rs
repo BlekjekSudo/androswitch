@@ -57,6 +57,9 @@ impl Framebuffer {
     }
 
     pub fn rect_border(&mut self, x: i32, y: i32, w: i32, h: i32, c: Rgb) {
+        if w <= 0 || h <= 0 {
+            return;
+        }
         self.rect(x, y, w, 1, c);
         self.rect(x, y.saturating_add(h.saturating_sub(1)), w, 1, c);
         self.rect(x, y, 1, h, c);
@@ -366,5 +369,16 @@ mod tests {
         root.children
             .push(node("C", "y", (i32::MAX, i32::MAX, i32::MAX, i32::MAX)));
         let _ = render_snapshot(&root);
+    }
+
+    #[test]
+    fn zero_or_negative_border_size_paints_nothing() {
+        let mut fb = Framebuffer::new((0xF6, 0xF6, 0xF6));
+        let before = fb.px.clone();
+        fb.rect_border(10, 20, 100, 0, (0xFF, 0, 0));
+        fb.rect_border(10, 20, 0, 100, (0xFF, 0, 0));
+        fb.rect_border(10, 20, -5, 100, (0xFF, 0, 0));
+        fb.rect_border(10, 20, 100, -5, (0xFF, 0, 0));
+        assert!(fb.px == before, "collapsed border must paint nothing");
     }
 }
