@@ -1400,3 +1400,65 @@ fn dex_body_wins_over_host_shim() {
     assert_eq!(ci!(e, ARRAY_MAP, "<init>", "()V", m, []).unwrap(), None);
     assert_eq!(ci!(e, ARRAY_MAP, "size", "()I", m, []).unwrap(), None);
 }
+
+// ── Regressão (auditoria de estabilização): um Observer que faz
+// setValue dentro de onChanged não pode recursar o despacho até ao
+// SIGABRT do hospedeiro. Antes das flags dispatching/invalidated
+// (paridade com o AOSP), este cenário abortava o processo.
+#[test]
+fn livedata_observer_setting_value_in_callback_is_bounded() {
+    let mut b = DexBuilder::new();
+    let cls = b.class("LLdLoop;", "Ljava/lang/Object;");
+    b.static_field(cls, "calls", "I", common::SVal::Int(0));
+    let f_calls = b.field_idx("LLdLoop;", "I", "calls");
+    let p_set = b.proto_idx("V", vec!["Ljava/lang/Object;".into()]);
+    let m_set = b.method_idx("Landroidx/lifecycle/MutableLiveData;", p_set, "setValue");
+    b.r#virtual(
+        cls,
+        "onChanged",
+        "V",
+        vec!["Ljava/lang/Object;"],
+        ACC_PUBLIC,
+        Some(b.code(5, 2, 2, {
+            let mut u = op21c(0x60, 0, f_calls);
+            u.extend(op11n(0x12, 1, 1));
+            u.extend(op23x(0x90, 0, 0, 1));
+            u.extend(op21c(0x67, 0, f_calls));
+            // O argumento é a própria LiveData: arg.setValue(arg).
+            u.extend(op35c(0x6E, 2, m_set, [4, 4, 0, 0, 0]));
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+    let ld = obj(&mut e, MUTABLE_LIVEDATA);
+    ci!(e, MUTABLE_LIVEDATA, "<init>", "()V", ld, []).unwrap();
+    let obs = obj(&mut e, "LLdLoop;");
+    ci!(
+        e,
+        MUTABLE_LIVEDATA,
+        "observeForever",
+        "(Landroidx/lifecycle/Observer;)V",
+        ld,
+        [Value::Obj(obs)]
+    )
+    .unwrap();
+    let r = ci!(
+        e,
+        MUTABLE_LIVEDATA,
+        "setValue",
+        "(Ljava/lang/Object;)V",
+        ld,
+        [Value::Obj(ld)]
+    );
+    assert!(r.is_ok(), "o setValue exterior conclui sem crash: {r:?}");
+    let calls = match e
+        .statics
+        .get(&("LLdLoop;".to_string(), "calls".to_string()))
+    {
+        Some(Value::Int(n)) => *n,
+        _ => 0,
+    };
+    assert!(calls > 1, "houve re-despacho iterativo (calls={calls})");
+    assert!(calls <= 256, "rondas limitadas pelo teto (calls={calls})");
+}
