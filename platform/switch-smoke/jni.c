@@ -66,7 +66,8 @@ enum {
   GET_FIELD = 35,
   SET_FIELD = 36,
   UNREGISTER = 37,
-  CONSTRUCT = 38
+  CONSTRUCT = 38,
+  EXCEPTION_DESCRIBE = 39
 };
 static uint64_t dispatch(uint32_t op, uint64_t a, uint64_t b, uint64_t c,
                          const void *data, size_t length) {
@@ -186,6 +187,10 @@ static jboolean exception_check(JNIEnv *env) {
 static void exception_clear(JNIEnv *env) {
   (void)env;
   dispatch(EXCEPTION_CLEAR, 0, 0, 0, NULL, 0);
+}
+static void exception_describe(JNIEnv *env) {
+  (void)env;
+  dispatch(EXCEPTION_DESCRIBE, 0, 0, 0, NULL, 0);
 }
 static jthrowable exception_object(JNIEnv *env) {
   (void)env;
@@ -516,6 +521,7 @@ uint64_t as_jni_initialize(void) {
     BIND(EnsureLocalCapacity, capacity);
     BIND(ExceptionCheck, exception_check);
     BIND(ExceptionClear, exception_clear);
+    BIND(ExceptionDescribe, exception_describe);
     BIND(ExceptionOccurred, exception_object);
     BIND(ThrowNew, throw_new);
     BIND(Throw, throw_object);

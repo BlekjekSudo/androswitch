@@ -57,10 +57,7 @@ fn jni_diagnostic(op: u32, a: u64, b: u64, c: u64, detail: &str) {
         as_native_jni_failure(op, a, b, c, detail.as_ptr(), detail.len());
     }
 }
-#[derive(Default)]
-struct ThreadState {
-    pending: Option<Throwable>,
-}
+use crate::jni_exceptions::PendingException as ThreadState;
 pub struct Session {
     loader: RefCell<Loader<HorizonNative>>,
     refs: RefCell<References>,
@@ -290,12 +287,12 @@ impl Session {
             .get(&thread())
             .and_then(|t| t.pending.clone())
     }
-    fn set_pending(&self, t: Throwable) {
+    fn set_pending(&self, vm: &Engine, t: Throwable) {
         self.threads
             .borrow_mut()
             .entry(thread())
             .or_default()
-            .pending = Some(t);
+            .set(vm, t);
     }
     fn value(&self, bits: u64, kind: &str) -> Result<Value> {
         crate::jni_objects::from_bits(&self.refs, thread(), bits, kind)
@@ -533,15 +530,22 @@ impl Session {
             13..=19 => crate::jni_objects::dispatch(vm, &self.refs, thread(), op, a, b, None),
             20 => Ok(self.pending().is_some() as u64),
             21 => {
-                self.threads
+                self.threads.borrow_mut().remove(&thread());
+                Ok(0)
+            }
+            39 => {
+                // Release the RefCell borrow before any virtual Java callback.
+                let mut pending = self
+                    .threads
                     .borrow_mut()
-                    .entry(thread())
-                    .or_default()
-                    .pending = None;
+                    .remove(&thread())
+                    .unwrap_or_default();
+                pending.describe(vm)?;
                 Ok(0)
             }
             22 => {
-                self.set_pending(Throwable::new(&self.class(vm, a)?, text(data, length)?));
+                let exception = Throwable::new(&self.class(vm, a)?, text(data, length)?);
+                self.set_pending(vm, exception);
                 Ok(0)
             }
             23 => {
@@ -551,7 +555,11 @@ impl Session {
                     } else {
                         let object = vm.heap.alloc_instance(pending.class.clone(), Vec::new())?;
                         pending.obj = Some(object);
-                        self.set_pending(pending);
+                        self.threads
+                            .borrow_mut()
+                            .entry(thread())
+                            .or_default()
+                            .pending = Some(pending);
                         object
                     };
                     self.local(Handle::Object(object))
@@ -561,11 +569,14 @@ impl Session {
             }
             24 => {
                 let object = self.object(a)?;
-                self.set_pending(Throwable {
-                    class: vm.heap.class_of(object)?.to_string(),
-                    message: None,
-                    obj: Some(object),
-                });
+                self.set_pending(
+                    vm,
+                    Throwable {
+                        class: vm.heap.class_of(object)?.to_string(),
+                        message: None,
+                        obj: Some(object),
+                    },
+                );
                 Ok(0)
             }
             25 => {
@@ -909,7 +920,7 @@ pub unsafe extern "C" fn as_jni_dispatch(
         Ok(value) => value,
         Err(VmExit::Exception(exception)) => {
             jni_diagnostic(op, a, b, c, &format!("exception={}", exception.class));
-            session.set_pending(exception);
+            session.set_pending(unsafe { &*vm }, exception);
             0
         }
         Err(e) => {

@@ -11,6 +11,82 @@ use std::{path::PathBuf, rc::Rc};
 fn output() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/input-connection-fixture")
 }
+#[test]
+fn api26_default_focus_highlight_has_state_and_changes_rendered_keyboard_focus() {
+    for variant in ["input-connection", "renamed"] {
+        let (mut app, _) = app(variant);
+        let probe = probe(variant);
+        let target = app
+            .vm
+            .invoke_static(&probe, "focusTarget", "()Landroid/view/View;", &[])
+            .unwrap();
+        assert_eq!(
+            app.vm
+                .invoke_static(
+                    &probe,
+                    "highlight",
+                    "(Landroid/view/View;)Z",
+                    std::slice::from_ref(&target)
+                )
+                .unwrap(),
+            Value::Int(1)
+        );
+        app.android.key(&mut app.vm, 22).unwrap();
+        app.draw().unwrap();
+        let highlighted = app.frame.pixels.clone();
+        app.vm
+            .invoke_static(
+                &probe,
+                "highlight",
+                "(Landroid/view/View;Z)V",
+                &[target.clone(), Value::Int(0)],
+            )
+            .unwrap();
+        app.vm.gc();
+        assert_eq!(
+            app.vm
+                .invoke_static(
+                    &probe,
+                    "highlight",
+                    "(Landroid/view/View;)Z",
+                    std::slice::from_ref(&target)
+                )
+                .unwrap(),
+            Value::Int(0)
+        );
+        app.draw().unwrap();
+        assert_ne!(
+            highlighted, app.frame.pixels,
+            "the setter must affect the rendered fallback, not only return success"
+        );
+        app.vm
+            .invoke_static(
+                &probe,
+                "highlight",
+                "(Landroid/view/View;Z)V",
+                &[target, Value::Int(1)],
+            )
+            .unwrap();
+        app.draw().unwrap();
+        assert_eq!(highlighted, app.frame.pixels);
+        assert_eq!(
+            app.android.method_metadata(
+                "Landroid/view/View;",
+                "setDefaultFocusHighlightEnabled",
+                "(Z)V"
+            ),
+            Some(HostMethodKind::Instance)
+        );
+        assert_eq!(
+            app.android.method_metadata(
+                "Landroid/view/View;",
+                "setDefaultFocusHighlightEnabled",
+                "(I)V"
+            ),
+            None
+        );
+    }
+}
 fn namespace(variant: &str) -> &'static str {
     if variant == "renamed" {
         "net/example/editorcontracts"

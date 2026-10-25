@@ -25,12 +25,20 @@ $specs=@(
   @('resource-boolean','org.fixture.packageboolean','android:versionCode="5" android:versionName="5.0"',$false,'android:debuggable="@bool/debug_value"'),
   @('min-only','org.fixture.packageminonly','android:versionCode="6"',$false,'','<uses-sdk android:minSdkVersion="26"/>'),
   @('empty-sdk','org.fixture.packageemptysdk','',$false,'','<uses-sdk/>'),
-  @('no-sdk','org.fixture.packagenosdk','',$false,'','')
+  @('no-sdk','org.fixture.packagenosdk','',$false,'',''),
+  @('provider-disabled-app','org.fixture.providerdisabled','',$false,'android:enabled="false"'),
+  @('provider-duplicate','org.fixture.providerduplicate','',$false,''),
+  @('provider-resource','org.fixture.providerresource','',$false,''),
+  @('provider-options','org.fixture.provideroptions','',$false,'android:directBootAware="true" android:permission="org.fixture.DEFAULT"')
 )
 foreach($spec in $specs){
   $activity=if($spec[3]){'<activity android:name="org.androswitch.contracts.PackageMetadataActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>'}else{''}
   $sdk=if($spec.Count -gt 5){$spec[5]}else{'<uses-sdk android:minSdkVersion="26" android:targetSdkVersion="26"/>'}
-  "<manifest xmlns:android=`"http://schemas.android.com/apk/res/android`" package=`"$($spec[1])`" $($spec[2])>$sdk<application android:label=`"Package metadata contracts`" $($spec[4])>$activity</application></manifest>"|Set-Content "$output/$($spec[0]).xml" -Encoding utf8NoBOM
+  $authority=if($spec[0] -eq 'updated'){"$($spec[1]).new"}elseif($spec[0] -eq 'provider-duplicate'){'org.fixture.packagecompanion.records'}elseif($spec[0] -eq 'provider-resource'){'@string/package_version'}else{"$($spec[1]).records;$($spec[1]).alias"}
+  $providers="<provider android:name=`".RecordsProvider`" android:authorities=`"$authority`" android:process=`":records`" android:permission=`"$($spec[1]).ACCESS`" android:grantUriPermissions=`"true`" android:initOrder=`"7`"/><provider android:name=`".DisabledProvider`" android:authorities=`"$($spec[1]).disabled`" android:enabled=`"false`"/>"
+  if($spec[0] -eq 'provider-options'){$providers='<provider android:name=".OptionsProvider" android:authorities="org.fixture.provideroptions.records" android:exported="true" android:singleUser="true" android:visibleToInstantApps="true" android:permission=""/>'}
+  $metadata=if($spec[0] -in @('package-info','renamed','updated','resource-version')){'<meta-data android:name="literal" android:value="hello"/><meta-data android:name="number" android:value="42"/><meta-data android:name="boolean" android:value="true"/><meta-data android:name="float" android:value="1.25"/><meta-data android:name="reference" android:resource="@string/package_version"/><meta-data android:name="string-value" android:value="@string/package_version"/><meta-data android:name="bool-value" android:value="@bool/debug_value"/>'}elseif($spec[0] -eq 'companion'){'<meta-data android:name="literal" android:value="companion"/>'}else{''}
+  "<manifest xmlns:android=`"http://schemas.android.com/apk/res/android`" package=`"$($spec[1])`" $($spec[2])>$sdk<application android:label=`"Package metadata contracts`" $($spec[4])>$activity$providers$metadata</application></manifest>"|Set-Content "$output/$($spec[0]).xml" -Encoding utf8NoBOM
   & "$tools/aapt2.exe" link -o "$output/$($spec[0]).apk" -I $androidJar --manifest "$output/$($spec[0]).xml" "$output/resources/values_metadata.arsc.flat"
   if($LASTEXITCODE){throw 'Package metadata APK packaging failed'}
   $zip=[IO.Compression.ZipFile]::Open("$output/$($spec[0]).apk",[IO.Compression.ZipArchiveMode]::Update)

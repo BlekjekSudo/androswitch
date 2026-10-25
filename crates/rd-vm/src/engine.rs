@@ -359,6 +359,12 @@ impl Engine {
         }
     }
 
+    /// Current execution owner's real DEX frames, innermost first. This is a
+    /// bounded runtime diagnostic, not Java StackTraceElement reflection.
+    pub fn diagnostic_stack(&self) -> Vec<String> {
+        self.frame_labels().rev().take(16).cloned().collect()
+    }
+
     /// Actual declaring DEX class on this execution owner's stack. No parsed
     /// diagnostic labels or another suspended thread's frame are consulted.
     /// No frame means a direct host call has no Java access-checking caller.

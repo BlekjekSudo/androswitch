@@ -61,4 +61,87 @@ public class BundleActivity extends Activity {
   public static boolean contains(String key) { return values.containsKey(key); }
   public static void remove(String key) { values.remove(key); }
   public static void clear() { values.clear(); }
+
+  public static void putBooleanArray(String key,boolean[] value) {values.putBooleanArray(key,value);}
+  public static boolean[] getBooleanArray(String key) {return values.getBooleanArray(key);}
+  public static void extraBooleanArray(String key,boolean[] value) {intent.putExtra(key,value);}
+  public static boolean[] readExtraBooleanArray(String key) {return intent.getBooleanArrayExtra(key);}
+  public static void putByteArray(String key,byte[] value) {values.putByteArray(key,value);}
+  public static byte[] getByteArray(String key) {return values.getByteArray(key);}
+  public static void extraByteArray(String key,byte[] value) {intent.putExtra(key,value);}
+  public static byte[] readExtraByteArray(String key) {return intent.getByteArrayExtra(key);}
+  public static void putCharArray(String key,char[] value) {values.putCharArray(key,value);}
+  public static char[] getCharArray(String key) {return values.getCharArray(key);}
+  public static void extraCharArray(String key,char[] value) {intent.putExtra(key,value);}
+  public static char[] readExtraCharArray(String key) {return intent.getCharArrayExtra(key);}
+  public static void putShortArray(String key,short[] value) {values.putShortArray(key,value);}
+  public static short[] getShortArray(String key) {return values.getShortArray(key);}
+  public static void extraShortArray(String key,short[] value) {intent.putExtra(key,value);}
+  public static short[] readExtraShortArray(String key) {return intent.getShortArrayExtra(key);}
+  public static void putIntArray(String key,int[] value) {values.putIntArray(key,value);}
+  public static int[] getIntArray(String key) {return values.getIntArray(key);}
+  public static void extraIntArray(String key,int[] value) {intent.putExtra(key,value);}
+  public static int[] readExtraIntArray(String key) {return intent.getIntArrayExtra(key);}
+  public static void putLongArray(String key,long[] value) {values.putLongArray(key,value);}
+  public static long[] getLongArray(String key) {return values.getLongArray(key);}
+  public static void extraLongArray(String key,long[] value) {intent.putExtra(key,value);}
+  public static long[] readExtraLongArray(String key) {return intent.getLongArrayExtra(key);}
+  public static void putFloatArray(String key,float[] value) {values.putFloatArray(key,value);}
+  public static float[] getFloatArray(String key) {return values.getFloatArray(key);}
+  public static void extraFloatArray(String key,float[] value) {intent.putExtra(key,value);}
+  public static float[] readExtraFloatArray(String key) {return intent.getFloatArrayExtra(key);}
+  public static void putDoubleArray(String key,double[] value) {values.putDoubleArray(key,value);}
+  public static double[] getDoubleArray(String key) {return values.getDoubleArray(key);}
+  public static void extraDoubleArray(String key,double[] value) {intent.putExtra(key,value);}
+  public static double[] readExtraDoubleArray(String key) {return intent.getDoubleArrayExtra(key);}
+  public static void putStringArray(String key,String[] value) {values.putStringArray(key,value);}
+  public static String[] getStringArray(String key) {return values.getStringArray(key);}
+  public static void extraStringArray(String key,String[] value) {intent.putExtra(key,value);}
+  public static String[] readExtraStringArray(String key) {return intent.getStringArrayExtra(key);}
+  public static int arrayProof() {
+    boolean[] a0=new boolean[]{true,false};
+    values.putBooleanArray("Boolean",a0);intent.putExtra("Boolean",a0);
+    System.gc();
+    if(values.getBooleanArray("Boolean")!=a0 || intent.getBooleanArrayExtra("Boolean")!=a0)throw new IllegalStateException("array identity Boolean");
+    byte[] a1=new byte[]{-113,99};
+    values.putByteArray("Byte",a1);intent.putExtra("Byte",a1);
+    System.gc();
+    if(values.getByteArray("Byte")!=a1 || intent.getByteArrayExtra("Byte")!=a1)throw new IllegalStateException("array identity Byte");
+    char[] a2=new char[]{'\u263a','Z'};
+    values.putCharArray("Char",a2);intent.putExtra("Char",a2);
+    System.gc();
+    if(values.getCharArray("Char")!=a2 || intent.getCharArrayExtra("Char")!=a2)throw new IllegalStateException("array identity Char");
+    short[] a3=new short[]{-23456,12345};
+    values.putShortArray("Short",a3);intent.putExtra("Short",a3);
+    System.gc();
+    if(values.getShortArray("Short")!=a3 || intent.getShortArrayExtra("Short")!=a3)throw new IllegalStateException("array identity Short");
+    int[] a4=new int[]{17,-19};
+    values.putIntArray("Int",a4);intent.putExtra("Int",a4);
+    System.gc();
+    if(values.getIntArray("Int")!=a4 || intent.getIntArrayExtra("Int")!=a4)throw new IllegalStateException("array identity Int");
+    long[] a5=new long[]{Long.MIN_VALUE,Long.MAX_VALUE};
+    values.putLongArray("Long",a5);intent.putExtra("Long",a5);
+    System.gc();
+    if(values.getLongArray("Long")!=a5 || intent.getLongArrayExtra("Long")!=a5)throw new IllegalStateException("array identity Long");
+    float[] a6=new float[]{1.25f,-3.5f};
+    values.putFloatArray("Float",a6);intent.putExtra("Float",a6);
+    System.gc();
+    if(values.getFloatArray("Float")!=a6 || intent.getFloatArrayExtra("Float")!=a6)throw new IllegalStateException("array identity Float");
+    double[] a7=new double[]{Double.NaN,-0.0};
+    values.putDoubleArray("Double",a7);intent.putExtra("Double",a7);
+    System.gc();
+    if(values.getDoubleArray("Double")!=a7 || intent.getDoubleArrayExtra("Double")!=a7)throw new IllegalStateException("array identity Double");
+    String[] a8=new String[]{"alpha",null};
+    values.putStringArray("String",a8);intent.putExtra("String",a8);
+    System.gc();
+    if(values.getStringArray("String")!=a8 || intent.getStringArrayExtra("String")!=a8)throw new IllegalStateException("array identity String");
+    snapshot=intent.getExtras();a8[0]="changed";
+    if(!"changed".equals(snapshot.getStringArray("String")[0]))throw new IllegalStateException("shallow array snapshot");
+    values.putInt("wrong",42);intent.putExtra("wrong",42);
+    if(values.getIntArray("wrong")!=null || intent.getStringArrayExtra("wrong")!=null || intent.getStringArrayExtra("absent")!=null)throw new IllegalStateException("array type defaults");
+    values.putStringArray(null,new String[0]);if(values.getStringArray(null).length!=0)throw new IllegalStateException("null key empty array");
+    values.putStringArray("nullable",null);if(values.getStringArray("nullable")!=null || !values.containsKey("nullable"))throw new IllegalStateException("explicit null array");
+    return 9;
+  }
+  public static void releaseArrays(){values.clear();intent=new Intent();snapshot=null;}
 }

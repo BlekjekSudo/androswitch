@@ -7,6 +7,7 @@ use alloc::{
     vec,
 };
 pub(crate) mod atomic;
+pub(crate) mod atomic_number;
 mod charset_catalog;
 pub(crate) mod classes;
 pub(crate) mod enums;
@@ -130,6 +131,9 @@ impl Engine {
         }
         let mut visited = crate::maps::HashSet::new();
         while visited.insert(current.clone()) {
+            if atomic_number::supports(&current) {
+                return atomic_number::attach(self, &current, _object);
+            }
             if current == atomic::CLASS {
                 return atomic::attach(self, _object);
             }

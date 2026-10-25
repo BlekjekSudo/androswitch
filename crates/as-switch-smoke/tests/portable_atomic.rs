@@ -14,14 +14,14 @@ fn vm() -> Engine {
     )
 }
 #[test]
-fn eighteen_jvm_cases_match_before_and_after_gc() {
+fn sixty_two_jvm_cases_match_before_and_after_gc() {
     let mut vm = vm();
     let oracle = std::fs::read_to_string(root().join("jvm-oracle.txt")).unwrap();
-    assert_eq!(oracle.lines().count(), 18);
+    assert_eq!(oracle.lines().count(), 62);
     for _ in 0..2 {
         for row in oracle.lines() {
             let parts: Vec<_> = row.split('\t').collect();
-            let sig = if parts[0] == "run" {
+            let sig = if parts[0] != "text" {
                 "(I)J"
             } else {
                 "(I)Ljava/lang/String;"
@@ -34,7 +34,7 @@ fn eighteen_jvm_cases_match_before_and_after_gc() {
                     &[Value::Int(parts[1].parse().unwrap())],
                 )
                 .unwrap();
-            let actual = if parts[0] == "run" {
+            let actual = if parts[0] != "text" {
                 value.as_long().unwrap().to_string()
             } else {
                 vm.heap
@@ -86,4 +86,51 @@ fn shared_identity_cas_and_collection_follow_heap_lifetime() {
     vm.gc();
     assert_eq!(vm.heap.class_of(object).unwrap(), rd_vm::gc::FREED_CLASS);
     assert!(vm.invoke_instance(object, "get", "()Z", &[]).is_err());
+}
+#[test]
+fn numeric_slots_keep_identity_reject_bad_descriptors_and_follow_gc() {
+    let mut vm = vm();
+    for (class, get, set, cas, one, zero) in [
+        (
+            "Ljava/util/concurrent/atomic/AtomicInteger;",
+            "()I",
+            "(I)V",
+            "(II)Z",
+            Value::Int(1),
+            Value::Int(0),
+        ),
+        (
+            "Ljava/util/concurrent/atomic/AtomicLong;",
+            "()J",
+            "(J)V",
+            "(JJ)Z",
+            Value::Long(1),
+            Value::Long(0),
+        ),
+    ] {
+        let object = vm.new_instance(class).unwrap();
+        vm.statics
+            .insert(("LRoot;".into(), "numeric".into()), Value::Obj(object));
+        vm.gc();
+        assert_eq!(vm.invoke_instance(object, "get", get, &[]).unwrap(), zero);
+        assert_eq!(
+            vm.invoke_instance(object, "compareAndSet", cas, &[zero.clone(), one.clone()])
+                .unwrap(),
+            Value::Int(1)
+        );
+        assert_eq!(
+            vm.invoke_instance(object, "compareAndSet", cas, &[zero, one.clone()])
+                .unwrap(),
+            Value::Int(0)
+        );
+        assert!(vm
+            .invoke_instance(object, "set", set, &[Value::Null])
+            .is_err());
+        assert_eq!(vm.invoke_instance(object, "get", get, &[]).unwrap(), one);
+        assert!(vm.invoke_instance(object, "getOpaque", get, &[]).is_err());
+        vm.statics.clear();
+        vm.gc();
+        assert_eq!(vm.heap.class_of(object).unwrap(), rd_vm::gc::FREED_CLASS);
+        assert!(vm.invoke_instance(object, "get", get, &[]).is_err());
+    }
 }

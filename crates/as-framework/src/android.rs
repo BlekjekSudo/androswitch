@@ -99,6 +99,7 @@ pub struct View {
     pub visible: bool,
     pub enabled: bool,
     pub clickable: bool,
+    pub default_focus_highlight_enabled: bool,
     pub color: u32,
     pub text_color: u32,
     pub text_size: f32,
@@ -125,6 +126,7 @@ impl View {
             visible: true,
             enabled: true,
             clickable: class == "Landroid/widget/Button;",
+            default_focus_highlight_enabled: true,
             color: if class == "Landroid/widget/Button;" {
                 0xff305c89
             } else {
@@ -199,6 +201,7 @@ struct State {
     motion: BTreeMap<ObjRef, (i32, f32, f32, f32, f32, u64)>,
     lifecycle: Vec<Lifecycle>,
     focus: usize,
+    keyboard_focus: bool,
     pressed: Option<ObjRef>,
     finished: bool,
     resources: Option<ObjRef>,
@@ -556,6 +559,7 @@ impl Android {
             self.record(&old.class, "onStop");
         }
         self.state.borrow_mut().focus = 0;
+        self.state.borrow_mut().keyboard_focus = false;
         self.layout();
         Ok(())
     }
@@ -748,6 +752,7 @@ impl Android {
             self.record(&active.class, method);
         }
         self.state.borrow_mut().focus = 0;
+        self.state.borrow_mut().keyboard_focus = false;
         self.layout();
         Ok(())
     }
@@ -818,6 +823,7 @@ impl Android {
         self.main_boundary(vm, |vm| self.touch_inner(vm, action, x, y))
     }
     fn touch_inner(&self, vm: &mut Engine, action: i32, x: f32, y: f32) -> Result<()> {
+        self.state.borrow_mut().keyboard_focus = false;
         self.layout();
         let root = self.active_root();
         let hit = root.and_then(|r| self.hit(r, x as i32, y as i32));
@@ -950,6 +956,9 @@ impl Android {
         if key == 4 {
             return self.back(vm);
         }
+        if !matches!(key, 19..=23 | 66) {
+            return Ok(());
+        }
         let Some(root) = self.active_root() else {
             return Ok(());
         };
@@ -959,6 +968,7 @@ impl Android {
             return Ok(());
         }
         let mut s = self.state.borrow_mut();
+        s.keyboard_focus = true;
         if key == 20 || key == 22 {
             s.focus = (s.focus + 1) % all.len();
         } else if key == 19 || key == 21 {
@@ -1101,11 +1111,27 @@ impl Android {
         self.services.glsurface.mark_display_started();
         frame.clear(0xff101419);
         if let Some(root) = self.active_root() {
-            self.draw_view(vm, frame, root, 0)?;
+            let mut focusable = vec![];
+            self.clickables(root, &mut focusable);
+            let state = self.state.borrow();
+            let focused = if state.keyboard_focus && !focusable.is_empty() {
+                Some(focusable[state.focus % focusable.len()])
+            } else {
+                None
+            };
+            drop(state);
+            self.draw_view(vm, frame, root, focused, 0)?;
         }
         Ok(())
     }
-    fn draw_view(&self, vm: &mut Engine, frame: &mut Frame, r: ObjRef, depth: usize) -> Result<()> {
+    fn draw_view(
+        &self,
+        vm: &mut Engine,
+        frame: &mut Frame,
+        r: ObjRef,
+        focused: Option<ObjRef>,
+        depth: usize,
+    ) -> Result<()> {
         if depth > 64 {
             return Err(error("VIEW_DEPTH", "draw tree >64"));
         }
@@ -1163,7 +1189,19 @@ impl Android {
             }
         }
         for child in v.children {
-            self.draw_view(vm, frame, child, depth + 1)?;
+            self.draw_view(vm, frame, child, focused, depth + 1)?;
+        }
+        if focused == Some(r) && v.default_focus_highlight_enabled {
+            // A visible fallback for this software View renderer's keyboard
+            // focus. Theme/state-list drawables remain a separate capability.
+            for (dx, dy, dw, dh) in [
+                (x, y, w, 2),
+                (x, y + h - 2, w, 2),
+                (x, y, 2, h),
+                (x + w - 2, y, 2, h),
+            ] {
+                frame.rect(dx, dy, dw, dh, 0xff66ccff);
+            }
         }
         Ok(())
     }
@@ -1381,6 +1419,7 @@ impl Android {
                     | "Landroid/content/pm/ApplicationInfo;"
                     | "Ljava/lang/ClassLoader;"
                     | "Ljava/lang/BootClassLoader;"
+                    | "Ldalvik/system/PathClassLoader;"
                     | "Landroid/view/View;"
                     | "Landroid/opengl/GLSurfaceView;"
                     | "Landroid/view/SurfaceView;"
@@ -2538,6 +2577,18 @@ impl Android {
                 Value::Null
             }
             ("isEnabled", "()Z") => Value::Int(self.state.borrow().views[&r].enabled as i32),
+            ("setDefaultFocusHighlightEnabled", "(Z)V") => {
+                self.state
+                    .borrow_mut()
+                    .views
+                    .get_mut(&r)
+                    .unwrap()
+                    .default_focus_highlight_enabled = int(args, 0)? != 0;
+                Value::Null
+            }
+            ("getDefaultFocusHighlightEnabled", "()Z") => Value::Int(i32::from(
+                self.state.borrow().views[&r].default_focus_highlight_enabled,
+            )),
             ("performClick", "()Z") => Value::Int(self.click_inner(vm, r)? as i32),
             ("setVisibility", "(I)V") => {
                 self.state.borrow_mut().views.get_mut(&r).unwrap().visible = int(args, 0)? == 0;

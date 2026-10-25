@@ -50,7 +50,11 @@ pub fn method_owner(
         if name == "<init>" {
             break;
         }
-        let Some(next) = vm.cp.superclass_of(&current) else {
+        let Some(next) = vm
+            .cp
+            .superclass_of(&current)
+            .or_else(|| rd_vm::classpath::host_superclass(&current).map(ToString::to_string))
+        else {
             break;
         };
         if next == current {

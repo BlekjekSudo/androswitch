@@ -1679,9 +1679,19 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Ljava/lang/InheritableThreadLocal;" => {
             Some(&["Ljava/lang/ThreadLocal;", "Ljava/lang/Object;"])
         }
-        "Ljava/lang/Class;" | "Lorg/androswitch/runtime/CollectionIterator;" => Some(OBJECT),
+        "Ljava/lang/Class;"
+        | "Landroid/os/Debug;"
+        | "Lorg/androswitch/runtime/CollectionIterator;" => Some(OBJECT),
         "Ljava/lang/ClassLoader;" => Some(OBJECT),
         "Ljava/lang/BootClassLoader;" => Some(&["Ljava/lang/ClassLoader;", "Ljava/lang/Object;"]),
+        "Ldalvik/system/BaseDexClassLoader;" => {
+            Some(&["Ljava/lang/ClassLoader;", "Ljava/lang/Object;"])
+        }
+        "Ldalvik/system/PathClassLoader;" => Some(&[
+            "Ldalvik/system/BaseDexClassLoader;",
+            "Ljava/lang/ClassLoader;",
+            "Ljava/lang/Object;",
+        ]),
         // M8: ServiceLoader host é um Iterable vazio enquanto a descoberta
         // `META-INF/services` do APK permanece fora do runtime.
         "Ljava/util/ServiceLoader;" => Some(OBJECT),
@@ -2101,6 +2111,16 @@ pub fn host_class_known(desc: &str) -> bool {
     desc == "Ljava/lang/Object;"
         || builtin_hierarchy(desc).is_some()
         || builtin_interfaces(desc).is_some()
+}
+/// Direct parent of a modeled platform class. DEX declarations remain owned by
+/// Classpath::superclass_of; interfaces do not inherit class constructors.
+pub fn host_superclass(desc: &str) -> Option<&'static str> {
+    if host_interface_modifiers(desc).is_some() {
+        return None;
+    }
+    builtin_hierarchy(desc)
+        .and_then(|parents| parents.first())
+        .copied()
 }
 
 /// Exact interfaces with modeled portable contracts. Public nested callbacks

@@ -1723,7 +1723,10 @@ fn do_invoke(
     } else if is_super
         && matches!(
             mref.class.as_str(),
-            "Ljava/lang/Enum;" | "Ljava/util/concurrent/atomic/AtomicBoolean;"
+            "Ljava/lang/Enum;"
+                | "Ljava/util/concurrent/atomic/AtomicBoolean;"
+                | "Ljava/util/concurrent/atomic/AtomicInteger;"
+                | "Ljava/util/concurrent/atomic/AtomicLong;"
         )
     {
         mref.class.as_str()

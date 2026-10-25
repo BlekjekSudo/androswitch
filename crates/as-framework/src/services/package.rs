@@ -1,13 +1,18 @@
 //! Package metadata and directories describe the same installation/VFS as the
 //! application executes. Loaded DEX classes share one canonical class loader.
 use super::*;
+mod application;
+mod features;
 mod installed;
+mod providers;
 
 const CONTEXT: &str = "Landroid/content/Context;";
 const CLASS_LOADER: &str = "Ljava/lang/ClassLoader;";
 const BOOT_LOADER: &str = "Ljava/lang/BootClassLoader;";
+const PATH_LOADER: &str = "Ldalvik/system/PathClassLoader;";
 const APPLICATION_INFO: &str = "Landroid/content/pm/ApplicationInfo;";
 const PACKAGE_INFO: &str = "Landroid/content/pm/PackageInfo;";
+const PROVIDER_INFO: &str = "Landroid/content/pm/ProviderInfo;";
 const PACKAGE_MANAGER: &str = "Landroid/content/pm/PackageManager;";
 const NAME_NOT_FOUND: &str = "Landroid/content/pm/PackageManager$NameNotFoundException;";
 struct MountedSource {
@@ -20,6 +25,7 @@ struct MountedSource {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum LoaderScope {
     Application,
+    System,
     Bootstrap,
 }
 
@@ -28,6 +34,7 @@ pub(super) struct PackageService {
     source: RefCell<Option<MountedSource>>,
     application_info: RefCell<Option<ObjRef>>,
     class_loader: RefCell<Option<ObjRef>>,
+    system_loader: RefCell<Option<ObjRef>>,
     boot_loader: RefCell<Option<ObjRef>>,
 }
 impl PackageService {
@@ -97,7 +104,7 @@ impl PackageService {
         if let Some(loader) = *self.class_loader.borrow() {
             return Ok(loader);
         }
-        let loader = shell(vm, CLASS_LOADER)?;
+        let loader = shell(vm, PATH_LOADER)?;
         *self.class_loader.borrow_mut() = Some(loader);
         Ok(loader)
     }
@@ -109,6 +116,34 @@ impl PackageService {
         *self.boot_loader.borrow_mut() = Some(loader);
         Ok(loader)
     }
+    fn system_loader(&self, vm: &mut Engine) -> Result<ObjRef> {
+        if let Some(loader) = *self.system_loader.borrow() {
+            return Ok(loader);
+        }
+        // API26 has a system PathClassLoader between the app and bootstrap
+        // loaders. Its boot/framework classpath does not include APK DEX.
+        let loader = shell(vm, PATH_LOADER)?;
+        *self.system_loader.borrow_mut() = Some(loader);
+        Ok(loader)
+    }
+    pub(super) fn call_static(
+        &self,
+        vm: &mut Engine,
+        class: &str,
+        name: &str,
+        sig: &str,
+    ) -> Result<Option<Value>> {
+        if (class, name, sig)
+            == (
+                CLASS_LOADER,
+                "getSystemClassLoader",
+                "()Ljava/lang/ClassLoader;",
+            )
+        {
+            return Ok(Some(Value::Obj(self.system_loader(vm)?)));
+        }
+        Ok(None)
+    }
     pub(super) fn resolve_loader(
         &self,
         vm: &Engine,
@@ -119,6 +154,9 @@ impl PackageService {
         };
         if *self.class_loader.borrow() == Some(loader) {
             return Ok(LoaderScope::Application);
+        }
+        if *self.system_loader.borrow() == Some(loader) {
+            return Ok(LoaderScope::System);
         }
         if *self.boot_loader.borrow() == Some(loader) {
             return Ok(LoaderScope::Bootstrap);
@@ -138,8 +176,15 @@ impl PackageService {
         name: &str,
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
-        use rd_vm::framework_host::HostMethodKind::Instance;
+        use rd_vm::framework_host::HostMethodKind::{Instance, Static};
         match (class, name, sig) {
+            (
+                PACKAGE_MANAGER,
+                "hasSystemFeature",
+                "(Ljava/lang/String;)Z" | "(Ljava/lang/String;I)Z",
+            ) => Some(Instance),
+            (CLASS_LOADER, "getSystemClassLoader", "()Ljava/lang/ClassLoader;") => Some(Static),
+            (CLASS_LOADER, "getParent", "()Ljava/lang/ClassLoader;") => Some(Instance),
             (CONTEXT | "Ljava/lang/Class;", "getClassLoader", "()Ljava/lang/ClassLoader;")
             | (CLASS_LOADER, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;")
             | (CONTEXT, "getPackageManager", "()Landroid/content/pm/PackageManager;")
@@ -147,6 +192,16 @@ impl PackageService {
                 PACKAGE_MANAGER,
                 "getPackageInfo",
                 "(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;",
+            )
+            | (
+                PACKAGE_MANAGER,
+                "getApplicationInfo",
+                "(Ljava/lang/String;I)Landroid/content/pm/ApplicationInfo;",
+            )
+            | (
+                PACKAGE_MANAGER,
+                "resolveContentProvider",
+                "(Ljava/lang/String;I)Landroid/content/pm/ProviderInfo;",
             ) => Some(Instance),
             _ => None,
         }
@@ -221,13 +276,12 @@ impl PackageService {
         // fabricated: their backing platform contracts are not implemented.
         Ok(info)
     }
-    fn package_info(&self, services: &Services, vm: &mut Engine, args: &[Value]) -> Result<Value> {
-        if int(args, 1)? != 0 {
-            return Err(error(
-                "API_UNAVAILABLE",
-                "PackageManager.getPackageInfo supports flags=0 only",
-            ));
-        }
+    fn lookup(
+        services: &Services,
+        vm: &mut Engine,
+        name: &Value,
+        installed_only: bool,
+    ) -> Result<as_package::Record> {
         let missing = |vm: &mut Engine, name: Option<String>| {
             let mut throwable = Throwable {
                 class: NAME_NOT_FOUND.into(),
@@ -245,7 +299,7 @@ impl PackageService {
                 Err(error) => error,
             }
         };
-        let Some(name) = args[0].as_ref()? else {
+        let Some(name) = name.as_ref()? else {
             return Err(missing(vm, None));
         };
         let name = vm.heap.as_str(name)?;
@@ -259,15 +313,15 @@ impl PackageService {
         if !as_platform::vfs::valid_package(&name) {
             return Err(missing(vm, Some(name)));
         }
-        let record = match as_package::PackageManager::new(services.fs.clone()).latest(&name) {
-            Ok(Some(record)) if record.installed => record,
-            Ok(_) => return Err(missing(vm, Some(name))),
-            Err(e) if e.code == "PACKAGE_CASE_COLLISION" => return Err(missing(vm, Some(name))),
-            Err(e) => return Err(storage_error(e)),
-        };
-        let metadata = installed::read(services.fs.as_ref(), &record)?;
-        let source = self
-            .source
+        match as_package::PackageManager::new(services.fs.clone()).latest(&name) {
+            Ok(Some(record)) if record.installed || !installed_only => Ok(record),
+            Ok(_) => Err(missing(vm, Some(name))),
+            Err(e) if e.code == "PACKAGE_CASE_COLLISION" => Err(missing(vm, Some(name))),
+            Err(e) => Err(storage_error(e)),
+        }
+    }
+    fn source_for(&self, record: &as_package::Record) -> Option<String> {
+        self.source
             .borrow()
             .as_ref()
             .filter(|mounted| {
@@ -276,7 +330,22 @@ impl PackageService {
                     && mounted.record.apk_sha256 == record.apk_sha256
                     && mounted.record.apk_bytes == record.apk_bytes
             })
-            .map(|mounted| mounted.guest.clone());
+            .map(|mounted| mounted.guest.clone())
+    }
+    fn package_info(&self, services: &Services, vm: &mut Engine, args: &[Value]) -> Result<Value> {
+        let flags = int(args, 1)?;
+        // A package with no registry history is absent regardless of requested
+        // fields. Retained/uninstalled records still require the unsupported
+        // visibility flags to be implemented before answering those queries.
+        let record = Self::lookup(services, vm, &args[0], flags == 0)?;
+        if flags != 0 {
+            return Err(error(
+                "API_UNAVAILABLE",
+                "PackageManager.getPackageInfo supports flags=0 only",
+            ));
+        }
+        let metadata = installed::read(services.fs.as_ref(), &record)?;
+        let source = self.source_for(&record);
         let info = shell(vm, PACKAGE_INFO)?;
         let application = Self::application_info(vm, &metadata.manifest, source, false)?;
         let package = string(vm, record.package)?;
@@ -326,6 +395,26 @@ impl PackageService {
         args: &[Value],
     ) -> Result<Option<Value>> {
         let actual = vm.heap.class_of(receiver)?.to_string();
+        if vm.cp.is_subtype(&actual, PACKAGE_MANAGER)
+            && name == "hasSystemFeature"
+            && matches!(sig, "(Ljava/lang/String;)Z" | "(Ljava/lang/String;I)Z")
+        {
+            return features::has(vm, args).map(Some);
+        }
+        if vm.cp.is_subtype(&actual, PACKAGE_MANAGER)
+            && name == "getApplicationInfo"
+            && sig == "(Ljava/lang/String;I)Landroid/content/pm/ApplicationInfo;"
+        {
+            return self
+                .installed_application_info(services, android, vm, args)
+                .map(Some);
+        }
+        if vm.cp.is_subtype(&actual, PACKAGE_MANAGER)
+            && name == "resolveContentProvider"
+            && sig == "(Ljava/lang/String;I)Landroid/content/pm/ProviderInfo;"
+        {
+            return self.resolve_provider(services, vm, args).map(Some);
+        }
         if vm.cp.is_subtype(&actual, PACKAGE_MANAGER)
             && name == "getPackageInfo"
             && sig == "(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;"
@@ -382,14 +471,28 @@ impl PackageService {
             return Ok(Some(value));
         }
         let app_loader = *self.class_loader.borrow() == Some(receiver);
+        let system_loader = *self.system_loader.borrow() == Some(receiver);
         let boot_loader = *self.boot_loader.borrow() == Some(receiver);
+        if vm.cp.is_subtype(&actual, CLASS_LOADER)
+            && name == "getParent"
+            && sig == "()Ljava/lang/ClassLoader;"
+        {
+            self.resolve_loader(vm, Some(receiver))?;
+            return Ok(Some(if app_loader {
+                Value::Obj(self.system_loader(vm)?)
+            } else if system_loader {
+                Value::Obj(self.bootstrap_loader(vm)?)
+            } else {
+                Value::Null
+            }));
+        }
         if vm.cp.is_subtype(&actual, CLASS_LOADER)
             && name == "loadClass"
             && sig == "(Ljava/lang/String;)Ljava/lang/Class;"
         {
             self.resolve_loader(vm, Some(receiver))?;
         }
-        if (app_loader || boot_loader)
+        if (app_loader || system_loader || boot_loader)
             && name == "loadClass"
             && sig == "(Ljava/lang/String;)Ljava/lang/Class;"
         {
@@ -429,6 +532,7 @@ impl PackageService {
             .iter()
             .copied()
             .chain(self.class_loader.borrow().iter().copied())
+            .chain(self.system_loader.borrow().iter().copied())
             .chain(self.boot_loader.borrow().iter().copied())
             .collect()
     }

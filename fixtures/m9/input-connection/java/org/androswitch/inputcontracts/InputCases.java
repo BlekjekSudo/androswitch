@@ -12,6 +12,15 @@ import android.view.inputmethod.BaseInputConnection;
 public final class InputCases {
   public static Context context;
   public static Object kept;
+  public static class FocusView extends View {
+    public FocusView(Context context) {super(context);setClickable(true);setBackgroundColor(0xff243444);}
+  }
+  public static View focusTarget() {
+    View view=new FocusView(context);
+    ((android.app.Activity)context).setContentView(view);kept=view;return view;
+  }
+  public static boolean highlight(View view) {return view.getDefaultFocusHighlightEnabled();}
+  public static void highlight(View view,boolean enabled) {view.setDefaultFocusHighlightEnabled(enabled);}
   public static class TrackingText extends SpannableStringBuilder {
     public int replaced;
     public boolean fail;

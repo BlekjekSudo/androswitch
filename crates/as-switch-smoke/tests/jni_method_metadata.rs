@@ -19,6 +19,7 @@ struct Identity {
     owner: Cell<u64>,
     roots: RefCell<Vec<ObjRef>>,
     invoked: RefCell<Vec<String>>,
+    fs: Rc<HostFileSystem>,
 }
 impl NativeHost for Identity {
     fn current_thread_id(&self) -> Option<u64> {
@@ -77,7 +78,7 @@ fn app() -> (App, Rc<Identity>) {
         .unwrap();
     let mut app = App::new(
         pm.load_apk(&installed.package, None).unwrap().1,
-        fs,
+        fs.clone(),
         Rc::new(HostPlatform::default()),
         640,
         360,
@@ -88,6 +89,7 @@ fn app() -> (App, Rc<Identity>) {
         owner: Cell::new(11),
         roots: RefCell::new(vec![]),
         invoked: RefCell::new(vec![]),
+        fs,
     });
     app.vm.bind_native(native.clone());
     app.android.bind_main_thread(&app.vm).unwrap();
@@ -539,5 +541,130 @@ fn adopted_thread_records_are_bounded_and_weak_dead_records_are_pruned() {
     native.owner.set(0);
     assert!(
         matches!(app.vm.invoke_static(THREAD,"currentThread",CURRENT,&[]),Err(VmExit::Error(e)) if e.code=="API_UNAVAILABLE")
+    );
+}
+#[test]
+fn inherited_platform_method_ids_resolve_the_actual_base_without_inheriting_constructors() {
+    let (mut app, _) = app();
+    let class = "Ldalvik/system/PathClassLoader;";
+    let sig = "(Ljava/lang/String;)Ljava/lang/Class;";
+    assert_eq!(
+        method_owner(&mut app.vm, class, "loadClass", sig, false).unwrap(),
+        "Ljava/lang/ClassLoader;"
+    );
+    assert_eq!(
+        method_owner(
+            &mut app.vm,
+            "Ljava/lang/BootClassLoader;",
+            "getParent",
+            "()Ljava/lang/ClassLoader;",
+            false
+        )
+        .unwrap(),
+        "Ljava/lang/ClassLoader;"
+    );
+    let system = app
+        .vm
+        .invoke_static(
+            "Ljava/lang/ClassLoader;",
+            "getSystemClassLoader",
+            "()Ljava/lang/ClassLoader;",
+            &[],
+        )
+        .unwrap();
+    let string = app
+        .vm
+        .invoke_instance(
+            system.as_ref().unwrap().unwrap(),
+            "loadClass",
+            sig,
+            &[Value::StrPlaceholder("java.lang.String".into())],
+        )
+        .unwrap();
+    assert_eq!(
+        app.vm
+            .heap
+            .class_of(string.as_ref().unwrap().unwrap())
+            .unwrap(),
+        "Ljava/lang/Class;"
+    );
+    for (name, descriptor, static_method) in [
+        ("loadClass", sig, true),
+        ("loadClass", "(I)Ljava/lang/Class;", false),
+        ("<init>", "()V", false),
+    ] {
+        assert!(
+            matches!(method_owner(&mut app.vm, class, name, descriptor, static_method), Err(VmExit::Exception(e)) if e.class == "Ljava/lang/NoSuchMethodError;")
+        );
+    }
+}
+#[test]
+fn debug_queries_report_this_vms_absent_java_debugger_without_inventing_other_debug_services() {
+    let (mut app, _) = app();
+    let class = "Landroid/os/Debug;";
+    assert!(as_switch_smoke::jni_constructor::class_known(
+        &app.vm, class
+    ));
+    for name in ["isDebuggerConnected", "waitingForDebugger"] {
+        assert_eq!(
+            method_owner(&mut app.vm, class, name, "()Z", true).unwrap(),
+            class
+        );
+        assert_eq!(
+            app.vm.invoke_static(class, name, "()Z", &[]).unwrap(),
+            Value::Int(0)
+        );
+        assert!(method_owner(&mut app.vm, class, name, "()Z", false).is_err());
+    }
+    assert!(method_owner(
+        &mut app.vm,
+        class,
+        "getNativeHeapAllocatedSize",
+        "()J",
+        true
+    )
+    .is_err());
+}
+#[test]
+fn exception_describe_logs_actual_object_detail_clears_pending_and_is_empty_on_repeat() {
+    let (mut app, native) = app();
+    let mut pending = as_switch_smoke::jni_exceptions::PendingException::default();
+    let exception = rd_vm::Throwable::new("Ljava/lang/IllegalStateException;", "initial detail");
+    let object = app.vm.materialize_throwable(&exception).unwrap();
+    app.vm
+        .invoke_instance(
+            object,
+            "<init>",
+            "(Ljava/lang/String;)V",
+            &[Value::StrPlaceholder("current detail".into())],
+        )
+        .unwrap();
+    pending.set(
+        &app.vm,
+        rd_vm::Throwable {
+            obj: Some(object),
+            ..exception
+        },
+    );
+    pending.describe(&mut app.vm).unwrap();
+    assert!(pending.pending.is_none());
+    assert!(pending.trace.is_empty());
+    let path = format!("logs/android/{}.log", app.android.apk.manifest.package);
+    let output = as_platform::fs::read_all(native.fs.as_ref(), &path, 65536).unwrap();
+    let text = String::from_utf8(output.clone()).unwrap();
+    assert!(
+        text.contains("[w] System.err: java.lang.IllegalStateException: current detail"),
+        "{text}"
+    );
+    assert!(!text.contains("initial detail"));
+    pending.describe(&mut app.vm).unwrap();
+    assert_eq!(
+        as_platform::fs::read_all(native.fs.as_ref(), &path, 65536).unwrap(),
+        output
+    );
+    app.vm.gc();
+    assert_eq!(
+        app.vm.heap.class_of(object).unwrap(),
+        rd_vm::gc::FREED_CLASS
     );
 }

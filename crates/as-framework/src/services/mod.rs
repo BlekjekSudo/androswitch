@@ -41,6 +41,12 @@ impl Services {
         name: &str,
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
+        if class == "Landroid/os/Debug;"
+            && matches!(name, "isDebuggerConnected" | "waitingForDebugger")
+            && sig == "()Z"
+        {
+            return Some(rd_vm::framework_host::HostMethodKind::Static);
+        }
         executors::Executors::metadata(class, name, sig)
             .or_else(|| input_connection::InputConnections::metadata(class, name, sig))
             .or_else(|| runtime::Runtime::metadata(class, name, sig))
@@ -53,6 +59,16 @@ impl Services {
                     (class, name, sig),
                     ("Ljava/lang/Object;", "equals", "(Ljava/lang/Object;)Z")
                         | ("Ljava/lang/String;", "endsWith", "(Ljava/lang/String;)Z")
+                        | (
+                            "Landroid/view/View;",
+                            "setDefaultFocusHighlightEnabled",
+                            "(Z)V"
+                        )
+                        | (
+                            "Landroid/view/View;",
+                            "getDefaultFocusHighlightEnabled",
+                            "()Z"
+                        )
                 )
                 .then_some(rd_vm::framework_host::HostMethodKind::Instance)
             })
@@ -106,7 +122,10 @@ impl Services {
         if self.input_connections.attach(vm, class, r)? {
             return Ok(true);
         }
-        if class == "Landroid/content/pm/PackageInfo;" {
+        if matches!(
+            class,
+            "Landroid/content/pm/PackageInfo;" | "Landroid/content/pm/ProviderInfo;"
+        ) {
             return Ok(true);
         }
         if self.bitmaps.attach(vm, class, r)? {
@@ -177,6 +196,17 @@ impl Services {
         sig: &str,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        if let Some(value) = self.package_metadata.call_static(vm, class, name, sig)? {
+            return Ok(Some(value));
+        }
+        if class == "Landroid/os/Debug;"
+            && matches!(name, "isDebuggerConnected" | "waitingForDebugger")
+            && sig == "()Z"
+        {
+            // This VM has no JDWP/debugger attachment or wait backend. Native
+            // call tracing is diagnostics, not a connected Java debugger.
+            return Ok(Some(Value::Int(0)));
+        }
         if (class, name, sig)
             == (
                 "Ljava/util/Arrays;",

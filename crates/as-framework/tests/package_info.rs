@@ -150,6 +150,22 @@ impl Harness {
         self.query(Value::StrPlaceholder(self.record.package.clone()), 0)
             .unwrap()
     }
+    fn provider(&mut self, authority: Value, flags: i32) -> Result<Value, VmExit> {
+        self.app.vm.invoke_static(
+            PROBE,
+            "provider",
+            "(Ljava/lang/String;I)Landroid/content/pm/ProviderInfo;",
+            &[authority, Value::Int(flags)],
+        )
+    }
+    fn application(&mut self, package: Value, flags: i32) -> Result<Value, VmExit> {
+        self.app.vm.invoke_static(
+            PROBE,
+            "application",
+            "(Ljava/lang/String;I)Landroid/content/pm/ApplicationInfo;",
+            &[package, Value::Int(flags)],
+        )
+    }
     fn field(&self, r: ObjRef, name: &str) -> Value {
         self.app.vm.heap.get_field(r, name).unwrap()
     }
@@ -193,6 +209,391 @@ impl Harness {
         assert!(
             matches!(result,Err(VmExit::Error(ref e)) if e.code=="API_UNAVAILABLE"),
             "{result:?}"
+        );
+    }
+}
+#[test]
+fn provider_authorities_follow_real_installs_aliases_updates_and_uninstall() {
+    for fixture in ["package-info", "renamed"] {
+        let mut h = Harness::new(fixture);
+        let companion = h.install("companion");
+        h.launch();
+        h.fs.bytes.store(0, Ordering::Relaxed);
+        let authority = format!("{}.records", companion.package);
+        let info = h
+            .provider(Value::StrPlaceholder(authority.clone()), 0)
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        assert!(
+            h.fs.bytes.load(Ordering::Relaxed) < 128 * 1024,
+            "metadata query must not stream the padded APK body"
+        );
+        assert_eq!(
+            h.text(h.field(info, "name")),
+            format!("{}.RecordsProvider", companion.package)
+        );
+        assert_eq!(h.text(h.field(info, "packageName")), companion.package);
+        assert_eq!(
+            h.text(h.field(info, "authority")),
+            format!("{}.records;{}.alias", companion.package, companion.package)
+        );
+        assert_eq!(
+            h.text(h.field(info, "processName")),
+            format!("{}:records", companion.package)
+        );
+        assert_eq!(
+            h.text(h.field(info, "readPermission")),
+            format!("{}.ACCESS", companion.package)
+        );
+        for (field, expected) in [
+            ("enabled", 1),
+            ("exported", 0),
+            ("grantUriPermissions", 1),
+            ("multiprocess", 0),
+            ("initOrder", 7),
+        ] {
+            assert_eq!(h.field(info, field), Value::Int(expected));
+        }
+        let application = h.field(info, "applicationInfo").as_ref().unwrap().unwrap();
+        h.app.vm.gc();
+        assert_eq!(
+            h.text(h.field(application, "packageName")),
+            companion.package
+        );
+        let alias = h
+            .provider(
+                Value::StrPlaceholder(format!("{}.alias", companion.package)),
+                0,
+            )
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        assert_ne!(alias, info, "mutable ProviderInfo is a fresh snapshot");
+        h.app.vm.heap.put_field(alias, "name", Value::Null).unwrap();
+        assert!(h
+            .provider(Value::StrPlaceholder(authority.to_uppercase()), 0)
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .is_none());
+        assert!(h
+            .provider(
+                Value::StrPlaceholder(format!("{}.disabled", companion.package)),
+                0
+            )
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .is_none());
+        PackageManager::new(h.fs.clone())
+            .uninstall(&companion.package)
+            .unwrap();
+        assert!(h
+            .provider(Value::StrPlaceholder(authority), 0)
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .is_none());
+        h.clear();
+        h.app.vm.gc();
+        assert_eq!(h.app.vm.heap.class_of(info).unwrap(), FREED_CLASS);
+    }
+    let mut h = Harness::new("package-info");
+    h.launch();
+    h.install("updated");
+    assert!(h
+        .provider(
+            Value::StrPlaceholder("org.fixture.packagemetadata.records".into()),
+            0
+        )
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .is_none());
+    assert!(h
+        .provider(
+            Value::StrPlaceholder("org.fixture.packagemetadata.new".into()),
+            0
+        )
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .is_some());
+}
+#[test]
+fn provider_absence_disabled_application_and_unresolved_metadata_are_distinct() {
+    let mut h = Harness::new("package-info");
+    h.install("provider-disabled-app");
+    h.install("resource-version");
+    h.launch();
+    for authority in [
+        "org.fixture.providerdisabled.records",
+        "no.provider.installed",
+        "",
+    ] {
+        assert!(h
+            .provider(Value::StrPlaceholder(authority.into()), 0)
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .is_none());
+    }
+    assert!(
+        matches!(h.provider(Value::Null, 0), Err(VmExit::Exception(e)) if e.class == "Ljava/lang/NullPointerException;")
+    );
+    assert!(
+        matches!(h.provider(Value::StrPlaceholder("missing".into()), 128), Err(VmExit::Error(e)) if e.code == "API_UNAVAILABLE")
+    );
+    h.install("companion");
+    h.install("provider-duplicate");
+    assert!(
+        matches!(h.provider(Value::StrPlaceholder("org.fixture.packagecompanion.records".into()), 0), Err(VmExit::Error(e)) if e.code == "INSTALLATION_CORRUPT")
+    );
+    h.install("provider-resource");
+    assert!(
+        matches!(h.provider(Value::StrPlaceholder("missing".into()), 0), Err(VmExit::Error(e)) if e.code == "API_UNAVAILABLE")
+    );
+}
+#[test]
+fn provider_api26_manifest_defaults_and_explicit_empty_permissions_are_preserved() {
+    let mut h = Harness::new("package-info");
+    h.install("provider-options");
+    h.install("no-sdk");
+    h.launch();
+    let info = h
+        .provider(
+            Value::StrPlaceholder("org.fixture.provideroptions.records".into()),
+            0,
+        )
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .unwrap();
+    assert_eq!(h.field(info, "exported"), Value::Int(0));
+    assert_eq!(h.field(info, "flags"), Value::Int((1 << 30) | (1 << 20)));
+    assert_eq!(h.field(info, "directBootAware"), Value::Int(0));
+    assert_eq!(h.field(info, "readPermission"), Value::Null);
+    assert_eq!(h.field(info, "writePermission"), Value::Null);
+    let old = h
+        .provider(
+            Value::StrPlaceholder("org.fixture.packagenosdk.records".into()),
+            0,
+        )
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        h.field(old, "exported"),
+        Value::Int(1),
+        "pre17 targets have the old exported default"
+    );
+}
+#[test]
+fn application_info_metadata_is_typed_rooted_and_does_not_invent_missing_packages() {
+    for fixture in ["package-info", "renamed"] {
+        let mut h = Harness::new(fixture);
+        let companion = h.install("companion");
+        let resource = h.install("resource-version");
+        h.launch();
+        let own = h.record.package.clone();
+        let info = h
+            .application(Value::StrPlaceholder(own.clone()), 0)
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        assert_eq!(h.field(info, "metaData"), Value::Null);
+        let info = h
+            .application(Value::StrPlaceholder(own.clone()), 128)
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        let metadata = h.field(info, "metaData").as_ref().unwrap().unwrap();
+        h.app.vm.gc();
+        for (key, method, sig, expected) in [
+            ("number", "getInt", "(Ljava/lang/String;)I", Value::Int(42)),
+            (
+                "boolean",
+                "getBoolean",
+                "(Ljava/lang/String;)Z",
+                Value::Int(1),
+            ),
+            (
+                "bool-value",
+                "getBoolean",
+                "(Ljava/lang/String;)Z",
+                Value::Int(1),
+            ),
+            (
+                "float",
+                "getFloat",
+                "(Ljava/lang/String;)F",
+                Value::Float(1.25),
+            ),
+        ] {
+            assert_eq!(
+                h.app
+                    .vm
+                    .invoke_instance(metadata, method, sig, &[Value::StrPlaceholder(key.into())])
+                    .unwrap(),
+                expected
+            );
+        }
+        for (key, expected) in [("literal", "hello"), ("string-value", "3.0-resource")] {
+            let value = h
+                .app
+                .vm
+                .invoke_instance(
+                    metadata,
+                    "getString",
+                    "(Ljava/lang/String;)Ljava/lang/String;",
+                    &[Value::StrPlaceholder(key.into())],
+                )
+                .unwrap();
+            assert_eq!(h.text(value), expected);
+        }
+        assert!(
+            h.app
+                .vm
+                .invoke_instance(
+                    metadata,
+                    "getInt",
+                    "(Ljava/lang/String;)I",
+                    &[Value::StrPlaceholder("reference".into())]
+                )
+                .unwrap()
+                .as_int()
+                .unwrap()
+                > 0
+        );
+        let other = h
+            .application(Value::StrPlaceholder(companion.package), 128)
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        let other_metadata = h.field(other, "metaData").as_ref().unwrap().unwrap();
+        let value = h
+            .app
+            .vm
+            .invoke_instance(
+                other_metadata,
+                "getString",
+                "(Ljava/lang/String;)Ljava/lang/String;",
+                &[Value::StrPlaceholder("literal".into())],
+            )
+            .unwrap();
+        assert_eq!(h.text(value), "companion");
+        assert!(
+            h.application(Value::StrPlaceholder(resource.package.clone()), 0)
+                .is_ok(),
+            "resource versionName is unrelated to ApplicationInfo"
+        );
+        assert!(
+            matches!(h.application(Value::StrPlaceholder(resource.package), 128), Err(VmExit::Error(e)) if e.code == "API_UNAVAILABLE")
+        );
+        assert!(
+            matches!(h.application(Value::StrPlaceholder("org.example.absent".into()), 0), Err(VmExit::Exception(e)) if e.class == MISSING)
+        );
+        assert!(
+            matches!(h.application(Value::Null, 0), Err(VmExit::Exception(e)) if e.class == MISSING)
+        );
+        assert!(
+            matches!(h.application(Value::StrPlaceholder(own), 1), Err(VmExit::Error(e)) if e.code == "API_UNAVAILABLE")
+        );
+        h.clear();
+        h.app.vm.gc();
+        assert_eq!(h.app.vm.heap.class_of(metadata).unwrap(), FREED_CLASS);
+    }
+}
+#[test]
+fn system_features_describe_exposed_runtime_capabilities_and_handle_unknown_names_and_versions() {
+    for fixture in ["package-info", "renamed"] {
+        let mut h = Harness::new(fixture);
+        h.launch();
+        for (name, expected) in [
+            ("android.hardware.touchscreen", 1),
+            ("android.hardware.faketouch", 1),
+            ("android.hardware.screen.landscape", 1),
+            ("android.hardware.screen.portrait", 1),
+            ("android.hardware.type.watch", 0),
+            ("android.hardware.type.automotive", 0),
+            ("android.hardware.camera", 0),
+            ("android.hardware.wifi", 0),
+            ("android.hardware.touchscreen.multitouch", 0),
+            ("arbitrary.unknown.feature", 0),
+        ] {
+            assert_eq!(
+                h.app
+                    .vm
+                    .invoke_static(
+                        PROBE,
+                        "feature",
+                        "(Ljava/lang/String;)Z",
+                        &[Value::StrPlaceholder(name.into())]
+                    )
+                    .unwrap(),
+                Value::Int(expected)
+            );
+            assert_eq!(
+                h.app
+                    .vm
+                    .invoke_static(
+                        PROBE,
+                        "featureVersion",
+                        "(Ljava/lang/String;I)Z",
+                        &[Value::StrPlaceholder(name.into()), Value::Int(0)]
+                    )
+                    .unwrap(),
+                Value::Int(expected)
+            );
+            assert_eq!(
+                h.app
+                    .vm
+                    .invoke_static(
+                        PROBE,
+                        "featureVersion",
+                        "(Ljava/lang/String;I)Z",
+                        &[Value::StrPlaceholder(name.into()), Value::Int(1)]
+                    )
+                    .unwrap(),
+                Value::Int(0)
+            );
+        }
+        assert_eq!(
+            h.app
+                .vm
+                .invoke_static(PROBE, "feature", "(Ljava/lang/String;)Z", &[Value::Null])
+                .unwrap(),
+            Value::Int(0)
+        );
+    }
+}
+#[test]
+fn never_installed_packages_are_missing_before_field_flags_but_retained_records_do_not_fake_visibility_support(
+) {
+    let mut h = Harness::new("package-info");
+    h.launch();
+    let retained = h.install("companion");
+    PackageManager::new(h.fs.clone())
+        .uninstall(&retained.package)
+        .unwrap();
+    for flags in [64, 128, 0x2000 | 64] {
+        let absent = h.query(
+            Value::StrPlaceholder("org.example.neverinstalled".into()),
+            flags,
+        );
+        h.missing(absent, Some("org.example.neverinstalled"));
+        assert!(
+            matches!(h.query(Value::StrPlaceholder(retained.package.clone()),flags), Err(VmExit::Error(e)) if e.code=="API_UNAVAILABLE")
+        );
+        assert!(
+            matches!(h.application(Value::StrPlaceholder("org.example.neverinstalled".into()),flags), Err(VmExit::Exception(e)) if e.class==MISSING)
         );
     }
 }

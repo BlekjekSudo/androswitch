@@ -1,5 +1,7 @@
 package org.androswitch.vm;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /** Same API 26-compatible source for a real JVM oracle and unmodified DEX. */
 public final class AtomicFixture {
@@ -7,6 +9,18 @@ public final class AtomicFixture {
         public int value = 43;
         Child(boolean value) { super(value); }
         public String toString() { return "DEX_OVERRIDE"; }
+        public String baseText() { return super.toString(); }
+    }
+    public static final class IntChild extends AtomicInteger {
+        public int value = 57;
+        IntChild(int n) { super(n); }
+        public int intValue() { return 307; }
+        public String toString() { return "DEX_INT_OVERRIDE"; }
+        public String baseText() { return super.toString(); }
+    }
+    public static final class LongChild extends AtomicLong {
+        LongChild(long n) { super(n); }
+        public String toString() { return "DEX_LONG_OVERRIDE"; }
         public String baseText() { return super.toString(); }
     }
     static AtomicBoolean shared;
@@ -65,6 +79,62 @@ public final class AtomicFixture {
             case 2: return ((Object)new AtomicBoolean(true)).toString();
             case 3: return ((AtomicBoolean)new Child(false)).toString();
             case 4: return new Child(true).baseText();
+            case 5: return new AtomicInteger(-123).toString();
+            case 6: return ((Object)new AtomicLong(Long.MIN_VALUE)).toString();
+            case 7: return ((AtomicInteger)new IntChild(9)).toString();
+            case 8: return new IntChild(9).baseText();
+            case 9: return ((AtomicLong)new LongChild(12)).toString();
+            case 10: return new LongChild(12).baseText();
+            default: throw new IllegalArgumentException();
+        }
+    }
+    public static long integer(int which) {
+        AtomicInteger a = new AtomicInteger(7);
+        switch (which) {
+            case 0: return new AtomicInteger().get();
+            case 1: a.set(Integer.MAX_VALUE); return a.incrementAndGet();
+            case 2: a.set(Integer.MIN_VALUE); return a.decrementAndGet();
+            case 3: return a.getAndIncrement() * 100L + a.get();
+            case 4: return a.getAndDecrement() * 100L + a.get();
+            case 5: return a.getAndAdd(-15) * 100L + a.get();
+            case 6: return a.addAndGet(Integer.MAX_VALUE);
+            case 7: a.lazySet(-9); return a.getAndSet(11) * 100L + a.get();
+            case 8: return (a.compareAndSet(7, 9) ? 100 : 0) + a.get();
+            case 9: return (a.compareAndSet(6, 9) ? 100 : 0) + a.get();
+            case 10: while (!a.weakCompareAndSet(7, 8)) {} return a.get();
+            case 11: return ((Number)new AtomicInteger(-129)).byteValue();
+            case 12: return ((Number)new AtomicInteger(65535)).shortValue();
+            case 13: return ((Number)new AtomicInteger(-123456)).longValue();
+            case 14: return (long)new AtomicInteger(16777217).floatValue();
+            case 15: return (long)new AtomicInteger(Integer.MAX_VALUE).doubleValue();
+            case 16: IntChild b = new IntChild(3); b.addAndGet(2); return b.value * 100L + b.get();
+            case 17: return ((Number)new IntChild(3)).byteValue();
+            case 18: System.gc(); return a.get();
+            case 19: return new AtomicInteger(4).get() * 100L + a.get();
+            default: throw new IllegalArgumentException();
+        }
+    }
+    public static long longer(int which) {
+        AtomicLong a = new AtomicLong(7);
+        switch (which) {
+            case 0: return new AtomicLong().get();
+            case 1: a.set(Long.MAX_VALUE); return a.incrementAndGet();
+            case 2: a.set(Long.MIN_VALUE); return a.decrementAndGet();
+            case 3: return a.getAndIncrement() * 100L + a.get();
+            case 4: return a.getAndDecrement() * 100L + a.get();
+            case 5: return a.getAndAdd(-15) * 100L + a.get();
+            case 6: return new AtomicLong(Long.MAX_VALUE).addAndGet(7);
+            case 7: a.lazySet(-9); return a.getAndSet(11) * 100L + a.get();
+            case 8: return (a.compareAndSet(7, Long.MIN_VALUE) ? 100 : 0) + a.get();
+            case 9: return (a.compareAndSet(6, 9) ? 100 : 0) + a.get();
+            case 10: while (!a.weakCompareAndSet(7, 8)) {} return a.get();
+            case 11: return ((Number)new AtomicLong(4294967295L)).intValue();
+            case 12: return ((Number)new AtomicLong(Long.MAX_VALUE)).byteValue();
+            case 13: return ((Number)new AtomicLong(Long.MAX_VALUE)).shortValue();
+            case 14: return (long)new AtomicLong(16777217).floatValue();
+            case 15: return (long)new AtomicLong(9007199254740993L).doubleValue();
+            case 16: LongChild b = new LongChild(3); b.addAndGet(2); return b.get();
+            case 17: System.gc(); return a.get();
             default: throw new IllegalArgumentException();
         }
     }
@@ -74,6 +144,8 @@ public final class AtomicFixture {
     }
     public static void main(String[] args) {
         for (int i = 0; i < 13; i++) System.out.println("run\t" + i + "\t" + run(i));
-        for (int i = 0; i < 5; i++) System.out.println("text\t" + i + "\t" + text(i));
+        for (int i = 0; i < 20; i++) System.out.println("integer\t" + i + "\t" + integer(i));
+        for (int i = 0; i < 18; i++) System.out.println("longer\t" + i + "\t" + longer(i));
+        for (int i = 0; i < 11; i++) System.out.println("text\t" + i + "\t" + text(i));
     }
 }

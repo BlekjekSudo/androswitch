@@ -42,7 +42,7 @@ fn link(
         }
         return Ok(());
     }
-    if matches!(scope, LoaderScope::Bootstrap) {
+    if !matches!(scope, LoaderScope::Application) {
         return Err(thrown("Ljava/lang/NoClassDefFoundError;", class));
     }
     if done.contains(class) {

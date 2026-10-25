@@ -37,7 +37,7 @@ pub(super) fn path(record: &as_package::Record) -> String {
         record.package, record.revision
     )
 }
-pub(super) fn read(fs: &dyn FileSystem, record: &as_package::Record) -> Result<Metadata> {
+pub(super) fn document(fs: &dyn FileSystem, record: &as_package::Record) -> Result<AxmlDocument> {
     let path = path(record);
     let reader = fs.open_read(&path).map_err(storage_error)?;
     if reader.len() != record.apk_bytes {
@@ -66,7 +66,10 @@ pub(super) fn read(fs: &dyn FileSystem, record: &as_package::Record) -> Result<M
     let bytes = zip
         .read("AndroidManifest.xml")
         .map_err(|e| error(&e.code, e.cause))?;
-    let document = rd_apk::axml::parse(&bytes).map_err(|e| error(&e.code, e.cause))?;
+    rd_apk::axml::parse(&bytes).map_err(|e| error(&e.code, e.cause))
+}
+pub(super) fn read(fs: &dyn FileSystem, record: &as_package::Record) -> Result<Metadata> {
+    let document = document(fs, record)?;
     let metadata = parse(&document)?;
     if metadata.manifest.package != record.package
         || metadata.manifest.version_code != record.version_code

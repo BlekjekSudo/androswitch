@@ -362,3 +362,34 @@ fn bounded_store_rejects_new_entries_without_mutating_previous_values() {
     put(&mut app, "Long", "J", key("key1023"), Value::Long(-9));
     assert_eq!(get(&mut app, "Long", "J", key("key1023")), Value::Long(-9));
 }
+#[test]
+fn sdk_primitive_and_string_arrays_keep_identity_snapshot_aliases_and_gc_edges() {
+    for fixture in ["bundle", "renamed"] {
+        let mut app = app(fixture);
+        assert_eq!(call(&mut app, "arrayProof", "()I", &[]), Value::Int(9));
+        let array = get(
+            &mut app,
+            "StringArray",
+            "[Ljava/lang/String;",
+            key("String"),
+        )
+        .as_ref()
+        .unwrap()
+        .unwrap();
+        app.vm.gc();
+        let first = app.vm.heap.as_array_elems(array).unwrap().0[0].clone();
+        assert_eq!(text(&app, &first), "changed");
+        let bytes = get(&mut app, "ByteArray", "[B", key("Byte"));
+        assert!(
+            matches!(invoke(&mut app,"putIntArray","(Ljava/lang/String;[I)V",&[key("Int"), bytes]), Err(VmExit::Exception(e)) if e.class=="Ljava/lang/ClassCastException;")
+        );
+        let integers = get(&mut app, "IntArray", "[I", key("Int"))
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        assert_eq!(app.vm.heap.class_of(integers).unwrap(), "[I");
+        call(&mut app, "releaseArrays", "()V", &[]);
+        app.vm.gc();
+        assert_eq!(app.vm.heap.class_of(array).unwrap(), rd_vm::gc::FREED_CLASS);
+    }
+}

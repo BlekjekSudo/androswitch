@@ -166,6 +166,100 @@ fn canonical_loader_visibility_and_class_identity_survive_collection() {
     );
 }
 #[test]
+fn system_loader_parent_chain_and_boot_visibility_are_canonical_in_both_packages() {
+    for fixture in ["class-forname", "renamed"] {
+        let mut app = app(fixture);
+        let application = loader(&app);
+        let sig = "()Ljava/lang/ClassLoader;";
+        let system = app
+            .vm
+            .invoke_static("Ljava/lang/ClassLoader;", "getSystemClassLoader", sig, &[])
+            .unwrap();
+        assert_ne!(system, application);
+        assert_eq!(
+            app.vm
+                .heap
+                .class_of(system.as_ref().unwrap().unwrap())
+                .unwrap(),
+            "Ldalvik/system/PathClassLoader;"
+        );
+        let parent = |app: &mut App, value: &Value| {
+            app.vm
+                .invoke_instance(value.as_ref().unwrap().unwrap(), "getParent", sig, &[])
+                .unwrap()
+        };
+        assert_eq!(parent(&mut app, &application), system);
+        let bootstrap = parent(&mut app, &system);
+        assert_ne!(system, bootstrap);
+        assert_ne!(application, bootstrap);
+        assert_eq!(parent(&mut app, &bootstrap), Value::Null);
+        let string = lookup(&mut app, Some("java.lang.String"), false, system.clone()).unwrap();
+        assert_eq!(
+            app.vm
+                .invoke_instance(
+                    string.as_ref().unwrap().unwrap(),
+                    "getClassLoader",
+                    sig,
+                    &[]
+                )
+                .unwrap(),
+            bootstrap
+        );
+        assert_eq!(
+            app.vm
+                .invoke_instance(
+                    system.as_ref().unwrap().unwrap(),
+                    "loadClass",
+                    "(Ljava/lang/String;)Ljava/lang/Class;",
+                    &[Value::StrPlaceholder("java.lang.String".into())]
+                )
+                .unwrap(),
+            string
+        );
+        exception(
+            lookup(
+                &mut app,
+                Some(&format!("{PREFIX}Lazy")),
+                false,
+                system.clone(),
+            ),
+            "Ljava/lang/ClassNotFoundException;",
+        );
+        exception(
+            app.vm.invoke_instance(
+                system.as_ref().unwrap().unwrap(),
+                "loadClass",
+                "(Ljava/lang/String;)Ljava/lang/Class;",
+                &[Value::StrPlaceholder(format!("{PREFIX}Lazy"))],
+            ),
+            "Ljava/lang/ClassNotFoundException;",
+        );
+        app.vm.gc();
+        assert_eq!(
+            app.vm
+                .invoke_static("Ljava/lang/ClassLoader;", "getSystemClassLoader", sig, &[])
+                .unwrap(),
+            system
+        );
+        assert_eq!(parent(&mut app, &system), bootstrap);
+        assert_eq!(
+            app.android
+                .method_metadata("Ljava/lang/ClassLoader;", "getSystemClassLoader", sig),
+            Some(HostMethodKind::Static)
+        );
+        assert_eq!(
+            app.android
+                .method_metadata("Ljava/lang/ClassLoader;", "getParent", sig),
+            Some(HostMethodKind::Instance)
+        );
+        assert_eq!(
+            app.android
+                .method_metadata("Ljava/lang/ClassLoader;", "getPlatformClassLoader", sig),
+            None
+        );
+    }
+}
+#[test]
 fn unknown_loader_identity_wrong_type_and_unsupported_descriptors_fail_explicitly() {
     let mut app = app("class-forname");
     for descriptor in [

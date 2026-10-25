@@ -95,6 +95,17 @@ pub fn call_instance_intrinsic_mref(
     {
         return Ok(Some(value));
     }
+    if let Some(value) = crate::portable::atomic_number::call_instance(
+        vm,
+        receiver_class,
+        declaring_class,
+        name,
+        sig,
+        receiver,
+        args,
+    )? {
+        return Ok(Some(value));
+    }
     if let Some(value) = crate::portable::atomic::call_instance(
         vm,
         receiver_class,
