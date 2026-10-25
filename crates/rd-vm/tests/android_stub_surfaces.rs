@@ -16473,6 +16473,61 @@ fn legacy_camera_without_a_camera_and_values_are_guest_visible() {
         ),
         Value::Int(1)
     );
+
+    // Size.equals compares only width/height; the synthetic enclosing
+    // Camera of the non-static inner class is ignored, so sizes from two
+    // different (uninitialized) cameras can still be equal.
+    let other_camera = object(call_static(
+        &mut engine,
+        P36B_CAMERA,
+        "openUninitialized",
+        "()Landroid/hardware/Camera;",
+        &[],
+    ));
+    let cross_size = p49_new(
+        &mut engine,
+        P36B_CAMERA_SIZE,
+        "(Landroid/hardware/Camera;II)V",
+        &[Value::Obj(other_camera), Value::Int(640), Value::Int(480)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            size,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(cross_size)],
+        ),
+        Value::Int(1)
+    );
+    // Area.equals short-circuits a null rect on either side.
+    let rect = p49_new(&mut engine, "Landroid/graphics/Rect;", "()V", &[]);
+    let rect_area = p49_new(
+        &mut engine,
+        P36B_CAMERA_AREA,
+        "(Landroid/graphics/Rect;I)V",
+        &[Value::Obj(rect), Value::Int(37)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            area,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(rect_area)],
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            rect_area,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(area)],
+        ),
+        Value::Int(0)
+    );
 }
 
 #[test]
