@@ -233,6 +233,12 @@ pub struct Application {
     pub process: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub app_component_factory: Option<String>,
+    /// `<meta-data>` declaradas direto no `<application>` (não em componentes).
+    /// Lei nº 2 (manifest é a verdade): TWA/PWA declara `asset_statements`
+    /// aqui; serviços declaram chaves de configuração global aqui. O motor de
+    /// detecção de engines inventaria este conjunto.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub meta_data: Vec<MetaData>,
     pub components: Vec<Component>,
 }
 
@@ -608,6 +614,7 @@ fn build_application(app: &XmlElement, package: &str, arsc: Option<&Arsc>) -> Ap
         has_code: attr_bool(app, "hasCode"),
         process: attr_str(app, "process"),
         app_component_factory: attr_str(app, "appComponentFactory"),
+        meta_data: collect_meta_data(app),
         components: Vec::new(),
     };
 
@@ -993,5 +1000,81 @@ mod tests {
         let c = &m.application.components[0];
         assert_eq!(c.exported, Some(true));
         assert!(c.exported_effective, "declaração explícita true vence");
+    }
+
+    /// Gap APK-Tester engine-32 (TWA): `<meta-data>` declarada direto no
+    /// `<application>` (não em componente) precisa ser modelada — Lei nº 2
+    /// (manifest é a verdade). Um TWA real declara `asset_statements` aqui.
+    #[test]
+    fn application_level_meta_data_is_collected() {
+        let mut doc = doc_with_component(
+            "activity",
+            vec![android_attr(
+                "name",
+                AttrValue::String("com.t.app.Main".into()),
+            )],
+            vec![vec!["android.intent.action.MAIN"]],
+        );
+        let app = &mut doc.root.children[0];
+        app.children.push(XmlElement {
+            name: "meta-data".to_string(),
+            attrs: vec![
+                android_attr("name", AttrValue::String("asset_statements".into())),
+                android_attr("resource", AttrValue::Int(0x7f_00_00_01)),
+            ],
+            children: Vec::new(),
+            text: None,
+        });
+        app.children.push(XmlElement {
+            name: "meta-data".to_string(),
+            attrs: vec![
+                android_attr(
+                    "name",
+                    AttrValue::String("android.support.customtabs.trusted.DEFAULT_URL".into()),
+                ),
+                android_attr(
+                    "value",
+                    AttrValue::String("https://twa.example.invalid/".into()),
+                ),
+            ],
+            children: Vec::new(),
+            text: None,
+        });
+        let m = build(&doc, None).expect("manifest");
+        // entries no nível application…
+        assert_eq!(m.application.meta_data.len(), 2);
+        assert_eq!(
+            m.application.meta_data[0].name.as_deref(),
+            Some("asset_statements")
+        );
+        assert_eq!(m.application.meta_data[0].resource, Some(0x7f_00_00_01));
+        assert_eq!(
+            m.application.meta_data[1].name.as_deref(),
+            Some("android.support.customtabs.trusted.DEFAULT_URL")
+        );
+        assert_eq!(
+            m.application.meta_data[1].value.as_deref(),
+            Some("https://twa.example.invalid/")
+        );
+        // …e NÃO vazam para o componente (que tem as suas próprias)
+        assert!(m.application.components[0].meta_data.is_empty());
+        // serialização: campo omitido quando vazio (golden vectors intactos)
+        let empty = build(
+            &doc_with_component(
+                "activity",
+                vec![android_attr(
+                    "name",
+                    AttrValue::String("com.t.app.B".into()),
+                )],
+                vec![],
+            ),
+            None,
+        )
+        .unwrap();
+        let json = serde_json::to_value(&empty.application).unwrap();
+        assert!(
+            json.get("meta_data").is_none(),
+            "meta_data vazio não deve aparecer no JSON"
+        );
     }
 }
