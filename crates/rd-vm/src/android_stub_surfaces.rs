@@ -32549,7 +32549,26 @@ fn p41_tile_service_instance(
             return Ok(None);
         }
         ("onBind", "(Landroid/content/Intent;)Landroid/os/IBinder;") => {
-            if oarg(args, 0).is_none() {
+            let Some(intent) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            let service_key = jstr(vm, "service")?;
+            let service_binder = vm.invoke_instance(
+                intent,
+                "getIBinderExtra",
+                "(Ljava/lang/String;)Landroid/os/IBinder;",
+                std::slice::from_ref(&service_key),
+            )?;
+            let token_key = jstr(vm, "token")?;
+            let tile_token = vm.invoke_instance(
+                intent,
+                "getIBinderExtra",
+                "(Ljava/lang/String;)Landroid/os/IBinder;",
+                std::slice::from_ref(&token_key),
+            )?;
+            put(vm, recv, "mTileToken", tile_token)?;
+            if matches!(service_binder, Value::Null) {
+                put(vm, recv, "mService", Value::Null)?;
                 return Err(npe(""));
             }
             return Ok(None);

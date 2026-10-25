@@ -9475,6 +9475,18 @@ fn quicksettings_tile_and_unbound_service_are_guest_visible() {
         ),
         "Ljava/lang/NullPointerException;",
     );
+    let bind_intent = p41_intent(&mut engine, "android.service.quicksettings.action.QS_TILE");
+    assert_throws(
+        engine.invoke_instance(
+            service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Obj(bind_intent)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_eq!(field(&engine, service, "mService"), Value::Null);
+    assert_eq!(field(&engine, service, "mTileToken"), Value::Null);
 }
 
 #[test]
