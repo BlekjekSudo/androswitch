@@ -402,7 +402,7 @@ jobs:
           fi
           # Do not upload copied A/B binaries or snapshot PNG caches as evidence;
           # hashes and metrics are already in the fingerprinted report.
-          rm -rf "$RD_SENTINEL_OUT/bin" "$RD_SENTINEL_OUT/snapshots"
+          rm -rf "${RD_SENTINEL_OUT:?}/bin" "${RD_SENTINEL_OUT:?}/snapshots"
           find "$RD_SENTINEL_OUT" -name '*.png' -delete || true
 
       - name: Upload fingerprinted Sentinel report
