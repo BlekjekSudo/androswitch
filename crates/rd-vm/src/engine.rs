@@ -126,6 +126,8 @@ pub struct Engine {
     pub(crate) gc_stats: crate::gc::GcStats,
     pub(crate) gc_slots_after: usize,
     pub(crate) gc_frames: Vec<Vec<crate::heap::ObjRef>>,
+    /// Active host->host reentrant call depth (`object_to_string`, `obj_equals`, `obj_hash`, etc.).
+    pub(crate) host_reentrant_depth: usize,
 }
 
 /// Cobertura por classe (AG-09, nível de método).
@@ -201,6 +203,7 @@ impl Engine {
             gc_stats: Default::default(),
             gc_slots_after: 0,
             gc_frames: Vec::new(),
+            host_reentrant_depth: 0,
             #[cfg(feature = "jit")]
             jit: {
                 let mut j = crate::jit::JitState::default();

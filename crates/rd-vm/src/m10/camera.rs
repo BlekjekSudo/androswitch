@@ -5,7 +5,7 @@
 use super::{
     alloc, alloc_with, array_len, bool_arg, byte_array, call_dex, check_perm, get_field,
     get_int_field, get_long_field, get_str_field, illegal, illegal_state, int_arg, obj_arg,
-    obj_array, put_field, read_byte_array, req_str_arg, str_val,
+    obj_array, put_field, req_str_arg, str_val,
 };
 use crate::{Engine, ObjRef, Value, VmExit};
 use std::collections::BTreeMap;
@@ -346,24 +346,45 @@ pub(super) fn static_call(
             if cap < 0 {
                 return Err(illegal("negative ByteBuffer capacity"));
             }
-            let buf = vec![0u8; cap as usize];
-            Ok(Some(Value::Obj(new_byte_buffer_from_bytes(vm, &buf)?)))
+            let arr = vm
+                .heap
+                .alloc_array_zeroed(crate::heap::ElemKind::Int, cap as usize, "[B")
+                .map_err(crate::err::oom_throwable)?;
+            let bb = vm
+                .heap
+                .alloc_instance(
+                    BYTE_BUFFER.into(),
+                    vec![
+                        ("rd_buf".into(), Value::Obj(arr)),
+                        ("rd_pos".into(), Value::Int(0)),
+                        ("rd_limit".into(), Value::Int(cap)),
+                        ("rd_cap".into(), Value::Int(cap)),
+                    ],
+                )
+                .map_err(crate::err::oom_throwable)?;
+            Ok(Some(Value::Obj(bb)))
         }
         (BYTE_BUFFER, "wrap") => {
             let Some(arr) = obj_arg(args, 0) else {
                 return Err(super::npe("ByteBuffer.wrap null array"));
             };
-            let cap = array_len(vm, arr)? as i32;
+            let cap_usize = array_len(vm, arr)?;
+            let cap = cap_usize.min(i32::MAX as usize) as i32;
             let (pos, limit) = if args.len() >= 3 {
                 let off = int_arg(args, 1);
                 let len = int_arg(args, 2);
-                if off < 0 || len < 0 || off + len > cap {
+                if off < 0
+                    || len < 0
+                    || (off as usize) > cap_usize
+                    || (len as usize) > cap_usize - (off as usize)
+                {
                     return Err(super::error(
                         "Ljava/lang/IndexOutOfBoundsException;",
                         "ByteBuffer.wrap bounds",
                     ));
                 }
-                (off, off + len)
+                let end = (off as usize + len as usize) as i32;
+                (off, end)
             } else {
                 (0, cap)
             };
@@ -392,7 +413,7 @@ pub(super) fn instance_call(
     vm: &mut Engine,
     class: &str,
     name: &str,
-    _sig: &str,
+    sig: &str,
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
@@ -1029,7 +1050,7 @@ pub(super) fn instance_call(
             "release" => Ok(Some(Value::Null)),
             _ => Ok(None),
         },
-        BYTE_BUFFER | NIO_BUFFER => byte_buffer_instance(vm, name, args, recv),
+        BYTE_BUFFER | NIO_BUFFER => byte_buffer_instance(vm, name, sig, args, recv),
         _ => Ok(None),
     }
 }
@@ -1037,6 +1058,7 @@ pub(super) fn instance_call(
 fn byte_buffer_instance(
     vm: &mut Engine,
     name: &str,
+    sig: &str,
     args: &[Value],
     recv: ObjRef,
 ) -> Result<Option<Value>, VmExit> {
@@ -1076,7 +1098,11 @@ fn byte_buffer_instance(
                 Ok(Some(Value::Obj(recv)))
             }
         }
-        "remaining" => Ok(Some(Value::Int((limit - pos).max(0)))),
+        "remaining" => Ok(Some(Value::Int(
+            i64::from(limit)
+                .saturating_sub(i64::from(pos))
+                .clamp(0, i64::from(i32::MAX)) as i32,
+        ))),
         "hasRemaining" => Ok(Some(Value::Int(i32::from(pos < limit)))),
         "rewind" => {
             put_field(vm, recv, "rd_pos", Value::Int(0))?;
@@ -1088,7 +1114,7 @@ fn byte_buffer_instance(
             Ok(Some(Value::Obj(recv)))
         }
         "flip" => {
-            put_field(vm, recv, "rd_limit", Value::Int(pos))?;
+            put_field(vm, recv, "rd_limit", Value::Int(pos.max(0)))?;
             put_field(vm, recv, "rd_pos", Value::Int(0))?;
             Ok(Some(Value::Obj(recv)))
         }
@@ -1110,7 +1136,7 @@ fn byte_buffer_instance(
                 return Err(illegal_state("ByteBuffer has no backing array"));
             };
             if args.is_empty() {
-                if pos >= limit {
+                if pos < 0 || pos >= limit {
                     return Err(super::error(
                         "Ljava/nio/BufferUnderflowException;",
                         "underflow",
@@ -1123,36 +1149,62 @@ fn byte_buffer_instance(
                     .unwrap_or(0);
                 put_field(vm, recv, "rd_pos", Value::Int(pos + 1))?;
                 Ok(Some(Value::Int(b)))
-            } else if let Some(dst) = obj_arg(args, 0) {
-                let dst_cap = array_len(vm, dst)? as i32;
-                let (off, len) = if args.len() >= 3 {
-                    (int_arg(args, 1), int_arg(args, 2))
-                } else {
-                    (0, dst_cap)
+            } else if sig.starts_with("([B") || matches!(args.first(), Some(Value::Obj(_))) {
+                let Some(dst) = obj_arg(args, 0) else {
+                    return Err(super::npe("ByteBuffer.get null array"));
                 };
-                if off < 0 || len < 0 || off + len > dst_cap {
-                    return Err(super::error(
-                        "Ljava/lang/IndexOutOfBoundsException;",
-                        "ByteBuffer.get bounds",
-                    ));
-                }
-                if pos + len > limit {
+                let dst_cap = array_len(vm, dst)?;
+                let (off, len) = if args.len() >= 3 {
+                    let off_i = int_arg(args, 1);
+                    let len_i = int_arg(args, 2);
+                    if off_i < 0
+                        || len_i < 0
+                        || (off_i as usize) > dst_cap
+                        || (len_i as usize) > dst_cap - (off_i as usize)
+                    {
+                        return Err(super::error(
+                            "Ljava/lang/IndexOutOfBoundsException;",
+                            "ByteBuffer.get bounds",
+                        ));
+                    }
+                    (off_i as usize, len_i as usize)
+                } else {
+                    (0usize, dst_cap)
+                };
+                let rem = if pos >= 0 && limit >= pos {
+                    (limit - pos) as usize
+                } else {
+                    0
+                };
+                let src_len = array_len(vm, arr)?;
+                if pos < 0
+                    || len > rem
+                    || (pos as usize) > src_len
+                    || len > src_len - (pos as usize)
+                {
                     return Err(super::error(
                         "Ljava/nio/BufferUnderflowException;",
                         "underflow",
                     ));
                 }
-                let src_bytes = read_byte_array(vm, arr)?;
+                let pos_u = pos as usize;
+                let slice_bytes: Vec<i8> = {
+                    let (src_elems, _) = vm.heap.as_array_elems(arr)?;
+                    src_elems[pos_u..pos_u + len]
+                        .iter()
+                        .map(|v| v.as_int().unwrap_or(0) as i8)
+                        .collect()
+                };
                 let dst_elems = vm.heap.array_elems_mut(dst)?;
-                for i in 0..len as usize {
-                    let b = src_bytes[pos as usize + i] as i8;
-                    dst_elems[off as usize + i] = Value::Int(i32::from(b));
+                for (slot, b) in dst_elems[off..off + len].iter_mut().zip(slice_bytes) {
+                    *slot = Value::Int(i32::from(b));
                 }
-                put_field(vm, recv, "rd_pos", Value::Int(pos + len))?;
+                put_field(vm, recv, "rd_pos", Value::Int((pos_u + len) as i32))?;
                 Ok(Some(Value::Obj(recv)))
             } else {
                 let idx = int_arg(args, 0);
-                if idx < 0 || idx >= limit {
+                let src_len = array_len(vm, arr)?;
+                if idx < 0 || idx >= limit || (idx as usize) >= src_len {
                     return Err(super::error(
                         "Ljava/lang/IndexOutOfBoundsException;",
                         "ByteBuffer.get(index)",
@@ -1170,33 +1222,61 @@ fn byte_buffer_instance(
             let Some(arr) = buf_ref else {
                 return Err(illegal_state("ByteBuffer has no backing array"));
             };
-            if let Some(src) = obj_arg(args, 0) {
-                let src_bytes = read_byte_array(vm, src)?;
-                let (off, len) = if args.len() >= 3 {
-                    (int_arg(args, 1) as usize, int_arg(args, 2) as usize)
-                } else {
-                    (0, src_bytes.len())
+            if sig.starts_with("([B") || matches!(args.first(), Some(Value::Obj(_))) {
+                let Some(src) = obj_arg(args, 0) else {
+                    return Err(super::npe("ByteBuffer.put null array"));
                 };
-                if off + len > src_bytes.len() {
-                    return Err(super::error(
-                        "Ljava/lang/IndexOutOfBoundsException;",
-                        "ByteBuffer.put bounds",
-                    ));
-                }
-                if pos + (len as i32) > limit {
+                let src_len = array_len(vm, src)?;
+                let (off, len) = if args.len() >= 3 {
+                    let off_i = int_arg(args, 1);
+                    let len_i = int_arg(args, 2);
+                    if off_i < 0
+                        || len_i < 0
+                        || (off_i as usize) > src_len
+                        || (len_i as usize) > src_len - (off_i as usize)
+                    {
+                        return Err(super::error(
+                            "Ljava/lang/IndexOutOfBoundsException;",
+                            "ByteBuffer.put bounds",
+                        ));
+                    }
+                    (off_i as usize, len_i as usize)
+                } else {
+                    (0usize, src_len)
+                };
+                let rem = if pos >= 0 && limit >= pos {
+                    (limit - pos) as usize
+                } else {
+                    0
+                };
+                let dst_len = array_len(vm, arr)?;
+                if pos < 0
+                    || len > rem
+                    || (pos as usize) > dst_len
+                    || len > dst_len - (pos as usize)
+                {
                     return Err(super::error(
                         "Ljava/nio/BufferOverflowException;",
                         "overflow",
                     ));
                 }
+                let slice_bytes: Vec<i8> = {
+                    let (src_elems, _) = vm.heap.as_array_elems(src)?;
+                    src_elems[off..off + len]
+                        .iter()
+                        .map(|v| v.as_int().unwrap_or(0) as i8)
+                        .collect()
+                };
+                let pos_u = pos as usize;
                 let dst_elems = vm.heap.array_elems_mut(arr)?;
-                for i in 0..len {
-                    dst_elems[pos as usize + i] = Value::Int(i32::from(src_bytes[off + i] as i8));
+                for (slot, b) in dst_elems[pos_u..pos_u + len].iter_mut().zip(slice_bytes) {
+                    *slot = Value::Int(i32::from(b));
                 }
-                put_field(vm, recv, "rd_pos", Value::Int(pos + len as i32))?;
+                put_field(vm, recv, "rd_pos", Value::Int((pos_u + len) as i32))?;
                 Ok(Some(Value::Obj(recv)))
             } else {
-                if pos >= limit {
+                let dst_len = array_len(vm, arr)?;
+                if pos < 0 || pos >= limit || (pos as usize) >= dst_len {
                     return Err(super::error(
                         "Ljava/nio/BufferOverflowException;",
                         "overflow",
@@ -1204,7 +1284,9 @@ fn byte_buffer_instance(
                 }
                 let b = int_arg(args, 0) as i8;
                 let dst_elems = vm.heap.array_elems_mut(arr)?;
-                dst_elems[pos as usize] = Value::Int(i32::from(b));
+                if let Some(slot) = dst_elems.get_mut(pos as usize) {
+                    *slot = Value::Int(i32::from(b));
+                }
                 put_field(vm, recv, "rd_pos", Value::Int(pos + 1))?;
                 Ok(Some(Value::Obj(recv)))
             }

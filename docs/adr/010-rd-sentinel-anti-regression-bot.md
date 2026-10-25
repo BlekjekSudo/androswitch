@@ -238,3 +238,17 @@ three evidence/presentation gaps found after 1.1:
    GitHub rejects that presentation layer (for example a fork head or a
    disabled code-scanning surface), the error is recorded and the verified
    comment/labels/commit-status decision remains authoritative.
+
+## Emenda 2026-10-25 — orçamento absoluto do `rd perf` já vermelho na base (issue #283)
+
+O `rd perf` sai com código 1 quando um orçamento falha (PRF-06). O `_run_perf` usava esse código para duas coisas: "a medição rodou" e "o orçamento passou". Na campanha `compare`, a base roda o mesmo `_run_perf`. Com a `main` acima de 1500 ms emulados, o check obrigatório da **base** nascia `fail`, e assim qualquer PR ficava bloqueado, inclusive um que melhore o cold start (catch-22).
+
+Decisão:
+1. **A medição e o veredito ficam separados.** Os checks `perf-rd-perf-*` passam quando há números (p50/max). Sem JSON válido ou com timeout, eles falham e bloqueiam, como antes.
+2. **Orçamento estourado na base** gera o finding P2 `perf-base-budget-preexisting`, que é advisory: a base é referência, não é a mudança em revisão.
+3. **Orçamento estourado no candidato** gera o check obrigatório `perf-budget-candidate-<apk>`:
+   - `fail` se a base passou no orçamento, porque a mudança regrediu;
+   - `fail` se a base não foi medida nesta execução, porque nesse caso não dá para afirmar que é pré-existente;
+   - `pass` (pré-existente) só quando a base também estoura. Nesse caso, quem bloqueia regressões são os gates pareados que já existiam (`perf-ab-p50-regression`: ratio > 1,10 e +25 ms; `perf-ab-max-regression`).
+
+Nenhum limiar muda. `STARTUP_BUDGET_EMULATED_MS` continua em 1500 e `policy.json` não muda. Piorar continua bloqueado; melhorar deixa de ser bloqueado. O orçamento absoluto volta a valer sozinho assim que a `main` ficar abaixo dele.

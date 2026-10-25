@@ -45,6 +45,7 @@ from sentinel.audit import (  # noqa: E402
 from sentinel.campaigns import (  # noqa: E402
     CampaignOptions,
     CampaignRunner,
+    RawResult,
     _mad,
     _noise_floor_ms,
     mutation_check_status,
@@ -597,6 +598,74 @@ test vm::stable ... ok
             runner._native_fixtures_ensured = False
             runner._ensure_native_test_fixtures("core", all_features)
             self.assertEqual([["bash", "golden/native/build.sh"]], calls)
+
+    # issue #283: a base already over the absolute `rd perf` budget must
+    # not block every candidate (catch-22); regressions stay blocked.
+    def _perf_runner(self, root: Path, runs: dict[str, tuple[int, dict | None]]):
+        report = {"bot_version": "1.1.0", "checks": [], "metrics": {}}
+        runner = CampaignRunner(
+            repo=root,
+            report=report,  # type: ignore[arg-type]
+            policy=POLICY,
+            baseline=BASELINE,
+            options=CampaignOptions(output_dir=root / "out", execute=True),
+        )
+
+        def fake_raw(argv, **_kw):
+            exit_code, payload = runs[Path(argv[0]).name]
+            return RawResult(list(argv), root, exit_code, json.dumps(payload) if payload else "garbage", "", 1.0)
+
+        runner._run_raw = fake_raw  # type: ignore[method-assign]
+        return runner, report
+
+    @staticmethod
+    def _perf_json(p50: float, ok: bool) -> dict:
+        return {"pass": ok, "cold_p50_emulated_ms": p50, "cold_max_emulated_ms": p50 + 40, "peak_rss_mb": 95.0, "app_heap_peak_mb": 3.7}
+
+    def _perf_compare(self, base, cand):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            runner, report = self._perf_runner(root, {"rd-base": base, "rd-cand": cand})
+            apk = root / "app.apk"
+            runner._run_perf(root / "rd-base", apk, label="base")
+            runner._run_perf(root / "rd-cand", apk, label="candidate")
+            runner._resolve_perf_budgets()
+            checks = {c["id"]: c for c in report["checks"]}
+            findings = [f["id"] for f in report.get("findings", [])]
+            return checks, findings
+
+    def test_perf_red_base_does_not_block_improving_candidate(self):
+        checks, findings = self._perf_compare((1, self._perf_json(1819.0, False)), (0, self._perf_json(900.0, True)))
+        self.assertEqual("pass", checks["perf-rd-perf-base-app"]["status"])
+        self.assertEqual("pass", checks["perf-rd-perf-candidate-app"]["status"])
+        self.assertNotIn("perf-budget-candidate-app", checks)
+        self.assertEqual(["perf-base-budget-preexisting"], findings)
+
+    def test_perf_red_base_and_red_candidate_is_preexisting_not_blocking(self):
+        checks, findings = self._perf_compare((1, self._perf_json(1819.0, False)), (1, self._perf_json(1840.0, False)))
+        self.assertEqual("pass", checks["perf-budget-candidate-app"]["status"])
+        self.assertIn("pre-existing", checks["perf-budget-candidate-app"]["summary"])
+        self.assertIn("perf-base-budget-preexisting", findings)
+
+    def test_perf_green_base_and_red_candidate_still_blocks(self):
+        checks, findings = self._perf_compare((0, self._perf_json(1400.0, True)), (1, self._perf_json(1550.0, False)))
+        self.assertEqual("fail", checks["perf-budget-candidate-app"]["status"])
+        self.assertTrue(checks["perf-budget-candidate-app"]["required"])
+        self.assertNotIn("perf-base-budget-preexisting", findings)
+
+    def test_perf_missing_measurement_still_blocks(self):
+        checks, _ = self._perf_compare((1, self._perf_json(1819.0, False)), (101, None))
+        self.assertEqual("fail", checks["perf-rd-perf-candidate-app"]["status"])
+
+    def test_perf_candidate_without_base_reference_still_blocks(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            runner, report = self._perf_runner(root, {"rd-cand": (1, self._perf_json(1840.0, False))})
+            runner._run_perf(root / "rd-cand", root / "app.apk", label="candidate")
+            runner._resolve_perf_budgets()
+            checks = {c["id"]: c for c in report["checks"]}
+            self.assertEqual("fail", checks["perf-budget-candidate-app"]["status"])
+            self.assertIn("base not measured", checks["perf-budget-candidate-app"]["summary"])
 
     def test_dynamic_feature_sets_cover_singletons_pairs_and_all(self):
         sets = CampaignRunner._feature_sets_from_names(

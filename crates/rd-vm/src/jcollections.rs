@@ -103,8 +103,15 @@ pub(crate) fn elems_of(vm: &mut Engine, v: &Value) -> Result<Vec<Value>, VmExit>
     // AbstractList contract: size() + get(int)
     if let Some(n) = guest_call(vm, r, "size", "()I", &[])? {
         let n = n.as_int()?;
-        let mut out = Vec::with_capacity(n.max(0) as usize);
+        let cap = (n.max(0) as usize).min(1024);
+        let mut out = Vec::with_capacity(cap);
         for i in 0..n {
+            if out.len() >= 10_000_000 {
+                return Err(exc(
+                    "Ljava/lang/OutOfMemoryError;",
+                    "collection size exceeds limit",
+                ));
+            }
             match guest_call(vm, r, "get", "(I)Ljava/lang/Object;", &[Value::Int(i)])? {
                 Some(e) => out.push(e),
                 None => break,
@@ -281,20 +288,59 @@ fn range(len: usize, from: i32, to: i32) -> Result<(usize, usize), VmExit> {
 }
 
 fn to_string(vm: &mut Engine, me: ObjRef, items: &[Value]) -> Result<String, VmExit> {
-    let mut s = String::from("[");
-    for (i, e) in items.iter().enumerate() {
-        if i > 0 {
-            s.push_str(", ");
+    crate::arrays::with_host_reentrant(vm, |vm| {
+        let mut s = String::from("[");
+        for (i, e) in items.iter().enumerate() {
+            if i > 0 {
+                s.push_str(", ");
+            }
+            match e {
+                Value::Obj(r) if *r == me => s.push_str("(this Collection)"),
+                Value::Obj(r) => s.push_str(&crate::intrinsics::object_to_string(vm, *r)?),
+                Value::Null => s.push_str("null"),
+                Value::Int(x) => s.push_str(&x.to_string()),
+                Value::Long(x) => s.push_str(&x.to_string()),
+                Value::Float(x) => s.push_str(&crate::repr::java_float(*x)),
+                Value::Double(x) => s.push_str(&crate::repr::java_double(*x)),
+                other => s.push_str(&format!("{other:?}")),
+            }
         }
-        match e {
-            Value::Obj(r) if *r == me => s.push_str("(this Collection)"),
-            Value::Obj(r) => s.push_str(&crate::intrinsics::object_to_string(vm, *r)?),
-            Value::Null => s.push_str("null"),
-            other => s.push_str(&format!("{other:?}")),
-        }
+        s.push(']');
+        Ok(s)
+    })
+}
+
+fn map_val_to_string(vm: &mut Engine, me: ObjRef, v: &Value) -> Result<String, VmExit> {
+    Ok(match v {
+        Value::Obj(r) if *r == me => "(this Map)".to_string(),
+        Value::Obj(r) => crate::intrinsics::object_to_string(vm, *r)?,
+        Value::Null => "null".to_string(),
+        Value::Int(x) => x.to_string(),
+        Value::Long(x) => x.to_string(),
+        Value::Float(x) => crate::repr::java_float(*x),
+        Value::Double(x) => crate::repr::java_double(*x),
+        other => format!("{other:?}"),
+    })
+}
+
+fn map_entries_of(vm: &mut Engine, other: ObjRef) -> Result<Option<Vec<(Value, Value)>>, VmExit> {
+    if let Some(HostObj::Map { entries }) = vm.fw.objects.get(&other) {
+        return Ok(Some(entries.clone()));
     }
-    s.push(']');
-    Ok(s)
+    let oc = vm.heap.class_of(other)?.to_string();
+    if !vm.cp.is_subtype(&oc, "Ljava/util/Map;") {
+        return Ok(None);
+    }
+    let entry_set = vm.invoke_instance(other, "entrySet", "()Ljava/util/Set;", &[])?;
+    let raw_entries = elems_of(vm, &entry_set)?;
+    let mut out = Vec::with_capacity(raw_entries.len());
+    for en in raw_entries {
+        let Value::Obj(er) = en else { continue };
+        let k = vm.invoke_instance(er, "getKey", "()Ljava/lang/Object;", &[])?;
+        let v = vm.invoke_instance(er, "getValue", "()Ljava/lang/Object;", &[])?;
+        out.push((k, v));
+    }
+    Ok(Some(out))
 }
 
 const COLLECTION_TYPES: &[&str] = &[
@@ -519,8 +565,14 @@ pub(crate) fn instance_intrinsic(
                 Some(n) => n.as_int()?,
                 None => return Ok(None),
             };
-            let mut items = Vec::new();
+            let mut items = Vec::with_capacity((n.max(0) as usize).min(1024));
             for i in 0..n {
+                if items.len() >= 10_000_000 {
+                    return Err(exc(
+                        "Ljava/lang/OutOfMemoryError;",
+                        "collection size exceeds limit",
+                    ));
+                }
                 match guest_call(vm, recv, "get", "(I)Ljava/lang/Object;", &[Value::Int(i)])? {
                     Some(e) => items.push(e),
                     None => return Ok(None),
@@ -757,63 +809,130 @@ pub(crate) fn host_object_method(
     if recv_class == "Landroid/util/ArraySet;" {
         return Ok(None);
     }
-    let items = match vm.fw.objects.get(&recv) {
-        Some(HostObj::List { elems }) => elems.clone(),
-        _ => return Ok(None),
-    };
-    let is_set = vm.cp.is_subtype(recv_class, "Ljava/util/Set;");
-    Ok(Some(match name {
-        "hashCode" => {
-            let mut h: i32 = if is_set { 0 } else { 1 };
-            for e in &items {
-                let eh = crate::arrays::obj_hash(vm, e)?;
-                h = if is_set {
-                    h.wrapping_add(eh)
-                } else {
-                    h.wrapping_mul(31).wrapping_add(eh)
-                };
+    crate::arrays::with_host_reentrant(vm, |vm| {
+        if recv_class.starts_with("Ljava/") {
+            if let Some(HostObj::Map { entries }) = vm.fw.objects.get(&recv) {
+                let entries = entries.clone();
+                return Ok(Some(match name {
+                    "hashCode" => {
+                        let mut h: i32 = 0;
+                        for (k, v) in &entries {
+                            let kh = crate::arrays::obj_hash(vm, k)?;
+                            let vh = crate::arrays::obj_hash(vm, v)?;
+                            h = h.wrapping_add(kh ^ vh);
+                        }
+                        Value::Int(h)
+                    }
+                    "toString" => {
+                        let mut parts = Vec::with_capacity(entries.len());
+                        for (k, v) in &entries {
+                            parts.push(format!(
+                                "{}={}",
+                                map_val_to_string(vm, recv, k)?,
+                                map_val_to_string(vm, recv, v)?
+                            ));
+                        }
+                        Value::Obj(crate::intrinsics::alloc_string(
+                            vm,
+                            format!("{{{}}}", parts.join(", ")),
+                        )?)
+                    }
+                    _ => {
+                        let Some(Value::Obj(o)) = args.first().cloned() else {
+                            return Ok(Some(Value::Int(0)));
+                        };
+                        if o == recv {
+                            return Ok(Some(Value::Int(1)));
+                        }
+                        let Some(other_entries) = (match map_entries_of(vm, o) {
+                            Ok(e) => e,
+                            Err(_) => return Ok(Some(Value::Int(0))),
+                        }) else {
+                            return Ok(Some(Value::Int(0)));
+                        };
+                        if other_entries.len() != entries.len() {
+                            return Ok(Some(Value::Int(0)));
+                        }
+                        let mut all_eq = true;
+                        for (k, v) in &entries {
+                            let mut matched = None;
+                            for (ok, ov) in &other_entries {
+                                if crate::arrays::obj_equals(vm, k, ok)? {
+                                    matched = Some(ov);
+                                    break;
+                                }
+                            }
+                            match matched {
+                                Some(ov) if crate::arrays::obj_equals(vm, v, ov)? => {}
+                                _ => {
+                                    all_eq = false;
+                                    break;
+                                }
+                            }
+                        }
+                        Value::Int(all_eq as i32)
+                    }
+                }));
             }
-            Value::Int(h)
         }
-        "toString" => {
-            let s = to_string(vm, recv, &items)?;
-            Value::Obj(crate::intrinsics::alloc_string(vm, s)?)
-        }
-        _ => {
-            let Some(Value::Obj(o)) = args.first().cloned() else {
-                return Ok(Some(Value::Int(0)));
-            };
-            if o == recv {
-                return Ok(Some(Value::Int(1)));
-            }
-            let oc = vm.heap.class_of(o)?.to_string();
-            let want = if is_set {
-                "Ljava/util/Set;"
-            } else {
-                "Ljava/util/List;"
-            };
-            if !vm.cp.is_subtype(&oc, want) {
-                return Ok(Some(Value::Int(0)));
-            }
-            let b = match elems_of(vm, &Value::Obj(o)) {
-                Ok(b) => b,
-                Err(_) => return Ok(Some(Value::Int(0))),
-            };
-            let mut eq = items.len() == b.len();
-            if eq {
-                for i in 0..items.len() {
-                    let ok = if is_set {
-                        contains(vm, &b, &items[i])?
+        let items = match vm.fw.objects.get(&recv) {
+            Some(HostObj::List { elems }) => elems.clone(),
+            _ => return Ok(None),
+        };
+        let is_set = vm.cp.is_subtype(recv_class, "Ljava/util/Set;");
+        Ok(Some(match name {
+            "hashCode" => {
+                let mut h: i32 = if is_set { 0 } else { 1 };
+                for e in &items {
+                    let eh = crate::arrays::obj_hash(vm, e)?;
+                    h = if is_set {
+                        h.wrapping_add(eh)
                     } else {
-                        crate::arrays::obj_equals(vm, &items[i], &b[i])?
+                        h.wrapping_mul(31).wrapping_add(eh)
                     };
-                    if !ok {
-                        eq = false;
-                        break;
+                }
+                Value::Int(h)
+            }
+            "toString" => {
+                let s = to_string(vm, recv, &items)?;
+                Value::Obj(crate::intrinsics::alloc_string(vm, s)?)
+            }
+            _ => {
+                let Some(Value::Obj(o)) = args.first().cloned() else {
+                    return Ok(Some(Value::Int(0)));
+                };
+                if o == recv {
+                    return Ok(Some(Value::Int(1)));
+                }
+                let oc = vm.heap.class_of(o)?.to_string();
+                let want = if is_set {
+                    "Ljava/util/Set;"
+                } else {
+                    "Ljava/util/List;"
+                };
+                if !vm.cp.is_subtype(&oc, want) {
+                    return Ok(Some(Value::Int(0)));
+                }
+                let b = match elems_of(vm, &Value::Obj(o)) {
+                    Ok(b) => b,
+                    Err(_) => return Ok(Some(Value::Int(0))),
+                };
+                let mut eq = items.len() == b.len();
+                if eq {
+                    for i in 0..items.len() {
+                        let ok = if is_set {
+                            contains(vm, &b, &items[i])?
+                        } else {
+                            crate::arrays::obj_equals(vm, &items[i], &b[i])?
+                        };
+                        if !ok {
+                            eq = false;
+                            break;
+                        }
                     }
                 }
+                Value::Int(eq as i32)
             }
-            Value::Int(eq as i32)
-        }
-    }))
+        }))
+    })
 }
