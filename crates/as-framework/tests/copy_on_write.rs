@@ -216,6 +216,57 @@ fn sixteen_cases_match_actual_jvm_in_renamed_namespaces_before_and_after_gc() {
         }
     }
 }
+
+#[test]
+fn cow_set_reuses_list_generations_and_matches_twenty_jvm_cases_in_both_namespaces() {
+    for variant in ["original", "renamed"] {
+        let rows = std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+            format!("../../target/copy-on-write-fixture/{variant}/set-oracle.tsv"),
+        ))
+        .unwrap();
+        let expected: std::collections::BTreeMap<_, _> = rows
+            .lines()
+            .map(|row| row.split_once('\t').unwrap())
+            .collect();
+        assert_eq!(expected.len(), 20);
+        let mut t = Test::new(variant, false);
+        t.cases = t.cases.replace("/CowCases;", "/CowSetCases;");
+        for _ in 0..2 {
+            for case in 0..20 {
+                assert_eq!(
+                    t.scenario(case),
+                    expected[format!("scenario{case}").as_str()],
+                    "{variant}/{case}"
+                );
+            }
+            t.app.vm.gc();
+        }
+        let set = t.reference("setObject");
+        let error = t
+            .app
+            .vm
+            .invoke_instance(set, "get", "(I)Ljava/lang/Object;", &[Value::Int(0)])
+            .unwrap_err();
+        assert!(error.to_string().contains("API_UNAVAILABLE"));
+        let host = t.app.vm.framework_host().unwrap();
+        assert_eq!(
+            host.method_metadata(
+                "Ljava/util/concurrent/CopyOnWriteArraySet;",
+                "<init>",
+                "(I)V"
+            ),
+            None
+        );
+        assert_eq!(
+            host.method_metadata(
+                "Ljava/util/concurrent/CopyOnWriteArraySet;",
+                "listIterator",
+                "()Ljava/util/ListIterator;"
+            ),
+            None
+        );
+    }
+}
 #[test]
 fn virtual_equality_native_reentry_retains_the_snapshot_after_list_clear_and_gc() {
     for variant in ["original", "renamed"] {

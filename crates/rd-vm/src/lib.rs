@@ -78,6 +78,7 @@ pub(crate) mod bundle;
 #[cfg(feature = "std")]
 pub(crate) mod choreographer;
 pub mod classpath;
+pub mod collection_values;
 #[cfg(feature = "std")]
 pub(crate) mod collections;
 #[cfg(feature = "std")]

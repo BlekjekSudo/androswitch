@@ -37,6 +37,9 @@ pub fn normalize(path: &str) -> Result<String, PlatformError> {
     Ok(format!("/{}", parts.join("/")))
 }
 pub trait GuestFileSystem {
+    fn sync_file(&self, path: &str) -> Result<(), PlatformError> {
+        Err(fs::error("API_UNAVAILABLE", "sync_file", path))
+    }
     fn resolve(&self, path: &str) -> Result<String, PlatformError>;
     fn stat(&self, path: &str) -> Result<Option<Metadata>, PlatformError>;
     fn read_at(&self, path: &str, offset: u64, output: &mut [u8]) -> Result<usize, PlatformError>;
@@ -108,6 +111,9 @@ impl<F: FileSystem> Vfs<F> {
     }
 }
 impl<F: FileSystem> GuestFileSystem for Vfs<F> {
+    fn sync_file(&self, path: &str) -> Result<(), PlatformError> {
+        self.fs.sync_file(&self.resolve(path)?)
+    }
     fn resolve(&self, path: &str) -> Result<String, PlatformError> {
         let path = normalize(path)?;
         if let Some(apk) = &self.source_apk {
@@ -248,6 +254,46 @@ impl<F: FileSystem> GuestFileSystem for Vfs<F> {
 #[cfg(all(test, feature = "std"))]
 mod native_rename_tests {
     use super::*;
+    #[test]
+    fn file_sync_uses_the_shared_mount_and_real_host_commit() {
+        let root = std::env::temp_dir().join(format!(
+            "androswitch-sync-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let host = alloc::rc::Rc::new(crate::host_fs::HostFileSystem::new(&root).unwrap());
+        fs::mkdirs(host.as_ref(), "Download").unwrap();
+        let vfs = Vfs::new(host, "org.fixture.general").unwrap();
+        vfs.write_at("/sdcard/Download/save", 0, b"committed", true)
+            .unwrap();
+        vfs.sync_file("/storage/emulated/0/Download/save").unwrap();
+        let mut bytes = [0; 9];
+        assert_eq!(
+            vfs.read_at("/sdcard/Download/save", 0, &mut bytes).unwrap(),
+            9
+        );
+        assert_eq!(&bytes, b"committed");
+        assert_eq!(
+            vfs.sync_file("/sdcard/Download/missing").unwrap_err().code,
+            "NOT_FOUND"
+        );
+        assert_eq!(
+            vfs.sync_file("/sdcard/Download").unwrap_err().code,
+            "IS_DIRECTORY"
+        );
+        assert_eq!(
+            vfs.sync_file("/data/user/0/org.other/save")
+                .unwrap_err()
+                .code,
+            "ACCESS_DENIED"
+        );
+        std::fs::remove_file(root.join("Download/save")).unwrap();
+        std::fs::remove_dir(root.join("Download")).unwrap();
+        std::fs::remove_dir(root).unwrap();
+    }
     #[test]
     fn virtual_rename_uses_shared_storage_and_preserves_existing_destination() {
         let root = std::env::temp_dir().join(format!(

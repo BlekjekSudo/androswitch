@@ -81,6 +81,22 @@ impl HostFileSystem {
     }
 }
 impl FileSystem for HostFileSystem {
+    fn sync_file(&self, p: &str) -> Result<(), PlatformError> {
+        let meta = self
+            .stat(p)?
+            .ok_or_else(|| fs::error("NOT_FOUND", "sync_file", p))?;
+        if meta.directory {
+            return Err(fs::error("IS_DIRECTORY", "sync_file", p));
+        }
+        // FlushFileBuffers on Windows requires a writable native handle.
+        // This operation never changes content or the guest's descriptor mode.
+        disk::OpenOptions::new()
+            .write(true)
+            .open(self.path(p)?)
+            .map_err(|e| io("sync_file", p, e))?
+            .sync_all()
+            .map_err(|e| io("sync_file", p, e))
+    }
     fn begin_write(&self, p: &str) -> Result<Option<Box<dyn fs::WriteFile>>, PlatformError> {
         let file = disk::File::create(self.path(p)?).map_err(|e| io("begin_write", p, e))?;
         Ok(Some(Box::new(HostWriteFile(file))))

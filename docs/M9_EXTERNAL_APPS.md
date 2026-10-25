@@ -694,6 +694,35 @@ manifests. Their immutable original receipts retain the former C: paths; the
 archive manifests provide the relocation mapping. Neither game has a verified
 first screen from these attempts.
 
+The NRO39 retest uses source `ef4c4bd5194a6d56055edd0b7e14745cff964375`
+and SHA256 `05b6d79166e3cf6f638de72449d3d40ef69410fa40ee54b4f8235f274542a8e1`.
+Mekorama advances past ConcurrentHashMap to CopyOnWriteArraySet, then returns
+through complete teardown. Candy Crush passes the former FILE/FD boundary and
+reaches fsync; its session error is recorded, but abort-time native destructors
+still prevent a completed launcher workflow. Its DEX admission reaches vm_ready
+with 34,874,388 raw bytes. These attempts have no first-screen pass.
+
+The following batch reuses existing implementations: Set constructor
+deduplication moves from upstream intrinsics into shared `collection_values`,
+and portable Set calls use the existing COW list generations/lock/iterators/GC,
+with add mapped to addIfAbsent. Twenty ordinary JVM scenarios run unchanged in
+both renamed SDK fixture identities, including callback mutation/GC, constructor
+deduplication, typed arrays and snapshot lifetime. All 11 COW tests, the existing
+seven communication tests, and the inherited host COW regression pass. The
+supported Set subset excludes bulk operations, equality/hash and string APIs;
+List-only methods cannot be called through a Set. Its shared superclass metadata
+is corrected to AbstractSet, consistent with the [Java 8 class contract](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CopyOnWriteArraySet.html).
+
+Native fsync/fdatasync validate the existing descriptor and route to one
+VFS/FileSystem sync operation. Host uses an actual disk sync; Horizon uses the
+same filesystem commit already used after positional writes and installation
+publication. Guest FILE transfers are unbuffered. Backend failures propagate;
+standard terminals reject sync and closed descriptors retain EBADF. These
+path-backed regular-file descriptors still do not promise open-file lifetime
+across rename/unlink or directory-FD support. Five platform tests and the full
+native ABI host/oracle suite pass, including sync failure injection and cursor
+preservation. The follow-up NRO and physical-device results remain separate.
+
 Reference behavior: [API26 ClassLoader](https://android.googlesource.com/platform/libcore/+/android-8.0.0_r4/ojluni/src/main/java/java/lang/ClassLoader.java),
 [JNI method IDs](https://docs.oracle.com/en/java/javase/21/docs/specs/jni/functions.html#getmethodid),
 [API26 provider parsing](https://github.com/aosp-mirror/platform_frameworks_base/blob/android-8.0.0_r4/core/java/android/content/pm/PackageParser.java).

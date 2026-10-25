@@ -1,8 +1,5 @@
 /* General ABI contracts, no package or commercial payload. MIT OR Apache-2.0.
  */
-#include "bionic_cxx.h"
-#include "bionic_vfs.h"
-#include "native.h"
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>
@@ -12,8 +9,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#include "bionic_cxx.h"
+#include "bionic_vfs.h"
+#include "native.h"
 static int processors_fail;
-int as_platform_available_processors(uint32_t *count) { if(processors_fail) return -1;*count=3;return 0; }
+int as_platform_available_processors(uint32_t *count) {
+  if (processors_fail) return -1;
+  *count = 3;
+  return 0;
+}
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t condition = PTHREAD_COND_INITIALIZER;
 static __thread jmp_buf *escape;
@@ -51,6 +56,7 @@ void as_jni_vm_lock(void) {}
 void as_jni_vm_unlock(void) {}
 static unsigned char file_content[256];
 static size_t file_length;
+static int sync_calls, sync_failure;
 int64_t as_guest_fs(uint32_t op, const char *path, uint64_t offset,
                     uint8_t *bytes, size_t length, uint32_t flags) {
   if (op == 104) {
@@ -61,8 +67,7 @@ int64_t as_guest_fs(uint32_t op, const char *path, uint64_t offset,
   }
   if (op == 106) {
     assert(!strcmp(path, "/sdcard/testdir"));
-    if (flags >= 2)
-      return 0;
+    if (flags >= 2) return 0;
     memset(bytes, 0, length);
     strcpy((char *)bytes, flags ? "alpha" : "zebra");
     return 1;
@@ -73,28 +78,28 @@ int64_t as_guest_fs(uint32_t op, const char *path, uint64_t offset,
   }
   if (op == 107)
     return !strcmp((char *)bytes, "/sdcard/destination.txt") ? 0 : -38;
+  if (op == 108) {
+    assert(!strcmp(path, "/sdcard/shared.txt"));
+    ++sync_calls;
+    return sync_failure ? -5 : 0;
+  }
   assert(!strcmp(path, "/sdcard/shared.txt"));
   if (op == 100) {
-    if (flags & 4)
-      file_length = 0;
+    if (flags & 4) file_length = 0;
     return flags & 8 ? file_length : 0;
   }
-  if (op == 103)
-    return file_length;
+  if (op == 103) return file_length;
   if (offset > sizeof(file_content) || length > sizeof(file_content) - offset)
     return -EFBIG;
   if (op == 101) {
-    if (offset >= file_length)
-      return 0;
-    if (length > file_length - offset)
-      length = file_length - offset;
+    if (offset >= file_length) return 0;
+    if (length > file_length - offset) length = file_length - offset;
     memcpy(bytes, file_content + offset, length);
     return length;
   }
   if (op == 102) {
     memcpy(file_content + offset, bytes, length);
-    if (file_length < offset + length)
-      file_length = offset + length;
+    if (file_length < offset + length) file_length = offset + length;
     return length;
   }
   return -ENOSYS;
@@ -159,8 +164,7 @@ int as_native_finalize(uint64_t token, const uint8_t *pages, size_t count) {
 void as_native_release(uint64_t token) {
   TestMapping *mapping = (void *)(uintptr_t)token;
   TestMapping **link = &test_mappings;
-  while (*link && *link != mapping)
-    link = &(*link)->next;
+  while (*link && *link != mapping) link = &(*link)->next;
   assert(*link);
   *link = mapping->next;
   free(mapping->bytes);
@@ -233,11 +237,15 @@ static void *once_worker(void *unused) {
   return NULL;
 }
 int main(void) {
-  long (*guest_sysconf)(int)=(void *)as_bionic_libc_import("sysconf");
-  assert(guest_sysconf && guest_sysconf(0x60)==3 && guest_sysconf(0x61)==3);
-  assert(guest_sysconf(0x27)==4096 && guest_sysconf(0x28)==4096);
-  processors_fail=1;errno=0;assert(guest_sysconf(0x61)==-1 && errno==ENOSYS);processors_fail=0;
-  errno=0;assert(guest_sysconf(-1)==-1 && errno==EINVAL);
+  long (*guest_sysconf)(int) = (void *)as_bionic_libc_import("sysconf");
+  assert(guest_sysconf && guest_sysconf(0x60) == 3 && guest_sysconf(0x61) == 3);
+  assert(guest_sysconf(0x27) == 4096 && guest_sysconf(0x28) == 4096);
+  processors_fail = 1;
+  errno = 0;
+  assert(guest_sysconf(0x61) == -1 && errno == ENOSYS);
+  processors_fail = 0;
+  errno = 0;
+  assert(guest_sysconf(-1) == -1 && errno == EINVAL);
 
   /* ARM64 getauxval uses unsigned long for both argument and result. Known
    *
@@ -261,8 +269,27 @@ int main(void) {
       (void *)as_bionic_libc_import("__system_property_get");
   assert(property);
   char property_value[94];
-  const char *property_names[] = {"ro.build.version.sdk", "ro.product.cpu.abi", "ro.product.cpu.abilist", "ro.product.cpu.abilist64", "ro.hardware", "ro.product.model", "ro.build.version.release", "ro.build.fingerprint", "ro.build.version.security_patch", "ro.build.date.utc"};
-  const char *property_expected[] = {"26", "arm64-v8a", "arm64-v8a", "arm64-v8a", "horizon", "AndroSwitch", "8.0.0", "androswitch/horizon/androswitch:8.0.0/AS26/0.1.0:eng/test-keys", "", "0"};
+  const char *property_names[] = {"ro.build.version.sdk",
+                                  "ro.product.cpu.abi",
+                                  "ro.product.cpu.abilist",
+                                  "ro.product.cpu.abilist64",
+                                  "ro.hardware",
+                                  "ro.product.model",
+                                  "ro.build.version.release",
+                                  "ro.build.fingerprint",
+                                  "ro.build.version.security_patch",
+                                  "ro.build.date.utc"};
+  const char *property_expected[] = {
+      "26",
+      "arm64-v8a",
+      "arm64-v8a",
+      "arm64-v8a",
+      "horizon",
+      "AndroSwitch",
+      "8.0.0",
+      "androswitch/horizon/androswitch:8.0.0/AS26/0.1.0:eng/test-keys",
+      "",
+      "0"};
   for (unsigned i = 0; i < sizeof(property_names) / sizeof(*property_names);
        ++i) {
     memset(property_value, 0x5a, sizeof(property_value));
@@ -274,9 +301,7 @@ int main(void) {
     assert(property_value[0] == 0x5a && property_value[93] == 0x5a);
     assert(property_value[strlen(expected) + 2] == 0x5a);
   }
-  const char *missing_properties[] = {"",
-                                      "PATH",
-                                      "ro.serialno",
+  const char *missing_properties[] = {"", "PATH", "ro.serialno",
                                       "RO.BUILD.VERSION.SDK"};
   for (unsigned i = 0;
        i < sizeof(missing_properties) / sizeof(*missing_properties); ++i) {
@@ -307,8 +332,7 @@ int main(void) {
   pthread_t threads[16];
   for (int i = 0; i < 16; ++i)
     assert(!pthread_create(&threads[i], NULL, worker, NULL));
-  for (int i = 0; i < 16; ++i)
-    assert(!pthread_join(threads[i], NULL));
+  for (int i = 0; i < 16; ++i) assert(!pthread_join(threads[i], NULL));
   assert(initialized == 1 && shared_guard == 1);
   uint64_t retry = 0;
   assert(acquire(&retry));
@@ -390,12 +414,18 @@ int main(void) {
   assert(!close_file(file));
   int (*fileno_fn)(void *) = (void *)as_bionic_io_import("fileno");
   int64_t (*read_fd)(int, void *, size_t) = (void *)as_bionic_io_import("read");
-  int64_t (*write_fd)(int, const void *, size_t) = (void *)as_bionic_io_import("write");
-  int64_t (*pread_fd)(int, void *, size_t, int64_t) = (void *)as_bionic_io_import("pread64");
-  int64_t (*pwrite_fd)(int, const void *, size_t, int64_t) = (void *)as_bionic_io_import("pwrite64");
-  int64_t (*lseek_fd)(int, int64_t, int) = (void *)as_bionic_io_import("lseek64");
+  int64_t (*write_fd)(int, const void *, size_t) =
+      (void *)as_bionic_io_import("write");
+  int64_t (*pread_fd)(int, void *, size_t, int64_t) =
+      (void *)as_bionic_io_import("pread64");
+  int64_t (*pwrite_fd)(int, const void *, size_t, int64_t) =
+      (void *)as_bionic_io_import("pwrite64");
+  int64_t (*lseek_fd)(int, int64_t, int) =
+      (void *)as_bionic_io_import("lseek64");
   int (*stat_fd)(int, AsGuestStat *) = (void *)as_bionic_io_import("fstat64");
   int (*close_fd)(int) = (void *)as_bionic_io_import("close");
+  int (*sync_fd)(int) = (void *)as_bionic_io_import("fsync");
+  int (*data_sync_fd)(int) = (void *)as_bionic_io_import("fdatasync");
   int64_t (*tell_file)(void *) = (void *)as_bionic_io_import("ftell");
   int (*eof_file)(void *) = (void *)as_bionic_io_import("feof");
   file = open_file("/sdcard/shared.txt", "r+");
@@ -416,14 +446,27 @@ int main(void) {
   AsGuestStat descriptor_stat;
   assert(!stat_fd(fd, &descriptor_stat) && descriptor_stat.size == 10);
   assert(stat_fd(fd, NULL) == -1 && errno == EFAULT);
+  assert(sync_fd && data_sync_fd);
+  int before_sync = sync_calls;
+  assert(!sync_fd(fd) && sync_calls == before_sync + 1);
+  assert(!data_sync_fd(fd) && sync_calls == before_sync + 2);
+  assert(tell_file(file) == 10 && !eof_file(file));
+  sync_failure = 1;
+  assert(sync_fd(fd) == -1 && errno == EIO);
+  sync_failure = 0;
+  assert(sync_fd(-1) == -1 && errno == EBADF);
+  assert(sync_fd(1) == -1 && errno == EINVAL);
   assert(!close_fd(fd));
+  assert(sync_fd(fd) == -1 && errno == EBADF);
   assert(read_fd(fd, out, 1) == -1 && errno == EBADF);
   assert(fileno_fn(file) == -1 && errno == EBADF);
   assert(read_file(out, 1, 1, file) == 0 && errno == EBADF);
   assert(close_file(file) == EOF && errno == EBADF);
   file = open_file("/sdcard/shared.txt", "r");
-  assert(fileno_fn(file) > fd); /* A stale descriptor never aliases a new FILE. */
+  assert(fileno_fn(file) >
+         fd); /* A stale descriptor never aliases a new FILE. */
   assert(write_fd(fileno_fn(file), "x", 1) == -1 && errno == EBADF);
+  assert(!sync_fd(fileno_fn(file))); /* Read-only regular FDs may be synced. */
   assert(!close_file(file));
   assert(fileno_fn(NULL) == -1 && errno == EBADF);
   void *standard_out = *(void **)(uintptr_t)as_bionic_io_data("stdout");
@@ -463,8 +506,7 @@ int main(void) {
   once_calls = 0;
   for (int i = 0; i < 16; ++i)
     assert(!pthread_create(&threads[i], NULL, once_worker, NULL));
-  for (int i = 0; i < 16; ++i)
-    assert(!pthread_join(threads[i], NULL));
+  for (int i = 0; i < 16; ++i) assert(!pthread_join(threads[i], NULL));
   assert(once_calls == 1);
   unsigned stale_key = destructor_key;
   assert(!key_delete_fn(destructor_key));
@@ -558,8 +600,7 @@ int main(void) {
   assert(trapped == -1211);
   assert(!strcmp(as_native_missing_library(), "libportable.so"));
   assert(!strcmp(as_native_missing_symbol(), "unsupported_shared_api"));
-  while (test_mappings)
-    as_native_release((uint64_t)test_mappings);
+  while (test_mappings) as_native_release((uint64_t)test_mappings);
   as_native_missing_reset();
   assert(!as_native_missing_library() && !as_native_missing_symbol());
   assert(!as_bionic_cxx_import("__cxa_throw"));
@@ -601,8 +642,9 @@ int main(void) {
   errno = E2BIG;
   as_bionic_libc_reset();
   assert(random_draw() == 1804289383 && errno == E2BIG);
-  puts("native ABI contracts: PASS (C++ lifetimes, guards/once/keys, "
-       "allocation, "
-       "fortify, stdio/VFS, logging)");
+  puts(
+      "native ABI contracts: PASS (C++ lifetimes, guards/once/keys, "
+      "allocation, "
+      "fortify, stdio/VFS, logging)");
   return 0;
 }

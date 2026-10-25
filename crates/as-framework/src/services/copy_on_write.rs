@@ -3,6 +3,7 @@ use super::*;
 use alloc::rc::Weak;
 use rd_vm::framework_host::HostMethodKind;
 const CLASS: &str = "Ljava/util/concurrent/CopyOnWriteArrayList;";
+const SET: &str = "Ljava/util/concurrent/CopyOnWriteArraySet;";
 const ITER: &str = "Ljava/util/concurrent/CopyOnWriteArrayList$COWIterator;";
 const LIMIT: usize = 10000;
 const PIN_LIMIT: usize = 32768;
@@ -144,6 +145,20 @@ impl Drop for Pin<'_> {
 }
 pub(super) fn metadata(class: &str, name: &str, sig: &str) -> Option<HostMethodKind> {
     use HostMethodKind::{Constructor, Instance};
+    if class == SET {
+        return match (name, sig) {
+            ("<init>", "()V" | "(Ljava/util/Collection;)V") => Some(Constructor),
+            ("size", "()I")
+            | ("isEmpty", "()Z")
+            | ("clear", "()V")
+            | ("add" | "remove" | "contains", "(Ljava/lang/Object;)Z")
+            | ("iterator", "()Ljava/util/Iterator;")
+            | ("toArray", "()[Ljava/lang/Object;" | "([Ljava/lang/Object;)[Ljava/lang/Object;") => {
+                Some(Instance)
+            }
+            _ => None,
+        };
+    }
     if class == CLASS {
         return match (name, sig) {
             ("<init>", "()V" | "([Ljava/lang/Object;)V" | "(Ljava/util/Collection;)V") => {
@@ -183,7 +198,7 @@ pub(super) fn metadata(class: &str, name: &str, sig: &str) -> Option<HostMethodK
 }
 impl Collections {
     pub(super) fn cow_attach(&self, vm: &Engine, class: &str, r: ObjRef) -> Result<bool> {
-        if !vm.cp.is_subtype(class, CLASS) {
+        if !vm.cp.is_subtype(class, CLASS) && !vm.cp.is_subtype(class, SET) {
             return Ok(false);
         }
         self.budget(0)?;
@@ -503,15 +518,14 @@ impl Collections {
         if !self.cow.borrow().lists.contains_key(&r) {
             return Ok(None);
         }
-        if metadata(CLASS, name, sig).is_none() {
-            return Err(error(
-                "API_UNAVAILABLE",
-                format!("CopyOnWriteArrayList.{name}{sig}"),
-            ));
+        let is_set = vm.cp.is_subtype(vm.heap.class_of(r)?, SET);
+        let family = if is_set { SET } else { CLASS };
+        if metadata(family, name, sig).is_none() {
+            return Err(error("API_UNAVAILABLE", format!("{family}->{name}{sig}")));
         }
         let pin = self.cow_pin(r, args)?;
         if name == "<init>" {
-            let values = match sig {
+            let mut values = match sig {
                 "()V" => self.cow_copy(&[], 0)?,
                 "([Ljava/lang/Object;)V" => {
                     let array = args[0].as_ref()?.ok_or_else(|| {
@@ -521,6 +535,13 @@ impl Collections {
                 }
                 _ => self.cow_collection_values(vm, &args[0], &pin)?,
             };
+            if is_set {
+                pin.extend(refs(&values))?;
+                rd_vm::collection_values::deduplicate_in_place(
+                    &mut values,
+                    |incoming, existing| equals(vm, incoming, existing),
+                )?;
+            }
             let lock = vm
                 .heap
                 .alloc_instance("Ljava/lang/Object;".into(), vec![])?;
@@ -532,6 +553,13 @@ impl Collections {
         let snapshot = self.cow_current(r)?;
         pin.snapshot(&snapshot)?;
         let len = snapshot.values.len();
+        // Set uses the same immutable generation, writer lock, revalidation,
+        // snapshot iterator and GC implementation as the existing COW list.
+        let name = if is_set && name == "add" {
+            "addIfAbsent"
+        } else {
+            name
+        };
         let value = match (name, sig) {
             ("size", "()I") => Value::Int(len as i32),
             ("isEmpty", "()Z") => Value::Int((len == 0) as i32),

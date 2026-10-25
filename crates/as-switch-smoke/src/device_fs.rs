@@ -15,6 +15,7 @@ use as_platform::{
 };
 #[allow(unsafe_code)]
 extern "C" {
+    fn as_storage_sync_file(path: *const core::ffi::c_char) -> i32;
     fn as_storage_writer_open(path: *const core::ffi::c_char) -> u64;
     fn as_storage_writer_write(handle: u64, bytes: *const u8, length: usize) -> i64;
     fn as_storage_writer_finish(handle: u64) -> i32;
@@ -82,6 +83,23 @@ impl LibnxFileSystem {
     }
 }
 impl FileSystem for LibnxFileSystem {
+    fn sync_file(&self, p: &str) -> Result<(), PlatformError> {
+        let meta = self
+            .stat(p)?
+            .ok_or_else(|| fs::error("NOT_FOUND", "sync_file", p))?;
+        if meta.directory {
+            return Err(fs::error("IS_DIRECTORY", "sync_file", p));
+        }
+        let path = self.path(p)?;
+        // SAFETY: path is a live terminated string during this synchronous call.
+        #[allow(unsafe_code)]
+        let result = unsafe { as_storage_sync_file(path.as_ptr()) };
+        if result < 0 {
+            Err(error("sync_file", result as i64))
+        } else {
+            Ok(())
+        }
+    }
     fn begin_write(&self, p: &str) -> Result<Option<Box<dyn fs::WriteFile>>, PlatformError> {
         let path = self.path(p)?;
         // SAFETY: C returns a uniquely owned FILE token; only LibnxWriteFile

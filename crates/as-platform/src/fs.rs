@@ -26,6 +26,11 @@ pub struct Entry {
     pub directory: bool,
 }
 pub trait FileSystem {
+    /// Commit a regular file's data and metadata to the backing store.
+    /// Backends without a durability operation must report that explicitly.
+    fn sync_file(&self, path: &str) -> Result<(), PlatformError> {
+        Err(error("API_UNAVAILABLE", "sync_file", path))
+    }
     fn begin_write(&self, _path: &str) -> Result<Option<Box<dyn WriteFile>>, PlatformError> {
         Ok(None)
     }
@@ -52,6 +57,9 @@ pub trait FileSystem {
     fn remove(&self, path: &str, recursive: bool) -> Result<(), PlatformError>;
 }
 impl<T: FileSystem + ?Sized> FileSystem for alloc::rc::Rc<T> {
+    fn sync_file(&self, path: &str) -> Result<(), PlatformError> {
+        (**self).sync_file(path)
+    }
     fn begin_write(&self, p: &str) -> Result<Option<Box<dyn WriteFile>>, PlatformError> {
         (**self).begin_write(p)
     }

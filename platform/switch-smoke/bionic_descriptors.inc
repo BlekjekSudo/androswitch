@@ -44,6 +44,16 @@ static int guest_fileno_impl(GuestFile *file) {
   return -1;
 }
 LEASE(int, guest_fileno, (GuestFile * file), (file))
+static int guest_fsync_impl(int fd) {
+  GuestFile *file = descriptor_file(fd);
+  if (!file) return -1;
+  if (standard_index(file) >= 0) {
+    errno = EINVAL;
+    return -1;
+  }
+  return operation(108, file->path, 0, NULL, 0, 0) < 0 ? -1 : 0;
+}
+LEASE(int, guest_fsync, (int fd), (fd))
 static int64_t descriptor_io(int fd, void *bytes, size_t count, int write,
                              int positioned, int64_t offset) {
   GuestFile *file = descriptor_file(fd);

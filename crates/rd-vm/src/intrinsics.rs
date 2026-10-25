@@ -3369,16 +3369,10 @@ fn set_intrinsic(
                 )
                 .into());
             };
-            let src_snapshot = src_elems.clone();
-            let mut out: Vec<Value> = Vec::new();
-            'outer: for el in src_snapshot {
-                for x in &out {
-                    if values_equal(&vm.heap, x, &el)? {
-                        continue 'outer;
-                    }
-                }
-                out.push(el);
-            }
+            let mut out = src_elems.clone();
+            crate::collection_values::deduplicate_in_place(&mut out, |incoming, existing| {
+                values_equal(&vm.heap, incoming, existing)
+            })?;
             out
         } else {
             Vec::new()

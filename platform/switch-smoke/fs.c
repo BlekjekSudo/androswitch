@@ -22,12 +22,10 @@ int as_storage_prepare(const char *root) {
   for (char *part = path + 6; *part; part++)
     if (*part == '/') {
       *part = 0;
-      if (mkdir(path, 0777) && errno != EEXIST)
-        return -errno;
+      if (mkdir(path, 0777) && errno != EEXIST) return -errno;
       *part = '/';
     }
-  if (mkdir(path, 0777) && errno != EEXIST)
-    return -errno;
+  if (mkdir(path, 0777) && errno != EEXIST) return -errno;
   return 0;
 }
 int as_storage_stat(const char *path, uint64_t *length, uint32_t *directory) {
@@ -42,8 +40,7 @@ int as_storage_stat(const char *path, uint64_t *length, uint32_t *directory) {
 int64_t as_storage_read(const char *path, uint64_t offset, uint8_t *output,
                         size_t length) {
   FILE *file = fopen(path, "rb");
-  if (!file)
-    return -errno;
+  if (!file) return -errno;
   if (fseeko(file, (off_t)offset, SEEK_SET)) {
     int e = errno;
     fclose(file);
@@ -58,10 +55,8 @@ int64_t as_storage_write(const char *path, uint64_t offset,
                          const uint8_t *input, size_t length,
                          uint32_t truncate) {
   FILE *file = fopen(path, truncate ? "wb" : "r+b");
-  if (!file && !truncate && errno == ENOENT)
-    file = fopen(path, "w+b");
-  if (!file)
-    return -errno;
+  if (!file && !truncate && errno == ENOENT) file = fopen(path, "w+b");
+  if (!file) return -errno;
   if (fseeko(file, (off_t)offset, SEEK_SET)) {
     int e = errno;
     fclose(file);
@@ -69,11 +64,17 @@ int64_t as_storage_write(const char *path, uint64_t offset,
   }
   size_t n = fwrite(input, 1, length, file);
   int e = (n != length || fflush(file)) ? EIO : 0;
-  if (fclose(file))
-    e = EIO;
-  if (!e && R_FAILED(fsdevCommitDevice("sdmc")))
-    e = EIO;
+  if (fclose(file)) e = EIO;
+  if (!e && R_FAILED(fsdevCommitDevice("sdmc"))) e = EIO;
   return e ? -e : (int64_t)n;
+}
+int as_storage_sync_file(const char *path) {
+  struct stat st;
+  if (stat(path, &st)) return -errno;
+  if (S_ISDIR(st.st_mode)) return -EISDIR;
+  /* Positional writes already fflush/fclose before returning. Reuse the same
+   * filesystem commit used by durable writes and installation publication. */
+  return R_FAILED(fsdevCommitDevice("sdmc")) ? -EIO : 0;
 }
 uint64_t as_storage_writer_open(const char *path) {
   return (uint64_t)fopen(path, "wb");
@@ -81,47 +82,37 @@ uint64_t as_storage_writer_open(const char *path) {
 int64_t as_storage_writer_write(uint64_t handle, const uint8_t *bytes,
                                 size_t length) {
   FILE *file = (FILE *)handle;
-  if (!file)
-    return -EINVAL;
+  if (!file) return -EINVAL;
   size_t written = fwrite(bytes, 1, length, file);
   return written == length ? (int64_t)written : -EIO;
 }
 int as_storage_writer_finish(uint64_t handle) {
   FILE *file = (FILE *)handle;
-  if (!file)
-    return -EINVAL;
+  if (!file) return -EINVAL;
   int error = fflush(file) ? EIO : 0;
-  if (fclose(file))
-    error = EIO;
-  if (!error && R_FAILED(fsdevCommitDevice("sdmc")))
-    error = EIO;
+  if (fclose(file)) error = EIO;
+  if (!error && R_FAILED(fsdevCommitDevice("sdmc"))) error = EIO;
   return error ? -error : 0;
 }
 void as_storage_writer_close(uint64_t handle) {
-  if (handle)
-    fclose((FILE *)handle);
+  if (handle) fclose((FILE *)handle);
 }
 int as_storage_mkdir(const char *path, uint32_t exclusive) {
-  if (!mkdir(path, 0777))
-    return 1;
+  if (!mkdir(path, 0777)) return 1;
   if (errno == EEXIST) {
     struct stat st;
-    if (!stat(path, &st) && S_ISDIR(st.st_mode))
-      return 0;
-    if (exclusive)
-      return 0;
+    if (!stat(path, &st) && S_ISDIR(st.st_mode)) return 0;
+    if (exclusive) return 0;
   }
   return -errno;
 }
 int64_t as_storage_list(const char *path, uint8_t *output, size_t capacity) {
   DIR *dir = opendir(path);
-  if (!dir)
-    return -errno;
+  if (!dir) return -errno;
   size_t used = 0;
   struct dirent *e;
   while ((e = readdir(dir))) {
-    if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, ".."))
-      continue;
+    if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
     size_t n = strlen(e->d_name);
     if (used + n + 2 > capacity) {
       closedir(dir);
@@ -148,14 +139,10 @@ int64_t as_storage_list(const char *path, uint8_t *output, size_t capacity) {
 }
 int as_storage_rename(const char *source, const char *destination) {
   struct stat st;
-  if (!stat(destination, &st))
-    return -EEXIST;
-  if (errno != ENOENT)
-    return -errno;
-  if (rename(source, destination))
-    return -errno;
-  if (R_SUCCEEDED(fsdevCommitDevice("sdmc")))
-    return 0;
+  if (!stat(destination, &st)) return -EEXIST;
+  if (errno != ENOENT) return -errno;
+  if (rename(source, destination)) return -errno;
+  if (R_SUCCEEDED(fsdevCommitDevice("sdmc"))) return 0;
   /* Restore the old visible state if publication could not be committed. */
   if (!rename(destination, source)) {
     fsdevCommitDevice("sdmc");
@@ -166,18 +153,14 @@ int as_storage_rename(const char *source, const char *destination) {
 }
 int as_storage_remove(const char *path, uint32_t recursive) {
   struct stat st;
-  if (stat(path, &st))
-    return -errno;
-  if (!S_ISDIR(st.st_mode))
-    return unlink(path) ? -errno : 0;
+  if (stat(path, &st)) return -errno;
+  if (!S_ISDIR(st.st_mode)) return unlink(path) ? -errno : 0;
   if (recursive) {
     DIR *dir = opendir(path);
-    if (!dir)
-      return -errno;
+    if (!dir) return -errno;
     struct dirent *entry;
     while ((entry = readdir(dir))) {
-      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
-        continue;
+      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) continue;
       char full[1024];
       if (snprintf(full, sizeof(full), "%s/%s", path, entry->d_name) >=
           (int)sizeof(full)) {

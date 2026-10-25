@@ -1196,6 +1196,10 @@ pub unsafe extern "C" fn as_guest_fs(
                     .map(|_| 0)
                     .map_err(|e| error(e.code, e.to_string()))
             }
+            108 => fs
+                .sync_file(&path)
+                .map(|_| 0)
+                .map_err(|e| error(e.code, e.to_string())),
             _ => Ok(-38),
         }
     })();
@@ -1209,6 +1213,7 @@ pub unsafe extern "C" fn as_guest_fs(
             "ALREADY_EXISTS" => -17,
             "INVALID_PATH" => -22,
             "NOT_DIRECTORY" => -20,
+            "IS_DIRECTORY" => -21,
             "DIRECTORY_NOT_EMPTY" => -39,
             _ => -5,
         },

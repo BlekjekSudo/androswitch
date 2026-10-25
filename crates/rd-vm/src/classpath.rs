@@ -1632,7 +1632,7 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/util/AbstractCollection;",
             "Ljava/lang/Object;",
         ]),
-        // CopyOnWrite*: na JDK real NÃO estendem Abstract* (implementam direto)
+        // COW list implements List directly; COW set extends AbstractSet.
         "Ljava/util/concurrent/CopyOnWriteArrayList;" => Some(OBJECT),
         "Ljava/util/concurrent/CopyOnWriteArrayList$COWIterator;" => Some(OBJECT),
         "Ljava/util/concurrent/LinkedBlockingQueue;" => Some(&[
@@ -1643,7 +1643,11 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Ljava/util/AbstractQueue;" => {
             Some(&["Ljava/util/AbstractCollection;", "Ljava/lang/Object;"])
         }
-        "Ljava/util/concurrent/CopyOnWriteArraySet;" => Some(OBJECT),
+        "Ljava/util/concurrent/CopyOnWriteArraySet;" => Some(&[
+            "Ljava/util/AbstractSet;",
+            "Ljava/util/AbstractCollection;",
+            "Ljava/lang/Object;",
+        ]),
         "Ljava/util/concurrent/atomic/AtomicReference;" => Some(OBJECT),
         "Ljava/lang/Number;" => Some(OBJECT),
         // primitive wrappers (boxes.rs): numeric ones extend Number
