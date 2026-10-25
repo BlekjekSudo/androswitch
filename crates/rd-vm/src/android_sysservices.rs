@@ -1271,6 +1271,20 @@ fn account_name_type(vm: &Engine, account: ObjRef) -> (String, String) {
     )
 }
 
+fn account_safe_name(name: &str, replacement: char) -> String {
+    // AOSP iterates UTF-16 code units, so a surrogate pair is never a
+    // letter or digit: supplementary letters survive unchanged.
+    name.chars()
+        .map(|c| {
+            if (c as u32) < 0x1_0000 && c.is_alphanumeric() {
+                replacement
+            } else {
+                c
+            }
+        })
+        .collect()
+}
+
 fn account_static(
     vm: &mut Engine,
     name: &str,
@@ -1280,12 +1294,8 @@ fn account_static(
     if name == "toSafeName" && sig == "(Ljava/lang/String;C)Ljava/lang/String;" {
         let input =
             opt_str(vm, args.first()).ok_or_else(|| npe("Account.toSafeName name == null"))?;
-        let replacement = char::from_u32(iarg(args, 1) as u32).unwrap_or('x');
-        let safe: String = input
-            .chars()
-            .map(|c| if c.is_alphanumeric() { replacement } else { c })
-            .collect();
-        return Ok(Some(jstr(vm, safe)?));
+        let replacement = char::from_u32((iarg(args, 1) & 0xffff) as u32).unwrap_or('x');
+        return Ok(Some(jstr(vm, account_safe_name(&input, replacement))?));
     }
     Ok(None)
 }
@@ -1481,6 +1491,26 @@ fn require_account(args: &[Value], i: usize) -> Result<ObjRef, VmExit> {
     oarg(args, i).ok_or_else(|| iae("account is null"))
 }
 
+/// AOSP `setPasswordInternal` deletes every cached auth token for the
+/// account whenever the password is set or cleared.
+fn purge_account_tokens(vm: &mut Engine, entry: ObjRef) -> Result<(), VmExit> {
+    let token_fields: Vec<String> = vm
+        .heap
+        .as_instance(entry)
+        .map(|(_, fields)| {
+            fields
+                .iter()
+                .filter(|(n, _)| n.starts_with("rd$authToken."))
+                .map(|(n, _)| n.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+    for field in token_fields {
+        put(vm, entry, &field, Value::Null)?;
+    }
+    Ok(())
+}
+
 fn user_data_field(key: &str) -> String {
     format!("rd$userData.{key}")
 }
@@ -1608,6 +1638,7 @@ fn account_manager_instance(
                     "rd$password",
                     args.get(1).cloned().unwrap_or(Value::Null),
                 )?;
+                purge_account_tokens(vm, entry)?;
             }
             Value::Null
         }
@@ -1615,16 +1646,15 @@ fn account_manager_instance(
             let account = require_account(args, 0)?;
             if let Some(entry) = find_account(vm, account)? {
                 put(vm, entry, "rd$password", Value::Null)?;
+                purge_account_tokens(vm, entry)?;
             }
             Value::Null
         }
         ("getUserData", "(Landroid/accounts/Account;Ljava/lang/String;)Ljava/lang/String;") => {
-            let Some(account) = oarg(args, 0) else {
-                return Ok(Some(Value::Null));
-            };
-            let Some(key) = opt_str(vm, args.get(1)) else {
-                return Ok(Some(Value::Null));
-            };
+            // The client property cache recomputes through the service
+            // on a miss, where the null checks throw these exact IAEs.
+            let account = require_account(args, 0)?;
+            let key = opt_str(vm, args.get(1)).ok_or_else(|| iae("key is null"))?;
             match find_account(vm, account)? {
                 Some(entry) => get(vm, entry, &user_data_field(&key)),
                 None => Value::Null,

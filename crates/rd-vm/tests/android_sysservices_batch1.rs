@@ -5,6 +5,7 @@
 mod common;
 
 use common::*;
+use rd_vm::err::VmExit;
 use rd_vm::value::Value;
 use rd_vm::{Engine, ObjRef};
 
@@ -709,4 +710,75 @@ fn account_manager_explicit_accounts_passwords_userdata_and_tokens() {
         &[],
     );
     assert_eq!(array_values(&engine, &after_remove).len(), 0);
+
+    // Deep audit: getUserData's cache recompute throws the service
+    // null-check IAEs (it does not quietly return null). AOSP checks
+    // the account first.
+    match engine.invoke_instance(
+        manager,
+        "getUserData",
+        "(Landroid/accounts/Account;Ljava/lang/String;)Ljava/lang/String;",
+        &[Value::Null, Value::Null],
+    ) {
+        Err(VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/IllegalArgumentException;")
+        }
+        other => panic!("expected IllegalArgumentException, got {other:?}"),
+    }
+    // setPasswordInternal deletes every cached auth token: after a
+    // password change, peekAuthToken must observe nothing.
+    let purge_account = account(&mut engine, "token-purge", "test.type");
+    call(
+        &mut engine,
+        manager,
+        "addAccountExplicitly",
+        "(Landroid/accounts/Account;Ljava/lang/String;Landroid/os/Bundle;)Z",
+        &[Value::Obj(purge_account), Value::Null, Value::Null],
+    );
+    let token_type = text(&mut engine, "oauth");
+    let token = text(&mut engine, "tok-1");
+    call(
+        &mut engine,
+        manager,
+        "setAuthToken",
+        "(Landroid/accounts/Account;Ljava/lang/String;Ljava/lang/String;)V",
+        &[Value::Obj(purge_account), token_type.clone(), token],
+    );
+    let new_password = text(&mut engine, "s3cret");
+    call(
+        &mut engine,
+        manager,
+        "setPassword",
+        "(Landroid/accounts/Account;Ljava/lang/String;)V",
+        &[Value::Obj(purge_account), new_password],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "peekAuthToken",
+            "(Landroid/accounts/Account;Ljava/lang/String;)Ljava/lang/String;",
+            &[Value::Obj(purge_account), token_type],
+        ),
+        Value::Null
+    );
+
+    // Deep audit: toSafeName walks UTF-16 code units, so a
+    // supplementary letter (a surrogate pair) is kept as-is instead
+    // of being replaced like a BMP letter or digit.
+    let bold_a = char::from_u32(0x1d56c).unwrap(); // supplementary letter
+    let mixed_source = format!("a{bold_a}@example.com");
+    let mixed_name = text(&mut engine, &mixed_source);
+    assert_eq!(text_of(&engine, &mixed_name), mixed_source);
+    let safe_name = call_static(
+        &mut engine,
+        ACCOUNT,
+        "toSafeName",
+        "(Ljava/lang/String;C)Ljava/lang/String;",
+        &[mixed_name, Value::Int('x' as i32)],
+    );
+    assert_eq!(
+        text_of(&engine, &safe_name),
+        format!("x{bold_a}@xxxxxxx.xxx")
+    );
 }
