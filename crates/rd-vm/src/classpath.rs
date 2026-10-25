@@ -1595,7 +1595,9 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Object;",
         ]),
         "Ljava/util/AbstractMap;" => Some(OBJECT),
-        "Ljava/util/HashMap;" => Some(&["Ljava/util/AbstractMap;", "Ljava/lang/Object;"]),
+        "Ljava/util/HashMap;" | "Ljava/util/EnumMap;" => {
+            Some(&["Ljava/util/AbstractMap;", "Ljava/lang/Object;"])
+        }
         "Ljava/util/LinkedHashMap;" => Some(&[
             "Ljava/util/HashMap;",
             "Ljava/util/AbstractMap;",
@@ -1975,7 +1977,7 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         ]),
         "Ljava/util/AbstractList;" | "Ljava/util/AbstractSequentialList;" => Some(LIST_IFACES),
         "Ljava/util/AbstractMap;" => Some(MAP_IFACES),
-        "Ljava/util/HashMap;" => Some(&[
+        "Ljava/util/HashMap;" | "Ljava/util/EnumMap;" => Some(&[
             "Ljava/util/Map;",
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",

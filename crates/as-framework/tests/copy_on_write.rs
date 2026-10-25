@@ -64,6 +64,45 @@ struct Test {
 }
 
 #[test]
+fn enum_map_reuses_map_storage_and_matches_jvm_before_and_after_gc() {
+    for variant in ["original", "renamed"] {
+        let rows = std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+            format!("../../target/copy-on-write-fixture/{variant}/enum-map-oracle.tsv"),
+        ))
+        .unwrap();
+        let expected: std::collections::BTreeMap<_, _> = rows
+            .lines()
+            .map(|row| row.split_once('\t').unwrap())
+            .collect();
+        assert_eq!(expected.len(), 26);
+        let mut test = Test::new(variant, false);
+        test.cases = test.cases.replace("CowCases", "EnumMapCases");
+        for _ in 0..2 {
+            for n in 0..26 {
+                assert_eq!(
+                    test.scenario(n),
+                    expected[format!("scenario{n}").as_str()],
+                    "{variant}/{n}"
+                );
+            }
+            test.app.vm.gc();
+        }
+        let vm = &mut test.app.vm;
+        let class = "Ljava/util/EnumMap;";
+        let receiver = vm.heap.alloc_instance(class.into(), vec![]).unwrap();
+        vm.attach_host_state(class, receiver).unwrap();
+        // Never advertise a detached snapshot as a Java live Map view.
+        for (name, sig) in [
+            ("entrySet", "()Ljava/util/Set;"),
+            ("keySet", "()Ljava/util/Set;"),
+            ("values", "()Ljava/util/Collection;"),
+        ] {
+            assert!(vm.invoke_instance(receiver, name, sig, &[]).is_err());
+        }
+    }
+}
+
+#[test]
 fn builder_scalar_overloads_use_the_descriptor_and_reject_unrepresentable_units() {
     let mut test = Test::new("original", false);
     for class in ["Ljava/lang/StringBuilder;", "Ljava/lang/StringBuffer;"] {

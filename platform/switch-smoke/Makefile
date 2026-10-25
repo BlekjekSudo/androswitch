@@ -54,7 +54,7 @@ $(OUTPUT_DIR)/bionic_finalize.o: bionic_finalize.c bionic_finalize.h bionic_cxx.
 
 $(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/bionic_libc.o: bionic_locale.h
 
-$(OUTPUT_DIR)/bionic_libc.o: bionic_libc.c bionic_auxv.h bionic_properties.h runtime_properties.inc native.h | $(OUTPUT_DIR)
+$(OUTPUT_DIR)/bionic_libc.o: bionic_libc.c bionic_auxv.h bionic_properties.h runtime_properties.inc bionic_signals.inc native.h | $(OUTPUT_DIR)
 	$(CC) $(ARCH) -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -c "$<" -o "$@"
 
 $(OUTPUT_DIR)/bionic_locale.o: bionic_locale.c bionic_locale.h bionic_cxx.h bionic_errno.h | $(OUTPUT_DIR)

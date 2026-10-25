@@ -5,6 +5,14 @@ Date: 2026-10-26. Scope: source-routing audit of the frozen RustyDroid base
 path. This is an initial family inventory, not an Android API coverage count or
 an execution claim.
 
+The latest upstream source was also inspected at
+[`3761815dc6a2a1427e9fc66b66e8471b78d1b170`](https://github.com/nadabgfccvd/RustyDroid/commit/3761815dc6a2a1427e9fc66b66e8471b78d1b170).
+It was fetched for comparison; the frozen fork base is unchanged. Neither that
+revision nor the frozen base implements EnumMap, EnumSet or sigaltstack. The
+latest tree contains one EnumMap comment, which is not an implementation.
+Its much larger framework surface needs the same state/GC/platform audit before
+integration; merging generated service surfaces does not establish behavior.
+
 ## Why an implemented upstream class can still fail on Switch
 
 The shared interpreter, classpath, heap, DEX reader and APK readers are inherited
@@ -51,6 +59,23 @@ evidence that RustyDroid implements the whole Android framework. They also do
 not establish that every AndroSwitch replacement needed a new implementation.
 
 ## Required investigation before expanding a missing API
+
+Two genuinely absent families are being added after this comparison. EnumMap
+uses the existing Collections map storage, budget and collector hooks, with
+enum key validation and three constructor forms layered on top. The implemented
+subset is size/isEmpty/clear, get/remove/containsKey/containsValue, put and
+putAll for implemented map sources. Live views, clone and serialization remain
+unavailable. The same SDK fixture harness supplies 26 JVM observations in two
+namespaces, before/after GC; this is not another standalone APK workflow.
+
+Android LP64 signal-set bit operations use an explicit eight-byte layout.
+Horizon cannot currently deliver Linux signals: sigaltstack, sigaction, signal,
+sigprocmask, sigpending and pthread_sigmask return ENOSYS/SIG_ERR (pthread APIs
+return the positive Android error without changing errno). Outputs stay intact;
+no handler is registered in the host. This exposes a normal native ABI failure
+path, not an implementation of Android signal delivery. Pure memory operations
+and unavailable delivery are tested separately. ABI references are the pinned
+NDK headers and [Bionic's signal source](https://android.googlesource.com/platform/bionic/%2B/main/libc/bionic/signal.cpp).
 
 1. Search the inherited implementation and its tests for the exact descriptor
    and its class family. Record whether the failure is dispatch/metadata,

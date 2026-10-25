@@ -1,6 +1,8 @@
 use super::*;
 #[path = "copy_on_write.rs"]
 mod copy_on_write;
+#[path = "enum_map.rs"]
+mod enum_map;
 #[derive(Clone)]
 enum Container {
     List(Vec<Value>),
@@ -28,7 +30,9 @@ fn kind(vm: &Engine, class: &str) -> Option<&'static str> {
             "Ljava/util/ArrayList;" | "Ljava/util/LinkedList;" | "Ljava/util/Vector;" => {
                 return Some("list")
             }
-            "Ljava/util/HashMap;" | "Ljava/util/LinkedHashMap;" => return Some("map"),
+            "Ljava/util/HashMap;" | "Ljava/util/LinkedHashMap;" | "Ljava/util/EnumMap;" => {
+                return Some("map")
+            }
             "Ljava/util/HashSet;" | "Ljava/util/LinkedHashSet;" => return Some("set"),
             _ if primitive(&class).is_some() => return Some("box"),
             _ => class = vm.cp.superclass_of(&class)?,
@@ -72,7 +76,7 @@ impl Collections {
                 _ => {}
             }
         }
-        copy_on_write::metadata(class, name, sig)
+        enum_map::metadata(class, name, sig).or_else(|| copy_on_write::metadata(class, name, sig))
     }
     pub(super) fn array_list_view(&self, vm: &mut Engine, array: ObjRef) -> Result<Value> {
         if vm.heap.as_array_elems(array)?.1 != rd_vm::heap::ElemKind::Obj {
@@ -209,6 +213,9 @@ impl Collections {
             return Ok(Some(value));
         }
         let actual = vm.heap.class_of(r)?.to_string();
+        if vm.cp.is_subtype(&actual, "Ljava/util/EnumMap;") {
+            return self.enum_map_call(vm, name, sig, r, args);
+        }
         if matches!(
             actual.as_str(),
             "Ljava/util/Arrays$ArrayList;" | "Ljava/util/Arrays$ArrayList$Itr;"
@@ -332,11 +339,25 @@ impl Collections {
         if primitive(&actual).is_some() {
             return rd_vm::boxes::instance_intrinsic(vm, &actual, name, sig, r, args);
         }
+        self.regular_call(vm, name, sig, r, args)
+    }
+    fn regular_call(
+        &self,
+        vm: &mut Engine,
+        name: &str,
+        sig: &str,
+        r: ObjRef,
+        args: &[Value],
+    ) -> Result<Option<Value>> {
         self.budget(2)?;
         let container = self.objects.borrow().get(&r).cloned();
         let Some(container) = container else {
             return Ok(None);
         };
+        // Guest equals implementations may reenter the VM and collect. Keep
+        // this operation's snapshot alive even if they clear its owner.
+        let pin = self.cow_pin(r, args)?;
+        pin.extend(self.references(r))?;
         let size = match &container {
             Container::List(v) | Container::Set(v) => v.len(),
             Container::Map(v) => v.len(),
@@ -498,6 +519,19 @@ impl Collections {
                 } else {
                     out
                 }
+            }
+            ("containsValue", "(Ljava/lang/Object;)Z") => {
+                let Container::Map(values) = container else {
+                    return Ok(None);
+                };
+                let mut found = false;
+                for (_, value) in values {
+                    if equals(vm, &args[0], &value)? {
+                        found = true;
+                        break;
+                    }
+                }
+                Value::Int(i32::from(found))
             }
             ("remove", "(Ljava/lang/Object;)Ljava/lang/Object;") => {
                 let Container::Map(mut values) = container else {

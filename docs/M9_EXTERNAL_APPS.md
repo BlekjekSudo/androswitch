@@ -702,6 +702,13 @@ reaches fsync; its session error is recorded, but abort-time native destructors
 still prevent a completed launcher workflow. Its DEX admission reaches vm_ready
 with 34,874,388 raw bytes. These attempts have no first-screen pass.
 
+NRO40 (`0e3119ee37a296c049b6dc4382544f41a3fb1f23`, SHA256
+`fc206d8f46321e05e82cd6941167fec0aa1fc59066ecafa937548e3622781958`)
+passes the COW Set and file-sync boundaries. Mekorama next requires EnumMap and
+returns through full teardown. Candy Crush next calls sigaltstack; its failure
+is recorded, but native abort finalization still faults. Neither attempt has a
+guest first-screen capture. Both dedicated emulator SD trees were restored.
+
 The following batch reuses existing implementations: Set constructor
 deduplication moves from upstream intrinsics into shared `collection_values`,
 and portable Set calls use the existing COW list generations/lock/iterators/GC,

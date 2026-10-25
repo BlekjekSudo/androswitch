@@ -20,6 +20,8 @@ foreach($variant in @('original','renamed')){
   $oracle | Set-Content "$v/oracle.tsv" -Encoding utf8NoBOM
   & java -cp "$v/classes;$androidJar" "$ns.CowSetCases" | Set-Content "$v/set-oracle.tsv" -Encoding utf8NoBOM
   if($LASTEXITCODE){throw "COW set JVM oracle failed: $variant"}
+  & java -cp "$v/classes;$androidJar" "$ns.EnumMapCases" | Set-Content "$v/enum-map-oracle.tsv" -Encoding utf8NoBOM
+  if($LASTEXITCODE){throw "EnumMap JVM oracle failed: $variant"}
   $classes=@(Get-ChildItem "$v/classes" -Recurse -Filter '*.class' -File | ForEach-Object FullName)
   & "$tools/d8.bat" --min-api 26 --lib $androidJar --output "$v/dex" @classes
   if($LASTEXITCODE){throw "COW d8 failed: $variant"}
@@ -33,5 +35,5 @@ foreach($variant in @('original','renamed')){
     try{[IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip,"$v/dex/classes.dex",'classes.dex',[IO.Compression.CompressionLevel]::Optimal) | Out-Null}finally{$zip.Dispose()}
   }
 }
-@{schema_version=1;api=26;build_tools='35.0.0';oracle_rows_per_namespace=16;set_oracle_rows_per_namespace=20;sources=@(@(Get-ChildItem "$PSScriptRoot/java" -Recurse -File)+@(Get-Item $PSCommandPath)|ForEach-Object {@{path=$_.FullName;sha256=(Get-FileHash $_.FullName).Hash.ToLowerInvariant()}});artifacts=@(Get-ChildItem $output -Recurse -File | Where-Object {$_.Name -in @('classes.dex','oracle.tsv','set-oracle.tsv') -or $_.Extension -eq '.apk'}|ForEach-Object {@{path=$_.FullName;sha256=(Get-FileHash $_.FullName).Hash.ToLowerInvariant()}})}|ConvertTo-Json -Depth 8 | Set-Content "$output/build-receipt.json" -Encoding utf8NoBOM
+@{schema_version=1;api=26;build_tools='35.0.0';oracle_rows_per_namespace=16;set_oracle_rows_per_namespace=20;enum_map_oracle_rows_per_namespace=26;sources=@(@(Get-ChildItem "$PSScriptRoot/java" -Recurse -File)+@(Get-Item $PSCommandPath)|ForEach-Object {@{path=$_.FullName;sha256=(Get-FileHash $_.FullName).Hash.ToLowerInvariant()}});artifacts=@(Get-ChildItem $output -Recurse -File | Where-Object {$_.Name -in @('classes.dex','oracle.tsv','set-oracle.tsv','enum-map-oracle.tsv') -or $_.Extension -eq '.apk'}|ForEach-Object {@{path=$_.FullName;sha256=(Get-FileHash $_.FullName).Hash.ToLowerInvariant()}})}|ConvertTo-Json -Depth 8 | Set-Content "$output/build-receipt.json" -Encoding utf8NoBOM
 Write-Output "$output/build-receipt.json"

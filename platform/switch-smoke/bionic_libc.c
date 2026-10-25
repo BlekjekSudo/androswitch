@@ -22,6 +22,7 @@
 extern int as_native_trace_active(void) __attribute__((weak));
 extern void as_native_trace_metadata(const char *, const uint8_t *, size_t)
     __attribute__((weak));
+#include "bionic_signals.inc"
 static void bounds_fail(void) { as_native_trap(-1210); }
 static void *memcpy_checked(void *out, const void *in, size_t count,
                             size_t size) {
@@ -343,6 +344,8 @@ static unsigned long guest_getauxval(unsigned long type) {
   return (uint64_t)(f)
 #define SCALAR(f) API(#f, f)
 uint64_t as_bionic_libc_import(const char *name) {
+  uint64_t signal_import = guest_signal_import(name);
+  if (signal_import) return signal_import;
   API("__memcpy_chk", memcpy_checked);
   API("__memmove_chk", memmove_checked);
   API("__memset_chk", memset_checked);

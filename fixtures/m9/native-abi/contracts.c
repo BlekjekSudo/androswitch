@@ -236,7 +236,10 @@ static void *once_worker(void *unused) {
   assert(!as_bionic_keys_thread_finalize());
   return NULL;
 }
+#include <limits.h>
+#include "signals.inc"
 int main(void) {
+  signal_contracts();
   long (*guest_sysconf)(int) = (void *)as_bionic_libc_import("sysconf");
   assert(guest_sysconf && guest_sysconf(0x60) == 3 && guest_sysconf(0x61) == 3);
   assert(guest_sysconf(0x27) == 4096 && guest_sysconf(0x28) == 4096);

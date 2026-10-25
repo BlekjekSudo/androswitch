@@ -66,7 +66,7 @@ $(OUTPUT_DIR)/bionic_libc.o $(OUTPUT_DIR)/bionic_random.o: ../switch-smoke/bioni
 $(OUTPUT_DIR)/bionic_random.o: ../switch-smoke/bionic_cxx.h
 $(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/bionic_finalize.o: ../switch-smoke/bionic_finalize.h
 $(OUTPUT_DIR)/bionic_finalize.o: ../switch-smoke/bionic_cxx.h
-$(OUTPUT_DIR)/bionic_libc.o: ../switch-smoke/bionic_auxv.h ../switch-smoke/bionic_properties.h ../switch-smoke/runtime_properties.inc
+$(OUTPUT_DIR)/bionic_libc.o: ../switch-smoke/bionic_auxv.h ../switch-smoke/bionic_properties.h ../switch-smoke/runtime_properties.inc ../switch-smoke/bionic_signals.inc
 $(OUTPUT_DIR)/native_call.o: ../switch-smoke/native_call.S | $(OUTPUT_DIR)
 	$(CC) $(ARCH) -c "$<" -o "$@"
 $(OUTPUT_DIR)/androswitch.elf: $(OBJECTS) $(MESA_OBJECTS) $(RUST_LIBRARY) Makefile
