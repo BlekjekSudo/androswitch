@@ -1233,6 +1233,244 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroidx/work/WorkRequest;" => Some(OBJECT),
         "Landroidx/room/RoomDatabase;" => Some(OBJECT),
         "Landroidx/room/RoomDatabase$Builder;" => Some(OBJECT),
+        // ── S7 (Apêndice D): hierarquias AndroidX/Material conhecidas ────
+        // Cadeias FIXAS upstream (não dependem do app): permitem que o
+        // LayoutInflater e os casts/check-cast resolvam widgets AndroidX
+        // mesmo quando a lib não está (ainda) no DEX do APK. Só ACRESCENTAM
+        // respostas positivas; o DEX real, quando presente, continua a
+        // mandar na resolução de métodos/campos. Intermediários puramente
+        // internos das libs (LinearLayoutCompat, VisibilityAwareImageButton,
+        // NavigationBarView…) são colapsados — simplificação documentada.
+        // Activities: AppCompatActivity → FragmentActivity →
+        // ComponentActivity → Activity.
+        "Landroidx/activity/ComponentActivity;" => Some(&[
+            "Landroid/app/Activity;",
+            "Landroid/view/ContextThemeWrapper;",
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroidx/fragment/app/FragmentActivity;" => Some(&[
+            "Landroidx/activity/ComponentActivity;",
+            "Landroid/app/Activity;",
+            "Landroid/view/ContextThemeWrapper;",
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroidx/appcompat/app/AppCompatActivity;" => Some(&[
+            "Landroidx/fragment/app/FragmentActivity;",
+            "Landroidx/activity/ComponentActivity;",
+            "Landroid/app/Activity;",
+            "Landroid/view/ContextThemeWrapper;",
+            "Landroid/content/ContextWrapper;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        // Widgets appcompat (infláveis como as contrapartes do framework).
+        "Landroidx/appcompat/widget/AppCompatTextView;" => Some(TEXTVIEW),
+        "Landroidx/appcompat/widget/AppCompatEditText;" => Some(&[
+            "Landroid/widget/EditText;",
+            "Landroid/widget/TextView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroidx/appcompat/widget/AppCompatAutoCompleteTextView;" => Some(&[
+            "Landroid/widget/AutoCompleteTextView;",
+            "Landroid/widget/EditText;",
+            "Landroid/widget/TextView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroidx/appcompat/widget/AppCompatMultiAutoCompleteTextView;" => Some(&[
+            "Landroid/widget/MultiAutoCompleteTextView;",
+            "Landroid/widget/AutoCompleteTextView;",
+            "Landroid/widget/EditText;",
+            "Landroid/widget/TextView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroidx/appcompat/widget/AppCompatButton;" => Some(BUTTON),
+        "Landroidx/appcompat/widget/AppCompatImageView;" => Some(IMAGEVIEW),
+        "Landroidx/appcompat/widget/AppCompatImageButton;" => Some(IMAGEBUTTON),
+        "Landroidx/appcompat/widget/AppCompatCheckBox;" => Some(&[
+            "Landroid/widget/CheckBox;",
+            "Landroid/widget/CompoundButton;",
+            "Landroid/widget/Button;",
+            "Landroid/widget/TextView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroidx/appcompat/widget/AppCompatRadioButton;" => Some(RADIO_BUTTON),
+        "Landroidx/appcompat/widget/AppCompatToggleButton;" => Some(&[
+            "Landroid/widget/ToggleButton;",
+            "Landroid/widget/CompoundButton;",
+            "Landroid/widget/Button;",
+            "Landroid/widget/TextView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroidx/appcompat/widget/AppCompatSpinner;" => Some(SPINNER),
+        "Landroidx/appcompat/widget/AppCompatSeekBar;" => Some(&[
+            "Landroid/widget/SeekBar;",
+            "Landroid/widget/AbsSeekBar;",
+            "Landroid/widget/ProgressBar;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroidx/appcompat/widget/AppCompatRatingBar;" => Some(&[
+            "Landroid/widget/RatingBar;",
+            "Landroid/widget/AbsSeekBar;",
+            "Landroid/widget/ProgressBar;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroidx/appcompat/widget/SwitchCompat;" => Some(COMPOUND_BUTTON),
+        "Landroidx/appcompat/widget/Toolbar;" => Some(VIEWGROUP),
+        "Landroidx/appcompat/widget/ActionMenuView;" => Some(VIEWGROUP),
+        "Landroidx/appcompat/widget/LinearLayoutCompat;" => Some(VIEWGROUP),
+        "Landroidx/appcompat/widget/SearchView;" => Some(VIEWGROUP),
+        "Landroidx/appcompat/widget/AppCompatCheckedTextView;" => Some(&[
+            "Landroid/widget/CheckedTextView;",
+            "Landroid/widget/TextView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        // Containers de layout (inflam como ViewGroup/FrameLayout host;
+        // solvers/behaviors das libs NÃO são modelados — ver registo D).
+        "Landroidx/constraintlayout/widget/ConstraintLayout;" => Some(VIEWGROUP),
+        "Landroidx/coordinatorlayout/widget/CoordinatorLayout;" => Some(VIEWGROUP),
+        "Landroidx/drawerlayout/widget/DrawerLayout;" => Some(VIEWGROUP),
+        "Landroidx/cardview/widget/CardView;" => Some(FRAMELAYOUT),
+        "Landroidx/swiperefreshlayout/widget/SwipeRefreshLayout;" => Some(VIEWGROUP),
+        "Landroidx/viewpager/widget/ViewPager;" => Some(VIEWGROUP),
+        "Landroidx/viewpager2/widget/ViewPager2;" => Some(VIEWGROUP),
+        "Landroidx/core/widget/NestedScrollView;" => Some(FRAMELAYOUT),
+        "Landroidx/fragment/app/FragmentContainerView;" => Some(FRAMELAYOUT),
+        "Landroidx/appcompat/widget/ContentFrameLayout;" => Some(FRAMELAYOUT),
+        // LayoutParams dos containers acima (casts do código DEX das libs).
+        "Landroidx/constraintlayout/widget/ConstraintLayout$LayoutParams;" => {
+            Some(MARGIN_LAYOUT_PARAMS)
+        }
+        "Landroidx/coordinatorlayout/widget/CoordinatorLayout$LayoutParams;" => {
+            Some(MARGIN_LAYOUT_PARAMS)
+        }
+        "Landroidx/drawerlayout/widget/DrawerLayout$LayoutParams;" => Some(MARGIN_LAYOUT_PARAMS),
+        "Landroidx/recyclerview/widget/RecyclerView$LayoutParams;" => Some(MARGIN_LAYOUT_PARAMS),
+        "Landroidx/viewpager/widget/ViewPager$LayoutParams;" => Some(VIEWGROUP_LAYOUT_PARAMS),
+        "Landroidx/appcompat/widget/LinearLayoutCompat$LayoutParams;" => Some(MARGIN_LAYOUT_PARAMS),
+        // Google Material Components (cadeias colapsadas nos intermediários).
+        "Lcom/google/android/material/button/MaterialButton;" => Some(&[
+            "Landroidx/appcompat/widget/AppCompatButton;",
+            "Landroid/widget/Button;",
+            "Landroid/widget/TextView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Lcom/google/android/material/textview/MaterialTextView;" => Some(&[
+            "Landroidx/appcompat/widget/AppCompatTextView;",
+            "Landroid/widget/TextView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Lcom/google/android/material/textfield/TextInputLayout;" => Some(LINEARLAYOUT),
+        "Lcom/google/android/material/textfield/TextInputEditText;" => Some(&[
+            "Landroidx/appcompat/widget/AppCompatEditText;",
+            "Landroid/widget/EditText;",
+            "Landroid/widget/TextView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Lcom/google/android/material/card/MaterialCardView;" => Some(&[
+            "Landroidx/cardview/widget/CardView;",
+            "Landroid/widget/FrameLayout;",
+            "Landroid/view/ViewGroup;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Lcom/google/android/material/chip/Chip;" => Some(&[
+            "Landroidx/appcompat/widget/AppCompatCheckBox;",
+            "Landroid/widget/CheckBox;",
+            "Landroid/widget/CompoundButton;",
+            "Landroid/widget/Button;",
+            "Landroid/widget/TextView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Lcom/google/android/material/chip/ChipGroup;" => Some(VIEWGROUP),
+        "Lcom/google/android/material/floatingactionbutton/FloatingActionButton;" => {
+            Some(IMAGEBUTTON)
+        }
+        "Lcom/google/android/material/floatingactionbutton/ExtendedFloatingActionButton;" => {
+            Some(&[
+                "Lcom/google/android/material/button/MaterialButton;",
+                "Landroidx/appcompat/widget/AppCompatButton;",
+                "Landroid/widget/Button;",
+                "Landroid/widget/TextView;",
+                "Landroid/view/View;",
+                "Ljava/lang/Object;",
+            ])
+        }
+        "Lcom/google/android/material/bottomnavigation/BottomNavigationView;" => Some(FRAMELAYOUT),
+        "Lcom/google/android/material/navigation/NavigationView;" => Some(FRAMELAYOUT),
+        "Lcom/google/android/material/navigationrail/NavigationRailView;" => Some(FRAMELAYOUT),
+        "Lcom/google/android/material/tabs/TabLayout;" => Some(&[
+            "Landroid/widget/HorizontalScrollView;",
+            "Landroid/widget/FrameLayout;",
+            "Landroid/view/ViewGroup;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Lcom/google/android/material/appbar/AppBarLayout;" => Some(LINEARLAYOUT),
+        "Lcom/google/android/material/appbar/CollapsingToolbarLayout;" => Some(FRAMELAYOUT),
+        "Lcom/google/android/material/appbar/MaterialToolbar;" => Some(&[
+            "Landroidx/appcompat/widget/Toolbar;",
+            "Landroid/view/ViewGroup;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Lcom/google/android/material/checkbox/MaterialCheckBox;" => Some(&[
+            "Landroidx/appcompat/widget/AppCompatCheckBox;",
+            "Landroid/widget/CheckBox;",
+            "Landroid/widget/CompoundButton;",
+            "Landroid/widget/Button;",
+            "Landroid/widget/TextView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Lcom/google/android/material/radiobutton/MaterialRadioButton;" => Some(&[
+            "Landroidx/appcompat/widget/AppCompatRadioButton;",
+            "Landroid/widget/RadioButton;",
+            "Landroid/widget/CompoundButton;",
+            "Landroid/widget/Button;",
+            "Landroid/widget/TextView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Lcom/google/android/material/switchmaterial/SwitchMaterial;" => Some(&[
+            "Landroidx/appcompat/widget/SwitchCompat;",
+            "Landroid/widget/CompoundButton;",
+            "Landroid/widget/Button;",
+            "Landroid/widget/TextView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Lcom/google/android/material/slider/Slider;" => Some(VIEW),
+        "Lcom/google/android/material/slider/RangeSlider;" => Some(VIEW),
+        "Lcom/google/android/material/progressindicator/CircularProgressIndicator;" => Some(VIEW),
+        "Lcom/google/android/material/progressindicator/LinearProgressIndicator;" => Some(VIEW),
+        "Lcom/google/android/material/bottomappbar/BottomAppBar;" => Some(&[
+            "Landroidx/appcompat/widget/Toolbar;",
+            "Landroid/view/ViewGroup;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
+        "Lcom/google/android/material/imageview/ShapeableImageView;" => Some(&[
+            "Landroidx/appcompat/widget/AppCompatImageView;",
+            "Landroid/widget/ImageView;",
+            "Landroid/view/View;",
+            "Ljava/lang/Object;",
+        ]),
         "Landroid/os/Bundle;" => Some(OBJECT),
         "Landroid/os/Handler;" => Some(OBJECT),
         "Landroid/os/Looper;" => Some(OBJECT),
@@ -2218,6 +2456,22 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
     const MAP_IFACES: &[&str] = &["Ljava/util/Map;"];
     match class {
         "Ljava/lang/String;" => Some(STRING_IFACES),
+        // S7 (Apêndice D): donos de lifecycle AndroidX — check-cast para
+        // LifecycleOwner & cia. funciona mesmo sem o DEX das libs.
+        "Landroidx/activity/ComponentActivity;"
+        | "Landroidx/fragment/app/FragmentActivity;"
+        | "Landroidx/appcompat/app/AppCompatActivity;" => Some(&[
+            "Landroidx/lifecycle/LifecycleOwner;",
+            "Landroidx/lifecycle/ViewModelStoreOwner;",
+            "Landroidx/savedstate/SavedStateRegistryOwner;",
+            "Landroidx/activity/OnBackPressedDispatcherOwner;",
+            "Landroidx/activity/result/ActivityResultRegistryOwner;",
+        ]),
+        "Landroidx/fragment/app/Fragment;" => Some(&[
+            "Landroidx/lifecycle/LifecycleOwner;",
+            "Landroidx/lifecycle/ViewModelStoreOwner;",
+            "Landroidx/savedstate/SavedStateRegistryOwner;",
+        ]),
         "Ljava/lang/StringBuilder;" | "Ljava/lang/StringBuffer;" => Some(SB_IFACES),
         "Ljava/util/regex/Pattern;" => Some(&["Ljava/io/Serializable;"]),
         "Ljava/util/regex/Matcher;" => Some(&["Ljava/util/regex/MatchResult;"]),

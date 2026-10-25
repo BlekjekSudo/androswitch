@@ -199,6 +199,28 @@ fn layout_params_class(vm: &Engine, parent: ObjRef) -> Result<String, VmExit> {
         // CoordinatorLayout casts every child LayoutParams to this DEX
         // subtype during onAttachedToWindow/resetTouchBehaviors.
         "Landroidx/coordinatorlayout/widget/CoordinatorLayout$LayoutParams;"
+    } else if vm.cp.is_subtype(
+        parent_class,
+        "Landroidx/constraintlayout/widget/ConstraintLayout;",
+    ) {
+        // S7: idem — o solver/checks do ConstraintLayout fazem cast dos
+        // LayoutParams dos filhos para o subtipo próprio.
+        "Landroidx/constraintlayout/widget/ConstraintLayout$LayoutParams;"
+    } else if vm
+        .cp
+        .is_subtype(parent_class, "Landroidx/drawerlayout/widget/DrawerLayout;")
+    {
+        "Landroidx/drawerlayout/widget/DrawerLayout$LayoutParams;"
+    } else if vm
+        .cp
+        .is_subtype(parent_class, "Landroidx/viewpager/widget/ViewPager;")
+    {
+        "Landroidx/viewpager/widget/ViewPager$LayoutParams;"
+    } else if vm
+        .cp
+        .is_subtype(parent_class, "Landroidx/recyclerview/widget/RecyclerView;")
+    {
+        "Landroidx/recyclerview/widget/RecyclerView$LayoutParams;"
     } else {
         "Landroid/view/ViewGroup$MarginLayoutParams;"
     }
@@ -229,7 +251,17 @@ fn assign_layout_params(
         .cp
         .find_own_method(&params_class, "<init>", "()V")
         .is_some();
-    if vm.cp.find_class(&params_class).is_some() && !has_dex_size_ctor && has_dex_default_ctor {
+    if vm.cp.find_class(&params_class).is_none() && !params_class.starts_with("Landroid/") {
+        // S7: LayoutParams de lib conhecido só pela hierarquia builtin
+        // (ConstraintLayout, DrawerLayout…) sem DEX no APK — não há corpo
+        // de construtor para executar; semeia width/height herdados, tal
+        // como o ramo do construtor no-arg abaixo.
+        crate::err::put_field_result(vm.heap.put_field(params, "width", Value::Int(width)))?;
+        crate::err::put_field_result(vm.heap.put_field(params, "height", Value::Int(height)))?;
+    } else if vm.cp.find_class(&params_class).is_some()
+        && !has_dex_size_ctor
+        && has_dex_default_ctor
+    {
         // AndroidX ViewPager.LayoutParams has only a no-arg DEX constructor;
         // the host inflater still has to seed the inherited width/height fields.
         vm.invoke_instance(params, "<init>", "()V", &[])?;
