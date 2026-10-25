@@ -18581,6 +18581,47 @@ fn bluetooth_le_scan_settings_and_filters_are_guest_visible() {
     assert!(engine
         .cp
         .is_subtype(P36D_SCAN_FILTER, "Landroid/os/Parcelable;"));
+
+    // Deep audit: setManufacturerData validates the *existing* stored
+    // data/mask pair, not the pair being set — so a mismatched pair is
+    // accepted on the first call and only rejected by the second call
+    // (whatever it tries to store). Builder state after the throw keeps
+    // the first pair.
+    let trap_builder = p49_new(
+        &mut engine,
+        "Landroid/bluetooth/le/ScanFilter$Builder;",
+        "()V",
+        &[],
+    );
+    let short_data = byte_array(&mut engine, &[1, 2, 3]);
+    let long_mask = byte_array(&mut engine, &[1, 2, 3, 4, 5]);
+    call(
+        &mut engine,
+        trap_builder,
+        "setManufacturerData",
+        "(I[B[B)Landroid/bluetooth/le/ScanFilter$Builder;",
+        &[Value::Int(7), short_data.clone(), long_mask],
+    );
+    let fine_data = byte_array(&mut engine, &[9]);
+    let fine_mask = byte_array(&mut engine, &[9]);
+    assert_throws(
+        engine.invoke_instance(
+            trap_builder,
+            "setManufacturerData",
+            "(I[B[B)Landroid/bluetooth/le/ScanFilter$Builder;",
+            &[Value::Int(7), fine_data, fine_mask],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let trapped = object(call(
+        &mut engine,
+        trap_builder,
+        "build",
+        "()Landroid/bluetooth/le/ScanFilter;",
+        &[],
+    ));
+    let stored = call(&mut engine, trapped, "getManufacturerData", "()[B", &[]);
+    assert_eq!(byte_array_values(&engine, &stored), vec![1u8, 2, 3]);
 }
 
 #[test]
