@@ -22377,3 +22377,103 @@ fn intent_to_uri_and_parse_uri_round_trip_is_guest_visible() {
         "Ljava/net/URISyntaxException;",
     );
 }
+
+#[test]
+fn intent_parse_uri_selector_and_android_app_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    // Selector: base intent has no package, so the SEL block is retained.
+    let sel_uri = text(
+        &mut engine,
+        "#Intent;action=com.example.BASE;SEL;action=com.example.SEL;end",
+    );
+    let parsed = object(call_static(
+        &mut engine,
+        "Landroid/content/Intent;",
+        "parseUri",
+        "(Ljava/lang/String;I)Landroid/content/Intent;",
+        &[sel_uri, Value::Int(0)],
+    ));
+    assert_eq!(
+        call_text(&mut engine, parsed, "getAction", "()Ljava/lang/String;", &[]),
+        "com.example.BASE"
+    );
+    let selector = object(call(
+        &mut engine,
+        parsed,
+        "getSelector",
+        "()Landroid/content/Intent;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(&mut engine, selector, "getAction", "()Ljava/lang/String;", &[]),
+        "com.example.SEL"
+    );
+    let back = call_text(&mut engine, parsed, "toUri", "(I)Ljava/lang/String;", &[Value::Int(0)]);
+    assert!(back.contains("SEL;action=com.example.SEL"), "toUri: {back}");
+
+    // android-app: package + scheme + authority + path decomposition.
+    let app_uri = text(
+        &mut engine,
+        "android-app://com.example.app/https/example.com/watch#Intent;end",
+    );
+    let app = object(call_static(
+        &mut engine,
+        "Landroid/content/Intent;",
+        "parseUri",
+        "(Ljava/lang/String;I)Landroid/content/Intent;",
+        &[app_uri, Value::Int(0)],
+    ));
+    assert_eq!(
+        call_text(&mut engine, app, "getPackage", "()Ljava/lang/String;", &[]),
+        "com.example.app"
+    );
+    assert_eq!(
+        call_text(&mut engine, app, "getAction", "()Ljava/lang/String;", &[]),
+        "android.intent.action.VIEW"
+    );
+    let data = object(call(&mut engine, app, "getData", "()Landroid/net/Uri;", &[]));
+    assert_eq!(
+        call_text(&mut engine, data, "toString", "()Ljava/lang/String;", &[]),
+        "https://example.com/watch"
+    );
+
+    // Package-only android-app targets the package with ACTION_MAIN.
+    let pkg_uri = text(&mut engine, "android-app://com.example.only#Intent;end");
+    let pkg_intent = object(call_static(
+        &mut engine,
+        "Landroid/content/Intent;",
+        "parseUri",
+        "(Ljava/lang/String;I)Landroid/content/Intent;",
+        &[pkg_uri, Value::Int(0)],
+    ));
+    assert_eq!(
+        call_text(&mut engine, pkg_intent, "getAction", "()Ljava/lang/String;", &[]),
+        "android.intent.action.MAIN"
+    );
+    assert_eq!(
+        call(&mut engine, pkg_intent, "getData", "()Landroid/net/Uri;", &[]),
+        Value::Null
+    );
+
+    // Old (pre-ICS) format: #action(...);categories(...!...).
+    let old_uri = text(
+        &mut engine,
+        "https://example.com/x#action(com.example.OLD)categories(android.intent.category.BROWSABLE!com.example.CAT)",
+    );
+    let old = object(call_static(
+        &mut engine,
+        "Landroid/content/Intent;",
+        "parseUri",
+        "(Ljava/lang/String;I)Landroid/content/Intent;",
+        &[old_uri, Value::Int(0)],
+    ));
+    assert_eq!(
+        call_text(&mut engine, old, "getAction", "()Ljava/lang/String;", &[]),
+        "com.example.OLD"
+    );
+    let old_data = object(call(&mut engine, old, "getData", "()Landroid/net/Uri;", &[]));
+    assert_eq!(
+        call_text(&mut engine, old_data, "toString", "()Ljava/lang/String;", &[]),
+        "https://example.com/x"
+    );
+}
