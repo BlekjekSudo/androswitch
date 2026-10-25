@@ -1022,6 +1022,40 @@ pub(crate) fn delete_file(p: &str) -> bool {
     VFS.with(|v| v.borrow_mut().files.remove(&p).is_some())
 }
 
+/// Issue #230: Android "clear data" / uninstall — apaga todo o
+/// armazenamento privado do pacote (`/data/user/0/<pkg>/`: files,
+/// databases SQLite, shared_prefs) e fecha os descritores abertos
+/// nesses caminhos. Sem isto, `package_clear`/`package_remove` no MCP
+/// só resetavam permissões e os dados "apagados" continuavam legíveis.
+pub fn clear_package_data(package: &str) {
+    let root = format!("/data/user/0/{package}");
+    let prefix = format!("{root}/");
+    let in_pkg = |p: &str| p == root || p.starts_with(&prefix);
+    VFS.with(|cell| {
+        let mut v = cell.borrow_mut();
+        let dead_descs: Vec<i64> = v
+            .open_descs
+            .iter()
+            .filter(|(_, d)| in_pkg(&d.path))
+            .map(|(k, _)| *k)
+            .collect();
+        for k in &dead_descs {
+            v.open_descs.remove(k);
+        }
+        v.fds.retain(|_, desc| !dead_descs.contains(desc));
+        v.files.retain(|p, _| !in_pkg(p));
+        v.meta.retain(|p, _| !in_pkg(p));
+        v.dirs.retain(|p| !in_pkg(p));
+    });
+}
+
+/// Issue #230: sessão nova = dispositivo limpo. Zera o VFS inteiro
+/// (arquivos, metadados e descritores) — chamado na criação de cada
+/// `AgentSession`, de onde nascem os cenários isolados do `rd test`.
+pub fn reset_all() {
+    VFS.with(|cell| *cell.borrow_mut() = Vfs::default());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1032,6 +1066,30 @@ mod tests {
         assert_eq!(parent_of("/a").as_deref(), Some("/"));
         mkdirs("/x/y/z");
         assert!(is_dir("/x/y") && is_dir("/x/y/z") && !is_file("/x/y"));
+    }
+
+    #[test]
+    fn clear_package_data_isolates_packages_and_reset_all_clears() {
+        reset_all();
+        write_bytes("/data/user/0/com.example.a/files/x.txt", b"a".to_vec());
+        write_bytes("/data/user/0/com.example.b/files/y.txt", b"b".to_vec());
+        clear_package_data("com.example.a");
+        assert_eq!(
+            read_bytes("/data/user/0/com.example.a/files/x.txt"),
+            None,
+            "#230: clear data apaga os arquivos do pacote"
+        );
+        assert_eq!(
+            read_bytes("/data/user/0/com.example.b/files/y.txt"),
+            Some(b"b".to_vec()),
+            "pacote vizinho fica intacto"
+        );
+        reset_all();
+        assert_eq!(
+            read_bytes("/data/user/0/com.example.b/files/y.txt"),
+            None,
+            "#230: sessão nova zera o VFS inteiro"
+        );
     }
 }
 

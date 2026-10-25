@@ -65,6 +65,13 @@ pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
     ARRAYS.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
+/// Issue #230: fronteira de `Engine` — parsers/atributos pendurados em
+/// `ObjRef`s de um heap morto não podem vazar para o próximo `Engine`.
+pub(crate) fn reset_all() {
+    PARSERS.with(|m| m.borrow_mut().clear());
+    ARRAYS.with(|m| m.borrow_mut().clear());
+}
+
 fn flatten(e: &XmlElement, depth: i32, out: &mut Vec<Ev>) {
     out.push(Ev::Start {
         name: e.name.clone(),

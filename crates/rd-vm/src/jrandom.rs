@@ -29,6 +29,14 @@ pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
     SEEDS.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
+/// Issue #230: fronteira de `Engine` — limpa os seeds por `ObjRef` e
+/// reinicia o uniquifier, para a sequência de `Random()` sem seed ser
+/// função só deste `Engine` (determinismo, PRF-04).
+pub(crate) fn reset_all() {
+    SEEDS.with(|m| m.borrow_mut().clear());
+    UNIQ.with(|u| *u.borrow_mut() = 0);
+}
+
 fn scramble(seed: i64) -> u64 {
     (seed as u64 ^ MULT) & MASK
 }

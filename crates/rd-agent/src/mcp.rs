@@ -432,6 +432,11 @@ impl AgentSession {
         // (nunca ao stdout do protocolo — mesmo contrato da #55).
         let logs: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::new()));
         rd_vm::set_app_stdout(HostOut::Buffer(logs.clone()));
+        // Issue #230: sessão nova = dispositivo limpo. O VFS do hóspede é
+        // thread_local no rd-vm; sem este reset, arquivos/SQLite/prefs de
+        // uma sessão (ou cenário de suíte) anterior na mesma thread
+        // vazavam para a próxima, quebrando o isolamento do M6.
+        rd_vm::reset_vfs();
         let policy = Policy::from_env();
         let roots = policy.canonical_roots();
         let session_id = format!(
@@ -530,6 +535,10 @@ impl AgentSession {
             self.engine_package = None;
             self.native_engine = None;
             self.activity = None;
+            // Issue #230: o heap morreu aqui — o estado host indexado por
+            // ObjRef nas thread_locals do rd-vm morre junto, para o
+            // próximo Engine (mesma thread) não herdar fantasmas.
+            rd_vm::reset_host_thread_state();
             true
         } else {
             false
@@ -2130,6 +2139,9 @@ impl AgentSession {
         // Android: desinstalar app em execução o mata primeiro — nunca
         // estado inconsistente (engine de outro app segue rodando).
         let killed = self.kill_engine_if_running(package);
+        // Issue #230: desinstalar apaga também os dados privados do app
+        // no VFS (/data/user/0/<pkg>/), não só o registro da sessão.
+        rd_vm::clear_package_data(package);
         self.installed.retain(|a| a.package != package);
         if self.active.as_deref() == Some(package) {
             self.active = self.installed.last().map(|a| a.package.clone());
@@ -2164,6 +2176,10 @@ impl AgentSession {
         // Android clear data: app em execução é morto e as permissões
         // runtime voltam ao estado de instalação.
         let killed = self.kill_engine_if_running(package);
+        // Issue #230: clear data apaga de fato o armazenamento privado
+        // (/data/user/0/<pkg>/: arquivos, SQLite, shared_prefs) — antes
+        // só as permissões resetavam e os dados continuavam legíveis.
+        rd_vm::clear_package_data(package);
         let table = PermissionTable::embedded()
             .map_err(|e| RdError::new(&e.code, &e.cause, &e.module_id))?;
         let fresh = PermissionEngine::install(&manifest, table);

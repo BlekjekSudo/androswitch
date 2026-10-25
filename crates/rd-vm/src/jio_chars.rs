@@ -139,6 +139,14 @@ pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
     BYTES_ST.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
+/// Issue #230: fronteira de `Engine` — estados de streams indexados por
+/// `ObjRef` morrem com o heap que os criou.
+pub(crate) fn reset_all() {
+    WRITERS_ST.with(|m| m.borrow_mut().clear());
+    READERS_ST.with(|m| m.borrow_mut().clear());
+    BYTES_ST.with(|m| m.borrow_mut().clear());
+}
+
 fn exc(class: &str, msg: impl Into<String>) -> VmExit {
     VmExit::Exception(Throwable::new(class, msg))
 }
