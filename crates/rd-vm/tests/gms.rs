@@ -2932,3 +2932,192 @@ fn gms_logs_are_capped_with_dropped_counter() {
         "os mais recentes são os retidos"
     );
 }
+
+// ── Regressão (auditoria): PurchasesUpdatedListener que relança o
+// fluxo no próprio callback (retry em loop) não pode recursar a
+// entrega síncrona até ao SIGABRT do hospedeiro.
+#[test]
+fn billing_listener_relaunching_flow_is_bounded() {
+    let mut b = DexBuilder::new();
+    let cls = b.class("LBillLoop;", "Ljava/lang/Object;");
+    b.static_field(cls, "calls", "I", common::SVal::Int(0));
+    b.static_field(cls, "client", "Ljava/lang/Object;", common::SVal::Int(0));
+    b.static_field(cls, "params", "Ljava/lang/Object;", common::SVal::Int(0));
+    let f_calls = b.field_idx("LBillLoop;", "I", "calls");
+    let f_client = b.field_idx("LBillLoop;", "Ljava/lang/Object;", "client");
+    let f_params = b.field_idx("LBillLoop;", "Ljava/lang/Object;", "params");
+    let p_launch = b.proto_idx(
+        "Lcom/android/billingclient/api/BillingResult;",
+        vec![
+            "Landroid/app/Activity;".to_string(),
+            "Lcom/android/billingclient/api/BillingFlowParams;".to_string(),
+        ],
+    );
+    let m_launch = b.method_idx(
+        "Lcom/android/billingclient/api/BillingClient;",
+        p_launch,
+        "launchBillingFlow",
+    );
+    b.direct(
+        cls,
+        "arm",
+        "V",
+        vec!["Ljava/lang/Object;", "Ljava/lang/Object;"],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(3, 2, 2, {
+            let mut u = op21c(0x69, 1, f_client);
+            u.extend(op21c(0x69, 2, f_params));
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    b.r#virtual(
+        cls,
+        "onPurchasesUpdated",
+        "V",
+        vec![
+            "Lcom/android/billingclient/api/BillingResult;",
+            "Ljava/util/List;",
+        ],
+        ACC_PUBLIC,
+        Some(b.code(5, 3, 3, {
+            let mut u = op21c(0x60, 0, f_calls);
+            u.extend(op11n(0x12, 1, 1));
+            u.extend(op23x(0x90, 0, 0, 1));
+            u.extend(op21c(0x67, 0, f_calls));
+            u.extend(op21c(0x62, 0, f_client));
+            u.extend(op21c(0x62, 1, f_params));
+            u.extend(op11n(0x12, 2, 0));
+            u.extend(op35c(0x6E, 3, m_launch, [0, 2, 1, 0, 0])); // relança!
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    counter_observer_class(
+        &mut b,
+        "LStateLis2;",
+        "onBillingSetupFinished",
+        vec!["Lcom/android/billingclient/api/BillingResult;"],
+    );
+    counter_observer_class(
+        &mut b,
+        "LSkuLis2;",
+        "onSkuDetailsResponse",
+        vec![
+            "Lcom/android/billingclient/api/BillingResult;",
+            "Ljava/util/List;",
+        ],
+    );
+
+    let mut e = engine_of(&b);
+    e.gms_billing_add_sku(
+        "coins100",
+        "inapp",
+        "R$ 4,99",
+        4_990_000,
+        "BRL",
+        "100 moedas",
+    );
+    let lis = obj(&mut e, "LBillLoop;");
+    let client = billing_client_with_listeners(&mut e, lis);
+    let state_lis = obj(&mut e, "LStateLis2;");
+    ci!(
+        e,
+        BILLING_CLIENT,
+        "startConnection",
+        "(Lcom/android/billingclient/api/BillingClientStateListener;)V",
+        client,
+        [Value::Obj(state_lis)]
+    )
+    .unwrap();
+    let params_builder = ov(cs!(
+        e,
+        SKU_PARAMS,
+        "newBuilder",
+        "()Lcom/android/billingclient/api/SkuDetailsParams$Builder;",
+        []
+    )
+    .unwrap());
+    let id = s(&mut e, "coins100");
+    let skus = host_list(&mut e, vec![id]);
+    ci!(
+        e,
+        SKU_PARAMS_BUILDER,
+        "setSkusList",
+        "(Ljava/util/List;)Lcom/android/billingclient/api/SkuDetailsParams$Builder;",
+        params_builder,
+        [skus]
+    )
+    .unwrap();
+    let typ = s(&mut e, "inapp");
+    ci!(
+        e,
+        SKU_PARAMS_BUILDER,
+        "setType",
+        "(Ljava/lang/String;)Lcom/android/billingclient/api/SkuDetailsParams$Builder;",
+        params_builder,
+        [typ]
+    )
+    .unwrap();
+    let qp = ov(ci!(
+        e,
+        SKU_PARAMS_BUILDER,
+        "build",
+        "()Lcom/android/billingclient/api/SkuDetailsParams;",
+        params_builder,
+        []
+    )
+    .unwrap());
+    let sku_listener = obj(&mut e, "LSkuLis2;");
+    ci!(e, BILLING_CLIENT, "querySkuDetailsAsync",
+        "(Lcom/android/billingclient/api/SkuDetailsParams;Lcom/android/billingclient/api/SkuDetailsResponseListener;)V",
+        client, [Value::Obj(qp), Value::Obj(sku_listener)]).unwrap();
+    let sku_obj = *e
+        .fw
+        .gms
+        .sku_details_objs
+        .keys()
+        .next()
+        .expect("SkuDetails cunhado");
+    let flow_builder = ov(cs!(
+        e,
+        FLOW_PARAMS,
+        "newBuilder",
+        "()Lcom/android/billingclient/api/BillingFlowParams$Builder;",
+        []
+    )
+    .unwrap());
+    ci!(e, FLOW_PARAMS_BUILDER, "setSkuDetails",
+        "(Lcom/android/billingclient/api/SkuDetails;)Lcom/android/billingclient/api/BillingFlowParams$Builder;",
+        flow_builder, [Value::Obj(sku_obj)]).unwrap();
+    let flow = ov(ci!(
+        e,
+        FLOW_PARAMS_BUILDER,
+        "build",
+        "()Lcom/android/billingclient/api/BillingFlowParams;",
+        flow_builder,
+        []
+    )
+    .unwrap());
+    e.invoke_static(
+        "LBillLoop;",
+        "arm",
+        "(Ljava/lang/Object;Ljava/lang/Object;)V",
+        &[Value::Obj(client), Value::Obj(flow)],
+    )
+    .unwrap();
+    let r = ci!(e, BILLING_CLIENT, "launchBillingFlow",
+        "(Landroid/app/Activity;Lcom/android/billingclient/api/BillingFlowParams;)Lcom/android/billingclient/api/BillingResult;",
+        client, [Value::Null, Value::Obj(flow)]);
+    assert!(r.is_ok(), "o lançamento exterior conclui: {r:?}");
+    let calls = match e
+        .statics
+        .get(&("LBillLoop;".to_string(), "calls".to_string()))
+    {
+        Some(Value::Int(n)) => *n,
+        _ => 0,
+    };
+    assert!(calls > 1, "relançamentos aconteceram (calls={calls})");
+    assert!(calls <= 16, "limitados pelo fusível (calls={calls})");
+    assert!(e.gms_dropped_callbacks() >= 1, "o excesso foi contado");
+}

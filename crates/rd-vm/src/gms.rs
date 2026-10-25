@@ -540,8 +540,13 @@ pub struct GmsState {
     /// OnCompleteListener que se re-adiciona abortava o processo).
     pub task_delivering: bool,
     pub task_queue: std::collections::VecDeque<TaskDelivery>,
-    /// Entradas de log descartadas pelo teto (todas as famílias).
+    /// Entradas descartadas pelo teto (todas as famílias).
     pub dropped_log_entries: usize,
+    /// Profundidade corrente de callbacks host→DEX (ver
+    /// `call_dex_any`): o fusível global anti-recursão.
+    pub callback_depth: u32,
+    /// Callbacks descartados por excederem o fusível de profundidade.
+    pub dropped_callbacks: usize,
     pub availability_code: i32,
     pub availability_obj: Option<ObjRef>,
     pub error_notifications: i32,
@@ -905,7 +910,37 @@ fn make_bytes(vm: &mut Engine, bytes: &[u8]) -> Result<Value, VmExit> {
 /// Invoca um callback DEX tentando assinaturas em ordem (bridges de
 /// genéricos apagam para `Object`, mas fixtures podem declarar o tipo
 /// concreto). `Ok(None)` = nenhum corpo DEX (objeto host/sintético).
+/// Fusível de profundidade para callbacks host→DEX do shim. As
+/// entregas são síncronas e um callback pode chamar métodos que
+/// disparam outro callback (retry no onPurchasesUpdated, listener
+/// que escreve, etc.); sem teto, a pilha do hospedeiro é o limite e
+/// o processo aborta (SIGABRT — provado em Billing, Tasks, RTDB,
+/// Firestore e LiveData). As filas de entrega (Tasks, FS/RTDB/Auth,
+/// LiveData) mantêm os fluxos legítimos rasos; este fusível é a rede
+/// para todos os outros callbacks. Acima do teto, a entrega é
+/// descartada e contada em `gms_dropped_callbacks`. O valor é baixo
+/// porque cada nível consome vários frames gordos do interpretador
+/// (medido: ~17 níveis já rebentam uma pilha de 2 MiB em debug).
+const MAX_CALLBACK_DEPTH: u32 = 8;
+
 fn call_dex_any(
+    vm: &mut Engine,
+    recv: ObjRef,
+    name: &str,
+    sigs: &[&str],
+    args: Vec<Value>,
+) -> Result<Option<Value>, VmExit> {
+    if vm.fw.gms.callback_depth >= MAX_CALLBACK_DEPTH {
+        vm.fw.gms.dropped_callbacks = vm.fw.gms.dropped_callbacks.saturating_add(1);
+        return Ok(None);
+    }
+    vm.fw.gms.callback_depth += 1;
+    let result = call_dex_any_inner(vm, recv, name, sigs, args);
+    vm.fw.gms.callback_depth -= 1;
+    result
+}
+
+fn call_dex_any_inner(
     vm: &mut Engine,
     recv: ObjRef,
     name: &str,
@@ -6382,6 +6417,12 @@ impl Engine {
     /// (analytics/crash/ads/nonces/upstream/resets somados).
     pub fn gms_dropped_log_entries(&self) -> usize {
         self.fw.gms.dropped_log_entries
+    }
+
+    /// Callbacks DEX descartados pelo fusível de profundidade
+    /// (`MAX_CALLBACK_DEPTH`) — sinal de reentrância patológica.
+    pub fn gms_dropped_callbacks(&self) -> usize {
+        self.fw.gms.dropped_callbacks
     }
 
     /// Faz os carregamentos de anúncios falharem com o código dado
