@@ -13156,6 +13156,184 @@ fn location_and_criteria_values_are_guest_visible() {
 }
 
 #[test]
+fn location_deep_audit_fixes_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let location = p35c_location_at(&mut engine, 1.0, 2.0);
+
+    // The two MSL getters throw IllegalStateException while unset, even
+    // though every other optional getter returns its retained field.
+    assert_throws(
+        engine.invoke_instance(location, "getMslAltitudeMeters", "()D", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    assert_throws(
+        engine.invoke_instance(location, "getMslAltitudeAccuracyMeters", "()F", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    call(
+        &mut engine,
+        location,
+        "setMslAltitudeMeters",
+        "(D)V",
+        &[Value::Double(123.5)],
+    );
+    call(
+        &mut engine,
+        location,
+        "setMslAltitudeAccuracyMeters",
+        "(F)V",
+        &[Value::Float(4.5)],
+    );
+    assert_eq!(
+        call(&mut engine, location, "getMslAltitudeMeters", "()D", &[]),
+        Value::Double(123.5)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            location,
+            "getMslAltitudeAccuracyMeters",
+            "()F",
+            &[]
+        ),
+        Value::Float(4.5)
+    );
+    call(&mut engine, location, "removeMslAltitude", "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(location, "getMslAltitudeMeters", "()D", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    // Location.equals uses Double.compare/Float.compare: distinct NaN
+    // payloads are equal (and hash alike), but -0.0 differs from 0.0.
+    let nan_a = f64::from_bits(0x7ff8_0000_0000_0001);
+    let nan_b = f64::from_bits(0xfff8_0000_0000_0002);
+    let left = p35c_location_at(&mut engine, nan_a, -0.0);
+    let right = p35c_location_at(&mut engine, nan_b, -0.0);
+    let locations_equal = |engine: &mut Engine, a: ObjRef, b: ObjRef| {
+        call(
+            engine,
+            a,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(b)],
+        )
+    };
+    assert_eq!(locations_equal(&mut engine, left, right), Value::Int(1));
+    assert_eq!(
+        call(&mut engine, left, "hashCode", "()I", &[]),
+        call(&mut engine, right, "hashCode", "()I", &[])
+    );
+    call(
+        &mut engine,
+        right,
+        "setLongitude",
+        "(D)V",
+        &[Value::Double(0.0)],
+    );
+    assert_eq!(locations_equal(&mut engine, left, right), Value::Int(0));
+    call(
+        &mut engine,
+        right,
+        "setLongitude",
+        "(D)V",
+        &[Value::Double(-0.0)],
+    );
+    call(
+        &mut engine,
+        left,
+        "setSpeed",
+        "(F)V",
+        &[Value::Float(f32::NAN)],
+    );
+    call(
+        &mut engine,
+        right,
+        "setSpeed",
+        "(F)V",
+        &[Value::Float(f32::from_bits(0xffc0_0001))],
+    );
+    assert_eq!(locations_equal(&mut engine, left, right), Value::Int(1));
+    call(&mut engine, left, "setSpeed", "(F)V", &[Value::Float(-0.0)]);
+    call(&mut engine, right, "setSpeed", "(F)V", &[Value::Float(0.0)]);
+    assert_eq!(locations_equal(&mut engine, left, right), Value::Int(0));
+
+    // convert(String) delegates its floating-point tokens to
+    // Double.parseDouble, and its range checks use ordinary comparisons,
+    // so NaN seconds slip through to a NaN result.
+    let parsed = |engine: &mut Engine, input: &str| -> f64 {
+        let value = text(engine, input);
+        p35c_as_double(call_static(
+            engine,
+            P35C_LOCATION,
+            "convert",
+            "(Ljava/lang/String;)D",
+            &[value],
+        ))
+    };
+    assert_eq!(parsed(&mut engine, " 12.5f "), 12.5);
+    assert_eq!(parsed(&mut engine, "1: 30.0f "), 1.5);
+    assert!(parsed(&mut engine, "1:2:NaN").is_nan());
+    assert_eq!(parsed(&mut engine, "Infinity"), f64::INFINITY);
+    let rust_spelling = text(&mut engine, "inf");
+    assert_throws(
+        engine.invoke_static(
+            P35C_LOCATION,
+            "convert",
+            "(Ljava/lang/String;)D",
+            &[rust_spelling],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    // Internal Preconditions range failures use the bounds, not the
+    // rejected value, and spell out which side failed.
+    let assert_message = |result: Result<Value, VmExit>, expected: &str| match result {
+        Err(VmExit::Exception(t)) => {
+            assert_eq!(t.class, "Ljava/lang/IllegalArgumentException;");
+            assert_eq!(t.message.as_deref(), Some(expected));
+        }
+        other => panic!("expected IllegalArgumentException({expected:?}), got {other:?}"),
+    };
+    assert_message(
+        engine.invoke_static(
+            P35C_LOCATION,
+            "convert",
+            "(DI)Ljava/lang/String;",
+            &[Value::Double(f64::NAN), Value::Int(0)],
+        ),
+        "coordinate must not be NaN",
+    );
+    assert_message(
+        engine.invoke_static(
+            P35C_LOCATION,
+            "convert",
+            "(DI)Ljava/lang/String;",
+            &[Value::Double(-180.5), Value::Int(0)],
+        ),
+        "coordinate is out of range of [-180.000000, 180.000000] (too low)",
+    );
+    assert_message(
+        engine.invoke_static(
+            P35C_LOCATION,
+            "convert",
+            "(DI)Ljava/lang/String;",
+            &[Value::Double(180.5), Value::Int(0)],
+        ),
+        "coordinate is out of range of [-180.000000, 180.000000] (too high)",
+    );
+    let criteria = p49_new(&mut engine, P35C_CRITERIA, "()V", &[]);
+    assert_message(
+        engine.invoke_instance(criteria, "setHorizontalAccuracy", "(I)V", &[Value::Int(-1)]),
+        "accuracy is out of range of [0, 3] (too low)",
+    );
+    assert_message(
+        engine.invoke_instance(criteria, "setPowerRequirement", "(I)V", &[Value::Int(4)]),
+        "powerRequirement is out of range of [0, 3] (too high)",
+    );
+}
+
+#[test]
 fn slice_values_builder_and_missing_manager_are_guest_visible() {
     let mut engine = engine_of(&DexBuilder::new());
 
@@ -13592,6 +13770,215 @@ fn slice_values_builder_and_missing_manager_are_guest_visible() {
     );
 }
 
+#[test]
+fn slice_deep_audit_fixes_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let item_sig = "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V";
+
+    // Typed getters really cast the payload: a String is a CharSequence
+    // but not a Bundle, Slice, or the Pair behind getAction.
+    let payload = text(&mut engine, "words");
+    let bundle_format = text(&mut engine, "bundle");
+    let no_hints = p35_string_list(&mut engine, &[]);
+    let wrong = p49_new(
+        &mut engine,
+        P35C_SLICE_ITEM,
+        item_sig,
+        &[payload, bundle_format, Value::Null, no_hints],
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            wrong,
+            "getText",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        "words"
+    );
+    assert_throws(
+        engine.invoke_instance(wrong, "getBundle", "()Landroid/os/Bundle;", &[]),
+        "Ljava/lang/ClassCastException;",
+    );
+    assert_throws(
+        engine.invoke_instance(wrong, "getSlice", "()Landroid/app/slice/Slice;", &[]),
+        "Ljava/lang/ClassCastException;",
+    );
+    assert_throws(
+        engine.invoke_instance(wrong, "getAction", "()Landroid/app/PendingIntent;", &[]),
+        "Ljava/lang/ClassCastException;",
+    );
+
+    // A null payload casts cleanly for reference getters, but getAction
+    // dereferences the Pair and therefore NPEs.
+    let text_format = text(&mut engine, "text");
+    let no_hints = p35_string_list(&mut engine, &[]);
+    let empty = p49_new(
+        &mut engine,
+        P35C_SLICE_ITEM,
+        item_sig,
+        &[Value::Null, text_format, Value::Null, no_hints],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            empty,
+            "getText",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            empty,
+            "getBundle",
+            "()Landroid/os/Bundle;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_throws(
+        engine.invoke_instance(empty, "getAction", "()Landroid/app/PendingIntent;", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+
+    // Build parent/child slices for the Pair and toString checks.
+    let make_slice = |engine: &mut Engine, uri_text: &str, label: &str| -> ObjRef {
+        let raw_uri = text(engine, uri_text);
+        let uri = call_static(
+            engine,
+            "Landroid/net/Uri;",
+            "parse",
+            "(Ljava/lang/String;)Landroid/net/Uri;",
+            &[raw_uri],
+        );
+        let builder = p49_new(
+            engine,
+            P35C_SLICE_BUILDER,
+            "(Landroid/net/Uri;Landroid/app/slice/SliceSpec;)V",
+            &[uri, Value::Null],
+        );
+        let words = text(engine, label);
+        let hints = p35_string_list(engine, &[]);
+        call(
+            engine,
+            builder,
+            "addText",
+            "(Ljava/lang/CharSequence;Ljava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;",
+            &[words, Value::Null, hints],
+        );
+        let hints = p35_string_list(engine, &[]);
+        call(
+            engine,
+            builder,
+            "addInt",
+            "(ILjava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;",
+            &[Value::Int(9), Value::Null, hints],
+        );
+        object(call(
+            engine,
+            builder,
+            "build",
+            "()Landroid/app/slice/Slice;",
+            &[],
+        ))
+    };
+    let child = make_slice(&mut engine, "content://example/child", "child");
+
+    // An action item created directly from a Pair exposes both sides.
+    let pending = p41_pending(&mut engine, "getActivity", 7);
+    let pair = instance(&mut engine, "Landroid/util/Pair;");
+    engine
+        .heap
+        .put_field(pair, "first", pending.clone())
+        .unwrap();
+    engine
+        .heap
+        .put_field(pair, "second", Value::Obj(child))
+        .unwrap();
+    let action_format = text(&mut engine, "action");
+    let no_hints = p35_string_list(&mut engine, &[]);
+    let action_item = p49_new(
+        &mut engine,
+        P35C_SLICE_ITEM,
+        item_sig,
+        &[Value::Obj(pair), action_format, Value::Null, no_hints],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            action_item,
+            "getAction",
+            "()Landroid/app/PendingIntent;",
+            &[]
+        ),
+        pending
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            action_item,
+            "getSlice",
+            "()Landroid/app/slice/Slice;",
+            &[]
+        ),
+        Value::Obj(child)
+    );
+
+    // Slice.toString prints one line per item and indents sub-slices.
+    let parent_uri_text = text(&mut engine, "content://example/parent");
+    let parent_uri = call_static(
+        &mut engine,
+        "Landroid/net/Uri;",
+        "parse",
+        "(Ljava/lang/String;)Landroid/net/Uri;",
+        &[parent_uri_text],
+    );
+    let parent_builder = p49_new(
+        &mut engine,
+        P35C_SLICE_BUILDER,
+        "(Landroid/net/Uri;Landroid/app/slice/SliceSpec;)V",
+        &[parent_uri, Value::Null],
+    );
+    let root = text(&mut engine, "root");
+    let hints = p35_string_list(&mut engine, &[]);
+    call(
+        &mut engine,
+        parent_builder,
+        "addText",
+        "(Ljava/lang/CharSequence;Ljava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;",
+        &[root, Value::Null, hints],
+    );
+    call(
+        &mut engine,
+        parent_builder,
+        "addSubSlice",
+        "(Landroid/app/slice/Slice;Ljava/lang/String;)Landroid/app/slice/Slice$Builder;",
+        &[Value::Obj(child), Value::Null],
+    );
+    let hints = p35_string_list(&mut engine, &[]);
+    call(
+        &mut engine,
+        parent_builder,
+        "addLong",
+        "(JLjava/lang/String;Ljava/util/List;)Landroid/app/slice/Slice$Builder;",
+        &[Value::Long(3), Value::Null, hints],
+    );
+    let parent = object(call(
+        &mut engine,
+        parent_builder,
+        "build",
+        "()Landroid/app/slice/Slice;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(&mut engine, parent, "toString", "()Ljava/lang/String;", &[]),
+        "text: root\nslice:\n   text: child\n   int\nlong\n"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Appendix C Batch 35-D: android.app.backup + android.telephony.gsm.
 // ---------------------------------------------------------------------------
@@ -13810,9 +14197,29 @@ fn backup_without_a_backup_service_is_guest_visible() {
         ),
         logger
     );
+    let logger = object(logger);
     let results = call(
         &mut engine,
-        object(logger),
+        logger,
+        "getLoggingResults",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, results), 0);
+    assert_eq!(
+        call(&mut engine, logger, "getOperationType", "()I", &[]),
+        Value::Int(1)
+    );
+    call(
+        &mut engine,
+        agent,
+        "clearBackupRestoreEventLogger",
+        "()V",
+        &[],
+    );
+    let results = call(
+        &mut engine,
+        logger,
         "getLoggingResults",
         "()Ljava/util/List;",
         &[],
@@ -14214,6 +14621,133 @@ fn ssl_certificate_and_error_values_are_guest_visible() {
     assert_eq!(
         call(&mut engine, chromium, "getPrimaryError", "()I", &[]),
         Value::Int(2)
+    );
+}
+
+#[test]
+fn ssl_certificate_deep_audit_fixes_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let millis = 1_704_067_200_000i64;
+
+    // cloneDate is `(Date) date.clone()`: a Date subclass instance
+    // keeps its dynamic type and its own fields through SslCertificate.
+    let stamp = instance(&mut engine, "Ljava/sql/Timestamp;");
+    engine
+        .heap
+        .put_field(stamp, "rd_ms", Value::Long(millis))
+        .unwrap();
+    engine
+        .heap
+        .put_field(stamp, "nanos", Value::Int(123_456_789))
+        .unwrap();
+    let stamp_after = instance(&mut engine, "Ljava/sql/Timestamp;");
+    engine
+        .heap
+        .put_field(stamp_after, "rd_ms", Value::Long(millis + 1_000))
+        .unwrap();
+    engine
+        .heap
+        .put_field(stamp_after, "nanos", Value::Int(987_654_321))
+        .unwrap();
+    let issued_to = text(&mut engine, "CN=example.com");
+    let issued_by = text(&mut engine, "CN=Root CA");
+    let cert = p49_new(
+        &mut engine,
+        P35E_SSL_CERTIFICATE,
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/util/Date;Ljava/util/Date;)V",
+        &[
+            issued_to,
+            issued_by,
+            Value::Obj(stamp),
+            Value::Obj(stamp_after),
+        ],
+    );
+    let returned = object(call(
+        &mut engine,
+        cert,
+        "getValidNotBeforeDate",
+        "()Ljava/util/Date;",
+        &[],
+    ));
+    assert_ne!(returned, stamp);
+    assert_eq!(
+        engine.heap.class_of(returned).unwrap(),
+        "Ljava/sql/Timestamp;"
+    );
+    assert_eq!(field(&engine, returned, "rd_ms"), Value::Long(millis));
+    assert_eq!(field(&engine, returned, "nanos"), Value::Int(123_456_789));
+    // Mutating the returned clone does not reach the certificate.
+    engine
+        .heap
+        .put_field(returned, "nanos", Value::Int(1))
+        .unwrap();
+    let returned_again = object(call(
+        &mut engine,
+        cert,
+        "getValidNotBeforeDate",
+        "()Ljava/util/Date;",
+        &[],
+    ));
+    assert_eq!(
+        field(&engine, returned_again, "nanos"),
+        Value::Int(123_456_789)
+    );
+
+    // Undecodable x509 bytes in restoreState degrade to a null X.509
+    // certificate instead of failing the restore.
+    let bundle = p41_bundle(&mut engine);
+    for (key, value) in [
+        ("issued-to", "CN=example.com"),
+        ("issued-by", "CN=Root CA"),
+        ("valid-not-before", "2024-01-01 00:00:00+0000"),
+        ("valid-not-after", "2025-01-01 00:00:00+0000"),
+    ] {
+        let key = text(&mut engine, key);
+        let value = text(&mut engine, value);
+        call(
+            &mut engine,
+            bundle,
+            "putString",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[key, value],
+        );
+    }
+    let key = text(&mut engine, "x509-certificate");
+    let garbage = byte_array(&mut engine, &[1, 2, 3]);
+    call(
+        &mut engine,
+        bundle,
+        "putByteArray",
+        "(Ljava/lang/String;[B)V",
+        &[key, garbage],
+    );
+    let restored = object(call_static(
+        &mut engine,
+        P35E_SSL_CERTIFICATE,
+        "restoreState",
+        "(Landroid/os/Bundle;)Landroid/net/http/SslCertificate;",
+        &[Value::Obj(bundle)],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            restored,
+            "getX509Certificate",
+            "()Ljava/security/cert/X509Certificate;",
+            &[]
+        ),
+        Value::Null
+    );
+    let before = object(call(
+        &mut engine,
+        restored,
+        "getValidNotBeforeDate",
+        "()Ljava/util/Date;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, before, "getTime", "()J", &[]),
+        Value::Long(millis)
     );
 }
 

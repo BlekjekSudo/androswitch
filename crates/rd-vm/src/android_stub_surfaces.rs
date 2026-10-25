@@ -36053,9 +36053,16 @@ fn p35b_require_args_non_null(args: &[Value], indexes: &[usize]) -> Result<(), V
 }
 
 fn p35b_check_range(value: i32, lower: i32, upper: i32, name: &str) -> Result<(), VmExit> {
-    if !(lower..=upper).contains(&value) {
+    // com.android.internal.util.Preconditions.checkArgumentInRange(int...):
+    // the value itself is not included in the failure message.
+    if value < lower {
         return Err(iae(format!(
-            "{name} was {value} but must be in range [{lower}, {upper}]"
+            "{name} is out of range of [{lower}, {upper}] (too low)"
+        )));
+    }
+    if value > upper {
+        return Err(iae(format!(
+            "{name} is out of range of [{lower}, {upper}] (too high)"
         )));
     }
     Ok(())
@@ -37573,8 +37580,24 @@ fn p35c_location_extras_equal(vm: &mut Engine, a: &Value, b: &Value) -> bool {
 }
 
 fn p35c_double_hash(value: f64) -> i32 {
-    let bits = value.to_bits() as i64;
+    // Double.hashCode uses doubleToLongBits, which canonicalizes NaN.
+    let bits = if value.is_nan() {
+        0x7ff8_0000_0000_0000_u64 as i64
+    } else {
+        value.to_bits() as i64
+    };
     (bits ^ (bits >> 32)) as i32
+}
+
+/// Equality under Java's `Double.compare(a, b) == 0`: all NaNs compare
+/// equal, while `-0.0` and `0.0` do not.
+fn p35c_java_double_eq(a: f64, b: f64) -> bool {
+    a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan())
+}
+
+/// Equality under Java's `Float.compare(a, b) == 0`.
+fn p35c_java_float_eq(a: f32, b: f32) -> bool {
+    a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan())
 }
 
 fn p35c_location_instance(
@@ -37598,6 +37621,24 @@ fn p35c_location_instance(
             return Ok(Some(Value::Null));
         }
         if name == getter && sig == getter_sig {
+            // AOSP's two MSL getters are the only optional-value getters
+            // that fail when the value is absent instead of returning the
+            // retained zero/default field.
+            if p35c_location_mask(vm, recv) & bit == 0 {
+                match getter {
+                    "getMslAltitudeMeters" => {
+                        return Err(ise(
+                            "The Mean Sea Level altitude of this location is not set.",
+                        ));
+                    }
+                    "getMslAltitudeAccuracyMeters" => {
+                        return Err(ise(
+                            "The Mean Sea Level altitude accuracy of this location is not set.",
+                        ));
+                    }
+                    _ => {}
+                }
+            }
             let value = if is_double {
                 Value::Double(p35c_field_double(vm, recv, field))
             } else {
@@ -37819,10 +37860,14 @@ fn p35c_location_instance(
             let mut eq = field_long(vm, recv, "mTimeMs") == field_long(vm, other, "mTimeMs")
                 && field_long(vm, recv, "mElapsedRealtimeNs")
                     == field_long(vm, other, "mElapsedRealtimeNs")
-                && p35c_field_double(vm, recv, "mLatitudeDegrees")
-                    == p35c_field_double(vm, other, "mLatitudeDegrees")
-                && p35c_field_double(vm, recv, "mLongitudeDegrees")
-                    == p35c_field_double(vm, other, "mLongitudeDegrees");
+                && p35c_java_double_eq(
+                    p35c_field_double(vm, recv, "mLatitudeDegrees"),
+                    p35c_field_double(vm, other, "mLatitudeDegrees"),
+                )
+                && p35c_java_double_eq(
+                    p35c_field_double(vm, recv, "mLongitudeDegrees"),
+                    p35c_field_double(vm, other, "mLongitudeDegrees"),
+                );
             // Optional fields compare only when present on both sides;
             // bearing uses its own row outside the props table.
             let mut prop_rows: Vec<(&str, i32, bool)> = P35C_LOCATION_PROPS
@@ -37840,9 +37885,15 @@ fn p35c_location_instance(
                     eq = false;
                 } else if has {
                     let same = if is_double {
-                        p35c_field_double(vm, recv, field) == p35c_field_double(vm, other, field)
+                        p35c_java_double_eq(
+                            p35c_field_double(vm, recv, field),
+                            p35c_field_double(vm, other, field),
+                        )
                     } else {
-                        field_float(vm, recv, field) == field_float(vm, other, field)
+                        p35c_java_float_eq(
+                            field_float(vm, recv, field),
+                            field_float(vm, other, field),
+                        )
                     };
                     eq = same;
                 }
@@ -37882,10 +37933,21 @@ fn p35c_format_decimal(value: f64) -> String {
 }
 
 fn p35c_location_convert_to_string(coordinate: f64, output_type: i32) -> Result<String, VmExit> {
-    if coordinate.is_nan() || !(-180.0..=180.0).contains(&coordinate) {
-        return Err(iae(format!(
-            "coordinate was {coordinate} but must be in range [-180.0, 180.0]"
-        )));
+    // Internal Preconditions.checkArgumentInRange(double...) gives NaN a
+    // dedicated message and formats both bounds with Java's %f (six
+    // fraction digits).
+    if coordinate.is_nan() {
+        return Err(iae("coordinate must not be NaN"));
+    }
+    if coordinate < -180.0 {
+        return Err(iae(
+            "coordinate is out of range of [-180.000000, 180.000000] (too low)",
+        ));
+    }
+    if coordinate > 180.0 {
+        return Err(iae(
+            "coordinate is out of range of [-180.000000, 180.000000] (too high)",
+        ));
     }
     if !(0..=2).contains(&output_type) {
         return Err(iae(format!("{output_type} is an unrecognized format")));
@@ -37928,19 +37990,25 @@ fn p35c_location_convert_from_string(input: &str) -> Result<f64, VmExit> {
     if tokens.is_empty() {
         return Err(iae(format!("coordinate={coordinate}")));
     }
-    let bad_number = |_: std::num::ParseFloatError| iae(format!("coordinate={coordinate}"));
+    // AOSP catches NumberFormatException from Double.parseDouble /
+    // Integer.parseInt and rethrows it as the coordinate IAE. Reusing the
+    // VM's Java double parser preserves its whitespace/suffix/NaN and
+    // Infinity spellings rather than Rust's narrower float grammar.
+    let parse_double = |token: &str| {
+        crate::numerics::parse_float(token).map_err(|_| iae(format!("coordinate={coordinate}")))
+    };
     let bad_int = |_: std::num::ParseIntError| iae(format!("coordinate={coordinate}"));
     if tokens.len() == 1 {
-        let value: f64 = tokens[0].parse().map_err(bad_number)?;
+        let value = parse_double(tokens[0])?;
         return Ok(if negative { -value } else { value });
     }
     let deg: i32 = tokens[0].parse().map_err(bad_int)?;
     let (minutes, seconds, sec_present) = if tokens.len() > 2 {
         let minutes: i32 = tokens[1].parse().map_err(bad_int)?;
-        let seconds: f64 = tokens[2].parse().map_err(bad_number)?;
+        let seconds = parse_double(tokens[2])?;
         (minutes as f64, seconds, true)
     } else {
-        let minutes: f64 = tokens[1].parse().map_err(bad_number)?;
+        let minutes = parse_double(tokens[1])?;
         (minutes, 0.0, false)
     };
     let is_negative_180 = negative && deg == 180 && minutes == 0.0 && seconds == 0.0;
@@ -37950,7 +38018,10 @@ fn p35c_location_convert_from_string(input: &str) -> Result<f64, VmExit> {
     if minutes < 0.0 || minutes >= 60.0 || (sec_present && minutes > 59.0) {
         return Err(iae(format!("coordinate={coordinate}")));
     }
-    if !(0.0..60.0).contains(&seconds) {
+    // Written as AOSP's two comparisons, not a range-contains check:
+    // both comparisons are false for NaN, so a NaN seconds token is
+    // accepted and yields a NaN coordinate.
+    if seconds < 0.0 || seconds >= 60.0 {
         return Err(iae(format!("coordinate={coordinate}")));
     }
     let value = (deg as f64 * 3600.0 + minutes * 60.0 + seconds) / 3600.0;
@@ -38197,6 +38268,35 @@ fn p35c_slice_spec_instance(
     Ok(Some(value))
 }
 
+/// The checkcast AOSP's typed SliceItem getters perform on `mObj`:
+/// null casts to any reference type, a wrong payload is a
+/// ClassCastException.
+fn p35c_cast(vm: &Engine, value: Value, expected: &str) -> Result<Value, VmExit> {
+    match &value {
+        Value::Null => Ok(value),
+        Value::Obj(reference) if vm.cp.is_subtype(&class_of(vm, *reference), expected) => Ok(value),
+        _ => Err(throw("Ljava/lang/ClassCastException;", "")),
+    }
+}
+
+/// One side of the `Pair<PendingIntent, Slice>` payload of an action
+/// item. A null payload NPEs on the field dereference in AOSP; a
+/// non-Pair payload fails the cast.
+fn p35c_slice_action_part(
+    vm: &Engine,
+    payload: Value,
+    field: &str,
+    expected: &str,
+) -> Result<Value, VmExit> {
+    let Value::Obj(pair) = payload else {
+        return Err(npe(""));
+    };
+    if !vm.cp.is_subtype(&class_of(vm, pair), "Landroid/util/Pair;") {
+        return Err(throw("Ljava/lang/ClassCastException;", ""));
+    }
+    p35c_cast(vm, get(vm, pair, field), expected)
+}
+
 fn p35c_slice_item_instance(
     vm: &mut Engine,
     name: &str,
@@ -38227,11 +38327,20 @@ fn p35c_slice_item_instance(
             "<init>",
             "(Landroid/app/PendingIntent;Landroid/app/slice/Slice;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)V",
         ) => {
+            // AOSP wraps the intent and slice in a Pair and stores that
+            // as mObj; getAction/getSlice read its two fields.
+            let pair = alloc_obj(
+                vm,
+                "Landroid/util/Pair;",
+                vec![
+                    ("first".to_string(), p35_arg(args, 0)),
+                    ("second".to_string(), p35_arg(args, 1)),
+                ],
+            )?;
             put(vm, recv, "mHints", p35_arg(args, 4))?;
             put(vm, recv, "mFormat", p35_arg(args, 2))?;
             put(vm, recv, "mSubType", p35_arg(args, 3))?;
-            put(vm, recv, "mObj", p35_arg(args, 0))?;
-            put(vm, recv, "rd_slice", p35_arg(args, 1))?;
+            put(vm, recv, "mObj", Value::Obj(pair))?;
             Value::Null
         }
         ("getHints", "()Ljava/util/List;") => {
@@ -38243,18 +38352,33 @@ fn p35c_slice_item_instance(
         }
         ("getFormat", "()Ljava/lang/String;") => get(vm, recv, "mFormat"),
         ("getSubType", "()Ljava/lang/String;") => get(vm, recv, "mSubType"),
-        ("getText", "()Ljava/lang/CharSequence;")
-        | ("getBundle", "()Landroid/os/Bundle;")
-        | ("getIcon", "()Landroid/graphics/drawable/Icon;")
-        | ("getAction", "()Landroid/app/PendingIntent;")
-        | ("getRemoteView", "()Landroid/widget/RemoteViews;")
-        | ("getRemoteInput", "()Landroid/app/RemoteInput;") => get(vm, recv, "mObj"),
+        ("getText", "()Ljava/lang/CharSequence;") => {
+            p35c_cast(vm, get(vm, recv, "mObj"), "Ljava/lang/CharSequence;")?
+        }
+        ("getBundle", "()Landroid/os/Bundle;") => {
+            p35c_cast(vm, get(vm, recv, "mObj"), "Landroid/os/Bundle;")?
+        }
+        ("getIcon", "()Landroid/graphics/drawable/Icon;") => {
+            p35c_cast(vm, get(vm, recv, "mObj"), "Landroid/graphics/drawable/Icon;")?
+        }
+        ("getRemoteView", "()Landroid/widget/RemoteViews;") => {
+            p35c_cast(vm, get(vm, recv, "mObj"), "Landroid/widget/RemoteViews;")?
+        }
+        ("getRemoteInput", "()Landroid/app/RemoteInput;") => {
+            p35c_cast(vm, get(vm, recv, "mObj"), "Landroid/app/RemoteInput;")?
+        }
+        ("getAction", "()Landroid/app/PendingIntent;") => p35c_slice_action_part(
+            vm,
+            get(vm, recv, "mObj"),
+            "first",
+            "Landroid/app/PendingIntent;",
+        )?,
         ("getSlice", "()Landroid/app/slice/Slice;") => {
             let format = get(vm, recv, "mFormat");
             if opt_str(vm, Some(&format)).as_deref() == Some("action") {
-                get(vm, recv, "rd_slice")
+                p35c_slice_action_part(vm, get(vm, recv, "mObj"), "second", P35C_SLICE)?
             } else {
-                get(vm, recv, "mObj")
+                p35c_cast(vm, get(vm, recv, "mObj"), P35C_SLICE)?
             }
         }
         ("getInt", "()I") => {
@@ -38310,6 +38434,42 @@ fn p35c_slice_item_instance(
     Ok(Some(value))
 }
 
+/// `Slice.toString(indent)`: one indented line per item, recursing
+/// into sub-slices with three more spaces of indent.
+fn p35c_slice_to_string(vm: &mut Engine, recv: ObjRef, indent: &str) -> Result<String, VmExit> {
+    let mut out = String::new();
+    for item in array_elems(vm, Some(&get(vm, recv, "mItems"))) {
+        out.push_str(indent);
+        let Value::Obj(item) = item else {
+            return Err(npe(""));
+        };
+        let format = vm.invoke_instance(item, "getFormat", "()Ljava/lang/String;", &[])?;
+        match opt_str(vm, Some(&format)).as_deref() {
+            Some("slice") => {
+                out.push_str("slice:\n");
+                let child =
+                    vm.invoke_instance(item, "getSlice", "()Landroid/app/slice/Slice;", &[])?;
+                let Value::Obj(child) = child else {
+                    return Err(npe(""));
+                };
+                out.push_str(&p35c_slice_to_string(vm, child, &format!("{indent}   "))?);
+            }
+            Some("text") => {
+                out.push_str("text: ");
+                let text =
+                    vm.invoke_instance(item, "getText", "()Ljava/lang/CharSequence;", &[])?;
+                out.push_str(&value_string(vm, &text)?);
+                out.push('\n');
+            }
+            _ => {
+                out.push_str(&value_string(vm, &format)?);
+                out.push('\n');
+            }
+        }
+    }
+    Ok(out)
+}
+
 fn p35c_slice_instance(
     vm: &mut Engine,
     name: &str,
@@ -38362,6 +38522,10 @@ fn p35c_slice_instance(
             Value::Int(needed as i32)
         }
         ("describeContents", "()I") => Value::Int(0),
+        ("toString", "()Ljava/lang/String;") => {
+            let text = p35c_slice_to_string(vm, recv, "")?;
+            jstr(vm, text)?
+        }
         _ => return Ok(None),
     };
     Ok(Some(value))
@@ -38749,6 +38913,14 @@ pub(crate) fn partial35c_host_static(
         (P35C_SLICE_ITEM, "FORMAT_TIMESTAMP") => Some("long"),
         (P35C_SLICE_ITEM, "FORMAT_REMOTE_INPUT") => Some("input"),
         (P35C_SLICE_ITEM, "FORMAT_BUNDLE") => Some("bundle"),
+        (P35C_SLICE, "HINT_TITLE") => Some("title"),
+        (P35C_SLICE, "HINT_LIST") => Some("list"),
+        (P35C_SLICE, "HINT_LIST_ITEM") => Some("list_item"),
+        (P35C_SLICE, "HINT_LARGE") => Some("large"),
+        (P35C_SLICE, "HINT_ACTIONS") => Some("actions"),
+        (P35C_SLICE, "HINT_SELECTED") => Some("selected"),
+        (P35C_SLICE, "HINT_NO_TINT") => Some("no_tint"),
+        (P35C_SLICE, "HINT_PARTIAL") => Some("partial"),
         (P35C_SLICE, "HINT_SHORTCUT") => Some("shortcut"),
         (P35C_SLICE, "HINT_SUMMARY") => Some("summary"),
         (P35C_SLICE, "HINT_TOGGLE") => Some("toggle"),
@@ -38896,16 +39068,17 @@ fn p35d_backup_manager_instance(
                 .map(|v| v.as_int().unwrap_or(1) != 0)
                 .unwrap_or(true);
             if !change_enabled {
-                if let Some(context) = field_obj(vm, recv, "mContext") {
-                    let permission = jstr(vm, "android.permission.BACKUP")?;
-                    let message = jstr(vm, "isBackupServiceActive")?;
-                    vm.invoke_instance(
-                        context,
-                        "enforceCallingOrSelfPermission",
-                        "(Ljava/lang/String;Ljava/lang/String;)V",
-                        &[permission, message],
-                    )?;
-                }
+                let Some(context) = field_obj(vm, recv, "mContext") else {
+                    return Err(npe(""));
+                };
+                let permission = jstr(vm, "android.permission.BACKUP")?;
+                let message = jstr(vm, "isBackupServiceActive")?;
+                vm.invoke_instance(
+                    context,
+                    "enforceCallingOrSelfPermission",
+                    "(Ljava/lang/String;Ljava/lang/String;)V",
+                    &[permission, message],
+                )?;
             }
             Value::Int(0)
         }
@@ -38959,7 +39132,14 @@ fn p35d_backup_manager_instance(
                     "Attempting to get logger on an uninitialised BackupAgent",
                 ));
             }
-            logger
+            // AOSP really does call the getter a second time and return
+            // that result instead of the value it just null-checked.
+            vm.invoke_instance(
+                agent,
+                "getBackupRestoreEventLogger",
+                "()Landroid/app/backup/BackupRestoreEventLogger;",
+                &[],
+            )?
         }
         ("getDelayedRestoreLogger", "()Landroid/app/backup/BackupRestoreEventLogger;") => {
             // OperationType.RESTORE
@@ -39025,6 +39205,12 @@ fn p35d_backup_agent_instance(
         ("getBackupRestoreEventLogger", "()Landroid/app/backup/BackupRestoreEventLogger;") => {
             get(vm, recv, "mLogger")
         }
+        ("clearBackupRestoreEventLogger", "()V") => {
+            if let Some(logger) = field_obj(vm, recv, "mLogger") {
+                vm.invoke_instance(logger, "clearData", "()V", &[])?;
+            }
+            Value::Null
+        }
         _ => return Ok(None),
     };
     Ok(Some(value))
@@ -39073,7 +39259,11 @@ fn p35d_event_logger_instance(
             put(vm, recv, "mOperationType", Value::Int(iarg(args, 0)))?;
             Value::Null
         }
-        // Nothing has been logged yet in this profile.
+        ("getOperationType", "()I") => Value::Int(field_int(vm, recv, "mOperationType")),
+        // The modeled logger never accumulates results (the log* entry
+        // points are outside this slice), so clearing is a no-op and
+        // the result list is always the empty snapshot.
+        ("clearData", "()V") => Value::Null,
         ("getLoggingResults", "()Ljava/util/List;") => p35_empty_list(vm)?,
         _ => return Ok(None),
     };
@@ -39283,6 +39473,11 @@ pub(crate) fn partial35d_host_static(
         (P35D_BACKUP_MANAGER, "ERROR_BACKUP_NOT_ALLOWED") => Some(-2001),
         (P35D_BACKUP_MANAGER, "ERROR_PACKAGE_NOT_FOUND") => Some(-2002),
         (P35D_BACKUP_MANAGER, "ERROR_BACKUP_CANCELLED") => Some(-2003),
+        (P35D_BACKUP_MANAGER, "ERROR_TRANSPORT_ABORTED") => Some(-1000),
+        (P35D_BACKUP_MANAGER, "ERROR_TRANSPORT_PACKAGE_REJECTED") => Some(-1002),
+        (P35D_BACKUP_MANAGER, "ERROR_TRANSPORT_QUOTA_EXCEEDED") => Some(-1005),
+        (P35D_BACKUP_MANAGER, "ERROR_AGENT_FAILURE") => Some(-1003),
+        (P35D_EVENT_LOGGER, "DATA_TYPES_ALLOWED") => Some(15),
         (P35D_BACKUP_MANAGER, "ERROR_TRANSPORT_UNAVAILABLE") => Some(-1),
         (P35D_BACKUP_MANAGER, "ERROR_TRANSPORT_INVALID") => Some(-2),
         (P35D_BACKUP_MANAGER, "FLAG_NON_INCREMENTAL_BACKUP") => Some(1),
@@ -39549,6 +39744,14 @@ fn p35e_clone_date(vm: &mut Engine, date: Value) -> Result<Value, VmExit> {
     let Value::Obj(date) = date else {
         return Ok(Value::Null);
     };
+    // AOSP is `(Date) date.clone()`: a shallow copy of the actual
+    // instance, so a Date subclass keeps its dynamic type and fields.
+    // Reconstructing java.util.Date from getTime() would lose both.
+    if let Ok((class, fields)) = vm.heap.as_instance(date) {
+        let class = class.to_string();
+        let fields = fields.to_vec();
+        return Ok(Value::Obj(alloc_obj(vm, &class, fields)?));
+    }
     let time = vm.invoke_instance(date, "getTime", "()J", &[])?;
     let copy = alloc_obj(vm, "Ljava/util/Date;", Vec::new())?;
     vm.invoke_instance(copy, "<init>", "(J)V", &[time])?;
@@ -39891,13 +40094,17 @@ fn p35e_se_service_instance(
             )?;
             // Context.BIND_AUTO_CREATE = 1. A binding failure is not an
             // exception in AOSP, and without the package it can never
-            // result in a connection.
-            let _ = vm.invoke_instance(
+            // result in a connection. A Java exception thrown by the
+            // Context itself still propagates, exactly as the uncaught
+            // bindService call would; only host-model gaps are ignored.
+            if let Err(error @ VmExit::Exception(_)) = vm.invoke_instance(
                 context,
                 "bindService",
                 "(Landroid/content/Intent;Landroid/content/ServiceConnection;I)Z",
                 &[Value::Obj(intent), Value::Obj(connection), Value::Int(1)],
-            );
+            ) {
+                return Err(error);
+            }
             Value::Null
         }
         ("isConnected", "()Z") => {
@@ -39917,13 +40124,22 @@ fn p35e_se_service_instance(
                 field_obj(vm, recv, "mContext"),
                 field_obj(vm, recv, "mConnection"),
             ) {
-                // AOSP fails silently when the binding never succeeded.
-                let _ = vm.invoke_instance(
+                // AOSP silently absorbs only IllegalArgumentException
+                // (the binding never succeeded); any other Java
+                // exception from unbindService propagates and leaves
+                // mSecureElementService untouched.
+                match vm.invoke_instance(
                     context,
                     "unbindService",
                     "(Landroid/content/ServiceConnection;)V",
                     &[Value::Obj(connection)],
-                );
+                ) {
+                    Ok(_) => {}
+                    Err(VmExit::Exception(t))
+                        if vm.cp.is_subtype(&t.class, "Ljava/lang/IllegalArgumentException;") => {}
+                    Err(error @ VmExit::Exception(_)) => return Err(error),
+                    Err(_) => {}
+                }
             }
             put(vm, recv, "mSecureElementService", Value::Null)?;
             Value::Null
@@ -40154,14 +40370,28 @@ pub(crate) fn partial35e_static(
                 vm.invoke_instance(certificate, "getValidNotAfter", "()Ljava/lang/String;", &[])?;
             p35e_bundle_put_string(vm, bundle, "valid-not-after", not_after)?;
             if let Some(x509) = field_obj(vm, certificate, "mX509Certificate") {
-                if let Ok(encoded) = vm.invoke_instance(x509, "getEncoded", "()[B", &[]) {
-                    let key = jstr(vm, "x509-certificate")?;
-                    vm.invoke_instance(
-                        bundle,
-                        "putByteArray",
-                        "(Ljava/lang/String;[B)V",
-                        &[key, encoded],
-                    )?;
+                // AOSP swallows CertificateEncodingException only; any
+                // other failure from a custom certificate propagates.
+                match vm.invoke_instance(x509, "getEncoded", "()[B", &[]) {
+                    Ok(encoded) => {
+                        let key = jstr(vm, "x509-certificate")?;
+                        vm.invoke_instance(
+                            bundle,
+                            "putByteArray",
+                            "(Ljava/lang/String;[B)V",
+                            &[key, encoded],
+                        )?;
+                    }
+                    Err(VmExit::Exception(t))
+                        if vm.cp.is_subtype(
+                            &t.class,
+                            "Ljava/security/cert/CertificateEncodingException;",
+                        ) => {}
+                    Err(error @ VmExit::Exception(_)) => return Err(error),
+                    // A structural VM error means the certificate class
+                    // itself is outside the modeled profile; AOSP's
+                    // observable outcome there is simply no encoded form.
+                    Err(_) => {}
                 }
             }
             Value::Obj(bundle)
@@ -40199,8 +40429,22 @@ pub(crate) fn partial35e_static(
                         &[Value::Obj(stream)],
                     )
                 })();
-                if let Ok(Value::Obj(cert)) = attempt {
-                    x509 = Value::Obj(cert);
+                // AOSP catches CertificateException only, and its cast
+                // to X509Certificate is outside that protection for any
+                // other throwable type.
+                match attempt {
+                    Ok(cert) => {
+                        x509 = p35c_cast(vm, cert, "Ljava/security/cert/X509Certificate;")?;
+                    }
+                    Err(VmExit::Exception(t))
+                        if vm
+                            .cp
+                            .is_subtype(&t.class, "Ljava/security/cert/CertificateException;") => {}
+                    Err(error @ VmExit::Exception(_)) => return Err(error),
+                    // CertificateFactory itself is outside the modeled
+                    // profile; without it restore keeps x509 null, the
+                    // same end state as an undecodable certificate.
+                    Err(_) => {}
                 }
             }
             let issued_to = p35e_bundle_get_string(vm, bundle, "issued-to")?;
