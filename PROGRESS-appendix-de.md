@@ -60,8 +60,8 @@ export PATH="$HOME/.cargo/bin:$PATH"   # rustc 1.99.1 em 2026-10-25
 ## Checklist
 
 - [x] S0 Branch + baseline (`rd-framework` 24 testes ok) + este ledger
-- [x] S1 `data/jetpack.toml` (44 libs/6 categorias) + `data/gms.toml` (21 serviços/3 categorias) + `docs/appendix-d-e.md` — status = realidade em `main`
-- [ ] S2 `fd_jetpack.rs` + `fd_gms.rs` + testes unitários
+- [x] S1 `data/jetpack.toml` (46 libs/6 categorias) + `data/gms.toml` (21 serviços/3 categorias) + `docs/appendix-d-e.md` — status = realidade em `main`
+- [x] S2 `fd_jetpack.rs` + `fd_gms.rs` + testes unitários (34 passed em rd-framework, clippy/fmt limpos)
 - [ ] S3 CLI `rd jetpack`/`rd gms` + testes CLI
 - [ ] S4 xtask + docs gerados + spec D/E + ADR 011 + ledger D/E
 - [ ] S5 Runtime AndroidX (`androidx.rs`) + estado/GC/dispatch + testes
@@ -75,3 +75,4 @@ export PATH="$HOME/.cargo/bin:$PATH"   # rustc 1.99.1 em 2026-10-25
   1.99.1, `cargo test -p rd-framework --lib` = 24 passed. PRs 191/192
   mapeados via `refs/pull/*/head` (refs locais `pr-191`/`pr-192`, só leitura).
 - 2026-10-25 S1: inventários TOML validados (parse + unicidade); statuses iniciais conservadores (D: 5 partial m8/m9, 3 stub, resto not_implemented; E: tudo not_implemented).
+
