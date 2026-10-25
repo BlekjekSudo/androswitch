@@ -19935,6 +19935,51 @@ fn audiofx_descriptors_and_no_effect_engine_are_guest_visible() {
     );
     call(&mut engine, effect, "release", "()V", &[]);
     assert_eq!(field(&engine, effect, "mState"), Value::Int(0));
+
+    // Deep audit: the string Descriptor constructor parses through
+    // UUID.fromString, so a malformed UUID is an IllegalArgumentException;
+    // equals dereferences the fields directly, so two default Descriptors
+    // (all-null fields) throw NPE; and a null type probe is simply false
+    // when no effects are installed.
+    let descriptor_class = "Landroid/media/audiofx/AudioEffect$Descriptor;";
+    let descriptor_sig =
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V";
+    let bad_uuid = text(&mut engine, "not-a-uuid");
+    let mode = text(&mut engine, "Insert");
+    let name = text(&mut engine, "Fx");
+    let implementor = text(&mut engine, "Rusty");
+    let good_uuid = text(&mut engine, "123e4567-e89b-12d3-a456-426614174000");
+    let malformed = instance(&mut engine, descriptor_class);
+    assert_throws(
+        engine.invoke_instance(
+            malformed,
+            "<init>",
+            descriptor_sig,
+            &[bad_uuid, good_uuid, mode, name, implementor],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let empty_one = p49_new(&mut engine, descriptor_class, "()V", &[]);
+    let empty_two = p49_new(&mut engine, descriptor_class, "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            empty_one,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(empty_two)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            "Landroid/media/audiofx/AudioEffect;",
+            "isEffectTypeAvailable",
+            "(Ljava/util/UUID;)Z",
+            &[Value::Null],
+        ),
+        Value::Int(0)
+    );
 }
 
 // ---- Appendix C Batch 36-F: graphics.pdf / renderscript ----
