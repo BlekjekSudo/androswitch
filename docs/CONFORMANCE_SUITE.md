@@ -79,7 +79,9 @@ The automated host run includes an independent JDK oracle for Java cases and
 tests JSON escaping, surrogate pairs, interruption recovery, history/reset and
 status parsing. Native C wrapper tests inject failures into the **production**
 resource helper and also compile it against actual libnx ARM64 headers.
-Mock C service tests are not actual Horizon service execution.
+Mock C service tests are not actual Horizon service execution. Unknown libnx
+HOS version (zero) returns an explicit unavailable query instead of selecting
+legacy PCV. libnx version fields use major16/minor8/micro0 bit positions.
 
 New APIs should add or strengthen cases in this catalog. Small existing focused
 fixtures remain useful for regression isolation, package-renaming checks and

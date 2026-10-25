@@ -39,9 +39,9 @@ impl RuntimeResources for HorizonResources {
         } else if kind == 5 {
             format!(
                 "{}.{}.{}",
-                (value >> 24) & 255,
                 (value >> 16) & 255,
-                (value >> 8) & 255
+                (value >> 8) & 255,
+                value & 255
             )
         } else {
             format!("{value}")

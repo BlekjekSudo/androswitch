@@ -362,6 +362,13 @@ try{
     $captured=@{};$settledCaptures=@{};$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds);$result=$null
     do{
         $terminalRefusal=$null
+        foreach($logName in @('ryujinx.stdout.log','ryujinx.stderr.log')){
+            $logPath=Join-Path $run $logName
+            if(Test-Path -LiteralPath $logPath){
+                $terminal=@(Get-Content -LiteralPath $logPath -Tail 80|Where-Object {$_ -match 'Unhandled exception caught:.*ServiceNotImplementedException'})
+                if($terminal.Count){$receipt.terminal_emulator_error=$terminal[-1];throw 'The owned emulator encountered an unimplemented Horizon service; preserve the partial journal and stop this run.'}
+            }
+        }
         $sessionFile=Join-Path $sdRoot 'logs/session-report.json'
         if(Test-Path -LiteralPath $sessionFile){
             try{

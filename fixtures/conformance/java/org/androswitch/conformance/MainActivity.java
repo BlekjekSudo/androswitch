@@ -8,7 +8,7 @@ import java.io.*;
 public final class MainActivity extends Activity implements View.OnClickListener {
   private Journal journal;
   private Handler handler;
-  private TextView title, summary, last, scope, detail;
+  private TextView summary, last, detail;
   private boolean running, waiting, resumeQueue;
   private int group, renderer, pendingAsync = -1, resultCursor;
   private int order;
@@ -28,8 +28,6 @@ public final class MainActivity extends Activity implements View.OnClickListener
     }
     LinearLayout root = new LinearLayout(this);
     root.setOrientation(1);
-    title = line(root, "AndroSwitch Conformance");
-    scope = line(root, "API 26 contracts | no sensors | catalog coverage");
     summary = line(root, "");
     last = line(root, "Ready; reports saved in application files/conformance");
     detail = line(root, "Runtime facts and guest Android identity are separate");
@@ -98,10 +96,8 @@ public final class MainActivity extends Activity implements View.OnClickListener
         else
           other++;
       }
-    summary.setText("Category " + GROUPS[group] + " | done " + done + "/" + Catalog.IDS.length
+    summary.setText("Conformance | " + GROUPS[group] + " | done " + done + "/" + Catalog.IDS.length
         + " pass " + pass + " other " + other);
-    scope.setText(
-        "API26 | " + (renderer == 0 ? "GLES tests" : "Vulkan tests") + " | sensors excluded");
   }
   private void start(boolean selected) throws IOException {
     if (waiting) {

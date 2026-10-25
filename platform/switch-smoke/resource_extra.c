@@ -19,10 +19,15 @@ int as_platform_resource_query(uint32_t kind, uint64_t *output) {
     return 0;
   }
   if (kind == 5) {
-    *output = hosversionGet();
+    u32 version = hosversionGet();
+    if (!version) return -ENOSYS;
+    *output = version;
     return 0;
   }
   if (kind < 1 || kind > 3) return -EINVAL;
+  /* libnx documents zero as failed/unknown version initialization. Never
+   * mistake it for pre-8.0 firmware and issue a legacy PCV IPC request. */
+  if (!hosversionGet()) return -ENOSYS;
   PcvModule module = kind == 1   ? PcvModule_CpuBus
                      : kind == 2 ? PcvModule_GPU
                                  : PcvModule_EMC;

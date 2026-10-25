@@ -7,6 +7,7 @@ static int modern = 1, exits, closes, opened, last_module;
 static Result init_error, open_error, read_error;
 static u32 clock_hz = 1020000000;
 static u64 mask = 7;
+static u32 version = 0x130000;
 Result svcGetInfo(u64 *v, int t, int h, u64 n) {
   assert(t == InfoType_CoreMask && h == CUR_PROCESS_HANDLE && !n);
   if (read_error) return read_error;
@@ -14,7 +15,7 @@ Result svcGetInfo(u64 *v, int t, int h, u64 n) {
   return 0;
 }
 u64 armGetSystemTickFreq(void) { return 19200000; }
-u32 hosversionGet(void) { return 0x13000000; }
+u32 hosversionGet(void) { return version; }
 bool hosversionAtLeast(int a, int b, int c) {
   assert(a == 8 && !b && !c);
   return modern;
@@ -57,7 +58,15 @@ int main(void) {
   assert(as_platform_resource_query(0, &out) == -EINVAL && out == 91);
   mask = 7;
   assert(!as_platform_resource_query(4, &out) && out == 19200000);
-  assert(!as_platform_resource_query(5, &out) && out == 0x13000000);
+  assert(!as_platform_resource_query(5, &out) && out == 0x130000);
+  version = 0;
+  out = 91;
+  for (unsigned kind = 1; kind <= 5; kind++) {
+    if (kind == 4) continue;
+    assert(as_platform_resource_query(kind, &out) == -ENOSYS && out == 91);
+  }
+  assert(!opened && !closes && !exits);
+  version = 0x130000;
   for (unsigned kind = 1; kind <= 3; kind++) {
     assert(!as_platform_resource_query(kind, &out) && out == clock_hz);
     assert(last_module == (kind == 1   ? PcvModuleId_CpuBus
@@ -79,6 +88,7 @@ int main(void) {
   assert(exits == 5);
   init_error = 0;
   modern = 0;
+  version = 0x070000;
   for (unsigned kind = 1; kind <= 3; kind++) {
     assert(!as_platform_resource_query(kind, &out));
     assert(last_module == (kind == 1   ? PcvModule_CpuBus
