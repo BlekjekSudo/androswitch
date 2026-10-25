@@ -51929,12 +51929,12 @@ fn p36h_proposal_builder(
         "addEncryptionAlgorithm" => {
             let algorithm = iarg(args, 0);
             let key_length = iarg(args, 1);
-            if is_child && !P36H_CHILD_ENCR_IDS.contains(&algorithm) {
-                return Err(iae(format!(
-                    "Encryption algorithm not supported for Child SA: {algorithm}"
-                )));
-            }
+            // AOSP validates the transform (algorithm id + key length)
+            // before applying the Child SA supported-algorithm filter.
             p36h_validate_encryption(algorithm, key_length)?;
+            if is_child && !P36H_CHILD_ENCR_IDS.contains(&algorithm) {
+                return Err(iae(format!("Unsupported encryption algorithm {algorithm}")));
+            }
             let is_aead = p36h_is_aead(algorithm);
             let has_aead = field_int(vm, recv, "rd_has_aead");
             if has_aead != -1 && (has_aead == 1) != is_aead {

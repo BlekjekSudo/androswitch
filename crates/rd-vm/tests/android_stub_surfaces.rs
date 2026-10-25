@@ -22709,6 +22709,29 @@ fn ike_sa_proposal_builders_validate_like_aosp() {
         ),
         "DH_GROUP_CURVE_25519"
     );
+
+    // Deep audit: the Child builder rejects IKE-valid ciphers that the
+    // IPsec stack does not support (3DES), while wholly unknown algorithm
+    // ids fail transform validation; both surface as IAE at add time.
+    let child_rejecting = p49_new(&mut engine, P36H_CHILD_BUILDER, "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            child_rejecting,
+            "addEncryptionAlgorithm",
+            "(II)Landroid/net/ipsec/ike/ChildSaProposal$Builder;",
+            &[Value::Int(3), Value::Int(0)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            child_rejecting,
+            "addEncryptionAlgorithm",
+            "(II)Landroid/net/ipsec/ike/ChildSaProposal$Builder;",
+            &[Value::Int(999), Value::Int(0)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
 }
 
 #[test]
