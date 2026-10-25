@@ -26185,6 +26185,35 @@ fn renderscript_matrix4f_multiply_and_rotate_audit_is_guest_visible() {
     };
     assert!((xy - 1.0).abs() < 1e-6, "get(0,1) = {xy}");
     assert!((yx + 1.0).abs() < 1e-6, "get(1,0) = {yx}");
+
+    // Deep audit: AOSP loadRotate "normalizes" only an already-unit
+    // axis (`if (!(len != 1))`), so a non-unit axis is used verbatim.
+    // Rotating 90 degrees about (0, 0, 2) therefore yields
+    // m[4] = xy*nc - z*s = -2 instead of the proper rotation's -1.
+    let nonunit = p49_new(&mut engine, "Landroid/renderscript/Matrix4f;", "()V", &[]);
+    call(
+        &mut engine,
+        nonunit,
+        "loadRotate",
+        "(FFFF)V",
+        &[
+            Value::Float(90.0),
+            Value::Float(0.0),
+            Value::Float(0.0),
+            Value::Float(2.0),
+        ],
+    );
+    let scaled = match call(
+        &mut engine,
+        nonunit,
+        "get",
+        "(II)F",
+        &[Value::Int(1), Value::Int(0)],
+    ) {
+        Value::Float(v) => v,
+        other => panic!("{other:?}"),
+    };
+    assert!((scaled + 2.0).abs() < 1e-6, "get(1,0) = {scaled}");
 }
 
 #[test]
