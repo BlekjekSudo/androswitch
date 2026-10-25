@@ -2786,3 +2786,103 @@ fn gms_tasks_are_observed_correctly_from_bytecode() {
     assert_eq!(sget(&e, "LTaskProbe;", "complete"), Value::Int(1));
     assert_eq!(sget(&e, "LTaskProbe;", "successful"), Value::Int(1));
 }
+
+// ── Regressão (auditoria; achado do 404-Agent no #315): de bytecode,
+// Tasks.forResult era cunhado pelo M10 (campos rd_*) e ficava fora do
+// motor de Tasks do shim — continueWith/getResult quebravam em
+// combinação. Agora forResult cai para o shim como qualquer Task.
+#[test]
+fn tasks_for_result_from_bytecode_lives_in_the_gms_engine() {
+    let mut b = DexBuilder::new();
+    let probe = b.class("LFRProbe;", "Ljava/lang/Object;");
+    b.static_field(probe, "result", "Ljava/lang/Object;", common::SVal::Int(0));
+    let f_result = b.field_idx("LFRProbe;", "Ljava/lang/Object;", "result");
+    let cont = b.class("LFRCont;", "Ljava/lang/Object;");
+    b.static_field(cont, "calls", "I", common::SVal::Int(0));
+    let f_calls = b.field_idx("LFRCont;", "I", "calls");
+    let s_valor = b.intern("valor") as u16;
+    let p_for_result = b.proto_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        vec!["Ljava/lang/Object;".to_string()],
+    );
+    let p_get_result = b.proto_idx("Ljava/lang/Object;", vec![]);
+    let p_cont = b.proto_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        vec!["Lcom/google/android/gms/tasks/Continuation;".to_string()],
+    );
+    let m_for_result = b.method_idx(
+        "Lcom/google/android/gms/tasks/Tasks;",
+        p_for_result,
+        "forResult",
+    );
+    let m_get_result = b.method_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        p_get_result,
+        "getResult",
+    );
+    let m_cont = b.method_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        p_cont,
+        "continueWith",
+    );
+    // static run(Object cont)
+    b.direct(
+        probe,
+        "run",
+        "V",
+        vec!["Ljava/lang/Object;"],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(4, 1, 2, {
+            // ins=1: v3=cont
+            let mut u = op21c(0x1A, 0, s_valor); // const-string v0, "valor"
+            u.extend(op35c(0x71, 1, m_for_result, [0, 0, 0, 0, 0])); // forResult
+            u.extend(op11x(0x0C, 0)); // move-result-object v0 (task)
+            u.extend(op35c(0x6E, 2, m_cont, [0, 3, 0, 0, 0])); // task.continueWith(cont)
+            u.extend(op11x(0x0C, 1)); // v1 = task2 (ignorar)
+            u.extend(op35c(0x6E, 1, m_get_result, [0, 0, 0, 0, 0])); // task.getResult()
+            u.extend(op11x(0x0C, 0));
+            u.extend(op21c(0x69, 0, f_result)); // sput-object result
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    // Continuation.then(Task)Object: calls++; return null.
+    b.r#virtual(
+        cont,
+        "then",
+        "Ljava/lang/Object;",
+        vec!["Lcom/google/android/gms/tasks/Task;"],
+        ACC_PUBLIC,
+        Some(b.code(5, 2, 2, {
+            let mut u = op21c(0x60, 0, f_calls);
+            u.extend(op11n(0x12, 1, 1));
+            u.extend(op23x(0x90, 0, 0, 1));
+            u.extend(op21c(0x67, 0, f_calls));
+            u.extend(op11n(0x12, 0, 0)); // const/4 v0, 0 (null)
+            u.extend(op11x(0x11, 0)); // return-object v0
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+    let cont_obj = obj(&mut e, "LFRCont;");
+    e.invoke_static(
+        "LFRProbe;",
+        "run",
+        "(Ljava/lang/Object;)V",
+        &[Value::Obj(cont_obj)],
+    )
+    .unwrap();
+    match e
+        .statics
+        .get(&("LFRProbe;".to_string(), "result".to_string()))
+    {
+        Some(Value::Obj(r)) => assert_eq!(e.heap.as_str(*r).unwrap(), "valor"),
+        other => panic!("getResult via bytecode: {other:?}"),
+    }
+    assert_eq!(
+        e.statics
+            .get(&("LFRCont;".to_string(), "calls".to_string())),
+        Some(&Value::Int(1)),
+        "continueWith correu no motor do shim"
+    );
+}

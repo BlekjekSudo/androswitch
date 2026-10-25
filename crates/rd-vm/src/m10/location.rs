@@ -19,7 +19,6 @@ const LOCATION_REQUEST_BUILDER: &str = "Lcom/google/android/gms/location/Locatio
 const LOCATION_CALLBACK: &str = "Lcom/google/android/gms/location/LocationCallback;";
 const LOCATION_RESULT: &str = "Lcom/google/android/gms/location/LocationResult;";
 const GMS_TASK: &str = "Lcom/google/android/gms/tasks/Task;";
-const GMS_TASKS: &str = "Lcom/google/android/gms/tasks/Tasks;";
 
 const LOCATION_PERMS: &[&str] = &[
     "android.permission.ACCESS_FINE_LOCATION",
@@ -202,10 +201,12 @@ pub(super) fn static_call(
             let r = alloc_with(vm, LOCATION_RESULT, vec![("rd_locations".into(), list_val)])?;
             Ok(Some(Value::Obj(r)))
         }
-        (GMS_TASKS, "forResult") => {
-            let res = args.first().cloned().unwrap_or(Value::Null);
-            Ok(Some(Value::Obj(completed_task(vm, res)?)))
-        }
+        // Tasks.forResult NÃO é cunhado aqui: cai para o shim GMS
+        // (gms.rs) mais abaixo na cadeia estática, para que TODAS as
+        // Tasks de uso geral vivam no mesmo motor (continueWith,
+        // whenAll, listeners e getResult consistentes de bytecode).
+        // As Tasks dos próprios fluxos fused continuam a nascer em
+        // completed_task/rd_*.
         _ => Ok(None),
     }
 }
