@@ -19738,6 +19738,26 @@ fn media_projection_without_a_token_or_service_is_guest_visible() {
         ),
         "Ljava/lang/NullPointerException;",
     );
+    // Deep audit: addCallback stores the delegate before the failing
+    // service call, so removing that callback reaches the service (and the
+    // same NPE) — but the local removal happens first, making a second
+    // removal an unknown-callback no-op.
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "removeCallback",
+            "(Landroid/media/projection/MediaProjectionManager$Callback;)V",
+            &[Value::Obj(callback)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    call(
+        &mut engine,
+        manager,
+        "removeCallback",
+        "(Landroid/media/projection/MediaProjectionManager$Callback;)V",
+        &[Value::Obj(callback)],
+    );
     let built_manager = p49_new(
         &mut engine,
         P36E_PROJECTION_MANAGER,
