@@ -359,6 +359,10 @@ fn call_static_intrinsic_rooted(
     if let Some(v) = crate::boxes::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
     }
+    // java.util.BitSet valueOf factories (jbitset.rs) — issue #293
+    if let Some(v) = crate::jbitset::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
     // Parcel.obtain / Binder identity statics (parcel.rs)
     if let Some(v) = crate::parcel::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
