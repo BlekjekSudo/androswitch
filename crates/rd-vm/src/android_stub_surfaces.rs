@@ -50167,6 +50167,10 @@ fn p36g_freeze_period_instance(
         ("<init>", "(Ljava/time/MonthDay;Ljava/time/MonthDay;)V") => {
             let (sm, sd) = p36g_month_day_parts(vm, &p36a_value(args, 0))?;
             let (em, ed) = p36g_month_day_parts(vm, &p36a_value(args, 1))?;
+            // AOSP derives the day-of-year from MonthDay.atYear(2001);
+            // 2001 is not a leap year, so February 29 resolves to the 28th.
+            let sd = if sm == 2 && sd == 29 { 28 } else { sd };
+            let ed = if em == 2 && ed == 29 { 28 } else { ed };
             put(vm, recv, "mStart", p36a_value(args, 0))?;
             put(vm, recv, "mEnd", p36a_value(args, 1))?;
             put(

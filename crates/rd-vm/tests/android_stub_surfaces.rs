@@ -26006,6 +26006,21 @@ fn freeze_periods_and_update_policy_validation_are_guest_visible() {
         }
         other => panic!("expected freezePeriodTooClose, got {other:?}"),
     }
+
+    // Deep audit: AOSP derives the freeze day-of-year from
+    // MonthDay.atYear(2001); 2001 is not a leap year, so a period
+    // starting February 29 is dated from the 28th.
+    let leap_start = freeze(&mut engine, 2, 29, 3, 5);
+    assert_eq!(
+        call_text(
+            &mut engine,
+            leap_start,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "Feb 28 - Mar 05"
+    );
 }
 
 #[test]
