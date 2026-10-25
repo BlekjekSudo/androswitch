@@ -6827,6 +6827,49 @@ fn keystore_specs_protection_and_key_info_preserve_explicit_values() {
         ),
         Value::Int(-1)
     );
+
+    // Deep audit: KeyGenParameterSpec.getUid wraps KeyProperties'
+    // IllegalArgumentException for non-legacy namespaces into an
+    // IllegalStateException (the static conversion itself throws IAE).
+    assert_throws(
+        engine.invoke_static(
+            "Landroid/security/keystore/KeyProperties;",
+            "namespaceToLegacyUid",
+            "(I)I",
+            &[Value::Int(103)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let namespaced_builder = instance(
+        &mut engine,
+        "Landroid/security/keystore/KeyGenParameterSpec$Builder;",
+    );
+    let namespaced_alias = text(&mut engine, "namespaced-key");
+    call(
+        &mut engine,
+        namespaced_builder,
+        "<init>",
+        "(Ljava/lang/String;I)V",
+        &[namespaced_alias, Value::Int(3)],
+    );
+    call(
+        &mut engine,
+        namespaced_builder,
+        "setNamespace",
+        "(I)Landroid/security/keystore/KeyGenParameterSpec$Builder;",
+        &[Value::Int(103)],
+    );
+    let namespaced_spec = object(call(
+        &mut engine,
+        namespaced_builder,
+        "build",
+        "()Landroid/security/keystore/KeyGenParameterSpec;",
+        &[],
+    ));
+    assert_throws(
+        engine.invoke_instance(namespaced_spec, "getUid", "()I", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
 }
 
 #[test]

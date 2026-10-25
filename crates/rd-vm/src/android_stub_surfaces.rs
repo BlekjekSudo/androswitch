@@ -24142,10 +24142,12 @@ fn p57_keygen_instance(
             ("getUid", "()I") => match field_int(vm, recv, "mNamespace") {
                 -1 => Value::Int(-1),
                 102 => Value::Int(1010),
-                ns => {
-                    return Err(iae(format!(
-                        "No UID corresponding to namespace {ns}"
-                    )))
+                _ => {
+                    // AOSP catches KeyProperties' IllegalArgumentException and
+                    // rethrows it as an IllegalStateException here.
+                    return Err(ise(
+                        "getUid called on KeyGenParameterSpec with non legacy keystore namespace.",
+                    ));
                 }
             },
             ("getNamespace", "()I") => Value::Int(field_int(vm, recv, "mNamespace")),
@@ -24472,7 +24474,7 @@ fn p57_keygen_instance(
                 self_value
             } else {
                 return Err(iae(
-                    "maxUsageCount must be either UNRESTRICTED_USAGE_COUNT or a positive value",
+                    "maxUsageCount is not valid",
                 ));
             }
         }
@@ -24853,9 +24855,7 @@ fn p57_key_protection_instance(
                 put(vm, recv, "mMaxUsageCount", Value::Int(count))?;
                 self_value
             } else {
-                return Err(iae(
-                    "maxUsageCount must be either UNRESTRICTED_USAGE_COUNT or a positive value",
-                ));
+                return Err(iae("maxUsageCount is not valid"));
             }
         }
         ("setRollbackResistant", "(Z)Landroid/security/keystore/KeyProtection$Builder;") => {
