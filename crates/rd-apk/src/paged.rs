@@ -6,21 +6,21 @@
 //! bytes this reader can ever pin in RSS are capped by the cache size,
 //! independent of the APK size (a 15 GiB APK opens in O(tail + CD) reads).
 //!
-//! Scope of the prototype: EOCD + ZIP64 locator/EOCD discovery from the
-//! file tail, central-directory parse entry-by-entry through the cache,
-//! and on-demand entry extraction (STORED/DEFLATE, CRC-checked, same
-//! policy as [`crate::zip::Zip::read_entry`]). The legacy in-memory
-//! [`crate::zip::Zip`] remains the default until Stage 2 integration
-//! swaps `Apk`'s backend (see ADR 008).
+//! Scope: EOCD + ZIP64 locator/EOCD discovery from the file tail,
+//! central-directory parse entry-by-entry through the cache, and
+//! on-demand entry extraction (STORED/DEFLATE, CRC-checked, same
+//! policy as [`crate::zip::Zip::read_entry`]). Stage 2 integration:
+//! [`crate::zip::Zip::open_paged`] wraps this reader as a `ZipSource`,
+//! and `Apk::open` routes files above the whole-file cap here.
 
 use crate::error::{RdError, RdResult};
 use crate::zip::{crc32, ZipEntry, CD_ENTRY_SIG, EOCD_SIG, ZIP64_EOCD_LOCATOR_SIG, ZIP64_EOCD_SIG};
-use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Read as _;
 use std::os::unix::fs::FileExt;
 use std::path::Path;
+use std::sync::Mutex;
 
 pub const PAGE_BYTES: usize = 64 * 1024;
 pub const CACHE_PAGES: usize = 256; // 256 * 64 KiB = 16 MiB hard cap
@@ -93,8 +93,11 @@ impl LruPageCache {
 }
 
 /// Paged ZIP container: metadata in memory, payloads on disk.
+/// O cache vive num `Mutex` (não `RefCell`): `PagedZip` é `Send + Sync`,
+/// então `Zip`/`Apk` paginados cruzam threads como o caminho whole-file
+/// (a `Arc<PagedZip>` do `ZipSource` e o `Arc<Apk>` do agente exigem).
 pub struct PagedZip {
-    cache: RefCell<LruPageCache>,
+    cache: Mutex<LruPageCache>,
     entries: Vec<ZipEntry>,
     cd_offset: u64,
     file_len: u64,
@@ -177,7 +180,7 @@ impl PagedZip {
             p += stride;
         }
         Ok(PagedZip {
-            cache: RefCell::new(cache),
+            cache: Mutex::new(cache),
             entries,
             cd_offset,
             file_len: len,
@@ -248,10 +251,25 @@ impl PagedZip {
     }
     /// Bytes the page cache currently pins (hard-capped at 16 MiB).
     pub fn cached_bytes(&self) -> usize {
-        self.cache.borrow().pages.iter().map(|(_, p)| p.len()).sum()
+        self.cache
+            .lock()
+            .expect("paged-zip cache lock")
+            .pages
+            .iter()
+            .map(|(_, p)| p.len())
+            .sum()
     }
     pub fn find(&self, name: &str) -> Option<&ZipEntry> {
         self.entries.iter().find(|e| e.name == name)
+    }
+
+    /// Janela crua do container (ex.: bloco de assinatura antes do CD) sem
+    /// materializar o arquivo — passa pelo cache de páginas (teto 16 MiB).
+    pub fn read_range(&self, off: u64, len: usize) -> RdResult<Vec<u8>> {
+        self.cache
+            .lock()
+            .expect("paged-zip cache lock")
+            .read_vec(off, len)
     }
 
     pub fn read(&self, name: &str) -> RdResult<Vec<u8>> {
@@ -262,7 +280,7 @@ impl PagedZip {
     }
 
     pub fn read_entry(&self, entry: &ZipEntry) -> RdResult<Vec<u8>> {
-        let mut cache = self.cache.borrow_mut();
+        let mut cache = self.cache.lock().expect("paged-zip cache lock");
         let off = entry.local_header_offset;
         if cache.u32_at(off)? != 0x0403_4b50 {
             return Err(RdError::parse(format!(
