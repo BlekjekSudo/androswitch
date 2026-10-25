@@ -1132,29 +1132,29 @@ key_apis = ["android.telecom.TelecomManager.placeCall", "android.telecom.Connect
 id = "android-bluetooth"
 prefix = "android.bluetooth"
 domain = "connectivity"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/android_res.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "M10"
-notes = "Bluetooth adapter/device/profile APIs have no virtual Bluetooth controller."
-evidence = ["docs/compat-matrix.md"]
+notes = "Bluetooth follows a profile with no Bluetooth manager service/controller: BluetoothAdapter factories return null, Context BLUETOOTH_SERVICE yields a BluetoothManager whose adapter is null and whose GATT profile validation precedes the absent-adapter failure, and a directly materialised adapter reports STATE_OFF/disabled and no LE scanner/advertiser. BluetoothDevice address construction, uppercase address validation, address types, equality and hash are exact local values. Discovery, bonding, sockets, profiles, GATT connections and adapter state transitions are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-bluetooth"
-key_apis = ["android.bluetooth.BluetoothAdapter.getBondedDevices", "android.bluetooth.BluetoothDevice.connectGatt"]
+key_apis = ["android.bluetooth.BluetoothAdapter.getDefaultAdapter", "android.bluetooth.BluetoothAdapter.checkBluetoothAddress", "android.bluetooth.BluetoothManager.getAdapter", "android.bluetooth.BluetoothDevice.getAddress", "android.bluetooth.BluetoothDevice.equals"]
 
 [[surface]]
 id = "android-bluetooth-le"
 prefix = "android.bluetooth.le"
 domain = "connectivity"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "M10"
-notes = "BLE scanning/advertising is not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Bluetooth LE modelling covers the scan request values and the disabled-adapter boundary: ScanSettings and ScanFilter builders retain AOSP defaults, validation (including ScanFilter's existing-mask checks), getters, ScanFilter equality/hash and EMPTY/isAllFieldsEmpty, while an off adapter returns no BluetoothLeScanner or BluetoothLeAdvertiser. Actual scanning/advertising, scan callbacks/results and record matching against radio traffic are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-bluetooth-le"
-key_apis = ["android.bluetooth.le.BluetoothLeScanner.startScan", "android.bluetooth.le.BluetoothLeAdvertiser.startAdvertising"]
+key_apis = ["android.bluetooth.le.ScanSettings.Builder.build", "android.bluetooth.le.ScanFilter.Builder.build", "android.bluetooth.le.ScanFilter.equals", "android.bluetooth.le.ScanFilter.isAllFieldsEmpty"]
 
 [[surface]]
 id = "android-nfc"
@@ -1174,29 +1174,29 @@ key_apis = ["android.nfc.NfcAdapter.getDefaultAdapter", "android.nfc.NfcManager.
 id = "android-nfc-cardemulation"
 prefix = "android.nfc.cardemulation"
 domain = "connectivity"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "Host/off-host card emulation services are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "NFC card emulation follows a device without FEATURE_NFC_HOST_CARD_EMULATION: CardEmulation.getInstance retains null-adapter failure, the adapter-context -> PackageManager feature probe, and UnsupportedOperationException. ISO7816 AID syntax/prefix validation and AidGroup construction (empty/too-many/invalid AID rejection, category normalisation to other, uppercase AID storage and exact toString) are guest-visible, and non-payment foreground/selection helpers retain their local AOSP branches. Host/off-host APDU service binding, routing/default selection, dynamic AID registration against an NFC service and APDU exchange are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-nfc-cardemulation"
-key_apis = ["android.nfc.cardemulation.HostApduService.processCommandApdu"]
+key_apis = ["android.nfc.cardemulation.CardEmulation.getInstance", "android.nfc.cardemulation.CardEmulation.isValidAid", "android.nfc.cardemulation.AidGroup.getAids", "android.nfc.cardemulation.AidGroup.getCategory"]
 
 [[surface]]
 id = "android-nfc-tech"
 prefix = "android.nfc.tech"
 domain = "connectivity"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "NFC tag technologies are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "NFC tag technologies are modelled for explicit mock tags: Tag construction validates/copies tech codes, generates technology class names and padded extras, exposes ID/tech/extras and connected-technology state, and retains mock rediscovery failure. NfcA.get only materialises for an enumerated NFC-A tag, reads SAK/ATQA from its extras, reports disconnected state, enforces connect-before-transceive, and retains the mock/no-service failures including BasicTagTechnology.close finally disconnecting the tag. Physical RF discovery/connect/transceive and the other tag technology classes are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-nfc-tech"
-key_apis = ["android.nfc.tech.Ndef.get", "android.nfc.tech.MifareClassic.get"]
+key_apis = ["android.nfc.tech.NfcA.get", "android.nfc.tech.NfcA.getAtqa", "android.nfc.tech.NfcA.getSak", "android.nfc.tech.NfcA.transceive", "android.nfc.tech.NfcA.close"]
 
 [[surface]]
 id = "android-companion"

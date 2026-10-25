@@ -1986,6 +1986,26 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         | "Landroid/net/nsd/NsdManager$NsdCallbackImpl;"
         | "Landroid/net/sip/SipManager;" => Some(OBJECT),
         "Landroid/net/sip/SipException;" => Some(EXC),
+        // Appendix C Batch 36-D bounded Bluetooth / LE and NFC
+        // card-emulation / tag-technology slices.
+        "Landroid/content/AttributionSource;"
+        | "Landroid/bluetooth/BluetoothAdapter;"
+        | "Landroid/bluetooth/BluetoothManager;"
+        | "Landroid/bluetooth/BluetoothDevice;"
+        | "Landroid/bluetooth/le/BluetoothLeScanner;"
+        | "Landroid/bluetooth/le/BluetoothLeAdvertiser;"
+        | "Landroid/bluetooth/le/ScanSettings;"
+        | "Landroid/bluetooth/le/ScanSettings$Builder;"
+        | "Landroid/bluetooth/le/ScanFilter;"
+        | "Landroid/bluetooth/le/ScanFilter$Builder;"
+        | "Landroid/nfc/Tag;"
+        | "Landroid/nfc/tech/BasicTagTechnology;"
+        | "Landroid/nfc/cardemulation/CardEmulation;"
+        | "Landroid/nfc/cardemulation/AidGroup;" => Some(OBJECT),
+        "Landroid/nfc/tech/NfcA;" => Some(&[
+            "Landroid/nfc/tech/BasicTagTechnology;",
+            "Ljava/lang/Object;",
+        ]),
         _ => None,
     }
 }
@@ -2584,6 +2604,18 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         ]),
         // Interfaces in the Batch 36-C bounded slices.
         "Landroid/net/nsd/NsdServiceInfo;" => Some(&["Landroid/os/Parcelable;"]),
+        // Interfaces in the Batch 36-D bounded slices.
+        "Landroid/content/AttributionSource;"
+        | "Landroid/bluetooth/BluetoothDevice;"
+        | "Landroid/bluetooth/le/ScanSettings;"
+        | "Landroid/bluetooth/le/ScanFilter;"
+        | "Landroid/nfc/Tag;"
+        | "Landroid/nfc/cardemulation/AidGroup;" => Some(&["Landroid/os/Parcelable;"]),
+        "Landroid/nfc/tech/BasicTagTechnology;" | "Landroid/nfc/tech/NfcA;" => Some(&[
+            "Landroid/nfc/tech/TagTechnology;",
+            "Ljava/io/Closeable;",
+            "Ljava/lang/AutoCloseable;",
+        ]),
         _ => None,
     }
 }

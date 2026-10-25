@@ -2299,6 +2299,7 @@ const SERVICES: &[(&str, &str)] = &[
     ),
     ("nfc", "Landroid/nfc/NfcManager;"),
     ("nsd", "Landroid/net/nsd/NsdManager;"),
+    ("bluetooth_manager", "Landroid/bluetooth/BluetoothManager;"),
 ];
 
 fn system_service_class(key: &str) -> &'static str {

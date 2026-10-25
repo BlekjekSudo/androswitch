@@ -446,6 +446,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial36c_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36d_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -611,6 +614,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial36c_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36d_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -707,6 +713,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial36c_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial36d_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -42610,6 +42619,2130 @@ fn p36c_sip_instance(
             // AOSP catches Throwable from the dead-service check and
             // rewraps it as SipException("takeAudioCall()", cause).
             return Err(throw(P36C_SIP_EXCEPTION, "takeAudioCall()"));
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+// ---- Appendix C Batch 36-D: Bluetooth / LE + NFC CE/tech ----
+//
+// AOSP 14 Bluetooth and NFC sources. The fixed device profile publishes
+// no Bluetooth manager service or NFC HCE feature, so adapter/CE factory
+// calls retain their documented null/UnsupportedOperationException
+// outcomes. BluetoothDevice, ScanSettings, ScanFilter and AidGroup are
+// local value objects with AOSP validation. Tag/NfcA use explicit mock
+// tags only; physical RF I/O is not claimed.
+
+const P36D_BT_ADAPTER: &str = "Landroid/bluetooth/BluetoothAdapter;";
+const P36D_BT_MANAGER: &str = "Landroid/bluetooth/BluetoothManager;";
+const P36D_BT_DEVICE: &str = "Landroid/bluetooth/BluetoothDevice;";
+const P36D_SCAN_SETTINGS: &str = "Landroid/bluetooth/le/ScanSettings;";
+const P36D_SCAN_SETTINGS_BUILDER: &str = "Landroid/bluetooth/le/ScanSettings$Builder;";
+const P36D_SCAN_FILTER: &str = "Landroid/bluetooth/le/ScanFilter;";
+const P36D_SCAN_FILTER_BUILDER: &str = "Landroid/bluetooth/le/ScanFilter$Builder;";
+const P36D_TAG: &str = "Landroid/nfc/Tag;";
+const P36D_NFC_A: &str = "Landroid/nfc/tech/NfcA;";
+const P36D_BASIC_TAG_TECH: &str = "Landroid/nfc/tech/BasicTagTechnology;";
+const P36D_CARD_EMULATION: &str = "Landroid/nfc/cardemulation/CardEmulation;";
+const P36D_AID_GROUP: &str = "Landroid/nfc/cardemulation/AidGroup;";
+
+fn partial36d_host_static(
+    vm: &mut Engine,
+    owner: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    if owner == P36D_SCAN_FILTER && field == "EMPTY" {
+        return Ok(Some(p36d_empty_scan_filter(vm)?));
+    }
+    let text = match (owner, field) {
+        (P36D_BT_ADAPTER, "ACTION_STATE_CHANGED") => {
+            Some("android.bluetooth.adapter.action.STATE_CHANGED")
+        }
+        (P36D_BT_ADAPTER, "ACTION_REQUEST_ENABLE") => {
+            Some("android.bluetooth.adapter.action.REQUEST_ENABLE")
+        }
+        (P36D_BT_ADAPTER, "ACTION_REQUEST_DISCOVERABLE") => {
+            Some("android.bluetooth.adapter.action.REQUEST_DISCOVERABLE")
+        }
+        (P36D_BT_ADAPTER, "ACTION_SCAN_MODE_CHANGED") => {
+            Some("android.bluetooth.adapter.action.SCAN_MODE_CHANGED")
+        }
+        (P36D_BT_ADAPTER, "ACTION_DISCOVERY_STARTED") => {
+            Some("android.bluetooth.adapter.action.DISCOVERY_STARTED")
+        }
+        (P36D_BT_ADAPTER, "ACTION_DISCOVERY_FINISHED") => {
+            Some("android.bluetooth.adapter.action.DISCOVERY_FINISHED")
+        }
+        (P36D_BT_ADAPTER, "EXTRA_STATE") => Some("android.bluetooth.adapter.extra.STATE"),
+        (P36D_BT_ADAPTER, "EXTRA_PREVIOUS_STATE") => {
+            Some("android.bluetooth.adapter.extra.PREVIOUS_STATE")
+        }
+        (P36D_BT_ADAPTER, "EXTRA_SCAN_MODE") => Some("android.bluetooth.adapter.extra.SCAN_MODE"),
+        (P36D_BT_DEVICE, "ACTION_FOUND") => Some("android.bluetooth.device.action.FOUND"),
+        (P36D_BT_DEVICE, "EXTRA_DEVICE") => Some("android.bluetooth.device.extra.DEVICE"),
+        (P36D_BT_DEVICE, "EXTRA_NAME") => Some("android.bluetooth.device.extra.NAME"),
+        (P36D_BT_DEVICE, "EXTRA_RSSI") => Some("android.bluetooth.device.extra.RSSI"),
+        (P36D_CARD_EMULATION, "ACTION_CHANGE_DEFAULT") => {
+            Some("android.nfc.cardemulation.action.ACTION_CHANGE_DEFAULT")
+        }
+        (P36D_CARD_EMULATION, "EXTRA_CATEGORY") => Some("category"),
+        (P36D_CARD_EMULATION, "EXTRA_SERVICE_COMPONENT") => Some("component"),
+        (P36D_CARD_EMULATION, "CATEGORY_PAYMENT") => Some("payment"),
+        (P36D_CARD_EMULATION, "CATEGORY_OTHER") => Some("other"),
+        (P36D_NFC_A, "EXTRA_SAK") => Some("sak"),
+        (P36D_NFC_A, "EXTRA_ATQA") => Some("atqa"),
+        _ => None,
+    };
+    if let Some(text) = text {
+        return Ok(Some(jstr(vm, text.to_string())?));
+    }
+    let value = match (owner, field) {
+        (P36D_BT_ADAPTER, "ERROR") => Some(i32::MIN),
+        (P36D_BT_ADAPTER, "STATE_OFF") => Some(10),
+        (P36D_BT_ADAPTER, "STATE_TURNING_ON") => Some(11),
+        (P36D_BT_ADAPTER, "STATE_ON") => Some(12),
+        (P36D_BT_ADAPTER, "STATE_TURNING_OFF") => Some(13),
+        (P36D_BT_ADAPTER, "STATE_BLE_TURNING_ON") => Some(14),
+        (P36D_BT_ADAPTER, "STATE_BLE_ON") => Some(15),
+        (P36D_BT_ADAPTER, "STATE_BLE_TURNING_OFF") => Some(16),
+        (P36D_BT_ADAPTER, "SCAN_MODE_NONE") => Some(20),
+        (P36D_BT_ADAPTER, "SCAN_MODE_CONNECTABLE") => Some(21),
+        (P36D_BT_ADAPTER, "SCAN_MODE_CONNECTABLE_DISCOVERABLE") => Some(23),
+        (P36D_BT_DEVICE, "TRANSPORT_AUTO") => Some(0),
+        (P36D_BT_DEVICE, "TRANSPORT_BREDR") => Some(1),
+        (P36D_BT_DEVICE, "TRANSPORT_LE") => Some(2),
+        (P36D_BT_DEVICE, "ADDRESS_TYPE_PUBLIC") => Some(0),
+        (P36D_BT_DEVICE, "ADDRESS_TYPE_RANDOM") => Some(1),
+        (P36D_BT_DEVICE, "ADDRESS_TYPE_UNKNOWN") => Some(0xffff),
+        (P36D_SCAN_SETTINGS, "SCAN_MODE_OPPORTUNISTIC") => Some(-1),
+        (P36D_SCAN_SETTINGS, "SCAN_MODE_LOW_POWER") => Some(0),
+        (P36D_SCAN_SETTINGS, "SCAN_MODE_BALANCED") => Some(1),
+        (P36D_SCAN_SETTINGS, "SCAN_MODE_LOW_LATENCY") => Some(2),
+        (P36D_SCAN_SETTINGS, "SCAN_MODE_AMBIENT_DISCOVERY") => Some(3),
+        (P36D_SCAN_SETTINGS, "SCAN_MODE_SCREEN_OFF") => Some(4),
+        (P36D_SCAN_SETTINGS, "SCAN_MODE_SCREEN_OFF_BALANCED") => Some(5),
+        (P36D_SCAN_SETTINGS, "CALLBACK_TYPE_ALL_MATCHES") => Some(1),
+        (P36D_SCAN_SETTINGS, "CALLBACK_TYPE_FIRST_MATCH") => Some(2),
+        (P36D_SCAN_SETTINGS, "CALLBACK_TYPE_MATCH_LOST") => Some(4),
+        (P36D_SCAN_SETTINGS, "CALLBACK_TYPE_ALL_MATCHES_AUTO_BATCH") => Some(8),
+        (P36D_SCAN_SETTINGS, "MATCH_NUM_ONE_ADVERTISEMENT") => Some(1),
+        (P36D_SCAN_SETTINGS, "MATCH_NUM_FEW_ADVERTISEMENT") => Some(2),
+        (P36D_SCAN_SETTINGS, "MATCH_NUM_MAX_ADVERTISEMENT") => Some(3),
+        (P36D_SCAN_SETTINGS, "MATCH_MODE_AGGRESSIVE") => Some(1),
+        (P36D_SCAN_SETTINGS, "MATCH_MODE_STICKY") => Some(2),
+        (P36D_SCAN_SETTINGS, "SCAN_RESULT_TYPE_FULL") => Some(0),
+        (P36D_SCAN_SETTINGS, "SCAN_RESULT_TYPE_ABBREVIATED") => Some(1),
+        (P36D_SCAN_SETTINGS, "PHY_LE_ALL_SUPPORTED") => Some(255),
+        (P36D_CARD_EMULATION, "SELECTION_MODE_PREFER_DEFAULT") => Some(0),
+        (P36D_CARD_EMULATION, "SELECTION_MODE_ALWAYS_ASK") => Some(1),
+        (P36D_CARD_EMULATION, "SELECTION_MODE_ASK_IF_CONFLICT") => Some(2),
+        (P36D_AID_GROUP, "MAX_NUM_AIDS") => Some(256),
+        ("Landroid/nfc/tech/TagTechnology;", "NFC_A") => Some(1),
+        ("Landroid/nfc/tech/TagTechnology;", "NFC_B") => Some(2),
+        ("Landroid/nfc/tech/TagTechnology;", "ISO_DEP") => Some(3),
+        ("Landroid/nfc/tech/TagTechnology;", "NFC_F") => Some(4),
+        ("Landroid/nfc/tech/TagTechnology;", "NFC_V") => Some(5),
+        ("Landroid/nfc/tech/TagTechnology;", "NDEF") => Some(6),
+        ("Landroid/nfc/tech/TagTechnology;", "NDEF_FORMATABLE") => Some(7),
+        ("Landroid/nfc/tech/TagTechnology;", "MIFARE_CLASSIC") => Some(8),
+        ("Landroid/nfc/tech/TagTechnology;", "MIFARE_ULTRALIGHT") => Some(9),
+        ("Landroid/nfc/tech/TagTechnology;", "NFC_BARCODE") => Some(10),
+        _ => None,
+    };
+    if let Some(value) = value {
+        return Ok(Some(Value::Int(value)));
+    }
+    if (owner, field) == (P36D_SCAN_SETTINGS, "AUTO_BATCH_MIN_REPORT_DELAY_MILLIS") {
+        return Ok(Some(Value::Long(600_000)));
+    }
+    Ok(None)
+}
+
+fn partial36d_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P36D_BT_ADAPTER => p36d_bt_adapter_static(vm, name, sig, args),
+        P36D_TAG => p36d_tag_static(vm, name, sig, args),
+        P36D_NFC_A => p36d_nfc_a_static(vm, name, sig, args),
+        P36D_CARD_EMULATION => p36d_card_emulation_static(vm, name, sig, args),
+        _ => Ok(None),
+    }
+}
+
+fn partial36d_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    _mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match recv_class {
+        P36D_BT_ADAPTER => p36d_bt_adapter_instance(vm, name, sig, recv, args),
+        P36D_BT_MANAGER => p36d_bt_manager_instance(vm, name, sig, recv, args),
+        P36D_BT_DEVICE => p36d_bt_device_instance(vm, name, sig, recv, args),
+        P36D_SCAN_SETTINGS => p36d_scan_settings_instance(vm, name, sig, recv, args),
+        P36D_SCAN_SETTINGS_BUILDER => {
+            p36d_scan_settings_builder_instance(vm, name, sig, recv, args)
+        }
+        P36D_SCAN_FILTER => p36d_scan_filter_instance(vm, name, sig, recv, args),
+        P36D_SCAN_FILTER_BUILDER => p36d_scan_filter_builder_instance(vm, name, sig, recv, args),
+        P36D_TAG => p36d_tag_instance(vm, name, sig, recv, args),
+        P36D_NFC_A | P36D_BASIC_TAG_TECH => p36d_nfc_a_instance(vm, name, sig, recv, args),
+        P36D_CARD_EMULATION => p36d_card_emulation_instance(vm, name, sig, recv, args),
+        P36D_AID_GROUP => p36d_aid_group_instance(vm, name, sig, recv, args),
+        _ => Ok(None),
+    }
+}
+
+fn p36d_check_bluetooth_address(address: Option<&str>) -> bool {
+    let Some(address) = address else {
+        return false;
+    };
+    let chars = address.chars().collect::<Vec<_>>();
+    if chars.len() != 17 {
+        return false;
+    }
+    for (index, character) in chars.iter().enumerate() {
+        if index % 3 == 2 {
+            if *character != ':' {
+                return false;
+            }
+        } else if !(character.is_ascii_digit() || ('A'..='F').contains(character)) {
+            return false;
+        }
+    }
+    true
+}
+
+fn p36d_new_bluetooth_device(
+    vm: &mut Engine,
+    address: Value,
+    address_type: Option<i32>,
+    attribution: Value,
+) -> Result<Value, VmExit> {
+    let device = alloc_obj(vm, P36D_BT_DEVICE, Vec::new())?;
+    if let Some(address_type) = address_type {
+        vm.invoke_instance(
+            device,
+            "<init>",
+            "(Ljava/lang/String;I)V",
+            &[address, Value::Int(address_type)],
+        )?;
+    } else {
+        vm.invoke_instance(
+            device,
+            "<init>",
+            "(Ljava/lang/String;)V",
+            std::slice::from_ref(&address),
+        )?;
+    }
+    vm.invoke_instance(
+        device,
+        "setAttributionSource",
+        "(Landroid/content/AttributionSource;)V",
+        std::slice::from_ref(&attribution),
+    )?;
+    Ok(Value::Obj(device))
+}
+
+fn p36d_bt_adapter_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("getDefaultAdapter", "()Landroid/bluetooth/BluetoothAdapter;") => {
+            let key = (P36D_BT_ADAPTER.to_string(), "sAdapter".to_string());
+            match vm.statics.get(&key) {
+                Some(value @ Value::Obj(_)) => value.clone(),
+                _ => Value::Null,
+            }
+        }
+        (
+            "createAdapter",
+            "(Landroid/content/AttributionSource;)Landroid/bluetooth/BluetoothAdapter;",
+        ) => Value::Null,
+        ("checkBluetoothAddress", "(Ljava/lang/String;)Z") => {
+            let address = opt_str_arg(vm, args, 0);
+            Value::Int(i32::from(p36d_check_bluetooth_address(address.as_deref())))
+        }
+        ("isAddressRandomStatic", "(Ljava/lang/String;)Z") => {
+            let address = opt_str_arg(vm, args, 0);
+            let Some(address) = address else {
+                return Err(npe(""));
+            };
+            let valid = p36d_check_bluetooth_address(Some(&address))
+                && (u8::from_str_radix(&address[..2], 16).unwrap_or(0) & 0xc0) == 0xc0;
+            Value::Int(i32::from(valid))
+        }
+        ("nameForState", "(I)Ljava/lang/String;") => {
+            let state = iarg(args, 0);
+            let name = match state {
+                10 => "OFF".to_string(),
+                11 => "TURNING_ON".to_string(),
+                12 => "ON".to_string(),
+                13 => "TURNING_OFF".to_string(),
+                14 => "BLE_TURNING_ON".to_string(),
+                15 => "BLE_ON".to_string(),
+                16 => "BLE_TURNING_OFF".to_string(),
+                _ => format!("?!?!? ({state})"),
+            };
+            jstr(vm, name)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36d_bt_adapter_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        (
+            "<init>",
+            "(Landroid/bluetooth/IBluetoothManager;Landroid/content/AttributionSource;)V",
+        ) => {
+            if !matches!(p36a_value(args, 0), Value::Obj(_))
+                || !matches!(p36a_value(args, 1), Value::Obj(_))
+            {
+                return Err(npe(""));
+            }
+            put(vm, recv, "mManagerService", p36a_value(args, 0))?;
+            put(vm, recv, "mAttributionSource", p36a_value(args, 1))?;
+            put(vm, recv, "mService", Value::Null)?;
+            Value::Null
+        }
+        ("getRemoteDevice", "(Ljava/lang/String;)Landroid/bluetooth/BluetoothDevice;") => {
+            let attribution = get(vm, recv, "mAttributionSource");
+            p36d_new_bluetooth_device(vm, p36a_value(args, 0), None, attribution)?
+        }
+        ("getRemoteLeDevice", "(Ljava/lang/String;I)Landroid/bluetooth/BluetoothDevice;") => {
+            let attribution = get(vm, recv, "mAttributionSource");
+            p36d_new_bluetooth_device(vm, p36a_value(args, 0), Some(iarg(args, 1)), attribution)?
+        }
+        ("getRemoteDevice", "([B)Landroid/bluetooth/BluetoothDevice;") => {
+            let bytes = match args.first() {
+                Some(value @ Value::Obj(_)) => p49_byte_values(vm, value),
+                _ => Vec::new(),
+            };
+            if bytes.len() != 6 {
+                return Err(iae("Bluetooth address must have 6 bytes"));
+            }
+            let address = format!(
+                "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]
+            );
+            let address = jstr(vm, address)?;
+            let attribution = get(vm, recv, "mAttributionSource");
+            p36d_new_bluetooth_device(vm, address, None, attribution)?
+        }
+        ("getStateInternal", "()I") => Value::Int(10),
+        ("getState", "()I") => {
+            let state = vm.invoke_instance(recv, "getStateInternal", "()I", &[])?;
+            let state = state.as_int().unwrap_or(10);
+            Value::Int(if matches!(state, 14..=16) { 10 } else { state })
+        }
+        ("getLeState", "()I") => vm.invoke_instance(recv, "getStateInternal", "()I", &[])?,
+        ("isEnabled", "()Z") => {
+            let state = vm.invoke_instance(recv, "getState", "()I", &[])?;
+            Value::Int(i32::from(state.as_int().unwrap_or(10) == 12))
+        }
+        ("isLeEnabled", "()Z") => {
+            let state = vm.invoke_instance(recv, "getLeState", "()I", &[])?;
+            Value::Int(i32::from(matches!(
+                state.as_int().unwrap_or(10),
+                11 | 12 | 13 | 15
+            )))
+        }
+        ("getLeAccess", "()Z") => {
+            let state = vm.invoke_instance(recv, "getLeState", "()I", &[])?;
+            Value::Int(i32::from(matches!(state.as_int().unwrap_or(10), 12 | 15)))
+        }
+        ("getBluetoothLeScanner", "()Landroid/bluetooth/le/BluetoothLeScanner;") => {
+            let access = vm.invoke_instance(recv, "getLeAccess", "()Z", &[])?;
+            if access.as_int().unwrap_or(0) == 0 {
+                Value::Null
+            } else if matches!(get(vm, recv, "mBluetoothLeScanner"), Value::Obj(_)) {
+                get(vm, recv, "mBluetoothLeScanner")
+            } else {
+                let scanner =
+                    alloc_obj(vm, "Landroid/bluetooth/le/BluetoothLeScanner;", Vec::new())?;
+                put(vm, recv, "mBluetoothLeScanner", Value::Obj(scanner))?;
+                Value::Obj(scanner)
+            }
+        }
+        ("getBluetoothLeAdvertiser", "()Landroid/bluetooth/le/BluetoothLeAdvertiser;") => {
+            let access = vm.invoke_instance(recv, "getLeAccess", "()Z", &[])?;
+            if access.as_int().unwrap_or(0) == 0 {
+                Value::Null
+            } else if matches!(get(vm, recv, "mBluetoothLeAdvertiser"), Value::Obj(_)) {
+                get(vm, recv, "mBluetoothLeAdvertiser")
+            } else {
+                let advertiser = alloc_obj(
+                    vm,
+                    "Landroid/bluetooth/le/BluetoothLeAdvertiser;",
+                    Vec::new(),
+                )?;
+                put(vm, recv, "mBluetoothLeAdvertiser", Value::Obj(advertiser))?;
+                Value::Obj(advertiser)
+            }
+        }
+        ("getAddress", "()Ljava/lang/String;") | ("getName", "()Ljava/lang/String;") => {
+            let manager = match get(vm, recv, "mManagerService") {
+                Value::Obj(manager) => manager,
+                _ => return Err(npe("")),
+            };
+            let attribution = get(vm, recv, "mAttributionSource");
+            match vm.invoke_instance(
+                manager,
+                name,
+                "(Landroid/content/AttributionSource;)Ljava/lang/String;",
+                std::slice::from_ref(&attribution),
+            ) {
+                Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
+                    Value::Null
+                }
+                other => other?,
+            }
+        }
+        ("getBluetoothManager", "()Landroid/bluetooth/IBluetoothManager;") => {
+            get(vm, recv, "mManagerService")
+        }
+        ("getAttributionSource", "()Landroid/content/AttributionSource;") => {
+            get(vm, recv, "mAttributionSource")
+        }
+        ("getBluetoothService", "()Landroid/bluetooth/IBluetooth;") => {
+            let key = (P36D_BT_ADAPTER.to_string(), "sService".to_string());
+            vm.statics.get(&key).cloned().unwrap_or(Value::Null)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36d_bt_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/content/Context;)V") => {
+            let attribution = match p36a_value(args, 0) {
+                Value::Obj(context) => vm.invoke_instance(
+                    context,
+                    "getAttributionSource",
+                    "()Landroid/content/AttributionSource;",
+                    &[],
+                )?,
+                _ => Value::Null,
+            };
+            let adapter = vm.invoke_static(
+                P36D_BT_ADAPTER,
+                "createAdapter",
+                "(Landroid/content/AttributionSource;)Landroid/bluetooth/BluetoothAdapter;",
+                std::slice::from_ref(&attribution),
+            )?;
+            put(vm, recv, "mAttributionSource", attribution)?;
+            put(vm, recv, "mAdapter", adapter)?;
+            Value::Null
+        }
+        ("getAdapter", "()Landroid/bluetooth/BluetoothAdapter;") => {
+            get(vm, recv, "mAdapter")
+        }
+        ("getConnectedDevices", "(I)Ljava/util/List;") => {
+            let states = new_int_array(vm, &[2])?;
+            vm.invoke_instance(
+                recv,
+                "getDevicesMatchingConnectionStates",
+                "(I[I)Ljava/util/List;",
+                &[Value::Int(iarg(args, 0)), states],
+            )?
+        }
+        ("getDevicesMatchingConnectionStates", "(I[I)Ljava/util/List;") => {
+            let profile = iarg(args, 0);
+            if !matches!(profile, 7 | 8) {
+                return Err(iae(format!("Profile not supported: {profile}")));
+            }
+            let adapter = match get(vm, recv, "mAdapter") {
+                Value::Obj(adapter) => adapter,
+                _ => return Err(npe("")),
+            };
+            let manager_service = vm.invoke_instance(
+                adapter,
+                "getBluetoothManager",
+                "()Landroid/bluetooth/IBluetoothManager;",
+                &[],
+            )?;
+            let Value::Obj(manager_service) = manager_service else {
+                return Err(npe(""));
+            };
+            let gatt = vm.invoke_instance(
+                manager_service,
+                "getBluetoothGatt",
+                "()Landroid/bluetooth/IBluetoothGatt;",
+                &[],
+            )?;
+            if matches!(gatt, Value::Obj(_)) {
+                return Ok(None);
+            }
+            Value::Obj(new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?)
+        }
+        ("getConnectionState", "(Landroid/bluetooth/BluetoothDevice;I)I") => {
+            let devices = vm.invoke_instance(
+                recv,
+                "getConnectedDevices",
+                "(I)Ljava/util/List;",
+                &[Value::Int(iarg(args, 1))],
+            )?;
+            let connected = collection_items(vm, Some(&devices));
+            let device = p36a_value(args, 0);
+            let mut state = 0;
+            for connected_device in connected {
+                let Value::Obj(device_ref) = device else {
+                    return Err(npe(""));
+                };
+                let equal = vm.invoke_instance(
+                    device_ref,
+                    "equals",
+                    "(Ljava/lang/Object;)Z",
+                    std::slice::from_ref(&connected_device),
+                )?;
+                if equal.as_int().unwrap_or(0) != 0 {
+                    state = 2;
+                    break;
+                }
+            }
+            Value::Int(state)
+        }
+        (
+            "openGattServer",
+            "(Landroid/content/Context;Landroid/bluetooth/BluetoothGattServerCallback;)Landroid/bluetooth/BluetoothGattServer;",
+        ) => vm.invoke_instance(
+            recv,
+            "openGattServer",
+            "(Landroid/content/Context;Landroid/bluetooth/BluetoothGattServerCallback;IZ)Landroid/bluetooth/BluetoothGattServer;",
+            &[
+                p36a_value(args, 0),
+                p36a_value(args, 1),
+                Value::Int(0),
+                Value::Int(0),
+            ],
+        )?,
+        (
+            "openGattServer",
+            "(Landroid/content/Context;Landroid/bluetooth/BluetoothGattServerCallback;Z)Landroid/bluetooth/BluetoothGattServer;",
+        ) => vm.invoke_instance(
+            recv,
+            "openGattServer",
+            "(Landroid/content/Context;Landroid/bluetooth/BluetoothGattServerCallback;IZ)Landroid/bluetooth/BluetoothGattServer;",
+            &[
+                p36a_value(args, 0),
+                p36a_value(args, 1),
+                Value::Int(0),
+                Value::Int(iarg(args, 2)),
+            ],
+        )?,
+        (
+            "openGattServer",
+            "(Landroid/content/Context;Landroid/bluetooth/BluetoothGattServerCallback;I)Landroid/bluetooth/BluetoothGattServer;",
+        ) => vm.invoke_instance(
+            recv,
+            "openGattServer",
+            "(Landroid/content/Context;Landroid/bluetooth/BluetoothGattServerCallback;IZ)Landroid/bluetooth/BluetoothGattServer;",
+            &[
+                p36a_value(args, 0),
+                p36a_value(args, 1),
+                Value::Int(iarg(args, 2)),
+                Value::Int(0),
+            ],
+        )?,
+        (
+            "openGattServer",
+            "(Landroid/content/Context;Landroid/bluetooth/BluetoothGattServerCallback;IZ)Landroid/bluetooth/BluetoothGattServer;",
+        ) => {
+            if matches!(p36a_value(args, 0), Value::Null)
+                || matches!(p36a_value(args, 1), Value::Null)
+            {
+                let context = p36a_value(args, 0);
+                let context_text = p36c_object_string(vm, &context)?;
+                let callback = p36a_value(args, 1);
+                let callback_text = p36c_object_string(vm, &callback)?;
+                return Err(iae(format!(
+                    "null parameter: {context_text} {callback_text}"
+                )));
+            }
+            let adapter = match get(vm, recv, "mAdapter") {
+                Value::Obj(adapter) => adapter,
+                _ => return Err(npe("")),
+            };
+            let manager_service = vm.invoke_instance(
+                adapter,
+                "getBluetoothManager",
+                "()Landroid/bluetooth/IBluetoothManager;",
+                &[],
+            )?;
+            let Value::Obj(manager_service) = manager_service else {
+                return Err(npe(""));
+            };
+            let gatt = match vm.invoke_instance(
+                manager_service,
+                "getBluetoothGatt",
+                "()Landroid/bluetooth/IBluetoothGatt;",
+                &[],
+            ) {
+                Err(VmExit::Exception(t))
+                    if t.class == "Landroid/os/RemoteException;" =>
+                {
+                    Value::Null
+                }
+                other => other?,
+            };
+            if matches!(gatt, Value::Obj(_)) {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36d_bt_device_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Ljava/lang/String;)V") | ("<init>", "(Ljava/lang/String;I)V") => {
+            let address = opt_str_arg(vm, args, 0);
+            if !p36d_check_bluetooth_address(address.as_deref()) {
+                let shown = address.unwrap_or_else(|| "null".to_string());
+                return Err(iae(format!("{shown} is not a valid Bluetooth address")));
+            }
+            let address_type = if sig == "(Ljava/lang/String;I)V" {
+                iarg(args, 1)
+            } else {
+                0
+            };
+            if !matches!(address_type, 0 | 1) {
+                return Err(iae(format!(
+                    "{address_type} is not a Bluetooth address type"
+                )));
+            }
+            put(vm, recv, "mAddress", p36a_value(args, 0))?;
+            put(vm, recv, "mAddressType", Value::Int(address_type))?;
+            put(vm, recv, "mAttributionSource", Value::Null)?;
+            Value::Null
+        }
+        ("setAttributionSource", "(Landroid/content/AttributionSource;)V")
+        | ("prepareToEnterProcess", "(Landroid/content/AttributionSource;)V") => {
+            put(vm, recv, "mAttributionSource", p36a_value(args, 0))?;
+            Value::Null
+        }
+        ("getAddress", "()Ljava/lang/String;") => get(vm, recv, "mAddress"),
+        ("getAddressType", "()I") => Value::Int(field_int(vm, recv, "mAddressType")),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let Some(other) = oarg(args, 0) else {
+                return Ok(Some(Value::Int(0)));
+            };
+            if !vm.cp.is_subtype(&class_of(vm, other), P36D_BT_DEVICE) {
+                Value::Int(0)
+            } else {
+                let address = get(vm, recv, "mAddress");
+                let Some(address) = p36c_string_value(vm, &address) else {
+                    return Err(npe(""));
+                };
+                let other_address =
+                    vm.invoke_instance(other, "getAddress", "()Ljava/lang/String;", &[])?;
+                Value::Int(i32::from(
+                    p36c_string_value(vm, &other_address).as_deref() == Some(address.as_str()),
+                ))
+            }
+        }
+        ("hashCode", "()I") => {
+            let address = get(vm, recv, "mAddress");
+            if !matches!(address, Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            Value::Int(host_hash(vm, &address))
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36d_scan_settings_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(IIIJIIZI)V") => {
+            put(vm, recv, "mScanMode", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mCallbackType", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mScanResultType", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mReportDelayMillis", Value::Long(larg(args, 3)))?;
+            put(vm, recv, "mMatchMode", Value::Int(iarg(args, 4)))?;
+            put(
+                vm,
+                recv,
+                "mNumOfMatchesPerFilter",
+                Value::Int(iarg(args, 5)),
+            )?;
+            put(vm, recv, "mLegacy", Value::Int(iarg(args, 6)))?;
+            put(vm, recv, "mPhy", Value::Int(iarg(args, 7)))?;
+            Value::Null
+        }
+        ("getScanMode", "()I") => Value::Int(field_int(vm, recv, "mScanMode")),
+        ("getCallbackType", "()I") => Value::Int(field_int(vm, recv, "mCallbackType")),
+        ("getScanResultType", "()I") => Value::Int(field_int(vm, recv, "mScanResultType")),
+        ("getMatchMode", "()I") => Value::Int(field_int(vm, recv, "mMatchMode")),
+        ("getNumOfMatches", "()I") => Value::Int(field_int(vm, recv, "mNumOfMatchesPerFilter")),
+        ("getLegacy", "()Z") => Value::Int(field_int(vm, recv, "mLegacy")),
+        ("getPhy", "()I") => Value::Int(field_int(vm, recv, "mPhy")),
+        ("getReportDelayMillis", "()J") => Value::Long(field_long(vm, recv, "mReportDelayMillis")),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36d_scan_settings_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            put(vm, recv, "mScanMode", Value::Int(0))?;
+            put(vm, recv, "mCallbackType", Value::Int(1))?;
+            put(vm, recv, "mScanResultType", Value::Int(0))?;
+            put(vm, recv, "mReportDelayMillis", Value::Long(0))?;
+            put(vm, recv, "mMatchMode", Value::Int(1))?;
+            put(vm, recv, "mNumOfMatchesPerFilter", Value::Int(3))?;
+            put(vm, recv, "mLegacy", Value::Int(1))?;
+            put(vm, recv, "mPhy", Value::Int(255))?;
+            Value::Null
+        }
+        ("setScanMode", "(I)Landroid/bluetooth/le/ScanSettings$Builder;") => {
+            let mode = iarg(args, 0);
+            if !matches!(mode, -1..=5) {
+                return Err(iae(format!("invalid scan mode {mode}")));
+            }
+            put(vm, recv, "mScanMode", Value::Int(mode))?;
+            Value::Obj(recv)
+        }
+        ("setCallbackType", "(I)Landroid/bluetooth/le/ScanSettings$Builder;") => {
+            let callback_type = iarg(args, 0);
+            if !matches!(callback_type, 1 | 2 | 4 | 6 | 8) {
+                return Err(iae(format!("invalid callback type - {callback_type}")));
+            }
+            put(vm, recv, "mCallbackType", Value::Int(callback_type))?;
+            Value::Obj(recv)
+        }
+        ("setScanResultType", "(I)Landroid/bluetooth/le/ScanSettings$Builder;") => {
+            let result_type = iarg(args, 0);
+            if !matches!(result_type, 0 | 1) {
+                return Err(iae(format!("invalid scanResultType - {result_type}")));
+            }
+            put(vm, recv, "mScanResultType", Value::Int(result_type))?;
+            Value::Obj(recv)
+        }
+        ("setReportDelay", "(J)Landroid/bluetooth/le/ScanSettings$Builder;") => {
+            let delay = larg(args, 0);
+            if delay < 0 {
+                return Err(iae("reportDelay must be > 0"));
+            }
+            put(vm, recv, "mReportDelayMillis", Value::Long(delay))?;
+            Value::Obj(recv)
+        }
+        ("setNumOfMatches", "(I)Landroid/bluetooth/le/ScanSettings$Builder;") => {
+            let matches = iarg(args, 0);
+            if !(1..=3).contains(&matches) {
+                return Err(iae(format!("invalid numOfMatches {matches}")));
+            }
+            put(vm, recv, "mNumOfMatchesPerFilter", Value::Int(matches))?;
+            Value::Obj(recv)
+        }
+        ("setMatchMode", "(I)Landroid/bluetooth/le/ScanSettings$Builder;") => {
+            let mode = iarg(args, 0);
+            if !(1..=2).contains(&mode) {
+                return Err(iae(format!("invalid matchMode {mode}")));
+            }
+            put(vm, recv, "mMatchMode", Value::Int(mode))?;
+            Value::Obj(recv)
+        }
+        ("setLegacy", "(Z)Landroid/bluetooth/le/ScanSettings$Builder;") => {
+            put(vm, recv, "mLegacy", Value::Int(iarg(args, 0)))?;
+            Value::Obj(recv)
+        }
+        ("setPhy", "(I)Landroid/bluetooth/le/ScanSettings$Builder;") => {
+            put(vm, recv, "mPhy", Value::Int(iarg(args, 0)))?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/bluetooth/le/ScanSettings;") => {
+            if field_int(vm, recv, "mCallbackType") == 8
+                && field_long(vm, recv, "mReportDelayMillis") < 600_000
+            {
+                return Err(iae("report delay for auto batch must be >= 600000"));
+            }
+            let settings = alloc_obj(vm, P36D_SCAN_SETTINGS, Vec::new())?;
+            vm.invoke_instance(
+                settings,
+                "<init>",
+                "(IIIJIIZI)V",
+                &[
+                    Value::Int(field_int(vm, recv, "mScanMode")),
+                    Value::Int(field_int(vm, recv, "mCallbackType")),
+                    Value::Int(field_int(vm, recv, "mScanResultType")),
+                    Value::Long(field_long(vm, recv, "mReportDelayMillis")),
+                    Value::Int(field_int(vm, recv, "mMatchMode")),
+                    Value::Int(field_int(vm, recv, "mNumOfMatchesPerFilter")),
+                    Value::Int(field_int(vm, recv, "mLegacy")),
+                    Value::Int(field_int(vm, recv, "mPhy")),
+                ],
+            )?;
+            Value::Obj(settings)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36d_init_scan_filter_fields(
+    vm: &mut Engine,
+    recv: ObjRef,
+    values: &[Value; 18],
+) -> Result<(), VmExit> {
+    put(vm, recv, "mDeviceName", values[0].clone())?;
+    put(vm, recv, "mDeviceAddress", values[1].clone())?;
+    put(vm, recv, "mServiceUuid", values[2].clone())?;
+    put(vm, recv, "mServiceUuidMask", values[3].clone())?;
+    put(vm, recv, "mServiceSolicitationUuid", values[4].clone())?;
+    put(vm, recv, "mServiceSolicitationUuidMask", values[5].clone())?;
+    put(vm, recv, "mServiceDataUuid", values[6].clone())?;
+    put(vm, recv, "mServiceData", values[7].clone())?;
+    put(vm, recv, "mServiceDataMask", values[8].clone())?;
+    put(vm, recv, "mManufacturerId", values[9].clone())?;
+    put(vm, recv, "mManufacturerData", values[10].clone())?;
+    put(vm, recv, "mManufacturerDataMask", values[11].clone())?;
+    put(vm, recv, "mAddressType", values[12].clone())?;
+    put(vm, recv, "mIrk", values[13].clone())?;
+    put(vm, recv, "mAdvertisingDataType", values[14].clone())?;
+    put(vm, recv, "mAdvertisingData", values[15].clone())?;
+    put(vm, recv, "mAdvertisingDataMask", values[16].clone())?;
+    put(vm, recv, "mTransportBlockFilter", values[17].clone())?;
+    Ok(())
+}
+
+fn p36d_empty_scan_filter(vm: &mut Engine) -> Result<Value, VmExit> {
+    let key = (P36D_SCAN_FILTER.to_string(), "EMPTY".to_string());
+    if let Some(value @ Value::Obj(_)) = vm.statics.get(&key) {
+        return Ok(value.clone());
+    }
+    let filter = alloc_obj(vm, P36D_SCAN_FILTER, Vec::new())?;
+    let values = [
+        Value::Null,
+        Value::Null,
+        Value::Null,
+        Value::Null,
+        Value::Null,
+        Value::Null,
+        Value::Null,
+        Value::Null,
+        Value::Null,
+        Value::Int(-1),
+        Value::Null,
+        Value::Null,
+        Value::Int(0),
+        Value::Null,
+        Value::Int(-1),
+        Value::Null,
+        Value::Null,
+        Value::Null,
+    ];
+    p36d_init_scan_filter_fields(vm, filter, &values)?;
+    let value = Value::Obj(filter);
+    vm.statics.insert(key, value.clone());
+    Ok(value)
+}
+
+fn p36d_scan_filter_byte_equal(vm: &Engine, left: &Value, right: &Value) -> bool {
+    match (left, right) {
+        (Value::Obj(_), Value::Obj(_)) => p49_byte_values(vm, left) == p49_byte_values(vm, right),
+        (Value::Obj(_), _) | (_, Value::Obj(_)) => false,
+        _ => true,
+    }
+}
+
+fn p36d_scan_filter_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if (name, sig) == ("matches", "(Landroid/bluetooth/le/ScanResult;)Z")
+        && matches!(p36a_value(args, 0), Value::Null)
+    {
+        return Ok(Some(Value::Int(0)));
+    }
+    let value = match (name, sig) {
+        (
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;Landroid/os/ParcelUuid;Landroid/os/ParcelUuid;Landroid/os/ParcelUuid;Landroid/os/ParcelUuid;Landroid/os/ParcelUuid;[B[BI[B[BI[BI[B[BLandroid/bluetooth/le/TransportBlockFilter;)V",
+        ) => {
+            let mut values = [
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Int(-1),
+                Value::Null,
+                Value::Null,
+                Value::Int(0),
+                Value::Null,
+                Value::Int(-1),
+                Value::Null,
+                Value::Null,
+                Value::Null,
+            ];
+            for (index, value) in values.iter_mut().enumerate() {
+                *value = p36a_value(args, index);
+            }
+            p36d_init_scan_filter_fields(vm, recv, &values)?;
+            Value::Null
+        }
+        ("getDeviceName", "()Ljava/lang/String;") => get(vm, recv, "mDeviceName"),
+        ("getServiceUuid", "()Landroid/os/ParcelUuid;") => get(vm, recv, "mServiceUuid"),
+        ("getServiceUuidMask", "()Landroid/os/ParcelUuid;") => {
+            get(vm, recv, "mServiceUuidMask")
+        }
+        ("getServiceSolicitationUuid", "()Landroid/os/ParcelUuid;") => {
+            get(vm, recv, "mServiceSolicitationUuid")
+        }
+        ("getServiceSolicitationUuidMask", "()Landroid/os/ParcelUuid;") => {
+            get(vm, recv, "mServiceSolicitationUuidMask")
+        }
+        ("getDeviceAddress", "()Ljava/lang/String;") => get(vm, recv, "mDeviceAddress"),
+        ("getAddressType", "()I") => Value::Int(field_int(vm, recv, "mAddressType")),
+        ("getIrk", "()[B") => get(vm, recv, "mIrk"),
+        ("getServiceData", "()[B") => get(vm, recv, "mServiceData"),
+        ("getServiceDataMask", "()[B") => get(vm, recv, "mServiceDataMask"),
+        ("getServiceDataUuid", "()Landroid/os/ParcelUuid;") => {
+            get(vm, recv, "mServiceDataUuid")
+        }
+        ("getManufacturerId", "()I") => Value::Int(field_int(vm, recv, "mManufacturerId")),
+        ("getManufacturerData", "()[B") => get(vm, recv, "mManufacturerData"),
+        ("getManufacturerDataMask", "()[B") => get(vm, recv, "mManufacturerDataMask"),
+        (
+            "getTransportBlockFilter",
+            "()Landroid/bluetooth/le/TransportBlockFilter;",
+        ) => get(vm, recv, "mTransportBlockFilter"),
+        ("getAdvertisingDataType", "()I") => {
+            Value::Int(field_int(vm, recv, "mAdvertisingDataType"))
+        }
+        ("getAdvertisingData", "()[B") => get(vm, recv, "mAdvertisingData"),
+        ("getAdvertisingDataMask", "()[B") => get(vm, recv, "mAdvertisingDataMask"),
+        ("describeContents", "()I") => Value::Int(0),
+        ("isAllFieldsEmpty", "()Z") => {
+            let empty = p36d_empty_scan_filter(vm)?;
+            let Value::Obj(empty) = empty else {
+                return Ok(Some(Value::Int(0)));
+            };
+            vm.invoke_instance(
+                empty,
+                "equals",
+                "(Ljava/lang/Object;)Z",
+                &[Value::Obj(recv)],
+            )?
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let Some(other) = oarg(args, 0) else {
+                return Ok(Some(Value::Int(0)));
+            };
+            if other == recv {
+                Value::Int(1)
+            } else if class_of(vm, other) != P36D_SCAN_FILTER {
+                Value::Int(0)
+            } else {
+                let object_fields = [
+                    "mDeviceName",
+                    "mDeviceAddress",
+                    "mServiceDataUuid",
+                    "mServiceUuid",
+                    "mServiceUuidMask",
+                    "mServiceSolicitationUuid",
+                    "mServiceSolicitationUuidMask",
+                    "mTransportBlockFilter",
+                ];
+                let mut equal = field_int(vm, recv, "mManufacturerId")
+                    == field_int(vm, other, "mManufacturerId")
+                    && field_int(vm, recv, "mAdvertisingDataType")
+                        == field_int(vm, other, "mAdvertisingDataType");
+                if equal {
+                    for field in object_fields {
+                        let left = get(vm, recv, field);
+                        let right = get(vm, other, field);
+                        if !af_objects_equal(vm, &left, &right)? {
+                            equal = false;
+                            break;
+                        }
+                    }
+                }
+                if equal {
+                    for field in [
+                        "mManufacturerData",
+                        "mManufacturerDataMask",
+                        "mServiceData",
+                        "mServiceDataMask",
+                        "mAdvertisingData",
+                        "mAdvertisingDataMask",
+                    ] {
+                        let left = get(vm, recv, field);
+                        let right = get(vm, other, field);
+                        if !p36d_scan_filter_byte_equal(vm, &left, &right) {
+                            equal = false;
+                            break;
+                        }
+                    }
+                }
+                Value::Int(i32::from(equal))
+            }
+        }
+        ("hashCode", "()I") => {
+            let manufacturer_data = get(vm, recv, "mManufacturerData");
+            let manufacturer_mask = get(vm, recv, "mManufacturerDataMask");
+            let service_data = get(vm, recv, "mServiceData");
+            let service_mask = get(vm, recv, "mServiceDataMask");
+            let advertising_data = get(vm, recv, "mAdvertisingData");
+            let advertising_mask = get(vm, recv, "mAdvertisingDataMask");
+            let values = [
+                get(vm, recv, "mDeviceName"),
+                get(vm, recv, "mDeviceAddress"),
+                Value::Int(field_int(vm, recv, "mManufacturerId")),
+                Value::Int(p49_array_hash(vm, &manufacturer_data)),
+                Value::Int(p49_array_hash(vm, &manufacturer_mask)),
+                get(vm, recv, "mServiceDataUuid"),
+                Value::Int(p49_array_hash(vm, &service_data)),
+                Value::Int(p49_array_hash(vm, &service_mask)),
+                get(vm, recv, "mServiceUuid"),
+                get(vm, recv, "mServiceUuidMask"),
+                get(vm, recv, "mServiceSolicitationUuid"),
+                get(vm, recv, "mServiceSolicitationUuidMask"),
+                Value::Int(field_int(vm, recv, "mAdvertisingDataType")),
+                Value::Int(p49_array_hash(vm, &advertising_data)),
+                Value::Int(p49_array_hash(vm, &advertising_mask)),
+                get(vm, recv, "mTransportBlockFilter"),
+            ];
+            Value::Int(p49_objects_hash(vm, &values))
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36d_check_existing_mask(
+    vm: &Engine,
+    recv: ObjRef,
+    data_field: &str,
+    mask_field: &str,
+    data_null_message: &str,
+    mismatch_message: &str,
+) -> Result<(), VmExit> {
+    let mask = get(vm, recv, mask_field);
+    if matches!(mask, Value::Obj(_)) {
+        let data = get(vm, recv, data_field);
+        if !matches!(data, Value::Obj(_)) {
+            return Err(iae(data_null_message.to_string()));
+        }
+        if p49_byte_values(vm, &data).len() != p49_byte_values(vm, &mask).len() {
+            return Err(iae(mismatch_message.to_string()));
+        }
+    }
+    Ok(())
+}
+
+fn p36d_set_scan_filter_address(
+    vm: &mut Engine,
+    recv: ObjRef,
+    address: Value,
+    address_type: i32,
+    irk: Value,
+) -> Result<(), VmExit> {
+    let Some(address_text) = p36c_string_value(vm, &address) else {
+        return Err(npe(""));
+    };
+    if !p36d_check_bluetooth_address(Some(&address_text)) {
+        return Err(iae(format!("invalid device address {address_text}")));
+    }
+    if !(0..=1).contains(&address_type) {
+        return Err(iae("'addressType' is invalid!"));
+    }
+    if address_type == 1 && matches!(irk, Value::Obj(_)) {
+        let random_static = vm.invoke_static(
+            P36D_BT_ADAPTER,
+            "isAddressRandomStatic",
+            "(Ljava/lang/String;)Z",
+            std::slice::from_ref(&address),
+        )?;
+        if random_static.as_int().unwrap_or(0) == 0 {
+            return Err(iae(
+                "Invalid combination: IRK requires either a PUBLIC or RANDOM (STATIC) Address",
+            ));
+        }
+    }
+    put(vm, recv, "mDeviceAddress", address)?;
+    put(vm, recv, "mAddressType", Value::Int(address_type))?;
+    put(vm, recv, "mIrk", irk)?;
+    Ok(())
+}
+
+fn p36d_scan_filter_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            let values = [
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Int(-1),
+                Value::Null,
+                Value::Null,
+                Value::Int(0),
+                Value::Null,
+                Value::Int(-1),
+                Value::Null,
+                Value::Null,
+                Value::Null,
+            ];
+            p36d_init_scan_filter_fields(vm, recv, &values)?;
+            // The builder names this one field mUuidMask; keep the
+            // initialised mServiceUuidMask as the canonical storage.
+            Value::Null
+        }
+        ("setDeviceName", "(Ljava/lang/String;)Landroid/bluetooth/le/ScanFilter$Builder;") => {
+            put(vm, recv, "mDeviceName", p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        (
+            "setDeviceAddress",
+            "(Ljava/lang/String;)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            let address = p36a_value(args, 0);
+            if matches!(address, Value::Null) {
+                put(vm, recv, "mDeviceAddress", Value::Null)?;
+            } else {
+                p36d_set_scan_filter_address(vm, recv, address, 0, Value::Null)?;
+            }
+            Value::Obj(recv)
+        }
+        (
+            "setDeviceAddress",
+            "(Ljava/lang/String;I)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            p36d_set_scan_filter_address(
+                vm,
+                recv,
+                p36a_value(args, 0),
+                iarg(args, 1),
+                Value::Null,
+            )?;
+            Value::Obj(recv)
+        }
+        (
+            "setDeviceAddress",
+            "(Ljava/lang/String;I[B)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            let irk = p36a_value(args, 2);
+            let Value::Obj(_) = irk else {
+                return Err(npe(""));
+            };
+            if p49_byte_values(vm, &irk).len() != 16 {
+                return Err(iae("'irk' is invalid length!"));
+            }
+            p36d_set_scan_filter_address(vm, recv, p36a_value(args, 0), iarg(args, 1), irk)?;
+            Value::Obj(recv)
+        }
+        (
+            "setServiceUuid",
+            "(Landroid/os/ParcelUuid;)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            put(vm, recv, "mServiceUuid", p36a_value(args, 0))?;
+            put(vm, recv, "mServiceUuidMask", Value::Null)?;
+            Value::Obj(recv)
+        }
+        (
+            "setServiceUuid",
+            "(Landroid/os/ParcelUuid;Landroid/os/ParcelUuid;)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            // AOSP checks the builder's existing fields here, not the
+            // new arguments; preserve that observable quirk.
+            if matches!(get(vm, recv, "mServiceUuidMask"), Value::Obj(_))
+                && !matches!(get(vm, recv, "mServiceUuid"), Value::Obj(_))
+            {
+                return Err(iae("uuid is null while uuidMask is not null!"));
+            }
+            put(vm, recv, "mServiceUuid", p36a_value(args, 0))?;
+            put(vm, recv, "mServiceUuidMask", p36a_value(args, 1))?;
+            Value::Obj(recv)
+        }
+        (
+            "setServiceSolicitationUuid",
+            "(Landroid/os/ParcelUuid;)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            let uuid = p36a_value(args, 0);
+            let clear_mask = matches!(uuid, Value::Null);
+            put(vm, recv, "mServiceSolicitationUuid", uuid)?;
+            if clear_mask {
+                put(vm, recv, "mServiceSolicitationUuidMask", Value::Null)?;
+            }
+            Value::Obj(recv)
+        }
+        (
+            "setServiceSolicitationUuid",
+            "(Landroid/os/ParcelUuid;Landroid/os/ParcelUuid;)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            if matches!(p36a_value(args, 1), Value::Obj(_))
+                && matches!(p36a_value(args, 0), Value::Null)
+            {
+                return Err(iae(
+                    "SolicitationUuid is null while SolicitationUuidMask is not null!",
+                ));
+            }
+            put(vm, recv, "mServiceSolicitationUuid", p36a_value(args, 0))?;
+            put(vm, recv, "mServiceSolicitationUuidMask", p36a_value(args, 1))?;
+            Value::Obj(recv)
+        }
+        (
+            "setServiceData",
+            "(Landroid/os/ParcelUuid;[B)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            if matches!(p36a_value(args, 0), Value::Null) {
+                return Err(iae("serviceDataUuid is null"));
+            }
+            put(vm, recv, "mServiceDataUuid", p36a_value(args, 0))?;
+            put(vm, recv, "mServiceData", p36a_value(args, 1))?;
+            put(vm, recv, "mServiceDataMask", Value::Null)?;
+            Value::Obj(recv)
+        }
+        (
+            "setServiceData",
+            "(Landroid/os/ParcelUuid;[B[B)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            if matches!(p36a_value(args, 0), Value::Null) {
+                return Err(iae("serviceDataUuid is null"));
+            }
+            p36d_check_existing_mask(
+                vm,
+                recv,
+                "mServiceData",
+                "mServiceDataMask",
+                "serviceData is null while serviceDataMask is not null",
+                "size mismatch for service data and service data mask",
+            )?;
+            put(vm, recv, "mServiceDataUuid", p36a_value(args, 0))?;
+            put(vm, recv, "mServiceData", p36a_value(args, 1))?;
+            put(vm, recv, "mServiceDataMask", p36a_value(args, 2))?;
+            Value::Obj(recv)
+        }
+        (
+            "setManufacturerData",
+            "(I[B)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            if matches!(p36a_value(args, 1), Value::Obj(_)) && iarg(args, 0) < 0 {
+                return Err(iae("invalid manufacture id"));
+            }
+            put(vm, recv, "mManufacturerId", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mManufacturerData", p36a_value(args, 1))?;
+            put(vm, recv, "mManufacturerDataMask", Value::Null)?;
+            Value::Obj(recv)
+        }
+        (
+            "setManufacturerData",
+            "(I[B[B)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            if matches!(p36a_value(args, 1), Value::Obj(_)) && iarg(args, 0) < 0 {
+                return Err(iae("invalid manufacture id"));
+            }
+            p36d_check_existing_mask(
+                vm,
+                recv,
+                "mManufacturerData",
+                "mManufacturerDataMask",
+                "manufacturerData is null while manufacturerDataMask is not null",
+                "size mismatch for manufacturerData and manufacturerDataMask",
+            )?;
+            put(vm, recv, "mManufacturerId", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mManufacturerData", p36a_value(args, 1))?;
+            put(vm, recv, "mManufacturerDataMask", p36a_value(args, 2))?;
+            Value::Obj(recv)
+        }
+        (
+            "setTransportBlockFilter",
+            "(Landroid/bluetooth/le/TransportBlockFilter;)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            let adapter = vm.invoke_static(
+                P36D_BT_ADAPTER,
+                "getDefaultAdapter",
+                "()Landroid/bluetooth/BluetoothAdapter;",
+                &[],
+            )?;
+            if matches!(adapter, Value::Null) {
+                return Err(iae("BluetoothAdapter is null"));
+            }
+            return Ok(None);
+        }
+        (
+            "setAdvertisingDataTypeWithData",
+            "(I[B[B)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            if iarg(args, 0) < 0 {
+                return Err(iae("invalid advertising data type"));
+            }
+            p36d_check_existing_mask(
+                vm,
+                recv,
+                "mAdvertisingData",
+                "mAdvertisingDataMask",
+                "mAdvertisingData is null while mAdvertisingDataMask is not null",
+                "size mismatch for mAdvertisingData and mAdvertisingDataMask",
+            )?;
+            put(vm, recv, "mAdvertisingDataType", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mAdvertisingData", p36a_value(args, 1))?;
+            put(vm, recv, "mAdvertisingDataMask", p36a_value(args, 2))?;
+            Value::Obj(recv)
+        }
+        (
+            "setAdvertisingDataType",
+            "(I)Landroid/bluetooth/le/ScanFilter$Builder;",
+        ) => {
+            if iarg(args, 0) < 0 {
+                return Err(iae("invalid advertising data type"));
+            }
+            put(vm, recv, "mAdvertisingDataType", Value::Int(iarg(args, 0)))?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/bluetooth/le/ScanFilter;") => {
+            let filter = alloc_obj(vm, P36D_SCAN_FILTER, Vec::new())?;
+            let values = [
+                get(vm, recv, "mDeviceName"),
+                get(vm, recv, "mDeviceAddress"),
+                get(vm, recv, "mServiceUuid"),
+                get(vm, recv, "mServiceUuidMask"),
+                get(vm, recv, "mServiceSolicitationUuid"),
+                get(vm, recv, "mServiceSolicitationUuidMask"),
+                get(vm, recv, "mServiceDataUuid"),
+                get(vm, recv, "mServiceData"),
+                get(vm, recv, "mServiceDataMask"),
+                Value::Int(field_int(vm, recv, "mManufacturerId")),
+                get(vm, recv, "mManufacturerData"),
+                get(vm, recv, "mManufacturerDataMask"),
+                Value::Int(field_int(vm, recv, "mAddressType")),
+                get(vm, recv, "mIrk"),
+                Value::Int(field_int(vm, recv, "mAdvertisingDataType")),
+                get(vm, recv, "mAdvertisingData"),
+                get(vm, recv, "mAdvertisingDataMask"),
+                get(vm, recv, "mTransportBlockFilter"),
+            ];
+            p36d_init_scan_filter_fields(vm, filter, &values)?;
+            Value::Obj(filter)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36d_tech_name(code: i32) -> Option<&'static str> {
+    match code {
+        1 => Some("android.nfc.tech.NfcA"),
+        2 => Some("android.nfc.tech.NfcB"),
+        3 => Some("android.nfc.tech.IsoDep"),
+        4 => Some("android.nfc.tech.NfcF"),
+        5 => Some("android.nfc.tech.NfcV"),
+        6 => Some("android.nfc.tech.Ndef"),
+        7 => Some("android.nfc.tech.NdefFormatable"),
+        8 => Some("android.nfc.tech.MifareClassic"),
+        9 => Some("android.nfc.tech.MifareUltralight"),
+        10 => Some("android.nfc.tech.NfcBarcode"),
+        _ => None,
+    }
+}
+
+fn p36d_tag_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("createMockTag", "([B[I[Landroid/os/Bundle;J)Landroid/nfc/Tag;") => {
+            let tag = alloc_obj(vm, P36D_TAG, Vec::new())?;
+            vm.invoke_instance(
+                tag,
+                "<init>",
+                "([B[I[Landroid/os/Bundle;IJLandroid/nfc/INfcTag;)V",
+                &[
+                    p36a_value(args, 0),
+                    p36a_value(args, 1),
+                    p36a_value(args, 2),
+                    Value::Int(0),
+                    Value::Long(larg(args, 3)),
+                    Value::Null,
+                ],
+            )?;
+            Value::Obj(tag)
+        }
+        ("getTechCodesFromStrings", "([Ljava/lang/String;)[I") => {
+            let Some(value @ Value::Obj(_)) = args.first() else {
+                return Err(iae("List cannot be null"));
+            };
+            let mut codes = Vec::new();
+            for item in array_elems(vm, Some(value)) {
+                let text = p36c_string_value(vm, &item);
+                let code = match text.as_deref() {
+                    Some("android.nfc.tech.NfcA") => Some(1),
+                    Some("android.nfc.tech.NfcB") => Some(2),
+                    Some("android.nfc.tech.IsoDep") => Some(3),
+                    Some("android.nfc.tech.NfcF") => Some(4),
+                    Some("android.nfc.tech.NfcV") => Some(5),
+                    Some("android.nfc.tech.Ndef") => Some(6),
+                    Some("android.nfc.tech.NdefFormatable") => Some(7),
+                    Some("android.nfc.tech.MifareClassic") => Some(8),
+                    Some("android.nfc.tech.MifareUltralight") => Some(9),
+                    Some("android.nfc.tech.NfcBarcode") => Some(10),
+                    _ => None,
+                };
+                let Some(code) = code else {
+                    let shown = text.unwrap_or_else(|| "null".to_string());
+                    return Err(iae(format!("Unknown tech type {shown}")));
+                };
+                codes.push(code);
+            }
+            new_int_array(vm, &codes)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36d_connected_technology(vm: &Engine, recv: ObjRef) -> i32 {
+    match get(vm, recv, "mConnectedTechnology") {
+        Value::Int(value) => value,
+        _ => -1,
+    }
+}
+
+fn p36d_tag_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "([B[I[Landroid/os/Bundle;IJLandroid/nfc/INfcTag;)V") => {
+            let tech = p36a_value(args, 1);
+            if !matches!(tech, Value::Obj(_)) {
+                return Err(iae("rawTargets cannot be null"));
+            }
+            let codes = int_values(vm, Some(&tech));
+            let mut names = Vec::with_capacity(codes.len());
+            for code in &codes {
+                let Some(name) = p36d_tech_name(*code) else {
+                    return Err(iae(format!("Unknown tech type {code}")));
+                };
+                names.push(jstr(vm, name.to_string())?);
+            }
+            let extras = p36a_value(args, 2);
+            if !matches!(extras, Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            let mut copied_extras = array_elems(vm, Some(&extras));
+            copied_extras.resize(codes.len(), Value::Null);
+            put(vm, recv, "mId", p36a_value(args, 0))?;
+            let tech_list = new_int_array(vm, &codes)?;
+            put(vm, recv, "mTechList", tech_list)?;
+            let tech_string_list = obj_array(vm, "[Ljava/lang/String;", names)?;
+            put(vm, recv, "mTechStringList", tech_string_list)?;
+            let tech_extras = obj_array(vm, "[Landroid/os/Bundle;", copied_extras)?;
+            put(vm, recv, "mTechExtras", tech_extras)?;
+            put(vm, recv, "mServiceHandle", Value::Int(iarg(args, 3)))?;
+            put(vm, recv, "mCookie", Value::Long(larg(args, 4)))?;
+            put(vm, recv, "mTagService", p36a_value(args, 5))?;
+            put(vm, recv, "mConnectedTechnology", Value::Int(-1))?;
+            Value::Null
+        }
+        ("getServiceHandle", "()I") => Value::Int(field_int(vm, recv, "mServiceHandle")),
+        ("getTechCodeList", "()[I") => get(vm, recv, "mTechList"),
+        ("getId", "()[B") => get(vm, recv, "mId"),
+        ("getTechList", "()[Ljava/lang/String;") => get(vm, recv, "mTechStringList"),
+        ("hasTech", "(I)Z") => {
+            let tech_list = get(vm, recv, "mTechList");
+            Value::Int(i32::from(
+                int_values(vm, Some(&tech_list)).contains(&iarg(args, 0)),
+            ))
+        }
+        ("getTechExtras", "(I)Landroid/os/Bundle;") => {
+            let tech_list = get(vm, recv, "mTechList");
+            let codes = int_values(vm, Some(&tech_list));
+            match codes.iter().position(|code| *code == iarg(args, 0)) {
+                Some(position) => {
+                    let extras = get(vm, recv, "mTechExtras");
+                    array_elems(vm, Some(&extras))
+                        .get(position)
+                        .cloned()
+                        .unwrap_or(Value::Null)
+                }
+                None => Value::Null,
+            }
+        }
+        ("getTagService", "()Landroid/nfc/INfcTag;") => {
+            let service = get(vm, recv, "mTagService");
+            let Value::Obj(service_ref) = service else {
+                return Ok(Some(Value::Null));
+            };
+            let up_to_date = match vm.invoke_instance(
+                service_ref,
+                "isTagUpToDate",
+                "(J)Z",
+                &[Value::Long(field_long(vm, recv, "mCookie"))],
+            ) {
+                Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
+                    return Err(throw(
+                        "Ljava/lang/RuntimeException;",
+                        t.message.unwrap_or_default(),
+                    ));
+                }
+                other => other?,
+            };
+            if up_to_date.as_int().unwrap_or(0) == 0 {
+                let id = get(vm, recv, "mId");
+                if !matches!(id, Value::Obj(_)) {
+                    return Err(npe(""));
+                }
+                let mut shown = String::new();
+                for byte in p49_byte_values(vm, &id) {
+                    shown.push_str(&format!("{byte:02X} "));
+                }
+                return Err(throw(
+                    "Ljava/lang/SecurityException;",
+                    format!("Permission Denial: Tag ( ID: {shown}) is out of date"),
+                ));
+            }
+            service
+        }
+        ("rediscover", "()Landroid/nfc/Tag;") => {
+            if p36d_connected_technology(vm, recv) != -1 {
+                return Err(throw(
+                    "Ljava/lang/IllegalStateException;",
+                    "Close connection to the technology first!",
+                ));
+            }
+            let service = match get(vm, recv, "mTagService") {
+                Value::Obj(service) => service,
+                _ => {
+                    return Err(throw(
+                        "Ljava/io/IOException;",
+                        "Mock tags don't support this operation.",
+                    ))
+                }
+            };
+            let result = match vm.invoke_instance(
+                service,
+                "rediscover",
+                "(I)Landroid/nfc/Tag;",
+                &[Value::Int(field_int(vm, recv, "mServiceHandle"))],
+            ) {
+                Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
+                    return Err(throw("Ljava/io/IOException;", "NFC service dead"));
+                }
+                other => other?,
+            };
+            if matches!(result, Value::Null) {
+                return Err(throw("Ljava/io/IOException;", "Failed to rediscover tag"));
+            }
+            result
+        }
+        ("setConnectedTechnology", "(I)Z") => {
+            if p36d_connected_technology(vm, recv) != -1 {
+                Value::Int(0)
+            } else {
+                put(vm, recv, "mConnectedTechnology", Value::Int(iarg(args, 0)))?;
+                Value::Int(1)
+            }
+        }
+        ("getConnectedTechnology", "()I") => Value::Int(p36d_connected_technology(vm, recv)),
+        ("setTechnologyDisconnected", "()V") => {
+            put(vm, recv, "mConnectedTechnology", Value::Int(-1))?;
+            Value::Null
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        ("toString", "()Ljava/lang/String;") => {
+            let tech_list = get(vm, recv, "mTechStringList");
+            let values = array_elems(vm, Some(&tech_list));
+            let mut names = Vec::with_capacity(values.len());
+            for value in &values {
+                names.push(p36c_object_string(vm, value)?);
+            }
+            jstr(vm, format!("TAG: Tech [{}]", names.join(", ")))?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36d_nfc_a_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if (name, sig) != ("get", "(Landroid/nfc/Tag;)Landroid/nfc/tech/NfcA;") {
+        return Ok(None);
+    }
+    let Value::Obj(tag) = p36a_value(args, 0) else {
+        return Err(npe(""));
+    };
+    let has_tech = vm.invoke_instance(tag, "hasTech", "(I)Z", &[Value::Int(1)])?;
+    if has_tech.as_int().unwrap_or(0) == 0 {
+        return Ok(Some(Value::Null));
+    }
+    let technology = alloc_obj(vm, P36D_NFC_A, Vec::new())?;
+    match vm.invoke_instance(
+        technology,
+        "<init>",
+        "(Landroid/nfc/Tag;)V",
+        &[Value::Obj(tag)],
+    ) {
+        Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
+            Ok(Some(Value::Null))
+        }
+        Err(error) => Err(error),
+        Ok(_) => Ok(Some(Value::Obj(technology))),
+    }
+}
+
+fn p36d_tag_service(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
+    let tag = match get(vm, recv, "mTag") {
+        Value::Obj(tag) => tag,
+        _ => return Err(npe("")),
+    };
+    vm.invoke_instance(tag, "getTagService", "()Landroid/nfc/INfcTag;", &[])
+}
+
+fn p36d_tag_service_or_npe(vm: &mut Engine, recv: ObjRef) -> Result<ObjRef, VmExit> {
+    match p36d_tag_service(vm, recv)? {
+        Value::Obj(service) => Ok(service),
+        _ => Err(npe("")),
+    }
+}
+
+fn p36d_check_connected(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    let tag = match get(vm, recv, "mTag") {
+        Value::Obj(tag) => tag,
+        _ => return Err(npe("")),
+    };
+    let connected = vm.invoke_instance(tag, "getConnectedTechnology", "()I", &[])?;
+    let connected = connected.as_int().unwrap_or(-1);
+    if connected != field_int(vm, recv, "mSelectedTechnology") || connected == -1 {
+        return Err(throw(
+            "Ljava/lang/IllegalStateException;",
+            "Call connect() first!",
+        ));
+    }
+    Ok(())
+}
+
+fn p36d_nfc_a_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/nfc/Tag;)V") => {
+            let tag = p36a_value(args, 0);
+            put(vm, recv, "mTag", tag.clone())?;
+            put(vm, recv, "mSelectedTechnology", Value::Int(1))?;
+            put(vm, recv, "mIsConnected", Value::Int(0))?;
+            let Value::Obj(tag_ref) = tag else {
+                return Err(npe(""));
+            };
+            let extras = vm.invoke_instance(
+                tag_ref,
+                "getTechExtras",
+                "(I)Landroid/os/Bundle;",
+                &[Value::Int(1)],
+            )?;
+            let Value::Obj(extras) = extras else {
+                return Err(npe(""));
+            };
+            let sak_key = jstr(vm, "sak".to_string())?;
+            let sak = vm.invoke_instance(
+                extras,
+                "getShort",
+                "(Ljava/lang/String;)S",
+                std::slice::from_ref(&sak_key),
+            )?;
+            let atqa_key = jstr(vm, "atqa".to_string())?;
+            let atqa = vm.invoke_instance(
+                extras,
+                "getByteArray",
+                "(Ljava/lang/String;)[B",
+                std::slice::from_ref(&atqa_key),
+            )?;
+            put(vm, recv, "mSak", sak)?;
+            put(vm, recv, "mAtqa", atqa)?;
+            Value::Null
+        }
+        ("getTag", "()Landroid/nfc/Tag;") => get(vm, recv, "mTag"),
+        ("getAtqa", "()[B") => get(vm, recv, "mAtqa"),
+        ("getSak", "()S") => Value::Int(field_int(vm, recv, "mSak")),
+        ("isConnected", "()Z") => {
+            if field_int(vm, recv, "mIsConnected") == 0 {
+                Value::Int(0)
+            } else {
+                let service = p36d_tag_service_or_npe(vm, recv)?;
+                let tag = match get(vm, recv, "mTag") {
+                    Value::Obj(tag) => tag,
+                    _ => return Err(npe("")),
+                };
+                let handle = vm.invoke_instance(tag, "getServiceHandle", "()I", &[])?;
+                match vm.invoke_instance(service, "isPresent", "(I)Z", &[handle]) {
+                    Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
+                        Value::Int(0)
+                    }
+                    other => other?,
+                }
+            }
+        }
+        ("connect", "()V") => {
+            let service = p36d_tag_service_or_npe(vm, recv)?;
+            let tag = match get(vm, recv, "mTag") {
+                Value::Obj(tag) => tag,
+                _ => return Err(npe("")),
+            };
+            let handle = vm.invoke_instance(tag, "getServiceHandle", "()I", &[])?;
+            let selected = field_int(vm, recv, "mSelectedTechnology");
+            let error = match vm.invoke_instance(
+                service,
+                "connect",
+                "(II)I",
+                &[handle, Value::Int(selected)],
+            ) {
+                Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
+                    return Err(throw("Ljava/io/IOException;", "NFC service died"));
+                }
+                other => other?,
+            };
+            let error = error.as_int().unwrap_or(-1);
+            if error == 0 {
+                let stored = vm.invoke_instance(
+                    tag,
+                    "setConnectedTechnology",
+                    "(I)Z",
+                    &[Value::Int(selected)],
+                )?;
+                if stored.as_int().unwrap_or(0) == 0 {
+                    return Err(throw(
+                        "Ljava/io/IOException;",
+                        "Only one TagTechnology can be connected at a time.",
+                    ));
+                }
+                put(vm, recv, "mIsConnected", Value::Int(1))?;
+            } else if error == -21 {
+                return Err(throw(
+                    "Ljava/lang/UnsupportedOperationException;",
+                    "Connecting to this technology is not supported by the NFC adapter.",
+                ));
+            } else {
+                return Err(throw("Ljava/io/IOException;", ""));
+            }
+            Value::Null
+        }
+        ("reconnect", "()V") => {
+            if field_int(vm, recv, "mIsConnected") == 0 {
+                return Err(throw(
+                    "Ljava/lang/IllegalStateException;",
+                    "Technology not connected yet",
+                ));
+            }
+            let service = p36d_tag_service_or_npe(vm, recv)?;
+            let tag = match get(vm, recv, "mTag") {
+                Value::Obj(tag) => tag,
+                _ => return Err(npe("")),
+            };
+            let handle = vm.invoke_instance(tag, "getServiceHandle", "()I", &[])?;
+            let error = match vm.invoke_instance(service, "reconnect", "(I)I", &[handle]) {
+                Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
+                    put(vm, recv, "mIsConnected", Value::Int(0))?;
+                    vm.invoke_instance(tag, "setTechnologyDisconnected", "()V", &[])?;
+                    return Err(throw("Ljava/io/IOException;", "NFC service died"));
+                }
+                other => other?,
+            };
+            if error.as_int().unwrap_or(-1) != 0 {
+                put(vm, recv, "mIsConnected", Value::Int(0))?;
+                vm.invoke_instance(tag, "setTechnologyDisconnected", "()V", &[])?;
+                return Err(throw("Ljava/io/IOException;", ""));
+            }
+            Value::Null
+        }
+        ("close", "()V") => {
+            let tag = get(vm, recv, "mTag");
+            let operation = (|| -> Result<(), VmExit> {
+                let service = p36d_tag_service_or_npe(vm, recv)?;
+                match vm.invoke_instance(service, "resetTimeouts", "()V", &[]) {
+                    Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
+                        return Ok(());
+                    }
+                    Err(error) => return Err(error),
+                    Ok(_) => {}
+                }
+                let Value::Obj(tag_ref) = tag else {
+                    return Err(npe(""));
+                };
+                let handle = vm.invoke_instance(tag_ref, "getServiceHandle", "()I", &[])?;
+                match vm.invoke_instance(service, "reconnect", "(I)I", &[handle]) {
+                    Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
+                        Ok(())
+                    }
+                    Err(error) => Err(error),
+                    Ok(_) => Ok(()),
+                }
+            })();
+            put(vm, recv, "mIsConnected", Value::Int(0))?;
+            let Value::Obj(tag_ref) = tag else {
+                return Err(npe(""));
+            };
+            vm.invoke_instance(tag_ref, "setTechnologyDisconnected", "()V", &[])?;
+            operation?;
+            Value::Null
+        }
+        ("transceive", "([B)[B") => {
+            p36d_check_connected(vm, recv)?;
+            let service = p36d_tag_service_or_npe(vm, recv)?;
+            let tag = match get(vm, recv, "mTag") {
+                Value::Obj(tag) => tag,
+                _ => return Err(npe("")),
+            };
+            let handle = vm.invoke_instance(tag, "getServiceHandle", "()I", &[])?;
+            let result = match vm.invoke_instance(
+                service,
+                "transceive",
+                "(I[BZ)Landroid/nfc/TransceiveResult;",
+                &[handle, p36a_value(args, 0), Value::Int(1)],
+            ) {
+                Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
+                    return Err(throw("Ljava/io/IOException;", "NFC service died"));
+                }
+                other => other?,
+            };
+            let Value::Obj(result) = result else {
+                return Err(throw("Ljava/io/IOException;", "transceive failed"));
+            };
+            vm.invoke_instance(result, "getResponseOrThrow", "()[B", &[])?
+        }
+        ("getMaxTransceiveLength", "()I") => {
+            let service = p36d_tag_service_or_npe(vm, recv)?;
+            match vm.invoke_instance(
+                service,
+                "getMaxTransceiveLength",
+                "(I)I",
+                &[Value::Int(field_int(vm, recv, "mSelectedTechnology"))],
+            ) {
+                Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
+                    Value::Int(0)
+                }
+                other => other?,
+            }
+        }
+        ("setTimeout", "(I)V") => {
+            let service = p36d_tag_service_or_npe(vm, recv)?;
+            let error = match vm.invoke_instance(
+                service,
+                "setTimeout",
+                "(II)I",
+                &[
+                    Value::Int(field_int(vm, recv, "mSelectedTechnology")),
+                    Value::Int(iarg(args, 0)),
+                ],
+            ) {
+                Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
+                    Value::Int(0)
+                }
+                other => other?,
+            };
+            if error.as_int().unwrap_or(-1) != 0 {
+                return Err(iae("The supplied timeout is not valid"));
+            }
+            Value::Null
+        }
+        ("getTimeout", "()I") => {
+            let service = p36d_tag_service_or_npe(vm, recv)?;
+            match vm.invoke_instance(
+                service,
+                "getTimeout",
+                "(I)I",
+                &[Value::Int(field_int(vm, recv, "mSelectedTechnology"))],
+            ) {
+                Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
+                    Value::Int(0)
+                }
+                other => other?,
+            }
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36d_is_valid_aid(aid: Option<&str>) -> bool {
+    let Some(aid) = aid else {
+        return false;
+    };
+    let prefix = aid.ends_with('*') || aid.ends_with('#');
+    if prefix == (aid.len() % 2 == 0) {
+        return false;
+    }
+    let core = if let Some(core) = aid.strip_suffix("*#") {
+        core
+    } else if prefix {
+        &aid[..aid.len() - 1]
+    } else {
+        aid
+    };
+    (10..=32).contains(&core.len()) && core.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+fn p36d_card_emulation_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("getInstance", "(Landroid/nfc/NfcAdapter;)Landroid/nfc/cardemulation/CardEmulation;") => {
+            let Value::Obj(adapter) = p36a_value(args, 0) else {
+                return Err(npe("NfcAdapter is null"));
+            };
+            let context =
+                vm.invoke_instance(adapter, "getContext", "()Landroid/content/Context;", &[])?;
+            let Value::Obj(context_ref) = context else {
+                return Err(throw("Ljava/lang/UnsupportedOperationException;", ""));
+            };
+            let pm = vm.invoke_instance(
+                context_ref,
+                "getPackageManager",
+                "()Landroid/content/pm/PackageManager;",
+                &[],
+            )?;
+            let Value::Obj(pm) = pm else {
+                return Err(throw("Ljava/lang/UnsupportedOperationException;", ""));
+            };
+            let feature = jstr(vm, "android.hardware.nfc.hce".to_string())?;
+            let supported = vm.invoke_instance(
+                pm,
+                "hasSystemFeature",
+                "(Ljava/lang/String;)Z",
+                std::slice::from_ref(&feature),
+            )?;
+            if supported.as_int().unwrap_or(0) == 0 {
+                return Err(throw("Ljava/lang/UnsupportedOperationException;", ""));
+            }
+            let service = vm.invoke_instance(
+                adapter,
+                "getCardEmulationService",
+                "()Landroid/nfc/INfcCardEmulation;",
+                &[],
+            )?;
+            if !matches!(service, Value::Obj(_)) {
+                return Err(throw("Ljava/lang/UnsupportedOperationException;", ""));
+            }
+            let manager = alloc_obj(vm, P36D_CARD_EMULATION, Vec::new())?;
+            vm.invoke_instance(
+                manager,
+                "<init>",
+                "(Landroid/content/Context;Landroid/nfc/INfcCardEmulation;)V",
+                &[context, service],
+            )?;
+            Value::Obj(manager)
+        }
+        ("isValidAid", "(Ljava/lang/String;)Z") => {
+            let aid = opt_str_arg(vm, args, 0);
+            Value::Int(i32::from(p36d_is_valid_aid(aid.as_deref())))
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36d_card_emulation_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/content/Context;Landroid/nfc/INfcCardEmulation;)V") => {
+            let Value::Obj(context) = p36a_value(args, 0) else {
+                return Err(npe(""));
+            };
+            let application = vm.invoke_instance(
+                context,
+                "getApplicationContext",
+                "()Landroid/content/Context;",
+                &[],
+            )?;
+            put(vm, recv, "mContext", application)?;
+            vm.statics.insert(
+                (P36D_CARD_EMULATION.to_string(), "sService".to_string()),
+                p36a_value(args, 1),
+            );
+            Value::Null
+        }
+        ("categoryAllowsForegroundPreference", "(Ljava/lang/String;)Z") => {
+            if opt_str_arg(vm, args, 0).as_deref() == Some("payment") {
+                return Ok(None);
+            }
+            Value::Int(1)
+        }
+        ("getSelectionModeForCategory", "(Ljava/lang/String;)I") => {
+            if opt_str_arg(vm, args, 0).as_deref() == Some("payment") {
+                let key = (P36D_CARD_EMULATION.to_string(), "sService".to_string());
+                if !matches!(vm.statics.get(&key), Some(Value::Obj(_))) {
+                    return Err(npe(""));
+                }
+                return Ok(None);
+            }
+            Value::Int(2)
+        }
+        (
+            "registerAidsForService",
+            "(Landroid/content/ComponentName;Ljava/lang/String;Ljava/util/List;)Z",
+        ) => {
+            let group = alloc_obj(vm, P36D_AID_GROUP, Vec::new())?;
+            vm.invoke_instance(
+                group,
+                "<init>",
+                "(Ljava/util/List;Ljava/lang/String;)V",
+                &[p36a_value(args, 2), p36a_value(args, 1)],
+            )?;
+            let key = (P36D_CARD_EMULATION.to_string(), "sService".to_string());
+            if !matches!(vm.statics.get(&key), Some(Value::Obj(_))) {
+                return Err(npe(""));
+            }
+            return Ok(None);
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36d_aid_group_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Ljava/util/List;Ljava/lang/String;)V") => {
+            let aids = p36a_value(args, 0);
+            let items = collection_items(vm, Some(&aids));
+            if !matches!(aids, Value::Obj(_)) || items.is_empty() {
+                return Err(iae("No AIDS in AID group."));
+            }
+            if items.len() > 256 {
+                return Err(iae("Too many AIDs in AID group."));
+            }
+            let mut upper = Vec::with_capacity(items.len());
+            for aid in &items {
+                let valid = vm.invoke_static(
+                    P36D_CARD_EMULATION,
+                    "isValidAid",
+                    "(Ljava/lang/String;)Z",
+                    std::slice::from_ref(aid),
+                )?;
+                if valid.as_int().unwrap_or(0) == 0 {
+                    let shown = p36c_object_string(vm, aid)?;
+                    return Err(iae(format!("AID {shown} is not a valid AID.")));
+                }
+                let text = p36c_string_value(vm, aid).unwrap_or_default();
+                upper.push(jstr(vm, text.to_ascii_uppercase())?);
+            }
+            let category = match opt_str_arg(vm, args, 1).as_deref() {
+                Some("payment" | "other") => p36a_value(args, 1),
+                _ => jstr(vm, "other".to_string())?,
+            };
+            let aids = new_collection(vm, "Ljava/util/ArrayList;", upper)?;
+            put(vm, recv, "aids", Value::Obj(aids))?;
+            put(vm, recv, "category", category)?;
+            put(vm, recv, "description", Value::Null)?;
+            Value::Null
+        }
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;)V") => {
+            let aids = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+            put(vm, recv, "aids", Value::Obj(aids))?;
+            put(vm, recv, "category", p36a_value(args, 0))?;
+            put(vm, recv, "description", p36a_value(args, 1))?;
+            Value::Null
+        }
+        ("getCategory", "()Ljava/lang/String;") => get(vm, recv, "category"),
+        ("getAids", "()Ljava/util/List;") => get(vm, recv, "aids"),
+        ("describeContents", "()I") => Value::Int(0),
+        ("toString", "()Ljava/lang/String;") => {
+            let category = get(vm, recv, "category");
+            let category = p36c_object_string(vm, &category)?;
+            let aids = get(vm, recv, "aids");
+            let items = collection_items(vm, Some(&aids));
+            let mut text = format!("Category: {category}, AIDs:");
+            for aid in &items {
+                text.push_str(&p36c_object_string(vm, aid)?);
+                text.push_str(", ");
+            }
+            jstr(vm, text)?
         }
         _ => return Ok(None),
     };

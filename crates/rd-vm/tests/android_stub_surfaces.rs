@@ -15610,3 +15610,704 @@ fn sip_without_sip_features_or_service_is_guest_visible() {
         P36C_SIP_EXCEPTION,
     );
 }
+
+// ---- Appendix C Batch 36-D: Bluetooth / LE + NFC CE/tech ----
+
+const P36D_BT_ADAPTER: &str = "Landroid/bluetooth/BluetoothAdapter;";
+const P36D_BT_MANAGER: &str = "Landroid/bluetooth/BluetoothManager;";
+const P36D_BT_DEVICE: &str = "Landroid/bluetooth/BluetoothDevice;";
+const P36D_SCAN_SETTINGS: &str = "Landroid/bluetooth/le/ScanSettings;";
+const P36D_SCAN_SETTINGS_BUILDER: &str = "Landroid/bluetooth/le/ScanSettings$Builder;";
+const P36D_SCAN_FILTER: &str = "Landroid/bluetooth/le/ScanFilter;";
+const P36D_SCAN_FILTER_BUILDER: &str = "Landroid/bluetooth/le/ScanFilter$Builder;";
+const P36D_TAG: &str = "Landroid/nfc/Tag;";
+const P36D_NFC_A: &str = "Landroid/nfc/tech/NfcA;";
+const P36D_CARD_EMULATION: &str = "Landroid/nfc/cardemulation/CardEmulation;";
+const P36D_AID_GROUP: &str = "Landroid/nfc/cardemulation/AidGroup;";
+
+#[test]
+fn bluetooth_without_a_service_and_device_values_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, CONTEXT);
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36D_BT_ADAPTER,
+            "getDefaultAdapter",
+            "()Landroid/bluetooth/BluetoothAdapter;",
+            &[],
+        ),
+        Value::Null
+    );
+    let valid = text(&mut engine, "00:11:22:33:AA:BB");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36D_BT_ADAPTER,
+            "checkBluetoothAddress",
+            "(Ljava/lang/String;)Z",
+            &[valid],
+        ),
+        Value::Int(1)
+    );
+    let lowercase = text(&mut engine, "00:11:22:33:aa:bb");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36D_BT_ADAPTER,
+            "checkBluetoothAddress",
+            "(Ljava/lang/String;)Z",
+            &[lowercase],
+        ),
+        Value::Int(0)
+    );
+    let random_static = text(&mut engine, "C0:11:22:33:AA:BB");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36D_BT_ADAPTER,
+            "isAddressRandomStatic",
+            "(Ljava/lang/String;)Z",
+            &[random_static],
+        ),
+        Value::Int(1)
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36D_BT_ADAPTER,
+            "isAddressRandomStatic",
+            "(Ljava/lang/String;)Z",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P36D_BT_ADAPTER,
+            "nameForState",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(99)],
+        ),
+        "?!?!? (99)"
+    );
+
+    let service_name = text(&mut engine, "bluetooth_manager");
+    let system_manager = object(call(
+        &mut engine,
+        context,
+        "getSystemService",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+        &[service_name],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            system_manager,
+            "getAdapter",
+            "()Landroid/bluetooth/BluetoothAdapter;",
+            &[],
+        ),
+        Value::Null
+    );
+    let manager = p49_new(
+        &mut engine,
+        P36D_BT_MANAGER,
+        "(Landroid/content/Context;)V",
+        &[Value::Obj(context)],
+    );
+    assert_eq!(field(&engine, manager, "mAdapter"), Value::Null);
+    let states = int_array(&mut engine, &[2]);
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "getDevicesMatchingConnectionStates",
+            "(I[I)Ljava/util/List;",
+            &[Value::Int(99), states.clone()],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "getDevicesMatchingConnectionStates",
+            "(I[I)Ljava/util/List;",
+            &[Value::Int(7), states],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "openGattServer",
+            "(Landroid/content/Context;Landroid/bluetooth/BluetoothGattServerCallback;)Landroid/bluetooth/BluetoothGattServer;",
+            &[Value::Null, Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    let adapter = instance(&mut engine, P36D_BT_ADAPTER);
+    assert_eq!(
+        call(&mut engine, adapter, "getState", "()I", &[]),
+        Value::Int(10)
+    );
+    assert_eq!(
+        call(&mut engine, adapter, "isEnabled", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            adapter,
+            "getBluetoothLeScanner",
+            "()Landroid/bluetooth/le/BluetoothLeScanner;",
+            &[],
+        ),
+        Value::Null
+    );
+    let address = text(&mut engine, "00:11:22:33:AA:BB");
+    let device = object(call(
+        &mut engine,
+        adapter,
+        "getRemoteDevice",
+        "(Ljava/lang/String;)Landroid/bluetooth/BluetoothDevice;",
+        &[address],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            device,
+            "getAddress",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "00:11:22:33:AA:BB"
+    );
+    let bytes = byte_array(&mut engine, &[0, 0x11, 0x22, 0x33, 0xaa, 0xbb]);
+    let same_device = object(call(
+        &mut engine,
+        adapter,
+        "getRemoteDevice",
+        "([B)Landroid/bluetooth/BluetoothDevice;",
+        &[bytes],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            device,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(same_device)],
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, device, "hashCode", "()I", &[]),
+        call(&mut engine, same_device, "hashCode", "()I", &[])
+    );
+    let le_address = text(&mut engine, "C0:11:22:33:AA:BB");
+    let le_device = object(call(
+        &mut engine,
+        adapter,
+        "getRemoteLeDevice",
+        "(Ljava/lang/String;I)Landroid/bluetooth/BluetoothDevice;",
+        &[le_address, Value::Int(1)],
+    ));
+    assert_eq!(
+        call(&mut engine, le_device, "getAddressType", "()I", &[]),
+        Value::Int(1)
+    );
+    let bad_address = text(&mut engine, "00-11-22-33-AA-BB");
+    assert_throws(
+        engine.invoke_instance(
+            adapter,
+            "getRemoteDevice",
+            "(Ljava/lang/String;)Landroid/bluetooth/BluetoothDevice;",
+            &[bad_address],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert!(engine
+        .cp
+        .is_subtype(P36D_BT_DEVICE, "Landroid/os/Parcelable;"));
+}
+
+#[test]
+fn bluetooth_le_scan_settings_and_filters_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let builder = p49_new(&mut engine, P36D_SCAN_SETTINGS_BUILDER, "()V", &[]);
+    let settings = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/bluetooth/le/ScanSettings;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, settings, "getScanMode", "()I", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, settings, "getCallbackType", "()I", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, settings, "getReportDelayMillis", "()J", &[]),
+        Value::Long(0)
+    );
+    assert_eq!(
+        call(&mut engine, settings, "getLegacy", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, settings, "getPhy", "()I", &[]),
+        Value::Int(255)
+    );
+    call(
+        &mut engine,
+        builder,
+        "setScanMode",
+        "(I)Landroid/bluetooth/le/ScanSettings$Builder;",
+        &[Value::Int(2)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "setCallbackType",
+        "(I)Landroid/bluetooth/le/ScanSettings$Builder;",
+        &[Value::Int(6)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "setReportDelay",
+        "(J)Landroid/bluetooth/le/ScanSettings$Builder;",
+        &[Value::Long(2500)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "setLegacy",
+        "(Z)Landroid/bluetooth/le/ScanSettings$Builder;",
+        &[Value::Int(0)],
+    );
+    let configured = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/bluetooth/le/ScanSettings;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, configured, "getScanMode", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(
+        call(&mut engine, configured, "getCallbackType", "()I", &[]),
+        Value::Int(6)
+    );
+    assert_eq!(
+        call(&mut engine, configured, "getReportDelayMillis", "()J", &[]),
+        Value::Long(2500)
+    );
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "setScanMode",
+            "(I)Landroid/bluetooth/le/ScanSettings$Builder;",
+            &[Value::Int(99)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    call(
+        &mut engine,
+        builder,
+        "setCallbackType",
+        "(I)Landroid/bluetooth/le/ScanSettings$Builder;",
+        &[Value::Int(8)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "build",
+            "()Landroid/bluetooth/le/ScanSettings;",
+            &[],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    let filter_builder = p49_new(&mut engine, P36D_SCAN_FILTER_BUILDER, "()V", &[]);
+    let empty = object(call(
+        &mut engine,
+        filter_builder,
+        "build",
+        "()Landroid/bluetooth/le/ScanFilter;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, empty, "isAllFieldsEmpty", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, empty, "getManufacturerId", "()I", &[]),
+        Value::Int(-1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            empty,
+            "matches",
+            "(Landroid/bluetooth/le/ScanResult;)Z",
+            &[Value::Null],
+        ),
+        Value::Int(0)
+    );
+    let name = text(&mut engine, "beacon");
+    call(
+        &mut engine,
+        filter_builder,
+        "setDeviceName",
+        "(Ljava/lang/String;)Landroid/bluetooth/le/ScanFilter$Builder;",
+        &[name],
+    );
+    let address = text(&mut engine, "00:11:22:33:AA:BB");
+    call(
+        &mut engine,
+        filter_builder,
+        "setDeviceAddress",
+        "(Ljava/lang/String;)Landroid/bluetooth/le/ScanFilter$Builder;",
+        &[address],
+    );
+    let manufacturer_data = byte_array(&mut engine, &[1, 2, 3]);
+    call(
+        &mut engine,
+        filter_builder,
+        "setManufacturerData",
+        "(I[B)Landroid/bluetooth/le/ScanFilter$Builder;",
+        &[Value::Int(76), manufacturer_data],
+    );
+    let first = object(call(
+        &mut engine,
+        filter_builder,
+        "build",
+        "()Landroid/bluetooth/le/ScanFilter;",
+        &[],
+    ));
+    let second = object(call(
+        &mut engine,
+        filter_builder,
+        "build",
+        "()Landroid/bluetooth/le/ScanFilter;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            first,
+            "getDeviceName",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "beacon"
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            first,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(second)],
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, first, "hashCode", "()I", &[]),
+        call(&mut engine, second, "hashCode", "()I", &[])
+    );
+    let bad_address = text(&mut engine, "invalid");
+    assert_throws(
+        engine.invoke_instance(
+            filter_builder,
+            "setDeviceAddress",
+            "(Ljava/lang/String;)Landroid/bluetooth/le/ScanFilter$Builder;",
+            &[bad_address],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert!(engine
+        .cp
+        .is_subtype(P36D_SCAN_SETTINGS, "Landroid/os/Parcelable;"));
+    assert!(engine
+        .cp
+        .is_subtype(P36D_SCAN_FILTER, "Landroid/os/Parcelable;"));
+}
+
+#[test]
+fn nfc_mock_tag_and_nfc_a_values_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let extras = p49_new(&mut engine, "Landroid/os/Bundle;", "()V", &[]);
+    let sak_key = text(&mut engine, "sak");
+    call(
+        &mut engine,
+        extras,
+        "putShort",
+        "(Ljava/lang/String;S)V",
+        &[sak_key, Value::Int(8)],
+    );
+    let atqa_key = text(&mut engine, "atqa");
+    let atqa = byte_array(&mut engine, &[4, 0]);
+    call(
+        &mut engine,
+        extras,
+        "putByteArray",
+        "(Ljava/lang/String;[B)V",
+        &[atqa_key, atqa],
+    );
+    let id = byte_array(&mut engine, &[1, 2, 3, 4]);
+    let tech = int_array(&mut engine, &[1, 6]);
+    let extras_array = object_array(
+        &mut engine,
+        "[Landroid/os/Bundle;",
+        vec![Value::Obj(extras)],
+    );
+    let tag = object(call_static(
+        &mut engine,
+        P36D_TAG,
+        "createMockTag",
+        "([B[I[Landroid/os/Bundle;J)Landroid/nfc/Tag;",
+        &[id, tech, extras_array, Value::Long(99)],
+    ));
+    let returned_id = call(&mut engine, tag, "getId", "()[B", &[]);
+    assert_eq!(byte_array_values(&engine, &returned_id), [1, 2, 3, 4]);
+    let tech_list = call(
+        &mut engine,
+        tag,
+        "getTechList",
+        "()[Ljava/lang/String;",
+        &[],
+    );
+    let tech_names = array_values(&engine, &tech_list)
+        .iter()
+        .map(|value| text_of(&engine, value))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        tech_names,
+        ["android.nfc.tech.NfcA", "android.nfc.tech.Ndef"]
+    );
+    assert_eq!(
+        call(&mut engine, tag, "hasTech", "(I)Z", &[Value::Int(1)]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, tag, "hasTech", "(I)Z", &[Value::Int(2)]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_text(&mut engine, tag, "toString", "()Ljava/lang/String;", &[]),
+        "TAG: Tech [android.nfc.tech.NfcA, android.nfc.tech.Ndef]"
+    );
+    assert_throws(
+        engine.invoke_instance(tag, "rediscover", "()Landroid/nfc/Tag;", &[]),
+        "Ljava/io/IOException;",
+    );
+
+    let technology = object(call_static(
+        &mut engine,
+        P36D_NFC_A,
+        "get",
+        "(Landroid/nfc/Tag;)Landroid/nfc/tech/NfcA;",
+        &[Value::Obj(tag)],
+    ));
+    assert_eq!(
+        call(&mut engine, technology, "getSak", "()S", &[]),
+        Value::Int(8)
+    );
+    let returned_atqa = call(&mut engine, technology, "getAtqa", "()[B", &[]);
+    assert_eq!(byte_array_values(&engine, &returned_atqa), [4, 0]);
+    assert_eq!(
+        call(
+            &mut engine,
+            technology,
+            "getTag",
+            "()Landroid/nfc/Tag;",
+            &[]
+        ),
+        Value::Obj(tag)
+    );
+    assert_eq!(
+        call(&mut engine, technology, "isConnected", "()Z", &[]),
+        Value::Int(0)
+    );
+    let payload = byte_array(&mut engine, &[0x30, 0]);
+    assert_throws(
+        engine.invoke_instance(technology, "transceive", "([B)[B", &[payload]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    assert_throws(
+        engine.invoke_instance(technology, "connect", "()V", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+    call(
+        &mut engine,
+        tag,
+        "setConnectedTechnology",
+        "(I)Z",
+        &[Value::Int(1)],
+    );
+    assert_throws(
+        engine.invoke_instance(technology, "close", "()V", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_eq!(
+        call(&mut engine, tag, "getConnectedTechnology", "()I", &[]),
+        Value::Int(-1)
+    );
+    assert!(engine.cp.is_subtype(P36D_TAG, "Landroid/os/Parcelable;"));
+    assert!(engine
+        .cp
+        .is_subtype(P36D_NFC_A, "Landroid/nfc/tech/TagTechnology;"));
+}
+
+#[test]
+fn nfc_card_emulation_without_hce_and_aid_groups_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, CONTEXT);
+    let adapter = instance(&mut engine, "Landroid/nfc/NfcAdapter;");
+    assert_throws(
+        engine.invoke_static(
+            P36D_CARD_EMULATION,
+            "getInstance",
+            "(Landroid/nfc/NfcAdapter;)Landroid/nfc/cardemulation/CardEmulation;",
+            &[Value::Obj(adapter)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+    engine
+        .heap
+        .put_field(adapter, "mContext", Value::Obj(context))
+        .unwrap();
+    assert_throws(
+        engine.invoke_static(
+            P36D_CARD_EMULATION,
+            "getInstance",
+            "(Landroid/nfc/NfcAdapter;)Landroid/nfc/cardemulation/CardEmulation;",
+            &[Value::Obj(adapter)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36D_CARD_EMULATION,
+            "getInstance",
+            "(Landroid/nfc/NfcAdapter;)Landroid/nfc/cardemulation/CardEmulation;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+
+    let valid = text(&mut engine, "F014811481");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36D_CARD_EMULATION,
+            "isValidAid",
+            "(Ljava/lang/String;)Z",
+            &[valid],
+        ),
+        Value::Int(1)
+    );
+    let prefix = text(&mut engine, "a000000004*");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36D_CARD_EMULATION,
+            "isValidAid",
+            "(Ljava/lang/String;)Z",
+            &[prefix],
+        ),
+        Value::Int(1)
+    );
+    let invalid = text(&mut engine, "F0148");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36D_CARD_EMULATION,
+            "isValidAid",
+            "(Ljava/lang/String;)Z",
+            &[invalid],
+        ),
+        Value::Int(0)
+    );
+
+    let first = text(&mut engine, "f014811481");
+    let second = text(&mut engine, "a000000004*");
+    let aids = list_of(&mut engine, &[first, second]);
+    let category = text(&mut engine, "custom");
+    let group = p49_new(
+        &mut engine,
+        P36D_AID_GROUP,
+        "(Ljava/util/List;Ljava/lang/String;)V",
+        &[Value::Obj(aids), category],
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            group,
+            "getCategory",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "other"
+    );
+    assert_eq!(
+        call_text(&mut engine, group, "toString", "()Ljava/lang/String;", &[]),
+        "Category: other, AIDs:F014811481, A000000004*, "
+    );
+    let empty = list_of(&mut engine, &[]);
+    let rejected = instance(&mut engine, P36D_AID_GROUP);
+    let payment = text(&mut engine, "payment");
+    assert_throws(
+        engine.invoke_instance(
+            rejected,
+            "<init>",
+            "(Ljava/util/List;Ljava/lang/String;)V",
+            &[Value::Obj(empty), payment],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    let card_emulation = instance(&mut engine, P36D_CARD_EMULATION);
+    let other = text(&mut engine, "other");
+    assert_eq!(
+        call(
+            &mut engine,
+            card_emulation,
+            "categoryAllowsForegroundPreference",
+            "(Ljava/lang/String;)Z",
+            std::slice::from_ref(&other),
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            card_emulation,
+            "getSelectionModeForCategory",
+            "(Ljava/lang/String;)I",
+            &[other],
+        ),
+        Value::Int(2)
+    );
+    let registered_aid = text(&mut engine, "F014811481");
+    let valid_aids = list_of(&mut engine, &[registered_aid]);
+    let category = text(&mut engine, "other");
+    assert_throws(
+        engine.invoke_instance(
+            card_emulation,
+            "registerAidsForService",
+            "(Landroid/content/ComponentName;Ljava/lang/String;Ljava/util/List;)Z",
+            &[Value::Null, category, Value::Obj(valid_aids)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+}
