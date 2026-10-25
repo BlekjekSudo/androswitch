@@ -19,7 +19,6 @@ const LOCATION_REQUEST_BUILDER: &str = "Lcom/google/android/gms/location/Locatio
 const LOCATION_CALLBACK: &str = "Lcom/google/android/gms/location/LocationCallback;";
 const LOCATION_RESULT: &str = "Lcom/google/android/gms/location/LocationResult;";
 const GMS_TASK: &str = "Lcom/google/android/gms/tasks/Task;";
-const GMS_TASKS: &str = "Lcom/google/android/gms/tasks/Tasks;";
 
 const LOCATION_PERMS: &[&str] = &[
     "android.permission.ACCESS_FINE_LOCATION",
@@ -202,10 +201,12 @@ pub(super) fn static_call(
             let r = alloc_with(vm, LOCATION_RESULT, vec![("rd_locations".into(), list_val)])?;
             Ok(Some(Value::Obj(r)))
         }
-        (GMS_TASKS, "forResult") => {
-            let res = args.first().cloned().unwrap_or(Value::Null);
-            Ok(Some(Value::Obj(completed_task(vm, res)?)))
-        }
+        // Tasks.forResult NÃO é cunhado aqui: cai para o shim GMS
+        // (gms.rs) mais abaixo na cadeia estática, para que TODAS as
+        // Tasks de uso geral vivam no mesmo motor (continueWith,
+        // whenAll, listeners e getResult consistentes de bytecode).
+        // As Tasks dos próprios fluxos fused continuam a nascer em
+        // completed_task/rd_*.
         _ => Ok(None),
     }
 }
@@ -579,52 +580,63 @@ pub(super) fn instance_call(
             "flushLocations" => Ok(Some(Value::Obj(completed_task(vm, Value::Null)?))),
             _ => Ok(None),
         },
-        GMS_TASK => match name {
-            "isComplete" => Ok(Some(Value::Int(get_int_field(vm, recv, "rd_complete", 1)))),
-            "isSuccessful" => Ok(Some(Value::Int(get_int_field(vm, recv, "rd_success", 1)))),
-            "isCanceled" => Ok(Some(Value::Int(0))),
-            "getResult" => Ok(Some(
-                get_field(vm, recv, "rd_result").unwrap_or(Value::Null),
-            )),
-            "getException" => Ok(Some(Value::Null)),
-            "addOnSuccessListener" => {
-                if get_int_field(vm, recv, "rd_success", 1) != 0 {
-                    if let Some(listener) = args.last().and_then(|v| match v {
-                        Value::Obj(r) => Some(*r),
-                        _ => None,
-                    }) {
-                        let res = get_field(vm, recv, "rd_result").unwrap_or(Value::Null);
-                        let _ = call_dex(
-                            vm,
-                            listener,
-                            "onSuccess",
-                            "(Ljava/lang/Object;)V",
-                            vec![res],
-                        )?;
-                    }
-                }
-                Ok(Some(Value::Obj(recv)))
+        GMS_TASK => {
+            // Só Tasks cunhadas pelo M10 (completed_task grava rd_* no
+            // heap). As Tasks do shim "sem GMS" (Apêndice E, gms.rs)
+            // NÃO têm esses campos — reclamá-las aqui fazia
+            // isComplete/isSuccessful devolverem os defaults 1/1,
+            // getResult null e listeners dispararem de imediato
+            // (daí a recursão fatal de um listener que se re-adiciona).
+            if get_field(vm, recv, "rd_complete").is_none() {
+                return Ok(None);
             }
-            "addOnCompleteListener" => {
-                if get_int_field(vm, recv, "rd_complete", 1) != 0 {
-                    if let Some(listener) = args.last().and_then(|v| match v {
-                        Value::Obj(r) => Some(*r),
-                        _ => None,
-                    }) {
-                        let _ = call_dex(
-                            vm,
-                            listener,
-                            "onComplete",
-                            "(Lcom/google/android/gms/tasks/Task;)V",
-                            vec![Value::Obj(recv)],
-                        )?;
+            match name {
+                "isComplete" => Ok(Some(Value::Int(get_int_field(vm, recv, "rd_complete", 1)))),
+                "isSuccessful" => Ok(Some(Value::Int(get_int_field(vm, recv, "rd_success", 1)))),
+                "isCanceled" => Ok(Some(Value::Int(0))),
+                "getResult" => Ok(Some(
+                    get_field(vm, recv, "rd_result").unwrap_or(Value::Null),
+                )),
+                "getException" => Ok(Some(Value::Null)),
+                "addOnSuccessListener" => {
+                    if get_int_field(vm, recv, "rd_success", 1) != 0 {
+                        if let Some(listener) = args.last().and_then(|v| match v {
+                            Value::Obj(r) => Some(*r),
+                            _ => None,
+                        }) {
+                            let res = get_field(vm, recv, "rd_result").unwrap_or(Value::Null);
+                            let _ = call_dex(
+                                vm,
+                                listener,
+                                "onSuccess",
+                                "(Ljava/lang/Object;)V",
+                                vec![res],
+                            )?;
+                        }
                     }
+                    Ok(Some(Value::Obj(recv)))
                 }
-                Ok(Some(Value::Obj(recv)))
+                "addOnCompleteListener" => {
+                    if get_int_field(vm, recv, "rd_complete", 1) != 0 {
+                        if let Some(listener) = args.last().and_then(|v| match v {
+                            Value::Obj(r) => Some(*r),
+                            _ => None,
+                        }) {
+                            let _ = call_dex(
+                                vm,
+                                listener,
+                                "onComplete",
+                                "(Lcom/google/android/gms/tasks/Task;)V",
+                                vec![Value::Obj(recv)],
+                            )?;
+                        }
+                    }
+                    Ok(Some(Value::Obj(recv)))
+                }
+                "addOnFailureListener" | "addOnCanceledListener" => Ok(Some(Value::Obj(recv))),
+                _ => Ok(None),
             }
-            "addOnFailureListener" | "addOnCanceledListener" => Ok(Some(Value::Obj(recv))),
-            _ => Ok(None),
-        },
+        }
         _ => Ok(None),
     }
 }
