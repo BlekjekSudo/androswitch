@@ -1,0 +1,1345 @@
+{
+  "status": "implemented_scoped_external_first_screens_pending",
+  "upstream": {
+    "scope": "Inherited implementation compiled by both configurations; shared dispatch/constant metadata, VM-owned cache, collector roots and framework adapters. Not all java.lang APIs or all Android compatibility.",
+    "families": [
+      "Boolean",
+      "Byte",
+      "Short",
+      "Character",
+      "Integer",
+      "Long",
+      "Float",
+      "Double"
+    ],
+    "base_commit": "6388281f66d254c8e01a0fdc7a5a9a30239bc762",
+    "shared_source": {
+      "sha256": "48d34b50f4708f3d8d7fd158fc706bbe38165bbb08042d23f620bcba0abed1da",
+      "path": "crates/rd-vm/src/boxes.rs"
+    },
+    "extracted_parser": {
+      "sha256": "fc0327470665d5abcd61f81afba5e49f4b9a53beee21ef05d27d044e3b337987",
+      "path": "crates/rd-vm/src/primitive_parse.rs"
+    },
+    "repository": "https://github.com/nadabgfccvd/RustyDroid",
+    "latest_inspected_commit": "3761815dc6a2a1427e9fc66b66e8471b78d1b170",
+    "latest_inspection_scope": "Fetched objects for source comparison only; no working-tree merge. EnumMap has only a comment match and no class implementation, EnumSet/sigaltstack have no matches in upstream crates. Frozen fork base remains 6388281.",
+    "history_ancestor_verified": true
+  },
+  "physical_device": {
+    "earlier_219_report": "reports/conformance-hardware-20261025.json",
+    "scope": "Earlier physical 219/219 feedback does not verify this new source or NRO.",
+    "status": "not_run"
+  },
+  "first_screen_pass": false,
+  "no_package_specific_runtime_fixes": true,
+  "schema_version": 1,
+  "date": "2026-10-26",
+  "implementation_commit": "ef4c4bd5194a6d56055edd0b7e14745cff964375",
+  "build": {
+    "executed": false,
+    "artifacts": [
+      {
+        "sha256": "05b6d79166e3cf6f638de72449d3d40ef69410fa40ee54b4f8235f274542a8e1",
+        "path": "local-artifacts/m9/startup-iterations/nro39/androswitch.nro"
+      },
+      {
+        "sha256": "ed72156a9ec0d30963636cd6d637bef0cf462cdc7899a269fb90f6efc993e656",
+        "path": "local-artifacts/m9/startup-iterations/nro39/build.json"
+      },
+      {
+        "sha256": "0f4c508e289de04f2056012e7f280f5559f8b089b3235184dc599ac0a7ad52a3",
+        "path": "local-artifacts/m9/startup-iterations/nro39/source.json"
+      }
+    ],
+    "nro_sha256": "05b6d79166e3cf6f638de72449d3d40ef69410fa40ee54b4f8235f274542a8e1",
+    "nro_bytes": 27369528,
+    "status": "built",
+    "iteration": "nro39",
+    "source_commit": "ef4c4bd5194a6d56055edd0b7e14745cff964375"
+  },
+  "fixture": {
+    "oracle": {
+      "sha256": "7cbd67531da34eb69ab8542f77b043af1d0570ef2d47fe4d09482af81a27ead8",
+      "path": "target/portable-boxes-fixture/oracle.tsv"
+    },
+    "receipt": {
+      "sha256": "115eb732c3a173b9035d574de774f8e12a2d851b7e97e9e98f3d5c38f37834ce",
+      "path": "target/portable-boxes-fixture/receipt.json"
+    },
+    "source": {
+      "sha256": "b74dfc1cf8d2a8eb2b334291019a6d794481db86bf63051c1f31667f2203d3c9",
+      "path": "crates/rd-vm/tests/fixtures/portable-boxes/BoxFixture.java"
+    },
+    "reference": "Ordinary JVM compilation/run, same class converted by Android d8 --min-api 26; no change to external game APKs",
+    "rounds_per_vm": 2,
+    "oracle_observations": 86,
+    "dex": {
+      "sha256": "5b05b6278cebfc2735e350aad3335317b4ab10bd52b17abdf8a5a5102129a3ec",
+      "path": "target/portable-boxes-fixture/dex/classes.dex"
+    },
+    "builder": {
+      "sha256": "a367e2e7328e6c14a85246cb58159dbf0deb0421656a54292d4ffd338e6bb1a6",
+      "path": "crates/rd-vm/tests/fixtures/portable-boxes/build.ps1"
+    }
+  },
+  "host": {
+    "status": "passed_scoped",
+    "checks": [
+      {
+        "scope": "Final portable binding, 86 JVM observations before/after GC, JNI method/constructor/static-field/reference contracts",
+        "passed_tests": 20,
+        "status": "passed",
+        "log": {
+          "sha256": "0ef3b5b56bcdf814e52bbb8ebb5a54a8a19cc05fbe8583916d00b3c7c56707f3",
+          "path": "target/evidence/m9-shared-boxes-lazy-fields-after.log"
+        },
+        "id": "portable-wrappers-and-jni"
+      },
+      {
+        "scope": "Same ordered 86-observation JVM/DEX corpus and cache/metadata contracts on inherited std VM",
+        "passed_tests": 2,
+        "status": "passed",
+        "log": {
+          "sha256": "63df1ee526d75689cc2fb0c14429e35afd63fc74f2c047294d8a79b2779a9d50",
+          "path": "target/evidence/m9-shared-boxes-desktop-after.log"
+        },
+        "id": "desktop-wrappers"
+      },
+      {
+        "scope": "Full framework regression after wrapper sharing, before the later standalone-Engine sget resolver binding; that binding is covered by the final portable corpus",
+        "passed_tests": 163,
+        "status": "passed",
+        "log": {
+          "sha256": "abf54f1942298286b2830e3fd2b7533ca1cd21959b71602817e2d58ca2e84fe7",
+          "path": "target/evidence/m9-reuse-framework.log"
+        },
+        "id": "framework"
+      },
+      {
+        "scope": "JNI objects/constructors, atomic and Formatter/Math regression",
+        "passed_tests": 20,
+        "status": "passed",
+        "log": {
+          "sha256": "1587f8e5e14f4269311a843c5b481164915c23a2db1dd3d9e62f57ea5fcd4589",
+          "path": "target/evidence/m9-reuse-portable-regression.log"
+        },
+        "id": "portable-regression"
+      },
+      {
+        "scope": "Inherited numeric helper tests",
+        "passed_tests": 4,
+        "status": "passed",
+        "log": {
+          "sha256": "a99dabf89cf0f6c0754c35d6cb1910b026d29d378ec8bd0c15004630804fede6",
+          "path": "target/evidence/m9-reuse-legacy-numerics.log"
+        },
+        "id": "legacy-numerics"
+      },
+      {
+        "status": "passed",
+        "log": {
+          "sha256": "6d0826e71e00c66fcdab108a80a5c804237233b7f772665b945698850921f47d",
+          "path": "target/evidence/m9-reuse-framework-clippy-final.log"
+        },
+        "id": "framework-clippy"
+      },
+      {
+        "status": "passed",
+        "log": {
+          "sha256": "54395f87e976181f97224d3e054eff9a74ba8a4acd5ea9e8fa376d398b1e940c",
+          "path": "target/evidence/m9-reuse-portable-clippy-final.log"
+        },
+        "id": "portable-clippy"
+      },
+      {
+        "status": "passed",
+        "log": {
+          "sha256": "c6dbc79974f97e79f06da6de00d15879a3a0ca6f27c861362b1040b3312dbb55",
+          "path": "target/evidence/m9-reuse-legacy-clippy-repair-4.log"
+        },
+        "id": "desktop-clippy"
+      },
+      {
+        "status": "passed",
+        "log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "target/evidence/m9-reuse-format-final.log"
+        },
+        "id": "format"
+      },
+      {
+        "status": "passed",
+        "log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "target/evidence/m9-reuse-shared-fixture-format-final.log"
+        },
+        "id": "shared-test-format"
+      }
+    ],
+    "new_required_checks": [
+      "shared-boxes-fixture",
+      "portable-shared-boxes",
+      "desktop-shared-boxes"
+    ],
+    "java": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\r\nOpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)\r\nOpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+    "prior_baseline_report": "reports/m9-atomic-loader-provider-20261025.json",
+    "registered_required_checks": 70,
+    "full_70_check_run": false,
+    "host_rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+  },
+  "emulator": {
+    "status": "blocked_runtime",
+    "runs": [
+      {
+        "sd_original_restore": "restored",
+        "label": "nro39-mek",
+        "status": "blocked_runtime",
+        "latest_session_report": {
+          "error": "API_UNAVAILABLE [rd-vm]: new-instance Ljava/util/concurrent/CopyOnWriteArraySet;: platform state for Ljava/util/concurrent/CopyOnWriteArraySet; is unavailable [pc 0x3: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 4292) }]\n  at Lcom/google/android/gms/measurement/internal/zzhx;-><init>(Lcom/google/android/gms/measurement/internal/zzfr;)V\n  at Lcom/google/android/gms/measurement/internal/zzfr;-><init>(Lcom/google/android/gms/measurement/internal/zzgu;)V\n  at Lcom/google/android/gms/measurement/internal/zzfr;->zzp(Landroid/content/Context;Lcom/google/android/gms/internal/measurement/zzcl;Ljava/lang/Long;)Lcom/google/android/gms/measurement/internal/zzfr;\n  at Lcom/google/android/gms/measurement/internal/AppMeasurementDynamiteService;->initialize(Lcom/google/android/gms/dynamic/IObjectWrapper;Lcom/google/android/gms/internal/measurement/zzcl;J)V\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+          "identity_status": "known",
+          "package": "com.martinmagni.mekorama",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "d3f1760a84c4490e99428da04c3cad5b-1",
+          "status": "failed"
+        },
+        "evidence": {
+          "sha256": "634e6d70d75eaa1f7b88d7b2f9b4e46ba19a51cbaeedc64a32cdc2ffbc722da7",
+          "path": "local-artifacts/m9/external-runs/d3f1760a84c4490e99428da04c3cad5b/verification.json"
+        },
+        "first_screen_pass": false,
+        "nro_sha256": "05b6d79166e3cf6f638de72449d3d40ef69410fa40ee54b4f8235f274542a8e1",
+        "cases": [
+          {
+            "teardown_phases": [
+              "stop_requested",
+              "native_activity_stop",
+              "java_activity_stop",
+              "worker_admission_closed",
+              "background_worker_quiesce",
+              "media_thread_quiesce",
+              "glsurface_join",
+              "egl_wait_gpu",
+              "egl_unbind",
+              "egl_destroy_context",
+              "egl_destroy_surface",
+              "egl_terminate",
+              "egl_terminated",
+              "guest_thread_quiesce",
+              "native_destructors",
+              "media_reset",
+              "media_released",
+              "activity_dispose",
+              "runtime_drop",
+              "native_mapping_release",
+              "native_resource_reset",
+              "native_reset_guest_threads",
+              "native_reset_cxx",
+              "native_reset_keys",
+              "native_reset_sync",
+              "native_reset_locale",
+              "native_reset_admitted",
+              "native_mapping_release",
+              "native_reset_anonymous_memory",
+              "native_tls_reset",
+              "native_resources_released",
+              "display_geometry_reset",
+              "runtime_closed",
+              "launcher_refresh"
+            ],
+            "installed_identity_matches": true,
+            "snapshots": [],
+            "presented_frames": null,
+            "returned_to_launcher": true,
+            "first_screen": "not_visually_verified",
+            "captures": [],
+            "input": {
+              "attempt": 0,
+              "source": "D:\\Download\\mekorama-1-7-2.apk",
+              "index": 0,
+              "staged_name": "0000-external.apk",
+              "install_snapshot_step": 3,
+              "bytes": 13099584,
+              "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+              "expected_session_id": "d3f1760a84c4490e99428da04c3cad5b-1"
+            },
+            "status": "blocked_or_unreported",
+            "runtime_status": "failed",
+            "error": "API_UNAVAILABLE [rd-vm]: new-instance Ljava/util/concurrent/CopyOnWriteArraySet;: platform state for Ljava/util/concurrent/CopyOnWriteArraySet; is unavailable [pc 0x3: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 4292) }]\n  at Lcom/google/android/gms/measurement/internal/zzhx;-><init>(Lcom/google/android/gms/measurement/internal/zzfr;)V\n  at Lcom/google/android/gms/measurement/internal/zzfr;-><init>(Lcom/google/android/gms/measurement/internal/zzgu;)V\n  at Lcom/google/android/gms/measurement/internal/zzfr;->zzp(Landroid/content/Context;Lcom/google/android/gms/internal/measurement/zzcl;Ljava/lang/Long;)Lcom/google/android/gms/measurement/internal/zzfr;\n  at Lcom/google/android/gms/measurement/internal/AppMeasurementDynamiteService;->initialize(Lcom/google/android/gms/dynamic/IObjectWrapper;Lcom/google/android/gms/internal/measurement/zzcl;J)V\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V"
+          }
+        ]
+      },
+      {
+        "sd_original_restore": "restored",
+        "label": "nro39-candy",
+        "status": "attempted_failed",
+        "latest_session_report": {
+          "error": "NATIVE_API_UNAVAILABLE [rd-vm]: call: libcandycrushsaga.so: call requires fsync [pc 0x45: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 5, idx: 4256, regs: [3, 4, 5, 6, 0] } }]\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V",
+          "identity_status": "known",
+          "package": "com.king.candycrushsaga",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "0d8255849c6947de96f630aad9b52be3-1",
+          "status": "failed"
+        },
+        "evidence": {
+          "sha256": "48cc82e8cdf47f75d22585a5e8ae95856a18ca11560b75132b951427da038177",
+          "path": "local-artifacts/m9/external-runs/0d8255849c6947de96f630aad9b52be3/verification.json"
+        },
+        "first_screen_pass": false,
+        "nro_sha256": "05b6d79166e3cf6f638de72449d3d40ef69410fa40ee54b4f8235f274542a8e1",
+        "cases": []
+      },
+      {
+        "label": "nro40-mek",
+        "status": "blocked_runtime",
+        "nro_sha256": "fc206d8f46321e05e82cd6941167fec0aa1fc59066ecafa937548e3622781958",
+        "latest_session_report": {
+          "error": "API_UNAVAILABLE [rd-vm]: new-instance Ljava/util/EnumMap;: platform state for Ljava/util/EnumMap; is unavailable [pc 0x3: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 4235) }]\n  at Lcom/google/android/gms/measurement/internal/zzai;-><init>(Ljava/lang/Boolean;Ljava/lang/Boolean;)V\n  at Lcom/google/android/gms/measurement/internal/zzai;-><clinit>()V\n  at Lcom/google/android/gms/measurement/internal/zzhx;-><init>(Lcom/google/android/gms/measurement/internal/zzfr;)V\n  at Lcom/google/android/gms/measurement/internal/zzfr;-><init>(Lcom/google/android/gms/measurement/internal/zzgu;)V\n  at Lcom/google/android/gms/measurement/internal/zzfr;->zzp(Landroid/content/Context;Lcom/google/android/gms/internal/measurement/zzcl;Ljava/lang/Long;)Lcom/google/android/gms/measurement/internal/zzfr;\n  at Lcom/google/android/gms/measurement/internal/AppMeasurementDynamiteService;->initialize(Lcom/google/android/gms/dynamic/IObjectWrapper;Lcom/google/android/gms/internal/measurement/zzcl;J)V\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+          "identity_status": "known",
+          "package": "com.martinmagni.mekorama",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "58d5ac552eaa45129ea154f947da8716-1",
+          "status": "failed"
+        },
+        "first_screen_pass": false,
+        "cases": [
+          {
+            "error": "API_UNAVAILABLE [rd-vm]: new-instance Ljava/util/EnumMap;: platform state for Ljava/util/EnumMap; is unavailable [pc 0x3: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 4235) }]\n  at Lcom/google/android/gms/measurement/internal/zzai;-><init>(Ljava/lang/Boolean;Ljava/lang/Boolean;)V\n  at Lcom/google/android/gms/measurement/internal/zzai;-><clinit>()V\n  at Lcom/google/android/gms/measurement/internal/zzhx;-><init>(Lcom/google/android/gms/measurement/internal/zzfr;)V\n  at Lcom/google/android/gms/measurement/internal/zzfr;-><init>(Lcom/google/android/gms/measurement/internal/zzgu;)V\n  at Lcom/google/android/gms/measurement/internal/zzfr;->zzp(Landroid/content/Context;Lcom/google/android/gms/internal/measurement/zzcl;Ljava/lang/Long;)Lcom/google/android/gms/measurement/internal/zzfr;\n  at Lcom/google/android/gms/measurement/internal/AppMeasurementDynamiteService;->initialize(Lcom/google/android/gms/dynamic/IObjectWrapper;Lcom/google/android/gms/internal/measurement/zzcl;J)V\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+            "teardown_phases": [
+              "stop_requested",
+              "native_activity_stop",
+              "java_activity_stop",
+              "worker_admission_closed",
+              "background_worker_quiesce",
+              "media_thread_quiesce",
+              "glsurface_join",
+              "egl_wait_gpu",
+              "egl_unbind",
+              "egl_destroy_context",
+              "egl_destroy_surface",
+              "egl_terminate",
+              "egl_terminated",
+              "guest_thread_quiesce",
+              "native_destructors",
+              "media_reset",
+              "media_released",
+              "activity_dispose",
+              "runtime_drop",
+              "native_mapping_release",
+              "native_resource_reset",
+              "native_reset_guest_threads",
+              "native_reset_cxx",
+              "native_reset_keys",
+              "native_reset_sync",
+              "native_reset_locale",
+              "native_reset_admitted",
+              "native_mapping_release",
+              "native_reset_anonymous_memory",
+              "native_tls_reset",
+              "native_resources_released",
+              "display_geometry_reset",
+              "runtime_closed",
+              "launcher_refresh"
+            ],
+            "input": {
+              "index": 0,
+              "attempt": 0,
+              "install_snapshot_step": 3,
+              "staged_name": "0000-external.apk",
+              "bytes": 13099584,
+              "expected_session_id": "58d5ac552eaa45129ea154f947da8716-1",
+              "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+              "source": "D:\\Download\\mekorama-1-7-2.apk"
+            },
+            "first_screen": "not_visually_verified",
+            "snapshots": [],
+            "presented_frames": null,
+            "runtime_status": "failed",
+            "installed_identity_matches": true,
+            "captures": [],
+            "status": "blocked_or_unreported",
+            "returned_to_launcher": true
+          }
+        ],
+        "evidence": {
+          "path": "local-artifacts/m9/external-runs/58d5ac552eaa45129ea154f947da8716/verification.json",
+          "sha256": "918c93882d1db8a29be405ba489832efe126b4241640c2b44e52b49aaf951e9c"
+        },
+        "sd_original_restore": "restored"
+      },
+      {
+        "label": "nro40-candy",
+        "status": "attempted_failed",
+        "nro_sha256": "fc206d8f46321e05e82cd6941167fec0aa1fc59066ecafa937548e3622781958",
+        "latest_session_report": {
+          "error": "NATIVE_API_UNAVAILABLE [rd-vm]: call: libcandycrushsaga.so: call requires sigaltstack [pc 0x45: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 5, idx: 4256, regs: [3, 4, 5, 6, 0] } }]\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V",
+          "identity_status": "known",
+          "package": "com.king.candycrushsaga",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "7dffdd79d97444b4ac319ce1de927ead-1",
+          "status": "failed"
+        },
+        "first_screen_pass": false,
+        "cases": [],
+        "evidence": {
+          "path": "local-artifacts/m9/external-runs/7dffdd79d97444b4ac319ce1de927ead/verification.json",
+          "sha256": "8cd4138fe2cc08c4afb88575f59539f75ee3576ab152c2c953d8f6ffd2f09af9"
+        },
+        "sd_original_restore": "restored"
+      },
+      {
+        "sd_original_restore": "restored",
+        "latest_session_report": {
+          "error": "NOT_FOUND [rd-vm]: método Landroid/util/Log;->w(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I não resolvido [pc 0xb: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 3, idx: 423, regs: [8, 9, 7, 0, 0] } }]\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzT(Ljava/lang/Exception;ZZ)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzt(Lcom/google/android/gms/internal/measurement/zzef;Ljava/lang/Exception;ZZ)V\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+          "identity_status": "known",
+          "package": "com.martinmagni.mekorama",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "6543ef49b7e241c1819659a6256c9f63-1",
+          "status": "failed"
+        },
+        "label": "nro41-mek",
+        "cases": [
+          {
+            "runtime_status": "failed",
+            "status": "blocked_or_unreported",
+            "error": "NOT_FOUND [rd-vm]: método Landroid/util/Log;->w(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I não resolvido [pc 0xb: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 3, idx: 423, regs: [8, 9, 7, 0, 0] } }]\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzT(Ljava/lang/Exception;ZZ)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzt(Lcom/google/android/gms/internal/measurement/zzef;Ljava/lang/Exception;ZZ)V\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+            "input": {
+              "attempt": 0,
+              "expected_session_id": "6543ef49b7e241c1819659a6256c9f63-1",
+              "staged_name": "0000-external.apk",
+              "bytes": 13099584,
+              "index": 0,
+              "source": "D:\\Download\\mekorama-1-7-2.apk",
+              "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+              "install_snapshot_step": 3
+            },
+            "snapshots": [],
+            "returned_to_launcher": true,
+            "first_screen": "not_visually_verified",
+            "captures": [],
+            "teardown_phases": [
+              "stop_requested",
+              "native_activity_stop",
+              "java_activity_stop",
+              "worker_admission_closed",
+              "background_worker_quiesce",
+              "media_thread_quiesce",
+              "glsurface_join",
+              "egl_wait_gpu",
+              "egl_unbind",
+              "egl_destroy_context",
+              "egl_destroy_surface",
+              "egl_terminate",
+              "egl_terminated",
+              "guest_thread_quiesce",
+              "native_destructors",
+              "media_reset",
+              "media_released",
+              "activity_dispose",
+              "runtime_drop",
+              "native_mapping_release",
+              "native_resource_reset",
+              "native_reset_guest_threads",
+              "native_reset_cxx",
+              "native_reset_keys",
+              "native_reset_sync",
+              "native_reset_locale",
+              "native_reset_admitted",
+              "native_mapping_release",
+              "native_reset_anonymous_memory",
+              "native_tls_reset",
+              "native_resources_released",
+              "display_geometry_reset",
+              "runtime_closed",
+              "launcher_refresh"
+            ],
+            "presented_frames": null,
+            "installed_identity_matches": true
+          }
+        ],
+        "status": "blocked_runtime",
+        "evidence": {
+          "sha256": "53108997eba07d405d080f4d569c2f44c4ea22c095790841a718aa2e81ab1412",
+          "path": "local-artifacts/m9/external-runs/6543ef49b7e241c1819659a6256c9f63/verification.json"
+        },
+        "first_screen_pass": false,
+        "nro_sha256": "e6cf3be395013ea4b46e862fdb1389d411c3a2bfadb53f34225007bbba38422c"
+      },
+      {
+        "sd_original_restore": "restored",
+        "latest_session_report": {
+          "error": "API_UNAVAILABLE [rd-vm]: GLSurfaceView.setEGLContextFactory(Landroid/opengl/GLSurfaceView$EGLContextFactory;)V [pc 0x27: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 485, regs: [3, 4, 0, 0, 0] } }]\n  at Lcom/king/core/GameView;->initialize(Lcom/king/core/NativeApplication;Lcom/king/core/PlatformSetup;)V\n  at Lcom/king/main/EngineActivity;->setPlatformSetup(Lcom/king/core/PlatformSetup;)V\n  at Lcom/king/core/GameLib;->setupPlatform(IIIII)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V; cleanup: NATIVE_RESOURCE_RESET_FAILED: -5; reopen homebrew",
+          "identity_status": "known",
+          "package": "com.king.candycrushsaga",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "ff058a5bbd6d4d41b8639d78a77cedd3-1",
+          "status": "failed"
+        },
+        "label": "nro41-candy",
+        "cases": [],
+        "status": "attempted_failed",
+        "evidence": {
+          "sha256": "de221df32e6e105478db2197dd18266e140c6e5c70177879aa22cffc64316ce3",
+          "path": "local-artifacts/m9/external-runs/ff058a5bbd6d4d41b8639d78a77cedd3/verification.json"
+        },
+        "first_screen_pass": false,
+        "nro_sha256": "e6cf3be395013ea4b46e862fdb1389d411c3a2bfadb53f34225007bbba38422c"
+      },
+      {
+        "first_screen_pass": false,
+        "sd_original_restore": "restored",
+        "status": "blocked_runtime",
+        "latest_session_report": {
+          "error": "NOT_FOUND [rd-vm]: método Ljava/lang/Integer;->highestOneBit(I)I não resolvido [pc 0xc: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 62962, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzf(I)I\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzl(I[Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzj(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><clinit>()V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Ljava/lang/Integer;->highestOneBit(I)I não resolvido [pc 0xc: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 62962, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzf(I)I\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzl(I[Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzj(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><clinit>()V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+          "identity_status": "known",
+          "package": "com.martinmagni.mekorama",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "66f21faad5364152b2e95ac57920603a-1",
+          "status": "failed"
+        },
+        "label": "nro42-mek",
+        "nro_sha256": "b3e7a69d5005f41d8d66a0e83475fb0581b1d9e729c1560144c0aeb4a6015c1e",
+        "evidence": {
+          "path": "local-artifacts/m9/external-runs/66f21faad5364152b2e95ac57920603a/verification.json",
+          "sha256": "d9a614a6fe948133636c14fb4c8331eb52e9067b9876179133e705193aa79d7d"
+        },
+        "cases": [
+          {
+            "status": "blocked_or_unreported",
+            "first_screen": "not_visually_verified",
+            "returned_to_launcher": true,
+            "teardown_phases": [
+              "stop_requested",
+              "native_activity_stop",
+              "java_activity_stop",
+              "egl_destroy_surface",
+              "egl_terminate",
+              "worker_admission_closed",
+              "background_worker_quiesce",
+              "media_thread_quiesce",
+              "glsurface_join",
+              "egl_terminated",
+              "guest_thread_quiesce",
+              "native_destructors",
+              "media_reset",
+              "media_released",
+              "activity_dispose",
+              "runtime_drop",
+              "native_mapping_release",
+              "native_resource_reset",
+              "native_reset_guest_threads",
+              "native_reset_cxx",
+              "native_reset_keys",
+              "native_reset_sync",
+              "native_reset_locale",
+              "native_reset_admitted",
+              "native_mapping_release",
+              "native_reset_anonymous_memory",
+              "native_tls_reset",
+              "native_resources_released",
+              "display_geometry_reset",
+              "runtime_closed",
+              "launcher_refresh"
+            ],
+            "snapshots": [],
+            "input": {
+              "source": "D:\\Download\\mekorama-1-7-2.apk",
+              "staged_name": "0000-external.apk",
+              "bytes": 13099584,
+              "install_snapshot_step": 3,
+              "index": 0,
+              "attempt": 0,
+              "expected_session_id": "66f21faad5364152b2e95ac57920603a-1",
+              "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01"
+            },
+            "presented_frames": null,
+            "captures": [],
+            "runtime_status": "failed",
+            "error": "NOT_FOUND [rd-vm]: método Ljava/lang/Integer;->highestOneBit(I)I não resolvido [pc 0xc: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 62962, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzf(I)I\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzl(I[Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzj(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><clinit>()V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Ljava/lang/Integer;->highestOneBit(I)I não resolvido [pc 0xc: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 62962, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzf(I)I\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzl(I[Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzj(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><clinit>()V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+            "installed_identity_matches": true
+          }
+        ]
+      },
+      {
+        "first_screen_pass": false,
+        "sd_original_restore": "restored",
+        "status": "attempted_failed",
+        "latest_session_report": {
+          "error": "API_UNAVAILABLE [rd-vm]: GLSurfaceView.setEGLContextFactory(Landroid/opengl/GLSurfaceView$EGLContextFactory;)V [pc 0x27: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 485, regs: [3, 4, 0, 0, 0] } }]\n  at Lcom/king/core/GameView;->initialize(Lcom/king/core/NativeApplication;Lcom/king/core/PlatformSetup;)V\n  at Lcom/king/main/EngineActivity;->setPlatformSetup(Lcom/king/core/PlatformSetup;)V\n  at Lcom/king/core/GameLib;->setupPlatform(IIIII)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V; cleanup: NATIVE_RESOURCE_RESET_FAILED: -5; reopen homebrew",
+          "identity_status": "known",
+          "package": "com.king.candycrushsaga",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "9006740668b044fa961170670299787f-1",
+          "status": "failed"
+        },
+        "label": "nro42-candy",
+        "nro_sha256": "b3e7a69d5005f41d8d66a0e83475fb0581b1d9e729c1560144c0aeb4a6015c1e",
+        "evidence": {
+          "path": "local-artifacts/m9/external-runs/9006740668b044fa961170670299787f/verification.json",
+          "sha256": "9c078893533f9694b570212b90fc649d189aa5fd827726e1dba38efca9669834"
+        },
+        "cases": []
+      },
+      {
+        "sd_original_restore": "restored",
+        "nro_sha256": "e9b75cd720acf41d049d3704e19b87d2c027c0b1f347968ce622b5ee6295c976",
+        "evidence": {
+          "sha256": "09975d6b9fcc82a7314dde23ee168f1430c8f498dbb647af172421f9e62fb1b8",
+          "path": "local-artifacts/m9/external-runs/24fd06f3ec024327b971769cffd5926c/verification.json"
+        },
+        "first_screen_pass": false,
+        "label": "nro43-mek",
+        "cases": [
+          {
+            "installed_identity_matches": true,
+            "returned_to_launcher": true,
+            "error": "NOT_FOUND [rd-vm]: método Ljava/lang/String;->hashCode()I não resolvido [pc 0x17: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 63049, regs: [4, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzl(I[Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzj(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><clinit>()V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Ljava/lang/String;->hashCode()I não resolvido [pc 0x17: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 63049, regs: [4, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzl(I[Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzj(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><clinit>()V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+            "teardown_phases": [
+              "stop_requested",
+              "native_activity_stop",
+              "java_activity_stop",
+              "egl_destroy_surface",
+              "egl_terminate",
+              "worker_admission_closed",
+              "background_worker_quiesce",
+              "media_thread_quiesce",
+              "glsurface_join",
+              "egl_terminated",
+              "guest_thread_quiesce",
+              "native_destructors",
+              "media_reset",
+              "media_released",
+              "activity_dispose",
+              "runtime_drop",
+              "native_mapping_release",
+              "native_resource_reset",
+              "native_reset_guest_threads",
+              "native_reset_cxx",
+              "native_reset_keys",
+              "native_reset_sync",
+              "native_reset_locale",
+              "native_reset_admitted",
+              "native_mapping_release",
+              "native_reset_anonymous_memory",
+              "native_tls_reset",
+              "native_resources_released",
+              "display_geometry_reset",
+              "runtime_closed",
+              "launcher_refresh"
+            ],
+            "captures": [],
+            "snapshots": [],
+            "runtime_status": "failed",
+            "first_screen": "not_visually_verified",
+            "status": "blocked_or_unreported",
+            "input": {
+              "bytes": 13099584,
+              "index": 0,
+              "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+              "install_snapshot_step": 3,
+              "source": "D:\\Download\\mekorama-1-7-2.apk",
+              "attempt": 0,
+              "expected_session_id": "24fd06f3ec024327b971769cffd5926c-1",
+              "staged_name": "0000-external.apk"
+            },
+            "presented_frames": null
+          }
+        ],
+        "latest_session_report": {
+          "error": "NOT_FOUND [rd-vm]: método Ljava/lang/String;->hashCode()I não resolvido [pc 0x17: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 63049, regs: [4, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzl(I[Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzj(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><clinit>()V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Ljava/lang/String;->hashCode()I não resolvido [pc 0x17: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 63049, regs: [4, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzl(I[Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzj(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><clinit>()V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+          "identity_status": "known",
+          "package": "com.martinmagni.mekorama",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "24fd06f3ec024327b971769cffd5926c-1",
+          "status": "failed"
+        },
+        "status": "blocked_runtime"
+      },
+      {
+        "sd_original_restore": "restored",
+        "nro_sha256": "e9b75cd720acf41d049d3704e19b87d2c027c0b1f347968ce622b5ee6295c976",
+        "evidence": {
+          "sha256": "2d6fc7480db839a962e5cfe66b6f892337342bbbbcc757cac1820a4ad57e4709",
+          "path": "local-artifacts/m9/external-runs/bd66608240714290b32eebd35ed6fee6/verification.json"
+        },
+        "first_screen_pass": false,
+        "label": "nro43-candy",
+        "cases": [],
+        "latest_session_report": {
+          "error": "API_UNAVAILABLE [rd-vm]: GLSurfaceView.setEGLContextFactory(Landroid/opengl/GLSurfaceView$EGLContextFactory;)V [pc 0x27: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 485, regs: [3, 4, 0, 0, 0] } }]\n  at Lcom/king/core/GameView;->initialize(Lcom/king/core/NativeApplication;Lcom/king/core/PlatformSetup;)V\n  at Lcom/king/main/EngineActivity;->setPlatformSetup(Lcom/king/core/PlatformSetup;)V\n  at Lcom/king/core/GameLib;->setupPlatform(IIIII)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V; cleanup: NATIVE_RESOURCE_RESET_FAILED: -5; reopen homebrew",
+          "identity_status": "known",
+          "package": "com.king.candycrushsaga",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "bd66608240714290b32eebd35ed6fee6-1",
+          "status": "failed"
+        },
+        "status": "attempted_failed"
+      },
+      {
+        "evidence": {
+          "sha256": "8babfe53643d65e748058d60b298a96820e2914a058d5f5e63806eb88febd64b",
+          "path": "local-artifacts/m9/external-runs/1cbcc705b79144e68d68a20cd780b81c/verification.json"
+        },
+        "latest_session_report": {
+          "error": "NOT_FOUND [rd-vm]: método Ljava/util/Arrays;->fill([Ljava/lang/Object;IILjava/lang/Object;)V não resolvido [pc 0x4f: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 63603, regs: [14, 8, 13, 3, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzl(I[Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzj(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><clinit>()V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Ljava/util/Arrays;->fill([Ljava/lang/Object;IILjava/lang/Object;)V não resolvido [pc 0x4f: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 63603, regs: [14, 8, 13, 3, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzl(I[Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzj(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><clinit>()V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+          "identity_status": "known",
+          "package": "com.martinmagni.mekorama",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "1cbcc705b79144e68d68a20cd780b81c-1",
+          "status": "failed"
+        },
+        "status": "blocked_runtime",
+        "sd_original_restore": "restored",
+        "cases": [
+          {
+            "installed_identity_matches": true,
+            "snapshots": [],
+            "status": "blocked_or_unreported",
+            "captures": [],
+            "runtime_status": "failed",
+            "first_screen": "not_visually_verified",
+            "input": {
+              "install_snapshot_step": 3,
+              "source": "D:\\Download\\mekorama-1-7-2.apk",
+              "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+              "index": 0,
+              "bytes": 13099584,
+              "expected_session_id": "1cbcc705b79144e68d68a20cd780b81c-1",
+              "staged_name": "0000-external.apk",
+              "attempt": 0
+            },
+            "error": "NOT_FOUND [rd-vm]: método Ljava/util/Arrays;->fill([Ljava/lang/Object;IILjava/lang/Object;)V não resolvido [pc 0x4f: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 63603, regs: [14, 8, 13, 3, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzl(I[Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzj(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><clinit>()V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Ljava/util/Arrays;->fill([Ljava/lang/Object;IILjava/lang/Object;)V não resolvido [pc 0x4f: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 4, idx: 63603, regs: [14, 8, 13, 3, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzl(I[Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdf;->zzj(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/android/gms/internal/consent_sdk/zzdf;\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><clinit>()V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+            "returned_to_launcher": true,
+            "teardown_phases": [
+              "stop_requested",
+              "egl_destroy_surface",
+              "native_activity_stop",
+              "java_activity_stop",
+              "egl_terminate",
+              "worker_admission_closed",
+              "background_worker_quiesce",
+              "egl_terminated",
+              "media_thread_quiesce",
+              "glsurface_join",
+              "guest_thread_quiesce",
+              "native_destructors",
+              "media_reset",
+              "media_released",
+              "activity_dispose",
+              "runtime_drop",
+              "native_mapping_release",
+              "native_resource_reset",
+              "native_reset_guest_threads",
+              "native_reset_cxx",
+              "native_reset_keys",
+              "native_reset_sync",
+              "native_reset_locale",
+              "native_reset_admitted",
+              "native_mapping_release",
+              "native_reset_anonymous_memory",
+              "native_tls_reset",
+              "native_resources_released",
+              "display_geometry_reset",
+              "runtime_closed",
+              "launcher_refresh"
+            ],
+            "presented_frames": null
+          }
+        ],
+        "first_screen_pass": false,
+        "label": "nro44-mek",
+        "nro_sha256": "1b1d56f836ff1b190b8d113afb5024ea0041d0922eb0aef35ed591fe7fd5fcae"
+      }
+    ]
+  },
+  "retained_failure_proof": {
+    "invalid_clippy_const_suggestion": {
+      "sha256": "2c7f7bcdfd2918ecc4039c2ae2203ebae659d8e2b07efae7653700e735e29953",
+      "path": "target/evidence/m9-reuse-legacy-clippy-repair.log"
+    },
+    "legacy_lint_exception": "Only jrandom.rs permits clippy::missing_const_for_thread_local because pinned rustc rejects the suggested HashMap::new/RandomState const initializer with E0015. Existing runtime initialization remains unchanged.",
+    "lazy_constant_gap": {
+      "sha256": "a913f0718b3987be8f144a77be4d481ae2d0d3bacb6befd11e44cb25c32db28a",
+      "path": "target/evidence/m9-shared-boxes-lazy-fields-before.log"
+    },
+    "explanation": "Reading Boolean.TRUE before valueOf failed on portable VM although upstream resolver existed. Final binding delegates exact sget descriptors to that same resolver, then the identical ordered corpus passes."
+  },
+  "followup": {
+    "status": "host_and_horizon_build_verified_external_startup_blocked",
+    "scope": "COW Set adapts the existing device list generation/monitor/iterator/GC engine, and extracts upstream set-constructor deduplication for both VM variants. Native fsync/fdatasync map to the shared real file-sync service, reusing libnx commit/host sync_all. No per-package behavior.",
+    "shared_deduplication_kernel": {
+      "sha256": "b234f92be4c9ae1a6c0fe1dcff2b847765f9767d2f9a880bb2f09ee6d22ae554",
+      "path": "crates/rd-vm/src/collection_values.rs"
+    },
+    "cow_fixture_receipt": {
+      "sha256": "06870fa1636e7421b37c22d418514fd638660f9902d509ea89ac388ab3bd6ce4",
+      "path": "target/copy-on-write-fixture/build-receipt.json",
+      "path_status": "Mutable build receipt was regenerated by the later enum-map fixture build; original hash retained as historical identity. Followup oracle logs remain retained; current fixture receipt is frozen separately."
+    },
+    "implementation_commit": "0e3119ee37a296c049b6dc4382544f41a3fb1f23",
+    "cow_set_oracle": {
+      "sha256": "db39998325a10ddc26e8069cceb3cbc3f0cb1fb06f10c1ab0b8cf01bc00d8df1",
+      "path": "target/copy-on-write-fixture/original/set-oracle.tsv"
+    },
+    "checks": [
+      {
+        "id": "cow-upstream",
+        "status": "passed",
+        "tests": 1,
+        "evidence": {
+          "sha256": "1a9a3737e921570bc240e873ae33192de79f3dc5b66627e4458b4fb7faed138c",
+          "path": "target/evidence/m9-cow-upstream-tests.log"
+        }
+      },
+      {
+        "id": "cow-and-containers",
+        "status": "passed",
+        "tests": 18,
+        "evidence": {
+          "sha256": "d9ad502263c7a11896277380795fb8e1f301226771e3ef92806fc00ccee00aad",
+          "path": "target/evidence/m9-cow-and-containers-final.log"
+        }
+      },
+      {
+        "id": "file-sync-platform",
+        "status": "passed",
+        "tests": 5,
+        "evidence": {
+          "sha256": "dbca4c1f6cf90a6c07972fab67b255b9b8380698e255b897718ae84c14fe4b51",
+          "path": "target/evidence/m9-file-sync-platform.log"
+        }
+      },
+      {
+        "id": "native-abi",
+        "receipt": {
+          "sha256": "9a6560cd87d259191fc43014fc6c0ddd0340f1e172f1623b073573ce36a36d9d",
+          "path": "local-artifacts/m9/native-abi/msys/host-result.json"
+        },
+        "status": "passed",
+        "evidence": {
+          "sha256": "633c4533e1b3e944e855619bbcfd4409bf689324db7e1f0dcb55e1f2b213c4cd",
+          "path": "target/evidence/m9-file-sync-native-abi.log"
+        }
+      },
+      {
+        "id": "framework-clippy",
+        "status": "passed",
+        "evidence": {
+          "sha256": "bad7416d1f909939474658e4655eabb50f875fbbef8456ef8ded98b2363e35cb",
+          "path": "target/evidence/m9-cow-sync-framework-clippy.log"
+        }
+      },
+      {
+        "id": "portable-clippy",
+        "status": "passed",
+        "evidence": {
+          "sha256": "7d89b02106dbeb3a72a5cfbd55b8f97e0fb4125763a4bef1358d9c6991b6661d",
+          "path": "target/evidence/m9-cow-sync-portable-clippy.log"
+        }
+      },
+      {
+        "id": "desktop-clippy",
+        "status": "passed",
+        "evidence": {
+          "sha256": "9345d5227a86ce0ac7909390e05cad8b8d4f7d6947e259758167d3c7c3793edb",
+          "path": "target/evidence/m9-cow-sync-desktop-clippy.log"
+        }
+      },
+      {
+        "id": "format",
+        "status": "passed",
+        "evidence": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "target/evidence/m9-cow-sync-format.log"
+        }
+      }
+    ],
+    "build": {
+      "sha256": "131ae4a93c253dd0b8e6f36c5aee50633cefd2e02090f242d811a0fe76284724",
+      "path": "local-artifacts/m9/startup-iterations/nro40/build.json",
+      "nro_bytes": 27369528,
+      "nro_sha256": "fc206d8f46321e05e82cd6941167fec0aa1fc59066ecafa937548e3622781958",
+      "source_commit": "0e3119ee37a296c049b6dc4382544f41a3fb1f23"
+    }
+  },
+  "logging": {
+    "implementation_commit": "60abf7fab0421771ca701e2ab97e9794c11a8421",
+    "shared_source": {
+      "sha256": "b1ce799f0d8d22903c89fa8bccab1a7dd9a552e1ae98d40dce26f6b8d4be1d92",
+      "path": "crates/rd-vm/src/android_log.rs"
+    },
+    "scope": "Extracted inherited android_text::log_intrinsic levels/Throwable summaries/println to shared core. Actual host output and device FS are adapters; tag policy remains explicit per adapter. Full stack trace and fatal wtf handlers unavailable.",
+    "fixture": {
+      "sha256": "fe8c2b7e1512291941d24d6e189e1695e669fc9c01139065041bb1e3f16b5f83",
+      "path": "target/evidence/m9-shared-log-fixture-receipt.json"
+    },
+    "catalog": {
+      "sha256": "e0494aa25aa284f2d5b8dca7311cd629f147ada931700e597df9720fb14e55ec",
+      "path": "target/evidence/m9-shared-log-catalog.json"
+    },
+    "registered_required_checks": 72,
+    "full_72_check_run": false,
+    "physical_device": "not_run",
+    "checks": [
+      {
+        "evidence": {
+          "sha256": "86d27e3e0da921bdb44e3c522d809033cc4435ec61ee093a590f3ad4ca182acb",
+          "path": "target/evidence/m9-shared-log-portable.log"
+        },
+        "id": "portable",
+        "status": "passed"
+      },
+      {
+        "evidence": {
+          "sha256": "a49f0cf2961ab229a9a605f53e0f7a56da1ad959464c8b54325d78474fb7bf6a",
+          "path": "target/evidence/m9-shared-log-desktop.log"
+        },
+        "id": "desktop",
+        "status": "passed"
+      },
+      {
+        "evidence": {
+          "sha256": "93dd10c10cb9861f5d2e0bf4aa08a03699b9c5e2d8dcb2ccae7a6eef17ef6383",
+          "path": "target/evidence/m9-shared-log-sdk.log"
+        },
+        "id": "sdk",
+        "status": "passed"
+      },
+      {
+        "evidence": {
+          "sha256": "7769e84d7534454c342f0a95553b49847a59865217e65db9ee439b158147ef5f",
+          "path": "target/evidence/m9-shared-log-framework-clippy.log"
+        },
+        "id": "framework-clippy",
+        "status": "passed"
+      },
+      {
+        "evidence": {
+          "sha256": "073bffd83744ee3bbab339a9cad901e486825c9026788d7fa8f2688373d8690a",
+          "path": "target/evidence/m9-shared-log-portable-clippy.log"
+        },
+        "id": "portable-clippy",
+        "status": "passed"
+      },
+      {
+        "evidence": {
+          "sha256": "8e675c97e6fed4b921d7fcbbe816e83491ffebb9cda3f2b18e7d3a7078e9d251",
+          "path": "target/evidence/m9-shared-log-desktop-clippy.log"
+        },
+        "id": "desktop-clippy",
+        "status": "passed"
+      },
+      {
+        "evidence": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "target/evidence/m9-shared-log-format.log"
+        },
+        "id": "format",
+        "status": "passed"
+      },
+      {
+        "evidence": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "target/evidence/m9-shared-log-fixture-format.log"
+        },
+        "id": "fixture-format",
+        "status": "passed"
+      },
+      {
+        "id": "framework-final-all-fixtures",
+        "ignored": 0,
+        "failed": 0,
+        "passed": 166,
+        "evidence": {
+          "sha256": "0c6e86bf5d39616dd1be22b1f32f0f5919f12a76916d0c505537abdf454eca31",
+          "path": "target/evidence/m9-shared-log-framework-final.log"
+        },
+        "status": "passed",
+        "command": "cargo test -p as-framework --features host -- --include-ignored"
+      }
+    ],
+    "emulator": "attempted_no_first_screen",
+    "retained_probe_failure": {
+      "scope": "Inherited std GC conservatively retains low IDs that alias scalar side-table fields. Probe allocations moved beyond low ID aliases; no collector behavior changed. Shared and portable probes then pass.",
+      "evidence": {
+        "sha256": "b790b8b8eb4ad7b3a1a908512a36a2c854d80c87028fbf46ffb1981330bb4f01",
+        "path": "target/evidence/m9-shared-log-desktop-conservative-root-probe-before.log"
+      }
+    },
+    "build": {
+      "source_commit": "60abf7fab0421771ca701e2ab97e9794c11a8421",
+      "source": {
+        "sha256": "48c73e4442829c11040e48b6c042508a9e1e7e94653d1eca33efe25e47926571",
+        "path": "local-artifacts/m9/startup-iterations/nro42/source.json"
+      },
+      "log": {
+        "sha256": "283df72433ed4a58c6612562081361637588514fe01f65a61cfc0ed9f13c4a9e",
+        "path": "target/evidence/m9-upstream-reuse-nro42.log"
+      },
+      "nro_bytes": 27390008,
+      "receipt": {
+        "sha256": "4bd65292fd85f35a559f4933ca0367caaf09439fc759a7130ad9fd0c8c1a233e",
+        "path": "local-artifacts/m9/startup-iterations/nro42/build.json"
+      },
+      "status": "built",
+      "nro_sha256": "b3e7a69d5005f41d8d66a0e83475fb0581b1d9e729c1560144c0aeb4a6015c1e"
+    }
+  },
+  "integer_bits": {
+    "implementation_commit": "88fe9219a56e9fae554b35a735db9adc069954db",
+    "shared_source": {
+      "path": "crates/rd-vm/src/integer_bits.rs",
+      "sha256": "34713658dc6e4d06643fe46a201a17bc910f374179c7143625c51e01e8b12171"
+    },
+    "scope": "37 Integer/Long bit and scalar static methods. Inherited numerics match arms moved, shared by wrappers and legacy numerics. New Long reverseBytes/divideUnsigned/remainderUnsigned match JVM. Not all numeric APIs or Math.",
+    "numeric_oracle_results": 518,
+    "zero_divisor_exceptions": 4,
+    "gc_passes_per_vm": 2,
+    "prior_wrapper_observations": 86,
+    "registered_catalog_count": 72,
+    "fixture": {
+      "path": "target/evidence/m9-integer-bits-fixture-receipt.json",
+      "sha256": "0c08f2120aaf83c7bc0b08d54094d42b9a15fb12ddf19e6642dc1f73b5b813a9"
+    },
+    "checks": [
+      {
+        "evidence": {
+          "path": "target/evidence/m9-integer-bits-fixture.log",
+          "sha256": "33ba12f541c0c1a3892eb5494868d88abe152e43f8a001523d5ac6793a1bbf2d"
+        },
+        "status": "passed",
+        "id": "fixture"
+      },
+      {
+        "evidence": {
+          "path": "target/evidence/m9-integer-bits-portable.log",
+          "sha256": "e83f1f9ffbac96a43513b1d2f5baa016a08a20c3c0d814cb54128e2e61939284"
+        },
+        "status": "passed",
+        "id": "portable"
+      },
+      {
+        "evidence": {
+          "path": "target/evidence/m9-integer-bits-desktop.log",
+          "sha256": "51aed273d2df81513a5a121a9b85c7eff48d8eba16a6845ea070073097ed074b"
+        },
+        "status": "passed",
+        "id": "desktop"
+      },
+      {
+        "evidence": {
+          "path": "target/evidence/m9-integer-bits-framework-clippy.log",
+          "sha256": "578cfc64ddd9cf891a94576f8e46b9b90c1faf71074b674b8cd4ba5887f807b6"
+        },
+        "status": "passed",
+        "id": "framework-clippy"
+      },
+      {
+        "evidence": {
+          "path": "target/evidence/m9-integer-bits-portable-clippy.log",
+          "sha256": "37e8ea22e3eb90937f5ab71f234b5025b6ad971744daea1f8dc3aea28ebd0e17"
+        },
+        "status": "passed",
+        "id": "portable-clippy"
+      },
+      {
+        "evidence": {
+          "path": "target/evidence/m9-integer-bits-desktop-clippy.log",
+          "sha256": "01b34f4c92a88683790fee9fb9943e844a9233a5d68644bfc35babb56e13d64b"
+        },
+        "status": "passed",
+        "id": "desktop-clippy"
+      },
+      {
+        "evidence": {
+          "path": "target/evidence/m9-integer-bits-format.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "status": "passed",
+        "id": "format"
+      },
+      {
+        "evidence": {
+          "path": "target/evidence/m9-integer-bits-fixture-format.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "status": "passed",
+        "id": "fixture-format"
+      }
+    ],
+    "emulator": "attempted_no_first_screen",
+    "physical_device": "not_run",
+    "build": {
+      "source": {
+        "path": "local-artifacts/m9/startup-iterations/nro43/source.json",
+        "sha256": "6f7ed096be3464ca108100fd6712bb97a564cb4ed46c4d76000456a72912120f"
+      },
+      "log": {
+        "path": "target/evidence/m9-upstream-reuse-nro43.log",
+        "sha256": "562c421750ebabab41a231fbf3f64690fff64ce7a02a21267248fe1d4683ceca"
+      },
+      "receipt": {
+        "path": "local-artifacts/m9/startup-iterations/nro43/build.json",
+        "sha256": "afb24f9baeb2f4054cfe8e2075b434467e023a310a7ffc87b28944b787dfed2b"
+      },
+      "nro_sha256": "e9b75cd720acf41d049d3704e19b87d2c027c0b1f347968ce622b5ee6295c976",
+      "source_commit": "88fe9219a56e9fae554b35a735db9adc069954db",
+      "nro_bytes": 27394104,
+      "status": "built"
+    }
+  },
+  "string_dispatch": {
+    "implementation_commit": "552689a7ba296aaf36ccb98804109bdf9bd0defb",
+    "scope": "Reuse existing portable String value methods when invoked through Object or CharSequence; choose final runtime String type. Desktop String.toString returns receiver identity, matching JVM. No new hash algorithm.",
+    "jvm_observations": 80,
+    "gc_passes_per_vm": 2,
+    "fixture": {
+      "sha256": "2e903056c9b219dc7b080c3efe0077827df41b8c52434f8314a3057ab243e442",
+      "path": "target/evidence/m9-string-dispatch-fixture-receipt.json"
+    },
+    "retained_failures": [
+      {
+        "sha256": "f3e7760f8e5f5ecea8e058ed46fa27403f65e4d307368562896a4533eddbb00c",
+        "path": "target/evidence/m9-string-dispatch-before.log"
+      },
+      {
+        "sha256": "7f4cdb7d3cc451a1d2bf3e0625f1cc042cefb7fc7c7873a4bd3db5e342f6c47c",
+        "path": "target/evidence/m9-string-dispatch-desktop-identity-before.log"
+      }
+    ],
+    "checks": [
+      {
+        "status": "passed",
+        "evidence": {
+          "sha256": "33ba12f541c0c1a3892eb5494868d88abe152e43f8a001523d5ac6793a1bbf2d",
+          "path": "target/evidence/m9-string-dispatch-fixture.log"
+        },
+        "id": "fixture"
+      },
+      {
+        "status": "passed",
+        "evidence": {
+          "sha256": "7d3d406d6198332bcdc9a9ca87668a9b62550390c2385e4dca99f757b8da637d",
+          "path": "target/evidence/m9-string-dispatch-portable.log"
+        },
+        "id": "portable"
+      },
+      {
+        "status": "passed",
+        "evidence": {
+          "sha256": "2f7a91458794a87da230b8f7c79d4d765541e855bee097f0f2f97c28ad55a70c",
+          "path": "target/evidence/m9-string-dispatch-desktop.log"
+        },
+        "id": "desktop"
+      },
+      {
+        "status": "passed",
+        "evidence": {
+          "sha256": "18d019883aac14b1a76760f81276cf3e1c1b6b2dedd89b8710761b84235b2224",
+          "path": "target/evidence/m9-string-dispatch-portable-clippy.log"
+        },
+        "id": "portable-clippy"
+      },
+      {
+        "status": "passed",
+        "evidence": {
+          "sha256": "62171208aaad3899d29f8863883a28b5861425af20af894f7f086da98b342201",
+          "path": "target/evidence/m9-string-dispatch-desktop-clippy.log"
+        },
+        "id": "desktop-clippy"
+      },
+      {
+        "status": "passed",
+        "evidence": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "target/evidence/m9-string-dispatch-format.log"
+        },
+        "id": "format"
+      },
+      {
+        "status": "passed",
+        "evidence": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "target/evidence/m9-string-dispatch-fixture-format.log"
+        },
+        "id": "fixture-format"
+      }
+    ],
+    "emulator": "attempted_no_first_screen",
+    "physical_device": "not_run",
+    "build": {
+      "nro_bytes": 27394104,
+      "source": {
+        "path": "local-artifacts/m9/startup-iterations/nro44/source.json",
+        "sha256": "5b02f74c18398ddf8767b17b1ce9347fd36752dfd6048e7a468902e655385aa7"
+      },
+      "source_commit": "552689a7ba296aaf36ccb98804109bdf9bd0defb",
+      "nro_sha256": "1b1d56f836ff1b190b8d113afb5024ea0041d0922eb0aef35ed591fe7fd5fcae",
+      "log": {
+        "path": "target/evidence/m9-upstream-reuse-nro44.log",
+        "sha256": "e2d55754f724c42d6fde4a4501bbb40b9ef39903357e2e2c215845b1503b844a"
+      },
+      "status": "built",
+      "receipt": {
+        "path": "local-artifacts/m9/startup-iterations/nro44/build.json",
+        "sha256": "61445d4ce84f653243e88150ac5707a5be1691f68a666b96270c0dba228ed968"
+      }
+    },
+    "candy_on_nro44": "not_run; latest evidence is nro43; context backend unchanged"
+  },
+  "enum_map_and_signals": {
+    "implementation_commit": "c45552d78fd82f974881b8582fd7ad94fe21d2f0",
+    "scope": "New enum-key policy over existing Collections map storage; explicit Android LP64 bit sets and ENOSYS signal delivery. No package or game behavior.",
+    "enum_map_observations_per_namespace": 26,
+    "enum_map_namespaces": 2,
+    "enum_map_gc_passes": 2,
+    "enum_map_scope": "Three constructors, get/put/remove/containsKey/containsValue/size/isEmpty/clear, putAll from implemented Maps. Views/clone/serialization remain unavailable.",
+    "signal_scope": "8-byte signal sets 1..64 and *64 aliases. Signal registration/masks/pending unavailable: ENOSYS/SIG_ERR, untouched outputs, positive pthread error preserving errno. No host handlers.",
+    "fixture": {
+      "sha256": "cd5266baa4bc4fc26c5a5ae12b9c168b0fb7b3fdd462ac3928b0a617b87cd2b8",
+      "path": "target/evidence/m9-enum-map-fixture-receipt.json"
+    },
+    "checks": [
+      {
+        "id": "fixture",
+        "status": "passed",
+        "evidence": {
+          "sha256": "e762dc687a38c726e9cdc7f3a39bcd84fcba8ce7bd7b82bfb29eb617284e92ba",
+          "path": "target/evidence/m9-enum-map-fixture.log"
+        }
+      },
+      {
+        "id": "framework",
+        "status": "passed",
+        "evidence": {
+          "sha256": "6bcc0ca684524662d106d3967df2e067139f9ca10a139bccda5f2ea226018c43",
+          "path": "target/evidence/m9-enum-signals-framework.log"
+        }
+      },
+      {
+        "id": "framework-clippy",
+        "status": "passed",
+        "evidence": {
+          "sha256": "273ed7be31c73106d44a5fb07162ff8f6e4521a56b1d251bbcbf0343e172903f",
+          "path": "target/evidence/m9-enum-signals-framework-clippy.log"
+        }
+      },
+      {
+        "id": "portable-clippy",
+        "status": "passed",
+        "evidence": {
+          "sha256": "b93f348b52b27965c59fc2be353f96fbad340017528d3c52194331e90f8e8561",
+          "path": "target/evidence/m9-enum-signals-portable-clippy.log"
+        }
+      },
+      {
+        "id": "desktop-clippy",
+        "status": "passed",
+        "evidence": {
+          "sha256": "adaa52ad6b3f7b813d7084a17d43525885a4e69eecc1aaa34c7f072c6a7d367d",
+          "path": "target/evidence/m9-enum-signals-desktop-clippy.log"
+        }
+      },
+      {
+        "id": "format",
+        "status": "passed",
+        "evidence": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "target/evidence/m9-enum-signals-format.log"
+        }
+      },
+      {
+        "id": "native-abi",
+        "status": "passed",
+        "evidence": {
+          "sha256": "0078a3bf01710db6dfee13b034d8579a0e7985a438f0f794208d98dffe1f34b5",
+          "path": "target/evidence/m9-enum-signals-native-abi.log"
+        }
+      },
+      {
+        "passed": 20,
+        "id": "framework-opt-in",
+        "status": "passed",
+        "failed": 0,
+        "evidence": {
+          "sha256": "a7e687214b7f406da72d25a96ae9e1df3d0a62071133a21f50d1b2a4cc87c793",
+          "path": "target/evidence/m9-enum-signals-framework-opt-in.log"
+        }
+      }
+    ],
+    "default_framework_counts": {
+      "failed": 0,
+      "ignored": 20,
+      "scope": "Default cargo test suite; opt-in fixture tests tracked separately",
+      "passed": 145
+    },
+    "native_abi_receipt": {
+      "sha256": "2cfcf80e4cbe12593eca03fa5d69b23a5980dd104a403c5d76c248a8374220a6",
+      "path": "target/evidence/m9-enum-signals-native-abi-receipt.json"
+    },
+    "framework_total_passed": 165,
+    "build": {
+      "status": "built",
+      "source": {
+        "sha256": "5e542ea6e44aca82fd439883785be7db9ced69b97cb5239d37302c27f5f24ecf",
+        "path": "local-artifacts/m9/startup-iterations/nro41/source.json"
+      },
+      "nro_sha256": "e6cf3be395013ea4b46e862fdb1389d411c3a2bfadb53f34225007bbba38422c",
+      "receipt": {
+        "sha256": "990bb8509179b374caafc686d038517672decabfe8923e6fbcc3534a69350378",
+        "path": "local-artifacts/m9/startup-iterations/nro41/build.json"
+      },
+      "log": {
+        "sha256": "9bccc5eb8c0381982614d627b86d6ccd4e066cd8c2b9da7089f87af99454abe9",
+        "path": "target/evidence/m9-upstream-reuse-nro41.log"
+      },
+      "nro_bytes": 27385912,
+      "source_commit": "c45552d78fd82f974881b8582fd7ad94fe21d2f0"
+    },
+    "emulator_status": "attempted_no_first_screen"
+  },
+  "latest_runtime_commit": "552689a7ba296aaf36ccb98804109bdf9bd0defb",
+  "latest_build": {
+    "nro_bytes": 27394104,
+    "source": {
+      "path": "local-artifacts/m9/startup-iterations/nro44/source.json",
+      "sha256": "5b02f74c18398ddf8767b17b1ce9347fd36752dfd6048e7a468902e655385aa7"
+    },
+    "source_commit": "552689a7ba296aaf36ccb98804109bdf9bd0defb",
+    "nro_sha256": "1b1d56f836ff1b190b8d113afb5024ea0041d0922eb0aef35ed591fe7fd5fcae",
+    "log": {
+      "path": "target/evidence/m9-upstream-reuse-nro44.log",
+      "sha256": "e2d55754f724c42d6fde4a4501bbb40b9ef39903357e2e2c215845b1503b844a"
+    },
+    "status": "built",
+    "receipt": {
+      "path": "local-artifacts/m9/startup-iterations/nro44/build.json",
+      "sha256": "61445d4ce84f653243e88150ac5707a5be1691f68a666b96270c0dba228ed968"
+    }
+  },
+  "latest_external_blockers": {
+    "mekorama": {
+      "api": "Ljava/util/Arrays;->fill([Ljava/lang/Object;IILjava/lang/Object;)V",
+      "source_audit": "Implemented in inherited arrays.rs; family core/alloc and callback/type/range audit pending",
+      "iteration": "nro44"
+    },
+    "candy_crush": {
+      "cleanup": "NATIVE_RESOURCE_RESET_FAILED: -5",
+      "api": "GLSurfaceView.setEGLContextFactory",
+      "source_audit": "Requires actual context creation/destruction and renderer ownership integration",
+      "iteration": "nro43"
+    }
+  },
+  "evidence_scope": "Each phase records its own runtime commit, source hashes, tests and NRO. Historical source/fixture paths may be regenerated; interpret their hashes at the named phase commit. Frozen NRO source/build manifests and distinct run/log paths retain execution identity. No whole Android coverage, full 72-gate pass, current hardware pass or external first-screen pass is claimed."
+}

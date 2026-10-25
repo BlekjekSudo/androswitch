@@ -762,6 +762,17 @@ receiver identity, matching its documented contract. Both paths retain the
 still stops at custom EGL context factory setup; both SD trees were restored.
 Neither attempt presents a verified first screen.
 
+NRO44 (`552689a7ba296aaf36ccb98804109bdf9bd0defb`, SHA256
+`1b1d56f836ff1b190b8d113afb5024ea0041d0922eb0aef35ed591fe7fd5fcae`)
+passes String virtual dispatch in the unmodified Mekorama APK. Its next blocker
+is Arrays.fill(Object[],int,int,Object), with full teardown and SD restoration
+but no application capture. That API exists in the inherited arrays.rs; the
+next work is a family port with range/type/GC contracts, not a game-specific
+fill replacement. Candy Crush was last retested on NRO43 and remains blocked
+at custom EGL context factory setup and resource reset. It was not rerun on
+NRO44; the renderer/context implementation is unchanged. The current reuse
+batch does not close either game's first-screen gate or M9's release gate.
+
 The following batch reuses existing implementations: Set constructor
 deduplication moves from upstream intrinsics into shared `collection_values`,
 and portable Set calls use the existing COW list generations/lock/iterators/GC,
