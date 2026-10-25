@@ -23125,3 +23125,112 @@ fn credential_option_public_constructor_is_guest_visible() {
         "Ljava/lang/NullPointerException;",
     );
 }
+
+#[test]
+fn renderscript_matrix4f_multiply_and_rotate_audit_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    // Column-major storage: get(x, y) reads mMat[x*4 + y]. A translation by
+    // (1, 2, 3) sits in column 3.
+    let m = p49_new(&mut engine, P36F_RS_MATRIX4, "()V", &[]);
+    call(
+        &mut engine,
+        m,
+        "loadTranslate",
+        "(FFF)V",
+        &[Value::Float(1.0), Value::Float(2.0), Value::Float(3.0)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            m,
+            "get",
+            "(II)F",
+            &[Value::Int(3), Value::Int(0)]
+        ),
+        Value::Float(1.0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            m,
+            "get",
+            "(II)F",
+            &[Value::Int(0), Value::Int(3)]
+        ),
+        Value::Float(0.0)
+    );
+    // multiply: translate * scale applies scale first, so the translation
+    // column is untouched (result(3,*) = lhs(3,*)).
+    let scale = p49_new(&mut engine, P36F_RS_MATRIX4, "()V", &[]);
+    call(
+        &mut engine,
+        scale,
+        "loadScale",
+        "(FFF)V",
+        &[Value::Float(2.0), Value::Float(4.0), Value::Float(8.0)],
+    );
+    call(
+        &mut engine,
+        m,
+        "multiply",
+        "(Landroid/renderscript/Matrix4f;)V",
+        &[Value::Obj(scale)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            m,
+            "get",
+            "(II)F",
+            &[Value::Int(0), Value::Int(0)]
+        ),
+        Value::Float(2.0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            m,
+            "get",
+            "(II)F",
+            &[Value::Int(3), Value::Int(1)]
+        ),
+        Value::Float(2.0)
+    );
+    // loadRotate 90 degrees about Z maps +X toward +Y in the AOSP sign
+    // convention: mMat[1] (x=0,y=1) = sin = 1, mMat[4] (x=1,y=0) = -sin.
+    let rot = p49_new(&mut engine, P36F_RS_MATRIX4, "()V", &[]);
+    call(
+        &mut engine,
+        rot,
+        "loadRotate",
+        "(FFFF)V",
+        &[
+            Value::Float(90.0),
+            Value::Float(0.0),
+            Value::Float(0.0),
+            Value::Float(1.0),
+        ],
+    );
+    let xy = match call(
+        &mut engine,
+        rot,
+        "get",
+        "(II)F",
+        &[Value::Int(0), Value::Int(1)],
+    ) {
+        Value::Float(v) => v,
+        other => panic!("{other:?}"),
+    };
+    let yx = match call(
+        &mut engine,
+        rot,
+        "get",
+        "(II)F",
+        &[Value::Int(1), Value::Int(0)],
+    ) {
+        Value::Float(v) => v,
+        other => panic!("{other:?}"),
+    };
+    assert!((xy - 1.0).abs() < 1e-6, "get(0,1) = {xy}");
+    assert!((yx + 1.0).abs() < 1e-6, "get(1,0) = {yx}");
+}
