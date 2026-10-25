@@ -19635,6 +19635,36 @@ fn media_browser_disconnected_state_and_media_items_are_guest_visible() {
         call(&mut engine, item, "isPlayable", "()Z", &[]),
         Value::Int(1)
     );
+    // Deep audit: FLAG_BROWSABLE is 1<<0 and FLAG_PLAYABLE is 1<<1 —
+    // pin each bit independently (a flags=3 fixture cannot detect a swap).
+    let browsable_only = p49_new(
+        &mut engine,
+        P36E_MEDIA_ITEM,
+        "(Landroid/media/MediaDescription;I)V",
+        &[Value::Obj(description), Value::Int(1)],
+    );
+    assert_eq!(
+        call(&mut engine, browsable_only, "isBrowsable", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, browsable_only, "isPlayable", "()Z", &[]),
+        Value::Int(0)
+    );
+    let playable_only = p49_new(
+        &mut engine,
+        P36E_MEDIA_ITEM,
+        "(Landroid/media/MediaDescription;I)V",
+        &[Value::Obj(description), Value::Int(2)],
+    );
+    assert_eq!(
+        call(&mut engine, playable_only, "isBrowsable", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, playable_only, "isPlayable", "()Z", &[]),
+        Value::Int(1)
+    );
     assert_eq!(
         call_text(&mut engine, item, "getMediaId", "()Ljava/lang/String;", &[]),
         "song-1"
