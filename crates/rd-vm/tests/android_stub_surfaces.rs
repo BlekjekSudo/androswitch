@@ -6217,6 +6217,45 @@ fn usage_empty_history_events_and_stats_merge_are_guest_visible() {
         call(&mut engine, iterable, "hasNextEvent", "()Z", &[]),
         Value::Int(0)
     );
+
+    // Deep audit: getNextEvent rejects a null output event with IAE, and
+    // resetToStart rewinds the cursor so the sequence can be read again.
+    assert_throws(
+        engine.invoke_instance(
+            iterable,
+            "getNextEvent",
+            "(Landroid/app/usage/UsageEvents$Event;)Z",
+            &[Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    call(&mut engine, iterable, "resetToStart", "()V", &[]);
+    assert_eq!(
+        call(&mut engine, iterable, "hasNextEvent", "()Z", &[]),
+        Value::Int(1)
+    );
+    let second_pass = instance(&mut engine, "Landroid/app/usage/UsageEvents$Event;");
+    call(&mut engine, second_pass, "<init>", "()V", &[]);
+    assert_eq!(
+        call(
+            &mut engine,
+            iterable,
+            "getNextEvent",
+            "(Landroid/app/usage/UsageEvents$Event;)Z",
+            &[Value::Obj(second_pass)],
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            second_pass,
+            "getPackageName",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "com.example"
+    );
 }
 
 #[test]
