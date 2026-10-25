@@ -73,9 +73,9 @@ done
 ```
 
 This is a real newline-delimited JSON-RPC MCP stdio client, not direct handler
-calls. It obtains the server's tool catalog, requires exactly 41 tools, checks
+calls. It obtains the server's tool catalog, requires exactly 47 tools (the catalog of `rd mcp`, see docs/mcp-tools.md), checks
 argument names/required fields, rejects unsuccessful assertions, and requires
-**positive coverage of all 41 for every language/ABI**. Expected negative errors
+**positive coverage of all 47 for every language/ABI**. Expected negative errors
 are counted separately and cannot satisfy positive coverage. Outputs include
 raw request/response JSONL, per-tool positive/negative counts, native instruction
 counters/ABI, APK SHA-256, PNG screenshots, and machine-readable summaries.
