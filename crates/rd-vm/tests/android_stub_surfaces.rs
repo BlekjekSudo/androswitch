@@ -5505,6 +5505,43 @@ fn euicc_info_and_disabled_manager_are_guest_visible() {
         ),
         Value::Int(0)
     );
+    // The disabled branch returns before touching its arguments: a null
+    // country is still just "not supported" and a null country list is
+    // silently ignored, matching AOSP's isEnabled()-first ordering.
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "isSupportedCountry",
+            "(Ljava/lang/String;)Z",
+            &[Value::Null],
+        ),
+        Value::Int(0)
+    );
+    call(
+        &mut engine,
+        manager,
+        "setSupportedCountries",
+        "(Ljava/util/List;)V",
+        &[Value::Null],
+    );
+    // isSimPortAvailable is the exception: AOSP dereferences the absent
+    // IEuiccController without an isEnabled() guard.
+    assert_throws(
+        engine.invoke_instance(manager, "isSimPortAvailable", "(I)Z", &[Value::Int(0)]),
+        "Ljava/lang/NullPointerException;",
+    );
+    // The public constructor dereferences its Context immediately.
+    let bare_manager = instance(&mut engine, "Landroid/telephony/euicc/EuiccManager;");
+    assert_throws(
+        engine.invoke_instance(
+            bare_manager,
+            "<init>",
+            "(Landroid/content/Context;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
     let for_card = object(call(
         &mut engine,
         manager,

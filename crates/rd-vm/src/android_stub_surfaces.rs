@@ -22323,7 +22323,14 @@ fn p57_euicc_instance(
     // No IEuiccController is present, so AOSP's isEnabled() is always false.
     Ok(Some(match (name, sig) {
         ("<init>", "(Landroid/content/Context;)V") => {
-            let context = args.first().cloned().unwrap_or(Value::Null);
+            // AOSP immediately calls context.getSystemService(TELEPHONY_SERVICE)
+            // to resolve the default eUICC card id, so a null Context fails
+            // here; only the private (Context, int) constructor stores it
+            // unchecked. No eUICC exists in this profile, hence the
+            // unsupported card id.
+            let Some(context) = args.first().cloned().filter(|v| obj(Some(v)).is_some()) else {
+                return Err(npe("context"));
+            };
             put(vm, recv, "mContext", context)?;
             put(vm, recv, "mCardId", Value::Int(-1))?;
             Value::Null
@@ -22413,9 +22420,9 @@ fn p57_euicc_instance(
         }
         ("setSupportedCountries", "(Ljava/util/List;)V")
         | ("setUnsupportedCountries", "(Ljava/util/List;)V") => {
-            if oarg(args, 0).is_none() {
-                return Err(npe("countries"));
-            }
+            // AOSP checks isEnabled() first and returns before touching the
+            // list, so in this disabled profile even a null list is silently
+            // ignored rather than dereferenced.
             Value::Null
         }
         ("getSupportedCountries", "()Ljava/util/List;")
@@ -22423,12 +22430,16 @@ fn p57_euicc_instance(
             Value::Obj(new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?)
         }
         ("isSupportedCountry", "(Ljava/lang/String;)Z") => {
-            if oarg(args, 0).is_none() {
-                return Err(npe("countryIso"));
-            }
+            // Same disabled early return: false without touching countryIso.
             Value::Int(0)
         }
-        ("isSimPortAvailable", "(I)Z") => Value::Int(0),
+        ("isSimPortAvailable", "(I)Z") => {
+            // Unlike most EuiccManager APIs this one has no isEnabled()
+            // guard: it calls getIEuiccController().isSimPortAvailable(...)
+            // and only catches RemoteException, so the absent controller in
+            // this profile surfaces as a NullPointerException, not false.
+            return Err(npe("IEuiccController"));
+        }
         (
             "startResolutionActivity",
             "(Landroid/app/Activity;ILandroid/content/Intent;Landroid/app/PendingIntent;)V",
