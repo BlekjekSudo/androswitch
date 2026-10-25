@@ -54217,10 +54217,9 @@ fn p36i_validate_icon_boundary(
         if let Ok(Value::Int(t)) = vm.invoke_instance(r, "getType", "()I", &[]) {
             // Icon.TYPE_URI = 4, TYPE_URI_ADAPTIVE_BITMAP = 6
             if t == 4 || t == 6 {
-                if let Ok(uri @ Value::Obj(u)) =
+                if let Ok(Value::Obj(u)) =
                     vm.invoke_instance(r, "getUri", "()Landroid/net/Uri;", &[])
                 {
-                    let _ = uri;
                     if let Ok(info) =
                         vm.invoke_instance(u, "getEncodedUserInfo", "()Ljava/lang/String;", &[])
                     {
