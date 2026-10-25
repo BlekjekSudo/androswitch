@@ -449,6 +449,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial36d_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36e_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -617,6 +620,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial36d_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36e_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -716,6 +722,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial36d_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial36e_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -44743,6 +44752,2710 @@ fn p36d_aid_group_instance(
                 text.push_str(", ");
             }
             jstr(vm, text)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+// ---- Appendix C Batch 36-E: media values and bounded neighbours ----
+
+const P36E_MEDIA_METADATA: &str = "Landroid/media/MediaMetadata;";
+const P36E_MEDIA_METADATA_BUILDER: &str = "Landroid/media/MediaMetadata$Builder;";
+const P36E_MEDIA_DESCRIPTION: &str = "Landroid/media/MediaDescription;";
+const P36E_MEDIA_DESCRIPTION_BUILDER: &str = "Landroid/media/MediaDescription$Builder;";
+const P36E_RATING: &str = "Landroid/media/Rating;";
+const P36E_PLAYBACK_STATE: &str = "Landroid/media/session/PlaybackState;";
+const P36E_PLAYBACK_STATE_BUILDER: &str = "Landroid/media/session/PlaybackState$Builder;";
+const P36E_CUSTOM_ACTION: &str = "Landroid/media/session/PlaybackState$CustomAction;";
+const P36E_CUSTOM_ACTION_BUILDER: &str =
+    "Landroid/media/session/PlaybackState$CustomAction$Builder;";
+const P36E_QUEUE_ITEM: &str = "Landroid/media/session/MediaSession$QueueItem;";
+const P36E_MEDIA_SESSION: &str = "Landroid/media/session/MediaSession;";
+const P36E_MEDIA_SESSION_MANAGER: &str = "Landroid/media/session/MediaSessionManager;";
+const P36E_MEDIA_BROWSER: &str = "Landroid/media/browse/MediaBrowser;";
+const P36E_MEDIA_ITEM: &str = "Landroid/media/browse/MediaBrowser$MediaItem;";
+const P36E_CONNECTION_CALLBACK: &str = "Landroid/media/browse/MediaBrowser$ConnectionCallback;";
+const P36E_SUBSCRIPTION_CALLBACK: &str = "Landroid/media/browse/MediaBrowser$SubscriptionCallback;";
+const P36E_ITEM_CALLBACK: &str = "Landroid/media/browse/MediaBrowser$ItemCallback;";
+const P36E_SUBSCRIPTION: &str = "Landroid/media/browse/MediaBrowser$Subscription;";
+const P36E_PROJECTION_MANAGER: &str = "Landroid/media/projection/MediaProjectionManager;";
+const P36E_PROJECTION: &str = "Landroid/media/projection/MediaProjection;";
+const P36E_PROJECTION_CALLBACK_DELEGATE: &str =
+    "Landroid/media/projection/MediaProjectionManager$CallbackDelegate;";
+const P36E_AUDIO_EFFECT: &str = "Landroid/media/audiofx/AudioEffect;";
+const P36E_AUDIO_EFFECT_DESCRIPTOR: &str = "Landroid/media/audiofx/AudioEffect$Descriptor;";
+
+fn partial36e_host_static(
+    vm: &mut Engine,
+    owner: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    if owner == P36E_MEDIA_METADATA {
+        if let Some(suffix) = field.strip_prefix("METADATA_KEY_") {
+            if p36e_metadata_key_type(&format!("android.media.metadata.{suffix}")).is_some() {
+                return Ok(Some(jstr(vm, format!("android.media.metadata.{suffix}"))?));
+            }
+        }
+    }
+    if owner == P36E_AUDIO_EFFECT {
+        let uuid = match field {
+            "EFFECT_TYPE_ENV_REVERB" => Some("c2e5d5f0-94bd-4763-9cac-4e234d06839e"),
+            "EFFECT_TYPE_PRESET_REVERB" => Some("47382d60-ddd8-11db-bf3a-0002a5d5c51b"),
+            "EFFECT_TYPE_EQUALIZER" => Some("0bed4300-ddd6-11db-8f34-0002a5d5c51b"),
+            "EFFECT_TYPE_BASS_BOOST" => Some("0634f220-ddd4-11db-a0fc-0002a5d5c51b"),
+            "EFFECT_TYPE_VIRTUALIZER" => Some("37cc2c00-dddd-11db-8577-0002a5d5c51b"),
+            "EFFECT_TYPE_AGC" => Some("0a8abfe0-654c-11e0-ba26-0002a5d5c51b"),
+            "EFFECT_TYPE_AEC" => Some("7b491460-8d4d-11e0-bd61-0002a5d5c51b"),
+            "EFFECT_TYPE_NS" => Some("58b4b260-8e06-11e0-aa8e-0002a5d5c51b"),
+            "EFFECT_TYPE_LOUDNESS_ENHANCER" => Some("fe3199be-aed0-413f-87bb-11260eb63cf1"),
+            "EFFECT_TYPE_DYNAMICS_PROCESSING" => Some("7261676f-6d75-7369-6364-28e2fd3ac39e"),
+            "EFFECT_TYPE_HAPTIC_GENERATOR" => Some("1411e6d6-aecd-4021-a1cf-a6aceb0d71e5"),
+            "EFFECT_TYPE_NULL" => Some("ec7178ec-e5e1-4432-a3f4-4657e6795210"),
+            _ => None,
+        };
+        if let Some(uuid) = uuid {
+            let key = (P36E_AUDIO_EFFECT.to_string(), field.to_string());
+            if let Some(value @ Value::Obj(_)) = vm.statics.get(&key).cloned() {
+                return Ok(Some(value));
+            }
+            let text = jstr(vm, uuid)?;
+            let value = vm.invoke_static(
+                "Ljava/util/UUID;",
+                "fromString",
+                "(Ljava/lang/String;)Ljava/util/UUID;",
+                std::slice::from_ref(&text),
+            )?;
+            vm.statics.insert(key, value.clone());
+            return Ok(Some(value));
+        }
+    }
+    let text = match (owner, field) {
+        (P36E_MEDIA_DESCRIPTION, "EXTRA_BT_FOLDER_TYPE") => {
+            Some("android.media.extra.BT_FOLDER_TYPE")
+        }
+        (P36E_MEDIA_BROWSER, "EXTRA_PAGE") => Some("android.media.browse.extra.PAGE"),
+        (P36E_MEDIA_BROWSER, "EXTRA_PAGE_SIZE") => Some("android.media.browse.extra.PAGE_SIZE"),
+        (P36E_AUDIO_EFFECT, "EFFECT_INSERT") => Some("Insert"),
+        (P36E_AUDIO_EFFECT, "EFFECT_AUXILIARY") => Some("Auxiliary"),
+        (P36E_AUDIO_EFFECT, "EFFECT_PRE_PROCESSING") => Some("Pre Processing"),
+        (P36E_AUDIO_EFFECT, "EFFECT_POST_PROCESSING") => Some("Post Processing"),
+        (P36E_AUDIO_EFFECT, "ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL") => {
+            Some("android.media.action.DISPLAY_AUDIO_EFFECT_CONTROL_PANEL")
+        }
+        (P36E_AUDIO_EFFECT, "ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION") => {
+            Some("android.media.action.OPEN_AUDIO_EFFECT_CONTROL_SESSION")
+        }
+        (P36E_AUDIO_EFFECT, "ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION") => {
+            Some("android.media.action.CLOSE_AUDIO_EFFECT_CONTROL_SESSION")
+        }
+        (P36E_AUDIO_EFFECT, "EXTRA_AUDIO_SESSION") => Some("android.media.extra.AUDIO_SESSION"),
+        (P36E_AUDIO_EFFECT, "EXTRA_PACKAGE_NAME") => Some("android.media.extra.PACKAGE_NAME"),
+        (P36E_AUDIO_EFFECT, "EXTRA_CONTENT_TYPE") => Some("android.media.extra.CONTENT_TYPE"),
+        _ => None,
+    };
+    if let Some(text) = text {
+        return Ok(Some(jstr(vm, text.to_string())?));
+    }
+    let integer = match (owner, field) {
+        (P36E_RATING, "RATING_NONE") => Some(0),
+        (P36E_RATING, "RATING_HEART") => Some(1),
+        (P36E_RATING, "RATING_THUMB_UP_DOWN") => Some(2),
+        (P36E_RATING, "RATING_3_STARS") => Some(3),
+        (P36E_RATING, "RATING_4_STARS") => Some(4),
+        (P36E_RATING, "RATING_5_STARS") => Some(5),
+        (P36E_RATING, "RATING_PERCENTAGE") => Some(6),
+        (P36E_PLAYBACK_STATE, "STATE_NONE") => Some(0),
+        (P36E_PLAYBACK_STATE, "STATE_STOPPED") => Some(1),
+        (P36E_PLAYBACK_STATE, "STATE_PAUSED") => Some(2),
+        (P36E_PLAYBACK_STATE, "STATE_PLAYING") => Some(3),
+        (P36E_PLAYBACK_STATE, "STATE_FAST_FORWARDING") => Some(4),
+        (P36E_PLAYBACK_STATE, "STATE_REWINDING") => Some(5),
+        (P36E_PLAYBACK_STATE, "STATE_BUFFERING") => Some(6),
+        (P36E_PLAYBACK_STATE, "STATE_ERROR") => Some(7),
+        (P36E_PLAYBACK_STATE, "STATE_CONNECTING") => Some(8),
+        (P36E_PLAYBACK_STATE, "STATE_SKIPPING_TO_PREVIOUS") => Some(9),
+        (P36E_PLAYBACK_STATE, "STATE_SKIPPING_TO_NEXT") => Some(10),
+        (P36E_PLAYBACK_STATE, "STATE_SKIPPING_TO_QUEUE_ITEM") => Some(11),
+        (P36E_QUEUE_ITEM, "UNKNOWN_ID") => Some(-1),
+        (P36E_MEDIA_ITEM, "FLAG_BROWSABLE") => Some(1),
+        (P36E_MEDIA_ITEM, "FLAG_PLAYABLE") => Some(2),
+        (P36E_AUDIO_EFFECT, "STATE_UNINITIALIZED") => Some(0),
+        (P36E_AUDIO_EFFECT, "STATE_INITIALIZED") => Some(1),
+        (P36E_AUDIO_EFFECT, "NATIVE_EVENT_CONTROL_STATUS") => Some(0),
+        (P36E_AUDIO_EFFECT, "NATIVE_EVENT_ENABLED_STATUS") => Some(1),
+        (P36E_AUDIO_EFFECT, "NATIVE_EVENT_PARAMETER_CHANGED") => Some(2),
+        (P36E_AUDIO_EFFECT, "SUCCESS") => Some(0),
+        (P36E_AUDIO_EFFECT, "ERROR") => Some(-1),
+        (P36E_AUDIO_EFFECT, "ALREADY_EXISTS") => Some(-2),
+        (P36E_AUDIO_EFFECT, "ERROR_NO_INIT") => Some(-3),
+        (P36E_AUDIO_EFFECT, "ERROR_BAD_VALUE") => Some(-4),
+        (P36E_AUDIO_EFFECT, "ERROR_INVALID_OPERATION") => Some(-5),
+        (P36E_AUDIO_EFFECT, "ERROR_NO_MEMORY") => Some(-6),
+        (P36E_AUDIO_EFFECT, "ERROR_DEAD_OBJECT") => Some(-7),
+        (P36E_AUDIO_EFFECT, "CONTENT_TYPE_MUSIC") => Some(0),
+        (P36E_AUDIO_EFFECT, "CONTENT_TYPE_MOVIE") => Some(1),
+        (P36E_AUDIO_EFFECT, "CONTENT_TYPE_GAME") => Some(2),
+        (P36E_AUDIO_EFFECT, "CONTENT_TYPE_VOICE") => Some(3),
+        _ => None,
+    };
+    if let Some(integer) = integer {
+        return Ok(Some(Value::Int(integer)));
+    }
+    let long = match (owner, field) {
+        (P36E_MEDIA_DESCRIPTION, "BT_FOLDER_TYPE_MIXED") => Some(0),
+        (P36E_MEDIA_DESCRIPTION, "BT_FOLDER_TYPE_TITLES") => Some(1),
+        (P36E_MEDIA_DESCRIPTION, "BT_FOLDER_TYPE_ALBUMS") => Some(2),
+        (P36E_MEDIA_DESCRIPTION, "BT_FOLDER_TYPE_ARTISTS") => Some(3),
+        (P36E_MEDIA_DESCRIPTION, "BT_FOLDER_TYPE_GENRES") => Some(4),
+        (P36E_MEDIA_DESCRIPTION, "BT_FOLDER_TYPE_PLAYLISTS") => Some(5),
+        (P36E_MEDIA_DESCRIPTION, "BT_FOLDER_TYPE_YEARS") => Some(6),
+        (P36E_PLAYBACK_STATE, "ACTION_STOP") => Some(1 << 0),
+        (P36E_PLAYBACK_STATE, "ACTION_PAUSE") => Some(1 << 1),
+        (P36E_PLAYBACK_STATE, "ACTION_PLAY") => Some(1 << 2),
+        (P36E_PLAYBACK_STATE, "ACTION_REWIND") => Some(1 << 3),
+        (P36E_PLAYBACK_STATE, "ACTION_SKIP_TO_PREVIOUS") => Some(1 << 4),
+        (P36E_PLAYBACK_STATE, "ACTION_SKIP_TO_NEXT") => Some(1 << 5),
+        (P36E_PLAYBACK_STATE, "ACTION_FAST_FORWARD") => Some(1 << 6),
+        (P36E_PLAYBACK_STATE, "ACTION_SET_RATING") => Some(1 << 7),
+        (P36E_PLAYBACK_STATE, "ACTION_SEEK_TO") => Some(1 << 8),
+        (P36E_PLAYBACK_STATE, "ACTION_PLAY_PAUSE") => Some(1 << 9),
+        (P36E_PLAYBACK_STATE, "ACTION_PLAY_FROM_MEDIA_ID") => Some(1 << 10),
+        (P36E_PLAYBACK_STATE, "ACTION_PLAY_FROM_SEARCH") => Some(1 << 11),
+        (P36E_PLAYBACK_STATE, "ACTION_SKIP_TO_QUEUE_ITEM") => Some(1 << 12),
+        (P36E_PLAYBACK_STATE, "ACTION_PLAY_FROM_URI") => Some(1 << 13),
+        (P36E_PLAYBACK_STATE, "ACTION_PREPARE") => Some(1 << 14),
+        (P36E_PLAYBACK_STATE, "ACTION_PREPARE_FROM_MEDIA_ID") => Some(1 << 15),
+        (P36E_PLAYBACK_STATE, "ACTION_PREPARE_FROM_SEARCH") => Some(1 << 16),
+        (P36E_PLAYBACK_STATE, "ACTION_PREPARE_FROM_URI") => Some(1 << 17),
+        (P36E_PLAYBACK_STATE, "ACTION_SET_PLAYBACK_SPEED") => Some(1 << 22),
+        (P36E_PLAYBACK_STATE, "PLAYBACK_POSITION_UNKNOWN") => Some(-1),
+        _ => None,
+    };
+    Ok(long.map(Value::Long))
+}
+
+fn partial36e_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match class {
+        P36E_RATING => p36e_rating_static(vm, name, sig, args),
+        P36E_AUDIO_EFFECT => p36e_audio_effect_static(vm, name, sig, args),
+        P36E_MEDIA_METADATA if name == "getKeyFromMetadataEditorKey" => {
+            Ok(Some(p36e_editor_key(vm, iarg(args, 0))?))
+        }
+        _ => Ok(None),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn partial36e_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    _mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match recv_class {
+        P36E_MEDIA_METADATA => p36e_media_metadata_instance(vm, name, sig, recv, args),
+        P36E_MEDIA_METADATA_BUILDER => {
+            p36e_media_metadata_builder_instance(vm, name, sig, recv, args)
+        }
+        P36E_MEDIA_DESCRIPTION => p36e_media_description_instance(vm, name, sig, recv, args),
+        P36E_MEDIA_DESCRIPTION_BUILDER => {
+            p36e_media_description_builder_instance(vm, name, sig, recv, args)
+        }
+        P36E_RATING => p36e_rating_instance(vm, name, sig, recv, args),
+        P36E_PLAYBACK_STATE => p36e_playback_state_instance(vm, name, sig, recv, args),
+        P36E_PLAYBACK_STATE_BUILDER => {
+            p36e_playback_state_builder_instance(vm, name, sig, recv, args)
+        }
+        P36E_CUSTOM_ACTION => p36e_custom_action_instance(vm, name, sig, recv, args),
+        P36E_CUSTOM_ACTION_BUILDER => {
+            p36e_custom_action_builder_instance(vm, name, sig, recv, args)
+        }
+        P36E_QUEUE_ITEM => p36e_queue_item_instance(vm, name, sig, recv, args),
+        P36E_MEDIA_SESSION => p36e_media_session_instance(vm, name, sig, recv, args),
+        P36E_MEDIA_SESSION_MANAGER => {
+            p36e_media_session_manager_instance(vm, name, sig, recv, args)
+        }
+        P36E_MEDIA_BROWSER => p36e_media_browser_instance(vm, name, sig, recv, args),
+        P36E_MEDIA_ITEM => p36e_media_item_instance(vm, name, sig, recv, args),
+        P36E_CONNECTION_CALLBACK | P36E_SUBSCRIPTION_CALLBACK | P36E_ITEM_CALLBACK => {
+            p36e_media_browser_callback_instance(vm, recv_class, name, sig, recv)
+        }
+        P36E_PROJECTION_MANAGER => p36e_projection_manager_instance(vm, name, sig, recv, args),
+        P36E_PROJECTION => p36e_projection_instance(vm, name, sig, recv, args),
+        P36E_AUDIO_EFFECT => p36e_audio_effect_instance(vm, name, sig, recv, args),
+        P36E_AUDIO_EFFECT_DESCRIPTOR => {
+            p36e_audio_effect_descriptor_instance(vm, name, sig, recv, args)
+        }
+        _ => Ok(None),
+    }
+}
+
+fn p36e_new(vm: &mut Engine, class: &str, sig: &str, args: &[Value]) -> Result<Value, VmExit> {
+    let object = alloc_obj(vm, class, Vec::new())?;
+    vm.invoke_instance(object, "<init>", sig, args)?;
+    Ok(Value::Obj(object))
+}
+
+fn p36e_clone_bundle(vm: &mut Engine, source: &Value) -> Result<Value, VmExit> {
+    let Some(source_ref) = (match source {
+        Value::Obj(object) => Some(*object),
+        _ => None,
+    }) else {
+        return Err(npe(""));
+    };
+    let copy = empty_bundle(vm)?;
+    let Value::Obj(copy_ref) = copy else {
+        return Ok(Value::Null);
+    };
+    vm.invoke_instance(
+        copy_ref,
+        "<init>",
+        "(Landroid/os/Bundle;)V",
+        std::slice::from_ref(&Value::Obj(source_ref)),
+    )?;
+    Ok(copy)
+}
+
+fn p36e_bundle_ref(vm: &Engine, receiver: ObjRef) -> Result<ObjRef, VmExit> {
+    field_obj(vm, receiver, "mBundle").ok_or_else(|| npe(""))
+}
+
+fn p36e_new_list(vm: &mut Engine, items: Vec<Value>) -> Result<Value, VmExit> {
+    Ok(Value::Obj(new_collection(
+        vm,
+        "Ljava/util/ArrayList;",
+        items,
+    )?))
+}
+
+fn p36e_list_items(vm: &Engine, value: &Value) -> Vec<Value> {
+    collection_items(vm, Some(value))
+}
+
+fn p36e_list_add(vm: &mut Engine, list: &Value, item: Value) -> Result<(), VmExit> {
+    let Value::Obj(list_ref) = list else {
+        return Err(npe(""));
+    };
+    if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(list_ref) {
+        elems.push(item);
+        return Ok(());
+    }
+    vm.invoke_instance(
+        *list_ref,
+        "add",
+        "(Ljava/lang/Object;)Z",
+        std::slice::from_ref(&item),
+    )?;
+    Ok(())
+}
+
+fn p36e_replace_list(
+    vm: &mut Engine,
+    owner: ObjRef,
+    field: &str,
+    items: Vec<Value>,
+) -> Result<(), VmExit> {
+    let list = p36e_new_list(vm, items)?;
+    put(vm, owner, field, list)
+}
+
+fn p36e_new_map(vm: &mut Engine, class: &str) -> Result<ObjRef, VmExit> {
+    let map = alloc_obj(vm, class, Vec::new())?;
+    vm.fw.objects.insert(
+        map,
+        HostObj::Map {
+            entries: Vec::new(),
+        },
+    );
+    Ok(map)
+}
+
+fn p36e_map_put_identity(
+    vm: &mut Engine,
+    map: ObjRef,
+    key: Value,
+    value: Value,
+) -> Result<Option<Value>, VmExit> {
+    let mut entries = map_entries(vm, Some(&Value::Obj(map)));
+    let mut previous = None;
+    if let Some(position) = entries.iter().position(|(existing, _)| *existing == key) {
+        previous = Some(entries[position].1.clone());
+        entries[position].1 = value;
+    } else {
+        entries.push((key, value));
+    }
+    vm.fw.objects.insert(map, HostObj::Map { entries });
+    Ok(previous)
+}
+
+fn p36e_map_remove_identity(vm: &mut Engine, map: ObjRef, key: &Value) -> Option<Value> {
+    let mut entries = map_entries(vm, Some(&Value::Obj(map)));
+    let position = entries.iter().position(|(existing, _)| existing == key)?;
+    let (_, value) = entries.remove(position);
+    vm.fw.objects.insert(map, HostObj::Map { entries });
+    Some(value)
+}
+
+fn p36e_map_put_string(
+    vm: &mut Engine,
+    map: ObjRef,
+    key: Value,
+    value: Value,
+) -> Result<Option<Value>, VmExit> {
+    let wanted = opt_str(vm, Some(&key));
+    let mut entries = map_entries(vm, Some(&Value::Obj(map)));
+    let mut previous = None;
+    let position = entries
+        .iter()
+        .position(|(existing, _)| opt_str(vm, Some(existing)) == wanted);
+    if let Some(position) = position {
+        previous = Some(entries[position].1.clone());
+        entries[position].1 = value;
+    } else {
+        entries.push((key, value));
+    }
+    vm.fw.objects.insert(map, HostObj::Map { entries });
+    Ok(previous)
+}
+
+fn p36e_map_get_string(vm: &Engine, map: ObjRef, key: &Value) -> Option<Value> {
+    let wanted = opt_str(vm, Some(key))?;
+    map_entries(vm, Some(&Value::Obj(map)))
+        .into_iter()
+        .find(|(existing, _)| opt_str(vm, Some(existing)).as_deref() == Some(&wanted))
+        .map(|(_, value)| value)
+}
+
+fn p36e_map_remove_string(vm: &mut Engine, map: ObjRef, key: &Value) -> Option<Value> {
+    let wanted = opt_str(vm, Some(key))?;
+    let mut entries = map_entries(vm, Some(&Value::Obj(map)));
+    let position = entries
+        .iter()
+        .position(|(existing, _)| opt_str(vm, Some(existing)).as_deref() == Some(&wanted))?;
+    let (_, value) = entries.remove(position);
+    vm.fw.objects.insert(map, HostObj::Map { entries });
+    Some(value)
+}
+
+fn p36e_objects_hash(vm: &mut Engine, values: &[Value]) -> Result<i32, VmExit> {
+    let mut result: i32 = 1;
+    for value in values {
+        result = result
+            .wrapping_mul(31)
+            .wrapping_add(af_objects_hash(vm, value)?);
+    }
+    Ok(result)
+}
+
+fn p36e_is_empty_text(vm: &mut Engine, value: &Value) -> Result<bool, VmExit> {
+    Ok(match charseq(vm, Some(value))? {
+        None => true,
+        Some(text) => text.is_empty(),
+    })
+}
+
+fn p36e_new_rating(vm: &mut Engine, style: i32, value: f32) -> Result<Value, VmExit> {
+    p36e_new(
+        vm,
+        P36E_RATING,
+        "(IF)V",
+        &[Value::Int(style), Value::Float(value)],
+    )
+}
+
+fn p36e_rating_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("newUnratedRating", "(I)Landroid/media/Rating;") => {
+            let style = iarg(args, 0);
+            if matches!(style, 1..=6) {
+                p36e_new_rating(vm, style, -1.0)?
+            } else {
+                Value::Null
+            }
+        }
+        ("newHeartRating", "(Z)Landroid/media/Rating;") => {
+            p36e_new_rating(vm, 1, if iarg(args, 0) != 0 { 1.0 } else { 0.0 })?
+        }
+        ("newThumbRating", "(Z)Landroid/media/Rating;") => {
+            p36e_new_rating(vm, 2, if iarg(args, 0) != 0 { 1.0 } else { 0.0 })?
+        }
+        ("newStarRating", "(IF)Landroid/media/Rating;") => {
+            let style = iarg(args, 0);
+            let rating = farg(args, 1);
+            let maximum = match style {
+                3 => 3.0,
+                4 => 4.0,
+                5 => 5.0,
+                _ => return Ok(Some(Value::Null)),
+            };
+            if (0.0..=maximum).contains(&rating) {
+                p36e_new_rating(vm, style, rating)?
+            } else {
+                Value::Null
+            }
+        }
+        ("newPercentageRating", "(F)Landroid/media/Rating;") => {
+            let percent = farg(args, 0);
+            if (0.0..=100.0).contains(&percent) {
+                p36e_new_rating(vm, 6, percent)?
+            } else {
+                Value::Null
+            }
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_rating_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let style = field_int(vm, recv, "mRatingStyle");
+    let rating = field_float(vm, recv, "mRatingValue");
+    let value = match (name, sig) {
+        ("<init>", "(IF)V") => {
+            put(vm, recv, "mRatingStyle", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mRatingValue", Value::Float(farg(args, 1)))?;
+            Value::Null
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let rendered = if rating < 0.0 {
+                "unrated".to_string()
+            } else {
+                crate::repr::java_float(rating)
+            };
+            jstr(vm, format!("Rating:style={style} rating={rendered}"))?
+        }
+        ("describeContents", "()I") => Value::Int(style),
+        ("isRated", "()Z") => Value::Int(i32::from(rating >= 0.0)),
+        ("getRatingStyle", "()I") => Value::Int(style),
+        ("hasHeart", "()Z") => Value::Int(i32::from(style == 1 && rating == 1.0)),
+        ("isThumbUp", "()Z") => Value::Int(i32::from(style == 2 && rating == 1.0)),
+        ("getStarRating", "()F") => Value::Float(if matches!(style, 3..=5) && rating >= 0.0 {
+            rating
+        } else {
+            -1.0
+        }),
+        ("getPercentRating", "()F") => Value::Float(if style == 6 && rating >= 0.0 {
+            rating
+        } else {
+            -1.0
+        }),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_media_description_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        (
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/CharSequence;Ljava/lang/CharSequence;Ljava/lang/CharSequence;Landroid/graphics/Bitmap;Landroid/net/Uri;Landroid/os/Bundle;Landroid/net/Uri;)V",
+        ) => {
+            put(vm, recv, "mMediaId", p36a_value(args, 0))?;
+            put(vm, recv, "mTitle", p36a_value(args, 1))?;
+            put(vm, recv, "mSubtitle", p36a_value(args, 2))?;
+            put(vm, recv, "mDescription", p36a_value(args, 3))?;
+            put(vm, recv, "mIcon", p36a_value(args, 4))?;
+            put(vm, recv, "mIconUri", p36a_value(args, 5))?;
+            put(vm, recv, "mExtras", p36a_value(args, 6))?;
+            put(vm, recv, "mMediaUri", p36a_value(args, 7))?;
+            Value::Null
+        }
+        ("getMediaId", "()Ljava/lang/String;") => get(vm, recv, "mMediaId"),
+        ("getTitle", "()Ljava/lang/CharSequence;") => get(vm, recv, "mTitle"),
+        ("getSubtitle", "()Ljava/lang/CharSequence;") => get(vm, recv, "mSubtitle"),
+        ("getDescription", "()Ljava/lang/CharSequence;") => get(vm, recv, "mDescription"),
+        ("getIconBitmap", "()Landroid/graphics/Bitmap;") => get(vm, recv, "mIcon"),
+        ("getIconUri", "()Landroid/net/Uri;") => get(vm, recv, "mIconUri"),
+        ("getExtras", "()Landroid/os/Bundle;") => get(vm, recv, "mExtras"),
+        ("getMediaUri", "()Landroid/net/Uri;") => get(vm, recv, "mMediaUri"),
+        ("describeContents", "()I") => Value::Int(0),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let other = match p36a_value(args, 0) {
+                Value::Obj(other)
+                    if vm.cp.is_subtype(&class_of(vm, other), P36E_MEDIA_DESCRIPTION) =>
+                {
+                    other
+                }
+                _ => return Ok(Some(Value::Int(0))),
+            };
+            let mut equal = true;
+            for field in ["mTitle", "mSubtitle", "mDescription"] {
+                let left = get(vm, recv, field);
+                let right = get(vm, other, field);
+                if value_string(vm, &left)? != value_string(vm, &right)? {
+                    equal = false;
+                    break;
+                }
+            }
+            Value::Int(i32::from(equal))
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let title = get(vm, recv, "mTitle");
+            let subtitle = get(vm, recv, "mSubtitle");
+            let description = get(vm, recv, "mDescription");
+            let title = value_string(vm, &title)?;
+            let subtitle = value_string(vm, &subtitle)?;
+            let description = value_string(vm, &description)?;
+            jstr(vm, format!("{title}, {subtitle}, {description}"))?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_media_description_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let field = match (name, sig) {
+        ("<init>", "()V") => return Ok(Some(Value::Null)),
+        ("setMediaId", "(Ljava/lang/String;)Landroid/media/MediaDescription$Builder;") => {
+            "mMediaId"
+        }
+        ("setTitle", "(Ljava/lang/CharSequence;)Landroid/media/MediaDescription$Builder;") => {
+            "mTitle"
+        }
+        ("setSubtitle", "(Ljava/lang/CharSequence;)Landroid/media/MediaDescription$Builder;") => {
+            "mSubtitle"
+        }
+        (
+            "setDescription",
+            "(Ljava/lang/CharSequence;)Landroid/media/MediaDescription$Builder;",
+        ) => "mDescription",
+        (
+            "setIconBitmap",
+            "(Landroid/graphics/Bitmap;)Landroid/media/MediaDescription$Builder;",
+        ) => "mIcon",
+        ("setIconUri", "(Landroid/net/Uri;)Landroid/media/MediaDescription$Builder;") => "mIconUri",
+        ("setExtras", "(Landroid/os/Bundle;)Landroid/media/MediaDescription$Builder;") => "mExtras",
+        ("setMediaUri", "(Landroid/net/Uri;)Landroid/media/MediaDescription$Builder;") => {
+            "mMediaUri"
+        }
+        ("build", "()Landroid/media/MediaDescription;") => {
+            let values = [
+                get(vm, recv, "mMediaId"),
+                get(vm, recv, "mTitle"),
+                get(vm, recv, "mSubtitle"),
+                get(vm, recv, "mDescription"),
+                get(vm, recv, "mIcon"),
+                get(vm, recv, "mIconUri"),
+                get(vm, recv, "mExtras"),
+                get(vm, recv, "mMediaUri"),
+            ];
+            return Ok(Some(p36e_new(
+                vm,
+                P36E_MEDIA_DESCRIPTION,
+                "(Ljava/lang/String;Ljava/lang/CharSequence;Ljava/lang/CharSequence;Ljava/lang/CharSequence;Landroid/graphics/Bitmap;Landroid/net/Uri;Landroid/os/Bundle;Landroid/net/Uri;)V",
+                &values,
+            )?));
+        }
+        _ => return Ok(None),
+    };
+    put(vm, recv, field, p36a_value(args, 0))?;
+    Ok(Some(Value::Obj(recv)))
+}
+
+const P36E_METADATA_KEYS: &[(&str, i32)] = &[
+    ("android.media.metadata.TITLE", 1),
+    ("android.media.metadata.ARTIST", 1),
+    ("android.media.metadata.DURATION", 0),
+    ("android.media.metadata.ALBUM", 1),
+    ("android.media.metadata.AUTHOR", 1),
+    ("android.media.metadata.WRITER", 1),
+    ("android.media.metadata.COMPOSER", 1),
+    ("android.media.metadata.COMPILATION", 1),
+    ("android.media.metadata.DATE", 1),
+    ("android.media.metadata.YEAR", 0),
+    ("android.media.metadata.GENRE", 1),
+    ("android.media.metadata.TRACK_NUMBER", 0),
+    ("android.media.metadata.NUM_TRACKS", 0),
+    ("android.media.metadata.DISC_NUMBER", 0),
+    ("android.media.metadata.ALBUM_ARTIST", 1),
+    ("android.media.metadata.ART", 2),
+    ("android.media.metadata.ART_URI", 1),
+    ("android.media.metadata.ALBUM_ART", 2),
+    ("android.media.metadata.ALBUM_ART_URI", 1),
+    ("android.media.metadata.USER_RATING", 3),
+    ("android.media.metadata.RATING", 3),
+    ("android.media.metadata.DISPLAY_TITLE", 1),
+    ("android.media.metadata.DISPLAY_SUBTITLE", 1),
+    ("android.media.metadata.DISPLAY_DESCRIPTION", 1),
+    ("android.media.metadata.DISPLAY_ICON", 2),
+    ("android.media.metadata.DISPLAY_ICON_URI", 1),
+    ("android.media.metadata.BT_FOLDER_TYPE", 0),
+    ("android.media.metadata.MEDIA_ID", 1),
+    ("android.media.metadata.MEDIA_URI", 1),
+];
+
+fn p36e_metadata_key_type(key: &str) -> Option<i32> {
+    P36E_METADATA_KEYS
+        .iter()
+        .find(|(known, _)| *known == key)
+        .map(|(_, kind)| *kind)
+}
+
+fn p36e_editor_key(vm: &mut Engine, editor_key: i32) -> Result<Value, VmExit> {
+    // MediaMetadataEditor keys 100..102 precede the
+    // MediaMetadataRetriever values in AOSP's SparseArray because
+    // SparseArray.get is keyed by int, not by insertion order.
+    let key = match editor_key {
+        100 => Some("android.media.metadata.ART"),
+        101 => Some("android.media.metadata.RATING"),
+        0x1000_0001 => Some("android.media.metadata.USER_RATING"),
+        1 => Some("android.media.metadata.ALBUM"),
+        13 => Some("android.media.metadata.ALBUM_ARTIST"),
+        2 => Some("android.media.metadata.ARTIST"),
+        3 => Some("android.media.metadata.AUTHOR"),
+        0 => Some("android.media.metadata.TRACK_NUMBER"),
+        4 => Some("android.media.metadata.COMPOSER"),
+        15 => Some("android.media.metadata.COMPILATION"),
+        5 => Some("android.media.metadata.DATE"),
+        14 => Some("android.media.metadata.DISC_NUMBER"),
+        9 => Some("android.media.metadata.DURATION"),
+        6 => Some("android.media.metadata.GENRE"),
+        10 => Some("android.media.metadata.NUM_TRACKS"),
+        7 => Some("android.media.metadata.TITLE"),
+        11 => Some("android.media.metadata.WRITER"),
+        8 => Some("android.media.metadata.YEAR"),
+        _ => None,
+    };
+    match key {
+        Some(key) => jstr(vm, key.to_string()),
+        None => Ok(Value::Null),
+    }
+}
+
+fn p36e_metadata_bundle_call(
+    vm: &mut Engine,
+    receiver: ObjRef,
+    method: &str,
+    sig: &str,
+    key: &Value,
+) -> Result<Value, VmExit> {
+    let bundle = p36e_bundle_ref(vm, receiver)?;
+    vm.invoke_instance(bundle, method, sig, std::slice::from_ref(key))
+}
+
+fn p36e_metadata_text_by_key(
+    vm: &mut Engine,
+    receiver: ObjRef,
+    key: &str,
+) -> Result<Value, VmExit> {
+    let key = jstr(vm, key.to_string())?;
+    vm.invoke_instance(
+        receiver,
+        "getText",
+        "(Ljava/lang/String;)Ljava/lang/CharSequence;",
+        std::slice::from_ref(&key),
+    )
+}
+
+fn p36e_metadata_string_by_key(
+    vm: &mut Engine,
+    receiver: ObjRef,
+    key: &str,
+) -> Result<Value, VmExit> {
+    let key = jstr(vm, key.to_string())?;
+    vm.invoke_instance(
+        receiver,
+        "getString",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+        std::slice::from_ref(&key),
+    )
+}
+
+fn p36e_metadata_long_by_key(vm: &mut Engine, receiver: ObjRef, key: &str) -> Result<i64, VmExit> {
+    let key = jstr(vm, key.to_string())?;
+    Ok(vm
+        .invoke_instance(
+            receiver,
+            "getLong",
+            "(Ljava/lang/String;)J",
+            std::slice::from_ref(&key),
+        )?
+        .as_long()
+        .unwrap_or(0))
+}
+
+fn p36e_bundle_parcelable_by_key(
+    vm: &mut Engine,
+    receiver: ObjRef,
+    key: &Value,
+    class: &str,
+) -> Result<Value, VmExit> {
+    let bundle = p36e_bundle_ref(vm, receiver)?;
+    let class_object = Value::Obj(vm.class_object_for(class)?);
+    match vm.invoke_instance(
+        bundle,
+        "getParcelable",
+        "(Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;",
+        &[key.clone(), class_object],
+    ) {
+        Err(VmExit::Exception(_)) => Ok(Value::Null),
+        other => other,
+    }
+}
+
+fn p36e_media_metadata_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/os/Bundle;I)V") => {
+            let source = p36a_value(args, 0);
+            let bundle = p36e_clone_bundle(vm, &source)?;
+            put(vm, recv, "mBundle", bundle)?;
+            put(vm, recv, "mBitmapDimensionLimit", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mDescription", Value::Null)?;
+            Value::Null
+        }
+        ("containsKey", "(Ljava/lang/String;)Z") => {
+            let key = p36a_value(args, 0);
+            p36e_metadata_bundle_call(vm, recv, "containsKey", "(Ljava/lang/String;)Z", &key)?
+        }
+        ("getText", "(Ljava/lang/String;)Ljava/lang/CharSequence;") => {
+            let key = p36a_value(args, 0);
+            p36e_metadata_bundle_call(
+                vm,
+                recv,
+                "getCharSequence",
+                "(Ljava/lang/String;)Ljava/lang/CharSequence;",
+                &key,
+            )?
+        }
+        ("getString", "(Ljava/lang/String;)Ljava/lang/String;") => {
+            let key = p36a_value(args, 0);
+            let text = vm.invoke_instance(
+                recv,
+                "getText",
+                "(Ljava/lang/String;)Ljava/lang/CharSequence;",
+                std::slice::from_ref(&key),
+            )?;
+            match text {
+                Value::Obj(object) => {
+                    if vm.heap.as_str(object).is_ok() {
+                        Value::Obj(object)
+                    } else {
+                        let rendered = crate::intrinsics::object_to_string(vm, object)?;
+                        jstr(vm, rendered)?
+                    }
+                }
+                _ => Value::Null,
+            }
+        }
+        ("getLong", "(Ljava/lang/String;)J") => {
+            let bundle = p36e_bundle_ref(vm, recv)?;
+            let key = p36a_value(args, 0);
+            vm.invoke_instance(
+                bundle,
+                "getLong",
+                "(Ljava/lang/String;J)J",
+                &[key, Value::Long(0)],
+            )?
+        }
+        ("getRating", "(Ljava/lang/String;)Landroid/media/Rating;") => {
+            let key = p36a_value(args, 0);
+            p36e_bundle_parcelable_by_key(vm, recv, &key, P36E_RATING)?
+        }
+        ("getBitmap", "(Ljava/lang/String;)Landroid/graphics/Bitmap;") => {
+            let key = p36a_value(args, 0);
+            p36e_bundle_parcelable_by_key(vm, recv, &key, "Landroid/graphics/Bitmap;")?
+        }
+        ("getBitmapDimensionLimit", "()I") => {
+            Value::Int(field_int(vm, recv, "mBitmapDimensionLimit"))
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        ("size", "()I") => {
+            let bundle = p36e_bundle_ref(vm, recv)?;
+            vm.invoke_instance(bundle, "size", "()I", &[])?
+        }
+        ("keySet", "()Ljava/util/Set;") => {
+            let bundle = p36e_bundle_ref(vm, recv)?;
+            vm.invoke_instance(bundle, "keySet", "()Ljava/util/Set;", &[])?
+        }
+        ("getDescription", "()Landroid/media/MediaDescription;") => {
+            if let description @ Value::Obj(_) = get(vm, recv, "mDescription") {
+                description
+            } else {
+                let media_id =
+                    p36e_metadata_string_by_key(vm, recv, "android.media.metadata.MEDIA_ID")?;
+                let mut texts = [Value::Null, Value::Null, Value::Null];
+                let display_title =
+                    p36e_metadata_text_by_key(vm, recv, "android.media.metadata.DISPLAY_TITLE")?;
+                if !p36e_is_empty_text(vm, &display_title)? {
+                    texts[0] = display_title;
+                    texts[1] = p36e_metadata_text_by_key(
+                        vm,
+                        recv,
+                        "android.media.metadata.DISPLAY_SUBTITLE",
+                    )?;
+                    texts[2] = p36e_metadata_text_by_key(
+                        vm,
+                        recv,
+                        "android.media.metadata.DISPLAY_DESCRIPTION",
+                    )?;
+                } else {
+                    let mut text_index = 0;
+                    for key in [
+                        "android.media.metadata.TITLE",
+                        "android.media.metadata.ARTIST",
+                        "android.media.metadata.ALBUM",
+                        "android.media.metadata.ALBUM_ARTIST",
+                        "android.media.metadata.WRITER",
+                        "android.media.metadata.AUTHOR",
+                        "android.media.metadata.COMPOSER",
+                    ] {
+                        if text_index >= texts.len() {
+                            break;
+                        }
+                        let next = p36e_metadata_text_by_key(vm, recv, key)?;
+                        if !p36e_is_empty_text(vm, &next)? {
+                            texts[text_index] = next;
+                            text_index += 1;
+                        }
+                    }
+                }
+                let mut icon = Value::Null;
+                for key in [
+                    "android.media.metadata.DISPLAY_ICON",
+                    "android.media.metadata.ART",
+                    "android.media.metadata.ALBUM_ART",
+                ] {
+                    let key_value = jstr(vm, key.to_string())?;
+                    let next = p36e_bundle_parcelable_by_key(
+                        vm,
+                        recv,
+                        &key_value,
+                        "Landroid/graphics/Bitmap;",
+                    )?;
+                    if matches!(next, Value::Obj(_)) {
+                        icon = next;
+                        break;
+                    }
+                }
+                let mut icon_uri = Value::Null;
+                for key in [
+                    "android.media.metadata.DISPLAY_ICON_URI",
+                    "android.media.metadata.ART_URI",
+                    "android.media.metadata.ALBUM_ART_URI",
+                ] {
+                    let next = p36e_metadata_string_by_key(vm, recv, key)?;
+                    if !p36e_is_empty_text(vm, &next)? {
+                        icon_uri = vm.invoke_static(
+                            "Landroid/net/Uri;",
+                            "parse",
+                            "(Ljava/lang/String;)Landroid/net/Uri;",
+                            std::slice::from_ref(&next),
+                        )?;
+                        break;
+                    }
+                }
+                let media_uri_text =
+                    p36e_metadata_string_by_key(vm, recv, "android.media.metadata.MEDIA_URI")?;
+                let media_uri = if p36e_is_empty_text(vm, &media_uri_text)? {
+                    Value::Null
+                } else {
+                    vm.invoke_static(
+                        "Landroid/net/Uri;",
+                        "parse",
+                        "(Ljava/lang/String;)Landroid/net/Uri;",
+                        std::slice::from_ref(&media_uri_text),
+                    )?
+                };
+                let builder = p36e_new(vm, P36E_MEDIA_DESCRIPTION_BUILDER, "()V", &[])?;
+                let Value::Obj(builder_ref) = builder else {
+                    return Ok(Some(Value::Null));
+                };
+                vm.invoke_instance(
+                    builder_ref,
+                    "setMediaId",
+                    "(Ljava/lang/String;)Landroid/media/MediaDescription$Builder;",
+                    std::slice::from_ref(&media_id),
+                )?;
+                vm.invoke_instance(
+                    builder_ref,
+                    "setTitle",
+                    "(Ljava/lang/CharSequence;)Landroid/media/MediaDescription$Builder;",
+                    std::slice::from_ref(&texts[0]),
+                )?;
+                vm.invoke_instance(
+                    builder_ref,
+                    "setSubtitle",
+                    "(Ljava/lang/CharSequence;)Landroid/media/MediaDescription$Builder;",
+                    std::slice::from_ref(&texts[1]),
+                )?;
+                vm.invoke_instance(
+                    builder_ref,
+                    "setDescription",
+                    "(Ljava/lang/CharSequence;)Landroid/media/MediaDescription$Builder;",
+                    std::slice::from_ref(&texts[2]),
+                )?;
+                vm.invoke_instance(
+                    builder_ref,
+                    "setIconBitmap",
+                    "(Landroid/graphics/Bitmap;)Landroid/media/MediaDescription$Builder;",
+                    std::slice::from_ref(&icon),
+                )?;
+                vm.invoke_instance(
+                    builder_ref,
+                    "setIconUri",
+                    "(Landroid/net/Uri;)Landroid/media/MediaDescription$Builder;",
+                    std::slice::from_ref(&icon_uri),
+                )?;
+                vm.invoke_instance(
+                    builder_ref,
+                    "setMediaUri",
+                    "(Landroid/net/Uri;)Landroid/media/MediaDescription$Builder;",
+                    std::slice::from_ref(&media_uri),
+                )?;
+                let folder_key = jstr(vm, "android.media.metadata.BT_FOLDER_TYPE")?;
+                let contains_folder = vm.invoke_instance(
+                    recv,
+                    "containsKey",
+                    "(Ljava/lang/String;)Z",
+                    std::slice::from_ref(&folder_key),
+                )?;
+                if contains_folder.as_int().unwrap_or(0) != 0 {
+                    let extras = empty_bundle(vm)?;
+                    let Value::Obj(extras_ref) = extras else {
+                        return Ok(Some(Value::Null));
+                    };
+                    let extra_key = jstr(vm, "android.media.extra.BT_FOLDER_TYPE")?;
+                    let folder = p36e_metadata_long_by_key(
+                        vm,
+                        recv,
+                        "android.media.metadata.BT_FOLDER_TYPE",
+                    )?;
+                    vm.invoke_instance(
+                        extras_ref,
+                        "putLong",
+                        "(Ljava/lang/String;J)V",
+                        &[extra_key, Value::Long(folder)],
+                    )?;
+                    vm.invoke_instance(
+                        builder_ref,
+                        "setExtras",
+                        "(Landroid/os/Bundle;)Landroid/media/MediaDescription$Builder;",
+                        std::slice::from_ref(&extras),
+                    )?;
+                }
+                let description = vm.invoke_instance(
+                    builder_ref,
+                    "build",
+                    "()Landroid/media/MediaDescription;",
+                    &[],
+                )?;
+                put(vm, recv, "mDescription", description.clone())?;
+                description
+            }
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let other = match p36a_value(args, 0) {
+                Value::Obj(other) if other == recv => {
+                    return Ok(Some(Value::Int(1)));
+                }
+                Value::Obj(other)
+                    if vm.cp.is_subtype(&class_of(vm, other), P36E_MEDIA_METADATA) =>
+                {
+                    other
+                }
+                _ => return Ok(Some(Value::Int(0))),
+            };
+            let mut equal = true;
+            for (key, kind) in P36E_METADATA_KEYS {
+                match kind {
+                    1 => {
+                        let left = p36e_metadata_string_by_key(vm, recv, key)?;
+                        let right = p36e_metadata_string_by_key(vm, other, key)?;
+                        if !af_objects_equal(vm, &left, &right)? {
+                            equal = false;
+                            break;
+                        }
+                    }
+                    0 if p36e_metadata_long_by_key(vm, recv, key)?
+                        != p36e_metadata_long_by_key(vm, other, key)? =>
+                    {
+                        equal = false;
+                        break;
+                    }
+                    0 => {}
+                    _ => {}
+                }
+            }
+            Value::Int(i32::from(equal))
+        }
+        ("hashCode", "()I") => {
+            let mut hash: i32 = 17;
+            for (key, kind) in P36E_METADATA_KEYS {
+                match kind {
+                    1 => {
+                        let text = p36e_metadata_string_by_key(vm, recv, key)?;
+                        let object_hash = p36e_objects_hash(vm, std::slice::from_ref(&text))?;
+                        hash = hash.wrapping_mul(31).wrapping_add(object_hash);
+                    }
+                    0 => {
+                        let value = p36e_metadata_long_by_key(vm, recv, key)?;
+                        hash = hash.wrapping_mul(31).wrapping_add(sysos_long_hash(value));
+                    }
+                    _ => {}
+                }
+            }
+            Value::Int(hash)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_metadata_builder_put(
+    vm: &mut Engine,
+    receiver: ObjRef,
+    args: &[Value],
+    expected_kind: i32,
+    kind_name: &str,
+    bundle_method: &str,
+    bundle_sig: &str,
+) -> Result<Value, VmExit> {
+    let key_text = opt_str_arg(vm, args, 0);
+    if let Some(key_text) = key_text.as_deref() {
+        if let Some(kind) = p36e_metadata_key_type(key_text) {
+            if kind != expected_kind {
+                return Err(iae(format!(
+                    "The {key_text} key cannot be used to put a {kind_name}"
+                )));
+            }
+        }
+    }
+    let bundle = p36e_bundle_ref(vm, receiver)?;
+    let key = p36a_value(args, 0);
+    let value = p36a_value(args, 1);
+    vm.invoke_instance(bundle, bundle_method, bundle_sig, &[key, value])?;
+    Ok(Value::Obj(receiver))
+}
+
+fn p36e_media_metadata_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            let bundle = empty_bundle(vm)?;
+            put(vm, recv, "mBundle", bundle)?;
+            put(vm, recv, "mBitmapDimensionLimit", Value::Int(i32::MAX))?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/media/MediaMetadata;)V") => {
+            let source = match p36a_value(args, 0) {
+                Value::Obj(source) => source,
+                _ => return Err(npe("")),
+            };
+            let source_bundle = get(vm, source, "mBundle");
+            let bundle = p36e_clone_bundle(vm, &source_bundle)?;
+            put(vm, recv, "mBundle", bundle)?;
+            put(
+                vm,
+                recv,
+                "mBitmapDimensionLimit",
+                Value::Int(field_int(vm, source, "mBitmapDimensionLimit")),
+            )?;
+            Value::Null
+        }
+        (
+            "putText",
+            "(Ljava/lang/String;Ljava/lang/CharSequence;)Landroid/media/MediaMetadata$Builder;",
+        ) => p36e_metadata_builder_put(
+            vm,
+            recv,
+            args,
+            1,
+            "CharSequence",
+            "putCharSequence",
+            "(Ljava/lang/String;Ljava/lang/CharSequence;)V",
+        )?,
+        (
+            "putString",
+            "(Ljava/lang/String;Ljava/lang/String;)Landroid/media/MediaMetadata$Builder;",
+        ) => p36e_metadata_builder_put(
+            vm,
+            recv,
+            args,
+            1,
+            "String",
+            "putCharSequence",
+            "(Ljava/lang/String;Ljava/lang/CharSequence;)V",
+        )?,
+        ("putLong", "(Ljava/lang/String;J)Landroid/media/MediaMetadata$Builder;") => {
+            p36e_metadata_builder_put(
+                vm,
+                recv,
+                args,
+                0,
+                "long",
+                "putLong",
+                "(Ljava/lang/String;J)V",
+            )?
+        }
+        (
+            "putRating",
+            "(Ljava/lang/String;Landroid/media/Rating;)Landroid/media/MediaMetadata$Builder;",
+        ) => p36e_metadata_builder_put(
+            vm,
+            recv,
+            args,
+            3,
+            "Rating",
+            "putParcelable",
+            "(Ljava/lang/String;Landroid/os/Parcelable;)V",
+        )?,
+        (
+            "putBitmap",
+            "(Ljava/lang/String;Landroid/graphics/Bitmap;)Landroid/media/MediaMetadata$Builder;",
+        ) => p36e_metadata_builder_put(
+            vm,
+            recv,
+            args,
+            2,
+            "Bitmap",
+            "putParcelable",
+            "(Ljava/lang/String;Landroid/os/Parcelable;)V",
+        )?,
+        ("setBitmapDimensionLimit", "(I)Landroid/media/MediaMetadata$Builder;") => {
+            let limit = iarg(args, 0);
+            if limit > 0 {
+                put(vm, recv, "mBitmapDimensionLimit", Value::Int(limit))?;
+            }
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/media/MediaMetadata;") => {
+            let limit = field_int(vm, recv, "mBitmapDimensionLimit");
+            if limit != i32::MAX {
+                let bundle = p36e_bundle_ref(vm, recv)?;
+                let key_set = vm.invoke_instance(bundle, "keySet", "()Ljava/util/Set;", &[])?;
+                for key in collection_items(vm, Some(&key_set)) {
+                    let stored = vm.invoke_instance(
+                        bundle,
+                        "get",
+                        "(Ljava/lang/String;)Ljava/lang/Object;",
+                        std::slice::from_ref(&key),
+                    )?;
+                    let Value::Obj(bitmap) = stored else {
+                        continue;
+                    };
+                    if !vm
+                        .cp
+                        .is_subtype(&class_of(vm, bitmap), "Landroid/graphics/Bitmap;")
+                    {
+                        continue;
+                    }
+                    let width = vm
+                        .invoke_instance(bitmap, "getWidth", "()I", &[])?
+                        .as_int()
+                        .unwrap_or(0);
+                    let height = vm
+                        .invoke_instance(bitmap, "getHeight", "()I", &[])?
+                        .as_int()
+                        .unwrap_or(0);
+                    if width > limit || height > limit {
+                        let scale = (limit as f32 / width as f32).min(limit as f32 / height as f32);
+                        let scaled_width = (width as f32 * scale) as i32;
+                        let scaled_height = (height as f32 * scale) as i32;
+                        let scaled = vm.invoke_static(
+                            "Landroid/graphics/Bitmap;",
+                            "createScaledBitmap",
+                            "(Landroid/graphics/Bitmap;IIZ)Landroid/graphics/Bitmap;",
+                            &[
+                                Value::Obj(bitmap),
+                                Value::Int(scaled_width),
+                                Value::Int(scaled_height),
+                                Value::Int(1),
+                            ],
+                        )?;
+                        vm.invoke_instance(
+                            recv,
+                            "putBitmap",
+                            "(Ljava/lang/String;Landroid/graphics/Bitmap;)Landroid/media/MediaMetadata$Builder;",
+                            &[key, scaled],
+                        )?;
+                    }
+                }
+            }
+            let bundle = get(vm, recv, "mBundle");
+            p36e_new(
+                vm,
+                P36E_MEDIA_METADATA,
+                "(Landroid/os/Bundle;I)V",
+                &[bundle, Value::Int(limit)],
+            )?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_playback_state_name(state: i32) -> &'static str {
+    match state {
+        0 => "NONE",
+        1 => "STOPPED",
+        2 => "PAUSED",
+        3 => "PLAYING",
+        4 => "FAST_FORWARDING",
+        5 => "REWINDING",
+        6 => "BUFFERING",
+        7 => "ERROR",
+        8 => "CONNECTING",
+        9 => "SKIPPING_TO_PREVIOUS",
+        10 => "SKIPPING_TO_NEXT",
+        11 => "SKIPPING_TO_QUEUE_ITEM",
+        _ => "UNKNOWN",
+    }
+}
+
+fn p36e_playback_state_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(IJJFJJLjava/util/List;JLjava/lang/CharSequence;Landroid/os/Bundle;)V") => {
+            put(vm, recv, "mState", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mPosition", Value::Long(larg(args, 1)))?;
+            put(vm, recv, "mUpdateTime", Value::Long(larg(args, 2)))?;
+            put(vm, recv, "mSpeed", Value::Float(farg(args, 3)))?;
+            put(vm, recv, "mBufferedPosition", Value::Long(larg(args, 4)))?;
+            put(vm, recv, "mActions", Value::Long(larg(args, 5)))?;
+            let custom = p36a_value(args, 6);
+            let copied = p36e_new_list(vm, p36e_list_items(vm, &custom))?;
+            put(vm, recv, "mCustomActions", copied)?;
+            put(vm, recv, "mActiveItemId", Value::Long(larg(args, 7)))?;
+            put(vm, recv, "mErrorMessage", p36a_value(args, 8))?;
+            put(vm, recv, "mExtras", p36a_value(args, 9))?;
+            Value::Null
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let state = field_int(vm, recv, "mState");
+            let custom = get(vm, recv, "mCustomActions");
+            let custom_text = value_string(vm, &custom)?;
+            let error = get(vm, recv, "mErrorMessage");
+            let error_text = value_string(vm, &error)?;
+            jstr(
+                vm,
+                format!(
+                    "PlaybackState {{state={}({state}), position={}, buffered position={}, speed={}, updated={}, actions={}, custom actions={custom_text}, active item id={}, error={error_text}}}",
+                    p36e_playback_state_name(state),
+                    field_long(vm, recv, "mPosition"),
+                    field_long(vm, recv, "mBufferedPosition"),
+                    crate::repr::java_float(field_float(vm, recv, "mSpeed")),
+                    field_long(vm, recv, "mUpdateTime"),
+                    field_long(vm, recv, "mActions"),
+                    field_long(vm, recv, "mActiveItemId"),
+                ),
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        ("getState", "()I") => get(vm, recv, "mState"),
+        ("getPosition", "()J") => get(vm, recv, "mPosition"),
+        ("getBufferedPosition", "()J") => get(vm, recv, "mBufferedPosition"),
+        ("getPlaybackSpeed", "()F") => get(vm, recv, "mSpeed"),
+        ("getActions", "()J") => get(vm, recv, "mActions"),
+        ("getCustomActions", "()Ljava/util/List;") => get(vm, recv, "mCustomActions"),
+        ("getErrorMessage", "()Ljava/lang/CharSequence;") => get(vm, recv, "mErrorMessage"),
+        ("getLastPositionUpdateTime", "()J") => get(vm, recv, "mUpdateTime"),
+        ("getActiveQueueItemId", "()J") => get(vm, recv, "mActiveItemId"),
+        ("getExtras", "()Landroid/os/Bundle;") => get(vm, recv, "mExtras"),
+        ("isActive", "()Z") => Value::Int(i32::from(matches!(
+            field_int(vm, recv, "mState"),
+            3 | 4 | 5 | 6 | 8 | 9 | 10 | 11
+        ))),
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_playback_builder_defaults(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    let custom = p36e_new_list(vm, Vec::new())?;
+    put(vm, recv, "mCustomActions", custom)?;
+    put(vm, recv, "mState", Value::Int(0))?;
+    put(vm, recv, "mPosition", Value::Long(0))?;
+    put(vm, recv, "mBufferedPosition", Value::Long(0))?;
+    put(vm, recv, "mSpeed", Value::Float(0.0))?;
+    put(vm, recv, "mActions", Value::Long(0))?;
+    put(vm, recv, "mErrorMessage", Value::Null)?;
+    put(vm, recv, "mUpdateTime", Value::Long(0))?;
+    put(vm, recv, "mActiveItemId", Value::Long(-1))?;
+    put(vm, recv, "mExtras", Value::Null)
+}
+
+fn p36e_playback_state_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => {
+            p36e_playback_builder_defaults(vm, recv)?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/media/session/PlaybackState;)V") => {
+            p36e_playback_builder_defaults(vm, recv)?;
+            if let Value::Obj(source) = p36a_value(args, 0) {
+                put(
+                    vm,
+                    recv,
+                    "mState",
+                    Value::Int(field_int(vm, source, "mState")),
+                )?;
+                put(
+                    vm,
+                    recv,
+                    "mPosition",
+                    Value::Long(field_long(vm, source, "mPosition")),
+                )?;
+                put(
+                    vm,
+                    recv,
+                    "mBufferedPosition",
+                    Value::Long(field_long(vm, source, "mBufferedPosition")),
+                )?;
+                put(
+                    vm,
+                    recv,
+                    "mSpeed",
+                    Value::Float(field_float(vm, source, "mSpeed")),
+                )?;
+                put(
+                    vm,
+                    recv,
+                    "mActions",
+                    Value::Long(field_long(vm, source, "mActions")),
+                )?;
+                let source_custom = get(vm, source, "mCustomActions");
+                if matches!(source_custom, Value::Obj(_)) {
+                    let copied =
+                        p36e_new_list(vm, p36e_list_items(vm, &source_custom))?;
+                    put(vm, recv, "mCustomActions", copied)?;
+                }
+                put(vm, recv, "mErrorMessage", get(vm, source, "mErrorMessage"))?;
+                put(
+                    vm,
+                    recv,
+                    "mUpdateTime",
+                    Value::Long(field_long(vm, source, "mUpdateTime")),
+                )?;
+                put(
+                    vm,
+                    recv,
+                    "mActiveItemId",
+                    Value::Long(field_long(vm, source, "mActiveItemId")),
+                )?;
+                put(vm, recv, "mExtras", get(vm, source, "mExtras"))?;
+            }
+            Value::Null
+        }
+        (
+            "setState",
+            "(IJFJ)Landroid/media/session/PlaybackState$Builder;",
+        ) => {
+            put(vm, recv, "mState", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mPosition", Value::Long(larg(args, 1)))?;
+            put(vm, recv, "mSpeed", Value::Float(farg(args, 2)))?;
+            put(vm, recv, "mUpdateTime", Value::Long(larg(args, 3)))?;
+            Value::Obj(recv)
+        }
+        ("setState", "(IJF)Landroid/media/session/PlaybackState$Builder;") => {
+            let now = vm.invoke_static(
+                "Landroid/os/SystemClock;",
+                "elapsedRealtime",
+                "()J",
+                &[],
+            )?;
+            put(vm, recv, "mState", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mPosition", Value::Long(larg(args, 1)))?;
+            put(vm, recv, "mSpeed", Value::Float(farg(args, 2)))?;
+            put(vm, recv, "mUpdateTime", now)?;
+            Value::Obj(recv)
+        }
+        ("setActions", "(J)Landroid/media/session/PlaybackState$Builder;") => {
+            put(vm, recv, "mActions", Value::Long(larg(args, 0)))?;
+            Value::Obj(recv)
+        }
+        (
+            "addCustomAction",
+            "(Ljava/lang/String;Ljava/lang/String;I)Landroid/media/session/PlaybackState$Builder;",
+        ) => {
+            let action = p36e_new(
+                vm,
+                P36E_CUSTOM_ACTION,
+                "(Ljava/lang/String;Ljava/lang/CharSequence;ILandroid/os/Bundle;)V",
+                &[
+                    p36a_value(args, 0),
+                    p36a_value(args, 1),
+                    Value::Int(iarg(args, 2)),
+                    Value::Null,
+                ],
+            )?;
+            vm.invoke_instance(
+                recv,
+                "addCustomAction",
+                "(Landroid/media/session/PlaybackState$CustomAction;)Landroid/media/session/PlaybackState$Builder;",
+                std::slice::from_ref(&action),
+            )?
+        }
+        (
+            "addCustomAction",
+            "(Landroid/media/session/PlaybackState$CustomAction;)Landroid/media/session/PlaybackState$Builder;",
+        ) => {
+            let action = p36a_value(args, 0);
+            if !matches!(action, Value::Obj(_)) {
+                return Err(iae(
+                    "You may not add a null CustomAction to PlaybackState.",
+                ));
+            }
+            let list = get(vm, recv, "mCustomActions");
+            p36e_list_add(vm, &list, action)?;
+            Value::Obj(recv)
+        }
+        (
+            "setBufferedPosition",
+            "(J)Landroid/media/session/PlaybackState$Builder;",
+        ) => {
+            put(vm, recv, "mBufferedPosition", Value::Long(larg(args, 0)))?;
+            Value::Obj(recv)
+        }
+        (
+            "setActiveQueueItemId",
+            "(J)Landroid/media/session/PlaybackState$Builder;",
+        ) => {
+            put(vm, recv, "mActiveItemId", Value::Long(larg(args, 0)))?;
+            Value::Obj(recv)
+        }
+        (
+            "setErrorMessage",
+            "(Ljava/lang/CharSequence;)Landroid/media/session/PlaybackState$Builder;",
+        ) => {
+            put(vm, recv, "mErrorMessage", p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        (
+            "setExtras",
+            "(Landroid/os/Bundle;)Landroid/media/session/PlaybackState$Builder;",
+        ) => {
+            put(vm, recv, "mExtras", p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/media/session/PlaybackState;") => {
+            let values = [
+                Value::Int(field_int(vm, recv, "mState")),
+                Value::Long(field_long(vm, recv, "mPosition")),
+                Value::Long(field_long(vm, recv, "mUpdateTime")),
+                Value::Float(field_float(vm, recv, "mSpeed")),
+                Value::Long(field_long(vm, recv, "mBufferedPosition")),
+                Value::Long(field_long(vm, recv, "mActions")),
+                get(vm, recv, "mCustomActions"),
+                Value::Long(field_long(vm, recv, "mActiveItemId")),
+                get(vm, recv, "mErrorMessage"),
+                get(vm, recv, "mExtras"),
+            ];
+            p36e_new(
+                vm,
+                P36E_PLAYBACK_STATE,
+                "(IJJFJJLjava/util/List;JLjava/lang/CharSequence;Landroid/os/Bundle;)V",
+                &values,
+            )?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_custom_action_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Ljava/lang/String;Ljava/lang/CharSequence;ILandroid/os/Bundle;)V") => {
+            put(vm, recv, "mAction", p36a_value(args, 0))?;
+            put(vm, recv, "mName", p36a_value(args, 1))?;
+            put(vm, recv, "mIcon", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mExtras", p36a_value(args, 3))?;
+            Value::Null
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        ("getAction", "()Ljava/lang/String;") => get(vm, recv, "mAction"),
+        ("getName", "()Ljava/lang/CharSequence;") => get(vm, recv, "mName"),
+        ("getIcon", "()I") => get(vm, recv, "mIcon"),
+        ("getExtras", "()Landroid/os/Bundle;") => get(vm, recv, "mExtras"),
+        ("toString", "()Ljava/lang/String;") => {
+            let name_value = get(vm, recv, "mName");
+            let extras_value = get(vm, recv, "mExtras");
+            let name_text = value_string(vm, &name_value)?;
+            let extras_text = value_string(vm, &extras_value)?;
+            jstr(
+                vm,
+                format!(
+                    "Action:mName='{name_text}, mIcon={}, mExtras={extras_text}",
+                    field_int(vm, recv, "mIcon")
+                ),
+            )?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_custom_action_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Ljava/lang/String;Ljava/lang/CharSequence;I)V") => {
+            let action = p36a_value(args, 0);
+            if p36e_is_empty_text(vm, &action)? {
+                return Err(iae("You must specify an action to build a CustomAction."));
+            }
+            let name_value = p36a_value(args, 1);
+            if p36e_is_empty_text(vm, &name_value)? {
+                return Err(iae("You must specify a name to build a CustomAction."));
+            }
+            if iarg(args, 2) == 0 {
+                return Err(iae(
+                    "You must specify an icon resource id to build a CustomAction.",
+                ));
+            }
+            put(vm, recv, "mAction", action)?;
+            put(vm, recv, "mName", name_value)?;
+            put(vm, recv, "mIcon", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mExtras", Value::Null)?;
+            Value::Null
+        }
+        (
+            "setExtras",
+            "(Landroid/os/Bundle;)Landroid/media/session/PlaybackState$CustomAction$Builder;",
+        ) => {
+            put(vm, recv, "mExtras", p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/media/session/PlaybackState$CustomAction;") => {
+            let values = [
+                get(vm, recv, "mAction"),
+                get(vm, recv, "mName"),
+                Value::Int(field_int(vm, recv, "mIcon")),
+                get(vm, recv, "mExtras"),
+            ];
+            p36e_new(
+                vm,
+                P36E_CUSTOM_ACTION,
+                "(Ljava/lang/String;Ljava/lang/CharSequence;ILandroid/os/Bundle;)V",
+                &values,
+            )?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_queue_item_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/media/MediaDescription;J)V") => {
+            if !matches!(p36a_value(args, 0), Value::Obj(_)) {
+                return Err(iae("Description cannot be null."));
+            }
+            if larg(args, 1) == -1 {
+                return Err(iae("Id cannot be QueueItem.UNKNOWN_ID"));
+            }
+            put(vm, recv, "mDescription", p36a_value(args, 0))?;
+            put(vm, recv, "mId", Value::Long(larg(args, 1)))?;
+            Value::Null
+        }
+        ("getDescription", "()Landroid/media/MediaDescription;") => get(vm, recv, "mDescription"),
+        ("getQueueId", "()J") => get(vm, recv, "mId"),
+        ("describeContents", "()I") => Value::Int(0),
+        ("toString", "()Ljava/lang/String;") => {
+            let description = get(vm, recv, "mDescription");
+            let description_text = value_string(vm, &description)?;
+            jstr(
+                vm,
+                format!(
+                    "MediaSession.QueueItem {{Description={description_text}, Id={} }}",
+                    field_long(vm, recv, "mId")
+                ),
+            )?
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let other = match p36a_value(args, 0) {
+                Value::Obj(other) if vm.cp.is_subtype(&class_of(vm, other), P36E_QUEUE_ITEM) => {
+                    other
+                }
+                _ => return Ok(Some(Value::Int(0))),
+            };
+            if field_long(vm, recv, "mId") != field_long(vm, other, "mId") {
+                return Ok(Some(Value::Int(0)));
+            }
+            let left = get(vm, recv, "mDescription");
+            let right = get(vm, other, "mDescription");
+            Value::Int(i32::from(af_objects_equal(vm, &left, &right)?))
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_media_session_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/content/Context;Ljava/lang/String;)V")
+        | ("<init>", "(Landroid/content/Context;Ljava/lang/String;Landroid/os/Bundle;)V") => {
+            if !matches!(p36a_value(args, 0), Value::Obj(_)) {
+                return Err(iae("context cannot be null."));
+            }
+            let tag = p36a_value(args, 1);
+            if p36e_is_empty_text(vm, &tag)? {
+                return Err(iae("tag cannot be null or empty"));
+            }
+            put(vm, recv, "mContext", p36a_value(args, 0))?;
+            put(vm, recv, "mActive", Value::Int(0))?;
+            return Err(throw(
+                "Ljava/lang/RuntimeException;",
+                "Remote error creating session.",
+            ));
+        }
+        ("isActive", "()Z") => Value::Int(i32::from(field_bool(vm, recv, "mActive"))),
+        ("getSessionToken", "()Landroid/media/session/MediaSession$Token;") => {
+            get(vm, recv, "mSessionToken")
+        }
+        ("getController", "()Landroid/media/session/MediaController;") => {
+            get(vm, recv, "mController")
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_session_listeners_map(vm: &mut Engine, recv: ObjRef) -> Result<ObjRef, VmExit> {
+    if let Some(map) = field_obj(vm, recv, "mListeners") {
+        return Ok(map);
+    }
+    let map = p36e_new_map(vm, "Landroid/util/ArrayMap;")?;
+    put(vm, recv, "mListeners", Value::Obj(map))?;
+    Ok(map)
+}
+
+fn p36e_add_session_listener(
+    vm: &mut Engine,
+    recv: ObjRef,
+    listener: Value,
+    executor: Value,
+) -> Result<Value, VmExit> {
+    if !matches!(listener, Value::Obj(_)) {
+        return Err(npe("sessionListener shouldn't be null"));
+    }
+    let map = p36e_session_listeners_map(vm, recv)?;
+    let present = map_entries(vm, Some(&Value::Obj(map)))
+        .iter()
+        .any(|(existing, _)| *existing == listener);
+    if present {
+        return Ok(Value::Null);
+    }
+    let wrapper = alloc_obj(
+        vm,
+        "Landroid/media/session/MediaSessionManager$SessionsChangedWrapper;",
+        Vec::new(),
+    )?;
+    put(vm, wrapper, "mContext", get(vm, recv, "mContext"))?;
+    put(vm, wrapper, "mListener", listener.clone())?;
+    put(vm, wrapper, "mExecutor", executor)?;
+    p36e_map_put_identity(vm, map, listener, Value::Obj(wrapper))?;
+    Ok(Value::Null)
+}
+
+fn p36e_media_session_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/content/Context;)V") => {
+            put(vm, recv, "mContext", p36a_value(args, 0))?;
+            put(vm, recv, "mService", Value::Null)?;
+            let map = p36e_new_map(vm, "Landroid/util/ArrayMap;")?;
+            put(vm, recv, "mListeners", Value::Obj(map))?;
+            Value::Null
+        }
+        (
+            "createSession",
+            "(Landroid/media/session/MediaSession$CallbackStub;Ljava/lang/String;Landroid/os/Bundle;)Landroid/media/session/ISession;",
+        ) => {
+            if !matches!(p36a_value(args, 0), Value::Obj(_)) {
+                return Err(npe("cbStub shouldn't be null"));
+            }
+            if !matches!(p36a_value(args, 1), Value::Obj(_)) {
+                return Err(npe("tag shouldn't be null"));
+            }
+            return Err(throw(
+                "Ljava/lang/RuntimeException;",
+                "Remote error creating session.",
+            ));
+        }
+        ("notifySession2Created", "(Landroid/media/Session2Token;)V") => Value::Null,
+        ("getActiveSessions", "(Landroid/content/ComponentName;)Ljava/util/List;") => {
+            p36e_new_list(vm, Vec::new())?
+        }
+        (
+            "getActiveSessionsForUser",
+            "(Landroid/content/ComponentName;Landroid/os/UserHandle;)Ljava/util/List;",
+        ) => {
+            if !matches!(p36a_value(args, 1), Value::Obj(_)) {
+                return Err(npe("userHandle shouldn't be null"));
+            }
+            p36e_new_list(vm, Vec::new())?
+        }
+        ("getMediaKeyEventSession", "()Landroid/media/session/MediaSession$Token;") => {
+            Value::Null
+        }
+        ("getMediaKeyEventSessionPackageName", "()Ljava/lang/String;") => jstr(vm, "")?,
+        ("getSession2Tokens", "()Ljava/util/List;") => p36e_new_list(vm, Vec::new())?,
+        (
+            "addOnActiveSessionsChangedListener",
+            "(Landroid/media/session/MediaSessionManager$OnActiveSessionsChangedListener;Landroid/content/ComponentName;)V",
+        ) => p36e_add_session_listener(vm, recv, p36a_value(args, 0), Value::Null)?,
+        (
+            "addOnActiveSessionsChangedListener",
+            "(Landroid/media/session/MediaSessionManager$OnActiveSessionsChangedListener;Landroid/content/ComponentName;Landroid/os/Handler;)V",
+        ) => p36e_add_session_listener(vm, recv, p36a_value(args, 0), p36a_value(args, 2))?,
+        (
+            "addOnActiveSessionsChangedListener",
+            "(Landroid/content/ComponentName;Landroid/os/UserHandle;Ljava/util/concurrent/Executor;Landroid/media/session/MediaSessionManager$OnActiveSessionsChangedListener;)V",
+        ) => {
+            if !matches!(p36a_value(args, 1), Value::Obj(_)) {
+                return Err(npe("userHandle shouldn't be null"));
+            }
+            if !matches!(p36a_value(args, 2), Value::Obj(_)) {
+                return Err(npe("executor shouldn't be null"));
+            }
+            p36e_add_session_listener(vm, recv, p36a_value(args, 3), p36a_value(args, 2))?
+        }
+        (
+            "removeOnActiveSessionsChangedListener",
+            "(Landroid/media/session/MediaSessionManager$OnActiveSessionsChangedListener;)V",
+        ) => {
+            let listener = p36a_value(args, 0);
+            if !matches!(listener, Value::Obj(_)) {
+                return Err(npe("sessionListener shouldn't be null"));
+            }
+            let map = p36e_session_listeners_map(vm, recv)?;
+            let _ = p36e_map_remove_identity(vm, map, &listener);
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_browser_state_label(state: i32) -> String {
+    match state {
+        0 => "CONNECT_STATE_DISCONNECTING".to_string(),
+        1 => "CONNECT_STATE_DISCONNECTED".to_string(),
+        2 => "CONNECT_STATE_CONNECTING".to_string(),
+        3 => "CONNECT_STATE_CONNECTED".to_string(),
+        4 => "CONNECT_STATE_SUSPENDED".to_string(),
+        _ => format!("UNKNOWN/{state}"),
+    }
+}
+
+fn p36e_browser_subscriptions_map(vm: &mut Engine, recv: ObjRef) -> Result<ObjRef, VmExit> {
+    if let Some(map) = field_obj(vm, recv, "mSubscriptions") {
+        return Ok(map);
+    }
+    let map = p36e_new_map(vm, "Landroid/util/ArrayMap;")?;
+    put(vm, recv, "mSubscriptions", Value::Obj(map))?;
+    Ok(map)
+}
+
+fn p36e_bundle_int_option(vm: &mut Engine, bundle: ObjRef, key: &str) -> Result<i32, VmExit> {
+    let key = jstr(vm, key.to_string())?;
+    Ok(vm
+        .invoke_instance(
+            bundle,
+            "getInt",
+            "(Ljava/lang/String;I)I",
+            &[key, Value::Int(-1)],
+        )?
+        .as_int()
+        .unwrap_or(-1))
+}
+
+fn p36e_same_browser_options(vm: &mut Engine, left: &Value, right: &Value) -> Result<bool, VmExit> {
+    if left == right {
+        return Ok(true);
+    }
+    let page = "android.media.browse.extra.PAGE";
+    let page_size = "android.media.browse.extra.PAGE_SIZE";
+    match (left, right) {
+        (Value::Null, Value::Obj(bundle)) | (Value::Obj(bundle), Value::Null) => {
+            Ok(p36e_bundle_int_option(vm, *bundle, page)? == -1
+                && p36e_bundle_int_option(vm, *bundle, page_size)? == -1)
+        }
+        (Value::Obj(left_ref), Value::Obj(right_ref)) => {
+            Ok(p36e_bundle_int_option(vm, *left_ref, page)?
+                == p36e_bundle_int_option(vm, *right_ref, page)?
+                && p36e_bundle_int_option(vm, *left_ref, page_size)?
+                    == p36e_bundle_int_option(vm, *right_ref, page_size)?)
+        }
+        _ => Ok(false),
+    }
+}
+
+fn p36e_subscription_put_callback(
+    vm: &mut Engine,
+    subscription: ObjRef,
+    options: Value,
+    callback: Value,
+) -> Result<(), VmExit> {
+    let callbacks_value = get(vm, subscription, "mCallbacks");
+    let options_value = get(vm, subscription, "mOptionsList");
+    let mut callbacks = p36e_list_items(vm, &callbacks_value);
+    let existing_options = p36e_list_items(vm, &options_value);
+    for (index, existing) in existing_options.iter().enumerate() {
+        if p36e_same_browser_options(vm, existing, &options)? {
+            if index < callbacks.len() {
+                callbacks[index] = callback;
+            } else {
+                callbacks.push(callback);
+            }
+            p36e_replace_list(vm, subscription, "mCallbacks", callbacks)?;
+            return Ok(());
+        }
+    }
+    p36e_list_add(vm, &callbacks_value, callback)?;
+    p36e_list_add(vm, &options_value, options)
+}
+
+fn p36e_media_browser_subscribe(
+    vm: &mut Engine,
+    recv: ObjRef,
+    parent: Value,
+    options: Value,
+    callback: Value,
+) -> Result<Value, VmExit> {
+    if p36e_is_empty_text(vm, &parent)? {
+        return Err(iae("parentId cannot be empty."));
+    }
+    if !matches!(callback, Value::Obj(_)) {
+        return Err(iae("callback cannot be null"));
+    }
+    let map = p36e_browser_subscriptions_map(vm, recv)?;
+    let subscription = match p36e_map_get_string(vm, map, &parent) {
+        Some(Value::Obj(subscription)) => subscription,
+        _ => {
+            let subscription = alloc_obj(vm, P36E_SUBSCRIPTION, Vec::new())?;
+            let callbacks = p36e_new_list(vm, Vec::new())?;
+            let options_list = p36e_new_list(vm, Vec::new())?;
+            put(vm, subscription, "mCallbacks", callbacks)?;
+            put(vm, subscription, "mOptionsList", options_list)?;
+            p36e_map_put_string(vm, map, parent, Value::Obj(subscription))?;
+            subscription
+        }
+    };
+    p36e_subscription_put_callback(vm, subscription, options, callback)?;
+    Ok(Value::Null)
+}
+
+fn p36e_media_browser_unsubscribe(
+    vm: &mut Engine,
+    recv: ObjRef,
+    parent: Value,
+    callback: Option<Value>,
+) -> Result<Value, VmExit> {
+    if p36e_is_empty_text(vm, &parent)? {
+        return Err(iae("parentId cannot be empty."));
+    }
+    let map = p36e_browser_subscriptions_map(vm, recv)?;
+    let Some(Value::Obj(subscription)) = p36e_map_get_string(vm, map, &parent) else {
+        return Ok(Value::Null);
+    };
+    let Some(callback) = callback else {
+        let _ = p36e_map_remove_string(vm, map, &parent);
+        return Ok(Value::Null);
+    };
+    let callbacks_value = get(vm, subscription, "mCallbacks");
+    let options_value = get(vm, subscription, "mOptionsList");
+    let callbacks = p36e_list_items(vm, &callbacks_value);
+    let options = p36e_list_items(vm, &options_value);
+    let mut retained_callbacks = Vec::new();
+    let mut retained_options = Vec::new();
+    for (index, existing) in callbacks.iter().enumerate() {
+        if *existing != callback {
+            retained_callbacks.push(existing.clone());
+            retained_options.push(options.get(index).cloned().unwrap_or(Value::Null));
+        }
+    }
+    let empty = retained_callbacks.is_empty();
+    p36e_replace_list(vm, subscription, "mCallbacks", retained_callbacks)?;
+    p36e_replace_list(vm, subscription, "mOptionsList", retained_options)?;
+    if empty {
+        let _ = p36e_map_remove_string(vm, map, &parent);
+    }
+    Ok(Value::Null)
+}
+
+fn p36e_media_browser_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let state = field_int(vm, recv, "mState");
+    let value = match (name, sig) {
+        (
+            "<init>",
+            "(Landroid/content/Context;Landroid/content/ComponentName;Landroid/media/browse/MediaBrowser$ConnectionCallback;Landroid/os/Bundle;)V",
+        ) => {
+            if !matches!(p36a_value(args, 0), Value::Obj(_)) {
+                return Err(iae("context must not be null"));
+            }
+            if !matches!(p36a_value(args, 1), Value::Obj(_)) {
+                return Err(iae("service component must not be null"));
+            }
+            if !matches!(p36a_value(args, 2), Value::Obj(_)) {
+                return Err(iae("connection callback must not be null"));
+            }
+            put(vm, recv, "mContext", p36a_value(args, 0))?;
+            put(vm, recv, "mServiceComponent", p36a_value(args, 1))?;
+            put(vm, recv, "mCallback", p36a_value(args, 2))?;
+            let hints = p36a_value(args, 3);
+            let hints = if matches!(hints, Value::Obj(_)) {
+                p36e_clone_bundle(vm, &hints)?
+            } else {
+                Value::Null
+            };
+            put(vm, recv, "mRootHints", hints)?;
+            put(vm, recv, "mHandler", Value::Null)?;
+            let subscriptions = p36e_new_map(vm, "Landroid/util/ArrayMap;")?;
+            put(vm, recv, "mSubscriptions", Value::Obj(subscriptions))?;
+            put(vm, recv, "mState", Value::Int(1))?;
+            put(vm, recv, "mRootId", Value::Null)?;
+            put(vm, recv, "mMediaSessionToken", Value::Null)?;
+            put(vm, recv, "mExtras", Value::Null)?;
+            put(vm, recv, "mServiceConnection", Value::Null)?;
+            put(vm, recv, "mServiceBinder", Value::Null)?;
+            put(vm, recv, "mServiceCallbacks", Value::Null)?;
+            Value::Null
+        }
+        ("connect", "()V") => {
+            if !matches!(state, 0 | 1) {
+                return Err(ise(format!(
+                    "connect() called while neither disconnecting nor disconnected (state={})",
+                    p36e_browser_state_label(state)
+                )));
+            }
+            put(vm, recv, "mState", Value::Int(2))?;
+            Value::Null
+        }
+        ("disconnect", "()V") => {
+            put(vm, recv, "mState", Value::Int(1))?;
+            put(vm, recv, "mServiceConnection", Value::Null)?;
+            put(vm, recv, "mServiceBinder", Value::Null)?;
+            put(vm, recv, "mServiceCallbacks", Value::Null)?;
+            put(vm, recv, "mRootId", Value::Null)?;
+            put(vm, recv, "mMediaSessionToken", Value::Null)?;
+            Value::Null
+        }
+        ("isConnected", "()Z") => Value::Int(i32::from(state == 3)),
+        ("getServiceComponent", "()Landroid/content/ComponentName;") => {
+            if state != 3 {
+                return Err(ise(format!(
+                    "getServiceComponent() called while not connected (state={state})"
+                )));
+            }
+            get(vm, recv, "mServiceComponent")
+        }
+        ("getRoot", "()Ljava/lang/String;") => {
+            if state != 3 {
+                return Err(ise(format!(
+                    "getRoot() called while not connected (state={})",
+                    p36e_browser_state_label(state)
+                )));
+            }
+            get(vm, recv, "mRootId")
+        }
+        ("getExtras", "()Landroid/os/Bundle;") => {
+            if state != 3 {
+                return Err(ise(format!(
+                    "getExtras() called while not connected (state={})",
+                    p36e_browser_state_label(state)
+                )));
+            }
+            get(vm, recv, "mExtras")
+        }
+        ("getSessionToken", "()Landroid/media/session/MediaSession$Token;") => {
+            if state != 3 {
+                return Err(ise(format!(
+                    "getSessionToken() called while not connected (state={state})"
+                )));
+            }
+            get(vm, recv, "mMediaSessionToken")
+        }
+        (
+            "subscribe",
+            "(Ljava/lang/String;Landroid/media/browse/MediaBrowser$SubscriptionCallback;)V",
+        ) => p36e_media_browser_subscribe(
+            vm,
+            recv,
+            p36a_value(args, 0),
+            Value::Null,
+            p36a_value(args, 1),
+        )?,
+        (
+            "subscribe",
+            "(Ljava/lang/String;Landroid/os/Bundle;Landroid/media/browse/MediaBrowser$SubscriptionCallback;)V",
+        ) => {
+            let options = p36a_value(args, 1);
+            if !matches!(options, Value::Obj(_)) {
+                return Err(iae("options cannot be null"));
+            }
+            let options = p36e_clone_bundle(vm, &options)?;
+            p36e_media_browser_subscribe(
+                vm,
+                recv,
+                p36a_value(args, 0),
+                options,
+                p36a_value(args, 2),
+            )?
+        }
+        ("unsubscribe", "(Ljava/lang/String;)V") => {
+            p36e_media_browser_unsubscribe(vm, recv, p36a_value(args, 0), None)?
+        }
+        (
+            "unsubscribe",
+            "(Ljava/lang/String;Landroid/media/browse/MediaBrowser$SubscriptionCallback;)V",
+        ) => {
+            let callback = p36a_value(args, 1);
+            if !matches!(callback, Value::Obj(_)) {
+                return Err(iae("callback cannot be null"));
+            }
+            p36e_media_browser_unsubscribe(vm, recv, p36a_value(args, 0), Some(callback))?
+        }
+        (
+            "getItem",
+            "(Ljava/lang/String;Landroid/media/browse/MediaBrowser$ItemCallback;)V",
+        ) => {
+            let media_id = p36a_value(args, 0);
+            if p36e_is_empty_text(vm, &media_id)? {
+                return Err(iae("mediaId cannot be empty."));
+            }
+            let callback = match p36a_value(args, 1) {
+                Value::Obj(callback) => callback,
+                _ => return Err(iae("cb cannot be null.")),
+            };
+            if state != 3 {
+                vm.invoke_instance(
+                    callback,
+                    "onError",
+                    "(Ljava/lang/String;)V",
+                    std::slice::from_ref(&media_id),
+                )?;
+            }
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_media_item_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/media/MediaDescription;I)V") => {
+            let description = match p36a_value(args, 0) {
+                Value::Obj(description) => description,
+                _ => return Err(iae("description cannot be null")),
+            };
+            let media_id =
+                vm.invoke_instance(description, "getMediaId", "()Ljava/lang/String;", &[])?;
+            if p36e_is_empty_text(vm, &media_id)? {
+                return Err(iae("description must have a non-empty media id"));
+            }
+            put(vm, recv, "mFlags", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mDescription", Value::Obj(description))?;
+            Value::Null
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        ("toString", "()Ljava/lang/String;") => {
+            let description = get(vm, recv, "mDescription");
+            let description_text = value_string(vm, &description)?;
+            jstr(
+                vm,
+                format!(
+                    "MediaItem{{mFlags={}, mDescription={description_text}}}",
+                    field_int(vm, recv, "mFlags")
+                ),
+            )?
+        }
+        ("getFlags", "()I") => get(vm, recv, "mFlags"),
+        ("isBrowsable", "()Z") => Value::Int(i32::from(field_int(vm, recv, "mFlags") & 1 != 0)),
+        ("isPlayable", "()Z") => Value::Int(i32::from(field_int(vm, recv, "mFlags") & 2 != 0)),
+        ("getDescription", "()Landroid/media/MediaDescription;") => get(vm, recv, "mDescription"),
+        ("getMediaId", "()Ljava/lang/String;") => {
+            let description = match get(vm, recv, "mDescription") {
+                Value::Obj(description) => description,
+                _ => return Err(npe("")),
+            };
+            vm.invoke_instance(description, "getMediaId", "()Ljava/lang/String;", &[])?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_media_browser_callback_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+) -> Result<Option<Value>, VmExit> {
+    let value = match (recv_class, name, sig) {
+        (P36E_CONNECTION_CALLBACK, "<init>", "()V") | (P36E_ITEM_CALLBACK, "<init>", "()V") => {
+            Value::Null
+        }
+        (P36E_SUBSCRIPTION_CALLBACK, "<init>", "()V") => {
+            let binder = alloc_obj(vm, "Landroid/os/Binder;", Vec::new())?;
+            put(vm, recv, "mToken", Value::Obj(binder))?;
+            Value::Null
+        }
+        (P36E_CONNECTION_CALLBACK, "onConnected", "()V")
+        | (P36E_CONNECTION_CALLBACK, "onConnectionSuspended", "()V")
+        | (P36E_CONNECTION_CALLBACK, "onConnectionFailed", "()V")
+        | (
+            P36E_SUBSCRIPTION_CALLBACK,
+            "onChildrenLoaded",
+            "(Ljava/lang/String;Ljava/util/List;)V",
+        )
+        | (
+            P36E_SUBSCRIPTION_CALLBACK,
+            "onChildrenLoaded",
+            "(Ljava/lang/String;Ljava/util/List;Landroid/os/Bundle;)V",
+        )
+        | (P36E_SUBSCRIPTION_CALLBACK, "onError", "(Ljava/lang/String;)V")
+        | (P36E_SUBSCRIPTION_CALLBACK, "onError", "(Ljava/lang/String;Landroid/os/Bundle;)V")
+        | (
+            P36E_ITEM_CALLBACK,
+            "onItemLoaded",
+            "(Landroid/media/browse/MediaBrowser$MediaItem;)V",
+        )
+        | (P36E_ITEM_CALLBACK, "onError", "(Ljava/lang/String;)V") => Value::Null,
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_projection_callbacks_map(vm: &mut Engine, recv: ObjRef) -> Result<ObjRef, VmExit> {
+    if let Some(map) = field_obj(vm, recv, "mCallbacks") {
+        return Ok(map);
+    }
+    let map = p36e_new_map(vm, "Landroid/util/ArrayMap;")?;
+    put(vm, recv, "mCallbacks", Value::Obj(map))?;
+    Ok(map)
+}
+
+fn p36e_projection_manager_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Landroid/content/Context;)V") => {
+            put(vm, recv, "mContext", p36a_value(args, 0))?;
+            put(vm, recv, "mService", Value::Null)?;
+            let callbacks = p36e_new_map(vm, "Landroid/util/ArrayMap;")?;
+            put(vm, recv, "mCallbacks", Value::Obj(callbacks))?;
+            Value::Null
+        }
+        (
+            "getMediaProjection",
+            "(ILandroid/content/Intent;)Landroid/media/projection/MediaProjection;",
+        ) => {
+            if iarg(args, 0) != -1 {
+                return Ok(Some(Value::Null));
+            }
+            let intent = match p36a_value(args, 1) {
+                Value::Obj(intent) => intent,
+                _ => return Ok(Some(Value::Null)),
+            };
+            let extra = jstr(vm, "android.media.projection.extra.EXTRA_MEDIA_PROJECTION")?;
+            let projection = vm.invoke_instance(
+                intent,
+                "getIBinderExtra",
+                "(Ljava/lang/String;)Landroid/os/IBinder;",
+                std::slice::from_ref(&extra),
+            )?;
+            if !matches!(projection, Value::Obj(_)) {
+                Value::Null
+            } else {
+                let context = get(vm, recv, "mContext");
+                p36e_new(
+                    vm,
+                    P36E_PROJECTION,
+                    "(Landroid/content/Context;Landroid/media/projection/IMediaProjection;)V",
+                    &[context, projection],
+                )?
+            }
+        }
+        ("getActiveProjectionInfo", "()Landroid/media/projection/MediaProjectionInfo;") => {
+            let service = match get(vm, recv, "mService") {
+                Value::Obj(service) => service,
+                _ => return Err(npe("")),
+            };
+            match vm.invoke_instance(
+                service,
+                "getActiveProjectionInfo",
+                "()Landroid/media/projection/MediaProjectionInfo;",
+                &[],
+            ) {
+                Err(VmExit::Exception(throwable))
+                    if throwable.class == "Landroid/os/RemoteException;" =>
+                {
+                    Value::Null
+                }
+                other => other?,
+            }
+        }
+        ("stopActiveProjection", "()V") => {
+            let service = match get(vm, recv, "mService") {
+                Value::Obj(service) => service,
+                _ => return Err(npe("")),
+            };
+            match vm.invoke_instance(service, "stopActiveProjection", "()V", &[]) {
+                Err(VmExit::Exception(throwable))
+                    if throwable.class == "Landroid/os/RemoteException;" =>
+                {
+                    Value::Null
+                }
+                other => other?,
+            }
+        }
+        (
+            "addCallback",
+            "(Landroid/media/projection/MediaProjectionManager$Callback;Landroid/os/Handler;)V",
+        ) => {
+            let callback = p36a_value(args, 0);
+            if !matches!(callback, Value::Obj(_)) {
+                return Err(iae("callback must not be null"));
+            }
+            let handler = p36a_value(args, 1);
+            let handler = if matches!(handler, Value::Obj(_)) {
+                handler
+            } else {
+                p36e_new(vm, "Landroid/os/Handler;", "()V", &[])?
+            };
+            let delegate = alloc_obj(vm, P36E_PROJECTION_CALLBACK_DELEGATE, Vec::new())?;
+            put(vm, delegate, "mCallback", callback.clone())?;
+            put(vm, delegate, "mHandler", handler)?;
+            let map = p36e_projection_callbacks_map(vm, recv)?;
+            p36e_map_put_identity(vm, map, callback, Value::Obj(delegate))?;
+            let service = match get(vm, recv, "mService") {
+                Value::Obj(service) => service,
+                _ => return Err(npe("")),
+            };
+            match vm.invoke_instance(
+                service,
+                "addCallback",
+                "(Landroid/media/projection/IMediaProjectionWatcherCallback;)V",
+                std::slice::from_ref(&Value::Obj(delegate)),
+            ) {
+                Err(VmExit::Exception(throwable))
+                    if throwable.class == "Landroid/os/RemoteException;" =>
+                {
+                    Value::Null
+                }
+                other => other?,
+            }
+        }
+        ("removeCallback", "(Landroid/media/projection/MediaProjectionManager$Callback;)V") => {
+            let callback = p36a_value(args, 0);
+            if !matches!(callback, Value::Obj(_)) {
+                return Err(iae("callback must not be null"));
+            }
+            let map = p36e_projection_callbacks_map(vm, recv)?;
+            let delegate = p36e_map_remove_identity(vm, map, &callback);
+            match delegate {
+                None => Value::Null,
+                Some(delegate) => {
+                    let service = match get(vm, recv, "mService") {
+                        Value::Obj(service) => service,
+                        _ => return Err(npe("")),
+                    };
+                    match vm.invoke_instance(
+                        service,
+                        "removeCallback",
+                        "(Landroid/media/projection/IMediaProjectionWatcherCallback;)V",
+                        std::slice::from_ref(&delegate),
+                    ) {
+                        Err(VmExit::Exception(throwable))
+                            if throwable.class == "Landroid/os/RemoteException;" =>
+                        {
+                            Value::Null
+                        }
+                        other => other?,
+                    }
+                }
+            }
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_projection_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        (
+            "<init>",
+            "(Landroid/content/Context;Landroid/media/projection/IMediaProjection;)V",
+        ) => {
+            put(vm, recv, "mContext", p36a_value(args, 0))?;
+            put(vm, recv, "mImpl", p36a_value(args, 1))?;
+            let callbacks = p36e_new_map(vm, "Landroid/util/ArrayMap;")?;
+            put(vm, recv, "mCallbacks", Value::Obj(callbacks))?;
+            Value::Null
+        }
+        (
+            "<init>",
+            "(Landroid/content/Context;Landroid/media/projection/IMediaProjection;Landroid/hardware/display/DisplayManager;)V",
+        ) => {
+            put(vm, recv, "mContext", p36a_value(args, 0))?;
+            put(vm, recv, "mImpl", p36a_value(args, 1))?;
+            put(vm, recv, "mDisplayManager", p36a_value(args, 2))?;
+            let callbacks = p36e_new_map(vm, "Landroid/util/ArrayMap;")?;
+            put(vm, recv, "mCallbacks", Value::Obj(callbacks))?;
+            Value::Null
+        }
+        (
+            "registerCallback",
+            "(Landroid/media/projection/MediaProjection$Callback;Landroid/os/Handler;)V",
+        ) => {
+            let callback = p36a_value(args, 0);
+            if !matches!(callback, Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            let handler = p36a_value(args, 1);
+            let handler = if matches!(handler, Value::Obj(_)) {
+                handler
+            } else {
+                p36e_new(vm, "Landroid/os/Handler;", "()V", &[])?
+            };
+            let record = alloc_obj(
+                vm,
+                "Landroid/media/projection/MediaProjection$CallbackRecord;",
+                Vec::new(),
+            )?;
+            put(vm, record, "mCallback", callback.clone())?;
+            put(vm, record, "mHandler", handler)?;
+            let map = p36e_projection_callbacks_map(vm, recv)?;
+            p36e_map_put_identity(vm, map, callback, Value::Obj(record))?;
+            Value::Null
+        }
+        (
+            "unregisterCallback",
+            "(Landroid/media/projection/MediaProjection$Callback;)V",
+        ) => {
+            let callback = p36a_value(args, 0);
+            if !matches!(callback, Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            let map = p36e_projection_callbacks_map(vm, recv)?;
+            let _ = p36e_map_remove_identity(vm, map, &callback);
+            Value::Null
+        }
+        ("getProjection", "()Landroid/media/projection/IMediaProjection;") => {
+            get(vm, recv, "mImpl")
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_audio_effect_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("queryEffects", "()[Landroid/media/audiofx/AudioEffect$Descriptor;") => obj_array(
+            vm,
+            "[Landroid/media/audiofx/AudioEffect$Descriptor;",
+            Vec::new(),
+        )?,
+        ("queryPreProcessings", "(I)[Landroid/media/audiofx/AudioEffect$Descriptor;") => obj_array(
+            vm,
+            "[Landroid/media/audiofx/AudioEffect$Descriptor;",
+            Vec::new(),
+        )?,
+        ("isEffectTypeAvailable", "(Ljava/util/UUID;)Z") => {
+            let descriptors = vm.invoke_static(
+                P36E_AUDIO_EFFECT,
+                "queryEffects",
+                "()[Landroid/media/audiofx/AudioEffect$Descriptor;",
+                &[],
+            )?;
+            let wanted = p36a_value(args, 0);
+            let mut available = false;
+            for descriptor in array_elems(vm, Some(&descriptors)) {
+                let Value::Obj(descriptor_ref) = descriptor else {
+                    continue;
+                };
+                let effect_type = get(vm, descriptor_ref, "type");
+                if af_objects_equal(vm, &effect_type, &wanted)? {
+                    available = true;
+                    break;
+                }
+            }
+            Value::Int(i32::from(available))
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_audio_effect_check_state(vm: &Engine, recv: ObjRef, method: &str) -> Result<(), VmExit> {
+    if field_int(vm, recv, "mState") == 1 {
+        Ok(())
+    } else {
+        Err(ise(format!(
+            "{method} called on uninitialized AudioEffect."
+        )))
+    }
+}
+
+fn p36e_audio_effect_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "(Ljava/util/UUID;Ljava/util/UUID;II)V") => {
+            if !matches!(p36a_value(args, 0), Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            if !matches!(p36a_value(args, 1), Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            return Err(throw(
+                "Ljava/lang/UnsupportedOperationException;",
+                "Effect library not loaded",
+            ));
+        }
+        ("<init>", "(Ljava/util/UUID;Landroid/media/AudioDeviceAttributes;)V") => {
+            if !matches!(p36a_value(args, 0), Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            if !matches!(p36a_value(args, 1), Value::Obj(_)) {
+                return Err(npe(""));
+            }
+            return Err(throw(
+                "Ljava/lang/UnsupportedOperationException;",
+                "Effect library not loaded",
+            ));
+        }
+        ("release", "()V") => {
+            put(vm, recv, "mState", Value::Int(0))?;
+            Value::Null
+        }
+        ("getDescriptor", "()Landroid/media/audiofx/AudioEffect$Descriptor;") => {
+            p36e_audio_effect_check_state(vm, recv, "getDescriptor()")?;
+            get(vm, recv, "mDescriptor")
+        }
+        ("setEnabled", "(Z)I") => {
+            p36e_audio_effect_check_state(vm, recv, "setEnabled()")?;
+            Value::Int(-5)
+        }
+        ("getId", "()I") => {
+            p36e_audio_effect_check_state(vm, recv, "getId()")?;
+            get(vm, recv, "mId")
+        }
+        ("getEnabled", "()Z") => {
+            p36e_audio_effect_check_state(vm, recv, "getEnabled()")?;
+            Value::Int(i32::from(field_bool(vm, recv, "mEnabled")))
+        }
+        ("hasControl", "()Z") => {
+            p36e_audio_effect_check_state(vm, recv, "hasControl()")?;
+            Value::Int(i32::from(field_bool(vm, recv, "mHasControl")))
+        }
+        ("checkState", "(Ljava/lang/String;)V") => {
+            let method = opt_str_arg(vm, args, 0).unwrap_or_default();
+            p36e_audio_effect_check_state(vm, recv, &method)?;
+            Value::Null
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn p36e_uuid_from_string(vm: &mut Engine, value: &Value) -> Result<Value, VmExit> {
+    vm.invoke_static(
+        "Ljava/util/UUID;",
+        "fromString",
+        "(Ljava/lang/String;)Ljava/util/UUID;",
+        std::slice::from_ref(value),
+    )
+}
+
+fn p36e_audio_effect_descriptor_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let value = match (name, sig) {
+        ("<init>", "()V") => Value::Null,
+        (
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+        ) => {
+            let effect_type = p36e_uuid_from_string(vm, &p36a_value(args, 0))?;
+            let uuid = p36e_uuid_from_string(vm, &p36a_value(args, 1))?;
+            put(vm, recv, "type", effect_type)?;
+            put(vm, recv, "uuid", uuid)?;
+            put(vm, recv, "connectMode", p36a_value(args, 2))?;
+            put(vm, recv, "name", p36a_value(args, 3))?;
+            put(vm, recv, "implementor", p36a_value(args, 4))?;
+            Value::Null
+        }
+        ("hashCode", "()I") => {
+            let values = [
+                get(vm, recv, "type"),
+                get(vm, recv, "uuid"),
+                get(vm, recv, "connectMode"),
+                get(vm, recv, "name"),
+                get(vm, recv, "implementor"),
+            ];
+            Value::Int(p36e_objects_hash(vm, &values)?)
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let other = match p36a_value(args, 0) {
+                Value::Obj(other) if other == recv => {
+                    return Ok(Some(Value::Int(1)));
+                }
+                Value::Obj(other)
+                    if vm.cp
+                        .is_subtype(&class_of(vm, other), P36E_AUDIO_EFFECT_DESCRIPTOR) =>
+                {
+                    other
+                }
+                _ => return Ok(Some(Value::Int(0))),
+            };
+            let mut equal = true;
+            for field in ["type", "uuid", "connectMode", "name", "implementor"] {
+                let left = get(vm, recv, field);
+                if !matches!(left, Value::Obj(_)) {
+                    return Err(npe(""));
+                }
+                let right = get(vm, other, field);
+                if !af_objects_equal(vm, &left, &right)? {
+                    equal = false;
+                    break;
+                }
+            }
+            Value::Int(i32::from(equal))
+        }
+        ("writeToParcel", "(Landroid/os/Parcel;)V") => {
+            let parcel = match p36a_value(args, 0) {
+                Value::Obj(parcel) => parcel,
+                _ => {
+                    // AOSP evaluates type.toString() before dereferencing
+                    // the parcel in the first writeString call.
+                    let effect_type = get(vm, recv, "type");
+                    let _ = value_string(vm, &effect_type)?;
+                    return Err(npe(""));
+                }
+            };
+            for field in ["type", "uuid", "connectMode", "name", "implementor"] {
+                let stored = get(vm, recv, field);
+                let rendered = value_string(vm, &stored)?;
+                let text = jstr(vm, rendered)?;
+                vm.invoke_instance(
+                    parcel,
+                    "writeString",
+                    "(Ljava/lang/String;)V",
+                    std::slice::from_ref(&text),
+                )?;
+            }
+            Value::Null
         }
         _ => return Ok(None),
     };
