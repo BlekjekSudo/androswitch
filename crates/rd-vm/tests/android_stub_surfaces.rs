@@ -21623,6 +21623,38 @@ fn credentials_entries_responses_and_service_binding_are_guest_visible() {
         ),
         P36G_NPE,
     );
+
+    // Deep audit: the (String, Slice) CredentialEntry constructor uses
+    // Objects.requireNonNull for the type (empty accepted, null NPE),
+    // unlike the other constructors' checkStringNotEmpty (IAE).
+    let entry_class = "Landroid/service/credentials/CredentialEntry;";
+    let empty_type = text(&mut engine, "");
+    let empty_typed = p49_new(
+        &mut engine,
+        entry_class,
+        "(Ljava/lang/String;Landroid/app/slice/Slice;)V",
+        &[empty_type, Value::Obj(slice)],
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            empty_typed,
+            "getType",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        ""
+    );
+    let null_typed = instance(&mut engine, entry_class);
+    assert_throws(
+        engine.invoke_instance(
+            null_typed,
+            "<init>",
+            "(Ljava/lang/String;Landroid/app/slice/Slice;)V",
+            &[Value::Null, Value::Obj(slice)],
+        ),
+        P36G_NPE,
+    );
 }
 
 #[test]
