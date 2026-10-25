@@ -190,7 +190,7 @@ milestone = "M3/M8+Literal-R3"
 notes = "Context, Intent/component/extras, broadcasts, services and ContentResolver observers have host subsets. SharedPreferences now uses canonical per-name objects backed by app-private shared_prefs/<name>.xml VFS files with typed String/int/long/float/boolean/StringSet values, listeners, remove/clear and cross-Engine persistence. Full provider IPC, multi-process preference reloading, mode enforcement and every Context service are not complete."
 evidence = ["crates/rd-vm/tests/m8.rs", "crates/rd-vm/src/prefs.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-content-partial"
-key_apis = ["android.content.Context.getSystemService", "android.content.Context.startActivity", "android.content.Intent.putExtra", "android.content.SharedPreferences.edit", "android.content.ContentResolver.notifyChange"]
+key_apis = ["android.content.Context.getSystemService", "android.content.Context.startActivity", "android.content.Context.getAssets", "android.content.Intent.putExtra", "android.content.SharedPreferences.edit", "android.content.ContentResolver.notifyChange"]
 
 [[surface]]
 id = "android-content-pm"
@@ -215,10 +215,10 @@ domain_module = "fd-content"
 module = "rd-vm/android-res"
 code = ["crates/rd-vm/src/android_res.rs", "crates/rd-vm/src/inflate.rs", "crates/rd-vm/src/xml_res.rs", "crates/rd-vm/src/jresources.rs"]
 milestone = "M3/M4"
-notes = "Resources, asset streams, configuration/display metrics and ARSC/AXML lookup for layout inflation are modelled. Provider-style resource loading and all qualifiers are not complete."
+notes = "Resources, asset streams, configuration/display metrics and ARSC/AXML lookup for layout inflation are modelled. AssetManager.open streams the real bytes of assets/ entries from the attached APK; AssetManager.list reports the first level; openFd is typed FileNotFoundException (deflated entries, AOSP parity). Provider-style resource loading and all qualifiers are not complete."
 evidence = ["docs/compat-matrix.md"]
 gap_id = "gap-android-content-res-partial"
-key_apis = ["android.content.res.Resources.getString", "android.content.res.Resources.getDrawable", "android.content.res.AssetManager.open", "android.content.res.Configuration"]
+key_apis = ["android.content.res.Resources.getString", "android.content.res.Resources.getDrawable", "android.content.res.Resources.getAssets", "android.content.res.AssetManager.open", "android.content.res.AssetManager.list", "android.content.res.Configuration"]
 
 # ===================== View/UI =====================
 [[surface]]

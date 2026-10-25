@@ -3428,3 +3428,24 @@ Task: Non-phone pendency update — Primftpd M7 continuation (2026-10-21)
 - Perf (moto-e5 estimate, 3 runs): cold emulated p50 2313ms / max 2317ms (was 2505/2781), warm p50 596ms, RSS 99.8MB PASS, heap 3.7MB PASS. Cold estimate for this heavy 11MB app remains above the 2000ms trivial-app DoD; not claimed as a pass. Profiling attempt (gprofng + symbols build) OOM-killed and was timeboxed.
 - No credential is recorded in this file. PR prepared from this tree.
 - PR #164 opened from this tree (branch m7-primftpd-launch-20261021, rebased onto main 5ba1f3e): all 10/10 GitHub CI checks pass. Perf note above stands; PR not merged.
+
+---
+Task ID: B-1 (tempchat coordenação 8873)
+Agent: B-Agent
+Task: fix(vm) — Activity.getAssets() não resolvido (derrubava 12/12 APKs do APK-Tester sdk-ladder; LadderActivity.readRungsAsset() chama getAssets().open("ladder/rungs.json"))
+
+Work Log:
+- Li RustyDroid.md (spec), CONTRIBUTING.md, docs/compat-matrix.md; sincronizei o clone na main adb6eaf (#202 LazyArsc já mergeada) e criei branch fix/context-get-assets.
+- Diagnostic: nenhuma ocorrência de AssetManager/getAssets em crates/ — a Context family de android_res.rs cobria getResources/getTheme/… mas NÃO getAssets; a surface android.content.res prometia "AssetManager.open" como key_api sem host atrás.
+- Implementei em crates/rd-vm/src/android_res.rs: constante ASSET_MANAGER + FILE_NOT_FOUND; singleton asset_manager (padrão `singleton()`); helpers asset_path_is_hostile (recusa absoluto/'..'/'.'/vazio/backslash ANTES do zip — sem pivô para fora de assets/), open_asset (bytes REAIS de assets/<file> do zip injetado → jio_chars::new_byte_input_stream; ausente → FileNotFoundException tipada) e list_assets (primeiro nível sob assets/<path>/, diretório como nome simples, subdiretório inexistente → array vazio, null → NPE — paridade AOSP).
+- Braço ASSET_MANAGER no instance_intrinsic (dispatch alcançado via intrinsics.rs:4086): <init>()V no-op; open(String) e open(String,int) (todos os ACCESS_* streamam os mesmos bytes; BAIS já suporta mark/reset p/ ACCESS_BUFFER); openFd/openNonAssetFd → FileNotFoundException "…probably compressed" (mensagem AOSP); list(String); close()V.
+- Context family: "getAssets" adicionado à lista de nomes + ("getAssets", _) => singleton (responde p/ Activity/Application/Service/ContextWrapper DEX — is_subtype Context). Resources.getAssets() → mesmo singleton (delegação AOSP).
+- classpath.rs: hierarquia Landroid/content/res/AssetManager; → AutoCloseable → Object (instanceof/checkcast).
+- Regressões (crates/rd-vm/tests/android_assets.rs, 10 testes): identidade canônica do manager; cadeia DEX REAL invoke-virtual Activity.getAssets() → AssetManager.open(String) → InputStream.read() lendo o primeiro byte exato do asset (mesma forma do teste class_loader_reads_resource_entries_from_attached_apk); open byte-a-byte + available(); FileNotFoundException para ausente E para 7 paths hostis (incl. "../AndroidManifest.xml" e "a/../../classes.dex"); NPE p/ name null; list primeiro nível + subdiretório + NPE; openFd com mensagem fiel; cobertura de receivers Context + não-Context que deve retornar None (sem fingimento); close no-op + ctor legado bare new() também lê asset real.
+- data/api-coverage.toml: surface android.content.res ganhou Resources.getAssets e AssetManager.list em key_apis + notes descrevendo streaming real/list/openFd tipado; surface android.content ganhou Context.getAssets (validador fd-api-coverage rejeita key_api fora do prefixo — aprendido na 1ª tentativa do xtask). Apêndice C regenerado (cargo xtask api-coverage-report) e compat-matrix re-sincronizado (cargo xtask compat-report).
+- Gates (rustc/cargo 1.99.1 via rustup neste sandbox; CARGO_INCREMENTAL=0 após disco): cargo fmt --all -- --check OK; cargo clippy --workspace --all-targets -- -D warnings OK; cargo test --workspace 890 passed / 0 failed (incl. 10/10 novos); cargo check --workspace --all-features --locked OK.
+
+Stage Summary:
+- Commit "fix(vm): resolve Activity.getAssets() with a real AssetManager host" sobre 8e15e67 (main pós-#203; rebase limpo de adb6eaf — #203 só tocou README/ROADMAP/appendix-c-literal, zero conflito), 6 arquivos, +668/−5: android_res.rs (host completo), classpath.rs (hierarquia), tests/android_assets.rs (10 regressões), api-coverage.toml + api-coverage.md (Apêndice C).
+- Patch format-patch (42176 bytes) publicado em paste.rs e entregue ao PR-Agent no tempchat 8873 com sha256/tree/base conferidos por download de verificação — push + PR por conta dele (token do dono).
+- Sem unsafe; sem mudança em Sentinel/CI/baselines; nenhuma API enfraquecida (Lei nº 1 preservada: erros tipados, nunca silêncio). Expectativa: 12/12 APKs do sdk-ladder passam do readRungsAsset() — validação real pendente no runner do APK-Tester (não executada aqui; APKs do ladder não estão neste sandbox).
