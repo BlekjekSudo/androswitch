@@ -18,7 +18,7 @@ The older [2026-10-14 report](appendix-g-validation.md) is historical and its
 - CLI/agent each have one feature table. Their existing `advanced-components`
   defaults and exact `native`/`jit` forwarding remain intact; LANG contracts are
   separately opt-in. Tests guard these invariants.
-- MCP remains at 41 tools. On analyzed APKs, `app_info` includes all 28
+- MCP was 41 tools in this validation run (the catalog is 47 tools today, see docs/mcp-tools.md). On analyzed APKs, `app_info` includes all 28
   engine records without launching a VM; no tool was removed to satisfy the old 32-tool assertion.
 - Generated catalog/spec/scoreboard distinguish unavailable registry adapters
   from the existing partial DEX and opt-in ELF/JNI routes. `partial_native`
@@ -53,7 +53,7 @@ The older [2026-10-14 report](appendix-g-validation.md) is historical and its
 | Registry minimal, all features, each LANG individually | All 14 configurations passed |
 | Explicit real-APK registry integration | Passed on Comprix 1.6.0, 448 ZIP entries |
 | Real CLI detect vs inspect JSON | Equal; 28 rows; `execution_claimed: false` |
-| Real MCP static detection | 41 tools; equal CLI report; `running: false` after `app_info` |
+| Real MCP static detection | 41 tools in this run (47 today); equal CLI report; `running: false` after `app_info` |
 | No-app MCP contract | 8/8 scenarios passed |
 | JVM golden gate and real vectors | Gate rejects 0/149 cases; 150/150 vectors passed |
 | Real native APKs | Five pinned APKs passed on each of x86_64, ARM64, ARMv7 |
