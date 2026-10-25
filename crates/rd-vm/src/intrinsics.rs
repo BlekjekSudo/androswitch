@@ -393,6 +393,12 @@ fn call_static_intrinsic_rooted(
     if let Some(v) = crate::jtext_format::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
+    if let Some(v) = crate::android_sysservices::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_stub_surfaces::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
     if let Some(v) = crate::jregex::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
@@ -1130,7 +1136,15 @@ fn platform_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<V
                     Some(v) => Some(v),
                     None => match crate::jnormalizer::host_static(vm, owner, field)? {
                         Some(v) => Some(v),
-                        None => crate::android_util::host_static(vm, owner, field)?,
+                        None => match crate::android_sysservices::host_static(vm, owner, field)? {
+                            Some(v) => Some(v),
+                            None => {
+                                match crate::android_stub_surfaces::host_static(vm, owner, field)? {
+                                    Some(v) => Some(v),
+                                    None => crate::android_util::host_static(vm, owner, field)?,
+                                }
+                            }
+                        },
                     },
                 },
             },
@@ -4101,6 +4115,16 @@ fn instance_intrinsic_dispatch(
     }
     if let Some(v) = crate::jtext_format::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
     {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_sysservices::instance_intrinsic(
+        vm, recv_class, mref_class, name, sig, recv, args,
+    )? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_stub_surfaces::instance_intrinsic(
+        vm, recv_class, mref_class, name, sig, recv, args,
+    )? {
         return Ok(Some(v));
     }
     if let Some(v) = crate::jregex::instance_intrinsic(vm, recv_class, name, recv, args)? {

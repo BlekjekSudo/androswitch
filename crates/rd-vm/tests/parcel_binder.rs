@@ -708,8 +708,13 @@ fn dex_interface_containers_use_function_callbacks() {
     );
 
     let list_pos = e.invoke_instance(p, "dataSize", "()I", &[]).unwrap();
-    e.invoke_instance(p, "setDataPosition", "(I)V", &[list_pos.clone()])
-        .unwrap();
+    e.invoke_instance(
+        p,
+        "setDataPosition",
+        "(I)V",
+        std::slice::from_ref(&list_pos),
+    )
+    .unwrap();
     let source_list = e
         .heap
         .alloc_instance("Ljava/util/ArrayList;".to_string(), Vec::new())
@@ -727,8 +732,13 @@ fn dex_interface_containers_use_function_callbacks() {
         &[Value::Obj(source_list)],
     )
     .unwrap();
-    e.invoke_instance(p, "setDataPosition", "(I)V", &[list_pos.clone()])
-        .unwrap();
+    e.invoke_instance(
+        p,
+        "setDataPosition",
+        "(I)V",
+        std::slice::from_ref(&list_pos),
+    )
+    .unwrap();
     let got_list = obj(e
         .invoke_instance(
             p,

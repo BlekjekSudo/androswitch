@@ -31,6 +31,7 @@
 //!
 //! **Context family.** `getResources`, `getTheme`, `obtainStyledAttributes`,
 //! `getMainLooper`, `getBaseContext`, `isRestricted`, `getAttributionTag`,
+//! `getAttributionSource`,
 //! `getText` and `getString(I, Object…)` are answered for any receiver that
 //! is a `Context` subtype. That covers Activity, Application, Service, and
 //! DEX `ContextWrapper`s, whatever class the method ref names. `getResources`
@@ -1027,6 +1028,7 @@ pub(crate) fn instance_intrinsic(
             | "getBaseContext"
             | "isRestricted"
             | "getAttributionTag"
+            | "getAttributionSource"
             | "getText"
             | "getString"
             | "getColor"
@@ -1080,6 +1082,19 @@ pub(crate) fn instance_intrinsic(
         ("getBaseContext", _) => Value::Obj(crate::intrinsics::context_impl(vm)?),
         ("isRestricted", _) => Value::Int(0),
         ("getAttributionTag", _) => Value::Null,
+        ("getAttributionSource", "()Landroid/content/AttributionSource;") => {
+            match get(vm, recv, "mAttributionSource") {
+                value @ Value::Obj(_) => value,
+                _ => {
+                    let source = vm.heap.alloc_instance(
+                        "Landroid/content/AttributionSource;".to_string(),
+                        Vec::new(),
+                    )?;
+                    put(vm, recv, "mAttributionSource", Value::Obj(source))?;
+                    Value::Obj(source)
+                }
+            }
+        }
         ("getText", "(I)Ljava/lang/CharSequence;") | ("getString", "(I)Ljava/lang/String;") => {
             let t = string_res(vm, int(0))?;
             s(vm, t)?

@@ -607,7 +607,7 @@ pub(crate) fn static_intrinsic(
     Ok(Some(v))
 }
 
-fn parse_float(t: &str) -> Result<f64, VmExit> {
+pub(crate) fn parse_float(t: &str) -> Result<f64, VmExit> {
     let s = t.trim_matches(|c: char| c <= ' ');
     let core = s.trim_end_matches(['f', 'F', 'd', 'D']);
     match core {

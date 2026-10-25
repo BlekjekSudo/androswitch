@@ -649,6 +649,15 @@ fn call_m8_instance_rooted(
         if class == "Ljava/lang/Object;" {
             return Ok(Some(Value::Null)); // unknown service name → null, as AOSP
         }
+        if class == "Landroid/net/nsd/NsdManager;" {
+            // SystemServiceRegistry registers NSD through
+            // ServiceManager.getServiceOrThrow("nsd"); no such binder is
+            // published in this profile.
+            return Err(VmExit::Exception(Throwable::new(
+                "Landroid/os/ServiceManager$ServiceNotFoundException;",
+                "No service published for: nsd",
+            )));
+        }
         let k = ("Lrd/SystemServices;".to_string(), class.clone());
         if let Some(v) = vm.statics.get(&k) {
             return Ok(Some(v.clone()));
@@ -2223,6 +2232,7 @@ const SERVICES: &[(&str, &str)] = &[
     ),
     ("location", "Landroid/location/LocationManager;"),
     ("sensor", "Landroid/hardware/SensorManager;"),
+    ("consumer_ir", "Landroid/hardware/ConsumerIrManager;"),
     (
         "accessibility",
         "Landroid/view/accessibility/AccessibilityManager;",
@@ -2248,9 +2258,16 @@ const SERVICES: &[(&str, &str)] = &[
     ),
     ("user", "Landroid/os/UserManager;"),
     ("appops", "Landroid/app/AppOpsManager;"),
+    ("account", "Landroid/accounts/AccountManager;"),
     ("batterymanager", "Landroid/os/BatteryManager;"),
     ("wifi", "Landroid/net/wifi/WifiManager;"),
+    ("device_policy", "Landroid/app/admin/DevicePolicyManager;"),
     ("telephony", "Landroid/telephony/TelephonyManager;"),
+    (
+        "telephony_subscription_service",
+        "Landroid/telephony/SubscriptionManager;",
+    ),
+    ("telecom", "Landroid/telecom/TelecomManager;"),
     ("shortcut", "Landroid/content/pm/ShortcutManager;"),
     ("appwidget", "Landroid/appwidget/AppWidgetManager;"),
     ("locale", "Landroid/app/LocaleManager;"),
@@ -2267,6 +2284,32 @@ const SERVICES: &[(&str, &str)] = &[
         "Landroid/media/session/MediaSessionManager;",
     ),
     ("usagestats", "Landroid/app/usage/UsageStatsManager;"),
+    ("usb", "Landroid/hardware/usb/UsbManager;"),
+    ("euicc", "Landroid/telephony/euicc/EuiccManager;"),
+    ("print", "Landroid/print/PrintManager;"),
+    (
+        "fingerprint",
+        "Landroid/hardware/fingerprint/FingerprintManager;",
+    ),
+    (
+        "biometric",
+        "Landroid/hardware/biometrics/BiometricManager;",
+    ),
+    ("hdmi_control", "Landroid/hardware/hdmi/HdmiControlManager;"),
+    ("input", "Landroid/hardware/input/InputManager;"),
+    ("midi", "Landroid/media/midi/MidiManager;"),
+    ("tv_input", "Landroid/media/tv/TvInputManager;"),
+    (
+        "companiondevice",
+        "Landroid/companion/CompanionDeviceManager;",
+    ),
+    ("nfc", "Landroid/nfc/NfcManager;"),
+    ("nsd", "Landroid/net/nsd/NsdManager;"),
+    ("bluetooth_manager", "Landroid/bluetooth/BluetoothManager;"),
+    (
+        "media_projection",
+        "Landroid/media/projection/MediaProjectionManager;",
+    ),
 ];
 
 fn system_service_class(key: &str) -> &'static str {

@@ -70,6 +70,8 @@ const NULLABLE: &[&str] = &[
     "getBackgroundTintList",
     "getForegroundTintList",
     "getKeyboardNavigationClusterSearch",
+    "getTransitionName",
+    "getClipBounds",
 ];
 
 const NOOP_ACTIONS: &[&str] = &[
@@ -248,6 +250,12 @@ pub(crate) fn fallback(
                 };
                 vm.view_props.insert(key, Value::Int(base.wrapping_add(d)));
             }
+            return Ok(Some(Value::Null));
+        }
+        ("suppressLayout", "(Z)V") => {
+            let v = args.first().and_then(|v| v.as_int().ok()).unwrap_or(0);
+            vm.view_props
+                .insert((recv, "LayoutSuppressed".to_string()), Value::Int(v));
             return Ok(Some(Value::Null));
         }
         ("setPadding", "(IIII)V") | ("setPaddingRelative", "(IIII)V") => {
