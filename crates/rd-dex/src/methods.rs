@@ -13,32 +13,36 @@ pub struct MethodId {
     pub name_idx: u32,
 }
 
-pub fn parse_method_ids(data: &[u8], count: u32, off: u32) -> RdResult<Vec<MethodId>> {
+pub(crate) fn validate_method_window(data: &[u8], count: u32, off: u32) -> RdResult<&[u8]> {
     let count = count as usize;
     let off = off as usize;
-    if count.checked_mul(8).is_none() {
-        return Err(RdError::parse("methods: method_ids_size overflow"));
-    }
+    let byte_len = count
+        .checked_mul(8)
+        .ok_or_else(|| RdError::parse("methods: method_ids_size overflow"))?;
     let window = data
         .get(off..)
         .ok_or_else(|| RdError::parse(format!("methods: table @ {off} além dos dados")))?;
-    if count > window.len() / 8 {
-        return Err(RdError::parse(format!(
+    window.get(..byte_len).ok_or_else(|| {
+        RdError::parse(format!(
             "methods: {} ids não cabem em {} bytes",
             count,
             window.len()
-        )));
+        ))
+    })
+}
+
+#[inline]
+pub(crate) fn decode_method_id(b: &[u8]) -> MethodId {
+    MethodId {
+        class_idx: u16::from_le_bytes([b[0], b[1]]),
+        proto_idx: u16::from_le_bytes([b[2], b[3]]),
+        name_idx: u32::from_le_bytes([b[4], b[5], b[6], b[7]]),
     }
-    let mut out = Vec::with_capacity(count);
-    for i in 0..count {
-        let base = i * 8;
-        out.push(MethodId {
-            class_idx: read::u16_at(window, base)?,
-            proto_idx: read::u16_at(window, base + 2)?,
-            name_idx: read::u32_at(window, base + 4)?,
-        });
-    }
-    Ok(out)
+}
+
+pub fn parse_method_ids(data: &[u8], count: u32, off: u32) -> RdResult<Vec<MethodId>> {
+    let window = validate_method_window(data, count, off)?;
+    Ok(window.chunks_exact(8).map(decode_method_id).collect())
 }
 
 /// encoded_method (class_data): method_idx_diff + access_flags + code_off.

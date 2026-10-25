@@ -1,5 +1,6 @@
 //! MUTF-8 (Modified UTF-8, Cesu-8-like) — o encoding das strings do DEX —
-//! com decode/encode e o escaping de literais no estilo baksmali.
+//! com decode/encode, comparação/hashing zero-alloc sobre bytes crus e o
+//! escaping de literais no estilo baksmali.
 //!
 //! Diferenças vs UTF-8 padrão:
 //! - NUL (U+0000) é codificado como `0xC0 0x80` (nunca byte zero).
@@ -9,76 +10,168 @@
 //! Decode é *lossy* (bytes inválidos → U+FFFD) — nunca pânico, nunca erro
 //! (strings malformadas não podem derrubar o parser; Lei 1).
 
-/// Decodifica bytes MUTF-8 para `String` (perda com U+FFFD em sequências inválidas).
-pub fn decode(bytes: &[u8]) -> String {
-    let mut out = String::with_capacity(bytes.len());
-    let mut i = 0usize;
-    while i < bytes.len() {
-        let b = bytes[i];
-        if b < 0x80 {
-            out.push(b as char);
-            i += 1;
-        } else if (0xC0..=0xDF).contains(&b) {
-            // 2 bytes — cobre 0xC0 0x80 → U+0000
-            match bytes.get(i + 1) {
-                Some(&b1) if b1 & 0xC0 == 0x80 => {
-                    let cp = (((b & 0x1F) as u32) << 6) | (b1 & 0x3F) as u32;
-                    out.push(char::from_u32(cp).unwrap_or('\u{FFFD}'));
-                    i += 2;
-                }
-                _ => {
-                    out.push('\u{FFFD}');
-                    i += 1;
-                }
+const HASH_SEED: u64 = 0x517c_c1b7_2722_0a95;
+
+/// Verifica em blocos de 8 bytes (SWAR) se `bytes` contém apenas ASCII `0x01..=0x7F`.
+#[inline]
+pub(crate) fn is_pure_ascii_non_nul(bytes: &[u8]) -> bool {
+    let mut chunks = bytes.chunks_exact(8);
+    for c in &mut chunks {
+        let w = u64::from_le_bytes([c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]);
+        if (w.wrapping_sub(0x0101_0101_0101_0101) | w) & 0x8080_8080_8080_8080 != 0 {
+            return false;
+        }
+    }
+    chunks.remainder().iter().all(|&b| b.wrapping_sub(1) < 0x7F)
+}
+
+/// Hash determinístico 64-bit processando 8 bytes por iteração sobre bytes
+/// MUTF-8 canônicos. Nunca retorna `0` (`0` é reservado como sentinela de
+/// slot vazio em `RawClassIndex`).
+#[inline]
+pub fn hash_bytes_nonzero(bytes: &[u8]) -> u64 {
+    let mut h = HASH_SEED ^ (bytes.len() as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+    let mut chunks = bytes.chunks_exact(8);
+    for c in &mut chunks {
+        let w = u64::from_le_bytes([c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]);
+        h = (h ^ w).wrapping_mul(HASH_SEED);
+        h ^= h >> 32;
+    }
+    let rem = chunks.remainder();
+    if !rem.is_empty() {
+        let mut tail = 0u64;
+        for (shift, &b) in rem.iter().enumerate() {
+            tail |= (b as u64) << (shift * 8);
+        }
+        h = (h ^ tail).wrapping_mul(HASH_SEED);
+    }
+    h ^= h >> 33;
+    h = h.wrapping_mul(0xff51_afd7_ed55_8ccd);
+    h ^= h >> 33;
+    if h == 0 {
+        1
+    } else {
+        h
+    }
+}
+
+/// Decodifica um único escalar Unicode de `bytes[*i..]` em MUTF-8 lossy e
+/// avança `*i`.
+#[inline]
+pub fn next_char(bytes: &[u8], i: &mut usize) -> char {
+    let b = bytes[*i];
+    if b < 0x80 {
+        *i += 1;
+        return b as char;
+    }
+    if (0xC0..=0xDF).contains(&b) {
+        if let Some(&b1) = bytes.get(*i + 1) {
+            if b1 & 0xC0 == 0x80 {
+                let cp = (((b & 0x1F) as u32) << 6) | (b1 & 0x3F) as u32;
+                *i += 2;
+                return char::from_u32(cp).unwrap_or('\u{FFFD}');
             }
-        } else if (0xE0..=0xEF).contains(&b) {
-            // 3 bytes — pode produzir surrogate; combina pares válidos
-            match (bytes.get(i + 1), bytes.get(i + 2)) {
-                (Some(&b1), Some(&b2)) if b1 & 0xC0 == 0x80 && b2 & 0xC0 == 0x80 => {
-                    let cp = (((b & 0x0F) as u32) << 12)
-                        | (((b1 & 0x3F) as u32) << 6)
-                        | (b2 & 0x3F) as u32;
-                    i += 3;
-                    if (0xD800..=0xDBFF).contains(&cp) {
-                        // high surrogate — tenta combinar com o próximo trio
-                        if let (Some(&b3), Some(&b4), Some(&b5)) =
-                            (bytes.get(i), bytes.get(i + 1), bytes.get(i + 2))
-                        {
-                            if (0xE0..=0xEF).contains(&b3) && b4 & 0xC0 == 0x80 && b5 & 0xC0 == 0x80
-                            {
-                                let cp2 = (((b3 & 0x0F) as u32) << 12)
-                                    | (((b4 & 0x3F) as u32) << 6)
-                                    | (b5 & 0x3F) as u32;
-                                if (0xDC00..=0xDFFF).contains(&cp2) {
-                                    let combined = 0x10000 + ((cp - 0xD800) << 10) + (cp2 - 0xDC00);
-                                    if let Some(c) = char::from_u32(combined) {
-                                        out.push(c);
-                                        i += 3;
-                                        continue;
-                                    }
+        }
+        *i += 1;
+        return '\u{FFFD}';
+    }
+    if (0xE0..=0xEF).contains(&b) {
+        if let (Some(&b1), Some(&b2)) = (bytes.get(*i + 1), bytes.get(*i + 2)) {
+            if b1 & 0xC0 == 0x80 && b2 & 0xC0 == 0x80 {
+                let cp =
+                    (((b & 0x0F) as u32) << 12) | (((b1 & 0x3F) as u32) << 6) | (b2 & 0x3F) as u32;
+                *i += 3;
+                if (0xD800..=0xDBFF).contains(&cp) {
+                    if let (Some(&b3), Some(&b4), Some(&b5)) =
+                        (bytes.get(*i), bytes.get(*i + 1), bytes.get(*i + 2))
+                    {
+                        if (0xE0..=0xEF).contains(&b3) && b4 & 0xC0 == 0x80 && b5 & 0xC0 == 0x80 {
+                            let cp2 = (((b3 & 0x0F) as u32) << 12)
+                                | (((b4 & 0x3F) as u32) << 6)
+                                | (b5 & 0x3F) as u32;
+                            if (0xDC00..=0xDFFF).contains(&cp2) {
+                                let combined = 0x10000 + ((cp - 0xD800) << 10) + (cp2 - 0xDC00);
+                                if let Some(c) = char::from_u32(combined) {
+                                    *i += 3;
+                                    return c;
                                 }
                             }
                         }
-                        // surrogate não pareado → replacement
-                        out.push('\u{FFFD}');
-                    } else if (0xDC00..=0xDFFF).contains(&cp) {
-                        out.push('\u{FFFD}');
-                    } else {
-                        out.push(char::from_u32(cp).unwrap_or('\u{FFFD}'));
                     }
+                    return '\u{FFFD}';
                 }
-                _ => {
-                    out.push('\u{FFFD}');
-                    i += 1;
+                if (0xDC00..=0xDFFF).contains(&cp) {
+                    return '\u{FFFD}';
                 }
+                return char::from_u32(cp).unwrap_or('\u{FFFD}');
             }
-        } else {
-            // 0x80..0xBF solto ou 0xF0..0xFF (MUTF-8 não tem 4 bytes) → inválido
-            out.push('\u{FFFD}');
-            i += 1;
+        }
+        *i += 1;
+        return '\u{FFFD}';
+    }
+    *i += 1;
+    '\u{FFFD}'
+}
+
+/// Decodifica bytes MUTF-8 para `String` (perda com U+FFFD em sequências inválidas).
+pub fn decode(bytes: &[u8]) -> String {
+    if is_pure_ascii_non_nul(bytes) {
+        if let Ok(s) = std::str::from_utf8(bytes) {
+            return s.to_owned();
         }
     }
+    let mut out = String::with_capacity(bytes.len());
+    let mut i = 0usize;
+    while i < bytes.len() {
+        out.push(next_char(bytes, &mut i));
+    }
     out
+}
+
+/// Compara bytes MUTF-8 crus (sem o terminador NUL final) contra `target`
+/// sem alocar `String`. Produz exatamente o mesmo resultado booleano que
+/// `decode(raw_mutf8) == target`.
+#[inline]
+pub fn eq_str(raw_mutf8: &[u8], target: &str) -> bool {
+    let tb = target.as_bytes();
+    if is_pure_ascii_non_nul(raw_mutf8) && is_pure_ascii_non_nul(tb) {
+        return raw_mutf8 == tb;
+    }
+    let mut i = 0usize;
+    let mut chars = target.chars();
+    while i < raw_mutf8.len() {
+        let ch = next_char(raw_mutf8, &mut i);
+        if chars.next() != Some(ch) {
+            return false;
+        }
+    }
+    chars.next().is_none()
+}
+
+/// Hash 64-bit não-zero sobre bytes MUTF-8 crus, canônico em relação a `hash_str`:
+/// para ASCII puro (>99,99% dos descritores), opera direto em `u64` (8 bytes/vez)
+/// sem decodificar; para sequências não-ASCII, normaliza via MUTF-8 canônico.
+#[inline]
+pub fn hash_mutf8(raw_mutf8: &[u8]) -> u64 {
+    if is_pure_ascii_non_nul(raw_mutf8) {
+        return hash_bytes_nonzero(raw_mutf8);
+    }
+    // Caminho raro (descritor Unicode ou MUTF-8 malformado): normaliza para o
+    // MUTF-8 canônico dos escalares decodificados para coincidir 100% com hash_str.
+    let decoded = decode(raw_mutf8);
+    let canonical = encode(&decoded);
+    hash_bytes_nonzero(&canonical)
+}
+
+/// Hash 64-bit não-zero sobre `s`, idêntico bit a bit a `hash_mutf8` em 8 bytes/vez.
+#[inline]
+pub fn hash_str(s: &str) -> u64 {
+    let tb = s.as_bytes();
+    if is_pure_ascii_non_nul(tb) {
+        return hash_bytes_nonzero(tb);
+    }
+    let canonical = encode(s);
+    hash_bytes_nonzero(&canonical)
 }
 
 /// Codifica `s` em MUTF-8 (NUL → C0 80; suplementares → par de surrogates 3-byte).
@@ -104,7 +197,6 @@ pub fn push_mutf8(s: &str, out: &mut Vec<u8>) {
             out.push(0x80 | ((cp >> 6) & 0x3F) as u8);
             out.push(0x80 | (cp & 0x3F) as u8);
         } else {
-            // par de surrogates, cada um em 3 bytes (CESU-8)
             let v = cp - 0x10000;
             let hi = 0xD800 + (v >> 10);
             let lo = 0xDC00 + (v & 0x3FF);
@@ -117,9 +209,7 @@ pub fn push_mutf8(s: &str, out: &mut Vec<u8>) {
     }
 }
 
-/// Escaping de literal de string no estilo baksmali/dexlib2 (`StringUtils.escapeString`):
-/// ASCII imprimível passa direto; `\n \r \t \\ "` com escape; o resto `\uXXXX`
-/// (em unidades de código UTF-16 — suplementares viram par de escapes, como em Java).
+/// Escaping de literal de string no estilo baksmali/dexlib2 (`StringUtils.escapeString`).
 pub fn escape_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     out.push('"');
@@ -140,7 +230,6 @@ pub fn escape_char(c: u16) -> String {
 }
 
 fn escape_unit(unit: u16, quote: char, out: &mut String) {
-    // ASCII imprimível que não exige escape
     if (32..127).contains(&unit) && unit as u8 as char != quote && unit != b'\\' as u16 {
         out.push(unit as u8 as char);
         return;
@@ -150,7 +239,6 @@ fn escape_unit(unit: u16, quote: char, out: &mut String) {
         0x0D => out.push_str("\\r"),
         0x09 => out.push_str("\\t"),
         0x5C => out.push_str("\\\\"),
-        // a própria aspa do literal (" no string, ' no char) vira \" / \'
         u if u == quote as u16 => {
             out.push('\\');
             out.push(quote);
@@ -167,13 +255,18 @@ mod tests {
     fn nul_is_c0_80() {
         assert_eq!(encode("\0"), vec![0xC0, 0x80]);
         assert_eq!(decode(&[0xC0, 0x80]), "\0");
+        assert!(eq_str(&[0xC0, 0x80], "\0"));
+        assert_eq!(hash_mutf8(&[0xC0, 0x80]), hash_str("\0"));
     }
 
     #[test]
     fn ascii_roundtrip() {
         for b in 1u8..0x80 {
             let s = (b as char).to_string();
-            assert_eq!(decode(&encode(&s)), s);
+            let enc = encode(&s);
+            assert_eq!(decode(&enc), s);
+            assert!(eq_str(&enc, &s));
+            assert_eq!(hash_mutf8(&enc), hash_str(&s));
         }
         assert_eq!(decode(b"hello world!"), "hello world!");
     }
@@ -181,37 +274,42 @@ mod tests {
     #[test]
     fn bmp_roundtrip() {
         for cp in [0xE9u32, 0x4E2D, 0x2603, 0x20AC, 0xFFFD] {
-            let s = char::from_u32(cp).unwrap().to_string();
+            let s = match char::from_u32(cp) {
+                Some(c) => c.to_string(),
+                None => continue,
+            };
             let enc = encode(&s);
             let want = if cp < 0x800 { 2 } else { 3 };
             assert_eq!(enc.len(), want, "cp U+{cp:04X} deve usar {want} bytes");
             assert_eq!(decode(&enc), s);
+            assert!(eq_str(&enc, &s));
+            assert_eq!(hash_mutf8(&enc), hash_str(&s));
         }
     }
 
     #[test]
     fn supplementary_is_surrogate_pair() {
-        let s = "\u{1F600}"; // 😀
+        let s = "\u{1F600}";
         let enc = encode(s);
         assert_eq!(enc.len(), 6, "par de surrogates = 2 × 3 bytes");
-        // ED A0 BD ED B8 80
         assert_eq!(enc, vec![0xED, 0xA0, 0xBD, 0xED, 0xB8, 0x80]);
         assert_eq!(decode(&enc), s);
+        assert!(eq_str(&enc, s));
+        assert_eq!(hash_mutf8(&enc), hash_str(s));
     }
 
     #[test]
     fn invalid_bytes_are_lossy_not_panic() {
-        // byte solto de continuação, truncado, 4-byte proibido
         assert_eq!(decode(&[0x80]), "\u{FFFD}");
-        // 0xE0 inválido vira replacement e o decode ressincroniza byte a byte
+        assert!(eq_str(&[0x80], "\u{FFFD}"));
+        assert_eq!(hash_mutf8(&[0x80]), hash_str("\u{FFFD}"));
         assert_eq!(decode(&[0xE0, 0x41]), "\u{FFFD}A");
+        assert!(eq_str(&[0xE0, 0x41], "\u{FFFD}A"));
         assert_eq!(
             decode(&[0xF0, 0x9F, 0x98, 0x80]),
             "\u{FFFD}\u{FFFD}\u{FFFD}\u{FFFD}"
         );
-        // truncado no fim
         assert_eq!(decode(&[0xC3]), "\u{FFFD}");
-        // surrogate não pareado
         assert_eq!(decode(&[0xED, 0xA0, 0xBD]), "\u{FFFD}");
     }
 
@@ -221,14 +319,10 @@ mod tests {
         assert_eq!(escape_string("a\"b"), "\"a\\\"b\"");
         assert_eq!(escape_string("a\\b"), "\"a\\\\b\"");
         assert_eq!(escape_string("a\nb\r\t"), "\"a\\nb\\r\\t\"");
-        // não-ASCII vira \uXXXX
         assert_eq!(escape_string("é"), "\"\\u00e9\"");
-        // DEL e controle
         assert_eq!(escape_string("\u{7f}"), "\"\\u007f\"");
         assert_eq!(escape_string("\u{8}"), "\"\\u0008\"");
-        // suplementar → par de escapes UTF-16 (comportamento Java)
         assert_eq!(escape_string("\u{1F600}"), "\"\\ud83d\\ude00\"");
-        // espaço imprimível passa
         assert_eq!(escape_string("a b"), "\"a b\"");
     }
 
@@ -241,9 +335,12 @@ mod tests {
 
     #[test]
     fn encode_matches_java_mutf8_reference() {
-        // "Aé中😀" — verificação cruzada dos comprimentos esperados
         let s = "A\u{E9}\u{4E2D}\u{1F600}";
-        assert_eq!(encode(s).len(), 1 + 2 + 3 + 6);
-        assert_eq!(decode(&encode(s)), s);
+        let enc = encode(s);
+        assert_eq!(enc.len(), 1 + 2 + 3 + 6);
+        assert_eq!(decode(&enc), s);
+        assert!(eq_str(&enc, s));
+        assert!(!eq_str(&enc, "A\u{E9}\u{4E2D}"));
+        assert_eq!(hash_mutf8(&enc), hash_str(s));
     }
 }

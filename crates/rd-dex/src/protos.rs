@@ -33,32 +33,36 @@ pub fn type_list(data: &[u8], off: u32) -> RdResult<Vec<u32>> {
     Ok(out)
 }
 
-pub fn parse_proto_ids(data: &[u8], count: u32, off: u32) -> RdResult<Vec<ProtoId>> {
+pub(crate) fn validate_proto_window(data: &[u8], count: u32, off: u32) -> RdResult<&[u8]> {
     let count = count as usize;
     let off = off as usize;
-    if count.checked_mul(12).is_none() {
-        return Err(RdError::parse("protos: proto_ids_size overflow"));
-    }
+    let byte_len = count
+        .checked_mul(12)
+        .ok_or_else(|| RdError::parse("protos: proto_ids_size overflow"))?;
     let window = data
         .get(off..)
         .ok_or_else(|| RdError::parse(format!("protos: table @ {off} além dos dados")))?;
-    if count > window.len() / 12 {
-        return Err(RdError::parse(format!(
+    window.get(..byte_len).ok_or_else(|| {
+        RdError::parse(format!(
             "protos: {} ids não cabem em {} bytes",
             count,
             window.len()
-        )));
+        ))
+    })
+}
+
+#[inline]
+pub(crate) fn decode_proto_id(b: &[u8]) -> ProtoId {
+    ProtoId {
+        shorty_idx: u32::from_le_bytes([b[0], b[1], b[2], b[3]]),
+        return_type_idx: u32::from_le_bytes([b[4], b[5], b[6], b[7]]),
+        parameters_off: u32::from_le_bytes([b[8], b[9], b[10], b[11]]),
     }
-    let mut out = Vec::with_capacity(count);
-    for i in 0..count {
-        let base = i * 12;
-        out.push(ProtoId {
-            shorty_idx: read::u32_at(window, base)?,
-            return_type_idx: read::u32_at(window, base + 4)?,
-            parameters_off: read::u32_at(window, base + 8)?,
-        });
-    }
-    Ok(out)
+}
+
+pub fn parse_proto_ids(data: &[u8], count: u32, off: u32) -> RdResult<Vec<ProtoId>> {
+    let window = validate_proto_window(data, count, off)?;
+    Ok(window.chunks_exact(12).map(decode_proto_id).collect())
 }
 
 #[cfg(test)]
