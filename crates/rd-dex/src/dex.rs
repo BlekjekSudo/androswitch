@@ -240,10 +240,10 @@ pub struct Dex {
     /// offsets de call_site_id_item (encoded_array_item).
     pub call_site_offsets: Vec<u32>,
     pub method_handles: Vec<MethodHandle>,
-    /// descriptor -> class_defs position, built lazily on first
-    /// `find_class` (the linear scan dominated launch time on
-    /// 10k-class apps).
-    pub class_index: std::sync::OnceLock<std::collections::HashMap<String, usize>>,
+    /// descriptor -> class_defs position, built lazily on first `find_class`
+    /// over raw MUTF-8 slices without decoding or allocating `String`s
+    /// (ADR 008 Stage 1b `RawClassIndex`).
+    pub class_index: std::sync::OnceLock<crate::lazy::RawClassIndex>,
 }
 
 impl Dex {
@@ -252,26 +252,36 @@ impl Dex {
         data.len() >= 8 && data[0..4] == DEX_MAGIC
     }
 
-    /// Parseia um DEX completo de memória (verifica o adler32 do header).
+    /// Parseia um DEX completo de memória (verifica o adler32 do header e
+    /// materializa a tabela de strings inteira para inspeção/fuzzing).
     pub fn parse(data: Vec<u8>) -> RdResult<Dex> {
-        Self::parse_inner(data, true)
+        Self::parse_inner(data, true, false)
     }
 
-    /// ADR 009: como `parse`, mas DEFERE a verificação do adler32 do
-    /// header (a varredura O(file_size) custava ~metade do mount num DEX
-    /// de 9 MB e é redundante no caminho de execução: a entrada ZIP já
-    /// teve o CRC32 conferido na extração, e o conteúdo é validado
-    /// estruturalmente por todas as tabelas). `header.checksum_ok` fica
-    /// `false` = "não verificado"; `verify_checksum()` recalcula sob
-    /// demanda. `rd dex`/inspect continuam usando `parse` (verificado).
+    /// ADR 009 + ADR 008 Stage 1b: como `parse`, mas DEFERE a verificação do
+    /// adler32 do header e a decodificação MUTF-8 das strings (apenas os
+    /// offsets de `string_ids` são validados no mount; cada string tocada em
+    /// `Dex::string` / `Dex::type_str` é decodificada e memoizada sob demanda).
+    /// `header.checksum_ok` fica `false` = "não verificado"; `verify_checksum()`
+    /// recalcula sob demanda. `rd dex`/inspect/fuzz continuam usando `parse`.
     pub fn parse_unverified(data: Vec<u8>) -> RdResult<Dex> {
-        Self::parse_inner(data, false)
+        Self::parse_inner(data, false, true)
     }
 
-    fn parse_inner(data: Vec<u8>, verify_checksum: bool) -> RdResult<Dex> {
+    /// Alias explícito para o mount com strings sob demanda e adler32 deferido
+    /// (ADR 008 Stage 1b).
+    pub fn parse_lazy(data: Vec<u8>) -> RdResult<Dex> {
+        Self::parse_inner(data, false, true)
+    }
+
+    fn parse_inner(data: Vec<u8>, verify_checksum: bool, lazy_strings: bool) -> RdResult<Dex> {
         let header = Self::parse_header_with(&data, verify_checksum)?;
         let map_list = Self::parse_map_list(&data, header.map_off)?;
-        let strings = Strings::parse(&data, header.string_ids_size, header.string_ids_off)?;
+        let strings = if lazy_strings {
+            Strings::parse_lazy(&data, header.string_ids_size, header.string_ids_off)?
+        } else {
+            Strings::parse(&data, header.string_ids_size, header.string_ids_off)?
+        };
         let type_ids =
             crate::types::TypeIds::parse(&data, header.type_ids_size, header.type_ids_off)?;
         let proto_ids =
@@ -327,6 +337,10 @@ impl Dex {
     /// Parse do header com validações fuzz-safe.
     pub fn parse_header(data: &[u8]) -> RdResult<Header> {
         Self::parse_header_with(data, true)
+    }
+
+    pub(crate) fn parse_header_checked(data: &[u8], verify_checksum: bool) -> RdResult<Header> {
+        Self::parse_header_with(data, verify_checksum)
     }
 
     fn parse_header_with(data: &[u8], verify_checksum: bool) -> RdResult<Header> {
@@ -450,7 +464,21 @@ impl Dex {
     // ── accessors de índices ────────────────────────────────────────────────
 
     pub fn string(&self, idx: u32) -> &str {
-        self.strings.get_or_empty(idx)
+        self.strings.get_or_empty_with_data(idx, &self.data)
+    }
+
+    /// Compara `string_ids[idx]` com `s` sobre MUTF-8 cru sem alocar `String`.
+    pub fn string_eq(&self, idx: u32, s: &str) -> RdResult<bool> {
+        if let Some(cached) = self.strings.get(idx) {
+            return Ok(cached == s);
+        }
+        match self.strings.raw_slice(idx, &self.data)? {
+            Some(raw) => Ok(crate::mutf8::eq_str(raw, s)),
+            None => Err(RdError::parse(format!(
+                "string idx {idx} fora da tabela ({})",
+                self.strings.len()
+            ))),
+        }
     }
 
     /// Descritor de tipo por índice (tolerante: índice inválido → "?").
@@ -527,22 +555,26 @@ impl Dex {
         protos::type_list(&self.data, def.interfaces_off)
     }
 
-    /// Class for a descriptor (`Lcom/x/Y;`). O(1) via a lazily built index;
-    /// the first definition wins, matching the previous linear scan.
-    /// (ADR 008 Stage 1b note: binary search over `type_ids` +
-    /// sorted-`class_idx` index was tried and reverted — at real call
-    /// volumes the per-call string compares lost to one hash lookup, and
-    /// cross-DEX misses made fallback scans catastrophic. The lazy
-    /// HashMap build measured faster end-to-end on the M7 gate APK.)
+    /// Class for a descriptor (`Lcom/x/Y;`). O(1) via a lazily built
+    /// zero-String-allocation `RawClassIndex`; the first definition wins,
+    /// matching the previous linear scan.
     pub fn find_class(&self, descriptor: &str) -> Option<&ClassDef> {
         let idx = self.class_index.get_or_init(|| {
-            let mut m = std::collections::HashMap::with_capacity(self.class_defs.len());
-            for (i, d) in self.class_defs.iter().enumerate() {
-                m.entry(self.type_str(d.class_idx).to_string()).or_insert(i);
-            }
-            m
+            crate::lazy::RawClassIndex::build_from_dex(
+                &self.data,
+                &self.strings,
+                &self.type_ids,
+                &self.class_defs,
+            )
         });
-        idx.get(descriptor).map(|&i| &self.class_defs[i])
+        idx.find_in_dex(
+            descriptor,
+            &self.data,
+            &self.strings,
+            &self.type_ids,
+            &self.class_defs,
+        )
+        .map(|i| &self.class_defs[i])
     }
 }
 

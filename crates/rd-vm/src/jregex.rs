@@ -68,6 +68,13 @@ pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
     MATCHERS.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
+/// Issue #230: fronteira de `Engine` — limpa só os matchers (indexados
+/// por `ObjRef`); o `CACHE` de regex compiladas é cache puro por
+/// (pattern, flags), válido entre engines, e fica.
+pub(crate) fn reset_all() {
+    MATCHERS.with(|m| m.borrow_mut().clear());
+}
+
 fn exc(class: &str, msg: impl Into<String>) -> VmExit {
     VmExit::Exception(Throwable::new(class, msg))
 }

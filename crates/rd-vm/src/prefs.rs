@@ -257,6 +257,11 @@ pub(crate) fn parse(bytes: &[u8]) -> Option<PrefStore> {
 
     while let Some(open) = rest.find('<') {
         rest = &rest[open + 1..];
+        if let Some(after_bang) = rest.strip_prefix("!--") {
+            let close = after_bang.find("-->")?;
+            rest = &after_bang[close + 3..];
+            continue;
+        }
         if rest.starts_with('?') || rest.starts_with('!') {
             let close = rest.find('>')?;
             rest = &rest[close + 1..];
@@ -276,6 +281,9 @@ pub(crate) fn parse(bytes: &[u8]) -> Option<PrefStore> {
         let self_closing = tag.trim_end().ends_with('/');
         rest = &rest[close + 1..];
         if name_of_tag == "map" {
+            if self_closing {
+                return Some(store);
+            }
             continue;
         }
         let attrs = attributes(tag)?;
@@ -315,38 +323,52 @@ pub(crate) fn parse(bytes: &[u8]) -> Option<PrefStore> {
                 );
             }
             "set" => {
-                let end = rest.find("</set>")?;
-                let body = &rest[..end];
-                let mut values = BTreeSet::new();
-                let mut set_rest = body;
-                while let Some(start) = set_rest.find('<') {
-                    set_rest = &set_rest[start + 1..];
-                    if set_rest.starts_with('/') {
+                if self_closing {
+                    store.insert(key, PrefValue::StringSet(BTreeSet::new()));
+                } else {
+                    let end = rest.find("</set>")?;
+                    let body = &rest[..end];
+                    let mut values = BTreeSet::new();
+                    let mut set_rest = body;
+                    while let Some(start) = set_rest.find('<') {
+                        set_rest = &set_rest[start + 1..];
+                        if let Some(after_bang) = set_rest.strip_prefix("!--") {
+                            let close = after_bang.find("-->")?;
+                            set_rest = &after_bang[close + 3..];
+                            continue;
+                        }
+                        if set_rest.starts_with('?') || set_rest.starts_with('!') {
+                            let close = set_rest.find('>')?;
+                            set_rest = &set_rest[close + 1..];
+                            continue;
+                        }
+                        if set_rest.starts_with('/') {
+                            let close = set_rest.find('>')?;
+                            set_rest = &set_rest[close + 1..];
+                            continue;
+                        }
                         let close = set_rest.find('>')?;
+                        let inner_tag = &set_rest[..close];
                         set_rest = &set_rest[close + 1..];
-                        continue;
-                    }
-                    let close = set_rest.find('>')?;
-                    let inner_tag = &set_rest[..close];
-                    set_rest = &set_rest[close + 1..];
-                    match tag_name(inner_tag) {
-                        "string" => {
-                            if inner_tag.trim_end().ends_with('/') {
-                                values.insert(Some(String::new()));
-                            } else {
-                                let string_end = set_rest.find("</string>")?;
-                                values.insert(Some(decode_entities(&set_rest[..string_end])?));
-                                set_rest = &set_rest[string_end + "</string>".len()..];
+                        match tag_name(inner_tag) {
+                            "string" => {
+                                if inner_tag.trim_end().ends_with('/') {
+                                    values.insert(Some(String::new()));
+                                } else {
+                                    let string_end = set_rest.find("</string>")?;
+                                    values.insert(Some(decode_entities(&set_rest[..string_end])?));
+                                    set_rest = &set_rest[string_end + "</string>".len()..];
+                                }
                             }
+                            "null" => {
+                                values.insert(None);
+                            }
+                            _ => {}
                         }
-                        "null" => {
-                            values.insert(None);
-                        }
-                        _ => {}
                     }
+                    store.insert(key, PrefValue::StringSet(values));
+                    rest = &rest[end + "</set>".len()..];
                 }
-                store.insert(key, PrefValue::StringSet(values));
-                rest = &rest[end + "</set>".len()..];
             }
             "null" => {
                 // `XmlUtils` can represent a null map value. A `putString`

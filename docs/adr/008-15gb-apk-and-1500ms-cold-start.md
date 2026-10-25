@@ -224,6 +224,37 @@ Still outstanding (unchanged from §8): full `LazyDex` mount, the
 Stage 4 VM internals, and the 15 GB sparse *launch* fixture — the
 ≤1,500 ms bar above is met on the M7 gate APK, not yet on a 15 GB APK.
 
+### 9.2 Stage 1b `LazyDex`, `PagedStringCache` & `RawClassIndex` addendum (2026-10-25)
+
+Stage 1b's `rd-dex` lazy decoding and zero-allocation class directory are now
+implemented in `crates/rd-dex`:
+
+1. **`LazyDex` + `DexBacking` (`crates/rd-dex/src/lazy.rs`):** O(1) header +
+   `map_list` + fixed-stride section bounds validation (`LazyDex::mount`
+   measured at `4–8 µs` on 9 MB DEX files with 65k strings and 9.5k classes),
+   positional `DexBacking::Slice` window support, raw MUTF-8 zero-alloc
+   `string_eq`, and on-demand fixed-stride readers (`method_id`, `field_id`,
+   `proto_id`, `class_def`, `find_class`, `class_data`, `code`).
+2. **2-level `PagedStringCache` (`crates/rd-dex/src/strings.rs`) wired into
+   `Dex::parse_unverified` / `Dex::parse_lazy`:** validates `string_ids`
+   offsets at mount without decoding untouched strings (`256` slots/page via
+   `OnceLock<Box<str>>`, ~4 KiB top-level directory for a 65k-string DEX vs
+   ~1.5 MiB eager `Vec<String>` + heap strings). `Dex::parse` remains eager for
+   `rd inspect` / `api_usage` / fuzz parity.
+3. **Cache-colocated `RawClassIndex` (`16 B` open-addressing `ClassSlot { hash,
+   str_off, class_def_idx }` + 8-byte SWAR MUTF-8 hashing):** eliminates all
+   per-class `String` allocations on first `find_class` while preserving
+   first-definition-wins semantics and keeping `warm_p50` faster than
+   `HashMap<String, usize>` (`442–450 ms` vs `450–547 ms` emulated on
+   `org.primftpd_71.apk`).
+4. **Measured before/after (`org.primftpd_71.apk`, 5 DEXs / 20.04 MB raw DEX /
+   135,777 strings / 17,809 classes, `profiling` profile, `moto-e5`):**
+   - `dex_parse:classes.dex` (`9.36 MB`): `10.0–12.5 ms` → **`0.47–0.97 ms`** (`>10×` faster)
+   - `dex_parse:classes4.dex` (`9.05 MB`): `7.4–10.5 ms` → **`0.93–1.14 ms`** (`~9×` faster)
+   - `dex_parse:classes5.dex` (`1.62 MB`): `1.0–11.3 ms` → **`0.06–0.37 ms`**
+   - Process peak RSS (`VmHWM`): `108–111 MB` → **`88.7–89.3 MB`** (`−21.7 MB` / `−19.6%`)
+   - Disassembly (`rd dex disasm`): **100% byte-for-byte identical** to eager `Dex::parse`.
+
 ## 10. Alternatives considered
 
 - **mmap (even windowed):** rejected as default (§3, RSS trap + unsafe ban); may return via dedicated ADR with hard eviction accounting.

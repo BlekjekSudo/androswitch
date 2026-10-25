@@ -462,27 +462,14 @@ pub fn build(doc: &AxmlDocument, arsc: Option<&Arsc>) -> RdResult<Manifest> {
 
     for feat in root.children_named("uses-feature") {
         let required = attr_bool(feat, "required").unwrap_or(true);
-        if let Some(gles) = attr_str(feat, "glEsVersion") {
+        let gl_es_version = decode_gles_version(feat);
+        let name = attr_str(feat, "name");
+        if gl_es_version.is_some() || name.is_some() {
             m.uses_features.push(UsesFeature {
-                name: None,
-                gl_es_version: Some(gles),
+                name,
+                gl_es_version,
                 required,
             });
-        } else if let Some(name) = attr_str(feat, "name") {
-            m.uses_features.push(UsesFeature {
-                name: Some(name),
-                gl_es_version: None,
-                required,
-            });
-        } else {
-            // glEsVersion pode vir codificada como int (major<<16|minor)
-            if let Some(code) = attr_u32(feat, "glEsVersion") {
-                m.uses_features.push(UsesFeature {
-                    name: None,
-                    gl_es_version: Some(format!("{}.{}", code >> 16, code & 0xFFFF)),
-                    required,
-                });
-            }
         }
     }
 
@@ -543,26 +530,52 @@ pub fn build(doc: &AxmlDocument, arsc: Option<&Arsc>) -> RdResult<Manifest> {
         });
     }
 
-    if let Some(queries) = root.children_named("queries").next() {
-        let mut q = Queries::default();
+    for queries in root.children_named("queries") {
         for pkg in queries.children_named("package") {
             if let Some(name) = attr_str(pkg, "name") {
-                q.packages.push(name);
+                m.queries.packages.push(name);
             }
         }
         for intent in queries.children_named("intent") {
-            q.intents.push(build_intent_filter(intent, q.intents.len()));
+            let idx = m.queries.intents.len();
+            m.queries.intents.push(build_intent_filter(intent, idx));
         }
         for prov in queries.children_named("provider") {
             if let Some(auth) = attr_str(prov, "authorities") {
-                q.providers.push(auth);
+                m.queries.providers.push(auth);
             }
         }
-        q.signature_count = queries.children_named("signature").count();
-        m.queries = q;
+        m.queries.signature_count += queries.children_named("signature").count();
     }
 
     Ok(m)
+}
+
+fn decode_gles_version(feat: &XmlElement) -> Option<String> {
+    let attr = feat.android_attr("glEsVersion")?;
+    if let AttrValue::Int(bits) = attr.value {
+        let code = bits as u32;
+        return Some(format!("{}.{}", code >> 16, code & 0xFFFF));
+    }
+    // Só texto numérico. Uma referência (`@integer/…`) também responde a
+    // `as_u32()` (com o id do recurso), mas não é uma versão: o texto é
+    // preservado.
+    if matches!(attr.value, AttrValue::String(_)) {
+        if let Some(code) = attr.as_u32() {
+            return Some(format!("{}.{}", code >> 16, code & 0xFFFF));
+        }
+    }
+    let raw = attr.text();
+    let trimmed = raw.trim();
+    if let Some(hex) = trimmed
+        .strip_prefix("0x")
+        .or_else(|| trimmed.strip_prefix("0X"))
+    {
+        if let Ok(code) = u32::from_str_radix(hex, 16) {
+            return Some(format!("{}.{}", code >> 16, code & 0xFFFF));
+        }
+    }
+    Some(raw)
 }
 
 /// Converte referência em texto: string resolvida, ou nome qualificado
@@ -1076,5 +1089,22 @@ mod tests {
             json.get("meta_data").is_none(),
             "meta_data vazio não deve aparecer no JSON"
         );
+    }
+
+    /// Delta da revisão (#254): uma referência em glEsVersion não vira
+    /// "major.minor" a partir do id do recurso.
+    #[test]
+    fn gl_es_version_reference_is_not_decoded_as_a_version() {
+        let feat = XmlElement {
+            name: "uses-feature".to_string(),
+            attrs: vec![android_attr(
+                "glEsVersion",
+                AttrValue::Reference(0x7f0a_0001),
+            )],
+            children: Vec::new(),
+            text: None,
+        };
+        let v = decode_gles_version(&feat).expect("attr present");
+        assert_ne!(v, format!("{}.{}", 0x7f0a_0001u32 >> 16, 0x0001));
     }
 }

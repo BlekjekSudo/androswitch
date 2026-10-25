@@ -4351,6 +4351,12 @@ fn instance_intrinsic_dispatch(
     {
         return Ok(Some(v));
     }
+    // java.util.BitSet (jbitset.rs) — JDK-fiel sobre heap longs
+    if let Some(v) =
+        crate::jbitset::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
+    {
+        return Ok(Some(v));
+    }
     if mref_class.starts_with("Landroid/view/") {
         if let Some(v) = crate::window::view_intrinsic(vm, name, sig, recv, args)? {
             return Ok(Some(v));

@@ -58,6 +58,12 @@ pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
     BUILDERS.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
+/// Issue #230: fronteira de `Engine` — builders são por `ObjRef` de um
+/// heap que deixou de existir quando o `Engine` anterior morreu.
+pub(crate) fn reset_all() {
+    BUILDERS.with(|m| m.borrow_mut().clear());
+}
+
 /// Encoded parts of a Uri string.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Parts {

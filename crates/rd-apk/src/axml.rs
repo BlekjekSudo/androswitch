@@ -220,7 +220,9 @@ impl XmlAttribute {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+const MAX_XML_DEPTH: usize = 1024;
+
+#[derive(Debug, Default)]
 pub struct XmlElement {
     /// Nome local do elemento (ex.: "activity", "uses-permission").
     pub name: String,
@@ -228,6 +230,45 @@ pub struct XmlElement {
     pub children: Vec<XmlElement>,
     /// Texto CDATA direto (raro em manifests).
     pub text: Option<String>,
+}
+
+// issue #253: `#[derive(Clone)]` recursivo estoura a stack em árvores profundas
+// (~200k níveis). Clone iterativo em pré-ordem + montagem bottom-up em O(N).
+impl Clone for XmlElement {
+    fn clone(&self) -> Self {
+        if self.children.is_empty() {
+            return Self {
+                name: self.name.clone(),
+                attrs: self.attrs.clone(),
+                children: Vec::new(),
+                text: self.text.clone(),
+            };
+        }
+        let mut nodes: Vec<(Option<usize>, XmlElement)> = Vec::new();
+        let mut work: Vec<(Option<usize>, &XmlElement)> = vec![(None, self)];
+        while let Some((parent, src)) = work.pop() {
+            let my_idx = nodes.len();
+            nodes.push((
+                parent,
+                XmlElement {
+                    name: src.name.clone(),
+                    attrs: src.attrs.clone(),
+                    children: Vec::with_capacity(src.children.len()),
+                    text: src.text.clone(),
+                },
+            ));
+            for child in &src.children {
+                work.push((Some(my_idx), child));
+            }
+        }
+        for idx in (1..nodes.len()).rev() {
+            let (parent_opt, child_el) = std::mem::take(&mut nodes[idx]);
+            if let Some(pidx) = parent_opt {
+                nodes[pidx].1.children.push(child_el);
+            }
+        }
+        std::mem::take(&mut nodes[0].1)
+    }
 }
 
 // issue #40: o drop recursivo padrão estoura a stack em AXML hostil com
@@ -298,19 +339,25 @@ pub fn parse(data: &[u8]) -> RdResult<AxmlDocument> {
     let mut open_count: usize = 0;
 
     let mut p = 8usize; // após o header do arquivo
-    while p + 8 <= data.len() {
+    while p.checked_add(8).is_some_and(|end| end <= data.len()) {
         let ctype = u16_at(data, p)?;
         let cheader = u16_at(data, p + 2)? as usize;
         let csize = u32_at(data, p + 4)? as usize;
-        // progresso garantido: chunk mínimo = 8 bytes (endurece contra fuzz)
-        if csize < 8 || csize < cheader || p + csize > data.len() {
+        // progresso garantido: chunk mínimo = 8 bytes (endurece contra fuzz e 32-bit)
+        let Some(chunk_end) = p.checked_add(csize) else {
+            return Err(RdError::parse(format!(
+                "axml: chunk 0x{ctype:04x} at {p} overflows address space (size {csize})"
+            )));
+        };
+        if csize < 8 || csize < cheader || chunk_end > data.len() {
             return Err(RdError::parse(format!(
                 "axml: chunk 0x{ctype:04x} at {p} declares size {csize} beyond bounds"
             )));
         }
+        let payload = p + cheader; // seguro: `cheader <= csize` e `p + csize` não deu overflow
         match ctype {
             RES_STRING_POOL_TYPE => {
-                let (pool, used) = StringPool::parse(data, p)?;
+                let (pool, used) = StringPool::parse(&data[..chunk_end], p)?;
                 if used as usize > csize {
                     return Err(RdError::parse("axml: string pool bigger than its chunk"));
                 }
@@ -319,23 +366,39 @@ pub fn parse(data: &[u8]) -> RdResult<AxmlDocument> {
             RES_XML_RESOURCE_MAP_TYPE => {
                 let n = (csize - cheader) / 4;
                 resource_ids = (0..n)
-                    .map(|i| u32_at(data, p + cheader + i * 4))
+                    .map(|i| u32_at(data, payload + i * 4))
                     .collect::<RdResult<_>>()?;
             }
             RES_XML_START_NAMESPACE_TYPE => {
-                let prefix_idx = u32_at(data, p + cheader)?;
-                let uri_idx = u32_at(data, p + cheader + 4)?;
+                if payload.checked_add(8).map_or(true, |end| end > chunk_end) {
+                    return Err(RdError::parse("axml: start namespace chunk truncated"));
+                }
+                let prefix_idx = u32_at(data, payload)?;
+                let uri_idx = u32_at(data, payload + 4)?;
                 let prefix = strings.get(prefix_idx).unwrap_or("").to_string();
                 let uri = strings.get(uri_idx).unwrap_or("").to_string();
                 namespaces.push((prefix, uri));
             }
             RES_XML_START_ELEMENT_TYPE => {
-                let el = parse_start_element(data, p, cheader, &strings, &resource_ids)?;
+                if root.is_some() {
+                    return Err(RdError::parse(
+                        "axml: trailing start element after root closed (unbalanced document)",
+                    ));
+                }
+                if open_count >= MAX_XML_DEPTH {
+                    return Err(RdError::parse(format!(
+                        "axml: element nesting exceeds maximum depth ({MAX_XML_DEPTH})"
+                    )));
+                }
+                let el = parse_start_element(data, p, cheader, chunk_end, &strings, &resource_ids)?;
                 stack.push(el);
                 open_count += 1;
             }
             RES_XML_END_ELEMENT_TYPE => {
-                let _name_idx = u32_at(data, p + cheader + 4)?;
+                if payload.checked_add(8).map_or(true, |end| end > chunk_end) {
+                    return Err(RdError::parse("axml: end element chunk truncated"));
+                }
+                let _name_idx = u32_at(data, payload + 4)?;
                 match (stack.pop(), open_count) {
                     (Some(el), n) if n > 1 => {
                         open_count = n - 1;
@@ -361,14 +424,23 @@ pub fn parse(data: &[u8]) -> RdResult<AxmlDocument> {
                 }
             }
             RES_XML_CDATA_TYPE => {
-                let text_idx = u32_at(data, p + cheader)?;
+                if payload.checked_add(4).map_or(true, |end| end > chunk_end) {
+                    return Err(RdError::parse("axml: cdata chunk truncated"));
+                }
+                let text_idx = u32_at(data, payload)?;
                 if let Some(parent) = stack.last_mut() {
                     parent.text = Some(strings.get(text_idx).unwrap_or("").to_string());
                 }
             }
             _ => { /* chunk desconhecido: skip por csize (robustez) */ }
         }
-        p += csize;
+        p = chunk_end;
+    }
+
+    if !stack.is_empty() || open_count != 0 {
+        return Err(RdError::parse(
+            "axml: unclosed elements at end of document (unbalanced document)",
+        ));
     }
 
     match root {
@@ -388,24 +460,53 @@ fn parse_start_element(
     data: &[u8],
     base: usize,
     cheader: usize,
+    chunk_end: usize,
     strings: &StringPool,
     resource_ids: &[u32],
 ) -> RdResult<XmlElement> {
     // ResXMLTree_attrExt: ns u32 | name u32 | attributeStart u16 | attributeSize u16
     //                     | attributeCount u16 | idIndex u16 | classIndex u16 | styleIndex u16
-    let attr_ext = base + cheader;
+    let attr_ext = base
+        .checked_add(cheader)
+        .ok_or_else(|| RdError::parse("axml: start element header overflow"))?;
+    if attr_ext.checked_add(20).map_or(true, |end| end > chunk_end) {
+        return Err(RdError::parse(
+            "axml: start element ResXMLTree_attrExt truncated",
+        ));
+    }
     let name_idx = u32_at(data, attr_ext + 4)?;
     let attribute_start = u16_at(data, attr_ext + 8)? as usize;
     let attribute_size = u16_at(data, attr_ext + 10)? as usize;
     let attribute_count = u16_at(data, attr_ext + 12)? as usize;
 
     let name = strings.get(name_idx).unwrap_or("").to_string();
-    let attrs_base = attr_ext + attribute_start;
+    let attrs_base = attr_ext
+        .checked_add(attribute_start)
+        .ok_or_else(|| RdError::parse("axml: attributeStart overflow"))?;
+
+    if attribute_count > 0 {
+        if attribute_size < 20 {
+            return Err(RdError::parse(format!(
+                "axml: invalid attributeSize {attribute_size} (< 20) on <{name}>"
+            )));
+        }
+        let attrs_bytes = attribute_count
+            .checked_mul(attribute_size)
+            .ok_or_else(|| RdError::parse("axml: attribute table size overflow"))?;
+        let attrs_end = attrs_base
+            .checked_add(attrs_bytes)
+            .ok_or_else(|| RdError::parse("axml: attribute table bounds overflow"))?;
+        if attrs_end > chunk_end {
+            return Err(RdError::parse(format!(
+                "axml: <{name}> declares {attribute_count} attributes beyond chunk end"
+            )));
+        }
+    }
 
     let mut attrs = Vec::with_capacity(attribute_count.min(256));
     for i in 0..attribute_count {
         let a = attrs_base + i * attribute_size;
-        if a + 20 > data.len() {
+        if a.checked_add(20).map_or(true, |end| end > chunk_end) {
             return Err(RdError::parse(format!(
                 "axml: attribute #{i} of <{name}> out of bounds"
             )));
