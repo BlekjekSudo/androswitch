@@ -90,6 +90,9 @@ pub fn static_field_descriptor(class: &str, field: &str) -> Option<&'static str>
 /// Exact declarations implemented by this module, shared with JNI lookup.
 pub fn method_metadata(class: &str, name: &str, sig: &str) -> Option<HostMethodKind> {
     use HostMethodKind::{Constructor, Instance, Static};
+    if crate::integer_bits::metadata(class, name, sig) {
+        return Some(Static);
+    }
     let k = kind(class)?;
     if name == "<init>" {
         return ((sig == format!("({k})V"))
@@ -379,6 +382,9 @@ pub fn static_intrinsic(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(value) = crate::integer_bits::call(class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     if method_metadata(class, name, sig) != Some(HostMethodKind::Static) {
         return Ok(None);
     }

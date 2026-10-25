@@ -100,6 +100,7 @@ pub(crate) mod handler_msg;
 pub mod heap;
 #[cfg(feature = "std")]
 pub mod inflate;
+mod integer_bits;
 pub mod interp;
 #[cfg(feature = "std")]
 pub mod intrinsics;

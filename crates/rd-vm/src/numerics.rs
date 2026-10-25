@@ -178,6 +178,9 @@ pub(crate) fn static_intrinsic(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(value) = crate::integer_bits::call(class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     let cls = match class
         .strip_prefix("Ljava/lang/")
         .and_then(|c| c.strip_suffix(';'))
@@ -196,46 +199,6 @@ pub(crate) fn static_intrinsic(
     };
     let v = match (cls, name, sig) {
         // ── Integer ──
-        ("Integer", "bitCount", "(I)I") => Value::Int(i(0).count_ones() as i32),
-        ("Integer", "numberOfLeadingZeros", "(I)I") => Value::Int(i(0).leading_zeros() as i32),
-        ("Integer", "numberOfTrailingZeros", "(I)I") => Value::Int(i(0).trailing_zeros() as i32),
-        ("Integer", "highestOneBit", "(I)I") => {
-            let x = i(0) as u32;
-            Value::Int(if x == 0 {
-                0
-            } else {
-                (1u32 << (31 - x.leading_zeros())) as i32
-            })
-        }
-        ("Integer", "lowestOneBit", "(I)I") => Value::Int(i(0) & i(0).wrapping_neg()),
-        ("Integer", "rotateLeft", "(II)I") => Value::Int(i(0).rotate_left((i(1) & 31) as u32)),
-        ("Integer", "rotateRight", "(II)I") => Value::Int(i(0).rotate_right((i(1) & 31) as u32)),
-        ("Integer", "reverse", "(I)I") => Value::Int(i(0).reverse_bits()),
-        ("Integer", "reverseBytes", "(I)I") => Value::Int(i(0).swap_bytes()),
-        ("Integer", "signum", "(I)I") => Value::Int(i(0).signum()),
-        ("Integer", "hashCode", "(I)I") => Value::Int(i(0)),
-        ("Integer", "compare", "(II)I") => Value::Int(i(0).cmp(&i(1)) as i32),
-        ("Integer", "compareUnsigned", "(II)I") => {
-            Value::Int((i(0) as u32).cmp(&(i(1) as u32)) as i32)
-        }
-        ("Integer", "divideUnsigned", "(II)I") | ("Integer", "remainderUnsigned", "(II)I") => {
-            if i(1) == 0 {
-                return Err(VmExit::Exception(Throwable::new(
-                    "Ljava/lang/ArithmeticException;",
-                    "/ by zero",
-                )));
-            }
-            let (a, c) = (i(0) as u32, i(1) as u32);
-            Value::Int(if name == "divideUnsigned" {
-                a / c
-            } else {
-                a % c
-            } as i32)
-        }
-        ("Integer", "toUnsignedLong", "(I)J") => Value::Long(i(0) as u32 as i64),
-        ("Integer", "max", "(II)I") => Value::Int(i(0).max(i(1))),
-        ("Integer", "min", "(II)I") => Value::Int(i(0).min(i(1))),
-        ("Integer", "sum", "(II)I") => Value::Int(i(0).wrapping_add(i(1))),
         ("Integer", "toHexString", "(I)Ljava/lang/String;") => s(vm, format!("{:x}", i(0) as u32))?,
         ("Integer", "toBinaryString", "(I)Ljava/lang/String;") => {
             s(vm, format!("{:b}", i(0) as u32))?
@@ -267,30 +230,6 @@ pub(crate) fn static_intrinsic(
             )?)
         }
         // ── Long ──
-        ("Long", "bitCount", "(J)I") => Value::Int(j(0).count_ones() as i32),
-        ("Long", "numberOfLeadingZeros", "(J)I") => Value::Int(j(0).leading_zeros() as i32),
-        ("Long", "numberOfTrailingZeros", "(J)I") => Value::Int(j(0).trailing_zeros() as i32),
-        ("Long", "highestOneBit", "(J)J") => {
-            let x = j(0) as u64;
-            Value::Long(if x == 0 {
-                0
-            } else {
-                (1u64 << (63 - x.leading_zeros())) as i64
-            })
-        }
-        ("Long", "lowestOneBit", "(J)J") => Value::Long(j(0) & j(0).wrapping_neg()),
-        ("Long", "rotateLeft", "(JI)J") => Value::Long(j(0).rotate_left((i(1) & 63) as u32)),
-        ("Long", "rotateRight", "(JI)J") => Value::Long(j(0).rotate_right((i(1) & 63) as u32)),
-        ("Long", "reverse", "(J)J") => Value::Long(j(0).reverse_bits()),
-        ("Long", "signum", "(J)I") => Value::Int(j(0).signum() as i32),
-        ("Long", "hashCode", "(J)I") => Value::Int((j(0) ^ ((j(0) as u64) >> 32) as i64) as i32),
-        ("Long", "compare", "(JJ)I") => Value::Int(j(0).cmp(&j(1)) as i32),
-        ("Long", "compareUnsigned", "(JJ)I") => {
-            Value::Int((j(0) as u64).cmp(&(j(1) as u64)) as i32)
-        }
-        ("Long", "max", "(JJ)J") => Value::Long(j(0).max(j(1))),
-        ("Long", "min", "(JJ)J") => Value::Long(j(0).min(j(1))),
-        ("Long", "sum", "(JJ)J") => Value::Long(j(0).wrapping_add(j(1))),
         ("Long", "toString", "(J)Ljava/lang/String;") => s(vm, j(0).to_string())?,
         ("Long", "toString", "(JI)Ljava/lang/String;") => {
             s(vm, to_radix(j(0) as i128, i(1) as u32))?

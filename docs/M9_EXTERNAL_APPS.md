@@ -731,6 +731,24 @@ wtf handler/termination behavior are not implemented. The device does not
 advertise getStackTraceString. Two regression gates bring the catalog to 72;
 a full 72-gate run is not claimed.
 
+NRO42 (`60abf7fab0421771ca701e2ab97e9794c11a8421`, SHA256
+`b3e7a69d5005f41d8d66a0e83475fb0581b1d9e729c1560144c0aeb4a6015c1e`)
+passes the logging boundary. Mekorama loads its native libraries and reports
+the next missing Integer.highestOneBit from a consent SDK path; the diagnostic
+stack also reaches RendererWrapper.onSurfaceCreated. This is not a presented
+application frame. Candy Crush repeats the custom EGL context factory blocker.
+Both SD trees were restored and neither run has a first-screen pass.
+
+The inherited Integer/Long bit and scalar match arms are extracted from
+numerics into shared integer_bits, rather than implementing highestOneBit
+alone in a device class. The existing wrapper corpus now also runs 518 JVM
+utility results and four caught zero-divisor cases on both VM paths, before
+and after GC. It covers 32/64-bit boundary values, rotation distances including
+negative/oversized shifts, unsigned arithmetic, byte/bit reversal, comparisons
+and wrapping sums. Long.reverseBytes/divideUnsigned/remainderUnsigned are new
+bounded additions alongside the extracted inherited algorithms. The existing
+shared-boxes regression gates include these tests; the catalog remains 72.
+
 The following batch reuses existing implementations: Set constructor
 deduplication moves from upstream intrinsics into shared `collection_values`,
 and portable Set calls use the existing COW list generations/lock/iterators/GC,
