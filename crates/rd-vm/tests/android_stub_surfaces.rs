@@ -22570,6 +22570,47 @@ fn service_state_and_cell_broadcast_id_range_values_are_guest_visible() {
         ),
         "Ljava/lang/IllegalArgumentException;",
     );
+    // Boundary: a single-id range at the top of the 16-bit id space is
+    // valid, and equality is exact-class/field based only.
+    let single = p49_new(
+        &mut engine,
+        P36I_CB_RANGE,
+        "(IIIZ)V",
+        &[
+            Value::Int(65535),
+            Value::Int(65535),
+            Value::Int(2),
+            Value::Int(0),
+        ],
+    );
+    assert_eq!(
+        call(&mut engine, single, "getType", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(
+        call_text(&mut engine, single, "toString", "()Ljava/lang/String;", &[]),
+        "CellBroadcastIdRange[65535, 65535, 2, false]"
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            range,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Null],
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            range,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(single)],
+        ),
+        Value::Int(0)
+    );
 }
 
 #[test]
