@@ -891,8 +891,8 @@ pub fn tool_defs() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "device_profile",
-            description: "Perfil de device corrente (piso contratual moto-e5) com os budgets de hardware.",
-            schema: obj(serde_json::json!({}), &[]),
+            description: "Perfil de device corrente (piso contratual moto-e5, budgets e snapshot de periféricos virtuais M10) e controle determinístico AG-10 via `action` opcional (`get`, `location`, `sensor`, `battery`, `network`, `telephony`, `sms_receive`, `ble_advertisement`, `nfc_tag`, `camera_frame`, `biometric`, `audio_input`, `media_action`, `dark_mode`, `locale`, `font_scale`, `orientation`, `clipboard`).",
+            schema: obj(device_profile_schema_props(), &[]),
         },
         ToolDef {
             name: "behavior_switches",
@@ -1211,7 +1211,7 @@ impl AgentSession {
                 false,
             ),
             "permissions_audit" => self.tool_permissions_audit(),
-            "device_profile" => self.tool_device_profile(),
+            "device_profile" => self.tool_device_profile_m10(&args),
             "behavior_switches" => self.tool_behavior_switches(),
             "runtime_health" => {
                 if args.get("gc").and_then(|v| v.as_bool()) == Some(true) {
@@ -1476,6 +1476,8 @@ impl AgentSession {
         };
         #[cfg(feature = "advanced-components")]
         eng.m9_set_notification_permission(notification_permission);
+        #[cfg(any(feature = "advanced-components", feature = "virtual-devices"))]
+        eng.m10_enable_virtual_devices();
         if let Some(ad) = app_desc {
             eng.set_application_class(ad);
         }
@@ -2265,28 +2267,6 @@ impl AgentSession {
         Ok(ToolResult::json(
             &serde_json::json!({ "findings": findings }),
         ))
-    }
-
-    fn tool_device_profile(&mut self) -> Result<ToolResult, RdError> {
-        // v1: o device virtual é o piso contratual moto-e5
-        let d = self.devices.get("moto-e5").ok_or_else(|| {
-            agent_error(
-                "INTERNAL",
-                "perfil moto-e5 ausente dos dados embutidos",
-                None,
-            )
-        })?;
-        Ok(ToolResult::json(&serde_json::json!({
-            "id": d.id,
-            "label": d.label,
-            "class": d.class,
-            "screen": [d.width_px, d.height_px],
-            "density_dpi": d.density_dpi,
-            "refresh_hz": d.refresh_hz,
-            "cpu_cores": d.cpu_cores,
-            "hardware_floor": d.is_hardware_floor(),
-            "budgets": d.budget_summary(),
-        })))
     }
 
     fn tool_behavior_switches(&mut self) -> Result<ToolResult, RdError> {
@@ -3255,6 +3235,7 @@ pub fn serve_stdio_with<R: std::io::Read, W: std::io::Write>(
 }
 
 include!("m9_tools.rs");
+include!("m10_tools.rs");
 include!("observe.rs");
 include!("snapshot.rs");
 include!("ui_tools.rs");

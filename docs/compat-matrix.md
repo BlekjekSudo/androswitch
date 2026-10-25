@@ -42,6 +42,7 @@
 | Suíte | Arquivo | Cenários | Passos |
 |---|---|---|---|
 | contract-no-app | `tests/suites/contract-no-app.json` | 8 | 10 |
+| m10-virtual-devices | `tests/suites/m10-virtual-devices.json` | 2 | 5 |
 | m8-compat | `tests/suites/m8-compat.json` | 2 | 4 |
 
 Executar: `rd test tests/suites/<arquivo>.json --junit <saida>.xml` (formato em `docs/suite-format.md`).

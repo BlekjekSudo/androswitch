@@ -1002,6 +1002,8 @@ pub struct HostState {
     pub m8: crate::m8::M8State,
     #[cfg(feature = "advanced-components")]
     pub m9: crate::m9::State,
+    #[cfg(feature = "virtual-devices")]
+    pub m10: crate::m10::State,
 }
 
 /// M8 (31º gap): fragment registrada por um commit de FragmentTransaction.
