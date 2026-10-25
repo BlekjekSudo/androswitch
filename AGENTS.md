@@ -22,6 +22,10 @@ AndroSwitch's contracts and status live in `docs/ANDROSWITCH_ROADMAP.md`,
   Python, Unicorn, a guest Linux kernel, or desktop process APIs in device builds.
 - Route OS behavior through platform interfaces; Java and native code must share
   storage and application state. Unavailable behavior returns a structured error.
+- Before expanding a missing API, inspect the inherited implementation and tests.
+  Prefer shared `core`/`alloc` extraction over a second implementation; record
+  state, GC, thread or platform differences that require adaptation. See
+  `docs/UPSTREAM_REUSE_AUDIT.md` for the current source-routing audit.
 - AndroSwitch uses an API 26 reference environment. A lower APK minSdk is valid;
   targetSdk is not a minimum. This supersedes upstream's Moto E5/minSdk floor
   policy for AndroSwitch APIs. Preserve legacy `rd` behavior until explicitly ported.

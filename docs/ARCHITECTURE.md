@@ -40,6 +40,13 @@ environment configuration, thread-local VM state and subprocesses must leave
 the portable core. Host tools may retain `std` and Unicorn as an oracle.
 Unicorn results do not verify native Horizon execution.
 
+An API missing on this path may already exist in the inherited desktop
+framework. Audit that implementation before adding a replacement: extract
+compatible pure behavior for both paths and adapt OS/state/GC dependencies.
+`no_std` does not require a second implementation of every Java class. The
+[upstream reuse audit](UPSTREAM_REUSE_AUDIT.md) records the current dispatch
+split, known semantic differences and family-by-family integration priorities.
+
 DEX and native execution share one class/object model, VFS, lifecycle, clock and
 application identity. JNI resolves actual framework/DEX methods, with tracked
 local/global references. Cross-thread callbacks and GC roots require tests.
