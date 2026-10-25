@@ -1113,12 +1113,29 @@ fn rfc822_tokenizer_instance(
         ("findTokenStart", "(Ljava/lang/CharSequence;I)I") => {
             let text = req_charseq(vm, args, 0, "Rfc822Tokenizer.findTokenStart text == null")?;
             let units: Vec<u16> = text.encode_utf16().collect();
-            Value::Int(find_token_start_u16(&units, iarg(args, 1).max(0) as usize) as i32)
+            let cursor = iarg(args, 1);
+            // Past-the-end cursors walk into charAt(len + 1) on AOSP.
+            if cursor > units.len() as i32 {
+                return Err(throw(
+                    "Ljava/lang/StringIndexOutOfBoundsException;",
+                    format!("String index out of range: {}", units.len() + 1),
+                ));
+            }
+            Value::Int(find_token_start_u16(&units, cursor.max(0) as usize) as i32)
         }
         ("findTokenEnd", "(Ljava/lang/CharSequence;I)I") => {
             let text = req_charseq(vm, args, 0, "Rfc822Tokenizer.findTokenEnd text == null")?;
             let units: Vec<u16> = text.encode_utf16().collect();
-            Value::Int(find_token_end_u16(&units, iarg(args, 1).max(0) as usize) as i32)
+            let cursor = iarg(args, 1);
+            // A negative cursor indexes charAt(-1); a past-the-end
+            // cursor is returned untouched.
+            if cursor < 0 {
+                return Err(throw(
+                    "Ljava/lang/StringIndexOutOfBoundsException;",
+                    format!("String index out of range: {cursor}"),
+                ));
+            }
+            Value::Int(find_token_end_u16(&units, cursor as usize) as i32)
         }
         ("terminateToken", "(Ljava/lang/CharSequence;)Ljava/lang/CharSequence;") => {
             let text = charseq(vm, args.first())?;
