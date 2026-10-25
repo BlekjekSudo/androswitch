@@ -37723,10 +37723,14 @@ fn p35c_compute_distance_bearing(
     }
 
     let distance = (b * a_a * (sigma - delta_sigma)) as f32;
-    let initial = (cos_u2 * sin_lambda).atan2(cos_u1 * sin_u2 - sin_u1 * cos_u2 * cos_lambda);
-    let initial = (initial * (180.0 / PI)) as f32;
-    let r#final = (cos_u1 * sin_lambda).atan2(-sin_u1 * cos_u2 + cos_u1 * sin_u2 * cos_lambda);
-    let r#final = (r#final * (180.0 / PI)) as f32;
+    // AOSP rounds each atan2 result to float *before* scaling to
+    // degrees, which shifts the bearings by a few last bits.
+    let initial =
+        (cos_u2 * sin_lambda).atan2(cos_u1 * sin_u2 - sin_u1 * cos_u2 * cos_lambda) as f32;
+    let initial = (f64::from(initial) * (180.0 / PI)) as f32;
+    let r#final =
+        (cos_u1 * sin_lambda).atan2(-sin_u1 * cos_u2 + cos_u1 * sin_u2 * cos_lambda) as f32;
+    let r#final = (f64::from(r#final) * (180.0 / PI)) as f32;
     (distance, initial, r#final)
 }
 

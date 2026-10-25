@@ -14909,6 +14909,23 @@ fn location_and_criteria_values_are_guest_visible() {
 }
 
 #[test]
+fn location_bearings_round_atan2_to_float_before_scaling() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let from = p35c_location_at(&mut engine, -15.5, 30.25);
+    let to = p35c_location_at(&mut engine, 40.4, -3.7);
+    let bearing = call(
+        &mut engine,
+        from,
+        "bearingTo",
+        "(Landroid/location/Location;)F",
+        &[Value::Obj(to)],
+    );
+    // AOSP narrows the atan2 result to float before multiplying by
+    // 180/pi; keeping the double changes the last bit here.
+    assert_eq!(bearing.as_float().unwrap().to_bits(), 0xc1e2_aee4);
+}
+
+#[test]
 fn location_deep_audit_fixes_are_guest_visible() {
     let mut engine = engine_of(&DexBuilder::new());
     let location = p35c_location_at(&mut engine, 1.0, 2.0);
