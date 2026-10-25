@@ -8043,6 +8043,27 @@ fn midi_no_device_profile_values_and_receiver_are_guest_visible() {
     );
     let stored = field(&engine, manager, "rd_device_callbacks");
     assert_eq!(p57_collection_size(&mut engine, stored), 0);
+    // AOSP stores listeners in a ConcurrentHashMap keyed by callback, so a
+    // null callback fails on both unregister (remove) and the transport
+    // overload's Objects.requireNonNull(executor) fires before anything else.
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "unregisterDeviceCallback",
+            "(Landroid/media/midi/MidiManager$DeviceCallback;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "registerDeviceCallback",
+            "(ILjava/util/concurrent/Executor;Landroid/media/midi/MidiManager$DeviceCallback;)V",
+            &[Value::Int(1), Value::Null, Value::Obj(callback)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
 
     let bundle = p49_new(&mut engine, "Landroid/os/Bundle;", "()V", &[]);
     let input_names = p57_string_array(&mut engine, &["in-a", "in-b"]);
@@ -8165,6 +8186,41 @@ fn midi_no_device_profile_values_and_receiver_are_guest_visible() {
         call_text(&mut engine, info, "toString", "()Ljava/lang/String;", &[])
             .starts_with("MidiDeviceInfo[mType=2,mInputPortCount=2,mOutputPortCount=1,")
     );
+    // AOSP's toString first calls mProperties.getString(...) to force
+    // unparcelling, so a device info built with null properties fails
+    // instead of rendering.
+    assert_throws(
+        engine.invoke_instance(same_id, "toString", "()Ljava/lang/String;", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+    // getPorts indexes the caller-supplied names arrays directly, so a
+    // names array shorter than the declared port count is out of bounds.
+    let short_input_names = p57_string_array(&mut engine, &["only-one"]);
+    let short_names_info = p49_new(
+        &mut engine,
+        info_class,
+        info_sig,
+        &[
+            Value::Int(1),
+            Value::Int(7),
+            Value::Int(2),
+            Value::Int(0),
+            short_input_names,
+            Value::Null,
+            Value::Obj(bundle),
+            Value::Int(0),
+            Value::Int(0),
+        ],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            short_names_info,
+            "getPorts",
+            "()[Landroid/media/midi/MidiDeviceInfo$PortInfo;",
+            &[],
+        ),
+        "Ljava/lang/ArrayIndexOutOfBoundsException;",
+    );
 
     call(
         &mut engine,
@@ -8202,6 +8258,16 @@ fn midi_no_device_profile_values_and_receiver_are_guest_visible() {
         field(&engine, receiver, "rd_last_timestamp"),
         Value::Long(99)
     );
+    // A zero-count send never enters AOSP's chunking loop.
+    let empty_message = byte_array(&mut engine, &[0x80]);
+    call(
+        &mut engine,
+        receiver,
+        "send",
+        "([BIIJ)V",
+        &[empty_message, Value::Int(0), Value::Int(0), Value::Long(7)],
+    );
+    assert_eq!(field(&engine, receiver, "rd_send_calls"), Value::Int(2));
     call(&mut engine, receiver, "flush", "()V", &[]);
     assert_eq!(field(&engine, receiver, "rd_flushed"), Value::Int(1));
 }
