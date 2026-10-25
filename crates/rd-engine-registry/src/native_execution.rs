@@ -1,8 +1,10 @@
 //! Real APK/DEX/ELF/JNI route for C, C++ and Rust. No language guessing.
 use crate::{Artifact, EngineEvent, EngineSyscall};
+use rd_apk::manifest::ComponentKind;
 use rd_apk::{Apk, RdError, RdResult};
 use rd_vm::{Engine, Value, VmConfig, VmExit};
 use serde::Deserialize;
+use std::sync::Arc;
 
 // Keep parsing limits explicit and validate before invoking any guest code.
 const MAX_APK_BYTES: u64 = 256 * 1024 * 1024;
@@ -52,6 +54,31 @@ impl std::fmt::Debug for NativeProcess {
 fn error(code: &str, cause: impl Into<String>) -> RdError {
     RdError::new(code, cause, "rd-native-engines").with_suggestion("see docs/native-languages.md; enable native-engines, launch first, and use only the documented bounded API")
 }
+// Issue #260: the descriptor must name a class the way Dalvik expects
+// (Lpkg/Name;). The MCP pre-resolves it, but this constructor is public —
+// reject shapes that cannot be a class before the heavy engine mount.
+fn valid_activity_desc(desc: &str) -> RdResult<String> {
+    let inner = desc
+        .strip_prefix('L')
+        .and_then(|rest| rest.strip_suffix(';'))
+        .ok_or_else(|| {
+            error(
+                "INVALID_FORMAT",
+                format!("activity descriptor {desc:?} must be a Dalvik Lpkg/Class; name"),
+            )
+        })?;
+    if inner.is_empty()
+        || inner
+            .split('/')
+            .any(|segment| segment.is_empty() || segment == "." || segment == "..")
+    {
+        return Err(error(
+            "INVALID_FORMAT",
+            format!("activity descriptor {desc:?} has an empty or hostile package segment"),
+        ));
+    }
+    Ok(desc.to_string())
+}
 fn vm_error(e: VmExit) -> RdError {
     match e {
         VmExit::Error(e) => RdError {
@@ -74,7 +101,25 @@ impl NativeProcess {
         Self::from_apk(id, Apk::from_bytes(artifact.bytes.to_vec())?)
     }
     /// Prepare an already-parsed APK for the same native route used by MCP.
+    ///
+    /// Issue #260: only a real `<activity>` may satisfy the launcher probe —
+    /// `<service>`/`<receiver>`/`<provider>` with an injected MAIN/LAUNCHER
+    /// intent filter no longer hijack the entry selection. `<activity-alias>`
+    /// still requires the MCP application route (which resolves the alias
+    /// target per issue #109 before any launch).
     pub fn from_apk(id: &str, apk: Apk) -> RdResult<Self> {
+        Self::from_apk_shared(id, Arc::new(apk), None)
+    }
+    /// MCP route (issue #260): the agent already resolved and validated the
+    /// entry component — an explicit non-launcher `<activity>`, an
+    /// `<activity-alias>` target (`launch_desc_of_component`, issue #109) or
+    /// the default launcher — so no launcher probe runs here and the VM still
+    /// enforces that the resolved class exists in the mounted DEX (issue #82).
+    /// The `Arc<Apk>` is shared with the engine instead of cloned per launch.
+    pub fn from_apk_with_activity(id: &str, apk: Arc<Apk>, activity_desc: &str) -> RdResult<Self> {
+        Self::from_apk_shared(id, apk, Some(activity_desc))
+    }
+    fn from_apk_shared(id: &str, apk: Arc<Apk>, activity: Option<&str>) -> RdResult<Self> {
         if !crate::native_execution_available(id) {
             return Err(error(
                 "NOT_IMPLEMENTED",
@@ -93,20 +138,29 @@ impl NativeProcess {
         if apk.native_libs.is_empty() {
             return Err(error("MISSING_ENTRY", "native APK has no lib/<abi>/*.so"));
         }
-        let activity = apk
-            .manifest
-            .application
-            .components
-            .iter()
-            .find(|c| c.is_launcher && c.enabled != Some(false))
-            .ok_or_else(|| error("MISSING_ENTRY", "no enabled launcher activity"))?;
-        if activity.target_activity.is_some() {
-            return Err(error(
-                "NOT_IMPLEMENTED",
-                "native adapter launch aliases require the MCP application route",
-            ));
-        }
-        let activity = format!("L{};", activity.class_name.replace('.', "/"));
+        let activity = match activity {
+            Some(desc) => valid_activity_desc(desc)?,
+            None => {
+                let component = apk
+                    .manifest
+                    .application
+                    .components
+                    .iter()
+                    .find(|c| {
+                        matches!(c.kind, ComponentKind::Activity)
+                            && c.is_launcher
+                            && c.enabled != Some(false)
+                    })
+                    .ok_or_else(|| error("MISSING_ENTRY", "no enabled launcher activity"))?;
+                if component.target_activity.is_some() {
+                    return Err(error(
+                        "NOT_IMPLEMENTED",
+                        "native adapter launch aliases require the MCP application route",
+                    ));
+                }
+                format!("L{};", component.class_name.replace('.', "/"))
+            }
+        };
         let package = apk.manifest.package.clone();
         let mut dexes = Vec::new();
         for name in &apk.dex_files {
@@ -118,7 +172,7 @@ impl NativeProcess {
         }
         let application = apk.manifest.application.name.clone();
         let mut engine = Engine::new(dexes, VmConfig::default());
-        engine.set_resources(apk);
+        engine.set_resources_arc(apk);
         if let Some(a) = application {
             engine.set_application_class(format!("L{};", a.replace('.', "/")));
         }

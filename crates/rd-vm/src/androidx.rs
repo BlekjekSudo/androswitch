@@ -112,6 +112,12 @@ pub struct LiveDataHost {
     pub value: Value,
     pub version: i32,
     pub observers: Vec<LiveObserver>,
+    /// As flags do AOSP (`mDispatchingValue`/`mDispatchInvalidated`):
+    /// um `setValue` dentro de `onChanged` marca invalidação e a
+    /// entrega recomeça iterativamente — sem elas, o despacho síncrono
+    /// recursia até ao SIGABRT do hospedeiro.
+    pub dispatching: bool,
+    pub dispatch_invalidated: bool,
 }
 
 impl Default for LiveDataHost {
@@ -120,6 +126,8 @@ impl Default for LiveDataHost {
             value: Value::Null,
             version: -1,
             observers: Vec::new(),
+            dispatching: false,
+            dispatch_invalidated: false,
         }
     }
 }
@@ -826,29 +834,69 @@ fn observer_active(vm: &Engine, o: &LiveObserver) -> bool {
         },
     }
 }
+/// Teto de rondas de re-despacho por disparo (o AOSP não tem teto
+/// porque o main thread + watchdog o limitam; aqui o teto é a
+/// alternativa honesta a um loop/abort do hospedeiro).
+const MAX_LIVEDATA_DISPATCH_ROUNDS: usize = 256;
+
 fn livedata_dispatch(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
-    // Deliver the current value to every active observer that has not
-    // seen this version; inactive observers keep their last version.
-    let snapshot: Vec<(ObjRef, Value)> = {
-        let Some(h) = vm.fw.androidx.livedata.get(&recv) else {
+    {
+        let Some(h) = vm.fw.androidx.livedata.get_mut(&recv) else {
             return Ok(());
         };
-        h.observers
-            .iter()
-            .filter(|o| o.last_version < h.version && observer_active(vm, o))
-            .map(|o| (o.observer, h.value.clone()))
-            .collect()
-    };
+        if h.dispatching {
+            // setValue aninhado (dentro de um onChanged): invalida e
+            // deixa a ronda exterior re-despachar com o valor novo.
+            h.dispatch_invalidated = true;
+            return Ok(());
+        }
+        h.dispatching = true;
+    }
+    let result = livedata_dispatch_rounds(vm, recv);
     if let Some(h) = vm.fw.androidx.livedata.get_mut(&recv) {
-        let version = h.version;
-        for o in h.observers.iter_mut() {
-            if snapshot.iter().any(|(obs, _)| *obs == o.observer) {
-                o.last_version = version;
+        h.dispatching = false;
+        h.dispatch_invalidated = false;
+    }
+    result
+}
+
+fn livedata_dispatch_rounds(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    for _ in 0..MAX_LIVEDATA_DISPATCH_ROUNDS {
+        if let Some(h) = vm.fw.androidx.livedata.get_mut(&recv) {
+            h.dispatch_invalidated = false;
+        }
+        // Deliver the current value to every active observer that has
+        // not seen this version; inactive keep their last version.
+        let snapshot: Vec<(ObjRef, Value)> = {
+            let Some(h) = vm.fw.androidx.livedata.get(&recv) else {
+                return Ok(());
+            };
+            h.observers
+                .iter()
+                .filter(|o| o.last_version < h.version && observer_active(vm, o))
+                .map(|o| (o.observer, h.value.clone()))
+                .collect()
+        };
+        if let Some(h) = vm.fw.androidx.livedata.get_mut(&recv) {
+            let version = h.version;
+            for o in h.observers.iter_mut() {
+                if snapshot.iter().any(|(obs, _)| *obs == o.observer) {
+                    o.last_version = version;
+                }
             }
         }
-    }
-    for (obs, val) in snapshot {
-        let _ = crate::m8::call_dex(vm, obs, "onChanged", "(Ljava/lang/Object;)V", vec![val])?;
+        for (obs, val) in snapshot {
+            let _ = crate::m8::call_dex(vm, obs, "onChanged", "(Ljava/lang/Object;)V", vec![val])?;
+        }
+        let invalidated = vm
+            .fw
+            .androidx
+            .livedata
+            .get(&recv)
+            .is_some_and(|h| h.dispatch_invalidated);
+        if !invalidated {
+            break;
+        }
     }
     Ok(())
 }
