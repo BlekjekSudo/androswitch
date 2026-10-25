@@ -24,6 +24,7 @@
 //! os `*int/lit8` válidos — NÃO fazem parte do intervalo unused (issue #13).
 
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
 use crate::annotations::{
     parse_annotation_item, parse_annotation_set_item, parse_annotation_set_ref_list,
@@ -61,6 +62,175 @@ const CATCHALL: &str = ":catchall_";
 #[cfg(test)]
 const SENTINEL: u32 = u32::MAX;
 
+// ── orçamento de renderização (anti-DoS / anti-DAG #285) ────────────────────
+
+/// Teto absoluto de texto smali produzido por uma chamada a `render_class` (`16 MiB`).
+const MAX_RENDER_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
+/// Teto absoluto de passos estruturais visitados em `render_class`.
+const MAX_RENDER_STEPS: usize = 250_000;
+/// Profundidade máxima ao renderizar `EncodedValue` recursivo (`Array`/`Annotation`).
+const MAX_RENDER_VALUE_DEPTH: usize = 64;
+
+struct RenderWriter {
+    buf: String,
+    max_bytes: usize,
+    steps: usize,
+    max_steps: usize,
+    ann_set_cache: BTreeMap<u32, Rc<[u32]>>,
+    ann_item_cache: BTreeMap<u32, Rc<AnnotationItem>>,
+    code_cache: BTreeMap<u32, Rc<CodeItem>>,
+    debug_cache: BTreeMap<u32, Rc<Option<DebugInfo>>>,
+}
+
+impl RenderWriter {
+    fn new(dex_len: usize) -> Self {
+        let max_bytes = dex_len
+            .saturating_mul(32)
+            .clamp(256 * 1024, MAX_RENDER_OUTPUT_BYTES);
+        let max_steps = dex_len.saturating_mul(8).clamp(16_384, MAX_RENDER_STEPS);
+        Self {
+            buf: String::with_capacity(8192),
+            max_bytes,
+            steps: 0,
+            max_steps,
+            ann_set_cache: BTreeMap::new(),
+            ann_item_cache: BTreeMap::new(),
+            code_cache: BTreeMap::new(),
+            debug_cache: BTreeMap::new(),
+        }
+    }
+
+    #[inline]
+    fn step(&mut self, n: usize) -> RdResult<()> {
+        self.steps = self.steps.saturating_add(n);
+        if self.steps > self.max_steps {
+            return Err(RdError::parse(format!(
+                "disasm: orçamento de trabalho excedido ({} > {} itens)",
+                self.steps, self.max_steps
+            )));
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn remaining_bytes(&self) -> usize {
+        self.max_bytes.saturating_sub(self.buf.len())
+    }
+
+    #[inline]
+    fn push_str(&mut self, s: &str) -> RdResult<()> {
+        let next = self.buf.len().saturating_add(s.len());
+        if next > self.max_bytes {
+            return Err(RdError::parse(format!(
+                "disasm: saída smali excede orçamento ({} > {} bytes)",
+                next, self.max_bytes
+            )));
+        }
+        self.buf.push_str(s);
+        Ok(())
+    }
+
+    #[inline]
+    fn push(&mut self, ch: char) -> RdResult<()> {
+        let next = self.buf.len().saturating_add(ch.len_utf8());
+        if next > self.max_bytes {
+            return Err(RdError::parse(format!(
+                "disasm: saída smali excede orçamento ({} > {} bytes)",
+                next, self.max_bytes
+            )));
+        }
+        self.buf.push(ch);
+        Ok(())
+    }
+
+    #[inline]
+    fn ends_with(&self, pat: &str) -> bool {
+        self.buf.ends_with(pat)
+    }
+
+    fn push_escaped_string(&mut self, raw: &str) -> RdResult<()> {
+        // Todo caractere consome >= 1 byte no literal smali (+ 2 aspas).
+        if raw.len().saturating_add(2) > self.remaining_bytes() {
+            return Err(RdError::parse(format!(
+                "disasm: literal de string ({} bytes) excede orçamento restante ({} bytes)",
+                raw.len(),
+                self.remaining_bytes()
+            )));
+        }
+        let escaped = mutf8::escape_string(raw);
+        self.push_str(&escaped)
+    }
+
+    fn escaped_string(&self, raw: &str) -> RdResult<String> {
+        if raw.len().saturating_add(2) > self.remaining_bytes() {
+            return Err(RdError::parse(format!(
+                "disasm: literal de string ({} bytes) excede orçamento restante ({} bytes)",
+                raw.len(),
+                self.remaining_bytes()
+            )));
+        }
+        Ok(mutf8::escape_string(raw))
+    }
+
+    fn annotation_set(&mut self, data: &[u8], off: u32) -> RdResult<Rc<[u32]>> {
+        if let Some(cached) = self.ann_set_cache.get(&off) {
+            let rc = Rc::clone(cached);
+            self.step(rc.len().max(1))?;
+            return Ok(rc);
+        }
+        let parsed = parse_annotation_set_item(data, off)?;
+        self.step(parsed.len().max(1))?;
+        let rc: Rc<[u32]> = parsed.into();
+        self.ann_set_cache.insert(off, Rc::clone(&rc));
+        Ok(rc)
+    }
+
+    fn annotation_item(&mut self, data: &[u8], off: u32) -> RdResult<Rc<AnnotationItem>> {
+        if let Some(cached) = self.ann_item_cache.get(&off) {
+            let rc = Rc::clone(cached);
+            self.step(rc.annotation.elements.len().max(1))?;
+            return Ok(rc);
+        }
+        let parsed = parse_annotation_item(data, off)?;
+        self.step(parsed.annotation.elements.len().max(1))?;
+        let rc = Rc::new(parsed);
+        self.ann_item_cache.insert(off, Rc::clone(&rc));
+        Ok(rc)
+    }
+
+    fn code_item(&mut self, dex: &Dex, off: u32) -> RdResult<Rc<CodeItem>> {
+        if let Some(cached) = self.code_cache.get(&off) {
+            let rc = Rc::clone(cached);
+            self.step(rc.instructions.len().max(1))?;
+            return Ok(rc);
+        }
+        let parsed = dex
+            .code(off)?
+            .ok_or_else(|| RdError::parse(format!("code_item ausente no offset 0x{off:x}")))?;
+        self.step(parsed.instructions.len().max(1))?;
+        let rc = Rc::new(parsed);
+        self.code_cache.insert(off, Rc::clone(&rc));
+        Ok(rc)
+    }
+
+    fn debug_item(&mut self, dex: &Dex, off: u32) -> RdResult<Rc<Option<DebugInfo>>> {
+        if let Some(cached) = self.debug_cache.get(&off) {
+            let rc = Rc::clone(cached);
+            if let Some(dbg) = rc.as_ref() {
+                self.step(dbg.entries.len().max(1))?;
+            }
+            return Ok(rc);
+        }
+        let parsed = dex.debug_info(off)?;
+        if let Some(dbg) = &parsed {
+            self.step(dbg.entries.len().max(1))?;
+        }
+        let rc = Rc::new(parsed);
+        self.debug_cache.insert(off, Rc::clone(&rc));
+        Ok(rc)
+    }
+}
+
 // ── API pública ─────────────────────────────────────────────────────────────
 
 /// Renderiza uma classe no formato smali (baksmali-compatible).
@@ -72,9 +242,9 @@ pub fn render_class(dex: &Dex, class_index: usize) -> RdResult<String> {
         ))
         .with_suggestion("list classes with `rd dex disasm <path>` (without --class)")
     })?;
-    let mut out = String::with_capacity(8192);
+    let mut out = RenderWriter::new(dex.data.len());
     render_class_into(dex, def, &mut out)?;
-    Ok(out)
+    Ok(out.buf)
 }
 
 /// Renderiza apenas o bloco `.method` do método `method_name` da classe.
@@ -232,22 +402,22 @@ fn ensure_dot(s: String) -> String {
 
 // ── renderização da classe ──────────────────────────────────────────────────
 
-fn render_class_into(dex: &Dex, def: &ClassDef, out: &mut String) -> RdResult<()> {
+fn render_class_into(dex: &Dex, def: &ClassDef, out: &mut RenderWriter) -> RdResult<()> {
+    out.step(1)?;
     let this = dex.type_str(def.class_idx);
     let flags = format_flags(def.access_flags, CLASS_FLAG_ORDER);
     if flags.is_empty() {
-        out.push_str(&format!(".class {this}\n"));
+        out.push_str(&format!(".class {this}\n"))?;
     } else {
-        out.push_str(&format!(".class {flags} {this}\n"));
+        out.push_str(&format!(".class {flags} {this}\n"))?;
     }
     if def.superclass_idx != NO_INDEX {
-        out.push_str(&format!(".super {}\n", dex.type_str(def.superclass_idx)));
+        out.push_str(&format!(".super {}\n", dex.type_str(def.superclass_idx)))?;
     }
     if def.source_file_idx != NO_INDEX {
-        out.push_str(&format!(
-            ".source {}\n",
-            mutf8::escape_string(dex.string(def.source_file_idx))
-        ));
+        out.push_str(".source ")?;
+        out.push_escaped_string(dex.string(def.source_file_idx))?;
+        out.push('\n')?;
     }
 
     let dir = if def.annotations_off != 0 {
@@ -258,9 +428,10 @@ fn render_class_into(dex: &Dex, def: &ClassDef, out: &mut String) -> RdResult<()
 
     if let Some(d) = &dir {
         if d.class_annotations_off != 0 {
-            out.push_str("\n# annotations\n");
-            for off in parse_annotation_set_item(&dex.data, d.class_annotations_off)? {
-                let item = parse_annotation_item(&dex.data, off)?;
+            out.push_str("\n# annotations\n")?;
+            let set = out.annotation_set(&dex.data, d.class_annotations_off)?;
+            for &off in set.iter() {
+                let item = out.annotation_item(&dex.data, off)?;
                 write_annotation_block(dex, out, &item, 0)?;
             }
         }
@@ -268,9 +439,10 @@ fn render_class_into(dex: &Dex, def: &ClassDef, out: &mut String) -> RdResult<()
 
     let interfaces = dex.interfaces(def)?;
     if !interfaces.is_empty() {
-        out.push_str("\n# interfaces\n");
+        out.step(interfaces.len())?;
+        out.push_str("\n# interfaces\n")?;
         for &t in &interfaces {
-            out.push_str(&format!(".implements {}\n", dex.type_str(t)));
+            out.push_str(&format!(".implements {}\n", dex.type_str(t)))?;
         }
     }
 
@@ -279,24 +451,38 @@ fn render_class_into(dex: &Dex, def: &ClassDef, out: &mut String) -> RdResult<()
     };
 
     // diretórios de anotação → mapas ordenados por índice (determinismo)
-    let mut field_anns: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
-    let mut method_anns: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
+    // spec §annotations_directory_item exige índices únicos e ordenados; rejeitar
+    // duplicatas impede amplificação quadrática por entradas repetidas (#285).
+    let mut field_anns: BTreeMap<u32, Rc<[u32]>> = BTreeMap::new();
+    let mut method_anns: BTreeMap<u32, Rc<[u32]>> = BTreeMap::new();
     let mut param_anns: BTreeMap<u32, Vec<Option<u32>>> = BTreeMap::new();
     if let Some(d) = &dir {
         for (idx, off) in &d.field_annotations {
-            field_anns
-                .entry(*idx)
-                .or_default()
-                .extend(parse_annotation_set_item(&dex.data, *off)?);
+            if field_anns.contains_key(idx) {
+                return Err(RdError::invalid_format(format!(
+                    "annotations_directory: field_idx {idx} duplicado"
+                )));
+            }
+            let set = out.annotation_set(&dex.data, *off)?;
+            field_anns.insert(*idx, set);
         }
         for (idx, off) in &d.method_annotations {
-            method_anns
-                .entry(*idx)
-                .or_default()
-                .extend(parse_annotation_set_item(&dex.data, *off)?);
+            if method_anns.contains_key(idx) {
+                return Err(RdError::invalid_format(format!(
+                    "annotations_directory: method_idx {idx} duplicado"
+                )));
+            }
+            let set = out.annotation_set(&dex.data, *off)?;
+            method_anns.insert(*idx, set);
         }
         for (idx, off) in &d.parameter_annotations {
+            if param_anns.contains_key(idx) {
+                return Err(RdError::invalid_format(format!(
+                    "annotations_directory: parameter method_idx {idx} duplicado"
+                )));
+            }
             let refs = parse_annotation_set_ref_list(&dex.data, *off)?;
+            out.step(refs.len().max(1))?;
             param_anns.insert(
                 *idx,
                 refs.into_iter()
@@ -309,7 +495,7 @@ fn render_class_into(dex: &Dex, def: &ClassDef, out: &mut String) -> RdResult<()
     let svals = dex.static_values(def)?;
 
     if !cd.static_fields.is_empty() {
-        out.push_str("\n# static fields\n");
+        out.push_str("\n# static fields\n")?;
         for (i, f) in cd.static_fields.iter().enumerate() {
             let fid = dex.field(f.field_idx)?;
             write_field(
@@ -318,37 +504,37 @@ fn render_class_into(dex: &Dex, def: &ClassDef, out: &mut String) -> RdResult<()
                 &fid,
                 f.access_flags,
                 svals.get(i),
-                field_anns.get(&f.field_idx).map(Vec::as_slice),
+                field_anns.get(&f.field_idx).map(Rc::as_ref),
             )?;
         }
     }
     if !cd.instance_fields.is_empty() {
-        out.push_str("\n# instance fields\n");
+        out.push_str("\n# instance fields\n")?;
         for f in &cd.instance_fields {
             let fid = dex.field(f.field_idx)?;
             write_field(dex, out, &fid, f.access_flags, None, None)?;
         }
     }
     if !cd.direct_methods.is_empty() {
-        out.push_str("\n# direct methods\n");
+        out.push_str("\n# direct methods\n")?;
         for m in &cd.direct_methods {
             write_method(
                 dex,
                 out,
                 m,
-                method_anns.get(&m.method_idx).map(Vec::as_slice),
+                method_anns.get(&m.method_idx).map(Rc::as_ref),
                 param_anns.get(&m.method_idx),
             )?;
         }
     }
     if !cd.virtual_methods.is_empty() {
-        out.push_str("\n# virtual methods\n");
+        out.push_str("\n# virtual methods\n")?;
         for m in &cd.virtual_methods {
             write_method(
                 dex,
                 out,
                 m,
-                method_anns.get(&m.method_idx).map(Vec::as_slice),
+                method_anns.get(&m.method_idx).map(Rc::as_ref),
                 param_anns.get(&m.method_idx),
             )?;
         }
@@ -358,35 +544,35 @@ fn render_class_into(dex: &Dex, def: &ClassDef, out: &mut String) -> RdResult<()
 
 fn write_field(
     dex: &Dex,
-    out: &mut String,
+    out: &mut RenderWriter,
     fid: &FieldId,
     flags: u32,
     value: Option<&EncodedValue>,
     anns: Option<&[u32]>,
 ) -> RdResult<()> {
-    let mut line = String::from(".field");
+    out.step(1)?;
+    out.push_str(".field")?;
     let fl = format_flags(flags, FIELD_FLAG_ORDER);
     if !fl.is_empty() {
-        line.push(' ');
-        line.push_str(&fl);
+        out.push(' ')?;
+        out.push_str(&fl)?;
     }
-    line.push(' ');
-    line.push_str(dex.string(fid.name_idx));
-    line.push(':');
-    line.push_str(dex.type_str(u32::from(fid.type_idx)));
+    out.push(' ')?;
+    out.push_str(dex.string(fid.name_idx))?;
+    out.push(':')?;
+    out.push_str(dex.type_str(u32::from(fid.type_idx)))?;
     if let Some(v) = value {
-        line.push_str(" = ");
-        line.push_str(&render_value(dex, v, 0)?);
+        out.push_str(" = ")?;
+        write_encoded_value(dex, out, v, 0, 0)?;
     }
-    out.push_str(&line);
-    out.push('\n');
+    out.push('\n')?;
     if let Some(list) = anns {
         if !list.is_empty() {
             for &off in list {
-                let item = parse_annotation_item(&dex.data, off)?;
+                let item = out.annotation_item(&dex.data, off)?;
                 write_annotation_block(dex, out, &item, 4)?;
             }
-            out.push_str(".end field\n");
+            out.push_str(".end field\n")?;
         }
     }
     Ok(())
@@ -394,14 +580,16 @@ fn write_field(
 
 fn write_method(
     dex: &Dex,
-    out: &mut String,
+    out: &mut RenderWriter,
     em: &crate::methods::EncodedMethod,
     method_anns: Option<&[u32]>,
     param_anns: Option<&Vec<Option<u32>>>,
 ) -> RdResult<()> {
+    out.step(1)?;
     let mid = dex.method(em.method_idx)?;
     let proto = dex.proto(mid.proto_idx)?;
     let params = dex.proto_params(mid.proto_idx)?;
+    out.step(params.len())?;
     let mut sig = String::from("(");
     for &p in &params {
         sig.push_str(dex.type_str(p));
@@ -412,54 +600,59 @@ fn write_method(
     let fl = format_flags(em.access_flags, METHOD_FLAG_ORDER);
     // separador em branco entre métodos (estilo baksmali)
     if !out.ends_with("\n\n") {
-        out.push('\n');
+        out.push('\n')?;
     }
     if fl.is_empty() {
-        out.push_str(&format!(".method {}{sig}\n", dex.string(mid.name_idx)));
+        out.push_str(&format!(".method {}{sig}\n", dex.string(mid.name_idx)))?;
     } else {
-        out.push_str(&format!(".method {fl} {}{sig}\n", dex.string(mid.name_idx)));
+        out.push_str(&format!(".method {fl} {}{sig}\n", dex.string(mid.name_idx)))?;
     }
 
     // anotações do método (inclusive em métodos sem corpo)
     let has_anns = method_anns.is_some_and(|l| !l.is_empty());
     if em.code_off == 0 {
         if has_anns {
-            out.push('\n');
+            out.push('\n')?;
             for &off in method_anns.unwrap_or(&[]) {
-                let item = parse_annotation_item(&dex.data, off)?;
+                let item = out.annotation_item(&dex.data, off)?;
                 write_annotation_block(dex, out, &item, 4)?;
             }
         }
-        out.push_str(".end method\n");
+        out.push_str(".end method\n")?;
         return Ok(());
     }
 
-    let code = dex.code(em.code_off)?.ok_or_else(|| {
-        RdError::parse(format!("code_item ausente no offset 0x{:x}", em.code_off))
-    })?;
+    let code = out.code_item(dex, em.code_off)?;
     let debug = if code.debug_info_off != 0 {
-        dex.debug_info(code.debug_info_off)?
+        out.debug_item(dex, code.debug_info_off)?
     } else {
-        None
+        Rc::new(None)
     };
     let is_static = em.access_flags & ACC_STATIC != 0;
 
-    out.push_str(&format!("    .registers {}\n\n", code.registers_size));
-    write_params(dex, out, &params, debug.as_ref(), param_anns, is_static)?;
+    out.push_str(&format!("    .registers {}\n\n", code.registers_size))?;
+    write_params(
+        dex,
+        out,
+        &params,
+        debug.as_ref().as_ref(),
+        param_anns,
+        is_static,
+    )?;
 
     if has_anns {
-        out.push('\n');
+        out.push('\n')?;
         for &off in method_anns.unwrap_or(&[]) {
-            let item = parse_annotation_item(&dex.data, off)?;
+            let item = out.annotation_item(&dex.data, off)?;
             write_annotation_block(dex, out, &item, 4)?;
         }
-        out.push('\n');
+        out.push('\n')?;
     }
 
-    let md = MethodRender::build(dex, &code, debug.as_ref())?;
+    let md = MethodRender::build(dex, &code, debug.as_ref().as_ref(), out)?;
     md.write_body(out)?;
 
-    out.push_str(".end method\n");
+    out.push_str(".end method\n")?;
     Ok(())
 }
 
@@ -476,7 +669,7 @@ fn param_width(desc: &str) -> usize {
 /// Numeração pN: p0 = this (não-estático); parâmetro wide consome 2 registradores.
 fn write_params(
     dex: &Dex,
-    out: &mut String,
+    out: &mut RenderWriter,
     params: &[u32],
     debug: Option<&DebugInfo>,
     param_anns: Option<&Vec<Option<u32>>>,
@@ -486,36 +679,36 @@ fn write_params(
     let mut preg = if is_static { 0usize } else { 1usize };
     let mut any = false;
     for (k, &t) in params.iter().enumerate() {
+        out.step(1)?;
         let tdesc = dex.type_str(t);
         let name = names
             .and_then(|v| v.get(k))
             .copied()
             .flatten()
             .filter(|&i| i != NO_INDEX)
-            .map(|i| dex.string(i).to_string());
+            .map(|i| dex.string(i));
         let ann_off = param_anns.and_then(|v| v.get(k)).copied().flatten();
-        if let Some(n) = &name {
-            out.push_str(&format!(
-                "    .param p{preg}, {}    # {tdesc}\n",
-                mutf8::escape_string(n)
-            ));
+        if let Some(n) = name {
+            let esc = out.escaped_string(n)?;
+            out.push_str(&format!("    .param p{preg}, {esc}    # {tdesc}\n"))?;
             any = true;
         }
         if let Some(off) = ann_off {
             if name.is_none() {
-                out.push_str(&format!("    .param p{preg}\n"));
+                out.push_str(&format!("    .param p{preg}\n"))?;
                 any = true;
             }
-            for aoff in parse_annotation_set_item(&dex.data, off)? {
-                let item = parse_annotation_item(&dex.data, aoff)?;
+            let set = out.annotation_set(&dex.data, off)?;
+            for &aoff in set.iter() {
+                let item = out.annotation_item(&dex.data, aoff)?;
                 write_annotation_block(dex, out, &item, 8)?;
             }
-            out.push_str("    .end param\n");
+            out.push_str("    .end param\n")?;
         }
         preg += param_width(tdesc);
     }
     if any {
-        out.push('\n');
+        out.push('\n')?;
     }
     Ok(())
 }
@@ -540,7 +733,9 @@ impl<'a> MethodRender<'a> {
         dex: &'a Dex,
         code: &'a CodeItem,
         debug: Option<&DebugInfo>,
+        out: &mut RenderWriter,
     ) -> RdResult<MethodRender<'a>> {
+        out.step(code.instructions.len().saturating_add(code.tries.len()))?;
         // issue #20: saturating_sub defensivo — o CodeItem::parse agora rejeita
         // ins_size > registers_size, mas o render não deve wrapar mesmo se
         // chamado com um CodeItem construído fora do parse
@@ -585,11 +780,13 @@ impl<'a> MethodRender<'a> {
             if let Some(p) = payloads.get(&paddr) {
                 match p {
                     Payload::PackedSwitch { targets, .. } => {
+                        out.step(targets.len())?;
                         for t in targets {
                             ins_target(&mut labels.pswitch, saddr as usize, *t as i64);
                         }
                     }
                     Payload::SparseSwitch { targets, .. } => {
+                        out.step(targets.len())?;
                         for t in targets {
                             ins_target(&mut labels.sswitch, saddr as usize, *t as i64);
                         }
@@ -616,6 +813,11 @@ impl<'a> MethodRender<'a> {
 
         let mut catches: BTreeMap<u32, Vec<String>> = BTreeMap::new();
         for (t, h) in code.tries.iter().zip(&code.handlers) {
+            out.step(
+                h.typed
+                    .len()
+                    .saturating_add(usize::from(h.catch_all.is_some())),
+            )?;
             let end = t.start_addr + t.insn_count as u32;
             let entry = catches.entry(end).or_default();
             for (ty, addr) in &h.typed {
@@ -641,7 +843,9 @@ impl<'a> MethodRender<'a> {
         let mut directives: BTreeMap<u32, Vec<String>> = BTreeMap::new();
         let mut last_line: Option<u32> = None;
         if let Some(dbg) = debug {
+            out.step(dbg.entries.len())?;
             for e in &dbg.entries {
+                out.step(e.events.len())?;
                 let entry = directives.entry(e.addr).or_default();
                 for ev in &e.events {
                     match ev {
@@ -657,7 +861,7 @@ impl<'a> MethodRender<'a> {
                 }
                 for ev in &e.events {
                     if let DebugEvent::Local(l) = ev {
-                        entry.push(render_local(dex, l, reg_base));
+                        entry.push(render_local(dex, l, reg_base, out)?);
                     }
                 }
             }
@@ -699,9 +903,9 @@ impl<'a> MethodRender<'a> {
     }
 
     /// Operando de índice para formatos 21c (opcode → string/tipo/campo).
-    fn index_ref_21c(&self, opcode: u8, idx: u16) -> RdResult<String> {
+    fn index_ref_21c(&self, opcode: u8, idx: u16, out: &RenderWriter) -> RdResult<String> {
         match opcode {
-            0x1a | 0x1b => Ok(mutf8::escape_string(self.dex.string(idx as u32))),
+            0x1a | 0x1b => out.escaped_string(self.dex.string(idx as u32)),
             0x1c | 0x1f | 0x22 => Ok(self.dex.type_str(idx as u32).to_string()),
             0x60..=0x6d => self.field_ref(idx as u32),
             _ => Ok(format!("index@{idx}")),
@@ -740,7 +944,7 @@ impl<'a> MethodRender<'a> {
         format!("{{{} .. {}}}", first, last)
     }
 
-    fn render_insn(&self, addr: usize, insn: &Insn) -> RdResult<String> {
+    fn render_insn(&self, addr: usize, insn: &Insn, out: &RenderWriter) -> RdResult<String> {
         let o = info(insn.opcode);
         if o.is_unused() {
             return Ok(format!("nop // unused 0x{:02x}", insn.opcode));
@@ -790,7 +994,7 @@ impl<'a> MethodRender<'a> {
                 format!("{name} {}, {lit}", self.r(*a))
             }
             Kind::RegIndex(a, idx) => {
-                let target = self.index_ref_21c(insn.opcode, *idx)?;
+                let target = self.index_ref_21c(insn.opcode, *idx, out)?;
                 format!("{name} {}, {target}", self.r(*a))
             }
             Kind::RegRegReg(a, b, c) => {
@@ -839,7 +1043,7 @@ impl<'a> MethodRender<'a> {
             Kind::RegIndex32(a, idx) => format!(
                 "{name} {}, {}",
                 self.r(*a),
-                mutf8::escape_string(self.dex.string(*idx))
+                out.escaped_string(self.dex.string(*idx))?
             ),
             Kind::Lit64(a, lit) => {
                 format!("{name} {}, {}", self.r(*a), long_lit(*lit))
@@ -892,77 +1096,89 @@ impl<'a> MethodRender<'a> {
         })
     }
 
-    fn emit_label(out: &mut String, m: &BTreeMap<u32, usize>, prefix: &str, a: u32) {
+    fn emit_label(
+        out: &mut RenderWriter,
+        m: &BTreeMap<u32, usize>,
+        prefix: &str,
+        a: u32,
+    ) -> RdResult<()> {
         if let Some(&i) = m.get(&a) {
-            out.push_str(&format!("{prefix}{i}\n"));
+            out.push_str(&format!("{prefix}{i}\n"))?;
         }
+        Ok(())
     }
 
-    fn emit_labels_at(&self, out: &mut String, a: u32) {
-        Self::emit_label(out, &self.labels.try_start, TRY_START, a);
-        Self::emit_label(out, &self.labels.try_end, TRY_END, a);
+    fn emit_labels_at(&self, out: &mut RenderWriter, a: u32) -> RdResult<()> {
+        Self::emit_label(out, &self.labels.try_start, TRY_START, a)?;
+        Self::emit_label(out, &self.labels.try_end, TRY_END, a)?;
         if let Some(lines) = self.catches.get(&a) {
             for l in lines {
-                out.push_str(l);
-                out.push('\n');
+                out.step(1)?;
+                out.push_str(l)?;
+                out.push('\n')?;
             }
         }
-        Self::emit_label(out, &self.labels.cond, COND, a);
-        Self::emit_label(out, &self.labels.goto, GOTO, a);
-        Self::emit_label(out, &self.labels.pswitch, PSWITCH, a);
-        Self::emit_label(out, &self.labels.sswitch, SSWITCH, a);
-        Self::emit_label(out, &self.labels.pswitch_data, PSWITCH_DATA, a);
-        Self::emit_label(out, &self.labels.sswitch_data, SSWITCH_DATA, a);
-        Self::emit_label(out, &self.labels.array_data, ARRAY_DATA, a);
+        Self::emit_label(out, &self.labels.cond, COND, a)?;
+        Self::emit_label(out, &self.labels.goto, GOTO, a)?;
+        Self::emit_label(out, &self.labels.pswitch, PSWITCH, a)?;
+        Self::emit_label(out, &self.labels.sswitch, SSWITCH, a)?;
+        Self::emit_label(out, &self.labels.pswitch_data, PSWITCH_DATA, a)?;
+        Self::emit_label(out, &self.labels.sswitch_data, SSWITCH_DATA, a)?;
+        Self::emit_label(out, &self.labels.array_data, ARRAY_DATA, a)?;
+        Ok(())
     }
 
-    fn emit_directives(&self, out: &mut String, a: u32) {
+    fn emit_directives(&self, out: &mut RenderWriter, a: u32) -> RdResult<()> {
         if let Some(dirs) = self.directives.get(&a) {
             for d in dirs {
-                out.push_str(IND);
-                out.push_str(d);
-                out.push('\n');
+                out.step(1)?;
+                out.push_str(IND)?;
+                out.push_str(d)?;
+                out.push('\n')?;
             }
         }
+        Ok(())
     }
 
-    fn write_payload(&self, out: &mut String, addr: u32, p: &Payload) -> RdResult<()> {
+    fn write_payload(&self, out: &mut RenderWriter, addr: u32, p: &Payload) -> RdResult<()> {
         match p {
             Payload::PackedSwitch { first_key, targets } => {
                 out.push_str(&format!(
                     "{}\n",
                     lab(&self.labels.pswitch_data, PSWITCH_DATA, addr)
-                ));
+                ))?;
                 out.push_str(&format!(
                     ".packed-switch {}\n",
                     signed_hex(*first_key as i64)
-                ));
+                ))?;
                 let sa = self.payload_switch.get(&addr).copied().unwrap_or(addr);
                 for t in targets {
+                    out.step(1)?;
                     let target = (sa as i64 + *t as i64) as u32;
                     out.push_str(&format!(
                         "{IND}{}\n",
                         lab(&self.labels.pswitch, PSWITCH, target)
-                    ));
+                    ))?;
                 }
-                out.push_str(".end packed-switch\n");
+                out.push_str(".end packed-switch\n")?;
             }
             Payload::SparseSwitch { keys, targets } => {
                 out.push_str(&format!(
                     "{}\n",
                     lab(&self.labels.sswitch_data, SSWITCH_DATA, addr)
-                ));
-                out.push_str(".sparse-switch\n");
+                ))?;
+                out.push_str(".sparse-switch\n")?;
                 let sa = self.payload_switch.get(&addr).copied().unwrap_or(addr);
                 for (k, t) in keys.iter().zip(targets.iter()) {
+                    out.step(1)?;
                     let target = (sa as i64 + *t as i64) as u32;
                     out.push_str(&format!(
                         "{IND}{} -> {}\n",
                         signed_hex(*k as i64),
                         lab(&self.labels.sswitch, SSWITCH, target)
-                    ));
+                    ))?;
                 }
-                out.push_str(".end sparse-switch\n");
+                out.push_str(".end sparse-switch\n")?;
             }
             Payload::ArrayData {
                 element_width,
@@ -972,53 +1188,63 @@ impl<'a> MethodRender<'a> {
                 out.push_str(&format!(
                     "{}\n",
                     lab(&self.labels.array_data, ARRAY_DATA, addr)
-                ));
-                out.push_str(&format!(".array-data {element_width}\n"));
+                ))?;
+                out.push_str(&format!(".array-data {element_width}\n"))?;
                 let w = *element_width as usize;
                 let total = (*element_count as usize).saturating_mul(w).min(data.len());
-                let mut i = 0usize;
-                while i + w <= total {
-                    let b = &data[i..i + w];
-                    // literais SIGNED (convenção baksmali: -0x1t, -0x40800000, …L)
-                    let s = match w {
-                        1 => fmt_array_lit(b[0] as i8 as i64, "t"),
-                        2 => fmt_array_lit(i16::from_le_bytes([b[0], b[1]]) as i64, "s"),
-                        4 => fmt_array_lit(i32::from_le_bytes([b[0], b[1], b[2], b[3]]) as i64, ""),
-                        8 => fmt_array_lit(
-                            i64::from_le_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]]),
-                            "L",
-                        ),
-                        _ => {
-                            // largura incomum — bytes brutos (tolerante)
-                            let hex: String = b.iter().fold(String::new(), |mut acc, x| {
-                                use std::fmt::Write as _;
-                                let _ = write!(acc, "{x:02x}");
-                                acc
-                            });
-                            format!("0x{hex}")
-                        }
-                    };
-                    out.push_str(&format!("{IND}{s}\n"));
-                    i += w;
+                if w > 0 {
+                    let mut i = 0usize;
+                    while i + w <= total {
+                        out.step(1)?;
+                        let b = &data[i..i + w];
+                        // literais SIGNED (convenção baksmali: -0x1t, -0x40800000, …L)
+                        let s = match w {
+                            1 => fmt_array_lit(b[0] as i8 as i64, "t"),
+                            2 => fmt_array_lit(i16::from_le_bytes([b[0], b[1]]) as i64, "s"),
+                            4 => fmt_array_lit(
+                                i32::from_le_bytes([b[0], b[1], b[2], b[3]]) as i64,
+                                "",
+                            ),
+                            8 => fmt_array_lit(
+                                i64::from_le_bytes([
+                                    b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
+                                ]),
+                                "L",
+                            ),
+                            _ => {
+                                // largura incomum — bytes brutos (tolerante)
+                                let hex: String = b.iter().fold(String::new(), |mut acc, x| {
+                                    use std::fmt::Write as _;
+                                    let _ = write!(acc, "{x:02x}");
+                                    acc
+                                });
+                                format!("0x{hex}")
+                            }
+                        };
+                        out.push_str(&format!("{IND}{s}\n"))?;
+                        i += w;
+                    }
                 }
-                out.push_str(".end array-data\n");
+                out.push_str(".end array-data\n")?;
             }
         }
         Ok(())
     }
 
-    fn write_body(&self, out: &mut String) -> RdResult<()> {
+    fn write_body(&self, out: &mut RenderWriter) -> RdResult<()> {
         let last_addr = self.code.instructions.last().map(|(a, _)| *a as u32);
         for (addr, insn) in &self.code.instructions {
+            out.step(1)?;
             let a = *addr as u32;
-            self.emit_labels_at(out, a);
-            self.emit_directives(out, a);
+            self.emit_labels_at(out, a)?;
+            self.emit_directives(out, a)?;
             match &insn.kind {
                 Kind::Payload(p) => self.write_payload(out, a, p)?,
                 _ => {
-                    out.push_str(IND);
-                    out.push_str(&self.render_insn(*addr, insn)?);
-                    out.push('\n');
+                    let rendered = self.render_insn(*addr, insn, out)?;
+                    out.push_str(IND)?;
+                    out.push_str(&rendered)?;
+                    out.push('\n')?;
                 }
             }
         }
@@ -1044,7 +1270,7 @@ impl<'a> MethodRender<'a> {
             tail.sort_unstable();
             tail.dedup();
             for k in tail {
-                self.emit_labels_at(out, k);
+                self.emit_labels_at(out, k)?;
             }
         }
         Ok(())
@@ -1065,8 +1291,13 @@ fn proto_sig(dex: &Dex, idx: u16) -> RdResult<String> {
 }
 
 /// Diretiva `.local` de um evento de variável local (debug info).
-fn render_local(dex: &Dex, l: &LocalEvent, reg_base: usize) -> String {
-    match l {
+fn render_local(
+    dex: &Dex,
+    l: &LocalEvent,
+    reg_base: usize,
+    out: &RenderWriter,
+) -> RdResult<String> {
+    Ok(match l {
         LocalEvent::Start {
             reg,
             name,
@@ -1079,13 +1310,16 @@ fn render_local(dex: &Dex, l: &LocalEvent, reg_base: usize) -> String {
                 typ.filter(|&i| i != NO_INDEX),
             ) {
                 (Some(n), Some(t)) => {
-                    let mut s = format!(
-                        ".local {r}, {}:{}",
-                        mutf8::escape_string(dex.string(n)),
-                        dex.type_str(t)
-                    );
+                    let esc = out.escaped_string(dex.string(n))?;
+                    let mut s = format!(".local {r}, {esc}:{}", dex.type_str(t));
                     if let Some(g) = sig.filter(|&i| i != NO_INDEX) {
-                        s.push_str(&format!("    # {}", dex.string(g)));
+                        let gs = dex.string(g);
+                        if gs.len() > out.remaining_bytes() {
+                            return Err(RdError::parse(
+                                "disasm: assinatura .local excede orçamento restante",
+                            ));
+                        }
+                        s.push_str(&format!("    # {gs}"));
                     }
                     s
                 }
@@ -1096,122 +1330,157 @@ fn render_local(dex: &Dex, l: &LocalEvent, reg_base: usize) -> String {
         LocalEvent::Restart { reg } => {
             format!(".restart local {}", reg_name(*reg as usize, reg_base))
         }
-    }
+    })
 }
 
 // ── anotações ───────────────────────────────────────────────────────────────
 
 fn write_annotation_block(
     dex: &Dex,
-    out: &mut String,
+    out: &mut RenderWriter,
     item: &AnnotationItem,
     ind: usize,
 ) -> RdResult<()> {
-    write_annotation_inner(dex, out, item.visibility.name(), &item.annotation, ind)
+    write_annotation_inner(dex, out, item.visibility.name(), &item.annotation, ind, 0)
 }
 
 fn write_annotation_inner(
     dex: &Dex,
-    out: &mut String,
+    out: &mut RenderWriter,
     vis: &str,
     ann: &EncodedAnnotation,
     ind: usize,
+    depth: usize,
 ) -> RdResult<()> {
+    if depth > MAX_RENDER_VALUE_DEPTH {
+        return Err(RdError::parse(format!(
+            "disasm: aninhamento de anotação excede {MAX_RENDER_VALUE_DEPTH} níveis"
+        )));
+    }
+    out.step(1)?;
     let pad = indent(ind);
     out.push_str(&format!(
         "{pad}.annotation {vis} {}\n",
         dex.type_str(ann.type_idx)
-    ));
+    ))?;
     for el in &ann.elements {
-        let val = render_value(dex, &el.value, ind + 4)?;
-        out.push_str(&format!("{pad}    {} = {val}\n", dex.string(el.name_idx)));
+        out.step(1)?;
+        out.push_str(&format!("{pad}    {} = ", dex.string(el.name_idx)))?;
+        write_encoded_value(dex, out, &el.value, ind + 4, depth + 1)?;
+        out.push('\n')?;
     }
-    out.push_str(&format!("{pad}.end annotation\n"));
+    out.push_str(&format!("{pad}.end annotation\n"))?;
     Ok(())
 }
 
-/// Valor `encoded_value` no literal smali. `ind` só é usado por
-/// `.subannotation` (multiline). Arrays: `{ a, b }` numa linha.
-fn render_value(dex: &Dex, v: &EncodedValue, ind: usize) -> RdResult<String> {
-    Ok(match v {
-        EncodedValue::Byte(b) => signed_hex(*b as i64) + "t",
-        EncodedValue::Short(s) => signed_hex(*s as i64) + "s",
-        EncodedValue::Char(c) => mutf8::escape_char(*c),
-        EncodedValue::Int(i) => signed_hex(*i as i64),
-        EncodedValue::Long(l) => signed_hex(*l) + "L",
-        EncodedValue::Float(f) => format!("{}f", fmt_f32(*f)),
-        EncodedValue::Double(d) => fmt_f64(*d),
-        EncodedValue::MethodType(idx) => proto_sig(dex, *idx as u16)?,
+/// Valor `encoded_value` no literal smali escrito diretamente em `out`.
+/// `ind` só é usado por `.subannotation` (multiline). Arrays: `{ a, b }` numa linha.
+fn write_encoded_value(
+    dex: &Dex,
+    out: &mut RenderWriter,
+    v: &EncodedValue,
+    ind: usize,
+    depth: usize,
+) -> RdResult<()> {
+    if depth > MAX_RENDER_VALUE_DEPTH {
+        return Err(RdError::parse(format!(
+            "disasm: aninhamento de encoded_value excede {MAX_RENDER_VALUE_DEPTH} níveis"
+        )));
+    }
+    out.step(1)?;
+    match v {
+        EncodedValue::Byte(b) => {
+            out.push_str(&signed_hex(*b as i64))?;
+            out.push('t')?;
+        }
+        EncodedValue::Short(s) => {
+            out.push_str(&signed_hex(*s as i64))?;
+            out.push('s')?;
+        }
+        EncodedValue::Char(c) => out.push_str(&mutf8::escape_char(*c))?,
+        EncodedValue::Int(i) => out.push_str(&signed_hex(*i as i64))?,
+        EncodedValue::Long(l) => {
+            out.push_str(&signed_hex(*l))?;
+            out.push('L')?;
+        }
+        EncodedValue::Float(f) => out.push_str(&format!("{}f", fmt_f32(*f)))?,
+        EncodedValue::Double(d) => out.push_str(&fmt_f64(*d))?,
+        EncodedValue::MethodType(idx) => out.push_str(&proto_sig(dex, *idx as u16)?)?,
         EncodedValue::MethodHandle(idx) => match dex.method_handles.get(*idx as usize) {
             Some(h) if crate::methods::method_handle_type::is_invoke(h.method_handle_type) => {
                 let m = dex.method(h.field_or_method_idx)?;
-                format!(
+                out.push_str(&format!(
                     "{}@{}->{}{}",
                     crate::methods::method_handle_type::name(h.method_handle_type),
                     dex.type_str(m.class_idx as u32),
                     dex.string(m.name_idx),
                     proto_sig(dex, m.proto_idx)?
-                )
+                ))?;
             }
             Some(h) => {
                 let f = dex.field(h.field_or_method_idx)?;
-                format!(
+                out.push_str(&format!(
                     "{}@{}->{}:{}",
                     crate::methods::method_handle_type::name(h.method_handle_type),
                     dex.type_str(f.class_idx as u32),
                     dex.string(f.name_idx),
                     dex.type_str(f.type_idx as u32)
-                )
+                ))?;
             }
-            None => format!("method_handle@{idx}"),
+            None => out.push_str(&format!("method_handle@{idx}"))?,
         },
-        EncodedValue::String(idx) => mutf8::escape_string(dex.string(*idx)),
-        EncodedValue::Type(idx) => dex.type_str(*idx).to_string(),
+        EncodedValue::String(idx) => out.push_escaped_string(dex.string(*idx))?,
+        EncodedValue::Type(idx) => out.push_str(dex.type_str(*idx))?,
         EncodedValue::Field(idx) | EncodedValue::Enum(idx) => {
             let f = dex.field(*idx)?;
-            format!(
+            out.push_str(&format!(
                 "{}->{}:{}",
                 dex.type_str(f.class_idx as u32),
                 dex.string(f.name_idx),
                 dex.type_str(f.type_idx as u32)
-            )
+            ))?;
         }
         EncodedValue::Method(idx) => {
             let m = dex.method(*idx)?;
-            format!(
+            out.push_str(&format!(
                 "{}->{}{}",
                 dex.type_str(m.class_idx as u32),
                 dex.string(m.name_idx),
                 proto_sig(dex, m.proto_idx)?
-            )
+            ))?;
         }
         EncodedValue::Array(elems) => {
             if elems.is_empty() {
-                "{}".to_string()
+                out.push_str("{}")?;
             } else {
-                let mut parts = Vec::with_capacity(elems.len());
-                for e in elems {
-                    parts.push(render_value(dex, e, ind)?);
+                out.push_str("{ ")?;
+                for (i, e) in elems.iter().enumerate() {
+                    if i > 0 {
+                        out.push_str(", ")?;
+                    }
+                    write_encoded_value(dex, out, e, ind, depth + 1)?;
                 }
-                format!("{{ {} }}", parts.join(", "))
+                out.push_str(" }")?;
             }
         }
         EncodedValue::Annotation(a) => {
-            let mut s = format!(".subannotation {}\n", dex.type_str(a.type_idx));
+            out.push_str(&format!(".subannotation {}\n", dex.type_str(a.type_idx)))?;
+            let elem_pad = indent(ind + 4);
             for el in &a.elements {
-                let val = render_value(dex, &el.value, ind + 4)?;
-                s.push_str(&format!(
-                    "{}{} = {val}\n",
-                    indent(ind + 4),
-                    dex.string(el.name_idx)
-                ));
+                out.step(1)?;
+                out.push_str(&elem_pad)?;
+                out.push_str(dex.string(el.name_idx))?;
+                out.push_str(" = ")?;
+                write_encoded_value(dex, out, &el.value, ind + 4, depth + 1)?;
+                out.push('\n')?;
             }
-            s.push_str(&format!("{}.end subannotation", indent(ind)));
-            s
+            out.push_str(&indent(ind))?;
+            out.push_str(".end subannotation")?;
         }
-        EncodedValue::Null => "null".to_string(),
-        EncodedValue::Boolean(b) => if *b { "true" } else { "false" }.to_string(),
-    })
+        EncodedValue::Null => out.push_str("null")?,
+        EncodedValue::Boolean(b) => out.push_str(if *b { "true" } else { "false" })?,
+    }
+    Ok(())
 }
 
 // ── utilidades ──────────────────────────────────────────────────────────────

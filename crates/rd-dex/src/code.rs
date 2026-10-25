@@ -415,8 +415,36 @@ impl CodeItem {
             // handler_off é relativo ao INÍCIO da lista (incluindo o campo size).
             let _list_size = r.uleb128()?;
             let base = handlers_offset;
+            const MAX_METHOD_CATCH_CLAUSES: usize = 16_384;
+            let clause_budget = data
+                .len()
+                .saturating_mul(2)
+                .clamp(1024, MAX_METHOD_CATCH_CLAUSES);
+            let mut total_clauses = 0usize;
+            let mut handler_cache: std::collections::BTreeMap<u16, CatchHandler> =
+                std::collections::BTreeMap::new();
             for t in &tries {
-                let h = parse_catch_handler(data, base + t.handler_off as usize)?;
+                let h = if let Some(cached) = handler_cache.get(&t.handler_off) {
+                    cached.clone()
+                } else {
+                    let handler_abs = base
+                        .checked_add(t.handler_off as usize)
+                        .ok_or_else(|| RdError::parse("code_item: handler_off overflow"))?;
+                    let parsed = parse_catch_handler(data, handler_abs)?;
+                    handler_cache.insert(t.handler_off, parsed.clone());
+                    parsed
+                };
+                let clauses = h
+                    .typed
+                    .len()
+                    .saturating_add(usize::from(h.catch_all.is_some()))
+                    .max(1);
+                total_clauses = total_clauses.saturating_add(clauses);
+                if total_clauses > clause_budget {
+                    return Err(RdError::parse(format!(
+                        "code_item: cláusulas catch acumuladas ({total_clauses}) excedem orçamento ({clause_budget}) @ 0x{off:x}"
+                    )));
+                }
                 handlers.push(h);
             }
             // valida tries dentro da stream
