@@ -378,15 +378,15 @@ key_apis = ["android.graphics.drawable.Drawable.draw", "android.graphics.drawabl
 id = "android-graphics-pdf"
 prefix = "android.graphics.pdf"
 domain = "graphics"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-ui"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "PdfDocument/PdfRenderer are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Partial: PdfDocument.PageInfo/Builder validation and values plus the PdfDocument startPage/finishPage/getPages/writeTo/close lifecycle are guest-visible; a started page exposes a host Canvas over a same-sized Bitmap target and writeTo emits a structurally valid PDF with the finished pages' MediaBox/CropBox geometry. Canvas drawing operations are not yet serialized into PDF content streams; PdfRenderer has no PDFium backend, so non-null construction fails (seekability IOException/IllegalArgumentException path) and only closed-renderer/page state checks and render-mode constants are modelled. No PDF parsing/rendering of real documents."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/api-coverage.md"]
 gap_id = "gap-android-graphics-pdf"
-key_apis = ["android.graphics.pdf.PdfDocument.startPage", "android.graphics.pdf.PdfRenderer.openPage"]
+key_apis = ["android.graphics.pdf.PdfDocument.startPage", "android.graphics.pdf.PdfDocument.writeTo", "android.graphics.pdf.PdfDocument.PageInfo.Builder.create", "android.graphics.pdf.PdfRenderer.getPageCount"]
 
 [[surface]]
 id = "android-opengl"
@@ -406,15 +406,15 @@ key_apis = ["android.opengl.Matrix.multiplyMM", "android.opengl.Matrix.multiplyM
 id = "android-renderscript"
 prefix = "android.renderscript"
 domain = "graphics"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-ui"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "legacy"
-notes = "Deprecated RenderScript has no host runtime."
-evidence = ["docs/compat-matrix.md"]
+notes = "Partial: deprecated RenderScript is modelled in the AOSP config.disable_renderscript profile. Pure-Java Float2/Float3/Float4 vector arithmetic and Matrix2f/Matrix3f/Matrix4f operations (including Matrix4f inverse/projection builders) plus Element sub-element state and DataType/DataKind/ContextType enum metadata are guest-visible; RenderScript.create/createMultiContext follow internalCreate's disabled path (null for sdk<23/multi-context, the sdk>=23 process-context NullPointerException, releaseAllContexts no-op). No Allocation/Type/Script/ScriptGroup/native RS runtime or GPU/CPU kernel execution exists."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/api-coverage.md"]
 gap_id = "gap-android-renderscript-legacy"
-key_apis = ["android.renderscript.RenderScript.create"]
+key_apis = ["android.renderscript.RenderScript.create", "android.renderscript.Float4.add", "android.renderscript.Matrix4f.loadOrtho", "android.renderscript.Element.getSubElementCount"]
 
 # ===================== Text =====================
 [[surface]]

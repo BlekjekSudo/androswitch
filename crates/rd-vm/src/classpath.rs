@@ -2048,6 +2048,38 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Landroid/os/Binder;",
             "Ljava/lang/Object;",
         ]),
+        // Appendix C Batch 36-F bounded PDF / RenderScript slices.
+        "Landroid/graphics/pdf/PdfDocument;"
+        | "Landroid/graphics/pdf/PdfDocument$PageInfo;"
+        | "Landroid/graphics/pdf/PdfDocument$PageInfo$Builder;"
+        | "Landroid/graphics/pdf/PdfDocument$Page;"
+        | "Landroid/graphics/pdf/PdfRenderer;"
+        | "Landroid/graphics/pdf/PdfRenderer$Page;"
+        | "Landroid/renderscript/RenderScript;"
+        | "Landroid/renderscript/BaseObj;"
+        | "Landroid/renderscript/Float2;"
+        | "Landroid/renderscript/Float3;"
+        | "Landroid/renderscript/Float4;"
+        | "Landroid/renderscript/Matrix2f;"
+        | "Landroid/renderscript/Matrix3f;"
+        | "Landroid/renderscript/Matrix4f;" => Some(OBJECT),
+        "Landroid/renderscript/Element;" => {
+            Some(&["Landroid/renderscript/BaseObj;", "Ljava/lang/Object;"])
+        }
+        "Landroid/renderscript/RenderScript$ContextType;"
+        | "Landroid/renderscript/Element$DataType;"
+        | "Landroid/renderscript/Element$DataKind;" => {
+            Some(&["Ljava/lang/Enum;", "Ljava/lang/Object;"])
+        }
+        "Landroid/renderscript/RSRuntimeException;" => Some(RUNTIME),
+        "Landroid/renderscript/RSInvalidStateException;"
+        | "Landroid/renderscript/RSIllegalArgumentException;" => Some(&[
+            "Landroid/renderscript/RSRuntimeException;",
+            "Ljava/lang/RuntimeException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
         _ => None,
     }
 }
@@ -2680,6 +2712,10 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Landroid/os/IInterface;",
             "Landroid/os/IBinder;",
         ]),
+        // Interfaces in the Batch 36-F bounded slices.
+        "Landroid/graphics/pdf/PdfRenderer;" | "Landroid/graphics/pdf/PdfRenderer$Page;" => {
+            Some(&["Ljava/lang/AutoCloseable;"])
+        }
         _ => None,
     }
 }

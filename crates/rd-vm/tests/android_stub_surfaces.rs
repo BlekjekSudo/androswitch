@@ -17345,3 +17345,812 @@ fn audiofx_descriptors_and_no_effect_engine_are_guest_visible() {
     call(&mut engine, effect, "release", "()V", &[]);
     assert_eq!(field(&engine, effect, "mState"), Value::Int(0));
 }
+
+// ---- Appendix C Batch 36-F: graphics.pdf / renderscript ----
+
+const P36F_PDF_DOCUMENT: &str = "Landroid/graphics/pdf/PdfDocument;";
+const P36F_PDF_PAGE_INFO_BUILDER: &str = "Landroid/graphics/pdf/PdfDocument$PageInfo$Builder;";
+const P36F_PDF_RENDERER: &str = "Landroid/graphics/pdf/PdfRenderer;";
+const P36F_PDF_RENDERER_PAGE: &str = "Landroid/graphics/pdf/PdfRenderer$Page;";
+const P36F_RS: &str = "Landroid/renderscript/RenderScript;";
+const P36F_RS_ELEMENT: &str = "Landroid/renderscript/Element;";
+const P36F_RS_FLOAT3: &str = "Landroid/renderscript/Float3;";
+const P36F_RS_FLOAT4: &str = "Landroid/renderscript/Float4;";
+const P36F_RS_MATRIX2: &str = "Landroid/renderscript/Matrix2f;";
+const P36F_RS_MATRIX3: &str = "Landroid/renderscript/Matrix3f;";
+const P36F_RS_MATRIX4: &str = "Landroid/renderscript/Matrix4f;";
+const P36F_IAE: &str = "Ljava/lang/IllegalArgumentException;";
+const P36F_ISE: &str = "Ljava/lang/IllegalStateException;";
+const P36F_NPE: &str = "Ljava/lang/NullPointerException;";
+
+fn p36f_pdf_bytes(engine: &mut Engine, document: ObjRef) -> Vec<u8> {
+    let sink = p49_new(engine, "Ljava/io/ByteArrayOutputStream;", "()V", &[]);
+    call(
+        engine,
+        document,
+        "writeTo",
+        "(Ljava/io/OutputStream;)V",
+        &[Value::Obj(sink)],
+    );
+    let bytes = call(engine, sink, "toByteArray", "()[B", &[]);
+    array_values(engine, &bytes)
+        .iter()
+        .map(|v| v.as_int().unwrap_or(0) as u8)
+        .collect()
+}
+
+#[test]
+fn pdf_document_lifecycle_and_page_info_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    for (w, h, number) in [(0, 100, 0), (100, 0, 0), (100, 100, -1)] {
+        let builder = instance(&mut engine, P36F_PDF_PAGE_INFO_BUILDER);
+        assert_throws(
+            engine.invoke_instance(
+                builder,
+                "<init>",
+                "(III)V",
+                &[Value::Int(w), Value::Int(h), Value::Int(number)],
+            ),
+            P36F_IAE,
+        );
+    }
+    let builder = p49_new(
+        &mut engine,
+        P36F_PDF_PAGE_INFO_BUILDER,
+        "(III)V",
+        &[Value::Int(612), Value::Int(792), Value::Int(0)],
+    );
+    let too_big = p49_new(
+        &mut engine,
+        "Landroid/graphics/Rect;",
+        "(IIII)V",
+        &[
+            Value::Int(0),
+            Value::Int(0),
+            Value::Int(613),
+            Value::Int(792),
+        ],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "setContentRect",
+            "(Landroid/graphics/Rect;)Landroid/graphics/pdf/PdfDocument$PageInfo$Builder;",
+            &[Value::Obj(too_big)],
+        ),
+        P36F_IAE,
+    );
+    let content = p49_new(
+        &mut engine,
+        "Landroid/graphics/Rect;",
+        "(IIII)V",
+        &[
+            Value::Int(36),
+            Value::Int(72),
+            Value::Int(576),
+            Value::Int(756),
+        ],
+    );
+    let returned = call(
+        &mut engine,
+        builder,
+        "setContentRect",
+        "(Landroid/graphics/Rect;)Landroid/graphics/pdf/PdfDocument$PageInfo$Builder;",
+        &[Value::Obj(content)],
+    );
+    assert_eq!(returned, Value::Obj(builder));
+    let info = object(call(
+        &mut engine,
+        builder,
+        "create",
+        "()Landroid/graphics/pdf/PdfDocument$PageInfo;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, info, "getPageWidth", "()I", &[]),
+        Value::Int(612)
+    );
+    assert_eq!(
+        call(&mut engine, info, "getPageHeight", "()I", &[]),
+        Value::Int(792)
+    );
+    assert_eq!(
+        call(&mut engine, info, "getPageNumber", "()I", &[]),
+        Value::Int(0)
+    );
+    let rect = object(call(
+        &mut engine,
+        info,
+        "getContentRect",
+        "()Landroid/graphics/Rect;",
+        &[],
+    ));
+    assert_eq!(field(&engine, rect, "left"), Value::Int(36));
+    assert_eq!(field(&engine, rect, "bottom"), Value::Int(756));
+
+    let builder2 = p49_new(
+        &mut engine,
+        P36F_PDF_PAGE_INFO_BUILDER,
+        "(III)V",
+        &[Value::Int(100), Value::Int(100), Value::Int(1)],
+    );
+    let info2 = object(call(
+        &mut engine,
+        builder2,
+        "create",
+        "()Landroid/graphics/pdf/PdfDocument$PageInfo;",
+        &[],
+    ));
+    let default_rect = object(call(
+        &mut engine,
+        info2,
+        "getContentRect",
+        "()Landroid/graphics/Rect;",
+        &[],
+    ));
+    assert_eq!(field(&engine, default_rect, "right"), Value::Int(100));
+
+    let document = p49_new(&mut engine, P36F_PDF_DOCUMENT, "()V", &[]);
+    let pages = object(call(
+        &mut engine,
+        document,
+        "getPages",
+        "()Ljava/util/List;",
+        &[],
+    ));
+    assert_eq!(call(&mut engine, pages, "size", "()I", &[]), Value::Int(0));
+    assert_throws(
+        engine.invoke_instance(
+            document,
+            "startPage",
+            "(Landroid/graphics/pdf/PdfDocument$PageInfo;)Landroid/graphics/pdf/PdfDocument$Page;",
+            &[Value::Null],
+        ),
+        P36F_IAE,
+    );
+    let page = object(call(
+        &mut engine,
+        document,
+        "startPage",
+        "(Landroid/graphics/pdf/PdfDocument$PageInfo;)Landroid/graphics/pdf/PdfDocument$Page;",
+        &[Value::Obj(info)],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            page,
+            "getInfo",
+            "()Landroid/graphics/pdf/PdfDocument$PageInfo;",
+            &[]
+        ),
+        Value::Obj(info)
+    );
+    let canvas = object(call(
+        &mut engine,
+        page,
+        "getCanvas",
+        "()Landroid/graphics/Canvas;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, canvas, "getWidth", "()I", &[]),
+        Value::Int(612)
+    );
+    assert_eq!(
+        call(&mut engine, canvas, "getHeight", "()I", &[]),
+        Value::Int(792)
+    );
+    assert_throws(
+        engine.invoke_instance(
+            document,
+            "startPage",
+            "(Landroid/graphics/pdf/PdfDocument$PageInfo;)Landroid/graphics/pdf/PdfDocument$Page;",
+            &[Value::Obj(info2)],
+        ),
+        P36F_ISE,
+    );
+    assert_throws(
+        engine.invoke_instance(document, "close", "()V", &[]),
+        P36F_ISE,
+    );
+    let other_page = instance(&mut engine, "Landroid/graphics/pdf/PdfDocument$Page;");
+    assert_throws(
+        engine.invoke_instance(
+            document,
+            "finishPage",
+            "(Landroid/graphics/pdf/PdfDocument$Page;)V",
+            &[Value::Obj(other_page)],
+        ),
+        P36F_ISE,
+    );
+    call(
+        &mut engine,
+        document,
+        "finishPage",
+        "(Landroid/graphics/pdf/PdfDocument$Page;)V",
+        &[Value::Obj(page)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            page,
+            "getCanvas",
+            "()Landroid/graphics/Canvas;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_throws(
+        engine.invoke_instance(
+            document,
+            "writeTo",
+            "(Ljava/io/OutputStream;)V",
+            &[Value::Null],
+        ),
+        P36F_IAE,
+    );
+    let bytes = p36f_pdf_bytes(&mut engine, document);
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(text.starts_with("%PDF-1.4"), "{text}");
+    assert!(text.contains("/Count 1"), "{text}");
+    assert!(text.contains("/MediaBox [0 0 612 792]"), "{text}");
+    assert!(text.contains("/CropBox [36 36 576 720]"), "{text}");
+    assert!(text.contains("%%EOF"), "{text}");
+    let pages = call(&mut engine, document, "getPages", "()Ljava/util/List;", &[]);
+    assert_eq!(
+        call(&mut engine, object(pages.clone()), "size", "()I", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(p49_list_get(&mut engine, pages, 0), Value::Obj(info));
+
+    let page2 = object(call(
+        &mut engine,
+        document,
+        "startPage",
+        "(Landroid/graphics/pdf/PdfDocument$PageInfo;)Landroid/graphics/pdf/PdfDocument$Page;",
+        &[Value::Obj(info2)],
+    ));
+    call(
+        &mut engine,
+        document,
+        "finishPage",
+        "(Landroid/graphics/pdf/PdfDocument$Page;)V",
+        &[Value::Obj(page2)],
+    );
+    let bytes = p36f_pdf_bytes(&mut engine, document);
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(text.contains("/Count 2"), "{text}");
+    assert!(text.contains("/MediaBox [0 0 100 100]"), "{text}");
+
+    call(&mut engine, document, "close", "()V", &[]);
+    call(&mut engine, document, "close", "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            document,
+            "startPage",
+            "(Landroid/graphics/pdf/PdfDocument$PageInfo;)Landroid/graphics/pdf/PdfDocument$Page;",
+            &[Value::Obj(info)],
+        ),
+        P36F_ISE,
+    );
+    assert_throws(
+        engine.invoke_instance(
+            document,
+            "writeTo",
+            "(Ljava/io/OutputStream;)V",
+            &[Value::Null],
+        ),
+        P36F_ISE,
+    );
+    let pages = object(call(
+        &mut engine,
+        document,
+        "getPages",
+        "()Ljava/util/List;",
+        &[],
+    ));
+    assert_eq!(call(&mut engine, pages, "size", "()I", &[]), Value::Int(2));
+}
+
+#[test]
+fn pdf_renderer_without_pdfium_fails_before_any_document_exists() {
+    let mut engine = engine_of(&DexBuilder::new());
+    assert!(engine
+        .cp
+        .is_subtype(P36F_PDF_RENDERER, "Ljava/lang/AutoCloseable;"));
+    assert!(engine
+        .cp
+        .is_subtype(P36F_PDF_RENDERER_PAGE, "Ljava/lang/AutoCloseable;"));
+    let renderer = instance(&mut engine, P36F_PDF_RENDERER);
+    assert_throws(
+        engine.invoke_instance(
+            renderer,
+            "<init>",
+            "(Landroid/os/ParcelFileDescriptor;)V",
+            &[Value::Null],
+        ),
+        P36F_NPE,
+    );
+    let descriptor = instance(&mut engine, "Landroid/os/ParcelFileDescriptor;");
+    match engine.invoke_instance(
+        renderer,
+        "<init>",
+        "(Landroid/os/ParcelFileDescriptor;)V",
+        &[Value::Obj(descriptor)],
+    ) {
+        Err(VmExit::Exception(t)) => {
+            assert!(
+                t.class == P36F_IAE || t.class == "Ljava/io/IOException;",
+                "{}",
+                t.class
+            )
+        }
+        other => panic!("expected construction failure, got {other:?}"),
+    }
+    for (name, sig, args) in [
+        ("getPageCount", "()I", Vec::new()),
+        ("shouldScaleForPrinting", "()Z", Vec::new()),
+        (
+            "openPage",
+            "(I)Landroid/graphics/pdf/PdfRenderer$Page;",
+            vec![Value::Int(0)],
+        ),
+        ("close", "()V", Vec::new()),
+    ] {
+        assert_throws(engine.invoke_instance(renderer, name, sig, &args), P36F_ISE);
+    }
+    let page = instance(&mut engine, P36F_PDF_RENDERER_PAGE);
+    assert_eq!(
+        call(&mut engine, page, "getIndex", "()I", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, page, "getWidth", "()I", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, page, "getHeight", "()I", &[]),
+        Value::Int(0)
+    );
+    assert_throws(engine.invoke_instance(page, "close", "()V", &[]), P36F_ISE);
+    assert_throws(
+        engine.invoke_instance(
+            page,
+            "render",
+            "(Landroid/graphics/Bitmap;Landroid/graphics/Rect;Landroid/graphics/Matrix;I)V",
+            &[Value::Null, Value::Null, Value::Null, Value::Int(1)],
+        ),
+        P36F_NPE,
+    );
+}
+
+fn p36f_floats(engine: &mut Engine, values: &[f32]) -> Value {
+    let array = float_array(engine, values.len());
+    *engine.heap.array_elems_mut(object(array.clone())).unwrap() =
+        values.iter().copied().map(Value::Float).collect();
+    array
+}
+
+fn p36f_float_values(engine: &Engine, value: &Value) -> Vec<f32> {
+    array_values(engine, value)
+        .iter()
+        .map(|v| match v {
+            Value::Float(f) => *f,
+            other => panic!("expected float element, got {other:?}"),
+        })
+        .collect()
+}
+
+#[test]
+fn renderscript_vectors_and_matrices_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let a = p49_new(
+        &mut engine,
+        P36F_RS_FLOAT4,
+        "(FFFF)V",
+        &[
+            Value::Float(1.0),
+            Value::Float(2.0),
+            Value::Float(3.0),
+            Value::Float(4.0),
+        ],
+    );
+    assert_eq!(field(&engine, a, "x"), Value::Float(1.0));
+    assert_eq!(field(&engine, a, "w"), Value::Float(4.0));
+    let b = p49_new(
+        &mut engine,
+        P36F_RS_FLOAT4,
+        "(FFFF)V",
+        &[
+            Value::Float(2.0),
+            Value::Float(0.0),
+            Value::Float(1.0),
+            Value::Float(0.0),
+        ],
+    );
+    let sum = object(call_static(
+        &mut engine,
+        P36F_RS_FLOAT4,
+        "add",
+        "(Landroid/renderscript/Float4;Landroid/renderscript/Float4;)Landroid/renderscript/Float4;",
+        &[Value::Obj(a), Value::Obj(b)],
+    ));
+    assert_eq!(field(&engine, sum, "x"), Value::Float(3.0));
+    assert_eq!(field(&engine, sum, "z"), Value::Float(4.0));
+    let scaled = object(call_static(
+        &mut engine,
+        P36F_RS_FLOAT4,
+        "mul",
+        "(Landroid/renderscript/Float4;F)Landroid/renderscript/Float4;",
+        &[Value::Obj(a), Value::Float(2.0)],
+    ));
+    assert_eq!(field(&engine, scaled, "w"), Value::Float(8.0));
+    assert_eq!(
+        call(
+            &mut engine,
+            a,
+            "dotProduct",
+            "(Landroid/renderscript/Float4;)F",
+            &[Value::Obj(b)]
+        ),
+        Value::Float(5.0)
+    );
+    assert_eq!(
+        call(&mut engine, a, "elementSum", "()F", &[]),
+        Value::Float(10.0)
+    );
+    assert_eq!(call(&mut engine, a, "length", "()I", &[]), Value::Int(4));
+    assert_eq!(
+        call(&mut engine, a, "get", "(I)F", &[Value::Int(2)]),
+        Value::Float(3.0)
+    );
+    assert_throws(
+        engine.invoke_instance(a, "get", "(I)F", &[Value::Int(4)]),
+        "Ljava/lang/IndexOutOfBoundsException;",
+    );
+    call(
+        &mut engine,
+        a,
+        "setAt",
+        "(IF)V",
+        &[Value::Int(0), Value::Float(9.0)],
+    );
+    call(&mut engine, a, "negate", "()V", &[]);
+    assert_eq!(field(&engine, a, "x"), Value::Float(-9.0));
+    let target = float_array(&mut engine, 6);
+    call(
+        &mut engine,
+        a,
+        "copyTo",
+        "([FI)V",
+        &[target.clone(), Value::Int(1)],
+    );
+    assert_eq!(
+        p36f_float_values(&engine, &target),
+        vec![0.0, -9.0, -2.0, -3.0, -4.0, 0.0]
+    );
+
+    let v3 = p49_new(
+        &mut engine,
+        P36F_RS_FLOAT3,
+        "(FFF)V",
+        &[Value::Float(1.0), Value::Float(2.0), Value::Float(3.0)],
+    );
+    let dot = object(call(
+        &mut engine,
+        v3,
+        "dotProduct",
+        "(Landroid/renderscript/Float3;)Ljava/lang/Float;",
+        &[Value::Obj(v3)],
+    ));
+    assert_eq!(
+        call(&mut engine, dot, "floatValue", "()F", &[]),
+        Value::Float(14.0)
+    );
+    let sum3 = object(call(
+        &mut engine,
+        v3,
+        "elementSum",
+        "()Ljava/lang/Float;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, sum3, "floatValue", "()F", &[]),
+        Value::Float(6.0)
+    );
+
+    let matrix = p49_new(&mut engine, P36F_RS_MATRIX4, "()V", &[]);
+    assert_eq!(
+        call(
+            &mut engine,
+            matrix,
+            "get",
+            "(II)F",
+            &[Value::Int(0), Value::Int(0)]
+        ),
+        Value::Float(1.0)
+    );
+    let array = call(&mut engine, matrix, "getArray", "()[F", &[]);
+    assert_eq!(array, field(&engine, matrix, "mMat"));
+    call(
+        &mut engine,
+        matrix,
+        "loadScale",
+        "(FFF)V",
+        &[Value::Float(2.0), Value::Float(3.0), Value::Float(4.0)],
+    );
+    call(
+        &mut engine,
+        matrix,
+        "translate",
+        "(FFF)V",
+        &[Value::Float(10.0), Value::Float(20.0), Value::Float(30.0)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            matrix,
+            "get",
+            "(II)F",
+            &[Value::Int(3), Value::Int(0)]
+        ),
+        Value::Float(20.0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            matrix,
+            "get",
+            "(II)F",
+            &[Value::Int(3), Value::Int(1)]
+        ),
+        Value::Float(60.0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            matrix,
+            "get",
+            "(II)F",
+            &[Value::Int(3), Value::Int(2)]
+        ),
+        Value::Float(120.0)
+    );
+    let invertible = p49_new(&mut engine, P36F_RS_MATRIX4, "()V", &[]);
+    call(
+        &mut engine,
+        invertible,
+        "loadScale",
+        "(FFF)V",
+        &[Value::Float(2.0), Value::Float(4.0), Value::Float(5.0)],
+    );
+    assert_eq!(
+        call(&mut engine, invertible, "inverse", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            invertible,
+            "get",
+            "(II)F",
+            &[Value::Int(0), Value::Int(0)]
+        ),
+        Value::Float(0.5)
+    );
+    call(
+        &mut engine,
+        invertible,
+        "loadScale",
+        "(FFF)V",
+        &[Value::Float(0.0), Value::Float(1.0), Value::Float(1.0)],
+    );
+    assert_eq!(
+        call(&mut engine, invertible, "inverse", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            invertible,
+            "get",
+            "(II)F",
+            &[Value::Int(0), Value::Int(0)]
+        ),
+        Value::Float(0.0)
+    );
+    call(
+        &mut engine,
+        invertible,
+        "loadOrtho",
+        "(FFFFFF)V",
+        &[
+            Value::Float(0.0),
+            Value::Float(2.0),
+            Value::Float(0.0),
+            Value::Float(2.0),
+            Value::Float(-1.0),
+            Value::Float(1.0),
+        ],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            invertible,
+            "get",
+            "(II)F",
+            &[Value::Int(3), Value::Int(0)]
+        ),
+        Value::Float(-1.0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            invertible,
+            "get",
+            "(II)F",
+            &[Value::Int(2), Value::Int(2)]
+        ),
+        Value::Float(-1.0)
+    );
+
+    let small = p36f_floats(&mut engine, &[1.0, 2.0, 3.0, 4.0]);
+    let matrix2 = p49_new(&mut engine, P36F_RS_MATRIX2, "([F)V", &[small]);
+    call(&mut engine, matrix2, "transpose", "()V", &[]);
+    assert_eq!(
+        call(
+            &mut engine,
+            matrix2,
+            "get",
+            "(II)F",
+            &[Value::Int(0), Value::Int(1)]
+        ),
+        Value::Float(3.0)
+    );
+    let matrix3 = p49_new(&mut engine, P36F_RS_MATRIX3, "()V", &[]);
+    call(
+        &mut engine,
+        matrix3,
+        "loadScale",
+        "(FF)V",
+        &[Value::Float(2.0), Value::Float(3.0)],
+    );
+    let widened = p49_new(&mut engine, P36F_RS_MATRIX4, "()V", &[]);
+    call(
+        &mut engine,
+        widened,
+        "load",
+        "(Landroid/renderscript/Matrix3f;)V",
+        &[Value::Obj(matrix3)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            widened,
+            "get",
+            "(II)F",
+            &[Value::Int(1), Value::Int(1)]
+        ),
+        Value::Float(3.0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            widened,
+            "get",
+            "(II)F",
+            &[Value::Int(3), Value::Int(3)]
+        ),
+        Value::Float(1.0)
+    );
+}
+
+#[test]
+fn renderscript_disabled_context_and_element_state_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    assert!(engine
+        .cp
+        .is_subtype(P36F_RS_ELEMENT, "Landroid/renderscript/BaseObj;"));
+    assert!(engine.cp.is_subtype(
+        "Landroid/renderscript/RSIllegalArgumentException;",
+        "Landroid/renderscript/RSRuntimeException;"
+    ));
+    assert!(engine.cp.is_subtype(
+        "Landroid/renderscript/RSRuntimeException;",
+        "Ljava/lang/RuntimeException;"
+    ));
+    let context = instance(&mut engine, CONTEXT);
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36F_RS,
+            "createMultiContext",
+            "(Landroid/content/Context;Landroid/renderscript/RenderScript$ContextType;II)Landroid/renderscript/RenderScript;",
+            &[Value::Obj(context), Value::Null, Value::Int(0), Value::Int(34)],
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36F_RS,
+            "create",
+            "(Landroid/content/Context;I)Landroid/renderscript/RenderScript;",
+            &[Value::Obj(context), Value::Int(22)],
+        ),
+        Value::Null
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36F_RS,
+            "create",
+            "(Landroid/content/Context;I)Landroid/renderscript/RenderScript;",
+            &[Value::Obj(context), Value::Int(34)],
+        ),
+        P36F_NPE,
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36F_RS,
+            "create",
+            "(Landroid/content/Context;)Landroid/renderscript/RenderScript;",
+            &[Value::Null],
+        ),
+        P36F_NPE,
+    );
+    // The bare host Context stand-in reports the no-APK fallback
+    // targetSdkVersion (1), so the disabled internalCreate null is
+    // returned directly instead of dereferenced by the sdk>=23 wrapper.
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36F_RS,
+            "create",
+            "(Landroid/content/Context;)Landroid/renderscript/RenderScript;",
+            &[Value::Obj(context)],
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call_static(&mut engine, P36F_RS, "releaseAllContexts", "()V", &[]),
+        Value::Null
+    );
+
+    let element = instance(&mut engine, P36F_RS_ELEMENT);
+    assert_eq!(
+        call(&mut engine, element, "isComplex", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, element, "getSubElementCount", "()I", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            element,
+            "getDataType",
+            "()Landroid/renderscript/Element$DataType;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_throws(
+        engine.invoke_instance(
+            element,
+            "getSubElement",
+            "(I)Landroid/renderscript/Element;",
+            &[Value::Int(0)],
+        ),
+        "Landroid/renderscript/RSIllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            element,
+            "getSubElementName",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(0)],
+        ),
+        "Landroid/renderscript/RSIllegalArgumentException;",
+    );
+}

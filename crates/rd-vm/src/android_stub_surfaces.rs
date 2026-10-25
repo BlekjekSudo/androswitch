@@ -452,6 +452,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial36e_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36f_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -623,6 +626,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial36e_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36f_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -725,6 +731,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial36e_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial36f_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -47460,4 +47469,1392 @@ fn p36e_audio_effect_descriptor_instance(
         _ => return Ok(None),
     };
     Ok(Some(value))
+}
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 36-F: android.graphics.pdf + android.renderscript.
+//
+// PDF: PageInfo values and the PdfDocument start/finish/write/close
+// lifecycle are modelled from AOSP.  A started page exposes a real host
+// Canvas backed by a same-sized Bitmap target; writeTo emits a structurally
+// valid PDF containing the finished pages' geometry with empty content
+// streams.  Canvas drawing operations are therefore NOT serialized into
+// PDF content yet, and PdfRenderer has no PDFium backend: a null descriptor
+// is an NPE and every other construction fails before a document exists,
+// so closed-renderer state checks are the only renderer behaviour.
+//
+// RenderScript: the deprecated runtime is modelled in its AOSP
+// `config.disable_renderscript` profile (sInitialized == false).  Pure
+// Java vector/matrix value classes and Element enum metadata work;
+// context creation follows internalCreate's disabled path exactly
+// (including the sdk>=23 process-context null dereference), and no
+// Allocation/Script/native RS execution exists.
+// ---------------------------------------------------------------------------
+
+const P36F_PDF_DOCUMENT: &str = "Landroid/graphics/pdf/PdfDocument;";
+const P36F_PDF_PAGE_INFO: &str = "Landroid/graphics/pdf/PdfDocument$PageInfo;";
+const P36F_PDF_PAGE_INFO_BUILDER: &str = "Landroid/graphics/pdf/PdfDocument$PageInfo$Builder;";
+const P36F_PDF_PAGE: &str = "Landroid/graphics/pdf/PdfDocument$Page;";
+const P36F_PDF_RENDERER: &str = "Landroid/graphics/pdf/PdfRenderer;";
+const P36F_PDF_RENDERER_PAGE: &str = "Landroid/graphics/pdf/PdfRenderer$Page;";
+const P36F_RS: &str = "Landroid/renderscript/RenderScript;";
+const P36F_RS_CONTEXT_TYPE: &str = "Landroid/renderscript/RenderScript$ContextType;";
+const P36F_RS_ELEMENT: &str = "Landroid/renderscript/Element;";
+const P36F_RS_DATA_TYPE: &str = "Landroid/renderscript/Element$DataType;";
+const P36F_RS_DATA_KIND: &str = "Landroid/renderscript/Element$DataKind;";
+const P36F_RS_FLOAT2: &str = "Landroid/renderscript/Float2;";
+const P36F_RS_FLOAT3: &str = "Landroid/renderscript/Float3;";
+const P36F_RS_FLOAT4: &str = "Landroid/renderscript/Float4;";
+const P36F_RS_MATRIX2: &str = "Landroid/renderscript/Matrix2f;";
+const P36F_RS_MATRIX3: &str = "Landroid/renderscript/Matrix3f;";
+const P36F_RS_MATRIX4: &str = "Landroid/renderscript/Matrix4f;";
+const P36F_RS_ILLEGAL_ARG: &str = "Landroid/renderscript/RSIllegalArgumentException;";
+const P36F_RECT: &str = "Landroid/graphics/Rect;";
+
+fn partial36f_host_static(
+    vm: &mut Engine,
+    owner: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    let int = match (owner, field) {
+        (P36F_PDF_RENDERER_PAGE, "RENDER_MODE_FOR_DISPLAY") => Some(1),
+        (P36F_PDF_RENDERER_PAGE, "RENDER_MODE_FOR_PRINT") => Some(2),
+        (P36F_RS, "CREATE_FLAG_NONE") => Some(0),
+        (P36F_RS, "CREATE_FLAG_LOW_LATENCY") => Some(0x0002),
+        (P36F_RS, "CREATE_FLAG_LOW_POWER") => Some(0x0004),
+        (P36F_RS, "CREATE_FLAG_WAIT_FOR_ATTACH") => Some(0x0008),
+        _ => None,
+    };
+    if let Some(value) = int {
+        return Ok(Some(Value::Int(value)));
+    }
+    if owner == P36F_RS_CONTEXT_TYPE {
+        let (ordinal, id) = match field {
+            "NORMAL" => (0, 0),
+            "DEBUG" => (1, 1),
+            "PROFILE" => (2, 2),
+            _ => return Ok(None),
+        };
+        let value = enum_value(vm, owner, field, ordinal)?;
+        if let Value::Obj(r) = value {
+            put(vm, r, "mID", Value::Int(id))?;
+        }
+        return Ok(Some(value));
+    }
+    if owner == P36F_RS_DATA_KIND {
+        let (ordinal, id) = match field {
+            "USER" => (0, 0),
+            "PIXEL_L" => (1, 7),
+            "PIXEL_A" => (2, 8),
+            "PIXEL_LA" => (3, 9),
+            "PIXEL_RGB" => (4, 10),
+            "PIXEL_RGBA" => (5, 11),
+            "PIXEL_DEPTH" => (6, 12),
+            "PIXEL_YUV" => (7, 13),
+            _ => return Ok(None),
+        };
+        let value = enum_value(vm, owner, field, ordinal)?;
+        if let Value::Obj(r) = value {
+            put(vm, r, "mID", Value::Int(id))?;
+        }
+        return Ok(Some(value));
+    }
+    if owner == P36F_RS_DATA_TYPE {
+        // RS_* entries use the single-argument constructor: on a 64-bit VM
+        // (sPointerSize == 8) their mSize is 32.
+        let (ordinal, id, size) = match field {
+            "NONE" => (0, 0, 0),
+            "FLOAT_16" => (1, 1, 2),
+            "FLOAT_32" => (2, 2, 4),
+            "FLOAT_64" => (3, 3, 8),
+            "SIGNED_8" => (4, 4, 1),
+            "SIGNED_16" => (5, 5, 2),
+            "SIGNED_32" => (6, 6, 4),
+            "SIGNED_64" => (7, 7, 8),
+            "UNSIGNED_8" => (8, 8, 1),
+            "UNSIGNED_16" => (9, 9, 2),
+            "UNSIGNED_32" => (10, 10, 4),
+            "UNSIGNED_64" => (11, 11, 8),
+            "BOOLEAN" => (12, 12, 1),
+            "UNSIGNED_5_6_5" => (13, 13, 2),
+            "UNSIGNED_5_5_5_1" => (14, 14, 2),
+            "UNSIGNED_4_4_4_4" => (15, 15, 2),
+            "MATRIX_4X4" => (16, 16, 64),
+            "MATRIX_3X3" => (17, 17, 36),
+            "MATRIX_2X2" => (18, 18, 16),
+            "RS_ELEMENT" => (19, 1000, 32),
+            "RS_TYPE" => (20, 1001, 32),
+            "RS_ALLOCATION" => (21, 1002, 32),
+            "RS_SAMPLER" => (22, 1003, 32),
+            "RS_SCRIPT" => (23, 1004, 32),
+            "RS_MESH" => (24, 1005, 32),
+            "RS_PROGRAM_FRAGMENT" => (25, 1006, 32),
+            "RS_PROGRAM_VERTEX" => (26, 1007, 32),
+            "RS_PROGRAM_RASTER" => (27, 1008, 32),
+            "RS_PROGRAM_STORE" => (28, 1009, 32),
+            "RS_FONT" => (29, 1010, 32),
+            _ => return Ok(None),
+        };
+        let value = enum_value(vm, owner, field, ordinal)?;
+        if let Value::Obj(r) = value {
+            put(vm, r, "mID", Value::Int(id))?;
+            put(vm, r, "mSize", Value::Int(size))?;
+        }
+        return Ok(Some(value));
+    }
+    Ok(None)
+}
+
+fn p36f_vector_dim(class: &str) -> Option<usize> {
+    match class {
+        P36F_RS_FLOAT2 => Some(2),
+        P36F_RS_FLOAT3 => Some(3),
+        P36F_RS_FLOAT4 => Some(4),
+        _ => None,
+    }
+}
+
+fn p36f_matrix_dim(class: &str) -> Option<usize> {
+    match class {
+        P36F_RS_MATRIX2 => Some(2),
+        P36F_RS_MATRIX3 => Some(3),
+        P36F_RS_MATRIX4 => Some(4),
+        _ => None,
+    }
+}
+
+fn p36f_is_class(class: &str) -> bool {
+    matches!(
+        class,
+        P36F_PDF_DOCUMENT
+            | P36F_PDF_PAGE_INFO
+            | P36F_PDF_PAGE_INFO_BUILDER
+            | P36F_PDF_PAGE
+            | P36F_PDF_RENDERER
+            | P36F_PDF_RENDERER_PAGE
+            | P36F_RS
+            | P36F_RS_ELEMENT
+    ) || p36f_vector_dim(class).is_some()
+        || p36f_matrix_dim(class).is_some()
+}
+
+fn partial36f_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P36F_RS {
+        return p36f_rs_static(vm, name, sig, args);
+    }
+    if let Some(dim) = p36f_vector_dim(class) {
+        return p36f_vector_static(vm, class, dim, name, sig, args);
+    }
+    Ok(None)
+}
+
+fn partial36f_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let class = if p36f_is_class(recv_class) {
+        recv_class
+    } else if p36f_is_class(mref_class) {
+        mref_class
+    } else {
+        return Ok(None);
+    };
+    if let Some(dim) = p36f_vector_dim(class) {
+        return p36f_vector_instance(vm, class, dim, name, sig, recv, args);
+    }
+    if let Some(dim) = p36f_matrix_dim(class) {
+        return p36f_matrix_instance(vm, class, dim, name, sig, recv, args);
+    }
+    match class {
+        P36F_PDF_DOCUMENT => p36f_pdf_document_instance(vm, name, sig, recv, args),
+        P36F_PDF_PAGE_INFO => Ok(Some(match (name, sig) {
+            ("<init>", "()V") => Value::Null,
+            ("getPageWidth", "()I") => Value::Int(field_int(vm, recv, "mPageWidth")),
+            ("getPageHeight", "()I") => Value::Int(field_int(vm, recv, "mPageHeight")),
+            ("getContentRect", "()Landroid/graphics/Rect;") => get(vm, recv, "mContentRect"),
+            ("getPageNumber", "()I") => Value::Int(field_int(vm, recv, "mPageNumber")),
+            _ => return Ok(None),
+        })),
+        P36F_PDF_PAGE_INFO_BUILDER => p36f_page_info_builder_instance(vm, name, sig, recv, args),
+        P36F_PDF_PAGE => Ok(Some(match (name, sig) {
+            ("getCanvas", "()Landroid/graphics/Canvas;") => get(vm, recv, "mCanvas"),
+            ("getInfo", "()Landroid/graphics/pdf/PdfDocument$PageInfo;") => {
+                get(vm, recv, "mPageInfo")
+            }
+            _ => return Ok(None),
+        })),
+        P36F_PDF_RENDERER => p36f_pdf_renderer_instance(vm, name, sig, recv, args),
+        P36F_PDF_RENDERER_PAGE => p36f_pdf_renderer_page_instance(vm, name, sig, recv, args),
+        P36F_RS_ELEMENT => p36f_element_instance(vm, name, sig, recv, args),
+        P36F_RS => Ok(Some(match (name, sig) {
+            // A RenderScript instance cannot be created in the disabled
+            // profile; only the plain application-context field read is
+            // meaningful on a fabricated receiver.
+            ("getApplicationContext", "()Landroid/content/Context;") => {
+                get(vm, recv, "mApplicationContext")
+            }
+            _ => return Ok(None),
+        })),
+        _ => Ok(None),
+    }
+}
+
+// --- android.graphics.pdf --------------------------------------------------
+
+fn p36f_rect(vm: &mut Engine, l: i32, t: i32, r: i32, b: i32) -> Result<Value, VmExit> {
+    let rect = alloc_obj(vm, P36F_RECT, Vec::new())?;
+    put(vm, rect, "left", Value::Int(l))?;
+    put(vm, rect, "top", Value::Int(t))?;
+    put(vm, rect, "right", Value::Int(r))?;
+    put(vm, rect, "bottom", Value::Int(b))?;
+    Ok(Value::Obj(rect))
+}
+
+fn p36f_rect_fields(vm: &Engine, rect: ObjRef) -> (i32, i32, i32, i32) {
+    (
+        field_int(vm, rect, "left"),
+        field_int(vm, rect, "top"),
+        field_int(vm, rect, "right"),
+        field_int(vm, rect, "bottom"),
+    )
+}
+
+fn p36f_page_info_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(III)V") => {
+            let (w, h, number) = (iarg(args, 0), iarg(args, 1), iarg(args, 2));
+            if w <= 0 {
+                return Err(iae("page width must be positive"));
+            }
+            if h <= 0 {
+                // AOSP repeats the width message for height.
+                return Err(iae("page width must be positive"));
+            }
+            if number < 0 {
+                return Err(iae("pageNumber must be non negative"));
+            }
+            let info = alloc_obj(vm, P36F_PDF_PAGE_INFO, Vec::new())?;
+            put(vm, info, "mPageWidth", Value::Int(w))?;
+            put(vm, info, "mPageHeight", Value::Int(h))?;
+            put(vm, info, "mPageNumber", Value::Int(number))?;
+            put(vm, recv, "mPageInfo", Value::Obj(info))?;
+            Value::Null
+        }
+        (
+            "setContentRect",
+            "(Landroid/graphics/Rect;)Landroid/graphics/pdf/PdfDocument$PageInfo$Builder;",
+        ) => {
+            let info = field_obj(vm, recv, "mPageInfo").ok_or_else(|| npe("mPageInfo"))?;
+            if let Some(rect) = oarg(args, 0) {
+                let (l, t, r, b) = p36f_rect_fields(vm, rect);
+                if l < 0
+                    || t < 0
+                    || r > field_int(vm, info, "mPageWidth")
+                    || b > field_int(vm, info, "mPageHeight")
+                {
+                    return Err(iae("contentRect does not fit the page"));
+                }
+            }
+            put(vm, info, "mContentRect", p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("create", "()Landroid/graphics/pdf/PdfDocument$PageInfo;") => {
+            let info = field_obj(vm, recv, "mPageInfo").ok_or_else(|| npe("mPageInfo"))?;
+            if field_obj(vm, info, "mContentRect").is_none() {
+                let rect = p36f_rect(
+                    vm,
+                    0,
+                    0,
+                    field_int(vm, info, "mPageWidth"),
+                    field_int(vm, info, "mPageHeight"),
+                )?;
+                put(vm, info, "mContentRect", rect)?;
+            }
+            Value::Obj(info)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p36f_pdf_throw_if_closed(vm: &Engine, doc: ObjRef) -> Result<(), VmExit> {
+    if field_long(vm, doc, "mNativeDocument") == 0 {
+        return Err(ise("document is closed!"));
+    }
+    Ok(())
+}
+
+fn p36f_pdf_throw_if_current(vm: &Engine, doc: ObjRef) -> Result<(), VmExit> {
+    if field_obj(vm, doc, "mCurrentPage").is_some() {
+        return Err(ise("Current page not finished!"));
+    }
+    Ok(())
+}
+
+fn p36f_pdf_finished_pages(vm: &Engine, doc: ObjRef) -> Vec<Value> {
+    collection_items(vm, Some(&get(vm, doc, "mPages")))
+}
+
+struct P36fPdfPage {
+    width: i32,
+    height: i32,
+    content: Option<(i32, i32, i32, i32)>,
+}
+
+fn p36f_pdf_bytes(pages: &[P36fPdfPage]) -> Vec<u8> {
+    // Minimal structurally-valid PDF: catalog, page tree, one page object
+    // plus an empty content stream per finished page, correct xref offsets.
+    let mut objects: Vec<String> = Vec::new();
+    objects.push("<< /Type /Catalog /Pages 2 0 R >>".to_string());
+    let kids: Vec<String> = pages
+        .iter()
+        .enumerate()
+        .map(|(i, _)| format!("{} 0 R", 3 + 2 * i))
+        .collect();
+    objects.push(format!(
+        "<< /Type /Pages /Kids [{}] /Count {} >>",
+        kids.join(" "),
+        pages.len()
+    ));
+    for (i, page) in pages.iter().enumerate() {
+        let (w, h, content) = (page.width, page.height, page.content);
+        let content_obj = 4 + 2 * i;
+        let crop = match content {
+            // Android content rects are top-left origin; PDF boxes are
+            // bottom-left origin.
+            Some((l, t, r, b)) => format!(" /CropBox [{l} {} {r} {}]", h - b, h - t),
+            None => String::new(),
+        };
+        objects.push(format!(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w} {h}]{crop} /Contents {content_obj} 0 R /Resources << >> >>"
+        ));
+        objects.push("<< /Length 0 >>\nstream\n\nendstream".to_string());
+    }
+    let mut out = String::from("%PDF-1.4\n");
+    let mut offsets = Vec::new();
+    for (i, body) in objects.iter().enumerate() {
+        offsets.push(out.len());
+        out.push_str(&format!("{} 0 obj\n{body}\nendobj\n", i + 1));
+    }
+    let xref = out.len();
+    out.push_str(&format!("xref\n0 {}\n", objects.len() + 1));
+    out.push_str("0000000000 65535 f \n");
+    for offset in &offsets {
+        out.push_str(&format!("{offset:010} 00000 n \n"));
+    }
+    out.push_str(&format!(
+        "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n",
+        objects.len() + 1
+    ));
+    out.into_bytes()
+}
+
+fn p36f_pdf_document_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => {
+            let pages = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+            put(vm, recv, "mPages", Value::Obj(pages))?;
+            put(vm, recv, "mNativeDocument", Value::Long(1))?;
+            put(vm, recv, "mCurrentPage", Value::Null)?;
+            Value::Null
+        }
+        (
+            "startPage",
+            "(Landroid/graphics/pdf/PdfDocument$PageInfo;)Landroid/graphics/pdf/PdfDocument$Page;",
+        ) => {
+            p36f_pdf_throw_if_closed(vm, recv)?;
+            p36f_pdf_throw_if_current(vm, recv)?;
+            let Some(info) = oarg(args, 0) else {
+                return Err(iae("page cannot be null"));
+            };
+            // AOSP dereferences pageInfo.mContentRect for nativeStartPage.
+            if field_obj(vm, info, "mContentRect").is_none() {
+                return Err(npe("pageInfo.mContentRect"));
+            }
+            let w = field_int(vm, info, "mPageWidth");
+            let h = field_int(vm, info, "mPageHeight");
+            let bitmap = alloc_obj(vm, "Landroid/graphics/Bitmap;", Vec::new())?;
+            vm.gfx
+                .objs
+                .insert(bitmap, crate::graphics::G::Bitmap(w, h, Vec::new()));
+            let canvas = alloc_obj(vm, "Landroid/graphics/Canvas;", Vec::new())?;
+            vm.invoke_instance(
+                canvas,
+                "<init>",
+                "(Landroid/graphics/Bitmap;)V",
+                &[Value::Obj(bitmap)],
+            )?;
+            let page = alloc_obj(vm, P36F_PDF_PAGE, Vec::new())?;
+            put(vm, page, "mCanvas", Value::Obj(canvas))?;
+            put(vm, page, "mPageInfo", Value::Obj(info))?;
+            put(vm, recv, "mCurrentPage", Value::Obj(page))?;
+            Value::Obj(page)
+        }
+        ("finishPage", "(Landroid/graphics/pdf/PdfDocument$Page;)V") => {
+            p36f_pdf_throw_if_closed(vm, recv)?;
+            let Some(page) = oarg(args, 0) else {
+                return Err(iae("page cannot be null"));
+            };
+            if field_obj(vm, recv, "mCurrentPage") != Some(page) {
+                return Err(ise("invalid page"));
+            }
+            if field_obj(vm, page, "mCanvas").is_none() {
+                return Err(ise("page already finished"));
+            }
+            let info = get(vm, page, "mPageInfo");
+            if let Some(list) = field_obj(vm, recv, "mPages") {
+                if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&list) {
+                    elems.push(info);
+                }
+            }
+            put(vm, recv, "mCurrentPage", Value::Null)?;
+            put(vm, page, "mCanvas", Value::Null)?;
+            Value::Null
+        }
+        ("writeTo", "(Ljava/io/OutputStream;)V") => {
+            p36f_pdf_throw_if_closed(vm, recv)?;
+            p36f_pdf_throw_if_current(vm, recv)?;
+            let Some(out) = oarg(args, 0) else {
+                return Err(iae("out cannot be null!"));
+            };
+            let mut pages = Vec::new();
+            for info in p36f_pdf_finished_pages(vm, recv) {
+                if let Value::Obj(info) = info {
+                    let content =
+                        field_obj(vm, info, "mContentRect").map(|rect| p36f_rect_fields(vm, rect));
+                    pages.push(P36fPdfPage {
+                        width: field_int(vm, info, "mPageWidth"),
+                        height: field_int(vm, info, "mPageHeight"),
+                        content,
+                    });
+                }
+            }
+            let bytes = p36f_pdf_bytes(&pages);
+            let array = p49_new_byte_array(vm, &bytes)?;
+            vm.invoke_instance(out, "write", "([B)V", &[array])?;
+            Value::Null
+        }
+        ("getPages", "()Ljava/util/List;") => {
+            // Snapshot of AOSP's unmodifiable view over mPages.
+            p49_list_value(vm, p36f_pdf_finished_pages(vm, recv))?
+        }
+        ("close", "()V") => {
+            p36f_pdf_throw_if_current(vm, recv)?;
+            if field_long(vm, recv, "mNativeDocument") != 0 {
+                put(vm, recv, "mNativeDocument", Value::Long(0))?;
+            }
+            Value::Null
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p36f_renderer_throw_if_closed(vm: &Engine, recv: ObjRef) -> Result<(), VmExit> {
+    if field_obj(vm, recv, "mInput").is_none() {
+        return Err(ise("Already closed"));
+    }
+    Ok(())
+}
+
+fn p36f_pdf_renderer_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match (name, sig) {
+        ("<init>", "(Landroid/os/ParcelFileDescriptor;)V") => {
+            let Some(input) = oarg(args, 0) else {
+                return Err(npe("input cannot be null"));
+            };
+            // No PDFium backend: mimic the seekability precheck, then fail
+            // document creation with the constructor's declared IOException.
+            let fd = vm
+                .invoke_instance(input, "getFd", "()I", &[])
+                .map(|v| v.as_int().unwrap_or(-1))
+                .unwrap_or(-1);
+            if fd < 0 {
+                return Err(iae("file descriptor not seekable"));
+            }
+            Err(throw("Ljava/io/IOException;", "cannot create document"))
+        }
+        ("close", "()V") => {
+            p36f_renderer_throw_if_closed(vm, recv)?;
+            if field_obj(vm, recv, "mCurrentPage").is_some() {
+                return Err(ise("Current page not closed"));
+            }
+            Ok(None)
+        }
+        ("getPageCount", "()I") | ("shouldScaleForPrinting", "()Z") => {
+            p36f_renderer_throw_if_closed(vm, recv)?;
+            Ok(None)
+        }
+        ("openPage", "(I)Landroid/graphics/pdf/PdfRenderer$Page;") => {
+            p36f_renderer_throw_if_closed(vm, recv)?;
+            if field_obj(vm, recv, "mCurrentPage").is_some() {
+                return Err(ise("Current page not closed"));
+            }
+            Ok(None)
+        }
+        _ => Ok(None),
+    }
+}
+
+fn p36f_pdf_renderer_page_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    _args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("getIndex", "()I") => Value::Int(field_int(vm, recv, "mIndex")),
+        ("getWidth", "()I") => Value::Int(field_int(vm, recv, "mWidth")),
+        ("getHeight", "()I") => Value::Int(field_int(vm, recv, "mHeight")),
+        ("close", "()V") => {
+            if field_long(vm, recv, "mNativePage") == 0 {
+                return Err(ise("Already closed"));
+            }
+            put(vm, recv, "mNativePage", Value::Long(0))?;
+            Value::Null
+        }
+        (
+            "render",
+            "(Landroid/graphics/Bitmap;Landroid/graphics/Rect;Landroid/graphics/Matrix;I)V",
+        ) => {
+            if field_long(vm, recv, "mNativePage") == 0 {
+                return Err(npe(""));
+            }
+            return Ok(None);
+        }
+        _ => return Ok(None),
+    }))
+}
+
+// --- android.renderscript ---------------------------------------------------
+
+fn p36f_rs_create_disabled(sdk_version: i32) -> Result<Value, VmExit> {
+    // internalCreate returns null immediately when RenderScript is
+    // disabled.  For sdk >= 23 the process-context wrapper then
+    // dereferences that null (`prs.mIsProcessContext = true`).
+    if sdk_version < 23 {
+        Ok(Value::Null)
+    } else {
+        Err(npe("RenderScript disabled"))
+    }
+}
+
+fn p36f_rs_target_sdk(vm: &mut Engine, ctx: ObjRef) -> Result<i32, VmExit> {
+    match vm.invoke_instance(
+        ctx,
+        "getApplicationInfo",
+        "()Landroid/content/pm/ApplicationInfo;",
+        &[],
+    ) {
+        Ok(Value::Obj(r)) => Ok(field_int(vm, r, "targetSdkVersion")),
+        Ok(_) => Err(npe("application info")),
+        Err(e @ VmExit::Exception(_)) => Err(e),
+        // A bare host Context stand-in has no concrete getApplicationInfo;
+        // fall back to the same app metadata PackageManager would report.
+        Err(VmExit::Error(_)) => Ok(vm
+            .fw
+            .resources
+            .as_ref()
+            .map(|apk| apk.manifest.target_sdk as i32)
+            .unwrap_or(1)),
+    }
+}
+
+fn p36f_rs_static(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("create", "(Landroid/content/Context;)Landroid/renderscript/RenderScript;")
+        | (
+            "create",
+            "(Landroid/content/Context;Landroid/renderscript/RenderScript$ContextType;)Landroid/renderscript/RenderScript;",
+        )
+        | (
+            "create",
+            "(Landroid/content/Context;Landroid/renderscript/RenderScript$ContextType;I)Landroid/renderscript/RenderScript;",
+        ) => {
+            let Some(ctx) = oarg(args, 0) else {
+                return Err(npe("ctx"));
+            };
+            let sdk = p36f_rs_target_sdk(vm, ctx)?;
+            p36f_rs_create_disabled(sdk)?
+        }
+        ("create", "(Landroid/content/Context;I)Landroid/renderscript/RenderScript;")
+        | (
+            "create",
+            "(Landroid/content/Context;ILandroid/renderscript/RenderScript$ContextType;I)Landroid/renderscript/RenderScript;",
+        ) => p36f_rs_create_disabled(iarg(args, 1))?,
+        (
+            "createMultiContext",
+            "(Landroid/content/Context;Landroid/renderscript/RenderScript$ContextType;II)Landroid/renderscript/RenderScript;",
+        ) => Value::Null,
+        ("releaseAllContexts", "()V") => Value::Null,
+        _ => return Ok(None),
+    }))
+}
+
+fn p36f_element_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let visible = get(vm, recv, "mVisibleElementMap");
+    let sub_check = |vm: &Engine, index: i32| -> Result<usize, VmExit> {
+        let map = int_values(vm, Some(&visible));
+        if !matches!(visible, Value::Obj(_)) {
+            return Err(throw(
+                P36F_RS_ILLEGAL_ARG,
+                "Element contains no sub-elements",
+            ));
+        }
+        if index < 0 || index as usize >= map.len() {
+            return Err(throw(P36F_RS_ILLEGAL_ARG, "Illegal sub-element index"));
+        }
+        Ok(map[index as usize] as usize)
+    };
+    Ok(Some(match (name, sig) {
+        ("isComplex", "()Z") => {
+            let elements = array_elems(vm, Some(&get(vm, recv, "mElements")));
+            let complex = elements.iter().any(|e| match e {
+                Value::Obj(r) => matches!(get(vm, *r, "mElements"), Value::Obj(_)),
+                _ => false,
+            });
+            Value::Int(i32::from(complex))
+        }
+        ("getSubElementCount", "()I") => Value::Int(int_values(vm, Some(&visible)).len() as i32),
+        ("getSubElement", "(I)Landroid/renderscript/Element;") => {
+            let mapped = sub_check(vm, iarg(args, 0))?;
+            let elements = array_elems(vm, Some(&get(vm, recv, "mElements")));
+            elements.get(mapped).cloned().unwrap_or(Value::Null)
+        }
+        ("getSubElementName", "(I)Ljava/lang/String;") => {
+            let mapped = sub_check(vm, iarg(args, 0))?;
+            let names = array_elems(vm, Some(&get(vm, recv, "mElementNames")));
+            names.get(mapped).cloned().unwrap_or(Value::Null)
+        }
+        ("getSubElementArraySize", "(I)I") => {
+            let mapped = sub_check(vm, iarg(args, 0))?;
+            Value::Int(
+                int_values(vm, Some(&get(vm, recv, "mArraySizes")))
+                    .get(mapped)
+                    .copied()
+                    .unwrap_or(0),
+            )
+        }
+        ("getSubElementOffsetBytes", "(I)I") => {
+            let mapped = sub_check(vm, iarg(args, 0))?;
+            Value::Int(
+                int_values(vm, Some(&get(vm, recv, "mOffsetInBytes")))
+                    .get(mapped)
+                    .copied()
+                    .unwrap_or(0),
+            )
+        }
+        ("getDataType", "()Landroid/renderscript/Element$DataType;") => get(vm, recv, "mType"),
+        ("getDataKind", "()Landroid/renderscript/Element$DataKind;") => get(vm, recv, "mKind"),
+        _ => return Ok(None),
+    }))
+}
+
+const P36F_VEC_FIELDS: [&str; 4] = ["x", "y", "z", "w"];
+
+fn p36f_vector_values(vm: &Engine, recv: ObjRef, dim: usize) -> Vec<f32> {
+    P36F_VEC_FIELDS[..dim]
+        .iter()
+        .map(|f| field_float(vm, recv, f))
+        .collect()
+}
+
+fn p36f_vector_store(
+    vm: &mut Engine,
+    recv: ObjRef,
+    dim: usize,
+    values: &[f32],
+) -> Result<(), VmExit> {
+    for (field, value) in P36F_VEC_FIELDS[..dim].iter().zip(values.iter()) {
+        put(vm, recv, field, Value::Float(*value))?;
+    }
+    Ok(())
+}
+
+fn p36f_vector_apply(op: &str, left: &[f32], right: &[f32]) -> Vec<f32> {
+    left.iter()
+        .zip(right.iter())
+        .map(|(a, b)| match op {
+            "add" => a + b,
+            "sub" => a - b,
+            "mul" => a * b,
+            _ => a / b,
+        })
+        .collect()
+}
+
+fn p36f_vector_boxed(vm: &mut Engine, class: &str, value: f32) -> Result<Value, VmExit> {
+    // Float3's generated dotProduct/elementSum return boxed Float.
+    if class == P36F_RS_FLOAT3 {
+        crate::boxes::box_value(vm, "Ljava/lang/Float;", Value::Float(value)).map(Value::Obj)
+    } else {
+        Ok(Value::Float(value))
+    }
+}
+
+fn p36f_vector_static(
+    vm: &mut Engine,
+    class: &str,
+    dim: usize,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let vector_sig = format!("({class}{class}){class}");
+    let scalar_sig = format!("({class}F){class}");
+    if matches!(name, "add" | "sub" | "mul" | "div") && sig == vector_sig {
+        let a = req_obj(args, 0, "a")?;
+        let b = req_obj(args, 1, "b")?;
+        let out = alloc_obj(vm, class, Vec::new())?;
+        let values = p36f_vector_apply(
+            name,
+            &p36f_vector_values(vm, a, dim),
+            &p36f_vector_values(vm, b, dim),
+        );
+        p36f_vector_store(vm, out, dim, &values)?;
+        return Ok(Some(Value::Obj(out)));
+    }
+    if matches!(name, "add" | "sub" | "mul" | "div") && sig == scalar_sig {
+        let a = req_obj(args, 0, "a")?;
+        let out = alloc_obj(vm, class, Vec::new())?;
+        let values = p36f_vector_apply(
+            name,
+            &p36f_vector_values(vm, a, dim),
+            &vec![farg(args, 1); dim],
+        );
+        p36f_vector_store(vm, out, dim, &values)?;
+        return Ok(Some(Value::Obj(out)));
+    }
+    if name == "dotProduct" {
+        let a = req_obj(args, 0, "a")?;
+        let b = req_obj(args, 1, "b")?;
+        let dot: f32 = p36f_vector_values(vm, a, dim)
+            .iter()
+            .zip(p36f_vector_values(vm, b, dim).iter())
+            .map(|(x, y)| x * y)
+            .sum();
+        return p36f_vector_boxed(vm, class, dot).map(Some);
+    }
+    Ok(None)
+}
+
+fn p36f_vector_instance(
+    vm: &mut Engine,
+    class: &str,
+    dim: usize,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let values = p36f_vector_values(vm, recv, dim);
+    Ok(Some(match name {
+        "<init>" => {
+            let init = if sig == "()V" {
+                vec![0.0; dim]
+            } else if sig == format!("({class})V") {
+                let other = req_obj(args, 0, "data")?;
+                p36f_vector_values(vm, other, dim)
+            } else if sig == format!("({})V", "F".repeat(dim)) {
+                (0..dim).map(|i| farg(args, i)).collect()
+            } else {
+                return Ok(None);
+            };
+            p36f_vector_store(vm, recv, dim, &init)?;
+            Value::Null
+        }
+        "add" | "sub" | "mul" | "div" if sig == format!("({class})V") => {
+            let other = req_obj(args, 0, "value")?;
+            let out = p36f_vector_apply(name, &values, &p36f_vector_values(vm, other, dim));
+            p36f_vector_store(vm, recv, dim, &out)?;
+            Value::Null
+        }
+        "add" | "sub" | "mul" | "div" if sig == "(F)V" => {
+            let out = p36f_vector_apply(name, &values, &vec![farg(args, 0); dim]);
+            p36f_vector_store(vm, recv, dim, &out)?;
+            Value::Null
+        }
+        "dotProduct" => {
+            let other = req_obj(args, 0, "a")?;
+            let dot: f32 = values
+                .iter()
+                .zip(p36f_vector_values(vm, other, dim).iter())
+                .map(|(x, y)| x * y)
+                .sum();
+            p36f_vector_boxed(vm, class, dot)?
+        }
+        "addMultiple" => {
+            let other = req_obj(args, 0, "a")?;
+            let factor = farg(args, 1);
+            let out: Vec<f32> = values
+                .iter()
+                .zip(p36f_vector_values(vm, other, dim).iter())
+                .map(|(x, y)| x + y * factor)
+                .collect();
+            p36f_vector_store(vm, recv, dim, &out)?;
+            Value::Null
+        }
+        "set" if sig == format!("({class})V") => {
+            let other = req_obj(args, 0, "a")?;
+            let out = p36f_vector_values(vm, other, dim);
+            p36f_vector_store(vm, recv, dim, &out)?;
+            Value::Null
+        }
+        "negate" if sig == "()V" => {
+            let out: Vec<f32> = values.iter().map(|v| -v).collect();
+            p36f_vector_store(vm, recv, dim, &out)?;
+            Value::Null
+        }
+        "length" if sig == "()I" => Value::Int(dim as i32),
+        "elementSum" => p36f_vector_boxed(vm, class, values.iter().sum())?,
+        "get" if sig == "(I)F" => {
+            let i = iarg(args, 0);
+            if i < 0 || i as usize >= dim {
+                return Err(idx_oob("Index: i"));
+            }
+            Value::Float(values[i as usize])
+        }
+        "setAt" if sig == "(IF)V" => {
+            let i = iarg(args, 0);
+            if i < 0 || i as usize >= dim {
+                return Err(idx_oob("Index: i"));
+            }
+            let mut out = values;
+            out[i as usize] = farg(args, 1);
+            p36f_vector_store(vm, recv, dim, &out)?;
+            Value::Null
+        }
+        "addAt" if sig == "(IF)V" => {
+            let i = iarg(args, 0);
+            if i < 0 || i as usize >= dim {
+                return Err(idx_oob("Index: i"));
+            }
+            let mut out = values;
+            out[i as usize] += farg(args, 1);
+            p36f_vector_store(vm, recv, dim, &out)?;
+            Value::Null
+        }
+        "setValues" => {
+            let out: Vec<f32> = (0..dim).map(|i| farg(args, i)).collect();
+            p36f_vector_store(vm, recv, dim, &out)?;
+            Value::Null
+        }
+        "copyTo" if sig == "([FI)V" => {
+            let Some(array) = oarg(args, 0) else {
+                return Err(npe("data"));
+            };
+            let offset = iarg(args, 1);
+            let elems = vm.heap.array_elems_mut(array).map_err(VmExit::from)?;
+            if offset < 0 || offset as usize + dim > elems.len() {
+                return Err(oob("copyTo offset"));
+            }
+            for (i, value) in values.iter().enumerate() {
+                elems[offset as usize + i] = Value::Float(*value);
+            }
+            Value::Null
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p36f_matrix_values(vm: &Engine, recv: ObjRef, dim: usize) -> Vec<f32> {
+    let mut values = float_values(vm, Some(&get(vm, recv, "mMat")));
+    values.resize(dim * dim, 0.0);
+    values.truncate(dim * dim);
+    values
+}
+
+fn p36f_matrix_store(
+    vm: &mut Engine,
+    recv: ObjRef,
+    dim: usize,
+    values: &[f32],
+) -> Result<(), VmExit> {
+    if let Value::Obj(array) = get(vm, recv, "mMat") {
+        let elems = vm.heap.array_elems_mut(array).map_err(VmExit::from)?;
+        if elems.len() == dim * dim {
+            for (dst, value) in elems.iter_mut().zip(values.iter()) {
+                *dst = Value::Float(*value);
+            }
+            return Ok(());
+        }
+    }
+    let array = new_float_array(vm, values)?;
+    put(vm, recv, "mMat", array)
+}
+
+fn p36f_mat_identity(dim: usize) -> Vec<f32> {
+    let mut m = vec![0.0; dim * dim];
+    for i in 0..dim {
+        m[i * dim + i] = 1.0;
+    }
+    m
+}
+
+fn p36f_mat_get(m: &[f32], dim: usize, x: usize, y: usize) -> f32 {
+    m[x * dim + y]
+}
+
+fn p36f_mat_multiply(lhs: &[f32], rhs: &[f32], dim: usize) -> Vec<f32> {
+    let mut out = vec![0.0; dim * dim];
+    for i in 0..dim {
+        for row in 0..dim {
+            let mut sum = 0.0;
+            for j in 0..dim {
+                sum += p36f_mat_get(lhs, dim, j, row) * p36f_mat_get(rhs, dim, i, j);
+            }
+            out[i * dim + row] = sum;
+        }
+    }
+    out
+}
+
+fn p36f_mat_rotate_axis(dim: usize, rot: f32, x: f32, y: f32, z: f32) -> Vec<f32> {
+    let mut m = vec![0.0; dim * dim];
+    if dim == 4 {
+        m[15] = 1.0;
+    }
+    let rot = rot * (std::f32::consts::PI / 180.0);
+    let c = rot.cos();
+    let s = rot.sin();
+    // AOSP: `if (!(len != 1))` normalizes only an already-unit axis.
+    let len = (x * x + y * y + z * z).sqrt();
+    let (x, y, z) = if len == 1.0 {
+        (x / len, y / len, z / len)
+    } else {
+        (x, y, z)
+    };
+    let nc = 1.0 - c;
+    let xy = x * y;
+    let yz = y * z;
+    let zx = z * x;
+    let xs = x * s;
+    let ys = y * s;
+    let zs = z * s;
+    m[0] = x * x * nc + c;
+    m[dim] = xy * nc - zs;
+    m[2 * dim] = zx * nc + ys;
+    m[1] = xy * nc + zs;
+    m[dim + 1] = y * y * nc + c;
+    m[2 * dim + 1] = yz * nc - xs;
+    m[2] = zx * nc - ys;
+    m[dim + 2] = yz * nc + xs;
+    m[2 * dim + 2] = z * z * nc + c;
+    m
+}
+
+fn p36f_mat_rotate2d(dim: usize, rot: f32) -> Vec<f32> {
+    let mut m = if dim == 3 {
+        p36f_mat_identity(3)
+    } else {
+        vec![0.0; 4]
+    };
+    let rot = rot * (std::f32::consts::PI / 180.0);
+    let c = rot.cos();
+    let s = rot.sin();
+    m[0] = c;
+    m[1] = -s;
+    m[dim] = s;
+    m[dim + 1] = c;
+    m
+}
+
+fn p36f_mat_ortho(l: f32, r: f32, b: f32, t: f32, n: f32, f: f32) -> Vec<f32> {
+    let mut m = p36f_mat_identity(4);
+    m[0] = 2.0 / (r - l);
+    m[5] = 2.0 / (t - b);
+    m[10] = -2.0 / (f - n);
+    m[12] = -(r + l) / (r - l);
+    m[13] = -(t + b) / (t - b);
+    m[14] = -(f + n) / (f - n);
+    m
+}
+
+fn p36f_mat_frustum(l: f32, r: f32, b: f32, t: f32, n: f32, f: f32) -> Vec<f32> {
+    let mut m = p36f_mat_identity(4);
+    m[0] = 2.0 * n / (r - l);
+    m[5] = 2.0 * n / (t - b);
+    m[8] = (r + l) / (r - l);
+    m[9] = (t + b) / (t - b);
+    m[10] = -(f + n) / (f - n);
+    m[11] = -1.0;
+    m[14] = -2.0 * f * n / (f - n);
+    m[15] = 0.0;
+    m
+}
+
+fn p36f_mat_cofactor(m: &[f32], i: usize, j: usize) -> f32 {
+    let c0 = (i + 1) % 4;
+    let c1 = (i + 2) % 4;
+    let c2 = (i + 3) % 4;
+    let r0 = (j + 1) % 4;
+    let r1 = (j + 2) % 4;
+    let r2 = (j + 3) % 4;
+    let minor = (m[c0 + 4 * r0]
+        * (m[c1 + 4 * r1] * m[c2 + 4 * r2] - m[c1 + 4 * r2] * m[c2 + 4 * r1]))
+        - (m[c0 + 4 * r1] * (m[c1 + 4 * r0] * m[c2 + 4 * r2] - m[c1 + 4 * r2] * m[c2 + 4 * r0]))
+        + (m[c0 + 4 * r2] * (m[c1 + 4 * r0] * m[c2 + 4 * r1] - m[c1 + 4 * r1] * m[c2 + 4 * r0]));
+    if (i + j) & 1 != 0 {
+        -minor
+    } else {
+        minor
+    }
+}
+
+fn p36f_matrix_instance(
+    vm: &mut Engine,
+    class: &str,
+    dim: usize,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let current = p36f_matrix_values(vm, recv, dim);
+    let store = |vm: &mut Engine, values: &[f32]| p36f_matrix_store(vm, recv, dim, values);
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => {
+            p36f_matrix_store(vm, recv, dim, &p36f_mat_identity(dim))?;
+            Value::Null
+        }
+        ("<init>", "([F)V") => {
+            let array = p36a_value(args, 0);
+            if matches!(array, Value::Null) {
+                return Err(npe("dataArray"));
+            }
+            let source = float_values(vm, Some(&array));
+            if source.len() < dim * dim {
+                return Err(idx_oob("dataArray too short"));
+            }
+            p36f_matrix_store(vm, recv, dim, &source[..dim * dim])?;
+            Value::Null
+        }
+        ("getArray", "()[F") => get(vm, recv, "mMat"),
+        ("get", "(II)F") => {
+            let (x, y) = (iarg(args, 0), iarg(args, 1));
+            let index = x
+                .checked_mul(dim as i32)
+                .and_then(|v| v.checked_add(y))
+                .unwrap_or(-1);
+            if index < 0 || index as usize >= dim * dim {
+                return Err(oob("matrix index"));
+            }
+            Value::Float(current[index as usize])
+        }
+        ("set", "(IIF)V") => {
+            let (x, y) = (iarg(args, 0), iarg(args, 1));
+            let index = x
+                .checked_mul(dim as i32)
+                .and_then(|v| v.checked_add(y))
+                .unwrap_or(-1);
+            if index < 0 || index as usize >= dim * dim {
+                return Err(oob("matrix index"));
+            }
+            let mut out = current;
+            out[index as usize] = farg(args, 2);
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("loadIdentity", "()V") => {
+            store(vm, &p36f_mat_identity(dim))?;
+            Value::Null
+        }
+        ("load", _) if sig == format!("({class})V") => {
+            let src = req_obj(args, 0, "src")?;
+            let values = p36f_matrix_values(vm, src, dim);
+            store(vm, &values)?;
+            Value::Null
+        }
+        ("load", "(Landroid/renderscript/Matrix3f;)V") if dim == 4 => {
+            let src = req_obj(args, 0, "src")?;
+            let s = p36f_matrix_values(vm, src, 3);
+            let out = vec![
+                s[0], s[1], s[2], 0.0, s[3], s[4], s[5], 0.0, s[6], s[7], s[8], 0.0, 0.0, 0.0, 0.0,
+                1.0,
+            ];
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("loadRotate", "(FFFF)V") if dim >= 3 => {
+            let out = p36f_mat_rotate_axis(
+                dim,
+                farg(args, 0),
+                farg(args, 1),
+                farg(args, 2),
+                farg(args, 3),
+            );
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("loadRotate", "(F)V") if dim <= 3 => {
+            let out = p36f_mat_rotate2d(dim, farg(args, 0));
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("loadScale", "(FFF)V") if dim >= 3 => {
+            let mut out = p36f_mat_identity(dim);
+            out[0] = farg(args, 0);
+            out[dim + 1] = farg(args, 1);
+            out[2 * dim + 2] = farg(args, 2);
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("loadScale", "(FF)V") if dim <= 3 => {
+            let mut out = p36f_mat_identity(dim);
+            out[0] = farg(args, 0);
+            if dim == 2 {
+                out[3] = farg(args, 1);
+            } else {
+                out[4] = farg(args, 1);
+            }
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("loadTranslate", "(FFF)V") if dim == 4 => {
+            let mut out = p36f_mat_identity(4);
+            out[12] = farg(args, 0);
+            out[13] = farg(args, 1);
+            out[14] = farg(args, 2);
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("loadTranslate", "(FF)V") if dim == 3 => {
+            let mut out = p36f_mat_identity(3);
+            out[6] = farg(args, 0);
+            out[7] = farg(args, 1);
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("loadMultiply", _) if sig == format!("({class}{class})V") => {
+            let lhs = req_obj(args, 0, "lhs")?;
+            let rhs = req_obj(args, 1, "rhs")?;
+            let out = p36f_mat_multiply(
+                &p36f_matrix_values(vm, lhs, dim),
+                &p36f_matrix_values(vm, rhs, dim),
+                dim,
+            );
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("loadOrtho", "(FFFFFF)V") if dim == 4 => {
+            let out = p36f_mat_ortho(
+                farg(args, 0),
+                farg(args, 1),
+                farg(args, 2),
+                farg(args, 3),
+                farg(args, 4),
+                farg(args, 5),
+            );
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("loadOrthoWindow", "(II)V") if dim == 4 => {
+            let out = p36f_mat_ortho(
+                0.0,
+                iarg(args, 0) as f32,
+                iarg(args, 1) as f32,
+                0.0,
+                -1.0,
+                1.0,
+            );
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("loadFrustum", "(FFFFFF)V") if dim == 4 => {
+            let out = p36f_mat_frustum(
+                farg(args, 0),
+                farg(args, 1),
+                farg(args, 2),
+                farg(args, 3),
+                farg(args, 4),
+                farg(args, 5),
+            );
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("loadPerspective", "(FFFF)V") if dim == 4 => {
+            let fovy = farg(args, 0);
+            let aspect = farg(args, 1);
+            let near = farg(args, 2);
+            let far = farg(args, 3);
+            let top = near * (fovy * std::f32::consts::PI / 360.0).tan();
+            let bottom = -top;
+            let out = p36f_mat_frustum(bottom * aspect, top * aspect, bottom, top, near, far);
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("loadProjectionNormalized", "(II)V") if dim == 4 => {
+            let (w, h) = (iarg(args, 0), iarg(args, 1));
+            let mut m1 = if w > h {
+                let aspect = w as f32 / h as f32;
+                p36f_mat_frustum(-aspect, aspect, -1.0, 1.0, 1.0, 100.0)
+            } else {
+                let aspect = h as f32 / w as f32;
+                p36f_mat_frustum(-1.0, 1.0, -aspect, aspect, 1.0, 100.0)
+            };
+            let rotate = p36f_mat_rotate_axis(4, 180.0, 0.0, 1.0, 0.0);
+            m1 = p36f_mat_multiply(&m1, &rotate, 4);
+            let mut scale = p36f_mat_identity(4);
+            scale[0] = -2.0;
+            scale[5] = 2.0;
+            m1 = p36f_mat_multiply(&m1, &scale, 4);
+            let mut translate = p36f_mat_identity(4);
+            translate[14] = 2.0;
+            m1 = p36f_mat_multiply(&m1, &translate, 4);
+            store(vm, &m1)?;
+            Value::Null
+        }
+        ("multiply", _) if sig == format!("({class})V") => {
+            let rhs = req_obj(args, 0, "rhs")?;
+            let out = p36f_mat_multiply(&current, &p36f_matrix_values(vm, rhs, dim), dim);
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("rotate", "(FFFF)V") if dim >= 3 => {
+            let tmp = p36f_mat_rotate_axis(
+                dim,
+                farg(args, 0),
+                farg(args, 1),
+                farg(args, 2),
+                farg(args, 3),
+            );
+            let out = p36f_mat_multiply(&current, &tmp, dim);
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("rotate", "(F)V") if dim <= 3 => {
+            let tmp = p36f_mat_rotate2d(dim, farg(args, 0));
+            let out = p36f_mat_multiply(&current, &tmp, dim);
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("scale", "(FFF)V") if dim >= 3 => {
+            let mut tmp = p36f_mat_identity(dim);
+            tmp[0] = farg(args, 0);
+            tmp[dim + 1] = farg(args, 1);
+            tmp[2 * dim + 2] = farg(args, 2);
+            let out = p36f_mat_multiply(&current, &tmp, dim);
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("scale", "(FF)V") if dim <= 3 => {
+            let mut tmp = p36f_mat_identity(dim);
+            tmp[0] = farg(args, 0);
+            if dim == 2 {
+                tmp[3] = farg(args, 1);
+            } else {
+                tmp[4] = farg(args, 1);
+            }
+            let out = p36f_mat_multiply(&current, &tmp, dim);
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("translate", "(FFF)V") if dim == 4 => {
+            let mut tmp = p36f_mat_identity(4);
+            tmp[12] = farg(args, 0);
+            tmp[13] = farg(args, 1);
+            tmp[14] = farg(args, 2);
+            let out = p36f_mat_multiply(&current, &tmp, 4);
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("translate", "(FF)V") if dim == 3 => {
+            let mut tmp = p36f_mat_identity(3);
+            tmp[6] = farg(args, 0);
+            tmp[7] = farg(args, 1);
+            let out = p36f_mat_multiply(&current, &tmp, 3);
+            store(vm, &out)?;
+            Value::Null
+        }
+        ("inverse", "()Z") if dim == 4 => {
+            let mut result = [0.0; 16];
+            for i in 0..4 {
+                for j in 0..4 {
+                    result[4 * i + j] = p36f_mat_cofactor(&current, i, j);
+                }
+            }
+            let det = current[0] * result[0]
+                + current[4] * result[1]
+                + current[8] * result[2]
+                + current[12] * result[3];
+            if det.abs() < 1e-6 {
+                Value::Int(0)
+            } else {
+                let inv = 1.0 / det;
+                let out: Vec<f32> = result.iter().map(|v| v * inv).collect();
+                store(vm, &out)?;
+                Value::Int(1)
+            }
+        }
+        ("inverseTranspose", "()Z") if dim == 4 => {
+            let mut result = [0.0; 16];
+            for i in 0..4 {
+                for j in 0..4 {
+                    result[4 * j + i] = p36f_mat_cofactor(&current, i, j);
+                }
+            }
+            let det = current[0] * result[0]
+                + current[4] * result[4]
+                + current[8] * result[8]
+                + current[12] * result[12];
+            if det.abs() < 1e-6 {
+                Value::Int(0)
+            } else {
+                let inv = 1.0 / det;
+                let out: Vec<f32> = result.iter().map(|v| v * inv).collect();
+                store(vm, &out)?;
+                Value::Int(1)
+            }
+        }
+        ("transpose", "()V") => {
+            let mut out = current.clone();
+            for i in 0..dim - 1 {
+                for j in i + 1..dim {
+                    out.swap(i * dim + j, j * dim + i);
+                }
+            }
+            store(vm, &out)?;
+            Value::Null
+        }
+        _ => return Ok(None),
+    }))
 }
