@@ -112,30 +112,34 @@ impl<'a> Reader<'a> {
 
     /// sleb128 — LEB128 com sinal (máx. 5 bytes para i32).
     pub fn sleb128(&mut self) -> RdResult<i32> {
-        let mut result: i64 = 0;
-        let mut shift = 0u32;
-        for i in 0..5 {
+        let mut result: u32 = 0;
+        for i in 0..4 {
             let b = self.u8()?;
-            result |= ((b & 0x7F) as i64) << shift;
-            shift += 7;
-            let last = i == 4;
-            if b & 0x80 == 0 || last {
-                if !last && b & 0x40 != 0 {
-                    // extensão de sinal a partir do bit 6 do último byte
-                    result |= -1i64 << shift;
+            let shift = i * 7;
+            result |= ((b & 0x7F) as u32) << shift;
+            if b & 0x80 == 0 {
+                let next_shift = shift + 7;
+                if b & 0x40 != 0 {
+                    result |= !0u32 << next_shift;
                 }
-                if last && (shift < 64) && (b & 0x08 != 0) {
-                    result |= -1i64 << shift;
-                }
-                let v = i32::try_from(result)
-                    .map_err(|_| RdError::parse("sleb128: value overflows i32"))?;
-                return Ok(v);
+                return Ok(result as i32);
             }
         }
-        Err(RdError::parse(format!(
-            "sleb128: continuation beyond 5 bytes @ {}",
-            self.pos
-        )))
+        let b = self.u8()?;
+        if b & 0x80 != 0 {
+            return Err(RdError::parse(format!(
+                "sleb128: continuation beyond 5 bytes @ {}",
+                self.pos
+            )));
+        }
+        // Em 32 bits com sinal, os bits 6..=3 do 5º byte devem estender o bit 3
+        // de sinal (todos 0 para >= 0, todos 1 para < 0 — AOSP DecodeSignedLeb128).
+        let top = b & 0x78;
+        if top != 0x00 && top != 0x78 {
+            return Err(RdError::parse("sleb128: value overflows i32"));
+        }
+        result |= ((b & 0x0F) as u32) << 28;
+        Ok(result as i32)
     }
 
     /// Fatia crua de `n` bytes (para Law 2 — janelas de bytes preservadas).

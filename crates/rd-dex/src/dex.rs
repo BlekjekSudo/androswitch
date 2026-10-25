@@ -274,8 +274,11 @@ impl Dex {
         Self::parse_inner(data, false, true)
     }
 
-    fn parse_inner(data: Vec<u8>, verify_checksum: bool, lazy_strings: bool) -> RdResult<Dex> {
+    fn parse_inner(mut data: Vec<u8>, verify_checksum: bool, lazy_strings: bool) -> RdResult<Dex> {
         let header = Self::parse_header_with(&data, verify_checksum)?;
+        // Limita o buffer ao tamanho declarado no header (#332): bytes de padding
+        // ou container após `file_size` não podem alimentar `map_list` ou seções.
+        data.truncate(header.file_size as usize);
         let map_list = Self::parse_map_list(&data, header.map_off)?;
         let strings = if lazy_strings {
             Strings::parse_lazy(&data, header.string_ids_size, header.string_ids_off)?
@@ -300,7 +303,18 @@ impl Dex {
             match item.map_type {
                 MapType::CallSiteId => {
                     let mut r = read::Reader::at(&data, item.offset as usize)?;
-                    for _ in 0..item.size {
+                    let count = item.size as usize;
+                    let Some(byte_len) = count.checked_mul(4) else {
+                        return Err(RdError::parse("call_site_id: size overflow"));
+                    };
+                    if byte_len > r.remaining() {
+                        return Err(RdError::parse(format!(
+                            "call_site_id: {count} itens não cabem em {} bytes",
+                            r.remaining()
+                        )));
+                    }
+                    call_site_offsets.reserve(count.min(1 << 16));
+                    for _ in 0..count {
                         call_site_offsets.push(r.u32()?);
                     }
                 }
@@ -386,6 +400,11 @@ impl Dex {
                 "dex: header_size {header_size} < 112"
             )));
         }
+        if file_size < 112 {
+            return Err(RdError::invalid_format(format!(
+                "dex: file_size {file_size} < header mínimo (112)"
+            )));
+        }
         // file_size não pode exceder o buffer real (APKs podem ter padding)
         if file_size as usize > data.len() {
             return Err(RdError::invalid_format(format!(
@@ -444,9 +463,15 @@ impl Dex {
                 r.remaining()
             )));
         }
-        let mut items = Vec::with_capacity(size);
+        let mut items = Vec::with_capacity(size.min(64));
+        let mut seen_types = std::collections::BTreeSet::new();
         for _ in 0..size {
             let raw_type = r.u16()?;
+            if !seen_types.insert(raw_type) {
+                return Err(RdError::invalid_format(format!(
+                    "map_list: tipo de seção duplicado 0x{raw_type:04x}"
+                )));
+            }
             let unused = r.u16()?;
             let size = r.u32()?;
             let offset = r.u32()?;

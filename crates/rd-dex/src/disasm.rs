@@ -73,6 +73,7 @@ const MAX_RENDER_VALUE_DEPTH: usize = 64;
 
 struct RenderWriter {
     buf: String,
+    reserved_bytes: usize,
     max_bytes: usize,
     steps: usize,
     max_steps: usize,
@@ -80,6 +81,7 @@ struct RenderWriter {
     ann_item_cache: BTreeMap<u32, Rc<AnnotationItem>>,
     code_cache: BTreeMap<u32, Rc<CodeItem>>,
     debug_cache: BTreeMap<u32, Rc<Option<DebugInfo>>>,
+    proto_sig_cache: BTreeMap<u16, (Rc<str>, usize)>,
 }
 
 impl RenderWriter {
@@ -90,6 +92,7 @@ impl RenderWriter {
         let max_steps = dex_len.saturating_mul(8).clamp(16_384, MAX_RENDER_STEPS);
         Self {
             buf: String::with_capacity(8192),
+            reserved_bytes: 0,
             max_bytes,
             steps: 0,
             max_steps,
@@ -97,6 +100,7 @@ impl RenderWriter {
             ann_item_cache: BTreeMap::new(),
             code_cache: BTreeMap::new(),
             debug_cache: BTreeMap::new(),
+            proto_sig_cache: BTreeMap::new(),
         }
     }
 
@@ -114,7 +118,78 @@ impl RenderWriter {
 
     #[inline]
     fn remaining_bytes(&self) -> usize {
-        self.max_bytes.saturating_sub(self.buf.len())
+        self.max_bytes
+            .saturating_sub(self.buf.len().saturating_add(self.reserved_bytes))
+    }
+
+    #[inline]
+    fn reserve_temp_bytes(&mut self, n: usize) -> RdResult<()> {
+        let used = self
+            .buf
+            .len()
+            .saturating_add(self.reserved_bytes)
+            .saturating_add(n);
+        if used > self.max_bytes {
+            return Err(RdError::parse(format!(
+                "disasm: buffer temporário smali excede orçamento ({} > {} bytes)",
+                used, self.max_bytes
+            )));
+        }
+        self.reserved_bytes = self.reserved_bytes.saturating_add(n);
+        Ok(())
+    }
+
+    #[inline]
+    fn release_temp_bytes(&mut self, n: usize) {
+        self.reserved_bytes = self.reserved_bytes.saturating_sub(n);
+    }
+
+    fn proto_sig(&mut self, dex: &Dex, idx: u16) -> RdResult<Rc<str>> {
+        if let Some((cached, param_steps)) = self.proto_sig_cache.get(&idx) {
+            let rc = Rc::clone(cached);
+            let steps = *param_steps;
+            self.step(steps)?;
+            if rc.len() > self.remaining_bytes() {
+                return Err(RdError::parse(format!(
+                    "disasm: assinatura de proto ({} bytes) excede orçamento restante ({} bytes)",
+                    rc.len(),
+                    self.remaining_bytes()
+                )));
+            }
+            return Ok(rc);
+        }
+        let p = dex.proto(idx)?;
+        let params = dex.proto_params(idx)?;
+        let param_steps = params.len().max(1);
+        self.step(param_steps)?;
+        let ret_s = dex.type_str(p.return_type_idx);
+        let mut total_len = 2usize.saturating_add(ret_s.len());
+        if total_len > self.remaining_bytes() {
+            return Err(RdError::parse(format!(
+                "disasm: assinatura de proto ({total_len} bytes) excede orçamento restante ({} bytes)",
+                self.remaining_bytes()
+            )));
+        }
+        for &t in &params {
+            total_len = total_len.saturating_add(dex.type_str(t).len());
+            if total_len > self.remaining_bytes() {
+                return Err(RdError::parse(format!(
+                    "disasm: assinatura de proto ({total_len} bytes) excede orçamento restante ({} bytes)",
+                    self.remaining_bytes()
+                )));
+            }
+        }
+        let mut sig = String::with_capacity(total_len);
+        sig.push('(');
+        for &t in &params {
+            sig.push_str(dex.type_str(t));
+        }
+        sig.push(')');
+        sig.push_str(ret_s);
+        let rc: Rc<str> = sig.into();
+        self.proto_sig_cache
+            .insert(idx, (Rc::clone(&rc), param_steps));
+        Ok(rc)
     }
 
     #[inline]
@@ -587,15 +662,14 @@ fn write_method(
 ) -> RdResult<()> {
     out.step(1)?;
     let mid = dex.method(em.method_idx)?;
-    let proto = dex.proto(mid.proto_idx)?;
     let params = dex.proto_params(mid.proto_idx)?;
-    out.step(params.len())?;
-    let mut sig = String::from("(");
-    for &p in &params {
-        sig.push_str(dex.type_str(p));
+    let sig = out.proto_sig(dex, mid.proto_idx)?;
+    let mname = dex.string(mid.name_idx);
+    if mname.len().saturating_add(sig.len()) > out.remaining_bytes() {
+        return Err(RdError::parse(
+            "disasm: cabeçalho .method excede orçamento restante",
+        ));
     }
-    sig.push(')');
-    sig.push_str(dex.type_str(proto.return_type_idx));
 
     let fl = format_flags(em.access_flags, METHOD_FLAG_ORDER);
     // separador em branco entre métodos (estilo baksmali)
@@ -603,9 +677,9 @@ fn write_method(
         out.push('\n')?;
     }
     if fl.is_empty() {
-        out.push_str(&format!(".method {}{sig}\n", dex.string(mid.name_idx)))?;
+        out.push_str(&format!(".method {mname}{sig}\n"))?;
     } else {
-        out.push_str(&format!(".method {fl} {}{sig}\n", dex.string(mid.name_idx)))?;
+        out.push_str(&format!(".method {fl} {mname}{sig}\n"))?;
     }
 
     // anotações do método (inclusive em métodos sem corpo)
@@ -651,6 +725,7 @@ fn write_method(
 
     let md = MethodRender::build(dex, &code, debug.as_ref().as_ref(), out)?;
     md.write_body(out)?;
+    out.reserved_bytes = 0;
 
     out.push_str(".end method\n")?;
     Ok(())
@@ -821,21 +896,31 @@ impl<'a> MethodRender<'a> {
             let end = t.start_addr + t.insn_count as u32;
             let entry = catches.entry(end).or_default();
             for (ty, addr) in &h.typed {
-                entry.push(format!(
+                let ty_s = dex.type_str(*ty);
+                if ty_s.len() > out.remaining_bytes() {
+                    return Err(RdError::parse(
+                        "disasm: tipo em .catch excede orçamento restante",
+                    ));
+                }
+                let line = format!(
                     ".catch {} {{{} .. {}}} {}",
-                    dex.type_str(*ty),
+                    ty_s,
                     lab(&labels.try_start, TRY_START, t.start_addr),
                     lab(&labels.try_end, TRY_END, end),
                     lab(&labels.catch, CATCH, *addr)
-                ));
+                );
+                out.reserve_temp_bytes(line.len().saturating_add(1))?;
+                entry.push(line);
             }
             if let Some(addr) = h.catch_all {
-                entry.push(format!(
+                let line = format!(
                     ".catchall {{{} .. {}}} {}",
                     lab(&labels.try_start, TRY_START, t.start_addr),
                     lab(&labels.try_end, TRY_END, end),
                     lab(&labels.catchall, CATCHALL, addr)
-                ));
+                );
+                out.reserve_temp_bytes(line.len().saturating_add(1))?;
+                entry.push(line);
             }
         }
 
@@ -849,19 +934,31 @@ impl<'a> MethodRender<'a> {
                 let entry = directives.entry(e.addr).or_default();
                 for ev in &e.events {
                     match ev {
-                        DebugEvent::SetPrologueEnd => entry.push(".prologue".into()),
-                        DebugEvent::SetEpilogueBegin => entry.push(".epilogue".into()),
+                        DebugEvent::SetPrologueEnd => {
+                            let line = String::from(".prologue");
+                            out.reserve_temp_bytes(line.len().saturating_add(5))?;
+                            entry.push(line);
+                        }
+                        DebugEvent::SetEpilogueBegin => {
+                            let line = String::from(".epilogue");
+                            out.reserve_temp_bytes(line.len().saturating_add(5))?;
+                            entry.push(line);
+                        }
                         DebugEvent::SetFile(_) => {}
                         DebugEvent::Local(_) => {}
                     }
                 }
                 if last_line != Some(e.line) {
-                    entry.push(format!(".line {}", e.line));
+                    let line = format!(".line {}", e.line);
+                    out.reserve_temp_bytes(line.len().saturating_add(5))?;
+                    entry.push(line);
                     last_line = Some(e.line);
                 }
                 for ev in &e.events {
                     if let DebugEvent::Local(l) = ev {
-                        entry.push(render_local(dex, l, reg_base, out)?);
+                        let line = render_local(dex, l, reg_base, out)?;
+                        out.reserve_temp_bytes(line.len().saturating_add(5))?;
+                        entry.push(line);
                     }
                 }
             }
@@ -882,41 +979,69 @@ impl<'a> MethodRender<'a> {
         reg_name(n.into() as usize, self.reg_base)
     }
 
-    fn field_ref(&self, idx: u32) -> RdResult<String> {
+    fn field_ref(&self, idx: u32, out: &RenderWriter) -> RdResult<String> {
         let f = self.dex.field(idx)?;
-        Ok(format!(
-            "{}->{}:{}",
-            self.dex.type_str(f.class_idx as u32),
-            self.dex.string(f.name_idx),
-            self.dex.type_str(f.type_idx as u32)
-        ))
+        let cls = self.dex.type_str(f.class_idx as u32);
+        let name = self.dex.string(f.name_idx);
+        let ty = self.dex.type_str(f.type_idx as u32);
+        let len = cls
+            .len()
+            .saturating_add(name.len())
+            .saturating_add(ty.len())
+            .saturating_add(3);
+        if len > out.remaining_bytes() {
+            return Err(RdError::parse(
+                "disasm: field_ref excede orçamento restante",
+            ));
+        }
+        Ok(format!("{cls}->{name}:{ty}"))
     }
 
-    fn method_ref(&self, idx: u32) -> RdResult<String> {
+    fn method_ref(&self, idx: u32, out: &mut RenderWriter) -> RdResult<String> {
         let m = self.dex.method(idx)?;
-        Ok(format!(
-            "{}->{}{}",
-            self.dex.type_str(m.class_idx as u32),
-            self.dex.string(m.name_idx),
-            proto_sig(self.dex, m.proto_idx)?
-        ))
+        let sig = out.proto_sig(self.dex, m.proto_idx)?;
+        let cls = self.dex.type_str(m.class_idx as u32);
+        let name = self.dex.string(m.name_idx);
+        let len = cls
+            .len()
+            .saturating_add(name.len())
+            .saturating_add(sig.len())
+            .saturating_add(2);
+        if len > out.remaining_bytes() {
+            return Err(RdError::parse(
+                "disasm: method_ref excede orçamento restante",
+            ));
+        }
+        Ok(format!("{cls}->{name}{sig}"))
     }
 
     /// Operando de índice para formatos 21c (opcode → string/tipo/campo).
     fn index_ref_21c(&self, opcode: u8, idx: u16, out: &RenderWriter) -> RdResult<String> {
         match opcode {
             0x1a | 0x1b => out.escaped_string(self.dex.string(idx as u32)),
-            0x1c | 0x1f | 0x22 => Ok(self.dex.type_str(idx as u32).to_string()),
-            0x60..=0x6d => self.field_ref(idx as u32),
+            0x1c | 0x1f | 0x22 => {
+                let ts = self.dex.type_str(idx as u32);
+                if ts.len() > out.remaining_bytes() {
+                    return Err(RdError::parse("disasm: type_str excede orçamento restante"));
+                }
+                Ok(ts.to_string())
+            }
+            0x60..=0x6d => self.field_ref(idx as u32, out),
             _ => Ok(format!("index@{idx}")),
         }
     }
 
     /// Operando de índice para formatos 22c (tipo ou campo).
-    fn index_ref_22c(&self, opcode: u8, idx: u16) -> RdResult<String> {
+    fn index_ref_22c(&self, opcode: u8, idx: u16, out: &RenderWriter) -> RdResult<String> {
         match opcode {
-            0x20 | 0x23 => Ok(self.dex.type_str(idx as u32).to_string()),
-            0x52..=0x5e => self.field_ref(idx as u32),
+            0x20 | 0x23 => {
+                let ts = self.dex.type_str(idx as u32);
+                if ts.len() > out.remaining_bytes() {
+                    return Err(RdError::parse("disasm: type_str excede orçamento restante"));
+                }
+                Ok(ts.to_string())
+            }
+            0x52..=0x5e => self.field_ref(idx as u32, out),
             _ => Ok(format!("index@{idx}")),
         }
     }
@@ -944,7 +1069,7 @@ impl<'a> MethodRender<'a> {
         format!("{{{} .. {}}}", first, last)
     }
 
-    fn render_insn(&self, addr: usize, insn: &Insn, out: &RenderWriter) -> RdResult<String> {
+    fn render_insn(&self, addr: usize, insn: &Insn, out: &mut RenderWriter) -> RdResult<String> {
         let o = info(insn.opcode);
         if o.is_unused() {
             return Ok(format!("nop // unused 0x{:02x}", insn.opcode));
@@ -1024,7 +1149,7 @@ impl<'a> MethodRender<'a> {
                 signed_hex(*lit as i64)
             ),
             Kind::RegRegIndex(a, b, idx) => {
-                let target = self.index_ref_22c(insn.opcode, *idx)?;
+                let target = self.index_ref_22c(insn.opcode, *idx, out)?;
                 format!("{name} {}, {}, {target}", self.r(*a), self.r(*b))
             }
             Kind::RegLit32(a, lit) => {
@@ -1050,18 +1175,34 @@ impl<'a> MethodRender<'a> {
             }
             Kind::Invoke35c { count, idx, regs } => {
                 let operand = match insn.opcode {
-                    0x24 => self.dex.type_str(*idx as u32).to_string(),
+                    0x24 => {
+                        let ts = self.dex.type_str(*idx as u32);
+                        if ts.len() > out.remaining_bytes() {
+                            return Err(RdError::parse(
+                                "disasm: type_str excede orçamento restante",
+                            ));
+                        }
+                        ts.to_string()
+                    }
                     0xfc => format!("call_site@{idx}"),
-                    _ => self.method_ref(*idx as u32)?,
+                    _ => self.method_ref(*idx as u32, out)?,
                 };
                 let list = self.reg_list_35c(*count, regs);
                 format!("{name} {list}, {operand}")
             }
             Kind::InvokeRange3rc { count, idx, start } => {
                 let operand = match insn.opcode {
-                    0x25 => self.dex.type_str(*idx as u32).to_string(),
+                    0x25 => {
+                        let ts = self.dex.type_str(*idx as u32);
+                        if ts.len() > out.remaining_bytes() {
+                            return Err(RdError::parse(
+                                "disasm: type_str excede orçamento restante",
+                            ));
+                        }
+                        ts.to_string()
+                    }
                     0xfd => format!("call_site@{idx}"),
-                    _ => self.method_ref(*idx as u32)?,
+                    _ => self.method_ref(*idx as u32, out)?,
                 };
                 let list = self.reg_range_3rc(*count, *start);
                 format!("{name} {list}, {operand}")
@@ -1073,11 +1214,9 @@ impl<'a> MethodRender<'a> {
                 proto,
             } => {
                 let list = self.reg_list_35c(*count, regs);
-                format!(
-                    "{name} {list}, {}, {}",
-                    self.method_ref(*idx as u32)?,
-                    proto_sig(self.dex, *proto)?
-                )
+                let mref = self.method_ref(*idx as u32, out)?;
+                let psig = out.proto_sig(self.dex, *proto)?;
+                format!("{name} {list}, {mref}, {psig}")
             }
             Kind::InvokeRange4rcc {
                 count,
@@ -1086,11 +1225,9 @@ impl<'a> MethodRender<'a> {
                 proto,
             } => {
                 let list = self.reg_range_3rc(*count, *start);
-                format!(
-                    "{name} {list}, {}, {}",
-                    self.method_ref(*idx as u32)?,
-                    proto_sig(self.dex, *proto)?
-                )
+                let mref = self.method_ref(*idx as u32, out)?;
+                let psig = out.proto_sig(self.dex, *proto)?;
+                format!("{name} {list}, {mref}, {psig}")
             }
             Kind::Payload(_) => "nop // payload".to_string(),
         })
@@ -1114,6 +1251,7 @@ impl<'a> MethodRender<'a> {
         if let Some(lines) = self.catches.get(&a) {
             for l in lines {
                 out.step(1)?;
+                out.release_temp_bytes(l.len().saturating_add(1));
                 out.push_str(l)?;
                 out.push('\n')?;
             }
@@ -1132,6 +1270,7 @@ impl<'a> MethodRender<'a> {
         if let Some(dirs) = self.directives.get(&a) {
             for d in dirs {
                 out.step(1)?;
+                out.release_temp_bytes(d.len().saturating_add(5));
                 out.push_str(IND)?;
                 out.push_str(d)?;
                 out.push('\n')?;
@@ -1277,19 +1416,6 @@ impl<'a> MethodRender<'a> {
     }
 }
 
-/// Assinatura de um proto: `(params)ret`.
-fn proto_sig(dex: &Dex, idx: u16) -> RdResult<String> {
-    let p = dex.proto(idx)?;
-    let params = dex.proto_params(idx)?;
-    let mut sig = String::from("(");
-    for &t in &params {
-        sig.push_str(dex.type_str(t));
-    }
-    sig.push(')');
-    sig.push_str(dex.type_str(p.return_type_idx));
-    Ok(sig)
-}
-
 /// Diretiva `.local` de um evento de variável local (debug info).
 fn render_local(
     dex: &Dex,
@@ -1311,10 +1437,16 @@ fn render_local(
             ) {
                 (Some(n), Some(t)) => {
                     let esc = out.escaped_string(dex.string(n))?;
-                    let mut s = format!(".local {r}, {esc}:{}", dex.type_str(t));
+                    let ts = dex.type_str(t);
+                    if esc.len().saturating_add(ts.len()) > out.remaining_bytes() {
+                        return Err(RdError::parse("disasm: .local excede orçamento restante"));
+                    }
+                    let mut s = format!(".local {r}, {esc}:{ts}");
                     if let Some(g) = sig.filter(|&i| i != NO_INDEX) {
                         let gs = dex.string(g);
-                        if gs.len() > out.remaining_bytes() {
+                        if s.len().saturating_add(gs.len()).saturating_add(6)
+                            > out.remaining_bytes()
+                        {
                             return Err(RdError::parse(
                                 "disasm: assinatura .local excede orçamento restante",
                             ));
@@ -1405,27 +1537,36 @@ fn write_encoded_value(
         }
         EncodedValue::Float(f) => out.push_str(&format!("{}f", fmt_f32(*f)))?,
         EncodedValue::Double(d) => out.push_str(&fmt_f64(*d))?,
-        EncodedValue::MethodType(idx) => out.push_str(&proto_sig(dex, *idx as u16)?)?,
+        EncodedValue::MethodType(idx) => {
+            let proto_idx = u16::try_from(*idx)
+                .map_err(|_| RdError::parse(format!("proto idx {idx} fora do intervalo u16")))?;
+            let sig = out.proto_sig(dex, proto_idx)?;
+            out.push_str(&sig)?;
+        }
         EncodedValue::MethodHandle(idx) => match dex.method_handles.get(*idx as usize) {
             Some(h) if crate::methods::method_handle_type::is_invoke(h.method_handle_type) => {
                 let m = dex.method(h.field_or_method_idx)?;
-                out.push_str(&format!(
-                    "{}@{}->{}{}",
-                    crate::methods::method_handle_type::name(h.method_handle_type),
-                    dex.type_str(m.class_idx as u32),
-                    dex.string(m.name_idx),
-                    proto_sig(dex, m.proto_idx)?
+                let sig = out.proto_sig(dex, m.proto_idx)?;
+                out.push_str(crate::methods::method_handle_type::name(
+                    h.method_handle_type,
                 ))?;
+                out.push('@')?;
+                out.push_str(dex.type_str(m.class_idx as u32))?;
+                out.push_str("->")?;
+                out.push_str(dex.string(m.name_idx))?;
+                out.push_str(&sig)?;
             }
             Some(h) => {
                 let f = dex.field(h.field_or_method_idx)?;
-                out.push_str(&format!(
-                    "{}@{}->{}:{}",
-                    crate::methods::method_handle_type::name(h.method_handle_type),
-                    dex.type_str(f.class_idx as u32),
-                    dex.string(f.name_idx),
-                    dex.type_str(f.type_idx as u32)
+                out.push_str(crate::methods::method_handle_type::name(
+                    h.method_handle_type,
                 ))?;
+                out.push('@')?;
+                out.push_str(dex.type_str(f.class_idx as u32))?;
+                out.push_str("->")?;
+                out.push_str(dex.string(f.name_idx))?;
+                out.push(':')?;
+                out.push_str(dex.type_str(f.type_idx as u32))?;
             }
             None => out.push_str(&format!("method_handle@{idx}"))?,
         },
@@ -1433,21 +1574,19 @@ fn write_encoded_value(
         EncodedValue::Type(idx) => out.push_str(dex.type_str(*idx))?,
         EncodedValue::Field(idx) | EncodedValue::Enum(idx) => {
             let f = dex.field(*idx)?;
-            out.push_str(&format!(
-                "{}->{}:{}",
-                dex.type_str(f.class_idx as u32),
-                dex.string(f.name_idx),
-                dex.type_str(f.type_idx as u32)
-            ))?;
+            out.push_str(dex.type_str(f.class_idx as u32))?;
+            out.push_str("->")?;
+            out.push_str(dex.string(f.name_idx))?;
+            out.push(':')?;
+            out.push_str(dex.type_str(f.type_idx as u32))?;
         }
         EncodedValue::Method(idx) => {
             let m = dex.method(*idx)?;
-            out.push_str(&format!(
-                "{}->{}{}",
-                dex.type_str(m.class_idx as u32),
-                dex.string(m.name_idx),
-                proto_sig(dex, m.proto_idx)?
-            ))?;
+            let sig = out.proto_sig(dex, m.proto_idx)?;
+            out.push_str(dex.type_str(m.class_idx as u32))?;
+            out.push_str("->")?;
+            out.push_str(dex.string(m.name_idx))?;
+            out.push_str(&sig)?;
         }
         EncodedValue::Array(elems) => {
             if elems.is_empty() {

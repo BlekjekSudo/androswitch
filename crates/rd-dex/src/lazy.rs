@@ -149,16 +149,19 @@ impl RawClassIndex {
         let cap = n.saturating_mul(2).max(16).next_power_of_two();
         let mask = cap - 1;
         let mut slots = vec![ClassSlot::default(); cap].into_boxed_slice();
+        let mut seen_str_off = std::collections::HashSet::with_capacity(n.min(1 << 16));
 
         for (i, def) in class_defs.iter().enumerate() {
             let str_off = match type_ids.string_idx.get(def.class_idx as usize) {
-                Some(&sidx) => strings
-                    .offsets
-                    .get(sidx as usize)
-                    .copied()
-                    .unwrap_or(STR_OFF_EMPTY),
+                Some(&sidx) => match strings.offsets.get(sidx as usize) {
+                    Some(&off) => off,
+                    None => STR_OFF_EMPTY,
+                },
                 None => STR_OFF_QUESTION,
             };
+            if !seen_str_off.insert(str_off) {
+                continue;
+            }
             let h = Self::hash_at_str_off(data, str_off);
             Self::insert_first_wins(&mut slots, mask, data, h, str_off, i as u32);
         }
@@ -201,18 +204,22 @@ impl RawClassIndex {
         let cap = n.saturating_mul(2).max(16).next_power_of_two();
         let mask = cap - 1;
         let mut slots = vec![ClassSlot::default(); cap].into_boxed_slice();
+        let mut seen_str_off = std::collections::BTreeSet::new();
 
         for i in 0..n {
             let str_off = match dex
                 .class_type_idx_unchecked_bounds(i)
                 .and_then(|tidx| dex.type_string_idx(tidx).ok())
             {
-                Some(sidx) => dex
-                    .string_data_offset(sidx)
-                    .map(|o| o as u32)
-                    .unwrap_or(STR_OFF_EMPTY),
+                Some(sidx) => match dex.string_data_offset(sidx) {
+                    Ok(o) => o as u32,
+                    Err(_) => STR_OFF_EMPTY,
+                },
                 None => STR_OFF_QUESTION,
             };
+            if !seen_str_off.insert(str_off) {
+                continue;
+            }
             let h = Self::hash_at_str_off(data, str_off);
             Self::insert_first_wins(&mut slots, mask, data, h, str_off, i as u32);
         }
@@ -321,8 +328,9 @@ impl LazyDex {
     }
 
     fn mount_inner(backing: DexBacking, verify_checksum: bool) -> RdResult<Self> {
-        let data = backing.as_bytes();
-        let hdr = Dex::parse_header_checked(data, verify_checksum)?;
+        let raw_data = backing.as_bytes();
+        let hdr = Dex::parse_header_checked(raw_data, verify_checksum)?;
+        let data = &raw_data[..hdr.file_size as usize];
         let map = Dex::parse_map_list(data, hdr.map_off)?;
 
         // Valida os limites aritméticos de todas as seções fixas em O(1).
@@ -333,7 +341,10 @@ impl LazyDex {
         let _ = methods::validate_method_window(data, hdr.method_ids_size, hdr.method_ids_off)?;
         let _ = classes::validate_class_defs_window(data, hdr.class_defs_size, hdr.class_defs_off)?;
 
-        let str_cache = PagedStringCache::with_len(hdr.string_ids_size as usize);
+        let str_cache = PagedStringCache::with_len_and_budget(
+            hdr.string_ids_size as usize,
+            strings::string_byte_budget(data.len()),
+        );
 
         Ok(Self {
             src: backing,
@@ -346,7 +357,7 @@ impl LazyDex {
 
     #[inline]
     pub fn as_bytes(&self) -> &[u8] {
-        self.src.as_bytes()
+        &self.src.as_bytes()[..self.hdr.file_size as usize]
     }
 
     #[inline]
@@ -413,8 +424,21 @@ impl LazyDex {
         }
         if let Some(cell) = self.str_cache.cell(i) {
             let raw = self.raw_string_bytes(idx)?;
-            let decoded = mutf8::decode(raw).into_boxed_str();
-            let _ = cell.set(decoded);
+            if raw.len() > self.str_cache.remaining_budget() {
+                return Err(RdError::parse(format!(
+                    "lazy_dex: string #{idx} ({} bytes) excede orçamento restante (limite {} bytes)",
+                    raw.len(),
+                    self.str_cache.byte_budget()
+                )));
+            }
+            let decoded_str = mutf8::decode(raw);
+            if !self.str_cache.try_charge(decoded_str.len()) {
+                return Err(RdError::parse(format!(
+                    "lazy_dex: volume decodificado acumulado excede orçamento ({} bytes)",
+                    self.str_cache.byte_budget()
+                )));
+            }
+            let _ = cell.set(decoded_str.into_boxed_str());
             if let Some(s) = cell.get() {
                 return Ok(Cow::Borrowed(s.as_ref()));
             }
@@ -443,11 +467,21 @@ impl LazyDex {
         let Ok(raw) = self.raw_string_bytes(idx) else {
             return "";
         };
+        if raw.len() > self.str_cache.remaining_budget() {
+            return "";
+        }
+        let decoded_str = mutf8::decode(raw);
+        if !self.str_cache.try_charge(decoded_str.len()) {
+            return "";
+        }
         let Some(cell) = self.str_cache.cell(i) else {
             return "";
         };
-        cell.get_or_init(|| mutf8::decode(raw).into_boxed_str())
-            .as_ref()
+        let _ = cell.set(decoded_str.into_boxed_str());
+        match cell.get() {
+            Some(s) => s.as_ref(),
+            None => "",
+        }
     }
 
     /// Compara `string_ids[idx]` com `s` sobre MUTF-8 cru sem alocar `String`

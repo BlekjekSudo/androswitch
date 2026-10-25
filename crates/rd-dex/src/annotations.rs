@@ -230,19 +230,34 @@ fn var_index(r: &mut Reader, value_arg: u8) -> RdResult<u32> {
 /// ~50 mil níveis (~100 KB de input) — abort do processo inteiro, sem chance
 /// de unwinding (Lei 1: parser não pode morrer em input hostil).
 const MAX_ENCODED_VALUE_DEPTH: usize = 64;
+/// Teto total de nós `EncodedValue` decodificados por chamada top-level (#332).
+const MAX_ENCODED_VALUE_NODES: usize = 262_144;
+/// Pré-alocação máxima de `Vec::with_capacity` em `ARRAY`/`ANNOTATION` (#332).
+const MAX_ENCODED_PREALLOC: usize = 4096;
 
 /// Lê um `encoded_value` completo (recursivo p/ array/annotation).
 pub fn read_encoded_value(r: &mut Reader) -> RdResult<EncodedValue> {
-    read_encoded_value_depth(r, 0)
+    let mut budget = MAX_ENCODED_VALUE_NODES;
+    read_encoded_value_depth(r, 0, &mut budget)
 }
 
-/// Implementação recursiva com orçamento de profundidade.
-fn read_encoded_value_depth(r: &mut Reader, depth: usize) -> RdResult<EncodedValue> {
+/// Implementação recursiva com orçamento de profundidade e contagem total de nós.
+fn read_encoded_value_depth(
+    r: &mut Reader,
+    depth: usize,
+    budget: &mut usize,
+) -> RdResult<EncodedValue> {
     if depth > MAX_ENCODED_VALUE_DEPTH {
         return Err(RdError::invalid_format(format!(
             "encoded_value: aninhamento além de {MAX_ENCODED_VALUE_DEPTH} níveis (recursão limitada contra stack overflow)"
         )));
     }
+    if *budget == 0 {
+        return Err(RdError::parse(format!(
+            "encoded_value: número de nós excede limite ({MAX_ENCODED_VALUE_NODES})"
+        )));
+    }
+    *budget -= 1;
     let header = r.u8()?;
     let vt = header & 0x1F;
     let arg = (header >> 5) & 0x07;
@@ -315,9 +330,15 @@ fn read_encoded_value_depth(r: &mut Reader, depth: usize) -> RdResult<EncodedVal
                     r.remaining()
                 )));
             }
-            let mut elements = Vec::with_capacity(count);
+            if count > *budget {
+                return Err(RdError::parse(format!(
+                    "encoded_value: array de {count} elementos excede orçamento restante ({})",
+                    *budget
+                )));
+            }
+            let mut elements = Vec::with_capacity(count.min(MAX_ENCODED_PREALLOC));
             for _ in 0..count {
-                elements.push(read_encoded_value_depth(r, depth + 1)?);
+                elements.push(read_encoded_value_depth(r, depth + 1, budget)?);
             }
             Ok(EncodedValue::Array(elements))
         }
@@ -337,10 +358,16 @@ fn read_encoded_value_depth(r: &mut Reader, depth: usize) -> RdResult<EncodedVal
                     r.remaining()
                 )));
             }
-            let mut elements = Vec::with_capacity(count);
+            if count > *budget {
+                return Err(RdError::parse(format!(
+                    "encoded_value: annotation com {count} elementos excede orçamento restante ({})",
+                    *budget
+                )));
+            }
+            let mut elements = Vec::with_capacity(count.min(MAX_ENCODED_PREALLOC));
             for _ in 0..count {
                 let name_idx = r.uleb128()?;
-                let value = read_encoded_value_depth(r, depth + 1)?;
+                let value = read_encoded_value_depth(r, depth + 1, budget)?;
                 elements.push(AnnotationElement { name_idx, value });
             }
             Ok(EncodedValue::Annotation(EncodedAnnotation {
@@ -371,9 +398,15 @@ pub fn parse_encoded_array(data: &[u8], offset: u32) -> RdResult<Vec<EncodedValu
             r.remaining()
         )));
     }
-    let mut out = Vec::with_capacity(size.min(1 << 16));
+    let mut budget = MAX_ENCODED_VALUE_NODES;
+    if size > budget {
+        return Err(RdError::parse(format!(
+            "encoded_array: {size} elementos excedem limite ({MAX_ENCODED_VALUE_NODES}) @ 0x{offset:x}"
+        )));
+    }
+    let mut out = Vec::with_capacity(size.min(MAX_ENCODED_PREALLOC));
     for _ in 0..size {
-        out.push(read_encoded_value(&mut r)?);
+        out.push(read_encoded_value_depth(&mut r, 0, &mut budget)?);
     }
     Ok(out)
 }
@@ -392,10 +425,16 @@ pub fn parse_annotation_item(data: &[u8], off: u32) -> RdResult<AnnotationItem> 
             r.remaining()
         )));
     }
-    let mut elements = Vec::with_capacity(size.min(1 << 16));
+    let mut budget = MAX_ENCODED_VALUE_NODES;
+    if size > budget {
+        return Err(RdError::parse(format!(
+            "annotation_item: {size} elementos excedem limite ({MAX_ENCODED_VALUE_NODES}) @ 0x{off:x}"
+        )));
+    }
+    let mut elements = Vec::with_capacity(size.min(MAX_ENCODED_PREALLOC));
     for _ in 0..size {
         let name_idx = r.uleb128()?;
-        let value = read_encoded_value(&mut r)?;
+        let value = read_encoded_value_depth(&mut r, 0, &mut budget)?;
         elements.push(AnnotationElement { name_idx, value });
     }
     Ok(AnnotationItem {
