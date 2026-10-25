@@ -51,5 +51,5 @@ fuzz-logs/
 
 # Agent session/process logs never belong in git (team rule, 2026-10-25).
 # History stays in git log; status lives in docs/ and ROADMAP.
-/worklog.md
+# worklog.md stays tracked as a short onboarding guide (owner decision).
 /PROGRESS-*.md
