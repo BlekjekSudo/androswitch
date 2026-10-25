@@ -64,6 +64,21 @@ struct Test {
 }
 
 #[test]
+fn shared_log_dispatch_records_actual_sdk_throwable_callbacks_in_the_file_sink() {
+    for variant in ["original", "renamed"] {
+        let mut test = Test::new(variant, false);
+        test.cases = test.cases.replace("CowCases", "LogCases");
+        let bytes = test.call("emit", "()I", &[]).as_int().unwrap();
+        let package = format!("org.fixture.cow{variant}");
+        let actual =
+            std::fs::read_to_string(test.root.join(format!("logs/android/{package}.log"))).unwrap();
+        let expected="V/probe: verbose\nD/probe: debug\nI/probe: info\nW/probe: warning\ncallback exception summary\nW/probe: callback exception summary\nE/probe: error\ncallback exception summary\nW/probe: raw\n";
+        assert_eq!(actual, expected);
+        assert_eq!(bytes, expected.len() as i32);
+    }
+}
+
+#[test]
 fn enum_map_reuses_map_storage_and_matches_jvm_before_and_after_gc() {
     for variant in ["original", "renamed"] {
         let rows = std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(

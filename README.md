@@ -52,6 +52,8 @@ compatibility gates remain open.
 The current [upstream reuse work](docs/UPSTREAM_REUSE_AUDIT.md) shares RustyDroid's
 primitive wrapper module between desktop and device, with 86 JVM observations
 passing on both paths. Existing upstream code is audited before new API work.
+Android logging dispatch is also extracted from upstream into one shared
+module, with host output and Horizon file storage supplied by adapters.
 Shared startup work now includes numeric/reference atomics, class loaders,
 package/provider metadata, local Binder, Locale, constructor reflection, JNI static
 fields and owned native anonymous memory/FILE descriptors. See the

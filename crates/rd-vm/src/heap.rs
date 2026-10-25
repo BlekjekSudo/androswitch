@@ -255,7 +255,7 @@ impl Heap {
         self.pin_allocation(r);
     }
 
-    fn pin_allocation(&mut self, r: ObjRef) {
+    pub(crate) fn pin_allocation(&mut self, r: ObjRef) {
         #[cfg(feature = "std")]
         if let Some(Some(roots)) = self.gc_scopes.last_mut() {
             roots.push(r);

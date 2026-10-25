@@ -98,6 +98,9 @@ impl Services {
         name: &str,
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
+        if rd_vm::android_log::metadata(class, name, sig) {
+            return Some(rd_vm::framework_host::HostMethodKind::Static);
+        }
         if let Some(kind) = concurrent_map::metadata(class, name, sig) {
             return Some(kind);
         }
@@ -333,47 +336,43 @@ impl Services {
         if let Some(value) = reflection::call_static(self, vm, class, name, sig, args)? {
             return Ok(Some(value));
         }
-        if class == "Landroid/util/Log;" && name == "isLoggable" && sig == "(Ljava/lang/String;I)Z"
-        {
-            text(vm, &args[0])?;
-            // Android's default tag threshold is INFO. No log.tag property
-            // provider is installed; this is shared policy for every tag.
-            return Ok(Some(Value::Int(i32::from(
-                (4..=7).contains(&int(args, 1)?),
-            ))));
-        }
-        if class == "Landroid/util/Log;"
-            && matches!(name, "v" | "d" | "i" | "w" | "e" | "wtf")
-            && sig == "(Ljava/lang/String;Ljava/lang/String;)I"
-        {
-            let tag = text(vm, &args[0])?;
-            let message = text(vm, &args[1])?;
-            let line = format!("[{name}] {tag}: {message}\n");
-            if line.len() > 64 << 10 {
-                return Err(error("LOG_BUDGET", "64 KiB per log entry"));
-            }
-            let directory = "logs/android";
-            as_platform::fs::mkdirs(self.fs.as_ref(), directory).map_err(storage_error)?;
-            let path = format!("{directory}/{}.log", self.package);
-            let offset = self
-                .fs
-                .stat(&path)
-                .map_err(storage_error)?
-                .map_or(0, |m| m.length);
-            let truncate = offset + line.len() as u64 > 1 << 20;
-            let written = self
-                .fs
-                .write_at(
-                    &path,
-                    if truncate { 0 } else { offset },
-                    line.as_bytes(),
-                    truncate,
-                )
-                .map_err(storage_error)?;
-            if written != line.len() {
-                return Err(error("SHORT_WRITE", "android Log sink"));
-            }
-            return Ok(Some(Value::Int(written as i32)));
+        if let Some(value) = rd_vm::android_log::call(
+            vm,
+            class,
+            name,
+            sig,
+            args,
+            |vm, reference| {
+                if let Ok(text) = vm.heap.as_str(reference) {
+                    return Ok(text.to_string());
+                }
+                let value =
+                    vm.invoke_instance(reference, "toString", "()Ljava/lang/String;", &[])?;
+                let text = obj(&value)?;
+                Ok(vm.heap.as_str(text)?.to_string())
+            },
+            |priority| (4..=7).contains(&priority),
+            |line| {
+                let directory = "logs/android";
+                as_platform::fs::mkdirs(self.fs.as_ref(), directory).map_err(storage_error)?;
+                let path = format!("{directory}/{}.log", self.package);
+                let offset = self
+                    .fs
+                    .stat(&path)
+                    .map_err(storage_error)?
+                    .map_or(0, |m| m.length);
+                let truncate = offset + line.len() as u64 > 1 << 20;
+                self.fs
+                    .write_at(
+                        &path,
+                        if truncate { 0 } else { offset },
+                        line.as_bytes(),
+                        truncate,
+                    )
+                    .map_err(storage_error)
+            },
+        )? {
+            return Ok(Some(value));
         }
         if let Some(value) = self.collections.call_static(vm, class, name, sig, args)? {
             return Ok(Some(value));

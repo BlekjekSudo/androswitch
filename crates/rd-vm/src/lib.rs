@@ -50,6 +50,7 @@ pub(crate) mod android_display;
 pub(crate) mod android_drawable;
 #[cfg(feature = "std")]
 pub(crate) mod android_env;
+pub mod android_log;
 #[cfg(feature = "std")]
 pub(crate) mod android_motion;
 #[cfg(feature = "std")]

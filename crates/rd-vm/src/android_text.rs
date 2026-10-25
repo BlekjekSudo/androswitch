@@ -123,11 +123,7 @@ pub(crate) fn static_intrinsic(
     Ok(Some(v))
 }
 
-/// `android.util.Log`: logcat-style lines (`D/Tag: message`) written to the
-/// app output the MCP `logs` tool returns (same channel as `System.out`).
-/// `isLoggable` is true from DEBUG up (the device default is INFO, but a
-/// headless test runtime wants the detail). The return value is the number
-/// of bytes written, as in AOSP.
+/// Legacy stack-summary API remains separate until real stack traces exist.
 pub(crate) fn log_intrinsic(
     vm: &mut Engine,
     class: &str,
@@ -135,53 +131,30 @@ pub(crate) fn log_intrinsic(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    if class != "Landroid/util/Log;" {
-        return Ok(None);
+    if (class, name, sig)
+        == (
+            "Landroid/util/Log;",
+            "getStackTraceString",
+            "(Ljava/lang/Throwable;)Ljava/lang/String;",
+        )
+    {
+        let value = match args[0].as_ref()? {
+            Some(reference) => crate::intrinsics::object_to_string(vm, reference)?,
+            None => String::new(),
+        };
+        return Ok(Some(s(vm, value)?));
     }
-    let level = match name {
-        "v" => 'V',
-        "d" => 'D',
-        "i" => 'I',
-        "w" => 'W',
-        "e" => 'E',
-        "wtf" => 'A',
-        "isLoggable" => {
-            let lvl = args.get(1).and_then(|v| v.as_int().ok()).unwrap_or(4);
-            return Ok(Some(Value::Int((lvl >= 3) as i32)));
-        }
-        "getStackTraceString" => {
-            let t = match args.first().map(|v| v.as_ref()).transpose()?.flatten() {
-                Some(r) => crate::intrinsics::object_to_string(vm, r)?,
-                None => String::new(),
-            };
-            return Ok(Some(s(vm, t)?));
-        }
-        "println" => {
-            // println(int priority, String tag, String msg)
-            let p = args.first().and_then(|v| v.as_int().ok()).unwrap_or(4);
-            let tag = text(vm, args.get(1))?.unwrap_or_default();
-            let msg = text(vm, args.get(2))?.unwrap_or_default();
-            let c = ['V', 'V', 'V', 'D', 'I', 'W', 'E', 'A'][p.clamp(0, 7) as usize];
-            let line = format!("{c}/{tag}: {msg}\n");
-            crate::intrinsics::host_print(1, &line);
-            return Ok(Some(Value::Int(line.len() as i32)));
-        }
-        _ => return Ok(None),
-    };
-    // (tag, msg) | (tag, msg, Throwable) | w/wtf(tag, Throwable)
-    let tag = text(vm, args.first())?.unwrap_or_default();
-    let mut msg = String::new();
-    for a in &args[1.min(args.len())..] {
-        if let Some(r) = a.as_ref()? {
-            let piece = crate::intrinsics::object_to_string(vm, r)?;
-            if !msg.is_empty() {
-                msg.push('\n');
-            }
-            msg.push_str(&piece);
-        }
-    }
-    let _ = sig;
-    let line = format!("{level}/{tag}: {msg}\n");
-    crate::intrinsics::host_print(1, &line);
-    Ok(Some(Value::Int(line.len() as i32)))
+    crate::android_log::call(
+        vm,
+        class,
+        name,
+        sig,
+        args,
+        crate::intrinsics::object_to_string,
+        |priority| priority >= 3,
+        |line| {
+            crate::intrinsics::host_print(1, line);
+            Ok(line.len())
+        },
+    )
 }

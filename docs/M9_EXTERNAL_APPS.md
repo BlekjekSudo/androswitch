@@ -709,6 +709,28 @@ returns through full teardown. Candy Crush next calls sigaltstack; its failure
 is recorded, but native abort finalization still faults. Neither attempt has a
 guest first-screen capture. Both dedicated emulator SD trees were restored.
 
+NRO41 (`c45552d78fd82f974881b8582fd7ad94fe21d2f0`, SHA256
+`e6cf3be395013ea4b46e862fdb1389d411c3a2bfadb53f34225007bbba38422c`)
+passes EnumMap. Mekorama then requires the three-argument Log.w overload and
+returns through teardown, retaining the worker and cleanup errors. Candy Crush
+takes the signal-unavailable ABI path and advances into Java GameView setup,
+where GLSurfaceView.setEGLContextFactory remains unavailable. Resource reset
+then reports -5; a complete safe-return workflow has not been verified. Both
+APK hashes match the frozen originals, both emulator SD trees were restored,
+and neither has a first-screen capture.
+
+The next reuse batch extracts the existing RustyDroid Log dispatch from
+android_text into android_log, compiled by both VM paths. Levels, supported
+Throwable summary overloads, println, byte counting, descriptor metadata and
+the bounded 64 KiB admission check are shared. Output is routed to the actual
+host/device sink, with short writes and storage errors propagated. The same
+four contracts execute on both VMs; an ordinary SDK fixture also verifies file
+content and a DEX Throwable.toString callback that runs GC, in two namespaces.
+This preserves a bounded logging subset: complete stack frames and Android's
+wtf handler/termination behavior are not implemented. The device does not
+advertise getStackTraceString. Two regression gates bring the catalog to 72;
+a full 72-gate run is not claimed.
+
 The following batch reuses existing implementations: Set constructor
 deduplication moves from upstream intrinsics into shared `collection_values`,
 and portable Set calls use the existing COW list generations/lock/iterators/GC,
