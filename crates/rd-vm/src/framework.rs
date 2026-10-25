@@ -3058,12 +3058,21 @@ fn call_host_static_rooted(
         }
         // ── SharedPreferences padrão: canonical per-package file, loaded
         // from and persisted to app-private `shared_prefs` XML.
-        (PREFERENCE_MANAGER, "getDefaultSharedPreferences") => {
-            Ok(Some(Value::Obj(vm.shared_prefs_obj()?)))
-        }
-        (PREFERENCE_MANAGER, "getDefaultSharedPreferencesName") => {
-            let name = prefs_default_name(vm);
-            Ok(Some(Value::Obj(intrinsics::alloc_string(vm, name)?)))
+        (PREFERENCE_MANAGER, "getDefaultSharedPreferences")
+        | (PREFERENCE_MANAGER, "getDefaultSharedPreferencesName") => {
+            // Both dereference context.getPackageName().
+            if !matches!(args.first(), Some(Value::Obj(_))) {
+                return Err(VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "PreferenceManager context null",
+                )));
+            }
+            if name == "getDefaultSharedPreferences" {
+                Ok(Some(Value::Obj(vm.shared_prefs_obj()?)))
+            } else {
+                let name = prefs_default_name(vm);
+                Ok(Some(Value::Obj(intrinsics::alloc_string(vm, name)?)))
+            }
         }
         (SYSTEM_CLOCK, "sleep") => {
             // sleep(ms): avança o relógio virtual e drena o Looper
@@ -3316,12 +3325,10 @@ fn call_host_instance_rooted(
             "putString" | "putStringSet" | "putInt" | "putLong" | "putFloat" | "putBoolean" => {
                 let key = match args.first() {
                     Some(Value::Obj(r)) => vm.heap.as_str(*r)?.to_string(),
-                    _ => {
-                        return Err(VmExit::Exception(crate::err::Throwable::new(
-                            "Ljava/lang/NullPointerException;",
-                            "Editor.put com key null",
-                        )))
-                    }
+                    // AOSP stages null keys in the editor's HashMap; the
+                    // host store keys on String, so a null-key edit is
+                    // tolerated but not persisted.
+                    _ => return Ok(Some(Value::Obj(recv))),
                 };
                 let value = match name {
                     // AOSP EditorImpl treats a null String/Set value as a
@@ -3442,10 +3449,8 @@ fn call_host_instance_rooted(
                         .is_some_and(|store| store.contains_key(&key));
                     Ok(Some(Value::Int(contains as i32)))
                 } else {
-                    Err(VmExit::Exception(crate::err::Throwable::new(
-                        "Ljava/lang/NullPointerException;",
-                        "SharedPreferences.contains com key null",
-                    )))
+                    // HashMap.containsKey(null) is simply false.
+                    Ok(Some(Value::Int(0)))
                 }
             }
             ("edit", _) => Ok(None),
@@ -4739,10 +4744,9 @@ fn prefs_get(
     args: &[Value],
 ) -> Result<Value, VmExit> {
     let Some(Value::Obj(key_ref)) = args.first() else {
-        return Err(VmExit::Exception(crate::err::Throwable::new(
-            "Ljava/lang/NullPointerException;",
-            format!("SharedPreferences.{method} com key null"),
-        )));
+        // SharedPreferencesImpl looks null keys up in a HashMap: a
+        // miss yields the caller's default, never an NPE.
+        return Ok(args.get(1).cloned().unwrap_or(Value::Null));
     };
     let key = vm.heap.as_str(*key_ref)?.to_string();
     let name = prefs_name_for_obj(vm, prefs);
@@ -4790,9 +4794,9 @@ fn apply_prefs_editor(vm: &mut Engine, editor: ObjRef) -> Result<bool, VmExit> {
     ensure_prefs_loaded(vm, &name);
 
     let mut changed_keys = Vec::new();
-    if vm.fw.m8.prefs_clear.remove(&editor).unwrap_or(false) {
+    let keys_cleared = vm.fw.m8.prefs_clear.remove(&editor).unwrap_or(false);
+    if keys_cleared {
         let store = vm.fw.m8.prefs_stores.entry(name.clone()).or_default();
-        changed_keys.extend(store.keys().cloned());
         store.clear();
     }
     if let Some(edits) = vm.fw.m8.prefs_editors.remove(&editor) {
@@ -4834,6 +4838,18 @@ fn apply_prefs_editor(vm: &mut Engine, editor: ObjRef) -> Result<bool, VmExit> {
         .get(&prefs)
         .cloned()
         .unwrap_or_default();
+    // Since targetSdk R, a clear() reports one null-key callback
+    // instead of one per cleared entry.
+    if keys_cleared {
+        for listener in &listeners {
+            vm.invoke_instance(
+                *listener,
+                "onSharedPreferenceChanged",
+                "(Landroid/content/SharedPreferences;Ljava/lang/String;)V",
+                &[Value::Obj(prefs), Value::Null],
+            )?;
+        }
+    }
     for key in changed_keys {
         let key_ref = intrinsics::alloc_string(vm, key)?;
         for listener in &listeners {
