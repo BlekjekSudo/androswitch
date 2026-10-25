@@ -1068,6 +1068,11 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Object;",
         ]),
         "Landroid/content/ComponentName;" => Some(OBJECT),
+        // AssetManager implements AutoCloseable in AOSP; the host manager is
+        // final and never subclassed by app DEX.
+        "Landroid/content/res/AssetManager;" => {
+            Some(&["Ljava/lang/AutoCloseable;", "Ljava/lang/Object;"])
+        }
         "Landroid/graphics/drawable/Drawable;" | "Landroid/content/res/ColorStateList;" => {
             Some(OBJECT)
         }

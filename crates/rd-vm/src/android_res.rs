@@ -31,11 +31,21 @@
 //!
 //! **Context family.** `getResources`, `getTheme`, `obtainStyledAttributes`,
 //! `getMainLooper`, `getBaseContext`, `isRestricted`, `getAttributionTag`,
-//! `getAttributionSource`,
+//! `getAttributionSource`, `getAssets`,
 //! `getText` and `getString(I, Object…)` are answered for any receiver that
 //! is a `Context` subtype. That covers Activity, Application, Service, and
 //! DEX `ContextWrapper`s, whatever class the method ref names. `getResources`
 //! also covers Views.
+//!
+//! **AssetManager (APK-Tester ladder 12/12).** `Context.getAssets()` and
+//! `Resources.getAssets()` return one canonical host `AssetManager` per VM.
+//! `open(String[, int])` streams the REAL bytes of `assets/<name>` from the
+//! attached APK ZIP (Lei de Ouro nº 2 — compat > elegância) as a host
+//! `ByteArrayInputStream`; a missing entry raises the same typed
+//! `FileNotFoundException` AOSP raises. `list(path)` reports the immediate
+//! entries under `assets/<path>/` (first level, like AOSP). `openFd` always
+//! throws `FileNotFoundException` ("probably compressed") — matching an APK
+//! whose entries are deflated, which is the common case.
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
@@ -52,6 +62,8 @@ const TYPED_ARRAY: &str = "Landroid/content/res/TypedArray;";
 const TYPED_VALUE: &str = "Landroid/util/TypedValue;";
 const LOCALE: &str = "Ljava/util/Locale;";
 const LOCALE_LIST: &str = "Landroid/os/LocaleList;";
+const ASSET_MANAGER: &str = "Landroid/content/res/AssetManager;";
+const FILE_NOT_FOUND: &str = "Ljava/io/FileNotFoundException;";
 
 /// Configuration fields copied by the copy constructor / setTo / diff.
 const CONFIG_FIELDS: &[&str] = &[
@@ -140,6 +152,77 @@ fn singleton(
 
 fn resources(vm: &mut Engine) -> Result<ObjRef, VmExit> {
     singleton(vm, "resources", RESOURCES, |_, _| Ok(()))
+}
+
+/// The canonical host `AssetManager` for this VM — what every
+/// `Context.getAssets()`/`Resources.getAssets()` call hands back (AOSP has
+/// one manager per Resources, and one Resources per process context set).
+fn asset_manager(vm: &mut Engine) -> Result<ObjRef, VmExit> {
+    singleton(vm, "asset_manager", ASSET_MANAGER, |_, _| Ok(()))
+}
+
+// ── assets/ lookups (APK-Tester ladder) ────────────────────────────────
+
+/// Rejects paths the AOSP asset layer never resolves: absolute, empty
+/// segments, `.`/`..` traversal and backslashes. Keeping this check on THIS
+/// side of the zip lookup means an app can never pivot `assets/…` into an
+/// arbitrary ZIP entry.
+fn asset_path_is_hostile(file: &str) -> bool {
+    file.is_empty()
+        || file.starts_with('/')
+        || file.contains('\\')
+        || file
+            .split('/')
+            .any(|seg| seg.is_empty() || seg == "." || seg == "..")
+}
+
+/// Reads `assets/<file>` from the attached APK — real bytes, no stub. A
+/// missing entry is the typed `FileNotFoundException` AOSP throws (never a
+/// silent empty stream — Lei nº 1).
+fn open_asset(vm: &mut Engine, file: &str) -> Result<Value, VmExit> {
+    let entry = format!("assets/{file}");
+    if asset_path_is_hostile(file) {
+        return Err(exc(FILE_NOT_FOUND, entry));
+    }
+    let apk = vm.resources()?;
+    let bytes = apk
+        .zip
+        .read(&entry)
+        .map_err(|e| exc(FILE_NOT_FOUND, format!("{entry}: {e}")))?;
+    crate::jio_chars::new_byte_input_stream(vm, bytes)
+}
+
+/// Immediate entries under `assets/<path>/` — the first level only, which is
+/// what AOSP `AssetManager.list` reports (directories show up as bare names,
+/// the caller lists them again to descend).
+fn list_assets(vm: &mut Engine, path: &str) -> Result<Value, VmExit> {
+    if asset_path_is_hostile(path) && !path.is_empty() {
+        return Err(exc(FILE_NOT_FOUND, format!("assets/{path}")));
+    }
+    let apk = vm.resources()?;
+    let mut prefix = String::from("assets/");
+    if !path.is_empty() {
+        prefix.push_str(path.trim_end_matches('/'));
+        prefix.push('/');
+    }
+    let mut names: Vec<String> = Vec::new();
+    for entry in apk.zip.names() {
+        let Some(rest) = entry.strip_prefix(prefix.as_str()) else {
+            continue;
+        };
+        if rest.is_empty() {
+            continue; // a directory entry for the prefix itself
+        }
+        let head = rest.split('/').next().unwrap_or(rest);
+        if !names.iter().any(|n| n == head) {
+            names.push(head.to_string());
+        }
+    }
+    let items = names
+        .into_iter()
+        .map(|n| s(vm, n))
+        .collect::<Result<Vec<Value>, VmExit>>()?;
+    crate::arrays::new_array(vm, "[Ljava/lang/String;", ElemKind::Obj, items)
 }
 
 fn metrics(vm: &mut Engine) -> Result<ObjRef, VmExit> {
@@ -539,10 +622,48 @@ pub(crate) fn instance_intrinsic(
 ) -> Result<Option<Value>, VmExit> {
     let int = |i: usize| args.get(i).and_then(|v| v.as_int().ok()).unwrap_or(0);
     match mref_class {
+        ASSET_MANAGER => {
+            return Ok(Some(match (name, sig) {
+                ("<init>", "()V") => Value::Null,
+                ("open", "(Ljava/lang/String;)Ljava/io/InputStream;")
+                | ("open", "(Ljava/lang/String;I)Ljava/io/InputStream;") => {
+                    // accessMode (UNKNOWN/RANDOM/STREAMING/BUFFER) all stream
+                    // the same bytes; ByteArrayInputStream already supports
+                    // mark/reset, which is what ACCESS_BUFFER asks for.
+                    let file =
+                        str_of(vm, args.first().unwrap_or(&Value::Null)).ok_or_else(|| {
+                            exc("Ljava/lang/NullPointerException;", "fileName == null")
+                        })?;
+                    open_asset(vm, &file)?
+                }
+                ("openFd", "(Ljava/lang/String;)Landroid/content/res/AssetFileDescriptor;")
+                | (
+                    "openNonAssetFd",
+                    "(Ljava/lang/String;)Landroid/content/res/AssetFileDescriptor;",
+                ) => {
+                    // Zip entries in a stock APK are deflated: no fd to hand
+                    // out. AOSP throws the exact same typed error here.
+                    return Err(exc(
+                        FILE_NOT_FOUND,
+                        "This file can not be opened as a file descriptor; it is probably compressed",
+                    ));
+                }
+                ("list", "(Ljava/lang/String;)[Ljava/lang/String;") => {
+                    let path = str_of(vm, args.first().unwrap_or(&Value::Null))
+                        .ok_or_else(|| exc("Ljava/lang/NullPointerException;", "path == null"))?;
+                    list_assets(vm, &path)?
+                }
+                ("close", "()V") => Value::Null,
+                _ => return Ok(None),
+            }));
+        }
         RESOURCES => {
             return Ok(Some(match (name, sig) {
                 ("getDisplayMetrics", _) => Value::Obj(metrics(vm)?),
                 ("getConfiguration", _) => Value::Obj(configuration(vm)?),
+                ("getAssets", "()Landroid/content/res/AssetManager;") => {
+                    Value::Obj(asset_manager(vm)?)
+                }
                 ("getString", "(I)Ljava/lang/String;")
                 | ("getText", "(I)Ljava/lang/CharSequence;") => {
                     let t = string_res(vm, int(0))?;
@@ -1029,6 +1150,7 @@ pub(crate) fn instance_intrinsic(
             | "isRestricted"
             | "getAttributionTag"
             | "getAttributionSource"
+            | "getAssets"
             | "getText"
             | "getString"
             | "getColor"
@@ -1077,6 +1199,7 @@ pub(crate) fn instance_intrinsic(
             ta
         }
         ("getMainLooper", _) => Value::Obj(vm.main_looper_obj()?),
+        ("getAssets", _) => Value::Obj(asset_manager(vm)?),
         // ContextWrapper with no attached base: the platform ContextImpl
         // (not a ContextWrapper, so unwrap loops terminate)
         ("getBaseContext", _) => Value::Obj(crate::intrinsics::context_impl(vm)?),
