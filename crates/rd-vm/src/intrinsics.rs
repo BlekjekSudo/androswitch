@@ -5352,8 +5352,7 @@ fn instance_intrinsic_dispatch(
         (STRING, "toString", "()Ljava/lang/String;") => {
             // toString de String retorna a própria string (antes do fallback
             // de identidade de Object, que seria errado aqui)
-            let s = vm.heap.as_str(recv)?.to_string();
-            Ok(Some(Value::Obj(alloc_string(vm, s)?)))
+            Ok(Some(Value::Obj(recv)))
         }
 
         // issue #27: métodos de Object para classes de usuário — o dispatch

@@ -749,6 +749,19 @@ and wrapping sums. Long.reverseBytes/divideUnsigned/remainderUnsigned are new
 bounded additions alongside the extracted inherited algorithms. The existing
 shared-boxes regression gates include these tests; the catalog remains 72.
 
+NRO43 (`88fe9219a56e9fae554b35a735db9adc069954db`, SHA256
+`e9b75cd720acf41d049d3704e19b87d2c027c0b1f347968ce622b5ee6295c976`)
+passes the integer utility boundary. Mekorama next reports String.hashCode in
+the same consent path. Source inspection finds that this is already implemented
+in portable/file.rs: dispatch used the declared Object type and bypassed the
+existing String value methods. A new 80-row JVM corpus reproduces that missing
+method before the routing fix, then passes direct/Object/CharSequence calls on
+the portable VM. Desktop comparison also corrects String.toString to preserve
+receiver identity, matching its documented contract. Both paths retain the
+86-wrapper and 518-integer utility observations. Candy Crush's NRO43 attempt
+still stops at custom EGL context factory setup; both SD trees were restored.
+Neither attempt presents a verified first screen.
+
 The following batch reuses existing implementations: Set constructor
 deduplication moves from upstream intrinsics into shared `collection_values`,
 and portable Set calls use the existing COW list generations/lock/iterators/GC,

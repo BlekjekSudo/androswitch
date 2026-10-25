@@ -152,9 +152,15 @@ pub fn call_instance_intrinsic_mref(
     )? {
         return Ok(Some(value));
     }
-    if let Some(value) =
-        crate::portable::file::call(vm, declaring_class, name, sig, receiver, args)?
-    {
+    // String is final. Virtual Object/CharSequence calls must select its
+    // existing value-method implementation, just like direct String calls.
+    // Keep declaring-class dispatch for file constructors and other receivers.
+    let value_class = if receiver_class == "Ljava/lang/String;" {
+        receiver_class
+    } else {
+        declaring_class
+    };
+    if let Some(value) = crate::portable::file::call(vm, value_class, name, sig, receiver, args)? {
         return Ok(Some(value));
     }
     Ok(None)
