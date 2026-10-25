@@ -1071,6 +1071,16 @@ def _rust_test_lines(repo: Path, path: str) -> set[int]:
     depth = 0
     for raw_index, line in enumerate(lines, 1):
         stripped = line.strip()
+        if in_test_block:
+            # Already inside a `#[cfg(test)]` item: a nested `#[test]` fn or
+            # helper must NOT restart the depth count, otherwise the lines
+            # between nested items (helpers, shared fixtures) were reported
+            # as production code once the first nested fn closed.
+            test_lines.add(raw_index)
+            depth += line.count("{") - line.count("}")
+            if depth <= 0:
+                in_test_block = False
+            continue
         if "#[cfg(test)]" in stripped or stripped == "#[test]":
             pending_test_block = True
             test_lines.add(raw_index)
@@ -1698,7 +1708,30 @@ def _diff_rule_findings(
             )
             triggers.add("global-state")
 
-        if is_rust and re.search(r"OnceLock\s*<\s*(?:[^>]*\b(?:HashMap|BTreeMap|Vec|HashSet|Mutex|RwLock)\b)", text):
+        collection_cell = re.search(r"OnceLock\s*<\s*(?:[^>]*\b(?:HashMap|BTreeMap|Vec|HashSet|Mutex|RwLock)\b)", text)
+        # A process-global is a `static` item. Besides `static X: OnceLock<..>`
+        # this also catches `static X: Mutex<HashMap<..>>`/`LazyLock<..>`/
+        # `RwLock<..>` globals, which the OnceLock-only pattern missed.
+        global_static = re.search(
+            r"\bstatic\s+(?:ref\s+)?[A-Za-z_][A-Za-z0-9_]*\s*:\s*[^=;]*\b(?:OnceLock|LazyLock|Lazy|Mutex|RwLock)\s*<[^=;]*\b(?:HashMap|BTreeMap|Vec|HashSet|BTreeSet|VecDeque|Mutex|RwLock)\b",
+            text,
+        )
+        if is_rust and not in_test_path and collection_cell and not global_static:
+            # Same pattern on a struct field / local: instance-owned, not
+            # global. Still reported (non-blocking) so reviewers see it.
+            findings.append(
+                Finding(
+                    id="new-instance-collection-cell",
+                    severity="P2",
+                    area="vm-core",
+                    title="New lazily-initialized collection cell (instance-owned)",
+                    evidence=text.strip()[:300],
+                    path=path,
+                    line=line.line,
+                    remediation="Confirm the owner is per-Engine/per-document state and that clones never share initialized cells.",
+                )
+            )
+        if is_rust and global_static:
             findings.append(
                 Finding(
                     id="new-global-collection",
