@@ -10388,6 +10388,40 @@ fn media_browser_root_result_and_unconnected_service_are_guest_visible() {
         call(&mut engine, item_result, "isDone", "()Z", &[]),
         Value::Int(1)
     );
+    assert_throws(
+        engine.invoke_instance(item_result, "detach", "()V", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    let children_parent = text(&mut engine, "library-root");
+    let children_options = p41_bundle(&mut engine);
+    let children_debug = text(&mut engine, "load-children-options");
+    let children_result = p41_new(
+        &mut engine,
+        P41_MEDIA_RESULT,
+        "(Landroid/service/media/MediaBrowserService;Ljava/lang/Object;)V",
+        &[Value::Obj(service), children_debug],
+    );
+    assert!(
+        engine
+            .invoke_instance(
+                service,
+                "onLoadChildren",
+                "(Ljava/lang/String;Landroid/service/media/MediaBrowserService$Result;Landroid/os/Bundle;)V",
+                &[
+                    children_parent,
+                    Value::Obj(children_result),
+                    Value::Obj(children_options),
+                ],
+            )
+            .is_err(),
+        "the exact abstract service has no two-argument onLoadChildren implementation"
+    );
+    assert_eq!(field(&engine, children_result, "mFlags"), Value::Int(1));
+    assert_eq!(
+        call(&mut engine, children_result, "isDone", "()Z", &[]),
+        Value::Int(0)
+    );
 
     let parent = text(&mut engine, "library-root");
     call(
