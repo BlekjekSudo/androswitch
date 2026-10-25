@@ -53283,12 +53283,14 @@ fn p36i_download_builder(
             let intent = oarg(args, 0).ok_or_else(|| npe("intent"))?;
             let uri =
                 vm.invoke_instance(intent, "toUri", "(I)Ljava/lang/String;", &[Value::Int(0)])?;
+            // AOSP stores the serialized intent *before* the length check,
+            // so the oversized value stays in the builder when it throws.
+            put(vm, recv, "appIntent", uri.clone())?;
             if let Some(text) = opt_str(vm, Some(&uri)) {
                 if text.encode_utf16().count() > 50000 {
                     return Err(iae("App intent must not exceed length 50000".to_string()));
                 }
             }
-            put(vm, recv, "appIntent", uri)?;
             this
         }
         "build" => {
