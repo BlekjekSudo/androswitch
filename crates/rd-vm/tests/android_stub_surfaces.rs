@@ -8512,6 +8512,100 @@ fn soundtrigger_models_and_metadata_are_guest_visible() {
         ),
         Value::Int(1)
     );
+
+    // Deep audit: Keyphrase requireNonNulls its locale and text, while a
+    // null users array normalizes to an empty array.
+    let keyphrase_class = "Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;";
+    let keyphrase_sig = "(IILjava/util/Locale;Ljava/lang/String;[I)V";
+    let phrase_text = text(&mut engine, "Ok Rusty");
+    let null_locale_phrase = instance(&mut engine, keyphrase_class);
+    assert_throws(
+        engine.invoke_instance(
+            null_locale_phrase,
+            "<init>",
+            keyphrase_sig,
+            &[
+                Value::Int(1),
+                Value::Int(1),
+                Value::Null,
+                phrase_text.clone(),
+                Value::Null,
+            ],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let null_text_phrase = instance(&mut engine, keyphrase_class);
+    assert_throws(
+        engine.invoke_instance(
+            null_text_phrase,
+            "<init>",
+            keyphrase_sig,
+            &[
+                Value::Int(1),
+                Value::Int(1),
+                Value::Obj(locale),
+                Value::Null,
+                Value::Null,
+            ],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let no_users_phrase = p49_new(
+        &mut engine,
+        keyphrase_class,
+        keyphrase_sig,
+        &[
+            Value::Int(1),
+            Value::Int(1),
+            Value::Obj(locale),
+            phrase_text,
+            Value::Null,
+        ],
+    );
+    let users = call(&mut engine, no_users_phrase, "getUsers", "()[I", &[]);
+    assert_eq!(int_values(&engine, &users), Vec::<i32>::new());
+
+    // Deep audit: SoundModel.equals uses instanceof, so a plain SoundModel
+    // can equal a KeyphraseSoundModel with the same base fields while the
+    // reverse comparison is false (asymmetric, as in AOSP).
+    let base_model = p49_new(
+        &mut engine,
+        "Landroid/hardware/soundtrigger/SoundTrigger$SoundModel;",
+        "(Ljava/util/UUID;Ljava/util/UUID;I[BI)V",
+        &[
+            uuid.clone(),
+            vendor_uuid.clone(),
+            Value::Int(0),
+            Value::Null,
+            Value::Int(-1),
+        ],
+    );
+    let keyphrase_model = p49_new(
+        &mut engine,
+        "Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseSoundModel;",
+        "(Ljava/util/UUID;Ljava/util/UUID;[B[Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;)V",
+        &[uuid.clone(), vendor_uuid, Value::Null, Value::Null],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            base_model,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(keyphrase_model)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            keyphrase_model,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(base_model)]
+        ),
+        Value::Int(0)
+    );
 }
 
 #[test]
