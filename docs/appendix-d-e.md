@@ -68,7 +68,7 @@ isso em toda linha (`network = "none"`, validado):
 
 ## Ledger de execução (branch `appendix-d-e-20261025`)
 
-Progresso passo a passo em `PROGRESS-appendix-de.md` (raiz do repo).
+Estado por etapa: ver a tabela deste documento e o histórico dos PRs do trilho D/E (#213, #214); o antigo `PROGRESS-appendix-de.md` (log de sessão) saiu do repositório — está no histórico do git.
 Os PRs #191/#192 (Apêndice C, outro agente) não são tocados por este
 trabalho; arquivos compartilhados recebem, no máximo, edições aditivas
 mínimas documentadas no PR.
