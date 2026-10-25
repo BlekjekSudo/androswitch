@@ -763,57 +763,57 @@ key_apis = ["android.net.ipsec.ike.IkeSession"]
 id = "android-media"
 prefix = "android.media"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "M10"
-notes = "MediaPlayer/MediaRecorder/AudioManager/codec playback and recording have no complete host media pipeline. Individual hierarchy stubs must not be read as playback support."
-evidence = ["docs/compat-matrix.md"]
+notes = "The android.media slice models the metadata value layer: MediaMetadata is backed by a real Bundle with AOSP key-type validation, text/long/Rating/Bitmap getters, copied-builder semantics, bitmap-dimension limiting/scaling for stored Bitmap values, size/keySet, MediaDescription derivation (including BT folder extras), and the exact text/long-only equals/hashCode that ignore Rating/Bitmap fields. MediaDescription builders/getters/equals/toString and Rating factories/accessors (including null results for invalid styles or out-of-range values) are guest-visible. MediaPlayer/MediaRecorder/AudioManager/codec playback, recording and extraction still have no host media pipeline and are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-media-pipeline"
-key_apis = ["android.media.MediaPlayer.start", "android.media.MediaRecorder.start", "android.media.AudioManager.getStreamVolume"]
+key_apis = ["android.media.MediaMetadata.Builder.putString", "android.media.MediaMetadata.getDescription", "android.media.MediaDescription.Builder.build", "android.media.Rating.newStarRating"]
 
 [[surface]]
 id = "android-media-session"
 prefix = "android.media.session"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "future"
-notes = "MediaSession/MediaController transport integration is not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Media sessions are modelled as values plus an empty session registry: PlaybackState and CustomAction builders retain defaults, copied custom-action lists, active-state logic and AOSP toString shapes; MediaSession.QueueItem validates description/id and retains equals/toString; MediaSession construction retains context/tag validation before the remote session-creation failure; and MediaSessionManager from MEDIA_SESSION_SERVICE reports no active sessions, no media-key session/package, no Session2 tokens, and local active-session listener bookkeeping. Live MediaSession registration, MediaController transport controls, playback callbacks and media-key dispatch are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-media-session"
-key_apis = ["android.media.session.MediaSession.setActive"]
+key_apis = ["android.media.session.PlaybackState.Builder.build", "android.media.session.MediaSession.QueueItem.getQueueId", "android.media.session.MediaSessionManager.getActiveSessions", "android.media.session.MediaSessionManager.addOnActiveSessionsChangedListener"]
 
 [[surface]]
 id = "android-media-browse"
 prefix = "android.media.browse"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "legacy"
-notes = "Legacy MediaBrowser APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Legacy MediaBrowser is modelled while disconnected: constructor argument validation and root-hint copying, connect/disconnect state transitions (including IllegalStateException for a second connect while connecting), not-connected failures for root/extras/session token/service component, subscription validation and local callback/options bookkeeping with MediaBrowserUtils page-option replacement rules, unsubscribe removal, and disconnected getItem delivering ItemCallback.onError. MediaBrowser.MediaItem validates a non-empty description media id and exposes flags/playable/browsable/description/toString. Binding to a MediaBrowserService, loading children/items from a service, and search are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-media-browse"
-key_apis = ["android.media.browse.MediaBrowser.connect"]
+key_apis = ["android.media.browse.MediaBrowser.connect", "android.media.browse.MediaBrowser.subscribe", "android.media.browse.MediaBrowser.getItem", "android.media.browse.MediaBrowser.MediaItem.getMediaId"]
 
 [[surface]]
 id = "android-media-projection"
 prefix = "android.media.projection"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "future"
-notes = "MediaProjection screen capture consent/virtual display flow is not modelled as an Android API, even though the agent can screenshot RustyDroid itself."
-evidence = ["docs/compat-matrix.md"]
+notes = "MediaProjection is modelled only up to the consent-token boundary: Context MEDIA_PROJECTION_SERVICE yields a MediaProjectionManager, getMediaProjection returns null for a non-RESULT_OK result, null result data, or a result Intent without the projection binder extra, and absent IMediaProjectionManager service calls retain their NullPointerException paths for active-projection queries after local callback bookkeeping. Removing an unknown manager callback is a no-op, and an explicit MediaProjection token wrapper retains getProjection plus local callback register/unregister bookkeeping. The consent activity Intent/component, IMediaProjection start/stop, VirtualDisplay creation and actual screen capture are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-media-projection"
-key_apis = ["android.media.projection.MediaProjectionManager.getMediaProjection"]
+key_apis = ["android.media.projection.MediaProjectionManager.getMediaProjection", "android.media.projection.MediaProjectionManager.removeCallback", "android.media.projection.MediaProjection.registerCallback", "android.media.projection.MediaProjection.getProjection"]
 
 [[surface]]
 id = "android-media-tv"
@@ -833,15 +833,15 @@ key_apis = ["android.media.tv.TvInputManager.getTvInputList", "android.media.tv.
 id = "android-media-audiofx"
 prefix = "android.media.audiofx"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "Audio effects (equalizer, bass boost, visualizer) are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Audio effects follow a device with no loaded native effect library: AudioEffect.Descriptor constructs UUID type/implementation values from strings and retains AOSP equals/hashCode/writeToParcel field order, queryEffects/queryPreProcessings return the empty installed-effect arrays for this profile so isEffectTypeAvailable is false, AudioEffect construction retains null-UUID failure followed by the AOSP ERROR_INVALID_OPERATION mapping to UnsupportedOperationException(Effect library not loaded), and an uninitialized effect retains IllegalStateException checkState behavior plus release-to-uninitialized. Real equalizer/bass-boost/virtualizer/reverb engines, parameters/commands and Visualizer capture are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-media-audiofx"
-key_apis = ["android.media.audiofx.Equalizer.setEnabled"]
+key_apis = ["android.media.audiofx.AudioEffect.queryEffects", "android.media.audiofx.AudioEffect.isEffectTypeAvailable", "android.media.audiofx.AudioEffect.Descriptor.equals", "android.media.audiofx.AudioEffect.release"]
 
 [[surface]]
 id = "android-media-midi"

@@ -2006,6 +2006,48 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Landroid/nfc/tech/BasicTagTechnology;",
             "Ljava/lang/Object;",
         ]),
+        // Appendix C Batch 36-E bounded media values / session /
+        // browse / projection / audiofx slices.
+        "Landroid/media/MediaMetadata;"
+        | "Landroid/media/MediaMetadata$Builder;"
+        | "Landroid/media/MediaDescription;"
+        | "Landroid/media/MediaDescription$Builder;"
+        | "Landroid/media/Rating;"
+        | "Landroid/media/session/PlaybackState;"
+        | "Landroid/media/session/PlaybackState$Builder;"
+        | "Landroid/media/session/PlaybackState$CustomAction;"
+        | "Landroid/media/session/PlaybackState$CustomAction$Builder;"
+        | "Landroid/media/session/MediaSession;"
+        | "Landroid/media/session/MediaSession$QueueItem;"
+        | "Landroid/media/session/MediaSession$Token;"
+        | "Landroid/media/session/MediaSession$Callback;"
+        | "Landroid/media/session/MediaSessionManager;"
+        | "Landroid/media/session/MediaSessionManager$SessionsChangedWrapper;"
+        | "Landroid/media/session/MediaController;"
+        | "Landroid/media/browse/MediaBrowser;"
+        | "Landroid/media/browse/MediaBrowser$MediaItem;"
+        | "Landroid/media/browse/MediaBrowser$ConnectionCallback;"
+        | "Landroid/media/browse/MediaBrowser$SubscriptionCallback;"
+        | "Landroid/media/browse/MediaBrowser$ItemCallback;"
+        | "Landroid/media/browse/MediaBrowser$Subscription;"
+        | "Landroid/media/projection/MediaProjectionManager;"
+        | "Landroid/media/projection/MediaProjectionManager$Callback;"
+        | "Landroid/media/projection/MediaProjection;"
+        | "Landroid/media/projection/MediaProjection$Callback;"
+        | "Landroid/media/projection/MediaProjection$CallbackRecord;"
+        | "Landroid/media/projection/MediaProjectionInfo;"
+        | "Landroid/media/audiofx/AudioEffect;"
+        | "Landroid/media/audiofx/AudioEffect$Descriptor;" => Some(OBJECT),
+        "Landroid/media/session/MediaSession$CallbackStub;" => Some(&[
+            "Landroid/media/session/ISessionCallback$Stub;",
+            "Landroid/os/Binder;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/media/projection/MediaProjectionManager$CallbackDelegate;" => Some(&[
+            "Landroid/media/projection/IMediaProjectionWatcherCallback$Stub;",
+            "Landroid/os/Binder;",
+            "Ljava/lang/Object;",
+        ]),
         _ => None,
     }
 }
@@ -2615,6 +2657,28 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Landroid/nfc/tech/TagTechnology;",
             "Ljava/io/Closeable;",
             "Ljava/lang/AutoCloseable;",
+        ]),
+        // Interfaces in the Batch 36-E bounded slices.
+        "Landroid/media/MediaMetadata;"
+        | "Landroid/media/MediaDescription;"
+        | "Landroid/media/Rating;"
+        | "Landroid/media/session/PlaybackState;"
+        | "Landroid/media/session/PlaybackState$CustomAction;"
+        | "Landroid/media/session/MediaSession$QueueItem;"
+        | "Landroid/media/session/MediaSession$Token;"
+        | "Landroid/media/browse/MediaBrowser$MediaItem;"
+        | "Landroid/media/projection/MediaProjectionInfo;" => Some(&["Landroid/os/Parcelable;"]),
+        "Landroid/media/session/MediaSession$CallbackStub;"
+        | "Landroid/media/session/ISessionCallback$Stub;" => Some(&[
+            "Landroid/media/session/ISessionCallback;",
+            "Landroid/os/IInterface;",
+            "Landroid/os/IBinder;",
+        ]),
+        "Landroid/media/projection/MediaProjectionManager$CallbackDelegate;"
+        | "Landroid/media/projection/IMediaProjectionWatcherCallback$Stub;" => Some(&[
+            "Landroid/media/projection/IMediaProjectionWatcherCallback;",
+            "Landroid/os/IInterface;",
+            "Landroid/os/IBinder;",
         ]),
         _ => None,
     }

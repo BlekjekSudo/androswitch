@@ -16311,3 +16311,1037 @@ fn nfc_card_emulation_without_hce_and_aid_groups_are_guest_visible() {
         "Ljava/lang/NullPointerException;",
     );
 }
+
+// ---- Appendix C Batch 36-E: media / session / browse / projection / audiofx ----
+
+const P36E_MEDIA_METADATA: &str = "Landroid/media/MediaMetadata;";
+const P36E_MEDIA_METADATA_BUILDER: &str = "Landroid/media/MediaMetadata$Builder;";
+const P36E_MEDIA_DESCRIPTION: &str = "Landroid/media/MediaDescription;";
+const P36E_MEDIA_DESCRIPTION_BUILDER: &str = "Landroid/media/MediaDescription$Builder;";
+const P36E_RATING: &str = "Landroid/media/Rating;";
+const P36E_PLAYBACK_STATE: &str = "Landroid/media/session/PlaybackState;";
+const P36E_PLAYBACK_STATE_BUILDER: &str = "Landroid/media/session/PlaybackState$Builder;";
+const P36E_CUSTOM_ACTION: &str = "Landroid/media/session/PlaybackState$CustomAction;";
+const P36E_CUSTOM_ACTION_BUILDER: &str =
+    "Landroid/media/session/PlaybackState$CustomAction$Builder;";
+const P36E_QUEUE_ITEM: &str = "Landroid/media/session/MediaSession$QueueItem;";
+const P36E_MEDIA_SESSION: &str = "Landroid/media/session/MediaSession;";
+const P36E_MEDIA_BROWSER: &str = "Landroid/media/browse/MediaBrowser;";
+const P36E_MEDIA_ITEM: &str = "Landroid/media/browse/MediaBrowser$MediaItem;";
+const P36E_CONNECTION_CALLBACK: &str = "Landroid/media/browse/MediaBrowser$ConnectionCallback;";
+const P36E_SUBSCRIPTION_CALLBACK: &str = "Landroid/media/browse/MediaBrowser$SubscriptionCallback;";
+const P36E_ITEM_CALLBACK: &str = "Landroid/media/browse/MediaBrowser$ItemCallback;";
+const P36E_PROJECTION_MANAGER: &str = "Landroid/media/projection/MediaProjectionManager;";
+const P36E_PROJECTION: &str = "Landroid/media/projection/MediaProjection;";
+const P36E_AUDIO_EFFECT: &str = "Landroid/media/audiofx/AudioEffect;";
+const P36E_AUDIO_EFFECT_DESCRIPTOR: &str = "Landroid/media/audiofx/AudioEffect$Descriptor;";
+
+#[test]
+fn media_metadata_description_and_rating_values_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let heart = object(call_static(
+        &mut engine,
+        P36E_RATING,
+        "newHeartRating",
+        "(Z)Landroid/media/Rating;",
+        &[Value::Int(1)],
+    ));
+    assert_eq!(
+        call(&mut engine, heart, "isRated", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, heart, "getRatingStyle", "()I", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, heart, "hasHeart", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, heart, "getStarRating", "()F", &[]),
+        Value::Float(-1.0)
+    );
+    assert_eq!(
+        call_text(&mut engine, heart, "toString", "()Ljava/lang/String;", &[]),
+        "Rating:style=1 rating=1.0"
+    );
+    let stars = object(call_static(
+        &mut engine,
+        P36E_RATING,
+        "newStarRating",
+        "(IF)Landroid/media/Rating;",
+        &[Value::Int(5), Value::Float(4.5)],
+    ));
+    assert_eq!(
+        call(&mut engine, stars, "getStarRating", "()F", &[]),
+        Value::Float(4.5)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36E_RATING,
+            "newStarRating",
+            "(IF)Landroid/media/Rating;",
+            &[Value::Int(5), Value::Float(5.5)],
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36E_RATING,
+            "newPercentageRating",
+            "(F)Landroid/media/Rating;",
+            &[Value::Float(101.0)],
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36E_RATING,
+            "newUnratedRating",
+            "(I)Landroid/media/Rating;",
+            &[Value::Int(0)],
+        ),
+        Value::Null
+    );
+
+    let description_builder = p49_new(&mut engine, P36E_MEDIA_DESCRIPTION_BUILDER, "()V", &[]);
+    let media_id = text(&mut engine, "song-1");
+    call(
+        &mut engine,
+        description_builder,
+        "setMediaId",
+        "(Ljava/lang/String;)Landroid/media/MediaDescription$Builder;",
+        &[media_id],
+    );
+    let title = text(&mut engine, "Blue in Green");
+    call(
+        &mut engine,
+        description_builder,
+        "setTitle",
+        "(Ljava/lang/CharSequence;)Landroid/media/MediaDescription$Builder;",
+        &[title],
+    );
+    let subtitle = text(&mut engine, "Miles Davis");
+    call(
+        &mut engine,
+        description_builder,
+        "setSubtitle",
+        "(Ljava/lang/CharSequence;)Landroid/media/MediaDescription$Builder;",
+        &[subtitle],
+    );
+    let uri_text = text(&mut engine, "content://media/external/audio/media/1");
+    let media_uri = call_static(
+        &mut engine,
+        "Landroid/net/Uri;",
+        "parse",
+        "(Ljava/lang/String;)Landroid/net/Uri;",
+        &[uri_text],
+    );
+    call(
+        &mut engine,
+        description_builder,
+        "setMediaUri",
+        "(Landroid/net/Uri;)Landroid/media/MediaDescription$Builder;",
+        &[media_uri],
+    );
+    let description = object(call(
+        &mut engine,
+        description_builder,
+        "build",
+        "()Landroid/media/MediaDescription;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            description,
+            "getMediaId",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "song-1"
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            description,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "Blue in Green, Miles Davis, null"
+    );
+    let same_description = object(call(
+        &mut engine,
+        description_builder,
+        "build",
+        "()Landroid/media/MediaDescription;",
+        &[],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            description,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(same_description)],
+        ),
+        Value::Int(1)
+    );
+
+    let builder = p49_new(&mut engine, P36E_MEDIA_METADATA_BUILDER, "()V", &[]);
+    let title_key = text(&mut engine, "android.media.metadata.TITLE");
+    let title_value = text(&mut engine, "Blue in Green");
+    call(
+        &mut engine,
+        builder,
+        "putString",
+        "(Ljava/lang/String;Ljava/lang/String;)Landroid/media/MediaMetadata$Builder;",
+        &[title_key, title_value],
+    );
+    let artist_key = text(&mut engine, "android.media.metadata.ARTIST");
+    let artist_value = text(&mut engine, "Miles Davis");
+    call(
+        &mut engine,
+        builder,
+        "putString",
+        "(Ljava/lang/String;Ljava/lang/String;)Landroid/media/MediaMetadata$Builder;",
+        &[artist_key, artist_value],
+    );
+    let album_key = text(&mut engine, "android.media.metadata.ALBUM");
+    let album_value = text(&mut engine, "Kind of Blue");
+    call(
+        &mut engine,
+        builder,
+        "putString",
+        "(Ljava/lang/String;Ljava/lang/String;)Landroid/media/MediaMetadata$Builder;",
+        &[album_key, album_value],
+    );
+    let id_key = text(&mut engine, "android.media.metadata.MEDIA_ID");
+    let id_value = text(&mut engine, "song-1");
+    call(
+        &mut engine,
+        builder,
+        "putString",
+        "(Ljava/lang/String;Ljava/lang/String;)Landroid/media/MediaMetadata$Builder;",
+        &[id_key, id_value],
+    );
+    let duration_key = text(&mut engine, "android.media.metadata.DURATION");
+    call(
+        &mut engine,
+        builder,
+        "putLong",
+        "(Ljava/lang/String;J)Landroid/media/MediaMetadata$Builder;",
+        &[duration_key, Value::Long(327_000)],
+    );
+    let folder_key = text(&mut engine, "android.media.metadata.BT_FOLDER_TYPE");
+    call(
+        &mut engine,
+        builder,
+        "putLong",
+        "(Ljava/lang/String;J)Landroid/media/MediaMetadata$Builder;",
+        &[folder_key, Value::Long(2)],
+    );
+    let rating_key = text(&mut engine, "android.media.metadata.USER_RATING");
+    call(
+        &mut engine,
+        builder,
+        "putRating",
+        "(Ljava/lang/String;Landroid/media/Rating;)Landroid/media/MediaMetadata$Builder;",
+        &[rating_key, Value::Obj(stars)],
+    );
+    let metadata = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/media/MediaMetadata;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, metadata, "size", "()I", &[]),
+        Value::Int(7)
+    );
+    let query_title = text(&mut engine, "android.media.metadata.TITLE");
+    assert_eq!(
+        call(
+            &mut engine,
+            metadata,
+            "containsKey",
+            "(Ljava/lang/String;)Z",
+            std::slice::from_ref(&query_title),
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            metadata,
+            "getString",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            std::slice::from_ref(&query_title),
+        ),
+        "Blue in Green"
+    );
+    let query_duration = text(&mut engine, "android.media.metadata.DURATION");
+    assert_eq!(
+        call(
+            &mut engine,
+            metadata,
+            "getLong",
+            "(Ljava/lang/String;)J",
+            std::slice::from_ref(&query_duration),
+        ),
+        Value::Long(327_000)
+    );
+    let query_rating = text(&mut engine, "android.media.metadata.USER_RATING");
+    assert_eq!(
+        call(
+            &mut engine,
+            metadata,
+            "getRating",
+            "(Ljava/lang/String;)Landroid/media/Rating;",
+            std::slice::from_ref(&query_rating),
+        ),
+        Value::Obj(stars)
+    );
+    let derived = object(call(
+        &mut engine,
+        metadata,
+        "getDescription",
+        "()Landroid/media/MediaDescription;",
+        &[],
+    ));
+    let derived_again = call(
+        &mut engine,
+        metadata,
+        "getDescription",
+        "()Landroid/media/MediaDescription;",
+        &[],
+    );
+    assert_eq!(derived_again, Value::Obj(derived));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            derived,
+            "getMediaId",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "song-1"
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            derived,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "Blue in Green, Miles Davis, Kind of Blue"
+    );
+    let extras = object(call(
+        &mut engine,
+        derived,
+        "getExtras",
+        "()Landroid/os/Bundle;",
+        &[],
+    ));
+    let extra_key = text(&mut engine, "android.media.extra.BT_FOLDER_TYPE");
+    assert_eq!(
+        call(
+            &mut engine,
+            extras,
+            "getLong",
+            "(Ljava/lang/String;J)J",
+            &[extra_key, Value::Long(-1)],
+        ),
+        Value::Long(2)
+    );
+    let same_metadata = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/media/MediaMetadata;",
+        &[],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            metadata,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(same_metadata)],
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, metadata, "hashCode", "()I", &[]),
+        call(&mut engine, same_metadata, "hashCode", "()I", &[])
+    );
+    let wrong_key = text(&mut engine, "android.media.metadata.DURATION");
+    let wrong_value = text(&mut engine, "not-a-long");
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "putText",
+            "(Ljava/lang/String;Ljava/lang/CharSequence;)Landroid/media/MediaMetadata$Builder;",
+            &[wrong_key, wrong_value],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert!(engine
+        .cp
+        .is_subtype(P36E_MEDIA_METADATA, "Landroid/os/Parcelable;"));
+    assert!(engine
+        .cp
+        .is_subtype(P36E_MEDIA_DESCRIPTION, "Landroid/os/Parcelable;"));
+    assert!(engine.cp.is_subtype(P36E_RATING, "Landroid/os/Parcelable;"));
+}
+
+#[test]
+fn playback_state_queue_and_empty_session_manager_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, CONTEXT);
+    let action_name = text(&mut engine, "com.example.FAVORITE");
+    let action_label = text(&mut engine, "Favorite");
+    let custom_builder = p49_new(
+        &mut engine,
+        P36E_CUSTOM_ACTION_BUILDER,
+        "(Ljava/lang/String;Ljava/lang/CharSequence;I)V",
+        &[action_name, action_label, Value::Int(7)],
+    );
+    let custom = object(call(
+        &mut engine,
+        custom_builder,
+        "build",
+        "()Landroid/media/session/PlaybackState$CustomAction;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            custom,
+            "getAction",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "com.example.FAVORITE"
+    );
+    assert_eq!(
+        call_text(&mut engine, custom, "toString", "()Ljava/lang/String;", &[]),
+        "Action:mName='Favorite, mIcon=7, mExtras=null"
+    );
+    let rejected = instance(&mut engine, P36E_CUSTOM_ACTION_BUILDER);
+    let empty = text(&mut engine, "");
+    let label = text(&mut engine, "Nope");
+    assert_throws(
+        engine.invoke_instance(
+            rejected,
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/CharSequence;I)V",
+            &[empty, label, Value::Int(1)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    let builder = p49_new(&mut engine, P36E_PLAYBACK_STATE_BUILDER, "()V", &[]);
+    let initial = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/media/session/PlaybackState;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, initial, "getActiveQueueItemId", "()J", &[]),
+        Value::Long(-1)
+    );
+    assert_eq!(
+        call(&mut engine, initial, "isActive", "()Z", &[]),
+        Value::Int(0)
+    );
+    call(
+        &mut engine,
+        builder,
+        "setState",
+        "(IJFJ)Landroid/media/session/PlaybackState$Builder;",
+        &[
+            Value::Int(3),
+            Value::Long(1234),
+            Value::Float(1.0),
+            Value::Long(9999),
+        ],
+    );
+    call(
+        &mut engine,
+        builder,
+        "setActions",
+        "(J)Landroid/media/session/PlaybackState$Builder;",
+        &[Value::Long(6)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "setBufferedPosition",
+        "(J)Landroid/media/session/PlaybackState$Builder;",
+        &[Value::Long(5000)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "setActiveQueueItemId",
+        "(J)Landroid/media/session/PlaybackState$Builder;",
+        &[Value::Long(42)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "addCustomAction",
+        "(Landroid/media/session/PlaybackState$CustomAction;)Landroid/media/session/PlaybackState$Builder;",
+        &[Value::Obj(custom)],
+    );
+    let second_action = text(&mut engine, "com.example.SKIP30");
+    let second_label = text(&mut engine, "Skip 30");
+    call(
+        &mut engine,
+        builder,
+        "addCustomAction",
+        "(Ljava/lang/String;Ljava/lang/String;I)Landroid/media/session/PlaybackState$Builder;",
+        &[second_action, second_label, Value::Int(9)],
+    );
+    let state = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/media/session/PlaybackState;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, state, "getState", "()I", &[]),
+        Value::Int(3)
+    );
+    assert_eq!(
+        call(&mut engine, state, "getPosition", "()J", &[]),
+        Value::Long(1234)
+    );
+    assert_eq!(
+        call(&mut engine, state, "getPlaybackSpeed", "()F", &[]),
+        Value::Float(1.0)
+    );
+    assert_eq!(
+        call(&mut engine, state, "isActive", "()Z", &[]),
+        Value::Int(1)
+    );
+    let actions = object(call(
+        &mut engine,
+        state,
+        "getCustomActions",
+        "()Ljava/util/List;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, actions, "size", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            actions,
+            "get",
+            "(I)Ljava/lang/Object;",
+            &[Value::Int(0)],
+        ),
+        Value::Obj(custom)
+    );
+    let rendered = call_text(&mut engine, state, "toString", "()Ljava/lang/String;", &[]);
+    assert!(rendered.contains("state=PLAYING(3)"), "{rendered}");
+    assert!(rendered.contains("active item id=42"), "{rendered}");
+
+    let description_builder = p49_new(&mut engine, P36E_MEDIA_DESCRIPTION_BUILDER, "()V", &[]);
+    let queue_title = text(&mut engine, "Queued");
+    call(
+        &mut engine,
+        description_builder,
+        "setTitle",
+        "(Ljava/lang/CharSequence;)Landroid/media/MediaDescription$Builder;",
+        &[queue_title],
+    );
+    let queue_description = object(call(
+        &mut engine,
+        description_builder,
+        "build",
+        "()Landroid/media/MediaDescription;",
+        &[],
+    ));
+    let queue_item = p49_new(
+        &mut engine,
+        P36E_QUEUE_ITEM,
+        "(Landroid/media/MediaDescription;J)V",
+        &[Value::Obj(queue_description), Value::Long(42)],
+    );
+    assert_eq!(
+        call(&mut engine, queue_item, "getQueueId", "()J", &[]),
+        Value::Long(42)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            queue_item,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "MediaSession.QueueItem {Description=Queued, null, null, Id=42 }"
+    );
+    let rejected_item = instance(&mut engine, P36E_QUEUE_ITEM);
+    assert_throws(
+        engine.invoke_instance(
+            rejected_item,
+            "<init>",
+            "(Landroid/media/MediaDescription;J)V",
+            &[Value::Obj(queue_description), Value::Long(-1)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    let session = instance(&mut engine, P36E_MEDIA_SESSION);
+    let tag = text(&mut engine, "test-session");
+    assert_throws(
+        engine.invoke_instance(
+            session,
+            "<init>",
+            "(Landroid/content/Context;Ljava/lang/String;)V",
+            &[Value::Obj(context), tag],
+        ),
+        "Ljava/lang/RuntimeException;",
+    );
+    let service_name = text(&mut engine, "media_session");
+    let manager = object(call(
+        &mut engine,
+        context,
+        "getSystemService",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+        &[service_name],
+    ));
+    let sessions = object(call(
+        &mut engine,
+        manager,
+        "getActiveSessions",
+        "(Landroid/content/ComponentName;)Ljava/util/List;",
+        &[Value::Null],
+    ));
+    assert_eq!(
+        call(&mut engine, sessions, "size", "()I", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getMediaKeyEventSession",
+            "()Landroid/media/session/MediaSession$Token;",
+            &[],
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            manager,
+            "getMediaKeyEventSessionPackageName",
+            "()Ljava/lang/String;",
+            &[],
+        ),
+        ""
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "removeOnActiveSessionsChangedListener",
+            "(Landroid/media/session/MediaSessionManager$OnActiveSessionsChangedListener;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert!(engine
+        .cp
+        .is_subtype(P36E_PLAYBACK_STATE, "Landroid/os/Parcelable;"));
+    assert!(engine
+        .cp
+        .is_subtype(P36E_CUSTOM_ACTION, "Landroid/os/Parcelable;"));
+    assert!(engine
+        .cp
+        .is_subtype(P36E_QUEUE_ITEM, "Landroid/os/Parcelable;"));
+}
+
+#[test]
+fn media_browser_disconnected_state_and_media_items_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, CONTEXT);
+    let component = instance(&mut engine, "Landroid/content/ComponentName;");
+    let connection = p49_new(&mut engine, P36E_CONNECTION_CALLBACK, "()V", &[]);
+    let browser = p49_new(
+        &mut engine,
+        P36E_MEDIA_BROWSER,
+        "(Landroid/content/Context;Landroid/content/ComponentName;Landroid/media/browse/MediaBrowser$ConnectionCallback;Landroid/os/Bundle;)V",
+        &[
+            Value::Obj(context),
+            Value::Obj(component),
+            Value::Obj(connection),
+            Value::Null,
+        ],
+    );
+    assert_eq!(
+        call(&mut engine, browser, "isConnected", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_throws(
+        engine.invoke_instance(browser, "getRoot", "()Ljava/lang/String;", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            browser,
+            "getSessionToken",
+            "()Landroid/media/session/MediaSession$Token;",
+            &[],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+    let subscription = p49_new(&mut engine, P36E_SUBSCRIPTION_CALLBACK, "()V", &[]);
+    let root = text(&mut engine, "root");
+    call(
+        &mut engine,
+        browser,
+        "subscribe",
+        "(Ljava/lang/String;Landroid/media/browse/MediaBrowser$SubscriptionCallback;)V",
+        &[root.clone(), Value::Obj(subscription)],
+    );
+    let empty = text(&mut engine, "");
+    assert_throws(
+        engine.invoke_instance(
+            browser,
+            "subscribe",
+            "(Ljava/lang/String;Landroid/media/browse/MediaBrowser$SubscriptionCallback;)V",
+            &[empty, Value::Obj(subscription)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    call(
+        &mut engine,
+        browser,
+        "unsubscribe",
+        "(Ljava/lang/String;Landroid/media/browse/MediaBrowser$SubscriptionCallback;)V",
+        &[root.clone(), Value::Obj(subscription)],
+    );
+    let item_callback = p49_new(&mut engine, P36E_ITEM_CALLBACK, "()V", &[]);
+    let item_id = text(&mut engine, "song-1");
+    call(
+        &mut engine,
+        browser,
+        "getItem",
+        "(Ljava/lang/String;Landroid/media/browse/MediaBrowser$ItemCallback;)V",
+        &[item_id, Value::Obj(item_callback)],
+    );
+    call(&mut engine, browser, "connect", "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(browser, "connect", "()V", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    call(&mut engine, browser, "disconnect", "()V", &[]);
+    call(&mut engine, browser, "connect", "()V", &[]);
+    call(&mut engine, browser, "disconnect", "()V", &[]);
+
+    let description_builder = p49_new(&mut engine, P36E_MEDIA_DESCRIPTION_BUILDER, "()V", &[]);
+    let media_id = text(&mut engine, "song-1");
+    call(
+        &mut engine,
+        description_builder,
+        "setMediaId",
+        "(Ljava/lang/String;)Landroid/media/MediaDescription$Builder;",
+        &[media_id],
+    );
+    let title = text(&mut engine, "Song");
+    call(
+        &mut engine,
+        description_builder,
+        "setTitle",
+        "(Ljava/lang/CharSequence;)Landroid/media/MediaDescription$Builder;",
+        &[title],
+    );
+    let description = object(call(
+        &mut engine,
+        description_builder,
+        "build",
+        "()Landroid/media/MediaDescription;",
+        &[],
+    ));
+    let item = p49_new(
+        &mut engine,
+        P36E_MEDIA_ITEM,
+        "(Landroid/media/MediaDescription;I)V",
+        &[Value::Obj(description), Value::Int(3)],
+    );
+    assert_eq!(
+        call(&mut engine, item, "isBrowsable", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, item, "isPlayable", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call_text(&mut engine, item, "getMediaId", "()Ljava/lang/String;", &[]),
+        "song-1"
+    );
+    assert_eq!(
+        call_text(&mut engine, item, "toString", "()Ljava/lang/String;", &[]),
+        "MediaItem{mFlags=3, mDescription=Song, null, null}"
+    );
+    let no_id_builder = p49_new(&mut engine, P36E_MEDIA_DESCRIPTION_BUILDER, "()V", &[]);
+    let no_id = object(call(
+        &mut engine,
+        no_id_builder,
+        "build",
+        "()Landroid/media/MediaDescription;",
+        &[],
+    ));
+    let rejected = instance(&mut engine, P36E_MEDIA_ITEM);
+    assert_throws(
+        engine.invoke_instance(
+            rejected,
+            "<init>",
+            "(Landroid/media/MediaDescription;I)V",
+            &[Value::Obj(no_id), Value::Int(2)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert!(engine
+        .cp
+        .is_subtype(P36E_MEDIA_ITEM, "Landroid/os/Parcelable;"));
+}
+
+#[test]
+fn media_projection_without_a_token_or_service_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, CONTEXT);
+    let service_name = text(&mut engine, "media_projection");
+    let manager = object(call(
+        &mut engine,
+        context,
+        "getSystemService",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+        &[service_name],
+    ));
+    let intent = p49_new(&mut engine, "Landroid/content/Intent;", "()V", &[]);
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getMediaProjection",
+            "(ILandroid/content/Intent;)Landroid/media/projection/MediaProjection;",
+            &[Value::Int(0), Value::Obj(intent)],
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getMediaProjection",
+            "(ILandroid/content/Intent;)Landroid/media/projection/MediaProjection;",
+            &[Value::Int(-1), Value::Obj(intent)],
+        ),
+        Value::Null
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "getActiveProjectionInfo",
+            "()Landroid/media/projection/MediaProjectionInfo;",
+            &[],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let callback = instance(
+        &mut engine,
+        "Landroid/media/projection/MediaProjectionManager$Callback;",
+    );
+    call(
+        &mut engine,
+        manager,
+        "removeCallback",
+        "(Landroid/media/projection/MediaProjectionManager$Callback;)V",
+        &[Value::Obj(callback)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "removeCallback",
+            "(Landroid/media/projection/MediaProjectionManager$Callback;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let handler = instance(&mut engine, "Landroid/os/Handler;");
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "addCallback",
+            "(Landroid/media/projection/MediaProjectionManager$Callback;Landroid/os/Handler;)V",
+            &[Value::Obj(callback), Value::Obj(handler)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let built_manager = p49_new(
+        &mut engine,
+        P36E_PROJECTION_MANAGER,
+        "(Landroid/content/Context;)V",
+        &[Value::Obj(context)],
+    );
+    assert_eq!(
+        field(&engine, built_manager, "mContext"),
+        Value::Obj(context)
+    );
+    assert_eq!(field(&engine, built_manager, "mService"), Value::Null);
+
+    let projection_impl = instance(&mut engine, "Landroid/media/projection/IMediaProjection;");
+    let projection = p49_new(
+        &mut engine,
+        P36E_PROJECTION,
+        "(Landroid/content/Context;Landroid/media/projection/IMediaProjection;)V",
+        &[Value::Obj(context), Value::Obj(projection_impl)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            projection,
+            "getProjection",
+            "()Landroid/media/projection/IMediaProjection;",
+            &[],
+        ),
+        Value::Obj(projection_impl)
+    );
+    let projection_callback = instance(
+        &mut engine,
+        "Landroid/media/projection/MediaProjection$Callback;",
+    );
+    call(
+        &mut engine,
+        projection,
+        "registerCallback",
+        "(Landroid/media/projection/MediaProjection$Callback;Landroid/os/Handler;)V",
+        &[Value::Obj(projection_callback), Value::Obj(handler)],
+    );
+    call(
+        &mut engine,
+        projection,
+        "unregisterCallback",
+        "(Landroid/media/projection/MediaProjection$Callback;)V",
+        &[Value::Obj(projection_callback)],
+    );
+}
+
+#[test]
+fn audiofx_descriptors_and_no_effect_engine_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let effects = call_static(
+        &mut engine,
+        P36E_AUDIO_EFFECT,
+        "queryEffects",
+        "()[Landroid/media/audiofx/AudioEffect$Descriptor;",
+        &[],
+    );
+    assert_eq!(array_values(&engine, &effects).len(), 0);
+    let equalizer_text = text(&mut engine, "0bed4300-ddd6-11db-8f34-0002a5d5c51b");
+    let equalizer = call_static(
+        &mut engine,
+        "Ljava/util/UUID;",
+        "fromString",
+        "(Ljava/lang/String;)Ljava/util/UUID;",
+        &[equalizer_text],
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36E_AUDIO_EFFECT,
+            "isEffectTypeAvailable",
+            "(Ljava/util/UUID;)Z",
+            std::slice::from_ref(&equalizer),
+        ),
+        Value::Int(0)
+    );
+    let type_text = text(&mut engine, "0bed4300-ddd6-11db-8f34-0002a5d5c51b");
+    let uuid_text = text(&mut engine, "123e4567-e89b-12d3-a456-426614174000");
+    let mode = text(&mut engine, "Insert");
+    let name = text(&mut engine, "Equalizer");
+    let implementor = text(&mut engine, "AOSP");
+    let descriptor = p49_new(
+        &mut engine,
+        P36E_AUDIO_EFFECT_DESCRIPTOR,
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+        &[type_text, uuid_text, mode, name, implementor],
+    );
+    let type_value = field(&engine, descriptor, "type");
+    let type_object = object(type_value);
+    assert_eq!(
+        call_text(
+            &mut engine,
+            type_object,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "0bed4300-ddd6-11db-8f34-0002a5d5c51b"
+    );
+    let type_text2 = text(&mut engine, "0bed4300-ddd6-11db-8f34-0002a5d5c51b");
+    let uuid_text2 = text(&mut engine, "123e4567-e89b-12d3-a456-426614174000");
+    let mode2 = text(&mut engine, "Insert");
+    let name2 = text(&mut engine, "Equalizer");
+    let implementor2 = text(&mut engine, "AOSP");
+    let same_descriptor = p49_new(
+        &mut engine,
+        P36E_AUDIO_EFFECT_DESCRIPTOR,
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+        &[type_text2, uuid_text2, mode2, name2, implementor2],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            descriptor,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(same_descriptor)],
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, descriptor, "hashCode", "()I", &[]),
+        call(&mut engine, same_descriptor, "hashCode", "()I", &[])
+    );
+    let effect = instance(&mut engine, P36E_AUDIO_EFFECT);
+    let uuid = equalizer.clone();
+    assert_throws(
+        engine.invoke_instance(
+            effect,
+            "<init>",
+            "(Ljava/util/UUID;Ljava/util/UUID;II)V",
+            &[uuid.clone(), uuid, Value::Int(0), Value::Int(0)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+    assert_throws(
+        engine.invoke_instance(effect, "getId", "()I", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    assert_throws(
+        engine.invoke_instance(effect, "setEnabled", "(Z)I", &[Value::Int(1)]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    call(&mut engine, effect, "release", "()V", &[]);
+    assert_eq!(field(&engine, effect, "mState"), Value::Int(0));
+}
