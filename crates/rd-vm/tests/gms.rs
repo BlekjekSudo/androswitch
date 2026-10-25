@@ -2472,3 +2472,118 @@ fn dex_bytecode_calls_gms_through_full_dispatch() {
         .expect("Probe.run outra vez");
     assert_eq!(get(&e, "code"), 1);
 }
+
+// ── Regressão (auditoria de estabilização): listeners que escrevem no
+// próprio callback NÃO podem recursir até ao abort do hospedeiro. Antes
+// da guarda de reentrância, este cenário terminava em
+// "fatal runtime error: stack overflow, aborting" (SIGABRT).
+#[test]
+fn rtdb_listener_writing_in_callback_is_bounded_not_recursive() {
+    let mut b = DexBuilder::new();
+    let cls = b.class("LDbLoop;", "Ljava/lang/Object;");
+    b.static_field(cls, "calls", "I", common::SVal::Int(0));
+    let f_calls = b.field_idx("LDbLoop;", "I", "calls");
+    let s_loop = b.intern("loop") as u16;
+    let s_x = b.intern("x") as u16;
+    let p_db = b.proto_idx("Lcom/google/firebase/database/FirebaseDatabase;", vec![]);
+    let p_ref = b.proto_idx(
+        "Lcom/google/firebase/database/DatabaseReference;",
+        vec!["Ljava/lang/String;".into()],
+    );
+    let p_task = b.proto_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        vec!["Ljava/lang/Object;".into()],
+    );
+    let m_instance = b.method_idx(
+        "Lcom/google/firebase/database/FirebaseDatabase;",
+        p_db,
+        "getInstance",
+    );
+    let m_ref = b.method_idx(
+        "Lcom/google/firebase/database/FirebaseDatabase;",
+        p_ref,
+        "getReference",
+    );
+    let m_set = b.method_idx(
+        "Lcom/google/firebase/database/DatabaseReference;",
+        p_task,
+        "setValue",
+    );
+    b.r#virtual(
+        cls,
+        "onDataChange",
+        "V",
+        vec!["Lcom/google/firebase/database/DataSnapshot;"],
+        ACC_PUBLIC,
+        Some(b.code(6, 2, 2, {
+            let mut u = op21c(0x60, 0, f_calls); // sget calls
+            u.extend(op11n(0x12, 1, 1));
+            u.extend(op23x(0x90, 0, 0, 1));
+            u.extend(op21c(0x67, 0, f_calls)); // sput calls
+            u.extend(op35c(0x71, 0, m_instance, [0, 0, 0, 0, 0]));
+            u.extend(op11x(0x0C, 0));
+            u.extend(op21c(0x1A, 1, s_loop));
+            u.extend(op35c(0x6E, 2, m_ref, [0, 1, 0, 0, 0]));
+            u.extend(op11x(0x0C, 0));
+            u.extend(op21c(0x1A, 1, s_x));
+            u.extend(op35c(0x6E, 2, m_set, [0, 1, 0, 0, 0])); // escreve de novo!
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+    let db = ov(cs!(
+        e,
+        FIREBASE_DATABASE,
+        "getInstance",
+        "()Lcom/google/firebase/database/FirebaseDatabase;",
+        []
+    )
+    .unwrap());
+    let path = s(&mut e, "loop");
+    let reference = ov(ci!(
+        e,
+        FIREBASE_DATABASE,
+        "getReference",
+        "(Ljava/lang/String;)Lcom/google/firebase/database/DatabaseReference;",
+        db,
+        [path]
+    )
+    .unwrap());
+    let lis = obj(&mut e, "LDbLoop;");
+    ci!(
+        e,
+        DATABASE_REF,
+        "addValueEventListener",
+        "(Lcom/google/firebase/database/ValueEventListener;)Lcom/google/firebase/database/ValueEventListener;",
+        reference,
+        [Value::Obj(lis)]
+    )
+    .unwrap();
+    let v = s(&mut e, "go");
+    let t = ov(ci!(
+        e,
+        DATABASE_REF,
+        "setValue",
+        "(Ljava/lang/Object;)Lcom/google/android/gms/tasks/Task;",
+        reference,
+        [v]
+    )
+    .unwrap());
+    // O processo sobrevive, a escrita conclui e as entregas são limitadas
+    // pelo teto da guarda (iterativas, nunca recursivas).
+    assert_eq!(task_flag(&mut e, t, "isSuccessful"), 1);
+    let calls = match e
+        .statics
+        .get(&("LDbLoop;".to_string(), "calls".to_string()))
+    {
+        Some(Value::Int(n)) => *n,
+        _ => 0,
+    };
+    assert!(calls > 1, "o listener repetiu (calls={calls})");
+    assert!(
+        calls <= 2 * 256 + 1,
+        "entregas limitadas pelo teto por disparo (calls={calls})"
+    );
+    assert!(e.gms_rtdb_value("loop").is_some());
+}

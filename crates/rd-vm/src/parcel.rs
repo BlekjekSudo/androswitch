@@ -82,6 +82,24 @@ const VAL_SHORTARRAY: i32 = 30;
 const VAL_CHARARRAY: i32 = 31;
 const VAL_FLOATARRAY: i32 = 32;
 
+/// Defensive ceiling on a single host `Parcel` byte buffer (16 MiB, well above
+/// Android's ~1 MiB Binder transaction buffer) so `setDataSize` or repeated
+/// writes cannot exhaust host memory outside `VmConfig::heap_budget`.
+const MAX_PARCEL_BYTES: usize = 16 * 1024 * 1024;
+
+/// Maximum nesting depth for recursive `Parcel` value/container read & write
+/// paths so cyclic or adversarially nested graphs throw a typed exception
+/// instead of overflowing the host call stack (sized to fit safely inside
+/// Rust's 2 MiB default worker-thread stack even in unoptimized debug builds).
+const MAX_PARCEL_DEPTH: usize = 32;
+
+/// Upper bound on initial `Vec::with_capacity` reservations before elements
+/// are incrementally parsed from the stream.
+const MAX_INITIAL_CAPACITY: usize = 4096;
+
+/// Hidden heap field tracking active guest-callback parcel recursion depth.
+const DEPTH_FIELD: &str = "rd$parcel_depth";
+
 fn bad(msg: impl Into<String>) -> VmExit {
     Throwable::new("Landroid/os/BadParcelableException;", msg).into()
 }
@@ -92,6 +110,64 @@ fn iae(msg: impl Into<String>) -> VmExit {
     Throwable::new("Ljava/lang/IllegalArgumentException;", msg).into()
 }
 
+fn bounded_cap(n: usize) -> usize {
+    n.min(MAX_INITIAL_CAPACITY)
+}
+
+fn checked_align4(n: usize) -> Result<usize, VmExit> {
+    n.checked_add(3)
+        .map(|v| v & !3)
+        .ok_or_else(|| bad("Parcel: alignment overflow"))
+}
+
+fn check_avail_elems(
+    st: &PState,
+    n: usize,
+    min_elem_bytes: usize,
+    what: &str,
+) -> Result<(), VmExit> {
+    let avail = st.data.len().saturating_sub(st.pos);
+    let need = n.checked_mul(min_elem_bytes).ok_or_else(|| {
+        bad(format!(
+            "Parcel under-run reading {what}: count {n} overflows byte size"
+        ))
+    })?;
+    if need > avail {
+        return Err(bad(format!(
+            "Parcel under-run reading {what}: count {n} needs at least {need} byte(s), avail {avail}"
+        )));
+    }
+    Ok(())
+}
+
+fn ensure_parcel_size(target: usize, what: &str) -> Result<(), VmExit> {
+    if target > MAX_PARCEL_BYTES {
+        return Err(bad(format!(
+            "Parcel: {what} size {target} exceeds maximum parcel size {MAX_PARCEL_BYTES}"
+        )));
+    }
+    Ok(())
+}
+
+fn current_parcel_depth(vm: &Engine, parcel: ObjRef) -> usize {
+    match vm.heap.get_field(parcel, DEPTH_FIELD) {
+        Ok(Value::Int(d)) if d > 0 => d as usize,
+        _ => 0,
+    }
+}
+
+fn check_depth(depth: usize) -> Result<usize, VmExit> {
+    let next = depth
+        .checked_add(1)
+        .ok_or_else(|| bad("Parcel: maximum nesting depth exceeded"))?;
+    if next > MAX_PARCEL_DEPTH {
+        return Err(bad(format!(
+            "Parcel: maximum nesting depth ({MAX_PARCEL_DEPTH}) exceeded"
+        )));
+    }
+    Ok(next)
+}
+
 #[derive(Debug, Clone, Default)]
 struct PState {
     data: Vec<u8>,
@@ -99,81 +175,107 @@ struct PState {
     objects: Vec<Value>,
 }
 
-fn align4(n: usize) -> usize {
-    (n + 3) & !3
-}
-
 impl PState {
-    fn align_write(&mut self) {
-        let a = align4(self.pos);
+    fn align_write(&mut self) -> Result<(), VmExit> {
+        let a = checked_align4(self.pos)?;
+        ensure_parcel_size(a, "aligned write")?;
         if a > self.data.len() {
             self.data.resize(a, 0);
         }
         self.pos = a;
+        Ok(())
     }
-    fn write_raw(&mut self, bytes: &[u8]) {
+    fn write_raw(&mut self, bytes: &[u8]) -> Result<(), VmExit> {
+        ensure_parcel_size(self.pos, "write cursor")?;
+        let end = self
+            .pos
+            .checked_add(bytes.len())
+            .ok_or_else(|| bad("Parcel: write size overflow"))?;
+        ensure_parcel_size(end, "write")?;
         if self.pos > self.data.len() {
             self.data.resize(self.pos, 0);
         }
-        let end = self.pos + bytes.len();
         if end > self.data.len() {
             self.data.resize(end, 0);
         }
         self.data[self.pos..end].copy_from_slice(bytes);
         self.pos = end;
+        Ok(())
     }
-    fn write_padded(&mut self, bytes: &[u8]) {
-        self.write_raw(bytes);
-        let pad = align4(bytes.len()) - bytes.len();
+    fn write_padded(&mut self, bytes: &[u8]) -> Result<(), VmExit> {
+        self.write_raw(bytes)?;
+        let pad = checked_align4(bytes.len())? - bytes.len();
         if pad > 0 {
-            self.write_raw(&[0, 0, 0][..pad]);
+            self.write_raw(&[0, 0, 0][..pad])?;
         }
+        Ok(())
     }
-    fn write_i32(&mut self, v: i32) {
-        self.align_write();
-        self.write_raw(&v.to_le_bytes());
+    fn write_i32(&mut self, v: i32) -> Result<(), VmExit> {
+        self.align_write()?;
+        self.write_raw(&v.to_le_bytes())
     }
-    fn write_i64(&mut self, v: i64) {
-        self.align_write();
-        self.write_raw(&v.to_le_bytes());
+    fn write_i64(&mut self, v: i64) -> Result<(), VmExit> {
+        self.align_write()?;
+        self.write_raw(&v.to_le_bytes())
     }
     fn patch_i32(&mut self, offset: usize, v: i32) {
-        if let Some(bytes) = self.data.get_mut(offset..offset + 4) {
-            bytes.copy_from_slice(&v.to_le_bytes());
+        if let Some(end) = offset.checked_add(4) {
+            if let Some(bytes) = self.data.get_mut(offset..end) {
+                bytes.copy_from_slice(&v.to_le_bytes());
+            }
         }
     }
-    fn write_string(&mut self, s: Option<&str>) {
+    fn write_string(&mut self, s: Option<&str>) -> Result<(), VmExit> {
         match s {
             None => self.write_i32(-1),
             Some(s) => {
                 let units: Vec<u16> = s.encode_utf16().collect();
-                self.write_i32(units.len() as i32);
-                let mut bytes = Vec::with_capacity((units.len() + 1) * 2);
+                let len_i32 =
+                    i32::try_from(units.len()).map_err(|_| bad("Parcel: string too long"))?;
+                let byte_len = units
+                    .len()
+                    .checked_add(1)
+                    .and_then(|u| u.checked_mul(2))
+                    .ok_or_else(|| bad("Parcel: string byte length overflow"))?;
+                ensure_parcel_size(byte_len, "string")?;
+                self.write_i32(len_i32)?;
+                let mut bytes = Vec::with_capacity(byte_len);
                 for u in &units {
                     bytes.extend_from_slice(&u.to_le_bytes());
                 }
                 bytes.extend_from_slice(&0u16.to_le_bytes());
-                self.write_padded(&bytes);
+                self.write_padded(&bytes)
             }
         }
     }
-    fn write_string8(&mut self, s: Option<&str>) {
+    fn write_string8(&mut self, s: Option<&str>) -> Result<(), VmExit> {
         match s {
             None => self.write_i32(-1),
             Some(s) => {
-                self.write_i32(s.len() as i32);
-                let mut bytes = s.as_bytes().to_vec();
+                let len_i32 =
+                    i32::try_from(s.len()).map_err(|_| bad("Parcel: string8 too long"))?;
+                let byte_len = s
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| bad("Parcel: string8 byte length overflow"))?;
+                ensure_parcel_size(byte_len, "string8")?;
+                self.write_i32(len_i32)?;
+                let mut bytes = Vec::with_capacity(byte_len);
+                bytes.extend_from_slice(s.as_bytes());
                 bytes.push(0);
-                self.write_padded(&bytes);
+                self.write_padded(&bytes)
             }
         }
     }
-    fn write_byte_blob(&mut self, b: Option<&[u8]>) {
+    fn write_byte_blob(&mut self, b: Option<&[u8]>) -> Result<(), VmExit> {
         match b {
             None => self.write_i32(-1),
             Some(b) => {
-                self.write_i32(b.len() as i32);
-                self.write_padded(b);
+                let len_i32 =
+                    i32::try_from(b.len()).map_err(|_| bad("Parcel: byte array too long"))?;
+                ensure_parcel_size(b.len(), "byte array")?;
+                self.write_i32(len_i32)?;
+                self.write_padded(b)
             }
         }
     }
@@ -190,23 +292,26 @@ impl PState {
         Ok(out)
     }
     fn read_padded(&mut self, n: usize, what: &str) -> Result<Vec<u8>, VmExit> {
+        let aligned = checked_align4(n)?;
         let out = self.read_raw(n, what)?;
-        let pad = align4(n) - n;
+        let pad = aligned - n;
         if pad > 0 {
-            if self.pos + pad > self.data.len() {
-                return Err(bad(format!("Parcel under-run reading {what} padding")));
-            }
-            self.pos += pad;
+            let next_pos = self
+                .pos
+                .checked_add(pad)
+                .filter(|&end| end <= self.data.len())
+                .ok_or_else(|| bad(format!("Parcel under-run reading {what} padding")))?;
+            self.pos = next_pos;
         }
         Ok(out)
     }
     fn read_i32(&mut self) -> Result<i32, VmExit> {
-        self.pos = align4(self.pos);
+        self.pos = checked_align4(self.pos)?;
         let b = self.read_raw(4, "int")?;
         Ok(i32::from_le_bytes([b[0], b[1], b[2], b[3]]))
     }
     fn read_i64(&mut self) -> Result<i64, VmExit> {
-        self.pos = align4(self.pos);
+        self.pos = checked_align4(self.pos)?;
         let b = self.read_raw(8, "long")?;
         Ok(i64::from_le_bytes([
             b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
@@ -223,7 +328,11 @@ impl PState {
         let Some(n) = self.read_len("string")? else {
             return Ok(None);
         };
-        let bytes = self.read_padded((n + 1) * 2, "string")?;
+        let byte_len = n
+            .checked_add(1)
+            .and_then(|u| u.checked_mul(2))
+            .ok_or_else(|| bad("Parcel under-run reading string: length overflow"))?;
+        let bytes = self.read_padded(byte_len, "string")?;
         let units: Vec<u16> = bytes
             .chunks_exact(2)
             .take(n)
@@ -235,7 +344,10 @@ impl PState {
         let Some(n) = self.read_len("string8")? else {
             return Ok(None);
         };
-        let bytes = self.read_padded(n + 1, "string8")?;
+        let byte_len = n
+            .checked_add(1)
+            .ok_or_else(|| bad("Parcel under-run reading string8: length overflow"))?;
+        let bytes = self.read_padded(byte_len, "string8")?;
         Ok(Some(String::from_utf8_lossy(&bytes[..n]).into_owned()))
     }
     fn read_byte_blob(&mut self) -> Result<Option<Vec<u8>>, VmExit> {
@@ -371,7 +483,7 @@ fn list_values(vm: &mut Engine, v: &Value) -> Result<Option<Vec<Value>>, VmExit>
         Value::Int(n) if n >= 0 => n as usize,
         _ => return Err(bad("Parcel: List.size() did not return a count")),
     };
-    let mut out = Vec::with_capacity(n.min(1_000_000));
+    let mut out = Vec::with_capacity(bounded_cap(n));
     for i in 0..n {
         out.push(vm.invoke_instance(r, "get", "(I)Ljava/lang/Object;", &[Value::Int(i as i32)])?);
     }
@@ -475,14 +587,15 @@ fn binder_for_handle(vm: &Engine, h: i32) -> Result<Value, VmExit> {
 /// Write one strong Binder handle (the body of `writeStrongBinder`).
 /// The binder is also recorded in the parcel's object table, mirroring the
 /// native flat-binder-object list that `hasBinders` inspects.
-fn write_strong_binder_to(vm: &mut Engine, parcel: ObjRef, v: &Value) {
+fn write_strong_binder_to(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit> {
     let h = binder_handle(vm, v);
     let mut st = load(vm, parcel);
-    st.write_i32(h);
+    st.write_i32(h)?;
     if matches!(v, Value::Obj(_)) {
         st.objects.push(v.clone());
     }
     store(vm, parcel, st);
+    Ok(())
 }
 
 /// Heap field holding a Parcel's class-cookie `ArrayMap<Class, Object>`
@@ -555,7 +668,7 @@ fn write_strong_interface_to(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Resu
         }
         _ => Value::Null,
     };
-    write_strong_binder_to(vm, parcel, &binder);
+    write_strong_binder_to(vm, parcel, &binder)?;
     Ok(())
 }
 
@@ -601,10 +714,12 @@ fn read_exception_code(vm: &mut Engine, parcel: ObjRef) -> Result<i32, VmExit> {
         let header_size = st.read_i32()?;
         if header_size > 4 {
             let skip = (header_size - 4) as usize;
-            if st.pos + skip > st.data.len() {
-                return Err(bad("Parcel under-run reading StrictMode reply header"));
-            }
-            st.pos += skip;
+            let next_pos = st
+                .pos
+                .checked_add(skip)
+                .filter(|&end| end <= st.data.len())
+                .ok_or_else(|| bad("Parcel under-run reading StrictMode reply header"))?;
+            st.pos = next_pos;
         }
         code = 0;
     }
@@ -675,10 +790,29 @@ fn read_exception(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
     Err(Throwable::new(class, msg).into())
 }
 
-fn write_string_to(vm: &mut Engine, parcel: ObjRef, s: Option<&str>) {
+fn write_string_to(vm: &mut Engine, parcel: ObjRef, s: Option<&str>) -> Result<(), VmExit> {
     let mut st = load(vm, parcel);
-    st.write_string(s);
+    st.write_string(s)?;
     store(vm, parcel, st);
+    Ok(())
+}
+
+fn with_parcel_depth<T>(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    depth: usize,
+    f: impl FnOnce(&mut Engine) -> Result<T, VmExit>,
+) -> Result<T, VmExit> {
+    let next = check_depth(depth)?;
+    let prev = current_parcel_depth(vm, parcel);
+    let _ = vm
+        .heap
+        .put_field(parcel, DEPTH_FIELD, Value::Int(next as i32));
+    let res = f(vm);
+    let _ = vm
+        .heap
+        .put_field(parcel, DEPTH_FIELD, Value::Int(prev as i32));
+    res
 }
 
 fn creator_for(vm: &mut Engine, desc: &str) -> Result<ObjRef, VmExit> {
@@ -694,49 +828,52 @@ fn creator_for(vm: &mut Engine, desc: &str) -> Result<ObjRef, VmExit> {
     }
 }
 
-fn creator_create(
+fn creator_create_depth(
     vm: &mut Engine,
     creator: ObjRef,
     parcel: ObjRef,
     target_desc: Option<&str>,
+    depth: usize,
 ) -> Result<Value, VmExit> {
-    let args = [Value::Obj(parcel)];
-    // The erasure bridge every Creator<T> gets from javac/kotlinc.
-    let class = vm.heap.class_of(creator)?.to_string();
-    if vm
-        .cp
-        .resolve_method(
-            &class,
-            "createFromParcel",
-            "(Landroid/os/Parcel;)Ljava/lang/Object;",
-        )
-        .is_some()
-    {
-        return vm.invoke_instance(
+    with_parcel_depth(vm, parcel, depth, |vm| {
+        let args = [Value::Obj(parcel)];
+        // The erasure bridge every Creator<T> gets from javac/kotlinc.
+        let class = vm.heap.class_of(creator)?.to_string();
+        if vm
+            .cp
+            .resolve_method(
+                &class,
+                "createFromParcel",
+                "(Landroid/os/Parcel;)Ljava/lang/Object;",
+            )
+            .is_some()
+        {
+            return vm.invoke_instance(
+                creator,
+                "createFromParcel",
+                "(Landroid/os/Parcel;)Ljava/lang/Object;",
+                &args,
+            );
+        }
+        if let Some(desc) = target_desc {
+            let sig = format!("(Landroid/os/Parcel;){desc}");
+            if vm
+                .cp
+                .resolve_method(&class, "createFromParcel", &sig)
+                .is_some()
+            {
+                return vm.invoke_instance(creator, "createFromParcel", &sig, &args);
+            }
+        }
+        // Host-implemented creators (or a bridge resolution miss): go through the
+        // normal invoke path, which reports a typed unresolved-method error.
+        vm.invoke_instance(
             creator,
             "createFromParcel",
             "(Landroid/os/Parcel;)Ljava/lang/Object;",
             &args,
-        );
-    }
-    if let Some(desc) = target_desc {
-        let sig = format!("(Landroid/os/Parcel;){desc}");
-        if vm
-            .cp
-            .resolve_method(&class, "createFromParcel", &sig)
-            .is_some()
-        {
-            return vm.invoke_instance(creator, "createFromParcel", &sig, &args);
-        }
-    }
-    // Host-implemented creators (or a bridge resolution miss): go through the
-    // normal invoke path, which reports a typed unresolved-method error.
-    vm.invoke_instance(
-        creator,
-        "createFromParcel",
-        "(Landroid/os/Parcel;)Ljava/lang/Object;",
-        &args,
-    )
+        )
+    })
 }
 
 fn creator_new_array(vm: &mut Engine, creator: ObjRef, n: i32) -> Result<Value, VmExit> {
@@ -748,25 +885,28 @@ fn creator_new_array(vm: &mut Engine, creator: ObjRef, n: i32) -> Result<Value, 
     )
 }
 
-fn invoke_write_to_parcel(
+fn invoke_write_to_parcel_depth(
     vm: &mut Engine,
     obj: ObjRef,
     parcel: ObjRef,
     flags: i32,
+    depth: usize,
 ) -> Result<(), VmExit> {
     let class = vm.heap.class_of(obj)?.to_string();
     if class == BUNDLE || class == PERSISTABLE_BUNDLE {
         // Bundle is a host value, not DEX: write its AOSP
         // length/magic/ArrayMap frame directly.
-        return write_bundle_map(vm, parcel, obj);
+        return write_bundle_map_depth(vm, parcel, obj, depth);
     }
-    vm.invoke_instance(
-        obj,
-        "writeToParcel",
-        "(Landroid/os/Parcel;I)V",
-        &[Value::Obj(parcel), Value::Int(flags)],
-    )?;
-    Ok(())
+    with_parcel_depth(vm, parcel, depth, |vm| {
+        vm.invoke_instance(
+            obj,
+            "writeToParcel",
+            "(Landroid/os/Parcel;I)V",
+            &[Value::Obj(parcel), Value::Int(flags)],
+        )?;
+        Ok(())
+    })
 }
 
 fn bundle_map(vm: &Engine, r: ObjRef) -> Vec<(String, Value)> {
@@ -776,34 +916,47 @@ fn bundle_map(vm: &Engine, r: ObjRef) -> Vec<(String, Value)> {
     }
 }
 
-fn write_bundle_entries(
+fn write_bundle_entries_depth(
     vm: &mut Engine,
     parcel: ObjRef,
     entries: Vec<(String, Value)>,
+    depth: usize,
 ) -> Result<(), VmExit> {
+    let len_i32 =
+        i32::try_from(entries.len()).map_err(|_| bad("Parcel: bundle entry count overflow"))?;
     let mut st = load(vm, parcel);
-    st.write_i32(entries.len() as i32);
+    st.write_i32(len_i32)?;
     store(vm, parcel, st);
     for (k, v) in entries {
-        write_string_to(vm, parcel, Some(&k));
-        write_value(vm, parcel, &v)?;
+        write_string_to(vm, parcel, Some(&k))?;
+        write_value_depth(vm, parcel, &v, depth)?;
     }
     Ok(())
 }
 
-fn read_bundle_entries(vm: &mut Engine, parcel: ObjRef) -> Result<Vec<(String, Value)>, VmExit> {
-    let mut st = load(vm, parcel);
-    let n = st.read_i32()?;
-    store(vm, parcel, st);
-    if n < 0 {
-        return Err(bad(format!("Parcel: negative bundle size {n}")));
-    }
-    let mut out = Vec::with_capacity(n as usize);
+fn read_bundle_entries_depth(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    depth: usize,
+) -> Result<Vec<(String, Value)>, VmExit> {
+    let next_depth = check_depth(depth)?;
+    let n = {
+        let mut st = load(vm, parcel);
+        let n = st.read_i32()?;
+        if n < 0 {
+            return Err(bad(format!("Parcel: negative bundle size {n}")));
+        }
+        let n = n as usize;
+        check_avail_elems(&st, n, 8, "bundle")?;
+        store(vm, parcel, st);
+        n
+    };
+    let mut out = Vec::with_capacity(bounded_cap(n));
     for _ in 0..n {
         let mut st = load(vm, parcel);
         let k = st.read_string()?.unwrap_or_default();
         store(vm, parcel, st);
-        let v = read_value(vm, parcel)?;
+        let v = read_value_depth(vm, parcel, next_depth)?;
         out.push((k, v));
     }
     Ok(out)
@@ -819,33 +972,45 @@ pub(crate) fn write_bundle_map(
     parcel: ObjRef,
     bundle: ObjRef,
 ) -> Result<(), VmExit> {
+    let depth = current_parcel_depth(vm, parcel);
+    write_bundle_map_depth(vm, parcel, bundle, depth)
+}
+
+#[inline(never)]
+fn write_bundle_map_depth(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    bundle: ObjRef,
+    depth: usize,
+) -> Result<(), VmExit> {
+    let next_depth = check_depth(depth)?;
     // A still-parcelled Bundle is written by appending its retained frame
     // payload verbatim (AOSP `Parcel.appendFrom` path in
     // `BaseBundle.writeToParcelInner`); it must not be materialized first.
     if let Some(payload) = parcelled_payload(vm, bundle) {
         let mut st = load(vm, parcel);
-        st.pos = align4(st.pos);
+        st.pos = checked_align4(st.pos)?;
         st.write_i32(
             i32::try_from(payload.len())
                 .map_err(|_| bad("Parcel: Bundle exceeds the maximum parcelable size"))?,
-        );
-        st.write_i32(BUNDLE_MAGIC);
-        st.write_raw(&payload);
+        )?;
+        st.write_i32(BUNDLE_MAGIC)?;
+        st.write_raw(&payload)?;
         store(vm, parcel, st);
         return Ok(());
     }
     let entries = bundle_map(vm, bundle);
     let (length_pos, start_pos) = {
         let mut st = load(vm, parcel);
-        st.pos = align4(st.pos);
+        st.pos = checked_align4(st.pos)?;
         let length_pos = st.pos;
-        st.write_i32(0); // Backpatched after the map is written.
-        st.write_i32(BUNDLE_MAGIC);
+        st.write_i32(0)?; // Backpatched after the map is written.
+        st.write_i32(BUNDLE_MAGIC)?;
         let start_pos = st.pos;
         store(vm, parcel, st);
         (length_pos, start_pos)
     };
-    write_bundle_entries(vm, parcel, entries)?;
+    write_bundle_entries_depth(vm, parcel, entries, next_depth)?;
     let mut st = load(vm, parcel);
     let end_pos = st.pos;
     let length = i32::try_from(end_pos - start_pos)
@@ -885,7 +1050,8 @@ pub(crate) fn read_bundle_map(
         store(vm, parcel, st);
         end_pos
     };
-    let entries = read_bundle_entries(vm, parcel)?;
+    let depth = current_parcel_depth(vm, parcel);
+    let entries = read_bundle_entries_depth(vm, parcel, depth)?;
     let mut st = load(vm, parcel);
     if st.pos > end_pos {
         return Err(bad(
@@ -1030,7 +1196,8 @@ pub(crate) fn unparcel_bundle(vm: &mut Engine, bundle: ObjRef) -> Result<(), VmE
     let Some(retained) = parcelled_data(vm, bundle) else {
         return Ok(());
     };
-    let entries = read_bundle_entries(vm, retained)?;
+    let depth = current_parcel_depth(vm, retained);
+    let entries = read_bundle_entries_depth(vm, retained, depth)?;
     crate::err::put_field_result(vm.heap.put_field(bundle, PARCELLED_FIELD, Value::Null))?;
     vm.fw
         .objects
@@ -1049,7 +1216,7 @@ fn write_nullable_bundle(
     match bundle {
         None => {
             let mut st = load(vm, parcel);
-            st.write_i32(-1);
+            st.write_i32(-1)?;
             store(vm, parcel, st);
             Ok(())
         }
@@ -1097,7 +1264,7 @@ fn sparse_entries(vm: &mut Engine, sparse: ObjRef) -> Result<Vec<(i32, Value)>, 
         Value::Int(n) if n >= 0 => n as usize,
         _ => return Err(bad("Parcel: SparseArray.size() did not return a count")),
     };
-    let mut entries = Vec::with_capacity(n.min(1_000_000));
+    let mut entries = Vec::with_capacity(bounded_cap(n));
     for i in 0..n {
         let index = Value::Int(i as i32);
         let key = vm
@@ -1149,7 +1316,7 @@ fn sparse_int_entries(vm: &mut Engine, sparse: ObjRef) -> Result<Vec<(i32, i32)>
         Value::Int(n) if n >= 0 => n as usize,
         _ => return Err(bad("Parcel: SparseIntArray.size() did not return a count")),
     };
-    let mut entries = Vec::with_capacity(n.min(1_000_000));
+    let mut entries = Vec::with_capacity(bounded_cap(n));
     for i in 0..n {
         let index = Value::Int(i as i32);
         let key = vm
@@ -1168,33 +1335,52 @@ fn write_sparse_array(
     parcel: ObjRef,
     sparse: Option<ObjRef>,
 ) -> Result<(), VmExit> {
+    let depth = current_parcel_depth(vm, parcel);
+    write_sparse_array_depth(vm, parcel, sparse, depth)
+}
+
+fn write_sparse_array_depth(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    sparse: Option<ObjRef>,
+    depth: usize,
+) -> Result<(), VmExit> {
+    let next_depth = check_depth(depth)?;
     let Some(sparse) = sparse else {
         let mut st = load(vm, parcel);
-        st.write_i32(-1);
+        st.write_i32(-1)?;
         store(vm, parcel, st);
         return Ok(());
     };
     let entries = sparse_entries(vm, sparse)?;
+    let len_i32 =
+        i32::try_from(entries.len()).map_err(|_| bad("Parcel: SparseArray count overflow"))?;
     let mut st = load(vm, parcel);
-    st.write_i32(entries.len() as i32);
+    st.write_i32(len_i32)?;
     store(vm, parcel, st);
     for (key, value) in entries {
         let mut st = load(vm, parcel);
-        st.write_i32(key);
+        st.write_i32(key)?;
         store(vm, parcel, st);
-        write_value(vm, parcel, &value)?;
+        write_value_depth(vm, parcel, &value, next_depth)?;
     }
     Ok(())
 }
 
 fn read_sparse_array(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
-    let Some(n) = read_typed_len(vm, parcel, "SparseArray")? else {
+    let depth = current_parcel_depth(vm, parcel);
+    read_sparse_array_depth(vm, parcel, depth)
+}
+
+fn read_sparse_array_depth(vm: &mut Engine, parcel: ObjRef, depth: usize) -> Result<Value, VmExit> {
+    let next_depth = check_depth(depth)?;
+    let Some(n) = read_typed_len(vm, parcel, 8, "SparseArray")? else {
         return Ok(Value::Null);
     };
-    let mut entries = Vec::with_capacity(n.min(1_000_000));
+    let mut entries = Vec::with_capacity(bounded_cap(n));
     for _ in 0..n {
         let key = read_i32_from(vm, parcel)?;
-        entries.push((key, read_value(vm, parcel)?));
+        entries.push((key, read_value_depth(vm, parcel, next_depth)?));
     }
     new_sparse(vm, SPARSE_ARRAY, entries)
 }
@@ -1206,29 +1392,31 @@ fn write_sparse_boolean_array(
 ) -> Result<(), VmExit> {
     let Some(sparse) = sparse else {
         let mut st = load(vm, parcel);
-        st.write_i32(-1);
+        st.write_i32(-1)?;
         store(vm, parcel, st);
         return Ok(());
     };
     let entries = sparse_entries(vm, sparse)?;
+    let len_i32 = i32::try_from(entries.len())
+        .map_err(|_| bad("Parcel: SparseBooleanArray count overflow"))?;
     let mut st = load(vm, parcel);
-    st.write_i32(entries.len() as i32);
+    st.write_i32(len_i32)?;
     for (key, value) in entries {
-        st.write_i32(key);
+        st.write_i32(key)?;
         // AOSP writes each boolean with writeByte, whose native aligned
         // representation is one 4-byte word in the Parcel stream.
-        st.write_i32((value.as_int().unwrap_or(0) != 0) as i32);
+        st.write_i32((value.as_int().unwrap_or(0) != 0) as i32)?;
     }
     store(vm, parcel, st);
     Ok(())
 }
 
 fn read_sparse_boolean_array(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
-    let Some(n) = read_typed_len(vm, parcel, "SparseBooleanArray")? else {
+    let Some(n) = read_typed_len(vm, parcel, 8, "SparseBooleanArray")? else {
         return Ok(Value::Null);
     };
     let mut st = load(vm, parcel);
-    let mut entries = Vec::with_capacity(n.min(1_000_000));
+    let mut entries = Vec::with_capacity(bounded_cap(n));
     for _ in 0..n {
         let key = st.read_i32()?;
         let value = st.read_i32()?;
@@ -1239,17 +1427,33 @@ fn read_sparse_boolean_array(vm: &mut Engine, parcel: ObjRef) -> Result<Value, V
 }
 
 fn write_parcelable(vm: &mut Engine, parcel: ObjRef, v: &Value, flags: i32) -> Result<(), VmExit> {
+    let depth = current_parcel_depth(vm, parcel);
+    write_parcelable_depth(vm, parcel, v, flags, depth)
+}
+
+fn write_parcelable_depth(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    v: &Value,
+    flags: i32,
+    depth: usize,
+) -> Result<(), VmExit> {
     let Some(r) = v.as_ref()? else {
-        write_string_to(vm, parcel, None);
+        write_string_to(vm, parcel, None)?;
         return Ok(());
     };
     let class = vm.heap.class_of(r)?.to_string();
     let name = java_name(&class);
-    write_string_to(vm, parcel, Some(&name));
-    invoke_write_to_parcel(vm, r, parcel, flags)
+    write_string_to(vm, parcel, Some(&name))?;
+    invoke_write_to_parcel_depth(vm, r, parcel, flags, depth)
 }
 
 fn read_parcelable(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
+    let depth = current_parcel_depth(vm, parcel);
+    read_parcelable_depth(vm, parcel, depth)
+}
+
+fn read_parcelable_depth(vm: &mut Engine, parcel: ObjRef, depth: usize) -> Result<Value, VmExit> {
     let mut st = load(vm, parcel);
     let name = st.read_string()?;
     store(vm, parcel, st);
@@ -1263,7 +1467,7 @@ fn read_parcelable(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
         return new_lazy_bundle(vm, &desc, parcel);
     }
     let creator = creator_for(vm, &desc)?;
-    creator_create(vm, creator, parcel, Some(&desc))
+    creator_create_depth(vm, creator, parcel, Some(&desc), depth)
 }
 
 fn boxed(vm: &mut Engine, class: &str, v: Value) -> Result<Value, VmExit> {
@@ -1289,59 +1493,80 @@ fn is_length_prefixed(tag: i32) -> bool {
 
 /// Write the `-1` length placeholder after a length-prefixed tag and
 /// return its absolute position for `backpatch_value_length`.
-fn write_length_placeholder(vm: &mut Engine, parcel: ObjRef) -> usize {
+fn write_length_placeholder(vm: &mut Engine, parcel: ObjRef) -> Result<usize, VmExit> {
     let mut st = load(vm, parcel);
-    st.pos = align4(st.pos);
+    st.pos = checked_align4(st.pos)?;
     let length_pos = st.pos;
-    st.write_i32(-1);
+    st.write_i32(-1)?;
     store(vm, parcel, st);
-    length_pos
+    Ok(length_pos)
 }
 
 /// Backpatch a length placeholder with the payload byte count written
 /// since (AOSP `writeValue` performs the same seek-and-patch).
-fn backpatch_value_length(vm: &mut Engine, parcel: ObjRef, length_pos: usize) {
+fn backpatch_value_length(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    length_pos: usize,
+) -> Result<(), VmExit> {
     let mut st = load(vm, parcel);
     let end = st.pos;
-    st.patch_i32(length_pos, (end - (length_pos + 4)) as i32);
+    let payload_len = end
+        .checked_sub(length_pos.saturating_add(4))
+        .and_then(|n| i32::try_from(n).ok())
+        .ok_or_else(|| bad("Parcel: length-prefixed value exceeds maximum size"))?;
+    st.patch_i32(length_pos, payload_len);
     st.pos = end;
     store(vm, parcel, st);
+    Ok(())
 }
 
 fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit> {
+    let depth = current_parcel_depth(vm, parcel);
+    write_value_depth(vm, parcel, v, depth)
+}
+
+#[inline(never)]
+fn write_value_depth(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    v: &Value,
+    depth: usize,
+) -> Result<(), VmExit> {
+    let next_depth = check_depth(depth)?;
     // Raw primitive Values can arrive from host-stored Bundles.
     match v {
         Value::Null | Value::WideHi => {
             let mut st = load(vm, parcel);
-            st.write_i32(VAL_NULL);
+            st.write_i32(VAL_NULL)?;
             store(vm, parcel, st);
             return Ok(());
         }
         Value::Int(i) => {
             let mut st = load(vm, parcel);
-            st.write_i32(VAL_INTEGER);
-            st.write_i32(*i);
+            st.write_i32(VAL_INTEGER)?;
+            st.write_i32(*i)?;
             store(vm, parcel, st);
             return Ok(());
         }
         Value::Long(l) => {
             let mut st = load(vm, parcel);
-            st.write_i32(VAL_LONG);
-            st.write_i64(*l);
+            st.write_i32(VAL_LONG)?;
+            st.write_i64(*l)?;
             store(vm, parcel, st);
             return Ok(());
         }
         Value::Float(f) => {
             let mut st = load(vm, parcel);
-            st.write_i32(VAL_FLOAT);
-            st.write_i32(f.to_bits() as i32);
+            st.write_i32(VAL_FLOAT)?;
+            st.write_i32(f.to_bits() as i32)?;
             store(vm, parcel, st);
             return Ok(());
         }
         Value::Double(d) => {
             let mut st = load(vm, parcel);
-            st.write_i32(VAL_DOUBLE);
-            st.write_i64(d.to_bits() as i64);
+            st.write_i32(VAL_DOUBLE)?;
+            st.write_i64(d.to_bits() as i64)?;
             store(vm, parcel, st);
             return Ok(());
         }
@@ -1352,15 +1577,26 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
         _ => None,
     }) else {
         let mut st = load(vm, parcel);
-        st.write_i32(VAL_NULL);
+        st.write_i32(VAL_NULL)?;
         store(vm, parcel, st);
         return Ok(());
     };
+    write_value_obj_depth(vm, parcel, v, r, next_depth)
+}
+
+#[inline(never)]
+fn write_value_obj_depth(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    v: &Value,
+    r: ObjRef,
+    next_depth: usize,
+) -> Result<(), VmExit> {
     if let Ok(s) = vm.heap.as_str(r) {
         let s = s.to_string();
         let mut st = load(vm, parcel);
-        st.write_i32(VAL_STRING);
-        st.write_string(Some(&s));
+        st.write_i32(VAL_STRING)?;
+        st.write_string(Some(&s))?;
         store(vm, parcel, st);
         return Ok(());
     }
@@ -1370,40 +1606,40 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
         let mut st = load(vm, parcel);
         match kind {
             'Z' => {
-                st.write_i32(VAL_BOOLEAN);
-                st.write_i32(inner.as_int().unwrap_or(0));
+                st.write_i32(VAL_BOOLEAN)?;
+                st.write_i32(inner.as_int().unwrap_or(0))?;
             }
             'B' => {
-                st.write_i32(VAL_BYTE);
-                st.write_i32(inner.as_int().unwrap_or(0));
+                st.write_i32(VAL_BYTE)?;
+                st.write_i32(inner.as_int().unwrap_or(0))?;
             }
             'S' => {
-                st.write_i32(VAL_SHORT);
-                st.write_i32(inner.as_int().unwrap_or(0));
+                st.write_i32(VAL_SHORT)?;
+                st.write_i32(inner.as_int().unwrap_or(0))?;
             }
             'C' => {
                 // AOSP writes Character as VAL_CHAR + writeInt(char), not
                 // as a one-character CharSequence.
-                st.write_i32(VAL_CHAR);
-                st.write_i32(inner.as_int().unwrap_or(0));
+                st.write_i32(VAL_CHAR)?;
+                st.write_i32(inner.as_int().unwrap_or(0))?;
             }
             'I' => {
-                st.write_i32(VAL_INTEGER);
-                st.write_i32(inner.as_int().unwrap_or(0));
+                st.write_i32(VAL_INTEGER)?;
+                st.write_i32(inner.as_int().unwrap_or(0))?;
             }
             'J' => {
-                st.write_i32(VAL_LONG);
-                st.write_i64(inner.as_long().unwrap_or(0));
+                st.write_i32(VAL_LONG)?;
+                st.write_i64(inner.as_long().unwrap_or(0))?;
             }
             'F' => {
-                st.write_i32(VAL_FLOAT);
-                st.write_i32(inner.as_float().unwrap_or(0.0).to_bits() as i32);
+                st.write_i32(VAL_FLOAT)?;
+                st.write_i32(inner.as_float().unwrap_or(0.0).to_bits() as i32)?;
             }
             'D' => {
-                st.write_i32(VAL_DOUBLE);
-                st.write_i64(inner.as_double().unwrap_or(0.0).to_bits() as i64);
+                st.write_i32(VAL_DOUBLE)?;
+                st.write_i64(inner.as_double().unwrap_or(0.0).to_bits() as i64)?;
             }
-            _ => st.write_i32(VAL_NULL),
+            _ => st.write_i32(VAL_NULL)?,
         }
         store(vm, parcel, st);
         return Ok(());
@@ -1416,9 +1652,9 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
             VAL_BUNDLE
         } else {
             VAL_PERSISTABLEBUNDLE
-        });
+        })?;
         store(vm, parcel, st);
-        return write_bundle_map(vm, parcel, r);
+        return write_bundle_map_depth(vm, parcel, r, next_depth);
     }
     if class == "Landroid/util/Size;" || class == "Landroid/util/SizeF;" {
         // `writeSize` writes two ints, `writeSizeF` two floats; the host
@@ -1427,30 +1663,30 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
         let h = vm.heap.get_field(r, "rd_h").unwrap_or(Value::Null);
         let mut st = load(vm, parcel);
         if class == "Landroid/util/Size;" {
-            st.write_i32(VAL_SIZE);
-            st.write_i32(w.as_int().unwrap_or(0));
-            st.write_i32(h.as_int().unwrap_or(0));
+            st.write_i32(VAL_SIZE)?;
+            st.write_i32(w.as_int().unwrap_or(0))?;
+            st.write_i32(h.as_int().unwrap_or(0))?;
         } else {
-            st.write_i32(VAL_SIZEF);
-            st.write_i32(w.as_float().unwrap_or(0.0).to_bits() as i32);
-            st.write_i32(h.as_float().unwrap_or(0.0).to_bits() as i32);
+            st.write_i32(VAL_SIZEF)?;
+            st.write_i32(w.as_float().unwrap_or(0.0).to_bits() as i32)?;
+            st.write_i32(h.as_float().unwrap_or(0.0).to_bits() as i32)?;
         }
         store(vm, parcel, st);
         return Ok(());
     }
     if class == SPARSE_BOOLEAN_ARRAY {
         let mut st = load(vm, parcel);
-        st.write_i32(VAL_SPARSEBOOLEANARRAY);
+        st.write_i32(VAL_SPARSEBOOLEANARRAY)?;
         store(vm, parcel, st);
         return write_sparse_boolean_array(vm, parcel, Some(r));
     }
     if class == SPARSE_ARRAY || vm.cp.is_subtype(&class, SPARSE_ARRAY) {
         let mut st = load(vm, parcel);
-        st.write_i32(VAL_SPARSEARRAY);
+        st.write_i32(VAL_SPARSEARRAY)?;
         store(vm, parcel, st);
-        let length_pos = write_length_placeholder(vm, parcel);
-        write_sparse_array(vm, parcel, Some(r))?;
-        backpatch_value_length(vm, parcel, length_pos);
+        let length_pos = write_length_placeholder(vm, parcel)?;
+        write_sparse_array_depth(vm, parcel, Some(r), next_depth)?;
+        backpatch_value_length(vm, parcel, length_pos)?;
         return Ok(());
     }
     if class.starts_with('[') {
@@ -1458,12 +1694,12 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
         let mut st = load(vm, parcel);
         match class.as_str() {
             "[B" => {
-                st.write_i32(VAL_BYTEARRAY);
+                st.write_i32(VAL_BYTEARRAY)?;
                 let bytes: Vec<u8> = elems
                     .iter()
                     .map(|e| e.as_int().unwrap_or(0) as u8)
                     .collect();
-                st.write_byte_blob(Some(&bytes));
+                st.write_byte_blob(Some(&bytes))?;
             }
             "[I" | "[S" => {
                 // short[] has its own tag in AOSP (same int-per-element
@@ -1472,69 +1708,69 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
                     VAL_SHORTARRAY
                 } else {
                     VAL_INTARRAY
-                });
-                st.write_i32(elems.len() as i32);
+                })?;
+                st.write_i32(elems.len() as i32)?;
                 for e in &elems {
-                    st.write_i32(e.as_int().unwrap_or(0));
+                    st.write_i32(e.as_int().unwrap_or(0))?;
                 }
             }
             "[Z" => {
-                st.write_i32(VAL_BOOLEANARRAY);
-                st.write_i32(elems.len() as i32);
+                st.write_i32(VAL_BOOLEANARRAY)?;
+                st.write_i32(elems.len() as i32)?;
                 for e in &elems {
-                    st.write_i32((e.as_int().unwrap_or(0) != 0) as i32);
+                    st.write_i32((e.as_int().unwrap_or(0) != 0) as i32)?;
                 }
             }
             "[C" => {
-                st.write_i32(VAL_CHARARRAY);
-                st.write_i32(elems.len() as i32);
+                st.write_i32(VAL_CHARARRAY)?;
+                st.write_i32(elems.len() as i32)?;
                 for e in &elems {
-                    st.write_i32(e.as_int().unwrap_or(0));
+                    st.write_i32(e.as_int().unwrap_or(0))?;
                 }
             }
             "[J" => {
-                st.write_i32(VAL_LONGARRAY);
-                st.write_i32(elems.len() as i32);
+                st.write_i32(VAL_LONGARRAY)?;
+                st.write_i32(elems.len() as i32)?;
                 for e in &elems {
-                    st.write_i64(e.as_long().unwrap_or(0));
+                    st.write_i64(e.as_long().unwrap_or(0))?;
                 }
             }
             "[F" => {
-                st.write_i32(VAL_FLOATARRAY);
-                st.write_i32(elems.len() as i32);
+                st.write_i32(VAL_FLOATARRAY)?;
+                st.write_i32(elems.len() as i32)?;
                 for e in &elems {
-                    st.write_i32(e.as_float().unwrap_or(0.0).to_bits() as i32);
+                    st.write_i32(e.as_float().unwrap_or(0.0).to_bits() as i32)?;
                 }
             }
             "[D" => {
-                st.write_i32(VAL_DOUBLEARRAY);
-                st.write_i32(elems.len() as i32);
+                st.write_i32(VAL_DOUBLEARRAY)?;
+                st.write_i32(elems.len() as i32)?;
                 for e in &elems {
-                    st.write_i64(e.as_double().unwrap_or(0.0).to_bits() as i64);
+                    st.write_i64(e.as_double().unwrap_or(0.0).to_bits() as i64)?;
                 }
             }
             "[Ljava/lang/String;" => {
                 // Strings need heap access after dropping the parcel state.
                 drop(st);
                 let mut st = load(vm, parcel);
-                st.write_i32(VAL_STRINGARRAY);
-                st.write_i32(elems.len() as i32);
+                st.write_i32(VAL_STRINGARRAY)?;
+                st.write_i32(elems.len() as i32)?;
                 store(vm, parcel, st);
                 for e in &elems {
                     let s = str_of(vm, Some(e))?;
-                    write_string_to(vm, parcel, s.as_deref());
+                    write_string_to(vm, parcel, s.as_deref())?;
                 }
                 return Ok(());
             }
             "[Ljava/lang/CharSequence;" => {
                 drop(st);
                 let mut st = load(vm, parcel);
-                st.write_i32(VAL_CHARSEQUENCEARRAY);
-                st.write_i32(elems.len() as i32);
+                st.write_i32(VAL_CHARSEQUENCEARRAY)?;
+                st.write_i32(elems.len() as i32)?;
                 store(vm, parcel, st);
                 for e in &elems {
                     let s = char_seq_of(vm, Some(e))?;
-                    write_string_to(vm, parcel, s.as_deref());
+                    write_string_to(vm, parcel, s.as_deref())?;
                 }
                 return Ok(());
             }
@@ -1553,22 +1789,22 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
                     VAL_PARCELABLEARRAY
                 } else {
                     VAL_OBJECTARRAY
-                });
+                })?;
                 store(vm, parcel, st);
-                let length_pos = write_length_placeholder(vm, parcel);
+                let length_pos = write_length_placeholder(vm, parcel)?;
                 let mut st = load(vm, parcel);
-                st.write_i32(elems.len() as i32);
+                st.write_i32(elems.len() as i32)?;
                 store(vm, parcel, st);
                 if parcelable_array {
                     for e in &elems {
-                        write_parcelable(vm, parcel, e, 0)?;
+                        write_parcelable_depth(vm, parcel, e, 0, next_depth)?;
                     }
                 } else {
                     for e in &elems {
-                        write_value(vm, parcel, e)?;
+                        write_value_depth(vm, parcel, e, next_depth)?;
                     }
                 }
-                backpatch_value_length(vm, parcel, length_pos);
+                backpatch_value_length(vm, parcel, length_pos)?;
                 return Ok(());
             }
         }
@@ -1580,56 +1816,56 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
         _ => None,
     } {
         let mut st = load(vm, parcel);
-        st.write_i32(VAL_MAP);
+        st.write_i32(VAL_MAP)?;
         store(vm, parcel, st);
-        let length_pos = write_length_placeholder(vm, parcel);
+        let length_pos = write_length_placeholder(vm, parcel)?;
         let mut st = load(vm, parcel);
-        st.write_i32(entries.len() as i32);
+        st.write_i32(entries.len() as i32)?;
         store(vm, parcel, st);
         for (k, val) in &entries {
-            write_value(vm, parcel, k)?;
-            write_value(vm, parcel, val)?;
+            write_value_depth(vm, parcel, k, next_depth)?;
+            write_value_depth(vm, parcel, val, next_depth)?;
         }
-        backpatch_value_length(vm, parcel, length_pos);
+        backpatch_value_length(vm, parcel, length_pos)?;
         return Ok(());
     }
     if let Some(elems) = list_values(vm, v)? {
         let mut st = load(vm, parcel);
-        st.write_i32(VAL_LIST);
+        st.write_i32(VAL_LIST)?;
         store(vm, parcel, st);
-        let length_pos = write_length_placeholder(vm, parcel);
+        let length_pos = write_length_placeholder(vm, parcel)?;
         let mut st = load(vm, parcel);
-        st.write_i32(elems.len() as i32);
+        st.write_i32(elems.len() as i32)?;
         store(vm, parcel, st);
         for e in &elems {
-            write_value(vm, parcel, e)?;
+            write_value_depth(vm, parcel, e, next_depth)?;
         }
-        backpatch_value_length(vm, parcel, length_pos);
+        backpatch_value_length(vm, parcel, length_pos)?;
         return Ok(());
     }
     if class == BINDER || vm.cp.is_subtype(&class, BINDER) || vm.cp.is_subtype(&class, IBINDER) {
         let h = binder_handle(vm, v);
         let mut st = load(vm, parcel);
-        st.write_i32(VAL_IBINDER);
-        st.write_i32(h);
+        st.write_i32(VAL_IBINDER)?;
+        st.write_i32(h)?;
         store(vm, parcel, st);
         return Ok(());
     }
     if vm.cp.is_subtype(&class, "Ljava/lang/CharSequence;") {
         let s = char_seq_of(vm, Some(v))?;
         let mut st = load(vm, parcel);
-        st.write_i32(VAL_CHARSEQUENCE);
-        st.write_string(s.as_deref());
+        st.write_i32(VAL_CHARSEQUENCE)?;
+        st.write_string(s.as_deref())?;
         store(vm, parcel, st);
         return Ok(());
     }
     if vm.cp.is_subtype(&class, "Landroid/os/Parcelable;") {
         let mut st = load(vm, parcel);
-        st.write_i32(VAL_PARCELABLE);
+        st.write_i32(VAL_PARCELABLE)?;
         store(vm, parcel, st);
-        let length_pos = write_length_placeholder(vm, parcel);
-        write_parcelable(vm, parcel, v, 0)?;
-        backpatch_value_length(vm, parcel, length_pos);
+        let length_pos = write_length_placeholder(vm, parcel)?;
+        write_parcelable_depth(vm, parcel, v, 0, next_depth)?;
+        backpatch_value_length(vm, parcel, length_pos)?;
         return Ok(());
     }
     Err(bad(format!(
@@ -1639,25 +1875,30 @@ fn write_value(vm: &mut Engine, parcel: ObjRef, v: &Value) -> Result<(), VmExit>
 
 /// AOSP boolean arrays are one int per element (`writeBooleanArray`
 /// loops `writeInt(v ? 1 : 0)`), like short/char arrays — not one byte.
-fn write_bool_array_to(vm: &mut Engine, parcel: ObjRef, elems: Option<&[Value]>) {
+fn write_bool_array_to(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    elems: Option<&[Value]>,
+) -> Result<(), VmExit> {
     let mut st = load(vm, parcel);
     match elems {
-        None => st.write_i32(-1),
+        None => st.write_i32(-1)?,
         Some(es) => {
-            st.write_i32(es.len() as i32);
+            st.write_i32(es.len() as i32)?;
             for e in es {
-                st.write_i32((e.as_int().unwrap_or(0) != 0) as i32);
+                st.write_i32((e.as_int().unwrap_or(0) != 0) as i32)?;
             }
         }
     }
     store(vm, parcel, st);
+    Ok(())
 }
 
 fn read_bool_array_from(vm: &mut Engine, parcel: ObjRef) -> Result<Option<Vec<Value>>, VmExit> {
-    let Some(n) = read_typed_len(vm, parcel, "boolean array")? else {
+    let Some(n) = read_typed_len(vm, parcel, 4, "boolean array")? else {
         return Ok(None);
     };
-    let mut vals = Vec::with_capacity(n);
+    let mut vals = Vec::with_capacity(bounded_cap(n));
     let mut st = load(vm, parcel);
     for _ in 0..n {
         vals.push(Value::Int((st.read_i32()? != 0) as i32));
@@ -1666,9 +1907,17 @@ fn read_bool_array_from(vm: &mut Engine, parcel: ObjRef) -> Result<Option<Vec<Va
     Ok(Some(vals))
 }
 
-fn read_typed_len(vm: &mut Engine, parcel: ObjRef, what: &str) -> Result<Option<usize>, VmExit> {
+fn read_typed_len(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    min_elem_bytes: usize,
+    what: &str,
+) -> Result<Option<usize>, VmExit> {
     let mut st = load(vm, parcel);
     let n = st.read_len(what)?;
+    if let Some(count) = n {
+        check_avail_elems(&st, count, min_elem_bytes, what)?;
+    }
     store(vm, parcel, st);
     Ok(n)
 }
@@ -1702,6 +1951,13 @@ fn read_blob_from(vm: &mut Engine, parcel: ObjRef) -> Result<Option<Vec<u8>>, Vm
 }
 
 fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
+    let depth = current_parcel_depth(vm, parcel);
+    read_value_depth(vm, parcel, depth)
+}
+
+#[inline(never)]
+fn read_value_depth(vm: &mut Engine, parcel: ObjRef, depth: usize) -> Result<Value, VmExit> {
+    let next_depth = check_depth(depth)?;
     let mut st = load(vm, parcel);
     let tag = st.read_i32()?;
     store(vm, parcel, st);
@@ -1712,13 +1968,27 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
         // behavior but reject a length that runs past the parcel here.
         let mut st = load(vm, parcel);
         let length = st.read_i32()?;
-        if length < 0 || st.pos + length as usize > st.data.len() {
+        let ok_end = usize::try_from(length)
+            .ok()
+            .and_then(|len| st.pos.checked_add(len))
+            .filter(|&end| end <= st.data.len());
+        if ok_end.is_none() {
             return Err(bad(format!(
                 "Parcel.readValue: invalid length-prefixed size {length} for tag {tag}"
             )));
         }
         store(vm, parcel, st);
     }
+    read_value_body_depth(vm, parcel, tag, next_depth)
+}
+
+#[inline(never)]
+fn read_value_body_depth(
+    vm: &mut Engine,
+    parcel: ObjRef,
+    tag: i32,
+    next_depth: usize,
+) -> Result<Value, VmExit> {
     Ok(match tag {
         VAL_NULL => Value::Null,
         VAL_STRING | VAL_CHARSEQUENCE => {
@@ -1752,11 +2022,11 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             let (class, w, h) = if tag == VAL_SIZE {
                 ("Landroid/util/Size;", Value::Int(w), Value::Int(h))
             } else {
-                (
-                    "Landroid/util/SizeF;",
-                    Value::Float(f32::from_bits(w as u32)),
-                    Value::Float(f32::from_bits(h as u32)),
-                )
+                let (wf, hf) = (f32::from_bits(w as u32), f32::from_bits(h as u32));
+                if !wf.is_finite() || !hf.is_finite() {
+                    return Err(iae("Parcel.readValue: non-finite SizeF dimension"));
+                }
+                ("Landroid/util/SizeF;", Value::Float(wf), Value::Float(hf))
             };
             let r = vm
                 .heap
@@ -1795,10 +2065,10 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             None => Value::Null,
         },
         VAL_INTARRAY | VAL_SHORTARRAY | VAL_CHARARRAY => {
-            let Some(n) = read_typed_len(vm, parcel, "int array")? else {
+            let Some(n) = read_typed_len(vm, parcel, 4, "int array")? else {
                 return Ok(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             let mut st = load(vm, parcel);
             for _ in 0..n {
                 vals.push(Value::Int(st.read_i32()?));
@@ -1816,10 +2086,10 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             )?
         }
         VAL_LONGARRAY => {
-            let Some(n) = read_typed_len(vm, parcel, "long array")? else {
+            let Some(n) = read_typed_len(vm, parcel, 8, "long array")? else {
                 return Ok(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             let mut st = load(vm, parcel);
             for _ in 0..n {
                 vals.push(Value::Long(st.read_i64()?));
@@ -1828,10 +2098,10 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             crate::arrays::new_array(vm, "[J", ElemKind::Long, vals)?
         }
         VAL_FLOATARRAY => {
-            let Some(n) = read_typed_len(vm, parcel, "float array")? else {
+            let Some(n) = read_typed_len(vm, parcel, 4, "float array")? else {
                 return Ok(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             let mut st = load(vm, parcel);
             for _ in 0..n {
                 vals.push(Value::Float(f32::from_bits(st.read_i32()? as u32)));
@@ -1840,10 +2110,10 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             crate::arrays::new_array(vm, "[F", ElemKind::Float, vals)?
         }
         VAL_DOUBLEARRAY => {
-            let Some(n) = read_typed_len(vm, parcel, "double array")? else {
+            let Some(n) = read_typed_len(vm, parcel, 8, "double array")? else {
                 return Ok(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             let mut st = load(vm, parcel);
             for _ in 0..n {
                 vals.push(Value::Double(f64::from_bits(st.read_i64()? as u64)));
@@ -1856,10 +2126,10 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             None => Value::Null,
         },
         VAL_STRINGARRAY | VAL_CHARSEQUENCEARRAY => {
-            let Some(n) = read_typed_len(vm, parcel, "string array")? else {
+            let Some(n) = read_typed_len(vm, parcel, 4, "string array")? else {
                 return Ok(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 let mut st = load(vm, parcel);
                 let s = st.read_string()?;
@@ -1878,50 +2148,50 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             )?
         }
         VAL_PARCELABLEARRAY => {
-            let Some(n) = read_typed_len(vm, parcel, "parcelable array")? else {
+            let Some(n) = read_typed_len(vm, parcel, 4, "parcelable array")? else {
                 return Ok(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
-                vals.push(read_parcelable(vm, parcel)?);
+                vals.push(read_parcelable_depth(vm, parcel, next_depth)?);
             }
             crate::arrays::new_array(vm, "[Landroid/os/Parcelable;", ElemKind::Obj, vals)?
         }
         VAL_OBJECTARRAY => {
-            let Some(n) = read_typed_len(vm, parcel, "object array")? else {
+            let Some(n) = read_typed_len(vm, parcel, 4, "object array")? else {
                 return Ok(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
-                vals.push(read_value(vm, parcel)?);
+                vals.push(read_value_depth(vm, parcel, next_depth)?);
             }
             crate::arrays::new_array(vm, "[Ljava/lang/Object;", ElemKind::Obj, vals)?
         }
         VAL_LIST => {
-            let Some(n) = read_typed_len(vm, parcel, "list")? else {
+            let Some(n) = read_typed_len(vm, parcel, 4, "list")? else {
                 return Ok(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
-                vals.push(read_value(vm, parcel)?);
+                vals.push(read_value_depth(vm, parcel, next_depth)?);
             }
             new_list(vm, vals)?
         }
         VAL_MAP => {
-            let Some(n) = read_typed_len(vm, parcel, "map")? else {
+            let Some(n) = read_typed_len(vm, parcel, 8, "map")? else {
                 return Ok(Value::Null);
             };
-            let mut entries = Vec::with_capacity(n);
+            let mut entries = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
-                let k = read_value(vm, parcel)?;
-                let v = read_value(vm, parcel)?;
+                let k = read_value_depth(vm, parcel, next_depth)?;
+                let v = read_value_depth(vm, parcel, next_depth)?;
                 entries.push((k, v));
             }
             new_map(vm, entries)?
         }
         VAL_BUNDLE => new_lazy_bundle(vm, BUNDLE, parcel)?,
         VAL_PERSISTABLEBUNDLE => new_lazy_bundle(vm, PERSISTABLE_BUNDLE, parcel)?,
-        VAL_SPARSEARRAY => read_sparse_array(vm, parcel)?,
+        VAL_SPARSEARRAY => read_sparse_array_depth(vm, parcel, next_depth)?,
         VAL_SPARSEBOOLEANARRAY => read_sparse_boolean_array(vm, parcel)?,
         VAL_IBINDER => {
             let mut st = load(vm, parcel);
@@ -1929,7 +2199,7 @@ fn read_value(vm: &mut Engine, parcel: ObjRef) -> Result<Value, VmExit> {
             store(vm, parcel, st);
             binder_for_handle(vm, h)?
         }
-        VAL_PARCELABLE => read_parcelable(vm, parcel)?,
+        VAL_PARCELABLE => read_parcelable_depth(vm, parcel, next_depth)?,
         VAL_SERIALIZABLE => {
             return Err(bad(
                 "Parcel.readValue: Java-serialized values are not supported",
@@ -1945,17 +2215,18 @@ fn write_present_typed(
     elems: &[Value],
     flags: i32,
 ) -> Result<(), VmExit> {
+    let depth = current_parcel_depth(vm, parcel);
     for e in elems {
         match e.as_ref()? {
             Some(r) => {
                 let mut st = load(vm, parcel);
-                st.write_i32(1);
+                st.write_i32(1)?;
                 store(vm, parcel, st);
-                invoke_write_to_parcel(vm, r, parcel, flags)?;
+                invoke_write_to_parcel_depth(vm, r, parcel, flags, depth)?;
             }
             None => {
                 let mut st = load(vm, parcel);
-                st.write_i32(0);
+                st.write_i32(0)?;
                 store(vm, parcel, st);
             }
         }
@@ -1969,7 +2240,9 @@ fn read_present_typed(
     creator: ObjRef,
     n: usize,
 ) -> Result<Vec<Value>, VmExit> {
-    let mut out = Vec::with_capacity(n);
+    let depth = current_parcel_depth(vm, parcel);
+    check_avail_elems(&load(vm, parcel), n, 4, "typed elements")?;
+    let mut out = Vec::with_capacity(bounded_cap(n));
     for _ in 0..n {
         let present = {
             let mut st = load(vm, parcel);
@@ -1978,7 +2251,7 @@ fn read_present_typed(
             p != 0
         };
         out.push(if present {
-            creator_create(vm, creator, parcel, None)?
+            creator_create_depth(vm, creator, parcel, None, depth)?
         } else {
             Value::Null
         });
@@ -2028,16 +2301,20 @@ fn parcel_instance(
             if n < 0 {
                 return Err(iae("Parcel.setDataSize: negative size"));
             }
+            let n = n as usize;
+            ensure_parcel_size(n, "setDataSize")?;
             let mut st = load(vm, recv);
-            st.data.resize(n as usize, 0);
-            st.pos = st.pos.min(n as usize);
+            st.data.resize(n, 0);
+            st.pos = st.pos.min(n);
             store(vm, recv, st);
             return some(Value::Null);
         }
         ("setDataCapacity", "(I)V") => {
-            if int_arg(args, 0) < 0 {
+            let cap = int_arg(args, 0);
+            if cap < 0 {
                 return Err(iae("Parcel.setDataCapacity: negative capacity"));
             }
+            ensure_parcel_size(cap as usize, "setDataCapacity")?;
             return some(Value::Null);
         }
         ("marshall", "()[B") => {
@@ -2057,6 +2334,7 @@ fn parcel_instance(
             {
                 return Err(iae("Parcel.unmarshall: offset/length out of bounds"));
             }
+            ensure_parcel_size(len as usize, "unmarshall")?;
             store(
                 vm,
                 recv,
@@ -2083,7 +2361,7 @@ fn parcel_instance(
                 return Err(iae("Parcel.appendFrom: offset/length out of bounds"));
             }
             let mut st = load(vm, recv);
-            st.write_raw(&src[off as usize..off as usize + len as usize]);
+            st.write_raw(&src[off as usize..off as usize + len as usize])?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2212,8 +2490,8 @@ fn parcel_instance(
             let w = vm.heap.get_field(r, "rd_w").unwrap_or(Value::Null);
             let h = vm.heap.get_field(r, "rd_h").unwrap_or(Value::Null);
             let mut st = load(vm, recv);
-            st.write_i32(w.as_int().unwrap_or(0));
-            st.write_i32(h.as_int().unwrap_or(0));
+            st.write_i32(w.as_int().unwrap_or(0))?;
+            st.write_i32(h.as_int().unwrap_or(0))?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2239,8 +2517,8 @@ fn parcel_instance(
             let w = vm.heap.get_field(r, "rd_w").unwrap_or(Value::Null);
             let h = vm.heap.get_field(r, "rd_h").unwrap_or(Value::Null);
             let mut st = load(vm, recv);
-            st.write_i32(w.as_float().unwrap_or(0.0).to_bits() as i32);
-            st.write_i32(h.as_float().unwrap_or(0.0).to_bits() as i32);
+            st.write_i32(w.as_float().unwrap_or(0.0).to_bits() as i32)?;
+            st.write_i32(h.as_float().unwrap_or(0.0).to_bits() as i32)?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2268,8 +2546,8 @@ fn parcel_instance(
         ("writeInterfaceToken", "(Ljava/lang/String;)V") => {
             let token = str_of(vm, args.first())?;
             let mut st = load(vm, recv);
-            st.write_i32(0); // local strict-mode header word
-            st.write_string(token.as_deref());
+            st.write_i32(0)?; // local strict-mode header word
+            st.write_string(token.as_deref())?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2293,7 +2571,7 @@ fn parcel_instance(
         }
         ("writeNoException", "()V") => {
             let mut st = load(vm, recv);
-            st.write_i32(0);
+            st.write_i32(0)?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2306,7 +2584,7 @@ fn parcel_instance(
         ("writeException", "(Ljava/lang/Exception;)V") => {
             let Some(e) = obj_arg(args, 0) else {
                 let mut st = load(vm, recv);
-                st.write_i32(0);
+                st.write_i32(0)?;
                 store(vm, recv, st);
                 return some(Value::Null);
             };
@@ -2338,28 +2616,28 @@ fn parcel_instance(
                 _ => None,
             };
             let mut st = load(vm, recv);
-            st.write_i32(code);
+            st.write_i32(code)?;
             if code == 0 {
                 // AOSP writes the 0 code and then rethrows exceptions it
                 // has no code for instead of marshalling them.
                 store(vm, recv, st);
                 return Err(Throwable::new(&class, msg.unwrap_or_default()).into());
             }
-            st.write_string(msg.as_deref());
-            st.write_i32(0); // no remote stack-trace payload
+            st.write_string(msg.as_deref())?;
+            st.write_i32(0)?; // no remote stack-trace payload
             if code == EX_SERVICE_SPECIFIC {
                 let error_code = match vm.heap.get_field(e, "errorCode") {
                     Ok(v) => v.as_int().unwrap_or(0),
                     Err(_) => 0,
                 };
-                st.write_i32(error_code);
+                st.write_i32(error_code)?;
             }
             store(vm, recv, st);
             return some(Value::Null);
         }
         ("writeInt", "(I)V") => {
             let mut st = load(vm, recv);
-            st.write_i32(int_arg(args, 0));
+            st.write_i32(int_arg(args, 0))?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2371,7 +2649,7 @@ fn parcel_instance(
         }
         ("writeLong", "(J)V") => {
             let mut st = load(vm, recv);
-            st.write_i64(args.first().and_then(|v| v.as_long().ok()).unwrap_or(0));
+            st.write_i64(args.first().and_then(|v| v.as_long().ok()).unwrap_or(0))?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2388,7 +2666,7 @@ fn parcel_instance(
                     .and_then(|v| v.as_float().ok())
                     .unwrap_or(0.0)
                     .to_bits() as i32,
-            );
+            )?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2405,7 +2683,7 @@ fn parcel_instance(
                     .and_then(|v| v.as_double().ok())
                     .unwrap_or(0.0)
                     .to_bits() as i64,
-            );
+            )?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2417,7 +2695,7 @@ fn parcel_instance(
         }
         ("writeByte", "(B)V") => {
             let mut st = load(vm, recv);
-            st.write_i32(int_arg(args, 0) as i8 as i32);
+            st.write_i32(int_arg(args, 0) as i8 as i32)?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2429,7 +2707,7 @@ fn parcel_instance(
         }
         ("writeBoolean", "(Z)V") => {
             let mut st = load(vm, recv);
-            st.write_i32((int_arg(args, 0) != 0) as i32);
+            st.write_i32((int_arg(args, 0) != 0) as i32)?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2441,7 +2719,7 @@ fn parcel_instance(
         }
         ("writeString", "(Ljava/lang/String;)V") => {
             let s = str_of(vm, args.first())?;
-            write_string_to(vm, recv, s.as_deref());
+            write_string_to(vm, recv, s.as_deref())?;
             return some(Value::Null);
         }
         ("readString", "()Ljava/lang/String;") => {
@@ -2453,7 +2731,7 @@ fn parcel_instance(
         ("writeString8", "(Ljava/lang/String;)V") => {
             let s = str_of(vm, args.first())?;
             let mut st = load(vm, recv);
-            st.write_string8(s.as_deref());
+            st.write_string8(s.as_deref())?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2465,7 +2743,7 @@ fn parcel_instance(
         }
         ("writeCharSequence", "(Ljava/lang/CharSequence;)V") => {
             let s = char_seq_of(vm, args.first())?;
-            write_string_to(vm, recv, s.as_deref());
+            write_string_to(vm, recv, s.as_deref())?;
             return some(Value::Null);
         }
         ("readCharSequence", "()Ljava/lang/CharSequence;") => {
@@ -2477,7 +2755,7 @@ fn parcel_instance(
         ("writeByteArray", "([B)V") | ("writeBlob", "([B)V") => {
             let b = bytes_of(vm, args.first())?;
             let mut st = load(vm, recv);
-            st.write_byte_blob(b.as_deref());
+            st.write_byte_blob(b.as_deref())?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2492,7 +2770,7 @@ fn parcel_instance(
                 return Err(iae("Parcel.writeByteArray: offset/length out of bounds"));
             }
             let mut st = load(vm, recv);
-            st.write_byte_blob(Some(&b[off as usize..off as usize + len as usize]));
+            st.write_byte_blob(Some(&b[off as usize..off as usize + len as usize]))?;
             store(vm, recv, st);
             return some(Value::Null);
         }
@@ -2530,7 +2808,7 @@ fn parcel_instance(
                 vm,
                 recv,
                 args.first().cloned().unwrap_or(Value::Null).as_ref_value(),
-            );
+            )?;
             return some(Value::Null);
         }
         ("readStrongBinder", "()Landroid/os/IBinder;") => {
@@ -2590,16 +2868,16 @@ fn parcel_instance(
             match obj_arg(args, 0) {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(sparse) => {
                     let entries = sparse_int_entries(vm, sparse)?;
                     let mut st = load(vm, recv);
-                    st.write_i32(entries.len() as i32);
+                    st.write_i32(entries.len() as i32)?;
                     for (key, value) in entries {
-                        st.write_i32(key);
-                        st.write_i32(value);
+                        st.write_i32(key)?;
+                        st.write_i32(value)?;
                     }
                     store(vm, recv, st);
                 }
@@ -2607,10 +2885,10 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("readSparseIntArray", "()Landroid/util/SparseIntArray;") => {
-            let Some(n) = read_typed_len(vm, recv, "SparseIntArray")? else {
+            let Some(n) = read_typed_len(vm, recv, 8, "SparseIntArray")? else {
                 return some(Value::Null);
             };
-            let mut entries = Vec::with_capacity(n.min(1_000_000));
+            let mut entries = Vec::with_capacity(bounded_cap(n));
             let mut st = load(vm, recv);
             for _ in 0..n {
                 let key = st.read_i32()?;
@@ -2644,12 +2922,12 @@ fn parcel_instance(
             match list_values(vm, &v)? {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(elems) => {
                     let mut st = load(vm, recv);
-                    st.write_i32(elems.len() as i32);
+                    st.write_i32(elems.len() as i32)?;
                     store(vm, recv, st);
                     for e in &elems {
                         write_value(vm, recv, e)?;
@@ -2663,10 +2941,10 @@ fn parcel_instance(
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readList: destination is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "list")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "list")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(read_value(vm, recv)?);
             }
@@ -2675,10 +2953,10 @@ fn parcel_instance(
         }
         ("readArrayList", "(Ljava/lang/ClassLoader;)Ljava/util/ArrayList;")
         | ("readArrayList", "(Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/util/ArrayList;") => {
-            let Some(n) = read_typed_len(vm, recv, "list")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "list")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(read_value(vm, recv)?);
             }
@@ -2688,12 +2966,12 @@ fn parcel_instance(
             match array_elems(vm, args.first())? {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(elems) => {
                     let mut st = load(vm, recv);
-                    st.write_i32(elems.len() as i32);
+                    st.write_i32(elems.len() as i32)?;
                     store(vm, recv, st);
                     for e in &elems {
                         write_value(vm, recv, e)?;
@@ -2704,10 +2982,10 @@ fn parcel_instance(
         }
         ("readArray", "(Ljava/lang/ClassLoader;)[Ljava/lang/Object;")
         | ("readArray", "(Ljava/lang/ClassLoader;Ljava/lang/Class;)[Ljava/lang/Object;") => {
-            let Some(n) = read_typed_len(vm, recv, "array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "array")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(read_value(vm, recv)?);
             }
@@ -2723,12 +3001,12 @@ fn parcel_instance(
             match map_entries(vm, &v)? {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(entries) => {
                     let mut st = load(vm, recv);
-                    st.write_i32(entries.len() as i32);
+                    st.write_i32(entries.len() as i32)?;
                     store(vm, recv, st);
                     for (k, val) in &entries {
                         write_value(vm, recv, k)?;
@@ -2749,10 +3027,10 @@ fn parcel_instance(
             } else {
                 Some(obj_arg(args, 0).ok_or_else(|| npe("Parcel.readMap: destination is null"))?)
             };
-            let Some(n) = read_typed_len(vm, recv, "map")? else {
+            let Some(n) = read_typed_len(vm, recv, 8, "map")? else {
                 return some(Value::Null);
             };
-            let mut entries = Vec::with_capacity(n);
+            let mut entries = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 let k = read_value(vm, recv)?;
                 let v = read_value(vm, recv)?;
@@ -2776,12 +3054,12 @@ fn parcel_instance(
             match list_values(vm, &v)? {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(elems) => {
                     let mut st = load(vm, recv);
-                    st.write_i32(elems.len() as i32);
+                    st.write_i32(elems.len() as i32)?;
                     store(vm, recv, st);
                     write_present_typed(vm, recv, &elems, flags)?;
                 }
@@ -2792,7 +3070,7 @@ fn parcel_instance(
             let Some(creator) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.createTypedArrayList: creator is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "typed list")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "typed list")? else {
                 return some(Value::Null);
             };
             let vals = read_present_typed(vm, recv, creator, n)?;
@@ -2805,7 +3083,7 @@ fn parcel_instance(
             let Some(creator) = obj_arg(args, 1) else {
                 return Err(npe("Parcel.readTypedList: creator is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "typed list")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "typed list")? else {
                 return some(Value::Null);
             };
             let vals = read_present_typed(vm, recv, creator, n)?;
@@ -2817,12 +3095,12 @@ fn parcel_instance(
             match array_elems(vm, args.first())? {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(elems) => {
                     let mut st = load(vm, recv);
-                    st.write_i32(elems.len() as i32);
+                    st.write_i32(elems.len() as i32)?;
                     store(vm, recv, st);
                     write_present_typed(vm, recv, &elems, int_arg(args, 1))?;
                 }
@@ -2836,7 +3114,7 @@ fn parcel_instance(
             match obj_arg(args, 0) {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(map) => {
@@ -2849,14 +3127,14 @@ fn parcel_instance(
                         }
                     };
                     let mut st = load(vm, recv);
-                    st.write_i32(entries.len() as i32);
+                    st.write_i32(entries.len() as i32)?;
                     store(vm, recv, st);
                     for (k, v) in &entries {
                         let key = match k {
                             Value::Obj(o) => vm.heap.as_str(*o).ok().map(str::to_string),
                             _ => None,
                         };
-                        write_string_to(vm, recv, key.as_deref());
+                        write_string_to(vm, recv, key.as_deref())?;
                         write_value(vm, recv, v)?;
                     }
                 }
@@ -2869,10 +3147,10 @@ fn parcel_instance(
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readArrayMap: destination is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "ArrayMap")? else {
+            let Some(n) = read_typed_len(vm, recv, 8, "ArrayMap")? else {
                 return some(Value::Null);
             };
-            let mut pairs = Vec::with_capacity(n);
+            let mut pairs = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 let key = read_string_from(vm, recv)?;
                 let value = read_value(vm, recv)?;
@@ -2901,7 +3179,7 @@ fn parcel_instance(
             match obj_arg(args, 0) {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(map) => {
@@ -2914,14 +3192,14 @@ fn parcel_instance(
                         }
                     };
                     let mut st = load(vm, recv);
-                    st.write_i32(entries.len() as i32);
+                    st.write_i32(entries.len() as i32)?;
                     store(vm, recv, st);
                     for (k, v) in &entries {
                         let key = match k {
                             Value::Obj(o) => vm.heap.as_str(*o).ok().map(str::to_string),
                             _ => None,
                         };
-                        write_string_to(vm, recv, key.as_deref());
+                        write_string_to(vm, recv, key.as_deref())?;
                         write_present_typed(vm, recv, std::slice::from_ref(v), int_arg(args, 1))?;
                     }
                 }
@@ -2935,10 +3213,10 @@ fn parcel_instance(
             let Some(creator) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.createTypedArrayMap: creator is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "typed ArrayMap")? else {
+            let Some(n) = read_typed_len(vm, recv, 8, "typed ArrayMap")? else {
                 return some(Value::Null);
             };
-            let mut entries = Vec::with_capacity(n);
+            let mut entries = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 let key = read_string_from(vm, recv)?;
                 let mut value = read_present_typed(vm, recv, creator, 1)?;
@@ -2956,12 +3234,12 @@ fn parcel_instance(
             match list_values(vm, &v)? {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(elems) => {
                     let mut st = load(vm, recv);
-                    st.write_i32(elems.len() as i32);
+                    st.write_i32(elems.len() as i32)?;
                     store(vm, recv, st);
                     for e in &elems {
                         write_value(vm, recv, e)?;
@@ -2974,10 +3252,10 @@ fn parcel_instance(
             // AOSP `readArraySet` appends in stream order; the producer
             // wrote the set's hash-sorted order, which the host list
             // representation preserves verbatim.
-            let Some(n) = read_typed_len(vm, recv, "ArraySet")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "ArraySet")? else {
                 return some(Value::Null);
             };
-            let mut elems = Vec::with_capacity(n);
+            let mut elems = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 elems.push(read_value(vm, recv)?);
             }
@@ -2992,7 +3270,7 @@ fn parcel_instance(
             let Some(creator) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.createTypedArray: creator is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "typed array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "typed array")? else {
                 return some(Value::Null);
             };
             let vals = read_present_typed(vm, recv, creator, n)?;
@@ -3019,7 +3297,7 @@ fn parcel_instance(
             let Some(creator) = obj_arg(args, 1) else {
                 return Err(npe("Parcel.readTypedArray: creator is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "typed array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "typed array")? else {
                 return some(Value::Null);
             };
             let vals = read_present_typed(vm, recv, creator, n)?;
@@ -3037,11 +3315,11 @@ fn parcel_instance(
         ("writeIntArray", "([I)V") | ("writeCharArray", "([C)V") | ("writeShortArray", "([S)V") => {
             let mut st = load(vm, recv);
             match array_elems(vm, args.first())? {
-                None => st.write_i32(-1),
+                None => st.write_i32(-1)?,
                 Some(es) => {
-                    st.write_i32(es.len() as i32);
+                    st.write_i32(es.len() as i32)?;
                     for e in &es {
-                        st.write_i32(e.as_int().unwrap_or(0));
+                        st.write_i32(e.as_int().unwrap_or(0))?;
                     }
                 }
             }
@@ -3049,11 +3327,11 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("createIntArray", "()[I") | ("createCharArray", "()[C") | ("createShortArray", "()[S") => {
-            let Some(n) = read_typed_len(vm, recv, "int array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "int array")? else {
                 return some(Value::Null);
             };
             let mut st = load(vm, recv);
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(Value::Int(st.read_i32()?));
             }
@@ -3073,11 +3351,11 @@ fn parcel_instance(
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readIntArray: destination is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "int array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "int array")? else {
                 return some(Value::Null);
             };
             let mut st = load(vm, recv);
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(Value::Int(st.read_i32()?));
             }
@@ -3092,11 +3370,11 @@ fn parcel_instance(
         ("writeLongArray", "([J)V") => {
             let mut st = load(vm, recv);
             match array_elems(vm, args.first())? {
-                None => st.write_i32(-1),
+                None => st.write_i32(-1)?,
                 Some(es) => {
-                    st.write_i32(es.len() as i32);
+                    st.write_i32(es.len() as i32)?;
                     for e in &es {
-                        st.write_i64(e.as_long().unwrap_or(0));
+                        st.write_i64(e.as_long().unwrap_or(0))?;
                     }
                 }
             }
@@ -3104,11 +3382,11 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("createLongArray", "()[J") => {
-            let Some(n) = read_typed_len(vm, recv, "long array")? else {
+            let Some(n) = read_typed_len(vm, recv, 8, "long array")? else {
                 return some(Value::Null);
             };
             let mut st = load(vm, recv);
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(Value::Long(st.read_i64()?));
             }
@@ -3119,11 +3397,11 @@ fn parcel_instance(
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readLongArray: destination is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "long array")? else {
+            let Some(n) = read_typed_len(vm, recv, 8, "long array")? else {
                 return some(Value::Null);
             };
             let mut st = load(vm, recv);
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(Value::Long(st.read_i64()?));
             }
@@ -3138,11 +3416,11 @@ fn parcel_instance(
         ("writeFloatArray", "([F)V") => {
             let mut st = load(vm, recv);
             match array_elems(vm, args.first())? {
-                None => st.write_i32(-1),
+                None => st.write_i32(-1)?,
                 Some(es) => {
-                    st.write_i32(es.len() as i32);
+                    st.write_i32(es.len() as i32)?;
                     for e in &es {
-                        st.write_i32(e.as_float().unwrap_or(0.0).to_bits() as i32);
+                        st.write_i32(e.as_float().unwrap_or(0.0).to_bits() as i32)?;
                     }
                 }
             }
@@ -3150,11 +3428,11 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("createFloatArray", "()[F") => {
-            let Some(n) = read_typed_len(vm, recv, "float array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "float array")? else {
                 return some(Value::Null);
             };
             let mut st = load(vm, recv);
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(Value::Float(f32::from_bits(st.read_i32()? as u32)));
             }
@@ -3165,11 +3443,11 @@ fn parcel_instance(
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readFloatArray: destination is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "float array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "float array")? else {
                 return some(Value::Null);
             };
             let mut st = load(vm, recv);
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(Value::Float(f32::from_bits(st.read_i32()? as u32)));
             }
@@ -3184,11 +3462,11 @@ fn parcel_instance(
         ("writeDoubleArray", "([D)V") => {
             let mut st = load(vm, recv);
             match array_elems(vm, args.first())? {
-                None => st.write_i32(-1),
+                None => st.write_i32(-1)?,
                 Some(es) => {
-                    st.write_i32(es.len() as i32);
+                    st.write_i32(es.len() as i32)?;
                     for e in &es {
-                        st.write_i64(e.as_double().unwrap_or(0.0).to_bits() as i64);
+                        st.write_i64(e.as_double().unwrap_or(0.0).to_bits() as i64)?;
                     }
                 }
             }
@@ -3196,11 +3474,11 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("createDoubleArray", "()[D") => {
-            let Some(n) = read_typed_len(vm, recv, "double array")? else {
+            let Some(n) = read_typed_len(vm, recv, 8, "double array")? else {
                 return some(Value::Null);
             };
             let mut st = load(vm, recv);
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(Value::Double(f64::from_bits(st.read_i64()? as u64)));
             }
@@ -3211,11 +3489,11 @@ fn parcel_instance(
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readDoubleArray: destination is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "double array")? else {
+            let Some(n) = read_typed_len(vm, recv, 8, "double array")? else {
                 return some(Value::Null);
             };
             let mut st = load(vm, recv);
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(Value::Double(f64::from_bits(st.read_i64()? as u64)));
             }
@@ -3229,7 +3507,7 @@ fn parcel_instance(
         }
         ("writeBooleanArray", "([Z)V") => {
             let elems = array_elems(vm, args.first())?;
-            write_bool_array_to(vm, recv, elems.as_deref());
+            write_bool_array_to(vm, recv, elems.as_deref())?;
             return some(Value::Null);
         }
         ("createBooleanArray", "()[Z") => {
@@ -3258,16 +3536,16 @@ fn parcel_instance(
             match array_elems(vm, args.first())? {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(elems) => {
                     let mut st = load(vm, recv);
-                    st.write_i32(elems.len() as i32);
+                    st.write_i32(elems.len() as i32)?;
                     store(vm, recv, st);
                     for e in &elems {
                         let s = char_seq_of(vm, Some(e))?;
-                        write_string_to(vm, recv, s.as_deref());
+                        write_string_to(vm, recv, s.as_deref())?;
                     }
                 }
             }
@@ -3276,10 +3554,10 @@ fn parcel_instance(
         ("createStringArray", "()[Ljava/lang/String;")
         | ("createString16Array", "()[Ljava/lang/String;")
         | ("createCharSequenceArray", "()[Ljava/lang/CharSequence;") => {
-            let Some(n) = read_typed_len(vm, recv, "string array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "string array")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 let mut st = load(vm, recv);
                 let s = st.read_string()?;
@@ -3303,10 +3581,10 @@ fn parcel_instance(
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readStringArray: destination is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "string array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "string array")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 let mut st = load(vm, recv);
                 let s = st.read_string()?;
@@ -3324,18 +3602,18 @@ fn parcel_instance(
             match array_elems(vm, args.first())? {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(elems) => {
-                    let mut strings = Vec::with_capacity(elems.len());
+                    let mut strings = Vec::with_capacity(bounded_cap(elems.len()));
                     for e in &elems {
                         strings.push(str_of(vm, Some(e))?);
                     }
                     let mut st = load(vm, recv);
-                    st.write_i32(strings.len() as i32);
+                    st.write_i32(strings.len() as i32)?;
                     for s in &strings {
-                        st.write_string8(s.as_deref());
+                        st.write_string8(s.as_deref())?;
                     }
                     store(vm, recv, st);
                 }
@@ -3343,16 +3621,16 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("createString8Array", "()[Ljava/lang/String;") => {
-            let Some(n) = read_typed_len(vm, recv, "string8 array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "string8 array")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             let mut st = load(vm, recv);
             for _ in 0..n {
                 vals.push(st.read_string8()?);
             }
             store(vm, recv, st);
-            let mut out = Vec::with_capacity(n);
+            let mut out = Vec::with_capacity(bounded_cap(n));
             for s in vals {
                 out.push(jstring(vm, s)?);
             }
@@ -3367,16 +3645,16 @@ fn parcel_instance(
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readString8Array: destination is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "string8 array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "string8 array")? else {
                 return some(Value::Null);
             };
-            let mut strs = Vec::with_capacity(n);
+            let mut strs = Vec::with_capacity(bounded_cap(n));
             let mut st = load(vm, recv);
             for _ in 0..n {
                 strs.push(st.read_string8()?);
             }
             store(vm, recv, st);
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for s in strs {
                 vals.push(jstring(vm, s)?);
             }
@@ -3393,16 +3671,16 @@ fn parcel_instance(
             match list_values(vm, &v)? {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(elems) => {
                     let mut st = load(vm, recv);
-                    st.write_i32(elems.len() as i32);
+                    st.write_i32(elems.len() as i32)?;
                     store(vm, recv, st);
                     for e in &elems {
                         let s = char_seq_of(vm, Some(e))?;
-                        write_string_to(vm, recv, s.as_deref());
+                        write_string_to(vm, recv, s.as_deref())?;
                     }
                 }
             }
@@ -3410,10 +3688,10 @@ fn parcel_instance(
         }
         ("createStringArrayList", "()Ljava/util/ArrayList;")
         | ("createCharSequenceArrayList", "()Ljava/util/ArrayList;") => {
-            let Some(n) = read_typed_len(vm, recv, "string list")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "string list")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 let mut st = load(vm, recv);
                 let s = st.read_string()?;
@@ -3427,10 +3705,10 @@ fn parcel_instance(
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readStringList: destination is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "string list")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "string list")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 let mut st = load(vm, recv);
                 let s = st.read_string()?;
@@ -3445,17 +3723,17 @@ fn parcel_instance(
             match array_elems(vm, args.first())? {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(elems) => {
                     let mut st = load(vm, recv);
-                    st.write_i32(elems.len() as i32);
+                    st.write_i32(elems.len() as i32)?;
                     store(vm, recv, st);
                     for e in &elems {
                         let h = binder_handle(vm, e);
                         let mut st = load(vm, recv);
-                        st.write_i32(h);
+                        st.write_i32(h)?;
                         store(vm, recv, st);
                     }
                 }
@@ -3464,10 +3742,10 @@ fn parcel_instance(
         }
         ("createIBinderArray", "()[Landroid/os/IBinder;")
         | ("createBinderArray", "()[Landroid/os/IBinder;") => {
-            let Some(n) = read_typed_len(vm, recv, "binder array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "binder array")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 let mut st = load(vm, recv);
                 let h = st.read_i32()?;
@@ -3486,10 +3764,10 @@ fn parcel_instance(
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readIBinderArray: destination is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "binder array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "binder array")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 let mut st = load(vm, recv);
                 let h = st.read_i32()?;
@@ -3509,12 +3787,12 @@ fn parcel_instance(
             match array_elems(vm, args.first())? {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(elems) => {
                     let mut st = load(vm, recv);
-                    st.write_i32(elems.len() as i32);
+                    st.write_i32(elems.len() as i32)?;
                     store(vm, recv, st);
                     for e in &elems {
                         write_strong_interface_to(vm, recv, e)?;
@@ -3536,7 +3814,7 @@ fn parcel_instance(
             let Some(as_interface) = obj_arg(args, 1) else {
                 return Err(npe("Parcel.createInterfaceArray: asInterface is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "interface array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "interface array")? else {
                 return some(Value::Null);
             };
             let array = match vm.invoke_instance(
@@ -3557,7 +3835,7 @@ fn parcel_instance(
                     "Parcel.createInterfaceArray: factory returned an array of the wrong length",
                 ));
             }
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(read_strong_interface_with(vm, recv, as_interface)?);
             }
@@ -3576,7 +3854,7 @@ fn parcel_instance(
             let Some(as_interface) = obj_arg(args, 1) else {
                 return Err(npe("Parcel.readInterfaceArray: asInterface is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "interface array")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "interface array")? else {
                 return some(Value::Null);
             };
             if n > vm.heap.as_array_elems(dest)?.0.len() {
@@ -3584,7 +3862,7 @@ fn parcel_instance(
                     "Parcel.readInterfaceArray: parcelled count exceeds destination length",
                 ));
             }
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(read_strong_interface_with(vm, recv, as_interface)?);
             }
@@ -3596,12 +3874,12 @@ fn parcel_instance(
             match list_values(vm, &v)? {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(elems) => {
                     let mut st = load(vm, recv);
-                    st.write_i32(elems.len() as i32);
+                    st.write_i32(elems.len() as i32)?;
                     store(vm, recv, st);
                     for e in &elems {
                         write_strong_interface_to(vm, recv, e)?;
@@ -3617,10 +3895,10 @@ fn parcel_instance(
             let Some(as_interface) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.createInterfaceArrayList: asInterface is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "interface list")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "interface list")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(read_strong_interface_with(vm, recv, as_interface)?);
             }
@@ -3637,10 +3915,10 @@ fn parcel_instance(
             let Some(as_interface) = obj_arg(args, 1) else {
                 return Err(npe("Parcel.readInterfaceList: asInterface is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "interface list")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "interface list")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 vals.push(read_strong_interface_with(vm, recv, as_interface)?);
             }
@@ -3652,17 +3930,17 @@ fn parcel_instance(
             match list_values(vm, &v)? {
                 None => {
                     let mut st = load(vm, recv);
-                    st.write_i32(-1);
+                    st.write_i32(-1)?;
                     store(vm, recv, st);
                 }
                 Some(elems) => {
                     let mut st = load(vm, recv);
-                    st.write_i32(elems.len() as i32);
+                    st.write_i32(elems.len() as i32)?;
                     store(vm, recv, st);
                     for e in &elems {
                         let h = binder_handle(vm, e);
                         let mut st = load(vm, recv);
-                        st.write_i32(h);
+                        st.write_i32(h)?;
                         store(vm, recv, st);
                     }
                 }
@@ -3670,10 +3948,10 @@ fn parcel_instance(
             return some(Value::Null);
         }
         ("createBinderArrayList", "()Ljava/util/ArrayList;") => {
-            let Some(n) = read_typed_len(vm, recv, "binder list")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "binder list")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 let mut st = load(vm, recv);
                 let h = st.read_i32()?;
@@ -3686,10 +3964,10 @@ fn parcel_instance(
             let Some(dest) = obj_arg(args, 0) else {
                 return Err(npe("Parcel.readBinderList: destination is null"));
             };
-            let Some(n) = read_typed_len(vm, recv, "binder list")? else {
+            let Some(n) = read_typed_len(vm, recv, 4, "binder list")? else {
                 return some(Value::Null);
             };
-            let mut vals = Vec::with_capacity(n);
+            let mut vals = Vec::with_capacity(bounded_cap(n));
             for _ in 0..n {
                 let mut st = load(vm, recv);
                 let h = st.read_i32()?;
@@ -3739,7 +4017,7 @@ fn write_descriptor_reply(
 ) -> Result<bool, VmExit> {
     if let Some(Value::Obj(r)) = reply {
         let d = binder_descriptor(vm, recv);
-        write_string_to(vm, *r, d.as_deref());
+        write_string_to(vm, *r, d.as_deref())?;
     }
     Ok(true)
 }
@@ -3965,9 +4243,9 @@ mod tests {
     #[test]
     fn primitive_and_string_layout_is_android_shaped() {
         let mut st = PState::default();
-        st.write_i32(0x0102_0304);
-        st.write_string(Some("Aé"));
-        st.write_byte_blob(Some(&[1, 2, 3, 4, 5]));
+        assert!(st.write_i32(0x0102_0304).is_ok());
+        assert!(st.write_string(Some("Aé")).is_ok());
+        assert!(st.write_byte_blob(Some(&[1, 2, 3, 4, 5])).is_ok());
         // int LE; string: len=2 UTF-16 chars; 'A' 41 00; 'é' e9 00; term 00 00;
         // byte array len=5 then 5 bytes + 3 pad.
         assert_eq!(&st.data[0..4], &[4, 3, 2, 1]);
@@ -3983,7 +4261,7 @@ mod tests {
     #[test]
     fn underrun_is_typed_not_a_panic() {
         let mut st = PState::default();
-        st.write_i32(7);
+        assert!(st.write_i32(7).is_ok());
         st.pos = 0;
         assert_eq!(st.read_i32().unwrap(), 7);
         assert!(st.read_string().is_err());
