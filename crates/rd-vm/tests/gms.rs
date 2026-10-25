@@ -2886,3 +2886,49 @@ fn tasks_for_result_from_bytecode_lives_in_the_gms_engine() {
         "continueWith correu no motor do shim"
     );
 }
+
+// ── Regressão (auditoria de estabilização): os logs do shim têm de
+// ser limitados. Antes do teto, 200 mil logEvent ficavam TODOS
+// retidos (crescimento ilimitado de RAM do hospedeiro por bytecode
+// em loop); agora retêm-se os mais recentes e os descartados contam.
+#[test]
+fn gms_logs_are_capped_with_dropped_counter() {
+    let mut e = engine_of(&DexBuilder::new());
+    let an = ov(cs!(
+        e,
+        FIREBASE_ANALYTICS,
+        "getInstance",
+        "(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;",
+        [Value::Null]
+    )
+    .unwrap());
+    let total = 25_000;
+    for i in 0..total {
+        let name = s(&mut e, &format!("evt{i}"));
+        ci!(
+            e,
+            FIREBASE_ANALYTICS,
+            "logEvent",
+            "(Ljava/lang/String;Landroid/os/Bundle;)V",
+            an,
+            [name, Value::Null]
+        )
+        .unwrap();
+    }
+    let kept = e.gms_analytics_events();
+    assert!(
+        kept.len() <= 2 * rd_vm::gms::MAX_GMS_LOG_ENTRIES,
+        "retidos limitados pelo teto: {}",
+        kept.len()
+    );
+    assert_eq!(
+        kept.len() + e.gms_dropped_log_entries(),
+        total,
+        "contabilidade retidos+descartados = total"
+    );
+    assert_eq!(
+        kept.last().map(|ev| ev.name.as_str()),
+        Some("evt24999"),
+        "os mais recentes são os retidos"
+    );
+}

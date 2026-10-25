@@ -510,6 +510,23 @@ pub enum TaskDelivery {
     },
 }
 
+/// Teto por registo (log) do shim: ao dobrar, drena a metade mais
+/// antiga. Sem teto, um loop de logEvent/recordException/log em
+/// bytecode esgotava a RAM do hospedeiro fora da contabilidade do
+/// heap guest (provado: 200 mil eventos retidos e a crescer).
+pub const MAX_GMS_LOG_ENTRIES: usize = 10_000;
+
+/// Push com teto amortizado (mantém os mais recentes; conta os
+/// descartados em `GmsState::dropped_log_entries`).
+pub fn push_capped<T>(v: &mut Vec<T>, item: T, dropped: &mut usize) {
+    v.push(item);
+    if v.len() > 2 * MAX_GMS_LOG_ENTRIES {
+        let excess = v.len() - MAX_GMS_LOG_ENTRIES;
+        v.drain(..excess);
+        *dropped += excess;
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct GmsState {
     /// Entrega de listeners em curso: escritas feitas DENTRO de um
@@ -523,6 +540,8 @@ pub struct GmsState {
     /// OnCompleteListener que se re-adiciona abortava o processo).
     pub task_delivering: bool,
     pub task_queue: std::collections::VecDeque<TaskDelivery>,
+    /// Entradas de log descartadas pelo teto (todas as famílias).
+    pub dropped_log_entries: usize,
     pub availability_code: i32,
     pub availability_obj: Option<ObjRef>,
     pub error_notifications: i32,
@@ -1958,10 +1977,14 @@ fn analytics_instance(
                 for (k, v) in params {
                     upsert(&mut all, k, v);
                 }
-                vm.fw.gms.analytics_events.push(AnalyticsEvent {
+                let ev = AnalyticsEvent {
                     name: ev,
                     params: all,
-                });
+                };
+                {
+                    let g = &mut vm.fw.gms;
+                    push_capped(&mut g.analytics_events, ev, &mut g.dropped_log_entries);
+                }
             }
             Value::Null
         }
@@ -2236,7 +2259,14 @@ fn fb_auth_instance(
                 .iter()
                 .any(|u| !u.deleted && u.email == email)
             {
-                vm.fw.gms.auth_password_resets.push(email);
+                {
+                    let g = &mut vm.fw.gms;
+                    push_capped(
+                        &mut g.auth_password_resets,
+                        email,
+                        &mut g.dropped_log_entries,
+                    );
+                }
                 Value::Obj(void_task(vm)?)
             } else {
                 auth_fail(
@@ -2547,7 +2577,10 @@ fn messaging_instance(
                     .get(&m)
                     .map(|x| x.message_id.clone())
                     .unwrap_or_default();
-                vm.fw.gms.fcm_upstream.push(id);
+                {
+                    let g = &mut vm.fw.gms;
+                    push_capped(&mut g.fcm_upstream, id, &mut g.dropped_log_entries);
+                }
             }
             Value::Null
         }
@@ -2606,18 +2639,25 @@ fn crashlytics_instance(
                 ),
                 _ => ("?".to_string(), String::new()),
             };
-            vm.fw.gms.crashes.push(CrashRecord {
+            let rec = CrashRecord {
                 kind: "recorded".to_string(),
                 class,
                 message,
-            });
+            };
+            {
+                let g = &mut vm.fw.gms;
+                push_capped(&mut g.crashes, rec, &mut g.dropped_log_entries);
+            }
             Value::Null
         }
         "log" => {
             if vm.fw.gms.crashlytics_disabled {
                 vm.fw.gms.crashlytics_dropped += 1;
             } else if let Some(s) = sarg(vm, args, 0) {
-                vm.fw.gms.crashlytics_logs.push(s);
+                {
+                    let g = &mut vm.fw.gms;
+                    push_capped(&mut g.crashlytics_logs, s, &mut g.dropped_log_entries);
+                }
             }
             Value::Null
         }
@@ -4593,7 +4633,14 @@ fn ads_instance(
                     .unwrap_or_default();
                 let listener = vm.fw.gms.ad_views.get(&recv).and_then(|v| v.listener);
                 if vm.fw.gms.ad_load_fail {
-                    vm.fw.gms.ad_events.push(format!("banner_fail:{unit}"));
+                    {
+                        let g = &mut vm.fw.gms;
+                        push_capped(
+                            &mut g.ad_events,
+                            format!("banner_fail:{unit}"),
+                            &mut g.dropped_log_entries,
+                        );
+                    }
                     if let Some(l) = listener {
                         let err = make_ad_error(
                             vm,
@@ -4610,7 +4657,14 @@ fn ads_instance(
                         )?;
                     }
                 } else {
-                    vm.fw.gms.ad_events.push(format!("banner_load:{unit}"));
+                    {
+                        let g = &mut vm.fw.gms;
+                        push_capped(
+                            &mut g.ad_events,
+                            format!("banner_load:{unit}"),
+                            &mut g.dropped_log_entries,
+                        );
+                    }
                     if let Some(v) = vm.fw.gms.ad_views.get_mut(&recv) {
                         v.loaded = true;
                     }
@@ -4639,7 +4693,14 @@ fn ads_instance(
                 Value::Null
             }
             "show" => {
-                vm.fw.gms.ad_events.push(format!("show:{}", ad.unit_id));
+                {
+                    let g = &mut vm.fw.gms;
+                    push_capped(
+                        &mut g.ad_events,
+                        format!("show:{}", ad.unit_id),
+                        &mut g.dropped_log_entries,
+                    );
+                }
                 if let Some(a) = vm.fw.gms.full_screen_ads.get_mut(&recv) {
                     a.shown = true;
                 }
@@ -4668,7 +4729,14 @@ fn ads_instance(
                             &["(Lcom/google/android/gms/ads/rewarded/RewardItem;)V"],
                             vec![Value::Obj(item)],
                         )?;
-                        vm.fw.gms.ad_events.push(format!("reward:{}", ad.unit_id));
+                        {
+                            let g = &mut vm.fw.gms;
+                            push_capped(
+                                &mut g.ad_events,
+                                format!("reward:{}", ad.unit_id),
+                                &mut g.dropped_log_entries,
+                            );
+                        }
                     }
                 }
                 if let Some(cb) = ad.callback {
@@ -4705,7 +4773,14 @@ fn ads_static(
     match (class, name) {
         (MOBILE_ADS, "initialize") => {
             vm.fw.gms.ads_initialized = true;
-            vm.fw.gms.ad_events.push("initialize".to_string());
+            {
+                let g = &mut vm.fw.gms;
+                push_capped(
+                    &mut g.ad_events,
+                    "initialize".to_string(),
+                    &mut g.dropped_log_entries,
+                );
+            }
             if let Some(listener) = oarg(args, 1) {
                 let status = alloc(vm, INIT_STATUS)?;
                 let _ = call_dex_any(
@@ -4737,7 +4812,14 @@ fn ads_static(
                 "interstitial"
             };
             if vm.fw.gms.ad_load_fail {
-                vm.fw.gms.ad_events.push(format!("{kind}_fail:{unit}"));
+                {
+                    let g = &mut vm.fw.gms;
+                    push_capped(
+                        &mut g.ad_events,
+                        format!("{kind}_fail:{unit}"),
+                        &mut g.dropped_log_entries,
+                    );
+                }
                 if let Some(cb) = callback {
                     let err = make_ad_error(
                         vm,
@@ -4754,7 +4836,14 @@ fn ads_static(
                     )?;
                 }
             } else {
-                vm.fw.gms.ad_events.push(format!("{kind}_load:{unit}"));
+                {
+                    let g = &mut vm.fw.gms;
+                    push_capped(
+                        &mut g.ad_events,
+                        format!("{kind}_load:{unit}"),
+                        &mut g.dropped_log_entries,
+                    );
+                }
                 let ad = alloc(vm, class)?;
                 vm.fw.gms.full_screen_ads.insert(
                     ad,
@@ -5423,11 +5512,19 @@ fn cast_nearby_integrity_instance(
                         nonce.len()
                     )
                 };
-                vm.fw.gms.integrity_nonces.push(format!(
+                let nonce_rec = format!(
                     "safetynet:{}bytes:apiKeyPresent={}",
                     nonce.len(),
                     sarg(vm, args, 1).is_some()
-                ));
+                );
+                {
+                    let g = &mut vm.fw.gms;
+                    push_capped(
+                        &mut g.integrity_nonces,
+                        nonce_rec,
+                        &mut g.dropped_log_entries,
+                    );
+                }
                 let r = alloc(vm, ATTESTATION_RESPONSE)?;
                 vm.fw.gms.attestations.insert(r, jws);
                 Value::Obj(completed_task(vm, Value::Obj(r))?)
@@ -6165,11 +6262,15 @@ impl Engine {
     /// reais são capturados" do spec: o hospedeiro entrega aqui o
     /// resumo do VmExit fatal.
     pub fn gms_report_uncaught_crash(&mut self, class: &str, message: &str) {
-        self.fw.gms.crashes.push(CrashRecord {
+        let rec = CrashRecord {
             kind: "uncaught".to_string(),
             class: class.to_string(),
             message: message.to_string(),
-        });
+        };
+        {
+            let g = &mut self.fw.gms;
+            push_capped(&mut g.crashes, rec, &mut g.dropped_log_entries);
+        }
     }
 
     /// Sumários dos crashes registados.
@@ -6275,6 +6376,12 @@ impl Engine {
     /// Registo de eventos de anúncios estruturados.
     pub fn gms_ads_events(&self) -> Vec<String> {
         self.fw.gms.ad_events.clone()
+    }
+
+    /// Entradas de log descartadas pelo teto `MAX_GMS_LOG_ENTRIES`
+    /// (analytics/crash/ads/nonces/upstream/resets somados).
+    pub fn gms_dropped_log_entries(&self) -> usize {
+        self.fw.gms.dropped_log_entries
     }
 
     /// Faz os carregamentos de anúncios falharem com o código dado
