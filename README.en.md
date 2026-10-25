@@ -54,7 +54,7 @@ for Android") built from day one for headless automation and AI agents:
 | Contract | Value / Rule |
 |---|---|
 | **Android API range** | `minSdkVersion 26` (Android 8.0) → `targetSdk 36` |
-| **Hardware floor** | **Motorola Moto E5** (`data/devices.toml`: 512 MB RSS cap, 256 MB app heap cap, 0.25× CPU factor, 720×1440 @ 280 dpi) |
+| **Hardware floor** | **Motorola Moto E5** (`data/devices.toml`: 1024 MB RSS cap (ADR 015), 256 MB app heap cap, 0.25× CPU factor, 720×1440 @ 280 dpi) |
 | **Error discipline (Law 1)** | Structured `RdError { code, cause, suggestion, module_id }` everywhere; unmodeled surfaces return `NOT_IMPLEMENTED` |
 | **Determinism (Law 4)** | Fuel budgets, virtual clock, deterministic GC, reproducible PNG frames |
 | **Memory safety** | `unsafe_code = "forbid"` across the workspace except audited boundaries in `rd-ndk` and `rd-jni` |

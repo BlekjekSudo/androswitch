@@ -46,7 +46,7 @@ Every design and pull request is bound by the project laws in
    GC, and byte-reproducible rendering/PNG outputs.
 5. **Hardware & API Floor Contract:** Android `minSdkVersion 26` through
    `targetSdk 36`, validated against the **Motorola Moto E5** hardware floor
-   (`data/devices.toml`: 512 MB process RSS cap, 256 MB app heap cap, 0.25×
+   (`data/devices.toml`: 1024 MB process RSS cap (ADR 015), 256 MB app heap cap, 0.25×
    single-thread CPU factor).
 
 ## 3. Architecture Decision Records (ADRs)
@@ -134,7 +134,7 @@ tomadas no **RustyDroid**, refletindo a PARTE 3 (§3.3) da especificação mestr
 4. **Lei 4 — Determinismo:** Fuel fixo, relógio virtual, GC determinístico e
    rasterização PNG reprodutível byte-a-byte.
 5. **Piso de API e Hardware:** `minSdkVersion 26` → `targetSdk 36`, contrato de
-   hardware **Motorola Moto E5** (`data/devices.toml`: RSS ≤ 512 MB, heap ≤ 256 MB).
+   hardware **Motorola Moto E5** (`data/devices.toml`: RSS ≤ 1024 MB, heap ≤ 256 MB).
 
 ## 3. ADRs, Gates de Merge e Versionamento
 
