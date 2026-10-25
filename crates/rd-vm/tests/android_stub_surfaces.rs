@@ -5001,6 +5001,200 @@ fn textservice_values_params_and_no_checker_manager_are_guest_visible() {
         call(&mut engine, session, "isSessionDisconnected", "()Z", &[]),
         Value::Int(1)
     );
+
+    // Deep audit: subtype extra-value parsing follows String.split
+    // semantics, so "a=" stores a null value, "b==x" stores "", a bare
+    // "=" pair stores nothing, and an empty extra value still maps the
+    // empty key to null.
+    let split_locale = text(&mut engine, "en");
+    let split_extra = text(&mut engine, "a=,b==x,=,c");
+    let split_subtype = instance(
+        &mut engine,
+        "Landroid/view/textservice/SpellCheckerSubtype;",
+    );
+    call(
+        &mut engine,
+        split_subtype,
+        "<init>",
+        "(ILjava/lang/String;Ljava/lang/String;)V",
+        &[Value::Int(0), split_locale, split_extra],
+    );
+    let a_key = text(&mut engine, "a");
+    assert_eq!(
+        call(
+            &mut engine,
+            split_subtype,
+            "getExtraValueOf",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            &[a_key],
+        ),
+        Value::Null
+    );
+    let b_key = text(&mut engine, "b");
+    assert_eq!(
+        call_text(
+            &mut engine,
+            split_subtype,
+            "getExtraValueOf",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            &[b_key],
+        ),
+        ""
+    );
+    let empty_key = text(&mut engine, "");
+    assert_eq!(
+        call(
+            &mut engine,
+            split_subtype,
+            "containsExtraValueKey",
+            "(Ljava/lang/String;)Z",
+            &[empty_key],
+        ),
+        Value::Int(0)
+    );
+    let empty_locale = text(&mut engine, "en");
+    let empty_extra = text(&mut engine, "");
+    let empty_subtype = instance(
+        &mut engine,
+        "Landroid/view/textservice/SpellCheckerSubtype;",
+    );
+    call(
+        &mut engine,
+        empty_subtype,
+        "<init>",
+        "(ILjava/lang/String;Ljava/lang/String;)V",
+        &[Value::Int(0), empty_locale, empty_extra],
+    );
+    let empty_key = text(&mut engine, "");
+    assert_eq!(
+        call(
+            &mut engine,
+            empty_subtype,
+            "containsExtraValueKey",
+            "(Ljava/lang/String;)Z",
+            &[empty_key],
+        ),
+        Value::Int(1)
+    );
+
+    // Deep audit: getLocaleObject parses the legacy underscore locale
+    // string (en_US) into language/country instead of treating it as a
+    // single language, and maps the legacy "tl" language to "fil".
+    let subtype_locale = object(call(
+        &mut engine,
+        subtype,
+        "getLocaleObject",
+        "()Ljava/util/Locale;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            subtype_locale,
+            "getLanguage",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "en"
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            subtype_locale,
+            "getCountry",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "US"
+    );
+    let tl_locale = text(&mut engine, "tl_PH");
+    let tl_extra = text(&mut engine, "");
+    let tl_subtype = instance(
+        &mut engine,
+        "Landroid/view/textservice/SpellCheckerSubtype;",
+    );
+    call(
+        &mut engine,
+        tl_subtype,
+        "<init>",
+        "(ILjava/lang/String;Ljava/lang/String;)V",
+        &[Value::Int(0), tl_locale, tl_extra],
+    );
+    let fil_locale = object(call(
+        &mut engine,
+        tl_subtype,
+        "getLocaleObject",
+        "()Ljava/util/Locale;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            fil_locale,
+            "getLanguage",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "fil"
+    );
+
+    // Deep audit: SpellCheckerSessionParams.Builder.setExtras performs no
+    // null check, and the null comes back from getExtras.
+    let null_extras_builder = instance(
+        &mut engine,
+        "Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;",
+    );
+    call(&mut engine, null_extras_builder, "<init>", "()V", &[]);
+    call(
+        &mut engine,
+        null_extras_builder,
+        "setShouldReferToSpellCheckerLanguageSettings",
+        "(Z)Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;",
+        &[Value::Int(1)],
+    );
+    call(
+        &mut engine,
+        null_extras_builder,
+        "setExtras",
+        "(Landroid/os/Bundle;)Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;",
+        &[Value::Null],
+    );
+    let null_extras_params = object(call(
+        &mut engine,
+        null_extras_builder,
+        "build",
+        "()Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams;",
+        &[],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            null_extras_params,
+            "getExtras",
+            "()Landroid/os/Bundle;",
+            &[]
+        ),
+        Value::Null
+    );
+
+    // Deep audit: with no enabled checkers the manager returns
+    // Collections.emptyList(), whose mutation throws.
+    let enabled_list = object(call(
+        &mut engine,
+        manager,
+        "getEnabledSpellCheckerInfos",
+        "()Ljava/util/List;",
+        &[],
+    ));
+    assert_throws(
+        engine.invoke_instance(
+            enabled_list,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(checker_info)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
 }
 
 #[test]
@@ -5216,6 +5410,165 @@ fn translation_values_context_and_no_service_manager_are_guest_visible() {
             &[Value::Obj(translation_context)],
         ),
         Value::Null
+    );
+
+    // Deep audit: the deprecated TranslationSpec(String, int) constructor
+    // performs no null check, so a null language is stored verbatim with
+    // a root ULocale instead of throwing.
+    let null_spec = instance(&mut engine, "Landroid/view/translation/TranslationSpec;");
+    call(
+        &mut engine,
+        null_spec,
+        "<init>",
+        "(Ljava/lang/String;I)V",
+        &[Value::Null, Value::Int(1)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            null_spec,
+            "getLanguage",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert!(matches!(
+        call(
+            &mut engine,
+            null_spec,
+            "getLocale",
+            "()Landroid/icu/util/ULocale;",
+            &[],
+        ),
+        Value::Obj(_)
+    ));
+
+    // Deep audit: ViewTranslationRequest.Builder.setValue accepts null
+    // keys/values (ArrayMap), and because checkNotUsed only runs when the
+    // map is first created, setValue after build() still mutates the map
+    // that was handed to the built request.
+    let null_key_builder = instance(
+        &mut engine,
+        "Landroid/view/translation/ViewTranslationRequest$Builder;",
+    );
+    call(
+        &mut engine,
+        null_key_builder,
+        "<init>",
+        "(Landroid/view/autofill/AutofillId;)V",
+        &[Value::Obj(autofill_id)],
+    );
+    let k_key = text(&mut engine, "k");
+    call(
+        &mut engine,
+        null_key_builder,
+        "setValue",
+        "(Ljava/lang/String;Landroid/view/translation/TranslationRequestValue;)Landroid/view/translation/ViewTranslationRequest$Builder;",
+        &[k_key, Value::Null],
+    );
+    let null_key_request = object(call(
+        &mut engine,
+        null_key_builder,
+        "build",
+        "()Landroid/view/translation/ViewTranslationRequest;",
+        &[],
+    ));
+    let k_lookup = text(&mut engine, "k");
+    assert_eq!(
+        call(
+            &mut engine,
+            null_key_request,
+            "getValue",
+            "(Ljava/lang/String;)Landroid/view/translation/TranslationRequestValue;",
+            &[k_lookup],
+        ),
+        Value::Null
+    );
+    let late_key = text(&mut engine, "late");
+    call(
+        &mut engine,
+        null_key_builder,
+        "setValue",
+        "(Ljava/lang/String;Landroid/view/translation/TranslationRequestValue;)Landroid/view/translation/ViewTranslationRequest$Builder;",
+        &[late_key, Value::Obj(request_value)],
+    );
+    let late_lookup = text(&mut engine, "late");
+    assert_eq!(
+        call(
+            &mut engine,
+            null_key_request,
+            "getValue",
+            "(Ljava/lang/String;)Landroid/view/translation/TranslationRequestValue;",
+            &[late_lookup],
+        ),
+        Value::Obj(request_value)
+    );
+
+    // Deep audit: TranslationContext.Builder.setActivityId performs no
+    // null validation, and build() marks the builder used before the
+    // constructor validates flags, so a flags failure still consumes it.
+    let bad_context_builder = instance(
+        &mut engine,
+        "Landroid/view/translation/TranslationContext$Builder;",
+    );
+    call(
+        &mut engine,
+        bad_context_builder,
+        "<init>",
+        "(Landroid/view/translation/TranslationSpec;Landroid/view/translation/TranslationSpec;)V",
+        &[Value::Obj(source), Value::Obj(target)],
+    );
+    call(
+        &mut engine,
+        bad_context_builder,
+        "setActivityId",
+        "(Landroid/app/assist/ActivityId;)Landroid/view/translation/TranslationContext$Builder;",
+        &[Value::Null],
+    );
+    call(
+        &mut engine,
+        bad_context_builder,
+        "setTranslationFlags",
+        "(I)Landroid/view/translation/TranslationContext$Builder;",
+        &[Value::Int(8)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            bad_context_builder,
+            "build",
+            "()Landroid/view/translation/TranslationContext;",
+            &[],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            bad_context_builder,
+            "build",
+            "()Landroid/view/translation/TranslationContext;",
+            &[],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    // Deep audit: the no-service capabilities result is
+    // Collections.emptySet(), so adding to it throws.
+    let capabilities_set = object(call(
+        &mut engine,
+        manager,
+        "getOnDeviceTranslationCapabilities",
+        "(II)Ljava/util/Set;",
+        &[Value::Int(1), Value::Int(1)],
+    ));
+    assert_throws(
+        engine.invoke_instance(
+            capabilities_set,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(capability)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
     );
 }
 
@@ -5453,6 +5806,75 @@ fn usb_explicit_descriptors_and_no_device_manager_are_guest_visible() {
             &[Value::Long((1 << 5) | (1 << 10))],
         ),
         Value::Int(1)
+    );
+
+    // Deep audit: usbFunctionsFromString maps null/"none" to FUNCTION_NONE,
+    // skips empty segments, and rejects unknown names with IAE.
+    let usb_manager_class = "Landroid/hardware/usb/UsbManager;";
+    assert_eq!(
+        call_static(
+            &mut engine,
+            usb_manager_class,
+            "usbFunctionsFromString",
+            "(Ljava/lang/String;)J",
+            &[Value::Null],
+        ),
+        Value::Long(0)
+    );
+    let none_functions = text(&mut engine, "none");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            usb_manager_class,
+            "usbFunctionsFromString",
+            "(Ljava/lang/String;)J",
+            &[none_functions],
+        ),
+        Value::Long(0)
+    );
+    let bogus_functions = text(&mut engine, "mtp,bogus");
+    assert_throws(
+        engine.invoke_static(
+            usb_manager_class,
+            "usbFunctionsFromString",
+            "(Ljava/lang/String;)J",
+            &[bogus_functions],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    // Deep audit: only none, a single settable function, or the
+    // rndis+ncm pair are settable (adb is not in the settable mask).
+    assert_eq!(
+        call_static(
+            &mut engine,
+            usb_manager_class,
+            "areSettableFunctions",
+            "(J)Z",
+            &[Value::Long((1 << 2) | (1 << 4))],
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            usb_manager_class,
+            "areSettableFunctions",
+            "(J)Z",
+            &[Value::Long(1)],
+        ),
+        Value::Int(0)
+    );
+
+    // Deep audit: interface lookup is a raw array access past the end.
+    assert_throws(
+        engine.invoke_instance(
+            device,
+            "getInterface",
+            "(I)Landroid/hardware/usb/UsbInterface;",
+            &[Value::Int(99)],
+        ),
+        "Ljava/lang/ArrayIndexOutOfBoundsException;",
     );
 }
 
@@ -7009,6 +7431,27 @@ fn biometrics_absent_service_prompt_and_crypto_are_guest_visible() {
         "(I)Landroid/hardware/biometrics/BiometricPrompt$Builder;",
         &[Value::Int(0x000f)],
     );
+    // Deep audit: PromptInfo.setAllowedSensorIds clears the current ids
+    // before addAll dereferences the argument, so the null call throws
+    // after emptying the list.
+    let sensor_id = instance(&mut engine, "Ljava/lang/Integer;");
+    let sensor_ids = list_of(&mut engine, &[Value::Obj(sensor_id)]);
+    call(
+        &mut engine,
+        builder,
+        "setAllowedSensorIds",
+        "(Ljava/util/List;)Landroid/hardware/biometrics/BiometricPrompt$Builder;",
+        &[Value::Obj(sensor_ids)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "setAllowedSensorIds",
+            "(Ljava/util/List;)Landroid/hardware/biometrics/BiometricPrompt$Builder;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
     call(
         &mut engine,
         builder,
@@ -7051,6 +7494,14 @@ fn biometrics_absent_service_prompt_and_crypto_are_guest_visible() {
         call(&mut engine, prompt, "isConfirmationRequired", "()Z", &[]),
         Value::Int(0)
     );
+    let cleared_ids = call(
+        &mut engine,
+        prompt,
+        "getAllowedSensorIds",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, cleared_ids), 0);
 
     let callback = p49_new(
         &mut engine,
@@ -7120,15 +7571,26 @@ fn biometrics_absent_service_prompt_and_crypto_are_guest_visible() {
         "(Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;I)V",
         &[Value::Obj(crypto), Value::Int(2)],
     );
+    // Deep audit: the AOSP getter is getAuthenticationType (the
+    // @AuthenticationResultType annotation is not a method), and the
+    // BiometricPrompt result carries a null identifier and userId 0.
+    assert_eq!(
+        call(&mut engine, result, "getAuthenticationType", "()I", &[]),
+        Value::Int(2)
+    );
     assert_eq!(
         call(
             &mut engine,
             result,
-            "getAuthenticationResultType",
-            "()I",
+            "getId",
+            "()Landroid/hardware/biometrics/BiometricAuthenticator$Identifier;",
             &[]
         ),
-        Value::Int(2)
+        Value::Null
+    );
+    assert_eq!(
+        call(&mut engine, result, "getUserId", "()I", &[]),
+        Value::Int(0)
     );
 }
 
@@ -7387,6 +7849,85 @@ fn hdmi_no_device_profile_and_values_are_guest_visible() {
             &[Value::Int(0x1100), Value::Int(0x1200)],
         ),
         Value::Int(6)
+    );
+
+    // Deep audit: remaining relative-position branches (directly below,
+    // below, above, different branch, and invalid/unassigned unknown).
+    for (src, dest, expected) in [
+        (0x1200, 0x1000, 1), // directly below
+        (0x1230, 0x1000, 2), // below
+        (0x1000, 0x1230, 5), // above
+        (0x1110, 0x1210, 7), // different branch
+        (0x1010, 0x1200, 0), // invalid physical address -> unknown
+        (0xffff, 0x1200, 0), // unassigned -> unknown
+    ] {
+        assert_eq!(
+            call_static(
+                &mut engine,
+                utils,
+                "getHdmiAddressRelativePosition",
+                "(II)I",
+                &[Value::Int(src), Value::Int(dest)],
+            ),
+            Value::Int(expected),
+            "relative position {src:#06x} vs {dest:#06x}"
+        );
+    }
+
+    // Deep audit: an empty DeviceFeatures operand keeps every status at
+    // FEATURE_SUPPORT_UNKNOWN (2) instead of clearing them.
+    let empty_operand = byte_array(&mut engine, &[]);
+    let unknown_features = object(call_static(
+        &mut engine,
+        "Landroid/hardware/hdmi/DeviceFeatures;",
+        "fromOperand",
+        "([B)Landroid/hardware/hdmi/DeviceFeatures;",
+        &[empty_operand],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            unknown_features,
+            "getRecordTvScreenSupport",
+            "()I",
+            &[]
+        ),
+        Value::Int(2)
+    );
+
+    // Deep audit: HdmiPortInfo.Builder rejects an invalid port type and a
+    // negative address in its constructor.
+    let bad_type_builder = instance(&mut engine, "Landroid/hardware/hdmi/HdmiPortInfo$Builder;");
+    assert_throws(
+        engine.invoke_instance(
+            bad_type_builder,
+            "<init>",
+            "(III)V",
+            &[Value::Int(1), Value::Int(7), Value::Int(0x1000)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let bad_address_builder = instance(&mut engine, "Landroid/hardware/hdmi/HdmiPortInfo$Builder;");
+    assert_throws(
+        engine.invoke_instance(
+            bad_address_builder,
+            "<init>",
+            "(III)V",
+            &[Value::Int(1), Value::Int(0), Value::Int(-1)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    // Deep audit: isDeviceConnected null-checks its argument before the
+    // invalid-local-address early return of this profile.
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "isDeviceConnected",
+            "(Landroid/hardware/hdmi/HdmiDeviceInfo;)Z",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
     );
 }
 
@@ -7708,6 +8249,41 @@ fn input_no_device_profile_and_device_values_are_guest_visible() {
             &[Value::Obj(context)],
         ),
         Value::Int(1)
+    );
+
+    // Deep audit: getMotionRange(axis, source) compares the source exactly
+    // (unlike MotionRange.isFromSource, which is a mask test).
+    assert_eq!(
+        call(
+            &mut engine,
+            device,
+            "getMotionRange",
+            "(II)Landroid/view/InputDevice$MotionRange;",
+            &[Value::Int(0), Value::Int(0x2)]
+        ),
+        Value::Null
+    );
+    let by_axis_source = object(call(
+        &mut engine,
+        device,
+        "getMotionRange",
+        "(II)Landroid/view/InputDevice$MotionRange;",
+        &[Value::Int(0), Value::Int(0x1002)],
+    ));
+    assert_eq!(
+        call(&mut engine, by_axis_source, "getMax", "()F", &[]),
+        Value::Float(1080.0)
+    );
+
+    // Deep audit: getKeyboardLayout rejects a null descriptor with IAE.
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "getKeyboardLayout",
+            "(Ljava/lang/String;)Landroid/hardware/input/KeyboardLayout;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
     );
 }
 
@@ -8039,6 +8615,100 @@ fn soundtrigger_models_and_metadata_are_guest_visible() {
             &[Value::Obj(locale)]
         ),
         Value::Int(1)
+    );
+
+    // Deep audit: Keyphrase requireNonNulls its locale and text, while a
+    // null users array normalizes to an empty array.
+    let keyphrase_class = "Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;";
+    let keyphrase_sig = "(IILjava/util/Locale;Ljava/lang/String;[I)V";
+    let phrase_text = text(&mut engine, "Ok Rusty");
+    let null_locale_phrase = instance(&mut engine, keyphrase_class);
+    assert_throws(
+        engine.invoke_instance(
+            null_locale_phrase,
+            "<init>",
+            keyphrase_sig,
+            &[
+                Value::Int(1),
+                Value::Int(1),
+                Value::Null,
+                phrase_text.clone(),
+                Value::Null,
+            ],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let null_text_phrase = instance(&mut engine, keyphrase_class);
+    assert_throws(
+        engine.invoke_instance(
+            null_text_phrase,
+            "<init>",
+            keyphrase_sig,
+            &[
+                Value::Int(1),
+                Value::Int(1),
+                Value::Obj(locale),
+                Value::Null,
+                Value::Null,
+            ],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let no_users_phrase = p49_new(
+        &mut engine,
+        keyphrase_class,
+        keyphrase_sig,
+        &[
+            Value::Int(1),
+            Value::Int(1),
+            Value::Obj(locale),
+            phrase_text,
+            Value::Null,
+        ],
+    );
+    let users = call(&mut engine, no_users_phrase, "getUsers", "()[I", &[]);
+    assert_eq!(int_values(&engine, &users), Vec::<i32>::new());
+
+    // Deep audit: SoundModel.equals uses instanceof, so a plain SoundModel
+    // can equal a KeyphraseSoundModel with the same base fields while the
+    // reverse comparison is false (asymmetric, as in AOSP).
+    let base_model = p49_new(
+        &mut engine,
+        "Landroid/hardware/soundtrigger/SoundTrigger$SoundModel;",
+        "(Ljava/util/UUID;Ljava/util/UUID;I[BI)V",
+        &[
+            uuid.clone(),
+            vendor_uuid.clone(),
+            Value::Int(0),
+            Value::Null,
+            Value::Int(-1),
+        ],
+    );
+    let keyphrase_model = p49_new(
+        &mut engine,
+        "Landroid/hardware/soundtrigger/SoundTrigger$KeyphraseSoundModel;",
+        "(Ljava/util/UUID;Ljava/util/UUID;[B[Landroid/hardware/soundtrigger/SoundTrigger$Keyphrase;)V",
+        &[uuid.clone(), vendor_uuid, Value::Null, Value::Null],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            base_model,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(keyphrase_model)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            keyphrase_model,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(base_model)]
+        ),
+        Value::Int(0)
     );
 }
 
@@ -9381,6 +10051,34 @@ fn companion_absent_service_values_filters_and_mac_are_guest_visible() {
         field(&engine, callback, "rd_found_sender"),
         Value::Obj(sender)
     );
+
+    // Deep audit: the absent-service getMyAssociations result is
+    // Collections.emptyList(), so adding to it throws (the deprecated
+    // getAssociations maps into a fresh list and stays empty here).
+    let my_associations = object(call(
+        &mut engine,
+        manager,
+        "getMyAssociations",
+        "()Ljava/util/List;",
+        &[],
+    ));
+    assert_throws(
+        engine.invoke_instance(
+            my_associations,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Null],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+    let legacy_associations = call(
+        &mut engine,
+        manager,
+        "getAssociations",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, legacy_associations), 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -16826,6 +17524,108 @@ fn nsd_service_info_txt_records_and_unpublished_service_are_guest_visible() {
         "Ljava/lang/IllegalArgumentException;",
     );
 
+    // Deep audit: AOSP wraps the live map in
+    // Collections.unmodifiableMap, so mutating the returned map throws
+    // instead of silently mutating a copy.
+    let extra_key = text(&mut engine, "extra");
+    assert_throws(
+        engine.invoke_instance(
+            attributes,
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            &[extra_key, Value::Null],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+
+    // Deep audit: the 1300-byte accounting double-counts an overwritten
+    // entry (AOSP sizes the future record from the current size plus
+    // the new entry), and a single key+value pair is capped below 255.
+    let sized = p49_new(&mut engine, P36C_NSD_INFO, "()V", &[]);
+    let k_key = text(&mut engine, "k");
+    let long_value = "v".repeat(254);
+    let long_value = text(&mut engine, &long_value);
+    assert_throws(
+        engine.invoke_instance(
+            sized,
+            "setAttribute",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[k_key, long_value],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    // Five entries of 254 counted bytes each reach 1270 of the 1300
+    // budget (each entry stays under the per-entry 255 cap).
+    for index in 0..5 {
+        let key = format!("k{index}");
+        let key = text(&mut engine, &key);
+        let value = "x".repeat(250);
+        let value = text(&mut engine, &value);
+        call(
+            &mut engine,
+            sized,
+            "setAttribute",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[key, value],
+        );
+    }
+    // Overwriting k0 with a 100-byte value would shrink the record,
+    // but AOSP adds the new entry to the current size without
+    // subtracting the replaced one: 1270 + 104 > 1300, so it throws.
+    let a_key = text(&mut engine, "k0");
+    let small_value = "y".repeat(100);
+    let small_value = text(&mut engine, &small_value);
+    assert_throws(
+        engine.invoke_instance(
+            sized,
+            "setAttribute",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[a_key, small_value],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    // Deep audit: a wire record "key=" (equals sign as the last byte)
+    // stores a null value, exactly like a boolean record without '='.
+    let equals_only = p49_new(&mut engine, P36C_NSD_INFO, "()V", &[]);
+    let equals_raw = byte_array(&mut engine, &[4, b'k', b'e', b'y', b'=']);
+    call(
+        &mut engine,
+        equals_only,
+        "setTxtRecords",
+        "([B)V",
+        &[equals_raw],
+    );
+    let equals_attributes = object(call(
+        &mut engine,
+        equals_only,
+        "getAttributes",
+        "()Ljava/util/Map;",
+        &[],
+    ));
+    let key_lookup = text(&mut engine, "key");
+    assert_eq!(
+        call(
+            &mut engine,
+            equals_attributes,
+            "containsKey",
+            "(Ljava/lang/Object;)Z",
+            &[key_lookup],
+        ),
+        Value::Int(1)
+    );
+    let key_lookup = text(&mut engine, "key");
+    assert_eq!(
+        call(
+            &mut engine,
+            equals_attributes,
+            "get",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            &[key_lookup],
+        ),
+        Value::Null
+    );
+
     let parsed = p49_new(&mut engine, P36C_NSD_INFO, "()V", &[]);
     let mut raw = Vec::new();
     raw.extend([12]);
@@ -16999,6 +17799,33 @@ fn nsd_manager_validation_and_listener_bookkeeping_are_guest_visible() {
             &[Value::Obj(info), Value::Obj(resolve_listener)],
         ),
         "Ljava/lang/IllegalArgumentException;",
+    );
+
+    // Deep audit: checkListener runs inside putListener after the
+    // type/protocol validation, so a null listener NPEs; registerService
+    // dereferences the service info's port before its null check.
+    let service_type = text(&mut engine, "_http._tcp");
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "discoverServices",
+            "(Ljava/lang/String;ILandroid/net/nsd/NsdManager$DiscoveryListener;)V",
+            &[service_type, Value::Int(1), Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "registerService",
+            "(Landroid/net/nsd/NsdServiceInfo;ILandroid/net/nsd/NsdManager$RegistrationListener;)V",
+            &[
+                Value::Null,
+                Value::Int(1),
+                Value::Obj(registration_listener),
+            ],
+        ),
+        "Ljava/lang/NullPointerException;",
     );
 }
 

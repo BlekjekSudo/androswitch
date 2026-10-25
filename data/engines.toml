@@ -357,8 +357,8 @@ notes = "Ausência de payload local não descarta TWA/PWA."
 [[engine.rule]]
 state = "signature"
 all = []
-any = ["class:com.google.androidbrowserhelper.trusted.", "class:android.support.customtabs.trusted.", "metadata:android.support.customtabs.trusted.DEFAULT_URL"]
-explanation = "Launcher/metadata de Trusted Web Activity."
+any = ["class:com.google.androidbrowserhelper.trusted.", "class:android.support.customtabs.trusted.", "metadata:android.support.customtabs.trusted.DEFAULT_URL", "metadata:asset_statements"]
+explanation = "Launcher/metadata de Trusted Web Activity (asset_statements declara os Digital Asset Links no <application>)."
 
 [[engine]]
 number = 15
@@ -393,6 +393,12 @@ state = "signature"
 all = ["path:assets/tauri.conf.json"]
 any = ["prefix:assets/www/", "prefix:assets/public/"]
 explanation = "Config Tauri embarcada acompanhada de assets web."
+
+[[engine.rule]]
+state = "signature"
+all = []
+any = ["native:libtauri_android.so", "native:libwry.so"]
+explanation = "Build real Tauri v2 mobile via cargo-ndk embarca as libs Rust do framework (tauri_android/wry); o APK final não carrega tauri.conf.json nem assets/www (a webview vem do sistema)."
 
 [[engine.rule]]
 state = "candidate"
@@ -529,8 +535,8 @@ notes = "Bytecode/containers podem ser comprimidos; .lua é apenas candidato."
 [[engine.rule]]
 state = "signature"
 all = []
-any = ["native:libcorona.so", "native:libdefold.so"]
-explanation = "Marcador de engine Lua."
+any = ["native:libcorona.so", "native:libdmengine.so"]
+explanation = "Marcador de engine Lua (Solar2D libcorona; Defold real embarca libdmengine.so — libdefold.so nunca existiu na build oficial)."
 
 [[engine.rule]]
 state = "candidate"

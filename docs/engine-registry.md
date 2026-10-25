@@ -206,7 +206,7 @@ Nenhum asset/lib é descomprimido, extraído, carregado ou executado.
 - **Rota existente/futura:** `rd-engine-webview`
 - **Runtime:** NOT_IMPLEMENTED
 - **Limite:** Ausência de payload local não descarta TWA/PWA.
-- **signature:** all=[]; any=[`class:com.google.androidbrowserhelper.trusted.`, `class:android.support.customtabs.trusted.`, `metadata:android.support.customtabs.trusted.DEFAULT_URL`] — Launcher/metadata de Trusted Web Activity.
+- **signature:** all=[]; any=[`class:com.google.androidbrowserhelper.trusted.`, `class:android.support.customtabs.trusted.`, `metadata:android.support.customtabs.trusted.DEFAULT_URL`, `metadata:asset_statements`] — Launcher/metadata de Trusted Web Activity (asset_statements declara os Digital Asset Links no <application>).
 
 ### 15 — `nativescript`
 
@@ -221,6 +221,7 @@ Nenhum asset/lib é descomprimido, extraído, carregado ou executado.
 - **Runtime:** NOT_IMPLEMENTED
 - **Limite:** Sem configuração Tauri, Rust+WebView não identifica Tauri unicamente.
 - **signature:** all=[`path:assets/tauri.conf.json`]; any=[`prefix:assets/www/`, `prefix:assets/public/`] — Config Tauri embarcada acompanhada de assets web.
+- **signature:** all=[]; any=[`native:libtauri_android.so`, `native:libwry.so`] — Build real Tauri v2 mobile via cargo-ndk embarca as libs Rust do framework (tauri_android/wry); o APK final não carrega tauri.conf.json nem assets/www (a webview vem do sistema).
 - **candidate:** all=[`native-so`]; any=[`prefix:assets/www/`, `prefix:assets/public/`] — Combinação de lib nativa e assets web é ambígua.
 
 ### 17 — `dotnet-maui`
@@ -268,7 +269,7 @@ Nenhum asset/lib é descomprimido, extraído, carregado ou executado.
 - **Rota existente/futura:** `rd-engine-lua`
 - **Runtime:** NOT_IMPLEMENTED
 - **Limite:** Bytecode/containers podem ser comprimidos; .lua é apenas candidato.
-- **signature:** all=[]; any=[`native:libcorona.so`, `native:libdefold.so`] — Marcador de engine Lua.
+- **signature:** all=[]; any=[`native:libcorona.so`, `native:libdmengine.so`] — Marcador de engine Lua (Solar2D libcorona; Defold real embarca libdmengine.so — libdefold.so nunca existiu na build oficial).
 - **candidate:** all=[`suffix:.lua`]; any=[] — Payload Lua não distingue Defold/Solar2D/Cocos2d-x.
 - **candidate:** all=[`suffix:.luac`]; any=[] — Bytecode Lua apenas por extensão; conteúdo não validado.
 - **candidate:** all=[`native:libcocos2dcpp.so`]; any=[] — Cocos2d-x não implica uso de Lua.

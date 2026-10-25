@@ -135,10 +135,17 @@ impl Registry {
         let metadata: BTreeSet<&str> = apk
             .manifest
             .application
-            .components
+            .meta_data
             .iter()
-            .flat_map(|c| &c.meta_data)
             .filter_map(|m| m.name.as_deref())
+            .chain(
+                apk.manifest
+                    .application
+                    .components
+                    .iter()
+                    .flat_map(|c| &c.meta_data)
+                    .filter_map(|m| m.name.as_deref()),
+            )
             .collect();
         let inventory = Inventory {
             paths: &paths,

@@ -20672,16 +20672,40 @@ fn p57_spell_subtype_hash(locale: &str, extra: &str) -> i32 {
     result
 }
 
+fn p57_java_split(s: &str, separator: char) -> Vec<String> {
+    // java.lang.String.split with limit 0: trailing empty strings are
+    // discarded, an all-empty result becomes an empty array, and splitting
+    // the empty string yields a single empty string.
+    if s.is_empty() {
+        return vec![String::new()];
+    }
+    let mut parts: Vec<String> = s.split(separator).map(str::to_string).collect();
+    while parts.len() > 1 && parts.last().is_some_and(|part| part.is_empty()) {
+        parts.pop();
+    }
+    if parts.iter().all(|part| part.is_empty()) {
+        return Vec::new();
+    }
+    parts
+}
+
 fn p57_spell_subtype_extra_map(extra: &str) -> Vec<(String, Option<String>)> {
     let mut out: Vec<(String, Option<String>)> = Vec::new();
-    for pair in extra.split(',') {
-        let mut parts = pair.split('=');
-        let Some(key) = parts.next() else { continue };
-        let value = parts.next().map(str::to_string);
+    for pair in p57_java_split(extra, ',') {
+        let parts = p57_java_split(&pair, '=');
+        // A pair that splits to zero parts (e.g. "=") stores nothing; a
+        // single part stores a null value; extra '=' parts are ignored
+        // beyond the first value, matching getExtraValueHashMap.
+        let Some(key) = parts.first() else { continue };
+        let value = if parts.len() == 1 {
+            None
+        } else {
+            Some(parts[1].clone())
+        };
         if let Some(existing) = out.iter_mut().find(|(k, _)| k == key) {
             existing.1 = value;
         } else {
-            out.push((key.to_string(), value));
+            out.push((key.clone(), value));
         }
     }
     out
@@ -20772,20 +20796,41 @@ fn p57_spell_subtype_instance(
         }
         ("getLocaleObject", "()Ljava/util/Locale;") => {
             let tag = field_str(vm, recv, "mSubtypeLanguageTag").unwrap_or_default();
-            let locale = if !tag.is_empty() {
-                tag
+            if !tag.is_empty() {
+                // Locale.forLanguageTag(tag)
+                let tag_value = jstr(vm, tag)?;
+                vm.invoke_static(
+                    "Ljava/util/Locale;",
+                    "forLanguageTag",
+                    "(Ljava/lang/String;)Ljava/util/Locale;",
+                    &[tag_value],
+                )?
             } else {
-                field_str(vm, recv, "mSubtypeLocale").unwrap_or_default()
-            };
-            if locale.is_empty() {
-                Value::Null
-            } else {
-                // java.util.Locale is already hosted; construct through its
-                // one-argument constructor with an AOSP locale string form.
-                let r = alloc_obj(vm, "Ljava/util/Locale;", Vec::new())?;
-                let s = jstr(vm, locale)?;
-                vm.invoke_instance(r, "<init>", "(Ljava/lang/String;)V", &[s])?;
-                Value::Obj(r)
+                // SubtypeLocaleUtils.constructLocaleFromString: split on '_'
+                // (at most 3 parts), map the legacy "tl" language to "fil",
+                // then use the matching Locale constructor.
+                let locale = field_str(vm, recv, "mSubtypeLocale").unwrap_or_default();
+                if locale.is_empty() {
+                    Value::Null
+                } else {
+                    let mut parts: Vec<String> =
+                        locale.splitn(3, '_').map(str::to_string).collect();
+                    if parts.first().is_some_and(|language| language == "tl") {
+                        parts[0] = "fil".to_string();
+                    }
+                    let r = alloc_obj(vm, "Ljava/util/Locale;", Vec::new())?;
+                    let mut ctor_args: Vec<Value> = Vec::new();
+                    for part in &parts {
+                        ctor_args.push(jstr(vm, part)?);
+                    }
+                    let sig = match parts.len() {
+                        1 => "(Ljava/lang/String;)V",
+                        2 => "(Ljava/lang/String;Ljava/lang/String;)V",
+                        _ => "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+                    };
+                    vm.invoke_instance(r, "<init>", sig, &ctor_args)?;
+                    Value::Obj(r)
+                }
             }
         }
         ("hashCode", "()I") => Value::Int(field_int(vm, recv, "mSubtypeHashCode")),
@@ -20861,10 +20906,9 @@ fn p57_spell_params_instance(
                 Value::Obj(recv)
             }
             ("setExtras", "(Landroid/os/Bundle;)Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;") => {
-                let v = match args.first() {
-                    Some(Value::Obj(_)) => args.first().cloned().unwrap(),
-                    _ => return Err(npe("extras")),
-                };
+                // AOSP's setter stores the argument without a null check,
+                // despite the @NonNull annotation.
+                let v = args.first().cloned().unwrap_or(Value::Null);
                 put(vm, recv, "mExtras", v)?;
                 Value::Obj(recv)
             }
@@ -20902,12 +20946,9 @@ fn p57_spell_params_instance(
             Value::Int(field_int(vm, recv, "mSupportedAttributes"))
         }
         ("getExtras", "()Landroid/os/Bundle;") => {
-            let v = get(vm, recv, "mExtras");
-            if matches!(v, Value::Obj(_)) {
-                v
-            } else {
-                empty_bundle(vm)?
-            }
+            // The builder defaults the field to Bundle.EMPTY; a null stored
+            // through setExtras comes back as null, as in AOSP.
+            get(vm, recv, "mExtras")
         }
         _ => return Ok(None),
     }))
@@ -20957,7 +20998,13 @@ fn p57_text_services_manager_instance(
             )?
         }
         ("getEnabledSpellCheckerInfos", "()Ljava/util/List;") => {
-            Value::Obj(new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?)
+            // With no enabled checkers AOSP returns Collections.emptyList().
+            vm.invoke_static(
+                "Ljava/util/Collections;",
+                "emptyList",
+                "()Ljava/util/List;",
+                &[],
+            )?
         }
         ("getCurrentSpellCheckerInfo", "()Landroid/view/textservice/SpellCheckerInfo;")
         | ("getCurrentSpellChecker", "()Landroid/view/textservice/SpellCheckerInfo;")
@@ -21034,11 +21081,16 @@ fn p57_translation_spec_instance(
 ) -> Result<Option<Value>, VmExit> {
     Ok(Some(match (name, sig) {
         ("<init>", "(Ljava/lang/String;I)V") => {
+            // AOSP's deprecated constructor performs no null check: a null
+            // language is stored verbatim and ULocale.Builder treats a null
+            // language subtag as a reset (root locale).
             let Some(language) = opt_str_arg(vm, args, 0) else {
-                return Err(npe("language"));
+                let locale = ulocale_from_tag(vm, "")?;
+                put(vm, recv, "mLanguage", Value::Null)?;
+                put(vm, recv, "mLocale", locale)?;
+                put(vm, recv, "mDataFormat", Value::Int(iarg(args, 1)))?;
+                return Ok(Some(Value::Null));
             };
-            // AOSP's ULocale.Builder accepts this as its language subtag.
-            // Keep the deprecated language field verbatim.
             let locale = ulocale_from_tag(vm, &language)?;
             let lang = jstr(vm, language)?;
             put(vm, recv, "mLanguage", lang)?;
@@ -21385,15 +21437,44 @@ fn p57_view_translation_builder_instance(
             Value::Null
         }
         ("setValue", "(Ljava/lang/String;Landroid/view/translation/TranslationRequestValue;)Landroid/view/translation/ViewTranslationRequest$Builder;") => {
-            p57_check_builder_unused(vm, recv)?;
-            let Some(key) = opt_str_arg(vm, args, 0) else {
-                return Err(npe("key"));
+            // AOSP performs no null checks here (the backing ArrayMap
+            // accepts null keys and values), and checkNotUsed only runs
+            // through setTranslationRequestValues when the map is first
+            // created; later calls mutate the map directly, even after
+            // build() has handed the same map to the built request.
+            if field_obj(vm, recv, "mTranslationRequestValues").is_none() {
+                p57_check_builder_unused(vm, recv)?;
+            }
+            let map = p57_ensure_map(vm, recv, "mTranslationRequestValues")?;
+            let key = args.first().cloned().unwrap_or(Value::Null);
+            let value = args.get(1).cloned().unwrap_or(Value::Null);
+            let key_text = opt_str(vm, Some(&key));
+            let existing_keys: Vec<Value> = match vm.fw.objects.get(&map) {
+                Some(HostObj::Map { entries }) => {
+                    entries.iter().map(|(k, _)| k.clone()).collect()
+                }
+                _ => Vec::new(),
             };
-            let Some(_) = oarg(args, 1) else {
-                return Err(npe("value"));
-            };
-            let v = args.get(1).cloned().unwrap();
-            p57_map_put_string(vm, recv, "mTranslationRequestValues", key, v)?;
+            let mut replace_at = None;
+            for (index, k) in existing_keys.iter().enumerate() {
+                let same = match (&key, k) {
+                    (Value::Null, Value::Null) => true,
+                    (Value::Obj(_), Value::Obj(_)) => {
+                        key_text.is_some() && key_text == opt_str(vm, Some(k))
+                    }
+                    _ => false,
+                };
+                if same {
+                    replace_at = Some(index);
+                    break;
+                }
+            }
+            if let Some(HostObj::Map { entries }) = vm.fw.objects.get_mut(&map) {
+                match replace_at {
+                    Some(index) => entries[index].1 = value,
+                    None => entries.push((key, value)),
+                }
+            }
             Value::Obj(recv)
         }
         ("build", "()Landroid/view/translation/ViewTranslationRequest;") => {
@@ -21416,22 +21497,26 @@ fn p57_view_translation_builder_instance(
 }
 
 fn p57_translation_flag_string(flags: i32) -> String {
+    // BitUtils.flagsToString renders each set bit through the single-flag
+    // function (unknown bits become the hex of that single bit) and joins
+    // with '|'; zero flags render the single-flag rendering of 0 ("0").
+    fn single(bit: i32) -> String {
+        match bit {
+            1 => "FLAG_LOW_LATENCY".to_string(),
+            2 => "FLAG_TRANSLITERATION".to_string(),
+            4 => "FLAG_DEFINITIONS".to_string(),
+            other => format!("{:x}", other as u32),
+        }
+    }
     let mut parts: Vec<String> = Vec::new();
-    if flags & 1 != 0 {
-        parts.push("FLAG_LOW_LATENCY".to_string());
-    }
-    if flags & 2 != 0 {
-        parts.push("FLAG_TRANSLITERATION".to_string());
-    }
-    if flags & 4 != 0 {
-        parts.push("FLAG_DEFINITIONS".to_string());
-    }
-    let unknown = flags & !7;
-    if unknown != 0 {
-        parts.push(format!("{unknown:x}"));
+    for i in 0..32 {
+        let bit = 1i32.checked_shl(i).unwrap_or(0);
+        if bit != 0 && flags & bit != 0 {
+            parts.push(single(bit));
+        }
     }
     if parts.is_empty() {
-        "0".to_string()
+        single(0)
     } else {
         parts.join("|")
     }
@@ -21470,20 +21555,22 @@ fn p57_translation_context_instance(
             }
             ("setActivityId", "(Landroid/app/assist/ActivityId;)Landroid/view/translation/TranslationContext$Builder;") => {
                 p57_check_builder_unused(vm, recv)?;
-                let Some(_) = oarg(args, 0) else {
-                    return Err(npe("activityId"));
-                };
-                let v = args.first().cloned().unwrap();
+                // The generated setter stores the value without any null
+                // validation (the context field itself is @Nullable).
+                let v = args.first().cloned().unwrap_or(Value::Null);
                 put(vm, recv, "mActivityId", v)?;
                 Value::Obj(recv)
             }
             ("build", "()Landroid/view/translation/TranslationContext;") => {
                 p57_check_builder_unused(vm, recv)?;
+                // AOSP marks the builder used before the generated
+                // constructor validates the flags, so a failed build still
+                // consumes the builder.
+                put(vm, recv, "rd_used", Value::Int(1))?;
                 let flags = field_int(vm, recv, "mTranslationFlags");
                 if flags & !7 != 0 {
                     return Err(iae(format!("translation flags invalid: {flags}")));
                 }
-                put(vm, recv, "rd_used", Value::Int(1))?;
                 let out = alloc_obj(vm, P57_TRANSLATION_CONTEXT, Vec::new())?;
                 for f in [
                     "mSourceSpec",
@@ -21664,7 +21751,9 @@ fn p57_translation_manager_instance(
         }
         ("getOnDeviceTranslationCapabilities", "(II)Ljava/util/Set;")
         | ("getTranslationCapabilities", "(II)Ljava/util/Set;") => {
-            Value::Obj(new_collection(vm, "Ljava/util/HashSet;", Vec::new())?)
+            // The no-service/failure path in AOSP returns
+            // Collections.emptySet(), whose mutations throw.
+            vm.invoke_static("Ljava/util/Collections;", "emptySet", "()Ljava/util/Set;", &[])?
         }
         ("addOnDeviceTranslationCapabilityUpdateListener", "(Ljava/util/concurrent/Executor;Ljava/util/function/Consumer;)V")
         | ("addTranslationCapabilityUpdateListener", "(Ljava/util/concurrent/Executor;Ljava/util/function/Consumer;)V") => {
@@ -21679,7 +21768,7 @@ fn p57_translation_manager_instance(
         ("removeOnDeviceTranslationCapabilityUpdateListener", "(Ljava/util/function/Consumer;)V")
         | ("removeTranslationCapabilityUpdateListener", "(Ljava/util/function/Consumer;)V") => {
             if oarg(args, 0).is_none() {
-                return Err(npe("capability listener should not be null"));
+                return Err(npe("capability callback should not be null"));
             }
             Value::Null
         }
@@ -26278,7 +26367,12 @@ fn p49_prompt_info_instance(
             Value::Null
         }
         ("setAllowedSensorIds", "(Ljava/util/List;)V") => {
+            // AOSP clears the current ids before addAll dereferences the
+            // argument, so a null argument still empties the list on its
+            // way to the NullPointerException.
             if oarg(args, 0).is_none() {
+                let empty = p49_empty_list(vm)?;
+                put(vm, recv, "mAllowedSensorIds", empty)?;
                 return Err(npe("sensorIds"));
             }
             let ids = p49_list_value(vm, collection_items(vm, args.first()))?;
@@ -26691,14 +26785,22 @@ fn p49_biometric_instance(
                 let crypto = args.first().cloned().unwrap_or(Value::Null);
                 put(vm, recv, "mCryptoObject", crypto)?;
                 put(vm, recv, "mAuthenticationType", Value::Int(iarg(args, 1)))?;
+                // The BiometricPrompt result passes a null identifier and
+                // userId 0 to the BiometricAuthenticator base class.
+                put(vm, recv, "mIdentifier", Value::Null)?;
+                put(vm, recv, "mUserId", Value::Int(0))?;
                 Value::Null
             }
             ("getCryptoObject", "()Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;") => {
                 get(vm, recv, "mCryptoObject")
             }
-            ("getAuthenticationResultType", "()I") => {
+            ("getAuthenticationType", "()I") => {
                 Value::Int(field_int(vm, recv, "mAuthenticationType"))
             }
+            ("getId", "()Landroid/hardware/biometrics/BiometricAuthenticator$Identifier;") => {
+                get(vm, recv, "mIdentifier")
+            }
+            ("getUserId", "()I") => Value::Int(field_int(vm, recv, "mUserId")),
             _ => return Ok(None),
         })),
         P49_BIOMETRIC_CALLBACK => {
@@ -27940,6 +28042,9 @@ fn p49_input_device_instance2(
                 "(Landroid/hardware/input/InputDeviceIdentifier;Landroid/view/inputmethod/InputMethodInfo;Landroid/view/inputmethod/InputMethodSubtype;)[Landroid/hardware/input/KeyboardLayout;",
             ) => obj_array(vm, "[Landroid/hardware/input/KeyboardLayout;", Vec::new())?,
             ("getKeyboardLayout", "(Ljava/lang/String;)Landroid/hardware/input/KeyboardLayout;") => {
+                if !matches!(args.first(), Some(Value::Obj(_))) {
+                    return Err(iae("keyboardLayoutDescriptor must not be null"));
+                }
                 Value::Null
             }
             (
@@ -28096,7 +28201,7 @@ fn p49_input_device_instance2(
                 .find(|range| match range {
                     Value::Obj(r) => {
                         field_int(vm, *r, "mAxis") == axis
-                            && (field_int(vm, *r, "mSource") & source) == source
+                            && field_int(vm, *r, "mSource") == source
                     }
                     _ => false,
                 })
@@ -30269,7 +30374,7 @@ fn p49_parse_mac_string(text: &str) -> Result<i64, VmExit> {
             }
         };
         if !(0..=0xff).contains(&x) {
-            return Err(iae(format!("{text}was not a valid MAC address")));
+            return Err(iae(format!("{text} was not a valid MAC address")));
         }
         result = (result << 8) + x;
     }
@@ -30413,9 +30518,19 @@ fn p49_companion_manager_instance(
         | ("startObservingDevicePresence", "(Ljava/lang/String;)V")
         | ("stopObservingDevicePresence", "(Ljava/lang/String;)V") => Value::Null,
         ("buildAssociationCancellationIntent", "()Landroid/content/IntentSender;") => Value::Null,
-        ("getAssociations", "()Ljava/util/List;")
-        | ("getMyAssociations", "()Ljava/util/List;")
-        | ("getAllAssociations", "()Ljava/util/List;") => p49_empty_list(vm)?,
+        ("getAssociations", "()Ljava/util/List;") => p49_empty_list(vm)?,
+        ("getMyAssociations", "()Ljava/util/List;")
+        | ("getAllAssociations", "()Ljava/util/List;") => {
+            // The guarded absent-service path in AOSP returns
+            // Collections.emptyList() for these two getters (the deprecated
+            // getAssociations above maps into a fresh mutable list instead).
+            vm.invoke_static(
+                "Ljava/util/Collections;",
+                "emptyList",
+                "()Ljava/util/List;",
+                &[],
+            )?
+        }
         ("hasNotificationAccess", "(Landroid/content/ComponentName;)Z") => bool_value(false),
         (
             "isDeviceAssociatedForWifiConnection",
@@ -42520,8 +42635,19 @@ fn p36c_nsd_info_instance(
             Value::Null
         }
         ("getAttributes", "()Ljava/util/Map;") => {
-            let entries = p57_map_entries(vm, recv, "mTxtRecord");
-            p57_new_map(vm, entries)?
+            // AOSP returns Collections.unmodifiableMap(mTxtRecord): the
+            // guest gets a read-only map whose mutations throw
+            // UnsupportedOperationException, not a mutable copy. The
+            // host Collections view snapshots entries (the documented
+            // VM-wide unmodifiable* deviation), so live-view liveness
+            // across later setAttribute calls is not claimed.
+            let backing = p57_ensure_map(vm, recv, "mTxtRecord")?;
+            vm.invoke_static(
+                "Ljava/util/Collections;",
+                "unmodifiableMap",
+                "(Ljava/util/Map;)Ljava/util/Map;",
+                &[Value::Obj(backing)],
+            )?
         }
         ("getTxtRecord", "()[B") => {
             let bytes = p36c_txt_record_bytes(vm, recv);

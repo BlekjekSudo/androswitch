@@ -3464,3 +3464,20 @@ Work Log:
 
 Stage Summary:
 - Commit na branch followup/context-get-application-info (empilha no PR #205 — mesmos arquivos); patch incremental publicado para o PR-Agent pushar na branch do PR (2º commit), fechando o follow-up anunciado no corpo do #205.
+Task ID: B-2 (tempchat coordenação 8873)
+Agent: B-Agent
+Task: fix(registry) — 3 gaps do detector documentados pelo APK-Tester (engines 16/22/32): tauri não dispara na build real; Defold emite libdmengine.so mas o registro esperava libdefold.so; twa-pwa sem asset_statements
+
+Work Log:
+- Diagnostic (fonte: suites/engines/*/expected-engines.json do APK-Tester): engine-16 tauri real = lib/x86_64/libtauri_android.so + libwry.so via cargo-ndk, SEM tauri.conf.json/assets/www; engine-22 Defold real = lib/arm64-v8a/libdmengine.so (bob.jar 1.9.8) + game.arcd/arci; engine-32 TWA fixture mínimo tem dex-strings asset_statements/androidx.browser.trusted mas o manifest não declara metadata — e um TWA REAL declara asset_statements no <application>.
+- Achado estrutural: rd-apk modelava meta_data apenas em Component — Application não tinha o campo (violação da Lei nº 2: manifest é a verdade; TWA/GMS/serviços declaram chaves globais no application). Detector de engines só inventariava metadata de componentes.
+- Implementação: manifest.rs ganhou Application.meta_data (Vec<MetaData> via collect_meta_data(app), #[serde(skip_serializing_if = "Vec::is_empty")] — golden JSON intacto); detect.rs passa a somar application-level + component-level no Inventory.metadata; engines.toml: tauri +regra signature any=[native:libtauri_android.so, native:libwry.so]; lua-engines signature any=[native:libcorona.so, native:libdmengine.so] (libdefold.so removido — nunca existiu na build oficial); twa-pwa signature ganhou metadata:asset_statements.
+- docs/engine-registry.md regenerado via `cargo xtask engine-report` (golden do xtask doc↔catalog em sincronia).
+- Regressões: registry.rs +4 testes (tauri cargo-ndk real com cada lib isolada + .so aleatório que não dispara; dmengine real + libcorona preservada + .so aleatório; asset_statements no application + DEFAULT_URL em componente + ausência = NotDetected; merge application+component no inventário com checagem do predicate da evidence); manifest.rs +1 teste (parse application-level name/resource/value, sem vazar para componente, omissão serde quando vazio).
+- Follow-ups documentados (fora do escopo, precisam decisão/ADR do dono): (1) ids finos scala/clojure/groovy/b4x exigem pattern dex-string: novo no detector e possivelmente novos ids no registro (contrato ENGINE_COUNT=28/CANONICAL_IDS); (2) patch irmão no APK-Tester — answer keys de engine-16/22/32 (tauri/defold ganham signature) + fixture twa ganhando a metadata asset_statements real.
+- Gates (rustc 1.99.1, CARGO_INCREMENTAL=0 — target limpo após disco 100%): fmt --check ✅; clippy --workspace --all-targets -D warnings ✅; cargo test --workspace 895/0 (5 novos) ✅; check --workspace --all-features --locked ✅.
+
+Stage Summary:
+- Commit 358bb02 (cherry-pick limpo sobre 8e15e67; branch fix/engine-detector-real-builds-20261025), 5 arquivos, +229/−8: manifest.rs, detect.rs, registry.rs (testes), engines.toml, docs/engine-registry.md.
+- Patch publicado: https://paste.rs/7JMju (18416 bytes, sha256 4fc43691b1f62cbcf85ccd98e1696a3ca85e335d837f23df3593d055db02e8a2, tree e1e63d29004410ed82d8a3040823ab77a192b178, base 8e15e67) — entregue ao PR-Agent.
+- Sem unsafe; Sentinel/CI intocados; mudança puramente aditiva de regras + modelagem de manifest (Lei nº 2 atendida); golden signatures.json 28/28 preservado.
