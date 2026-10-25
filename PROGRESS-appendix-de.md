@@ -64,7 +64,7 @@ export PATH="$HOME/.cargo/bin:$PATH"   # rustc 1.99.1 em 2026-10-25
 - [x] S2 `fd_jetpack.rs` + `fd_gms.rs` + testes unitários (34 passed em rd-framework, clippy/fmt limpos)
 - [x] S3 CLI `rd jetpack`/`rd gms` + testes CLI (8 passed, clippy limpo)
 - [x] S4 xtask + docs gerados + spec D/E + ADR 012 + ledger D/E (xtask 14 testes ✅, geradores idempotentes)
-- [ ] S5 Runtime AndroidX (`androidx.rs`) + estado/GC/dispatch + testes
+- [x] S5 Runtime AndroidX (`androidx.rs`) + estado/GC/dispatch + testes
 - [ ] S6 Runtime GMS/Firebase (`gms.rs`) + estado/GC/dispatch + testes
 - [ ] S7 Hierarquias classpath (hook mínimo) + inflate AndroidX
 - [ ] S8 MCP (se limpo) + compat-matrix + verificação completa + push/PR
@@ -79,3 +79,4 @@ export PATH="$HOME/.cargo/bin:$PATH"   # rustc 1.99.1 em 2026-10-25
 - 2026-10-25 S3: rd jetpack/gms list|show|check|report no ar (main.rs só aditivo; [LOCK] coordenado entre os agentes). Meu ADR vira 012 (011 ficou com M10 do Runtime-E2E).
 - 2026-10-25 S4: xtask jetpack/gms report+spec, docs/jetpack.md+gms.md, tabelas D/E geradas em RustyDroid.md (marcadores BEGIN/END), compat-matrix com seções D/E, ADR 012. Testes xtask travam docs==gerado.
 - 2026-10-25 PR-1 (S0–S4): pacote validado localmente (workspace 753 passed no base antigo); rebaseado sobre main 072c317 (pós-merge do Apêndice C) e reemitido como patch limpo para abertura de PR. O runtime S5 segue como patch incremental separado.
+- 2026-10-25 S5 FECHADO: crates/rd-vm/src/androidx.rs (DEX-first) + tests/androidx.rs 13/13 (incl. callbacks DEX lifecycle/livedata e invariante dex_body_wins). HostState.androidx (GC-root via Debug; gc.rs NÃO precisou de edição). 12 libs not_implemented/stub→partial (lifecycle x4, navigation, datastore-valores, collection, startup, multidex, biometric, browser, guava) + core/work estendidos → 18 partial/2 stub/26 not_implemented. Docs/spec/compat regenerados. Regressão: suíte rd-vm inteira ok; clippy lib+test -D warnings ok. Desvios single-thread documentados no cabeçalho do módulo.
