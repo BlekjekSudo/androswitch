@@ -78,4 +78,4 @@ export PATH="$HOME/.cargo/bin:$PATH"   # rustc 1.99.1 em 2026-10-25
 
 - 2026-10-25 S3: rd jetpack/gms list|show|check|report no ar (main.rs só aditivo; [LOCK] coordenado entre os agentes). Meu ADR vira 012 (011 ficou com M10 do Runtime-E2E).
 - 2026-10-25 S4: xtask jetpack/gms report+spec, docs/jetpack.md+gms.md, tabelas D/E geradas em RustyDroid.md (marcadores BEGIN/END), compat-matrix com seções D/E, ADR 012. Testes xtask travam docs==gerado.
-- 2026-10-25 PR-1: patch S0–S4 (6 commits, sha256 a5088a5e...7618a) entregue ao PR-Agent via filebin (bin rustydroid-de-20261025) p/ abrir PR (branch sugerida appendix-d-e-20261025 vs main). Verificação pré-entrega: workspace 753 passed/0 failed, fmt --check ok, clippy escopado ok (warnings parcel_binder pré-existentes = #193/ArenaAgent). Runtime S5/S6 virão como patches empilhados.
+- 2026-10-25 PR-1 (S0–S4): pacote validado localmente (workspace 753 passed no base antigo); rebaseado sobre main 072c317 (pós-merge do Apêndice C) e reemitido como patch limpo para abertura de PR. O runtime S5 segue como patch incremental separado.
