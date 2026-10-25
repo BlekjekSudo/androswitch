@@ -382,6 +382,11 @@ class CampaignRunner:
         self._release_binary: Path | None = None
         self._debug_binary: Path | None = None
         self._native_fixtures_ensured = False
+        # issue #283: the absolute `rd perf` budget verdict is resolved at
+        # the end of run(), once the base reference (compare) is known.
+        self._perf_base_budget_ok: dict[str, bool] = {}
+        self._perf_base_budget_metrics: dict[str, dict[str, Any]] = {}
+        self._perf_candidate_budget_failures: list[tuple[str, dict[str, Any]]] = []
         self._used_check_ids = {str(c.get("id")) for c in report.get("checks", []) if isinstance(c, Mapping)}
 
     # ------------------------------------------------------------------ util
@@ -714,6 +719,7 @@ class CampaignRunner:
                         summary=redact(str(exc), repo=self.repo, limit=1000),
                     )
                 )
+        self._resolve_perf_budgets()
 
     # ------------------------------------------------------------------- core
     def _test_commands_for_packages(self, packages: Sequence[str]) -> list[tuple[str, list[str]]]:
@@ -1716,9 +1722,68 @@ class CampaignRunner:
                 "peak_rss_mb": parsed.get("peak_rss_mb"),
                 "app_heap_peak_mb": parsed.get("app_heap_peak_mb"),
             }
-            status = "pass" if parsed.get("pass") is True and raw.exit_code == 0 else "fail"
-        self._record_raw(raw, check_id=f"perf-rd-perf-{label}-{apk.stem}", title=f"rd perf ({label}, {apk.name})", component="perf", status=status, metrics=metrics)
+        # issue #283: "the measurement ran" and "the budget passed" are two
+        # different facts. `rd perf` exits 1 when a budget fails (PRF-06), so
+        # using exit_code for both made a red base block every candidate,
+        # including one that improves cold start. The measurement check
+        # passes only when it produced numbers; the budget verdict is a
+        # metric, resolved against the base in _resolve_perf_budgets().
+        measured = (
+            isinstance(parsed, Mapping)
+            and not raw.timed_out
+            and isinstance(parsed.get("cold_p50_emulated_ms"), (int, float))
+            and isinstance(parsed.get("cold_max_emulated_ms"), (int, float))
+        )
+        summary = None
+        if measured:
+            status = "pass"
+            budget_ok = parsed.get("pass") is True and raw.exit_code == 0
+            metrics["budget_ok"] = budget_ok
+            summary = f"exit {raw.exit_code}; measured; absolute budget {'pass' if budget_ok else 'FAIL'}"
+            if label == "base":
+                self._perf_base_budget_ok[apk.stem] = budget_ok
+                self._perf_base_budget_metrics[apk.stem] = dict(metrics)
+            elif not budget_ok:
+                self._perf_candidate_budget_failures.append((apk.stem, dict(metrics)))
+        self._record_raw(raw, check_id=f"perf-rd-perf-{label}-{apk.stem}", title=f"rd perf ({label}, {apk.name})", component="perf", status=status, summary=summary, metrics=metrics)
         return dict(parsed) if isinstance(parsed, Mapping) else None
+
+    def _resolve_perf_budgets(self) -> None:
+        """issue #283: decide the absolute `rd perf` budget once per run.
+
+        - Base over budget: pre-existing, reported as a P2 advisory finding.
+          The base is the reference, not the change under review.
+        - Candidate over budget and base within budget (or base not
+          measured in this run): blocking, exactly as before.
+        - Candidate over budget and base also over budget: not blocking by
+          itself. Regressions stay blocked by the paired A/B gates
+          (perf-ab-p50-regression / perf-ab-max-regression), so getting
+          worse is still impossible and getting better is no longer blocked.
+        """
+        for stem, base_ok in sorted(self._perf_base_budget_ok.items()):
+            if not base_ok:
+                m = self._perf_base_budget_metrics.get(stem, {})
+                self._add_finding(Finding("perf-base-budget-preexisting", "P2", "performance", "Absolute rd perf budget already fails on the base", f"apk={stem}, base cold_p50={m.get('cold_p50_emulated_ms')}, cold_max={m.get('cold_max_emulated_ms')}, peak_rss_mb={m.get('peak_rss_mb')}", remediation="Pre-existing on main: fix it in a dedicated performance PR (see issue #271). Candidates are gated by the A/B ratio meanwhile."))
+        for stem, metrics in self._perf_candidate_budget_failures:
+            base_ok = self._perf_base_budget_ok.get(stem)
+            preexisting = base_ok is False
+            if preexisting:
+                summary = "absolute budget fails on base and candidate (pre-existing); the A/B ratio gates regressions"
+            elif base_ok is None:
+                summary = "absolute budget failed; base not measured in this run, so it cannot be pre-existing"
+            else:
+                summary = "absolute budget failed; the base passed it, so this change regressed it"
+            self._add_check(
+                CheckResult(
+                    id=f"perf-budget-candidate-{stem}",
+                    title=f"Absolute rd perf budget (candidate, {stem})",
+                    status="pass" if preexisting else "fail",
+                    required=True,
+                    component="perf",
+                    summary=summary,
+                    metrics={**metrics, "base_budget_ok": base_ok},
+                )
+            )
 
     def _run_cold26(
         self,
