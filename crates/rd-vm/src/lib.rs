@@ -73,6 +73,8 @@ pub(crate) mod jtext_format;
 pub(crate) mod jtime;
 pub(crate) mod juuid;
 pub(crate) mod jxml;
+#[cfg(feature = "virtual-devices")]
+pub mod m10;
 pub mod m8;
 #[cfg(feature = "advanced-components")]
 pub mod m9;

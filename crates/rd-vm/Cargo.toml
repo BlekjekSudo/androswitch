@@ -32,7 +32,8 @@ rd-testsupport = { path = "../rd-testsupport" }
 
 [features]
 default = ["advanced-components"]
-advanced-components = []
+advanced-components = ["virtual-devices"]
+virtual-devices = []
 native = ["dep:rd-ndk", "dep:rd-jni", "rd-ndk/native"]
 
 jit = ["dep:rd-jni", "rd-jni/jit"]

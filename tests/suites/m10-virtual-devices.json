@@ -1,0 +1,52 @@
+{
+  "name": "m10-virtual-devices",
+  "scenarios": [
+    {
+      "name": "device_profile action=get sem app preserva o contrato do piso moto-e5",
+      "steps": [
+        {
+          "name": "device_profile",
+          "arguments": {}
+        },
+        {
+          "name": "device_profile",
+          "arguments": {
+            "action": "get"
+          }
+        }
+      ]
+    },
+    {
+      "name": "device_profile mutável sem app em execução devolve NOT_RUNNING tipado",
+      "steps": [
+        {
+          "name": "device_profile",
+          "arguments": {
+            "action": "location",
+            "latitude": -18.2414,
+            "longitude": -43.6003
+          },
+          "expect": "error:NOT_RUNNING"
+        },
+        {
+          "name": "device_profile",
+          "arguments": {
+            "action": "sensor",
+            "sensor": "accelerometer",
+            "values": [0.0, 9.81, 0.0]
+          },
+          "expect": "error:NOT_RUNNING"
+        },
+        {
+          "name": "device_profile",
+          "arguments": {
+            "action": "battery",
+            "level": 80,
+            "charging": true
+          },
+          "expect": "error:NOT_RUNNING"
+        }
+      ]
+    }
+  ]
+}

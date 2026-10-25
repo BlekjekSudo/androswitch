@@ -48,6 +48,7 @@ lang-12 = ["rd-engine-registry/lang-12", "rd-agent/lang-12"]
 
 default = ["advanced-components"]
 advanced-components = ["rd-vm/advanced-components"]
+virtual-devices = ["advanced-components", "rd-vm/virtual-devices", "rd-agent/virtual-devices"]
 native = ["rd-vm/native", "rd-agent/native"]
 native-engines = ["native", "rd-engine-registry/native-execution", "rd-agent/native-engines"]
 

@@ -166,9 +166,9 @@ Auditoria estática do manifest (exported sem guarda, debuggable, cleartext, per
 
 ### `device_profile`
 
-Perfil de device corrente (piso contratual moto-e5) com os budgets de hardware.
+Perfil de device corrente (piso contratual moto-e5, budgets e snapshot de periféricos virtuais M10) e controle determinístico AG-10 via `action` opcional (`get`, `location`, `sensor`, `battery`, `network`, `telephony`, `sms_receive`, `ble_advertisement`, `nfc_tag`, `camera_frame`, `biometric`, `audio_input`, `media_action`, `dark_mode`, `locale`, `font_scale`, `orientation`, `clipboard`).
 
-- Parâmetros: nenhum
+- Parâmetros: `accuracy, action, address, airplane_mode, altitude, bearing, bytes_hex, call_state, camera_id, carrier_name, charging, command, enabled, enrolled, format, hardware_present, height, id_hex, label, latitude, level, locale, longitude, metered, name, network_type, online, orientation, outcome, payload_hex, pcm_hex, persist, plugged, power_save_mode, roaming, route, rssi, scale, seek_ms, sender, sensor, sensor_type, sim_state, speed, step_route, temperature_tenths_c, text, transport, uri, values, width`
 
 ### `behavior_switches`
 
